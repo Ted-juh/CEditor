@@ -4423,6 +4423,12 @@
     outline: none;
     z-index: 4;
   }
+  /* .control-content is click-through so the wrapper owns editor selection.
+     In preview these native fields must take the pointer themselves. */
+  .canvas-control.preview-interactive .canvas-listbox-filter,
+  .canvas-control.preview-interactive .canvas-text-input {
+    pointer-events: auto;
+  }
   .canvas-listbox-filter:focus-visible { border-color: #5B9BD5; }
 
   .control-content {

@@ -196,10 +196,10 @@ test('the dock toggle is labelled and says what is in there', () => {
   assert.match(toggles, /aria-pressed=/, 'and the toggles report their state');
 });
 
-test('an action opens the dock on the tab it implies, and tells the parent', () => {
+test('an action opens the implied dock tab and clears stale colour and gradient targets', () => {
   assert.match(source.displayPanel, /function openTabForAction\(tabId\)/);
-  assert.match(source.displayPanel, /openTabForAction\(impliedDockTab\(\{ colorTarget: t/);
-  assert.match(source.displayPanel, /openTabForAction\(impliedDockTab\(\{ gradientTarget: t/);
+  assert.match(source.displayPanel, /handleTabClick\(impliedDockTab\(\{ colorTarget: t/);
+  assert.match(source.displayPanel, /handleTabClick\(impliedDockTab\(\{ gradientTarget: t/);
   assert.match(source.displayPanel, /impliedDockTab\(\{ tabRequest: req/);
 });
 
@@ -261,6 +261,7 @@ test('cancelling a deferred colour mode refuses to commit rather than reverting 
 test('the gradient half got the same exit', () => {
   assert.match(source.displayPanel, /class="context-cancel"[\s\S]{0,140}onclick=\{handleGradientCancel\}/);
   const cancel = source.displayPanel.match(/function handleGradientCancel\(\)[\s\S]*?\n  \}\n/)?.[0] ?? '';
-  assert.match(cancel, /_initialGradient/);
+  assert.match(cancel, /gradientTargetDirty && target\._initialGradient/,
+    'an untouched gradient Cancel must not create a control patch or undo entry');
   assert.match(cancel, /applyGradientToTarget\(/);
 });

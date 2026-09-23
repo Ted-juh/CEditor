@@ -142,10 +142,10 @@ test('the device profile designer clears its stack through that form', () => {
 test('an abandoned notepad colour pick commits, exactly as a gradient stop edit does', () => {
   const s = src('CE_Application/panels/DisplayPanel.svelte');
   assert.match(s, /function commitNotepadPick\(\)/);
-  // Three callers: the explicit Back button, tab-away, and dock-close. Before this, tab-away and
-  // dock-close threw the pick away while the neighbouring stop edit committed.
+  // Four callers: the explicit Back button, tab-away, dock-close, and a new property-colour target.
+  // Before this, tab-away and dock-close threw the pick away while the neighbouring stop edit committed.
   const calls = s.match(/commitNotepadPick\(\)/g) ?? [];
-  assert.equal(calls.length, 4, 'one definition plus three call sites');
+  assert.equal(calls.length, 5, 'one definition plus four call sites');
   assert.ok(
     !/Leaving colors without going back — discard the pick/.test(s),
     'the discarding branch must be gone, not merely bypassed',

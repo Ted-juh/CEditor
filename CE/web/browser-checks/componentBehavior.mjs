@@ -139,7 +139,10 @@ try {
     };
     await verify();await reopen(id);await verify();await tab('Behavior');await toggle('Editable');await toggle('Focusable');
     await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();
-    const input=node(id).locator('input');await input.fill('Changed');await input.press('Enter');await settle();
+    const input=node(id).locator('input');
+    await input.click();
+    assert.equal(await input.evaluate(e=>document.activeElement===e),true,'a pointer click focuses the editable text field');
+    await input.press('ControlOrMeta+A');await page.keyboard.type('Changed');await input.press('Enter');await settle();
     let output=await page.evaluate(()=>window.__behaviorMidi.filter(x=>x.name==='setDeviceParameter'));
     assert.equal(output.length,1,'Enter must commit once, not again on blur');assert.equal(output[0].payload.value,'Changed');
     await input.fill('Cancelled');await input.press('Escape');await settle();assert.equal(await input.inputValue(),'Changed');
@@ -432,7 +435,7 @@ try {
   await check('Listbox search field accepts ordinary keyboard editing without selecting rows',async()=>{
     const rows=['Alpha','Beta','Betamax'].map((displayText,i)=>({id:String(i),internalValue:displayText,displayText,enabled:true}));
     const id=await fixture('Listbox',{Value:{rows},Listbox:{filterBox:true,typeAhead:'prefix'},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'selectedChoice',deviceRole:'mainSynth',parameterId:'patchName',dryRun:true}]}});
-    await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();const input=node(id).locator('input.canvas-listbox-filter');await input.focus();await page.keyboard.type('beta');await settle();assert.equal(await input.inputValue(),'beta');assert.deepEqual(await node(id).locator('.lb-label').allTextContents(),['Beta','Betamax']);
+    await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();const input=node(id).locator('input.canvas-listbox-filter');await input.click();assert.equal(await input.evaluate(e=>document.activeElement===e),true,'pointer click focuses the filter');await page.keyboard.type('beta');await settle();assert.equal(await input.inputValue(),'beta');assert.deepEqual(await node(id).locator('.lb-label').allTextContents(),['Beta','Betamax']);
     assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').length),0,'searching is not a committed selection');
   });
   await check('Momentary pointer cancellation stops repeat output immediately',async()=>{
@@ -933,6 +936,7 @@ try {
       await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();
       const css=await field().evaluate(e=>{const s=getComputedStyle(e);return{font:s.fontFamily,size:s.fontSize,weight:s.fontWeight,style:s.fontStyle,letter:s.letterSpacing,word:s.wordSpacing,transform:s.textTransform,decoration:s.textDecorationLine,align:s.textAlign,colour:s.color,padding:s.padding};});
       assert.deepEqual(css,{font:'Georgia',size:'24px',weight:'700',style:'italic',letter:'3px',word:'5px',transform:'uppercase',decoration:'underline',align:'right',colour:'rgb(0, 255, 0)',padding:'0px'});
+      await field().click();assert.equal(await field().evaluate(e=>document.activeElement===e),true,'click reaches the native input');
       await field().fill('New patch');await field().press('Enter');await settle();assert.equal(await field().inputValue(),'New patch','case styling does not rewrite the committed text');assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),'New patch');
       await field().fill('');await field().press('Enter');await settle();assert.equal(await field().getAttribute('placeholder'),'Name here');assert.equal(await field().evaluate(e=>e.matches(':placeholder-shown')),true);
     };await verify();await reopen(id);await verify();

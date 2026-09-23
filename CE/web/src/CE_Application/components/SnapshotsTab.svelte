@@ -45,6 +45,21 @@
   // Locks are per session rather than saved: they are "leave this alone while I roll the dice",
   // which is a state of mind for the next thirty seconds, not a property of the panel.
   let locked = $state(new Set());
+  let selectedRandomScope = $derived(groups.includes(randomScope) ? randomScope : '');
+  let lastPanelId = null;
+  $effect(() => {
+    const panelId = $activePanel?.id ?? null;
+    if (panelId === lastPanelId) return;
+    lastPanelId = panelId;
+    morphFrom = '';
+    morphTo_ = '';
+    morphPosition = 0;
+    morphDeferred = 0;
+    comparison = null;
+    randomScope = '';
+    locked = new Set();
+    captureNotice = '';
+  });
 
   function doCapture() {
     const snapshot = captureSnapshot({ name: newName.trim() || `Snapshot ${snapshots.length + 1}` });
@@ -82,7 +97,7 @@
     const result = randomizeValues(parameters, {
       mode: randomMode,
       locked,
-      groups: randomMode === RANDOMIZE_MODE.scoped && randomScope ? [randomScope] : null,
+      groups: randomMode === RANDOMIZE_MODE.scoped ? [selectedRandomScope].filter(Boolean) : null,
       current: readPanelValues(panel, parameters),
       random: randomSeed.trim() ? seededRandom(Number(randomSeed.trim())) : Math.random,
     });
@@ -229,7 +244,7 @@
           </select>
         {/if}
         <input class="field seed" placeholder="seed (optional)" bind:value={randomSeed} />
-        <button class="btn primary" onclick={doRandomize}>Roll</button>
+        <button class="btn primary" disabled={randomMode === RANDOMIZE_MODE.scoped && !selectedRandomScope} onclick={doRandomize}>Roll</button>
       </div>
       <p class="note">
         Only ever writes values the profile says are legal, and takes an undo snapshot first.
@@ -276,6 +291,7 @@
   }
   .btn:hover { background: #454E57; color: #FFF; }
   .btn.primary { background: #3A5A80; border-color: #4A72A0; color: #FFF; }
+  .btn:disabled { opacity: 0.45; cursor: default; }
   .btn.icon { padding: 3px 6px; }
 
   .seg { display: inline-flex; border: 1px solid #3A3A3A; border-radius: 4px; overflow: hidden; }

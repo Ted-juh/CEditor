@@ -242,10 +242,18 @@
   let colorTargetDirty = false;
   $effect(() => {
     syncExternalTarget($colorTarget, colorTargetGuard, (t) => !!t._initialColor, (t) => {
+      // A property swatch can be opened while a stop or notepad colour is
+      // being picked. Finish that deferred edit before replacing its colour.
+      if (editingGradientStop !== null) {
+        commitStopColor();
+        editingGradientStop = null;
+        editingGradientStopDestination = null;
+      }
+      commitNotepadPick();
+      handleTabClick(impliedDockTab({ colorTarget: t, lastTab: activeTab }));
       colorTargetDirty = false;
       userPickedColor = t._initialColor;
       userPickedAlpha = t._initialAlpha ?? 1;
-      openTabForAction(impliedDockTab({ colorTarget: t, lastTab: activeTab }));
     });
   });
   // Drag quantisation for the colour bands. 0 = smooth (no design tool ships
@@ -364,10 +372,12 @@
 
   // --- Gradient target: sync from external control gradient ---
   const gradTargetGuard = { current: null };
+  let gradientTargetDirty = false;
   $effect(() => {
     syncExternalTarget($gradientTarget, gradTargetGuard, (t) => !!t._initialGradient, (t) => {
+      handleTabClick(impliedDockTab({ gradientTarget: t, lastTab: activeTab }));
+      gradientTargetDirty = false;
       currentGradient = deepClone(t._initialGradient);
-      openTabForAction(impliedDockTab({ gradientTarget: t, lastTab: activeTab }));
     });
   });
 
@@ -382,7 +392,7 @@
     const id = t ? `${t.kind}:${t.controlId}:${t.domain ?? ''}` : null;
     if (id && id !== lastEditorTargetId) {
       lastEditorTargetId = id;
-      openTabForAction(impliedDockTab({ editorTarget: t, lastTab: activeTab }));
+      handleTabClick(impliedDockTab({ editorTarget: t, lastTab: activeTab }));
     }
     if (!t) lastEditorTargetId = null;
   });
@@ -517,7 +527,10 @@
   function handleGradientChange(newGradient) {
     currentGradient = newGradient;
     // Route to gradient target if active (e.g. border gradient)
-    if ($gradientTarget && applyGradientToTarget(newGradient)) return;
+    if ($gradientTarget && applyGradientToTarget(newGradient)) {
+      gradientTargetDirty = true;
+      return;
+    }
     // Default: write to panel bgGradient
     const panel = $activePanel;
     if (panel) {
@@ -540,12 +553,16 @@
   function commitStopColor() {
     if (editingGradientStop === null) return;
     if (editingGradientStopDestination !== gradientDestinationIdentity()) return;
+    if (currentGradient.stops[editingGradientStop]?.color === userPickedColor) return;
     const newStops = currentGradient.stops.map((s, i) =>
       i === editingGradientStop ? { ...s, color: userPickedColor } : s
     );
     currentGradient = { ...currentGradient, stops: newStops };
     // Route to gradient target if active
-    if ($gradientTarget && applyGradientToTarget(currentGradient)) return;
+    if ($gradientTarget && applyGradientToTarget(currentGradient)) {
+      gradientTargetDirty = true;
+      return;
+    }
     // Default: persist to panel store
     const panel = $activePanel;
     if (panel) {
@@ -663,7 +680,10 @@
   let hadGradientTarget = false;
   $effect(() => {
     const t = $gradientTarget;
-    if (!t && hadGradientTarget) resetGradientFromPanel();
+    if (!t && hadGradientTarget) {
+      gradientTargetDirty = false;
+      resetGradientFromPanel();
+    }
     hadGradientTarget = !!t;
   });
 
@@ -791,10 +811,11 @@
   function handleGradientCancel() {
     const target = $gradientTarget;
     if (!target) return;
-    if (target._initialGradient) {
+    if (gradientTargetDirty && target._initialGradient) {
       currentGradient = deepClone(target._initialGradient);
       applyGradientToTarget(currentGradient);
     }
+    gradientTargetDirty = false;
     clearGradientTarget();
     resetGradientFromPanel();
   }

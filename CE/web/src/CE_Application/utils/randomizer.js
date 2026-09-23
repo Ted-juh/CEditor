@@ -89,6 +89,15 @@ export function randomizeValues(parameters, {
   const lockedIds = locked instanceof Set ? locked : new Set(locked ?? []);
   const wantedGroups = groups instanceof Set ? groups : (Array.isArray(groups) ? new Set(groups) : null);
 
+  if (mode === RANDOMIZE_MODE.scoped && !wantedGroups?.size) {
+    return {
+      values: {},
+      changed: 0,
+      skipped: { locked: [], outOfScope: [], notRandomizable: [] },
+      reason: 'Choose a group before randomising its parameters.',
+    };
+  }
+
   const values = {};
   const skipped = { locked: [], outOfScope: [], notRandomizable: [] };
 

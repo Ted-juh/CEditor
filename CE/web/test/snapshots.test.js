@@ -262,6 +262,11 @@ test('a scoped run only touches its groups', () => {
   const grouped = [{ ...cutoff, group: 'Filter' }, { ...wave, group: 'OSC' }];
   const { values } = randomizeValues(grouped, { mode: RANDOMIZE_MODE.scoped, groups: ['Filter'] });
   assert.deepEqual(Object.keys(values), ['k.value']);
+  for (const groups of [null, [], new Set()]) {
+    const result = randomizeValues(grouped, { mode: RANDOMIZE_MODE.scoped, groups });
+    assert.deepEqual(result.values, {}, 'a missing scope must not randomise the whole panel');
+    assert.match(result.reason, /choose a group/i);
+  }
 });
 
 test('a run that changes nothing says why, rather than shrugging', () => {
