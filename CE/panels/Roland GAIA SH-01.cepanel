@@ -16072,8 +16072,8 @@
                           "controlType": "TabContainer"
                         },
                         "Transform": {
-                          "x": 151.9234449760765,
-                          "width": 164,
+                          "x": 100.78468899521533,
+                          "width": 205.43540669856458,
                           "height": 229
                         },
                         "Background": {
@@ -16124,7 +16124,7 @@
                                 "Transform": {
                                   "x": 8,
                                   "y": 124,
-                                  "width": 148,
+                                  "width": 189.43540669856458,
                                   "height": 80
                                 },
                                 "Background": {
@@ -16211,7 +16211,7 @@
                                   "controlType": "CustomComponent"
                                 },
                                 "Transform": {
-                                  "x": 11.253588516746504,
+                                  "x": 62.39234449760767,
                                   "y": 124,
                                   "width": 28.13397129186603,
                                   "height": 80,
@@ -17448,7 +17448,7 @@
                                   "controlType": "CustomComponent"
                                 },
                                 "Transform": {
-                                  "x": 58.14354066985652,
+                                  "x": 109.28229665071768,
                                   "y": 124,
                                   "width": 28.13397129186603,
                                   "height": 80,
@@ -18684,6 +18684,7 @@
                                   "controlType": "Label"
                                 },
                                 "Transform": {
+                                  "x": 51.13875598086116,
                                   "y": 207,
                                   "width": 46.889952153110045,
                                   "height": 22
@@ -18736,7 +18737,7 @@
                                   "controlType": "Label"
                                 },
                                 "Transform": {
-                                  "x": 46.88995215311013,
+                                  "x": 98.02870813397129,
                                   "y": 207,
                                   "width": 46.889952153110045,
                                   "height": 22
@@ -68020,8 +68021,8 @@
                           "controlType": "TabContainer"
                         },
                         "Transform": {
-                          "x": 151.9234449760765,
-                          "width": 164,
+                          "x": 100.78468899521533,
+                          "width": 205.43540669856458,
                           "height": 229
                         },
                         "Background": {
@@ -68072,7 +68073,7 @@
                                 "Transform": {
                                   "x": 8,
                                   "y": 124,
-                                  "width": 148,
+                                  "width": 189.43540669856458,
                                   "height": 80
                                 },
                                 "Background": {
@@ -68159,7 +68160,7 @@
                                   "controlType": "CustomComponent"
                                 },
                                 "Transform": {
-                                  "x": 11.253588516746504,
+                                  "x": 62.39234449760767,
                                   "y": 124,
                                   "width": 28.13397129186603,
                                   "height": 80,
@@ -69396,7 +69397,7 @@
                                   "controlType": "CustomComponent"
                                 },
                                 "Transform": {
-                                  "x": 58.14354066985652,
+                                  "x": 109.28229665071768,
                                   "y": 124,
                                   "width": 28.13397129186603,
                                   "height": 80,
@@ -70632,6 +70633,7 @@
                                   "controlType": "Label"
                                 },
                                 "Transform": {
+                                  "x": 51.13875598086116,
                                   "y": 207,
                                   "width": 46.889952153110045,
                                   "height": 22
@@ -70684,7 +70686,7 @@
                                   "controlType": "Label"
                                 },
                                 "Transform": {
-                                  "x": 46.88995215311013,
+                                  "x": 98.02870813397129,
                                   "y": 207,
                                   "width": 46.889952153110045,
                                   "height": 22
@@ -119264,8 +119266,8 @@
                           "controlType": "TabContainer"
                         },
                         "Transform": {
-                          "x": 151.9234449760765,
-                          "width": 164,
+                          "x": 100.78468899521533,
+                          "width": 205.43540669856458,
                           "height": 229
                         },
                         "Background": {
@@ -119316,7 +119318,7 @@
                                 "Transform": {
                                   "x": 8,
                                   "y": 124,
-                                  "width": 148,
+                                  "width": 189.43540669856458,
                                   "height": 80
                                 },
                                 "Background": {
@@ -119403,7 +119405,7 @@
                                   "controlType": "CustomComponent"
                                 },
                                 "Transform": {
-                                  "x": 11.253588516746504,
+                                  "x": 62.39234449760767,
                                   "y": 124,
                                   "width": 28.13397129186603,
                                   "height": 80,
@@ -120640,7 +120642,7 @@
                                   "controlType": "CustomComponent"
                                 },
                                 "Transform": {
-                                  "x": 58.14354066985652,
+                                  "x": 109.28229665071768,
                                   "y": 124,
                                   "width": 28.13397129186603,
                                   "height": 80,
@@ -121876,6 +121878,7 @@
                                   "controlType": "Label"
                                 },
                                 "Transform": {
+                                  "x": 51.13875598086116,
                                   "y": 207,
                                   "width": 46.889952153110045,
                                   "height": 22
@@ -121928,7 +121931,7 @@
                                   "controlType": "Label"
                                 },
                                 "Transform": {
-                                  "x": 46.88995215311013,
+                                  "x": 98.02870813397129,
                                   "y": 207,
                                   "width": 46.889952153110045,
                                   "height": 22

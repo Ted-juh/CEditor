@@ -54,3 +54,38 @@ export function applyEnvelopeViews(panel) {
   }
   return panel;
 }
+
+/**
+ * Centre the OSC pitch-envelope graph in the gap it shares with the faders around it.
+ *
+ * The pitch envelope has two stages, so its view is sized by a floor (164px) rather than by what
+ * sits beside it, and its graph ended 9px short of ENV DEPTH while starting 70px after PW — plainly
+ * off-centre, and narrower than the FILTER and AMP graphs. The graph now spans from PW to ENV DEPTH
+ * with the row's own fader gap on both sides (PWM to PW), and the view is widened to hold it. The
+ * A and D faders keep their panel positions. Derived from the neighbours every time, so a second
+ * run changes nothing.
+ */
+export function alignPitchEnvelopeGraphs(panel) {
+  const all = flatControls(panel.controls);
+  const named = (name) => all.find((c) => c._children.Core.name === name);
+  for (const tone of [1, 2, 3]) {
+    const view = named(`tone${tone}.osc.pitchEnv.view`);
+    const pwm = named(`tone${tone}.osc.pulseWidthModDepth`)?._children.Transform;
+    const pw = named(`tone${tone}.osc.pulseWidth`)?._children.Transform;
+    const depth = named(`tone${tone}.osc.pitchEnvDepth`)?._children.Transform;
+    if (!view || !pwm || !pw || !depth) throw new Error(`alignPitchEnvelopeGraphs: tone ${tone} OSC row is incomplete`);
+    const kids = Object.values(view._children.Children._children);
+    const graph = kids.find((c) => c._children.Envelope);
+    const gap = pw.x - (pwm.x + pwm.width);
+    const left = pw.x + pw.width + gap;
+    const right = depth.x - gap;
+    const inset = 8;                                   // the view's own margin round its graph
+    const v = view._children.Transform;
+    const newX = left - inset;
+    for (const child of kids) child._children.Transform.x += v.x - newX;   // same place on the panel
+    v.x = newX;
+    v.width = right - left + inset * 2;
+    Object.assign(graph._children.Transform, { x: inset, width: right - left });
+  }
+  return panel;
+}
