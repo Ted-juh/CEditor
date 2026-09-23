@@ -16152,14 +16152,14 @@
                                     },
                                     {
                                       "id": "attack",
-                                      "x": 0.1,
+                                      "x": 0,
                                       "y": 1,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "decay",
-                                      "x": 0.2,
+                                      "x": 0.1,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
@@ -28246,28 +28246,28 @@
                                     },
                                     {
                                       "id": "attack",
-                                      "x": 0.075,
+                                      "x": 0,
                                       "y": 1,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "decay",
-                                      "x": 0.15,
+                                      "x": 0.075,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "sustain",
-                                      "x": 0.3,
+                                      "x": 0.22499999999999998,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "release",
-                                      "x": 0.375,
+                                      "x": 0.3,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
@@ -40936,28 +40936,28 @@
                                     },
                                     {
                                       "id": "attack",
-                                      "x": 0.075,
+                                      "x": 0,
                                       "y": 1,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "decay",
-                                      "x": 0.15,
+                                      "x": 0.075,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "sustain",
-                                      "x": 0.3,
+                                      "x": 0.22499999999999998,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "release",
-                                      "x": 0.375,
+                                      "x": 0.3,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
@@ -68101,14 +68101,14 @@
                                     },
                                     {
                                       "id": "attack",
-                                      "x": 0.1,
+                                      "x": 0,
                                       "y": 1,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "decay",
-                                      "x": 0.2,
+                                      "x": 0.1,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
@@ -79491,28 +79491,28 @@
                                     },
                                     {
                                       "id": "attack",
-                                      "x": 0.075,
+                                      "x": 0,
                                       "y": 1,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "decay",
-                                      "x": 0.15,
+                                      "x": 0.075,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "sustain",
-                                      "x": 0.3,
+                                      "x": 0.22499999999999998,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "release",
-                                      "x": 0.375,
+                                      "x": 0.3,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
@@ -92181,28 +92181,28 @@
                                     },
                                     {
                                       "id": "attack",
-                                      "x": 0.075,
+                                      "x": 0,
                                       "y": 1,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "decay",
-                                      "x": 0.15,
+                                      "x": 0.075,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "sustain",
-                                      "x": 0.3,
+                                      "x": 0.22499999999999998,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "release",
-                                      "x": 0.375,
+                                      "x": 0.3,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
@@ -119346,14 +119346,14 @@
                                     },
                                     {
                                       "id": "attack",
-                                      "x": 0.1,
+                                      "x": 0,
                                       "y": 1,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "decay",
-                                      "x": 0.2,
+                                      "x": 0.1,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
@@ -130736,28 +130736,28 @@
                                     },
                                     {
                                       "id": "attack",
-                                      "x": 0.075,
+                                      "x": 0,
                                       "y": 1,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "decay",
-                                      "x": 0.15,
+                                      "x": 0.075,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "sustain",
-                                      "x": 0.3,
+                                      "x": 0.22499999999999998,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "release",
-                                      "x": 0.375,
+                                      "x": 0.3,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
@@ -143426,28 +143426,28 @@
                                     },
                                     {
                                       "id": "attack",
-                                      "x": 0.075,
+                                      "x": 0,
                                       "y": 1,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "decay",
-                                      "x": 0.15,
+                                      "x": 0.075,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "sustain",
-                                      "x": 0.3,
+                                      "x": 0.22499999999999998,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0
                                     },
                                     {
                                       "id": "release",
-                                      "x": 0.375,
+                                      "x": 0.3,
                                       "y": 0,
                                       "curve": "linear",
                                       "tension": 0

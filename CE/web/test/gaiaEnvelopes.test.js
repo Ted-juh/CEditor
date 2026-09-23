@@ -58,7 +58,10 @@ test('stage mapping spans every parameter independently, including all-zero/all-
     const stages=linkedEnvelopeStages(graph), values=Object.fromEntries(stages.map(s=>[s,v]));
     const points=linkedEnvelopePoints(graph,values);
     assert.equal(points.length,stages.length+1);
-    points.forEach((p,i)=>{assert.ok(p.x>=0 && p.x<=1+1e-12);assert.ok(p.y>=0&&p.y<=1);if(i)assert.ok(p.x>points[i-1].x,'even zero values remain selectable');});
+    // Every HANDLE stays apart, so even zero values remain selectable. The origin is not a handle:
+    // an attack of 0 is instant and sits straight above it.
+    points.forEach((p,i)=>{assert.ok(p.x>=0 && p.x<=1+1e-12);assert.ok(p.y>=0&&p.y<=1);if(i>1)assert.ok(p.x>points[i-1].x,'even zero values remain selectable');});
+    assert.equal(points[1].x>points[0].x,v>0,'attack is vertical exactly when its time is zero');
     const cfg=graph._children.Envelope.stageSources;
     assert.equal(points[1].y,1,'peak is fixed');
     assert.equal(points.at(-1).y,0,'end is fixed');

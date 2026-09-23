@@ -43,7 +43,10 @@ export function linkedEnvelopePoints(control, values = {}, holdDuration = undefi
   };
   const adsr = !!cfg.sustain && !!cfg.release;
   const gap = adsr ? .075 : .1, span = adsr ? .175 : .35;
-  const a = gap + span * fraction('attack'), d = a + gap + span * fraction('decay');
+  // Attack starts at the origin with NO gap: an attack of 0 is instant, and instant is straight up.
+  // Every later stage keeps its gap so two handles can never coincide (decay 0 with sustain at the
+  // top would put D exactly on A). The origin is not a handle, so attack needs no such guard.
+  const a = span * fraction('attack'), d = a + gap + span * fraction('decay');
   const p = (id,x,y) => ({id,x,y,curve:'linear',tension:0});
   if (!adsr) return [p('start',0,0),p('attack',a,1),p('decay',d,0)];
   const s = fraction('sustain'), hold = d + linkedEnvelopeHold(holdDuration ?? control._children.Envelope.holdPreview);
