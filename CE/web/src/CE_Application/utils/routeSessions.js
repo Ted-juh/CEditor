@@ -40,9 +40,9 @@ const controlIdOf = (control) => String(control?._children?.Core?.id ?? '');
  * should still move something. A route that silently did nothing would be indistinguishable from a
  * route that was never made.
  */
-export function specForEndpoint(panel, endpoint) {
+export function specForEndpoint(panel, endpoint, controlsById = null) {
   if (!endpoint || endpoint.kind === 'device') return null;
-  const control = controlMapOf(panel).get(String(endpoint.controlId));
+  const control = (controlsById ?? controlMapOf(panel)).get(String(endpoint.controlId));
   if (!control) return null;
 
   const channel = control?._children?.ValueChannels?._children?.[endpoint.port];
@@ -149,7 +149,10 @@ export function applyPanelValueRoutes(panel, sessions = {}) {
   const routes = panelRoutes(panel);
   if (!routes.length) return sessions;
 
-  const specs = (endpoint) => specForEndpoint(panel, endpoint);
+  // A route settle may ask for endpoint specs repeatedly across passes. Build
+  // the control tree index once instead of flattening it for every lookup.
+  const controlsById = controlMapOf(panel);
+  const specs = (endpoint) => specForEndpoint(panel, endpoint, controlsById);
   let next = sessions ?? {};
   // The base each target is evaluated against, fixed for the whole settle. Read once per target
   // rather than per pass, because a pass writes the target and the next pass would then read its own
