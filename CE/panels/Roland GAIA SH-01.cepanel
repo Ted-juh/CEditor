@@ -6320,13 +6320,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 51,
+                                  "x": 21.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -18906,13 +18906,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 51,
+                                  "x": 21.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -33443,13 +33443,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 63,
+                                  "x": 33.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -45969,13 +45969,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 51,
+                                  "x": 21.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -48907,13 +48907,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 72,
+                                  "x": 42.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -57776,13 +57776,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 51,
+                                  "x": 21.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -70362,13 +70362,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 51,
+                                  "x": 21.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -84195,13 +84195,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 63,
+                                  "x": 33.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -96721,13 +96721,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 51,
+                                  "x": 21.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -99659,13 +99659,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 72,
+                                  "x": 42.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -108528,13 +108528,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 51,
+                                  "x": 21.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -121114,13 +121114,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 51,
+                                  "x": 21.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -134947,13 +134947,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 63,
+                                  "x": 33.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -147473,13 +147473,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 51,
+                                  "x": 21.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -150411,13 +150411,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 72,
+                                  "x": 42.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -159272,13 +159272,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 99,
+                                  "x": 69.14285714285714,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -163940,13 +163940,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 72,
+                                  "x": 42.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -168607,13 +168607,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 54,
+                                  "x": 24.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -173112,13 +173112,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 63,
+                                  "x": 33.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -177455,13 +177455,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 153,
+                                  "x": 123.14285714285714,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -180343,13 +180343,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 54,
+                                  "x": 24.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -198800,13 +198800,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 81,
+                                  "x": 51.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -202608,13 +202608,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 135,
+                                  "x": 105.14285714285714,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -203749,13 +203749,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 108,
+                                  "x": 78.14285714285714,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -204738,13 +204738,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 51,
+                                  "x": 21.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -206135,13 +206135,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 171,
+                                  "x": 141.14285714285714,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -207142,13 +207142,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 225,
+                                  "x": 195.14285714285714,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",
@@ -214907,13 +214907,13 @@
                             },
                             "slant": {
                               "name": "slant",
-                              "kind": "rightTriangle",
+                              "kind": "parallelogram",
                               "zIndex": 1,
                               "_children": {
                                 "Layout": {
-                                  "x": 63,
+                                  "x": 33.142857142857146,
                                   "y": 0,
-                                  "width": 13,
+                                  "width": 42.857142857142854,
                                   "height": 20,
                                   "xUnit": "px",
                                   "yUnit": "px",

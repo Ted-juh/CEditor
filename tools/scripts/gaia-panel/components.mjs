@@ -22,6 +22,7 @@ import {
 } from '../../../CE/web/src/CE_Application/utils/customComponentFactory.js';
 import { createControl } from '../../../CE/web/src/CE_Application/models/componentTypes.js';
 import { SECTION_DEFAULTS } from '../../../CE/web/src/CE_Application/models/sectionDefaults.js';
+import { SHAPE_POLYGONS } from '../../../CE/web/src/CE_Application/utils/shapeGeometry.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -200,11 +201,18 @@ function component({
  */
 export function gaiaSectionTab({ title, width, height = 20, tint }) {
   const corner = 5;
-  // The SH-01 prints its section names in a tab whose right end is cut on a slant, running down
-  // and out to the right. A right triangle carries that slope and the body stops where it starts,
-  // inside the tab's own width, so nothing that places or sizes the tab has to know about it.
+  // The SH-01 prints its section names in a tab whose right end is cut on a slant: the top edge
+  // runs further right than the bottom one. Inside the tab's own width, so nothing that places or
+  // sizes the tab has to know about it — the body's bottom edge stops `slant` short of the end.
+  //
+  // The shape library has one right triangle, and it leans the other way; parts cannot be
+  // mirrored. A parallelogram's RIGHT edge has exactly this lean, so one is laid over the body's
+  // end with its left edge hidden underneath, sized from the library's own skew so the visible
+  // edge runs `slant` across.
   const slant = Math.round(height * 0.6);
   const bodyWidth = width - slant;
+  const skew = SHAPE_POLYGONS.parallelogram[0][0];
+  const slantWidth = slant / skew;
   const titlePart = text('title', title, {
     x: 0, y: 1, width, height: height - 2,
   }, { size: 11, colour: 'FF13161A', align: 'left' });
@@ -223,8 +231,8 @@ export function gaiaSectionTab({ title, width, height = 20, tint }) {
       topRight: rect('topRight', { x: bodyWidth - corner, y: 0, width: corner, height: corner }, tint, { zIndex: 1 }),
       // Both lower corners meet the section interior at 90 degrees.
       bottom: rect('bottom', { x: 0, y: height - corner, width: bodyWidth, height: corner }, tint, { zIndex: 1 }),
-      // The slanted end. One pixel under the body, so no hairline shows where the two meet.
-      slant: rect('slant', { x: bodyWidth - 1, y: 0, width: slant + 1, height }, tint, { zIndex: 1, kind: 'rightTriangle' }),
+      // The slanted end: bottom-right corner at the body's end, top-right corner `slant` beyond it.
+      slant: rect('slant', { x: width - slantWidth, y: 0, width: slantWidth, height }, tint, { zIndex: 1, kind: 'parallelogram' }),
       title: titlePart,
     },
     // Pure chrome: unlike a knob or selector, a section tab must not publish a phantom automation
