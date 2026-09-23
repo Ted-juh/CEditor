@@ -53,7 +53,7 @@ function radial(centerX, centerY, stops, { radiusX = 60, radiusY = 60 } = {}) {
 /** A filled rectangle part. `radius: 0` is what keeps a fader cap square. */
 function rect(name, { x, y, width, height }, colour, {
   zIndex = 0, radius = 0, borderColour = '00000000', borderThickness = 0, opacity = 1, gradient = null,
-  pivotX = null, pivotY = null,
+  pivotX = null, pivotY = null, kind = 'rectangle',
 } = {}) {
   const background = clone(SECTION_DEFAULTS.Background);
   background._children.Fill.colour = colour;
@@ -69,6 +69,8 @@ function rect(name, { x, y, width, height }, colour, {
 
   return createPartNode(name, {
     role: 'custom',
+    // A polygon kind (utils/shapeGeometry.js) draws the same fill as an SVG shape instead of a box.
+    kind,
     zIndex,
     opacity,
     layout: {
@@ -198,6 +200,11 @@ function component({
  */
 export function gaiaSectionTab({ title, width, height = 20, tint }) {
   const corner = 5;
+  // The SH-01 prints its section names in a tab whose right end is cut on a slant, running down
+  // and out to the right. A right triangle carries that slope and the body stops where it starts,
+  // inside the tab's own width, so nothing that places or sizes the tab has to know about it.
+  const slant = Math.round(height * 0.6);
+  const bodyWidth = width - slant;
   const titlePart = text('title', title, {
     x: 0, y: 1, width, height: height - 2,
   }, { size: 11, colour: 'FF13161A', align: 'left' });
@@ -210,11 +217,14 @@ export function gaiaSectionTab({ title, width, height = 20, tint }) {
     width,
     height,
     parts: {
-      body: rect('body', { x: 0, y: 0, width, height }, tint, { zIndex: 0, radius: corner }),
-      // Square the inner end of the top edge while preserving the outside top-left curve.
-      topRight: rect('topRight', { x: width - corner, y: 0, width: corner, height: corner }, tint, { zIndex: 1 }),
+      body: rect('body', { x: 0, y: 0, width: bodyWidth, height }, tint, { zIndex: 0, radius: corner }),
+      // Square the inner end of the top edge, where the slant begins, while preserving the outside
+      // top-left curve.
+      topRight: rect('topRight', { x: bodyWidth - corner, y: 0, width: corner, height: corner }, tint, { zIndex: 1 }),
       // Both lower corners meet the section interior at 90 degrees.
-      bottom: rect('bottom', { x: 0, y: height - corner, width, height: corner }, tint, { zIndex: 1 }),
+      bottom: rect('bottom', { x: 0, y: height - corner, width: bodyWidth, height: corner }, tint, { zIndex: 1 }),
+      // The slanted end. One pixel under the body, so no hairline shows where the two meet.
+      slant: rect('slant', { x: bodyWidth - 1, y: 0, width: slant + 1, height }, tint, { zIndex: 1, kind: 'rightTriangle' }),
       title: titlePart,
     },
     // Pure chrome: unlike a knob or selector, a section tab must not publish a phantom automation
