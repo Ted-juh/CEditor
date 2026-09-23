@@ -32,6 +32,7 @@
   let groups = $derived([...new Set(parameters.map((p) => String(p.group ?? p.controlName ?? '')).filter(Boolean))].sort());
 
   let newName = $state('');
+  let captureNotice = $state('');
   let morphFrom = $state('');
   let morphTo_ = $state('');
   let morphPosition = $state(0);
@@ -47,7 +48,12 @@
 
   function doCapture() {
     const snapshot = captureSnapshot({ name: newName.trim() || `Snapshot ${snapshots.length + 1}` });
-    if (snapshot) newName = '';
+    if (snapshot) {
+      newName = '';
+      captureNotice = '';
+    } else {
+      captureNotice = 'Nothing to capture yet. Enter the main panel Preview mode and interact with a control, then try again.';
+    }
   }
 
   function driveMorph(position) {
@@ -118,6 +124,7 @@
         Records every parameter that has a value. A control nobody has touched is left out — a
         snapshot full of zeroes would recall the panel to zero rather than to where it was.
       </p>
+      {#if captureNotice}<p class="note" role="status">{captureNotice}</p>{/if}
     </section>
 
     <section class="block">

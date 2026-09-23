@@ -3,7 +3,7 @@
    * Display Panel — bottom dock with mini displays/tools.
    * Tabs for: Colors, Gradient, Notepad, Viewer, Tools, Console.
    */
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import AlignCenter from 'lucide-svelte/icons/align-center';
   import Cable from 'lucide-svelte/icons/cable';
   import Share2 from 'lucide-svelte/icons/share-2';
@@ -328,6 +328,38 @@
     const parsed = splitColourAlpha(panel.bgColour);
     userPickedColor = parsed.color;
     userPickedAlpha = parsed.alpha;
+  });
+
+  // Undo/redo replaces the active panel without changing its id. Keep the
+  // panel-background editors in step with those document changes. Compare the
+  // actual background fields so unrelated component edits do not reset a
+  // chooser or gradient that the user is currently working in.
+  let observedPanelId = null;
+  let observedBgColour;
+  let observedBgGradient;
+  $effect(() => {
+    const panel = $activePanel;
+    const panelId = panel?.id ?? null;
+    const bgColour = panel?.bgColour;
+    const bgGradient = panel?.bgGradient;
+    const panelChanged = panelId !== observedPanelId;
+    const colourChanged = bgColour !== observedBgColour;
+    const gradientChanged = bgGradient !== observedBgGradient;
+    observedPanelId = panelId;
+    observedBgColour = bgColour;
+    observedBgGradient = bgGradient;
+
+    if (!panel || panelChanged) return; // panel switching is handled above
+    untrack(() => {
+      if (colourChanged && !$colorTarget && editingGradientStop === null && !pickingNotepadColor) {
+        const parsed = splitColourAlpha(bgColour);
+        userPickedColor = parsed.color;
+        userPickedAlpha = parsed.alpha;
+      }
+      if (gradientChanged && !$gradientTarget && editingGradientStop === null) {
+        currentGradient = bgGradient ? deepClone(bgGradient) : deepClone(defaultGradient);
+      }
+    });
   });
 
   // --- Gradient target: sync from external control gradient ---
