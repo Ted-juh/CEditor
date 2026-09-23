@@ -46,20 +46,32 @@ test('a nested control takes its own pointer events back when it is interactive 
 test('and only then — the editor still wants an unselected child click to land on its container', () => {
   // A blanket re-enable would change selection behaviour on the canvas, which is a different
   // feature with its own expectations. Every pointer-events:auto in the file must be qualified
-  // by one of the three deliberate exceptions:
+  // by one of the four deliberate exceptions:
   //   - .preview-interactive — preview mode hands nested controls their events back;
   //   - .selected            — the drill-down: double-clicking a container selects the child
   //                            under the pointer, and a SELECTED child is directly draggable
   //                            (an unselected child still clicks through to its container);
-  //   - .inline-text-editor  — the in-place text editor must be typeable wherever it opens.
+  //   - .inline-text-editor  — the in-place text editor must be typeable wherever it opens;
+  //   - .scope-open          — once something INSIDE a container is selected, that container's
+  //                            other children are click targets too, so drilling to one knob and
+  //                            clicking the next selects it (stores/selectionScope.js). Outside
+  //                            such a container a click still lands on the container.
   const enabling = [...styles.matchAll(/([^{}]*)\{[^}]*pointer-events:\s*auto[^}]*\}/g)]
     .map((m) => m[1].trim());
   assert.ok(enabling.length > 0, 'expected at least the nested-child rule');
   for (const selector of enabling) {
-    assert.match(selector, /preview-interactive|\.selected|\.inline-text-editor/,
+    assert.match(selector, /preview-interactive|\.selected|\.inline-text-editor|\.scope-open/,
       `"${selector}" turns pointer events on for UNSELECTED children outside preview — that would `
       + 'break click-selects-the-container');
   }
+});
+
+test('an open scope reaches its direct children only', () => {
+  // A descendant selector would reach every grandchild as well, and a click inside a neighbouring
+  // section would land on its knob instead of on the section — skipping the level the Figma model
+  // keeps. The child combinator is the rule.
+  assert.match(styles, /\.children-origin\.scope-open\s*>\s*:global\(\.canvas-control\)\s*\{[^}]*pointer-events:\s*auto/,
+    'the open-scope rule is missing, or no longer limited to direct children');
 });
 
 test('the drill-down rule waits for the selection class the component actually applies', () => {
