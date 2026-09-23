@@ -52,7 +52,7 @@ export function applyEnvelopeButtons(panel) {
     Object.assign(shape._children.Transform, at);
     panel.controls.push(shape);
 
-    panel.controls.push(createControl('Button', {
+    const button = createControl('Button', {
       Core: { id, name, tooltip: 'Switch between envelope faders and graph.' },
       Transform: { ...at },
       Text: {
@@ -62,7 +62,15 @@ export function applyEnvelopeButtons(panel) {
       // Text centred on the tab's body, clear of the slant at its left end.
       ContentLayout: { paddingLeft: Math.round(TAB_HEIGHT * 0.6), paddingRight: 2, paddingTop: 0, paddingBottom: 0 },
       Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false, thickness: 0 }, Corners: { radius: 0 } } },
-    }));
+    });
+    // A Button's own hover, press and focus fill its BOX — a square over a slanted outline. The
+    // shape is the corner tab's, so the button's states leave the background alone and answer in
+    // the letters: brighter under the pointer, amber while pressed.
+    const states = button._children.States?._children ?? {};
+    if (states.Hover) states.Hover.patches.component = { 'Text.Fill.colour': 'FFFFFFFF' };
+    if (states.Pressed) states.Pressed.patches.component = { 'Text.Fill.colour': 'FFE2A52C', 'Transform.scale': 0.985 };
+    if (states.Focused) states.Focused.patches.component = {};
+    panel.controls.push(button);
     const pagePath = `${s.Core.id}.TabContainer.pageIndex`;
     panel.scripts.push(createScript({ id: `${id}_click`, name: `Tone ${tone} ${kind} view`, scope: 'panel', target: name,
       language: 'javascript', event: 'onClick',
