@@ -11,6 +11,7 @@
 
 import { getChildControls, isContainerControl } from './containment.js';
 import { getControlId, getControlLayer, getControlZIndex } from './controlOrder.js';
+import { activePageIndex, childPageId, tabPages } from './tabContainerLayout.js';
 
 /** Row height in CSS pixels. `.tree-item` is pinned to this — the window maths cannot measure. */
 export const TREE_ROW_HEIGHT = 32;
@@ -151,12 +152,56 @@ function controlFingerprint(control) {
     getControlLayer(control),
     core?.visible === false ? '0' : '1',
     core?.locked === true ? '1' : '0',
+    // The tree groups a Tab Container's children under its pages: which page a child is on, and
+    // the pages themselves (names, order, which one is showing), are all drawn.
+    core?.tabPageId ?? '',
+    control?._children?.TabContainer ? tabPageSignature(control) : '',
     // Joined on a separator no name can contain, so {name:'a', type:'b'} and {name:'ab', type:''}
     // do not fingerprint the same.
   ].join('\u0001');
 
   fingerprintCache.set(control, fingerprint);
   return fingerprint;
+}
+
+function tabPageSignature(control) {
+  return `${activePageIndex(control)}:${tabPages(control).map((page) => `${page?.id ?? ''}=${page?.label ?? ''}`).join(',')}`;
+}
+
+/** The tree row id of one page of a Tab Container. Cannot collide with a control id. */
+export function tabPageRowId(containerId, pageId) {
+  return `page${containerId}${pageId}`;
+}
+
+export function isTabPageRowId(id) {
+  return typeof id === 'string' && id.startsWith('page');
+}
+
+/**
+ * A Tab Container's children, grouped under the page each one is on, in page order.
+ *
+ * Null for anything that is not a Tab Container, so the caller keeps listing its children flat.
+ * Every page is returned, empty ones included — an empty page is still a page the author made,
+ * and the tree is where they would look for it. Which page a child is on comes from
+ * `childPageId`, the same rule the renderer uses, so a child whose page was deleted is listed
+ * under the first page, which is also where it is drawn.
+ */
+export function tabPageGroups(container, children) {
+  if (!container?._children?.TabContainer) return null;
+  const pages = tabPages(container);
+  const active = activePageIndex(container);
+  const groups = pages.map((page, index) => ({
+    pageId: String(page?.id ?? index),
+    label: String(page?.label ?? page?.title ?? `Page ${index + 1}`),
+    index,
+    active: index === active,
+    children: [],
+  }));
+  const byId = new Map(groups.map((group) => [group.pageId, group]));
+  for (const child of children ?? []) {
+    (byId.get(childPageId(child, container)) ?? groups[0])?.children.push(child);
+  }
+  return groups;
 }
 
 export function controlTreeSignature(controls) {

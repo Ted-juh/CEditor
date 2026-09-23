@@ -145,3 +145,34 @@ test('selection is reported on the row, not just coloured in', () => {
   const html = renderTree();
   assert.match(html, /aria-selected="true"/);
 });
+
+test('a tab container lists its children under its pages', () => {
+  // The GAIA panel's bottom tabs were one flat list of 170 controls, with nothing saying which of
+  // the four pages each one was on.
+  const tabs = createControl('TabContainer', { Core: { id: 'tabs', name: 'bottom_pages', zIndex: 0 } });
+  tabs._children.TabContainer = {
+    ...tabs._children.TabContainer,
+    pageIndex: 1,
+    pages: [{ id: 'arp', label: 'Arpeggiator' }, { id: 'sys', label: 'System' }, { id: 'empty', label: 'Status' }],
+  };
+  tabs._children.Children = {
+    _children: {
+      a: createControl('Label', { Core: { id: 'a', name: 'arp_rate', zIndex: 0, tabPageId: 'arp' } }),
+      b: createControl('Label', { Core: { id: 'b', name: 'midi_channel', zIndex: 1, tabPageId: 'sys' } }),
+      c: createControl('Label', { Core: { id: 'c', name: 'master_tune', zIndex: 2, tabPageId: 'sys' } }),
+    },
+  };
+  panelOf([tabs]);
+
+  const html = renderTree();
+  const order = ['bottom_pages', 'ARPEGGIATOR', 'arp_rate', 'SYSTEM', 'master_tune', 'midi_channel', 'STATUS']
+    .map((text) => html.indexOf(`>${text}<`) >= 0 ? html.indexOf(`>${text}<`) : html.toUpperCase().indexOf(`>${text}<`));
+  assert.ok(order.every((at) => at >= 0), `a row is missing: ${order}`);
+  assert.deepEqual([...order].sort((x, y) => x - y), order, 'rows are not grouped under their pages in page order');
+
+  assert.match(html, /aria-label="Page System, 2 components, showing"/, 'the showing page is not marked');
+  assert.match(html, /aria-label="Page Status, 0 components"/, 'an empty page must still be listed');
+  // Page rows sit one level under the container; its controls one level under the page.
+  assert.match(html, /aria-level="2"[^>]*aria-label="Page Arpeggiator/);
+  assert.match(html, /data-tree-id="a"[^>]*aria-level="3"|aria-level="3"[\s\S]{0,300}data-tree-id="a"|data-tree-id="a"[\s\S]{0,300}aria-level="3"/);
+});

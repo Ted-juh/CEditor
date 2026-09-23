@@ -29,7 +29,10 @@
     TREE_ROW_HEIGHT,
     controlTreeSignature,
     dragAutoScrollStep,
+    isTabPageRowId,
     scrollTopForRow,
+    tabPageGroups,
+    tabPageRowId,
     treeArrowTarget,
     treeWindow,
     typeBadgeAddsInformation,
@@ -46,6 +49,7 @@
     panelToLocalPoint,
     selectionRoots,
   } from '../utils/containment.js';
+  import { childPageId } from '../utils/tabContainerLayout.js';
 
   // Collapsed container ids (expanded by default), loaded per panel.
   let collapsedIds = $state(new Set());
@@ -170,9 +174,38 @@
         const hidden = core?.visible === false;
         const locked = core?.locked === true;
         out.push(rowFor(ctrl, id, depth, container, inheritedHidden, inheritedLocked, index + 1, setsize));
-        if (container && (query || !collapsedIds.has(id))) {
-          visit(getChildControls(ctrl), depth + 1, inheritedHidden || hidden, inheritedLocked || locked);
+        if (!container || (!query && collapsedIds.has(id))) return;
+        const childHidden = inheritedHidden || hidden;
+        const childLocked = inheritedLocked || locked;
+        // A Tab Container lists its children under its pages. Flat, the GAIA panel's bottom tabs
+        // were one list of 170 controls with nothing saying which of the four pages each is on.
+        const groups = tabPageGroups(ctrl, getChildControls(ctrl));
+        if (!groups) {
+          visit(getChildControls(ctrl), depth + 1, childHidden, childLocked);
+          return;
         }
+        // While filtering, a page with no match in it is noise; otherwise every page is shown,
+        // empty ones included.
+        const shown = groups.filter((group) => !visibleSet
+          || group.children.some((child) => visibleSet.has(getControlId(child))));
+        shown.forEach((group, pageIndex) => {
+          const pageRow = tabPageRowId(id, group.pageId);
+          out.push({
+            page: true,
+            id: pageRow,
+            depth: depth + 1,
+            container: true,
+            containerId: id,
+            pageId: group.pageId,
+            pageIndex: group.index,
+            label: group.label,
+            active: group.active,
+            count: group.children.length,
+            posinset: pageIndex + 1,
+            setsize: shown.length,
+          });
+          if (query || !collapsedIds.has(pageRow)) visit(group.children, depth + 2, childHidden, childLocked);
+        });
       });
     };
     visit(controls, 0, false, false);
@@ -230,7 +263,8 @@
     lastRevealedId = first;
 
     // Expand collapsed ancestors so the selected row actually renders.
-    const ancestors = getAncestorIds(panel.controls, first);
+    // Inside a Tab Container, the page group the control is listed under has to open too.
+    const ancestors = [...getAncestorIds(panel.controls, first), ...pageRowsAbove(panel.controls, first)];
     if (ancestors.some((a) => collapsedIds.has(a))) {
       const next = new Set(collapsedIds);
       for (const a of ancestors) next.delete(a);
@@ -244,6 +278,24 @@
     focusedId = first;
     requestAnimationFrame(() => scrollRowIntoView(index));
   });
+
+  /** The page-group rows a control sits under, one per Tab Container it is inside. */
+  function pageRowsAbove(controls, id) {
+    const out = [];
+    let child = findControlById(controls, id);
+    let parent = findParentOfControl(controls, id);
+    while (child && parent) {
+      if (parent._children?.TabContainer) out.push(tabPageRowId(getControlId(parent), childPageId(child, parent)));
+      child = parent;
+      parent = findParentOfControl(controls, getControlId(parent));
+    }
+    return out;
+  }
+
+  /** Clicking a page group shows that page on the canvas, the same as clicking its tab. */
+  function showPage(row) {
+    updateControlProperty(row.containerId, 'TabContainer.pageIndex', row.pageIndex);
+  }
 
   // --- Rename ---
   let renamingId = $state(null);
@@ -330,7 +382,9 @@
     if (!row) return;
     focusedId = row.id;
     scrollRowIntoView(index);
-    if (e?.shiftKey && $keyObjectId != null) selectRange(row.id, e.ctrlKey || e.metaKey);
+    if (row.page) {
+      // A page group is not a control: there is nothing to select, only somewhere to be.
+    } else if (e?.shiftKey && $keyObjectId != null) selectRange(row.id, e.ctrlKey || e.metaKey);
     else if (!e?.ctrlKey && !e?.metaKey) selectComponent(row.id, false);
     requestAnimationFrame(() => focusRowElement(row.id));
   }
@@ -365,6 +419,12 @@
     const row = rows[focusedIndex];
     if (!row) return;
 
+    if (row.page) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showPage(row); }
+      else if (e.key === 'Escape') closeCtx();
+      return;
+    }
+
     if (e.key === 'Enter' || e.key === 'F2') {
       e.preventDefault();
       startRename(row.id, getSection(row.ctrl, 'Core')?.name ?? '');
@@ -382,7 +442,7 @@
 
   // --- Selection ---
   function selectRange(id, additive) {
-    const ids = rows.map((row) => row.id);
+    const ids = rows.filter((row) => !row.page).map((row) => row.id);
     const a = ids.indexOf($keyObjectId);
     const b = ids.indexOf(id);
     if (a === -1 || b === -1) return false;
@@ -562,6 +622,36 @@
     }
   }
 
+  /** A page group takes a drop as "put these inside the container, on this page". */
+  function handleDragOverPage(row, e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    updateDragAutoScroll(e.clientY);
+    const controls = $activePanel?.controls ?? [];
+    if (dragSourceIds.length === 0 || dragSourceIds.some((sourceId) => sourceId === row.containerId
+      || isDescendantOfControl(controls, sourceId, row.containerId))) {
+      dragOverId = null;
+      return;
+    }
+    dragOverId = row.id;
+    dragOverPos = 'inside';
+  }
+
+  function dropOntoPage(row) {
+    const controls = $activePanel.controls;
+    const entries = [];
+    for (const sourceId of dragSourceIds) {
+      const parent = findParentOfControl(controls, sourceId);
+      if (parent && getControlId(parent) === row.containerId) continue;
+      const rect = controlPanelRect(controls, sourceId);
+      if (!rect) continue;
+      const local = panelToLocalPoint(controls, row.containerId, rect.x, rect.y);
+      entries.push({ id: sourceId, x: local.x, y: local.y });
+    }
+    if (entries.length) reparentControls(entries, row.containerId);
+    applyControlPatchesById(new Map(dragSourceIds.map((sourceId) => [sourceId, { 'Core.tabPageId': row.pageId }])));
+  }
+
   function handleDragLeave() {
     dragOverId = null;
     dragOverPos = null;
@@ -570,6 +660,13 @@
   function handleDrop(e) {
     e.preventDefault();
     if (!$activePanel || dragSourceIds.length === 0 || !dragOverId || dragSourceIds.includes(dragOverId)) {
+      resetDragState();
+      return;
+    }
+
+    if (isTabPageRowId(dragOverId)) {
+      const row = rows.find((candidate) => candidate.id === dragOverId);
+      if (row) dropOntoPage(row);
       resetDragState();
       return;
     }
@@ -640,8 +737,18 @@
     if (dragOverPos === 'below') targetIndex += 1;
     reorderedDisplayLayer.splice(targetIndex, 0, ...movedItems);
 
+    // Dropped beside a control inside a Tab Container: the moved rows join that control's page,
+    // or they would be reordered here and then listed, and drawn, on the page they came from.
+    const targetPage = parent?._children?.TabContainer
+      ? childPageId(findControlById(nextControls, dragOverId), parent)
+      : null;
     const patches = new Map(
-      [...reorderedDisplayLayer].reverse().map((control, index) => [getControlId(control), { 'Core.zIndex': index }])
+      [...reorderedDisplayLayer].reverse().map((control, index) => {
+        const id = getControlId(control);
+        const patch = { 'Core.zIndex': index };
+        if (targetPage != null && movedSet.has(id)) patch['Core.tabPageId'] = targetPage;
+        return [id, patch];
+      })
     );
     applyControlPatchesById(patches);
 
@@ -703,6 +810,47 @@
       <div class="tree-window" role="presentation" style="height: {rows.length * TREE_ROW_HEIGHT}px">
         <div class="tree-rows" role="presentation" style="transform: translateY({windowRange.padTop}px)">
           {#each visibleRows as row (row.id)}
+            {#if row.page}
+            {@const expanded = filtering || !collapsedIds.has(row.id)}
+            <div
+              class="tree-item page-row"
+              class:drag-inside={dragOverId === row.id && dragOverPos === 'inside'}
+              style="padding-left: {10 + row.depth * 14}px"
+              data-tree-id={row.id}
+              role="treeitem"
+              aria-selected="false"
+              aria-level={row.depth + 1}
+              aria-posinset={row.posinset}
+              aria-setsize={row.setsize}
+              aria-expanded={expanded}
+              aria-label="Page {row.label}, {row.count} {row.count === 1 ? 'component' : 'components'}{row.active ? ', showing' : ''}"
+              title={row.active ? 'This page is showing' : 'Click to show this page'}
+              tabindex={focusedId === row.id || (focusedId == null && row === visibleRows[0]) ? 0 : -1}
+              onfocus={() => { focusedId = row.id; }}
+              onkeydown={handleTreeKeyDown}
+              onclick={() => { focusedId = row.id; showPage(row); }}
+              ondragover={(e) => handleDragOverPage(row, e)}
+              ondragleave={handleDragLeave}
+              ondrop={handleDrop}
+            >
+              <button
+                class="collapse-toggle"
+                tabindex="-1"
+                aria-label={expanded ? 'Collapse page' : 'Expand page'}
+                title={expanded ? 'Collapse' : 'Expand'}
+                onclick={(e) => { e.stopPropagation(); toggleCollapsed(row.id); }}
+              >
+                {#if expanded}
+                  {@render chevronDown()}
+                {:else}
+                  {@render chevronRight()}
+                {/if}
+              </button>
+              <span class="page-dot" class:active={row.active} aria-hidden="true"></span>
+              <span class="item-name page-name">{row.label}</span>
+              <span class="page-count">{row.count}</span>
+            </div>
+            {:else}
             {@const core = getSection(row.ctrl, 'Core')}
             {@const id = row.id}
             {@const isSelected = $selectedComponentIds.has(id)}
@@ -811,6 +959,7 @@
                 </button>
               </div>
             </div>
+            {/if}
           {/each}
         </div>
       </div>
@@ -1125,6 +1274,34 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* A page group reads as a heading, not as a control: smaller caps, no row actions. */
+  .page-name {
+    font-size: 10px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .page-count {
+    font-size: 10px;
+    color: #666;
+    padding-right: 4px;
+  }
+
+  /* Hollow for a hidden page, filled for the one the tab container is showing. */
+  .page-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1px solid #666;
+    flex-shrink: 0;
+  }
+
+  .page-dot.active {
+    background: #5B9BD5;
+    border-color: #5B9BD5;
   }
 
   .rename-input {

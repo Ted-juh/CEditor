@@ -14,7 +14,10 @@ import {
   TREE_ROW_HEIGHT,
   controlTreeSignature,
   dragAutoScrollStep,
+  isTabPageRowId,
   scrollTopForRow,
+  tabPageGroups,
+  tabPageRowId,
   treeArrowTarget,
   treeWindow,
   typeBadgeAddsInformation,
@@ -237,4 +240,54 @@ test('Left closes an open container, then steps out to the parent', () => {
 test('keys the tree does not own are left alone', () => {
   assert.equal(treeArrowTarget({ rows: arrowRows, index: 0, key: 'a' }), null);
   assert.equal(treeArrowTarget({ rows: [], index: -1, key: 'ArrowDown' }), null);
+});
+
+// --- Tab pages ---------------------------------------------------------------------------------
+
+function tabContainer(pages, pageIndex = 0) {
+  const tabs = createControl('TabContainer', { Core: { id: 'tabs', name: 'tabs' } });
+  tabs._children.TabContainer = { ...tabs._children.TabContainer, pages, pageIndex };
+  return tabs;
+}
+
+test('a tab container groups its children by page, in page order, empty pages included', () => {
+  const tabs = tabContainer([{ id: 'p1', label: 'One' }, { id: 'p2', label: 'Two' }, { id: 'p3', label: 'Three' }], 1);
+  const children = [
+    createControl('Label', { Core: { id: 'x', tabPageId: 'p2' } }),
+    createControl('Label', { Core: { id: 'y', tabPageId: 'p1' } }),
+    // No page recorded, and a page that no longer exists: both belong to the first page, which
+    // is where the renderer draws them (childPageId).
+    createControl('Label', { Core: { id: 'z' } }),
+    createControl('Label', { Core: { id: 'w', tabPageId: 'deleted' } }),
+  ];
+  const groups = tabPageGroups(tabs, children);
+  assert.deepEqual(groups.map((g) => [g.label, g.active, g.children.map((c) => c._children.Core.id)]), [
+    ['One', false, ['y', 'z', 'w']],
+    ['Two', true, ['x']],
+    ['Three', false, []],
+  ]);
+});
+
+test('only a tab container is grouped', () => {
+  assert.equal(tabPageGroups(createControl('Container', { Core: { id: 'c' } }), []), null);
+});
+
+test('a page row id never looks like a control id', () => {
+  const id = tabPageRowId('tabs', 'p1');
+  assert.ok(isTabPageRowId(id));
+  assert.ok(!isTabPageRowId('tabs'));
+  assert.ok(!isTabPageRowId('page_1'), 'a control named like a page must not be mistaken for one');
+});
+
+test('the tree signature sees a page change', () => {
+  // The tree hands back its cached rows while the signature holds, so anything it draws has to
+  // be in the signature: moving a child to another page, or switching the showing page.
+  const child = createControl('Label', { Core: { id: 'k', tabPageId: 'p1' } });
+  const pages = [{ id: 'p1', label: 'One' }, { id: 'p2', label: 'Two' }];
+  const withChild = (tabs, c) => { tabs._children.Children = { _children: { k: c } }; return [tabs]; };
+  const base = controlTreeSignature(withChild(tabContainer(pages, 0), child));
+  const moved = createControl('Label', { Core: { id: 'k', tabPageId: 'p2' } });
+  assert.notEqual(controlTreeSignature(withChild(tabContainer(pages, 0), moved)), base, 'moving a child between pages');
+  assert.notEqual(controlTreeSignature(withChild(tabContainer(pages, 1), child)), base, 'switching the showing page');
+  assert.notEqual(controlTreeSignature(withChild(tabContainer([pages[0], { id: 'p2', label: 'Renamed' }], 0), child)), base, 'renaming a page');
 });
