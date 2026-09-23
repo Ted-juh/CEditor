@@ -16,8 +16,10 @@
   // panel load, the single largest item in it.
   //
   // The markup below is byte-for-byte what lucide renders (same viewBox, same path data, same
-  // stroke attributes), minus the class names, which nothing styles. Icons elsewhere in the editor
-  // are fine as components — this is about a list with hundreds of rows, not about lucide.
+  // stroke attributes), minus the class names, which nothing styles — except the two chevrons,
+  // drawn at 13px with a heavier stroke because at 11px and 1.5 they were hard to find. Icons
+  // elsewhere in the editor are fine as components — this is about a list with hundreds of rows,
+  // not about lucide.
   import { onDestroy } from 'svelte';
   import { activePanel, selectedComponentIds, selectComponent, keyObjectId } from '../stores/panels.js';
   import { applyControlPatchesById, renameControl, updateControlProperty, reparentControls, removeControl, duplicateControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
@@ -1007,15 +1009,15 @@
 <!-- Row icons, drawn inline. See the note at the top of the script for why these are not
      lucide-svelte components. Path data is lucide's own (ISC), copied verbatim. -->
 {#snippet chevronRight()}
-  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="m9 18 6-6-6-6" />
   </svg>
 {/snippet}
 
 {#snippet chevronDown()}
-  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="m6 9 6 6 6-6" />
   </svg>
 {/snippet}
@@ -1240,13 +1242,14 @@
     height: 14px;
     background: none;
     border: none;
-    color: #777;
+    /* Bright enough to find at a glance: #777 on the dock background was all but invisible. */
+    color: #C8C8C8;
     cursor: pointer;
     padding: 0;
     flex-shrink: 0;
   }
 
-  .collapse-toggle:hover { color: #CCC; }
+  .collapse-toggle:hover { color: #FFF; }
 
   .collapse-spacer {
     width: 14px;
