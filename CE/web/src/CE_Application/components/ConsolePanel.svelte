@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import Trash2 from 'lucide-svelte/icons/trash-2';
   import ArrowDownToLine from 'lucide-svelte/icons/arrow-down-to-line';
   import Filter from 'lucide-svelte/icons/filter';
@@ -8,7 +9,10 @@
   import { isPerfDebugEnabled, setPerfDebugEnabled, startPerfDebugStallWatch } from '../utils/perfDebug.js';
 
   let copied = $state(false);
+  let copiedTimer = 0;
+  let scrollFrame = 0;
   let perfLoggingEnabled = $state(isPerfDebugEnabled());
+  let filterBeforePerf = null;
 
   async function copyAll() {
     const text = filtered.map(e =>
@@ -16,19 +20,23 @@
     ).join('\n');
     try {
       await navigator.clipboard.writeText(text);
-      copied = true;
-      setTimeout(() => copied = false, 1500);
+      showCopied();
     } catch (err) {
       // Fallback: select text in a temp textarea
       const ta = document.createElement('textarea');
       ta.value = text;
       document.body.appendChild(ta);
       ta.select();
-      document.execCommand('copy');
+      const copied = document.execCommand('copy');
       document.body.removeChild(ta);
-      copied = true;
-      setTimeout(() => copied = false, 1500);
+      if (copied) showCopied();
     }
+  }
+
+  function showCopied() {
+    copied = true;
+    if (copiedTimer) clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => { copiedTimer = 0; copied = false; }, 1500);
   }
 
   let containerEl = $state(null);
@@ -55,12 +63,26 @@
 
   // Auto-scroll to bottom when new entries arrive
   $effect(() => {
-    void filtered.length;
+    // Depend on the newest identity as well as the count. Once the capped console reaches 2000,
+    // the length stays constant while entries continue to arrive.
+    void filtered.at(-1)?.id;
     if (autoScroll && containerEl) {
-      requestAnimationFrame(() => {
-        containerEl.scrollTop = containerEl.scrollHeight;
+      const element = containerEl;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = 0;
+        if (!element.isConnected) return;
+        element.scrollTop = element.scrollHeight;
       });
     }
+    return () => {
+      if (scrollFrame) cancelAnimationFrame(scrollFrame);
+      scrollFrame = 0;
+    };
+  });
+
+  onDestroy(() => {
+    if (copiedTimer) clearTimeout(copiedTimer);
+    if (scrollFrame) cancelAnimationFrame(scrollFrame);
   });
 
   function handleScroll() {
@@ -80,10 +102,13 @@
     perfLoggingEnabled = nextEnabled;
 
     if (nextEnabled) {
+      filterBeforePerf = filterText;
       filterText = 'perf';
       startPerfDebugStallWatch();   // armed here too, so it does not need a restart to start watching
       console.info('[perf] Logging enabled from Console panel. Load or reload a panel to capture timings.');
     } else {
+      if (filterText === 'perf' && filterBeforePerf !== null) filterText = filterBeforePerf;
+      filterBeforePerf = null;
       console.info('[perf] Logging disabled from Console panel.');
     }
   }

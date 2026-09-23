@@ -48,15 +48,18 @@ function setValueAtPath(control, modelPath, value) {
 
 /**
  * Build the runtime host for a loaded player panel.
- * @param {object} panel the deserialized panel document the player is running
+ * @param {object|function(): object} panel the deserialized panel document the player is running,
+ *   or a getter for it when the player replaces the document object reactively
+ * @param {{ onDocumentWrite?: function(object, string, unknown): void }} options
  */
-export function createPlayerHost(panel) {
+export function createPlayerHost(panel, { onDocumentWrite = null } = {}) {
+  const currentPanel = () => (typeof panel === 'function' ? panel() : panel);
   return {
-    panel,
+    get panel() { return currentPanel(); },
     // Panel-level + per-control scripts (honoring panel.scripting.runOnExport / enabled flags),
     // filtered to the source (Lua/JS) scripts this runtime can execute — legacy command-graph
     // scripts are skipped (they ran in the retired engine).
-    scripts: collectPanelExportScripts(panel).filter(isSourceScript),
+    get scripts() { return collectPanelExportScripts(currentPanel()).filter(isSourceScript); },
 
     readValue(control, modelPath) {
       if (readsLiveValue(control, modelPath)) {
@@ -86,7 +89,11 @@ export function createPlayerHost(panel) {
         updatePanelPreviewSession(id, liveValuePatch(value));
         return true;
       }
-      return setValueAtPath(control, modelPath, value) !== false;
+      const wrote = setValueAtPath(control, modelPath, value) !== false;
+      if (wrote && typeof onDocumentWrite === 'function') {
+        onDocumentWrite(control, modelPath, value);
+      }
+      return wrote;
     },
   };
 }

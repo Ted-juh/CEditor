@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import { guides, removeGuide, updateGuide, draggingGuide, selectedGuide } from '../stores/guides.js';
   import { rulerCreateDrag, pendingGuideOf, pendingGuideFor } from '../utils/guideGeometry.js';
 
@@ -188,6 +189,7 @@
   // it afterwards. It now publishes the pending guide to `draggingGuide` on every move, which is
   // what makes the preview show up on this ruler's opposite number AND as a full line on the
   // canvas without any of them talking to each other.
+  let cancelCreateDrag = null;
   function handleRulerMouseDown(e) {
     if (e.button !== 0) return;
     // Don't start create-drag if clicking on a marker
@@ -196,6 +198,7 @@
     // only. Starting a drag there would preview a guide that mouseup could never commit.
     if (!onGuideCreate) return;
     e.preventDefault();
+    cancelCreateDrag?.();
 
     const newOrientation = isHorizontal ? 'horizontal' : 'vertical';
 
@@ -221,38 +224,50 @@
       draggingGuide.set(pendingGuideOf(measure(ev)));
     };
 
-    const createDragEnd = (ev) => {
+    const stopCreateDrag = () => {
       window.removeEventListener('mousemove', createDragMove);
       window.removeEventListener('mouseup', createDragEnd);
+      window.removeEventListener('blur', stopCreateDrag);
+      if (cancelCreateDrag === stopCreateDrag) cancelCreateDrag = null;
+      draggingGuide.set(null);
+    };
 
+    const createDragEnd = (ev) => {
       const drag = measure(ev);
+      stopCreateDrag();
+
       // Cleared first and unconditionally, ahead of the cancel check: releasing back over the
       // ruler must leave no guide AND no preview, and an early return that skipped this line
       // would strand a guide-shaped ghost on the canvas with nothing behind it.
-      draggingGuide.set(null);
       if (!drag?.outside) return;
       onGuideCreate(drag.orientation, drag.pos);
     };
 
+    cancelCreateDrag = stopCreateDrag;
     window.addEventListener('mousemove', createDragMove);
     window.addEventListener('mouseup', createDragEnd);
+    window.addEventListener('blur', stopCreateDrag);
   }
 
   // --- Guide marker interaction: select, drag, delete ---
   let dragStartMouse = $state(0);
   let dragStartPos = $state(0);
+  let markerDragActive = false;
 
   function handleMarkerMouseDown(index, pos, e) {
     if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
 
+    cancelMarkerDrag();
     dragStartPos = pos;
     dragStartMouse = isHorizontal ? e.clientX : e.clientY;
     draggingGuide.set({ orientation: guideOrientation, index, pos });
 
+    markerDragActive = true;
     window.addEventListener('mousemove', handleMarkerDragMove);
     window.addEventListener('mouseup', handleMarkerDragEnd);
+    window.addEventListener('blur', cancelMarkerDrag);
   }
 
   function handleMarkerDragMove(e) {
@@ -264,17 +279,28 @@
     draggingGuide.set({ ...dg, pos: Math.round(dragStartPos + delta) });
   }
 
-  function handleMarkerDragEnd() {
+  function stopMarkerDrag(commit) {
+    if (!markerDragActive) return;
     window.removeEventListener('mousemove', handleMarkerDragMove);
     window.removeEventListener('mouseup', handleMarkerDragEnd);
+    window.removeEventListener('blur', cancelMarkerDrag);
 
     const dg = $draggingGuide;
-    if (dg && dg.pos !== dragStartPos) {
+    if (commit && dg && dg.pos !== dragStartPos) {
       updateGuide(dg.orientation, dg.index, dg.pos);
     }
 
+    markerDragActive = false;
     draggingGuide.set(null);
   }
+
+  function handleMarkerDragEnd() { stopMarkerDrag(true); }
+  function cancelMarkerDrag() { stopMarkerDrag(false); }
+
+  onDestroy(() => {
+    cancelCreateDrag?.();
+    cancelMarkerDrag();
+  });
 
   function handleMarkerRightClick(index, e) {
     e.preventDefault();

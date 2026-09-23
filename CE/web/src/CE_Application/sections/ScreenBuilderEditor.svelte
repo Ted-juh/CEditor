@@ -40,7 +40,9 @@
         preview = p;
         previewReady = true;  // flips the render effect on
       })
-      .catch((err) => { previewError = String(err?.message ?? err); });
+      .catch((err) => {
+        if (!disposed) previewError = String(err?.message ?? err);
+      });
     return () => { disposed = true; preview?.dispose(); preview = null; };
   });
 

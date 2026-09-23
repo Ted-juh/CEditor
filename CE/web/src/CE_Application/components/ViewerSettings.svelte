@@ -50,7 +50,7 @@
   function zoomOut() { act((ref) => ref.zoomOut?.()); }
   function zoom100() { act((ref) => ref.zoom100?.()); }
   function fitToSection() { act((ref) => ref.fitToSection?.()); }
-  function loadImage() { getViewerRef?.()?.addImage?.() ?? document.querySelector('.image-tab-add')?.click(); }
+  function loadImage() { getViewerRef?.()?.addImage?.(); }
 
   function toggleEyedropper() {
     act((ref) => ref.setEyedropper?.(!(ref.isEyedropper?.() ?? false)));

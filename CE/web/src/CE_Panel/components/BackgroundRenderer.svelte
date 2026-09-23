@@ -15,6 +15,8 @@
   // Only ever passed true when plainFillCSS returned a style, and that only happens when exactly
   // one layer is visible — which is why this drops the whole loop rather than skipping one entry.
   let { background = null, width = 0, height = 0, absorbFill = false } = $props();
+  const svgInstanceId = $props.id();
+  const svgDefId = (localId) => `${svgInstanceId}-${localId}`;
 
   let fill = $derived(background?._children?.Fill);
   let border = $derived(background?._children?.Border);
@@ -569,16 +571,16 @@
         const linearFollowInherit = flowMode === 'follow' && !isRoundedCorner;
         if (useRoundedInherit || linearFollowInherit) {
           const sideKey = seg.cornerPartSide || inheritedSideKeyFor(seg.pos, src.cornerGradientInheritSide);
-          out.push({ stroke: `url(#grad_${seg._ring}_side_${sideKey})` });
+          out.push({ stroke: `url(#${svgDefId(`grad_${seg._ring}_side_${sideKey}`)})` });
         } else {
-          out.push({ stroke: `url(#grad_${baseId})` });
+          out.push({ stroke: `url(#${svgDefId(`grad_${baseId}`)})` });
         }
       } else {
-        out.push({ stroke: `url(#grad_${baseId})` });
+        out.push({ stroke: `url(#${svgDefId(`grad_${baseId}`)})` });
       }
     }
-    if (flags.image) out.push({ stroke: `url(#img_${baseId})` });
-    if (flags.overlay) out.push({ stroke: `url(#ovr_${baseId})` });
+    if (flags.image) out.push({ stroke: `url(#${svgDefId(`img_${baseId}`)})` });
+    if (flags.overlay) out.push({ stroke: `url(#${svgDefId(`ovr_${baseId}`)})` });
     if (out.length === 0) out.push({ stroke: 'none' });
     return out;
   }
@@ -608,7 +610,7 @@
           {@const stops = gradStops(def.data)}
           {@const coords = gradientCoords(def.data?.angle, width, height)}
           {#if stops.length >= 2}
-            <linearGradient id={def.id} gradientUnits="userSpaceOnUse"
+            <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse"
               x1={coords.x1} y1={coords.y1} x2={coords.x2} y2={coords.y2}>
               {#each stops as stop}
                 <stop offset="{stop.position}%" stop-color="#{stop.color}" />
@@ -620,19 +622,19 @@
           {@const t = def.thickness}
           {#if stops.length >= 2}
             {#if def.sideKey === 'top'}
-              <linearGradient id={def.id} gradientUnits="userSpaceOnUse" x1="0" y1={t} x2="0" y2="0">
+              <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse" x1="0" y1={t} x2="0" y2="0">
                 {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" />{/each}
               </linearGradient>
             {:else if def.sideKey === 'right'}
-              <linearGradient id={def.id} gradientUnits="userSpaceOnUse" x1={width - t} y1="0" x2={width} y2="0">
+              <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse" x1={width - t} y1="0" x2={width} y2="0">
                 {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" />{/each}
               </linearGradient>
             {:else if def.sideKey === 'bottom'}
-              <linearGradient id={def.id} gradientUnits="userSpaceOnUse" x1="0" y1={height - t} x2="0" y2={height}>
+              <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse" x1="0" y1={height - t} x2="0" y2={height}>
                 {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" />{/each}
               </linearGradient>
             {:else if def.sideKey === 'left'}
-              <linearGradient id={def.id} gradientUnits="userSpaceOnUse" x1={t} y1="0" x2="0" y2="0">
+              <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse" x1={t} y1="0" x2="0" y2="0">
                 {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" />{/each}
               </linearGradient>
             {/if}
@@ -640,7 +642,7 @@
         {:else if def.type === 'flowGradient'}
           {@const stops = def.stops ?? gradStops(def.data)}
           {#if stops.length >= 2}
-            <linearGradient id={def.id} gradientUnits="userSpaceOnUse"
+            <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse"
               x1={def.axis.x1} y1={def.axis.y1} x2={def.axis.x2} y2={def.axis.y2}>
               {#each stops as stop}
                 <stop offset="{stop.position}%" stop-color="#{stop.color}" />
@@ -658,7 +660,7 @@
           {@const innerR = Math.max(0.01, R - t / 2)}
           {@const outerR = R + t / 2}
           {#if stops.length >= 2}
-            <radialGradient id={def.id} gradientUnits="userSpaceOnUse"
+            <radialGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse"
               cx={def.geom.arcCx} cy={def.geom.arcCy}
               fx={def.geom.arcCx} fy={def.geom.arcCy}
               fr={innerR} r={outerR}>
@@ -673,7 +675,7 @@
           {@const start = def.flip ? { x: def.axis.x2, y: def.axis.y2 } : { x: def.axis.x1, y: def.axis.y1 }}
           {@const end = def.flip ? { x: def.axis.x1, y: def.axis.y1 } : { x: def.axis.x2, y: def.axis.y2 }}
           {#if stops.length >= 2}
-            <linearGradient id={def.id} gradientUnits="userSpaceOnUse"
+            <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse"
               x1={start.x} y1={start.y} x2={end.x} y2={end.y}>
               {#each stops as stop}
                 <stop offset="{stop.position}%" stop-color="#{stop.color}" />
@@ -684,7 +686,7 @@
           {@const stops = gradStops(def.data)}
           {@const ax = def.gradAxis}
           {#if stops.length >= 2}
-            <linearGradient id={def.id} gradientUnits="userSpaceOnUse"
+            <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse"
               x1={ax.x1} y1={ax.y1} x2={ax.x2} y2={ax.y2}>
               {#each stops as stop}
                 {@const pos = def.flip ? (100 - stop.position) : stop.position}
@@ -693,11 +695,11 @@
             </linearGradient>
           {/if}
         {:else if def.type === 'image'}
-          <pattern id={def.id} patternUnits="userSpaceOnUse" width={width} height={height}>
+          <pattern id={svgDefId(def.id)} patternUnits="userSpaceOnUse" width={width} height={height}>
             <image href={def.data} width={width} height={height} preserveAspectRatio="xMidYMid slice" />
           </pattern>
         {:else if def.type === 'overlay'}
-          <pattern id={def.id} patternUnits="userSpaceOnUse" width={width} height={height}>
+          <pattern id={svgDefId(def.id)} patternUnits="userSpaceOnUse" width={width} height={height}>
             <image href={def.data} width={width} height={height} preserveAspectRatio="xMidYMid slice" />
           </pattern>
         {/if}

@@ -64,7 +64,7 @@ try {
     (await import('/src/CE_Application/stores/displayTab.js')).displayTabRequest.set({ tab: 'type' });
   }, ids[0]);
   await page.locator('.text-dock').waitFor();
-  await page.locator('.studio-rail').getByRole('button', { name: 'Effects', exact: true }).click();
+  await page.locator('.studio-rail').getByRole('tab', { name: 'Effects', exact: true }).click();
   await dock.waitFor(); await settle();
   assert.equal(await dock.locator('.target-bar strong').innerText(), 'Effects example');
   assert.equal(await dock.getByRole('button', { name: 'Use selection', exact: true }).count(), 0);
@@ -80,9 +80,9 @@ try {
   await page.evaluate(async (id) => (await import('/src/CE_Application/stores/panels.js')).selectComponent(id), ids[0]);
   await settle();
   assert.equal(await dock.locator('.target-bar strong').innerText(), 'Effects example');
-  await page.locator('.studio-rail').getByRole('button', { name: 'Text', exact: true }).click();
+  await page.locator('.studio-rail').getByRole('tab', { name: 'Text', exact: true }).click();
   await page.locator('.text-dock').waitFor();
-  await page.locator('.studio-rail').getByRole('button', { name: 'Effects', exact: true }).click();
+  await page.locator('.studio-rail').getByRole('tab', { name: 'Effects', exact: true }).click();
   await dock.waitFor(); await settle();
   assert.equal(await dock.locator('.target-bar strong').innerText(), 'Effects example');
   console.log('ok direct tab clicks follow selection, including after Text, deselection, and reopening');

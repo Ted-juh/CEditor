@@ -179,13 +179,15 @@
   async function setPropertyFile(entry, file) {
     const path = String(entry?.path ?? '').trim();
     if (!core?.id || !path || !file) return;
+    const targetId = core.id;
     const dataUrl = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result ?? ''));
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-    updateControlProperty(core.id, path, dataUrl);
+    if (core?.id !== targetId) return;
+    updateControlProperty(targetId, path, dataUrl);
   }
 
   function resetAllPublicValues() {

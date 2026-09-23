@@ -18,12 +18,16 @@
 import { get, writable } from 'svelte/store';
 
 import { collectExportParameters } from '../utils/exportParameters.js';
+import { deepClone } from '../utils/deepClone.js';
 import { controlIdForParameter, readParameterValue, writeParameterPatch } from '../utils/panelValueAccess.js';
 import {
   captureValues, diffSnapshots, makeSnapshot, morphSendPlan, morphSnapshots, morphWeighted,
 } from '../utils/snapshotModel.js';
 import { activePanel, updatePanel } from './panels.js';
-import { panelPreviewSessions, updatePanelPreviewSession } from './interactionPreview.js';
+import {
+  panelPreviewSessions, restorePanelPreviewSessionEntries, updatePanelPreviewSessions,
+} from './interactionPreview.js';
+import { beginHistoryTransaction, commitHistoryTransaction } from './history.js';
 import { cinfo, cwarn } from './console.js';
 
 /**
@@ -117,16 +121,55 @@ export function applyValues(values, { panel = null, parameters = null } = {}) {
   const byId = new Map(list.map((p) => [p.id, p]));
   const sessions = get(panelPreviewSessions) ?? {};
 
+  const working = new Map();
   let written = 0;
   for (const [id, value] of Object.entries(values ?? {})) {
     const parameter = byId.get(id);
     if (!parameter) continue;
     const controlId = controlIdForParameter(parameter, target);
     if (!controlId) continue;
-    updatePanelPreviewSession(controlId, writeParameterPatch(parameter, value, sessions[controlId]));
+    const previous = working.get(controlId) ?? sessions[controlId] ?? {};
+    const patch = writeParameterPatch(parameter, value, previous);
+    const next = {
+      ...previous,
+      ...patch,
+      ...(patch.customValues
+        ? { customValues: { ...(previous.customValues ?? {}), ...patch.customValues } }
+        : {}),
+    };
+    working.set(controlId, next);
     written += 1;
   }
+  updatePanelPreviewSessions([...working].map(([controlId, patch]) => ({ controlId, patch })));
   return written;
+}
+
+/**
+ * Capture exactly the preview sessions a value-map can write, for one explicit undo transaction.
+ * Ordinary preview updates stay out of document history; only Recall and Roll opt in.
+ */
+export function beginSnapshotValueHistory(values, { panel = null, parameters = null } = {}) {
+  const target = panel ?? get(activePanel);
+  if (!target) return null;
+  const list = parameters ?? snapshotParameters(target);
+  const byId = new Map(list.map((parameter) => [parameter.id, parameter]));
+  const controlIds = [...new Set(Object.keys(values ?? {}).map((id) =>
+    controlIdForParameter(byId.get(id), target)).filter(Boolean))];
+  if (controlIds.length === 0) return null;
+
+  const capture = () => {
+    const sessions = get(panelPreviewSessions) ?? {};
+    return Object.fromEntries(controlIds.map((controlId) => [controlId,
+      Object.prototype.hasOwnProperty.call(sessions, controlId)
+        ? { exists: true, session: deepClone(sessions[controlId]) }
+        : { exists: false }]));
+  };
+  const restore = (entries) => restorePanelPreviewSessionEntries(deepClone(entries ?? {}));
+  return beginHistoryTransaction({ capture, restore });
+}
+
+export function commitSnapshotValueHistory(transaction) {
+  return commitHistoryTransaction(transaction);
 }
 
 /** Recall a snapshot: write every value it holds, instantly. */
@@ -135,7 +178,9 @@ export function recallSnapshot(snapshotId) {
   const snapshot = panelSnapshots(panel).find((s) => s.id === snapshotId);
   if (!snapshot) { cwarn(`[snapshot] No snapshot "${snapshotId}" on this panel.`); return 0; }
 
+  const history = beginSnapshotValueHistory(snapshot.values, { panel });
   const written = applyValues(snapshot.values, { panel });
+  commitSnapshotValueHistory(history);
   lastMorphSent.delete(panel?.id);
   cinfo(`[snapshot] Recalled "${snapshot.name}" — ${written} parameter(s).`);
   return written;

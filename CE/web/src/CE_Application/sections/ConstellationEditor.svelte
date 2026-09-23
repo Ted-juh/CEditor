@@ -1,10 +1,10 @@
 <script>
-  import { get } from 'svelte/store';
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { panelPreviewSessions } from '../stores/interactionPreview.js';
   import { isRangeBehavior, getRangeMin, getRangeMax, getCurrentRangeValue } from '../utils/rangeBehavior.js';
   import { autoArrange, captureConstellationValues } from '../utils/constellationLayout.js';
+  import { flatControls } from '../utils/containment.js';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -59,9 +59,9 @@
   // Capture-from-patch (shared with Timbre): the panel's current bound values.
   function currentParamValues() {
     const controls = $activePanel?.controls ?? [];
-    const sessions = get(panelPreviewSessions) ?? {};
+    const sessions = $panelPreviewSessions ?? {};
     const map = {};
-    for (const c of controls) {
+    for (const c of flatControls(controls)) {
       const beh = c?._children?.Behavior;
       if (!isRangeBehavior(beh)) continue;
       const bindings = c?._children?.DeviceBindings?.bindings;

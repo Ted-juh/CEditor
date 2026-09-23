@@ -3,7 +3,7 @@
   // ScriptWorkspace). Cloned from the DPD shell: fixed frame, nav-rail by lifecycle,
   // screens via display:none/.active, list -> detail. Spec: docs/design/panel-api-spec.md.
   import './behaviorDesigner.css';
-  import { onMount, untrack } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import ScriptPicker from './ScriptPicker.svelte';
   import CodeEditor from './CodeEditor.svelte';
   import ScriptConsole from './ScriptConsole.svelte';
@@ -31,8 +31,8 @@
   // `panel` is the panel document, for the picker's module filtering and for validating a
   // script against the modules the panel declares. Null on the standalone debug route, where
   // there is no document — the picker then shows everything rather than nothing.
-  let { panelName = 'Untitled Panel', panelId = null, panel = null, controls = [], initialScripts = [],
-        onEnableModule = null, onChange = null } = $props();
+  let { panelName = 'Untitled Panel', panelId = null, documentId = null, panel = null, controls = [], initialScripts = [],
+         onEnableModule = null, onChange = null } = $props();
 
   let codeEditor = $state(null);   // the CodeEditor instance, for insert-at-cursor
   // Right-hand docked panel: one column with Insert / Library / History tabs (default open).
@@ -341,36 +341,51 @@
     tsLoadTick; // re-run after the compiler finishes loading
     for (const s of scripts) { s.language; s.source; } // track language + source of every script
     const needsCompiler = untrack(() => syncCompileTs());
-    if (needsCompiler) ensureTs().then((m) => { if (m) tsLoadTick++; });
+    if (needsCompiler) ensureTs().then((m) => { if (m && !destroyed) tsLoadTick++; });
   });
 
-  // Persist to the panel (debounced) whenever any script changes — add/edit/rename/folder/delete.
-  // saveState drives the footer indicator: 'saved' (clean) | 'pending' (edited, not yet flushed).
+  // Persist each edit immediately so closing a workspace cannot remove its document before a
+  // debounce writes the last change. The debounce only coalesces the saved indicator and version
+  // history; the parent store is already current while the tab's close confirmation runs.
+  // saveState drives the footer indicator: 'saved' (clean) | 'pending' (edited, not yet settled).
   let saveTimer = null;
   let saveState = $state('saved');
   let firstSnapshot = true;
-  let pendingSnap = null;
+  let destroyed = false;
+  function settleSnapshot() {
+    saveState = 'saved';
+    const s = scripts.find((x) => x.id === selectedId);
+    if (s) { recordVersion(s.id, s.source); historyTick++; } // coalesces internally
+  }
   $effect(() => {
     const snap = $state.snapshot(scripts); // deep-reads scripts so the effect tracks every change
-    pendingSnap = snap;
     if (firstSnapshot) { firstSnapshot = false; return; } // initial seed isn't an edit
     saveState = 'pending';
+    onChange?.(snap, documentId);
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      onChange?.(pendingSnap);
-      saveState = 'saved';
-      const s = scripts.find((x) => x.id === selectedId);
-      if (s) { recordVersion(s.id, s.source); historyTick++; } // coalesces internally
+      saveTimer = null;
+      settleSnapshot();
     }, 400);
   });
   function saveNow() {
     clearTimeout(saveTimer);
+    saveTimer = null;
     syncCompileTs(); // make sure the manual save captures the latest transpiled TS, if compiler is loaded
     const snap = $state.snapshot(scripts);
-    pendingSnap = snap;
-    onChange?.(snap);
-    saveState = 'saved';
+    onChange?.(snap, documentId);
+    settleSnapshot();
   }
+  function flushPendingSave() {
+    if (saveTimer == null && saveState !== 'pending') return;
+    saveNow();
+  }
+  // Settle pending history work when the component goes away. Script workspaces are keyed by the
+  // instance's document prop, so even this final write never asks which tab is active later.
+  onDestroy(() => {
+    destroyed = true;
+    flushPendingSave();
+  });
 
   // Cursor position reported by the code editor, shown in the footer.
   let caret = $state({ line: 1, col: 1 });
@@ -545,8 +560,10 @@
   async function importScriptFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const fallbackLanguage = selected?.language ?? 'lua';
     const text = await file.text();
-    const overrides = scriptOverridesFromFile(file.name, text, selected?.language ?? 'lua');
+    if (destroyed) return;
+    const overrides = scriptOverridesFromFile(file.name, text, fallbackLanguage);
     const event = inferEventFromSource(text, KNOWN_EVENT_NAMES) ?? 'onValueChanged';
     const s = createScript({ ...overrides, event });
     scripts = [...scripts, s];

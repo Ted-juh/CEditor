@@ -6,9 +6,9 @@
   import Layers from 'lucide-svelte/icons/layers';
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
-  import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
+  import { getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
-  import { activateColorTarget } from '../stores/colorTarget.js';
+  import { activateInspectorColorTarget } from '../stores/colorTarget.js';
   import { activeControlSet } from '../stores/controlSets.js';
   import { resolveColourLiteral, tokenNameOf } from '../models/controlSets.js';
   import { ensureFillGradientSeeded, openFillGradientEditor } from '../stores/gradientTarget.js';
@@ -139,6 +139,7 @@
       fill,
       defaultGradient: DEFAULT_FILL_GRADIENT,
       seedGradient: (seeded) => set(`${pathPrefix}.Fill.gradient`, seeded),
+      inspector: true,
     });
   }
 
@@ -241,7 +242,7 @@
     if (!core?.id) return;
     const fillProp = prop.startsWith('bg') ? (panelKeyToFillProp(prop, prop.startsWith('bgImage') ? 'Image' : 'Texture')) : prop;
     if (!fillProp) return;
-    activateColorTarget(
+    activateInspectorColorTarget(
       { type: 'control', controlId: core.id, path: `${pathPrefix}.Fill.${fillProp}` },
       currentColor
     );
@@ -344,7 +345,7 @@
 
   function handleSwatchClick() {
     if (!core?.id || !fill?.colour) return;
-    activateColorTarget(
+    activateInspectorColorTarget(
       { type: 'control', controlId: core.id, path: `${pathPrefix}.Fill.colour` },
       fill.colour
     );

@@ -3,6 +3,7 @@ import { equalityWritable } from '../utils/equalityStore.js';
 import { panels, resolvedActivePanelId, selectedComponentId, selectedComponentIds, keyObjectId } from './panels.js';
 import { getSection } from '../models/componentTypes.js';
 import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
+import { findControlById } from '../utils/containment.js';
 
 const DEFAULT_SCOPE = {
   mode: 'base',
@@ -45,7 +46,7 @@ export const availableStateEditNames = derived(
     if (targetId == null) return [];
     const panel = $panels.find((item) => item.id === $resolvedActivePanelId);
     if (!panel) return [];
-    const control = panel.controls.find((item) => item._children?.Core?.id === targetId) ?? null;
+    const control = findControlById(panel.controls, targetId);
     return Object.keys(getSection(control, 'States')?._children ?? {});
   }
 );
@@ -57,7 +58,7 @@ export const selectedScopedEditingControl = derived(
     if (targetId == null) return null;
     const panel = $panels.find((item) => item.id === $resolvedActivePanelId);
     if (!panel) return null;
-    const control = panel.controls.find((item) => item._children?.Core?.id === targetId) ?? null;
+    const control = findControlById(panel.controls, targetId);
     if (!control) return null;
     if ($stateEditScope?.mode !== 'state' || !$stateEditScope?.stateName) return control;
     return resolveStateScopedControl(control, $stateEditScope.stateName);

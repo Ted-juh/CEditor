@@ -426,6 +426,70 @@ export function readCaretOffset(root, selection) {
 }
 
 /**
+ * A serialisable selection inside `root`.
+ *
+ * DOM Ranges are tied to the nodes they were created from. The notepad is
+ * unmounted while its user visits the Colors tab, so keeping a cloned Range
+ * across that trip leaves it pointing at a detached tree. Character offsets
+ * survive both the unmount and the later HTML parse.
+ */
+export function readSelectionOffsets(root, selection) {
+  const range = currentRange(selection, root);
+  if (!range) return null;
+  const start = caretOffsetWithin(root, range.startContainer, range.startOffset);
+  const end = caretOffsetWithin(root, range.endContainer, range.endOffset);
+  if (start == null || end == null) return null;
+  return { start, end };
+}
+
+function textPointAtOffset(root, offset) {
+  const nodes = collectTextNodes(root);
+  let remaining = Math.max(0, Number(offset) || 0);
+  for (const node of nodes) {
+    const length = textLength(node);
+    if (remaining <= length) return { node, offset: remaining };
+    remaining -= length;
+  }
+  const last = nodes[nodes.length - 1];
+  return last
+    ? { node: last, offset: textLength(last) }
+    : { node: root, offset: 0 };
+}
+
+/** Restore a serialised selection, clamping both ends to the available text. */
+export function restoreSelectionOffsets(root, offsets, selection, document) {
+  if (!root || !offsets || !selection || !document) return false;
+  const startValue = Math.max(0, Number(offsets.start) || 0);
+  const endValue = Math.max(startValue, Number(offsets.end) || 0);
+  const start = textPointAtOffset(root, startValue);
+  const end = textPointAtOffset(root, endValue);
+  const range = document.createRange();
+  range.setStart(start.node, start.offset);
+  range.setEnd(end.node, end.offset);
+  selection.removeAllRanges();
+  selection.addRange(range);
+  return true;
+}
+
+/**
+ * Apply a colour to a detached editor using a serialised selection.
+ *
+ * A tiny Selection-shaped adapter is enough for the Range helpers and avoids
+ * putting the detached scratch editor into the browser's live Selection.
+ */
+export function applyTextColourAtOffsets(root, offsets, hex, document) {
+  let range = null;
+  const selection = {
+    get rangeCount() { return range ? 1 : 0; },
+    getRangeAt() { return range; },
+    removeAllRanges() { range = null; },
+    addRange(next) { range = next; },
+  };
+  if (!restoreSelectionOffsets(root, offsets, selection, document)) return false;
+  return !!applyTextColour(root, selection, hex, document);
+}
+
+/**
  * Put the caret back `offset` characters into `root`, clamping to the end.
  *
  * Clamping matters: the content this caret is being restored into is usually
@@ -458,6 +522,119 @@ export function restoreCaretOffset(root, offset, selection, document) {
   selection.removeAllRanges();
   selection.addRange(range);
   return true;
+}
+
+const NOTEPAD_ALLOWED_TAGS = new Set([
+  'B', 'BR', 'DIV', 'EM', 'FONT', 'I', 'LI', 'OL', 'P', 'S', 'SPAN', 'STRIKE',
+  'STRONG', 'SUB', 'SUP', 'U', 'UL',
+]);
+
+// These elements can run code, load remote resources, submit data, or conceal
+// an executable subtree. Their contents are discarded rather than unwrapped.
+const NOTEPAD_DROP_TAGS = new Set([
+  'AUDIO', 'BASE', 'BUTTON', 'EMBED', 'FORM', 'IFRAME', 'IMG', 'INPUT', 'LINK',
+  'MATH', 'META', 'OBJECT', 'PICTURE', 'SCRIPT', 'SELECT', 'SOURCE', 'STYLE',
+  'SVG', 'TEMPLATE', 'TEXTAREA', 'VIDEO',
+]);
+
+const NOTEPAD_ALLOWED_STYLES = new Map([
+  ['background-color', 'backgroundColor'],
+  ['color', 'color'],
+  ['font-family', 'fontFamily'],
+  ['font-size', 'fontSize'],
+  ['font-style', 'fontStyle'],
+  ['font-weight', 'fontWeight'],
+  ['text-align', 'textAlign'],
+  ['text-decoration', 'textDecoration'],
+]);
+
+const UNSAFE_STYLE_VALUE = /(?:url\s*\(|expression\s*\(|javascript\s*:|@import|-moz-binding)/i;
+
+function styleValue(element, cssName, jsName) {
+  return String(element?.style?.getPropertyValue?.(cssName) ?? element?.style?.[jsName] ?? '').trim();
+}
+
+function removeAllAttributes(element) {
+  const names = typeof element?.getAttributeNames === 'function'
+    ? element.getAttributeNames()
+    : Array.from(element?.attributes ?? [], (attribute) => attribute?.name).filter(Boolean);
+  for (const name of names) element.removeAttribute?.(name);
+}
+
+function setSafeStyle(element, cssName, jsName, value) {
+  if (!value || UNSAFE_STYLE_VALUE.test(value)) return;
+  if (typeof element?.style?.setProperty === 'function') element.style.setProperty(cssName, value);
+  else if (element?.style) element.style[jsName] = value;
+}
+
+function unwrapElement(element) {
+  const parent = element?.parentNode;
+  if (!parent) return;
+  for (const child of [...(element.childNodes ?? [])]) parent.insertBefore(child, element);
+  parent.removeChild(element);
+}
+
+/**
+ * Remove executable/resource-loading markup from an already parsed note tree.
+ * Exported separately so the security policy can be tested without a browser
+ * HTML parser.
+ */
+export function sanitizeNotepadTree(root) {
+  if (!root) return root;
+  for (const node of [...(root.childNodes ?? [])]) {
+    if (node?.nodeType === TEXT_NODE) continue;
+    if (node?.nodeType !== ELEMENT_NODE) {
+      root.removeChild?.(node);
+      continue;
+    }
+
+    const tag = String(node.tagName ?? '').toUpperCase();
+    if (NOTEPAD_DROP_TAGS.has(tag)) {
+      root.removeChild?.(node);
+      continue;
+    }
+
+    sanitizeNotepadTree(node);
+    if (!NOTEPAD_ALLOWED_TAGS.has(tag)) {
+      unwrapElement(node);
+      continue;
+    }
+
+    const safeStyles = [];
+    for (const [cssName, jsName] of NOTEPAD_ALLOWED_STYLES) {
+      const value = styleValue(node, cssName, jsName);
+      if (value && !UNSAFE_STYLE_VALUE.test(value)) safeStyles.push([cssName, jsName, value]);
+    }
+    const legacyFont = tag === 'FONT' ? {
+      color: String(node.getAttribute?.('color') ?? ''),
+      face: String(node.getAttribute?.('face') ?? ''),
+      size: String(node.getAttribute?.('size') ?? ''),
+    } : null;
+
+    removeAllAttributes(node);
+    if (node.style && typeof node.style.cssText === 'string') node.style.cssText = '';
+    else if (node.style) {
+      for (const name of Object.keys(node.style)) delete node.style[name];
+    }
+    for (const [cssName, jsName, value] of safeStyles) setSafeStyle(node, cssName, jsName, value);
+
+    // Preserve the safe subset of markup emitted by the pre-Range notepad.
+    if (legacyFont) {
+      if (/^(?:#[0-9a-f]{3,8}|[a-z]+)$/i.test(legacyFont.color)) node.setAttribute?.('color', legacyFont.color);
+      if (/^[\w ,'-]{1,120}$/.test(legacyFont.face)) node.setAttribute?.('face', legacyFont.face);
+      if (/^[1-7]$/.test(legacyFont.size)) node.setAttribute?.('size', legacyFont.size);
+    }
+  }
+  return root;
+}
+
+/** Parse note HTML inertly, apply the allowlist, and return safe rich text. */
+export function sanitizeNotepadHtml(html, document) {
+  if (!document?.createElement) return '';
+  const template = document.createElement('template');
+  template.innerHTML = String(html ?? '');
+  sanitizeNotepadTree(template.content ?? template);
+  return template.innerHTML;
 }
 
 /**

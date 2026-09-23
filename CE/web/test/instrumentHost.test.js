@@ -103,7 +103,9 @@ import {
   applyVersion,
   diffVersions,
   hostLibrary,
+  hostRackCaptures,
   requestLibrary,
+  requestRackCaptures,
   saveUserPreset,
   saveChainToLibrary,
   rackCanvasLayout,
@@ -649,6 +651,20 @@ test('mock reducer: the library round trip — search, capture, favourite, load-
   removeLibraryRecord('lib-1');
   assert.equal(get(hostLibrary).records.some((r) => r.recordId === 'lib-1'), true,
     'factory records refuse removal in the mock too');
+});
+
+test('setlist rack lookup does not replace the active sound-library view', () => {
+  requestLibrary('warm', 'preset');
+  const before = get(hostLibrary);
+
+  requestRackCaptures();
+
+  assert.deepEqual(get(hostLibrary).request, before.request,
+    'the Sounds browser keeps its query while Setlist loads rack choices');
+  assert.deepEqual(get(hostLibrary).records.map((record) => record.recordId),
+    before.records.map((record) => record.recordId));
+  assert.ok(get(hostRackCaptures).length > 0);
+  assert.ok(get(hostRackCaptures).every((record) => record.type === 'rack'));
 });
 
 test('a facet chip cycles off → keep → refuse, and alt-click goes straight to refuse', () => {

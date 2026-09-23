@@ -80,6 +80,12 @@
   // the preview cell can be four pixels wide.
   let selStep = $state(0);
   let selRow = $state(0);
+  $effect(() => {
+    const lastStep = Math.max(0, steps - 1);
+    const lastRow = Math.max(0, rows - 1);
+    if (selStep > lastStep) selStep = lastStep;
+    if (selRow > lastRow) selRow = lastRow;
+  });
   let selCell = $derived.by(() => {
     try { return cellAt(phrasePattern(control), selStep, selRow); } catch { return null; }
   });

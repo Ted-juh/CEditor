@@ -3,6 +3,7 @@
    * ColorSettings — Format display, Harmony swatches, Tint/Shade variations,
    * Quick actions, Opacity presets, and Bit Depth for the Colors tab sidebar.
    */
+  import { onDestroy } from 'svelte';
   import Copy from 'lucide-svelte/icons/copy';
   import Check from 'lucide-svelte/icons/check';
   import Sun from 'lucide-svelte/icons/sun';
@@ -20,6 +21,11 @@
   let harmonyType = $state('complementary');
   let bitDepth = $state('24');
   let copied = $state(false);
+  let copiedTimer = null;
+
+  onDestroy(() => {
+    if (copiedTimer) clearTimeout(copiedTimer);
+  });
 
   function applyColor(hex6, a = alpha) {
     onApplyColor?.(alphaToHex(a) + hex6);
@@ -69,7 +75,11 @@
     try {
       await navigator.clipboard.writeText(formattedColor);
       copied = true;
-      setTimeout(() => copied = false, 1200);
+      if (copiedTimer) clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => {
+        copiedTimer = null;
+        copied = false;
+      }, 1200);
     } catch {
       // Fallback: no-op
     }

@@ -1456,7 +1456,11 @@
     window.removeEventListener('mouseup', handleResizeEnd);
     window.removeEventListener('blur', handleResizeEnd);
 
-    if (core?.id) {
+    const changed = transientX !== resizeStartRect.x
+      || transientY !== resizeStartRect.y
+      || transientW !== resizeStartRect.w
+      || transientH !== resizeStartRect.h;
+    if (core?.id && changed) {
       applyControlPatchesById(new Map([[
         core.id,
         {
@@ -3386,7 +3390,7 @@
   role={previewInteractive && previewRole ? previewRole
     : (inPreview && previewImageRole ? 'img' : undefined)}
   data-preview-role={previewInteractive ? (previewRole || '') : undefined}
-  tabindex={previewInteractive ? effectiveTabIndex : undefined}
+  tabindex={previewInteractive && !isListboxControl ? effectiveTabIndex : undefined}
   aria-label={previewInteractive || (inPreview && previewImageRole) ? previewAriaLabel : undefined}
   aria-disabled={previewInteractive ? previewAriaDisabled : undefined}
   aria-checked={previewInteractive ? previewAriaChecked : undefined}
@@ -3573,6 +3577,12 @@
         control={listboxRenderControl}
         width={displayW}
         height={displayH}
+        interactive={previewInteractive}
+        tabIndex={previewInteractive ? effectiveTabIndex : undefined}
+        ariaLabel={previewAriaLabel}
+        ariaDisabled={previewAriaDisabled}
+        onfocus={onpreviewfocus}
+        onblur={onpreviewblur}
         selectedValue={interactionRuntime?.signals?.valueRaw ?? resolveInteractionContext(listboxRenderControl, appliedPreviewSession).valueRaw}
         selectedValues={listboxMultiSet}
         pendingValue={previewSession?.listboxPending ?? ''}
@@ -3858,8 +3868,8 @@
                     {#each customTextLayout.glyphs as glyph}
                       {#if glyph.render}
                         <text
-                          x={customTextOrigin.x + glyph.x}
-                          y={customTextOrigin.y + glyph.y}
+                          x={glyph.x}
+                          y={glyph.y}
                           text-anchor="middle"
                           dominant-baseline="middle"
                           fill="#000"
@@ -3867,7 +3877,7 @@
                           stroke-width={Math.max(0, customFlowDecorations.underline.gap * 2)}
                           paint-order="stroke fill"
                           style={customFlowTextMaskStyle}
-                          transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
+                          transform={glyph.rotation ? `rotate(${glyph.rotation} ${glyph.x} ${glyph.y})` : null}
                         >{glyph.char}</text>
                       {/if}
                     {/each}
@@ -3883,8 +3893,8 @@
                     {#each customTextLayout.glyphs as glyph}
                       {#if glyph.render}
                         <text
-                          x={customTextOrigin.x + glyph.x}
-                          y={customTextOrigin.y + glyph.y}
+                          x={glyph.x}
+                          y={glyph.y}
                           text-anchor="middle"
                           dominant-baseline="middle"
                           fill="#000"
@@ -3892,7 +3902,7 @@
                           stroke-width={Math.max(0, customFlowDecorations.strikethrough.gap * 2)}
                           paint-order="stroke fill"
                           style={customFlowTextMaskStyle}
-                          transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
+                          transform={glyph.rotation ? `rotate(${glyph.rotation} ${glyph.x} ${glyph.y})` : null}
                         >{glyph.char}</text>
                       {/if}
                     {/each}
@@ -3908,8 +3918,8 @@
                     {#each customTextLayout.glyphs as glyph}
                       {#if glyph.render}
                         <text
-                          x={customTextOrigin.x + glyph.x}
-                          y={customTextOrigin.y + glyph.y}
+                          x={glyph.x}
+                          y={glyph.y}
                           text-anchor="middle"
                           dominant-baseline="middle"
                           fill="#000"
@@ -3917,7 +3927,7 @@
                           stroke-width={Math.max(0, customFlowDecorations.overline.gap * 2)}
                           paint-order="stroke fill"
                           style={customFlowTextMaskStyle}
-                          transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
+                          transform={glyph.rotation ? `rotate(${glyph.rotation} ${glyph.x} ${glyph.y})` : null}
                         >{glyph.char}</text>
                       {/if}
                     {/each}

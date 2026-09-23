@@ -33,7 +33,10 @@
       tabindex="0"
       aria-selected={row.name === selectedName}
       onclick={() => onselect(row.name)}
-      onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onselect(row.name); } }}
+      onkeydown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onselect(row.name); }
+      }}
     >
       <button
         type="button"

@@ -207,7 +207,25 @@ function applyPanelSessionEffects(controls, sessions, panel = null) {
   return applyPanelDependentChoices(controls, routed);
 }
 
+// The editor's active panel lives in stores/panels. The exported Player deliberately owns its
+// panel as local Svelte state instead, but it uses this same session engine. Let that entry point
+// provide its current panel so links, value routes, cascading choices and control-aware patches do
+// not silently disappear just because there is no editor tab behind the window.
+let previewPanelProvider = null;
+
+export function setInteractionPreviewPanelProvider(provider = null) {
+  previewPanelProvider = typeof provider === 'function' ? provider : null;
+}
+
 function getActivePanel() {
+  if (previewPanelProvider) {
+    try {
+      const provided = previewPanelProvider();
+      if (provided) return provided;
+    } catch {
+      // A provider is view-owned; fall back to the editor store while it is being torn down.
+    }
+  }
   const activePanelId = get(resolvedActivePanelId);
   if (activePanelId == null) return null;
   return get(panels).find((entry) => entry.id === activePanelId) ?? null;
@@ -240,7 +258,7 @@ function createPreviewSessionsMap(controls = []) {
     nextSessions[controlId] = createInteractionPreviewSession(control);
     return nextSessions;
   }, {});
-  return applyPanelSessionEffects(controlList, sessions);
+  return applyPanelSessionEffects(controlList, sessions, getActivePanel());
 }
 
 export function updateInteractionPreviewSession(controlId, patch = {}) {
@@ -346,7 +364,7 @@ export function syncPanelPreviewSessions(controls = []) {
 
   const currentKeys = Object.keys(current ?? {});
   if (currentKeys.length !== Object.keys(next).length) changed = true;
-  const routed = applyPanelSessionEffects(controlList, next);
+  const routed = applyPanelSessionEffects(controlList, next, getActivePanel());
   if (changed || routed !== next) panelPreviewSessions.set(routed);
 }
 
@@ -398,6 +416,29 @@ export function updatePanelPreviewSessions(patches = []) {
   if (nextSessions !== current) {
     panelPreviewSessions.set(applyPanelSessionEffects(controls, nextSessions, panel));
   }
+}
+
+/**
+ * Restore complete session records for a bounded set of controls.
+ *
+ * Snapshot undo needs exact replacement rather than patch merging: an untouched parameter has no
+ * override at all, and merging the later override back into that session would make Undo display
+ * the random value again. `exists: false` preserves that absence too.
+ */
+export function restorePanelPreviewSessionEntries(entries = {}) {
+  const panel = getActivePanel();
+  const { controls } = controlIndex(panel?.controls);
+  const current = get(panelPreviewSessions) ?? {};
+  let next = current;
+
+  for (const [controlId, entry] of Object.entries(entries ?? {})) {
+    if (!controlId) continue;
+    if (next === current) next = { ...current };
+    if (entry?.exists === false) delete next[controlId];
+    else next[controlId] = entry?.session ?? {};
+  }
+
+  if (next !== current) panelPreviewSessions.set(applyPanelSessionEffects(controls, next, panel));
 }
 
 export function resetPanelPreviewSessions(controls = []) {

@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { get } from 'svelte/store';
-import { scriptApiForTesting, setRuntimeHost } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptApiForTesting, setRuntimeHost, resetScriptStateForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { CE_API_VERSION, RUNTIME_WEBVIEW } from '../src/CE_Application/scripting/panelApi.js';
 
@@ -268,14 +268,26 @@ test('the note verbs build the bytes the MIDI spec calls for', () => {
   // `n` is midiNote(note), resolved once — sendNote now also schedules the note off when given a
   // duration, and re-resolving the name for that would let a note start on one pitch and end on
   // another if noteName ever changed under it.
-  assert.match(runtimeSource, /0x90 \| midiCh\(ch\), n,/, 'note on is 0x90');
-  assert.match(runtimeSource, /0x80 \| midiCh\(ch\), n, 0/, 'the scheduled note off is 0x80');
-  assert.match(runtimeSource, /0x80 \| midiCh\(ch\), midiNote\(note\)/, 'and explicit sendNoteOff is 0x80');
+  assert.match(runtimeSource, /0x90 \| channel, n,/, 'note on is 0x90');
+  assert.match(runtimeSource, /0x80 \| channel, n, 0/, 'the scheduled note off is 0x80');
+  assert.match(runtimeSource, /0x80 \| channel, n, midiInt\(velocity/, 'and explicit sendNoteOff is 0x80');
   assert.match(runtimeSource, /0xC0 \| midiCh\(ch\)/, 'program change is 0xC0');
   assert.match(runtimeSource, /0xE0 \| midiCh\(ch\), v % 128, Math\.floor\(v \/ 128\)/, 'pitch bend is lsb then msb');
   assert.match(runtimeSource, /0xD0 \| midiCh\(ch\)/, 'channel pressure is 0xD0');
   assert.match(runtimeSource, /0xA0 \| midiCh\(ch\)/, 'poly pressure is 0xA0');
   assert.match(runtimeSource, /\[0xF8\]/, 'clock is 0xF8');
+});
+
+test('tearing down a script sends pending duration note-offs before cancelling timers', () => {
+  resetScriptStateForTesting();
+  clearScriptTrace();
+  api.sendNote(1, 60, 100, 60_000);
+  clearScriptTrace();
+
+  resetScriptStateForTesting();
+
+  const midi = get(scriptTrace).filter((entry) => entry.kind === 'midi').map((entry) => entry.message);
+  assert.ok(midi.some((line) => /80 3C 00/.test(line)), 'teardown cancelled the promised note-off');
 });
 
 test('bank select is sent before the program change', () => {

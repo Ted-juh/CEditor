@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import { getSection, applyControlPatch } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -41,7 +42,12 @@
   ]);
   let libraryEntries = $derived($customComponentLibrary ?? []);
   let selectedLibraryId = $state('');
+  let confirmRemoveId = $state('');
   let selectedLibraryEntry = $derived(libraryEntries.find((entry) => entry.id === selectedLibraryId) ?? null);
+
+  $effect(() => {
+    if (confirmRemoveId && confirmRemoveId !== selectedLibraryId) confirmRemoveId = '';
+  });
   let librarySearch = $state('');
   let libraryValidity = $state('all');
   let libraryKind = $state('all');
@@ -56,6 +62,8 @@
   let packageLicense = $state('');
   let packageHomepage = $state('');
   let packageTags = $state('custom-component');
+  let packageMetadataKey = '';
+  let importFileRequest = 0;
   let packageText = $state('');
   let importText = $state('');
   let importPreview = $derived(parseImportPreview(importText));
@@ -128,11 +136,18 @@
   ];
 
   $effect(() => {
-    if (!packageName && core?.name) packageName = core.name;
-  });
-
-  $effect(() => {
-    if (!packageDescription && designer?.notes) packageDescription = designer.notes;
+    const key = `${core?.id ?? ''}:${designer?.packageFingerprint ?? designer?.packageId ?? ''}`;
+    if (key === packageMetadataKey) return;
+    packageMetadataKey = key;
+    const source = designer?.sourcePackage ?? {};
+    packageName = designer?.packageName || source.name || core?.name || '';
+    packageVersion = designer?.packageVersion || source.version || '1.0.0';
+    packageAuthor = source.author || '';
+    packageDescription = designer?.notes || '';
+    packageCategory = source.category || 'custom';
+    packageLicense = source.license || '';
+    packageHomepage = source.homepage || '';
+    packageTags = 'custom-component';
   });
 
   $effect(() => {
@@ -452,11 +467,21 @@
     importText = '';
   }
 
-  function removeFromLibrary() {
+  function removeFromLibrary(event) {
     if (!selectedLibraryId) return;
+    if (event?.detail > 1) return;
+    if (confirmRemoveId !== selectedLibraryId) {
+      confirmRemoveId = selectedLibraryId;
+      return;
+    }
     customComponentLibrary.remove(selectedLibraryId);
+    confirmRemoveId = '';
     selectedLibraryId = '';
     libraryStatus = 'Removed';
+  }
+
+  function guardRepeatedRemoveKey(event) {
+    if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
   }
 
   function renameLibraryEntry() {
@@ -505,15 +530,21 @@
   async function importPackageFile(event) {
     const file = event?.target?.files?.[0];
     if (!file) return;
+    const request = ++importFileRequest;
     try {
-      importText = await file.text();
+      const text = await file.text();
+      if (request !== importFileRequest) return;
+      importText = text;
       libraryStatus = `Loaded file ${file.name}`;
     } catch (error) {
+      if (request !== importFileRequest) return;
       libraryStatus = error?.message ?? 'File import failed';
     } finally {
       if (event?.target) event.target.value = '';
     }
   }
+
+  onDestroy(() => { importFileRequest += 1; });
 </script>
 
 <!--
@@ -775,7 +806,10 @@
         <button class="library-btn" type="button" onclick={duplicateLibraryEntry}>Copy</button>
       </PropertyCell>
       <PropertyCell label="Remove" span={1} hint="Remove the selected local package from this machine.">
-        <button class="library-btn danger" type="button" onclick={removeFromLibrary}>Remove</button>
+        <button class="library-btn danger" type="button" onclick={removeFromLibrary}
+                onkeydown={guardRepeatedRemoveKey}>
+          {confirmRemoveId === selectedLibraryId ? 'Confirm remove' : 'Remove'}
+        </button>
       </PropertyCell>
     {/if}
     <PropertyCell label="Import" span={3} hint="Paste one package JSON, a package array, or a ceditor-component-library bundle.">

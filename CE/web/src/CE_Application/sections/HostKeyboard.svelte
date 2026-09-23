@@ -26,6 +26,7 @@
    * There used to be a second keyboard for this under the rack, linear in semitones, which
    * never lined up with the piano above it. One keyboard, one geometry (pianoGeometry.js).
    */
+  import { onDestroy } from 'svelte';
   import { hostNote, hostState, hostKeyboardMode, showKeyboardPlay, showPartRange,
            setPartMidiRules, partColor } from '../stores/instrumentHost.js';
   import { FULL_KEYBOARD, MAX_COMPLETE_OCTAVES, isBlack, noteName, whiteCount,
@@ -76,21 +77,44 @@
 
   // --- playing -------------------------------------------------------------------------
   let pressed = $state(new Set());
+  const heldSources = new Map();
   let mouseNote = -1;
   let mouseDown = false;
 
-  function press(note, velocity) {
-    if (pressed.has(note)) return;
-    pressed = new Set(pressed).add(note);
-    hostNote(note, velocity, true);
+  function refreshPressed() {
+    pressed = new Set(heldSources.values());
   }
 
-  function release(note) {
-    if (!pressed.has(note)) return;
-    const next = new Set(pressed);
-    next.delete(note);
-    pressed = next;
-    hostNote(note, 0, false);
+  function press(source, note, velocity) {
+    const previous = heldSources.get(source);
+    if (previous === note) return;
+    if (previous !== undefined) release(source);
+    const alreadyHeld = [...heldSources.values()].includes(note);
+    heldSources.set(source, note);
+    refreshPressed();
+    if (!alreadyHeld) hostNote(note, velocity, true);
+  }
+
+  function release(source) {
+    const note = heldSources.get(source);
+    if (note === undefined) return;
+    heldSources.delete(source);
+    const stillHeld = [...heldSources.values()].includes(note);
+    refreshPressed();
+    if (!stillHeld) hostNote(note, 0, false);
+  }
+
+  function releaseAll() {
+    const notes = new Set(heldSources.values());
+    heldSources.clear();
+    pressed = new Set();
+    mouseDown = false;
+    mouseNote = -1;
+    for (const note of notes) hostNote(note, 0, false);
+  }
+
+  function visibilityChanged() {
+    if (document.hidden) releaseAll();
   }
 
   function velocityFrom(event) {
@@ -102,19 +126,19 @@
   function keyDown(note, event) {
     mouseDown = true;
     mouseNote = note;
-    press(note, velocityFrom(event));
+    press('mouse', note, velocityFrom(event));
   }
 
   function keyEnter(note, event) {
     if (!mouseDown) return;
-    if (mouseNote >= 0 && mouseNote !== note) release(mouseNote);
+    if (mouseNote >= 0 && mouseNote !== note) release('mouse');
     mouseNote = note;
-    press(note, velocityFrom(event));
+    press('mouse', note, velocityFrom(event));
   }
 
   function mouseUp() {
     mouseDown = false;
-    if (mouseNote >= 0) release(mouseNote);
+    if (mouseNote >= 0) release('mouse');
     mouseNote = -1;
   }
 
@@ -124,12 +148,12 @@
     if (key === 'escape' && mode === 'range') { cancelRangeDrag(); showKeyboardPlay(); return; }
     if (key === 'z') { shiftOctave(-1); return; }
     if (key === 'x') { shiftOctave(1); return; }
-    if (key in KEYMAP) press(noteAt(baseOctave, KEYMAP[key]), 100);
+    if (key in KEYMAP) press(`key:${event.code || key}`, noteAt(baseOctave, KEYMAP[key]), 100);
   }
 
   function typeUp(event) {
     const key = event.key.toLowerCase();
-    if (key in KEYMAP) release(noteAt(baseOctave, KEYMAP[key]));
+    if (key in KEYMAP) release(`key:${event.code || key}`);
   }
 
   function shiftOctave(amount) {
@@ -224,9 +248,12 @@
 
   const pct = (fraction) => `${(fraction * 100).toFixed(3)}%`;
   const partLabel = (part) => part.pluginName || (part.hardware ? part.midiOutputName || 'hardware' : 'empty');
+
+  onDestroy(releaseAll);
 </script>
 
-<svelte:window onmouseup={mouseUp} onkeydown={typeDown} onkeyup={typeUp} />
+<svelte:window onmouseup={mouseUp} onkeydown={typeDown} onkeyup={typeUp} onblur={releaseAll} />
+<svelte:document onvisibilitychange={visibilityChanged} />
 
 <div class="host-keyboard" class:range={mode === 'range'} data-testid="host-keyboard" data-mode={mode}>
   <div class="side">

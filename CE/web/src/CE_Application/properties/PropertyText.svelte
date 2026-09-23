@@ -1,4 +1,6 @@
 <script>
+  import { tick } from 'svelte';
+
   /**
    * The shared single-line text field.
    *
@@ -29,9 +31,45 @@
     onfocus = null,
   } = $props();
 
+  let valueGeneration = 0;
+  let suppressCommit = false;
+
+  // When a controlled field rejects an edit or normalizes it back to the same
+  // prop value, Svelte has no prop change to write into the DOM. Re-apply the
+  // canonical value after the caller has had one render tick to accept it.
+  $effect(() => {
+    value;
+    valueGeneration += 1;
+  });
+
+  async function handleChange(event) {
+    if (suppressCommit) {
+      suppressCommit = false;
+      return;
+    }
+    const input = event.currentTarget;
+    const generation = ++valueGeneration;
+    commit?.(input.value, event);
+    await tick();
+    if (generation === valueGeneration && input.isConnected) {
+      input.value = String(value ?? '');
+    }
+  }
+
   function handleKeydown(event) {
-    if (event.key !== 'Enter') return;
-    event.currentTarget.blur();
+    if (event.key === 'Enter') {
+      event.currentTarget.blur();
+      return;
+    }
+    if (event.key !== 'Escape') return;
+    const input = event.currentTarget;
+    valueGeneration += 1;
+    suppressCommit = true;
+    input.value = String(value ?? '');
+    event.preventDefault();
+    event.stopPropagation();
+    input.blur();
+    queueMicrotask(() => { suppressCommit = false; });
   }
 </script>
 
@@ -47,7 +85,7 @@
   style:text-align={align}
   aria-label={ariaLabel || undefined}
   oninput={(e) => oninput?.(e.currentTarget.value, e)}
-  onchange={(e) => commit?.(e.currentTarget.value, e)}
+  onchange={handleChange}
   onfocus={(e) => onfocus?.(e)}
   onkeydown={handleKeydown}
 />

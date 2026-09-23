@@ -82,6 +82,18 @@
   let baking = $state(false);
   let bakeBusy = $state(false);
   let status = $state('');
+  let bakeControlId = '';
+  let bakeGeneration = 0;
+
+  $effect(() => {
+    const nextControlId = controlId;
+    if (nextControlId === bakeControlId) return;
+    bakeControlId = nextControlId;
+    bakeGeneration += 1;
+    bakeBusy = false;
+    baking = false;
+    status = '';
+  });
 
   // --- Measuring --------------------------------------------------------------
   // Keyed by source, so switching back to an asset is instant and a changed source re-measures.
@@ -223,33 +235,40 @@ onMount(() => {
 
   async function importAsset(kind, file) {
     if (!controlId || !file) return;
+    const targetId = controlId;
     try {
       const source = await readFile(file);
+      if (controlId !== targetId) return;
       if (!source.startsWith('data:image/')) { status = 'That is not an image file.'; return; }
       const size = await measure(source);
+      if (controlId !== targetId) return;
       measured.set(source, size);
       const name = uniqueName(kind, safeAssetFileName(file.name.replace(/\.[^.]+$/, ''), kind));
       const asset = importedAsset({ kind, name, source, width: size.width, height: size.height, fileName: file.name });
-      patch({ [assetPath(kind, name)]: asset });
+      applyControlPatch(targetId, { [assetPath(kind, name)]: asset });
       wantedKey = `${kind}:${name}`;
       rawFrameIndex = 0;
       status = kind === 'filmstrip'
         ? `Imported ${file.name} — ${asset.frameCount} frames guessed from its shape, check below`
         : `Imported ${file.name}`;
     } catch (error) {
-      status = error?.message ?? 'Import failed';
+      if (controlId === targetId) status = error?.message ?? 'Import failed';
     }
   }
 
   async function runBake(options) {
     if (!controlId || bakeBusy) return;
+    const targetId = controlId;
+    const targetControl = control;
+    const generation = ++bakeGeneration;
     bakeBusy = true;
     status = 'Baking…';
     try {
-      const asset = await bakeCustomComponentFilmstrip(control, options);
+      const asset = await bakeCustomComponentFilmstrip(targetControl, options);
+      if (controlId !== targetId) return;
       // The generator is written alongside the asset for the same reason the properties panel does
       // it: a baked strip nothing draws is a file, not a component.
-      patch({
+      applyControlPatch(targetId, {
         [assetPath('filmstrip', asset.name)]: asset,
         [`Generators.${asset.name}Filmstrip`]: {
           _type: 'Generator',
@@ -266,9 +285,9 @@ onMount(() => {
       baking = false;
       status = `Baked ${asset.frameCount} frames into ${asset.name}`;
     } catch (error) {
-      status = error?.message ?? 'Bake failed';
+      if (controlId === targetId) status = error?.message ?? 'Bake failed';
     } finally {
-      bakeBusy = false;
+      if (controlId === targetId && generation === bakeGeneration) bakeBusy = false;
     }
   }
 

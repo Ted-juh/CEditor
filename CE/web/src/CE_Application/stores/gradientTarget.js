@@ -1,6 +1,7 @@
 import { writable, get } from 'svelte/store';
 import { resolvedActivePanelId, selectedComponentIds } from './panels.js';
-import { updateControlProperty } from './controls.js';
+import { inspectorStateNameForPath, updateControlProperty, updateInspectorControlProperty } from './controls.js';
+import { stateEditScope } from './stateEditScope.js';
 
 /**
  * Gradient target binding store.
@@ -42,6 +43,14 @@ export function activateGradientTarget(target, currentGradient) {
   return grad;
 }
 
+export function activateInspectorGradientTarget(target, currentGradient) {
+  const gradientPath = target?.path ? `${target.path}.gradient` : '';
+  const stateName = target?.type === 'control'
+    ? inspectorStateNameForPath(gradientPath)
+    : '';
+  return activateGradientTarget({ ...target, _inspectorStateName: stateName }, currentGradient);
+}
+
 /**
  * Apply a gradient change from the GradientEditor to the active target.
  * Called by DisplayPanel when editing a targeted gradient.
@@ -60,7 +69,12 @@ export function applyGradientToTarget(newGradient) {
   if (target.type !== 'control') return false;
 
   // Write gradient to the control property
-  updateControlProperty(target.controlId, `${target.path}.gradient`, newGradient);
+  const path = `${target.path}.gradient`;
+  if (Object.prototype.hasOwnProperty.call(target, '_inspectorStateName')) {
+    updateInspectorControlProperty(target.controlId, path, newGradient, target._inspectorStateName);
+  } else {
+    updateControlProperty(target.controlId, path, newGradient);
+  }
   return true;
 }
 
@@ -86,6 +100,12 @@ resolvedActivePanelId.subscribe(() => {
   if (get(gradientTarget)) gradientTarget.set(null);
 });
 
+let stateScopeSeen = false;
+stateEditScope.subscribe(() => {
+  if (!stateScopeSeen) { stateScopeSeen = true; return; }
+  if (get(gradientTarget)) gradientTarget.set(null);
+});
+
 /**
  * Shared seed helper for the fill editors (Background / Text / custom-surface —
  * previously three near-identical copies): returns the fill's gradient when it
@@ -104,8 +124,9 @@ export function ensureFillGradientSeeded({ fill, defaultGradient, seedGradient }
  * Seed-and-open in one step: ensure the Fill has a usable gradient, then
  * activate the gradient target at `targetPath` (the Fill node's path).
  */
-export function openFillGradientEditor({ controlId, targetPath, fill, defaultGradient, seedGradient }) {
+export function openFillGradientEditor({ controlId, targetPath, fill, defaultGradient, seedGradient, inspector = false }) {
   if (!controlId || !targetPath) return null;
   const gradient = ensureFillGradientSeeded({ fill, defaultGradient, seedGradient });
-  return activateGradientTarget({ type: 'control', controlId, path: targetPath }, gradient);
+  const activate = inspector ? activateInspectorGradientTarget : activateGradientTarget;
+  return activate({ type: 'control', controlId, path: targetPath }, gradient);
 }

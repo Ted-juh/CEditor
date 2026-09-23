@@ -22,7 +22,7 @@
   import { activePanel } from '../stores/panels.js';
   import NumberCell from '../properties/NumberCell.svelte';
   import StopColourPopover from './StopColourPopover.svelte';
-  import { beginStopEdit, previewStopColour, commitStopEdit, cancelStopEdit } from '../utils/stopColourEdit.js';
+  import { beginStopEdit, previewStopColour, commitStopEdit, cancelStopEdit, gradientEditSignature, ownsGradientEdit } from '../utils/stopColourEdit.js';
 
   const SECTION_ORDER_STORAGE_KEY = 'ce.gradientSettings.sectionOrder.v1';
   const DEFAULT_SECTION_ORDER = ['type', 'geometry', 'shape', 'edge', 'stops', 'presets'];
@@ -102,28 +102,68 @@
   // `stopEdit` is the record from utils/stopColourEdit.js: { index, original }.
   let stopEdit = $state(null);
   let editingStopIndex = $derived(stopEdit ? stopEdit.index : null);
+  let stopEditOwner = null;
+  let stopEditExpectedSignature = '';
+
+  function gradientEditOwner() {
+    return $gradientTarget ?? ($activePanel ? `panel:${$activePanel.id}` : null);
+  }
+
+  function stopEditStillOwned() {
+    return !!stopEdit
+      && ownsGradientEdit(stopEditOwner, gradientEditOwner(), stopEditExpectedSignature, gradient);
+  }
+
+  function closeStaleStopEdit() {
+    stopEdit = null;
+    stopEditOwner = null;
+    stopEditExpectedSignature = '';
+  }
+
+  $effect(() => {
+    // Undo/redo or a replacement gradient target can change the destination
+    // while the popover is still mounted. End the edit rather than replaying
+    // its old stop snapshot into the new gradient.
+    gradient;
+    $gradientTarget;
+    $activePanel;
+    if (stopEdit && !stopEditStillOwned()) closeStaleStopEdit();
+  });
 
   function openStopEditor(index) {
     const edit = beginStopEdit(gradient.stops, index);
     if (!edit) return;
     onSelectStop?.(index);
     stopEdit = edit;
+    stopEditOwner = gradientEditOwner();
+    stopEditExpectedSignature = gradientEditSignature(gradient);
   }
 
   function handleStopColourInput(colour) {
-    onchange({ ...gradient, stops: previewStopColour(gradient.stops, stopEdit, colour) });
+    if (!stopEditStillOwned()) { closeStaleStopEdit(); return; }
+    const next = { ...gradient, stops: previewStopColour(gradient.stops, stopEdit, colour) };
+    stopEditExpectedSignature = gradientEditSignature(next);
+    onchange(next);
   }
 
   function handleStopColourCommit(colour) {
+    if (!stopEditStillOwned()) { closeStaleStopEdit(); return; }
     const result = commitStopEdit(gradient.stops, stopEdit, colour);
-    onchange({ ...gradient, stops: result.stops });
+    const next = { ...gradient, stops: result.stops };
+    stopEditExpectedSignature = gradientEditSignature(next);
+    onchange(next);
     stopEdit = result.edit;
+    if (!stopEdit) closeStaleStopEdit();
   }
 
   function handleStopColourCancel() {
+    if (!stopEditStillOwned()) { closeStaleStopEdit(); return; }
     const result = cancelStopEdit(gradient.stops, stopEdit);
-    onchange({ ...gradient, stops: result.stops });
+    const next = { ...gradient, stops: result.stops };
+    stopEditExpectedSignature = gradientEditSignature(next);
+    onchange(next);
     stopEdit = result.edit;
+    if (!stopEdit) closeStaleStopEdit();
   }
 
   // Contextual controls based on gradient type
@@ -224,9 +264,9 @@
           <div class="section-sub-label offset">Centre</div>
           <div class="input-row">
             <span class="input-prefix">X</span>
-            <NumberCell min={0} max={100} value={gradient.centerX} defaultValue={50} onchange={(v) => update({ centerX: parseInt(v) || 50 })} />
+            <NumberCell min={0} max={100} value={gradient.centerX} defaultValue={50} onchange={(v) => update({ centerX: Number.isFinite(Number(v)) ? Math.round(Number(v)) : 50 })} />
             <span class="input-prefix" style="margin-left: 4px">Y</span>
-            <NumberCell min={0} max={100} value={gradient.centerY} defaultValue={50} onchange={(v) => update({ centerY: parseInt(v) || 50 })} />
+            <NumberCell min={0} max={100} value={gradient.centerY} defaultValue={50} onchange={(v) => update({ centerY: Number.isFinite(Number(v)) ? Math.round(Number(v)) : 50 })} />
           </div>
         {/if}
         {#if showRadius}

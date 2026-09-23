@@ -131,12 +131,18 @@
     <label class="row">
       <span>Output</span>
       <select class="val" aria-label="MIDI output" disabled={!role} value={mapping?.midiDestination?.id ?? 'previewOnly'} onchange={(e) => changePort('midiDestination', e.target.value)}>
+        {#if mapping?.midiDestination?.id && !destinations.some((port) => port.id === mapping.midiDestination.id)}
+          <option value={mapping.midiDestination.id}>Unavailable · {mapping.midiDestination.name || mapping.midiDestination.id}</option>
+        {/if}
         {#each destinations as port (port.id)}<option value={port.id}>{port.name}</option>{/each}
       </select>
     </label>
     <label class="row">
       <span>Input</span>
       <select class="val" aria-label="MIDI input" disabled={!role} value={mapping?.midiInput?.id ?? 'none'} onchange={(e) => changePort('midiInput', e.target.value)}>
+        {#if mapping?.midiInput?.id && !inputs.some((port) => port.id === mapping.midiInput.id)}
+          <option value={mapping.midiInput.id}>Unavailable · {mapping.midiInput.name || mapping.midiInput.id}</option>
+        {/if}
         {#each inputs as port (port.id)}<option value={port.id}>{port.name}</option>{/each}
       </select>
     </label>

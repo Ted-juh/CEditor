@@ -6,7 +6,7 @@
   // highlight, smart Tab/auto-indent, bracket & quote auto-closing, comment toggle,
   // find & replace, and font zoom. Native textarea undo/redo and copy/paste are kept
   // intact by routing every programmatic edit through document.execCommand('insertText').
-  import { tick } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import { highlight, lineCommentToken, matchingBracket, identifierOccurrences } from './codeHighlight.js';
   import { analyze, getCompletions, getHover, getDefinition, getSignatureHelp, getFoldRegions, wordAt } from '../scripting/languageService.js';
   import { projectFolds, pruneFolds } from './foldModel.js';
@@ -74,8 +74,17 @@
   $effect(() => {
     const v = value;
     clearTimeout(analyzeTimer);
+    analyzeTimer = null;
     if (v.length < 4000) { analyzedSource = v; return; } // small: parse immediately
-    analyzeTimer = setTimeout(() => { analyzedSource = v; }, 250);
+    const timer = setTimeout(() => {
+      if (analyzeTimer === timer) analyzeTimer = null;
+      analyzedSource = v;
+    }, 250);
+    analyzeTimer = timer;
+    return () => {
+      clearTimeout(timer);
+      if (analyzeTimer === timer) analyzeTimer = null;
+    };
   });
   let analysis = $derived(analyze(analyzedSource, language));
   let diagnostics = $derived(analysis.diagnostics);
@@ -202,6 +211,7 @@
     void value; void theme; void language; void showMinimap;
     if (showMinimap) drawMinimap();
   });
+  let cancelMinimapDrag = null;
   function minimapScrollTo(clientY) {
     if (!taEl || !minimapWrap) return;
     const r = minimapWrap.getBoundingClientRect();
@@ -211,11 +221,21 @@
   }
   function onMinimapDown(e) {
     e.preventDefault();
+    cancelMinimapDrag?.();
     minimapScrollTo(e.clientY);
     const move = (ev) => minimapScrollTo(ev.clientY);
-    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      window.removeEventListener('blur', up);
+      if (cancelMinimapDrag === up) cancelMinimapDrag = null;
+    };
+    cancelMinimapDrag = up;
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    window.addEventListener('blur', up);
   }
 
   function syncCaret() {
@@ -335,7 +355,7 @@
       hover = info ? { ...info, cx, cy } : null;
     }, 220);
   }
-  function clearHover() { clearTimeout(hoverTimer); hover = null; }
+  function clearHover() { clearTimeout(hoverTimer); hoverTimer = null; hover = null; }
 
   // Move the caret to an offset and scroll it into view.
   function jumpTo(index) {
@@ -805,6 +825,12 @@
     taEl.focus();
   }
   export function focus() { taEl?.focus(); }
+
+  onDestroy(() => {
+    cancelMinimapDrag?.();
+    clearTimeout(analyzeTimer);
+    clearHover();
+  });
 
   // Move a node to <body> so fixed-positioned popups aren't clipped by an ancestor's
   // overflow or transformed containing block.

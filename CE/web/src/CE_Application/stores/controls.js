@@ -61,7 +61,12 @@ export const selectedControls = derived(
   }
 );
 
-const STATE_SCOPABLE_PREFIXES = ['Background.', 'Text.', 'Icon.', 'Effects.', 'ContentLayout.'];
+const STATE_SCOPABLE_PREFIXES = [
+  'Background.', 'Text.', 'Icon.', 'Effects.', 'ContentLayout.',
+  // Screen lighting is edited from the same state-aware Effects tab. Keeping these roots out of
+  // the scope made a state-labelled edit silently overwrite the base Display/Pixel document.
+  'Display.', 'Pixel.',
+];
 const STATE_SCOPABLE_EXACT = new Set(['Transform.scale', 'Transform.rotation', 'Transform.opacity']);
 
 function isStateScopablePath(path) {
@@ -70,7 +75,7 @@ function isStateScopablePath(path) {
   return STATE_SCOPABLE_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
-function activeStateScopeNameForPath(path) {
+export function inspectorStateNameForPath(path) {
   const scope = get(stateEditScope);
   if (scope?.mode !== 'state' || !scope?.stateName) return '';
   return isStateScopablePath(path) ? scope.stateName : '';
@@ -95,6 +100,15 @@ function applyStateScopedValue(control, stateName, path, value) {
   const patchMap = ensureStatePatchMap(control, stateName);
   if (!patchMap) return false;
 
+  // A whole-node replacement supersedes every older leaf override below it.
+  // Leaving both entries in this flat map lets the older child apply after
+  // the new parent (for example Display.fields followed by a stale
+  // Display.fields.0.colour), so the UI immediately resurrects old data.
+  const descendantPrefix = `${path}.`;
+  for (const existingPath of Object.keys(patchMap)) {
+    if (existingPath.startsWith(descendantPrefix)) delete patchMap[existingPath];
+  }
+
   const baseValue = valueAtPath(control, path);
   if (deepEqual(baseValue, value)) {
     delete patchMap[path];
@@ -105,12 +119,20 @@ function applyStateScopedValue(control, stateName, path, value) {
 }
 
 export function applyResolvedValue(control, path, value) {
-  const stateName = activeStateScopeNameForPath(path);
-  if (stateName) {
-    return applyStateScopedValue(control, stateName, path, value);
-  }
   setNestedValue(control, path, value);
   return true;
+}
+
+/**
+ * Apply a property edit made by a state-aware inspector. Generic document
+ * writers deliberately do not consult the global inspector scope: scripts,
+ * previews and canvas commands must keep writing the base document. When a
+ * pinned inspector points at a control without the selected state, fall back
+ * to the base value instead of accepting and then dropping the edit.
+ */
+export function applyInspectorResolvedValue(control, path, value, stateName = inspectorStateNameForPath(path)) {
+  if (stateName && applyStateScopedValue(control, stateName, path, value)) return true;
+  return applyResolvedValue(control, path, value);
 }
 
 function isBehaviorPath(path) {
@@ -152,6 +174,17 @@ export function updateSelectedProperty(path, value) {
 
     return nextList;
   });
+}
+
+export function updateSelectedInspectorProperty(path, value, stateName = inspectorStateNameForPath(path)) {
+  const panelId = get(resolvedActivePanelId);
+  const ids = get(selectedComponentIds);
+  if (panelId == null || ids.size === 0) return;
+
+  panels.update((list) => mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
+    applyInspectorResolvedValue(draft, path, value, stateName);
+    return true;
+  }));
 }
 
 /**
@@ -535,6 +568,32 @@ export function updateControlProperty(controlId, path, value) {
   applyControlPatchesById(new Map([[controlId, { [path]: value }]]));
 }
 
+export function updateInspectorControlProperty(
+  controlId,
+  path,
+  value,
+  stateName = inspectorStateNameForPath(path),
+) {
+  const panelId = get(resolvedActivePanelId);
+  if (panelId == null) {
+    mutateComponentDocumentControl(controlId, (draft) => {
+      applyInspectorResolvedValue(draft, path, value, stateName);
+      return true;
+    });
+    return;
+  }
+
+  panels.update((list) => mutatePanelControlsInList(
+    list,
+    panelId,
+    (control) => control?._children?.Core?.id === controlId,
+    (draft) => {
+      applyInspectorResolvedValue(draft, path, value, stateName);
+      return true;
+    },
+  ));
+}
+
 export function applyControlPatchesById(patchesByControlId, targetPanelId = get(resolvedActivePanelId)) {
   const panelId = targetPanelId;
   if (!patchesByControlId || patchesByControlId.size === 0) return;
@@ -585,6 +644,30 @@ export function applyControlPatchesById(patchesByControlId, targetPanelId = get(
 export function applyControlPatch(controlId, patch) {
   if (!patch || Object.keys(patch).length === 0) return;
   applyControlPatchesById(new Map([[controlId, patch]]));
+}
+
+export function applyInspectorControlPatch(controlId, patch) {
+  if (!patch || Object.keys(patch).length === 0) return;
+  const panelId = get(resolvedActivePanelId);
+
+  const applyPatch = (draft) => {
+    for (const [path, value] of Object.entries(patch)) {
+      applyInspectorResolvedValue(draft, path, value);
+    }
+    return true;
+  };
+
+  if (panelId == null) {
+    mutateComponentDocumentControl(controlId, applyPatch);
+    return;
+  }
+
+  panels.update((list) => mutatePanelControlsInList(
+    list,
+    panelId,
+    (control) => control?._children?.Core?.id === controlId,
+    applyPatch,
+  ));
 }
 
 export function applySelectedPatch(patch) {

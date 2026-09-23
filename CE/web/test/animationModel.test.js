@@ -292,6 +292,8 @@ test('a duplicate name is suffixed rather than silently doing nothing', () => {
   assert.equal(uniqueAnimationName(['a'], 'a'), 'a2');
   assert.equal(uniqueAnimationName(['a', 'a2'], 'a'), 'a3');
   assert.equal(uniqueAnimationName([], 'fresh'), 'fresh');
+  assert.equal(uniqueAnimationName([], 'enabled'), 'enabled2',
+    'the section-level enabled switch cannot be replaced by an animation child');
   assert.equal(uniqueAnimationName([], '  '), '', 'nothing usable means nothing made');
 });
 
@@ -299,6 +301,7 @@ test('a rename says why it cannot happen', () => {
   assert.equal(renameBlockedBecause(['a', 'b'], 'a', 'c'), '');
   assert.equal(renameBlockedBecause(['a', 'b'], 'a', 'a'), '', 'renaming to itself is fine');
   assert.match(renameBlockedBecause(['a', 'b'], 'a', 'b'), /already an animation called b/);
+  assert.match(renameBlockedBecause(['a'], 'a', 'enabled'), /reserved/);
   assert.match(renameBlockedBecause(['a'], 'a', '   '), /letters, digits or underscores/);
 });
 

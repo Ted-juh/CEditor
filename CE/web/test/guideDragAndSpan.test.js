@@ -147,12 +147,17 @@ test('the ruler no longer ships an empty create-drag move handler', () => {
   assert.match(ruler, /createDragMove\s*=\s*\(ev\)\s*=>/);
   // The preview goes through the shared store, not through local component state.
   assert.match(ruler, /draggingGuide\.set\(pendingGuideOf\(measure\(ev\)\)\)/);
-  // …and the commit path clears it before every early return, so no ghost can survive mouseup.
+  // …and the commit path runs the shared cleanup before every early return, so no ghost can
+  // survive mouseup. Blur and component destruction use that same cleanup path.
+  const cleanup = ruler.slice(ruler.indexOf('const stopCreateDrag'));
+  assert.match(cleanup, /draggingGuide\.set\(null\)/);
   const end = ruler.slice(ruler.indexOf('const createDragEnd'));
   assert.ok(
-    end.indexOf('draggingGuide.set(null)') < end.indexOf('if (!drag?.outside) return'),
+    end.indexOf('stopCreateDrag()') < end.indexOf('if (!drag?.outside) return'),
     'the preview is cleared before the cancel path returns',
   );
+  assert.match(ruler, /window\.addEventListener\('blur', stopCreateDrag\)/);
+  assert.match(ruler, /onDestroy\(\(\) => \{[\s\S]*?cancelCreateDrag\?\.\(\);[\s\S]*?cancelMarkerDrag\(\);/);
 });
 
 test('the pending guide is drawn on the ruler for its own axis only', () => {

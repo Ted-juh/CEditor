@@ -92,10 +92,38 @@ export function captureValues(parameters, readValue, scope = null) {
   return values;
 }
 
+let fallbackSnapshotSequence = 0;
+
+/** A capture identity must stay unique even when name, value count and timestamp are identical. */
+export function createSnapshotId() {
+  try {
+    if (globalThis.crypto?.randomUUID) return `snap_${globalThis.crypto.randomUUID()}`;
+  } catch { /* use the process-local fallback */ }
+  fallbackSnapshotSequence += 1;
+  return `snap_${Date.now().toString(36)}_${fallbackSnapshotSequence.toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** Repair old or hand-authored snapshot lists whose ids are absent or repeated. */
+export function dedupeSnapshotIds(snapshots) {
+  if (!Array.isArray(snapshots)) return [];
+  const used = new Set();
+  return snapshots.map((snapshot) => {
+    const current = String(snapshot?.id ?? '').trim();
+    if (current && !used.has(current)) {
+      used.add(current);
+      return snapshot;
+    }
+    let id = createSnapshotId();
+    while (used.has(id)) id = createSnapshotId();
+    used.add(id);
+    return { ...(snapshot && typeof snapshot === 'object' ? snapshot : {}), id };
+  });
+}
+
 /** A snapshot record. `now` is injected so two captures of the same state can be compared. */
 export function makeSnapshot({ id = '', name = '', values = {}, scope = '', now = null } = {}) {
   return {
-    id: id || `snap_${Object.keys(values).length}_${name.replace(/\W+/g, '_').toLowerCase()}`,
+    id: id || createSnapshotId(),
     name: String(name || 'Snapshot'),
     scope: String(scope || 'panel'),
     capturedAt: now ?? new Date().toISOString(),

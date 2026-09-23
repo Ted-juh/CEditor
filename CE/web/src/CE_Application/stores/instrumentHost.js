@@ -93,7 +93,13 @@ export const hostAudioDevices = writable(emptyAudioDevices());
 export const hostProject = writable(emptyHostProject());
 export const hostBuild = writable(emptyHostBuild());
 export const hostParameters = writable(emptyHostParameters());
+// Several host views share this registry. Coalesce repeated reads for a target while one is
+// in flight, but replay the latest request after the reply: a return can be added while the
+// first read is still running, and that response may contain the old parameter roster.
+const parameterRequestsInFlight = new Set();
+const parameterRequestsPending = new Set();
 export const hostLibrary = writable(emptyHostLibrary());
+export const hostRackCaptures = writable([]);
 export const hostLibraryLoad = writable(normalizeLibraryLoad());
 
 export function normalizeLibraryLoad(payload = {}) {
@@ -7042,13 +7048,25 @@ export function initInstrumentHostBridge() {
   onInstrumentHostAudioDevices((payload) => hostAudioDevices.set(normalizeAudioDevices(payload)));
   onInstrumentHostProject((payload) => hostProject.set(normalizeHostProject(payload)));
   onInstrumentHostBuildProgress((payload) => hostBuild.update((b) => applyBuildProgress(b, payload)));
-  onInstrumentHostParameters((payload) => hostParameters.set(normalizeHostParameters(payload)));
+  onInstrumentHostParameters((payload) => {
+    const partId = String(payload?.partId ?? '');
+    parameterRequestsInFlight.delete(partId);
+    hostParameters.set(normalizeHostParameters(payload));
+    if (parameterRequestsPending.delete(partId)) requestParameters(partId);
+  });
   onInstrumentHostParamValues((payload) => {
     hostParameters.update((r) => applyParamValues(r, payload));
     hostState.update((state) => applyControlSlotValues(state, payload));
   });
   onInstrumentHostMeters(receiveHostMeters);
-  onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
+  onInstrumentHostLibrary((payload) => {
+    const normalized = normalizeHostLibrary(payload);
+    if (payload?.consumer === 'setlist') {
+      hostRackCaptures.set(normalized.records.filter((record) => record.type === 'rack'));
+      return;
+    }
+    hostLibrary.set(normalized);
+  });
   onInstrumentHostVersionDiff((payload) => hostVersionDiff.set(normalizeVersionDiff(payload)));
   onInstrumentHostSimilar((payload) => hostSimilar.set(normalizeSimilar(payload)));
   onInstrumentHostUnplayed((payload) => hostUnplayed.set(normalizeUnplayed(payload)));
@@ -7258,6 +7276,10 @@ export function initInstrumentHostBridge() {
     if (payload?.done === true) send({ cmd: 'getState' });
   });
   onInstrumentHostError((payload) => {
+    // The error channel is not request-addressed. Release outstanding reads so the next
+    // explicit request can retry instead of leaving a failed target stuck forever.
+    parameterRequestsInFlight.clear();
+    parameterRequestsPending.clear();
     clearSaveNotice();
     hostLastError.set(String(payload?.message ?? ''));
   });
@@ -7558,9 +7580,14 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'getLibrary' || payload?.cmd === 'scanLibrary') {
-      mockLibraryView = payload.cmd === 'getLibrary' ? normalizeLibraryQuery(payload)
-                                                     : mockLibraryView;
-      hostLibrary.set(mockHostLibrary(mockLibraryView));
+      const requestedView = payload.cmd === 'getLibrary' ? normalizeLibraryQuery(payload)
+                                                         : mockLibraryView;
+      if (!payload.consumer) mockLibraryView = requestedView;
+      const library = mockHostLibrary(requestedView);
+      if (payload.consumer === 'setlist')
+        hostRackCaptures.set(library.records.filter((record) => record.type === 'rack'));
+      else
+        hostLibrary.set(library);
       return;
     }
     if (payload?.cmd === 'analyseLibrary') {
@@ -8239,7 +8266,21 @@ export const closeEditorWindow = (partId) => send({ cmd: 'closeEditorWindow', pa
 export const requestAudioDevices = () => send({ cmd: 'getAudioDevices' });
 export const setAudioDevice = (name) => send({ cmd: 'setAudioDevice', name });
 export const setMidiInputEnabled = (id, enabled) => send({ cmd: 'setMidiInputEnabled', id, enabled });
-export const requestParameters = (partId) => send({ cmd: 'getParameters', partId });
+export function requestParameters(partId) {
+  const id = String(partId ?? '');
+  if (!id) return;
+  if (parameterRequestsInFlight.has(id)) {
+    parameterRequestsPending.add(id);
+    return;
+  }
+  parameterRequestsInFlight.add(id);
+  send({ cmd: 'getParameters', partId: id });
+  // The browser mock answers synchronously inside send(); it has no bridge event to clear this.
+  if (!isJuceAvailable()) {
+    parameterRequestsInFlight.delete(id);
+    parameterRequestsPending.delete(id);
+  }
+}
 export const setParameter = (partId, id, value) => send({ cmd: 'setParameter', partId, id, value });
 export const setParameterText = (partId, id, text) => send({ cmd: 'setParameterText', partId, id, text });
 export const quickLearnParameter = (partId, parameterId) =>
@@ -8457,6 +8498,7 @@ export const requestLibrary = (query = '', type = '') =>
   (typeof query === 'object' && query !== null
     ? send({ cmd: 'getLibrary', ...normalizeLibraryQuery(query) })
     : send({ cmd: 'getLibrary', query, type }));
+export const requestRackCaptures = () => send({ cmd: 'getLibrary', type: 'rack', consumer: 'setlist' });
 
 /** Save the view you are looking at as a rail entry. Omitting the query means "what is on
     screen", which is the gesture: filter until the results are right, then name them. */

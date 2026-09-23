@@ -1,6 +1,6 @@
 <script>
   import { controlSources } from '../utils/controlSources.js';
-  import { getSection, updateControlProperty } from '../stores/controls.js';
+  import { getSection, inspectorStateNameForPath, updateInspectorControlProperty as updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
   import { ZONE_SHOW_KINDS, WIDGET_ZONE_KINDS, isActiveSource, activeFilterOf, BAR_CHARS } from '../utils/lcdZones.js';
@@ -64,9 +64,9 @@
     controlSources($activePanel?.controls, 'range', core?.id)
   );
 
-  function set(prop, value) {
+  function set(prop, value, stateName = undefined) {
     if (!core?.id) return;
-    updateControlProperty(core.id, `Display.${prop}`, value);
+    updateControlProperty(core.id, `Display.${prop}`, value, stateName);
   }
 
   // On picking a source, adopt its value range so pct/bar tokens scale correctly.
@@ -164,19 +164,27 @@
 
   function onPickImage(event) {
     const file = event?.target?.files?.[0];
-    if (!file) return;
+    if (!file || !core?.id) return;
+    const targetId = core.id;
+    const targetState = inspectorStateNameForPath('Display.imageSrc');
     const reader = new FileReader();
-    reader.onload = () => set('imageSrc', String(reader.result ?? ''));
+    reader.onload = () => {
+      if (core?.id !== targetId) return;
+      updateControlProperty(targetId, 'Display.imageSrc', String(reader.result ?? ''), targetState);
+    };
     reader.readAsDataURL(file);
   }
 
   function onPickAnim(event) {
     const file = event?.target?.files?.[0];
-    if (!file) return;
+    if (!file || !core?.id) return;
+    const targetId = core.id;
+    const targetState = inspectorStateNameForPath('Display.animSrc');
     const reader = new FileReader();
     reader.onload = () => {
-      if (file.type === 'image/gif') set('animFrames', 0);
-      set('animSrc', String(reader.result ?? ''));
+      if (core?.id !== targetId) return;
+      if (file.type === 'image/gif') updateControlProperty(targetId, 'Display.animFrames', 0, targetState);
+      updateControlProperty(targetId, 'Display.animSrc', String(reader.result ?? ''), targetState);
     };
     reader.readAsDataURL(file);
   }

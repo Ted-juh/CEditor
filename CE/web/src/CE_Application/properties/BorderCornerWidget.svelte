@@ -1,11 +1,12 @@
 <script>
+  import { onDestroy } from 'svelte';
   import NumberCell from './NumberCell.svelte';
   import LineTypeGrid from './LineTypeGrid.svelte';
   import CornerGradientModePicker from './CornerGradientModePicker.svelte';
   import CornerShapeCenter from './CornerShapeCenter.svelte';
   import { sideStyleOptions } from './lineTypeSvgs.js';
-  import { activateColorTarget } from '../stores/colorTarget.js';
-  import { activateGradientTarget } from '../stores/gradientTarget.js';
+  import { activateInspectorColorTarget } from '../stores/colorTarget.js';
+  import { activateInspectorGradientTarget } from '../stores/gradientTarget.js';
   import Image from 'lucide-svelte/icons/image';
   import Layers from 'lucide-svelte/icons/layers';
   import { deepClone } from '../utils/deepClone.js';
@@ -69,12 +70,19 @@
   // --- Thickness/gap "All" writers ---
   // Fan a single value out to both border (all sides) and corners (all keys)
   function writeAll(prop, value) {
-    if (border?.linked) set(borderPropPath(prop), value);
-    else for (const s of SIDES) set(borderPropPath(`${s}.${prop}`), value);
-    set(borderPropPath(prop), value);
-    if (corners?.linked) set(cornersPropPath(prop), value);
-    else for (const k of CORNERS) set(cornersPropPath(`${k}.${prop}`), value);
-    set(cornersPropPath(prop), value);
+    if (border?.linked) {
+      set(borderPropPath(prop), value);
+    } else {
+      for (const s of SIDES) set(borderPropPath(`${s}.${prop}`), value);
+      // Keep the root value as the seed used when the sides are linked again.
+      set(borderPropPath(prop), value);
+    }
+    if (corners?.linked) {
+      set(cornersPropPath(prop), value);
+    } else {
+      for (const k of CORNERS) set(cornersPropPath(`${k}.${prop}`), value);
+      set(cornersPropPath(prop), value);
+    }
   }
 
   function setAllThickness(value) { writeAll('thickness', value); }
@@ -251,7 +259,7 @@
       ? buildColorTarget({ path, colour, kind: ctx.kind, selected, data: ctx.data })
       : (controlId ? { type: 'control', controlId, path } : null);
     if (!target) return;
-    activateColorTarget(target, colour);
+    activateInspectorColorTarget(target, colour);
   }
 
   // --- Fill modes (unified) ---
@@ -259,6 +267,15 @@
   // Path captured at click time so an async file pick always writes to the
   // cell that was selected when the dialog was opened.
   let pendingFilePath = $state(null);
+  let activeReader = null;
+  let fileReadGeneration = 0;
+
+  onDestroy(() => {
+    fileReadGeneration += 1;
+    activeReader?.abort();
+    activeReader = null;
+    pendingFilePath = null;
+  });
 
   function fillProp(mode) {
     return `fill${mode[0].toUpperCase() + mode.slice(1)}`;
@@ -292,7 +309,7 @@
       ? buildGradientTarget({ path: rootPath, gradient: currentGrad, kind: ctx.kind, selected, data: ctx.data })
       : (controlId ? { type: 'control', controlId, path: rootPath } : null);
     if (!target) return;
-    activateGradientTarget(target, currentGrad);
+    activateInspectorGradientTarget(target, currentGrad);
   }
 
   function handleFillClick(mode) {
@@ -315,8 +332,18 @@
     if (!file || !pendingFilePath) { e.target.value = ''; return; }
     const path = pendingFilePath;
     pendingFilePath = null;
+    activeReader?.abort();
+    const generation = ++fileReadGeneration;
     const reader = new FileReader();
-    reader.onload = () => set(path, reader.result);
+    activeReader = reader;
+    reader.onload = () => {
+      if (generation !== fileReadGeneration) return;
+      activeReader = null;
+      set(path, reader.result);
+    };
+    reader.onerror = reader.onabort = () => {
+      if (generation === fileReadGeneration) activeReader = null;
+    };
     reader.readAsDataURL(file);
     e.target.value = '';
   }

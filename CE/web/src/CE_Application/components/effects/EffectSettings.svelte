@@ -5,7 +5,7 @@
   import PropertyToggle from '../../properties/PropertyToggle.svelte';
   import NumberCell from '../../properties/NumberCell.svelte';
   import OpenInDock from '../../properties/OpenInDock.svelte';
-  import { activateColorTarget } from '../../stores/colorTarget.js';
+  import { activateInspectorColorTarget } from '../../stores/colorTarget.js';
 
   let { row = null, values = null, controlId = '', colourRoot = null, stackIndex = -1, stackSize = 0,
     onset = () => {}, ontoggle = () => {}, onreorder = () => {} } = $props();
@@ -55,7 +55,7 @@
               disabled={field.when ? !field.when(values ?? {}) : false} onchange={(v) => onset(row, field.key, v)} />
           {:else if field.kind === 'colour'}
             <PropertyColor value={String(values?.[field.key] ?? 'FFFFFFFF')} onchange={(v) => colourChanged(field.key, v)}
-              onswatchclick={() => activateColorTarget({ type: 'control', controlId, path: `${colourRoot ?? row.root}.${field.key}` }, String(values?.[field.key] ?? 'FFFFFFFF'))} />
+              onswatchclick={() => activateInspectorColorTarget({ type: 'control', controlId, path: `${colourRoot ?? row.root}.${field.key}` }, String(values?.[field.key] ?? 'FFFFFFFF'))} />
           {/if}
         </PropertyCell>
       {/each}

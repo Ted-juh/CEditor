@@ -12,6 +12,7 @@ import { get } from 'svelte/store';
 
 import {
   normalizeStopColour, beginStopEdit, previewStopColour, commitStopEdit, cancelStopEdit,
+  gradientEditSignature, ownsGradientEdit,
 } from '../src/CE_Application/utils/stopColourEdit.js';
 import { panels, activePanelId, activeEditorTab } from '../src/CE_Application/stores/panels.js';
 import { gradientTarget } from '../src/CE_Application/stores/gradientTarget.js';
@@ -85,6 +86,24 @@ test('a garbled colour during an edit falls back to the original, not to white',
   const edit = beginStopEdit(stops(), 0);
   const after = previewStopColour(stops(), edit, 'not-a-colour');
   assert.equal(after[0].color, 'FF0000');
+});
+
+test('a stop edit loses ownership after undo or retarget', () => {
+  const before = gradient();
+  const owner = { type: 'control', controlId: 'one' };
+  const signature = gradientEditSignature(before);
+
+  assert.equal(ownsGradientEdit(owner, owner, signature, before), true);
+  assert.equal(
+    ownsGradientEdit(owner, owner, signature, { ...before, angle: 45 }),
+    false,
+    'undo/redo replacement invalidates the open edit',
+  );
+  assert.equal(
+    ownsGradientEdit(owner, { type: 'control', controlId: 'two' }, signature, before),
+    false,
+    'retargeting invalidates the open edit',
+  );
 });
 
 // --- The hosts --------------------------------------------------------------

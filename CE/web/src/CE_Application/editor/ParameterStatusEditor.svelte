@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   let { model, control, allControls, width, height } = $props();
@@ -17,7 +18,15 @@
   let digits = $derived(selected?.choices.length ? String(selected.choices.find(c=>String(c.value)===String(selected.value))?.label ?? selected.value) : String(Number.isFinite(selected?.displayNumber) ? Number(selected.displayNumber.toFixed(2)) : selected?.value ?? '—'));
   let context = $derived((selected?.group ?? 'PARAMETER').replace(/^tone(\d)\./, 'TONE $1 / ').toUpperCase());
   let previousId = '';
-  $effect(() => { if (selected?.id !== previousId) { previousId = selected?.id; editing = false; error = ''; } });
+  $effect(() => {
+    if (selected?.id !== previousId) {
+      end(true);
+      previousId = selected?.id;
+      editing = false;
+      error = '';
+    }
+  });
+  onDestroy(() => end(true));
   const stop = event => event.stopPropagation();
   function select(id) { editing = false; if (pinned) model.updateUi({ pinnedId: id }); model.select(id); }
   function pin() { model.updateUi({ pinnedId: selected?.id ?? '', pinned: !pinned }); }
@@ -26,6 +35,7 @@
     event.currentTarget.focus();
     event.currentTarget.setPointerCapture(event.pointerId);
     drag = { id: selected.id, value: Number(selected.value), y: event.clientY, span: selected.max-selected.min,
+      target: event.currentTarget, pointerId: event.pointerId,
       height: event.currentTarget.getBoundingClientRect().height, next: Number(selected.value) };
   }
   function move(event) {
@@ -35,7 +45,14 @@
   }
   function end(cancel = false) {
     if (!drag) return;
-    model.write(drag.id, cancel ? drag.value : drag.next, false); drag = null;
+    const finishing = drag;
+    drag = null;
+    model.write(finishing.id, cancel ? finishing.value : finishing.next, false);
+    try {
+      if (finishing.target?.hasPointerCapture?.(finishing.pointerId)) {
+        finishing.target.releasePointerCapture(finishing.pointerId);
+      }
+    } catch { /* The node or capture may already have been released by the browser. */ }
   }
   function startEntry() {
     if (!selected || selected.disabled || selected.choices.length) return;
@@ -79,6 +96,7 @@
         <div class="value" role="slider" tabindex={selected.disabled ? -1 : 0} aria-label={selected.title}
           aria-valuemin={selected.min} aria-valuemax={selected.max} aria-valuenow={Number(selected.value) || 0} aria-valuetext={selected.displayValue}
           onpointerdown={down} onpointermove={move} onpointerup={()=>end()} onpointercancel={()=>end(true)}
+          onlostpointercapture={()=>end(true)}
           ondblclick={startEntry} onkeydown={key} data-parameter-value={selected.parameterId}>
           {#if editing}
             <input class="exact" aria-label="Exact parameter value" bind:value={draft} use:focusInput

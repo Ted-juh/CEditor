@@ -88,9 +88,9 @@ try {
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('.ports')?.textContent.includes('dropped by an outgoing MIDI filter'));
   // These three tabs used to import successfully but never render their loaded component.
-  await page.locator('.ports').getByRole('button', { name: 'Routes', exact: true }).click();
+  await page.locator('.ports').getByRole('tab', { name: 'Routes', exact: true }).click();
   await page.getByText('No routes yet.', { exact: false }).waitFor();
-  await page.locator('.ports').getByRole('button', { name: 'Snapshots', exact: true }).click();
+  await page.locator('.ports').getByRole('tab', { name: 'Snapshots', exact: true }).click();
   await page.getByPlaceholder('Snapshot name').waitFor();
   await page.locator('.midi-status').click();
   await page.getByLabel('MIDI output', { exact: true }).waitFor();

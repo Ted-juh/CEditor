@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import ImagePlus from 'lucide-svelte/icons/image-plus';
   import Power from 'lucide-svelte/icons/power';
   import Trash2 from 'lucide-svelte/icons/trash-2';
@@ -13,17 +14,24 @@
   let dragActive = $state(false);
   let importMessage = $state('');
   let importTone = $state('muted');
+  let importGeneration = 0;
+
+  onDestroy(() => { importGeneration += 1; });
 
   async function handleImport(fileList) {
+    const generation = ++importGeneration;
     let result;
 
     try {
       result = await importLocalIconFiles(fileList);
     } catch (error) {
+      if (generation !== importGeneration) return;
       importTone = 'error';
       importMessage = error?.message ?? 'The icon import did not complete.';
       return;
     }
+
+    if (generation !== importGeneration) return;
 
     if (result.ok) {
       importTone = 'success';

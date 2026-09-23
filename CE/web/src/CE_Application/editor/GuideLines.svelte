@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import { guides, removeGuide, updateGuide, selectedGuide, draggingGuide } from '../stores/guides.js';
   import {
     guideLineStyle,
@@ -117,6 +118,7 @@
 
     window.addEventListener('mousemove', handleDragMove);
     window.addEventListener('mouseup', handleDragEnd);
+    window.addEventListener('blur', cancelDrag);
   }
 
   function handleDragMove(e) {
@@ -128,17 +130,24 @@
     draggingGuide.set({ ...dg, pos: Math.round(dragStartPos + delta) });
   }
 
-  function handleDragEnd() {
-    window.removeEventListener('mousemove', handleDragMove);
-    window.removeEventListener('mouseup', handleDragEnd);
+  function stopDrag(commit) {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('mousemove', handleDragMove);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('blur', cancelDrag);
+    }
 
     const dg = $draggingGuide;
-    if (dg && dg.pos !== dragStartPos) {
+    if (commit && dg && dg.pos !== dragStartPos) {
       updateGuide(dg.orientation, dg.index, dg.pos);
     }
 
     draggingGuide.set(null);
   }
+  function handleDragEnd() { stopDrag(true); }
+  function cancelDrag() { stopDrag(false); }
+
+  onDestroy(cancelDrag);
 
   function handleRightClick(orientation, index, e) {
     e.preventDefault();

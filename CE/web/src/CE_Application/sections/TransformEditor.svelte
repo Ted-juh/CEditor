@@ -1,5 +1,5 @@
 <script>
-  import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
+  import { getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
   import { activePanel, selectedComponentIds } from '../stores/panels.js';
   import { findParentOfControl } from '../utils/containment.js';
   import { fitSettings, FIT_CONTENTS } from '../utils/containerFit.js';

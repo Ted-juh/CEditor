@@ -7,27 +7,51 @@
   import { runTestsForProfile, parseProfileDump, latestProfileTestResult, latestDumpParseResult } from '../../stores/deviceProfiles.js';
   import { validateProfile } from '../../generated/dpd/validate.mjs';
 
-  let { model, profileId = '', onApplyModel } = $props();
+  let { model, profileId = '', active = false, onApplyModel } = $props();
 
   // ---- raw source (the new-schema model as JSON) ----
   let sourceText = $state('');
   let sourceStatus = $state('');
   let editing = $state(false);
-  let lastModelRef = null;
+  let draftBaseJson = null;
+  let wasActive = false;
+  function reloadSource() {
+    const json = model ? JSON.stringify(model, null, 2) : '';
+    sourceText = json;
+    draftBaseJson = json;
+    editing = false;
+    sourceStatus = '';
+  }
   $effect(() => {
-    // re-sync the textarea from the model when the model changes, unless the user is mid-edit
-    if (model !== lastModelRef && !editing) { lastModelRef = model; sourceText = model ? JSON.stringify(model, null, 2) : ''; }
+    // Other screens mutate the same state proxy in place. Refresh on entry rather than comparing
+    // object identity, which never changes for those edits.
+    if (active && !wasActive) {
+      const currentJson = model ? JSON.stringify(model, null, 2) : '';
+      if (!editing) {
+        sourceText = currentJson;
+        draftBaseJson = currentJson;
+      } else if (draftBaseJson !== currentJson) {
+        sourceStatus = 'The visual model changed while this draft was open. Reload before applying.';
+      }
+    }
+    wasActive = active;
   });
   function validateSource() {
     try { const v = validateProfile(JSON.parse(sourceText)); sourceStatus = v.ok ? 'valid ✓' : ('invalid: ' + v.errors.join('; ')); }
     catch (e) { sourceStatus = 'Parse error: ' + e.message; }
   }
   function applySource() {
+    const currentJson = model ? JSON.stringify(model, null, 2) : '';
+    if (editing && draftBaseJson !== currentJson) {
+      sourceStatus = 'The visual model changed while this draft was open. Reload before applying.';
+      return;
+    }
     let parsed;
     try { parsed = JSON.parse(sourceText); } catch (e) { sourceStatus = 'Parse error: ' + e.message; return; }
     const v = validateProfile(parsed);
     if (!v.ok) { sourceStatus = 'invalid: ' + v.errors.join('; '); return; }
     onApplyModel?.(parsed);
+    draftBaseJson = JSON.stringify(parsed, null, 2);
     editing = false;
     sourceStatus = 'Applied — use Save to engine to persist.';
   }
@@ -49,6 +73,7 @@
     <span class="advh">New-DPD source (JSON)</span>
     <div class="advspacer"></div>
     <button class="btn sm" onclick={() => validateSource()}>Validate</button>
+    <button class="btn sm" onclick={reloadSource}>Reload model</button>
     <button class="btn sm primary" onclick={() => applySource()}>Apply</button>
     {#if sourceStatus}<span class="advstatus">{sourceStatus}</span>{/if}
   </div>

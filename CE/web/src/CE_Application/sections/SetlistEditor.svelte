@@ -96,8 +96,8 @@
     set('scenes', next);
   }
   function capture(i) {
-    updateScene(i, captureScene(scenes[i], capturePaths, readPath).values !== undefined
-      ? { values: captureScene(scenes[i], capturePaths, readPath).values } : {});
+    const captured = captureScene(scenes[i], capturePaths, readPath);
+    updateScene(i, captured.values !== undefined ? { values: captured.values } : {});
   }
   function captureAllPathsFromPanel() { set('capturePaths', candidatePaths); }
   // Extra MIDI, typed rather than clicked: "91=0, 93=40" is faster than four

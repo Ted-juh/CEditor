@@ -137,6 +137,7 @@
   // says which controller (or note) moved.
   let litSlotId = $state('');
   let litAt = 0;
+  let litTimer;
   $effect(() => {
     const activity = $hostMidiActivity;
     if ((activity.cc < 0 && activity.note < 0) || !page) return;
@@ -149,7 +150,8 @@
     const seq = activity.seq;
     // Held briefly rather than latched: a knob that stays lit after you let go is a knob you
     // stop believing.
-    setTimeout(() => { if (litAt === seq) litSlotId = ''; }, 350);
+    clearTimeout(litTimer);
+    litTimer = setTimeout(() => { if (litAt === seq) litSlotId = ''; }, 350);
   });
 
   function title(control) {
@@ -266,7 +268,10 @@
     setControlSlotOptions(page.pageId, selectedSlot.slotId, fields);
   }
 
-  onDestroy(() => clearTimeout(clearTimer));
+  onDestroy(() => {
+    clearTimeout(clearTimer);
+    clearTimeout(litTimer);
+  });
 </script>
 <svelte:window onkeydown={(event) => { if (event.key === 'Escape') { clearTimeout(clearTimer); clearArmed = false; } }} />
 

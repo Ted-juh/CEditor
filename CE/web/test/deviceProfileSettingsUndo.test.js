@@ -78,6 +78,11 @@ function makeDesigner(t, id, model, { active = true, observeOnRestore = true } =
     mutate(designer.model);
     designer.observe();
   };
+  designer.setActive = (active) => {
+    if (designer.active === active) return;
+    designer.active = active;
+    designer.history.focusChanged();
+  };
   // Always, even when an assertion throws: a designer left registered and
   // claiming to be active outranks every context in every test that follows,
   // and the cascade of failures says nothing about what actually broke.
@@ -208,6 +213,19 @@ test('opening a different document is not an undoable step', (t) => {
   assert.equal(designer.model.version, 11);
 });
 
+test('a save acknowledgement records the snapshot that was sent, not a later edit', (t) => {
+  const designer = makeDesigner(t, 'an1x-save-race', profileModel());
+  designer.observe();
+  designer.edit((m) => { m.version = 4; });
+  const sent = structuredClone(designer.model);
+  designer.edit((m) => { m.label = 'edited while saving'; });
+
+  designer.history.noteSaved(sent);
+  designer.dirty = designer.history.isDirty();
+
+  assert.equal(designer.dirty, true, 'the edit made while saving was marked persisted');
+});
+
 test('a profile with no model at all records nothing', (t) => {
   const designer = makeDesigner(t, 'no-profile', null);
   designer.observe();
@@ -259,13 +277,28 @@ test('the designer does not steal undo from the panel behind it', (t) => {
   assert.equal(designer.model.version, 3, 'a panel undo reached into the designer');
 
   // The user reaches over into the designer pane.
-  designer.active = true;
-  resetHistoryBaseline();
+  designer.setActive(true);
   designer.edit((m) => { m.version = 7; });
   flushHistory();
   undo();
   assert.equal(designer.model.version, 3);
   assert.equal(xOf(panelId, 'behind_k0'), 0, 'a designer undo reached into the panel');
+});
+
+test('entering the split designer seeds its undo baseline before the first edit', (t) => {
+  livePanel('focus-baseline');
+  const designer = makeDesigner(t, 'an1x-focus-baseline', profileModel(), { active: false });
+  designer.observe();
+
+  // This models the document-level focusin/pointerdown transition. There is deliberately no
+  // manual resetHistoryBaseline() here: the adapter owns that context switch.
+  designer.setActive(true);
+  designer.edit((m) => { m.version = 8; });
+  flushHistory();
+
+  assert.equal(canUndo(), true, 'the first designer edit was adopted as the baseline');
+  undo();
+  assert.equal(designer.model.version, 3);
 });
 
 test('two profiles keep separate stacks', (t) => {

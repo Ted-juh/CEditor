@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import { panels, activePanel, updatePanel, buildActivePanelVst3, openSettingsTab } from '../stores/panels.js';
   import { createPanel, makeGuid } from '../stores/panelModel.js';
   import { shortcutFromEvent, panicShortcutWarnings } from '../utils/panicLayout.js';
@@ -85,14 +86,15 @@
   let fileInfo = $state(null);
   let lastInfoPath = $state(null);
 
-  onFileInfo((result) => {
-    fileInfo = result;
+  const removeFileInfoListener = onFileInfo((result) => {
+    if (result?.filePath === panel?.filePath) fileInfo = result;
   });
 
   $effect(() => {
     const path = panel?.filePath;
     if (path && path !== lastInfoPath) {
       lastInfoPath = path;
+      fileInfo = null;
       requestFileInfo(path);
     }
     if (!path) {
@@ -267,21 +269,32 @@
   }
 
   // --- Image/Texture browse ---
-  onImageBrowsed((result) => {
-    if (!panel) return;
-    if (result.requestId === 'bgImage') {
-      updatePanel(panel.id, { bgImage: result.filePath });
-    } else if (result.requestId === 'bgTexture') {
-      updatePanel(panel.id, { bgTexture: result.filePath });
-    }
+  let pendingBackgroundBrowse = null;
+  const removeImageBrowsedListener = onImageBrowsed((result) => {
+    const pending = pendingBackgroundBrowse;
+    if (!pending || result.requestId !== pending.requestId) return;
+    pendingBackgroundBrowse = null;
+    updatePanel(pending.panelId, { [pending.prop]: result.filePath });
   });
 
+  onDestroy(() => {
+    removeFileInfoListener?.();
+    removeImageBrowsedListener?.();
+  });
+
+  function browsePanelBackground(prop) {
+    if (!panel?.id) return;
+    const requestId = `panelBackground:${prop}:${panel.id}:${Date.now()}`;
+    pendingBackgroundBrowse = { requestId, panelId: panel.id, prop };
+    browseImage(requestId);
+  }
+
   function handleBrowseImage() {
-    browseImage('bgImage');
+    browsePanelBackground('bgImage');
   }
 
   function handleBrowseTexture() {
-    browseImage('bgTexture');
+    browsePanelBackground('bgTexture');
   }
 
   // --- Z-Order ---
@@ -1119,11 +1132,11 @@
         <PropertyCell label="Bank" span={4}
                       hint="Bakes this bank into the exported plugin as its host program list. Entries with captured patch data send that patch; name-only entries send the profile's recall action for the slot.">
           <div class="export-row">
-            <select class="shortcut" style="width: auto"
+            <select class="shortcut" style="width: auto" value={bakedBank?.sourceBankId ?? ''}
                     onchange={(e) => (e.currentTarget.value ? bakeBank(e.currentTarget.value) : clearBank())}>
               <option value="">— none —</option>
               {#each availableBanks as bank (bank.id)}
-                <option value={bank.id} selected={bakedBank?.label === bank.label}>
+                <option value={bank.id}>
                   {bank.label} ({bank.entries.length})
                 </option>
               {/each}

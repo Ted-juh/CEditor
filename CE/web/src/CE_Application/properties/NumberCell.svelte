@@ -1,4 +1,5 @@
 <script>
+  import { parseNumericDraft } from '../utils/numericDraft.js';
   import { dragScrub } from '../scrub/dragScrubAction';
   import { presets } from '../scrub/dragScrub';
   import { appScrubOverrides } from '../utils/scrubRuntime.js';
@@ -25,9 +26,10 @@
 
   let editing = $state(false);
   let draft = $state('');
+  let draftDirty = $state(false);
   let inputEl = $state(null);
 
-  let bounded = $derived(Number.isFinite(min) && Number.isFinite(max));
+  let bounded = $derived(Number.isFinite(min) && Number.isFinite(max) && max > min);
   let fillPct = $derived(bounded ? Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100)) : 0);
 
   // Display the stored value faithfully (typed values are not snapped to
@@ -74,13 +76,22 @@
   function beginEdit(e) {
     editing = true;
     draft = format(value);
+    draftDirty = false;
     e.target.select();
   }
 
+  // Follow external updates while the field is idle or the user has not typed yet. Once a real
+  // draft exists it stays theirs until commit/Escape, so store refreshes cannot erase keystrokes.
+  $effect(() => {
+    const external = format(value);
+    if (!editing || !draftDirty) draft = external;
+  });
+
   function commit() {
     if (!editing) return;
-    const v = parseFloat(draft);
+    const v = parseNumericDraft(draft);
     editing = false;
+    draftDirty = false;
     if (draft === format(value)) return;
     if (allowEmpty && draft.trim() === '') {
       if (value !== '') onchange?.('');
@@ -92,12 +103,23 @@
     }
   }
 
+  // Selection surfaces commonly switch their target on pointerdown. Commit in capture phase,
+  // before that handler can replace this cell's value/onchange props; blur then becomes a no-op.
+  function commitBeforePointerTargetChanges(event) {
+    if (!editing || event?.target === inputEl) return;
+    commit();
+  }
+
   function handleKeydown(e) {
     if (e.key === 'Enter') {
       commit();
       e.target.blur();
     } else if (e.key === 'Escape') {
       editing = false;
+      draftDirty = false;
+      draft = format(value);
+      e.preventDefault();
+      e.stopPropagation();
       e.target.blur();
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       const typed = parseFloat(draft);
@@ -105,11 +127,14 @@
         editing && Number.isFinite(typed) ? clamp(typed) : value);
       draft = format(next);
       editing = true;
+      draftDirty = true;
       queueMicrotask(() => inputEl?.select());
       e.preventDefault();
     }
   }
 </script>
+
+<svelte:window onpointerdowncapture={commitBeforePointerTargetChanges} />
 
 <div class="number-cell" class:disabled {title}>
   {#if bounded}
@@ -125,7 +150,7 @@
          {disabled}
          bind:this={inputEl}
          value={editing ? draft : format(value)}
-         oninput={(e) => { draft = e.target.value; }}
+         oninput={(e) => { draft = e.target.value; draftDirty = true; }}
          onfocus={beginEdit}
          onblur={commit}
          onkeydown={handleKeydown} />

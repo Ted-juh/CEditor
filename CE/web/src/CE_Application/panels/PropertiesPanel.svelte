@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import '../properties/propertyTheme.css';
   import Paintbrush from 'lucide-svelte/icons/paintbrush';
   import Type from 'lucide-svelte/icons/type';
@@ -424,6 +425,8 @@
     activeComponentPropertiesTab.set(String(activeSingleTab ?? ''));
   });
 
+  onDestroy(() => activeComponentPropertiesTab.set(''));
+
   $effect(() => {
     const focusTab = String(designerFocusSection ?? '').trim();
     if (contextMode !== 'component' || !selectedControlId || !focusTab) return;
@@ -612,12 +615,16 @@
           <div class="creator-mode-toggle" role="radiogroup" aria-label="Creator mode">
             <button
               type="button"
+              role="radio"
+              aria-checked={$creatorMode === 'simple'}
               class:active={$creatorMode === 'simple'}
               onclick={() => creatorMode.set('simple')}
               title="Hide the raw graph editors"
             >Simple</button>
             <button
               type="button"
+              role="radio"
+              aria-checked={$creatorMode === 'advanced'}
               class:active={$creatorMode === 'advanced'}
               onclick={() => creatorMode.set('advanced')}
               title="Show the full component graph"

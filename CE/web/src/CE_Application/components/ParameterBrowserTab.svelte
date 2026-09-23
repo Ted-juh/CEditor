@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { activePanel, openDeviceProfileTab, syncOpenDeviceProfileDesigner, updatePanel } from '../stores/panels.js';
   import { selectedControl, updateControlProperty } from '../stores/controls.js';
@@ -45,6 +45,7 @@
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
   import { listMidiDestinations, listMidiInputs } from '../bridge/bridge.js';
   import { monitorCounts } from '../utils/midiMonitor.js';
+  import { flatControls } from '../utils/containment.js';
 
   /** Set by DisplayPanel, which owns the tab state. Used to hand off to the MIDI monitor. */
   let { onopentab = null } = $props();
@@ -53,6 +54,15 @@
   let showAllIssues = $state(false);
   let showProfileInspector = $state(false);
   let monitorCopyStatus = $state('');
+  let monitorCopyTimer = null;
+  let monitorCopyGeneration = 0;
+  let disposed = false;
+
+  onDestroy(() => {
+    disposed = true;
+    monitorCopyGeneration += 1;
+    if (monitorCopyTimer) clearTimeout(monitorCopyTimer);
+  });
   let selectedProfileId = $derived($selectedDeviceProfileId);
   let selectedDestinationId = $derived($selectedMidiDestinationId);
   let selectedInputId = $derived($selectedMidiInputId);
@@ -157,7 +167,6 @@
 
   onMount(() => {
     refreshDeviceProfiles();
-    refreshProfileParameters(selectedProfileId);
     // Ask C++ what ports exist. initDeviceProfileBridge registers the listener for the reply but
     // never sends the request, and only Player.svelte ever did — so in the editor these two
     // dropdowns sat on their defaults ("Preview Only", "No MIDI Input") even on a desktop build
@@ -173,7 +182,6 @@
   });
 
   function handleProfileChange(profileId) {
-    refreshProfileParameters(profileId);
     mapDeviceRole(DEFAULT_DEVICE_ROLE, profileId, {
       midiDestination: findDestination(selectedDestinationId),
       midiInput: findInput(selectedInputId),
@@ -625,17 +633,28 @@
     const text = latestMonitorEvent ? monitorEventLine(latestMonitorEvent) : '';
     if (!text) return;
 
+    const generation = ++monitorCopyGeneration;
+    if (monitorCopyTimer) {
+      clearTimeout(monitorCopyTimer);
+      monitorCopyTimer = null;
+    }
+
+    let nextStatus = 'Copied';
+
     try {
       if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
         throw new Error('Clipboard API unavailable');
       }
       await navigator.clipboard.writeText(text);
-      monitorCopyStatus = 'Copied';
     } catch {
-      monitorCopyStatus = 'Copy failed.';
+      nextStatus = 'Copy failed.';
     }
 
-    setTimeout(() => {
+    if (disposed || generation !== monitorCopyGeneration) return;
+    monitorCopyStatus = nextStatus;
+    monitorCopyTimer = setTimeout(() => {
+      if (disposed || generation !== monitorCopyGeneration) return;
+      monitorCopyTimer = null;
       monitorCopyStatus = '';
     }, 1200);
   }
@@ -723,7 +742,7 @@
       }
     }
 
-    for (const control of panel.controls ?? []) {
+    for (const control of flatControls(panel.controls ?? [])) {
       const controlId = control?._children?.Core?.id ?? 'control';
       const controlName = control?._children?.Core?.name || controlId;
       const bindings = control?._children?.DeviceBindings?.bindings;

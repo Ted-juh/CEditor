@@ -19,7 +19,8 @@
 
   import { activePanel } from '../stores/panels.js';
   import {
-    applyValues, captureSnapshot, compareSnapshots, compareWithLive, morphTo,
+    applyValues, beginSnapshotValueHistory, captureSnapshot, commitSnapshotValueHistory,
+    compareSnapshots, compareWithLive, morphTo,
     panelSnapshots, readPanelValues, recallSnapshot, removeSnapshot, renameSnapshot,
     snapshotParameters,
   } from '../stores/snapshots.js';
@@ -72,9 +73,6 @@
     const panel = $activePanel;
     if (!panel) return;
 
-    const before = captureSnapshot({ name: 'Before randomise' });
-    if (!before) cwarn('[random] Could not take an undo snapshot — nothing on this panel has a value yet.');
-
     const result = randomizeValues(parameters, {
       mode: randomMode,
       locked,
@@ -84,7 +82,14 @@
     });
 
     if (result.changed === 0) { cwarn('[random]', result.reason); return; }
+    const history = beginSnapshotValueHistory(result.values, { panel, parameters });
+    const before = captureSnapshot({ name: 'Before randomise' });
+    if (!before) {
+      cwarn('[random] Could not take an undo snapshot — nothing was changed.');
+      return;
+    }
     applyValues(result.values, { panel, parameters });
+    commitSnapshotValueHistory(history);
     cinfo(`[random] ${result.changed} parameter(s) changed`
       + `${result.skipped.locked.length ? `, ${result.skipped.locked.length} locked` : ''}`
       + `${randomSeed.trim() ? `, seed ${randomSeed.trim()}` : ''}.`);

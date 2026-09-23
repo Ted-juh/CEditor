@@ -15,6 +15,7 @@
    * Pause keeps a snapshot; nothing is lost, because C++ goes on collecting either way.
    */
   import MidiLearnChips from './MidiLearnChips.svelte';
+  import { onDestroy } from 'svelte';
   import { latestMidiPreview, midiMonitorEvents, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
   import { clearMidiMonitorEvents, isJuceAvailable } from '../bridge/bridge.js';
   import {
@@ -36,6 +37,7 @@
   let paused = $state(false);
   let frozen = $state([]);
   let copyStatus = $state('');
+  let copyStatusTimer = 0;
   const rowHeight = 22;
   let scrollTop = $state(0);
   let viewportHeight = $state(300);
@@ -75,10 +77,16 @@
       if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) throw new Error('no clipboard');
       await navigator.clipboard.writeText(body);
       copyStatus = `Copied ${rows.length}`;
+      if (copyStatusTimer) clearTimeout(copyStatusTimer);
+      copyStatusTimer = setTimeout(() => { copyStatusTimer = 0; copyStatus = ''; }, 1500);
     } catch {
       copyStatus = 'Copy failed';
+      if (copyStatusTimer) clearTimeout(copyStatusTimer);
+      copyStatusTimer = setTimeout(() => { copyStatusTimer = 0; copyStatus = ''; }, 2500);
     }
   }
+
+  onDestroy(() => { if (copyStatusTimer) clearTimeout(copyStatusTimer); });
 </script>
 
 <div class="midi-monitor">

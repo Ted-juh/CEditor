@@ -1,6 +1,6 @@
 <script>
   import { controlSources } from '../utils/controlSources.js';
-  import { getSection, updateControlProperty } from '../stores/controls.js';
+  import { getSection, inspectorStateNameForPath, updateInspectorControlProperty as updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
   import { lcdDesignLayoutIds, setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
@@ -29,7 +29,7 @@
   import Pencil from 'lucide-svelte/icons/pencil';
   import Type from 'lucide-svelte/icons/type';
   import { isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
-  import { ICON_GLYPHS } from '../utils/pixelFont.js';
+  import { ICON_GLYPHS, withPixelCustomFontSource } from '../utils/pixelFont.js';
   import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
   const ICON_NAMES = Object.keys(ICON_GLYPHS);
   // Reset only appearance (never content: elements/layouts/text/sources).
@@ -67,9 +67,9 @@
     controlSources($activePanel?.controls, 'range', core?.id)
   );
 
-  function set(prop, value) {
+  function set(prop, value, stateName = undefined) {
     if (!core?.id) return;
-    updateControlProperty(core.id, `Pixel.${prop}`, value);
+    updateControlProperty(core.id, `Pixel.${prop}`, value, stateName);
   }
 
   function toggle(prop, defaultOn = true) {
@@ -90,19 +90,27 @@
 
   function onPickImage(event) {
     const file = event?.target?.files?.[0];
-    if (!file) return;
+    if (!file || !core?.id) return;
+    const targetId = core.id;
+    const targetState = inspectorStateNameForPath('Pixel.imageSrc');
     const reader = new FileReader();
-    reader.onload = () => set('imageSrc', String(reader.result ?? ''));
+    reader.onload = () => {
+      if (core?.id !== targetId) return;
+      updateControlProperty(targetId, 'Pixel.imageSrc', String(reader.result ?? ''), targetState);
+    };
     reader.readAsDataURL(file);
   }
 
   function onPickAnim(event) {
     const file = event?.target?.files?.[0];
-    if (!file) return;
+    if (!file || !core?.id) return;
+    const targetId = core.id;
+    const targetState = inspectorStateNameForPath('Pixel.animSrc');
     const reader = new FileReader();
     reader.onload = () => {
-      if (file.type === 'image/gif') set('animFrames', 0);
-      set('animSrc', String(reader.result ?? ''));
+      if (core?.id !== targetId) return;
+      if (file.type === 'image/gif') updateControlProperty(targetId, 'Pixel.animFrames', 0, targetState);
+      updateControlProperty(targetId, 'Pixel.animSrc', String(reader.result ?? ''), targetState);
     };
     reader.readAsDataURL(file);
   }
@@ -114,23 +122,38 @@
   }
   function onPickCustomFont(event) {
     const file = event?.target?.files?.[0];
-    if (!file) return;
+    if (!file || !core?.id) return;
+    const targetId = core.id;
+    const targetState = inspectorStateNameForPath('Pixel.customFont');
     const reader = new FileReader();
-    reader.onload = () => setCustomFont({ src: String(reader.result ?? '') });
+    reader.onload = () => {
+      if (core?.id !== targetId) return;
+      updateControlProperty(
+        targetId,
+        'Pixel.customFont',
+        withPixelCustomFontSource(pixel?.customFont, reader.result),
+        targetState,
+      );
+    };
     reader.readAsDataURL(file);
   }
 
   function onPickElementAnim(i, event) {
     const file = event?.target?.files?.[0];
-    if (!file) return;
+    if (!file || !core?.id || !elements[i]) return;
+    const targetId = core.id;
+    const targetLayoutId = selectionLayout;
+    const targetElementId = pixelElementId(elements[i], i);
+    const targetState = inspectorStateNameForPath('Pixel.elements');
     const reader = new FileReader();
     reader.onload = () => {
+      if (core?.id !== targetId || selectionLayout !== targetLayoutId) return;
       const next = cloneElements();
-      if (next[i]) {
+      if (next[i] && pixelElementId(next[i], i) === targetElementId) {
         next[i].animSrc = String(reader.result ?? '');
         next[i].animMode = 'file';
         if (file.type === 'image/gif') next[i].animFrames = 0;
-        commitElements(next);
+        commitElements(next, targetState);
       }
     };
     reader.readAsDataURL(file);
@@ -255,13 +278,13 @@
   }
 
   function cloneElements() { return $state.snapshot(elements); }
-  function commitElements(next) {
-    if (!layouts.length) { set('elements', next); return; }
+  function commitElements(next, stateName = undefined) {
+    if (!layouts.length) { set('elements', next, stateName); return; }
     const all = cloneLayouts();
     const l = all.find((x) => String(x.id) === String(editLayout?.id));
     if (!l) return;
     l.elements = next;
-    commitLayouts(all);
+    set('layouts', all, stateName);
   }
 
   function addElement() {

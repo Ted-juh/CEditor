@@ -50,6 +50,7 @@
       onclick={() => onselect(row.id)}
       ondblclick={() => onplace(row)}
       onkeydown={(event) => {
+        if (event.target !== event.currentTarget) return;
         if (event.key === 'Enter') { event.preventDefault(); onplace(row); }
         else if (event.key === ' ') { event.preventDefault(); onselect(row.id); }
       }}

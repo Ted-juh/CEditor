@@ -1,5 +1,5 @@
 <script>
-  import { untrack } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import Copy from 'lucide-svelte/icons/copy';
   import Download from 'lucide-svelte/icons/download';
   import Plus from 'lucide-svelte/icons/plus';
@@ -41,6 +41,9 @@
   let status = $state('');
   let galleryOpen = $state(false);
   let familySources = $state({});
+  let importGeneration = 0;
+
+  onDestroy(() => { importGeneration += 1; });
   let allSets = $derived([
     ...$controlSetLibrary.map((set) => ({ ...set, origin: 'library' })),
     ...BUILT_IN_CONTROL_SETS.filter((set) => !$controlSetLibrary.some((custom) => custom.id === set.id))
@@ -92,8 +95,10 @@
   function removeSelected() {
     if (!isCustom || !draft) return;
     if (typeof window !== 'undefined' && !window.confirm(`Delete “${draft.name}” from your library?`)) return;
+    const wasDefault = $generalSettings.defaultControlSetId === draft.id;
     removeControlSetFromLibrary(draft.id);
-    choose($generalSettings.defaultControlSetId === draft.id ? 'graphite' : ($generalSettings.defaultControlSetId || 'graphite'));
+    if (wasDefault) updateGeneralSettings({ defaultControlSetId: 'graphite' });
+    choose(wasDefault ? 'graphite' : ($generalSettings.defaultControlSetId || 'graphite'));
     status = 'Removed from your library.';
   }
 
@@ -134,14 +139,19 @@
   }
 
   async function importFile(event) {
-    const file = event.target.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
+    input.value = '';
+    const generation = ++importGeneration;
     try {
       const result = importControlSetText(await file.text(), { carry: false });
+      if (generation !== importGeneration) return;
       if (!result.ok) status = result.error;
       else { choose(result.set.id); status = `Imported ${result.set.name} into your library.`; }
-    } catch (error) { status = error?.message ?? 'Import failed.'; }
-    event.target.value = '';
+    } catch (error) {
+      if (generation === importGeneration) status = error?.message ?? 'Import failed.';
+    }
   }
 
   function applyToPanel(id = selectedId) {

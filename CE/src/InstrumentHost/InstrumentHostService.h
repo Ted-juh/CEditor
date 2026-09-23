@@ -892,7 +892,7 @@ private:
         unmodulated one, as with gain and pan), and why it cannot be ridden right now when it
         cannot. Void when the part has none. */
     juce::var morphProjection (const RackPart& part, float amount) const;
-    void emitLibrary (const LibraryQuery& query);
+    void emitLibrary (const LibraryQuery& query, const juce::String& consumer = {});
     juce::String saveCapturedLibraryRecord (LibraryRecord record);
     void scanVstPresets();
     void scanCataloguePrograms (std::shared_ptr<juce::Array<PluginClassRecord>>, int index);

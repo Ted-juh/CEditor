@@ -117,7 +117,11 @@
           {:else if field.kind === 'list'}
             <input class="txt" id={`api-${field.key}`} type="text" value={valuesText(row)}
                    title={field.hint}
-                   onchange={(event) => onset('values', event.currentTarget.value.split(',').map((v) => v.trim()).filter(Boolean))} />
+                   onchange={(event) => {
+                     const next = event.currentTarget.value.split(',').map((v) => v.trim()).filter(Boolean);
+                     onset('values', next);
+                     event.currentTarget.value = next.join(', ');
+                   }} />
           {:else}
             <input class="txt" id={`api-${field.key}`} type="text" value={String(row[field.key] ?? '')}
                    title={field.hint}

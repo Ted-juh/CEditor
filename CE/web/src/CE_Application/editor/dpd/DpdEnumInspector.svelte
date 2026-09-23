@@ -11,7 +11,12 @@
   let prevRef = null;
   $effect(() => {
     const p = param;
-    if (p !== prevRef) { prevRef = p; previewSel = 0; }
+    if (p !== prevRef) {
+      prevRef = p;
+      previewSel = 0;
+      customValues = p?.valueType === 'enum'
+        && (p.enum ?? []).some((entry, index) => Number(entry.wire ?? index) !== index);
+    }
   });
 
   let isEnum = $derived(param?.valueType === 'enum');
@@ -24,8 +29,13 @@
   }
   function hex(w) { return Number(w ?? 0).toString(16).toUpperCase().padStart(2, '0'); }
   function setWire(entry, raw) {
+    if (!customValues) return;
     const n = parseInt(String(raw).replace(/[^0-9a-fA-F]/g, ''), 16);
     entry.wire = Number.isFinite(n) ? n : 0;
+  }
+  function setCustomValues(enabled) {
+    customValues = enabled;
+    if (!enabled) enumArr().forEach((entry, index) => { entry.wire = index; });
   }
   function move(i, dir) {
     const arr = enumArr();
@@ -68,8 +78,12 @@
     <div
       class={['valtoggle', customValues && 'on']}
       role="switch" aria-checked={customValues} tabindex="0"
-      onclick={() => customValues = !customValues}
-      onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (customValues = !customValues)}
+      onclick={() => setCustomValues(!customValues)}
+      onkeydown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        setCustomValues(!customValues);
+      }}
     >
       <span class="sw"></span> Custom device values <span style="color:var(--txt-faint)">(set each option's wire byte)</span>
     </div>
@@ -81,7 +95,7 @@
           <span class="grip">⠿</span>
           <span class="idx">{i}</span>
           <input class="lbl" bind:value={entry.label} onfocus={(e) => e.target.select()} />
-          <span class="valwrap"><input value={hex(entry.wire)} oninput={(e) => setWire(entry, e.target.value)} onfocus={(e) => e.target.select()} /></span>
+          <span class="valwrap"><input value={hex(customValues ? entry.wire : i)} disabled={!customValues} oninput={(e) => setWire(entry, e.target.value)} onfocus={(e) => e.target.select()} /></span>
           <span class="arrows"><button type="button" class="up" onclick={() => move(i, -1)} aria-label={`Move ${entry.label} up`} disabled={i === 0}>▲</button><button type="button" class="dn" onclick={() => move(i, 1)} aria-label={`Move ${entry.label} down`} disabled={i === entries.length - 1}>▼</button></span>
           <button type="button" class="del" onclick={() => remove(i)} aria-label={`Delete ${entry.label}`}>✕</button>
         </div>

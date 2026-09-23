@@ -103,9 +103,9 @@
 
   // ── librarian ──
   let live = $derived(isJuceAvailable());
-  let scan = $derived($latestPresetListScan);
-  let library = $derived($presetLibrary[profileId || merged?.id]?.banks ?? []);
   let libraryKey = $derived(profileId || merged?.id || '');
+  let scan = $derived($latestPresetListScan?.profileId === libraryKey ? $latestPresetListScan : null);
+  let library = $derived($presetLibrary[libraryKey]?.banks ?? []);
   let statusLine = $state('');
 
   function runScan() {
@@ -154,8 +154,11 @@
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    const targetKey = libraryKey;
     try {
-      const result = importLibraryBankJson(libraryKey, JSON.parse(await file.text()));
+      const payload = JSON.parse(await file.text());
+      if (targetKey !== libraryKey) return;
+      const result = importLibraryBankJson(targetKey, payload);
       statusLine = result.ok ? 'Bank imported.' : result.error;
     } catch (e) {
       statusLine = e?.message ?? 'Import failed.';
@@ -278,7 +281,7 @@
     </div>
     <div class="recallrow">
       {#if scan?.running}
-        <button class="asbtn" onclick={() => cancelPresetListScan({})}>Cancel scan</button>
+        <button class="asbtn" onclick={() => cancelPresetListScan({ scanId: scan.scanId })}>Cancel scan</button>
         <span class="lm">Scanning… {scan.completed ?? 0}/{scan.total ?? '?'}</span>
       {:else}
         <button class="asbtn" onclick={runScan} disabled={!presets.nameRequest && !probeProfile?.presetBrowser}>Scan names from device</button>

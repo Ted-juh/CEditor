@@ -55,8 +55,8 @@
   <div class="surface-options-strip" aria-label="Surface view + zoom options">
     <div class="surface-toolbar-left">
     <div class="zone-mode-control creator-mode" role="radiogroup" aria-label="Creator mode" title="Simple hides the raw graph editors; Advanced shows them">
-      <button type="button" class:active={$creatorMode === 'simple'} onclick={() => creatorMode.set('simple')}>Simple</button>
-      <button type="button" class:active={$creatorMode === 'advanced'} onclick={() => creatorMode.set('advanced')}>Adv</button>
+      <button type="button" role="radio" aria-checked={$creatorMode === 'simple'} class:active={$creatorMode === 'simple'} onclick={() => creatorMode.set('simple')}>Simple</button>
+      <button type="button" role="radio" aria-checked={$creatorMode === 'advanced'} class:active={$creatorMode === 'advanced'} onclick={() => creatorMode.set('advanced')}>Adv</button>
     </div>
     <PropertyToggle compact label="Snap" value={snapEnabled} onchange={(next) => setSnapEnabled(next)} />
     <label class="snap-size">
@@ -77,10 +77,10 @@
     <PropertyToggle compact label="Bounds" value={showBounds} onchange={(next) => { setPreviewFlag('showBounds', next) }} />
     <PropertyToggle compact label="Gen Names" title="Show generated layer names on the canvas" value={showGeneratedLabels} onchange={(next) => { setPreviewFlag('showGeneratedLabels', next) }} />
     <PropertyToggle compact label="Zones" value={showHitZones} onchange={(next) => { setPreviewFlag('showHitZones', next) }} />
-    <div class="zone-mode-control" aria-label="Zone display mode">
-      <button type="button" class:active={zoneDisplayMode === 'selected'} onclick={() => setZoneDisplayMode('selected')} title="Show only the selected hit zone">Sel</button>
-      <button type="button" class:active={zoneDisplayMode === 'dim'} onclick={() => setZoneDisplayMode('dim')} title="Show all hit zones dimmed">Dim</button>
-      <button type="button" class:active={zoneDisplayMode === 'all'} onclick={() => setZoneDisplayMode('all')} title="Show all hit zones">All</button>
+    <div class="zone-mode-control" role="radiogroup" aria-label="Zone display mode">
+      <button type="button" role="radio" aria-checked={zoneDisplayMode === 'selected'} class:active={zoneDisplayMode === 'selected'} onclick={() => setZoneDisplayMode('selected')} title="Show only the selected hit zone">Sel</button>
+      <button type="button" role="radio" aria-checked={zoneDisplayMode === 'dim'} class:active={zoneDisplayMode === 'dim'} onclick={() => setZoneDisplayMode('dim')} title="Show all hit zones dimmed">Dim</button>
+      <button type="button" role="radio" aria-checked={zoneDisplayMode === 'all'} class:active={zoneDisplayMode === 'all'} onclick={() => setZoneDisplayMode('all')} title="Show all hit zones">All</button>
     </div>
     {#if arpeggiatorEnabled}
       <label class="snap-size">

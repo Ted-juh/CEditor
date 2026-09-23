@@ -1,5 +1,4 @@
 <script>
-  import { get } from 'svelte/store';
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { panelPreviewSessions } from '../stores/interactionPreview.js';
@@ -59,7 +58,7 @@
   // by the device parameter(s) it's bound to. Prefers the live preview value.
   function currentParamValues() {
     const controls = $activePanel?.controls ?? [];
-    const sessions = get(panelPreviewSessions) ?? {};
+    const sessions = $panelPreviewSessions ?? {};
     const map = {};
     for (const c of controls) {
       const beh = c?._children?.Behavior;

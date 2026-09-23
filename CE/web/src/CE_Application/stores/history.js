@@ -249,6 +249,11 @@ function getHistory(key) {
 }
 
 function updateAvailability() {
+  if (suppressed) {
+    undoAvailable.set(false);
+    redoAvailable.set(false);
+    return;
+  }
   const context = activeContext();
   if (!context) {
     undoAvailable.set(false);
@@ -304,9 +309,15 @@ function snapshotOf(context) {
   const panel = get(panels).find((p) => p.id === context.id);
   if (!panel) return null;
   const { id, modified, bgImage, bgTexture, viewer, ...data } = panel;
+  // Which note is open is view state, like the active viewer image above. Keep the notes in
+  // history, but do not turn tab navigation into a document edit or rewind it with an unrelated
+  // undo.
+  const notepad = data.notepad && typeof data.notepad === 'object'
+    ? Object.fromEntries(Object.entries(data.notepad).filter(([key]) => key !== 'activeNoteIndex'))
+    : data.notepad;
   // The array is copied so a stray in-place push cannot reach back into history; its ELEMENTS are
   // shared, which is the whole point.
-  return { ...data, controls: Array.isArray(data.controls) ? data.controls.slice() : data.controls };
+  return { ...data, notepad, controls: Array.isArray(data.controls) ? data.controls.slice() : data.controls };
 }
 
 /** Selection ids as a plain array, captured alongside panel snapshots. */
@@ -487,10 +498,10 @@ function noteCleanState(context, snapshot) {
  * saved state leaves the dirty dot on. Accepts `{kind, id}`, a bare panel id,
  * or nothing for whatever context is active.
  */
-export function markContextSaved(context) {
+export function markContextSaved(context, savedSnapshot) {
   const target = normaliseContext(context);
   if (!target) return;
-  const snapshot = snapshotOf(target);
+  const snapshot = savedSnapshot === undefined ? snapshotOf(target) : savedSnapshot;
   if (snapshot == null) return;
   savedMarkers.set(contextKey(target), snapshot);
 }
@@ -554,7 +565,13 @@ function restoreSnapshot(context, entry) {
       panels.update((list) =>
         // Spread order keeps the excluded asset fields (bgImage/bgTexture/viewer)
         // from the live panel — they are not part of the snapshot.
-        list.map((p) => (p.id === context.id ? { ...p, ...data, modified } : p))
+        list.map((p) => {
+          if (p.id !== context.id) return p;
+          const restoredNotepad = data.notepad && typeof data.notepad === 'object'
+            ? { ...data.notepad, activeNoteIndex: p.notepad?.activeNoteIndex ?? 0 }
+            : data.notepad;
+          return { ...p, ...data, notepad: restoredNotepad, modified };
+        })
       );
       // Restore the selection that went with this state, so undoing a delete
       // hands the control back selected instead of blanking the properties view.
@@ -562,6 +579,7 @@ function restoreSnapshot(context, entry) {
         selectedComponentIds.set(new Set(entry.selection));
       }
     }
+    if (entry.auxiliary?.restore) entry.auxiliary.restore(entry.auxiliary.value);
   } finally {
     // A throwing restore must not leave recording wedged off for the session.
     isRestoring = false;
@@ -630,6 +648,79 @@ function commitSnapshot(context, snapshotOverride, selectionOverride) {
  */
 export function pushSnapshot() {
   commitSnapshot(activeContext());
+}
+
+/**
+ * Begin one command that changes state outside the document stores.
+ *
+ * Preview sessions deliberately are not globally subscribed to history: pointer movement,
+ * incoming MIDI and scripts can update them every frame. Commands such as snapshot Recall and
+ * Roll opt in here and provide a small capture/restore sidecar for only the controls they write.
+ */
+export function beginHistoryTransaction({ capture = null, restore = null } = {}) {
+  flushPendingSnapshot();
+  const context = activeContext();
+  if (!context) return null;
+  let auxiliaryValue = null;
+  try {
+    auxiliaryValue = typeof capture === 'function' ? capture() : null;
+  } catch {
+    return null;
+  }
+  return {
+    context,
+    key: contextKey(context),
+    snapshot: snapshotOf(context),
+    selection: selectionOf(context),
+    auxiliary: typeof capture === 'function' && typeof restore === 'function'
+      ? { capture, restore, value: auxiliaryValue }
+      : null,
+  };
+}
+
+/** Commit a transaction begun above as exactly one undo step. */
+export function commitHistoryTransaction(transaction) {
+  if (!transaction || isRestoring || suppressed) return false;
+  const context = activeContext();
+  if (!context || contextKey(context) !== transaction.key) return false;
+
+  // Document writes made inside the command have scheduled an ordinary debounced snapshot.
+  // This explicit boundary owns them, so discard that pending copy before publishing the entry.
+  clearPending();
+  const snapshot = snapshotOf(context);
+  if (snapshot == null || transaction.snapshot == null) return false;
+
+  let auxiliaryValue = null;
+  try {
+    auxiliaryValue = transaction.auxiliary?.capture?.() ?? null;
+  } catch {
+    return false;
+  }
+  const documentChanged = !sameSnapshot(transaction.snapshot, snapshot, context);
+  const auxiliaryChanged = transaction.auxiliary
+    ? JSON.stringify(transaction.auxiliary.value) !== JSON.stringify(auxiliaryValue)
+    : false;
+  if (!documentChanged && !auxiliaryChanged) {
+    lastSnapshot = snapshot;
+    lastSelection = selectionOf(context);
+    baselineKey = transaction.key;
+    return false;
+  }
+
+  const history = getHistory(transaction.key);
+  history.undoStack.push({
+    snapshot: transaction.snapshot,
+    selection: transaction.selection,
+    auxiliary: transaction.auxiliary,
+  });
+  if (history.undoStack.length > MAX_HISTORY) history.undoStack.shift();
+  history.redoStack.length = 0;
+
+  lastSnapshot = snapshot;
+  lastSelection = selectionOf(context);
+  baselineKey = transaction.key;
+  updateAvailability();
+  return true;
 }
 
 /** Flush a snapshot that is still waiting on the debounce timer. */
@@ -743,6 +834,7 @@ export function setHistoryRecordingSuppressed(on) {
   } else {
     resetBaseline();
   }
+  updateAvailability();
 }
 
 /** Reset the committed baseline to the active context's current state.
@@ -776,6 +868,7 @@ export function resetHistoryBaseline() {
  * Undo the last action on the active context.
  */
 export function undo() {
+  if (suppressed) return;
   // Flush any pending debounced snapshot first
   flushPendingSnapshot();
 
@@ -788,10 +881,16 @@ export function undo() {
   // Save current state to redo
   const current = snapshotOf(context);
   if (current == null) return;
-  history.redoStack.push({ snapshot: current, selection: selectionOf(context) });
+  const prev = history.undoStack.pop();
+  let auxiliary = null;
+  if (prev?.auxiliary) {
+    let value = null;
+    try { value = prev.auxiliary.capture(); } catch { value = null; }
+    auxiliary = { ...prev.auxiliary, value };
+  }
+  history.redoStack.push({ snapshot: current, selection: selectionOf(context), auxiliary });
 
   // Restore previous state
-  const prev = history.undoStack.pop();
   restoreSnapshot(context, prev);
   updateAvailability();
 }
@@ -800,6 +899,11 @@ export function undo() {
  * Redo the last undone action on the active context.
  */
 export function redo() {
+  if (suppressed) return;
+  // A new edit after undo invalidates the redo chain even while its snapshot is debounced.
+  // Flush it before checking redoStack so redo cannot overwrite that uncommitted edit.
+  flushPendingSnapshot();
+
   const context = activeContext();
   if (!context) return;
 
@@ -809,10 +913,16 @@ export function redo() {
   // Save current state to undo
   const current = snapshotOf(context);
   if (current == null) return;
-  history.undoStack.push({ snapshot: current, selection: selectionOf(context) });
+  const next = history.redoStack.pop();
+  let auxiliary = null;
+  if (next?.auxiliary) {
+    let value = null;
+    try { value = next.auxiliary.capture(); } catch { value = null; }
+    auxiliary = { ...next.auxiliary, value };
+  }
+  history.undoStack.push({ snapshot: current, selection: selectionOf(context), auxiliary });
 
   // Restore redo state
-  const next = history.redoStack.pop();
   restoreSnapshot(context, next);
   updateAvailability();
 }
@@ -821,12 +931,14 @@ export function redo() {
  * Check if undo/redo is available for the active context.
  */
 export function canUndo() {
+  if (suppressed) return false;
   const context = activeContext();
   if (!context) return false;
   return getHistory(contextKey(context)).undoStack.length > 0;
 }
 
 export function canRedo() {
+  if (suppressed) return false;
   const context = activeContext();
   if (!context) return false;
   return getHistory(contextKey(context)).redoStack.length > 0;

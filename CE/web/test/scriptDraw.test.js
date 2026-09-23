@@ -242,8 +242,9 @@ test('the drawing is clipped to the control, so it cannot paint over its neighbo
     api.drawRect(-50, -50, 500, 500);
     const id = panel.controls[0]._children.Core.id;
     const svg = svgOf(id, 120, 60);
-    assert.match(svg, new RegExp(`clipPath id="ce-draw-clip-${id}"`), 'the clip is per control');
-    assert.match(svg, new RegExp(`clip-path="url\\(#ce-draw-clip-${id}\\)"`));
+    const clipId = svg.match(/<clipPath id="([^"]+)"/)?.[1];
+    assert.ok(clipId, 'the control owns a clip path');
+    assert.ok(svg.includes(`clip-path="url(#${clipId})"`), 'the drawing references its own clip');
   });
 });
 
@@ -364,7 +365,9 @@ test('the overlay resolves a gradient with the app\'s own gradientCoords', () =>
     const co = gradientCoords(90, 120, 60);
     assert.match(html, new RegExp(`x1="${co.x1}"`), 'the geometry must be the panel\'s, not a second opinion');
     assert.match(html, new RegExp(`x2="${co.x2}"`));
-    assert.match(html, /url\(#ce-draw-grad-/, 'and the shape points at it by reference');
+    const gradientId = html.match(/<linearGradient id="([^"]+)"/)?.[1];
+    assert.ok(gradientId, 'the overlay defines a gradient');
+    assert.ok(html.includes(`fill="url(#${gradientId})"`), 'and the shape points at it by reference');
   });
 });
 

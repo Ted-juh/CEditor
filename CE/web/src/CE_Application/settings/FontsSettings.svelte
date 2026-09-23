@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import Download from 'lucide-svelte/icons/download';
   import Globe from 'lucide-svelte/icons/globe';
   import Power from 'lucide-svelte/icons/power';
@@ -14,7 +15,14 @@
   let localErrorMessage = $state('');
   let isDragActive = $state(false);
   let fileInput;
+  let localImportGeneration = 0;
+  let googleImportGeneration = 0;
   const librarySampleText = '0123456789 ABCD abcd';
+
+  onDestroy(() => {
+    localImportGeneration += 1;
+    googleImportGeneration += 1;
+  });
 
   function libraryPreviewKey(font) {
     return `library:${font.id}:${font.fontStyle || 'normal'}:${font.staticWeight || 400}`;
@@ -47,11 +55,13 @@
   });
 
   async function processLocalFiles(fileList) {
+    const generation = ++localImportGeneration;
     localStatusMessage = '';
     localErrorMessage = '';
 
     try {
       const result = await importLocalFontFiles(fileList);
+      if (generation !== localImportGeneration) return;
       if (!result.ok) {
         if (result.reason === 'no-supported-files') {
           localErrorMessage = 'Choose or drop `.ttf`, `.otf`, `.woff`, or `.woff2` files.';
@@ -68,7 +78,9 @@
         : `Imported ${result.importedCount} font(s).`;
     } catch (error) {
       console.error('[fonts] Local import failed', error);
-      localErrorMessage = 'The file browser opened, but the selected font files could not be read.';
+      if (generation === localImportGeneration) {
+        localErrorMessage = 'The file browser opened, but the selected font files could not be read.';
+      }
     }
   }
 
@@ -112,8 +124,19 @@
 
     isAddingGoogle = true;
     errorMessage = '';
-
-    const result = await addGoogleFont(googleFamily);
+    const generation = ++googleImportGeneration;
+    let result;
+    try {
+      result = await addGoogleFont(googleFamily);
+    } catch (error) {
+      console.error('[fonts] Google font import failed', error);
+      if (generation === googleImportGeneration) {
+        errorMessage = 'Google Fonts could not be reached. Try again in a moment.';
+        isAddingGoogle = false;
+      }
+      return;
+    }
+    if (generation !== googleImportGeneration) return;
     if (!result.ok) {
       if (result.reason === 'empty') {
         errorMessage = 'Enter a Google font family name first.';

@@ -18,6 +18,7 @@
   // The markup below is byte-for-byte what lucide renders (same viewBox, same path data, same
   // stroke attributes), minus the class names, which nothing styles. Icons elsewhere in the editor
   // are fine as components — this is about a list with hundreds of rows, not about lucide.
+  import { onDestroy } from 'svelte';
   import { activePanel, selectedComponentIds, selectComponent, keyObjectId } from '../stores/panels.js';
   import { applyControlPatchesById, renameControl, updateControlProperty, reparentControls, removeControl, duplicateControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
   import { bringToFront, bringForward, sendBackward, sendToBack } from '../stores/alignment.js';
@@ -59,7 +60,16 @@
 
   function setCollapsed(next) {
     collapsedIds = next;
-    if (collapsePanelId != null) collapsedByPanel.set(collapsePanelId, next);
+    if (collapsePanelId != null) {
+      // This module state intentionally survives unmounts, but the editor can
+      // open an unbounded number of documents over a long session. Keep a
+      // small LRU instead of retaining every panel id forever.
+      collapsedByPanel.delete(collapsePanelId);
+      collapsedByPanel.set(collapsePanelId, next);
+      while (collapsedByPanel.size > 64) {
+        collapsedByPanel.delete(collapsedByPanel.keys().next().value);
+      }
+    }
   }
 
   function toggleCollapsed(id) {
@@ -337,6 +347,12 @@
       else toggleCollapsed(arrow.id);
       return;
     }
+    // Boundary arrows still belong to the tree. Letting them bubble reaches the App fallback,
+    // which interprets them as canvas nudges for the selected control.
+    if (e.key.startsWith('Arrow')) {
+      e.preventDefault();
+      return;
+    }
 
     const row = rows[focusedIndex];
     if (!row) return;
@@ -482,6 +498,11 @@
     dragScrollFrame = 0;
     dragScrollSpeed = 0;
   }
+
+  onDestroy(() => {
+    clearTimeout(renameNoticeTimer);
+    stopDragAutoScroll();
+  });
 
   function stepDragAutoScroll() {
     dragScrollFrame = 0;

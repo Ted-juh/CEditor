@@ -1,5 +1,5 @@
 <script>
-  import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
+  import { getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -17,7 +17,6 @@
 
   let { control = null } = $props();
 
-  const TARGETS = ['component', 'text', 'icon'];
   const blendModes = [
     'normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
     'color-dodge', 'color-burn', 'hard-light', 'soft-light',
@@ -30,7 +29,16 @@
   let icon = $derived(getSection(control, 'Icon'));
   let textEffects = $derived(text?._children?.Effects ?? null);
   let iconEffects = $derived(icon?._children?.Effects ?? null);
+  let targets = $derived([
+    'component',
+    ...(textEffects ? ['text'] : []),
+    ...(iconEffects ? ['icon'] : []),
+  ]);
   let selectedTarget = $state('component');
+
+  $effect(() => {
+    if (!targets.includes(selectedTarget)) selectedTarget = 'component';
+  });
 
   function set(path, value) {
     if (!core?.id) return;
@@ -58,7 +66,7 @@
 -->
 {#snippet targetPicker()}
   <div class="target-row">
-    {#each TARGETS as target}
+    {#each targets as target}
       <PropertyButton
         compact
         label={target}

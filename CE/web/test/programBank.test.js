@@ -62,6 +62,14 @@ test('programs come out in slot order, not capture order', () => {
     { slot: 9, name: 'Nine' }, { slot: 1, name: 'One' }, { slot: 5, name: 'Five' },
   ]));
   assert.deepEqual(baked.programs.map((p) => p.slot), [1, 5, 9]);
+  assert.equal(baked.sourceBankId, 'b1');
+});
+
+test('a baked bank keeps source identity when two banks share a label', () => {
+  const first = bakeProgramBank({ id: 'bank-a', label: 'Live set', entries: [{ slot: 0 }] });
+  const second = bakeProgramBank({ id: 'bank-b', label: 'Live set', entries: [{ slot: 0 }] });
+  assert.equal(first.label, second.label);
+  assert.notEqual(first.sourceBankId, second.sourceBankId);
 });
 
 test('a bank with nothing usable in it bakes to nothing, not to an empty bank', () => {

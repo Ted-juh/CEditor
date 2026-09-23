@@ -1,7 +1,8 @@
 import { writable, get } from 'svelte/store';
 import { activePanel, resolvedActivePanelId, selectedComponentIds, updatePanel } from './panels.js';
 import { controlSetForPanel, isTokenReference, resolveColourLiteral } from '../models/controlSets.js';
-import { updateControlProperty } from './controls.js';
+import { inspectorStateNameForPath, updateControlProperty, updateInspectorControlProperty } from './controls.js';
+import { stateEditScope } from './stateEditScope.js';
 
 /**
  * Color target binding store.
@@ -64,9 +65,17 @@ export function activateColorTarget(target, currentColor) {
   }
 
   // Attach initial color to the target so DisplayPanel can sync
-  colorTarget.set({ ...target, _initialColor: color, _initialAlpha: alpha });
+  colorTarget.set({ ...target, _initialRawColor: currentColor, _initialColor: color, _initialAlpha: alpha });
 
   return { color, alpha };
+}
+
+/** Arm a colour target owned by a state-aware property inspector. */
+export function activateInspectorColorTarget(target, currentColor) {
+  const stateName = target?.type === 'control'
+    ? inspectorStateNameForPath(target.path)
+    : '';
+  return activateColorTarget({ ...target, _inspectorStateName: stateName }, currentColor);
 }
 
 /**
@@ -87,10 +96,19 @@ export function applyColorToTarget(hex) {
     updatePanel(panelId, { [target.prop]: hex, modified: true });
   } else if (target.type === 'control') {
     // Control properties use AARRGGBB
-    updateControlProperty(target.controlId, target.path, hex);
+    if (Object.prototype.hasOwnProperty.call(target, '_inspectorStateName')) {
+      updateInspectorControlProperty(target.controlId, target.path, hex, target._inspectorStateName);
+    } else {
+      updateControlProperty(target.controlId, target.path, hex);
+    }
   } else if (target.type === 'callback' && typeof target.apply === 'function') {
     target.apply(hex);
   }
+}
+
+/** Return the exact pre-edit value only after the session made a live write. */
+export function colorTargetRestoreValue(target, dirty) {
+  return dirty && target?._initialRawColor != null ? target._initialRawColor : null;
 }
 
 /**
@@ -114,5 +132,11 @@ selectedComponentIds.subscribe(() => {
 let panelSeen = false;
 resolvedActivePanelId.subscribe(() => {
   if (!panelSeen) { panelSeen = true; return; }
+  if (get(colorTarget)) colorTarget.set(null);
+});
+
+let stateScopeSeen = false;
+stateEditScope.subscribe(() => {
+  if (!stateScopeSeen) { stateScopeSeen = true; return; }
   if (get(colorTarget)) colorTarget.set(null);
 });

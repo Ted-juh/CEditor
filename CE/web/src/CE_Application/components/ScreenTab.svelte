@@ -8,8 +8,10 @@
   import { panels, resolvedActivePanelId } from '../stores/panels.js';
   import { selectedControl, getSection } from '../stores/controls.js';
   import { screenDockState } from '../stores/screenDock.js';
+  import { stateEditScope } from '../stores/stateEditScope.js';
   import { lcdDesignLayoutIds, setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
   import { flatControls } from '../utils/containment.js';
+  import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import '../properties/propertyTheme.css';
 
   // A search in the side panel must not silently hide unrelated controls in this dock.
@@ -19,7 +21,13 @@
   let panel = $derived($panels.find((item) => item.id === $resolvedActivePanelId));
   let rawControl = $derived($screenDockState.followSelection ? $selectedControl
     : flatControls(panel?.controls ?? []).find((item) => item._children?.Core?.id === $screenDockState.pinnedId));
-  let control = $derived(rawControl);
+  let stateName = $derived(
+    $stateEditScope?.mode === 'state'
+    && rawControl?._children?.States?._children?.[$stateEditScope.stateName]
+      ? $stateEditScope.stateName
+      : ''
+  );
+  let control = $derived(resolveStateScopedControl(rawControl, stateName));
   let core = $derived(getSection(control, 'Core'));
   let screenKind = $derived(getSection(control, 'Display') ? 'lcd' : getSection(control, 'Pixel') ? 'pixel' : '');
   let group = $derived($screenDockState.group);
@@ -44,6 +52,7 @@
     {#if screenKind}
       <span> / {screenKind === 'lcd' ? 'LCD' : 'Pixel display'}</span>
     {/if}
+    {#if stateName}<span class="state-badge">State: {stateName}</span>{/if}
     <button type="button" class:pinned={!$screenDockState.followSelection} aria-pressed={!$screenDockState.followSelection}
       disabled={!core?.id && $screenDockState.followSelection} onclick={togglePin}
       title={$screenDockState.followSelection ? 'Keep editing this control when the selection changes' : 'Follow the editor selection'}>
@@ -64,7 +73,7 @@
       {/if}
     </nav>
     <div class="settings" aria-label="Screen properties">
-      {#key core.id}
+      {#key `${core.id}:${stateName}`}
         {#if screenKind === 'lcd'}<DisplayEditor {control} dockGroup={group} />
         {:else}<PixelDisplayEditor {control} dockGroup={group} />{/if}
       {/key}
@@ -83,6 +92,7 @@
   .target-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; padding: 4px 8px; border-bottom: 1px solid #333; background: #222; flex: 0 0 auto; }
   .target-bar strong { font-weight: 600; overflow-wrap: anywhere; }
   .target-bar span { color: #999; }
+  .target-bar .state-badge { padding: 1px 5px; border: 1px solid #7A5B13; border-radius: 999px; background: #3B2C08; color: #FFD166; }
   .target-bar button { margin-left: auto; display: flex; align-items: center; gap: 5px; min-height: 22px; padding: 2px 6px; border: 1px solid #333; border-radius: 3px; background: #1A1A1A; color: #AAA; font: inherit; cursor: pointer; }
   .target-bar button:hover { border-color: #5B9BD5; color: #FFF; }
   .target-bar button.pinned { background: #094771; color: #FFF; }

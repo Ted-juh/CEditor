@@ -1,8 +1,8 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import {
-    recorderTake, takeEventCount, takePasses, lastPass, undoPass, clearTake,
-    quantizeTake, RECORDER_STATE_LABELS, RECORDER_STATES, recorderState,
+    recorderTake, takeEventCount, takePasses, undoPass, clearTake,
+    quantizeTake, RECORDER_STATE_LABELS, recorderState,
     isRecordingState, toggleRecordState, takeIsEmpty, MIN_BARS, MAX_BARS, MAX_EVENTS,
     rowLabelFor, takeNoteRange, recorderUseFlats,
     editNote, deleteNote, nudgeTake, transposeTake,

@@ -135,6 +135,22 @@ test('every drawn run in mirrored custom-flow text is mirrored', () => {
   assert.equal(unmirrored, 0, `${unmirrored} run(s) painted outside the mirror transform`);
 });
 
+test('custom-flow decoration masks keep glyph coordinates local to their translated path', () => {
+  const control = texturedLabel('arc');
+  Object.assign(control._children.Text._children.Font, {
+    underline: true,
+    underlineGap: 3,
+  });
+  const html = renderControl(control);
+  const match = /<g transform="translate\(([-\d.]+) ([-\d.]+)\)">[\s\S]{0,400}?<text x="([-\d.]+)" y="([-\d.]+)"/.exec(html);
+
+  assert.ok(match, 'expected the decoration mask to translate its local flow coordinates');
+  const translateX = Number(match[1]);
+  const glyphX = Number(match[3]);
+  assert.ok(glyphX < translateX,
+    'the glyph x must stay local; adding the translation into x would move the mask twice');
+});
+
 test('the two layout modes never share a defs id', () => {
   const idsOf = (flowMode) => new Set(
     [...textVisualSvg(renderControl(texturedLabel(flowMode))).matchAll(/\sid="([^"]+)"/g)].map((m) => m[1])

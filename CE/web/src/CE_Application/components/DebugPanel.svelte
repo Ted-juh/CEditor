@@ -1,11 +1,26 @@
 <script>
+  import { onDestroy } from 'svelte';
   import Copy from 'lucide-svelte/icons/copy';
   import Check from 'lucide-svelte/icons/check';
   import Trash2 from 'lucide-svelte/icons/trash-2';
   import { debugDockState, clearDebugDock } from '../stores/debugDock.js';
 
   let copied = $state(false);
+  let copiedTimer = null;
   let debugState = $derived($debugDockState);
+
+  function showCopied() {
+    copied = true;
+    if (copiedTimer) clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => {
+      copiedTimer = null;
+      copied = false;
+    }, 1500);
+  }
+
+  onDestroy(() => {
+    if (copiedTimer) clearTimeout(copiedTimer);
+  });
 
   async function copyDebug() {
     const text = debugState?.text ?? '';
@@ -13,17 +28,15 @@
 
     try {
       await navigator.clipboard.writeText(text);
-      copied = true;
-      setTimeout(() => copied = false, 1500);
+      showCopied();
     } catch {
       const ta = document.createElement('textarea');
       ta.value = text;
       document.body.appendChild(ta);
       ta.select();
-      document.execCommand('copy');
+      const copied = document.execCommand('copy');
       document.body.removeChild(ta);
-      copied = true;
-      setTimeout(() => copied = false, 1500);
+      if (copied) showCopied();
     }
   }
 </script>

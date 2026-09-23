@@ -5,7 +5,7 @@
   import PropertyToggle from '../../properties/PropertyToggle.svelte';
   import NumberCell from '../../properties/NumberCell.svelte';
   import { TEXT_EFFECTS, TEXT_UNORDERED } from '../../utils/effectStack.js';
-  import { activateColorTarget } from '../../stores/colorTarget.js';
+  import { activateInspectorColorTarget } from '../../stores/colorTarget.js';
 
   let { values = null, controlId = '', selected = $bindable('outline'), onset = () => {} } = $props();
   const effects = [...TEXT_EFFECTS, ...TEXT_UNORDERED,
@@ -51,7 +51,7 @@
         {:else if field.kind === 'colour'}
           <PropertyColor value={String(values?.[field.key] ?? 'FFFFFFFF')}
             onchange={(v) => colourChanged(field.key, v)}
-            onswatchclick={() => activateColorTarget({ type: 'control', controlId, path: `Text.Effects.${field.key}` }, String(values?.[field.key] ?? 'FFFFFFFF'))} />
+            onswatchclick={() => activateInspectorColorTarget({ type: 'control', controlId, path: `Text.Effects.${field.key}` }, String(values?.[field.key] ?? 'FFFFFFFF'))} />
         {/if}
       </PropertyCell>
     {/each}

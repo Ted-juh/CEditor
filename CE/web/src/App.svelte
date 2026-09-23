@@ -32,6 +32,7 @@
   import { saveActiveScriptWorkspace, saveActiveScriptWorkspaceAs } from './CE_Application/stores/scriptWorkspace.js';
   import { handleEditorShortcut } from './CE_Application/utils/editorShortcuts.js';
   import { isEditableTarget, resolveGlobalShortcut } from './CE_Application/utils/globalShortcuts.js';
+  import { isEditorShortcutFocus } from './CE_Application/utils/editorShortcutFocus.js';
   import { initScriptWorkspaceBridge } from './CE_Application/stores/scriptWorkspace.js';
   import { initAppSettingsBridge } from './CE_Application/stores/appSettings.js';
   import { initConsoleBridge } from './CE_Application/stores/console.js';
@@ -136,7 +137,10 @@
     // wrapper handler goes silent and this window-level pass keeps the
     // selection editable. Skipped when the wrapper already handled the key
     // (defaultPrevented), while typing, and in workspaces without a canvas.
-    if (e.defaultPrevented || editableTarget) return;
+    // The canvas wrapper handles its own sibling cycle. A window fallback must never claim Tab
+    // from the component tree, dock or page body, where it moves focus to the next control.
+    if (e.defaultPrevented || e.key === 'Tab'
+        || !isEditorShortcutFocus(e.target, { allowPageBody: true, allowTree: true })) return;
     if ($previewModeEnabled || $componentWorkspaceMode === 'surface') return;
     const panel = get(activePanel);
     if (!panel) return;
@@ -287,7 +291,7 @@
     deadZone: 0,
     invertX: true,
     min: MIN_PROPERTIES_PANEL_WIDTH,
-    max: typeof window === 'undefined' ? 10000 : Math.max(MIN_PROPERTIES_PANEL_WIDTH, window.innerWidth - 120),
+    max: Math.max(MIN_PROPERTIES_PANEL_WIDTH, viewportWidth - 120),
     value: propertiesPanelWidth,
     manageCursor: false,
     onChange: (v) => { propertiesPanelWidth = Math.round(v); },
@@ -362,7 +366,8 @@
     // this call site — Settings → General → Check for Updates on Startup, off by default.
     // Delayed past the first frames: a network call has no business competing with panel restore
     // for the message thread while the window is still painting.
-    setTimeout(() => runStartupUpdateCheck(), 4000);
+    const updateTimer = setTimeout(() => runStartupUpdateCheck(), 4000);
+    return () => clearTimeout(updateTimer);
   });
 
 </script>

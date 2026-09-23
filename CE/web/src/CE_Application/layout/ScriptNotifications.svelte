@@ -4,10 +4,10 @@
   // A notification is an EVENT: it appears, it expires, it is gone. (A state belongs in the status
   // bar, which ce.ui.status() drives.) Expiry is swept here rather than with a timer per toast,
   // because a hundred notifications should cost one interval, not a hundred.
-  import { onMount } from 'svelte';
   import { scriptNotifications, dismissNotification, expireNotifications } from '../stores/scriptUi.js';
 
-  onMount(() => {
+  $effect(() => {
+    if ($scriptNotifications.length === 0) return;
     const handle = setInterval(() => expireNotifications(), 250);
     return () => clearInterval(handle);
   });

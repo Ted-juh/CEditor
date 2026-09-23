@@ -380,16 +380,28 @@
   }
 
   function captureWholeShellTarget(relativePath) {
+    const controlId = core?.id;
     const targetIds = targetRowIdsForWrite();
     const stateName = activeStateName;
+    const inheritedValues = new Map(
+      targetIds.map((rowId) => [rowId, deepClone(wholeInheritedValue(rowId, relativePath))])
+    );
     return {
       type: 'callback',
-      apply: (value) => writeWholeShellValue(relativePath, value, { targetIds, stateName }),
+      apply: (value) => {
+        if (!controlId || core?.id !== controlId) return;
+        writeWholeShellValue(relativePath, value, { controlId, targetIds, stateName, inheritedValues });
+      },
     };
   }
 
-  function writeWholeShellValue(relativePath, nextValue, { targetIds = targetRowIdsForWrite(), stateName = activeStateName } = {}) {
-    if (!core?.id || !relativePath) return;
+  function writeWholeShellValue(relativePath, nextValue, {
+    controlId = core?.id,
+    targetIds = targetRowIdsForWrite(),
+    stateName = activeStateName,
+    inheritedValues = null,
+  } = {}) {
+    if (!controlId || !relativePath) return;
 
     const nextContainer = stateName
       ? createStatePatchObject(stateName)
@@ -397,7 +409,9 @@
 
     for (const rowId of targetIds) {
       const bucket = ensurePartBucket(nextContainer, rowId, 'whole');
-      const inheritedValue = wholeInheritedValue(rowId, relativePath);
+      const inheritedValue = inheritedValues?.has(rowId)
+        ? inheritedValues.get(rowId)
+        : wholeInheritedValue(rowId, relativePath);
 
       if (nextValue === null || compareValues(nextValue, inheritedValue)) {
         deleteObjectPath(bucket, relativePath);
@@ -409,11 +423,11 @@
     cleanupStyleContainer(nextContainer);
 
     if (stateName) {
-      updateControlProperty(core.id, `States.${stateName}.patches.segments`, nextContainer);
+      updateControlProperty(controlId, `States.${stateName}.patches.segments`, nextContainer);
       return;
     }
 
-    updateControlProperty(core.id, 'Value.segmentStyle', nextContainer);
+    updateControlProperty(controlId, 'Value.segmentStyle', nextContainer);
   }
 
   function writeFieldValue(field, nextRawValue) {

@@ -1,4 +1,5 @@
 <script>
+  import { parseNumericDraft } from '../utils/numericDraft.js';
   import { dragScrub } from '../scrub/dragScrubAction';
   import { presets } from '../scrub/dragScrub';
   import { appScrubOverrides } from '../utils/scrubRuntime.js';
@@ -9,10 +10,16 @@
   // to stepping and scrubbing only, so exact values can always be entered.
   let editing = $state(false);
   let draft = $state('');
+  let draftDirty = $state(false);
   let inputEl = $state(null);
 
   function pctFromValue(v) {
-    return ((v - min) / (max - min)) * 100;
+    const low = Number(min);
+    const high = Number(max);
+    const current = Number(v);
+    const span = high - low;
+    if (!Number.isFinite(current) || !Number.isFinite(span) || span <= 0) return 0;
+    return Math.max(0, Math.min(100, ((current - low) / span) * 100));
   }
 
   // Display the stored value faithfully (it may sit off the step grid after a
@@ -51,13 +58,22 @@
   function beginEdit(e) {
     editing = true;
     draft = format(value);
+    draftDirty = false;
     e.target.select();
   }
 
+  // Keep an untouched focused field in sync with automation, undo, or another
+  // editor. Once the user types, preserve that draft until commit or Escape.
+  $effect(() => {
+    const external = format(value);
+    if (!editing || !draftDirty) draft = external;
+  });
+
   function commit() {
     if (!editing) return;
-    const v = parseFloat(draft);
+    const v = parseNumericDraft(draft);
     editing = false;
+    draftDirty = false;
     if (draft === format(value)) return;
     if (Number.isFinite(v)) {
       const next = clamp(v);
@@ -71,6 +87,10 @@
       e.target.blur();
     } else if (e.key === 'Escape') {
       editing = false;
+      draftDirty = false;
+      draft = format(value);
+      e.preventDefault();
+      e.stopPropagation();
       e.target.blur();
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       const typed = parseFloat(draft);
@@ -78,6 +98,7 @@
         editing && Number.isFinite(typed) ? clamp(typed) : value);
       draft = format(next);
       editing = true;
+      draftDirty = true;
       queueMicrotask(() => inputEl?.select());
       e.preventDefault();
     }
@@ -106,7 +127,7 @@
            aria-label={label ? `${label} value` : 'Value'}
            bind:this={inputEl}
            value={editing ? draft : format(value)}
-           oninput={(e) => { draft = e.target.value; }}
+           oninput={(e) => { draft = e.target.value; draftDirty = true; }}
            onfocus={beginEdit}
            onblur={commit}
            onkeydown={handleKeydown} />

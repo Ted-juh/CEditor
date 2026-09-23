@@ -1,5 +1,5 @@
 <script>
-  import { colorTarget, activateColorTarget } from '../stores/colorTarget.js';
+  import { colorTarget, activateInspectorColorTarget } from '../stores/colorTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
 
   // A control's colours as one row of captioned mini-swatches — the panel's
@@ -17,7 +17,7 @@
   function pick(s) {
     // The swatch key rides along so callback targets (dynamic collections
     // with no stable path) can still be matched for the live ring.
-    activateColorTarget({ ...s.target, _swatchKey: s.key }, s.value);
+    activateInspectorColorTarget({ ...s.target, _swatchKey: s.key }, s.value);
     displayTabRequest.set({ tab: 'colors' });
   }
 

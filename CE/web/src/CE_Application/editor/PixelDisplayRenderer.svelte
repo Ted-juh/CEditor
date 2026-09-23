@@ -99,6 +99,18 @@
   let showGlass = $derived(pixel?.showGlass !== false);
   let dotShape = $derived(String(pixel?.dotShape ?? 'round').trim().toLowerCase());
 
+  // One index build per controls-array change. A PixelDisplay can ask for up to nine sources per
+  // element; scanning a thousand-control panel for every one made an animated display do O(E×C)
+  // lookup work before it drew a single dot.
+  let controlsById = $derived.by(() => {
+    const index = new Map();
+    for (const candidate of (Array.isArray(allControls) ? allControls : [])) {
+      const id = String(candidate?._children?.Core?.id ?? '');
+      if (id) index.set(id, candidate);
+    }
+    return index;
+  });
+
   // Live info about a source: preview-injected (__live), else static defaults.
   function controlInfo(sourceId) {
     const id = String(sourceId ?? '');
@@ -108,8 +120,7 @@
       return { present: true, name: '', value: 0, min: 0, max: 0, text: String(pixel?.editText ?? ''), on: false };
     }
     const live = pixel?.__live?.[id];
-    const ctrl = (Array.isArray(allControls) ? allControls : [])
-      .find((c) => String(c?._children?.Core?.id ?? '') === id);
+    const ctrl = controlsById.get(id);
     if (!live && !ctrl) return null;
     const behavior = ctrl?._children?.Behavior ?? null;
     const min = live?.min ?? numberOr(behavior?.min, 0);
@@ -354,6 +365,7 @@
     event.preventDefault();
     const el = elements[box.i];
     if (!el) return;
+    endElementDrag();
     selectPixelElement(coreId, activeLayoutId, pixelElementId(el, box.i));
     // Grouped elements move together: capture every member's start position.
     const group = String(el.group ?? '').trim();
@@ -364,6 +376,7 @@
     dragEl = { i: box.i, cx: event.clientX, cy: event.clientY, x: numberOr(el.x, 0), y: numberOr(el.y, 0), members };
     window.addEventListener('mousemove', onElementDragMove);
     window.addEventListener('mouseup', endElementDrag);
+    window.addEventListener('blur', endElementDrag);
   }
 
   function onElementDragMove(event) {
@@ -390,8 +403,11 @@
 
   function endElementDrag() {
     dragEl = null;
-    window.removeEventListener('mousemove', onElementDragMove);
-    window.removeEventListener('mouseup', endElementDrag);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('mousemove', onElementDragMove);
+      window.removeEventListener('mouseup', endElementDrag);
+      window.removeEventListener('blur', endElementDrag);
+    }
   }
 
   // SE-corner resize: drags the element's width/height (grid px), snapped to the
@@ -402,12 +418,14 @@
     event.preventDefault();
     const el = elements[box.i];
     if (!el) return;
+    endElementResize();
     selectPixelElement(coreId, activeLayoutId, pixelElementId(el, box.i));
     const defW = String(el?.kind) === 'anim' ? 32 : Math.max(4, Math.round(numberOr(el?.w, 10)));
     const defH = String(el?.kind) === 'anim' ? 16 : Math.max(3, Math.round(numberOr(el?.h, 8)));
     resizeEl = { i: box.i, cx: event.clientX, cy: event.clientY, w: numberOr(el.w, defW), h: numberOr(el.h, defH) };
     window.addEventListener('mousemove', onElementResizeMove);
     window.addEventListener('mouseup', endElementResize);
+    window.addEventListener('blur', endElementResize);
   }
 
   function onElementResizeMove(event) {
@@ -430,8 +448,11 @@
 
   function endElementResize() {
     resizeEl = null;
-    window.removeEventListener('mousemove', onElementResizeMove);
-    window.removeEventListener('mouseup', endElementResize);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('mousemove', onElementResizeMove);
+      window.removeEventListener('mouseup', endElementResize);
+      window.removeEventListener('blur', endElementResize);
+    }
   }
 
   onDestroy(() => { endElementDrag(); endElementResize(); });
@@ -442,9 +463,11 @@
     const out = [];
     for (const el of elements) {
       if (el?.visible === false || String(el?.kind ?? '') !== 'anim') continue;
-      if (el?.blink === true && !blinkPhase) continue;
       out.push({
         id: String(el?.id ?? ''),
+        // Keep the authored descriptor in the list during the blink-off half so the canvas does
+        // not interpret temporary invisibility as removal and discard its decoded frame cache.
+        visibleNow: el?.blink !== true || blinkPhase,
         x: Math.round(numberOr(el?.x, 0)),
         y: Math.round(numberOr(el?.y, 0)),
         w: Math.max(4, Math.round(numberOr(el?.w, 32))),
@@ -496,7 +519,13 @@
   let animMode = $derived(String(pixel?.animMode ?? 'off').trim().toLowerCase());
   // Visibility during a blink must not stop/restart the clock driving it.
   let animActive = $derived(animMode !== 'off' || elements.some((e) => e?.kind === 'anim' && e?.visible !== false));
-  let widgetMotion = $derived(pixelWidgets.some((w) => w.smooth || w.peakHold || w.kind === 'wave' || w.kind === 'scope'));
+  // Blink hides a widget for half a second; it does not remove its animation. Derive the clock
+  // requirement from authored elements so the off half cannot stop/restart rAF and reset phase.
+  let widgetMotion = $derived(elements.some((el) => {
+    const kind = String(el?.kind ?? '');
+    return el?.visible !== false && PIXEL_WIDGET_KINDS.has(kind)
+      && (el?.smooth === true || el?.peakHold === true || kind === 'wave' || kind === 'scope');
+  }));
   let editActive = $derived(pixel?.__edit?.active === true);
   let clockActive = $derived(elements.some((e) => String(e?.kind ?? '') === 'clock' && e?.visible !== false));
   let blinkActive = $derived(elements.some((e) => e?.blink === true && e?.visible !== false));
@@ -504,7 +533,8 @@
   // Blink phase (~530ms, matches the LCD cursor): elements flagged blink are
   // dropped from the frame on the "off" half.
   let blinkPhase = $derived(Math.floor(frameTime / 530) % 2 === 0);
-  let motionActive = $derived(animActive || widgetMotion || editActive || clockActive || blinkActive || scrollActive);
+  let continuousMotion = $derived(animActive || widgetMotion);
+  let discreteMotion = $derived(editActive || blinkActive || scrollActive);
 
   // On-screen edit caret: the preview injects pixel.__edit = { active, elementId,
   // caret, kind }. Compute a blinking I-beam at the insertion point, mirroring
@@ -547,20 +577,32 @@
 
   $effect(() => {
     // Explicit screen media is authored content. Reduced UI motion must not
-    // silently pause a GIF, sprite sheet or selected animation preset.
-    if (!motionActive || (prefersReducedMotion() && !animActive)) {
+    // silently pause a GIF, sprite sheet or selected animation preset. A clock is information,
+    // so reduced-motion mode still advances it while decorative UI motion stays still.
+    const reduced = prefersReducedMotion();
+    const runContinuous = continuousMotion && (!reduced || animActive);
+    const runDiscrete = clockActive || (!reduced && discreteMotion);
+    if (!runContinuous && !runDiscrete) {
       frameTime = 0;
       return;
     }
-    let raf = 0;
-    let origin = -1;
-    const loop = (t) => {
-      if (origin < 0) origin = t;
-      frameTime = t - origin;
+    if (runContinuous) {
+      let raf = 0;
+      let origin = -1;
+      const loop = (t) => {
+        if (origin < 0) origin = t;
+        frameTime = t - origin;
+        raf = requestAnimationFrame(loop);
+      };
       raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+      return () => cancelAnimationFrame(raf);
+    }
+
+    // Clock text, blinking, and marquee windows change at human-scale intervals. Updating the
+    // complete dot canvas at display refresh rate for them wastes almost every rendered frame.
+    const origin = Date.now();
+    const timer = setInterval(() => { frameTime = Date.now() - origin; }, 100);
+    return () => clearInterval(timer);
   });
 
   // Surface layers (bezel inset, backlight wash, scanlines, glass) — same look

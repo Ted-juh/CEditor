@@ -101,7 +101,7 @@ try {
     assert.equal(await read(id, `${root}.Shadows.items.0.blur`), 18);
     await settings.locator('.mini-swatch').click();
     await page.evaluate(async () => (await import('/src/CE_Application/stores/colorTarget.js')).applyColorToTarget('CC00DDEE'));
-    await page.locator('.studio-rail').getByRole('button', { name: 'Effects', exact: true }).click(); await dock.waitFor(); await settle();
+    await page.locator('.studio-rail').getByRole('tab', { name: 'Effects', exact: true }).click(); await dock.waitFor(); await settle();
     assert.equal(await read(id, `${root}.Shadows.items.0.colour`), 'CC00DDEE');
     assert.equal(await dock.getByLabel('Effect target', { exact: true }).inputValue(), surface, 'target survives shared colour editor');
     await dock.locator('.looks').getByRole('radio', { name: 'Flat', exact: true }).click(); await settle();

@@ -57,3 +57,12 @@ export function cancelStopEdit(stops, edit) {
   if (!edit) return { stops, edit: null };
   return { stops: updateStopAt(stops, edit.index, { color: edit.original }), edit: null };
 }
+
+export function gradientEditSignature(gradient) {
+  return JSON.stringify(gradient ?? null);
+}
+
+/** A popover may write only while both its destination and gradient snapshot still match. */
+export function ownsGradientEdit(owner, currentOwner, expectedSignature, currentGradient) {
+  return owner === currentOwner && expectedSignature === gradientEditSignature(currentGradient);
+}

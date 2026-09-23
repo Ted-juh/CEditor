@@ -16,6 +16,7 @@
   import InsertFlyout from './InsertFlyout.svelte';
   import { INSERT_CATEGORIES } from '../models/insertCatalog.js';
   import { CATEGORY_ICONS, FALLBACK_TYPE_ICON } from '../models/insertCatalogIcons.js';
+  import { onDestroy } from 'svelte';
 
   let {
     showDisplayPanel = true,
@@ -129,6 +130,7 @@
   /** '' when nothing is open, 'search' for the +, otherwise a category id. */
   let openFlyoutId = $state('');
   let flyoutCloseTimer = null;
+  onDestroy(cancelFlyoutClose);
 
   function cancelFlyoutClose() {
     if (flyoutCloseTimer === null) return;
@@ -151,7 +153,7 @@
   }
 
   function flyoutKeydown(id, event) {
-    if (event.key === 'Escape') { closeFlyout(true); return; }
+    if (event.key === 'Escape') { event.preventDefault(); closeFlyout(true); return; }
     // Keyboard and touch get the same menu, on a real activation rather than a hover.
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -165,8 +167,8 @@
   // is focused; this is the case where focus is elsewhere on the page.
   function handleWindowKeydown(event) {
     if (event.key !== 'Escape') return;
-    if (openFlyoutId) closeFlyout(true);
-    else if (customLibraryOpen) customLibraryOpen = false;
+    if (openFlyoutId) { event.preventDefault(); closeFlyout(true); }
+    else if (customLibraryOpen) { event.preventDefault(); customLibraryOpen = false; }
   }
 
   function handleInsertPackage(entry) {

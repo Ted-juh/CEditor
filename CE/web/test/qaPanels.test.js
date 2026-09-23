@@ -73,11 +73,7 @@ const QA_DIR = path.join(REPO, 'CE/qa');
  * allowed to be broken — it is a list of components this particular gate cannot see, which is
  * worth knowing precisely because they are the ones nothing else checks either.
  */
-const NO_SSR = {
-  // PixelDisplayRenderer reaches for `window` while rendering, so it has no server pass. Every
-  // other component has one. Guarding that access would bring PixelDisplay under this gate too.
-  PixelDisplay: 'PixelDisplayRenderer touches `window` during render — no server pass',
-};
+const NO_SSR = {};
 
 /* ------------------------------------------------------------------ 1. coverage ratchet */
 

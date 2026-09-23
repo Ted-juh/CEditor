@@ -6,9 +6,15 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
 import { render } from 'svelte/server';
 import NumberCell from '../src/CE_Application/properties/NumberCell.svelte';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const source = readFileSync(resolve(here, '..', 'src', 'CE_Application', 'properties', 'NumberCell.svelte'), 'utf8');
 
 function renderCell(props) {
   return render(NumberCell, { props }).body;
@@ -52,6 +58,9 @@ test('fill bar renders only for fully bounded ranges', () => {
 
   const unbounded = renderCell({ value: 50 });
   assert.doesNotMatch(unbounded, /nc-fill/, 'unbounded → no fill bar');
+
+  const emptyRange = renderCell({ value: 5, min: 5, max: 5 });
+  assert.doesNotMatch(emptyRange, /nc-fill/, 'a zero-width range cannot produce a meaningful percentage');
 });
 
 test('disabled state disables the input and steppers', () => {
@@ -59,4 +68,19 @@ test('disabled state disables the input and steppers', () => {
 
   assert.match(html, /<input[^>]*disabled/);
   assert.match(html, /number-cell[^"]*disabled/);
+});
+
+test('external values update a clean draft but never erase text the user has changed', () => {
+  assert.match(source, /let draftDirty = \$state\(false\)/);
+  assert.match(source, /const external = format\(value\);[\s\S]*?if \(!editing \|\| !draftDirty\) draft = external/);
+  assert.match(source, /oninput=\{\(e\) => \{ draft = e\.target\.value; draftDirty = true; \}\}/);
+  assert.match(source, /function beginEdit[\s\S]*?draftDirty = false/);
+});
+
+test('Escape restores the latest external value and cannot trigger a parent shortcut', () => {
+  const escape = source.slice(source.indexOf("} else if (e.key === 'Escape')"));
+  assert.ok(escape.indexOf('draft = format(value)') < escape.indexOf('e.target.blur()'));
+  assert.match(escape, /draftDirty = false/);
+  assert.match(escape, /e\.preventDefault\(\)/);
+  assert.match(escape, /e\.stopPropagation\(\)/);
 });

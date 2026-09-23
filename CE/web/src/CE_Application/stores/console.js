@@ -27,10 +27,27 @@ function ts() {
   );
 }
 
+function formatConsoleArg(value) {
+  if (typeof value === 'string') return value;
+  if (value instanceof Error) return value.stack || `${value.name}: ${value.message}`;
+  const seen = new WeakSet();
+  try {
+    const json = JSON.stringify(value, (_key, entry) => {
+      if (typeof entry === 'bigint') return `${entry}n`;
+      if (entry && typeof entry === 'object') {
+        if (seen.has(entry)) return '[Circular]';
+        seen.add(entry);
+      }
+      return entry;
+    }, 2);
+    return json ?? String(value);
+  } catch {
+    try { return String(value); } catch { return '[Unprintable]'; }
+  }
+}
+
 function push(level, source, args) {
-  const message = args.map(a =>
-    typeof a === 'string' ? a : JSON.stringify(a, null, 2) ?? String(a)
-  ).join(' ');
+  const message = args.map(formatConsoleArg).join(' ');
 
   consoleEntries.update(list => {
     const next = [...list, { id: nextId++, timestamp: ts(), level, source, message }];

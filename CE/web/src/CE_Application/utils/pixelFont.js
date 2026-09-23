@@ -7,6 +7,17 @@ export const FONT_W = 5;
 export const FONT_H = 7;
 export const FONT_ADVANCE = 6; // 5px glyph + 1px gap
 
+export function withPixelCustomFontSource(customFont, src) {
+  return {
+    glyphW: 6,
+    glyphH: 8,
+    cols: 16,
+    first: 32,
+    ...(customFont ?? {}),
+    src: String(src ?? ''),
+  };
+}
+
 // Match the canvas's integer-scaled glyphs when wrapping, selecting or editing
 // a pixel text element. Custom sheets have their own cell dimensions.
 export function pixelTextMetrics(element, customFont = null) {

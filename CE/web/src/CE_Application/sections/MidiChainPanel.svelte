@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import HostConfirmButton from './HostConfirmButton.svelte';
   /**
    * MidiChainPanel.svelte — a part's MIDI inserts, in the order the player put them.
@@ -134,11 +135,33 @@
       entry.articulationId !== articulationId) });
   }
 
+  const auditionTimers = new Map();
+
   function auditionArticulation(entry) {
     const channel = entry.triggerChannel || part.channel || 1;
+    const key = `${channel}:${entry.triggerNote}`;
+    const previous = auditionTimers.get(key);
+    if (previous) {
+      clearTimeout(previous);
+      hostNote(entry.triggerNote, 0, false, channel);
+    }
     hostNote(entry.triggerNote, 100, true, channel);
-    setTimeout(() => hostNote(entry.triggerNote, 0, false, channel), 80);
+    const timer = setTimeout(() => {
+      if (auditionTimers.get(key) !== timer) return;
+      auditionTimers.delete(key);
+      hostNote(entry.triggerNote, 0, false, channel);
+    }, 80);
+    auditionTimers.set(key, timer);
   }
+
+  onDestroy(() => {
+    for (const [key, timer] of auditionTimers) {
+      clearTimeout(timer);
+      const [channel, note] = key.split(':').map(Number);
+      hostNote(note, 0, false, channel);
+    }
+    auditionTimers.clear();
+  });
 
   /** Beats as a musician reads them. Everything in these modules is timed in beats rather
       than milliseconds — a strum that is right at 90bpm is wrong at 160 — so the labels have

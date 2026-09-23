@@ -14,6 +14,9 @@
   import { glyphRows, FONT_W, FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
 
   let { controlId = '', width = 0, height = 0 } = $props();
+  const instanceId = $props.id();
+  const definitionId = (id) => `ce-draw-${instanceId}-${id}`;
+  const boundsClipId = definitionId('bounds');
 
   // The runtime appends to its OWN array and republishes that array rather than handing over a fresh
   // copy per command: copying per command made a drawing O(n²), 21ms for a 256-segment trace before
@@ -54,7 +57,7 @@
   // object rather than a string, and becomes a url(#…) reference to the <defs> entry above.
   const paint = (colour) => {
     if (colour == null || colour === '') return 'none';
-    if (typeof colour === 'object') return colour.gradient ? `url(#${colour.id})` : 'none';
+    if (typeof colour === 'object') return colour.gradient ? `url(#${definitionId(colour.id)})` : 'none';
     return colour;
   };
 
@@ -79,7 +82,7 @@
   /** A stable id per distinct clip rect, so N commands sharing one clip share one <clipPath>.
    *  "region" rather than "clip": the control's own bounds clip is ce-draw-clip-<id> and these are a
    *  different thing entirely — a script's clip() narrows within those bounds, never past them. */
-  const clipId = (r) => `ce-draw-region-${controlId}-${r.x}-${r.y}-${r.w}-${r.h}`;
+  const clipId = (r) => definitionId(`region-${r.x}-${r.y}-${r.w}-${r.h}`);
 
   /** Every distinct clip rect the commands referred to, defined once each. */
   let clips = $derived((() => {
@@ -182,7 +185,7 @@
     aria-hidden="true"
   >
     <defs>
-      <clipPath id="ce-draw-clip-{controlId}">
+      <clipPath id={boundsClipId}>
         <rect x="0" y="0" width={Math.max(0, width)} height={Math.max(0, height)} />
       </clipPath>
       <!-- One <clipPath> per distinct region a script asked for, so twenty shapes sharing a clip
@@ -195,7 +198,7 @@
       {#each gradients as g (g.id)}
         {@const co = gradientCoords(g.angle, Math.max(1, width), Math.max(1, height))}
         <linearGradient
-          id={g.id}
+          id={definitionId(g.id)}
           gradientUnits="userSpaceOnUse"
           x1={co.x1} y1={co.y1} x2={co.x2} y2={co.y2}
         >
@@ -205,7 +208,7 @@
         </linearGradient>
       {/each}
     </defs>
-    <g clip-path="url(#ce-draw-clip-{controlId})">
+    <g clip-path={`url(#${boundsClipId})`}>
       {#each commands as c, i (i)}
         {#if c.op === 'rect'}
           <rect

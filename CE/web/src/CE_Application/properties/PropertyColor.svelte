@@ -1,8 +1,27 @@
 <script>
+  import { tick } from 'svelte';
+
   let { value = '000000', onchange = null, onswatchclick = null } = $props();
 
-  function handleInput(e) {
-    onchange?.(e.target.value);
+  let valueGeneration = 0;
+
+  // A caller may reject invalid text or normalize it back to the value it
+  // already held. In both cases Svelte sees no prop change, so the browser's
+  // edited value would otherwise remain visible while the swatch and model
+  // still contain the canonical value.
+  $effect(() => {
+    value;
+    valueGeneration += 1;
+  });
+
+  async function handleInput(e) {
+    const input = e.currentTarget;
+    const generation = ++valueGeneration;
+    onchange?.(input.value);
+    await tick();
+    if (generation === valueGeneration && input.isConnected) {
+      input.value = String(value ?? '');
+    }
   }
 
   function selectAll(e) {

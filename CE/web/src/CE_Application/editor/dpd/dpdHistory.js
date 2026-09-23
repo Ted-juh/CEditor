@@ -152,11 +152,16 @@ export function createDeviceProfileHistory({ id, isActive, applyModel }) {
       clearHistory({ kind: DPD_HISTORY_KIND, id });
     },
 
-    /** The engine confirmed the save: this state is the one on disk now. */
-    noteSaved() {
-      if (currentJson == null) return;
-      savedJson = currentJson;
-      markContextSaved({ kind: DPD_HISTORY_KIND, id });
+    /** The engine confirmed the save: remember the snapshot that was actually sent. */
+    noteSaved(savedModel = current) {
+      if (savedModel == null) return;
+      savedJson = JSON.stringify(savedModel);
+      markContextSaved({ kind: DPD_HISTORY_KIND, id }, savedModel);
+    },
+
+    /** The split view crossed between panel and designer ownership; seed the new active context. */
+    focusChanged() {
+      resetHistoryBaseline();
     },
 
     isDirty,

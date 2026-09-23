@@ -8,6 +8,7 @@ import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
 import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
 import { DEFAULT_CONTROL_SET_ID, normalizeControlSet, normalizeControlSetList, serializeControlSet } from '../models/controlSets.js';
 import { resolveControlForSet } from '../models/controlSetFamilies.js';
+import { dedupeSnapshotIds } from '../utils/snapshotModel.js';
 
 let nextId = 1;
 
@@ -443,6 +444,7 @@ export function deserializePanel(json, filePath, name) {
     cardPresets: normalizeCardPresets(data.cardPresets),
     controlSet: normalizeControlSet(data.controlSet),
     controlSets: normalizeControlSetList(data.controlSets),
+    snapshots: dedupeSnapshotIds(data.snapshots),
     // Migration lives here rather than in a version bump: a document with no `layers` gets one
     // built from first-appearance order, which is exactly what rendering used to infer, so it
     // looks identical on the first load and stops restacking on every load after it.

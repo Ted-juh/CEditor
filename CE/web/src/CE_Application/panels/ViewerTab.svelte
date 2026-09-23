@@ -7,8 +7,10 @@
    */
   import ViewerEditor from '../components/ViewerEditor.svelte';
   import ViewerSettings from '../components/ViewerSettings.svelte';
-  import { activePanel, updatePanel } from '../stores/panels.js';
+  import { untrack } from 'svelte';
+  import { activePanel, panels, updatePanel } from '../stores/panels.js';
   import { deepClone } from '../utils/deepClone.js';
+  import { withViewerActiveIndex } from '../utils/panelNavigation.js';
 
   let {
     // Parent drives active-panel sync by toggling this reset key.
@@ -25,7 +27,10 @@
   // Re-sync from the active panel whenever `resetKey` changes.
   $effect(() => {
     void resetKey;
-    const panel = $activePanel;
+    // resetKey is the panel-switch signal. Tracking the whole panel object here would also
+    // deep-clone our own viewer writes back into `images`, replacing every image identity and
+    // throwing away its WeakMap-backed zoom/pan state after each rename, close, or tab switch.
+    const panel = untrack(() => $activePanel);
     if (!panel) { images = []; activeIndex = 0; return; }
     const vw = panel.viewer;
     if (vw) {
@@ -37,15 +42,23 @@
     }
   });
 
-  function handleChange(updatedImages) {
-    images = updatedImages;
+  function handleChange(updatedImages, source) {
     const panel = $activePanel;
-    if (panel) {
-      updatePanel(panel.id, {
-        viewer: { images: deepClone(updatedImages), activeImageIndex: activeIndex },
-        modified: true,
-      });
+    const panelId = source?.sourceId;
+    if (!panelId || panelId !== panel?.id || source?.sourceGeneration !== resetKey) return;
+    images = updatedImages;
+    activeIndex = source.activeImageIndex;
+    if (source.documentChanged === false) {
+      // Active image is workspace navigation. Preserve the saved flag and the image objects;
+      // updatePanel always marks a panel modified, even if passed modified: false.
+      panels.update((list) => list.map((entry) => entry.id === panelId
+        ? withViewerActiveIndex(entry, source.activeImageIndex) : entry));
+      return;
     }
+    updatePanel(panelId, {
+      viewer: { images: deepClone(updatedImages), activeImageIndex: source.activeImageIndex },
+      modified: true,
+    });
   }
 
   function handleColorPicked(hex) {
@@ -61,6 +74,8 @@
       <ViewerEditor
         bind:images
         bind:activeImageIndex={activeIndex}
+        sourceId={$activePanel.id}
+        sourceGeneration={resetKey}
         onchange={handleChange}
         onColorPicked={handleColorPicked}
         onColorHover={(hex) => hoverColor = hex}

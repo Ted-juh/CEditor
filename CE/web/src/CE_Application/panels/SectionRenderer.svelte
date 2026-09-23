@@ -73,12 +73,21 @@
 
   let hasDedicatedEditor = $derived(hasSectionEditor(contextMode, tabId));
   let EditorComponent = $state(null);
+  let editorComponentKey = $state('');
+  let editorLoadError = $state('');
+  let editorErrorKey = $state('');
+  let retryKey = $state(0);
 
   $effect(() => {
     let cancelled = false;
+    void retryKey;
+    const requestedKey = `${contextMode}:${tabId}`;
 
     if (!hasDedicatedEditor) {
       EditorComponent = null;
+      editorComponentKey = '';
+      editorLoadError = '';
+      editorErrorKey = '';
       return () => {
         cancelled = true;
       };
@@ -87,16 +96,29 @@
     const existing = getSectionEditorComponent(contextMode, tabId);
     if (existing) {
       EditorComponent = existing;
+      editorComponentKey = requestedKey;
+      editorLoadError = '';
+      editorErrorKey = '';
       return () => {
         cancelled = true;
       };
     }
 
     EditorComponent = null;
-    ensureSectionEditorComponent(contextMode, tabId).then((component) => {
-      if (cancelled) return;
-      EditorComponent = component;
-    });
+    editorComponentKey = '';
+    editorLoadError = '';
+    editorErrorKey = '';
+    ensureSectionEditorComponent(contextMode, tabId)
+      .then((component) => {
+        if (cancelled) return;
+        EditorComponent = component;
+        editorComponentKey = requestedKey;
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        editorLoadError = error?.message ?? 'The editor chunk could not be loaded.';
+        editorErrorKey = requestedKey;
+      });
 
     return () => {
       cancelled = true;
@@ -106,10 +128,15 @@
 
 {#if !hasDedicatedEditor}
   <div class="placeholder">Component: {fallbackLabel}</div>
-{:else if EditorComponent}
+{:else if EditorComponent && editorComponentKey === `${contextMode}:${tabId}`}
   {#key editorInstanceKey}
     <EditorComponent {...editorProps} />
   {/key}
+{:else if editorLoadError && editorErrorKey === `${contextMode}:${tabId}`}
+  <div class="placeholder error">
+    <span>Failed to load {fallbackLabel || tabId}: {editorLoadError}</span>
+    <button type="button" onclick={() => retryKey += 1}>Retry</button>
+  </div>
 {:else}
   <div class="placeholder">Loading {fallbackLabel || tabId}…</div>
 {/if}
@@ -123,5 +150,20 @@
     padding: 20px;
     color: #444;
     font-size: 11px;
+  }
+
+  .placeholder.error {
+    flex-direction: column;
+    gap: 8px;
+    color: #B77;
+  }
+
+  .placeholder button {
+    padding: 3px 10px;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #292929;
+    color: #DDD;
+    cursor: pointer;
   }
 </style>

@@ -42,10 +42,11 @@
 
     const normalizedIds = normalizeSegmentTargetIds(valueSection, activeSegmentScope?.segmentIds ?? []);
     if (activeSegmentScope?.mode !== 'segments') return;
-    if (
-      normalizedIds.length === selectedSegmentIds.length
-      && normalizedIds.every((id, index) => id === selectedSegmentIds[index])
-    ) {
+    const rawIds = Array.isArray(activeSegmentScope?.segmentIds)
+      ? activeSegmentScope.segmentIds.map((id) => String(id ?? '').trim()).filter(Boolean)
+      : [];
+    if (normalizedIds.length === rawIds.length
+      && normalizedIds.every((id, index) => id === rawIds[index])) {
       return;
     }
 

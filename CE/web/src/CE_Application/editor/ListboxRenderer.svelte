@@ -20,6 +20,12 @@
     matchQuery = '',             // substring to highlight (search)
     filterText = '',             // filter-box query (reduces the visible rows)
     focused = false,             // control holds keyboard focus (draws a focus ring)
+    interactive = false,
+    tabIndex = undefined,
+    ariaLabel = '',
+    ariaDisabled = undefined,
+    onfocus = null,
+    onblur = null,
   } = $props();
 
   function css(hex, fallback = 'rgba(224,224,224,1)') {
@@ -122,7 +128,11 @@
   role="listbox"
   aria-multiselectable={cfg.multiSelect === true}
   aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
-  tabindex="0"
+  aria-label={ariaLabel || undefined}
+  aria-disabled={ariaDisabled}
+  tabindex={interactive ? tabIndex : undefined}
+  onfocus={interactive ? onfocus : undefined}
+  onblur={interactive ? onblur : undefined}
   style={`width:${width}px; height:${height}px; color:${textCss}; font-family:${fontFamily}; font-size:${fontSize}px; font-weight:${fontWeight}; padding-top:${padTop}px; padding-bottom:${padBottom}px; --lb-accent:${accentCss};`}
 >
   {#if thumb}

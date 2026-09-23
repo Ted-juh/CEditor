@@ -44,6 +44,7 @@
   let model = $state(null);
   let loadedFor = '__none__';
   let appliedSavedFor = null;
+  let openingModelJson = null;
   $effect(() => {
     const pid = profileId;
     if (pid === loadedFor) return;
@@ -52,6 +53,7 @@
     saveStatus = '';
     const id = resolveDpdId(pid);
     model = id ? deepClone(dpdLibrary[id]) : null;
+    openingModelJson = model ? JSON.stringify($state.snapshot(model)) : null;
     if (pid) requestProfileSource(pid); // ask the engine for the saved source (no-op without the bridge)
   });
 
@@ -61,6 +63,10 @@
     const entry = $profileSources?.[pid];
     if (!entry?.source || appliedSavedFor === pid) return;
     appliedSavedFor = pid;
+    // The bridge may answer well after the bundled model is already editable. Never replace a
+    // draft the user has changed while that request was in flight.
+    const currentJson = model ? JSON.stringify($state.snapshot(model)) : null;
+    if (currentJson !== openingModelJson) return;
     try {
       const parsed = JSON.parse(entry.source);
       if (parsed?.dpdModel?.scopes) {
@@ -136,7 +142,10 @@
     // to hand undo back to the panel.
     const track = (event) => {
       const target = event.target;
-      focusWithin = rootEl != null && target instanceof Node && rootEl.contains(target);
+      const nextFocusWithin = rootEl != null && target instanceof Node && rootEl.contains(target);
+      if (nextFocusWithin === focusWithin) return;
+      focusWithin = nextFocusWithin;
+      designerHistory?.focusChanged();
     };
     document.addEventListener('pointerdown', track, true);
     document.addEventListener('focusin', track, true);
@@ -153,6 +162,8 @@
 
   // --- Save: resolve the new-schema model -> legacy engine profile -> persist via the bridge. ---
   let saveStatus = $state('');
+  let pendingSave = null;
+  let saveSequence = 0;
   function save() {
     if (!model || !profileId) return;
     saveStatus = 'saving';
@@ -161,20 +172,26 @@
       const plain = $state.snapshot(model);
       const merged = resolveModel(plain, dpdLibrary);
       const legacy = buildLegacyProfile(merged, { legacyId: profileId, embedDpdModel: plain });
-      saveProfileSource(profileId, JSON.stringify(legacy, null, 2));
+      const requestId = `profile_save_${profileId}_${++saveSequence}`;
+      pendingSave = { requestId, model: deepClone(plain) };
+      saveProfileSource(profileId, JSON.stringify(legacy, null, 2), requestId);
     } catch (e) {
       saveStatus = 'error: ' + (e?.message ?? 'build failed');
     }
   }
   $effect(() => {
     const s = $latestProfileSourceSave;
-    if (!s || s.profileId !== profileId) return;
+    if (!s || s.profileId !== profileId || !pendingSave || s.requestId !== pendingSave.requestId) return;
     saveStatus = s.running ? 'saving…' : s.ok ? 'Saved ✓' : ('error: ' + (s.error ?? 'save failed'));
     // The engine confirmed it, so this state is the one on disk: undoing back to
     // it must stop claiming unsaved changes.
     if (!s.running && s.ok) {
-      untrack(() => designerHistory?.noteSaved());
-      dirty = false;
+      const savedModel = pendingSave.model;
+      pendingSave = null;
+      untrack(() => designerHistory?.noteSaved(savedModel));
+      dirty = untrack(() => designerHistory?.isDirty() ?? false);
+    } else if (!s.running) {
+      pendingSave = null;
     }
   });
 
@@ -296,7 +313,7 @@
           <DpdBulkDumpsScreen {model} {merged} />
         </div>
         <div class={['screen', activeScreen === 'advanced' && 'active']}>
-          <DpdAdvancedScreen {model} {profileId} onApplyModel={(m) => { model = m; appliedSavedFor = profileId; }} />
+          <DpdAdvancedScreen {model} {profileId} active={activeScreen === 'advanced'} onApplyModel={(m) => { model = m; appliedSavedFor = profileId; }} />
         </div>
         <div class={['screen', activeScreen === 'presets' && 'active']}>
           <DpdPresetsScreen {model} {merged} {profileId} />

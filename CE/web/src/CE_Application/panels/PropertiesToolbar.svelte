@@ -71,21 +71,22 @@
 </script>
 
 <div class="props-toolbar">
-  <button class="toolbar-btn" class:active={$undoAvailable} disabled={!$undoAvailable} title="Undo" onclick={undo}>
+  <button class="toolbar-btn" class:active={$undoAvailable} disabled={!$undoAvailable} title="Undo" aria-label="Undo" onclick={undo}>
     <Undo2 size={18} strokeWidth={1.5} />
   </button>
-  <button class="toolbar-btn" class:active={$redoAvailable} disabled={!$redoAvailable} title="Redo" onclick={redo}>
+  <button class="toolbar-btn" class:active={$redoAvailable} disabled={!$redoAvailable} title="Redo" aria-label="Redo" onclick={redo}>
     <Redo2 size={18} strokeWidth={1.5} />
   </button>
 
   <div class="toolbar-divider"></div>
 
-  <button class="toolbar-btn" class:active={panel.modified} title="Save panel"
+  <button class="toolbar-btn" class:active={panel.modified} title="Save panel" aria-label="Save panel"
     onclick={() => saveActivePanel()}>
     <Save size={18} strokeWidth={1.5} />
   </button>
   <button class="toolbar-btn" class:active={panel.locked}
     title={panel.locked ? 'Unlock panel' : 'Lock panel'}
+    aria-label={panel.locked ? 'Unlock panel' : 'Lock panel'}
     onclick={() => updatePanel(panel.id, { locked: !panel.locked })}>
     {#if panel.locked}
       <Lock size={18} strokeWidth={1.5} />
@@ -95,6 +96,7 @@
   </button>
   <button class="toolbar-btn" class:active={previewMode}
     title={previewMode ? 'Exit Preview' : 'Enter Preview'}
+    aria-label={previewMode ? 'Exit Preview' : 'Enter Preview'}
     onclick={() => ontogglepreview?.()}>
     {#if previewMode}
       <Square size={16} strokeWidth={1.5} />
@@ -107,11 +109,13 @@
 
   <button class="toolbar-btn" class:active={panel.gridEnabled}
     title={panel.gridEnabled ? 'Hide grid' : 'Show grid'}
+    aria-label={panel.gridEnabled ? 'Hide grid' : 'Show grid'}
     onclick={() => updatePanel(panel.id, { gridEnabled: !panel.gridEnabled })}>
     <GridIcon size={18} strokeWidth={1.5} />
   </button>
   <button class="toolbar-btn" class:active={panel.snapToGrid}
     title={panel.snapToGrid ? 'Disable snap' : 'Enable snap'}
+    aria-label={panel.snapToGrid ? 'Disable snap' : 'Enable snap'}
     onclick={() => updatePanel(panel.id, { snapToGrid: !panel.snapToGrid })}>
     <Magnet size={18} strokeWidth={1.5} />
   </button>
@@ -135,6 +139,7 @@
   {:else}
     <div class="toolbar-spacer"></div>
     <button class="toolbar-btn" class:active={!!$propertyFilter} title="Search properties"
+      aria-label="Search properties"
       onclick={() => { searching = true; }}>
       <Search size={16} strokeWidth={1.5} />
     </button>
@@ -143,6 +148,7 @@
   {#if sectionCount > 0}
     <button class="toolbar-btn"
       title={allCollapsed ? 'Expand all sections' : 'Collapse all sections'}
+      aria-label={allCollapsed ? 'Expand all sections' : 'Collapse all sections'}
       onclick={toggleAllSections}>
       {#if allCollapsed}
         <ChevronsUpDown size={16} strokeWidth={1.5} />
@@ -154,6 +160,7 @@
 
   <button class="toolbar-btn" class:active={pinPanelProps}
     title={pinPanelProps ? 'Unpin panel properties' : 'Pin panel properties'}
+    aria-label={pinPanelProps ? 'Unpin panel properties' : 'Pin panel properties'}
     onclick={() => ontogglepin?.()}>
     {#if pinPanelProps}
       <Pin size={16} strokeWidth={1.5} />
@@ -163,6 +170,7 @@
   </button>
   <button class="toolbar-btn" class:active={viewMode === 'multi'}
     title={viewMode === 'single' ? 'Switch to multi view' : 'Switch to single view'}
+    aria-label={viewMode === 'single' ? 'Switch to multi view' : 'Switch to single view'}
     onclick={() => ontoggleview?.()}>
     {#if viewMode === 'single'}
       <Layers size={16} strokeWidth={1.5} />

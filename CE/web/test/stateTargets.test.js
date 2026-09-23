@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BASE_STATE_TARGET, resolveSelectedStateName } from '../src/CE_Application/utils/stateTargets.js';
+import { BASE_STATE_TARGET, isStateScopableTabId, resolveSelectedStateName } from '../src/CE_Application/utils/stateTargets.js';
 
 const OPTIONS = [
   { id: 'hover', fullLabel: 'Hover' },
@@ -37,4 +37,9 @@ test('resolveSelectedStateName falls back to the first available option when nee
 test('resolveSelectedStateName returns empty string when there are no states', () => {
   const next = resolveSelectedStateName([], 'hover', 'pressed');
   assert.equal(next, '');
+});
+
+test('Display and Pixel editors read the same selected state that their writes target', () => {
+  assert.equal(isStateScopableTabId('display'), true);
+  assert.equal(isStateScopableTabId('pixel'), true);
 });

@@ -292,6 +292,8 @@ export function cleanAnimationName(wanted) {
   return String(wanted ?? '').trim().replace(/[^A-Za-z0-9_]+/g, '');
 }
 
+const RESERVED_ANIMATION_NAMES = new Set(['enabled']);
+
 /**
  * A name not already taken, or '' when there is nothing usable in what was typed.
  *
@@ -302,10 +304,10 @@ export function uniqueAnimationName(existingNames, wanted) {
   const base = cleanAnimationName(wanted);
   if (!base) return '';
   const taken = new Set((existingNames ?? []).map(String));
-  if (!taken.has(base)) return base;
+  if (!taken.has(base) && !RESERVED_ANIMATION_NAMES.has(base)) return base;
   for (let n = 2; ; n += 1) {
     const candidate = `${base}${n}`;
-    if (!taken.has(candidate)) return candidate;
+    if (!taken.has(candidate) && !RESERVED_ANIMATION_NAMES.has(candidate)) return candidate;
   }
 }
 
@@ -314,6 +316,7 @@ export function renameBlockedBecause(existingNames, from, to) {
   const clean = cleanAnimationName(to);
   if (!clean) return 'A name needs letters, digits or underscores.';
   if (clean === from) return '';
+  if (RESERVED_ANIMATION_NAMES.has(clean)) return `${clean} is reserved by the Animations section.`;
   if ((existingNames ?? []).map(String).includes(clean)) return `There is already an animation called ${clean}.`;
   return '';
 }

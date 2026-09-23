@@ -27,7 +27,7 @@
    * thing to keep in sync and a second thing to show by mistake. Renaming therefore rewrites the
    * bindings that referred to the old name, so the controls keep pointing at the same instrument.
    */
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import Plug from 'lucide-svelte/icons/plug';
   import RefreshCw from 'lucide-svelte/icons/refresh-cw';
   import {
@@ -153,6 +153,7 @@
    * outstanding; the outcome is derived from whichever event names that device next.
    */
   let testing = $state({});                      // device name -> { at, correlationId, expired }
+  const testTimers = new Map();
 
   // A backstop for "Asking…", which must never be a resting state. C++ times an identity request out
   // after the profile's own timeoutMs (1000ms for the GAIA) and emits deviceRequestTimedOut — but a
@@ -181,12 +182,20 @@
       request: 'identityRequest',
       dryRun: false,
     });
-    setTimeout(() => {
+    if (testTimers.has(row.role)) clearTimeout(testTimers.get(row.role));
+    const timer = setTimeout(() => {
+      testTimers.delete(row.role);
       const current = testing[row.role];
       if (current?.correlationId !== correlationId) return;      // a newer Test replaced this one
       testing = { ...testing, [row.role]: { ...current, expired: true } };
     }, TEST_GIVE_UP_MS);
+    testTimers.set(row.role, timer);
   }
+
+  onDestroy(() => {
+    for (const timer of testTimers.values()) clearTimeout(timer);
+    testTimers.clear();
+  });
 
   /** The outcome for a device, from whichever of the replies named it most recently. */
   function outcomeFor(row) {

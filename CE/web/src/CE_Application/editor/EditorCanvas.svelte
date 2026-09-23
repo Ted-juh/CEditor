@@ -37,6 +37,7 @@
   import EditorRuler from './EditorRuler.svelte';
   import SettingsView from './SettingsView.svelte';
   import InstrumentHostView from '../sections/InstrumentHostView.svelte';
+  import { isEditorShortcutFocus } from '../utils/editorShortcutFocus.js';
   import { isTextEntryTarget } from '../utils/textEntry.js';
   import BehaviorDesigner from './BehaviorDesigner.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
@@ -58,6 +59,7 @@
   import { componentDesignerStatus, requestComponentDesignerPreview } from '../stores/componentDesignerStatus.js';
   import { createScriptWorkspaceDocument, scriptDocuments, updateScriptDocument, getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { createScreenDocument } from '../stores/screenBuilder.js';
+  import { onDestroy } from 'svelte';
   import { isSourceScript } from '../scripting/scriptModel.js';
   import { backgroundPreviewPreparation, previewPreparationDelayMs } from '../stores/runtimePreferences.js';
   import { preparePreviewInBackground } from '../utils/previewPreparation.js';
@@ -422,6 +424,7 @@
     gestureStart = { ...found, id: found.element.dataset?.controlId ?? null, x: e.clientX, y: e.clientY };
     window.addEventListener('mousemove', trackGesture);
     window.addEventListener('mouseup', endGesture);
+    window.addEventListener('blur', endGesture);
     window.addEventListener('keydown', gestureKey, true);
   }
 
@@ -441,9 +444,12 @@
   }
 
   function endGesture() {
-    window.removeEventListener('mousemove', trackGesture);
-    window.removeEventListener('mouseup', endGesture);
-    window.removeEventListener('keydown', gestureKey, true);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('mousemove', trackGesture);
+      window.removeEventListener('mouseup', endGesture);
+      window.removeEventListener('blur', endGesture);
+      window.removeEventListener('keydown', gestureKey, true);
+    }
     if (gestureFrame !== null) { cancelAnimationFrame(gestureFrame); gestureFrame = null; }
     gestureStart = null;
     gesture = null;
@@ -598,12 +604,13 @@
     // controls. The Settings view also renders INSIDE this wrapper, so every keystroke in a settings
     // text box arrives here too. Without this, Backspace in a field never reached the field — and if
     // a control happened to be selected, deleted it. Ctrl+A/C/X/V/D were swallowed the same way.
-    if (isTextEntryTarget(e.target)) return;
-
     if ($previewModeEnabled) {
+      if (isTextEntryTarget(e.target)) return;
       handlePreviewShortcut(e);
       return;
     }
+
+    if (!isEditorShortcutFocus(e.target)) return;
 
     panCtrl.handleKeyDown(e);
     handleEditorShortcut(e, {
@@ -729,9 +736,11 @@
       : `grid-template-columns: minmax(75px, ${before}) 7px minmax(75px, ${after});`;
   }
 
+  let cancelSplitResize = null;
   function handleSplitResizeStart(event) {
     if (!panelDesignerSplit || $activeEditorTab?.type !== 'panel' || !splitContainerEl) return;
     event.preventDefault();
+    cancelSplitResize?.();
     splitResizing = true;
 
     // Absolute mapping over the split container, so the core is driven
@@ -763,12 +772,21 @@
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
       window.removeEventListener('pointercancel', handleUp);
+      window.removeEventListener('blur', handleUp);
+      if (cancelSplitResize === handleUp) cancelSplitResize = null;
     };
 
+    cancelSplitResize = handleUp;
     window.addEventListener('pointermove', handleMove);
     window.addEventListener('pointerup', handleUp);
     window.addEventListener('pointercancel', handleUp);
+    window.addEventListener('blur', handleUp);
   }
+
+  onDestroy(() => {
+    endGesture();
+    cancelSplitResize?.();
+  });
 
   function launchComponentWorkspace(event) {
     event?.preventDefault?.();
@@ -1045,11 +1063,12 @@
           <BehaviorDesigner
             panelName={scriptPanel?.name ?? 'Scripts'}
             panelId={scriptPanel?.id ?? null}
+            documentId={$activeEditorTab.id}
             panel={scriptPanel}
             controls={behaviorControls}
             initialScripts={(scriptDoc?.scripts ?? []).filter(isSourceScript)}
             onEnableModule={enableScriptModule}
-            onChange={(scripts) => updateScriptDocument($activeEditorTab.id, { scripts })} />
+            onChange={(scripts, documentId) => updateScriptDocument(documentId, { scripts })} />
         {/key}
       {:else if canvasPanel}
         {#if selectedIsCustomComponent && !$previewModeEnabled}

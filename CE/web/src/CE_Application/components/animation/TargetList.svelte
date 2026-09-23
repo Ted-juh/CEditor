@@ -46,7 +46,16 @@
   }
 
   function endDrag() {
-    if (dragIndex >= 0 && dropIndex >= 0 && dragIndex !== dropIndex) onreorder(dragIndex, dropIndex);
+    if (dragIndex >= 0 && dropIndex >= 0 && dragIndex !== dropIndex) {
+      const from = dragIndex;
+      const to = dropIndex;
+      let nextSelection = selectedIndex;
+      if (selectedIndex === from) nextSelection = to;
+      else if (from < to && selectedIndex > from && selectedIndex <= to) nextSelection -= 1;
+      else if (to < from && selectedIndex >= to && selectedIndex < from) nextSelection += 1;
+      onreorder(from, to);
+      if (nextSelection !== selectedIndex) onselect(nextSelection);
+    }
     dragIndex = -1;
     dropIndex = -1;
   }
@@ -77,7 +86,10 @@
         ? `Animates ${row.status.animates}`
         : row.status.detail}
       onclick={() => onselect(row.index)}
-      onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onselect(row.index); } }}
+      onkeydown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onselect(row.index); }
+      }}
     >
       {#if dragIndex >= 0 && dropIndex === row.index && dragIndex !== row.index}
         <span class="dropline" aria-hidden="true"></span>

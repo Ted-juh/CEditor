@@ -27,11 +27,12 @@
     applyPastedNames, namesFromPaste, sessionReport,
     baselineAgeHours, normalizeCaptureSession, touchCaptureSession,
   } from '../../utils/captureSession.js';
+  import { onDestroy } from 'svelte';
   import { activePanel, updatePanel } from '../../stores/panels.js';
   import { CONFIDENCE } from '../../utils/captureInference.js';
   import { cinfo, cwarn } from '../../stores/console.js';
 
-  let { model, profileId = '', requestDump = null, deviceTransmits = false, deviceDumps = true } = $props();
+  let { model, profileId = '', requestDump = null, deviceTransmits = false, deviceDumps = false } = $props();
 
   // SAVE AND RESUME (S5), and the panel document is where a session lives — beside `deviceSession`,
   // so it survives whatever the panel survives and travels between machines with the file.
@@ -93,7 +94,7 @@
 
   let modeChoice = $derived(chooseMode({
     transmitsOnEdit: deviceTransmits,
-    answersDumpRequest: deviceDumps,
+    answersDumpRequest: deviceDumps && typeof requestDump === 'function',
     hasProfile: (model?.parameters?.length ?? 0) > 0,
   }));
 
@@ -111,6 +112,8 @@
   let pasting = $state(false);
   let pasteText = $state('');
   let reportCopied = $state(false);
+  let reportTimer = null;
+  let destroyed = false;
   let pastePlan = $derived(session && pasteText.trim() ? namesFromPaste(pasteText, session) : null);
 
   function applyPaste() {
@@ -124,8 +127,10 @@
     const text = sessionReport(session);
     try {
       await navigator.clipboard?.writeText(text);
+      if (destroyed) return;
       reportCopied = true;
-      setTimeout(() => { reportCopied = false; }, 1500);
+      clearTimeout(reportTimer);
+      reportTimer = setTimeout(() => { reportCopied = false; reportTimer = null; }, 1500);
     } catch {
       // No clipboard (a locked-down webview, a denied permission). The report is still worth
       // producing, so it goes to the console rather than nowhere.
@@ -139,17 +144,39 @@
    * A capture screen that invents a payload would produce a profile with high confidence and no
    * relationship to any instrument, which is worse than one that says it cannot run.
    */
+  let dumpPending = $state(false);
+  let dumpGeneration = 0;
+  onDestroy(() => {
+    destroyed = true;
+    dumpGeneration += 1;
+    clearTimeout(reportTimer);
+  });
+
   async function takeDump() {
+    if (dumpPending) return null;
     if (typeof requestDump !== 'function') {
       cwarn('[capture] No dump source. Connect the device on the MIDI tab first.');
       return null;
     }
-    const payload = await requestDump();
-    if (!Array.isArray(payload) || payload.length === 0) {
-      cwarn('[capture] The device did not answer the dump request.');
-      return null;
+    const generation = ++dumpGeneration;
+    dumpPending = true;
+    try {
+      const payload = await requestDump();
+      if (generation !== dumpGeneration) return null;
+      if (!Array.isArray(payload) || payload.length === 0) {
+        cwarn('[capture] The device did not answer the dump request.');
+        return null;
+      }
+      return payload;
+    } finally {
+      if (generation === dumpGeneration) dumpPending = false;
     }
-    return payload;
+  }
+
+  function stillCurrent(expected) {
+    if (session === expected) return true;
+    cwarn('[capture] Ignored a dump returned for an older capture step.');
+    return false;
   }
 
   function start() {
@@ -159,8 +186,9 @@
   }
 
   async function baseline() {
+    const expected = session;
     const payload = await takeDump();
-    if (payload) persist(addBaseline(session, payload));
+    if (payload && stillCurrent(expected)) persist(addBaseline(expected, payload));
   }
 
   function go() {
@@ -168,8 +196,9 @@
   }
 
   async function captured() {
+    const expected = session;
     const payload = await takeDump();
-    if (payload) session = recordDump(session, payload);
+    if (payload && stillCurrent(expected)) persist(recordDump(expected, payload));
   }
 
   function keep() {
@@ -249,7 +278,7 @@
         its own — a counter, a live LFO value — goes on a mask and is excluded from every later
         attribution. Do it once and the whole rest of the session gets quieter.</p>
 
-      <button class="btn" onclick={baseline}>Take a baseline dump</button>
+      <button class="btn" disabled={dumpPending} onclick={baseline}>{dumpPending ? 'Waiting for dump…' : 'Take a baseline dump'}</button>
 
       {#if session.mask.length}
         <p class="note">Masked: {session.mask.length} offset{session.mask.length === 1 ? '' : 's'}
@@ -273,10 +302,10 @@
         — one observation is a guess, three is a reading.</p>
 
       <div class="row">
-        <button class="btn primary" onclick={captured}>Captured</button>
+        <button class="btn primary" disabled={dumpPending} onclick={captured}>{dumpPending ? 'Waiting for dump…' : 'Captured'}</button>
         <span class="note inline">{session.observations.length} observation{session.observations.length === 1 ? '' : 's'}</span>
         {#if session.observations.length}
-          <button class="btn" onclick={() => (session = discardHypothesis(session))}>Start this one again</button>
+          <button class="btn" onclick={() => persist(discardHypothesis(session))}>Start this one again</button>
         {/if}
       </div>
 
@@ -291,7 +320,7 @@
           {/if}
         </div>
         {#if session.hypothesis.kind !== 'none'}
-          <button class="btn primary" onclick={() => (session = toConfirm(session))}>Name it</button>
+          <button class="btn primary" onclick={() => persist(toConfirm(session))}>Name it</button>
         {/if}
       {/if}
     </section>
@@ -317,7 +346,7 @@
         <button class="btn primary" disabled={!name.trim()} onclick={keep}>
           <CircleCheck size={12} /> Keep it
         </button>
-        <button class="btn" onclick={() => { session = discardHypothesis({ ...session, state: CAPTURE_STATE.capture }); }}>
+        <button class="btn" onclick={() => persist(discardHypothesis({ ...session, state: CAPTURE_STATE.capture }))}>
           Discard
         </button>
       </div>

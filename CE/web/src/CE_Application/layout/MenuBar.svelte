@@ -413,9 +413,9 @@
 
   function handleWindowKeydown(e) {
     if (e.key === 'Escape') {
-      if (picker) { picker = ''; return; }
-      if (openSubmenuIndex >= 0) { const at = openSubmenuIndex; closeSubmenu(); focusIndex = at; return; }
-      if (openMenu) closeMenus({ restoreFocus: true });
+      if (picker) { e.preventDefault(); picker = ''; return; }
+      if (openSubmenuIndex >= 0) { e.preventDefault(); const at = openSubmenuIndex; closeSubmenu(); focusIndex = at; return; }
+      if (openMenu) { e.preventDefault(); closeMenus({ restoreFocus: true }); }
       return;
     }
     // Alt+letter opens a menu, the way every desktop menu bar does. Guarded on a text target for
@@ -433,6 +433,9 @@
     openMenu = name;
     barFocusName = name;
     focusIndex = firstFocusableIndex(menus[name]);
+    // Move focus off the canvas immediately. Its window shortcut listener is registered before
+    // this menu's listener and otherwise treats Escape as a selection command while the menu opens.
+    barEls[name]?.focus();
   }
 
   function handleMenuHover(name) {

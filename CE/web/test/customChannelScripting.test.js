@@ -316,3 +316,21 @@ test('the player host writes a channel where it reads one', () => {
     'the player must round-trip too — it is the runtime the panel actually ships on');
   assert.notEqual(get(panelPreviewSessions)[control._children.Core.id].valueOverrideEnabled, true);
 });
+
+test('the player host invalidates raw document writes so scripted visuals repaint', () => {
+  const control = componentPanel({ cutoff: { defaultValue: 40 } });
+  const panel = { id: 'p', controls: [control], scripts: [] };
+  const writes = [];
+  const host = createPlayerHost(() => panel, {
+    onDocumentWrite: (writtenControl, path, value) => writes.push({ writtenControl, path, value }),
+  });
+
+  assert.equal(host.writeValue(control, 'Core.visible', false), true);
+  assert.equal(control._children.Core.visible, false);
+  assert.deepEqual(writes, [{ writtenControl: control, path: 'Core.visible', value: false }]);
+
+  // Session-backed values already publish through panelPreviewSessions. Invalidating the raw
+  // document for those as well would repaint twice for one script call.
+  host.writeValue(control, 'ValueChannels.cutoff.currentValue', 61);
+  assert.equal(writes.length, 1);
+});

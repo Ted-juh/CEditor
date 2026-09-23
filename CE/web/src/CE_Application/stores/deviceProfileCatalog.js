@@ -184,13 +184,13 @@ export function validateProfileSource(profileId, source) {
   });
 }
 
-export function saveProfileSource(profileId, source) {
+export function saveProfileSource(profileId, source, requestId = `profile_save_${profileId}`) {
   initDeviceProfileBridge();
-  latestProfileSourceSave.set({ profileId, running: true });
+  latestProfileSourceSave.set({ profileId, requestId, running: true });
   if (!isJuceAvailable()) {
     const parsed = parseProfileSourceText(profileId, source);
     if (!parsed.ok) {
-      latestProfileSourceSave.set({ profileId, ok: false, error: parsed.error });
+      latestProfileSourceSave.set({ profileId, requestId, ok: false, error: parsed.error });
       return;
     }
     const sourceText = JSON.stringify(parsed.profile, null, 2);
@@ -202,6 +202,7 @@ export function saveProfileSource(profileId, source) {
     latestProfileSourceValidation.set(validated);
     latestProfileSourceSave.set({
       profileId,
+      requestId,
       ok: true,
       source: sourceText,
       localDraft: true,
@@ -211,7 +212,7 @@ export function saveProfileSource(profileId, source) {
     return;
   }
   saveDeviceProfileSource({
-    requestId: `profile_save_${profileId}`,
+    requestId,
     profileId,
     source,
   });

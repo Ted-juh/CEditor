@@ -3,7 +3,6 @@
    * GradientMiniPreview — Small gradient preview shown in the Colors tab
    * when editing a gradient stop's color. Shows live gradient result.
    */
-  import { onMount } from 'svelte';
   import { gradientToCSS, gradientFilterCSS, gradientBlendCSS, squareRampToDataURL } from '../utils/gradientCSS.js';
   import ArrowLeft from 'lucide-svelte/icons/arrow-left';
 
@@ -33,15 +32,16 @@
   let containerW = $state(0);
   let containerH = $state(0);
 
-  onMount(() => {
-    if (!shapeContainerEl) return;
+  $effect(() => {
+    const element = shapeContainerEl;
+    if (!element || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       containerW = width;
       containerH = height;
       shapeSize = Math.floor(Math.min(width, height) * 0.85);
     });
-    ro.observe(shapeContainerEl);
+    ro.observe(element);
     return () => ro.disconnect();
   });
 

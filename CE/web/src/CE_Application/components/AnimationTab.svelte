@@ -53,6 +53,7 @@
     EASING_NAMES,
     targetStatus,
     newAnimationShape,
+    cleanAnimationName,
     uniqueAnimationName,
     renameBlockedBecause,
   } from '../utils/animationModel.js';
@@ -169,7 +170,7 @@ onMount(() => {
 
   function commitRename() {
     const from = renaming;
-    const to = renameDraft.trim();
+    const to = cleanAnimationName(renameDraft);
     renaming = '';
     if (!controlId || !from || renameBlockedBecause(rows.map((row) => row.name), from, to)) return;
     if (to === from) return;

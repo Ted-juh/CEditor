@@ -103,3 +103,45 @@ export function resolveRadioGroupValueAtPoint(layout, x, y) {
   ));
   return item?.key ?? '';
 }
+
+/**
+ * Apply one radio-group activation while preserving authored row order and raw values.
+ * `selectedValues` is deliberately supplied by the caller because a live preview may have an
+ * override while an editor-only rendering resolves selection from authored defaults.
+ */
+export function resolveRadioGroupSelection({
+  behavior = null,
+  valueRows = [],
+  selectedValues = [],
+  requestedValue = '',
+} = {}) {
+  const rows = getEnabledRadioGroupRows(valueRows);
+  const requestedKey = normalizeKey(requestedValue);
+  const nextRow = rows.find((row, index) => getRadioGroupValueKey(row, `item_${index + 1}`) === requestedKey);
+  if (!nextRow) return { matched: false, value: undefined };
+
+  const selected = new Set((Array.isArray(selectedValues) ? selectedValues : [selectedValues])
+    .filter((value) => value !== '' && value != null)
+    .map(normalizeKey));
+  const nextValue = nextRow?.internalValue ?? nextRow?.id ?? '';
+  const nextKey = normalizeKey(nextValue);
+
+  if (normalizeRadioGroupSelectionMode(behavior) === 'multi') {
+    if (selected.has(nextKey)) {
+      if (behavior?.allowDeselect === true) selected.delete(nextKey);
+    } else {
+      selected.add(nextKey);
+    }
+    return {
+      matched: true,
+      value: rows
+        .filter((row, index) => selected.has(getRadioGroupValueKey(row, `item_${index + 1}`)))
+        .map((row) => row?.internalValue ?? row?.id ?? ''),
+    };
+  }
+
+  return {
+    matched: true,
+    value: behavior?.allowDeselect === true && selected.has(nextKey) ? '' : nextValue,
+  };
+}

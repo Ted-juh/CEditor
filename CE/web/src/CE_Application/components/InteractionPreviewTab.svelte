@@ -240,6 +240,13 @@
   function handleToggle(key, event) {
     const nextValue = event.currentTarget.checked;
     if (key === 'checked' && showGroupPreview && isExclusiveSelectBehavior(behavior)) {
+      if (!nextValue && behavior?.uncheckOnClick !== true) {
+        // The group refused the transition, so restore the controlled input immediately. With no
+        // session write Svelte has no reason to render and the browser would otherwise leave the
+        // checkbox visually unchecked while the preview remains selected.
+        event.currentTarget.checked = true;
+        return;
+      }
       setExclusivePreviewSelection(controlId, nextValue);
       return;
     }

@@ -17,7 +17,7 @@
    * Double-clicking a stop opens its colour editor IN PLACE (B5), so the
    * gradient stays on screen while one of its stops is edited.
    */
-  import { onMount, untrack } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { gradientToCSS, gradientFilterCSS, gradientBlendCSS, interpolateColor, squareRampToDataURL } from '../utils/gradientCSS.js';
   import {
     computeAxisGeometry, stopThumbPoint,
@@ -78,11 +78,16 @@
   // below reads it — an in-place stop edit is a gesture like a drag is.
   // `stopEdit` is the record from utils/stopColourEdit.js: { index, original }.
   let stopEdit = $state(null);
+  let stopEditOwner = null;
   let editingStopIndex = $derived(stopEdit ? stopEdit.index : null);
   let editorEl = $state(null);
   let shapeSize = $state(0);
   let editorWidth = $state(100);
   let editorHeight = $state(100);
+
+  function gradientEditOwner() {
+    return $gradientTarget ?? ($activePanel ? `panel:${$activePanel.id}` : null);
+  }
 
   // Measure editor container
   onMount(() => {
@@ -123,6 +128,14 @@
       internalRadiusY = g.radiusY ?? 50;
     }
     ignoreNextSync = false;
+  });
+
+  $effect(() => {
+    const owner = gradientEditOwner();
+    if (!stopEdit || owner === stopEditOwner) return;
+    stopEdit = null;
+    stopEditOwner = null;
+    if (gradient?.stops) internalStops = gradient.stops.map((stop) => ({ ...stop }));
   });
 
   // Build gradient with ALL internal state for live rendering
@@ -221,10 +234,52 @@
 
   // --- Interaction handlers ---
 
+  let clearActiveDragListeners = null;
+  let clearJustDraggedTimer = 0;
+
+  function markJustDragged() {
+    justDragged = true;
+    if (clearJustDraggedTimer) clearTimeout(clearJustDraggedTimer);
+    // The synthetic click belonging to this mouseup is dispatched before the next task. If the
+    // release happened outside the axis, clear the guard anyway so a later real click is not lost.
+    clearJustDraggedTimer = setTimeout(() => {
+      clearJustDraggedTimer = 0;
+      justDragged = false;
+    }, 0);
+  }
+
+  function startDocumentDrag(onMove, onEnd) {
+    clearActiveDragListeners?.();
+    let finished = false;
+    const cleanup = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', finish);
+      window.removeEventListener('blur', finish);
+      if (clearActiveDragListeners === cleanup) clearActiveDragListeners = null;
+    };
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      onEnd();
+    };
+    clearActiveDragListeners = cleanup;
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', finish);
+    window.addEventListener('blur', finish);
+  }
+
+  onDestroy(() => {
+    clearActiveDragListeners?.();
+    if (clearJustDraggedTimer) clearTimeout(clearJustDraggedTimer);
+    dragging = false;
+  });
+
   function handleStopMouseDown(index, e) {
     e.preventDefault();
     e.stopPropagation();
     dragging = true;
+    const owner = gradientEditOwner();
     if (onSelectStop) onSelectStop(index);
 
     function onMove(ev) {
@@ -235,22 +290,21 @@
     }
 
     function onUp() {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
       dragging = false;
-      justDragged = true;
+      markJustDragged();
+      if (gradientEditOwner() !== owner) return;
       ignoreNextSync = true;
       emitChange();
     }
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    startDocumentDrag(onMove, onUp);
   }
 
   function handleCenterMouseDown(e) {
     e.preventDefault();
     e.stopPropagation();
     dragging = true;
+    const owner = gradientEditOwner();
 
     function onMove(ev) {
       const el = axisContainerEl;
@@ -261,22 +315,21 @@
     }
 
     function onUp() {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
       dragging = false;
-      justDragged = true;
+      markJustDragged();
+      if (gradientEditOwner() !== owner) return;
       ignoreNextSync = true;
       emitChange();
     }
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    startDocumentDrag(onMove, onUp);
   }
 
   function handleRadiusMouseDown(axis, e) {
     e.preventDefault();
     e.stopPropagation();
     dragging = true;
+    const owner = gradientEditOwner();
 
     function onMove(ev) {
       const el = axisContainerEl;
@@ -293,22 +346,25 @@
     }
 
     function onUp() {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
       dragging = false;
-      justDragged = true;
+      markJustDragged();
+      if (gradientEditOwner() !== owner) return;
       ignoreNextSync = true;
       emitChange();
     }
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    startDocumentDrag(onMove, onUp);
   }
 
   let justDragged = false;
 
   function handleAxisClick(e) {
-    if (justDragged) { justDragged = false; return; }
+    if (justDragged) {
+      justDragged = false;
+      if (clearJustDraggedTimer) clearTimeout(clearJustDraggedTimer);
+      clearJustDraggedTimer = 0;
+      return;
+    }
     if (e.target.closest('.stop-thumb') || e.target.closest('.center-handle') || e.target.closest('.radius-handle')) return;
     const position = projectOntoAxis(e);
     const color = interpolateColor(internalStops, position);
@@ -351,6 +407,7 @@
     popoverLeft = placed.left;
     popoverTop = placed.top;
     stopEdit = edit;
+    stopEditOwner = gradientEditOwner();
   }
 
   function handleStopColourInput(colour) {
@@ -358,9 +415,11 @@
   }
 
   function handleStopColourCommit(colour) {
+    if (!stopEdit || gradientEditOwner() !== stopEditOwner) return;
     const result = commitStopEdit(internalStops, stopEdit, colour);
     internalStops = result.stops;
     stopEdit = result.edit;
+    stopEditOwner = null;
     ignoreNextSync = true;
     emitChange();
   }
@@ -369,6 +428,7 @@
     const result = cancelStopEdit(internalStops, stopEdit);
     internalStops = result.stops;
     stopEdit = result.edit;
+    stopEditOwner = null;
   }
 
   function handleStopRightClick(index, e) {

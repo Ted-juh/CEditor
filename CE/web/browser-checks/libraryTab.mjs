@@ -174,6 +174,29 @@ await page.waitForTimeout(300);
 const sizeBefore = await ev(() => window.__lib.librarySize());
 await ev(() => window.__lib.select('Amber LED'));
 await page.waitForTimeout(200);
+
+const forgetButton = page.locator('[data-testid="library-forget"]');
+await forgetButton.focus();
+await page.keyboard.down('Enter');
+await page.keyboard.down('Enter');
+await page.keyboard.up('Enter');
+await page.waitForTimeout(150);
+check('a repeated confirmation key only arms forget once', async () => {});
+assert.equal(await ev(() => window.__lib.librarySize()), sizeBefore);
+assert.match(await ev(() => window.__lib.forgetLabel()), /Confirm forget/);
+
+// Changing the detail target clears its armed state, so the mouse scenario starts unarmed.
+await ev(() => window.__lib.select('Big Knob'));
+await page.waitForTimeout(100);
+await ev(() => window.__lib.select('Amber LED'));
+await page.waitForTimeout(100);
+await forgetButton.dblclick();
+await page.waitForTimeout(150);
+check('one double-click only arms forget once', async () => {});
+assert.equal(await ev(() => window.__lib.librarySize()), sizeBefore);
+assert.match(await ev(() => window.__lib.forgetLabel()), /Confirm forget/);
+
+// Confirmation is a later, deliberate activation.
 await ev(() => window.__lib.forget());
 await page.waitForTimeout(350);
 const sizeAfter = await ev(() => window.__lib.librarySize());

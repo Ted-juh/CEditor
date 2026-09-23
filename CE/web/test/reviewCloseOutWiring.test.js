@@ -150,6 +150,18 @@ test('an abandoned notepad colour pick commits, exactly as a gradient stop edit 
     !/Leaving colors without going back — discard the pick/.test(s),
     'the discarding branch must be gone, not merely bypassed',
   );
+  assert.match(s, /captureTextSelection\?\.\(\)/, 'the selection must be captured before Notepad unmounts');
+  assert.match(s, /applyTextColourAtOffsets\(scratch, snapshot\.selection/, 'the detached HTML is edited by offsets');
+  assert.ok(!/cloneRange\(\)/.test(s), 'a DOM Range cannot survive the lazy Notepad component unmount');
+});
+
+test('a lazy dock tab never renders the component loaded for the previous tab', () => {
+  const s = src('CE_Application/panels/DisplayPanel.svelte');
+  assert.match(s, /let activeTabComponentId = \$state\(null\)/);
+  assert.match(s, /activeTabComponentId = requestedTab/);
+  const renderGuards = s.match(/activeTabComponentId === activeTab && activeTabComponent\?/g) ?? [];
+  assert.ok(renderGuards.length >= 17, 'every explicit lazy branch and the fallback need the identity guard');
+  assert.match(s, /activeTabErrorId === activeTab && activeTabError/);
 });
 
 // --- B7: one gradient, one proxy shape ---------------------------------------------------------

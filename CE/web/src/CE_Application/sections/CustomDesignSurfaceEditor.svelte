@@ -26,6 +26,7 @@
   import { setActiveEditorTab } from '../stores/panels.js';
   import EditorRuler from '../editor/EditorRuler.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import { isSurfaceEditorShortcutAllowed } from '../utils/editorShortcutFocus.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
@@ -920,6 +921,13 @@
     });
   }
 
+  function editGeneratedSource(source, event = null) {
+    event?.stopPropagation?.();
+    if (!core?.id || !source || !generators?._children?.[source]) return;
+    dockTab = 'generators';
+    applyControlPatch(core.id, { 'Designer.selectedGenerator': source });
+  }
+
   function kitFrame(kit) {
     if (!kit?.layerNames?.length) return null;
     return boundsForFrames(
@@ -1787,6 +1795,9 @@
 
   function openLayerColour(relativePath, currentValue) {
     if (!core?.id || !selectedLayer) return;
+    const controlId = core.id;
+    const targetLayer = selectedLayer;
+    const targetLayerNames = selectedLayerNames.filter((name) => isEditablePart(authoredParts?._children?.[name]));
     // A colour dock edits one target, so a multi-selection goes through the callback form and
     // writes to every selected layer. Without this the corner radius would reach all three layers
     // and the colour beside it only one, which is a worse kind of confusing than neither working.
@@ -1795,10 +1806,12 @@
           type: 'callback',
           _swatchKey: `surface:${relativePath}`,
           apply: (hex) => {
-            for (const name of selectedLayerNames) setLayerPropertyFor(name, relativePath, hex);
+            for (const name of targetLayerNames) {
+              updateControlProperty(controlId, `Parts.${name}.${relativePath}`, hex);
+            }
           },
         }
-      : { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.${relativePath}` };
+      : { type: 'control', controlId, path: `Parts.${targetLayer}.${relativePath}` };
     activateColorTarget(target, currentValue ?? 'FF5B9BD5');
     revealDisplayDock('colors');
   }
@@ -3237,8 +3250,7 @@
   function surfaceKeyEventAllowed(event) {
     if (core?.controlType !== 'CustomComponent') return false;
     if (event.defaultPrevented) return false;
-    const targetTag = String(event.target?.tagName ?? '').toLowerCase();
-    if (['input', 'select', 'textarea'].includes(targetTag) || event.target?.isContentEditable) return false;
+    if (!isSurfaceEditorShortcutAllowed(event)) return false;
     const active = document.activeElement;
     if (active && active !== document.body && surfaceShellEl && !surfaceShellEl.contains(active)) return false;
     return true;
@@ -3817,7 +3829,6 @@
           </div>
           {#if dockTab === 'layers'}
           <SurfaceDockLayers
-            {core} {parts} {generators}
             {topLevelPartEntries} {kitEntries} {generatedSourceEntries} {hitZoneEntries} {dockHitZoneEntries}
             {activeSelectionKind} {selectedLayer} {selectedLayerSet} {selectedKit} {selectedHitZone}
             {selectionPulseTarget} {draggingLayerName}
@@ -3825,7 +3836,7 @@
             {selectLayer} {selectKit} {selectHitZone} {toggleLayerMultiSelection}
             {toggleLayerVisibility} {toggleLayerLock} {toggleGeneratedSource}
             {moveLayer} {beginLayerDrag} {dropLayerOn}
-            {addLayerAtCenter} {addHitZoneAtCenter} {editKitParts} {editGeneratorForLayer} {removeKitEntry}
+            {addLayerAtCenter} {addHitZoneAtCenter} {editKitParts} {editGeneratedSource} {editGeneratorForLayer} {removeKitEntry}
             {renameLayer}
           />
           {:else if dockTab === 'generators'}

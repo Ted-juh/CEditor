@@ -27,8 +27,8 @@
   import Square from 'lucide-svelte/icons/square';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Image from 'lucide-svelte/icons/image';
-  import { selectedControl, getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
-  import { selectedComponentIds } from '../stores/panels.js';
+  import { selectedControl, getSection, updateControlProperty, updateSelectedProperty, applyControlPatchesById } from '../stores/controls.js';
+  import { selectedComponentIds, resolvedActivePanelId } from '../stores/panels.js';
   import { componentWorkspaceMode } from '../stores/componentWorkspace.js';
   import { availableFonts, availableIcons } from '../stores/appSettings.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
@@ -171,10 +171,15 @@
   function openColour(path, previous, label = 'Colour') {
     if (!core?.id) return;
     if (multiSelect) {
+      const targetIds = [...$selectedComponentIds];
+      const targetPanelId = $resolvedActivePanelId;
       activateColorTarget({
         type: 'callback',
-        label: `${$selectedComponentIds.size} selected · ${label}`,
-        apply: (hex) => updateSelectedProperty(path, hex),
+        label: `${targetIds.length} selected · ${label}`,
+        apply: (hex) => applyControlPatchesById(
+          new Map(targetIds.map((controlId) => [controlId, { [path]: hex }])),
+          targetPanelId,
+        ),
       }, String(previous ?? 'FFFFFFFF'));
       return;
     }

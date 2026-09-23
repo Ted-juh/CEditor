@@ -1,8 +1,17 @@
 <script>
+  import { onDestroy } from 'svelte';
   import Plus from 'lucide-svelte/icons/plus';
   import X from 'lucide-svelte/icons/x';
 
-  let { images = $bindable([]), activeImageIndex = $bindable(0), onchange, onColorPicked, onColorHover } = $props();
+  let {
+    images = $bindable([]),
+    activeImageIndex = $bindable(0),
+    sourceId = null,
+    sourceGeneration = 0,
+    onchange,
+    onColorPicked,
+    onColorHover,
+  } = $props();
 
   let containerEl = $state(null);
   let containerW = $state(0);
@@ -21,27 +30,43 @@
     return () => ro.disconnect();
   });
 
-  // Per-image view state (zoom, pan) — keyed by index
-  let viewStates = $state(new Map());
+  // Per-image view state follows the image object. Array indexes are positions, not identities:
+  // closing image 0 must not hand its zoom and pan to the image that shifts into index 0.
+  const viewStates = new WeakMap();
+  const emptyView = { zoom: 100, panX: 0, panY: 0 };
+  let viewStateVersion = $state(0);
 
   function getView(idx) {
-    if (!viewStates.has(idx)) {
-      viewStates.set(idx, { zoom: 100, panX: 0, panY: 0 });
-    }
-    return viewStates.get(idx);
+    const image = images[idx];
+    if (!image || typeof image !== 'object') return emptyView;
+    if (!viewStates.has(image)) viewStates.set(image, { zoom: 100, panX: 0, panY: 0 });
+    return viewStates.get(image);
   }
 
   let currentView = $derived((() => {
+    viewStateVersion;
     const v = getView(activeImageIndex);
     return { zoom: v.zoom, panX: v.panX, panY: v.panY };
   })());
+
+  let disposed = false;
+  const sourceSnapshot = () => ({ id: sourceId, generation: sourceGeneration });
+  const isCurrentSource = (source) =>
+    !disposed && source?.id === sourceId && source?.generation === sourceGeneration;
+  function emitChange(nextImages = images, nextIndex = activeImageIndex, source = sourceSnapshot(), documentChanged = true) {
+    onchange?.(nextImages, {
+      sourceId: source.id,
+      sourceGeneration: source.generation,
+      activeImageIndex: nextIndex,
+      documentChanged,
+    });
+  }
 
   // Eyedropper state
   let eyedropperActive = $state(false);
 
   export function setEyedropper(on) {
     eyedropperActive = on;
-    if (on) ensurePixelCanvas();
     if (!on && onColorHover) onColorHover(null);
   }
   export function isEyedropper() { return eyedropperActive; }
@@ -49,23 +74,56 @@
   // Cached offscreen canvas for pixel sampling (rebuilt per image)
   let pixelCanvas = null;
   let pixelCtx = null;
-  let pixelCanvasFor = null; // dataUrl key
+  let pixelCanvasFor = null; // { image, dataUrl, sourceId, sourceGeneration }
+  let pixelRequestGeneration = 0;
 
-  function ensurePixelCanvas() {
+  onDestroy(() => {
+    disposed = true;
+    pixelRequestGeneration += 1;
+  });
+
+  // Rebuild whenever the selected image or viewer source changes while the eyedropper is active.
+  // The request token and complete source snapshot keep a late Image.onload from publishing pixels
+  // for the tab or panel that used to occupy this component.
+  $effect(() => {
     const img = images[activeImageIndex];
-    if (!img || !img.dataUrl) return;
-    if (pixelCanvasFor === img.dataUrl) return; // already cached
-    pixelCanvas = document.createElement('canvas');
-    pixelCanvas.width = img.naturalWidth;
-    pixelCanvas.height = img.naturalHeight;
-    pixelCtx = pixelCanvas.getContext('2d', { willReadFrequently: true });
+    const dataUrl = img?.dataUrl;
+    const requestSource = sourceSnapshot();
+    const shouldLoad = eyedropperActive && !!img && !!dataUrl;
+    const request = ++pixelRequestGeneration;
+    pixelCanvas = null;
+    pixelCtx = null;
+    pixelCanvasFor = null;
+    onColorHover?.(null);
+    if (!shouldLoad) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
     const el = new Image();
     el.onload = () => {
-      pixelCtx.drawImage(el, 0, 0);
-      pixelCanvasFor = img.dataUrl;
+      if (request !== pixelRequestGeneration || !isCurrentSource(requestSource)) return;
+      if (images[activeImageIndex] !== img || images[activeImageIndex]?.dataUrl !== dataUrl) return;
+      ctx.drawImage(el, 0, 0);
+      pixelCanvas = canvas;
+      pixelCtx = ctx;
+      pixelCanvasFor = {
+        image: img,
+        dataUrl,
+        sourceId: requestSource.id,
+        sourceGeneration: requestSource.generation,
+      };
     };
-    el.src = img.dataUrl;
-  }
+    el.onerror = () => {};
+    el.src = dataUrl;
+    return () => {
+      if (request === pixelRequestGeneration) pixelRequestGeneration += 1;
+      el.onload = null;
+      el.onerror = null;
+    };
+  });
 
   function mouseToImageCoords(e) {
     const img = images[activeImageIndex];
@@ -84,7 +142,12 @@
   }
 
   function samplePixel(x, y) {
-    if (!pixelCtx || pixelCanvasFor !== images[activeImageIndex]?.dataUrl) return null;
+    const img = images[activeImageIndex];
+    if (!pixelCtx || !pixelCanvasFor || pixelCanvasFor.image !== img) return null;
+    if (pixelCanvasFor.dataUrl !== img?.dataUrl || !isCurrentSource({
+      id: pixelCanvasFor.sourceId,
+      generation: pixelCanvasFor.sourceGeneration,
+    })) return null;
     const pixel = pixelCtx.getImageData(x, y, 1, 1).data;
     return ((1 << 24) + (pixel[0] << 16) + (pixel[1] << 8) + pixel[2]).toString(16).slice(1).toUpperCase();
   }
@@ -115,9 +178,13 @@
 
   function switchTab(index) {
     activeImageIndex = index;
+    // The selected viewer tab is workspace navigation. Persist it for the next visit without
+    // turning an otherwise saved panel into an unsaved document.
+    emitChange(images, index, sourceSnapshot(), false);
   }
 
-  function addImage() {
+  export function addImage() {
+    const requestSource = sourceSnapshot();
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -126,17 +193,19 @@
       if (!file) return;
       const reader = new FileReader();
       reader.onload = () => {
+        if (!isCurrentSource(requestSource)) return;
         const newImg = { name: file.name, dataUrl: reader.result, naturalWidth: 0, naturalHeight: 0 };
         // Probe natural size
         const img = new Image();
         img.onload = () => {
+          if (!isCurrentSource(requestSource)) return;
           newImg.naturalWidth = img.naturalWidth;
           newImg.naturalHeight = img.naturalHeight;
           images = [...images, newImg];
           activeImageIndex = images.length - 1;
           // Auto-fit
           fitToSection(activeImageIndex);
-          if (onchange) onchange(images);
+          emitChange(images, activeImageIndex, requestSource);
         };
         img.src = reader.result;
       };
@@ -149,8 +218,9 @@
     e.stopPropagation();
     if (images.length <= 0) return;
 
+    const closingImage = images[index];
     images = images.filter((_, i) => i !== index);
-    viewStates.delete(index);
+    if (closingImage && typeof closingImage === 'object') viewStates.delete(closingImage);
 
     if (images.length === 0) {
       activeImageIndex = 0;
@@ -159,7 +229,7 @@
     } else if (activeImageIndex > index) {
       activeImageIndex = activeImageIndex - 1;
     }
-    if (onchange) onchange(images);
+    emitChange();
   }
 
   function handleTabDblClick(index) {
@@ -168,7 +238,7 @@
     if (newName && newName.trim()) {
       images[index].name = newName.trim();
       images = [...images];
-      if (onchange) onchange(images);
+      emitChange();
     }
   }
 
@@ -176,19 +246,19 @@
   export function zoomIn() {
     const v = getView(activeImageIndex);
     v.zoom = Math.min(v.zoom + 10, 1600);
-    viewStates = new Map(viewStates);
+    viewStateVersion += 1;
   }
 
   export function zoomOut() {
     const v = getView(activeImageIndex);
     v.zoom = Math.max(v.zoom - 10, 10);
-    viewStates = new Map(viewStates);
+    viewStateVersion += 1;
   }
 
   export function setZoom(val) {
     const v = getView(activeImageIndex);
     v.zoom = Math.max(10, Math.min(1600, val));
-    viewStates = new Map(viewStates);
+    viewStateVersion += 1;
   }
 
   export function getZoom() {
@@ -200,7 +270,7 @@
     v.zoom = 100;
     v.panX = 0;
     v.panY = 0;
-    viewStates = new Map(viewStates);
+    viewStateVersion += 1;
   }
 
   export function fitToSection(idx) {
@@ -214,7 +284,7 @@
     v.zoom = Math.round(scale);
     v.panX = 0;
     v.panY = 0;
-    viewStates = new Map(viewStates);
+    viewStateVersion += 1;
   }
 
   // Mouse drag
@@ -239,7 +309,7 @@
     const v = getView(activeImageIndex);
     v.panX = dragStartPanX + (e.clientX - dragStartX);
     v.panY = dragStartPanY + (e.clientY - dragStartY);
-    viewStates = new Map(viewStates);
+    viewStateVersion += 1;
   }
 
   function handleMouseUp() {
@@ -252,11 +322,11 @@
     const v = getView(activeImageIndex);
     const delta = e.deltaY > 0 ? -10 : 10;
     v.zoom = Math.max(10, Math.min(1600, v.zoom + delta));
-    viewStates = new Map(viewStates);
+    viewStateVersion += 1;
   }
 </script>
 
-<svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} />
+<svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} onblur={handleMouseUp} />
 
 <div class="viewer-editor">
   <div class="image-tabs" role="tablist" aria-label="Open images">

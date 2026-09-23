@@ -16,13 +16,9 @@
   import Lock from 'lucide-svelte/icons/lock';
   import Unlock from 'lucide-svelte/icons/lock-open';
   import Trash2 from 'lucide-svelte/icons/trash-2';
-  import { applyControlPatch } from '../stores/controls.js';
   import { generatorNameForEntry, layerKind, layerKindClass, layerKindLabel } from '../utils/customDesignSurfaceHelpers.js';
 
   let {
-    core = null,
-    parts = null,
-    generators = null,
     topLevelPartEntries = [],
     kitEntries = [],
     generatedSourceEntries = [],
@@ -52,6 +48,7 @@
     addLayerAtCenter = () => {},
     addHitZoneAtCenter = () => {},
     editKitParts = () => {},
+    editGeneratedSource = () => {},
     editGeneratorForLayer = () => {},
     removeKitEntry = () => {},
     renameLayer = () => {},
@@ -207,7 +204,7 @@
         {#if source.hasGenerator}
           <button
             type="button"
-            onclick={(event) => { event.stopPropagation(); dockTab = 'generators'; applyControlPatch(core.id, { 'Designer.selectedGenerator': source.source }); }}
+            onclick={(event) => editGeneratedSource(source.source, event)}
             title={`Edit ${source.source} generator`}
           >
             Gen
@@ -235,36 +232,47 @@
       ondragover={(event) => event.preventDefault()}
       ondrop={(event) => dropLayerOn(name, event)}
   >
-    <button type="button" class="row-main" onclick={(event) => selectLayer(name, event)} ondblclick={() => beginRename(name)}>
+    {#if renamingLayer === name}
+      <div class="row-main rename-main">
         <span class="layer-thumb" aria-hidden="true">
           <span class={`layer-thumb-shape ${layerKindClass(part)}`} style={layerThumbPartStyle(name, part)}>
             {#if layerKind(part) === 'text'}T{/if}
           </span>
         </span>
         <span class="row-text">
-          {#if renamingLayer === name}
-            <!-- svelte-ignore a11y_autofocus -->
-            <input
-              class="rename-input"
-              type="text"
-              autofocus
-              bind:value={renameDraft}
-              aria-label={`Rename ${name}`}
-              onclick={(event) => event.stopPropagation()}
-              onblur={commitRename}
-              onkeydown={(event) => {
-                event.stopPropagation();
-                if (event.key === 'Enter') event.currentTarget.blur();
-                else if (event.key === 'Escape') { renamingLayer = ''; event.currentTarget.blur(); }
-              }}
-            />
-          {:else}
-            <strong>{name}</strong>
-          {/if}
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            class="rename-input"
+            type="text"
+            autofocus
+            bind:value={renameDraft}
+            aria-label={`Rename ${name}`}
+            onclick={(event) => event.stopPropagation()}
+            onblur={commitRename}
+            onkeydown={(event) => {
+              event.stopPropagation();
+              if (event.key === 'Enter') event.currentTarget.blur();
+              else if (event.key === 'Escape') { renamingLayer = ''; event.currentTarget.blur(); }
+            }}
+          />
+          <em>{part?.visible === false ? 'hidden · ' : ''}{part?.locked === true || part?.meta?.locked === true ? 'locked · ' : ''}{layerKindLabel(part)}</em>
+        </span>
+        <span class="row-badge">{part?.generated === true || part?.meta?.generated === true ? 'GEN' : layerKindLabel(part)}</span>
+      </div>
+    {:else}
+      <button type="button" class="row-main" onclick={(event) => selectLayer(name, event)} ondblclick={() => beginRename(name)}>
+        <span class="layer-thumb" aria-hidden="true">
+          <span class={`layer-thumb-shape ${layerKindClass(part)}`} style={layerThumbPartStyle(name, part)}>
+            {#if layerKind(part) === 'text'}T{/if}
+          </span>
+        </span>
+        <span class="row-text">
+          <strong>{name}</strong>
           <em>{part?.visible === false ? 'hidden · ' : ''}{part?.locked === true || part?.meta?.locked === true ? 'locked · ' : ''}{layerKindLabel(part)}</em>
         </span>
         <span class="row-badge">{part?.generated === true || part?.meta?.generated === true ? 'GEN' : layerKindLabel(part)}</span>
       </button>
+    {/if}
       <div class="row-actions">
         {#if generatorNameForEntry(part)}
           <button

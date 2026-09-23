@@ -76,7 +76,10 @@
         aria-selected={row.key === selectedKey}
         title={row.issue ? `${API_KIND_META[row.kind].label} "${row.name}" ${row.issue.message}` : row.label}
         onclick={() => onselect(row.key)}
-        onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onselect(row.key); } }}
+        onkeydown={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onselect(row.key); }
+        }}
       >
         <span class="td kind" role="cell" title={API_KIND_META[row.kind].label}>
           <Icon size={11} aria-hidden="true" />

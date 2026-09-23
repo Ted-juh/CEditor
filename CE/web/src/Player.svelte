@@ -6,13 +6,13 @@
   import { get } from 'svelte/store';
   import PanelPreviewSurface from './CE_Application/editor/PanelPreviewSurface.svelte';
   import { deserializePanel } from './CE_Application/stores/panelModel.js';
-  import { syncPanelPreviewSessions, updatePanelPreviewSession, panelPreviewSessions, setPreviewModeEnabled } from './CE_Application/stores/interactionPreview.js';
+  import { updatePanelPreviewSession, updatePanelPreviewSessions, panelPreviewSessions, setPreviewModeEnabled, setInteractionPreviewPanelProvider } from './CE_Application/stores/interactionPreview.js';
   import { initPanelRuntime, setRuntimeHost } from './CE_Application/scripting/panelRuntime.js';
   import { createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
-  import { choiceIndexOf, choiceValueAt } from './CE_Application/utils/exportParameters.js';
-  import { sectionValueOf, sectionValuePatch } from './CE_Application/utils/sectionValueOverrides.js';
+  import { choiceValueAt } from './CE_Application/utils/exportParameters.js';
+  import { choiceParameterForControl, controlParamValue, hostValuePatch } from './CE_Application/utils/playerParameterSession.js';
   import { fileCache, loadFile } from './CE_Application/stores/fileCache.js';
   import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState, requestProfileSource } from './CE_Application/stores/deviceProfiles.js';
   import { profileSources, latestPresetListScan } from './CE_Application/stores/deviceProfileStores.js';
@@ -28,12 +28,13 @@
   // before the profile source arrives — see the index below, which covers any profile.
   import deviceRuntime from './CE_Application/generated/roland.gaia.runtime.json';
   import { DEFAULT_DEVICE_ROLE } from './CE_Application/stores/deviceConstants.js';
+  import { flatControls } from './CE_Application/utils/containment.js';
+  import { queueIncomingFeedback, incomingFeedbackEntries } from './CE_Application/utils/incomingFeedback.js';
 
-  // $state.raw: the panel is replaced wholesale, never deep-mutated here. A deep $state
-  // proxy would make PanelPreviewSurface's structuredClone() throw DataCloneError, and
-  // mirrors how the editor feeds a non-proxied panel (via $derived) to the same surface.
+  // $state.raw keeps the document cloneable by PanelPreviewSurface. Loads replace it wholesale;
+  // script-driven visual writes replace its shallow shell after mutating the addressed field.
   let panel = $state.raw(null);
-  let surfaceRef = $state(null);
+  let panelLoadGeneration = $state(0);
 
   // --- Live device output (step 1): pick a MIDI port and send for real ---
   let hasBridge = $state(false);
@@ -98,8 +99,7 @@
   // Coalesce high-rate incoming CC to ONE DOM update per animation frame. The GAIA streams
   // CC 102/103/104 on every knob tick (hundreds/sec); applying each immediately floods
   // re-renders and makes the slider trail the knob. We keep only the latest value per control.
-  let pendingIncoming = null;   // { [controlId]: latestValue }
-  let lastAppliedValue = {};    // { [controlId]: value } — skip redundant updates
+  let pendingIncoming = null;   // { [controlId]: { [port]: latestValue } }
   let incomingRaf = 0;
 
   function rebuildParamControlMap(controls) {
@@ -107,7 +107,7 @@
     const rows = {};
     const ports = {};
     const raw = [];
-    for (const c of controls ?? []) {
+    for (const c of flatControls(controls ?? [])) {
       const id = c?._children?.Core?.id;
       if (!id) continue;
       const valueRows = c?._children?.Value?.rows;
@@ -127,7 +127,6 @@
     paramPortMap = ports;
     paramRows = rows;
     midiControlBindings = raw;
-    lastAppliedValue = {};
   }
 
   // --- Host parameter sync (M2): panel control <-> DAW automation parameter (two-way) ---
@@ -143,7 +142,7 @@
     paramSyncReady = false;
     const idByName = {};
     const controlsById = {};
-    for (const c of p?.controls ?? []) {
+    for (const c of flatControls(p?.controls ?? [])) {
       const core = c?._children?.Core;
       if (core?.id) { controlsById[core.id] = c; idByName[core.id] = core.id; }
       if (core?.name) idByName[core.name] = core.id;
@@ -162,33 +161,11 @@
         .filter((b) => b?.kind === 'deviceParameter' && b?.parameterId);
       // Store-by-name selectors carry a fixed choice list; keep the param so the
       // choice name ↔ host index mapping stays stable across cascading changes.
-      const choiceParam = String(param?.choiceMode ?? '') === 'value' ? param : null;
-      controlByParam[param.id] = { controlId, leaf, bindings, choiceParam, sectionField };
+      const choiceParam = choiceParameterForControl(param, controlsById[controlId]);
+      const behavior = controlsById[controlId]?._children?.Behavior;
+      controlByParam[param.id] = { controlId, leaf, bindings, choiceParam, sectionField,
+        valueKind: String(param?.valueKind ?? (behavior?.valueType === 'bool' ? 'bool' : 'float')) };
     }
-  }
-
-  // The numeric value a control currently holds in its preview session (matches the param's range).
-  function controlParamValue(session, leaf, choiceParam = null, sectionField = null) {
-    if (!session) return undefined;
-    if (sectionField) {
-      const n = Number(sectionValueOf(session.sectionValues, sectionField.section, sectionField.field));
-      return Number.isFinite(n) ? n : undefined;
-    }
-    if (leaf && leaf !== 'value') {
-      const n = Number(session.customValues?.[leaf]);
-      return Number.isFinite(n) ? n : undefined;
-    }
-    let v;
-    if (session.currentValueOverrideEnabled) v = session.currentValueOverride;
-    else if (session.valueOverrideEnabled) v = session.valueOverride;
-    else if (typeof session.checked === 'boolean') v = session.checked ? 1 : 0;
-    // Store-by-name selector: the live value is a choice name → its fixed host index.
-    if (choiceParam) {
-      const idx = choiceIndexOf(choiceParam, v);
-      return idx == null ? undefined : idx;
-    }
-    const n = Number(v);
-    return Number.isFinite(n) ? n : undefined;  // non-numeric (e.g. select ids) -> skip
   }
 
   // DAW automation moved a parameter -> move the on-screen control AND drive the synth. We route
@@ -205,15 +182,7 @@
     // 1. Move the on-screen control (silent — no echo back into the recorded value). Three
     //    destinations, one per export door: a field on the component's own section, a
     //    CustomComponent value channel, or the plain Behavior value.
-    let patch;
-    if (m.sectionField) {
-      const existing = get(panelPreviewSessions)?.[m.controlId]?.sectionValues;
-      patch = { sectionValues: sectionValuePatch(existing, m.sectionField.section, m.sectionField.field, v) };
-    } else if (m.leaf && m.leaf !== 'value') {
-      patch = { customValues: { [m.leaf]: v } };
-    } else {
-      patch = { valueOverrideEnabled: true, valueOverride: writeValue };
-    }
+    const patch = hostValuePatch(m, v, writeValue, get(panelPreviewSessions)?.[m.controlId]);
     updatePanelPreviewSession(m.controlId, patch);
     // 2. Send the bound device parameter(s) to the synth — the same call a user drag makes, so
     //    automation playback drives the hardware. 'continuous' = rate-limited stream.
@@ -246,10 +215,8 @@
     const pend = pendingIncoming;
     pendingIncoming = null;
     if (!pend) return;
-    for (const controlId in pend) {
-      const { v: value, port } = pend[controlId];
-      if (lastAppliedValue[controlId] === value) continue;  // no change -> no render
-      lastAppliedValue[controlId] = value;
+    const patches = [];
+    for (const { controlId, port, value } of incomingFeedbackEntries(pend)) {
       // Move the on-screen control WITHOUT re-emitting a send (updatePanelPreviewSession
       // directly, not patchControlSession) so we don't fight the synth / create a loop.
       // Display ports drive the panel's lighting/text, not a value override, so a
@@ -259,8 +226,9 @@
       else if (port === 'backlight') patch = { backlightOverride: Number(value) >= 64 };
       else if (port === 'text') patch = { textOverride: String(value) };
       else patch = { valueOverrideEnabled: true, valueOverride: value };
-      updatePanelPreviewSession(controlId, patch);
+      patches.push({ controlId, patch });
     }
+    updatePanelPreviewSessions(patches);
   }
 
   // Queue a decoded device value for the next frame (shared by the CC and SysEx decoders).
@@ -288,7 +256,7 @@
   // since it has no parameter id to go through.
   function queueSessionValue(controlId, port, value) {
     if (!controlId) return;
-    (pendingIncoming ??= {})[controlId] = { v: value, port: String(port ?? 'value') };
+    pendingIncoming = queueIncomingFeedback(pendingIncoming, controlId, port, value);
     if (!incomingRaf) incomingRaf = requestAnimationFrame(flushIncoming);
   }
 
@@ -376,6 +344,15 @@
     }
   }
 
+  let synthSyncTimer = 0;
+  function scheduleSynthSync() {
+    if (synthSyncTimer) clearTimeout(synthSyncTimer);
+    synthSyncTimer = setTimeout(() => {
+      synthSyncTimer = 0;
+      syncFromSynth();
+    }, 600);
+  }
+
   function mapRole() {
     const dest = ports.find((p) => p.id === selectedOut)
       ?? { type: 'previewOnly', id: 'previewOnly', name: 'Preview Only' };
@@ -392,7 +369,7 @@
     // Load this profile's parameter list so resolveParameterSend recognizes the bound params.
     if (profileId) listProfileParameters({ profileId, deviceRole: DEFAULT_DEVICE_ROLE });
     // Pull current values from the synth via RQ1 once the hardware port is open (SysEx read-back).
-    if (dest.type === 'hardwareOutput') setTimeout(syncFromSynth, 600);
+    if (dest.type === 'hardwareOutput') scheduleSynthSync();
   }
   function selectPort(id) {
     selectedOut = id;
@@ -411,7 +388,7 @@
       selectedOut = dest.id;
       if (m.profileId) profileId = m.profileId;
       if (profileId) listProfileParameters({ profileId, deviceRole: DEFAULT_DEVICE_ROLE });
-      setTimeout(syncFromSynth, 600);
+      scheduleSynthSync();
     }
   }
 
@@ -441,23 +418,37 @@
       next = deserializePanel(JSON.stringify(input), input.filePath ?? filePath, input.name ?? null);
     }
     if (!next) return null;
+    // A queued frame or partial NRPN belongs to the document that received it. Panel ids and
+    // control ids are commonly reused across generated exports, so letting either cross a reload
+    // can apply the previous synth's final message to the new panel.
+    if (incomingRaf) cancelAnimationFrame(incomingRaf);
+    incomingRaf = 0;
+    pendingIncoming = null;
+    nrpnState = EMPTY_NRPN_STATE;
     // Player is a runtime: make bound controls SEND (not dry-run). Safe — the engine still
     // only transmits when the role's output is a real hardware port (else it's a no-op).
-    for (const c of next.controls ?? [])
+    for (const c of flatControls(next.controls ?? []))
       for (const b of c?._children?.DeviceBindings?.bindings ?? [])
         if (b && typeof b === 'object') b.dryRun = false;
     profileId = next.deviceSession?.mainSynth?.profileId || 'roland-gaia';
-    panel = next;
-    syncPanelPreviewSessions(panel.controls ?? []);
     // Start (or restart) the panel script runtime for this panel — the SAME Lua/JS runtime the editor
-    // preview uses, now driving the shipped plugin. Close the previous panel's scripts (no-op on first
-    // load), install the new panel as the runtime host, then previewMode off→on fires onPanelLoad +
-    // onPanelReady so lifecycle scripts run.
+    // preview uses, now driving the shipped plugin. Close the previous panel while the old host still
+    // points at it, then install and index the new document before seeding its sessions. The session
+    // subscriber runs synchronously, so publishing sooner would send through stale host maps.
     setPreviewModeEnabled(false);
-    setRuntimeHost(createPlayerHost(panel));
-    setPreviewModeEnabled(true);
+    panel = next;
+    panelLoadGeneration += 1;
+    setRuntimeHost(createPlayerHost(
+      () => panel,
+      // The player keeps its document in $state.raw so native objects remain cloneable. A script
+      // changing text, colour or visibility mutates that raw tree; replace the shallow panel shell
+      // to tell Svelte and PanelPreviewSurface that the document changed.
+      { onDocumentWrite: () => { panel = { ...panel }; } },
+    ));
     rebuildParamControlMap(panel.controls ?? []);
     rebuildHostParamMaps(panel);
+    // The off→on edge seeds sessions and then fires onPanelLoad/onPanelBuild/onPanelReady.
+    setPreviewModeEnabled(true);
     // Ask the host to push current parameter values now that our maps exist (restored automation).
     if (hasBridge && window.__JUCE__?.backend) window.__JUCE__.backend.emitEvent('requestParamSync', {});
     if (panel?.bgImageEnabled && panel?.bgImage) loadFile(panel.bgImage);
@@ -523,6 +514,7 @@
 
   onMount(() => {
     initPanelRuntime();   // start the panel script runtime (Lua/JS) so the loaded panel's scripts run
+    setInteractionPreviewPanelProvider(() => panel);
     // Expose a loader the host can call directly (and for browser testing).
     const loadPanel = (doc, filePath) => loadPanelDocument(doc, filePath);
     window.__CE_LOAD_PANEL__ = loadPanel;
@@ -578,6 +570,11 @@
     window.addEventListener('resize', onResize);
     return () => {
       window.removeEventListener('resize', onResize);
+      if (incomingRaf) cancelAnimationFrame(incomingRaf);
+      incomingRaf = 0;
+      pendingIncoming = null;
+      if (synthSyncTimer) clearTimeout(synthSyncTimer);
+      synthSyncTimer = 0;
       if (window.__CE_LOAD_PANEL__ === loadPanel) delete window.__CE_LOAD_PANEL__;
       if (backend && loadToken != null) backend.removeEventListener(loadToken);
       if (backend && paramSyncToken != null) backend.removeEventListener(paramSyncToken);
@@ -588,6 +585,9 @@
       if (sysexUnsub) sysexUnsub();
       if (sessionsUnsub) sessionsUnsub();
       if (deviceUnsub) deviceUnsub();
+      setPreviewModeEnabled(false);
+      setRuntimeHost(null);
+      setInteractionPreviewPanelProvider(null);
     };
   });
 </script>
@@ -610,7 +610,9 @@
   <div class="player-viewport">
     {#if panel}
       <div class="player-stage" style="width: {panel.width * scale}px; height: {panel.height * scale}px;">
-        <PanelPreviewSurface bind:surfaceRef {panel} {scale} {bgLayers} {gridStyle} />
+        {#key panelLoadGeneration}
+          <PanelPreviewSurface {panel} {scale} {bgLayers} {gridStyle} />
+        {/key}
       </div>
     {:else}
       <div class="placeholder">No panel loaded.</div>

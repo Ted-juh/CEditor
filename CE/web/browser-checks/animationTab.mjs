@@ -204,7 +204,16 @@ await settle();
 check('and a rename that works moves the animation, keeping what was in it', async () => {});
 assert.deepEqual(await ev(() => window.__anim.storedNames()), ['pressMotion', 'hoverGlow', 'fadeOut', 'fadeSlow']);
 
-await ev(() => window.__anim.removeAnimation('fadeSlow'));
+await ev(() => window.__anim.beginRename('fadeSlow'));
+await settle();
+await ev(() => window.__anim.typeRename('fade.slower'));
+await settle();
+await ev(() => window.__anim.clickRename());
+await settle();
+check('rename sanitizes path punctuation instead of nesting and deleting the animation', async () => {});
+assert.deepEqual(await ev(() => window.__anim.storedNames()), ['pressMotion', 'hoverGlow', 'fadeOut', 'fadeslower']);
+
+await ev(() => window.__anim.removeAnimation('fadeslower'));
 await settle();
 await ev(() => window.__anim.removeAnimation('fadeOut'));
 await settle();

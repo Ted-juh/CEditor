@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import Bold from 'lucide-svelte/icons/bold';
   import Italic from 'lucide-svelte/icons/italic';
   import Underline from 'lucide-svelte/icons/underline';
@@ -18,10 +19,10 @@
   import Spline from 'lucide-svelte/icons/spline';
   import TextAlignJustify from 'lucide-svelte/icons/text-align-justify';
   import Type from 'lucide-svelte/icons/type';
-  import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
+  import { getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { availableFonts, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';
-  import { activateColorTarget } from '../stores/colorTarget.js';
+  import { activateInspectorColorTarget } from '../stores/colorTarget.js';
   import { activeControlSet } from '../stores/controlSets.js';
   import { resolveColourLiteral, tokenNameOf } from '../models/controlSets.js';
   import { ensureFillGradientSeeded, openFillGradientEditor } from '../stores/gradientTarget.js';
@@ -211,7 +212,7 @@
 
   function handleFillColorSwatch() {
     if (!core?.id) return;
-    activateColorTarget(
+    activateInspectorColorTarget(
       { type: 'control', controlId: core.id, path: scopeTextPath('Text.Fill.colour') },
       String(textFill?.colour ?? 'FFFFFFFF')
     );
@@ -233,6 +234,7 @@
       fill: textFill,
       defaultGradient: DEFAULT_TEXT_FILL_GRADIENT,
       seedGradient: (seeded) => set('Text.Fill.gradient', seeded),
+      inspector: true,
     });
   }
 
@@ -257,7 +259,7 @@
     set(path, normalized);
   }
 
-  onImageBrowsed((result) => {
+  const removeImageBrowsedListener = onImageBrowsed((result) => {
     if (!core?.id) return;
     if (result.requestId === textFillAssetRequestId('image')) {
       set('Text.Fill.imageSrc', result.filePath);
@@ -269,6 +271,8 @@
       set('Text.Fill.mode', 'texture');
     }
   });
+
+  onDestroy(removeImageBrowsedListener);
 
   function caseModeValue() {
     const value = String(font?.caseMode ?? 'normal');
@@ -603,8 +607,8 @@
 
   function handleLineColorSwatch(name) {
     if (!core?.id) return;
-    activateColorTarget(
-      { type: 'control', controlId: core.id, path: `Text.Font.${name}` },
+    activateInspectorColorTarget(
+      { type: 'control', controlId: core.id, path: scopeTextPath(`Text.Font.${name}`) },
       String(lineProp(name, lineColourFallback))
     );
   }
@@ -1314,7 +1318,7 @@
             <PropertyColor
               value={String(fillProp('imageTint', 'FFFFFFFF'))}
               onchange={(value) => setTextFillTint('Text.Fill.imageTint', value)}
-              onswatchclick={() => activateColorTarget({ type: 'control', controlId: core.id, path: scopeTextPath('Text.Fill.imageTint') }, String(fillProp('imageTint', 'FFFFFFFF')))}
+              onswatchclick={() => activateInspectorColorTarget({ type: 'control', controlId: core.id, path: scopeTextPath('Text.Fill.imageTint') }, String(fillProp('imageTint', 'FFFFFFFF')))}
             />
           </PropertyCell>
           <PropertyCell label="Fill Order" span={1} compact hint="Draw order of the main text fill layer. Lower draws earlier, higher draws later.">
@@ -1357,7 +1361,7 @@
             <PropertyColor
               value={String(fillProp('textureTint', 'FFFFFFFF'))}
               onchange={(value) => setTextFillTint('Text.Fill.textureTint', value)}
-              onswatchclick={() => activateColorTarget({ type: 'control', controlId: core.id, path: scopeTextPath('Text.Fill.textureTint') }, String(fillProp('textureTint', 'FFFFFFFF')))}
+              onswatchclick={() => activateInspectorColorTarget({ type: 'control', controlId: core.id, path: scopeTextPath('Text.Fill.textureTint') }, String(fillProp('textureTint', 'FFFFFFFF')))}
             />
           </PropertyCell>
           <PropertyCell label="Fill Order" span={1} compact hint="Draw order of the main text fill layer. Lower draws earlier, higher draws later.">

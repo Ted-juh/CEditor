@@ -59,6 +59,10 @@ export function bakeProgramBank(bank, { maxPrograms = MAX_PROGRAMS } = {}) {
 
   return {
     label: text(bank?.label) || text(bank?.id) || 'Programs',
+    // Editor-only provenance. Bank labels are not unique, so the Export tab
+    // cannot reliably show which source bank was baked by comparing labels.
+    // The player ignores unknown fields and keeps reading label/programs.
+    sourceBankId: text(bank?.id),
     // Truncation is reported by the caller rather than hidden here — see `bakeReport`.
     programs: programs.slice(0, maxPrograms),
   };

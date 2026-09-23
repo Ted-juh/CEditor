@@ -27,6 +27,29 @@
   } = $props();
 
   let loss = $derived(row ? thumbnailLoss(row) : null);
+  let confirmRemoveId = $state('');
+
+  $effect(() => {
+    const rowId = row?.id ?? '';
+    if (confirmRemoveId && confirmRemoveId !== rowId) confirmRemoveId = '';
+  });
+
+  function requestRemove(event) {
+    if (!row?.id) return;
+    // A double-click emits two click events for one physical gesture. The first click may arm the
+    // action, but the second must not turn that same gesture into confirmation.
+    if (event?.detail > 1) return;
+    if (confirmRemoveId !== row.id) {
+      confirmRemoveId = row.id;
+      return;
+    }
+    confirmRemoveId = '';
+    onremove(row);
+  }
+
+  function guardRepeatedRemoveKey(event) {
+    if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
+  }
 </script>
 
 {#if row}
@@ -76,8 +99,10 @@
               title={canReplace ? `Overwrite every section of ${targetName} with this package` : 'Select a custom component to replace'}>
         <Replace size={11} /> Replace {targetName || 'selection'}
       </button>
-      <button type="button" class="danger" onclick={() => onremove(row)} title={`Remove ${row.name} from the library`}>
-        <Trash2 size={11} /> Forget
+      <button type="button" class="danger" class:confirm={confirmRemoveId === row.id}
+              data-testid="library-forget" onclick={requestRemove} onkeydown={guardRepeatedRemoveKey}
+              title={confirmRemoveId === row.id ? `Confirm removing ${row.name}` : `Remove ${row.name} from the library`}>
+        <Trash2 size={11} /> {confirmRemoveId === row.id ? 'Confirm forget' : 'Forget'}
       </button>
     </div>
     {#if canReplace}
@@ -188,6 +213,7 @@
   .acts button:disabled { opacity: 0.35; cursor: default; }
   .acts .go { border-color: #0E7C70; background: #0B2320; color: #8FEDE3; flex-basis: 100%; }
   .acts .go:hover:not(:disabled) { border-color: #14B8A6; color: #C9FFF8; }
+  .acts .danger.confirm { border-color: #D56B6B; background: #32191B; color: #FFD9D9; }
   .acts .danger:hover:not(:disabled) { border-color: #D56B6B; color: #FFD9D9; }
 
   .caution {

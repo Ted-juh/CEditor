@@ -59,6 +59,7 @@ export function dragScrub(node: HTMLElement, params: DragScrubParams) {
   let scrub = new DragScrub(optionsFrom(current), current.value);
   let activePointer: number | null = null;
   let locked = false;
+  let destroyed = false;
   // Under pointer lock there is no meaningful clientX, so we integrate
   // movementX/Y into a virtual position and feed the core that instead.
   let virtualX = 0;
@@ -106,7 +107,9 @@ export function dragScrub(node: HTMLElement, params: DragScrubParams) {
       try {
         const result = node.requestPointerLock() as unknown as Promise<void> | undefined;
         if (result && typeof result.then === 'function') {
-          result.then(() => { locked = document.pointerLockElement === node; }).catch(() => {});
+          result.then(() => {
+            if (!destroyed) locked = document.pointerLockElement === node;
+          }).catch(() => {});
         } else {
           locked = document.pointerLockElement === node;
         }
@@ -212,6 +215,15 @@ export function dragScrub(node: HTMLElement, params: DragScrubParams) {
       }
     },
     destroy() {
+      destroyed = true;
+      if (activePointer !== null) {
+        scrub.end();
+        if (node.hasPointerCapture(activePointer)) node.releasePointerCapture(activePointer);
+        if (document.pointerLockElement === node) document.exitPointerLock();
+        activePointer = null;
+        locked = false;
+        current.onDragEnd?.();
+      }
       node.removeEventListener('pointerdown', onPointerDown);
       node.removeEventListener('pointermove', onPointerMove);
       node.removeEventListener('pointerup', onPointerUp);

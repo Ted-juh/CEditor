@@ -55,9 +55,11 @@
   function onKeydown(e) {
     if (!$scriptDialog) return;
     // Escape dismisses — the callback runs with no answer, the same as clicking away.
-    if (e.key === 'Escape') { e.stopPropagation(); answerDialog(undefined); }
-    // Enter in a field accepts, which is what every text prompt anywhere does.
-    if (e.key === 'Enter' && $scriptDialog.ask === 'text') {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); answerDialog(undefined); }
+    // Only Enter in the text field accepts. A focused Cancel button must keep its native action.
+    if (e.key === 'Enter' && $scriptDialog.ask === 'text'
+        && e.target?.matches?.('.dialog-input')) {
+      e.preventDefault();
       e.stopPropagation();
       answerDialog(answerFor($scriptDialog.buttons[0]));
     }

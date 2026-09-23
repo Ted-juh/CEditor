@@ -92,7 +92,7 @@
     <div class="tab-sections-scroll">
       {#each visibleTabs as tab, i (tab.id)}
         <div class="multi-card">
-          <button class="multi-card-header" onclick={() => ontogglecollapse?.(cardId(tab.id))}>
+          <button class="multi-card-header" aria-expanded={!isCollapsed(tab.id)} onclick={() => ontogglecollapse?.(cardId(tab.id))}>
             {#if isCollapsed(tab.id)}
               <ChevronRight size={16} strokeWidth={1.5} />
             {:else}

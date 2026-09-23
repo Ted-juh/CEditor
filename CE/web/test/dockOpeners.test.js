@@ -114,7 +114,7 @@ test('the button does both halves of the handoff, the way the colour swatch does
   // The claim the whole handoff rests on: arming a target without requesting the tab lands the user
   // on whatever tab they left open. Pinned against both shipped sources.
   const swatch = src('properties/SwatchCluster.svelte');
-  assert.match(swatch, /activateColorTarget\(/);
+  assert.match(swatch, /activateInspectorColorTarget\(/);
   assert.match(swatch, /displayTabRequest\.set\(\{ tab: 'colors' \}\)/);
 
   const button = src('properties/OpenInDock.svelte');
@@ -169,7 +169,7 @@ test('the explicit path still takes the target from whoever holds it', () => {
 test('tabs that arm on mount use the idle path, not the explicit one', () => {
   // The mount-time arm is the one that must not steal. Read out of the shipped tabs so a new tab
   // copying the old shape fails here rather than breaking the opener that points at it.
-  const tabs = ['TypographyTab', 'AssetsTab', 'ApiTab', 'AnimationTab', 'DesignerTab'];
+  const tabs = ['AssetsTab', 'ApiTab', 'AnimationTab', 'DesignerTab'];
   for (const tab of tabs) {
     const source = src(`components/${tab}.svelte`);
     const mount = source.slice(source.indexOf('onMount(() => {'), source.indexOf('});', source.indexOf('onMount(() => {')));

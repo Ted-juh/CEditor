@@ -34,7 +34,7 @@
   // how a stale profile reference turns into "the user picked something they did not pick". Show
   // it instead, marked, so it can be seen and corrected.
   let missing = $derived(
-    value !== '' && value != null && !normalized.some((option) => option.value === value)
+    value !== '' && value != null && !normalized.some((option) => String(option.value) === String(value))
   );
 </script>
 

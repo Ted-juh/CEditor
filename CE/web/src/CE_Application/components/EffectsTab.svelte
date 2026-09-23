@@ -6,7 +6,7 @@
   import EffectSettings from './effects/EffectSettings.svelte';
   import EffectLooks from './effects/EffectLooks.svelte';
   import { activePanel, selectedComponentIds } from '../stores/panels.js';
-  import { selectedControl, applyControlPatch, updateControlProperty } from '../stores/controls.js';
+  import { selectedControl, applyInspectorControlPatch, updateInspectorControlProperty } from '../stores/controls.js';
   import { effectsDockSelection, effectsDockState } from '../stores/effectsDock.js';
   import { stateEditScope, setStateEditScopeBase, setStateEditScopeState } from '../stores/stateEditScope.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
@@ -57,13 +57,13 @@
     effectsDockSelection.update((value) => ({ ...value, [selectionKey]: key }));
   }
   function applyPatch(patch) {
-    if (control) applyControlPatch(control._children.Core.id,
+    if (control) applyInspectorControlPatch(control._children.Core.id,
       domain === 'component' ? effectSurfacePatch(control, surface, patch) : patch);
   }
   function setField(row, key, value) {
     if (!control?._children?.Core?.id || !row?.root) return;
     if (domain === 'component') applyPatch({ [`${row.root}.${key}`]: value });
-    else updateControlProperty(control._children.Core.id, `${row.root}.${key}`, value);
+    else updateInspectorControlProperty(control._children.Core.id, `${row.root}.${key}`, value);
   }
   function toggleRow(row) {
     if (control?._children?.Core?.id && row?.enabledPath && !row.alwaysOn)

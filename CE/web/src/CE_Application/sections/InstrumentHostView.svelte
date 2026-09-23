@@ -117,6 +117,7 @@
   let buildHoldTimer;
   let pendingDestructive = $state('');
   let destructiveTimer;
+  let activeParameterGesture = null;
   const restoredNavigation = restoreHostNavigation();
   let buildWorkspace = $state(restoredNavigation.workspace);
   let activeUtility = $state(restoredNavigation.utility);
@@ -183,6 +184,31 @@
     cancelStageUnlock();
   }
 
+  function cancelBuildHoldWhenHidden() {
+    if (document.visibilityState !== 'hidden') return;
+    cancelBuildHold();
+    finishParameterGesture();
+  }
+
+  function startParameterGesture(partId, id) {
+    if (activeParameterGesture?.partId === partId && activeParameterGesture?.id === id) return;
+    finishParameterGesture();
+    activeParameterGesture = { partId, id };
+    beginParameterGesture(partId, id);
+  }
+
+  function finishParameterGesture() {
+    if (!activeParameterGesture) return;
+    const { partId, id } = activeParameterGesture;
+    activeParameterGesture = null;
+    endParameterGesture(partId, id);
+  }
+
+  function cancelTransientInput() {
+    cancelBuildHold();
+    finishParameterGesture();
+  }
+
   function guardedAction(key, action) {
     if (pendingDestructive === key) {
       clearTimeout(destructiveTimer);
@@ -199,6 +225,7 @@
     clearTimeout(buildHoldTimer);
     clearTimeout(destructiveTimer);
     if (buildHold) cancelStageUnlock();
+    finishParameterGesture();
   });
   let preparedUtility = '';
   $effect(() => {
@@ -593,7 +620,8 @@
   const redo = key === 'y' || event.shiftKey;
   if (redo ? $hostState.editHistory.canRedo : $hostState.editHistory.canUndo)
     (redo ? redoHostEdit : undoHostEdit)();
-}} />
+}} onblur={cancelTransientInput} />
+<svelte:document onvisibilitychange={cancelBuildHoldWhenHidden} />
 
 <div class="host-workspace" data-testid="instrument-host-workspace">
   <header class="host-header">
@@ -1882,8 +1910,10 @@
                   {:else}
                     <input type="range" min="0" max="1" step={stepFor(parameter)} value={parameter.value}
                            aria-label={parameter.name}
-                           onpointerdown={() => beginParameterGesture(paramTargetId, parameter.id)}
-                           onpointerup={() => endParameterGesture(paramTargetId, parameter.id)}
+                           onpointerdown={() => startParameterGesture(paramTargetId, parameter.id)}
+                           onpointerup={finishParameterGesture}
+                           onpointercancel={finishParameterGesture}
+                           onlostpointercapture={finishParameterGesture}
                            oninput={(e) => setParameter(paramTargetId, parameter.id, Number(e.currentTarget.value))} />
                   {/if}
                   {#if editingParamId === parameter.id}

@@ -2050,6 +2050,8 @@ function checksumOf(kind, bytes, opts) {
 // per-call argument, the same shape noTransmit() uses: it keeps thirteen signatures unchanged and
 // reads as what it is, a decision that applies to a run of sends rather than to one of them.
 let routedRole = null;
+let activeScriptNoteSeq = 0;
+const activeScriptNotes = new Map(); // token -> { role, channel, note, timerId }
 
 function sendRawMidi(bytes, actionId) {
   const message = toHexMessage(bytes);
@@ -2061,6 +2063,24 @@ function sendRawMidi(bytes, actionId) {
     addScriptTrace('midi', '', `→ ${actionId}: ${message}${role === DEFAULT_ROLE ? '' : `  [${role}]`}`);
   } else {
     addScriptTrace('midi', '', `→ ${actionId}: ${message}  (no JUCE host — not sent)`);
+  }
+}
+
+function sendRawMidiForRole(bytes, actionId, role) {
+  const previous = routedRole;
+  routedRole = role;
+  try { sendRawMidi(bytes, actionId); }
+  finally { routedRole = previous; }
+}
+
+function releaseTrackedScriptNotes(role, channel, note) {
+  for (const [token, active] of activeScriptNotes) {
+    if (active.role !== role || active.channel !== channel || active.note !== note) continue;
+    if (active.timerId) {
+      afterCallbacks.delete(active.timerId);
+      stopTimer(active.timerId);
+    }
+    activeScriptNotes.delete(token);
   }
 }
 
@@ -2130,7 +2150,12 @@ const midiApi = {
   },
   sendNote: (ch, note, velocity, ms) => {
     const n = midiNote(note);
-    sendRawMidi([0x90 | midiCh(ch), n, midiInt(velocity, 0, 127)], `note_${n}`);
+    const channel = midiCh(ch);
+    const role = routedRole ?? DEFAULT_ROLE;
+    sendRawMidi([0x90 | channel, n, midiInt(velocity, 0, 127)], `note_${n}`);
+    const token = ++activeScriptNoteSeq;
+    const active = { role, channel, note: n, timerId: '' };
+    activeScriptNotes.set(token, active);
     // A duration schedules the note off. Not doing this was making every script that plays a note
     // hand-roll a timer, and getting it wrong meant a hung voice — the one MIDI mistake you hear
     // rather than read. The role is captured now, so a note started inside routeMidi() ends where
@@ -2138,16 +2163,18 @@ const midiApi = {
     if (ms === undefined || ms === null) return;
     const delay = Number(ms);
     if (!Number.isFinite(delay) || delay <= 0) return;
-    const role = routedRole;
-    scheduleOneShot(delay, () => {
-      const previous = routedRole;
-      routedRole = role;
-      try { sendRawMidi([0x80 | midiCh(ch), n, 0], `noteoff_${n}`); }
-      finally { routedRole = previous; }
+    active.timerId = scheduleOneShot(delay, () => {
+      if (!activeScriptNotes.delete(token)) return;
+      sendRawMidiForRole([0x80 | channel, n, 0], `noteoff_${n}`, role);
     });
   },
-  sendNoteOff: (ch, note, velocity) =>
-    sendRawMidi([0x80 | midiCh(ch), midiNote(note), midiInt(velocity ?? 0, 0, 127)], `noteoff_${midiNote(note)}`),
+  sendNoteOff: (ch, note, velocity) => {
+    const channel = midiCh(ch);
+    const n = midiNote(note);
+    const role = routedRole ?? DEFAULT_ROLE;
+    releaseTrackedScriptNotes(role, channel, n);
+    sendRawMidi([0x80 | channel, n, midiInt(velocity ?? 0, 0, 127)], `noteoff_${n}`);
+  },
   sendProgramChange: (ch, program, bankMsb, bankLsb) => {
     // Bank select first: a device applies the bank that was in force when the program change lands.
     const s = 0xB0 | midiCh(ch);
@@ -5532,6 +5559,12 @@ function runAfterCallback(id) {
 }
 
 function stopAllTimers() {
+  // sendNote's duration is a host-owned timer. Cancelling it during preview teardown without first
+  // sending its promised note-off leaves the synth holding a voice after the panel has disappeared.
+  for (const active of activeScriptNotes.values()) {
+    sendRawMidiForRole([0x80 | active.channel, active.note, 0], `noteoff_${active.note}`, active.role);
+  }
+  activeScriptNotes.clear();
   afterCallbacks.clear();   // a one-shot outliving its panel would fire into nothing
   for (const handle of timers.values()) clearInterval(handle);
   timers.clear();

@@ -11,6 +11,7 @@ import {
   canRedo,
   undoAvailable,
   redoAvailable,
+  setHistoryRecordingSuppressed,
 } from '../src/CE_Application/stores/history.js';
 import {
   componentWorkspaceMode,
@@ -86,6 +87,49 @@ test('undo/redo operates on the active custom-component document', () => {
   redo();
   assert.equal(valueOf('docA'), 2);
   assert.equal(canRedo(), false);
+});
+
+test('redo preserves a new edit made before its debounced history snapshot', () => {
+  initHistory();
+  componentDocuments.set([makeDoc('redoPending', 0)]);
+  activeComponentDocumentId.set('redoPending');
+  componentWorkspaceMode.set('surface');
+  commit();
+
+  mutate('redoPending', 1);
+  commit();
+  undo();
+  assert.equal(valueOf('redoPending'), 0);
+  assert.equal(canRedo(), true);
+
+  mutate('redoPending', 5);
+  redo();
+  assert.equal(valueOf('redoPending'), 5, 'redo must not overwrite a pending edit');
+  assert.equal(canRedo(), false, 'the new edit invalidates the old redo branch');
+  undo();
+  assert.equal(valueOf('redoPending'), 0);
+});
+
+test('preview suppression disables undo and redo without consuming their steps', () => {
+  initHistory();
+  componentDocuments.set([makeDoc('previewHistory', 0)]);
+  activeComponentDocumentId.set('previewHistory');
+  componentWorkspaceMode.set('surface');
+  commit();
+  mutate('previewHistory', 1);
+  commit();
+
+  setHistoryRecordingSuppressed(true);
+  assert.equal(canUndo(), false);
+  assert.equal(get(undoAvailable), false);
+  undo();
+  redo();
+  assert.equal(valueOf('previewHistory'), 1);
+
+  setHistoryRecordingSuppressed(false);
+  assert.equal(canUndo(), true);
+  undo();
+  assert.equal(valueOf('previewHistory'), 0);
 });
 
 test('each document keeps an independent undo stack', () => {

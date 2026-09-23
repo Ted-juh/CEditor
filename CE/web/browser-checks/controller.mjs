@@ -20,6 +20,37 @@ try {
   const errors = [];
   page.on('pageerror', e => { errors.push(e.message); console.error(e.stack); });
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/controller.html`);
+
+  // A held computer key owns the note it started even if the octave changes before key-up.
+  await page.evaluate(() => { window.controllerCommands.length = 0; });
+  await page.keyboard.down('a');
+  await page.keyboard.press('x');
+  await page.keyboard.up('a');
+  assert.deepEqual(await page.evaluate(() => window.controllerCommands.filter(c => c.cmd === 'hostNote')),
+    [
+      { cmd: 'hostNote', note: 60, velocity: 100, on: true, channel: 1 },
+      { cmd: 'hostNote', note: 60, velocity: 0, on: false, channel: 1 },
+    ], 'octave changes cannot strand a held note');
+
+  // Mouse and typing may hold the same pitch together. Releasing either source must leave the
+  // pitch sounding until the final source releases it.
+  await page.keyboard.press('z');
+  await page.evaluate(() => { window.controllerCommands.length = 0; });
+  const middleC = page.locator('[data-note="60"]').first();
+  const middleCBox = await middleC.boundingBox();
+  await page.keyboard.down('a');
+  await page.mouse.move(middleCBox.x + middleCBox.width / 2, middleCBox.y + middleCBox.height / 2);
+  await page.mouse.down();
+  await page.keyboard.up('a');
+  assert.equal((await page.evaluate(() => window.controllerCommands.filter(c => c.cmd === 'hostNote'))).length, 1,
+    'releasing one input source does not stop another source holding the same note');
+  await page.mouse.up();
+  assert.deepEqual(await page.evaluate(() => window.controllerCommands.filter(c => c.cmd === 'hostNote')),
+    [
+      { cmd: 'hostNote', note: 60, velocity: 100, on: true, channel: 1 },
+      { cmd: 'hostNote', note: 60, velocity: 0, on: false, channel: 1 },
+    ]);
+
   await page.getByRole('button', { name: 'Controller', exact: true }).click();
   const target = page.getByTestId('surface-encoder-2');
   await target.waitFor();

@@ -16,6 +16,7 @@
     deviceProfiles,
     deviceRoleMappings,
     profileParameters,
+    profileParameterPages,
     deviceRuntimeState,
     refreshProfileParameters,
   } from '../stores/deviceProfiles.js';
@@ -41,6 +42,7 @@
   let profile = $derived($deviceProfiles.find((entry) => String(entry?.id ?? '') === profileId) ?? null);
   let profileName = $derived(profile?.name ?? profileId ?? '');
   let params = $derived(Array.isArray($profileParameters?.[profileId]) ? $profileParameters[profileId] : []);
+  let parameterPage = $derived($profileParameterPages?.[profileId] ?? null);
   let parameter = $derived(primary ? params.find((entry) => String(entry?.id ?? '') === String(primary.parameterId)) : null);
   let paramType = $derived(String(parameter?.type ?? primary?.parameterType ?? ''));
   let range = $derived(parameter?.range ?? null);
@@ -69,11 +71,22 @@
     return '';
   });
 
-  const requested = new Set();
+  const requestedPages = new Set();
+  function requestParameterPage(offset = 0, { retry = false } = {}) {
+    if (!profileId) return;
+    const normalizedOffset = Math.max(0, Number(offset) || 0);
+    const key = `${profileId}:${normalizedOffset}`;
+    if (retry) requestedPages.delete(key);
+    if (requestedPages.has(key)) return;
+    requestedPages.add(key);
+    refreshProfileParameters(profileId, deviceRole, { offset: normalizedOffset });
+  }
   function ensureParams() {
-    if (!profileId || params.length > 0 || requested.has(profileId)) return;
-    requested.add(profileId);
-    refreshProfileParameters(profileId, deviceRole);
+    if (!profileId || params.length > 0) return;
+    requestParameterPage(0);
+  }
+  function loadMoreParams() {
+    requestParameterPage(parameterPage?.loaded ?? params.length, { retry: true });
   }
   $effect(() => {
     if (primary && profileId) ensureParams();
@@ -165,10 +178,13 @@
       <div class="dev-picker">
         <div class="dev-picker-head">{profileName || profileId || 'Device profile'}</div>
         {#if params.length === 0}
-          <div class="dev-picker-empty">No parameters loaded. Open this profile in the Device Profile Designer.</div>
+          <div class="dev-picker-empty">
+            <span>No parameters loaded.</span>
+            <button class="dev-retry" onclick={() => requestParameterPage(0, { retry: true })}>Retry</button>
+          </div>
         {:else}
           <div class="dev-picker-list">
-            {#each params.slice(0, 200) as param (param.id)}
+            {#each params as param (param.id)}
               {@const compat = getBindingCompatibility(control, param)}
               <button
                 class="dev-picker-item"
@@ -181,6 +197,11 @@
                 <span class={['pi-badge', compat.status]}>{compat.status === 'compatible' ? '✓' : compat.status === 'warning' ? '⚠' : '✗'}</span>
               </button>
             {/each}
+            {#if parameterPage?.hasMore}
+              <button class="dev-load-more" onclick={loadMoreParams}>
+                Load more ({params.length} of {parameterPage.total})
+              </button>
+            {/if}
           </div>
         {/if}
       </div>
@@ -366,6 +387,21 @@
     font-size: 11px;
     line-height: 1.4;
   }
+
+  .dev-picker-empty span { display: block; margin-bottom: 8px; }
+  .dev-retry,
+  .dev-load-more {
+    border: 1px solid #444;
+    border-radius: 3px;
+    background: #333;
+    color: #CCC;
+    font: inherit;
+    cursor: pointer;
+  }
+  .dev-retry { padding: 3px 8px; }
+  .dev-load-more { width: 100%; padding: 7px 10px; }
+  .dev-retry:hover,
+  .dev-load-more:hover { border-color: #5B9BD5; color: #FFF; }
 
   .dev-picker-list {
     overflow-y: auto;

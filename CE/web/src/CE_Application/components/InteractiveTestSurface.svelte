@@ -6,7 +6,16 @@
   import { deepClone } from '../utils/deepClone.js';
   import { isDisplayOnly } from '../utils/displayMode.js';
   import { getNextEnumValue } from '../utils/enumBehavior.js';
-  import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
+  import {
+    resolveRadioGroupLayout,
+    resolveRadioGroupSelection,
+    resolveRadioGroupValueAtPoint,
+  } from '../utils/radioGroupLayout.js';
+  import { resolveRadioSelectedKeys } from '../utils/radioSegmentStyle.js';
+  import {
+    resolvePreviewTriggerBindingValue,
+    shouldPulseTriggerOnRelease,
+  } from '../utils/previewDeviceBindings.js';
   import { numberOr, clamp } from '../utils/primitives.js';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
   import {
@@ -14,6 +23,9 @@
     isTimedButtonBehavior,
     resolveTimedButtonConfig,
   } from '../utils/timedButtonPreview.js';
+  import {
+    createMomentaryButtonPreviewController,
+  } from '../utils/momentaryButtonPreview.js';
   import {
     adjustRangeValue,
     getCurrentRangeValue,
@@ -101,18 +113,55 @@
   let pointerCustomHitZone = $state(null);
   let pointerCustomStartValues = $state({});
   let keyboardFocusActive = $state(false);
+  let keyboardActivationKey = '';
+  let suppressNextRangeFieldBlurCommit = false;
   let lastInputMode = $state('pointer');
   let lastControlId = $state('');
   let comboboxOpen = $state(false);
   let commitResetTimer = null;
+  const oneShotTimers = new Map();
 
   const timedButtonPreview = createTimedButtonPreviewController({
     patchSession: (_controlId, patch) => patchSession(patch),
   });
+  const momentaryButtonPreview = createMomentaryButtonPreviewController({
+    patchSession: (_controlId, patch) => patchSession(patch),
+  });
 
   function patchSession(patch = {}) {
-    onpatchsession?.(patch);
-    emitDeviceBindingsForPatch(patch);
+    const controlId = String(control?._children?.Core?.id ?? '');
+    const oneShot = String(behavior?.buttonType ?? '') === 'one_shot';
+    const previousPressed = session?.pressed === true;
+    let nextPatch = patch;
+    let activatedOneShot = false;
+
+    if (oneShot && patch.pressed === true && !isDisabled) {
+      nextPatch = { ...nextPatch, executed: false };
+    }
+    if (oneShot && previousPressed && patch.pressed === false && patch.hover === true && !isDisabled) {
+      activatedOneShot = true;
+      nextPatch = {
+        ...nextPatch,
+        executed: true,
+        disabled: behavior?.disableAfterUse !== false,
+      };
+    }
+
+    onpatchsession?.(nextPatch);
+    emitDeviceBindingsForPatch(nextPatch, previousPressed);
+
+    if (activatedOneShot && nextPatch.disabled && controlId) {
+      const lockout = Math.max(0, numberOr(behavior?.lockoutDuration, 0));
+      clearTimeout(oneShotTimers.get(controlId));
+      if (lockout > 0) {
+        oneShotTimers.set(controlId, setTimeout(() => {
+          oneShotTimers.delete(controlId);
+          if (String(control?._children?.Core?.id ?? '') === controlId) {
+            patchSession({ disabled: false, executed: false });
+          }
+        }, lockout));
+      }
+    }
   }
 
   function activeDeviceBindings() {
@@ -124,7 +173,7 @@
       : [];
   }
 
-    function bindingValueForPatch(binding, patch = {}) {
+    function bindingValueForPatch(binding, patch = {}, previousPressed = false) {
         if (isTimedButtonBehavior(behavior)) {
             return patch.executed === true ? true : undefined;
         }
@@ -132,11 +181,12 @@
         const port = String(binding?.port ?? 'value');
         if (port !== 'value' && control?._children?.ValueChannels?._children?.[port]) return patch.customValues?.[port];
         if (port === 'trigger') {
-            if (String(binding?.parameterType ?? '') === 'momentary') {
-                return Object.prototype.hasOwnProperty.call(patch, 'pressed') ? patch.pressed === true : undefined;
-            }
-      if (patch.executed === true || patch.pressed === false) return true;
-      return undefined;
+      return resolvePreviewTriggerBindingValue({
+        behavior,
+        parameterType: binding?.parameterType,
+        patch,
+        previousPressed,
+      });
     }
     if (port === 'state') {
       return Object.prototype.hasOwnProperty.call(patch, 'checked') ? patch.checked : undefined;
@@ -156,9 +206,9 @@
     return undefined;
   }
 
-  function emitDeviceBindingsForPatch(patch = {}) {
+  function emitDeviceBindingsForPatch(patch = {}, previousPressed = false) {
     for (const binding of activeDeviceBindings()) {
-      const value = bindingValueForPatch(binding, patch);
+      const value = bindingValueForPatch(binding, patch, previousPressed);
       if (value === undefined) continue;
       commitDeviceParameter({
         requestId: `surface_${control?._children?.Core?.id ?? 'control'}_${Date.now()}`,
@@ -179,6 +229,18 @@
       commitResetTimer = null;
       patchSession({ executed: false });
     }, 180);
+  }
+
+  function releaseTriggerPatch(inside = true) {
+    return shouldPulseTriggerOnRelease(behavior, inside) ? { executed: true } : {};
+  }
+
+  function resetReleaseTriggerPulse() {
+    if (commitResetTimer) clearTimeout(commitResetTimer);
+    commitResetTimer = setTimeout(() => {
+      commitResetTimer = null;
+      patchSession({ executed: false });
+    }, 8);
   }
 
   let behavior = $derived(control?._children?.Behavior ?? null);
@@ -209,23 +271,27 @@
 
   let controlWidth = $derived(Math.max(24, numberOr(transform?.width, 100)));
   let controlHeight = $derived(Math.max(24, numberOr(transform?.height, 40)));
+  let isComboboxControl = $derived(
+    String(behavior?.buttonType ?? '').trim().toLowerCase() === 'combobox'
+  );
+  let comboboxRows = $derived(getValueRows(control));
+  let comboboxMenuHeight = $derived(Math.min(184, (comboboxRows.length * 26) + 10));
+  let previewLayoutHeight = $derived(
+    controlHeight + (isComboboxControl && comboboxOpen && comboboxRows.length ? comboboxMenuHeight + 4 : 0)
+  );
   let surfacePadding = $derived(compact ? 0 : 24);
   let fitScale = $derived.by(() => {
     if (!stageWidth || !stageHeight) return 1;
     const usableWidth = Math.max(1, stageWidth - (surfacePadding * 2));
     const usableHeight = Math.max(1, stageHeight - (surfacePadding * 2));
-    return clamp(Math.min(usableWidth / controlWidth, usableHeight / controlHeight, MAX_PREVIEW_SCALE), 0.25, MAX_PREVIEW_SCALE);
+    return clamp(Math.min(usableWidth / controlWidth, usableHeight / previewLayoutHeight, MAX_PREVIEW_SCALE), 0.25, MAX_PREVIEW_SCALE);
   });
   let sceneWidth = $derived(controlWidth * fitScale);
-  let sceneHeight = $derived(controlHeight * fitScale);
+  let sceneHeight = $derived(previewLayoutHeight * fitScale);
   let sceneLeft = $derived(compact ? Math.max(0, (stageWidth - sceneWidth) / 2) : Math.max(surfacePadding, (stageWidth - sceneWidth) / 2));
   let sceneTop = $derived(compact ? Math.max(0, (stageHeight - sceneHeight) / 2) : Math.max(surfacePadding, (stageHeight - sceneHeight) / 2));
   let previewSession = $derived(session?.enabled === false ? {} : (session ?? {}));
   let isDisabled = $derived(session?.enabled === false || session?.disabled === true);
-  let isComboboxControl = $derived(
-    String(behavior?.buttonType ?? '').trim().toLowerCase() === 'combobox'
-  );
-  let comboboxRows = $derived(getValueRows(control));
   let helperLabel = $derived.by(() => {
     if (isCustomComponent) return 'Drag, click, wheel, or use keys to test custom hit zones, behavior modules, and value channels.';
     if (!behavior) return 'Hover and click to test the selected control.';
@@ -278,14 +344,56 @@
       ? (isSliderControl() ? resolvedRuntime?.signals?.ariaValueText : resolveRangeDisplayValue(behavior, session))
       : undefined
   );
+  let previewAriaChecked = $derived(
+    previewRole === 'checkbox' || previewRole === 'radio' ? currentBoolValue() : undefined
+  );
+  let previewLabel = $derived(
+    control?._children?.Core?.name || control?._children?.Core?.controlType || 'Interactive preview surface'
+  );
+  let comboboxListboxId = $derived(
+    `interaction-preview-listbox-${String(control?._children?.Core?.id ?? 'control').replace(/[^a-zA-Z0-9_-]/g, '-')}`
+  );
+  let comboboxActiveOptionId = $derived.by(() => {
+    if (!isComboboxControl) return undefined;
+    const current = String(currentComboboxValue());
+    const index = comboboxRows.findIndex((row) => String(rowValue(row)) === current);
+    return index >= 0 ? `${comboboxListboxId}-option-${index}` : undefined;
+  });
 
   function removeWindowListeners() {
     window.removeEventListener('pointermove', handleWindowPointerMove);
     window.removeEventListener('pointerup', handleWindowPointerUp);
+    window.removeEventListener('pointercancel', cancelPointerInteraction);
+    window.removeEventListener('blur', cancelPointerInteraction);
     rangeScrub?.end();
     rangeScrub = null;
     sliderScrub?.end();
     sliderScrub = null;
+  }
+
+  function cancelPointerInteraction() {
+    if (isTimedButtonBehavior(behavior)) {
+      timedButtonPreview.cancel(control?._children?.Core?.id);
+    }
+    momentaryButtonPreview.cancel(control?._children?.Core?.id);
+    const momentaryRelease = momentaryButtonPreview.releasePress(control?._children?.Core?.id, behavior);
+    if (pointerActive) {
+      patchSession({
+        hover: false,
+        pressed: false,
+        dragging: false,
+        inputModality: 'pointer',
+        ...(momentaryRelease ?? {}),
+      });
+    }
+    pointerActive = false;
+    draggingRange = false;
+    pointerDownZone = '';
+    pointerSliderHandle = '';
+    pointerCustomHitZone = null;
+    pointerCustomStartValues = {};
+    keyboardActivationKey = '';
+    removeWindowListeners();
   }
 
   onDestroy(() => {
@@ -295,11 +403,21 @@
       commitResetTimer = null;
     }
     timedButtonPreview.destroy();
+    momentaryButtonPreview.destroy();
+    keyboardActivationKey = '';
+    for (const timer of oneShotTimers.values()) clearTimeout(timer);
+    oneShotTimers.clear();
   });
 
   $effect(() => {
     const nextControlId = String(control?._children?.Core?.id ?? '');
     timedButtonPreview.syncKeys(nextControlId ? [nextControlId] : []);
+    momentaryButtonPreview.syncKeys(nextControlId ? [nextControlId] : []);
+    for (const [id, timer] of oneShotTimers) {
+      if (id === nextControlId) continue;
+      clearTimeout(timer);
+      oneShotTimers.delete(id);
+    }
     if (nextControlId !== lastControlId) {
       lastControlId = nextControlId;
       pointerActive = false;
@@ -309,6 +427,8 @@
       pointerCustomHitZone = null;
       pointerCustomStartValues = {};
       keyboardFocusActive = false;
+      keyboardActivationKey = '';
+      suppressNextRangeFieldBlurCommit = false;
       comboboxOpen = false;
       if (commitResetTimer) {
         clearTimeout(commitResetTimer);
@@ -612,6 +732,17 @@
       ?? '';
   }
 
+  function currentRadioValue() {
+    const rows = getValueRows(control);
+    if (session?.valueOverrideEnabled === true) return session?.valueOverride;
+    return behavior?.defaultValue
+      ?? rows.find((row) => row?.selectedByDefault === true)?.internalValue
+      ?? rows.find((row) => row?.selectedByDefault === true)?.id
+      ?? rows[0]?.internalValue
+      ?? rows[0]?.id
+      ?? '';
+  }
+
   function rowValue(row) {
     return row?.internalValue ?? row?.id ?? '';
   }
@@ -833,7 +964,7 @@
     return resolveRadioGroupValueAtPoint(layout, localX, localY);
   }
 
-  function commitSelectAction(nextValue = '') {
+  function commitSelectAction(nextValue = undefined) {
     const buttonType = String(behavior?.buttonType ?? '');
     const role = String(behavior?.role ?? '');
     const valueType = String(behavior?.valueType ?? '');
@@ -849,17 +980,22 @@
       return;
     }
     if (buttonType === 'radio' || role === 'radio') {
-      const selectedValue = String(nextValue ?? '').trim();
-      const nextRow = valueRows.find((row) => String(row?.internalValue ?? row?.id ?? '') === selectedValue)
-        ?? valueRows.find((row) => row?.selectedByDefault === true)
-        ?? valueRows[0]
-        ?? null;
-      if (!nextRow) return;
+      if (nextValue !== undefined && String(nextValue ?? '').trim() === '') return;
+      const currentValues = session?.valueOverrideEnabled === true
+        ? (Array.isArray(session?.valueOverride) ? session.valueOverride : [session?.valueOverride])
+        : [...resolveRadioSelectedKeys(valueRows, behavior)];
+      const selection = resolveRadioGroupSelection({
+        behavior,
+        valueRows,
+        selectedValues: currentValues,
+        requestedValue: nextValue,
+      });
+      if (!selection.matched) return;
       patchSession({
         checked: false,
         mixed: false,
         valueOverrideEnabled: true,
-        valueOverride: nextRow?.internalValue ?? nextRow?.id ?? '',
+        valueOverride: selection.value,
       });
       return;
     }
@@ -925,10 +1061,12 @@
     });
   }
 
-  function commitRangeFieldInput() {
+  function commitRangeFieldInput(rawValueOverride = undefined) {
     if (isSliderControl()) {
       const role = String(session?.valueInputRole ?? currentSliderActiveHandle()).trim().toLowerCase();
-      const rawValue = session?.valueInputActive === true
+      const rawValue = rawValueOverride !== undefined
+        ? String(rawValueOverride)
+        : session?.valueInputActive === true
         ? String(session?.valueInputBuffer ?? '')
         : formatSliderNumericValue(behavior, currentSliderRoleValue(role));
       const parsed = parseSliderInputValue(behavior, rawValue);
@@ -948,7 +1086,9 @@
       return;
     }
 
-    const rawValue = session?.valueInputActive === true
+    const rawValue = rawValueOverride !== undefined
+      ? String(rawValueOverride)
+      : session?.valueInputActive === true
       ? String(session?.valueInputBuffer ?? '')
       : resolveRangeDisplayValue(behavior, session);
     const parsed = parseRangeInputValue(behavior, rawValue);
@@ -966,31 +1106,21 @@
 
   function handleRangeFieldInput(event) {
     event.stopPropagation();
+    suppressNextRangeFieldBlurCommit = false;
     const rawValue = String(event?.currentTarget?.value ?? '');
     if (isSliderControl()) {
       const role = String(session?.valueInputRole ?? currentSliderActiveHandle()).trim().toLowerCase();
-      const parsed = parseSliderInputValue(behavior, rawValue);
       patchSession({
         valueInputActive: true,
         valueInputRole: role,
         valueInputBuffer: rawValue,
-        ...(parsed === null ? {} : {
-          activeHandle: role,
-          [`${role}ValueOverrideEnabled`]: true,
-          [`${role}ValueOverride`]: parsed,
-        }),
       });
       return;
     }
 
-    const parsed = parseRangeInputValue(behavior, rawValue);
     patchSession({
       valueInputActive: true,
       valueInputBuffer: rawValue,
-      ...(parsed === null ? {} : {
-        valueOverrideEnabled: true,
-        valueOverride: parsed,
-      }),
     });
   }
 
@@ -1005,24 +1135,30 @@
 
     if (event.key === 'Enter') {
       event.preventDefault();
-      commitRangeFieldInput();
+      commitRangeFieldInput(event?.currentTarget?.value);
+      suppressNextRangeFieldBlurCommit = true;
       return;
     }
 
     if (event.key === 'Escape') {
       event.preventDefault();
       clearRangeInput();
+      suppressNextRangeFieldBlurCommit = true;
     }
   }
 
   function handleRangeFieldFocus(event) {
     event.stopPropagation();
+    suppressNextRangeFieldBlurCommit = false;
     beginRangeFieldEdit();
   }
 
   function handleRangeFieldBlur(event) {
     event.stopPropagation();
-    commitRangeFieldInput();
+    if (!suppressNextRangeFieldBlurCommit) {
+      commitRangeFieldInput(event?.currentTarget?.value);
+    }
+    suppressNextRangeFieldBlurCommit = false;
     patchSession({
       focused: false,
       pressed: false,
@@ -1190,16 +1326,10 @@
         return false;
       }
 
-      const parsed = parseSliderInputValue(behavior, nextBuffer);
       patchSession({
         valueInputActive: true,
         valueInputRole: role,
         valueInputBuffer: nextBuffer,
-        ...(parsed === null ? {} : {
-          activeHandle: role,
-          [`${role}ValueOverrideEnabled`]: true,
-          [`${role}ValueOverride`]: parsed,
-        }),
       });
       return true;
     }
@@ -1236,14 +1366,9 @@
       return false;
     }
 
-    const parsed = parseRangeInputValue(behavior, nextBuffer);
     patchSession({
       valueInputActive: true,
       valueInputBuffer: nextBuffer,
-      ...(parsed === null ? {} : {
-        valueOverrideEnabled: true,
-        valueOverride: parsed,
-      }),
     });
     return true;
   }
@@ -1326,6 +1451,7 @@
     event.currentTarget?.setPointerCapture?.(event.pointerId);
     lastInputMode = 'pointer';
     keyboardFocusActive = false;
+    keyboardActivationKey = '';
     pointerActive = true;
     if (!isComboboxControl) comboboxOpen = false;
     pointerDownPoint = { x: event.clientX, y: event.clientY };
@@ -1354,6 +1480,8 @@
       }
       window.addEventListener('pointermove', handleWindowPointerMove);
       window.addEventListener('pointerup', handleWindowPointerUp);
+      window.addEventListener('pointercancel', cancelPointerInteraction);
+      window.addEventListener('blur', cancelPointerInteraction);
       return;
     }
 
@@ -1381,10 +1509,12 @@
       });
     }
 
+    const momentaryPress = momentaryButtonPreview.beginPress(control?._children?.Core?.id, behavior);
     patchSession({
       hover: true,
       pressed: true,
       dragging: draggingRange,
+      ...(momentaryPress ?? {}),
     });
     if (isTimedButtonBehavior(behavior)) {
       timedButtonPreview.beginPress(control?._children?.Core?.id, behavior);
@@ -1410,6 +1540,8 @@
     }
     window.addEventListener('pointermove', handleWindowPointerMove);
     window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', cancelPointerInteraction);
+    window.addEventListener('blur', cancelPointerInteraction);
   }
 
   function handleWindowPointerMove(event) {
@@ -1485,12 +1617,17 @@
       timedButtonPreview.releasePress(control?._children?.Core?.id, behavior, { inside });
     }
 
+    const momentaryRelease = momentaryButtonPreview.releasePress(control?._children?.Core?.id, behavior);
+    const triggerRelease = releaseTriggerPatch(inside && !draggingRange);
     patchSession({
       hover: inside,
       pressed: false,
       dragging: false,
       inputModality: 'pointer',
+      ...(momentaryRelease ?? {}),
+      ...triggerRelease,
     });
+    if (triggerRelease.executed === true) resetReleaseTriggerPulse();
     if (draggingRange && isRangeControl()) pulseCommitState();
 
     pointerActive = false;
@@ -1513,9 +1650,17 @@
     if (isTimedButtonBehavior(behavior)) {
       timedButtonPreview.cancel(control?._children?.Core?.id);
     }
+    const momentaryRelease = momentaryButtonPreview.releasePress(control?._children?.Core?.id, behavior);
     keyboardFocusActive = false;
+    keyboardActivationKey = '';
     comboboxOpen = false;
-    patchSession({ focused: false, pressed: false, dragging: false, valueInputActive: false });
+    patchSession({
+      focused: false,
+      pressed: false,
+      dragging: false,
+      valueInputActive: false,
+      ...(momentaryRelease ?? {}),
+    });
     pointerActive = false;
     draggingRange = false;
     pointerSliderHandle = '';
@@ -1526,6 +1671,7 @@
   function handleKeyDown(event) {
     if (isReadOnly) return;
     if (isDisabled) return;
+    if (event.target !== event.currentTarget) return;
     const arpPatch = isCustomComponent ? customArpeggiatorKeyPatch(control, customSessionValues(), event) : null;
     if (arpPatch) {
       event.preventDefault();
@@ -1591,8 +1737,10 @@
     if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault();
       if (event.repeat) return;
+      keyboardActivationKey = event.key;
       hitboxElement?.focus?.();
-      patchSession({ focused: true, pressed: true, hover: true });
+      const momentaryPress = momentaryButtonPreview.beginPress(control?._children?.Core?.id, behavior);
+      patchSession({ focused: true, pressed: true, hover: true, ...(momentaryPress ?? {}) });
       if (isTimedButtonBehavior(behavior)) {
         timedButtonPreview.beginPress(control?._children?.Core?.id, behavior);
       }
@@ -1608,7 +1756,13 @@
   }
 
   function handleKeyUp(event) {
-    if (isDisabled) return;
+    if (isReadOnly || isDisabled) {
+      keyboardActivationKey = '';
+      return;
+    }
+    if (event.target !== event.currentTarget) return;
+    if (event.key !== keyboardActivationKey) return;
+    keyboardActivationKey = '';
     if (isCustomComponent) {
       if (event.key === ' ' || event.key === 'Enter') {
         event.preventDefault();
@@ -1624,9 +1778,16 @@
     if (isTimedButtonBehavior(behavior)) {
       timedButtonPreview.releasePress(control?._children?.Core?.id, behavior, { inside: true });
     } else if (String(behavior?.family ?? 'trigger') === 'select') {
-      commitSelectAction();
+      const keyboardValue = String(behavior?.buttonType ?? '') === 'radio'
+        || String(behavior?.role ?? '') === 'radio'
+        ? currentRadioValue()
+        : undefined;
+      commitSelectAction(keyboardValue);
     }
-    patchSession({ focused: true, hover: true, pressed: false });
+    const momentaryRelease = momentaryButtonPreview.releasePress(control?._children?.Core?.id, behavior);
+    const triggerRelease = releaseTriggerPatch(true);
+    patchSession({ focused: true, hover: true, pressed: false, ...(momentaryRelease ?? {}), ...triggerRelease });
+    if (triggerRelease.executed === true) resetReleaseTriggerPulse();
   }
 </script>
 
@@ -1668,16 +1829,20 @@
         <div
           bind:this={hitboxElement}
           class="test-hitbox"
-          class:disabled={session?.disabled === true}
+          class:disabled={isDisabled}
           class:keyboard-focus={keyboardFocusActive}
           role={previewRole}
-          aria-label="Interactive preview surface"
-          aria-disabled={session?.disabled === true}
+          aria-label={previewLabel}
+          aria-disabled={isDisabled}
+          aria-checked={previewAriaChecked}
           aria-valuenow={previewAriaValueNow}
           aria-valuemin={previewAriaValueMin}
           aria-valuemax={previewAriaValueMax}
           aria-valuetext={previewAriaValueText}
           aria-expanded={isComboboxControl ? comboboxOpen : undefined}
+          aria-haspopup={isComboboxControl ? 'listbox' : undefined}
+          aria-controls={isComboboxControl ? comboboxListboxId : undefined}
+          aria-activedescendant={isComboboxControl && comboboxOpen ? comboboxActiveOptionId : undefined}
           tabindex={isDisabled ? undefined : 0}
           onpointerenter={handlePointerEnter}
           onpointerleave={handlePointerLeave}
@@ -1699,10 +1864,12 @@
             panelLocked={false}
             allControls={[previewControl]}
             editorInteractionEnabled={false}
+            previewTabIndex={-1}
             previewSessionOverride={previewSession}
             previewValueField={previewRole === 'spinbutton' ? {
               value: resolveRangeDisplayValue(behavior, session),
               disabled: isDisabled,
+              readOnly: isReadOnly || behavior?.keyboardEnabled === false,
               inputMode: String(behavior?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
               ariaLabel: `${control?._children?.Core?.name ?? control?._children?.Core?.controlType ?? 'Range'} value`,
               tabIndex: -1,
@@ -1732,13 +1899,15 @@
         {#if isComboboxControl && comboboxOpen && comboboxRows.length}
           <div
             class="combobox-menu"
+            id={comboboxListboxId}
             style="top:{controlHeight + 4}px; width:{controlWidth}px;"
             role="listbox"
           >
-            {#each comboboxRows as row}
+            {#each comboboxRows as row, index}
               {@const selected = String(rowValue(row)) === String(currentComboboxValue())}
               <button
                 type="button"
+                id={`${comboboxListboxId}-option-${index}`}
                 class:selected
                 role="option"
                 aria-selected={selected}

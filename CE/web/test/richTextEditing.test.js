@@ -29,6 +29,7 @@ import {
   applyInlineStyle,
   applyList,
   applyTextColour,
+  applyTextColourAtOffsets,
   blocksInRange,
   clearFormatting,
   decorationValue,
@@ -38,8 +39,10 @@ import {
   insertPlainText,
   isInlineStyleActive,
   readCaretOffset,
+  readSelectionOffsets,
   resolveNotepadSync,
   restoreCaretOffset,
+  sanitizeNotepadTree,
 } from '../src/CE_Application/utils/richTextEditing.js';
 
 // --- A DOM small enough to read, real enough to catch offset bugs -------------
@@ -94,7 +97,16 @@ class FakeText extends FakeNode {
 }
 
 class FakeElement extends FakeNode {
-  constructor(tagName) { super(1); this.tagName = tagName; this.style = {}; }
+  constructor(tagName) {
+    super(1);
+    this.tagName = tagName;
+    this.style = {};
+    this.attrs = new Map();
+  }
+  getAttributeNames() { return [...this.attrs.keys()]; }
+  getAttribute(name) { return this.attrs.get(name) ?? null; }
+  setAttribute(name, value) { this.attrs.set(name, String(value)); }
+  removeAttribute(name) { this.attrs.delete(name); }
 }
 
 class FakeFragment extends FakeNode {
@@ -405,6 +417,54 @@ test('restoring into an emptied editor puts the caret at the root', () => {
   const selection = new FakeSelection();
   assert.equal(restoreCaretOffset(after, 12, selection, fakeDocument), true);
   assert.equal(selection.getRangeAt(0).startContainer, after);
+});
+
+test('a notepad selection survives a DOM replacement as character offsets', () => {
+  const before = editorWith('choose this colour', 7, 11);
+  const snapshot = readSelectionOffsets(before.root, before.selection);
+  assert.deepEqual(snapshot, { start: 7, end: 11 });
+
+  // This is a new tree: none of the nodes the original Range referenced exist.
+  const after = editorWith('choose this colour');
+  assert.equal(applyTextColourAtOffsets(after.root, snapshot, '12abEF', fakeDocument), true);
+  assert.equal(
+    innerHtml(after.root),
+    'choose <span style="color:#12abEF">this</span> colour',
+  );
+});
+
+test('notepad sanitization removes active content and event attributes but keeps supported styles', () => {
+  const root = new FakeElement('div');
+  const script = new FakeElement('script');
+  script.appendChild(new FakeText('run()'));
+  root.appendChild(script);
+
+  const image = new FakeElement('img');
+  image.setAttribute('src', 'https://example.invalid/track');
+  image.setAttribute('onerror', 'run()');
+  root.appendChild(image);
+
+  const span = new FakeElement('span');
+  span.setAttribute('onclick', 'run()');
+  span.setAttribute('data-secret', 'x');
+  span.style.color = '#abcdef';
+  span.style.backgroundImage = 'url(javascript:run())';
+  span.appendChild(new FakeText('safe'));
+  root.appendChild(span);
+
+  const unknown = new FakeElement('section');
+  unknown.appendChild(new FakeText(' text'));
+  root.appendChild(unknown);
+
+  sanitizeNotepadTree(root);
+
+  assert.equal(root.textContent, 'safe text', 'active elements are dropped and unknown wrappers are unwrapped');
+  assert.deepEqual(span.getAttributeNames(), [], 'all persisted attributes, including event handlers, are stripped');
+  assert.equal(span.style.color, '#abcdef');
+  assert.equal(span.style.backgroundImage, undefined);
+  assert.equal(root.childNodes.includes(script), false);
+  assert.equal(root.childNodes.includes(image), false);
+  assert.equal(root.childNodes.includes(unknown), false);
 });
 
 // --- The D2 condition ----------------------------------------------------------

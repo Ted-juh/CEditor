@@ -102,8 +102,8 @@ test('the Effects tab does the editing rather than pointing at it', () => {
   }
   assert.doesNotMatch(tab, /<EffectSpecimen/, 'the separate preview stays removed');
   // And it writes, rather than deep-linking somewhere that writes.
-  assert.match(tab, /updateControlProperty\(/, 'it writes properties itself');
-  assert.match(tab, /applyControlPatch\(/, 'and applies reorder patches itself');
+  assert.match(tab, /updateInspectorControlProperty\(/, 'it writes state-aware properties itself');
+  assert.match(tab, /applyInspectorControlPatch\(/, 'and applies state-aware reorder patches itself');
 });
 
 test('a stored "effects" tab resolves, now that the tab is back', () => {
@@ -244,8 +244,10 @@ test('the colour context bar offers a real Cancel, not just Done', () => {
   assert.match(source.displayPanel, /class="context-cancel"[\s\S]{0,120}onclick=\{handleColorCancel\}/);
   const cancel = source.displayPanel.match(/function handleColorCancel\(\)[\s\S]*?\n  \}\n/)?.[0] ?? '';
   assert.ok(cancel, 'handleColorCancel exists');
-  assert.match(cancel, /_initialColor/, 'it restores the value captured when the target was armed');
-  assert.match(cancel, /applyColorToTarget\(/, 'and writes it back — clearing the target would not');
+  assert.match(cancel, /colorTargetRestoreValue\(target, colorTargetDirty\)/,
+    'it restores the raw authored value only after an edit');
+  assert.match(cancel, /if \(restoreValue != null\) applyColorToTarget\(restoreValue\)/,
+    'untouched Cancel leaves token-backed and state colours unchanged');
   assert.match(cancel, /clearColorTarget\(\)/);
 });
 

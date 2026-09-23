@@ -5953,8 +5953,14 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (cmd == "getLibrary")
     {
         ensureLibrary();
-        libraryView = libraryQueryFromVar (payload);
-        emitLibrary (libraryView);
+        const auto query = libraryQueryFromVar (payload);
+        const auto consumer = payload["consumer"].toString();
+        // Background consumers (for example Setlist's rack picker) must not replace the
+        // Sounds browser's remembered view. They receive the same payload, tagged so the web
+        // store can route it to a separate cache.
+        if (consumer.isEmpty())
+            libraryView = query;
+        emitLibrary (query, consumer);
         return;
     }
 
@@ -11029,7 +11035,7 @@ juce::String InstrumentHostService::saveCapturedLibraryRecord (LibraryRecord rec
     return recordId;
 }
 
-void InstrumentHostService::emitLibrary (const LibraryQuery& query)
+void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::String& consumer)
 {
     if (options.emit == nullptr)
         return;
@@ -11295,6 +11301,8 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
     root->setProperty ("query",   query.text);
     root->setProperty ("type",    query.type);
     root->setProperty ("request", libraryQueryToVar (query));
+    if (consumer.isNotEmpty())
+        root->setProperty ("consumer", consumer);
     root->setProperty ("counts",  juce::var (counts));
     root->setProperty ("facets",  juce::var (facetVar));
     root->setProperty ("scanning", libraryScanBusy);

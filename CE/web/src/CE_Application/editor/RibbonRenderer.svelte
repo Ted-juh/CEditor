@@ -51,7 +51,8 @@
     const p = Math.max(0, Math.round(n(cfg.valuePrecision, 2)));
     return (bipolar ? (value * 2 - 1) : value).toFixed(p);
   });
-  let gid = $derived(`rib-${String(control?._children?.Core?.id ?? 'x')}`);
+  const instanceId = $props.id();
+  let gid = $derived(`rib-${instanceId}-${String(control?._children?.Core?.id ?? 'x')}`);
   let wheelRx = $derived(Math.min(geom.w, geom.h) * 0.28);
   let ridges = $derived(realistic ? wheelRidges(value, Math.max(6, Math.round((vertical ? geom.h : geom.w) / 6))) : []);
 </script>

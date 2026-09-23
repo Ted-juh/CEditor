@@ -21,7 +21,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  MORPH_POLICY, captureValues, diffSnapshots, makeSnapshot, morphPolicyFor,
+  MORPH_POLICY, captureValues, dedupeSnapshotIds, diffSnapshots, makeSnapshot, morphPolicyFor,
   morphSendPlan, morphSnapshots, morphValue, morphWeighted,
 } from '../src/CE_Application/utils/snapshotModel.js';
 import {
@@ -76,6 +76,22 @@ test('a written value is clamped into the parameter it belongs to', () => {
 test('capture records what has a value and omits what does not', () => {
   const values = captureValues(PARAMS, (p) => (p.id === 'k.value' ? 64 : undefined));
   assert.deepEqual(values, { 'k.value': 64 });
+});
+
+test('captures with the same name and value count still receive unique ids', () => {
+  const first = makeSnapshot({ name: 'Same', values: { a: 1 }, now: 'fixed' });
+  const second = makeSnapshot({ name: 'Same', values: { a: 2 }, now: 'fixed' });
+  assert.notEqual(first.id, second.id);
+});
+
+test('duplicate and absent snapshot ids are repaired without rewriting unique ids', () => {
+  const repaired = dedupeSnapshotIds([
+    { id: 'kept', name: 'A', values: {} },
+    { id: 'kept', name: 'B', values: {} },
+    { name: 'C', values: {} },
+  ]);
+  assert.equal(repaired[0].id, 'kept');
+  assert.equal(new Set(repaired.map((entry) => entry.id)).size, 3);
 });
 
 test('a scope is a predicate, so "just the filter" and "just this group" are one mechanism', () => {
@@ -273,6 +289,18 @@ test('snapshots travel with the panel', () => {
   const reopened = deserializePanel(serializePanel(panel), null, 'x');
   assert.equal(reopened.snapshots.length, 1);
   assert.equal(reopened.snapshots[0].name, 'Bright');
+});
+
+test('opening a panel repairs duplicate snapshot ids', () => {
+  const panel = createPanel('x');
+  panel.snapshots = [
+    snap({ 'k.value': 1 }, { id: 'duplicate', name: 'One' }),
+    snap({ 'k.value': 2 }, { id: 'duplicate', name: 'Two' }),
+  ];
+  const reopened = deserializePanel(serializePanel(panel), null, 'x');
+  assert.equal(reopened.snapshots[0].id, 'duplicate');
+  assert.notEqual(reopened.snapshots[1].id, 'duplicate');
+  assert.equal(new Set(reopened.snapshots.map((entry) => entry.id)).size, 2);
 });
 
 test('a panel with no snapshots writes no key', () => {

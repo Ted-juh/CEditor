@@ -164,7 +164,7 @@
       </g>
     {/if}
     </g>
-    <text x="80" y="96" text-anchor="middle" fill={legend} font-size="11" font-family="inherit">{label || (toggle ? 'SWITCH' : 'PRESS')}{toggle ? ` Â· ${active?'ON':'OFF'}` : ''}</text>
+    <text x="80" y="96" text-anchor="middle" fill={legend} font-size="11" font-family="inherit">{label || (toggle ? 'SWITCH' : 'PRESS')}{toggle ? ` · ${active?'ON':'OFF'}` : ''}</text>
   {/if}
 </svg>
 

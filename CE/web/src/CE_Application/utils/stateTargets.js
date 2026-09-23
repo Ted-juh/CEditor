@@ -10,7 +10,7 @@ const KNOWN_STATE_META = {
   mixed: { shortLabel: 'M', order: 70, title: 'Mixed' },
 };
 
-export const STATE_SCOPABLE_TABS = new Set(['transform', 'background', 'border', 'text', 'icon', 'effects', 'contentlayout', 'segments']);
+export const STATE_SCOPABLE_TABS = new Set(['transform', 'background', 'border', 'text', 'icon', 'effects', 'contentlayout', 'display', 'pixel', 'segments']);
 export { BASE_STATE_TARGET };
 
 export function isStateScopableTabId(tabId = '') {

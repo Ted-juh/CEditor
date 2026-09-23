@@ -102,7 +102,8 @@ window.__lib = {
   detailName: () => textOf(document.querySelector('.detailcol .f')),
   place: () => { [...document.querySelectorAll('.acts button')].find((b) => textOf(b).includes('Place'))?.click(); },
   replace: () => { [...document.querySelectorAll('.acts button')].find((b) => textOf(b).includes('Replace'))?.click(); },
-  forget: () => { [...document.querySelectorAll('.acts button')].find((b) => textOf(b).includes('Forget'))?.click(); },
+  forget: () => { document.querySelector('[data-testid="library-forget"]')?.click(); },
+  forgetLabel: () => textOf(document.querySelector('[data-testid="library-forget"]')),
   replaceLabel: () => textOf([...document.querySelectorAll('.acts button')].find((b) => textOf(b).includes('Replace'))),
   detailNote: () => textOf(document.querySelector('.detailcol .note')),
 

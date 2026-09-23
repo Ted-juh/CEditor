@@ -71,7 +71,7 @@
   }
 
   function handleKeydown(e) {
-    if (e.key === 'Escape') { e.stopPropagation(); closeNewPanelDialog(); }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeNewPanelDialog(); }
     else if (e.key === 'Enter' && e.target?.tagName !== 'BUTTON') { e.preventDefault(); create(); }
   }
 </script>

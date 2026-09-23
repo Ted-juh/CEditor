@@ -19,15 +19,45 @@
     activeStateTarget = '',
     onstatetargetclick = null,
   } = $props();
+
+  let focusedTabId = $state('');
+
+  $effect(() => {
+    if (focusedTabId && !tabs.some((tab) => tab.id === focusedTabId)) focusedTabId = '';
+  });
+
+  function handleTabKeydown(tabId, event) {
+    const current = tabs.findIndex((tab) => tab.id === tabId);
+    if (current < 0) return;
+    let next = current;
+    if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+    else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = (current + 1) % tabs.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    // Arrow/Home/End move focus within the tablist. Activation remains an explicit click,
+    // Enter, or Space action; calling the click callback here also applied its multi-select
+    // modifier semantics to a navigation key and unexpectedly changed the open property tabs.
+    focusedTabId = tabs[next].id;
+    event.currentTarget.parentElement?.querySelectorAll?.('.tab-icon')?.[next]?.focus?.();
+  }
 </script>
 
-<div class="icon-tabs">
+<div class="icon-tabs" role="tablist" aria-label={titlePrefix ? `${titlePrefix.trim()} property sections` : 'Property sections'} aria-orientation="vertical">
   {#each tabs as tab (tab.id)}
     <button
       class="tab-icon"
       class:active={isActive(tab.id)}
       title={titlePrefix + tab.label}
+      aria-label={titlePrefix + tab.label}
+      aria-selected={isActive(tab.id)}
+      role="tab"
+      tabindex={focusedTabId ? (focusedTabId === tab.id ? 0 : -1) : (isActive(tab.id) ? 0 : -1)}
+      data-tab-id={tab.id}
+      onfocus={() => focusedTabId = tab.id}
       onclick={(e) => onclick?.(tab.id, e)}
+      onkeydown={(e) => handleTabKeydown(tab.id, e)}
     >
       <tab.icon size={20} strokeWidth={1.5} />
     </button>
@@ -39,6 +69,8 @@
             class:active={activeStateTarget === target.id}
             class:has-overrides={target.hasOverrides}
             title={target.tooltip}
+            aria-label={target.tooltip}
+            aria-pressed={activeStateTarget === target.id}
             onclick={() => onstatetargetclick?.(target.id)}
           >
             <span>{target.shortLabel}</span>

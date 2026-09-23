@@ -444,7 +444,8 @@
   let readoutText = $derived(String(signals?.valueDisplay ?? formatSliderReadout(behavior, null)));
   let activeHandleLabel = $derived(String(signals?.activeHandle ?? 'current'));
   let titleText = $derived(String(labelParts.title?._children?.Text?.content ?? control?._children?.Text?.content ?? '').trim());
-  let sliderMaskSeed = $derived(safeSvgId(control?._children?.Core?.id ?? 'slider'));
+  const sliderInstanceId = $props.id();
+  let sliderMaskSeed = $derived(safeSvgId(`${control?._children?.Core?.id ?? 'slider'}-${sliderInstanceId}`));
   let singleFillOrigin = $derived(String(behavior?.fillOrigin ?? 'min').trim().toLowerCase() === 'center' ? centerMarkerNormalized : 0);
   let selectionStart = $derived(valueMode === 'single' ? singleFillOrigin : normalizedValues.start);
   let selectionEnd = $derived(valueMode === 'single' ? normalizedValues.current : normalizedValues.end);

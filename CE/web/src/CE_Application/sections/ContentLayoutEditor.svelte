@@ -1,5 +1,5 @@
 <script>
-  import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
+  import { getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';

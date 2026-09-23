@@ -69,6 +69,7 @@
   let startBounds = null;
   let startMouse = null;
   let resizeHandle = '';
+  let resizeChanged = false;
   let members = [];
   let rotateCenter = null;
   let rotateStartAngle = 0;
@@ -94,6 +95,7 @@
     isRotating = false;
     rotateDelta = 0;
     transientBounds = null;
+    resizeChanged = false;
     startBounds = null;
     startMouse = null;
     members = [];
@@ -187,6 +189,7 @@
     cancelGesture();
     isResizing = true;
     resizeHandle = handleId;
+    resizeChanged = false;
     startMouse = { x: e.clientX, y: e.clientY };
     startBounds = { x: bounds.x, y: bounds.y, w: bounds.w, h: bounds.h };
     members = captureMembers();
@@ -240,6 +243,16 @@
         });
       }
     }
+    const originalById = new Map(members.map((member) => [member.id, member.local]));
+    resizeChanged = [...patches.entries()].some(([id, patch]) => {
+      const original = originalById.get(id);
+      return original && (
+        patch['Transform.x'] !== Math.round(original.x)
+        || patch['Transform.y'] !== Math.round(original.y)
+        || patch['Transform.width'] !== Math.round(original.w)
+        || patch['Transform.height'] !== Math.round(original.h)
+      );
+    });
     applyControlPatchesById(patches);
   }
 
@@ -252,7 +265,8 @@
     transientBounds = null;
     startBounds = null;
     members = [];
-    pushSnapshot();   // gesture boundary — one group resize, one undo step
+    if (resizeChanged) pushSnapshot();   // gesture boundary — one group resize, one undo step
+    resizeChanged = false;
     if (e?.type === 'mouseup') swallowNextCanvasClick();
   }
 

@@ -62,6 +62,9 @@
   // Per-degree overrides. 1-based in the UI, as musicians count degrees.
   let selDegree = $state(1);
   let degreeCount = $derived.by(() => { try { return harmoniserScale(control).length; } catch { return 7; } });
+  $effect(() => {
+    if (selDegree > degreeCount) selDegree = Math.max(1, degreeCount);
+  });
   let degreeOverride = $derived.by(() => { try { return overrideForDegree(control, selDegree - 1); } catch { return null; } });
   function setDegree(list) {
     const prior = p.degreeChords && typeof p.degreeChords === 'object' ? p.degreeChords : {};

@@ -9,9 +9,15 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
 import { render } from 'svelte/server';
 import PropertyScrub from '../src/CE_Application/properties/PropertyScrub.svelte';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const source = readFileSync(resolve(here, '..', 'src', 'CE_Application', 'properties', 'PropertyScrub.svelte'), 'utf8');
 
 function renderScrub(props) {
   return render(PropertyScrub, { props }).body;
@@ -60,9 +66,33 @@ test('fill and thumb reflect the value position in the range', () => {
   assert.match(html, /left:25%/, 'thumb sits at the range fraction');
 });
 
+test('degenerate ranges and out-of-range values produce safe track percentages', () => {
+  const degenerate = renderScrub({ value: 10, min: 10, max: 10 });
+  assert.doesNotMatch(degenerate, /NaN|Infinity/);
+  assert.match(degenerate, /width:0%/);
+  assert.match(degenerate, /left:0%/);
+
+  const beyond = renderScrub({ value: 150, min: 0, max: 100 });
+  assert.match(beyond, /width:100%/);
+  assert.match(beyond, /left:100%/);
+});
+
 test('label is optional; the row renders without one', () => {
   const html = renderScrub({ value: 10, min: 0, max: 100 });
 
   assert.doesNotMatch(html, /scrub-label/, 'no label strip when label is empty');
   assert.match(html, /aria-label="Value"/, 'track falls back to a generic name');
+});
+
+test('external updates follow an untouched draft but preserve user input', () => {
+  assert.match(source, /let draftDirty = \$state\(false\)/);
+  assert.match(source, /const external = format\(value\);[\s\S]*?if \(!editing \|\| !draftDirty\) draft = external/);
+  assert.match(source, /oninput=\{\(e\) => \{ draft = e\.target\.value; draftDirty = true; \}\}/);
+});
+
+test('Escape restores the current value and consumes the key', () => {
+  const escape = source.slice(source.indexOf("} else if (e.key === 'Escape')"));
+  assert.ok(escape.indexOf('draft = format(value)') < escape.indexOf('e.target.blur()'));
+  assert.match(escape, /e\.preventDefault\(\)/);
+  assert.match(escape, /e\.stopPropagation\(\)/);
 });

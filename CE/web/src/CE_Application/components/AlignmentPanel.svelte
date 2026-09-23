@@ -78,6 +78,13 @@
   let canCircle = $derived(selCount >= 2);
   let hasKeyObject = $derived($keyObjectId != null && $selectedComponentIds.has($keyObjectId));
 
+  $effect(() => {
+    if (alignMode === 'key-object' && !hasKeyObject) alignMode = 'selection';
+    if (alignMode === 'guides' && $guides.vertical.length === 0 && $guides.horizontal.length === 0) {
+      alignMode = 'selection';
+    }
+  });
+
   function setLayout(path, value) {
     const controlId = control?._children?.Core?.id;
     if (!controlId) return;
@@ -348,7 +355,7 @@
       </button>
       <span class="input-label">Cols</span>
       <span class="spacing-input sm nc-wrap">
-        <NumberCell value={gridCols} min={1} onchange={(v) => gridCols = v} />
+        <NumberCell value={gridCols} min={1} step={1} onchange={(v) => gridCols = Math.max(1, Math.round(v))} />
       </span>
       <span class="input-label">Gap</span>
       <span class="spacing-input sm nc-wrap">

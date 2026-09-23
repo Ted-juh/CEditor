@@ -1,5 +1,5 @@
 <script>
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import SetlistSoundcheckRow from './SetlistSoundcheckRow.svelte';
   import HostConfirmButton from './HostConfirmButton.svelte';
   /**
@@ -16,7 +16,7 @@
    * WebView's frame rate — the animation follows the engine, it does not drive it.
    */
   import {
-    hostState, hostParameters, hostLibrary, requestParameters, requestLibrary,
+    hostState, hostParameters, hostRackCaptures, requestParameters, requestRackCaptures,
     addPattern, removePattern, renamePattern, setPatternOptions, createPatternVariations,
     importGrooveTemplate, removeGrooveTemplate, applyGrooveTemplate, extractGrooveTemplate,
     removeGestureShape, applyGestureShape, extractGestureShape, importGestureShape,
@@ -54,11 +54,48 @@
   let { onShowMixer = () => {} } = $props();
   const stopMeasurement = () => { if ($hostState.soundcheck.activeItemId) finishSoundcheck(); };
   onDestroy(stopMeasurement);
+  const heldFillClipIds = new Set();
+  const heldEnvelopeIds = new Set();
+
+  function setFillHeld(clipId, held) {
+    if (held) heldFillClipIds.add(clipId);
+    else heldFillClipIds.delete(clipId);
+    setPerformanceFill(clipId, held);
+  }
+
+  function setEnvelopeAuditionHeld(envelopeId, held) {
+    if (held) heldEnvelopeIds.add(envelopeId);
+    else heldEnvelopeIds.delete(envelopeId);
+    triggerEnvelope(envelopeId, held, held ? 1 : undefined);
+  }
+
+  function releaseHeldPerformanceActions() {
+    for (const clipId of heldFillClipIds) setPerformanceFill(clipId, false);
+    for (const envelopeId of heldEnvelopeIds) triggerEnvelope(envelopeId, false);
+    heldFillClipIds.clear();
+    heldEnvelopeIds.clear();
+  }
+
+  onMount(() => {
+    window.addEventListener('blur', releaseHeldPerformanceActions);
+    return () => window.removeEventListener('blur', releaseHeldPerformanceActions);
+  });
+  onDestroy(releaseHeldPerformanceActions);
   const showMixer = () => { stopMeasurement(); onShowMixer(); };
   let navigation = $state(restorePerformanceNavigation());
   let tab = $derived(navigation.tab);
   let activeGroup = $derived(performanceGroupFor(tab));
   let activeTool = $derived(activeGroup.tools.find(tool => tool.id === tab));
+  $effect(() => {
+    if (tab !== 'clips' && heldFillClipIds.size > 0) {
+      for (const clipId of heldFillClipIds) setPerformanceFill(clipId, false);
+      heldFillClipIds.clear();
+    }
+    if (tab !== 'envelopes' && heldEnvelopeIds.size > 0) {
+      for (const envelopeId of heldEnvelopeIds) triggerEnvelope(envelopeId, false);
+      heldEnvelopeIds.clear();
+    }
+  });
   const selectTool = (tool) => {
     if (tool !== 'setlist') stopMeasurement();
     navigation = selectPerformanceTool(navigation, tool);
@@ -105,7 +142,7 @@
     performance.clips.filter((clip) => clip.gestureClip || clip.looperLayer));
   let hardwareParts = $derived(parts.filter((part) => part.hardware));
   let microtuning = $derived($hostState.rack.microtuning);
-  let rackCaptures = $derived($hostLibrary.records.filter((record) => record.type === 'rack'));
+  let rackCaptures = $derived($hostRackCaptures);
 
   let selectedPattern = $derived(
     patterns.find((p) => p.patternId === selectedPatternId) ?? patterns[0] ?? null);
@@ -125,7 +162,7 @@
   });
 
   $effect(() => {
-    if (tab === 'setlist') requestLibrary('', 'rack');
+    if (tab === 'setlist') requestRackCaptures();
   });
 
   $effect(() => {
@@ -2232,10 +2269,10 @@
                 </label>
                 <span class="perf-spacer"></span>
                 <button type="button" class="envelope-audition" disabled={!envelope.enabled}
-                        onpointerdown={() => triggerEnvelope(envelope.envelopeId, true, 1)}
-                        onpointerup={() => triggerEnvelope(envelope.envelopeId, false)}
-                        onpointercancel={() => triggerEnvelope(envelope.envelopeId, false)}
-                        onpointerleave={() => triggerEnvelope(envelope.envelopeId, false)}>
+                        onpointerdown={() => setEnvelopeAuditionHeld(envelope.envelopeId, true)}
+                        onpointerup={() => setEnvelopeAuditionHeld(envelope.envelopeId, false)}
+                        onpointercancel={() => setEnvelopeAuditionHeld(envelope.envelopeId, false)}
+                        onpointerleave={() => setEnvelopeAuditionHeld(envelope.envelopeId, false)}>
                   Hold to audition
                 </button>
                 <button type="button" class="mod-add-button"
@@ -2811,18 +2848,18 @@
                     onpointerdown={(e) => {
                       e.preventDefault();
                       e.currentTarget.setPointerCapture?.(e.pointerId);
-                      setPerformanceFill(clip.clipId, true);
+                      setFillHeld(clip.clipId, true);
                     }}
-                    onpointerup={(e) => { e.preventDefault(); setPerformanceFill(clip.clipId, false); }}
-                    onpointercancel={() => setPerformanceFill(clip.clipId, false)}
+                    onpointerup={(e) => { e.preventDefault(); setFillHeld(clip.clipId, false); }}
+                    onpointercancel={() => setFillHeld(clip.clipId, false)}
                     onkeydown={(e) => {
                       if (!e.repeat && (e.key === ' ' || e.key === 'Enter')) {
-                        e.preventDefault(); setPerformanceFill(clip.clipId, true);
+                        e.preventDefault(); setFillHeld(clip.clipId, true);
                       }
                     }}
                     onkeyup={(e) => {
                       if (e.key === ' ' || e.key === 'Enter') {
-                        e.preventDefault(); setPerformanceFill(clip.clipId, false);
+                        e.preventDefault(); setFillHeld(clip.clipId, false);
                       }
                     }}>
               {clip.fillPending ? 'Fill…' : clip.fillActive ? 'Filling' : 'Hold Fill'}

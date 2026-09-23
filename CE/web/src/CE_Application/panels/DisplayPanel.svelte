@@ -3,6 +3,7 @@
    * Display Panel — bottom dock with mini displays/tools.
    * Tabs for: Colors, Gradient, Notepad, Viewer, Tools, Console.
    */
+  import { onDestroy } from 'svelte';
   import AlignCenter from 'lucide-svelte/icons/align-center';
   import Cable from 'lucide-svelte/icons/cable';
   import Share2 from 'lucide-svelte/icons/share-2';
@@ -36,7 +37,7 @@
   import SwatchGrid from '../components/SwatchGrid.svelte';
   import GradientTab from './GradientTab.svelte';
   import { activePanel, updatePanel } from '../stores/panels.js';
-  import { colorTarget, applyColorToTarget, clearColorTarget } from '../stores/colorTarget.js';
+  import { colorTarget, applyColorToTarget, clearColorTarget, colorTargetRestoreValue } from '../stores/colorTarget.js';
   import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { showDisplayPanel } from '../stores/panelVisibility.js';
@@ -48,6 +49,7 @@
   import { impliedDockTab } from '../utils/displayDock.js';
   import { flatControls } from '../utils/containment.js';
   import { collectDocumentColours } from '../utils/documentColours.js';
+  import { applyTextColourAtOffsets, sanitizeNotepadHtml } from '../utils/richTextEditing.js';
   import { recentColours, recordRecentColour } from '../stores/recentColours.js';
 
   let props = $props();
@@ -109,7 +111,10 @@
 
   let activeTab = $state(sanitizeStoredDisplayTab(readStoredJson(DISPLAY_TAB_STORAGE_KEY, DEFAULT_DISPLAY_TAB)));
   let activeTabComponent = $state(null);
+  let activeTabComponentId = $state(null);
   let activeTabError = $state('');
+  let activeTabErrorId = $state(null);
+  let lazyTabRetryKey = $state(0);
   $effect(() => {
     writeStoredJson(
       DISPLAY_TAB_STORAGE_KEY,
@@ -149,10 +154,13 @@
 
   $effect(() => {
     let cancelled = false;
+    void lazyTabRetryKey;
 
     if (!LAZY_TAB_LOADERS[activeTab]) {
       activeTabComponent = null;
+      activeTabComponentId = null;
       activeTabError = '';
+      activeTabErrorId = null;
       return () => {
         cancelled = true;
       };
@@ -161,23 +169,30 @@
     const existing = getLazyTabComponent(activeTab);
     if (existing) {
       activeTabComponent = existing;
+      activeTabComponentId = activeTab;
       activeTabError = '';
+      activeTabErrorId = null;
       return () => {
         cancelled = true;
       };
     }
 
     activeTabComponent = null;
+    activeTabComponentId = null;
     activeTabError = '';
+    activeTabErrorId = null;
 
-    ensureLazyTabComponent(activeTab)
+    const requestedTab = activeTab;
+    ensureLazyTabComponent(requestedTab)
       .then((componentSet) => {
         if (cancelled) return;
         activeTabComponent = componentSet;
+        activeTabComponentId = requestedTab;
       })
       .catch((error) => {
         if (cancelled) return;
         activeTabError = error?.message ?? 'load failed';
+        activeTabErrorId = requestedTab;
       });
 
     return () => {
@@ -208,6 +223,12 @@
     onTabChange?.(tabId);
   }
 
+  function retryActiveTab() {
+    activeTabError = '';
+    activeTabErrorId = null;
+    lazyTabRetryKey += 1;
+  }
+
   // --- Central color state ---
   // Panel colours are stored AARRGGBB — splitColourAlpha keeps the alpha out
   // of the RGB channels (feeding 'FF333333' to a 6-char consumer shows red).
@@ -218,8 +239,10 @@
   // --- Color target: switch to Colors tab and set color when a swatch activates a target ---
   // Plain variable (not $state) so it doesn't become a reactive dependency of the effect.
   const colorTargetGuard = { current: null };
+  let colorTargetDirty = false;
   $effect(() => {
     syncExternalTarget($colorTarget, colorTargetGuard, (t) => !!t._initialColor, (t) => {
+      colorTargetDirty = false;
       userPickedColor = t._initialColor;
       userPickedAlpha = t._initialAlpha ?? 1;
       openTabForAction(impliedDockTab({ colorTarget: t, lastTab: activeTab }));
@@ -275,8 +298,8 @@
   // their reset signal so they can re-sync from the new active panel.
   let panelResetKey = $state(0);
 
-  // Ref to the notepad tab so the cross-tab "back from color pick" flow
-  // can call `applyTextColor(hex, range)` on it.
+  // Ref to the notepad tab so the cross-tab picker can capture a serialisable
+  // selection before the tab (and all of its DOM nodes) is unmounted.
   let notepadTabRef = $state(null);
 
   // Sync from store when active panel changes (panel switch). Any in-flight
@@ -284,17 +307,27 @@
   let lastPanelId = $state(null);
   $effect(() => {
     const panel = $activePanel;
-    if (panel && panel.id !== lastPanelId) {
-      lastPanelId = panel.id;
-      currentGradient = panel.bgGradient ? deepClone(panel.bgGradient) : deepClone(defaultGradient);
-      editingGradientStop = null;
-      pickingNotepadColor = false;
-      savedNotepadSelection = null;
-      const parsed = splitColourAlpha(panel.bgColour);
-      userPickedColor = parsed.color;
-      userPickedAlpha = parsed.alpha;
-      panelResetKey++;
+    const nextPanelId = panel?.id ?? null;
+    if (nextPanelId === lastPanelId) return;
+
+    lastPanelId = nextPanelId;
+    editingGradientStop = null;
+    editingGradientStopDestination = null;
+    pickingNotepadColor = false;
+    savedNotepadSelection = null;
+    panelResetKey++;
+
+    if (!panel) {
+      currentGradient = deepClone(defaultGradient);
+      userPickedColor = '333333';
+      userPickedAlpha = 1;
+      return;
     }
+
+    currentGradient = panel.bgGradient ? deepClone(panel.bgGradient) : deepClone(defaultGradient);
+    const parsed = splitColourAlpha(panel.bgColour);
+    userPickedColor = parsed.color;
+    userPickedAlpha = parsed.alpha;
   });
 
   // --- Gradient target: sync from external control gradient ---
@@ -324,6 +357,22 @@
 
   // Stop color editing mode
   let editingGradientStop = $state(null);
+  let editingGradientStopDestination = null;
+
+  function gradientDestinationIdentity() {
+    return $gradientTarget ?? ($activePanel ? `panel:${$activePanel.id}` : null);
+  }
+
+  // A target can be replaced while the Colors tab is showing the old stop.
+  // Close that deferred edit immediately so it cannot later be committed into
+  // the replacement target.
+  $effect(() => {
+    const destination = gradientDestinationIdentity();
+    if (editingGradientStop !== null && editingGradientStopDestination !== destination) {
+      editingGradientStop = null;
+      editingGradientStopDestination = null;
+    }
+  });
 
   // Notepad color picking mode (cross-tab flow: pick color on Colors tab,
   // then apply as text foreColor in the notepad editor).
@@ -343,8 +392,39 @@
   // "Panel" = the colours this panel already uses, harvested live;
   // "Recent" = the user's settled picks, persisted. One drag = one recent
   // entry (debounced), not sixty.
-  let documentColours = $derived(activeTab === 'colors' ? collectDocumentColours($activePanel) : []);
+  let documentColours = $state([]);
+  let documentColourTimer = null;
+  let scannedColourPanelId = null;
   let recentColourTimer = null;
+
+  // A transform drag replaces the active panel on every pointer move. Colour
+  // harvesting walks every control, so doing that synchronously for unrelated
+  // x/y changes made the Colors tab add a full document traversal per frame.
+  // Scan immediately when opening a panel, then coalesce later mutations.
+  $effect(() => {
+    const panel = $activePanel;
+    if (activeTab !== 'colors' || !panel) {
+      documentColours = [];
+      scannedColourPanelId = null;
+      return;
+    }
+    const scan = () => {
+      documentColourTimer = null;
+      documentColours = collectDocumentColours(panel);
+      scannedColourPanelId = panel.id;
+    };
+    if (scannedColourPanelId !== panel.id) scan();
+    else documentColourTimer = setTimeout(scan, 80);
+    return () => {
+      if (documentColourTimer) clearTimeout(documentColourTimer);
+      documentColourTimer = null;
+    };
+  });
+
+  onDestroy(() => {
+    if (recentColourTimer) clearTimeout(recentColourTimer);
+    if (documentColourTimer) clearTimeout(documentColourTimer);
+  });
 
   function noteRecentColour(rgb) {
     if (recentColourTimer) clearTimeout(recentColourTimer);
@@ -376,7 +456,11 @@
     if (editingGradientStop !== null || pickingNotepadColor) return;
 
     // External color target (swatch binding) — route to target
-    if ($colorTarget) { applyColorToTarget(hex); return; }
+    if ($colorTarget) {
+      colorTargetDirty = true;
+      applyColorToTarget(hex);
+      return;
+    }
 
     // Default — write to panel bgColour. Full AARRGGBB, matching how the
     // panel stores it — the old 6-char write silently dropped the alpha and
@@ -413,15 +497,17 @@
   function handleEditStopColor(stopIndex) {
     if (currentGradient.stops[stopIndex]) {
       editingGradientStop = stopIndex;
+      editingGradientStopDestination = gradientDestinationIdentity();
       userPickedColor = currentGradient.stops[stopIndex].color;
       userPickedAlpha = 1;
-      activeTab = 'colors';
+      openTabForAction('colors');
     }
   }
 
   // --- Commit edited stop color into currentGradient ---
   function commitStopColor() {
     if (editingGradientStop === null) return;
+    if (editingGradientStopDestination !== gradientDestinationIdentity()) return;
     const newStops = currentGradient.stops.map((s, i) =>
       i === editingGradientStop ? { ...s, color: userPickedColor } : s
     );
@@ -440,17 +526,17 @@
     commitStopColor();
     resetUserColor();
     editingGradientStop = null;
+    editingGradientStopDestination = null;
     activeTab = 'gradient';
     if (onTabChange) onTabChange('gradient');
   }
 
   // --- Pick color from Colors section for notepad text ---
   function handlePickNotepadColor() {
-    // Save the current selection in the editor so we can restore & apply later
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      savedNotepadSelection = sel.getRangeAt(0).cloneRange();
-    }
+    const panel = $activePanel;
+    const snapshot = notepadTabRef?.captureTextSelection?.();
+    if (!panel || !snapshot) return;
+    savedNotepadSelection = { panelId: panel.id, ...snapshot };
     pickingNotepadColor = true;
     activeTab = 'colors';
     if (onTabChange) onTabChange('colors');
@@ -469,11 +555,36 @@
   function commitNotepadPick() {
     if (!pickingNotepadColor) return;
     const pickedColor = userPickedColor;
-    const range = savedNotepadSelection;
+    const snapshot = savedNotepadSelection;
     savedNotepadSelection = null;
     pickingNotepadColor = false;
     resetUserColor();
-    notepadTabRef?.applyTextColor(pickedColor, range);
+
+    const panel = $activePanel;
+    if (!snapshot || !panel || panel.id !== snapshot.panelId) return;
+    const sourceNotes = panel.notepad?.notes;
+    const sourceNote = sourceNotes?.[snapshot.noteIndex];
+    if (!sourceNote) return;
+
+    // Work against a detached, sanitised editor. The original Range belonged
+    // to the NotepadTab DOM, which no longer exists while Colors is visible.
+    const snapshotScratch = document.createElement('div');
+    snapshotScratch.innerHTML = sanitizeNotepadHtml(snapshot.html, document);
+    const scratch = document.createElement('div');
+    scratch.innerHTML = sanitizeNotepadHtml(sourceNote.content, document);
+    // Selection offsets are safe to replay over newer markup only while the
+    // underlying text is unchanged. This preserves formatting updates made by
+    // another writer while the Colors tab is open and refuses to colour the
+    // wrong characters after a textual edit.
+    if (scratch.textContent !== snapshotScratch.textContent) return;
+    if (!applyTextColourAtOffsets(scratch, snapshot.selection, pickedColor, document)) return;
+
+    const notes = deepClone(sourceNotes);
+    notes[snapshot.noteIndex].content = sanitizeNotepadHtml(scratch.innerHTML, document);
+    updatePanel(panel.id, {
+      notepad: { ...deepClone(panel.notepad), notes },
+      modified: true,
+    });
   }
 
   // --- Back from color picking to notepad ---
@@ -534,6 +645,7 @@
       if (editingGradientStop !== null) {
         commitStopColor();
         editingGradientStop = null;
+        editingGradientStopDestination = null;
       }
       commitNotepadPick();
       if ($colorTarget) clearColorTarget();
@@ -600,8 +712,8 @@
    * thirty repaints. Clearing the target, which is all Done does, leaves every
    * one of those writes standing.
    *
-   * The value to restore is the one captured when the target was ARMED —
-   * `_initialColor` / `_initialAlpha`, put there by activateColorTarget — not
+   * The value to restore is the raw value captured when the target was ARMED —
+   * `_initialRawColor`, put there by activateColorTarget — not
    * whatever the property held a moment ago, which is the colour this session
    * put there. The deferred modes (a gradient stop, a notepad pick) commit only
    * on their way back, so cancelling them is simply refusing to commit.
@@ -609,6 +721,7 @@
   function handleColorCancel() {
     if (editingGradientStop !== null) {
       editingGradientStop = null;
+      editingGradientStopDestination = null;
       resetUserColor();
       activeTab = 'gradient';
       onTabChange?.('gradient');
@@ -624,9 +737,12 @@
     }
     const target = $colorTarget;
     if (target) {
-      if (target._initialColor) {
-        applyColorToTarget(alphaToHex(target._initialAlpha ?? 1) + target._initialColor);
-      }
+      // Opening and immediately cancelling is a true no-op. This matters for
+      // state editing and token-backed colours: an unconditional restore used
+      // to create a Hover patch and replace `{surface}` with its resolved hex.
+      const restoreValue = colorTargetRestoreValue(target, colorTargetDirty);
+      if (restoreValue != null) applyColorToTarget(restoreValue);
+      colorTargetDirty = false;
       clearColorTarget();
       resetUserColor();
     }
@@ -656,6 +772,7 @@
       if (editingGradientStop !== null) {
         commitStopColor();
         editingGradientStop = null;
+        editingGradientStopDestination = null;
         resetUserColor();
       }
       // Leaving colors without going back still commits, exactly as an in-flight stop edit does.
@@ -671,6 +788,20 @@
     }
     activeTab = tabId;
     if (onTabChange) onTabChange(tabId);
+  }
+
+  function handleStudioTabKeydown(event, tabId) {
+    const index = tabs.findIndex((tab) => tab.id === tabId);
+    if (index < 0) return;
+    let nextIndex = null;
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = tabs.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    handleTabClick(tabs[nextIndex].id);
+    event.currentTarget.parentElement?.querySelectorAll?.('[role="tab"]')?.[nextIndex]?.focus?.();
   }
 
   // --- Swatch handlers (shared) ---
@@ -717,14 +848,18 @@
 </script>
 
 <div class="display-panel">
-  <div class="studio-rail" aria-label="Display studios">
+  <div class="studio-rail" role="tablist" aria-label="Display studios">
     {#each tabs as tab (tab.id)}
       <button
         class="studio-tab"
         class:active={activeTab === tab.id}
+        role="tab"
+        aria-selected={activeTab === tab.id}
+        tabindex={activeTab === tab.id ? 0 : -1}
         aria-label={tab.label}
         title={tab.label}
         onclick={() => handleTabClick(tab.id)}
+        onkeydown={(event) => handleStudioTabKeydown(event, tab.id)}
       >
         <tab.icon size={15} strokeWidth={1.6} />
         <span>{tab.label}</span>
@@ -829,47 +964,47 @@
           />
         </div>
       </div>
-    {:else if activeTab === 'effects' && activeTabComponent?.default}
+    {:else if activeTab === 'effects' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const EffectsTab = activeTabComponent.default}
       <div class="tab-pane">
         <EffectsTab />
       </div>
-    {:else if activeTab === 'type' && activeTabComponent?.default}
-      {@const TypographyTab = activeTabComponent.default}
+    {:else if activeTab === 'type' && activeTabComponentId === activeTab && activeTabComponent?.default}
+      {@const TextDock = activeTabComponent.default}
       <div class="tab-pane">
-        <TypographyTab />
+        <TextDock />
       </div>
-    {:else if activeTab === 'assets' && activeTabComponent?.default}
+    {:else if activeTab === 'assets' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const AssetsTab = activeTabComponent.default}
       <div class="tab-pane">
         <AssetsTab />
       </div>
-    {:else if activeTab === 'screen' && activeTabComponent?.default}
+    {:else if activeTab === 'screen' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const ScreenTab = activeTabComponent.default}
       <div class="tab-pane">
         <ScreenTab />
       </div>
-    {:else if activeTab === 'api' && activeTabComponent?.default}
+    {:else if activeTab === 'api' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const ApiTab = activeTabComponent.default}
       <div class="tab-pane">
         <ApiTab />
       </div>
-    {:else if activeTab === 'library' && activeTabComponent?.default}
+    {:else if activeTab === 'library' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const LibraryTab = activeTabComponent.default}
       <div class="tab-pane">
         <LibraryTab />
       </div>
-    {:else if activeTab === 'animation' && activeTabComponent?.default}
+    {:else if activeTab === 'animation' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const AnimationTab = activeTabComponent.default}
       <div class="tab-pane">
         <AnimationTab />
       </div>
-    {:else if activeTab === 'designer' && activeTabComponent?.default}
+    {:else if activeTab === 'designer' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const DesignerTab = activeTabComponent.default}
       <div class="tab-pane">
         <DesignerTab />
       </div>
-    {:else if activeTab === 'notepad' && activeTabComponent?.default}
+    {:else if activeTab === 'notepad' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const NotepadTab = activeTabComponent.default}
       <div class="tab-pane">
         <NotepadTab
@@ -882,37 +1017,37 @@
           onpickcolor={handlePickNotepadColor}
         />
       </div>
-    {:else if activeTab === 'viewer' && activeTabComponent?.default}
+    {:else if activeTab === 'viewer' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const ViewerTab = activeTabComponent.default}
       <div class="tab-pane">
         <ViewerTab resetKey={panelResetKey} oncolorpicked={handleViewerColorPicked} />
       </div>
-    {:else if activeTab === 'layers' && activeTabComponent?.default}
+    {:else if activeTab === 'layers' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const LayersPanel = activeTabComponent.default}
       <div class="tab-pane">
         <LayersPanel />
       </div>
-    {:else if activeTab === 'align' && activeTabComponent?.default}
+    {:else if activeTab === 'align' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const AlignmentPanel = activeTabComponent.default}
       <div class="tab-pane">
         <AlignmentPanel />
       </div>
-    {:else if activeTab === 'device' && activeTabComponent?.default}
+    {:else if activeTab === 'device' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const ParameterBrowserTab = activeTabComponent.default}
       <div class="tab-pane">
         <ParameterBrowserTab onopentab={handleTabClick} />
       </div>
-    {:else if activeTab === 'midi' && activeTabComponent?.default}
+    {:else if activeTab === 'midi' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const MidiMonitorTab = activeTabComponent.default}
       <div class="tab-pane">
         <MidiMonitorTab />
       </div>
-    {:else if activeTab === 'preview' && activeTabComponent?.default}
+    {:else if activeTab === 'preview' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const PreviewTabComponent = activeTabComponent.default}
       <div class="tab-pane">
         <PreviewTabComponent />
       </div>
-    {:else if activeTab === 'console' && activeTabComponent?.debug && activeTabComponent?.console}
+    {:else if activeTab === 'console' && activeTabComponentId === activeTab && activeTabComponent?.debug && activeTabComponent?.console}
       {@const DebugPanel = activeTabComponent.debug}
       {@const ConsolePanel = activeTabComponent.console}
       <div class="tab-pane">
@@ -926,15 +1061,18 @@
           </div>
         </div>
       </div>
-    {:else if activeTabComponent?.default}
+    {:else if activeTabComponentId === activeTab && activeTabComponent?.default}
       <!-- Tools requiring props keep an explicit branch above this default renderer. -->
       {@const ToolTab = activeTabComponent.default}
       <div class="tab-pane">
         <ToolTab />
       </div>
-    {:else if activeTabError}
+    {:else if activeTabErrorId === activeTab && activeTabError}
       <div class="tab-pane">
-        <div class="placeholder">Failed To Load: {activeTabError}</div>
+        <div class="placeholder load-error">
+          <span>Failed To Load: {activeTabError}</span>
+          <button type="button" onclick={retryActiveTab}>Retry</button>
+        </div>
       </div>
     {:else}
       <div class="tab-pane">
@@ -1221,6 +1359,21 @@
     height: 100%;
     color: #444;
     font-size: 12px;
+  }
+
+  .placeholder.load-error {
+    flex-direction: column;
+    gap: 8px;
+    color: #B77;
+  }
+
+  .placeholder.load-error button {
+    padding: 3px 10px;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #292929;
+    color: #DDD;
+    cursor: pointer;
   }
 
   .console-split {

@@ -18,7 +18,7 @@
    *   onchange(AARRGGBB) — every interaction that changes the colour
    */
 
-  import { onMount, untrack } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import Pipette from 'lucide-svelte/icons/pipette';
   import { rgbToHex, alphaToHex } from '../utils/colorMath.js';
   import { hsvToRgb, hsvToHslaString, hexToHsvPreserving } from '../utils/hsvMath.js';
@@ -29,7 +29,7 @@
   import { presets } from '../scrub/dragScrub';
   import { appScrubOverrides } from '../utils/scrubRuntime.js';
 
-  let { color = '333333', alpha: propAlpha = 1, stepSize = 10, onchange } = $props();
+  let { color = '333333', alpha: propAlpha = 1, stepSize = 0, onchange } = $props();
 
   // --- Internal HSB state (for smooth dragging) ---
   // Seeded from the props rather than from zero: effects do not run during
@@ -51,8 +51,10 @@
   let notice = $state('');           // why an entry was refused, or an eyedropper failure
   let hasEyedropper = $state(false); // resolved on mount — SSR has no window
 
-  // Flag: when true, the next prop change is our own echo — skip it
-  let ignoreNextPropChange = false;
+  // The exact serialised value expected back from the parent. A boolean "ignore next" flag can
+  // swallow an unrelated external update when a parent does not echo, transforms, or delays one.
+  let expectedPropEcho = null;
+  let eyedropperRequest = 0;
 
   onMount(() => {
     hasEyedropper = eyedropperAvailable(typeof window === 'undefined' ? globalThis : window);
@@ -72,10 +74,12 @@
     const c = color;
     const a = propAlpha;
 
-    if (ignoreNextPropChange) {
-      ignoreNextPropChange = false;
+    const propEcho = alphaToHex(a) + String(c ?? '').replace(/^#/, '').slice(-6).toUpperCase();
+    if (expectedPropEcho === propEcho) {
+      expectedPropEcho = null;
       return;
     }
+    expectedPropEcho = null;
 
     syncFromHex(c);
     alpha = a;
@@ -113,8 +117,8 @@
     editingHex = false;
     notice = '';
     if (onchange) {
-      // Tell the effect to ignore the prop echo that will come back
-      ignoreNextPropChange = true;
+      // Ignore only this exact echo. A different parent value is an external update and wins.
+      expectedPropEcho = currentFullHex;
       onchange(currentFullHex);
     }
   }
@@ -279,7 +283,17 @@
   // --- Screen eyedropper -------------------------------------------------
   async function handleEyedropper() {
     notice = '';
+    const request = ++eyedropperRequest;
+    const targetColor = String(color ?? '').replace(/^#/, '').slice(-6).toUpperCase();
+    const targetAlpha = alphaToHex(propAlpha);
+    const targetChange = onchange;
     const result = await pickScreenColour(typeof window === 'undefined' ? globalThis : window);
+    if (request !== eyedropperRequest) return;
+    // If the chooser was retargeted while the native picker was open, discard the late result.
+    // Applying it would colour the newly selected property instead of the one that opened it.
+    if (targetChange !== onchange
+      || targetColor !== String(color ?? '').replace(/^#/, '').slice(-6).toUpperCase()
+      || targetAlpha !== alphaToHex(propAlpha)) return;
     if (result.ok) {
       syncFromHex(result.color);
       fireChange();
@@ -288,6 +302,8 @@
     if (result.cancelled) return;
     notice = result.reason;
   }
+
+  onDestroy(() => { eyedropperRequest += 1; });
 
   // --- Band config ---
   const bands = [

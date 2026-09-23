@@ -108,6 +108,7 @@
   function thumbPoints(envelope) {
     const n = envelope.length;
     if (n === 0) return '';
+    if (n === 1) return `50,${(12 - envelope[0] * 11).toFixed(1)} 50,${(12 + envelope[0] * 11).toFixed(1)}`;
     const top = envelope.map((v, i) => `${((i / (n - 1)) * 100).toFixed(1)},${(12 - v * 11).toFixed(1)}`);
     const bottom = envelope.map((v, i) => `${(((n - 1 - i) / (n - 1)) * 100).toFixed(1)},${(12 + v * 11).toFixed(1)}`);
     return [...top, ...bottom].join(' ');
@@ -140,6 +141,9 @@
   }
 
   function lassoDown(event) {
+    // Dot buttons own their pointer gesture. Capturing it on the map retargets the click and
+    // prevents selecting or morphing that sound.
+    if (event.target !== event.currentTarget) return;
     const at = mapPoint(event);
     lasso = { x0: at.x, y0: at.y, x1: at.x, y1: at.y };
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -156,6 +160,9 @@
     // A click rather than a drag is not a selection.
     if (Math.abs(box.x1 - box.x0) < 0.02 || Math.abs(box.y1 - box.y0) < 0.02) return;
     ask(lassoToQuery(box));
+  }
+  function lassoCancel() {
+    lasso = null;
   }
 
   function setRange(axis, key, value) {
@@ -213,7 +220,7 @@
         listElement.scrollTop = top + rowHeight - listHeight;
       scrollTop = listElement.scrollTop;
       await tick();
-      listElement.querySelector(`[data-row-index="${index}"] .preset-pick`)?.focus({ preventScroll: true });
+      listElement?.querySelector(`[data-row-index="${index}"] .preset-pick`)?.focus({ preventScroll: true });
     }
   }
 
@@ -271,7 +278,7 @@
   // clear the filter to reveal it, and say so rather than changing the view behind their back.
   let revealedNote = $state('');
   function revealRecord(recordId) {
-    if (!recordId || recordId === selectedId) return;
+    if (!recordId || (recordId === selectedId && records.some((r) => r.recordId === recordId))) return;
     if (!records.some((r) => r.recordId === recordId)) {
       revealedNote = 'Filters cleared to show it.';
       ask(emptyLibraryQuery());
@@ -645,7 +652,8 @@
           </div>
 
           <div class="map" role="presentation"
-               onpointerdown={lassoDown} onpointermove={lassoMove} onpointerup={lassoUp}>
+               onpointerdown={lassoDown} onpointermove={lassoMove} onpointerup={lassoUp}
+               onpointercancel={lassoCancel} onlostpointercapture={lassoCancel}>
             {#each records.filter((r) => r.sonic) as record (record.recordId)}
               {@const x = record.sonic[axisX]}
               {@const y = 1 - record.sonic[axisY]}
@@ -925,7 +933,7 @@
               <div class="subrow">
                 <button type="button" class="ghost simrow" data-testid="similar-row"
                         title={`${agreedAxes(match).join(', ')} agree${gaveUp(match) ? ` — but ${gaveUp(match)}` : ''}`}
-                        onclick={() => selectRecord(match.recordId)}>
+                        onclick={() => revealRecord(match.recordId)}>
                   <span class="simname">{match.name}</span>
                   <span class="simpct">{match.percent}%</span>
                 </button>

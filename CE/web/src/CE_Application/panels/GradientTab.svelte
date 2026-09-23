@@ -29,6 +29,11 @@
   // Tab-local state — not shared with any other tab.
   let selectedStop = $state(0);
 
+  $effect(() => {
+    const last = Math.max(0, (gradient?.stops?.length ?? 1) - 1);
+    if (selectedStop > last) selectedStop = last;
+  });
+
   // Swatch click: filled cell → apply that color to the currently selected
   // gradient stop. Empty cell → store the selected stop's color into the
   // swatch. `swatches` is a $state proxy from the parent — mutating it

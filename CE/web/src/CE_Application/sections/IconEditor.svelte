@@ -1,6 +1,6 @@
 <script>
   import Settings from 'lucide-svelte/icons/settings';
-  import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
+  import { getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { availableIcons } from '../stores/appSettings.js';
   import PropertyGrid from '../properties/PropertyGrid.svelte';

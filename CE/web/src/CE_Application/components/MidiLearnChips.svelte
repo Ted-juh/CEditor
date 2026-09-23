@@ -36,10 +36,14 @@
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
   import { clearDeviceParameterDrag, startDeviceParameterDrag } from '../stores/deviceParameterDrag.js';
   import { CHIP_LIMIT, EMPTY_CHIP_STATE, applyChipHex, chipDragPayload, chipList } from '../utils/midiLearnChips.js';
+  import { untrack } from 'svelte';
+  import { get } from 'svelte/store';
 
   let state = $state(EMPTY_CHIP_STATE);
-  let lastInbound = null;
-  let lastSysex = null;
+  // Store subscriptions replay their current value synchronously. Seed it so opening the tab does
+  // not present an old pre-mount message as a newly learned gesture.
+  let lastInbound = get(latestMidiInputMessage);
+  let lastSysex = get(latestSysexInputMessage);
 
   let profileId = $derived($selectedDeviceProfileId ?? '');
   let indexed = $derived(inboundIndexFor(profileId, $profileSources?.[profileId]?.source));
@@ -65,16 +69,16 @@
   // The effect body reads nothing reactive, so it subscribes once; the index is read at message
   // time, which is also what lets the CC side work before the profile source has arrived.
   $effect(() => {
-    const stopInbound = latestMidiInputMessage.subscribe((payload) => {
+    const stopInbound = untrack(() => latestMidiInputMessage.subscribe((payload) => {
       if (!payload?.hex || payload === lastInbound) return;
       lastInbound = payload;
       state = applyChipHex(state, payload.hex, indexed?.index ?? null);
-    });
-    const stopSysex = latestSysexInputMessage.subscribe((payload) => {
+    }));
+    const stopSysex = untrack(() => latestSysexInputMessage.subscribe((payload) => {
       if (!payload?.hex || payload === lastSysex) return;
       lastSysex = payload;
       state = applyChipHex(state, payload.hex, indexed?.index ?? null);
-    });
+    }));
     return () => { stopInbound(); stopSysex(); };
   });
 

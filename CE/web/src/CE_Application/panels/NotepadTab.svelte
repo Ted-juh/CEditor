@@ -2,10 +2,9 @@
   /**
    * Notepad tab for DisplayPanel. Owns the editor, its notes, and the
    * notepad-local swatch click semantics. The parent still drives the
-   * cross-tab "pick a text color from the Colors tab" flow — when the
-   * user clicks the mini "Back to Notepad" button, the parent calls
-   * `applyTextColor(hex, range)` (exposed via bind:this) which focuses
-   * the editor, restores the selection range, and recolours it.
+   * cross-tab "pick a text color from the Colors tab" flow. Before this
+   * component is unmounted it exposes a serialisable note/selection snapshot;
+   * the parent applies the colour to that HTML without retaining DOM nodes.
    *
    * The recolouring was `document.execCommand('foreColor')` (B10): deprecated,
    * unspecified, and emitting `<font color>` in some engines — legacy markup
@@ -22,8 +21,9 @@
   import { applyTextColour } from '../utils/richTextEditing.js';
   import NotepadSettings from '../components/NotepadSettings.svelte';
   import SwatchGrid from '../components/SwatchGrid.svelte';
-  import { activePanel, updatePanel } from '../stores/panels.js';
+  import { activePanel, panels, updatePanel } from '../stores/panels.js';
   import { deepClone } from '../utils/deepClone.js';
+  import { withNotepadActiveIndex } from '../utils/panelNavigation.js';
 
   let {
     swatches = [],
@@ -39,19 +39,18 @@
   let editorRef = $state(null);
   let textColor = $state('DDDDDD');
 
-  // Re-sync from the active panel whenever `resetKey` changes.
+  // Re-sync from the active panel on panel transitions and external document
+  // changes (including undo). Equality guards keep our own updatePanel writes
+  // from replacing the live notes proxy with a fresh deep clone on every key.
   $effect(() => {
     void resetKey;
     const panel = $activePanel;
     if (!panel) return;
     const np = panel.notepad;
-    if (np) {
-      notes = deepClone(np.notes);
-      activeIndex = np.activeNoteIndex ?? 0;
-    } else {
-      notes = [{ name: 'Note 1', content: '' }];
-      activeIndex = 0;
-    }
+    const nextNotes = np?.notes?.length ? np.notes : [{ name: 'Note 1', content: '' }];
+    const nextIndex = Math.max(0, Math.min(Number(np?.activeNoteIndex) || 0, nextNotes.length - 1));
+    if (JSON.stringify(notes) !== JSON.stringify(nextNotes)) notes = deepClone(nextNotes);
+    if (activeIndex !== nextIndex) activeIndex = nextIndex;
   });
 
   function handleChange(updatedNotes) {
@@ -63,6 +62,15 @@
         modified: true,
       });
     }
+  }
+
+  function handleActiveIndexChange(index) {
+    const panel = $activePanel;
+    if (!panel) return;
+    // Selecting a note is workspace navigation; keep the saved flag and note identities intact.
+    // updatePanel always sets modified: true, even when the caller asks to preserve it.
+    panels.update((list) => list.map((entry) => entry.id === panel.id
+      ? withNotepadActiveIndex(entry, index) : entry));
   }
 
   // Swatch click: when cell is filled, apply that color as text foreColor.
@@ -97,10 +105,14 @@
     return !!applied;
   }
 
-  // Expose the editor element accessor + a one-shot "apply color" method
-  // used by the parent's cross-tab "Back to Notepad" flow.
+  // Expose the editor element accessor for callers that need to focus it.
   export function getEditorElement() {
     return editorRef?.getEditorElement?.();
+  }
+
+  export function captureTextSelection() {
+    const snapshot = editorRef?.captureSelectionSnapshot?.();
+    return snapshot ? { noteIndex: activeIndex, ...snapshot } : null;
   }
 
   /**
@@ -114,12 +126,6 @@
     return editorRef?.formatSelection?.(command, value) ?? false;
   }
 
-  export function applyTextColor(hex, range) {
-    textColor = hex;
-    // A frame later: the parent switches tab and applies the colour in the same
-    // turn, and the editor is not back on screen (or focusable) until it paints.
-    requestAnimationFrame(() => recolourSelection(hex, range));
-  }
 </script>
 
 {#if $activePanel}
@@ -129,6 +135,7 @@
         bind:notes
         bind:activeNoteIndex={activeIndex}
         onchange={handleChange}
+        onactivechange={handleActiveIndexChange}
         bind:this={editorRef}
       />
     </div>

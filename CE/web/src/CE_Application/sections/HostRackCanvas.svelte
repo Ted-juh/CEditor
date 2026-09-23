@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import HostConfirmButton from './HostConfirmButton.svelte';
   import HostPartIssueIcons from './HostPartIssueIcons.svelte';
   import { hostRackIssues } from '../stores/hostPartIssues.js';
@@ -171,6 +172,8 @@
     else if (drag.kind === 'effect') addEffect(node.id === '@master' ? 'master' : node.id, drag.id);
     dragEnd();
   }
+
+  onDestroy(dragEnd);
 </script>
 
 <div class="canvas-scroll" data-testid="host-rack-canvas">

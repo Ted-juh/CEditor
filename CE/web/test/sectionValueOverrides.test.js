@@ -23,9 +23,9 @@ import {
 } from '../src/CE_Application/utils/sectionValueOverrides.js';
 import { COMPONENT_TYPES, createControl } from '../src/CE_Application/models/componentTypes.js';
 import { deriveExportParameters } from '../src/CE_Application/utils/exportParameters.js';
+import { controlParamValue, hostValuePatch } from '../src/CE_Application/utils/playerParameterSession.js';
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', 'src');
-const PLAYER = readFileSync(join(SRC, 'Player.svelte'), 'utf8');
 const SURFACE = readFileSync(join(SRC, 'CE_Application/editor/PanelPreviewSurface.svelte'), 'utf8');
 
 const arp = () => createControl('Arp', { Core: { id: 'a1', name: 'a1' } });
@@ -104,9 +104,11 @@ test('every parameter from the type-declaration door carries where it lives', ()
 });
 
 test('the player writes and reads through sectionValues', () => {
-  assert.match(PLAYER, /sectionValuePatch/, 'automation playback does not write section values');
-  assert.match(PLAYER, /sectionValueOf/, 'and does not read them back');
-  assert.match(PLAYER, /sectionField/, 'the parameter map does not carry the section and field');
+  const sectionField = { section: 'Arp', field: 'rate' };
+  const patch = hostValuePatch({ sectionField, leaf: 'rate' }, 3, 3,
+    { sectionValues: { Arp: { rate: 1 } } });
+  assert.equal(sectionValueOf(patch.sectionValues, 'Arp', 'rate'), 3);
+  assert.equal(controlParamValue({ sectionValues: patch.sectionValues }, 'rate', null, sectionField), 3);
 });
 
 test('the overlay happens before the value-source chain, not inside it', () => {

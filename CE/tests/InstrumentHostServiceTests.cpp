@@ -10157,6 +10157,33 @@ void testLibrarySaveFeedback()
     }
 }
 
+void testLibraryConsumers()
+{
+    std::cout << "\nlibrary view consumers" << std::endl;
+    Harness h (freshDataDir ("library-consumers"));
+
+    h.cmd ("getLibrary", { { "text", "Warm" }, { "type", "preset" } });
+    const auto* sounds = h.emits.last ("instrumentHostLibrary");
+    check (sounds != nullptr && sounds->getProperty ("consumer", {}).toString().isEmpty()
+             && sounds->getProperty ("request", {}).getProperty ("text", {}).toString() == "Warm",
+           "the Sounds browser receives its requested view without a consumer tag");
+
+    h.cmd ("getLibrary", { { "type", "rack" }, { "consumer", "setlist" } });
+    const auto* racks = h.emits.last ("instrumentHostLibrary");
+    check (racks != nullptr && racks->getProperty ("consumer", {}).toString() == "setlist"
+             && racks->getProperty ("request", {}).getProperty ("type", {}).toString() == "rack",
+           "the Setlist lookup receives a tagged rack view");
+
+    // Omitting a query saves the remembered Sounds view. A background Setlist lookup must not
+    // silently replace that view with its own rack-only request.
+    h.cmd ("saveSmartCollection", { { "name", "Current sounds" } });
+    const auto* afterSave = h.emits.last ("instrumentHostLibrary");
+    check (afterSave != nullptr
+             && afterSave->getProperty ("request", {}).getProperty ("text", {}).toString() == "Warm"
+             && afterSave->getProperty ("request", {}).getProperty ("type", {}).toString() == "preset",
+           "a later library write still emits the remembered Sounds query");
+}
+
 void testLibrary()
 {
     std::cout << "\nthe unified library" << std::endl;
@@ -12275,6 +12302,7 @@ int main (int argc, char* argv[])
     testLibrarySaveFeedback();
     testUnreadableLibraryIsNotOverwritten();
     testBuildEditHistory();
+    testLibraryConsumers();
     testLibrary();
     testSonicProbe();
     testAuditioner();

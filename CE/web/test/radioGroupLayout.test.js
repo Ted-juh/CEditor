@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../src/CE_Application/utils/radioGroupLayout.js';
+import {
+  resolveRadioGroupLayout,
+  resolveRadioGroupSelection,
+  resolveRadioGroupValueAtPoint,
+} from '../src/CE_Application/utils/radioGroupLayout.js';
 
 const valueRows = [
   { id: 'off', displayText: 'Off', internalValue: 'off', enabled: true },
@@ -55,4 +59,35 @@ test('resolveRadioGroupValueAtPoint returns the clicked option key', () => {
   );
 
   assert.equal(selectedValue, 'bpf');
+});
+
+test('radio selection supports ordered multi-select toggles and allow-deselect', () => {
+  const behavior = { selectionMode: 'multi', allowDeselect: true };
+  assert.deepEqual(resolveRadioGroupSelection({
+    behavior,
+    valueRows,
+    selectedValues: ['lpf'],
+    requestedValue: 'hpf',
+  }), { matched: true, value: ['lpf', 'hpf'] });
+  assert.deepEqual(resolveRadioGroupSelection({
+    behavior,
+    valueRows,
+    selectedValues: ['lpf', 'hpf'],
+    requestedValue: 'lpf',
+  }), { matched: true, value: ['hpf'] });
+});
+
+test('single radio selection can clear the active row and ignores gaps', () => {
+  assert.deepEqual(resolveRadioGroupSelection({
+    behavior: { selectionMode: 'single', allowDeselect: true },
+    valueRows,
+    selectedValues: ['bpf'],
+    requestedValue: 'bpf',
+  }), { matched: true, value: '' });
+  assert.deepEqual(resolveRadioGroupSelection({
+    behavior: { selectionMode: 'single' },
+    valueRows,
+    selectedValues: ['off'],
+    requestedValue: '',
+  }), { matched: false, value: undefined });
 });

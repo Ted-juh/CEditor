@@ -20,6 +20,7 @@
   let pointerActiveControlId = $state('');
   let pointerActiveElement = $state(null);
   let keyboardFocusControlId = $state('');
+  let keyboardPressedControlId = $state('');
   let lastInputMode = $state('pointer');
 
   function getControlId(control) {
@@ -133,6 +134,8 @@
 
   function removeWindowListeners() {
     window.removeEventListener('pointerup', handleWindowPointerUp);
+    window.removeEventListener('pointercancel', cancelActivePointer);
+    window.removeEventListener('blur', cancelActivePointer);
   }
 
   onDestroy(removeWindowListeners);
@@ -178,6 +181,17 @@
     });
 
     window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', cancelActivePointer);
+    window.addEventListener('blur', cancelActivePointer);
+  }
+
+  function cancelActivePointer() {
+    if (pointerActiveControlId) {
+      patchControlSession(pointerActiveControlId, { hover: false, pressed: false });
+    }
+    pointerActiveControlId = '';
+    pointerActiveElement = null;
+    removeWindowListeners();
   }
 
   function handleWindowPointerUp(event) {
@@ -214,6 +228,7 @@
     if (keyboardFocusControlId === controlId) {
       keyboardFocusControlId = '';
     }
+    if (keyboardPressedControlId === controlId) keyboardPressedControlId = '';
 
     patchControlSession(controlId, {
       focused: false,
@@ -236,6 +251,7 @@
 
     if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault();
+      keyboardPressedControlId = controlId;
       event.currentTarget?.focus?.();
       patchControlSession(controlId, {
         focused: true,
@@ -251,6 +267,8 @@
 
     event.preventDefault();
     const controlId = getControlId(control);
+    if (keyboardPressedControlId !== controlId) return;
+    keyboardPressedControlId = '';
     commitSelection(controlId);
     patchControlSession(controlId, {
       focused: true,
@@ -291,7 +309,7 @@
               class:keyboard-focus={keyboardFocusControlId === entry.id}
               class:selected-preview={selectedControlId === entry.id}
               role={previewRole(entry)}
-              aria-label="Interactive preview surface"
+              aria-label={entry.control?._children?.Core?.name || entry.control?._children?.Core?.controlType || entry.id || 'Preview option'}
               aria-disabled={isDisabled(entry.control)}
               aria-checked={previewRole(entry) === 'radio' ? sessionFor(entry.control).checked === true : undefined}
               tabindex={isDisabled(entry.control) ? undefined : 0}

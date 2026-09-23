@@ -39,6 +39,8 @@
   let bakeInterpolation = $state('nearest');
   let bakeStatus = $state('');
   let bakeBusy = $state(false);
+  let bakeGeneration = 0;
+  let bakeControlId = '';
   let imageAsset = $derived(assets?.images?.[selectedImage] ?? null);
   let filmstrip = $derived(assets?.filmstrips?.[selectedFilmstrip] ?? null);
   let bakeEstimate = $derived(estimateFilmstripBake(control, {
@@ -53,6 +55,15 @@
   }));
   let bakeEstimateText = $derived(`${bakeEstimate.canvasWidth}x${bakeEstimate.canvasHeight} | ${formatBytes(bakeEstimate.estimatedMemoryBytes)}${bakeEstimate.blockReason ? ` | ${bakeEstimate.blockReason}` : ''}`);
   let bakeWillReplace = $derived(!!assets?.filmstrips?.[bakeEstimate.name]);
+
+  $effect(() => {
+    const nextControlId = String(core?.id ?? '');
+    if (nextControlId === bakeControlId) return;
+    bakeControlId = nextControlId;
+    bakeGeneration += 1;
+    bakeBusy = false;
+    bakeStatus = '';
+  });
 
   $effect(() => {
     if (!imageNames.length) {
@@ -222,42 +233,54 @@
   async function importFilmstripFile(event) {
     const file = event?.target?.files?.[0];
     if (!core?.id || !file) return;
+    const targetId = core.id;
+    const targetSelection = selectedFilmstrip;
+    const name = targetSelection || safeFileName(file.name.replace(/\.[^.]+$/, ''), 'importedFilmstrip');
+    const targetFilmstrip = filmstrip ? {
+      frameCount: filmstrip.frameCount,
+      frameWidth: filmstrip.frameWidth,
+      frameHeight: filmstrip.frameHeight,
+      orientation: filmstrip.orientation,
+      interpolation: filmstrip.interpolation,
+      valueSource: filmstrip.valueSource,
+    } : null;
+    const frameCount = Math.max(1, Math.round(Number(targetFilmstrip?.frameCount ?? 128)));
+    const orientation = targetFilmstrip?.orientation ?? 'vertical';
     try {
       const source = await fileToDataUrl(file);
+      if (core?.id !== targetId) return;
       if (!source.startsWith('data:image/')) {
         bakeStatus = 'Filmstrip import expects an image file.';
         return;
       }
-      const name = selectedFilmstrip || safeFileName(file.name.replace(/\.[^.]+$/, ''), 'importedFilmstrip');
-      const frameCount = Math.max(1, Math.round(Number(filmstrip?.frameCount ?? 128)));
-      const orientation = filmstrip?.orientation ?? 'vertical';
       const dimensions = await imageDimensions(source);
+      if (core?.id !== targetId) return;
       const frameWidth = orientation === 'horizontal'
         ? Math.round(dimensions.width / frameCount)
         : dimensions.width;
       const frameHeight = orientation === 'horizontal'
         ? dimensions.height
         : Math.round(dimensions.height / frameCount);
-      applyControlPatch(core.id, {
+      applyControlPatch(targetId, {
         [`Assets.filmstrips.${name}`]: {
           _type: 'FilmstripAsset',
           name,
           source,
           frameCount,
-          frameWidth: Number.isFinite(frameWidth) && frameWidth > 0 ? frameWidth : (filmstrip?.frameWidth ?? 0),
-          frameHeight: Number.isFinite(frameHeight) && frameHeight > 0 ? frameHeight : (filmstrip?.frameHeight ?? 0),
+          frameWidth: Number.isFinite(frameWidth) && frameWidth > 0 ? frameWidth : (targetFilmstrip?.frameWidth ?? 0),
+          frameHeight: Number.isFinite(frameHeight) && frameHeight > 0 ? frameHeight : (targetFilmstrip?.frameHeight ?? 0),
           orientation,
-          interpolation: filmstrip?.interpolation ?? 'nearest',
-          valueSource: filmstrip?.valueSource ?? 'mainValue',
+          interpolation: targetFilmstrip?.interpolation ?? 'nearest',
+          valueSource: targetFilmstrip?.valueSource ?? 'mainValue',
           package: true,
           importedAt: new Date().toISOString(),
           sourceFileName: file.name,
         },
       });
-      selectedFilmstrip = name;
+      if (selectedFilmstrip === targetSelection) selectedFilmstrip = name;
       bakeStatus = `Imported ${file.name}`;
     } catch (error) {
-      bakeStatus = error?.message ?? 'Filmstrip import failed';
+      if (core?.id === targetId) bakeStatus = error?.message ?? 'Filmstrip import failed';
     } finally {
       if (event?.target) event.target.value = '';
     }
@@ -266,15 +289,19 @@
   async function importImageFile(event) {
     const file = event?.target?.files?.[0];
     if (!core?.id || !file) return;
+    const targetId = core.id;
+    const targetSelection = selectedImage;
+    const name = targetSelection || safeFileName(file.name.replace(/\.[^.]+$/, ''), 'importedImage');
     try {
       const source = await fileToDataUrl(file);
+      if (core?.id !== targetId) return;
       if (!source.startsWith('data:image/')) {
         bakeStatus = 'Image import expects an image file.';
         return;
       }
-      const name = selectedImage || safeFileName(file.name.replace(/\.[^.]+$/, ''), 'importedImage');
       const dimensions = await imageDimensions(source);
-      applyControlPatch(core.id, {
+      if (core?.id !== targetId) return;
+      applyControlPatch(targetId, {
         [`Assets.images.${name}`]: {
           _type: 'ImageAsset',
           name,
@@ -286,10 +313,10 @@
           sourceFileName: file.name,
         },
       });
-      selectedImage = name;
+      if (selectedImage === targetSelection) selectedImage = name;
       bakeStatus = `Imported ${file.name}`;
     } catch (error) {
-      bakeStatus = error?.message ?? 'Image import failed';
+      if (core?.id === targetId) bakeStatus = error?.message ?? 'Image import failed';
     } finally {
       if (event?.target) event.target.value = '';
     }
@@ -297,6 +324,9 @@
 
   async function bakeFilmstrip() {
     if (!core?.id || bakeBusy) return;
+    const targetId = core.id;
+    const targetControl = control;
+    const generation = ++bakeGeneration;
     bakeBusy = true;
     bakeStatus = 'Baking...';
     const options = normalizeFilmstripBakeOptions(control, {
@@ -317,8 +347,9 @@
     }
 
     try {
-      const asset = await bakeCustomComponentFilmstrip(control, options);
-      applyControlPatch(core.id, {
+      const asset = await bakeCustomComponentFilmstrip(targetControl, options);
+      if (core?.id !== targetId) return;
+      applyControlPatch(targetId, {
         [`Assets.filmstrips.${asset.name}`]: asset,
         [`Generators.${asset.name}Filmstrip`]: {
           _type: 'Generator',
@@ -333,9 +364,9 @@
       selectedFilmstrip = asset.name;
       bakeStatus = `${bakeWillReplace ? 'Rebaked' : 'Baked'} ${asset.frameCount} frames`;
     } catch (error) {
-      bakeStatus = error?.message ?? 'Bake failed';
+      if (core?.id === targetId) bakeStatus = error?.message ?? 'Bake failed';
     } finally {
-      bakeBusy = false;
+      if (core?.id === targetId && generation === bakeGeneration) bakeBusy = false;
     }
   }
 </script>

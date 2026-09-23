@@ -10,6 +10,7 @@
   // LcdDisplayRenderer; this canvas draws only the dots (transparent).
   import { FONT_W, FONT_H, FONT_ADVANCE, drawCharInto, drawTextInto } from '../utils/pixelFont.js';
   import { decodeGifAnimation } from '../utils/gifAnimation.js';
+  import { lcdAnimationCacheKey, pruneLcdAnimationCaches } from './lcdAnimationCache.js';
 
   let {
     lines = [],
@@ -258,9 +259,9 @@
     const gh = Math.max(2, Math.round(Number(cfGlyphH) || 0));
     const cols = Math.max(1, Math.round(Number(cfCols) || 0));
     const first = Math.max(0, Math.round(Number(cfFirst) || 32));
+    const token = ++cfToken;
     customFont = null;
     if (!src) return;
-    const token = ++cfToken;
     const image = new Image();
     image.onload = () => {
       if (token !== cfToken) return;
@@ -278,6 +279,10 @@
     };
     image.onerror = () => {};
     image.src = src;
+    return () => {
+      image.onload = null;
+      image.onerror = null;
+    };
   });
 
   // Draw a string using the custom font glyphs (mirrors drawTextInto).
@@ -358,7 +363,7 @@
 
     decodeAnimation(src, spriteFrames, fps, pixW, pixH, wantColour, spriteCols).then((cache) => {
       if (token === animDecodeToken && cache) animCache = { ...cache, startedAt: animTick };
-    });
+    }).catch(() => {});
     return () => { ++animDecodeToken; };
   });
 
@@ -372,16 +377,18 @@
   $effect(() => {
     const list = Array.isArray(anims) ? anims : [];
     void dither;
+    const pruned = pruneLcdAnimationCaches(elAnimCaches, list);
+    if (pruned !== elAnimCaches) elAnimCaches = pruned;
     for (const a of list) {
       if (a.mode !== 'file' || !a.src) continue;
-      const key = `${a.src.length}:${a.src.slice(-24)}|${a.w}x${a.h}|${a.frames}|${a.spriteCols ?? 0}|${a.fps}|${dither}|c${a.colourful ? 1 : 0}`;
+      const key = lcdAnimationCacheKey(a, dither);
       if (elAnimCaches[a.id]?.key === key) continue;
       elAnimCaches = { ...elAnimCaches, [a.id]: { key, cache: null } };
       decodeAnimation(a.src, a.frames, a.fps, a.w, a.h, a.colourful === true, a.spriteCols ?? 0).then((cache) => {
         if (elAnimCaches[a.id]?.key === key) {
           elAnimCaches = { ...elAnimCaches, [a.id]: { key, cache, startedAt: animTick } };
         }
-      });
+      }).catch(() => {});
     }
   });
 
@@ -874,6 +881,9 @@
 
     // Placeable animation elements: blit each one's current frame into its rect.
     for (const a of (Array.isArray(anims) ? anims : [])) {
+      // Keep temporarily hidden (for example, blink-off) descriptors in `anims` so their decoded
+      // frames remain cached; visibility controls painting, not resource lifetime.
+      if (a?.visibleNow === false) continue;
       const tint = a.colourful && a.mode === 'preset' ? colId(hueCss(animTick, a.speed)) : colId(a.colour);
       let fb = null;
       if (a.mode === 'preset') {

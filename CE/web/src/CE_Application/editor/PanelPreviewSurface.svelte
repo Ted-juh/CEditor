@@ -1524,6 +1524,10 @@
   // note-off. Only when something actually sounded, so closing an untouched
   // panel is quiet.
   onDestroy(() => {
+    if (transportStartedBySurface) {
+      transportStartedBySurface = false;
+      stopTransport();
+    }
     if (sentAnyNote) firePanicEmergency({ flashButtons: false });
     else if (noteInputStarted) clearNoteInput();
   });
@@ -3255,7 +3259,7 @@
   // whatever hardware output the 'mainSynth' role holds. Held pads + sounding
   // notes live in the session so the renderer can light up.
   const chordHeld = {};         // id -> { [padId]: number[] }  (sounding notes per pad)
-  const chordStrumTimers = {};  // id -> [timeoutId...]
+  const chordStrumTimers = {};  // id -> Map(padId, Set(timeoutId))
   let chordPress = null;        // { id, padId } while a pad is held by the pointer
   function isChordPadControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'ChordPad';
@@ -3314,8 +3318,19 @@
     if (chordPadFeedsArp(control)) { syncChordSession(control); return; }
     notes.forEach((note, i) => {
       if (strum > 0 && i > 0) {
-        const t = setTimeout(() => sendNoteBytes(noteOnBytes(ch, note, vel), `note_on_${note}`), strum * i);
-        (chordStrumTimers[id] ??= []).push(t);
+        const timers = (chordStrumTimers[id] ??= new Map());
+        const pending = timers.get(padId) ?? new Set();
+        timers.set(padId, pending);
+        const t = setTimeout(() => {
+          pending.delete(t);
+          if (pending.size === 0) timers.delete(padId);
+          // A release can happen before a later strummed voice is due. Only sound it while this
+          // exact pad press still owns the note.
+          if ((chordHeld[id] ?? {})[padId] === notes) {
+            sendNoteBytes(noteOnBytes(ch, note, vel), `note_on_${note}`);
+          }
+        }, strum * i);
+        pending.add(t);
       } else {
         sendNoteBytes(noteOnBytes(ch, note, vel), `note_on_${note}`);
       }
@@ -3327,6 +3342,9 @@
     const map = chordHeld[id] ?? {};
     const notes = map[padId];
     if (!notes) return;
+    const pending = chordStrumTimers[id]?.get(padId);
+    for (const timer of pending ?? []) clearTimeout(timer);
+    chordStrumTimers[id]?.delete(padId);
     const ch = chordPadChannel(control);
     // Only silence notes no OTHER held pad is still sounding.
     const stillHeld = new Set(Object.entries(map).filter(([k]) => k !== padId).flatMap(([, v]) => v));
@@ -3339,8 +3357,10 @@
   }
   function chordAllOff(control) {
     const id = getControlId(control);
-    for (const t of chordStrumTimers[id] ?? []) clearTimeout(t);
-    chordStrumTimers[id] = [];
+    for (const timers of chordStrumTimers[id]?.values?.() ?? []) {
+      for (const timer of timers) clearTimeout(timer);
+    }
+    chordStrumTimers[id] = new Map();
     for (const padId of Object.keys(chordHeld[id] ?? {})) chordNoteOff(control, padId);
   }
   // Inject the held pads + sounding notes so the renderer lights up.
@@ -3648,7 +3668,7 @@
   // of the position. So the transport says how many boundaries were crossed and `advanceStep`
   // decides where each lands — the direction modes keep working when synced instead of quietly
   // becoming forward.
-  const seqTimers = {};         // id -> [timeoutId...]  (note-offs)
+  const seqTimers = {};         // id -> Map("channel:note", timeoutId) (note-offs)
   const seqSounding = {};       // id -> Set("ch:note") currently ringing
   const seqPosition = {};       // id -> step index
   const seqState = {};          // id -> { forward } for ping-pong
@@ -3666,8 +3686,8 @@
   }
   function seqAllOff(control) {
     const id = getControlId(control);
-    for (const t of seqTimers[id] ?? []) clearTimeout(t);
-    seqTimers[id] = [];
+    for (const t of seqTimers[id]?.values?.() ?? []) clearTimeout(t);
+    seqTimers[id] = new Map();
     for (const key of seqSounding[id] ?? []) {
       const [ch, note] = String(key).split(':').map(Number);
       sendNoteBytes(noteOffBytes(ch, note), `seq_off_${note}`);
@@ -3681,12 +3701,21 @@
     const held = gateMs(control, bpm);
     for (const entry of notes) {
       const key = `${entry.channel}:${entry.note}`;
+      const timers = (seqTimers[id] ??= new Map());
+      const previousTimer = timers.get(key);
+      if (previousTimer) {
+        clearTimeout(previousTimer);
+        sendNoteBytes(noteOffBytes(entry.channel, entry.note), `seq_off_${entry.note}`);
+      }
       sendNoteBytes(noteOnBytes(entry.channel, entry.note, entry.velocity), `seq_on_${entry.note}`);
       (seqSounding[id] ??= new Set()).add(key);
-      (seqTimers[id] ??= []).push(setTimeout(() => {
+      const timer = setTimeout(() => {
+        if (timers.get(key) !== timer) return;
+        timers.delete(key);
         sendNoteBytes(noteOffBytes(entry.channel, entry.note), `seq_off_${entry.note}`);
         seqSounding[id]?.delete(key);
-      }, held));
+      }, held);
+      timers.set(key, timer);
     }
     raiseComponent(control, 'onStep', {
       index: step + 1,
@@ -3985,7 +4014,8 @@
   // which is how a closed hi-hat cuts an open one.
   const DRUM_PAD = 8;
   const drumHits = {};        // id -> { [padId]: { note, mode } }
-  const drumTimers = {};      // id -> [timeoutId...]  (one-shot gates)
+  const drumTimers = {};      // id -> Map(padId, Set({ timer, channel, note })) (flam grace notes)
+  const drumGateTimers = {};  // id -> Map(padId, timeoutId) (one-shot gates)
   let drumPress = null;       // { id, padId } while the pointer holds a pad
   // ROLL. A pad marked `roll` restrikes for as long as it is ON — held under 'momentary', latched
   // under 'toggle'. The clock is the same one a repeating button holds; what differs is only what
@@ -4018,6 +4048,17 @@
   }
   function drumNoteOff(control, padId) {
     const id = getControlId(control);
+    const pendingFlams = drumTimers[id]?.get(padId);
+    for (const pending of pendingFlams ?? []) {
+      clearTimeout(pending.timer);
+      // The grace note has already sounded even though the delayed main strike has not. Releasing
+      // inside flamMs must silence it and cancel the main strike rather than leaving either behind.
+      sendNoteBytes(noteOffBytes(pending.channel, pending.note), `note_off_${pending.note}`);
+    }
+    drumTimers[id]?.delete(padId);
+    const gate = drumGateTimers[id]?.get(padId);
+    if (gate) clearTimeout(gate);
+    drumGateTimers[id]?.delete(padId);
     // Stop the roll FIRST, and unconditionally. This is the one place every way a pad can stop
     // passes through — released, toggled off, choked by a group-mate, or cut by its one-shot gate —
     // so a roll that outlived any of them would be a roll with no pad under it.
@@ -4054,10 +4095,14 @@
     raiseComponent(control, 'onHit', { id: pad.id, note: pad.note, notes: [pad.note], velocity: strikeVel });
     startDrumRoll(control, pad, mode, opts?.roll === true);
     if (mode === 'oneShot') {
-      (drumTimers[id] ??= []).push(setTimeout(() => {
+      const gates = (drumGateTimers[id] ??= new Map());
+      const timer = setTimeout(() => {
+        if (gates.get(pad.id) !== timer) return;
+        gates.delete(pad.id);
         drumNoteOff(control, pad.id);
         syncDrumSession(control);
-      }, drumGateMs(control)));
+      }, drumGateMs(control));
+      gates.set(pad.id, timer);
     }
     syncDrumSession(control, { label: pad.label, note: pad.note });
   }
@@ -4144,10 +4189,19 @@
         const ch = drumChannel(control);
         const grace = ghostVelocity(cfg, base);
         sendNoteBytes(noteOnBytes(ch, hit.pad.note, grace), `note_on_${hit.pad.note}`);
-        (drumTimers[getControlId(control)] ??= []).push(setTimeout(() => {
+        const id = getControlId(control);
+        const timers = (drumTimers[id] ??= new Map());
+        const pending = timers.get(hit.pad.id) ?? new Set();
+        timers.set(hit.pad.id, pending);
+        const entry = { timer: null, channel: ch, note: hit.pad.note };
+        const timer = setTimeout(() => {
+          pending.delete(entry);
+          if (pending.size === 0) timers.delete(hit.pad.id);
           sendNoteBytes(noteOffBytes(ch, hit.pad.note), `note_off_${hit.pad.note}`);
           drumHit(control, hit.pad, hit.strikeY, { velocity: base, roll: false });
-        }, flamMs(cfg)));
+        }, flamMs(cfg));
+        entry.timer = timer;
+        pending.add(entry);
         return true;
       }
       case 'roll':
@@ -4396,7 +4450,7 @@
   const harmHeld = {};            // id -> pure held state (see harmoniserLayout)
   const harmSeen = {};            // id -> midiNoteState.seq consumed
   let harmKeyPress = null;        // { id, note } — a key auditioned with the mouse
-  const harmTimers = {};          // id -> [timeoutId…] for strummed note-ons
+  const harmTimers = {};          // id -> Map("channel:note", timeoutId) for strummed note-ons
   const harmXSeen = {};           // id -> midiRouteEvents.seq consumed
   function isHarmoniserControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'Harmoniser';
@@ -4411,14 +4465,27 @@
     const ons = sends.filter((m) => m.kind === 'on');
     const delays = strumDelays(control, ons.length);
     let oi = 0;
+    const id = getControlId(control);
+    const timers = (harmTimers[id] ??= new Map());
     for (const m of sends) {
-      if (m.kind !== 'on') { sendNoteBytes(noteOffBytes(m.channel, m.note), `harm_off_${m.note}`, 'Harmoniser'); continue; }
+      const key = `${m.channel}:${m.note}`;
+      if (m.kind !== 'on') {
+        const pending = timers.get(key);
+        if (pending) { clearTimeout(pending); timers.delete(key); }
+        sendNoteBytes(noteOffBytes(m.channel, m.note), `harm_off_${m.note}`, 'Harmoniser');
+        continue;
+      }
       const d = delays[oi] ?? 0;
       oi += 1;
+      const previous = timers.get(key);
+      if (previous) { clearTimeout(previous); timers.delete(key); }
       if (d <= 0) { sendNoteBytes(noteOnBytes(m.channel, m.note, m.velocity), `harm_on_${m.note}`, 'Harmoniser'); continue; }
-      (harmTimers[getControlId(control)] ??= []).push(setTimeout(() => {
+      const timer = setTimeout(() => {
+        if (timers.get(key) !== timer) return;
+        timers.delete(key);
         sendNoteBytes(noteOnBytes(m.channel, m.note, m.velocity), `harm_on_${m.note}`, 'Harmoniser');
-      }, d));
+      }, d);
+      timers.set(key, timer);
     }
   }
   // Pitch bend and aftertouch arriving on the input, forwarded to the channel
@@ -4450,8 +4517,8 @@
   }
   function harmAllOff(control) {
     const id = getControlId(control);
-    for (const t of harmTimers[id] ?? []) clearTimeout(t);
-    harmTimers[id] = [];
+    for (const t of harmTimers[id]?.values?.() ?? []) clearTimeout(t);
+    harmTimers[id] = new Map();
     const r = releaseAllHarmony(harmHeld[id] ?? EMPTY_HELD);
     harmHeld[id] = r.held;
     harmKeyPress = harmKeyPress?.id === id ? null : harmKeyPress;
@@ -5292,7 +5359,8 @@
   // clock of its own — two transports on a panel drive the same one, which is
   // the point.
   const tapTimes = [];
-  let transportConfigured = false;
+  const transportConfigured = new Map();
+  let transportStartedBySurface = false;
   function isTransportControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'Transport';
   }
@@ -5318,6 +5386,7 @@
    * one, moved.
    */
   $effect(() => {
+    const seenTransportIds = new Set();
     // FLATTENED, and resolved the way the render path resolved it. `orderedControls` is the
     // top-level canvas list; the value-source chain also ran through `childPreviewPropsFor`, so a
     // Transport inside a Group or a Tab container configured the clock and would silently stop
@@ -5328,6 +5397,8 @@
     // paths saying the same thing.
     for (const raw of allControls) {
       if (!isTransportControl(raw)) continue;
+      const transportId = getControlId(raw);
+      seenTransportIds.add(transportId);
       const session = sessionFor(raw);
       const overrides = session?.enabled === false ? {} : session;
       const valued = applySectionValues(raw, overrides?.sectionValues);
@@ -5340,8 +5411,8 @@
       const clockTarget = resolveClockDevice(cfg.clockDevice, countRolesInPanels([panel]).keys());
       const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}|${cfg.beatsPerBar}`
         + `|${cfg.loopEnabled}|${cfg.loopStartBar}|${cfg.loopLengthBars}|${cfg.swing}|${clockTarget}`;
-      if (transportConfigured === signature) continue;
-      transportConfigured = signature;
+      if (transportConfigured.get(transportId) === signature) continue;
+      transportConfigured.set(transportId, signature);
       setTransportSource(tpSource(control));
       if (!transportIsFollowing(tpSource(control))) setTransportBpm(numberOr(cfg.bpm, 120));
       setTransportClockOut(cfg.clockOut === true);
@@ -5357,8 +5428,12 @@
       // DAW or an incoming clock, pressing play is the other end's job, and
       // starting ourselves would show a running transport parked at bar 1.
       if (cfg.runOnLoad === true && !isTransportRunning() && !transportIsFollowing(tpSource(control))) {
+        transportStartedBySurface = true;
         startTransportWithCountIn(countInBars(control), 0);
       }
+    }
+    for (const id of transportConfigured.keys()) {
+      if (!seenTransportIds.has(id)) transportConfigured.delete(id);
     }
   });
   // Read-only: the live clock state the renderer draws from. Nothing here writes.
@@ -5395,8 +5470,13 @@
       // Pressing play runs the count-in first; pressing it again during the
       // count-in aborts, which is what every DAW does and what you want when
       // you started it by mistake.
-      if (isTransportRunning() || isCountingIn()) stopTransport();
-      else startTransportWithCountIn(countInBars(control));
+      if (isTransportRunning() || isCountingIn()) {
+        stopTransport();
+        transportStartedBySurface = false;
+      } else {
+        transportStartedBySurface = true;
+        startTransportWithCountIn(countInBars(control));
+      }
       return true;
     }
     // Anywhere else on the face is tap tempo — but only when we're the master;
@@ -5422,6 +5502,20 @@
   function isPanicControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'Panic';
   }
+  const panicFlashTimers = new Map();
+  function flashPanicButton(controlId) {
+    clearTimeout(panicFlashTimers.get(controlId));
+    patchControlSession(controlId, { panicFlash: true });
+    const timer = setTimeout(() => {
+      panicFlashTimers.delete(controlId);
+      if (!surfaceDestroyed) patchControlSession(controlId, { panicFlash: undefined });
+    }, 180);
+    panicFlashTimers.set(controlId, timer);
+  }
+  onDestroy(() => {
+    for (const timer of panicFlashTimers.values()) clearTimeout(timer);
+    panicFlashTimers.clear();
+  });
   // Stop every note-playing control on this panel, whatever it happens to hold.
   function silenceLocalNoteControls() {
     for (const c of allControls) {
@@ -5440,8 +5534,12 @@
         syncRibbonSession(c, null);
       } else if (isDrumPadsControl(c)) {
         const id = getControlId(c);
-        for (const t of drumTimers[id] ?? []) clearTimeout(t);
-        drumTimers[id] = [];
+        for (const pending of drumTimers[id]?.values?.() ?? []) {
+          for (const entry of pending) clearTimeout(entry.timer);
+        }
+        drumTimers[id] = new Map();
+        for (const t of drumGateTimers[id]?.values?.() ?? []) clearTimeout(t);
+        drumGateTimers[id] = new Map();
         // drumNoteOff stops each pad's roll on the way out; this catches a roll whose pad is no
         // longer in drumHits, which a torn-down surface can leave behind.
         for (const padId of Object.keys(drumHits[id] ?? {})) drumNoteOff(c, padId);
@@ -5460,8 +5558,7 @@
     clearNoteInput();
     // Flash, because the whole point is that the result is silence — without it
     // there is no way to tell a working button from a dead one.
-    patchControlSession(id, { panicFlash: true });
-    setTimeout(() => patchControlSession(id, { panicFlash: undefined }), 180);
+    flashPanicButton(id);
   }
   function handlePanicPointerDown(control, localPoint) {
     if (!isPanicControl(control) || panicConfig(control).editable === false) return false;
@@ -5492,8 +5589,7 @@
     for (const c of allControls) {
       if (!isPanicControl(c)) continue;
       const id = getControlId(c);
-      patchControlSession(id, { panicFlash: true });
-      setTimeout(() => patchControlSession(id, { panicFlash: undefined }), 180);
+      flashPanicButton(id);
     }
   }
   // The guard that stops Esc stealing the per-control Escape cancels lives in
@@ -5501,6 +5597,11 @@
   // cancelled text edit also panics the rig.
   function handleGlobalKeyDown(event) {
     const shortcut = panel?.panicShortcut ?? DEFAULT_PANIC_SHORTCUT;
+    // Escape dismisses menus and dialogs first. Several of those handlers live on window too, so
+    // listener registration order cannot safely decide precedence; the visible semantic surface
+    // can. A configured non-Escape panic shortcut remains available while an overlay is open.
+    if (event.key === 'Escape' && typeof document !== 'undefined'
+      && document.querySelector('dialog[open], [role="dialog"], [role="menu"]')) return;
     if (!isPanicShortcut(event, { shortcut, lcdEditing: lcdEdit.active === true })) return;
     event.preventDefault();
     firePanicEmergency();
@@ -5668,6 +5769,10 @@
     patchControlSession(getControlId(control), { focused: false });
   }
   function handleTextFieldKeyDown(control, event) {
+    // The native input owns every key, including Space. Without stopping propagation the event
+    // reaches the CanvasControl wrapper, whose generic button handler prevents Space and activates
+    // the control instead of inserting a character.
+    event.stopPropagation();
     if (event.key === 'Enter') {
       event.preventDefault();
       event.currentTarget?.blur?.();
@@ -6143,7 +6248,7 @@
       return;
     }
 
-    if (event.key === 'Escape') {
+      if (event.key === 'Escape') {
       event.preventDefault();
       patchControlSession(getControlId(control), { valueInputActive: false, valueInputBuffer: '' });
     }
@@ -6461,7 +6566,10 @@
   let lastInboundPayload = null;
   let nrpnState = EMPTY_NRPN_STATE;
   $effect(() => {
-    const stop = latestMidiInputMessage.subscribe((payload) => {
+    // Svelte stores synchronously replay their current value to a new subscriber. Seed that value
+    // first so opening preview does not re-apply an old hardware gesture to a fresh session.
+    lastInboundPayload = untrack(() => get(latestMidiInputMessage));
+    const stop = untrack(() => latestMidiInputMessage.subscribe((payload) => {
       if (!payload?.hex || payload === lastInboundPayload) return;
       lastInboundPayload = payload;
       // The assembler runs even with nothing bound, so its channel selections stay in step with the
@@ -6480,7 +6588,7 @@
           }
         }
       }
-    });
+    }));
     return stop;
   });
 
@@ -7407,6 +7515,9 @@
     momentaryButtonPreview.syncKeys(activeControlIds);
     for (const [id, timer] of oneShotTimers) {
       if (!controlsById.has(id)) { clearTimeout(timer); oneShotTimers.delete(id); }
+    }
+    for (const [id, timer] of panicFlashTimers) {
+      if (!controlsById.has(id)) { clearTimeout(timer); panicFlashTimers.delete(id); }
     }
 
     if (pointerActiveControlId && !controlsById.has(pointerActiveControlId)) {
@@ -8500,6 +8611,9 @@
 
   function previewRoleFor(control) {
     if (isCustomComponent(control)) return previewRoleForCustomComponent(control);
+    // TextInput renders a native input inside CanvasControl. The inner textbox owns semantics and
+    // focus; a button role on the wrapper creates nested interactive controls and a duplicate stop.
+    if (isTextInputControl(control)) return '';
 
     const behavior = getBehavior(control);
     const family = String(behavior?.family ?? 'trigger');
@@ -8507,6 +8621,10 @@
     const buttonType = String(behavior?.buttonType ?? '').trim().toLowerCase();
 
     if (family === 'range') return isSliderRangeBehavior(behavior) ? 'slider' : 'spinbutton';
+    // The listbox renderer owns the role because its option descendants and
+    // aria-activedescendant live inside that element. Giving the CanvasControl
+    // wrapper a button role creates an invalid interactive listbox-in-button.
+    if (buttonType === 'listbox') return '';
     if (buttonType === 'combobox') return 'combobox';
     if (buttonType === 'radio') return 'radiogroup';
     if (role === 'radio' || role === 'segmented') return 'radio';
@@ -8562,6 +8680,8 @@
 
   function previewTabIndexFor(control) {
     if (isDisabled(control)) return undefined;
+    if (isTextInputControl(control)) return undefined;
+    if (String(getBehavior(control)?.buttonType ?? '').trim().toLowerCase() === 'listbox') return 0;
     const role = previewRoleFor(control);
     return ['button', 'checkbox', 'radio', 'combobox', 'slider', 'spinbutton'].includes(role) ? 0 : undefined;
   }

@@ -53,7 +53,13 @@
 
   onMount(() => {
     function onPointerDown(event) {
-      if (rootEl && !rootEl.contains(event.target)) commit();
+      if (rootEl && !rootEl.contains(event.target)) {
+        // This capture listener exists specifically to keep the dismissing press from starting a
+        // gradient handle drag underneath the popover.
+        event.preventDefault();
+        event.stopPropagation();
+        commit();
+      }
     }
     function onKeydown(event) {
       // A key pressed inside a field belongs to the field. The chooser's hex
@@ -62,7 +68,10 @@
       // only meant to undo a typo.
       if (event.target?.tagName === 'INPUT') return;
       if (event.key === 'Escape') { event.stopPropagation(); cancel(); }
-      else if (event.key === 'Enter') { commit(); }
+      // Enter on a chooser control or either action button belongs to that control. In particular,
+      // committing here before the Cancel button's synthetic click would commit and then revert the
+      // same edit, producing two parent actions for one key press.
+      else if (event.key === 'Enter' && !rootEl?.contains(event.target)) { commit(); }
     }
     // Capture phase: the gradient surface under this popover starts a drag on
     // mousedown, and a click meant to dismiss the popover must not also grab a

@@ -11,11 +11,13 @@
     clearFormatting,
     insertPlainText,
     readCaretOffset,
+    readSelectionOffsets,
     resolveNotepadSync,
     restoreCaretOffset,
+    sanitizeNotepadHtml,
   } from '../utils/richTextEditing.js';
 
-  let { notes = $bindable([]), activeNoteIndex = $bindable(0), onchange } = $props();
+  let { notes = $bindable([]), activeNoteIndex = $bindable(0), onchange, onactivechange = null } = $props();
 
   let editorEl = $state(null);
 
@@ -59,16 +61,28 @@
     const selection = typeof window === 'undefined' ? null : window.getSelection?.() ?? null;
     const caret = decision.preserveCaret ? readCaretOffset(editorEl, selection) : null;
 
+    const safeHtml = sanitizeNotepadHtml(modelHtml, document);
     lastSyncedIndex = idx;
+    // Keep the original model value as the echo marker. A legacy or imported
+    // unsafe value may differ from the safe DOM by design; treating that as a
+    // fresh external change on every effect run would repeatedly rebuild the
+    // editor and lose its selection.
     lastSyncedHtml = modelHtml;
-    editorEl.innerHTML = modelHtml;
+    editorEl.innerHTML = safeHtml;
 
     if (caret != null && selection) restoreCaretOffset(editorEl, caret, selection, document);
   });
 
   function saveCurrentContent() {
     if (!editorEl || !notes[activeNoteIndex]) return;
-    const html = editorEl.innerHTML;
+    const rawHtml = editorEl.innerHTML;
+    const html = sanitizeNotepadHtml(rawHtml, document);
+    if (html !== rawHtml) {
+      const selection = currentSelection();
+      const caret = readCaretOffset(editorEl, selection);
+      editorEl.innerHTML = html;
+      if (caret != null && selection) restoreCaretOffset(editorEl, caret, selection, document);
+    }
     // Recorded even when unchanged: this is the "the DOM and the model agree
     // because of something WE did" marker the sync effect tests against.
     lastSyncedHtml = html;
@@ -82,6 +96,17 @@
     saveCurrentContent();
   }
 
+  // Browser paste/drop inserts HTML before `input`, which gives active content
+  // (for example an image onerror handler) a chance to run before an input
+  // sanitizer sees it. Insert the clipboard's plain-text representation
+  // ourselves; users can reapply the notepad's supported formatting safely.
+  function insertTransferredText(event, transfer) {
+    if (!transfer) return;
+    event.preventDefault();
+    insertPlainText(editorEl, currentSelection(), transfer.getData('text/plain') ?? '', document);
+    saveCurrentContent();
+  }
+
   function currentSelection() {
     return typeof window === 'undefined' ? null : window.getSelection?.() ?? null;
   }
@@ -89,6 +114,7 @@
   function switchTab(index) {
     saveCurrentContent();
     activeNoteIndex = index;
+    onactivechange?.(index);
   }
 
   function addNote() {
@@ -164,6 +190,17 @@
   // Expose the editor element for settings panel to apply formatting
   export function getEditorElement() {
     return editorEl;
+  }
+
+  /** A DOM-independent snapshot that remains valid while this component is unmounted. */
+  export function captureSelectionSnapshot() {
+    if (!editorEl) return null;
+    const selection = readSelectionOffsets(editorEl, currentSelection());
+    if (!selection) return null;
+    return {
+      html: sanitizeNotepadHtml(editorEl.innerHTML, document),
+      selection,
+    };
   }
 
   /**
@@ -242,6 +279,8 @@
     tabindex="0"
     bind:this={editorEl}
     oninput={handleInput}
+    onpaste={(event) => insertTransferredText(event, event.clipboardData)}
+    ondrop={(event) => insertTransferredText(event, event.dataTransfer)}
     onkeydown={handleKeyDown}
     oncompositionstart={() => composing = true}
     oncompositionend={() => { composing = false; saveCurrentContent(); }}
