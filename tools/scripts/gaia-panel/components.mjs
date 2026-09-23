@@ -54,7 +54,7 @@ function radial(centerX, centerY, stops, { radiusX = 60, radiusY = 60 } = {}) {
 /** A filled rectangle part. `radius: 0` is what keeps a fader cap square. */
 function rect(name, { x, y, width, height }, colour, {
   zIndex = 0, radius = 0, borderColour = '00000000', borderThickness = 0, opacity = 1, gradient = null,
-  pivotX = null, pivotY = null, kind = 'rectangle',
+  pivotX = null, pivotY = null, kind = 'rectangle', rotation = 0,
 } = {}) {
   const background = clone(SECTION_DEFAULTS.Background);
   background._children.Fill.colour = colour;
@@ -84,6 +84,7 @@ function rect(name, { x, y, width, height }, colour, {
       // come out wrong.
       ...(pivotX === null ? {} : { pivotX }),
       ...(pivotY === null ? {} : { pivotY }),
+      ...(rotation ? { rotation } : {}),
     },
     sections: { Background: background },
   });
@@ -237,6 +238,41 @@ export function gaiaSectionTab({ title, width, height = 20, tint }) {
     },
     // Pure chrome: unlike a knob or selector, a section tab must not publish a phantom automation
     // parameter merely because it is implemented as a custom component.
+    channels: {},
+    published: {
+      _type: 'PublishedProperties', inputs: {}, outputs: {}, editableProperties: {},
+    },
+  });
+}
+
+/**
+ * The section tab, mirrored: for the top-RIGHT corner of a section, where the Fader/Graph switch
+ * sits. Rounded outside corner on the right, square inside corners, and the slant on the left with
+ * the top edge again the longer one — the section name's tab seen in a mirror.
+ *
+ * Shape only: the switch itself is an ordinary Button laid over it, so its click script and the
+ * text it rewrites stay what they were.
+ *
+ * The slant is the library's right triangle turned half a turn. Upright, its sloping side runs from
+ * the top-left corner down to the bottom-right with the fill below it; turned 180 degrees about its
+ * own centre the fill is above that same line, which is exactly a left end whose top reaches
+ * further out than its bottom. A half turn keeps the part's box, so it lines up without measuring.
+ */
+export function gaiaCornerTab({ width, height = 20, tint }) {
+  const corner = 5;
+  const slant = Math.round(height * 0.6);
+  return component({
+    name: 'GAIA Corner Tab',
+    width,
+    height,
+    parts: {
+      body: rect('body', { x: slant, y: 0, width: width - slant, height }, tint, { zIndex: 0, radius: corner }),
+      // Square the inner end of the top edge, keeping the outside top-right curve.
+      topLeft: rect('topLeft', { x: slant, y: 0, width: corner, height: corner }, tint, { zIndex: 1 }),
+      bottom: rect('bottom', { x: slant, y: height - corner, width: width - slant, height: corner }, tint, { zIndex: 1 }),
+      // One pixel under the body, so no hairline shows where the two meet.
+      slant: rect('slant', { x: 0, y: 0, width: slant + 1, height }, tint, { zIndex: 1, kind: 'rightTriangle', rotation: 180 }),
+    },
     channels: {},
     published: {
       _type: 'PublishedProperties', inputs: {}, outputs: {}, editableProperties: {},

@@ -6001,7 +6001,7 @@
       "id": "tone1_osc_pitchEnv_view_button_click",
       "name": "Tone 1 osc.pitchEnv view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone1_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone1_osc_pitchEnv_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone1_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone1_osc_pitchEnv_view_button.Text.content', next ? 'GRAPH' : 'FADER'); }",
       "scope": "panel",
       "target": "tone1_osc_pitchEnv_viewButton",
       "event": "onClick",
@@ -6013,7 +6013,7 @@
       "id": "tone1_filter_env_view_button_click",
       "name": "Tone 1 filter.env view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone1_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_filter_env_view.TabContainer.pageIndex', next); set('tone1_filter_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone1_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_filter_env_view.TabContainer.pageIndex', next); set('tone1_filter_env_view_button.Text.content', next ? 'GRAPH' : 'FADER'); }",
       "scope": "panel",
       "target": "tone1_filter_env_viewButton",
       "event": "onClick",
@@ -6025,7 +6025,7 @@
       "id": "tone1_amp_env_view_button_click",
       "name": "Tone 1 amp.env view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone1_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_amp_env_view.TabContainer.pageIndex', next); set('tone1_amp_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone1_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_amp_env_view.TabContainer.pageIndex', next); set('tone1_amp_env_view_button.Text.content', next ? 'GRAPH' : 'FADER'); }",
       "scope": "panel",
       "target": "tone1_amp_env_viewButton",
       "event": "onClick",
@@ -6037,7 +6037,7 @@
       "id": "tone2_osc_pitchEnv_view_button_click",
       "name": "Tone 2 osc.pitchEnv view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone2_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone2_osc_pitchEnv_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone2_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone2_osc_pitchEnv_view_button.Text.content', next ? 'GRAPH' : 'FADER'); }",
       "scope": "panel",
       "target": "tone2_osc_pitchEnv_viewButton",
       "event": "onClick",
@@ -6049,7 +6049,7 @@
       "id": "tone2_filter_env_view_button_click",
       "name": "Tone 2 filter.env view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone2_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_filter_env_view.TabContainer.pageIndex', next); set('tone2_filter_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone2_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_filter_env_view.TabContainer.pageIndex', next); set('tone2_filter_env_view_button.Text.content', next ? 'GRAPH' : 'FADER'); }",
       "scope": "panel",
       "target": "tone2_filter_env_viewButton",
       "event": "onClick",
@@ -6061,7 +6061,7 @@
       "id": "tone2_amp_env_view_button_click",
       "name": "Tone 2 amp.env view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone2_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_amp_env_view.TabContainer.pageIndex', next); set('tone2_amp_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone2_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_amp_env_view.TabContainer.pageIndex', next); set('tone2_amp_env_view_button.Text.content', next ? 'GRAPH' : 'FADER'); }",
       "scope": "panel",
       "target": "tone2_amp_env_viewButton",
       "event": "onClick",
@@ -6073,7 +6073,7 @@
       "id": "tone3_osc_pitchEnv_view_button_click",
       "name": "Tone 3 osc.pitchEnv view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone3_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone3_osc_pitchEnv_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone3_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone3_osc_pitchEnv_view_button.Text.content', next ? 'GRAPH' : 'FADER'); }",
       "scope": "panel",
       "target": "tone3_osc_pitchEnv_viewButton",
       "event": "onClick",
@@ -6085,7 +6085,7 @@
       "id": "tone3_filter_env_view_button_click",
       "name": "Tone 3 filter.env view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone3_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_filter_env_view.TabContainer.pageIndex', next); set('tone3_filter_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone3_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_filter_env_view.TabContainer.pageIndex', next); set('tone3_filter_env_view_button.Text.content', next ? 'GRAPH' : 'FADER'); }",
       "scope": "panel",
       "target": "tone3_filter_env_viewButton",
       "event": "onClick",
@@ -6097,7 +6097,7 @@
       "id": "tone3_amp_env_view_button_click",
       "name": "Tone 3 amp.env view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone3_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_amp_env_view.TabContainer.pageIndex', next); set('tone3_amp_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone3_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_amp_env_view.TabContainer.pageIndex', next); set('tone3_amp_env_view_button.Text.content', next ? 'GRAPH' : 'FADER'); }",
       "scope": "panel",
       "target": "tone3_amp_env_viewButton",
       "event": "onClick",
@@ -27898,6 +27898,202 @@
                       },
                       "_type": "Control"
                     },
+                    "tone1_osc_pitchEnv_view_button_tab": {
+                      "_children": {
+                        "Core": {
+                          "name": "tone1_osc_pitchEnv_viewButtonTab",
+                          "id": "tone1_osc_pitchEnv_view_button_tab",
+                          "controlType": "CustomComponent"
+                        },
+                        "Transform": {
+                          "x": 318.49760765550235,
+                          "y": 2,
+                          "width": 64,
+                          "height": 20
+                        },
+                        "Parts": {
+                          "_children": {
+                            "body": {
+                              "name": "body",
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 52,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true,
+                                      "radius": 5
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "topLeft": {
+                              "name": "topLeft",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 5,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "bottom": {
+                              "name": "bottom",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 15,
+                                  "width": 52,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "slant": {
+                              "name": "slant",
+                              "kind": "rightTriangle",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 13,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top",
+                                  "rotation": 180
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            }
+                          }
+                        },
+                        "ValueChannels": {
+                          "_children": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          }
+                        },
+                        "Behaviors": {
+                          "_children": {
+                            "_removed": [
+                              "mainSlider",
+                              "modeButton"
+                            ]
+                          }
+                        },
+                        "Bindings": {
+                          "_removed": [
+                            "_type"
+                          ]
+                        },
+                        "PublishedProperties": {
+                          "inputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode",
+                              "accentColour"
+                            ]
+                          },
+                          "outputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          },
+                          "editableProperties": {
+                            "_removed": [
+                              "label",
+                              "variant"
+                            ]
+                          }
+                        }
+                      },
+                      "_type": "Control"
+                    },
                     "tone1_osc_pitchEnv_view_button": {
                       "_children": {
                         "Core": {
@@ -27907,37 +28103,41 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 253.9234449760765,
+                          "x": 318.49760765550235,
                           "y": 2,
-                          "width": 58,
-                          "height": 16
+                          "width": 64,
+                          "height": 20
                         },
                         "Background": {
                           "_children": {
                             "Fill": {
-                              "colour": "FF39372B"
+                              "colour": "00000000"
                             },
                             "Border": {
-                              "colour": "FFE2A52C"
+                              "enabled": false,
+                              "thickness": 0
                             },
                             "Corners": {
-                              "radius": 4
+                              "radius": 0
                             }
                           }
                         },
                         "Text": {
-                          "content": "Fader",
+                          "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FFFFE1A0"
+                              "colour": "FF13161A"
                             },
                             "Font": {
-                              "size": 9
+                              "weight": "Bold",
+                              "weightValue": 700,
+                              "size": 10,
+                              "letterSpacing": 1,
+                              "bold": true
                             }
                           }
                         },
                         "ContentLayout": {
-                          "paddingLeft": 2,
                           "paddingRight": 2,
                           "paddingTop": 0,
                           "paddingBottom": 0
@@ -40424,6 +40624,202 @@
                       },
                       "_type": "Control"
                     },
+                    "tone1_filter_env_view_button_tab": {
+                      "_children": {
+                        "Core": {
+                          "name": "tone1_filter_env_viewButtonTab",
+                          "id": "tone1_filter_env_view_button_tab",
+                          "controlType": "CustomComponent"
+                        },
+                        "Transform": {
+                          "x": 318.4976076555024,
+                          "y": 2,
+                          "width": 64,
+                          "height": 20
+                        },
+                        "Parts": {
+                          "_children": {
+                            "body": {
+                              "name": "body",
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 52,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true,
+                                      "radius": 5
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "topLeft": {
+                              "name": "topLeft",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 5,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "bottom": {
+                              "name": "bottom",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 15,
+                                  "width": 52,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "slant": {
+                              "name": "slant",
+                              "kind": "rightTriangle",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 13,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top",
+                                  "rotation": 180
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            }
+                          }
+                        },
+                        "ValueChannels": {
+                          "_children": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          }
+                        },
+                        "Behaviors": {
+                          "_children": {
+                            "_removed": [
+                              "mainSlider",
+                              "modeButton"
+                            ]
+                          }
+                        },
+                        "Bindings": {
+                          "_removed": [
+                            "_type"
+                          ]
+                        },
+                        "PublishedProperties": {
+                          "inputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode",
+                              "accentColour"
+                            ]
+                          },
+                          "outputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          },
+                          "editableProperties": {
+                            "_removed": [
+                              "label",
+                              "variant"
+                            ]
+                          }
+                        }
+                      },
+                      "_type": "Control"
+                    },
                     "tone1_filter_env_view_button": {
                       "_children": {
                         "Core": {
@@ -40433,37 +40829,41 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 140.56459330143537,
+                          "x": 318.4976076555024,
                           "y": 2,
-                          "width": 58,
-                          "height": 16
+                          "width": 64,
+                          "height": 20
                         },
                         "Background": {
                           "_children": {
                             "Fill": {
-                              "colour": "FF39372B"
+                              "colour": "00000000"
                             },
                             "Border": {
-                              "colour": "FFE2A52C"
+                              "enabled": false,
+                              "thickness": 0
                             },
                             "Corners": {
-                              "radius": 4
+                              "radius": 0
                             }
                           }
                         },
                         "Text": {
-                          "content": "Fader",
+                          "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FFFFE1A0"
+                              "colour": "FF13161A"
                             },
                             "Font": {
-                              "size": 9
+                              "weight": "Bold",
+                              "weightValue": 700,
+                              "size": 10,
+                              "letterSpacing": 1,
+                              "bold": true
                             }
                           }
                         },
                         "ContentLayout": {
-                          "paddingLeft": 2,
                           "paddingRight": 2,
                           "paddingTop": 0,
                           "paddingBottom": 0
@@ -48691,6 +49091,202 @@
                       },
                       "_type": "Control"
                     },
+                    "tone1_amp_env_view_button_tab": {
+                      "_children": {
+                        "Core": {
+                          "name": "tone1_amp_env_viewButtonTab",
+                          "id": "tone1_amp_env_view_button_tab",
+                          "controlType": "CustomComponent"
+                        },
+                        "Transform": {
+                          "x": 144.06698564593307,
+                          "y": 2,
+                          "width": 64,
+                          "height": 20
+                        },
+                        "Parts": {
+                          "_children": {
+                            "body": {
+                              "name": "body",
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 52,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true,
+                                      "radius": 5
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "topLeft": {
+                              "name": "topLeft",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 5,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "bottom": {
+                              "name": "bottom",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 15,
+                                  "width": 52,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "slant": {
+                              "name": "slant",
+                              "kind": "rightTriangle",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 13,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top",
+                                  "rotation": 180
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            }
+                          }
+                        },
+                        "ValueChannels": {
+                          "_children": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          }
+                        },
+                        "Behaviors": {
+                          "_children": {
+                            "_removed": [
+                              "mainSlider",
+                              "modeButton"
+                            ]
+                          }
+                        },
+                        "Bindings": {
+                          "_removed": [
+                            "_type"
+                          ]
+                        },
+                        "PublishedProperties": {
+                          "inputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode",
+                              "accentColour"
+                            ]
+                          },
+                          "outputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          },
+                          "editableProperties": {
+                            "_removed": [
+                              "label",
+                              "variant"
+                            ]
+                          }
+                        }
+                      },
+                      "_type": "Control"
+                    },
                     "tone1_amp_env_view_button": {
                       "_children": {
                         "Core": {
@@ -48700,37 +49296,41 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 136.81339712918657,
+                          "x": 144.06698564593307,
                           "y": 2,
-                          "width": 58,
-                          "height": 16
+                          "width": 64,
+                          "height": 20
                         },
                         "Background": {
                           "_children": {
                             "Fill": {
-                              "colour": "FF39372B"
+                              "colour": "00000000"
                             },
                             "Border": {
-                              "colour": "FFE2A52C"
+                              "enabled": false,
+                              "thickness": 0
                             },
                             "Corners": {
-                              "radius": 4
+                              "radius": 0
                             }
                           }
                         },
                         "Text": {
-                          "content": "Fader",
+                          "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FFFFE1A0"
+                              "colour": "FF13161A"
                             },
                             "Font": {
-                              "size": 9
+                              "weight": "Bold",
+                              "weightValue": 700,
+                              "size": 10,
+                              "letterSpacing": 1,
+                              "bold": true
                             }
                           }
                         },
                         "ContentLayout": {
-                          "paddingLeft": 2,
                           "paddingRight": 2,
                           "paddingTop": 0,
                           "paddingBottom": 0
@@ -78650,6 +79250,202 @@
                       },
                       "_type": "Control"
                     },
+                    "tone2_osc_pitchEnv_view_button_tab": {
+                      "_children": {
+                        "Core": {
+                          "name": "tone2_osc_pitchEnv_viewButtonTab",
+                          "id": "tone2_osc_pitchEnv_view_button_tab",
+                          "controlType": "CustomComponent"
+                        },
+                        "Transform": {
+                          "x": 318.49760765550235,
+                          "y": 2,
+                          "width": 64,
+                          "height": 20
+                        },
+                        "Parts": {
+                          "_children": {
+                            "body": {
+                              "name": "body",
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 52,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true,
+                                      "radius": 5
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "topLeft": {
+                              "name": "topLeft",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 5,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "bottom": {
+                              "name": "bottom",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 15,
+                                  "width": 52,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "slant": {
+                              "name": "slant",
+                              "kind": "rightTriangle",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 13,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top",
+                                  "rotation": 180
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            }
+                          }
+                        },
+                        "ValueChannels": {
+                          "_children": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          }
+                        },
+                        "Behaviors": {
+                          "_children": {
+                            "_removed": [
+                              "mainSlider",
+                              "modeButton"
+                            ]
+                          }
+                        },
+                        "Bindings": {
+                          "_removed": [
+                            "_type"
+                          ]
+                        },
+                        "PublishedProperties": {
+                          "inputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode",
+                              "accentColour"
+                            ]
+                          },
+                          "outputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          },
+                          "editableProperties": {
+                            "_removed": [
+                              "label",
+                              "variant"
+                            ]
+                          }
+                        }
+                      },
+                      "_type": "Control"
+                    },
                     "tone2_osc_pitchEnv_view_button": {
                       "_children": {
                         "Core": {
@@ -78659,37 +79455,41 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 253.9234449760765,
+                          "x": 318.49760765550235,
                           "y": 2,
-                          "width": 58,
-                          "height": 16
+                          "width": 64,
+                          "height": 20
                         },
                         "Background": {
                           "_children": {
                             "Fill": {
-                              "colour": "FF39372B"
+                              "colour": "00000000"
                             },
                             "Border": {
-                              "colour": "FFE2A52C"
+                              "enabled": false,
+                              "thickness": 0
                             },
                             "Corners": {
-                              "radius": 4
+                              "radius": 0
                             }
                           }
                         },
                         "Text": {
-                          "content": "Fader",
+                          "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FFFFE1A0"
+                              "colour": "FF13161A"
                             },
                             "Font": {
-                              "size": 9
+                              "weight": "Bold",
+                              "weightValue": 700,
+                              "size": 10,
+                              "letterSpacing": 1,
+                              "bold": true
                             }
                           }
                         },
                         "ContentLayout": {
-                          "paddingLeft": 2,
                           "paddingRight": 2,
                           "paddingTop": 0,
                           "paddingBottom": 0
@@ -91176,6 +91976,202 @@
                       },
                       "_type": "Control"
                     },
+                    "tone2_filter_env_view_button_tab": {
+                      "_children": {
+                        "Core": {
+                          "name": "tone2_filter_env_viewButtonTab",
+                          "id": "tone2_filter_env_view_button_tab",
+                          "controlType": "CustomComponent"
+                        },
+                        "Transform": {
+                          "x": 318.4976076555024,
+                          "y": 2,
+                          "width": 64,
+                          "height": 20
+                        },
+                        "Parts": {
+                          "_children": {
+                            "body": {
+                              "name": "body",
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 52,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true,
+                                      "radius": 5
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "topLeft": {
+                              "name": "topLeft",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 5,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "bottom": {
+                              "name": "bottom",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 15,
+                                  "width": 52,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "slant": {
+                              "name": "slant",
+                              "kind": "rightTriangle",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 13,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top",
+                                  "rotation": 180
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            }
+                          }
+                        },
+                        "ValueChannels": {
+                          "_children": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          }
+                        },
+                        "Behaviors": {
+                          "_children": {
+                            "_removed": [
+                              "mainSlider",
+                              "modeButton"
+                            ]
+                          }
+                        },
+                        "Bindings": {
+                          "_removed": [
+                            "_type"
+                          ]
+                        },
+                        "PublishedProperties": {
+                          "inputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode",
+                              "accentColour"
+                            ]
+                          },
+                          "outputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          },
+                          "editableProperties": {
+                            "_removed": [
+                              "label",
+                              "variant"
+                            ]
+                          }
+                        }
+                      },
+                      "_type": "Control"
+                    },
                     "tone2_filter_env_view_button": {
                       "_children": {
                         "Core": {
@@ -91185,37 +92181,41 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 140.56459330143537,
+                          "x": 318.4976076555024,
                           "y": 2,
-                          "width": 58,
-                          "height": 16
+                          "width": 64,
+                          "height": 20
                         },
                         "Background": {
                           "_children": {
                             "Fill": {
-                              "colour": "FF39372B"
+                              "colour": "00000000"
                             },
                             "Border": {
-                              "colour": "FFE2A52C"
+                              "enabled": false,
+                              "thickness": 0
                             },
                             "Corners": {
-                              "radius": 4
+                              "radius": 0
                             }
                           }
                         },
                         "Text": {
-                          "content": "Fader",
+                          "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FFFFE1A0"
+                              "colour": "FF13161A"
                             },
                             "Font": {
-                              "size": 9
+                              "weight": "Bold",
+                              "weightValue": 700,
+                              "size": 10,
+                              "letterSpacing": 1,
+                              "bold": true
                             }
                           }
                         },
                         "ContentLayout": {
-                          "paddingLeft": 2,
                           "paddingRight": 2,
                           "paddingTop": 0,
                           "paddingBottom": 0
@@ -99443,6 +100443,202 @@
                       },
                       "_type": "Control"
                     },
+                    "tone2_amp_env_view_button_tab": {
+                      "_children": {
+                        "Core": {
+                          "name": "tone2_amp_env_viewButtonTab",
+                          "id": "tone2_amp_env_view_button_tab",
+                          "controlType": "CustomComponent"
+                        },
+                        "Transform": {
+                          "x": 144.06698564593307,
+                          "y": 2,
+                          "width": 64,
+                          "height": 20
+                        },
+                        "Parts": {
+                          "_children": {
+                            "body": {
+                              "name": "body",
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 52,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true,
+                                      "radius": 5
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "topLeft": {
+                              "name": "topLeft",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 5,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "bottom": {
+                              "name": "bottom",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 15,
+                                  "width": 52,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "slant": {
+                              "name": "slant",
+                              "kind": "rightTriangle",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 13,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top",
+                                  "rotation": 180
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            }
+                          }
+                        },
+                        "ValueChannels": {
+                          "_children": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          }
+                        },
+                        "Behaviors": {
+                          "_children": {
+                            "_removed": [
+                              "mainSlider",
+                              "modeButton"
+                            ]
+                          }
+                        },
+                        "Bindings": {
+                          "_removed": [
+                            "_type"
+                          ]
+                        },
+                        "PublishedProperties": {
+                          "inputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode",
+                              "accentColour"
+                            ]
+                          },
+                          "outputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          },
+                          "editableProperties": {
+                            "_removed": [
+                              "label",
+                              "variant"
+                            ]
+                          }
+                        }
+                      },
+                      "_type": "Control"
+                    },
                     "tone2_amp_env_view_button": {
                       "_children": {
                         "Core": {
@@ -99452,37 +100648,41 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 136.81339712918657,
+                          "x": 144.06698564593307,
                           "y": 2,
-                          "width": 58,
-                          "height": 16
+                          "width": 64,
+                          "height": 20
                         },
                         "Background": {
                           "_children": {
                             "Fill": {
-                              "colour": "FF39372B"
+                              "colour": "00000000"
                             },
                             "Border": {
-                              "colour": "FFE2A52C"
+                              "enabled": false,
+                              "thickness": 0
                             },
                             "Corners": {
-                              "radius": 4
+                              "radius": 0
                             }
                           }
                         },
                         "Text": {
-                          "content": "Fader",
+                          "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FFFFE1A0"
+                              "colour": "FF13161A"
                             },
                             "Font": {
-                              "size": 9
+                              "weight": "Bold",
+                              "weightValue": 700,
+                              "size": 10,
+                              "letterSpacing": 1,
+                              "bold": true
                             }
                           }
                         },
                         "ContentLayout": {
-                          "paddingLeft": 2,
                           "paddingRight": 2,
                           "paddingTop": 0,
                           "paddingBottom": 0
@@ -129402,6 +130602,202 @@
                       },
                       "_type": "Control"
                     },
+                    "tone3_osc_pitchEnv_view_button_tab": {
+                      "_children": {
+                        "Core": {
+                          "name": "tone3_osc_pitchEnv_viewButtonTab",
+                          "id": "tone3_osc_pitchEnv_view_button_tab",
+                          "controlType": "CustomComponent"
+                        },
+                        "Transform": {
+                          "x": 318.49760765550235,
+                          "y": 2,
+                          "width": 64,
+                          "height": 20
+                        },
+                        "Parts": {
+                          "_children": {
+                            "body": {
+                              "name": "body",
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 52,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true,
+                                      "radius": 5
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "topLeft": {
+                              "name": "topLeft",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 5,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "bottom": {
+                              "name": "bottom",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 15,
+                                  "width": 52,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "slant": {
+                              "name": "slant",
+                              "kind": "rightTriangle",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 13,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top",
+                                  "rotation": 180
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            }
+                          }
+                        },
+                        "ValueChannels": {
+                          "_children": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          }
+                        },
+                        "Behaviors": {
+                          "_children": {
+                            "_removed": [
+                              "mainSlider",
+                              "modeButton"
+                            ]
+                          }
+                        },
+                        "Bindings": {
+                          "_removed": [
+                            "_type"
+                          ]
+                        },
+                        "PublishedProperties": {
+                          "inputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode",
+                              "accentColour"
+                            ]
+                          },
+                          "outputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          },
+                          "editableProperties": {
+                            "_removed": [
+                              "label",
+                              "variant"
+                            ]
+                          }
+                        }
+                      },
+                      "_type": "Control"
+                    },
                     "tone3_osc_pitchEnv_view_button": {
                       "_children": {
                         "Core": {
@@ -129411,37 +130807,41 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 253.9234449760765,
+                          "x": 318.49760765550235,
                           "y": 2,
-                          "width": 58,
-                          "height": 16
+                          "width": 64,
+                          "height": 20
                         },
                         "Background": {
                           "_children": {
                             "Fill": {
-                              "colour": "FF39372B"
+                              "colour": "00000000"
                             },
                             "Border": {
-                              "colour": "FFE2A52C"
+                              "enabled": false,
+                              "thickness": 0
                             },
                             "Corners": {
-                              "radius": 4
+                              "radius": 0
                             }
                           }
                         },
                         "Text": {
-                          "content": "Fader",
+                          "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FFFFE1A0"
+                              "colour": "FF13161A"
                             },
                             "Font": {
-                              "size": 9
+                              "weight": "Bold",
+                              "weightValue": 700,
+                              "size": 10,
+                              "letterSpacing": 1,
+                              "bold": true
                             }
                           }
                         },
                         "ContentLayout": {
-                          "paddingLeft": 2,
                           "paddingRight": 2,
                           "paddingTop": 0,
                           "paddingBottom": 0
@@ -141928,6 +143328,202 @@
                       },
                       "_type": "Control"
                     },
+                    "tone3_filter_env_view_button_tab": {
+                      "_children": {
+                        "Core": {
+                          "name": "tone3_filter_env_viewButtonTab",
+                          "id": "tone3_filter_env_view_button_tab",
+                          "controlType": "CustomComponent"
+                        },
+                        "Transform": {
+                          "x": 318.4976076555024,
+                          "y": 2,
+                          "width": 64,
+                          "height": 20
+                        },
+                        "Parts": {
+                          "_children": {
+                            "body": {
+                              "name": "body",
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 52,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true,
+                                      "radius": 5
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "topLeft": {
+                              "name": "topLeft",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 5,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "bottom": {
+                              "name": "bottom",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 15,
+                                  "width": 52,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "slant": {
+                              "name": "slant",
+                              "kind": "rightTriangle",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 13,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top",
+                                  "rotation": 180
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            }
+                          }
+                        },
+                        "ValueChannels": {
+                          "_children": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          }
+                        },
+                        "Behaviors": {
+                          "_children": {
+                            "_removed": [
+                              "mainSlider",
+                              "modeButton"
+                            ]
+                          }
+                        },
+                        "Bindings": {
+                          "_removed": [
+                            "_type"
+                          ]
+                        },
+                        "PublishedProperties": {
+                          "inputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode",
+                              "accentColour"
+                            ]
+                          },
+                          "outputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          },
+                          "editableProperties": {
+                            "_removed": [
+                              "label",
+                              "variant"
+                            ]
+                          }
+                        }
+                      },
+                      "_type": "Control"
+                    },
                     "tone3_filter_env_view_button": {
                       "_children": {
                         "Core": {
@@ -141937,37 +143533,41 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 140.56459330143537,
+                          "x": 318.4976076555024,
                           "y": 2,
-                          "width": 58,
-                          "height": 16
+                          "width": 64,
+                          "height": 20
                         },
                         "Background": {
                           "_children": {
                             "Fill": {
-                              "colour": "FF39372B"
+                              "colour": "00000000"
                             },
                             "Border": {
-                              "colour": "FFE2A52C"
+                              "enabled": false,
+                              "thickness": 0
                             },
                             "Corners": {
-                              "radius": 4
+                              "radius": 0
                             }
                           }
                         },
                         "Text": {
-                          "content": "Fader",
+                          "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FFFFE1A0"
+                              "colour": "FF13161A"
                             },
                             "Font": {
-                              "size": 9
+                              "weight": "Bold",
+                              "weightValue": 700,
+                              "size": 10,
+                              "letterSpacing": 1,
+                              "bold": true
                             }
                           }
                         },
                         "ContentLayout": {
-                          "paddingLeft": 2,
                           "paddingRight": 2,
                           "paddingTop": 0,
                           "paddingBottom": 0
@@ -150195,6 +151795,202 @@
                       },
                       "_type": "Control"
                     },
+                    "tone3_amp_env_view_button_tab": {
+                      "_children": {
+                        "Core": {
+                          "name": "tone3_amp_env_viewButtonTab",
+                          "id": "tone3_amp_env_view_button_tab",
+                          "controlType": "CustomComponent"
+                        },
+                        "Transform": {
+                          "x": 144.06698564593307,
+                          "y": 2,
+                          "width": 64,
+                          "height": 20
+                        },
+                        "Parts": {
+                          "_children": {
+                            "body": {
+                              "name": "body",
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 52,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true,
+                                      "radius": 5
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "topLeft": {
+                              "name": "topLeft",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 0,
+                                  "width": 5,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "bottom": {
+                              "name": "bottom",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 12,
+                                  "y": 15,
+                                  "width": 52,
+                                  "height": 5,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top"
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            },
+                            "slant": {
+                              "name": "slant",
+                              "kind": "rightTriangle",
+                              "zIndex": 1,
+                              "_children": {
+                                "Layout": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 13,
+                                  "height": 20,
+                                  "xUnit": "px",
+                                  "yUnit": "px",
+                                  "anchorX": "left",
+                                  "anchorY": "top",
+                                  "rotation": 180
+                                },
+                                "Background": {
+                                  "_children": {
+                                    "Fill": {
+                                      "colour": "FFE0A030"
+                                    },
+                                    "Border": {
+                                      "enabled": false,
+                                      "thickness": 0,
+                                      "colour": "00000000"
+                                    },
+                                    "Corners": {
+                                      "linked": true
+                                    }
+                                  },
+                                  "_type": "Background"
+                                }
+                              },
+                              "_type": "Part"
+                            }
+                          }
+                        },
+                        "ValueChannels": {
+                          "_children": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          }
+                        },
+                        "Behaviors": {
+                          "_children": {
+                            "_removed": [
+                              "mainSlider",
+                              "modeButton"
+                            ]
+                          }
+                        },
+                        "Bindings": {
+                          "_removed": [
+                            "_type"
+                          ]
+                        },
+                        "PublishedProperties": {
+                          "inputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode",
+                              "accentColour"
+                            ]
+                          },
+                          "outputs": {
+                            "_removed": [
+                              "mainValue",
+                              "mode"
+                            ]
+                          },
+                          "editableProperties": {
+                            "_removed": [
+                              "label",
+                              "variant"
+                            ]
+                          }
+                        }
+                      },
+                      "_type": "Control"
+                    },
                     "tone3_amp_env_view_button": {
                       "_children": {
                         "Core": {
@@ -150204,37 +152000,41 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 136.81339712918657,
+                          "x": 144.06698564593307,
                           "y": 2,
-                          "width": 58,
-                          "height": 16
+                          "width": 64,
+                          "height": 20
                         },
                         "Background": {
                           "_children": {
                             "Fill": {
-                              "colour": "FF39372B"
+                              "colour": "00000000"
                             },
                             "Border": {
-                              "colour": "FFE2A52C"
+                              "enabled": false,
+                              "thickness": 0
                             },
                             "Corners": {
-                              "radius": 4
+                              "radius": 0
                             }
                           }
                         },
                         "Text": {
-                          "content": "Fader",
+                          "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FFFFE1A0"
+                              "colour": "FF13161A"
                             },
                             "Font": {
-                              "size": 9
+                              "weight": "Bold",
+                              "weightValue": 700,
+                              "size": 10,
+                              "letterSpacing": 1,
+                              "bold": true
                             }
                           }
                         },
                         "ContentLayout": {
-                          "paddingLeft": 2,
                           "paddingRight": 2,
                           "paddingTop": 0,
                           "paddingBottom": 0
