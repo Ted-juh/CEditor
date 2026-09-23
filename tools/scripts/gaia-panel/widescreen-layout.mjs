@@ -148,7 +148,7 @@ export function applyWidescreenLayout(panel) {
   }
   Object.assign(rect(named('plate')),{x:10,y:30,width:1900,height:960});
   panel.width=1920; panel.height=1000;
-  return alignPitchEnvelopeGraphs(applyEnvelopeButtons(expandStatusDisplay(moveDBeamToSystem(refineToneSpacing(applyEnvelopeViews(compactPanelRows(moveSyncRingIntoOsc(expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel)))))))))));
+  return fillLowerPages(alignPitchEnvelopeGraphs(applyEnvelopeButtons(expandStatusDisplay(moveDBeamToSystem(refineToneSpacing(applyEnvelopeViews(compactPanelRows(moveSyncRingIntoOsc(expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel))))))))))));
 }
 
 // Reuse the decorative header's 18px for the controls: the upper controls move
@@ -315,5 +315,50 @@ export function moveSyncRingIntoOsc(panel) {
     if (typeof zone.payload === 'number') zone.payload = { value: zone.payload };
   }
   panel.controls.push(sync);
+  return panel;
+}
+
+/**
+ * Let the System and Patch Banks pages use the lower workspace's full height.
+ *
+ * The status display and arpeggiator pages are sized to the page area by their own passes; System
+ * and Patch Banks kept the height the proportional squeeze left them (205 and 216 of 244px), so
+ * both stopped short with an empty band underneath. Their frames — section boxes, the bank tabs —
+ * now stretch to the page, and everything in them keeps its size and moves down in proportion, so
+ * the rows spread out rather than the fields and buttons getting taller. A page already full is
+ * left alone, so this is safe to run twice.
+ */
+export function fillLowerPages(panel) {
+  const bottom = flatControls(panel.controls).find((c) => c._children.Core.name === 'bottom_pages');
+  if (!bottom) return panel;
+  const frame = (c) => String(c._children.Core.name ?? '').startsWith('box_') || !!c._children.TabContainer;
+  const pageOf = (c, tabs) => String(c._children.Core.tabPageId || tabs._children.TabContainer.pages[0]?.id);
+
+  // Spread one list of siblings over `factor` times its height; frames grow, controls move.
+  function spread(list, factor) {
+    for (const c of list) {
+      const t = c._children.Transform;
+      t.y = (t.y ?? 0) * factor;
+      if (!frame(c)) continue;
+      const before = t.height;
+      t.height = before * factor;
+      if (c._children.TabContainer) {
+        // Its children live in its page area, below the strip; that area grows by what the tab did.
+        const strip = c._children.TabContainer.stripSize ?? 0;
+        const inner = (before - strip) > 0 ? (t.height - strip) / (before - strip) : 1;
+        spread(Object.values(c._children.Children?._children ?? {}), inner);
+      }
+    }
+  }
+
+  const t = bottom._children.Transform;
+  const pageHeight = tabGeometry(t.width, t.height, bottom).page.h;
+  const kids = Object.values(bottom._children.Children?._children ?? {});
+  for (const page of ['system', 'banks']) {
+    const onPage = kids.filter((c) => pageOf(c, bottom) === page);
+    const used = Math.max(...onPage.map((c) => (c._children.Transform.y ?? 0) + c._children.Transform.height));
+    if (!(used > 0) || used >= pageHeight - 0.5) continue;
+    spread(onPage, pageHeight / used);
+  }
   return panel;
 }
