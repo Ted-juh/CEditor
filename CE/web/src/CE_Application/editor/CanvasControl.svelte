@@ -58,6 +58,10 @@
   import { listboxDefaultSelectedValues } from '../utils/listboxLayout.js';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { selectionScopeIds } from '../stores/selectionScope.js';
+  import SceneryGround from './SceneryGround.svelte';
+  import { planSceneryFold, sceneryHoldSet } from '../utils/sceneryModel.js';
+  import { foldSceneryInEditor } from '../stores/runtimePreferences.js';
+  import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
   import { layerTints } from '../stores/panelLayerActions.js';
   import { normalizeLayerName } from '../utils/panelLayers.js';
   import { applyControlPatchesById, duplicateControlsInPlace, getSection, updateControlProperty, reparentControls } from '../stores/controls.js';
@@ -789,6 +793,40 @@
   // Flow layout wins where both apply: it is an explicit "the container places everything" mode,
   // and an anchor inside it would be a control opting out of the layout it was put in.
   let childPositions = $derived(childFlowPositions ?? childAnchoredPositions);
+
+  // --- Scenery inside a container ---
+  // The surface folds a panel's inert controls — captions, frames — into one frozen ground
+  // (utils/sceneryRenderPlan.js), but only at the top level. A panel built from real sections puts
+  // almost all of them inside containers, where that fold never looked: the GAIA's baked ground went
+  // from 107 controls to 1 when its sections became containers. So a container folds its own
+  // children the same way, with the same rule, into a ground of its own. It has to be its own: the
+  // section's frame is this container's background, and a panel-level ground is drawn below every
+  // live control on the layer — the frame would cover the captions printed on it.
+  //
+  // Same switch as the surface: the editor's preference on the editing canvas, always in preview,
+  // where this control is not editable.
+  let foldChildren = $derived(childControls.length > 1 && (editorInteractionEnabled ? $foldSceneryInEditor : true));
+  let childFold = $derived.by(() => {
+    if (!foldChildren) return null;
+    // Anything the container itself places (flow layout, anchors) stays live: the ground draws a
+    // control where its own Transform says, and for these that is not where it is drawn. Anything a
+    // script has written to stays live too, as it does at the top level.
+    const stayLive = new Set($scriptTouchedControlIds);
+    for (const child of childControls) {
+      const id = child?._children?.Core?.id;
+      if (id != null && childPositions?.get(id)) stayLive.add(String(id));
+    }
+    const plan = planSceneryFold(childControls, stayLive);
+    return plan.ground.length ? plan : null;
+  });
+  // A selected folded child is drawn live over its own ground — handles and a drag need a real
+  // control — with whatever it would otherwise cover, exactly as PanelSurface does for its grounds.
+  let childHold = $derived(childFold && editorInteractionEnabled
+    ? sceneryHoldSet(childFold.ground, (child) => $selectedComponentIds.has(child?._children?.Core?.id))
+    : null);
+  // What is mounted as components, in paint order: the held copies first (directly above the
+  // ground), then everything live, which the fold guarantees nothing folded is on top of.
+  let childLiveControls = $derived(childFold ? [...(childHold?.held ?? []), ...childFold.live] : childControls);
   let childParentOffset = $derived({
     x: parentOffset.x + displayX + childrenPad.left - childScroll.x,
     y: parentOffset.y + displayY + childrenPad.top - childScroll.y,
@@ -4251,7 +4289,19 @@
     <div class="children-clip" class:clipped={childrenClip} class:children-interactive={mouseChildrenTakePointer}
       style={`${childrenClip && childrenClipRadius ? `border-radius:${childrenClipRadius}px;` : ''}${scrollViewport ? `width:${scrollViewport.w}px;height:${scrollViewport.h}px;` : ''}${tabPageRect ? `left:${tabPageRect.x}px;top:${tabPageRect.y}px;width:${tabPageRect.w}px;height:${tabPageRect.h}px;` : ''}`}>
       <div class="children-origin" class:scope-open={childScopeOpen} style="left:{childrenPad.left - childScroll.x - (tabPageRect?.x ?? 0)}px; top:{childrenPad.top - childScroll.y - (tabPageRect?.y ?? 0)}px;">
-        {#each childControls as child (child._children?.Core?.id)}
+        {#if childFold}
+          <SceneryGround
+            annotate={!editorInteractionEnabled}
+            controls={childFold.ground}
+            {allControls}
+            {panelControls}
+            panelWidth={childFrameSize.width}
+            panelHeight={childFrameSize.height}
+            {scale}
+            hiddenIds={childHold?.heldIds ?? new Set()}
+          />
+        {/if}
+        {#each childLiveControls as child (child._children?.Core?.id)}
           <CanvasControlNested
             control={child}
             {scale}

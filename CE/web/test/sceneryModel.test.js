@@ -201,33 +201,52 @@ test('the fold never moves anything, on the real panel', () => {
   // The invariant, asserted against the GAIA rather than a fixture, because the interleaving is the
   // thing fixtures get wrong: its scenery runs three deep before the first live control and then
   // alternates for four hundred more.
+  //
+  // The GAIA is built from sections now, and every container folds its own children the way the
+  // surface folds the top level (CanvasControl's childFold), so the fold is run on every sibling
+  // list — each a separate paint context — and a Tab Container's pages separately, since only one
+  // of them is drawn at a time.
   const panel = JSON.parse(readPanel());
-  const ordered = sortControlsForRender((panel.controls ?? []).map(expandControl));
-  const { ground, live } = planSceneryFold(ordered);
-
-  // The GAIA's sections are containers now, and the fold only reads the top level, where just the
-  // plate is left to fold. The invariant below still holds on what there is; folding each
-  // section's own legends and frame is the next change, and restores a substantial ground here.
-  assert.ok(ground.length >= 1, `expected the plate at least, got ${ground.length}`);
-  assert.equal(ground.length + live.length, ordered.length, 'the fold lost or duplicated a control');
-
   const box = (c) => {
     const t = c._children?.Transform ?? {};
     return { x: +t.x || 0, y: +t.y || 0, w: +t.width || 0, h: +t.height || 0 };
   };
   const hits = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-  const liveSet = new Set(live);
 
-  // For every folded control, nothing live that was painted BEFORE it may overlap it — that is
-  // precisely the set of controls it would now be behind instead of in front of.
-  for (const folded of ground) {
-    const index = ordered.indexOf(folded);
-    for (let j = 0; j < index; j++) {
-      if (!liveSet.has(ordered[j])) continue;
-      assert.ok(!hits(box(folded), box(ordered[j])),
-        `folding ${folded._children.Core.id} would drop it behind ${ordered[j]._children.Core.id}`);
+  let folded = 0;
+  const foldList = (list) => {
+    const ordered = sortControlsForRender(list.map(expandControl));
+    const { ground, live } = planSceneryFold(ordered);
+    assert.equal(ground.length + live.length, ordered.length, 'the fold lost or duplicated a control');
+    folded += ground.length;
+    const liveSet = new Set(live);
+    // For every folded control, nothing live that was painted BEFORE it may overlap it — that is
+    // precisely the set of controls it would now be behind instead of in front of.
+    for (const control of ground) {
+      const index = ordered.indexOf(control);
+      for (let j = 0; j < index; j++) {
+        if (!liveSet.has(ordered[j])) continue;
+        assert.ok(!hits(box(control), box(ordered[j])),
+          `folding ${control._children.Core.id} would drop it behind ${ordered[j]._children.Core.id}`);
+      }
     }
-  }
+    for (const control of list) {
+      const children = Object.values(control._children?.Children?._children ?? {});
+      if (!children.length) continue;
+      if (!control._children?.TabContainer) { foldList(children); continue; }
+      const pages = new Map();
+      for (const child of children) {
+        const page = String(child._children?.Core?.tabPageId ?? '');
+        if (!pages.has(page)) pages.set(page, []);
+        pages.get(page).push(child);
+      }
+      for (const onPage of pages.values()) foldList(onPage);
+    }
+  };
+  foldList(panel.controls ?? []);
+
+  // 107 folded when every section was drawn loose on the panel; the sections must not cost that.
+  assert.ok(folded > 100, `expected a substantial ground, got ${folded}`);
 });
 
 // Kept at the bottom so the test above reads as the assertion it is.
