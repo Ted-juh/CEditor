@@ -719,6 +719,10 @@ function systemPage(byId) {
         { x: x + 10 + slot * 48 - 48, y: 52 + bank * 28 }).controls);
     }
   }
+  // None of this is a DAW parameter. These are the instrument's settings, not the patch's: a MIDI
+  // channel or a write-protect flag that a host lane could move mid-song is a hazard, not a feature,
+  // and the plugin window still edits every one of them.
+  for (const control of controls) control._children.Core.hostAutomation = false;
   return controls;
 }
 

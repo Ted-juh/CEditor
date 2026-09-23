@@ -16,6 +16,7 @@
 // the first, a non-'value' path leaf for the second, nothing for the third), so the routing here is
 // a reading of the parameter rather than a guess about the control.
 
+import { flatControls } from './containment.js';
 import { sectionValueOf, sectionValuePatch } from './sectionValueOverrides.js';
 
 /** The leaf of a parameter's dotted path — 'value' for the ordinary Behavior case. */
@@ -79,11 +80,16 @@ export function writeParameterPatch(parameter, value, session = null) {
   }
 }
 
-/** The control a parameter drives, resolved by name or by the id prefix of its path. */
+/**
+ * The control a parameter drives, resolved by name or by the id prefix of its path.
+ *
+ * Over the whole tree: an exported parameter can belong to a control inside a container, and a
+ * top-level scan answered '' for it — so snapshots, morph and the Randomizer skipped it silently.
+ */
 export function controlIdForParameter(parameter, panel) {
   const wanted = String(parameter?.controlName ?? String(parameter?.id ?? '').split('.')[0] ?? '');
   if (!wanted) return '';
-  for (const control of panel?.controls ?? []) {
+  for (const control of flatControls(panel?.controls ?? [])) {
     const core = control?._children?.Core;
     if (!core) continue;
     if (core.id === wanted || core.name === wanted) return String(core.id ?? '');

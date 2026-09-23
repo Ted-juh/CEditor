@@ -151,7 +151,9 @@ test('the GAIA panel names its device after the instrument', () => {
   assert.deepEqual([...counts.keys()], ['Roland GAIA SH-01'], 'the panel names some other device');
   assert.equal(counts.get('Roland GAIA SH-01'), 278);
   // The linked envelopes now export their hardware bindings. Their local fold state and the
-  // remaining page selector have no device role; the removed top_pages selector must not survive.
+  // page selectors have no device role; the removed top_pages selector must not survive. The
+  // patch-bank selector is nested inside bottom_pages and was invisible to the export until the
+  // derivation walked the whole tree.
   const exported = new Set(panel.exportParameters.map((e) => e.deviceRole).filter(Boolean));
   assert.deepEqual([...exported], ['Roland GAIA SH-01'],
     'an exported parameter names a different device from the controls');
@@ -162,6 +164,7 @@ test('the GAIA panel names its device after the instrument', () => {
       `tone${tone}.amp.env.view.page`,
     ]),
     'bottom_pages.page',
+    'patch_banks.page',
   ]);
   assert.deepEqual(panel.requiredProfiles.map((e) => e.role), ['Roland GAIA SH-01']);
 });

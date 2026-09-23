@@ -286,10 +286,19 @@ function paramFromBehavior(name, behavior, valueSection = null) {
   };
 }
 
-/** Derive a sensible parameter set from the panel's value-bearing controls. */
+/**
+ * Derive a sensible parameter set from the panel's value-bearing controls.
+ *
+ * The WHOLE TREE, not the top level. A control inside a Tab Container or a Group is as much an input
+ * as one beside it, and for a long time this loop read only `panel.controls` — so the GAIA panel's
+ * thirty envelope faders, which sit on the Fader page of their tab containers, never reached a DAW
+ * while the page selector above them did. Every consumer already resolves a nested control by name
+ * (the Player through `flatControls`, the C++ side through `PanelValueModel::findControlByName`), so
+ * the list was the only thing that could not see them. Depth-first, a container before its children.
+ */
 export function deriveExportParameters(panel) {
   const out = [];
-  for (const control of panel?.controls ?? []) {
+  for (const control of flatControls(panel?.controls ?? [])) {
     const core = control?._children?.Core;
     const name = core?.name ?? core?.id;
     if (!name) continue;
@@ -300,6 +309,8 @@ export function deriveExportParameters(panel) {
     // frame — a lane that appears to work, records fine, and moves nothing. Gated here rather than
     // per door, because all three doors below would otherwise need the same check.
     if (isDisplayOnly(kids.Behavior)) continue;
+    // The author said no. Only the host lane goes: the control still works in the plugin window.
+    if (core?.hostAutomation === false) continue;
 
     const wire = deviceWireFor(control); // which synth parameter this control drives
 
@@ -398,16 +409,17 @@ function paramFromTypeSpec(name, spec, sections) {
 }
 
 /**
- * The names of every control on the panel that shows a value and does not accept input.
+ * The names of every control on the panel that must not reach a host: the ones that show a value
+ * and do not accept input, and the ones whose author switched host automation off.
  *
  * Walked with `flatControls` rather than over the top level, because a meter inside a group is
  * still a meter and an explicit list can name it.
  */
-function displayOnlyControlNames(panel) {
+function unexportableControlNames(panel) {
   const names = new Set();
   for (const control of flatControls(Array.isArray(panel?.controls) ? panel.controls : [])) {
-    if (!isDisplayOnly(control?._children?.Behavior)) continue;
     const core = control?._children?.Core;
+    if (!isDisplayOnly(control?._children?.Behavior) && core?.hostAutomation !== false) continue;
     const name = core?.name ?? core?.id;
     if (name) names.add(String(name));
   }
@@ -417,8 +429,9 @@ function displayOnlyControlNames(panel) {
 /**
  * The panel's host-automatable parameters: explicit author list if present, else derived.
  *
- * THE DISPLAY GATE APPLIES TO BOTH LISTS. `deriveExportParameters` has skipped read-only controls
- * since the capability landed, and an explicit `panel.exportParameters` went straight past it —
+ * THE DISPLAY GATE APPLIES TO BOTH LISTS, and so does `Core.hostAutomation: false`.
+ * `deriveExportParameters` has skipped read-only controls since the capability landed, and an
+ * explicit `panel.exportParameters` went straight past it —
  * which is the same silent failure the gate exists to stop, reached through the other door. A host
  * parameter for a display gives the DAW an automation lane whose every value is overwritten by the
  * next feedback frame: it appears to work, it records fine, and it moves nothing.
@@ -432,8 +445,8 @@ export function collectExportParameters(panel) {
   const explicit = Array.isArray(panel?.exportParameters) ? panel.exportParameters : [];
   if (!explicit.length) return deriveExportParameters(panel);
 
-  const displays = displayOnlyControlNames(panel);
+  const excluded = unexportableControlNames(panel);
   return explicit
     .map(normalizeExportParameter)
-    .filter((parameter) => parameter && !displays.has(parameter.controlName));
+    .filter((parameter) => parameter && !excluded.has(parameter.controlName));
 }

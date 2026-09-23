@@ -22,6 +22,7 @@
   import CheckSquare from 'lucide-svelte/icons/square-check';
   import Lock from 'lucide-svelte/icons/lock';
   import Tag from 'lucide-svelte/icons/tag';
+  import AudioLines from 'lucide-svelte/icons/audio-lines';
 
   let { control = null } = $props();
 
@@ -56,10 +57,6 @@
       : (typed ? `"${typed}" is taken — used "${applied}"` : `A component needs a name — used "${applied}"`);
     // The input is uncontrolled between renders, so put back whatever was actually applied.
     if (event?.currentTarget) event.currentTarget.value = applied;
-  }
-
-  function handleToggle(prop) {
-    set(prop, !core?.[prop]);
   }
 
   function selectAll(event) {
@@ -116,14 +113,16 @@
       <PropertyText value={core.screenReaderText ?? ''} onfocus={selectAll} commit={(v) => set('screenReaderText', v)} />
     </PropertyCell>
 
-    <PropertyCell label="State" span={2} hint="Visible, enabled and locked, for this component on the canvas.">
+    <PropertyCell label="State" span={2} hint="Visible, enabled and locked, for this component on the canvas. The fourth chip makes its value automatable in a DAW when the panel is exported as a plugin; switch it off for settings a host should not move.">
       <FlagStrip
         flags={[
           { key: 'visible', title: 'Visible', on: !!core.visible, icon: Eye },
           { key: 'enabled', title: 'Enabled', on: !!core.enabled, icon: CheckSquare },
           { key: 'locked', title: 'Locked', on: !!core.locked, icon: Lock },
+          // Absent means on: a control saved before the field existed was always exported.
+          { key: 'hostAutomation', title: 'Automatable in DAW', on: core.hostAutomation !== false, icon: AudioLines },
         ]}
-        ontoggle={(key) => handleToggle(key)}
+        ontoggle={(key, next) => set(key, next)}
       />
     </PropertyCell>
     <PropertyCell label="Z-Index" span={2} hint="Stacking order within the panel. Higher draws in front.">

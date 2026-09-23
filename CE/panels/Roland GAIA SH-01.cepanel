@@ -319,6 +319,34 @@
       "deviceParameterId": ""
     },
     {
+      "id": "tone1.osc.pitchEnvAttackTime.value",
+      "label": "tone1.osc.pitchEnvAttackTime",
+      "controlName": "tone1.osc.pitchEnvAttackTime",
+      "path": "tone1.osc.pitchEnvAttackTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone1.osc.pitchEnvAttackTime"
+    },
+    {
+      "id": "tone1.osc.pitchEnvDecay.value",
+      "label": "tone1.osc.pitchEnvDecay",
+      "controlName": "tone1.osc.pitchEnvDecay",
+      "path": "tone1.osc.pitchEnvDecay.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone1.osc.pitchEnvDecay"
+    },
+    {
       "id": "tone1.osc.wave.value",
       "label": "tone1.osc.wave",
       "controlName": "tone1.osc.wave",
@@ -442,6 +470,62 @@
       "deviceParameterId": ""
     },
     {
+      "id": "tone1.filter.envAttackTime.value",
+      "label": "tone1.filter.envAttackTime",
+      "controlName": "tone1.filter.envAttackTime",
+      "path": "tone1.filter.envAttackTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone1.filter.envAttackTime"
+    },
+    {
+      "id": "tone1.filter.envDecayTime.value",
+      "label": "tone1.filter.envDecayTime",
+      "controlName": "tone1.filter.envDecayTime",
+      "path": "tone1.filter.envDecayTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone1.filter.envDecayTime"
+    },
+    {
+      "id": "tone1.filter.envSustainLevel.value",
+      "label": "tone1.filter.envSustainLevel",
+      "controlName": "tone1.filter.envSustainLevel",
+      "path": "tone1.filter.envSustainLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone1.filter.envSustainLevel"
+    },
+    {
+      "id": "tone1.filter.envReleaseTime.value",
+      "label": "tone1.filter.envReleaseTime",
+      "controlName": "tone1.filter.envReleaseTime",
+      "path": "tone1.filter.envReleaseTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone1.filter.envReleaseTime"
+    },
+    {
       "id": "tone1.filter.mode.value",
       "label": "tone1.filter.mode",
       "controlName": "tone1.filter.mode",
@@ -563,6 +647,62 @@
       "field": "pageIndex",
       "deviceRole": "",
       "deviceParameterId": ""
+    },
+    {
+      "id": "tone1.amp.envAttackTime.value",
+      "label": "tone1.amp.envAttackTime",
+      "controlName": "tone1.amp.envAttackTime",
+      "path": "tone1.amp.envAttackTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone1.amp.envAttackTime"
+    },
+    {
+      "id": "tone1.amp.envDecayTime.value",
+      "label": "tone1.amp.envDecayTime",
+      "controlName": "tone1.amp.envDecayTime",
+      "path": "tone1.amp.envDecayTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone1.amp.envDecayTime"
+    },
+    {
+      "id": "tone1.amp.envSustainLevel.value",
+      "label": "tone1.amp.envSustainLevel",
+      "controlName": "tone1.amp.envSustainLevel",
+      "path": "tone1.amp.envSustainLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone1.amp.envSustainLevel"
+    },
+    {
+      "id": "tone1.amp.envReleaseTime.value",
+      "label": "tone1.amp.envReleaseTime",
+      "controlName": "tone1.amp.envReleaseTime",
+      "path": "tone1.amp.envReleaseTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone1.amp.envReleaseTime"
     },
     {
       "id": "tone1.amp.level.value",
@@ -928,6 +1068,34 @@
       "deviceParameterId": ""
     },
     {
+      "id": "tone2.osc.pitchEnvAttackTime.value",
+      "label": "tone2.osc.pitchEnvAttackTime",
+      "controlName": "tone2.osc.pitchEnvAttackTime",
+      "path": "tone2.osc.pitchEnvAttackTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone2.osc.pitchEnvAttackTime"
+    },
+    {
+      "id": "tone2.osc.pitchEnvDecay.value",
+      "label": "tone2.osc.pitchEnvDecay",
+      "controlName": "tone2.osc.pitchEnvDecay",
+      "path": "tone2.osc.pitchEnvDecay.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone2.osc.pitchEnvDecay"
+    },
+    {
       "id": "tone2.osc.wave.value",
       "label": "tone2.osc.wave",
       "controlName": "tone2.osc.wave",
@@ -1051,6 +1219,62 @@
       "deviceParameterId": ""
     },
     {
+      "id": "tone2.filter.envAttackTime.value",
+      "label": "tone2.filter.envAttackTime",
+      "controlName": "tone2.filter.envAttackTime",
+      "path": "tone2.filter.envAttackTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone2.filter.envAttackTime"
+    },
+    {
+      "id": "tone2.filter.envDecayTime.value",
+      "label": "tone2.filter.envDecayTime",
+      "controlName": "tone2.filter.envDecayTime",
+      "path": "tone2.filter.envDecayTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone2.filter.envDecayTime"
+    },
+    {
+      "id": "tone2.filter.envSustainLevel.value",
+      "label": "tone2.filter.envSustainLevel",
+      "controlName": "tone2.filter.envSustainLevel",
+      "path": "tone2.filter.envSustainLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone2.filter.envSustainLevel"
+    },
+    {
+      "id": "tone2.filter.envReleaseTime.value",
+      "label": "tone2.filter.envReleaseTime",
+      "controlName": "tone2.filter.envReleaseTime",
+      "path": "tone2.filter.envReleaseTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone2.filter.envReleaseTime"
+    },
+    {
       "id": "tone2.filter.mode.value",
       "label": "tone2.filter.mode",
       "controlName": "tone2.filter.mode",
@@ -1172,6 +1396,62 @@
       "field": "pageIndex",
       "deviceRole": "",
       "deviceParameterId": ""
+    },
+    {
+      "id": "tone2.amp.envAttackTime.value",
+      "label": "tone2.amp.envAttackTime",
+      "controlName": "tone2.amp.envAttackTime",
+      "path": "tone2.amp.envAttackTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone2.amp.envAttackTime"
+    },
+    {
+      "id": "tone2.amp.envDecayTime.value",
+      "label": "tone2.amp.envDecayTime",
+      "controlName": "tone2.amp.envDecayTime",
+      "path": "tone2.amp.envDecayTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone2.amp.envDecayTime"
+    },
+    {
+      "id": "tone2.amp.envSustainLevel.value",
+      "label": "tone2.amp.envSustainLevel",
+      "controlName": "tone2.amp.envSustainLevel",
+      "path": "tone2.amp.envSustainLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone2.amp.envSustainLevel"
+    },
+    {
+      "id": "tone2.amp.envReleaseTime.value",
+      "label": "tone2.amp.envReleaseTime",
+      "controlName": "tone2.amp.envReleaseTime",
+      "path": "tone2.amp.envReleaseTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone2.amp.envReleaseTime"
     },
     {
       "id": "tone2.amp.level.value",
@@ -1537,6 +1817,34 @@
       "deviceParameterId": ""
     },
     {
+      "id": "tone3.osc.pitchEnvAttackTime.value",
+      "label": "tone3.osc.pitchEnvAttackTime",
+      "controlName": "tone3.osc.pitchEnvAttackTime",
+      "path": "tone3.osc.pitchEnvAttackTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone3.osc.pitchEnvAttackTime"
+    },
+    {
+      "id": "tone3.osc.pitchEnvDecay.value",
+      "label": "tone3.osc.pitchEnvDecay",
+      "controlName": "tone3.osc.pitchEnvDecay",
+      "path": "tone3.osc.pitchEnvDecay.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone3.osc.pitchEnvDecay"
+    },
+    {
       "id": "tone3.osc.wave.value",
       "label": "tone3.osc.wave",
       "controlName": "tone3.osc.wave",
@@ -1660,6 +1968,62 @@
       "deviceParameterId": ""
     },
     {
+      "id": "tone3.filter.envAttackTime.value",
+      "label": "tone3.filter.envAttackTime",
+      "controlName": "tone3.filter.envAttackTime",
+      "path": "tone3.filter.envAttackTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone3.filter.envAttackTime"
+    },
+    {
+      "id": "tone3.filter.envDecayTime.value",
+      "label": "tone3.filter.envDecayTime",
+      "controlName": "tone3.filter.envDecayTime",
+      "path": "tone3.filter.envDecayTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone3.filter.envDecayTime"
+    },
+    {
+      "id": "tone3.filter.envSustainLevel.value",
+      "label": "tone3.filter.envSustainLevel",
+      "controlName": "tone3.filter.envSustainLevel",
+      "path": "tone3.filter.envSustainLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone3.filter.envSustainLevel"
+    },
+    {
+      "id": "tone3.filter.envReleaseTime.value",
+      "label": "tone3.filter.envReleaseTime",
+      "controlName": "tone3.filter.envReleaseTime",
+      "path": "tone3.filter.envReleaseTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone3.filter.envReleaseTime"
+    },
+    {
       "id": "tone3.filter.mode.value",
       "label": "tone3.filter.mode",
       "controlName": "tone3.filter.mode",
@@ -1781,6 +2145,62 @@
       "field": "pageIndex",
       "deviceRole": "",
       "deviceParameterId": ""
+    },
+    {
+      "id": "tone3.amp.envAttackTime.value",
+      "label": "tone3.amp.envAttackTime",
+      "controlName": "tone3.amp.envAttackTime",
+      "path": "tone3.amp.envAttackTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone3.amp.envAttackTime"
+    },
+    {
+      "id": "tone3.amp.envDecayTime.value",
+      "label": "tone3.amp.envDecayTime",
+      "controlName": "tone3.amp.envDecayTime",
+      "path": "tone3.amp.envDecayTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone3.amp.envDecayTime"
+    },
+    {
+      "id": "tone3.amp.envSustainLevel.value",
+      "label": "tone3.amp.envSustainLevel",
+      "controlName": "tone3.amp.envSustainLevel",
+      "path": "tone3.amp.envSustainLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone3.amp.envSustainLevel"
+    },
+    {
+      "id": "tone3.amp.envReleaseTime.value",
+      "label": "tone3.amp.envReleaseTime",
+      "controlName": "tone3.amp.envReleaseTime",
+      "path": "tone3.amp.envReleaseTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "tone3.amp.envReleaseTime"
     },
     {
       "id": "tone3.amp.level.value",
@@ -2260,6 +2680,440 @@
         "PATCH BANKS",
         "ARPEGGIATOR",
         "SYSTEM"
+      ],
+      "choiceMode": "index",
+      "section": "TabContainer",
+      "field": "pageIndex",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "arp_pattern_grid.arpCurrentStep",
+      "label": "arp_pattern_grid Current Step",
+      "controlName": "arp_pattern_grid",
+      "path": "arp_pattern_grid.arpCurrentStep",
+      "min": 0,
+      "max": 31,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.endStep"
+    },
+    {
+      "id": "arp_pattern_grid.arpStepCount",
+      "label": "arp_pattern_grid Step Count",
+      "controlName": "arp_pattern_grid",
+      "path": "arp_pattern_grid.arpStepCount",
+      "min": 1,
+      "max": 256,
+      "defaultValue": 32,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.endStep"
+    },
+    {
+      "id": "arp_pattern_grid.arpEndStep",
+      "label": "arp_pattern_grid Loop End Step",
+      "controlName": "arp_pattern_grid",
+      "path": "arp_pattern_grid.arpEndStep",
+      "min": 1,
+      "max": 32,
+      "defaultValue": 32,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.endStep"
+    },
+    {
+      "id": "arp_pattern_grid.arpGate",
+      "label": "arp_pattern_grid Gate",
+      "controlName": "arp_pattern_grid",
+      "path": "arp_pattern_grid.arpGate",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.endStep"
+    },
+    {
+      "id": "arp_pattern_grid.arpNote",
+      "label": "arp_pattern_grid Note",
+      "controlName": "arp_pattern_grid",
+      "path": "arp_pattern_grid.arpNote",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.endStep"
+    },
+    {
+      "id": "arp_pattern_grid.arpVelocity",
+      "label": "arp_pattern_grid Velocity",
+      "controlName": "arp_pattern_grid",
+      "path": "arp_pattern_grid.arpVelocity",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.endStep"
+    },
+    {
+      "id": "arp_pattern_grid.arpPattern",
+      "label": "arp_pattern_grid Arp Pattern",
+      "controlName": "arp_pattern_grid",
+      "path": "arp_pattern_grid.arpPattern",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.endStep"
+    },
+    {
+      "id": "common.switch.value",
+      "label": "common.switch",
+      "controlName": "common.switch",
+      "path": "common.switch.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "common.switch"
+    },
+    {
+      "id": "arp.grid.value",
+      "label": "arp.grid",
+      "controlName": "arp.grid",
+      "path": "arp.grid.value",
+      "min": 0,
+      "max": 8,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "1/4 straight",
+        "1/8 straight",
+        "1/8 light shuffle",
+        "1/8 heavy shuffle",
+        "1/8 triplet",
+        "1/16 straight",
+        "1/16 light shuffle",
+        "1/16 heavy shuffle",
+        "1/16 triplet"
+      ],
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.grid"
+    },
+    {
+      "id": "arp.duration.value",
+      "label": "arp.duration",
+      "controlName": "arp.duration",
+      "path": "arp.duration.value",
+      "min": 0,
+      "max": 9,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "30%",
+        "40%",
+        "50%",
+        "60%",
+        "70%",
+        "80%",
+        "90%",
+        "100%",
+        "120%",
+        "Full (legato)"
+      ],
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.duration"
+    },
+    {
+      "id": "arp.motif.value",
+      "label": "arp.motif",
+      "controlName": "arp.motif",
+      "path": "arp.motif.value",
+      "min": 0,
+      "max": 11,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Up · keep low",
+        "Up · keep low+high",
+        "Up · no fixed note",
+        "Down · keep low",
+        "Down · keep low+high",
+        "Down · no fixed note",
+        "Up/down · keep low",
+        "Up/down · keep low+high",
+        "Up/down · no fixed note",
+        "Random · keep low",
+        "Random · no fixed note",
+        "Phrase · last key"
+      ],
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.motif"
+    },
+    {
+      "id": "arp.octaveRange.value",
+      "label": "arp.octaveRange",
+      "controlName": "arp.octaveRange",
+      "path": "arp.octaveRange.value",
+      "min": 61,
+      "max": 67,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.octaveRange"
+    },
+    {
+      "id": "arp.accentRate.value",
+      "label": "arp.accentRate",
+      "controlName": "arp.accentRate",
+      "path": "arp.accentRate.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.accentRate"
+    },
+    {
+      "id": "arp.velocity.value",
+      "label": "arp.velocity",
+      "controlName": "arp.velocity",
+      "path": "arp.velocity.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "arp.velocity"
+    },
+    {
+      "id": "common.patchLevel.value",
+      "label": "common.patchLevel",
+      "controlName": "common.patchLevel",
+      "path": "common.patchLevel.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "common.patchLevel"
+    },
+    {
+      "id": "common.patchTempo.value",
+      "label": "common.patchTempo",
+      "controlName": "common.patchTempo",
+      "path": "common.patchTempo.value",
+      "min": 5,
+      "max": 300,
+      "defaultValue": 5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "common.patchTempo"
+    },
+    {
+      "id": "common.octaveShift.value",
+      "label": "common.octaveShift",
+      "controlName": "common.octaveShift",
+      "path": "common.octaveShift.value",
+      "min": 61,
+      "max": 67,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "common.octaveShift"
+    },
+    {
+      "id": "common.monoSwitch.value",
+      "label": "common.monoSwitch",
+      "controlName": "common.monoSwitch",
+      "path": "common.monoSwitch.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "common.monoSwitch"
+    },
+    {
+      "id": "common.portamentoSwitch.value",
+      "label": "common.portamentoSwitch",
+      "controlName": "common.portamentoSwitch",
+      "path": "common.portamentoSwitch.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "common.portamentoSwitch"
+    },
+    {
+      "id": "common.portamentoTime.value",
+      "label": "common.portamentoTime",
+      "controlName": "common.portamentoTime",
+      "path": "common.portamentoTime.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "common.portamentoTime"
+    },
+    {
+      "id": "common.pitchBendRangeUp.value",
+      "label": "common.pitchBendRangeUp",
+      "controlName": "common.pitchBendRangeUp",
+      "path": "common.pitchBendRangeUp.value",
+      "min": 0,
+      "max": 24,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "common.pitchBendRangeUp"
+    },
+    {
+      "id": "common.pitchBendRangeDown.value",
+      "label": "common.pitchBendRangeDown",
+      "controlName": "common.pitchBendRangeDown",
+      "path": "common.pitchBendRangeDown.value",
+      "min": 0,
+      "max": 24,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "common.pitchBendRangeDown"
+    },
+    {
+      "id": "common.dBeamAssign.value",
+      "label": "common.dBeamAssign",
+      "controlName": "common.dBeamAssign",
+      "path": "common.dBeamAssign.value",
+      "min": 0,
+      "max": 29,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "LFO-RATE",
+        "LFO-FADE-TIME",
+        "LFO-PITCH-MOD",
+        "LFO-FILTER-MOD",
+        "LFO-AMP-MOD",
+        "OSC-PITCH",
+        "OSC-DETUNE",
+        "OSC-PWM",
+        "OSC-PW",
+        "OSC-ENV-A",
+        "OSC-ENV-D",
+        "OSC-ENV-MOD",
+        "FILTER-CUTOFF",
+        "FILTER-RESONANCE",
+        "FILTER-ENV-A",
+        "FILTER-ENV-D",
+        "FILTER-ENV-S",
+        "FILTER-ENV-R",
+        "FILTER-ENV-MOD",
+        "AMP-LEVEL",
+        "AMP-ENV-A",
+        "AMP-ENV-D",
+        "AMP-ENV-S",
+        "AMP-ENV-R",
+        "EFX-CTRL",
+        "PORT-TIME",
+        "BENDER",
+        "MODULATION",
+        "FILTER-CUTOFF-KF",
+        "EFX-LEVEL"
+      ],
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "common.dBeamAssign"
+    },
+    {
+      "id": "common.dBeamPolarity.value",
+      "label": "common.dBeamPolarity",
+      "controlName": "common.dBeamPolarity",
+      "path": "common.dBeamPolarity.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "common.dBeamPolarity"
+    },
+    {
+      "id": "patch_banks.page",
+      "label": "patch_banks Page",
+      "controlName": "patch_banks",
+      "path": "patch_banks.page",
+      "min": 0,
+      "max": 3,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "PRESET / ROM",
+        "USER",
+        "USB MEMORY",
+        "PCM / ROM"
+      ],
+      "choiceValues": [
+        "PRESET / ROM",
+        "USER",
+        "USB MEMORY",
+        "PCM / ROM"
       ],
       "choiceMode": "index",
       "section": "TabContainer",
@@ -173964,6 +174818,7 @@
                 "Core": {
                   "name": "box_MASTER / CLOCK",
                   "id": "gaia_box_678",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Background"
                 },
@@ -173992,6 +174847,7 @@
                 "Core": {
                   "name": "tab_MASTER / CLOCK",
                   "id": "gaia_tab_679",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "CustomComponent"
                 },
@@ -174193,6 +175049,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_680",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -174251,6 +175108,7 @@
                   "name": "system.masterLevel",
                   "id": "gaia_system_masterLevel_681",
                   "description": "Master Level — 01 00 00 03",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Number"
                 },
@@ -174297,6 +175155,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_682",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -174355,6 +175214,7 @@
                   "name": "system.masterTune",
                   "id": "gaia_system_masterTune_683",
                   "description": "Master Tune — 01 00 00 04",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Number"
                 },
@@ -174412,6 +175272,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_684",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -174470,6 +175331,7 @@
                   "name": "system.patchRemain",
                   "id": "gaia_system_patchRemain_685",
                   "description": "Patch Remain — 01 00 00 08",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -174551,6 +175413,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_686",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -174609,6 +175472,7 @@
                   "name": "system.clockSource",
                   "id": "gaia_system_clockSource_687",
                   "description": "Clock Source — 01 00 00 09",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -174718,6 +175582,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_688",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -174776,6 +175641,7 @@
                   "name": "system.tempo",
                   "id": "gaia_system_tempo_689",
                   "description": "System Tempo — 01 00 00 0A",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Number"
                 },
@@ -174826,6 +175692,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_690",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -174884,6 +175751,7 @@
                   "name": "system.powerSave",
                   "id": "gaia_system_powerSave_691",
                   "description": "Power Save Mode — 01 00 00 6B",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -175049,6 +175917,7 @@
                 "Core": {
                   "name": "box_CONTROLLERS",
                   "id": "gaia_box_692",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Background"
                 },
@@ -175078,6 +175947,7 @@
                 "Core": {
                   "name": "tab_CONTROLLERS",
                   "id": "gaia_tab_693",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "CustomComponent"
                 },
@@ -175280,6 +176150,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_694",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -175338,6 +176209,7 @@
                   "name": "system.keyboardVelocity",
                   "id": "gaia_system_keyboardVelocity_695",
                   "description": "Keyboard Velocity — 01 00 00 0D",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -175419,6 +176291,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_696",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -175477,6 +176350,7 @@
                   "name": "system.pedalPolarity",
                   "id": "gaia_system_pedalPolarity_697",
                   "description": "Pedal Polarity — 01 00 00 0E",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -175558,6 +176432,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_698",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -175616,6 +176491,7 @@
                   "name": "system.pedalAssign",
                   "id": "gaia_system_pedalAssign_699",
                   "description": "Pedal Assign — 01 00 00 0F",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -175767,6 +176643,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_700",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -175825,6 +176702,7 @@
                   "name": "system.dBeamSens",
                   "id": "gaia_system_dBeamSens_701",
                   "description": "D Beam Sensitivity — 01 00 00 10",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Number"
                 },
@@ -175874,6 +176752,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_702",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -175932,6 +176811,7 @@
                   "name": "system.rxTxChannel",
                   "id": "gaia_system_rxTxChannel_703",
                   "description": "Rx/Tx Channel — 01 00 00 11",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Number"
                 },
@@ -175984,6 +176864,7 @@
                 "Core": {
                   "name": "box_MIDI",
                   "id": "gaia_box_704",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Background"
                 },
@@ -176013,6 +176894,7 @@
                 "Core": {
                   "name": "tab_MIDI",
                   "id": "gaia_tab_705",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "CustomComponent"
                 },
@@ -176215,6 +177097,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_706",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -176273,6 +177156,7 @@
                   "name": "system.midiUsbThru",
                   "id": "gaia_system_midiUsbThru_707",
                   "description": "MIDI-USB Thru — 01 00 00 12",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -176354,6 +177238,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_708",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -176412,6 +177297,7 @@
                   "name": "system.softThru",
                   "id": "gaia_system_softThru_709",
                   "description": "Soft Thru — 01 00 00 13",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -176493,6 +177379,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_710",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -176551,6 +177438,7 @@
                   "name": "system.rxProgramChange",
                   "id": "gaia_system_rxProgramChange_711",
                   "description": "Rx Program Change — 01 00 00 14",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -176632,6 +177520,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_712",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -176690,6 +177579,7 @@
                   "name": "system.rxBankSelect",
                   "id": "gaia_system_rxBankSelect_713",
                   "description": "Rx Bank Select — 01 00 00 15",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -176771,6 +177661,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_714",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -176829,6 +177720,7 @@
                   "name": "system.remoteKeyboard",
                   "id": "gaia_system_remoteKeyboard_715",
                   "description": "Remote Keyboard — 01 00 00 16",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -176910,6 +177802,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_716",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -176968,6 +177861,7 @@
                   "name": "system.txProgramChange",
                   "id": "gaia_system_txProgramChange_717",
                   "description": "Tx Program Change — 01 00 00 17",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -177049,6 +177943,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_718",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -177107,6 +178002,7 @@
                   "name": "system.txBankSelect",
                   "id": "gaia_system_txBankSelect_719",
                   "description": "Tx Bank Select — 01 00 00 18",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -177188,6 +178084,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_720",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -177246,6 +178143,7 @@
                   "name": "system.txEditData",
                   "id": "gaia_system_txEditData_721",
                   "description": "Tx Edit Data — 01 00 00 19",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -177327,6 +178225,7 @@
                 "Core": {
                   "name": "box_RECORDER / ADDRESS",
                   "id": "gaia_box_722",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Background"
                 },
@@ -177356,6 +178255,7 @@
                 "Core": {
                   "name": "tab_RECORDER / ADDRESS",
                   "id": "gaia_tab_723",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "CustomComponent"
                 },
@@ -177558,6 +178458,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_724",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -177616,6 +178517,7 @@
                   "name": "system.recorderSyncOutput",
                   "id": "gaia_system_recorderSyncOutput_725",
                   "description": "Recorder Sync Output — 01 00 00 1A",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -177697,6 +178599,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_726",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -177755,6 +178658,7 @@
                   "name": "system.metronomeMode",
                   "id": "gaia_system_metronomeMode_727",
                   "description": "Recorder Metronome Mode — 01 00 00 1B",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Combobox"
                 },
@@ -177864,6 +178768,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_728",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -177922,6 +178827,7 @@
                   "name": "system.metronomeLevel",
                   "id": "gaia_system_metronomeLevel_729",
                   "description": "Recorder Metronome Level — 01 00 00 1C",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Number"
                 },
@@ -177968,6 +178874,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_730",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -178026,6 +178933,7 @@
                   "name": "system.bankSelectMsb",
                   "id": "gaia_system_bankSelectMsb_731",
                   "description": "Bank Select MSB — 01 00 00 00",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Number"
                 },
@@ -178072,6 +178980,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_732",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -178130,6 +179039,7 @@
                   "name": "system.bankSelectLsb",
                   "id": "gaia_system_bankSelectLsb_733",
                   "description": "Bank Select LSB — 01 00 00 01",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Number"
                 },
@@ -178176,6 +179086,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_734",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -178234,6 +179145,7 @@
                   "name": "system.programNumber",
                   "id": "gaia_system_programNumber_735",
                   "description": "Program Number — 01 00 00 02",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Number"
                 },
@@ -178280,6 +179192,7 @@
                 "Core": {
                   "name": "box_USER PATCH WRITE PROTECT",
                   "id": "gaia_box_736",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Background"
                 },
@@ -178309,6 +179222,7 @@
                 "Core": {
                   "name": "tab_USER PATCH WRITE PROTECT",
                   "id": "gaia_tab_737",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "CustomComponent"
                 },
@@ -178511,6 +179425,7 @@
                 "Core": {
                   "name": "label",
                   "id": "gaia_lbl_738",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "Label"
                 },
@@ -178569,6 +179484,7 @@
                   "name": "system.writeProtectA1",
                   "id": "gaia_system_writeProtectA1_739",
                   "description": "Write Protect A-1 — 01 00 00 2B",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -178685,6 +179601,7 @@
                   "name": "system.writeProtectA2",
                   "id": "gaia_system_writeProtectA2_740",
                   "description": "Write Protect A-2 — 01 00 00 2C",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -178801,6 +179718,7 @@
                   "name": "system.writeProtectA3",
                   "id": "gaia_system_writeProtectA3_741",
                   "description": "Write Protect A-3 — 01 00 00 2D",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -178917,6 +179835,7 @@
                   "name": "system.writeProtectA4",
                   "id": "gaia_system_writeProtectA4_742",
                   "description": "Write Protect A-4 — 01 00 00 2E",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -179033,6 +179952,7 @@
                   "name": "system.writeProtectA5",
                   "id": "gaia_system_writeProtectA5_743",
                   "description": "Write Protect A-5 — 01 00 00 2F",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -179149,6 +180069,7 @@
                   "name": "system.writeProtectA6",
                   "id": "gaia_system_writeProtectA6_744",
                   "description": "Write Protect A-6 — 01 00 00 30",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -179265,6 +180186,7 @@
                   "name": "system.writeProtectA7",
                   "id": "gaia_system_writeProtectA7_745",
                   "description": "Write Protect A-7 — 01 00 00 31",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -179381,6 +180303,7 @@
                   "name": "system.writeProtectA8",
                   "id": "gaia_system_writeProtectA8_746",
                   "description": "Write Protect A-8 — 01 00 00 32",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -179497,6 +180420,7 @@
                   "name": "system.writeProtectB1",
                   "id": "gaia_system_writeProtectB1_747",
                   "description": "Write Protect B-1 — 01 00 00 33",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -179613,6 +180537,7 @@
                   "name": "system.writeProtectB2",
                   "id": "gaia_system_writeProtectB2_748",
                   "description": "Write Protect B-2 — 01 00 00 34",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -179729,6 +180654,7 @@
                   "name": "system.writeProtectB3",
                   "id": "gaia_system_writeProtectB3_749",
                   "description": "Write Protect B-3 — 01 00 00 35",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -179845,6 +180771,7 @@
                   "name": "system.writeProtectB4",
                   "id": "gaia_system_writeProtectB4_750",
                   "description": "Write Protect B-4 — 01 00 00 36",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -179961,6 +180888,7 @@
                   "name": "system.writeProtectB5",
                   "id": "gaia_system_writeProtectB5_751",
                   "description": "Write Protect B-5 — 01 00 00 37",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -180077,6 +181005,7 @@
                   "name": "system.writeProtectB6",
                   "id": "gaia_system_writeProtectB6_752",
                   "description": "Write Protect B-6 — 01 00 00 38",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -180193,6 +181122,7 @@
                   "name": "system.writeProtectB7",
                   "id": "gaia_system_writeProtectB7_753",
                   "description": "Write Protect B-7 — 01 00 00 39",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -180309,6 +181239,7 @@
                   "name": "system.writeProtectB8",
                   "id": "gaia_system_writeProtectB8_754",
                   "description": "Write Protect B-8 — 01 00 00 3A",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -180425,6 +181356,7 @@
                   "name": "system.writeProtectC1",
                   "id": "gaia_system_writeProtectC1_755",
                   "description": "Write Protect C-1 — 01 00 00 3B",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -180541,6 +181473,7 @@
                   "name": "system.writeProtectC2",
                   "id": "gaia_system_writeProtectC2_756",
                   "description": "Write Protect C-2 — 01 00 00 3C",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -180657,6 +181590,7 @@
                   "name": "system.writeProtectC3",
                   "id": "gaia_system_writeProtectC3_757",
                   "description": "Write Protect C-3 — 01 00 00 3D",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -180773,6 +181707,7 @@
                   "name": "system.writeProtectC4",
                   "id": "gaia_system_writeProtectC4_758",
                   "description": "Write Protect C-4 — 01 00 00 3E",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -180889,6 +181824,7 @@
                   "name": "system.writeProtectC5",
                   "id": "gaia_system_writeProtectC5_759",
                   "description": "Write Protect C-5 — 01 00 00 3F",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -181005,6 +181941,7 @@
                   "name": "system.writeProtectC6",
                   "id": "gaia_system_writeProtectC6_760",
                   "description": "Write Protect C-6 — 01 00 00 40",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -181121,6 +182058,7 @@
                   "name": "system.writeProtectC7",
                   "id": "gaia_system_writeProtectC7_761",
                   "description": "Write Protect C-7 — 01 00 00 41",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -181237,6 +182175,7 @@
                   "name": "system.writeProtectC8",
                   "id": "gaia_system_writeProtectC8_762",
                   "description": "Write Protect C-8 — 01 00 00 42",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -181353,6 +182292,7 @@
                   "name": "system.writeProtectD1",
                   "id": "gaia_system_writeProtectD1_763",
                   "description": "Write Protect D-1 — 01 00 00 43",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -181469,6 +182409,7 @@
                   "name": "system.writeProtectD2",
                   "id": "gaia_system_writeProtectD2_764",
                   "description": "Write Protect D-2 — 01 00 00 44",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -181585,6 +182526,7 @@
                   "name": "system.writeProtectD3",
                   "id": "gaia_system_writeProtectD3_765",
                   "description": "Write Protect D-3 — 01 00 00 45",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -181701,6 +182643,7 @@
                   "name": "system.writeProtectD4",
                   "id": "gaia_system_writeProtectD4_766",
                   "description": "Write Protect D-4 — 01 00 00 46",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -181817,6 +182760,7 @@
                   "name": "system.writeProtectD5",
                   "id": "gaia_system_writeProtectD5_767",
                   "description": "Write Protect D-5 — 01 00 00 47",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -181933,6 +182877,7 @@
                   "name": "system.writeProtectD6",
                   "id": "gaia_system_writeProtectD6_768",
                   "description": "Write Protect D-6 — 01 00 00 48",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -182049,6 +182994,7 @@
                   "name": "system.writeProtectD7",
                   "id": "gaia_system_writeProtectD7_769",
                   "description": "Write Protect D-7 — 01 00 00 49",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -182165,6 +183111,7 @@
                   "name": "system.writeProtectD8",
                   "id": "gaia_system_writeProtectD8_770",
                   "description": "Write Protect D-8 — 01 00 00 4A",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -182281,6 +183228,7 @@
                   "name": "system.writeProtectE1",
                   "id": "gaia_system_writeProtectE1_771",
                   "description": "Write Protect E-1 — 01 00 00 4B",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -182397,6 +183345,7 @@
                   "name": "system.writeProtectE2",
                   "id": "gaia_system_writeProtectE2_772",
                   "description": "Write Protect E-2 — 01 00 00 4C",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -182513,6 +183462,7 @@
                   "name": "system.writeProtectE3",
                   "id": "gaia_system_writeProtectE3_773",
                   "description": "Write Protect E-3 — 01 00 00 4D",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -182629,6 +183579,7 @@
                   "name": "system.writeProtectE4",
                   "id": "gaia_system_writeProtectE4_774",
                   "description": "Write Protect E-4 — 01 00 00 4E",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -182745,6 +183696,7 @@
                   "name": "system.writeProtectE5",
                   "id": "gaia_system_writeProtectE5_775",
                   "description": "Write Protect E-5 — 01 00 00 4F",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -182861,6 +183813,7 @@
                   "name": "system.writeProtectE6",
                   "id": "gaia_system_writeProtectE6_776",
                   "description": "Write Protect E-6 — 01 00 00 50",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -182977,6 +183930,7 @@
                   "name": "system.writeProtectE7",
                   "id": "gaia_system_writeProtectE7_777",
                   "description": "Write Protect E-7 — 01 00 00 51",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -183093,6 +184047,7 @@
                   "name": "system.writeProtectE8",
                   "id": "gaia_system_writeProtectE8_778",
                   "description": "Write Protect E-8 — 01 00 00 52",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -183209,6 +184164,7 @@
                   "name": "system.writeProtectF1",
                   "id": "gaia_system_writeProtectF1_779",
                   "description": "Write Protect F-1 — 01 00 00 53",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -183325,6 +184281,7 @@
                   "name": "system.writeProtectF2",
                   "id": "gaia_system_writeProtectF2_780",
                   "description": "Write Protect F-2 — 01 00 00 54",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -183441,6 +184398,7 @@
                   "name": "system.writeProtectF3",
                   "id": "gaia_system_writeProtectF3_781",
                   "description": "Write Protect F-3 — 01 00 00 55",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -183557,6 +184515,7 @@
                   "name": "system.writeProtectF4",
                   "id": "gaia_system_writeProtectF4_782",
                   "description": "Write Protect F-4 — 01 00 00 56",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -183673,6 +184632,7 @@
                   "name": "system.writeProtectF5",
                   "id": "gaia_system_writeProtectF5_783",
                   "description": "Write Protect F-5 — 01 00 00 57",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -183789,6 +184749,7 @@
                   "name": "system.writeProtectF6",
                   "id": "gaia_system_writeProtectF6_784",
                   "description": "Write Protect F-6 — 01 00 00 58",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -183905,6 +184866,7 @@
                   "name": "system.writeProtectF7",
                   "id": "gaia_system_writeProtectF7_785",
                   "description": "Write Protect F-7 — 01 00 00 59",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -184021,6 +184983,7 @@
                   "name": "system.writeProtectF8",
                   "id": "gaia_system_writeProtectF8_786",
                   "description": "Write Protect F-8 — 01 00 00 5A",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -184137,6 +185100,7 @@
                   "name": "system.writeProtectG1",
                   "id": "gaia_system_writeProtectG1_787",
                   "description": "Write Protect G-1 — 01 00 00 5B",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -184253,6 +185217,7 @@
                   "name": "system.writeProtectG2",
                   "id": "gaia_system_writeProtectG2_788",
                   "description": "Write Protect G-2 — 01 00 00 5C",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -184369,6 +185334,7 @@
                   "name": "system.writeProtectG3",
                   "id": "gaia_system_writeProtectG3_789",
                   "description": "Write Protect G-3 — 01 00 00 5D",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -184485,6 +185451,7 @@
                   "name": "system.writeProtectG4",
                   "id": "gaia_system_writeProtectG4_790",
                   "description": "Write Protect G-4 — 01 00 00 5E",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -184601,6 +185568,7 @@
                   "name": "system.writeProtectG5",
                   "id": "gaia_system_writeProtectG5_791",
                   "description": "Write Protect G-5 — 01 00 00 5F",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -184717,6 +185685,7 @@
                   "name": "system.writeProtectG6",
                   "id": "gaia_system_writeProtectG6_792",
                   "description": "Write Protect G-6 — 01 00 00 60",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -184833,6 +185802,7 @@
                   "name": "system.writeProtectG7",
                   "id": "gaia_system_writeProtectG7_793",
                   "description": "Write Protect G-7 — 01 00 00 61",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -184949,6 +185919,7 @@
                   "name": "system.writeProtectG8",
                   "id": "gaia_system_writeProtectG8_794",
                   "description": "Write Protect G-8 — 01 00 00 62",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -185065,6 +186036,7 @@
                   "name": "system.writeProtectH1",
                   "id": "gaia_system_writeProtectH1_795",
                   "description": "Write Protect H-1 — 01 00 00 63",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -185181,6 +186153,7 @@
                   "name": "system.writeProtectH2",
                   "id": "gaia_system_writeProtectH2_796",
                   "description": "Write Protect H-2 — 01 00 00 64",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -185297,6 +186270,7 @@
                   "name": "system.writeProtectH3",
                   "id": "gaia_system_writeProtectH3_797",
                   "description": "Write Protect H-3 — 01 00 00 65",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -185413,6 +186387,7 @@
                   "name": "system.writeProtectH4",
                   "id": "gaia_system_writeProtectH4_798",
                   "description": "Write Protect H-4 — 01 00 00 66",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -185529,6 +186504,7 @@
                   "name": "system.writeProtectH5",
                   "id": "gaia_system_writeProtectH5_799",
                   "description": "Write Protect H-5 — 01 00 00 67",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -185645,6 +186621,7 @@
                   "name": "system.writeProtectH6",
                   "id": "gaia_system_writeProtectH6_800",
                   "description": "Write Protect H-6 — 01 00 00 68",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -185761,6 +186738,7 @@
                   "name": "system.writeProtectH7",
                   "id": "gaia_system_writeProtectH7_801",
                   "description": "Write Protect H-7 — 01 00 00 69",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
@@ -185877,6 +186855,7 @@
                   "name": "system.writeProtectH8",
                   "id": "gaia_system_writeProtectH8_802",
                   "description": "Write Protect H-8 — 01 00 00 6A",
+                  "hostAutomation": false,
                   "tabPageId": "system",
                   "controlType": "ToggleButton"
                 },
