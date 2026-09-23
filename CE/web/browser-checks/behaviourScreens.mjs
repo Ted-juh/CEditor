@@ -60,6 +60,30 @@ const lcd = (extra = {}) => kit.make('LcdDisplay', { 'Transform.x': 70, 'Transfo
 
 const px = (a) => Math.round(parseFloat(a) * 100) / 100;
 
+// Follow the scanner's painted position, rather than comparing sparse pixels
+// from a wave. Raster thresholds and temporal aliasing can make a faster wave
+// produce a smaller pixel difference even while it is visibly moving faster.
+const scannerPosition = (id) => kit.page.evaluate(({ id }) => {
+  const c = document.querySelector(`[data-control-id="${id}"] canvas`);
+  if (!c) return null;
+  const data = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  let xTotal = 0, lit = 0;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] < 128) continue;
+    xTotal += ((i - 3) / 4) % c.width;
+    lit += 1;
+  }
+  return lit ? xTotal / lit : null;
+}, { id });
+const scannerTravel = async (id) => {
+  const positions = [];
+  for (let i = 0; i < 12; i += 1) {
+    await kit.settle(50);
+    positions.push(await scannerPosition(id));
+  }
+  return positions.every(Number.isFinite) ? Math.max(...positions) - Math.min(...positions) : null;
+};
+
 try {
   // =============================================================================================
   // The screen itself: substrate, backlight, glass, scanlines and the two phosphor colours.
@@ -416,33 +440,15 @@ try {
     led.check(D, 'imageSrc', 'an image given to a graphic LCD is dithered onto its dots, the same as on the pixel panel',
       true, bare !== null && withImage !== null && withImage !== bare && inkOf(withImage) > 0);
 
-    await kit.set(id, { 'Display.imageSrc': '', 'Display.animMode': 'preset',
-      'Display.animPreset': 'wave', 'Display.animSpeed': 0.05 });
+    await kit.set(id, { 'Display.imageSrc': '', 'Display.lines': ['', ''], 'Display.showGhost': false,
+      'Display.animMode': 'preset', 'Display.animPreset': 'scanner', 'Display.animSpeed': 0.05 });
     await kit.settle(900);
-    const surface = () => kit.page.evaluate(({ id }) => {
-      const c = document.querySelector(`[data-control-id="${id}"] canvas`);
-      if (!c) return null;
-      const data = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-      const out = [];
-      for (let i = 0; i < data.length; i += 4 * 97) out.push(data[i] + data[i + 1] + data[i + 2]);
-      return out;
-    }, { id });
-    const driftPerTick = async (ticks, gap) => {
-      let total = 0;
-      let prev = await surface();
-      for (let i = 0; i < ticks; i += 1) {
-        await kit.settle(gap);
-        const now = await surface();
-        total += prev.reduce((sum, v, n) => sum + Math.abs(v - now[n]), 0) / prev.length;
-        prev = now;
-      }
-      return total / ticks;
-    };
-    const crawl = await driftPerTick(6, 160);
+    const crawl = await scannerTravel(id);
     await kit.set(id, { 'Display.animSpeed': 1 });
-    await kit.settle(800);
-    led.check(D, 'animSpeed', 'and the preset animation on an LCD runs at the speed it was given, measured the same way — how far the picture travels between two samples, not how many samples differed',
-      true, crawl !== null && (await driftPerTick(6, 160)) > crawl * 4);
+    await kit.settle(200);
+    const fastTravel = await scannerTravel(id);
+    led.check(D, 'animSpeed', 'the preset scanner visibly travels farther in the same time when its speed increases',
+      true, crawl !== null && fastTravel !== null && fastTravel > Math.max(12, crawl * 4));
     await kit.set(id, { 'Display.animMode': 'off' });
     await kit.settle(600);
   }
@@ -585,48 +591,23 @@ try {
       'and the colour switch decides whether it keeps the picture’s colours or is reduced to the panel’s single lit colour — four bright quadrants come back as more distinct colours with it on than with it off',
       true, distinct(coloured) > distinct(monochrome));
 
-    await kit.set(id, { 'Pixel.imageSrc': '', 'Pixel.imageColour': false,
-      'Pixel.animMode': 'preset', 'Pixel.animPreset': 'wave', 'Pixel.animSpeed': 0.05 });
+    await kit.set(id, { 'Pixel.imageSrc': '', 'Pixel.imageColour': false, 'Pixel.showGhost': false,
+      'Pixel.animMode': 'preset', 'Pixel.animPreset': 'scanner', 'Pixel.animSpeed': 0.05 });
     await kit.settle(900);
-
-    // HOW FAR THE PICTURE TRAVELS, not how many pictures there were. Counting distinct frames
-    // saturates immediately — the wave preset is continuous, so even at a twentieth speed every
-    // sample differs from the last and the count is the number of samples at every speed. The
-    // useful measure is the SIZE of the change per tick, read off the canvas itself.
-    const surface = () => kit.page.evaluate(({ id }) => {
-      const c = document.querySelector(`[data-control-id="${id}"] canvas`);
-      if (!c) return null;
-      const data = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-      const out = [];
-      for (let i = 0; i < data.length; i += 4 * 97) out.push(data[i] + data[i + 1] + data[i + 2]);
-      return out;
-    }, { id });
-    const driftPerTick = async (ticks, gap) => {
-      let total = 0;
-      let prev = await surface();
-      for (let i = 0; i < ticks; i += 1) {
-        await kit.settle(gap);
-        const now = await surface();
-        total += prev.reduce((sum, v, n) => sum + Math.abs(v - now[n]), 0) / prev.length;
-        prev = now;
-      }
-      return total / ticks;
-    };
-
-    const crawling = await driftPerTick(6, 160);
+    const crawling = await scannerTravel(id);
     await kit.set(id, { 'Pixel.animSpeed': 1 });
-    await kit.settle(800);
-    const running = await driftPerTick(6, 160);
+    await kit.settle(200);
+    const running = await scannerTravel(id);
     led.check(P, 'animSpeed',
-      'the preset runs at the speed asked for: at a twentieth of the rate the picture barely moves between two samples a sixth of a second apart, and at full rate it moves several times as far',
-      true, crawling !== null && running > crawling * 4);
-    led.check(P, 'animSpeed (why the comparison stops at 1x)',
-      'and a faster-still setting is NOT more drift, because past one screen per sample the measurement aliases — six times the rate reads as less movement than one, which is a fact about sampling rather than about the panel, and is why this row compares a slow rate with a normal one instead of a normal one with a fast one',
+      'the preset scanner visibly travels farther in the same time when its speed increases',
+      true, crawling !== null && running !== null && running > Math.max(12, crawling * 4));
+    led.check(P, 'animSpeed (faster setting)',
+      'a still faster setting continues moving the scanner across the screen',
       true, await (async () => {
         await kit.set(id, { 'Pixel.animSpeed': 6 });
-        await kit.settle(800);
-        const galloping = await driftPerTick(6, 160);
-        return galloping > crawling;
+        await kit.settle(200);
+        const galloping = await scannerTravel(id);
+        return galloping !== null && galloping > Math.max(12, crawling * 4);
       })());
     led.check(P, 'animColour',
       'and the colour switch applies to the animation as well as to a still image — a hue-cycling preset paints more than one colour with it on',
@@ -670,17 +651,18 @@ try {
       return cv.toDataURL('image/png');
     }) });
     await kit.settle(900);
-    // THE MEAN, NOT THE PEAK. Dimming a dithered panel drops the average level across it and leaves
-    // the brightest dots at full — measured: a white image reads max 255 at every brightness, while
-    // the mean walks from 211 down to 196. A row built on the peak would report a live property
-    // dead.
+    // The canvas stores brightness in alpha. Raw RGB stays near white even when
+    // the lit dots are nearly transparent, so measure their composited energy.
     const level = () => kit.page.evaluate(({ id }) => {
       const c = document.querySelector(`[data-control-id="${id}"] canvas`);
       if (!c) return null;
       const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
       let sum = 0;
       let n = 0;
-      for (let i = 0; i < d.length; i += 4) { sum += Math.max(d[i], d[i + 1], d[i + 2]); n += 1; }
+      for (let i = 0; i < d.length; i += 4) {
+        sum += Math.max(d[i], d[i + 1], d[i + 2]) * d[i + 3] / 255;
+        n += 1;
+      }
       return Math.round(sum / n);
     }, { id });
 

@@ -156,7 +156,8 @@
     const coords = mouseToImageCoords(e);
     if (!coords) return;
     const hex = samplePixel(coords.x, coords.y);
-    if (hex && onColorPicked) onColorPicked(hex);
+    if (!hex) return;
+    if (onColorPicked) onColorPicked(hex);
     eyedropperActive = false;
     if (onColorHover) onColorHover(null);
   }
