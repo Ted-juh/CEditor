@@ -9,6 +9,12 @@ export function isJuceAvailable() {
          window.__JUCE__.backend;
 }
 
+/** Ask the native host to close the application through its normal shutdown path. */
+export function closeApplication() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('closeApplication', {});
+}
+
 // --- Panel file operations ---
 
 /** Request a "Save As" dialog for a panel. C++ will emit 'panelSaved' on success. */

@@ -3,6 +3,7 @@
   // Extracted verbatim from CustomDesignSurfaceEditor.svelte: owns the grid
   // gestures (draw / move / resize / velocity) and pushes block changes up via
   // callback props; the parent owns the arpeggiator data and commits patches.
+  import { onDestroy } from 'svelte';
   import { numberOr } from '../utils/primitives.js';
   import { clampNumber } from '../utils/customDesignSurfaceGeometry.js';
   import { stopSelectionAction } from '../utils/customDesignSurfaceHelpers.js';
@@ -24,6 +25,19 @@
   let arpVisibleNotes = $derived(Array.from({ length: 12 }, (_, index) => arpViewNote + 11 - index));
   let arpDraftBlock = $state(null);
   let interaction = null;
+
+  function cancelInteraction() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('mousemove', handleInteractionMove);
+      window.removeEventListener('mouseup', handleInteractionEnd);
+      window.removeEventListener('blur', handleInteractionEnd);
+    }
+    interaction?.scrub?.end();
+    interaction = null;
+    arpDraftBlock = null;
+  }
+
+  onDestroy(cancelInteraction);
 
   function noteName(note) {
     return noteNameFromMidi(note);
@@ -68,6 +82,7 @@
     if (arpTool !== 'draw' || !arpeggiatorEnabled || event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
+    cancelInteraction();
     const start = arpCellFromEvent(event);
     const block = {
       id: nextArpBlockId(),
@@ -85,12 +100,14 @@
     };
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
+    window.addEventListener('blur', handleInteractionEnd);
   }
 
   function beginArpBlockMove(block, event) {
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
+    cancelInteraction();
     const start = arpCellFromEvent(event);
     selectArpBlock(block.id);
     interaction = {
@@ -102,12 +119,14 @@
     };
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
+    window.addEventListener('blur', handleInteractionEnd);
   }
 
   function beginArpBlockResize(block, event) {
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
+    cancelInteraction();
     const start = arpCellFromEvent(event);
     selectArpBlock(block.id);
     interaction = {
@@ -119,6 +138,7 @@
     };
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
+    window.addEventListener('blur', handleInteractionEnd);
   }
 
   function scrubSampleFromEvent(event) {
@@ -136,6 +156,7 @@
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
+    cancelInteraction();
     selectArpBlock(block.id);
     // The grab element is the small handle but the mapping runs over the whole
     // block, so the core is driven directly with the block rect as bounds.
@@ -149,6 +170,7 @@
     interaction = { type: 'arpVelocity', id: block.id, scrub };
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
+    window.addEventListener('blur', handleInteractionEnd);
     applyArpVelocity(block.id, scrub.begin(scrubSampleFromEvent(event), { bounds: rect, jumpToPointer: true }));
   }
 
@@ -218,9 +240,10 @@
   }
 
   function handleInteractionEnd() {
-    if (!interaction) return;
     window.removeEventListener('mousemove', handleInteractionMove);
     window.removeEventListener('mouseup', handleInteractionEnd);
+    window.removeEventListener('blur', handleInteractionEnd);
+    if (!interaction) return;
     interaction.scrub?.end();
 
     if (interaction.type === 'arpDraw') {

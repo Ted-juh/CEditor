@@ -524,7 +524,8 @@
   onMount(() => {
     initPanelRuntime();   // start the panel script runtime (Lua/JS) so the loaded panel's scripts run
     // Expose a loader the host can call directly (and for browser testing).
-    window.__CE_LOAD_PANEL__ = (doc, filePath) => loadPanelDocument(doc, filePath);
+    const loadPanel = (doc, filePath) => loadPanelDocument(doc, filePath);
+    window.__CE_LOAD_PANEL__ = loadPanel;
 
     // Native player host (B3): announce readiness, then receive the panel via "loadPanel".
     const backend = typeof window !== 'undefined' && window.__JUCE__ && window.__JUCE__.backend;
@@ -577,6 +578,7 @@
     window.addEventListener('resize', onResize);
     return () => {
       window.removeEventListener('resize', onResize);
+      if (window.__CE_LOAD_PANEL__ === loadPanel) delete window.__CE_LOAD_PANEL__;
       if (backend && loadToken != null) backend.removeEventListener(loadToken);
       if (backend && paramSyncToken != null) backend.removeEventListener(paramSyncToken);
       if (backend && restoreToken != null) backend.removeEventListener(restoreToken);

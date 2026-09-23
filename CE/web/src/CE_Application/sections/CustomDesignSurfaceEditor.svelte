@@ -353,6 +353,7 @@
   let arpTool = $state('draw');
   let selectionPulseTarget = $state('');
   let selectionPulseTimer = null;
+  let selectionPulseFrame = null;
   let surfaceScrollEl = $state(null);
   let draggingLayerName = $state('');
   let spacePanActive = $state(false);
@@ -413,8 +414,12 @@
     // Defer to after layout/paint so flex-centering + scrollbars have settled;
     // measuring synchronously catches a pre-centering position that never
     // corrects itself.
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(measureBoardOffset);
-    else measureBoardOffset();
+    if (typeof requestAnimationFrame !== 'function') {
+      measureBoardOffset();
+      return;
+    }
+    const frame = requestAnimationFrame(measureBoardOffset);
+    return () => cancelAnimationFrame(frame);
   });
   let authoredPartNames = $derived(Object.keys(authoredParts?._children ?? {}));
   let valueChannelEntries = $derived(Object.entries(valueChannels?._children ?? {}));
@@ -587,6 +592,33 @@
   });
 
   onDestroy(() => {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('mousemove', handleInteractionMove);
+      window.removeEventListener('mouseup', handleInteractionEnd);
+      window.removeEventListener('blur', handleInteractionEnd);
+      window.removeEventListener('mousemove', handleMarqueeMove);
+      window.removeEventListener('mouseup', handleMarqueeEnd);
+      window.removeEventListener('blur', handleMarqueeEnd);
+      window.removeEventListener('mousemove', handleDrawMove);
+      window.removeEventListener('mouseup', handleDrawEnd);
+      window.removeEventListener('blur', handleDrawEnd);
+      window.removeEventListener('mousemove', handleSurfacePanMove);
+      window.removeEventListener('mouseup', endSurfacePan);
+      window.removeEventListener('blur', endSurfacePan);
+      if (displayDockMoveHandler) window.removeEventListener('mousemove', displayDockMoveHandler);
+      if (displayDockEndHandler) window.removeEventListener('mouseup', displayDockEndHandler);
+      if (displayDockEndHandler) window.removeEventListener('blur', displayDockEndHandler);
+    }
+    if (selectionPulseTimer) clearTimeout(selectionPulseTimer);
+    if (drawNoticeTimer) clearTimeout(drawNoticeTimer);
+    if (selectionPulseFrame != null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(selectionPulseFrame);
+    }
+    interaction = null;
+    marquee = null;
+    drawDraft = null;
+    surfacePan = null;
+    resizingDisplayDock = false;
     componentDesignerStatus.set({
       kind: '',
       tool: '',
@@ -1125,7 +1157,9 @@
   function pulseSelection(target) {
     selectionPulseTarget = '';
     if (selectionPulseTimer) clearTimeout(selectionPulseTimer);
-    requestAnimationFrame(() => {
+    if (selectionPulseFrame != null) cancelAnimationFrame(selectionPulseFrame);
+    selectionPulseFrame = requestAnimationFrame(() => {
+      selectionPulseFrame = null;
       selectionPulseTarget = target;
       selectionPulseTimer = setTimeout(() => {
         if (selectionPulseTarget === target) selectionPulseTarget = '';
@@ -1142,8 +1176,8 @@
   }
 
   function focusOnMount(node) {
-    requestAnimationFrame(() => node?.focus?.());
-    return {};
+    const frame = requestAnimationFrame(() => node?.focus?.());
+    return { destroy: () => cancelAnimationFrame(frame) };
   }
 
   function snapGuides(frame = feedbackFrame) {
@@ -2509,6 +2543,7 @@
         activeLayerFrames = startFrames;
         window.addEventListener('mousemove', handleInteractionMove);
         window.addEventListener('mouseup', handleInteractionEnd);
+        window.addEventListener('blur', handleInteractionEnd);
         return;
       }
     }
@@ -2522,6 +2557,7 @@
     activeFrame = frame;
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
+    window.addEventListener('blur', handleInteractionEnd);
   }
 
   function beginResize(handle, event) {
@@ -2542,6 +2578,7 @@
     activeFrame = selectedFrame;
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
+    window.addEventListener('blur', handleInteractionEnd);
   }
 
   function beginRotate(event) {
@@ -2564,6 +2601,7 @@
     };
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
+    window.addEventListener('blur', handleInteractionEnd);
   }
 
   function beginArcHandleDrag(handle, event) {
@@ -2580,6 +2618,7 @@
     };
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
+    window.addEventListener('blur', handleInteractionEnd);
   }
 
   function handleInteractionMove(event) {
@@ -2785,9 +2824,10 @@
   }
 
   function handleInteractionEnd() {
-    if (!interaction) return;
     window.removeEventListener('mousemove', handleInteractionMove);
     window.removeEventListener('mouseup', handleInteractionEnd);
+    window.removeEventListener('blur', handleInteractionEnd);
+    if (!interaction) return;
 
     if ((interaction.type === 'move' || interaction.type === 'resize') && activeFrame && selectedAuthoredPart) {
       applyLayerPatch(patchFromFrame(selectedAuthoredPart, activeFrame));
@@ -2897,25 +2937,34 @@
   const DISPLAY_DOCK_MAX = 720;
   let displayDockHeight = $state(readStoredNumber('ce.surface.displayDockHeight', 340));
   let resizingDisplayDock = $state(false);
+  let displayDockMoveHandler = null;
+  let displayDockEndHandler = null;
 
   function beginDisplayDockResize(event) {
     event.preventDefault();
+    if (displayDockMoveHandler) window.removeEventListener('mousemove', displayDockMoveHandler);
+    if (displayDockEndHandler) window.removeEventListener('mouseup', displayDockEndHandler);
+    if (displayDockEndHandler) window.removeEventListener('blur', displayDockEndHandler);
     const startY = event.clientY;
     const startHeight = displayDockHeight;
     resizingDisplayDock = true;
     // Dragging the divider UP grows the dock, because the dock is below it.
-    const move = (moveEvent) => {
+    displayDockMoveHandler = (moveEvent) => {
       const next = startHeight + (startY - moveEvent.clientY);
       displayDockHeight = Math.max(DISPLAY_DOCK_MIN, Math.min(DISPLAY_DOCK_MAX, Math.round(next)));
     };
-    const end = () => {
+    displayDockEndHandler = () => {
       resizingDisplayDock = false;
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', end);
+      window.removeEventListener('mousemove', displayDockMoveHandler);
+      window.removeEventListener('mouseup', displayDockEndHandler);
+      window.removeEventListener('blur', displayDockEndHandler);
+      displayDockMoveHandler = null;
+      displayDockEndHandler = null;
       writeStoredNumber('ce.surface.displayDockHeight', displayDockHeight);
     };
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', end);
+    window.addEventListener('mousemove', displayDockMoveHandler);
+    window.addEventListener('mouseup', displayDockEndHandler);
+    window.addEventListener('blur', displayDockEndHandler);
   }
 
   function beginMarquee(event) {
@@ -2925,6 +2974,7 @@
     marquee = { start, end: start, additive: event.shiftKey === true };
     window.addEventListener('mousemove', handleMarqueeMove);
     window.addEventListener('mouseup', handleMarqueeEnd);
+    window.addEventListener('blur', handleMarqueeEnd);
     return true;
   }
 
@@ -2937,6 +2987,7 @@
   function handleMarqueeEnd() {
     window.removeEventListener('mousemove', handleMarqueeMove);
     window.removeEventListener('mouseup', handleMarqueeEnd);
+    window.removeEventListener('blur', handleMarqueeEnd);
     const band = marquee;
     marquee = null;
     if (!band) return;
@@ -2990,6 +3041,7 @@
     };
     window.addEventListener('mousemove', handleDrawMove);
     window.addEventListener('mouseup', handleDrawEnd);
+    window.addEventListener('blur', handleDrawEnd);
     return true;
   }
 
@@ -3018,9 +3070,10 @@
   }
 
   function handleDrawEnd(event = null) {
-    if (!drawDraft) return;
     window.removeEventListener('mousemove', handleDrawMove);
     window.removeEventListener('mouseup', handleDrawEnd);
+    window.removeEventListener('blur', handleDrawEnd);
+    if (!drawDraft) return;
 
     let rect = snapFrame(draftRect(drawDraft));
     const tool = drawDraft.tool;
@@ -3038,6 +3091,7 @@
     if (!drawDraft) return;
     window.removeEventListener('mousemove', handleDrawMove);
     window.removeEventListener('mouseup', handleDrawEnd);
+    window.removeEventListener('blur', handleDrawEnd);
     drawDraft = null;
   }
 
@@ -3079,6 +3133,7 @@
     activeZoneFrame = frame;
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
+    window.addEventListener('blur', handleInteractionEnd);
   }
 
   function beginZoneResize(handle, event) {
@@ -3094,6 +3149,7 @@
     activeZoneFrame = selectedZoneFrame;
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
+    window.addEventListener('blur', handleInteractionEnd);
   }
 
   function beginSurfacePan(event) {
@@ -3107,6 +3163,7 @@
     };
     window.addEventListener('mousemove', handleSurfacePanMove);
     window.addEventListener('mouseup', endSurfacePan);
+    window.addEventListener('blur', endSurfacePan);
   }
 
   function handleSurfaceScroll() {
@@ -3131,6 +3188,7 @@
   function endSurfacePan() {
     window.removeEventListener('mousemove', handleSurfacePanMove);
     window.removeEventListener('mouseup', endSurfacePan);
+    window.removeEventListener('blur', endSurfacePan);
     surfacePan = null;
   }
 

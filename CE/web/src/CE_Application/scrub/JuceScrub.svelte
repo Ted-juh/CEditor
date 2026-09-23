@@ -7,7 +7,6 @@
    * two-way sync, automation gestures, and discrete-parameter stepping.
    */
   import * as Juce from 'juce-framework-frontend';
-  import { onMount } from 'svelte';
   import ScrubControl from './ScrubControl.svelte';
   import { presets } from './dragScrub';
 
@@ -22,6 +21,13 @@
     [key: string]: unknown;
   }
 
+  interface SliderProperties {
+    numSteps?: number;
+    label?: string;
+    name?: string;
+    [key: string]: unknown;
+  }
+
   let {
     identifier,
     shape = 'rotary',
@@ -32,25 +38,30 @@
     ...config
   }: Props = $props();
 
-  const state = Juce.getSliderState(identifier);
+  let sliderState = $derived(Juce.getSliderState(identifier));
+  let value = $state(0);
+  let scaled = $state(0);
+  let properties = $state<SliderProperties>({});
 
-  let value = $state(state.getNormalisedValue());
-  let scaled = $state(state.getScaledValue());
-  let properties = $state(state.properties);
-
-  onMount(() => {
+  // The identifier is a prop and can change when a reusable control is rebound.
+  // Reconnect to the matching relay and detach from the old one in that case.
+  $effect(() => {
+    const relay = sliderState;
     const onValue = () => {
       // Host automation, preset recall, or another view of the same parameter.
-      value = state.getNormalisedValue();
-      scaled = state.getScaledValue();
+      value = relay.getNormalisedValue();
+      scaled = relay.getScaledValue();
     };
-    const onProps = () => { properties = state.properties; };
+    const onProps = () => { properties = (relay.properties ?? {}) as SliderProperties; };
 
-    state.valueChangedEvent.addListener(onValue);
-    state.propertiesChangedEvent?.addListener(onProps);
+    onValue();
+    onProps();
+
+    const valueListener = relay.valueChangedEvent.addListener(onValue);
+    const propertiesListener = relay.propertiesChangedEvent?.addListener(onProps);
     return () => {
-      state.valueChangedEvent.removeListener(onValue);
-      state.propertiesChangedEvent?.removeListener(onProps);
+      relay.valueChangedEvent.removeListener(valueListener);
+      if (propertiesListener !== undefined) relay.propertiesChangedEvent?.removeListener(propertiesListener);
     };
   });
 
@@ -68,7 +79,7 @@
 
   function handleChange(v: number) {
     value = v;
-    state.setNormalisedValue(v);
+    sliderState.setNormalisedValue(v);
   }
 </script>
 
@@ -82,7 +93,7 @@
   {display}
   label={label ?? properties?.name ?? identifier}
   onChange={handleChange}
-  onDragStart={() => state.sliderDragStarted()}
-  onDragEnd={() => state.sliderDragEnded()}
+  onDragStart={() => sliderState.sliderDragStarted()}
+  onDragEnd={() => sliderState.sliderDragEnded()}
   {...config}
 />

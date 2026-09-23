@@ -19,7 +19,8 @@
    *
    * Writes go to the store live for feedback; one snapshot is pushed at the
    * gesture boundary so the whole resize (or rotation) is a single undo step.
-   */
+  */
+  import { onDestroy } from 'svelte';
   import { selectedComponentIds, multiDragDelta } from '../stores/panels.js';
   import { applyControlPatchesById } from '../stores/controls.js';
   import { pushSnapshot } from '../stores/history.js';
@@ -71,12 +72,36 @@
   let members = [];
   let rotateCenter = null;
   let rotateStartAngle = 0;
+  let cancelPendingClickSwallow = null;
   // The surface the gesture started in, captured at mousedown. The
   // single-control rotate re-queries per move with
   // `document.querySelector('.panel-surface')`, which finds the FIRST panel on
   // screen rather than the one under the hand — harmless with one panel open,
   // wrong the moment there are two.
   let rotateSurface = null;
+
+  function cancelGesture() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('mousemove', handleResizeMove);
+      window.removeEventListener('mouseup', handleResizeEnd);
+      window.removeEventListener('blur', handleResizeEnd);
+      window.removeEventListener('mousemove', handleRotateMove);
+      window.removeEventListener('mouseup', handleRotateEnd);
+      window.removeEventListener('blur', handleRotateEnd);
+    }
+    cancelPendingClickSwallow?.();
+    isResizing = false;
+    isRotating = false;
+    rotateDelta = 0;
+    transientBounds = null;
+    startBounds = null;
+    startMouse = null;
+    members = [];
+    rotateCenter = null;
+    rotateSurface = null;
+  }
+
+  onDestroy(cancelGesture);
 
   // Panel-space AABB over the selection. While a member drag is live the
   // store still holds the start positions, so the box rides the broadcast
@@ -159,6 +184,7 @@
     e.preventDefault();
     e.stopPropagation();
 
+    cancelGesture();
     isResizing = true;
     resizeHandle = handleId;
     startMouse = { x: e.clientX, y: e.clientY };
@@ -167,6 +193,7 @@
 
     window.addEventListener('mousemove', handleResizeMove);
     window.addEventListener('mouseup', handleResizeEnd);
+    window.addEventListener('blur', handleResizeEnd);
   }
 
   function handleResizeMove(e) {
@@ -216,16 +243,17 @@
     applyControlPatchesById(patches);
   }
 
-  function handleResizeEnd() {
+  function handleResizeEnd(e) {
     if (!isResizing) return;
     window.removeEventListener('mousemove', handleResizeMove);
     window.removeEventListener('mouseup', handleResizeEnd);
+    window.removeEventListener('blur', handleResizeEnd);
     isResizing = false;
     transientBounds = null;
     startBounds = null;
     members = [];
     pushSnapshot();   // gesture boundary — one group resize, one undo step
-    swallowNextCanvasClick();
+    if (e?.type === 'mouseup') swallowNextCanvasClick();
   }
 
   // --- Group rotation ---
@@ -239,6 +267,7 @@
     const point = surface ? clientToPanelPoint(surface, e.clientX, e.clientY, scale || 1) : null;
     if (!point) return;
 
+    cancelGesture();
     isRotating = true;
     rotateSurface = surface;
     startBounds = { x: bounds.x, y: bounds.y, w: bounds.w, h: bounds.h };
@@ -253,6 +282,7 @@
 
     window.addEventListener('mousemove', handleRotateMove);
     window.addEventListener('mouseup', handleRotateEnd);
+    window.addEventListener('blur', handleRotateEnd);
   }
 
   function handleRotateMove(e) {
@@ -274,10 +304,11 @@
     );
   }
 
-  function handleRotateEnd() {
+  function handleRotateEnd(e) {
     if (!isRotating) return;
     window.removeEventListener('mousemove', handleRotateMove);
     window.removeEventListener('mouseup', handleRotateEnd);
+    window.removeEventListener('blur', handleRotateEnd);
 
     const turned = Math.abs(rotateDelta) > 0.001;
     isRotating = false;
@@ -290,18 +321,29 @@
     // Gesture boundary — one group rotation, one undo step. A zero-degree
     // click on a rotate zone changed nothing and must not spend one.
     if (turned) pushSnapshot();
-    swallowNextCanvasClick();
+    if (e?.type === 'mouseup') swallowNextCanvasClick();
   }
 
   /** Swallow the click that follows mouseup so it doesn't clear the selection
    *  (clicks on menus and toolbars still pass through). */
   function swallowNextCanvasClick() {
+    cancelPendingClickSwallow?.();
+    const controller = new AbortController();
+    const cancel = () => {
+      controller.abort();
+      if (cancelPendingClickSwallow === cancel) cancelPendingClickSwallow = null;
+    };
+    cancelPendingClickSwallow = cancel;
     window.addEventListener('click', (ev) => {
+      if (ev.detail === 0) return;
       if (ev.target?.closest?.('.panel-surface, .canvas-viewport')) {
         ev.stopPropagation();
         ev.preventDefault();
       }
-    }, { once: true, capture: true });
+      cancel();
+    }, { capture: true, signal: controller.signal });
+    window.addEventListener('mousedown', cancel, { capture: true, once: true, signal: controller.signal });
+    setTimeout(cancel, 0);
   }
 </script>
 

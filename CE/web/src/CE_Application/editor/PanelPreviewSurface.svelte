@@ -313,6 +313,11 @@
     surfaceRef = $bindable(null),
   } = $props();
 
+  // Several control families own self-scheduling animation loops. Their data remains reachable
+  // after unmount, so a loop that only checks the last panel snapshot would otherwise run forever.
+  let surfaceDestroyed = false;
+  onDestroy(() => { surfaceDestroyed = true; });
+
   // The set this panel's controls resolve their colour tokens against. Through context rather
   // than the editor's store because the Player renders a document the editor's panel list has
   // never seen — CanvasControl prefers this when present (stores/controlSets.js).
@@ -2285,6 +2290,7 @@
     orbitTickerRunning = true;
     orbitLastMs = Date.now();
     const loop = () => {
+      if (surfaceDestroyed) { orbitTickerRunning = false; return; }
       const running = orbitControls().filter((c) => orbitConfig(c).running !== false);
       if (!running.length) { orbitTickerRunning = false; return; } // self-stop
       const now = Date.now();
@@ -2437,6 +2443,7 @@
     looperTickerRunning = true;
     looperLastMs = Date.now();
     const loop = () => {
+      if (surfaceDestroyed) { looperTickerRunning = false; return; }
       const running = looperControls().filter((c) => looperConfig(c).running !== false);
       if (!running.length) { looperTickerRunning = false; return; } // self-stop
       const now = Date.now();
@@ -2755,6 +2762,7 @@
     turingTickerRunning = true;
     turingLastMs = Date.now();
     const loop = () => {
+      if (surfaceDestroyed) { turingTickerRunning = false; return; }
       const running = turingControls().filter((c) => turingConfig(c).running !== false);
       if (!running.length) { turingTickerRunning = false; return; } // self-stop
       const now = Date.now();
@@ -2894,6 +2902,7 @@
     kineticTickerRunning = true;
     kineticLastMs = Date.now();
     const loop = () => {
+      if (surfaceDestroyed) { kineticTickerRunning = false; return; }
       const active = kineticControls().filter((c) => kineticConfig(c).running !== false || (kineticDrag && kineticDrag.id === getControlId(c)));
       if (!active.length) { kineticTickerRunning = false; return; } // self-stop
       const now = Date.now();
@@ -3018,6 +3027,7 @@
     constTickerRunning = true;
     constLastMs = Date.now();
     const loop = () => {
+      if (surfaceDestroyed) { constTickerRunning = false; return; }
       const running = constControls().filter((c) => constellationConfig(c).running === true);
       if (!running.length) { constTickerRunning = false; return; } // self-stop
       const now = Date.now();
@@ -3494,6 +3504,7 @@
     arpTickerRunning = true;
     arpLastMs = Date.now();
     const loop = () => {
+      if (surfaceDestroyed) { arpTickerRunning = false; return; }
       const running = arpControls().filter((c) => arpConfig(c).running !== false);
       if (!running.length) { arpTickerRunning = false; return; }   // self-stop
       const now = Date.now();
@@ -3661,6 +3672,7 @@
     seqTickerRunning = true;
     seqLastMs = Date.now();
     const loop = () => {
+      if (surfaceDestroyed) { seqTickerRunning = false; return; }
       const running = stepSequencerControls().filter((c) => sequencerConfig(c).running === true);
       if (!running.length) { seqTickerRunning = false; return; }   // self-stop, like the Arp's
       const now = Date.now();
@@ -4659,6 +4671,7 @@
     recorderTickerRunning = true;
     recorderLastMs = Date.now();
     const loop = () => {
+      if (surfaceDestroyed) { recorderTickerRunning = false; return; }
       const all = recorderControls();
       if (!all.length) { recorderTickerRunning = false; return; }
       const now = Date.now();
@@ -4925,6 +4938,7 @@
     phraseTickerRunning = true;
     phraseLastMs = Date.now();
     const loop = () => {
+      if (surfaceDestroyed) { phraseTickerRunning = false; return; }
       const all = phraseControls();
       const running = all.filter((c) => phraseConfig(c).running !== false);
       // Stopping must let go. Otherwise the ticker exits with the last step
