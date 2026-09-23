@@ -1,0 +1,9 @@
+{
+  "results": [
+    {
+      "name": "TextInput shows authored text or placeholder and preserves font and zero padding in the editable field",
+      "status": "pass"
+    }
+  ],
+  "errors": []
+}
