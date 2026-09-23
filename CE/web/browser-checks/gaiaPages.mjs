@@ -15,7 +15,12 @@ try {
   await page.goto(`${server.resolvedUrls.local[0]}gaiaPages.html`);
   await page.waitForFunction(()=>!!window.__gaia,null,{timeout:90000});
   const size=await page.evaluate(()=>window.__gaia.load('/gaia-panel.json'));
-  await page.waitForTimeout(1000);
+  const initialMounted = await page.evaluate(() => document.querySelectorAll('[data-control-id]').length);
+  const topLevelControls = await page.evaluate(() => window.__gaia.panel.controls.length);
+  assert.ok(initialMounted > 0 && initialMounted < topLevelControls,
+    'large previews paint a first slice before mounting every control');
+  await page.waitForFunction(total => document.querySelectorAll('[data-control-id]').length >= total,
+    topLevelControls, { timeout: 30000 });
   assert.ok((await page.evaluate(()=>window.__gaia.actions())).includes('gaiaNamesScan'),
     'ordinary preview must initialize embedded panel scripts without a script editor or manual Run');
   async function control(name) {

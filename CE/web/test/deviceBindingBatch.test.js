@@ -108,3 +108,24 @@ test('binding edits and newly nested controls invalidate the receive index', () 
   assert.equal(syncDeviceParameterToPanelPreview('synth', 'new', 40), 1);
   assert.equal(get(panelPreviewSessions).a.customValues.value, 40);
 });
+
+test('preview control lookup cache follows immutable controls-array revisions', () => {
+  setup([component('slider')]);
+  updatePanelPreviewSession('slider', { pressed: true }); // populate the old document's index
+
+  const replacement = {
+    _children: {
+      Core: { id: 'slider', name: 'slider', controlType: 'Slider' },
+      Behavior: {
+        family: 'range', role: 'slider', valueMode: 'range', activeHandlePolicy: 'endFirst',
+        min: 0, max: 127, defaultStartValue: 0, defaultEndValue: 127,
+      },
+    },
+  };
+  panels.set([{ id: 'batch-panel', controls: [replacement] }]);
+  panelPreviewSessions.set({});
+  updatePanelPreviewSession('slider', { pressed: true });
+
+  assert.equal(get(panelPreviewSessions).slider.activeHandle, 'end',
+    'a new controls array must not reuse the previous document revision\'s id index');
+});

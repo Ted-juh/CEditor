@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "check": "svelte-check --config ./svelte.config.js --tsconfig ./jsconfig.json",
     "preview": "vite preview",
     "test": "node --import ./test/support/register-svelte.mjs --test",
     "test:script-exports": "node scripts/validate-script-exports.mjs",
@@ -29,6 +30,7 @@
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "playwright-core": "^1.62.1",
     "svelte": "^5.0.0",
+    "svelte-check": "^4.7.6",
     "typescript": "^6.0.3",
     "vite": "^6.0.0"
   },

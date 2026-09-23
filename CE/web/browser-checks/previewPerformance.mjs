@@ -68,15 +68,16 @@ try {
       samples, siblingMutations,
       unchangedSibling: window.__gaia.session(other) === originalSibling,
       value: window.__gaia.session(name).customValues.value,
-      capTop: parseFloat([...target.querySelectorAll('.interactive-part')]
-        .find(part => part.style.width === '26px' && part.style.height === '13px')?.style.top),
+      capTop: parseFloat(target.querySelector('[data-part-name="cap"]')?.style.top),
+      capHeight: parseFloat(target.querySelector('[data-part-name="cap"]')?.style.height),
       echoed: window.__gaia.feedbackSent().filter(event => event.name === 'setDeviceParameter').length - sentBefore,
       nodes: document.querySelectorAll('*').length,
     };
   });
   if (profiler) await writeFile(process.env.PREVIEW_CPU_PROFILE, JSON.stringify((await profiler.send('Profiler.stop')).profile));
   assert.equal(result.value, 51, 'incoming MIDI reaches the preview session');
-  assert.equal(result.capTop, Math.round(89 - 87 * 51 / 127), 'incoming MIDI moves the fader cap, not just its stored value');
+  assert.ok(Math.abs(result.capTop - Math.round(89 - 87 * 51 / 127) * result.capHeight / 13) < 0.01,
+    'incoming MIDI moves the fader cap, not just its stored value');
   assert.equal(result.echoed, 0, 'incoming MIDI must not echo back to the device');
   assert.equal(result.unchangedSibling, true);
   assert.equal(result.siblingMutations, 0, 'one MIDI parameter must not redraw unrelated knobs');
@@ -91,9 +92,8 @@ try {
   const after = await page.evaluate(() => window.__gaia.session('tone1.filter.envAttackTime'));
   assert.notEqual(after.customValues.value, before, 'pointer drag changes the value');
   assert.equal(after.dragging, false, 'pointer release clears the MIDI echo guard');
-  const capTop = await knob.evaluate(target => parseFloat([...target.querySelectorAll('.interactive-part')]
-    .find(part => part.style.width === '26px' && part.style.height === '13px')?.style.top));
-  assert.equal(capTop, Math.round(89 - 87 * after.customValues.value / 127));
+  const capTop = await knob.evaluate(target => parseFloat(target.querySelector('[data-part-name="cap"]')?.style.top));
+  assert.ok(Math.abs(capTop - Math.round(89 - 87 * after.customValues.value / 127) * result.capHeight / 13) < 0.01);
   const stream = await page.evaluate(async () => {
     const name = 'tone1.filter.envAttackTime';
     const start = performance.now();
@@ -111,11 +111,12 @@ try {
     const target = document.querySelector(`[data-control-id="${window.__gaia.id(name)}"]`);
     return { count, sentMs, drainMs: performance.now() - start - sentMs,
       value: window.__gaia.session(name).customValues.value,
-      capTop: parseFloat([...target.querySelectorAll('.interactive-part')]
-        .find(part => part.style.width === '26px' && part.style.height === '13px')?.style.top) };
+      capTop: parseFloat(target.querySelector('[data-part-name="cap"]')?.style.top),
+      capHeight: parseFloat(target.querySelector('[data-part-name="cap"]')?.style.height) };
   });
   assert.equal(stream.value, 127, 'a sustained incoming stream reaches its latest value');
-  assert.equal(stream.capTop, 2, 'the fader paints the final stream value without a backlog');
+  assert.ok(Math.abs(stream.capTop - 2 * stream.capHeight / 13) < 0.01,
+    'the fader paints the final stream value without a backlog');
   assert.deepEqual(errors, []);
   const sorted = result.samples.map(sample => sample.frameMs).sort((a, b) => a - b);
   console.log(JSON.stringify({ loadMs, nodes: result.nodes, midiFrameMedianMs: sorted[Math.floor(sorted.length / 2)], midiFrameP95Ms: sorted[Math.floor(sorted.length * 0.95)], midiFrameMaxMs: sorted.at(-1), midiSyncMeanMs: result.samples.reduce((sum, sample) => sum + sample.syncMs, 0) / result.samples.length, siblingMutations: result.siblingMutations, pointerValue: after.customValues.value, stream }, null, 2));

@@ -51,11 +51,11 @@ try {
       times.push(performance.now() - start);
     }
     const target = document.querySelector(`[data-control-id="${g.id('tone1.filter.envAttackTime')}"]`);
-    const cap = [...target.querySelectorAll('.interactive-part')].find(part => part.style.width === '26px' && part.style.height === '13px');
-    return { times, value: g.session('tone1.filter.envAttackTime').customValues.value, capTop: parseFloat(cap.style.top), rows: document.querySelectorAll('.midi-monitor .row').length, total: document.querySelector('.midi-monitor .summary').textContent, echoes: g.feedbackSent().filter(event => event.name === 'setDeviceParameter').length - beforeSent };
+    const cap = target.querySelector('[data-part-name="cap"]');
+    return { times, value: g.session('tone1.filter.envAttackTime').customValues.value, capTop: parseFloat(cap?.style.top), capHeight: parseFloat(cap?.style.height), rows: document.querySelectorAll('.midi-monitor .row').length, total: document.querySelector('.midi-monitor .summary').textContent, echoes: g.feedbackSent().filter(event => event.name === 'setDeviceParameter').length - beforeSent };
   });
   assert.equal(result.value, 83);
-  assert.equal(result.capTop, Math.round(89 - 87 * 83 / 127));
+  assert.ok(Math.abs(result.capTop - Math.round(89 - 87 * 83 / 127) * result.capHeight / 13) < 0.01);
   assert.equal(result.echoes, 0);
   assert.ok(result.rows < 80, 'the monitor must only mount visible rows');
   assert.match(result.total, /500 events/);

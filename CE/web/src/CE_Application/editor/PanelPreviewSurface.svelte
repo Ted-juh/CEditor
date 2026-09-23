@@ -57,6 +57,7 @@
   import { countRolesInPanels, resolveClockDevice } from '../utils/deviceRoles.js';
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
   import { buildSceneryRenderPlan, controlItem } from '../utils/sceneryRenderPlan.js';
+  import { initialMountCount, nextMountCount, mountIncomplete, scheduleNextSlice } from '../utils/progressiveMount.js';
   import SceneryGround from './SceneryGround.svelte';
   import { flatControls, controlPanelRect } from '../utils/containment.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
@@ -387,7 +388,7 @@
 
   // The plan, with each ground's held controls drawn immediately after it — above the rest of that
   // ground and below every live control on the layer, which is where the fold guarantees they fit.
-  let renderItems = $derived.by(() => {
+  let allRenderItems = $derived.by(() => {
     if (groundHolds.size === 0) return previewPlan.items;
     const out = [];
     for (const item of previewPlan.items) {
@@ -397,6 +398,26 @@
     }
     return out;
   });
+
+  // Player and Preview used to mount every live control in one synchronous block. On the 783
+  // control AN1x panel that produced a one-second long task before the first control appeared.
+  // Use the same ordered-prefix strategy as the editor surface: paint a useful first slice, then
+  // append the remainder immediately after successive paints. Sessions and script state are built
+  // for the whole panel before this point, so a control mounted in a later slice sees current state.
+  let mountedCount = $state(0);
+  let panelIdentity = $derived(panel?.id ?? null);
+  $effect(() => {
+    panelIdentity;
+    mountedCount = initialMountCount(allRenderItems.length);
+  });
+  $effect(() => {
+    const total = allRenderItems.length;
+    if (!mountIncomplete(mountedCount, total)) return;
+    return scheduleNextSlice(() => { mountedCount = nextMountCount(mountedCount, total); });
+  });
+  let renderItems = $derived(
+    mountedCount >= allRenderItems.length ? allRenderItems : allRenderItems.slice(0, mountedCount)
+  );
   /**
    * Id -> control, over the WHOLE tree.
    *

@@ -3630,6 +3630,7 @@
       {#each renderedPartEntries as [partName, part] (partName)}
         <InteractivePartRenderer
           {part}
+          {partName}
           parentWidth={displayW}
           parentHeight={displayH}
           transitionBucket={interactionRuntime?.transitions?.partTransitions?.get?.(partName) ?? null}

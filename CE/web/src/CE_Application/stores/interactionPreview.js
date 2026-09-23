@@ -29,6 +29,25 @@ import { listboxDefaultSelectedValues } from '../utils/listboxLayout.js';
  */
 const allControls = (controls) => flatControls(Array.isArray(controls) ? controls : []);
 
+// Session patches arrive on every hardware value and gesture frame. Flattening the panel tree and
+// rebuilding the id map for each batch made that hot path allocate O(panel size) even when one
+// fader changed. Panel edits replace the root controls array, so its identity is the document
+// revision and is a safe WeakMap key (the same contract used by deviceBindingSync's binding index).
+const controlIndexes = new WeakMap();
+const EMPTY_CONTROL_INDEX = { controls: [], byId: new Map() };
+function controlIndex(controls) {
+  if (!Array.isArray(controls)) return EMPTY_CONTROL_INDEX;
+  let index = controlIndexes.get(controls);
+  if (index) return index;
+  const flattened = allControls(controls);
+  index = {
+    controls: flattened,
+    byId: new Map(flattened.map(control => [getControlId(control), control])),
+  };
+  controlIndexes.set(controls, index);
+  return index;
+}
+
 const DEFAULT_SESSION = {
   enabled: true,
   hover: false,
@@ -340,8 +359,7 @@ export function updatePanelPreviewSession(controlId, patch = {}) {
 export function updatePanelPreviewSessions(patches = []) {
   if (!patches.length) return;
   const panel = getActivePanel();
-  const controls = allControls(panel?.controls);
-  const byId = new Map(controls.map(control => [getControlId(control), control]));
+  const { controls, byId } = controlIndex(panel?.controls);
   const current = get(panelPreviewSessions);
   let nextSessions = current;
   for (const { controlId, patch = {} } of patches) {

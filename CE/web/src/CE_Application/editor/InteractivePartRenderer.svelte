@@ -9,6 +9,7 @@
 
   let {
     part = null,
+    partName = '',
     parentWidth = 0,
     parentHeight = 0,
     transitionBucket = null,
@@ -495,7 +496,7 @@
 </script>
 
 {#if part?.visible !== false}
-  <div class="interactive-part" class:debug={debug} style={partStyle}>
+  <div class="interactive-part" class:debug={debug} data-part-name={partName || part?.name || undefined} style={partStyle}>
     {#if materialLit}
       <MaterialFilter id={materialId} {material} />
     {/if}
