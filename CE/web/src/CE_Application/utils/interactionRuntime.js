@@ -336,11 +336,9 @@ function applyPatchMap(target, patchMap = {}) {
   }
 }
 
-function applyStatePatches(control, state, { skipComponentPatch = false } = {}) {
+function applyStatePatches(control, state) {
   const patches = state?.patches ?? {};
-  if (!skipComponentPatch) {
-    applyPatchMap(control, patches.component);
-  }
+  applyPatchMap(control, patches.component);
   const partsSection = getNodeChild(control, 'Parts');
   for (const [partName, patchMap] of Object.entries(patches.parts ?? {})) {
     const partNode = partsSection?._children?.[partName];
@@ -356,7 +354,7 @@ export function resolveStateScopedControl(control, stateName = '') {
   if (!state) return control;
 
   const resolved = deepClone(control);
-  applyStatePatches(resolved, state, { skipComponentPatch: isRadioGroupControl(control) });
+  applyStatePatches(resolved, state);
   const resolvedValue = getNodeChild(resolved, 'Value');
   if (resolvedValue) {
     resolvedValue.__segmentPreviewState = stateName;

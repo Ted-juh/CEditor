@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveInteractionContext, resolveInteractiveControl } from '../src/CE_Application/utils/interactionRuntime.js';
+import { resolveInteractionContext, resolveInteractiveControl, resolveStateScopedControl } from '../src/CE_Application/utils/interactionRuntime.js';
 
 test('choice defaults never resolve a header or disabled option as the selected value', () => {
   const rows = [
@@ -174,6 +174,18 @@ test('resolveInteractiveControl still applies checked-driven selected states for
   assert.equal(resolved.runtime.signals.selectionActive, true);
   assert.deepEqual(resolved.runtime.activeStates, ['Selected']);
   assert.equal(resolved.control._children.Background._children.Fill.colour, 'FF2D6F9C');
+});
+
+test('radio group inspector reads the component Hover patch it writes', () => {
+  const control = makeRadioGroupControl('radio_hover');
+  control._children.States._children.Hover = {
+    enabled: true,
+    when: { hover: true },
+    patches: { component: { 'Background.Fill.colour': 'FF30C030' }, parts: {} },
+  };
+  const resolved = resolveStateScopedControl(control, 'Hover');
+  assert.equal(resolved._children.Background._children.Fill.colour, 'FF30C030');
+  assert.equal(control._children.Background._children.Fill.colour, 'FF3A3A3A');
 });
 
 test('resolveInteractiveControl applies checked-driven selected states for cyclic buttons using their current row value', () => {

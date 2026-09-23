@@ -54,3 +54,19 @@ export function cascadeUnlink(sectionPath, root, keys, propSpec, set) {
     }
   }
 }
+
+/** Build the unlink writes from one control's own linked values. */
+export function linkTogglePatch(border, corners, linked, {
+  borderPath = 'Background.Border',
+  cornersPath = 'Background.Corners',
+} = {}) {
+  const patch = {};
+  const set = (path, value) => { patch[path] = value; };
+  if (!linked) {
+    if (corners) cascadeUnlink(cornersPath, corners, CORNERS, CORNER_UNLINK_PROPS, set);
+    if (border) cascadeUnlink(borderPath, border, SIDES, BORDER_UNLINK_PROPS, set);
+  }
+  patch[`${cornersPath}.linked`] = linked;
+  if (border) patch[`${borderPath}.linked`] = linked;
+  return patch;
+}

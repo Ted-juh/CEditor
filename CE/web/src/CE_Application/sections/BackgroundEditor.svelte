@@ -1,5 +1,5 @@
 <script>
-  import { onDestroy } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import PaintBucket from 'lucide-svelte/icons/paint-bucket';
   import Blend from 'lucide-svelte/icons/blend';
   import Image from 'lucide-svelte/icons/image';
@@ -352,9 +352,13 @@
   }
 
   function setColour(e) {
-    let val = e.target.value.replace(/^#/, '').toUpperCase();
+    const input = e.currentTarget;
+    let val = input.value.replace(/^#/, '').toUpperCase();
     if (val.length === 6) val = 'FF' + val;
     set(`${pathPrefix}.Fill.colour`, val);
+    // A rejected or equivalent edit leaves displayColour unchanged, so Svelte
+    // will not rewrite the DOM value on its own.
+    void tick().then(() => { if (input.isConnected) input.value = displayColour; });
   }
 
   // A colour linked to the control set ('{surface}') shows what the active set resolves it to,

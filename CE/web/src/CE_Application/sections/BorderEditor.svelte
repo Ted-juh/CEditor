@@ -1,6 +1,10 @@
 <script>
-  import { getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
-  import { selectedComponentIds } from '../stores/panels.js';
+  import { getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty, applyInspectorControlPatchesById } from '../stores/controls.js';
+  import { activePanel, selectedComponentIds } from '../stores/panels.js';
+  import { stateEditScope } from '../stores/stateEditScope.js';
+  import { findControlById } from '../utils/containment.js';
+  import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
+  import { linkTogglePatch } from '../utils/borderLinkCascade.js';
   import BorderCornerWidget from '../properties/BorderCornerWidget.svelte';
 
   let { control = null } = $props();
@@ -18,6 +22,23 @@
       updateControlProperty(core.id, path, value);
     }
   }
+
+  function toggleLinkForSelection(nextLinked) {
+    if ($selectedComponentIds.size < 2 || !$activePanel) return false;
+    const stateName = $stateEditScope.mode === 'state' ? $stateEditScope.stateName : '';
+    const patches = new Map();
+    for (const id of $selectedComponentIds) {
+      const source = findControlById($activePanel.controls, id);
+      if (!source) continue;
+      const scoped = resolveStateScopedControl(source, stateName);
+      const bg = getSection(scoped, 'Background');
+      if (!bg) continue;
+      patches.set(id, linkTogglePatch(bg._children?.Border, bg._children?.Corners, nextLinked));
+    }
+    if (!patches.size) return false;
+    applyInspectorControlPatchesById(patches);
+    return true;
+  }
 </script>
 
 {#if background}
@@ -28,6 +49,7 @@
       linked={corners?.linked ?? true}
       controlId={core?.id}
       onupdate={(path, value) => set(path, value)}
+      onlinktoggle={toggleLinkForSelection}
     />
   </div>
 {/if}

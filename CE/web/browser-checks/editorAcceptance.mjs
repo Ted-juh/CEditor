@@ -30,6 +30,69 @@ try {
   await page.waitForTimeout(600);
   if(process.env.CEDITOR_ACCEPTANCE_MODE==='dock-opener'){
     await runDockOpener(page);assert.deepEqual(errors,[]);
+  } else if(process.env.CEDITOR_ACCEPTANCE_MODE==='tree-rename'){
+    await page.getByTitle('Search every component and saved package',{exact:true}).click();
+    await page.getByRole('textbox',{name:'Search components',exact:true}).fill('Label');
+    await page.getByTitle('Insert Label — or drag it onto the canvas',{exact:true}).click();
+    const [id]=await page.evaluate(()=>window.__acceptance.selection());
+    const row=page.getByRole('tree',{name:'Components'}).locator(`[data-tree-id="${id}"]`);
+    await row.focus();
+    await row.press('F2');
+    const input=row.locator('.rename-input');
+    await input.waitFor();
+    assert.equal(await input.evaluate(e=>document.activeElement===e),true,'F2 focuses the rename input');
+    assert.equal(await input.evaluate(e=>e.selectionStart===0&&e.selectionEnd===e.value.length),true,'the old name is selected');
+    await page.keyboard.type('RenamedLabel');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(id=>window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)._children.Core.name,id),'RenamedLabel');
+    assert.deepEqual(await page.evaluate(()=>window.__acceptance.selection()),[id]);
+    assert.equal(await page.evaluate(()=>window.__acceptance.panel().controls.length),1);
+    assert.deepEqual(errors,[]);
+    console.log('PASS tree F2 focuses and selects name; typing and Enter rename without canvas shortcuts');
+  } else if(process.env.CEDITOR_ACCEPTANCE_MODE==='border-unlink'){
+    const insert=async type=>{
+      const label=await page.evaluate(t=>window.__acceptance.catalog.flatMap(c=>c.items).find(i=>i.type===t).label,type);
+      await page.getByTitle('Search every component and saved package',{exact:true}).click();
+      await page.getByRole('textbox',{name:'Search components',exact:true}).fill(type);
+      await page.getByTitle(`Insert ${label} — or drag it onto the canvas`,{exact:true}).click();
+      return (await page.evaluate(()=>window.__acceptance.selection()))[0];
+    };
+    const buttonId=await insert('MomentaryButton');
+    const toggleId=await insert('ToggleButton');
+    const tree=page.getByRole('tree',{name:'Components'});
+    await tree.locator(`[data-tree-id="${buttonId}"]`).click();
+    const props=page.locator('.properties-panel');
+    await props.locator('.tab-icon[title="Border"]').click();
+    const radius=props.locator('.corner-cell[title="Top Left corner"] input');
+    await radius.fill('20');await radius.press('Enter');
+    await tree.locator(`[data-tree-id="${toggleId}"]`).click({modifiers:['Shift']});
+    assert.deepEqual(new Set(await page.evaluate(()=>window.__acceptance.selection())),new Set([buttonId,toggleId]));
+    await props.getByRole('button',{name:'Unlink',exact:true}).click();
+    const corners=await page.evaluate(ids=>ids.map(id=>{
+      const c=window.__acceptance.panel().controls.find(x=>x._children.Core.id===id);
+      return c._children.Background._children.Corners;
+    }),[buttonId,toggleId]);
+    assert.equal(corners[0].topLeft.radius,20);
+    assert.equal(corners[1].topLeft.radius,8);
+    assert.equal(corners[0].linked,false);
+    assert.equal(corners[1].linked,false);
+    assert.deepEqual(errors,[]);
+    console.log('PASS multi-selection unlink preserves each control’s linked radius');
+
+    const labelId=await insert('Label');
+    const labelBase=await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)._children.Background),labelId);
+    await tree.locator(`[data-tree-id="${toggleId}"]`).click({modifiers:['Control']});
+    assert.deepEqual(new Set(await page.evaluate(()=>window.__acceptance.selection())),new Set([labelId,toggleId]));
+    await page.getByRole('button',{name:'Hover',exact:true}).click();
+    await props.locator('.tab-icon[title="Background"]').click();
+    await page.getByText('1 skipped',{exact:false}).waitFor();
+    const colour=props.locator('.color-input input').first();
+    await colour.fill('3060C0');await colour.press('Enter');
+    assert.equal(await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)._children.Background),labelId),labelBase);
+    const hoverPatch=await page.evaluate(id=>window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)._children.States._children.Hover.patches.component['Background.Fill.colour'],toggleId);
+    assert.equal(hoverPatch,'FF3060C0');
+    assert.deepEqual(errors,[]);
+    console.log('PASS mixed Hover edit skips controls without Hover and shows the skipped count');
   } else if(process.env.CEDITOR_ACCEPTANCE_MODE==='keyboard'){
     await runKeyboardGestures(page);assert.deepEqual(errors,[]);
   } else if(process.env.CEDITOR_ACCEPTANCE_MODE==='gestures'){

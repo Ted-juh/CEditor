@@ -53,7 +53,7 @@
   import { propertyHint } from '../stores/propertyHint.js';
   import { clearPropertyFilter } from '../stores/propertyFilter.js';
   import { creatorMode, CREATOR_SIMPLE_HIDDEN_TABS } from '../stores/creatorMode.js';
-  import { selectedControl, hasSection, getSection, updateControlProperty } from '../stores/controls.js';
+  import { selectedControl, selectedControls, hasSection, getSection, updateControlProperty } from '../stores/controls.js';
   import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
   import PropertiesToolbar from './PropertiesToolbar.svelte';
   import DockSearchHits from '../properties/DockSearchHits.svelte';
@@ -280,15 +280,20 @@
       : BASE_STATE_TARGET
   );
   let activeStateTargetOption = $derived(findStateTargetOption(stateTargetOptions, activeStateTarget));
+  let missingStateCount = $derived(
+    activeStateTarget === BASE_STATE_TARGET ? 0 : $selectedControls.filter((control) =>
+      !getSection(control, 'States')?._children?.[activeStateTarget]
+    ).length
+  );
   let stateTargetBadge = $derived(
     activeStateTargetOption?.id === BASE_STATE_TARGET
       ? ''
-      : (activeStateTargetOption?.fullLabel ?? '')
+      : `${activeStateTargetOption?.fullLabel ?? ''}${missingStateCount ? ` · ${missingStateCount} skipped` : ''}`
   );
   let stateTargetTooltip = $derived(
     activeStateTargetOption?.id === BASE_STATE_TARGET
       ? ''
-      : `Editing ${activeStateTargetOption?.fullLabel ?? activeStateTarget}`
+      : `Editing ${activeStateTargetOption?.fullLabel ?? activeStateTarget}${missingStateCount ? `; ${missingStateCount} selected component${missingStateCount === 1 ? '' : 's'} without this state will be skipped` : ''}`
   );
   let scopedComponentControl = $derived.by(() => {
     if (!$selectedControl) return null;

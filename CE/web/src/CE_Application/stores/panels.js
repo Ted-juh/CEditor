@@ -572,6 +572,7 @@ function maybeAutoOpenComponentDesigner(panel) {
 /** Add a new panel and make it active */
 export function addPanel(panel = null) {
   const p = panel ?? createPanel();
+  clearSelection();
   panels.update(list => [...list, p]);
   activePanelId.set(p.id);
   activeEditorTab.set({ type: 'panel', id: p.id });
@@ -865,6 +866,7 @@ function normalizeEditorTabDescriptor(tab) {
 export function closePanel(id) {
   const closing = get(panels).find((p) => p.id === id);
   if (closing?.modified && !confirmDiscardUnsaved(closing.name)) return false;
+  if (get(activePanelId) === id || (get(activeEditorTab)?.type === 'panel' && get(activeEditorTab)?.id === id)) clearSelection();
 
   panelDesignerSplits.update((splits) => {
     if (!splits || !(id in splits)) return splits;
@@ -915,6 +917,7 @@ export function closePanel(id) {
 /** Switch to a panel by id */
 export function setActivePanel(id) {
   const nextTab = { type: 'panel', id };
+  if (get(activeEditorTab)?.type !== 'panel' || get(activePanelId) !== id) clearSelection();
   activePanelId.set(id);
   activeEditorTab.set(nextTab);
 }

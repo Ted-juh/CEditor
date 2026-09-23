@@ -254,6 +254,11 @@
     renameValue = name;
   }
 
+  function focusRenameInput(input) {
+    input.focus({ preventScroll: true });
+    input.select();
+  }
+
   // A rename that cannot be typed is a rename that lies. The old code took `renameValue.trim()`
   // and, if it was empty, threw the edit away without a word — the row snapped back to its old
   // name and nothing said why. And it wrote `Core.name` straight through, so two controls could
@@ -288,8 +293,10 @@
   }
 
   function handleRenameKeyDown(e) {
-    if (e.key === 'Enter') { commitRename(); }
-    else if (e.key === 'Escape') { renamingId = null; }
+    // Rename keys must not reach canvas shortcuts while this input is open.
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+    else if (e.key === 'Escape') { e.preventDefault(); renamingId = null; }
   }
 
   // F2 renames the selected component — the same convention the code editor
@@ -333,7 +340,8 @@
   }
 
   function handleTreeKeyDown(e) {
-    if (renamingId != null || isEditableTarget(e.target)) return;
+    if (renamingId != null) { e.stopPropagation(); return; }
+    if (isEditableTarget(e.target)) return;
 
     const arrow = treeArrowTarget({
       rows,
@@ -756,15 +764,13 @@
               {/if}
 
               {#if renamingId === id}
-                <!-- svelte-ignore a11y_autofocus -->
                 <input
                   class="rename-input"
                   type="text"
                   bind:value={renameValue}
+                  use:focusRenameInput
                   onblur={commitRename}
                   onkeydown={handleRenameKeyDown}
-                  onfocus={(e) => e.target.select()}
-                  autofocus
                   onclick={(e) => e.stopPropagation()}
                 />
               {:else}

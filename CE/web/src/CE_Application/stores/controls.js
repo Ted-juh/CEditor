@@ -126,12 +126,13 @@ export function applyResolvedValue(control, path, value) {
 /**
  * Apply a property edit made by a state-aware inspector. Generic document
  * writers deliberately do not consult the global inspector scope: scripts,
- * previews and canvas commands must keep writing the base document. When a
- * pinned inspector points at a control without the selected state, fall back
- * to the base value instead of accepting and then dropping the edit.
+ * previews and canvas commands must keep writing the base document. A
+ * pinned inspector only writes to controls that have the selected state.
+ * Writing their base values while the UI says "Editing Hover" changes the
+ * normal appearance without warning.
  */
 export function applyInspectorResolvedValue(control, path, value, stateName = inspectorStateNameForPath(path)) {
-  if (stateName && applyStateScopedValue(control, stateName, path, value)) return true;
+  if (stateName) return applyStateScopedValue(control, stateName, path, value);
   return applyResolvedValue(control, path, value);
 }
 
@@ -182,9 +183,31 @@ export function updateSelectedInspectorProperty(path, value, stateName = inspect
   if (panelId == null || ids.size === 0) return;
 
   panels.update((list) => mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
-    applyInspectorResolvedValue(draft, path, value, stateName);
-    return true;
+    return applyInspectorResolvedValue(draft, path, value, stateName);
   }));
+}
+
+/** Apply distinct inspector patches to selected controls in one document update. */
+export function applyInspectorControlPatchesById(patchesByControlId) {
+  const panelId = get(resolvedActivePanelId);
+  if (panelId == null || !patchesByControlId?.size) return;
+  const selectedIds = get(selectedComponentIds);
+  panels.update((list) => mutatePanelControlsInList(
+    list,
+    panelId,
+    (control) => {
+      const id = control?._children?.Core?.id;
+      return selectedIds.has(id) && patchesByControlId.has(id);
+    },
+    (draft) => {
+      const patch = patchesByControlId.get(draft?._children?.Core?.id);
+      let changed = false;
+      for (const [path, value] of Object.entries(patch ?? {})) {
+        changed = applyInspectorResolvedValue(draft, path, value) || changed;
+      }
+      return changed;
+    },
+  ));
 }
 
 /**
@@ -577,8 +600,7 @@ export function updateInspectorControlProperty(
   const panelId = get(resolvedActivePanelId);
   if (panelId == null) {
     mutateComponentDocumentControl(controlId, (draft) => {
-      applyInspectorResolvedValue(draft, path, value, stateName);
-      return true;
+      return applyInspectorResolvedValue(draft, path, value, stateName);
     });
     return;
   }
@@ -588,8 +610,7 @@ export function updateInspectorControlProperty(
     panelId,
     (control) => control?._children?.Core?.id === controlId,
     (draft) => {
-      applyInspectorResolvedValue(draft, path, value, stateName);
-      return true;
+      return applyInspectorResolvedValue(draft, path, value, stateName);
     },
   ));
 }
@@ -651,10 +672,11 @@ export function applyInspectorControlPatch(controlId, patch) {
   const panelId = get(resolvedActivePanelId);
 
   const applyPatch = (draft) => {
+    let changed = false;
     for (const [path, value] of Object.entries(patch)) {
-      applyInspectorResolvedValue(draft, path, value);
+      changed = applyInspectorResolvedValue(draft, path, value) || changed;
     }
-    return true;
+    return changed;
   };
 
   if (panelId == null) {

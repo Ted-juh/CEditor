@@ -90,13 +90,13 @@ test('generic screen writes remain on the base document while Hover is selected'
   }
 });
 
-test('a state-aware inspector falls back to base when the control has no matching state', () => {
+test('a state-aware inspector skips controls without the selected state', () => {
   const control = screenControl();
   delete control._children.States;
   setStateEditScopeState('Hover');
   try {
-    applyInspectorResolvedValue(control, 'Display.brightness', 91);
-    assert.equal(control._children.Display.brightness, 91);
+    assert.equal(applyInspectorResolvedValue(control, 'Display.brightness', 91), false);
+    assert.equal(control._children.Display.brightness, 40);
   } finally {
     setStateEditScopeBase();
   }

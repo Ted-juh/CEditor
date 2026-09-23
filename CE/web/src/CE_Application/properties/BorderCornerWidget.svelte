@@ -12,7 +12,7 @@
   import { deepClone } from '../utils/deepClone.js';
   import {
     SIDES, CORNERS,
-    BORDER_UNLINK_PROPS, CORNER_UNLINK_PROPS, cascadeUnlink,
+    linkTogglePatch,
   } from '../utils/borderLinkCascade.js';
   import {
     cornerComboToData, comboFromCorners, sideForCombo, nextCombo,
@@ -24,6 +24,7 @@
     linked = true,
     controlId = null,
     onupdate = null,
+    onlinktoggle = null,
     borderPath = 'Background.Border',
     cornersPath = 'Background.Corners',
     buildColorTarget = null,
@@ -91,15 +92,9 @@
   // --- Link/Unlink ---
   function toggleLink() {
     const newLinked = !linked;
-    if (!newLinked) {
-      if (corners) cascadeUnlink(cornersPath, corners, CORNERS, CORNER_UNLINK_PROPS, set);
-      if (border) {
-        cascadeUnlink(borderPath, border, SIDES, BORDER_UNLINK_PROPS, set);
-        set(borderPropPath('linked'), false);
-      }
-    }
-    set(cornersPropPath('linked'), newLinked);
-    if (border) set(borderPropPath('linked'), newLinked);
+    if (onlinktoggle?.(newLinked) === true) return;
+    const patch = linkTogglePatch(border, corners, newLinked, { borderPath, cornersPath });
+    for (const [path, value] of Object.entries(patch)) set(path, value);
   }
 
   // --- Grid cell readers ---
