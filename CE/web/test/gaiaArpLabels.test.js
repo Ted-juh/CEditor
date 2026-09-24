@@ -22,7 +22,9 @@ test('all arpeggio choices retain their original wire mapping and identifiers', 
   assert.equal(controlNamed(panel,'arp.grid')._children.Value.rows[2].id,'08l');
   assert.equal(controlNamed(panel,'arp.motif')._children.Value.rows[7].id,'updownlh');
   assert.equal(controlNamed(panel,'arp.duration')._children.Value.rows[9].id,'ful');
-  const once=JSON.stringify(panel); applyArpeggioLabels(panel); assert.equal(JSON.stringify(panel),once,'migration is idempotent');
+  // On the flat layout the pass was written for: the finished panel has been sectioned since.
+  const flat=buildGaiaPanel({sections:false});
+  const once=JSON.stringify(flat); applyArpeggioLabels(flat); assert.equal(JSON.stringify(flat),once,'migration is idempotent');
 });
 test('special values are readable without adding an input or changing the stored range',()=>{
   assert.equal(arpKnobCaption('arp.velocity',0),'VELOCITY\nREAL (played)');
@@ -42,7 +44,7 @@ test('real script runtime updates captions from local and incoming values withou
   const panel=buildGaiaPanel(), mounted=mountPanel(panel);
   const script=loadScript(panel.scripts.find(s=>s.id==='gaia_arpeggio_captions').source);
   script.onPanelLoad();
-  const text=name=>mounted.controls().find(c=>c._children.Core.name===`${name}.caption`)._children.Text.content;
+  const text=name=>mounted.controls().find(c=>c._children.Core.name===`${name.replace(/\./g,'_')}_caption`)._children.Text.content;
   assert.equal(text('arp.velocity'),'VELOCITY\nREAL (played)');
   // A step counter's local edit is a preview value override, not a custom channel move.
   updatePanelPreviewSession(idOf(controlNamed(panel,'arp.velocity')),{valueOverrideEnabled:true,valueOverride:96}); script.settle();

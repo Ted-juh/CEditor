@@ -112,7 +112,8 @@ export function collectSubtreeIds(control) {
  * cloning several controls in one operation.
  */
 export function uniqueCopyName(existingNames, sourceName) {
-  const base = String(sourceName ?? 'control').replace(/_copy\d*$/, '') || 'control';
+  // Dots out, as everywhere a name is made (utils/controlNames.js).
+  const base = String(sourceName ?? 'control').replace(/\./g, '_').replace(/_copy\d*$/, '') || 'control';
   let candidate = `${base}_copy`;
   for (let n = 2; existingNames.has(candidate); n++) candidate = `${base}_copy${n}`;
   return candidate;

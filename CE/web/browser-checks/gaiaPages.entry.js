@@ -54,7 +54,12 @@ window.__gaia = {
     window.__gaia.controls=controls;
     return {width:panel.width,height:panel.height};
   },
-  id(name) { return window.__gaia.controls.find(c=>c._children.Core.name===name)?._children.Core.id; },
+  // Names lost their dots (utils/controlNames.js: a dot becomes an underscore), and the checks are
+  // written with the parameter ids they were named after. Either spelling finds the control.
+  id(name) {
+    const find = n => window.__gaia.controls.find(c=>c._children.Core.name===n)?._children.Core.id;
+    return find(name) ?? find(String(name).replace(/\./g, '_'));
+  },
   session(name) { return get(panelPreviewSessions)[window.__gaia.id(name)]; },
   receive(bytes) { runtime.deliverSysexForTesting({ hex: bytes.map(b=>b.toString(16).padStart(2,'0')).join(' ') }); },
   actions() { return runtime.registeredActions(); },

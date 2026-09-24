@@ -9,6 +9,7 @@
     envPath, envFillPath, envValueAt,
   } from '../utils/envelopeLayout.js';
   import { linkedEnvelopeConfig } from '../utils/linkedEnvelope.js';
+  import { envelopeLabelPosition } from '../utils/envelopeLabels.js';
 
   let { control = null, width = 0, height = 0, activeIndex = -1 } = $props();
 
@@ -66,6 +67,18 @@
   let nodeR = $derived(Math.max(2, n(cfg.nodeRadius, 4)));
   let lineW = $derived(Math.max(1, n(cfg.lineWidth, 2)));
   let baseY = $derived(geom.y0 + geom.h);
+  // Where each stage letter goes: the side of its node furthest from the line (utils/envelopeLabels.js).
+  let labelAt = $derived.by(() => {
+    if (!linked) return [];
+    const bounds = { x0: 2, y0: 2, x1: Math.max(4, width - 2), y1: Math.max(4, height - 2) };
+    const at = (i) => ({ x: nodesPx[i].px, y: nodesPx[i].py });
+    return nodesPx.map((_, i) => {
+      const segments = [];
+      if (i > 0) segments.push([at(i - 1), at(i)]);
+      if (i < nodesPx.length - 1) segments.push([at(i), at(i + 1)]);
+      return envelopeLabelPosition(at(i), segments, bounds);
+    });
+  });
 </script>
 
   <svg class="envelope" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`}>
@@ -99,15 +112,18 @@
             class:active={node.i === activeIndex} />
     {#if linked}
       {@const stage = points[node.i].id}
-      <text x={node.px} y={node.py < geom.y0 + 14 ? node.py + 15 : node.py - 8}
-        fill={node.i === activeIndex ? sustainCss : nodeCss} text-anchor="middle" font-size="8" font-family="sans-serif"
+      <!-- A dark edge under the letter, so where it does meet the line it is still a letter. -->
+      <text class="stage-letter" x={labelAt[node.i]?.x ?? node.px} y={labelAt[node.i]?.y ?? node.py - 8}
+        fill={node.i === activeIndex ? sustainCss : nodeCss} text-anchor="middle" dominant-baseline="central"
+        font-size="9" font-weight="700" font-family="sans-serif"
       >{stage.slice(0,1).toUpperCase()}</text>
     {/if}
     {/if}
   {/each}
   {#if linked && activeIndex > 0 && points[activeIndex]}
     {@const stage = points[activeIndex].id}
-    <text x={width - 7} y={9} text-anchor="end" fill={nodeCss} font-size="8" font-family="monospace"
+    <!-- The value being dragged. It was 8px, small enough that the stage letter in it was a guess. -->
+    <text class="stage-letter" x={width - 7} y={13} text-anchor="end" fill={nodeCss} font-size="11" font-weight="700" font-family="monospace"
     >{stage === 'sustain' ? 'HOLD (view only)' : stage === 'decay' && linked.sustain
       ? `D ${cfg.__stageValues?.decay ?? linked.decay.defaultValue} / S ${cfg.__stageValues?.sustain ?? linked.sustain.defaultValue}`
       : `${stage.slice(0,1).toUpperCase()} ${cfg.__stageValues?.[stage] ?? linked[stage]?.defaultValue}`}</text>
@@ -117,4 +133,5 @@
 <style>
   .envelope { position: absolute; inset: 0; display: block; pointer-events: none; overflow: visible; }
   circle.active { filter: drop-shadow(0 0 3px rgba(255,255,255,0.6)); }
+  .stage-letter { paint-order: stroke; stroke: rgba(0, 0, 0, 0.85); stroke-width: 3px; stroke-linejoin: round; }
 </style>

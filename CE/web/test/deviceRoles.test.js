@@ -159,9 +159,9 @@ test('the GAIA panel names its device after the instrument', () => {
     'an exported parameter names a different device from the controls');
   assert.deepEqual(panel.exportParameters.filter((e) => !e.deviceRole).map(e => e.id), [
     ...[1, 2, 3].flatMap((tone) => [
-      `tone${tone}.osc.pitchEnv.view.page`,
-      `tone${tone}.filter.env.view.page`,
-      `tone${tone}.amp.env.view.page`,
+      `tone${tone}_osc_pitchEnv_view.page`,
+      `tone${tone}_filter_env_view.page`,
+      `tone${tone}_amp_env_view.page`,
     ]),
     'bottom_pages.page',
     'patch_banks.page',

@@ -24,7 +24,7 @@ try{
   async function until(fn){for(let i=0;i<40;i++){if(await fn())return;await page.waitForTimeout(100);}assert.fail('Timed out checking linked envelope');}
   async function view(tone,kind,mode){
     const before=(await sends()).length;
-    const button=await ctl(`tone${tone}.${kind}.viewButton`), label=mode==='graph'?'FADERS ›':'GRAPH ›'; // a button names what it shows next
+    const button=await ctl(`tone${tone}.${kind}.viewButton`), label=mode==='graph'?'GRAPH':'FADER'; // the corner tab names the view that is showing
     if((await button.innerText()).trim()===label)return;
     await button.click();
     await until(async()=>(await button.innerText()).trim()===label);
@@ -35,7 +35,7 @@ try{
     assert.ok(await(await ctl(`tone${tone}.${kind}AttackTime`)).isVisible());
     const container=await ctl(`tone${tone}.${kind}.view`), button=await ctl(`tone${tone}.${kind}.viewButton`);
     assert.equal(await container.locator('svg.tabs').count(),0,'no tab strip is rendered');
-    assert.equal(await button.innerText(),'GRAPH ›','faders showing, so the button offers the graph');
+    assert.equal(await button.innerText(),'FADER','faders are the default view');
     const frame=await container.boundingBox(), label=await button.boundingBox();
     assert.ok(Math.abs(label.x+label.width/2-(frame.x+frame.width-33))<1,'button is at the section right edge');
   }

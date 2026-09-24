@@ -19,20 +19,19 @@ function setup() {
   return { panel, mounted, script, config, byId, opacity, enabled, receive };
 }
 
-test('every tone row and effect block is found, and the TONE buttons are never dimmed with their row', () => {
+test('every tone row is its section containers, and the TONE buttons are never dimmed with it', () => {
   const { panel, config } = setup();
   assert.equal(config.tones.length, 3);
-  for (const tone of config.tones) {
-    assert.ok(tone.members.length > 60, `tone row has its frames, captions and controls: ${tone.members.length}`);
-    for (const t of [1, 2, 3]) for (const name of [`common.tone${t}Switch`, `common.tone${t}Select`, `tone${t}.copy`]) {
+  for (const [i, tone] of config.tones.entries()) {
+    const n = i + 1;
+    // The five sections, dimmed as units: frames, captions and controls go together.
+    assert.deepEqual(tone.members, ['lfo', 'osc', 'filter', 'amp', 'mod_lfo'].map(section => idOf(controlNamed(panel, `tone${n}_${section}`))));
+    for (const name of [`common_tone${n}Switch`, `common_tone${n}Select`, `tone${n}_copy`]) {
       assert.ok(!tone.members.includes(idOf(controlNamed(panel, name))), `${name} stays bright`);
     }
+    assert.equal(tone.switchId, idOf(controlNamed(panel, `common_tone${n}Switch`)));
+    assert.equal(tone.parameter, `common.tone${n}Switch`, 'the device parameter keeps its dotted id');
   }
-  const t2 = new Set(config.tones[1].members);
-  for (const name of ['tone2.filter.cutoff', 'tone2.amp.level', 'tone2.modLfo.rate', 'tone2.osc.pitchEnv.viewButton']) {
-    assert.ok(t2.has(idOf(controlNamed(panel, name))), `${name} dims with tone 2`);
-  }
-  assert.ok(!t2.has(idOf(controlNamed(panel, 'tone1.filter.cutoff'))), 'rows do not bleed into each other');
   assert.deepEqual(config.effects.map(e => e.parameter), ['distortion.type', 'flanger.type', 'delay.type', 'reverb.type']);
   for (const effect of config.effects) { assert.equal(effect.knobs.length, 4); assert.equal(effect.captions.length, 4); }
 });
@@ -76,7 +75,7 @@ test('effect knobs lock and dim while TYPE is OFF and come back with a type', as
 test('switching a tone off on the panel dims it without waiting for the synth', () => {
   const { panel, script, config, opacity } = setup();
   script.onPanelLoad(); script.settle();
-  const sw = idOf(controlNamed(panel, 'common.tone3Switch'));
+  const sw = idOf(controlNamed(panel, 'common_tone3Switch'));
   updatePanelPreviewSession(sw, { checked: true }); script.settle();
   updatePanelPreviewSession(sw, { checked: false }); script.settle();
   for (const id of config.tones[2].members) assert.equal(opacity(id), DIMMED);

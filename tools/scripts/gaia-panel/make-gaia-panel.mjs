@@ -37,6 +37,8 @@ import { applyCompactHeader } from './compact-header.mjs';
 import { applyWidescreenLayout } from './widescreen-layout.mjs';
 import { applyStepCounters } from './step-counters.mjs';
 import { applyActiveState } from './active-state.mjs';
+import { applySectionTree } from './section-tree.mjs';
+import { migrateDottedControlNames } from '../../../CE/web/src/CE_Application/utils/controlNames.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -67,6 +69,16 @@ const DEVICE_NAME = 'Roland GAIA SH-01';
  */
 const CONTENT_TOP = 16;
 
+/**
+ * A button label that stays on one line and shrinks to fit rather than wrapping. The layout squeezes
+ * these buttons to 15px tall, where a second line has nowhere to go: CHECK SELECTION wrapped and
+ * spilled out of its button onto the PATCH section below.
+ */
+const ONE_LINE = { wrapMode: 'word', maxLines: 1, overflowMode: 'shrink', fitMode: 'shrink' };
+// And room to do it in: a Button's default padding is taller than the 15px these end up, which
+// left the text no height at all.
+const ONE_LINE_PADDING = { paddingLeft: 4, paddingRight: 4, paddingTop: 1, paddingBottom: 1 };
+
 const PORT_FOR = {
   Knob: 'value', Slider: 'value', Number: 'value',
   ToggleButton: 'state', RadioButtonGroup: 'selectedChoice', Combobox: 'selectedChoice',
@@ -86,6 +98,15 @@ function setPath(control, dotted, value) {
   node[keys[keys.length - 1]] = value;
 }
 
+/**
+ * A caption is named after the control it captions, so the component tree says what it is: `label`
+ * a hundred and seventy times said nothing. Underscores, not dots — a script path ends the control
+ * name at its first dot.
+ */
+function captionName(control, parameter) {
+  return `${String(control?._children?.Core?.name ?? parameter.id).replace(/[^A-Za-z0-9]+/g, '_')}_label`;
+}
+
 function label(text, { x, y, w, h = 16 }, { size = 9, colour = SKIN.labelDim, bold = false, align = 'center', name = 'label' } = {}) {
   // maxLines follows the text, rather than always allowing two. Reserving a second line in a
   // single-line box pushed the block past the box height and clipped the glyph bottoms — "NAME"
@@ -93,8 +114,9 @@ function label(text, { x, y, w, h = 16 }, { size = 9, colour = SKIN.labelDim, bo
   // failure; it just does not look like a word.
   const lines = String(text).includes('\n') ? 2 : 1;
   return createControl('Label', {
-    // Captions are all called 'label' unless a caller needs to find one again — the effect
-    // parameter captions do, because a generated script renames them when the TYPE selector moves.
+    // A caption under a control is named for it (captionName); the effect parameter captions keep
+    // the names their generated script finds them by. 'label' is left only on loose text, which
+    // the section pass names for the section it lands in.
     Core: { id: nextId('lbl'), name },
     Transform: { x, y, width: w, height: h },
     Text: {
@@ -501,7 +523,7 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
       controls.push(placeStatic(gaiaEnvelope({ stages: env.stages, width: env.w, height: env.h }),
         `env_${env.bind.replace(/\W+/g, '_')}`, { x, y, w: env.w, h: env.h }));
       if (env.title) {
-        controls.push(label(env.title, { x, y: y - 13, w: env.w, h: 13 }, { size: 8, colour: SKIN.labelDim }));
+        controls.push(label(env.title, { x, y: y - 13, w: env.w, h: 13 }, { size: 8, colour: SKIN.labelDim, name: `env_${env.bind.replace(/\W+/g, '_')}_title` }));
       }
     }
 
@@ -534,7 +556,7 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
         const caption = label(built.caption.text, {
           x: built.caption.x, y: built.caption.y, w: built.caption.w,
           h: built.caption.lines === 2 ? 26 : 16,
-        }, { size: 9, colour: SKIN.label, align: built.caption.align ?? 'center', name: spec.captionName ?? 'label' });
+        }, { size: 9, colour: SKIN.label, align: built.caption.align ?? 'center', name: spec.captionName ?? captionName(built.controls[0], parameter) });
         if (!spec.rulerOnly) controls.push(caption);
       }
     }
@@ -662,7 +684,8 @@ function patchBanks(profile, scripts) {
       controls.push(createControl('Button', {
         Core: { id: nextId(name), name },
         Transform: { x, y: 178, width, height: 22 },
-        Text: { content: title, _children: { Font: { size: 10 } } },
+        Text: { content: title, _children: { Font: { size: 10 }, Multiline: ONE_LINE } },
+        ContentLayout: ONE_LINE_PADDING,
         Background: { _children: { Fill: { colour: 'FF333D46' }, Border: { thickness: 1, colour: 'FF65717C' }, Corners: { radius: 3 } } },
       }));
       scripts.push(createScript({ id: name, name: title, scope: 'panel', target: name, language: 'javascript', event: 'onClick',
@@ -673,17 +696,15 @@ function patchBanks(profile, scripts) {
     const checkName = `names_check_${bankId.replace(/-/g, '_')}`;
     controls.push(createControl('Button', {
       Core: { id: `gaia_${checkName}`, name: checkName, tooltip: 'Read current bank/program without changing sounds or writing memory.' },
-      Transform: { x: 290, y: 178, width: 132, height: 22 },
-      Text: { content: 'CHECK SELECTION', _children: { Font: { size: 10 } } },
+      Transform: { x: 290, y: 178, width: 150, height: 22 },
+      Text: { content: 'CHECK SELECTION', _children: { Font: { size: 10 }, Multiline: ONE_LINE } },
+        ContentLayout: ONE_LINE_PADDING,
       Background: { _children: { Fill: { colour: 'FF333D46' }, Border: { thickness: 1, colour: 'FF65717C' }, Corners: { radius: 3 } } },
-      // The default 6px top and bottom padding leaves a 22px button no room for one line, so the
-      // label wrapped to "CHECK / SELECTION" and was clipped at both edges.
-      ContentLayout: { paddingLeft: 4, paddingRight: 4, paddingTop: 0, paddingBottom: 0 },
     }));
     scripts.push(createScript({ id: checkName, name: 'Check current patch', scope: 'panel', target: checkName, language: 'javascript', event: 'onClick',
       source: 'function onClick() { run("gaiaNamesCheck"); }' }));
-    info._children.Transform.x = 434;
-    info._children.Transform.width = 1114;
+    info._children.Transform.x = 452;
+    info._children.Transform.width = 1096;
     info._children.Text._children.Font.size = 9;
     info._children.Core.name = `names_status_${bankId.replace(/-/g, '_')}`;
     controls.push(info);
@@ -708,7 +729,7 @@ function systemPage(byId) {
       const y = 38 + i * 29;
       const inputWidth = group.title === 'CONTROLLERS' ? 130 : 112;
       const x = group.x + group.w - inputWidth - 10;
-      controls.push(label(group.labels[i], { x: group.x + 8, y, w: x - group.x - 14, h: 23 }, { size: 9, align: 'left' }));
+      controls.push(label(group.labels[i], { x: group.x + 8, y, w: x - group.x - 14, h: 23 }, { size: 9, align: 'left', name: `system_${id}_label` }));
       const input = bound(parameter, parameter.choices ? 'Combobox' : 'Number', { x, y, w: inputWidth, h: 23 });
       controls.push(input);
     });
@@ -731,7 +752,12 @@ function systemPage(byId) {
   return controls;
 }
 
-export function buildGaiaPanel() {
+/**
+ * The GAIA panel. `sections: false` stops before the section pass, at the flat layout every other
+ * pass works on — for checking that those passes are idempotent, which they can only be on the
+ * shape they were written for.
+ */
+export function buildGaiaPanel({ sections = true } = {}) {
   const profile = JSON.parse(readFileSync(PROFILE, 'utf8'));
   const byId = new Map(profile.parameters.map((p) => [p.id, p]));
   seq = 0;
@@ -880,8 +906,17 @@ export function buildGaiaPanel() {
   panel.scriptId = 'roland_gaia_sh01';
   panel.filePath = null;
 
-  const laidOut = applyWidescreenLayout(applyGaiaTabStyle(applyCompactHeader(applyPerformanceLayout(moveStatusDisplayToBottom(applyToneControls(applyEditableEnvelopes(applyStatusDisplay(applyArpeggioLabels(panel), profile))))))));
-  return applyActiveState(applyStepCounters(laidOut, (id, box) => bound(byId.get(id), 'Number', box)), DEVICE_NAME);
+  // Sectioning is last: it works on the finished geometry, so no layout pass has to know about nesting.
+  // Step counters run on that finished flat layout, before it, because they find their knobs by
+  // parameter-id name.
+  const flat = applyStepCounters(
+    applyWidescreenLayout(applyGaiaTabStyle(applyCompactHeader(applyPerformanceLayout(moveStatusDisplayToBottom(applyToneControls(applyEditableEnvelopes(applyStatusDisplay(applyArpeggioLabels(panel), profile)))))))),
+    (id, box) => bound(byId.get(id), 'Number', box));
+  // Names last of all: every pass above finds controls by their parameter-id names, and the saved
+  // panel must carry none of those dots (utils/controlNames.js). The flat layout stays as the
+  // passes built it, for the idempotence checks that run them again. The switched-off dimming
+  // needs the sections, so it comes after them.
+  return sections ? applyActiveState(migrateDottedControlNames(applySectionTree(flat)), DEVICE_NAME) : flat;
 }
 
 export function serializeGaiaPanel() {

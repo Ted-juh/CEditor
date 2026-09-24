@@ -57,6 +57,11 @@
   import ListboxRenderer from './ListboxRenderer.svelte';
   import { listboxDefaultSelectedValues } from '../utils/listboxLayout.js';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
+  import { selectionScopeIds } from '../stores/selectionScope.js';
+  import SceneryGround from './SceneryGround.svelte';
+  import { planSceneryFold, sceneryHoldSet } from '../utils/sceneryModel.js';
+  import { foldSceneryInEditor } from '../stores/runtimePreferences.js';
+  import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
   import { layerTints } from '../stores/panelLayerActions.js';
   import { normalizeLayerName } from '../utils/panelLayers.js';
   import { applyControlPatchesById, duplicateControlsInPlace, getSection, updateControlProperty, reparentControls } from '../stores/controls.js';
@@ -734,6 +739,9 @@
     ? sortControlsForRender(getChildControls(control))
       .filter((child) => !isTabContainer || isChildOnActivePage(child, renderControl ?? control))
     : []);
+  // Something inside this container is selected, so its children are click targets in the editor:
+  // the other half of double-click-to-drill. See stores/selectionScope.js.
+  let childScopeOpen = $derived(editorInteractionEnabled && core?.id != null && $selectionScopeIds.has(core.id));
   // WHERE A CHILD'S 0,0 IS. Everything else in the app answers this with containment.contentOrigin
   // — hit-testing, controlPanelRect, the fit measurement, the scenery compiler — and that function
   // prefers paddingLeft/paddingTop over the shared `padding`. This component used the shared number
@@ -753,7 +761,9 @@
     } : pad;
   });
   let childrenGap = $derived(Number(childrenSection?.gap ?? 0));
-  let childrenClip = $derived(isTabContainer || isScrollArea || childrenSection?.clip === true);
+  // A Tab Container clips its pages by default. `clip: false` opts out, for a page that puts its own
+  // controls on the tab strip beside the tabs (TabContainer.tabWidth leaves the room for them).
+  let childrenClip = $derived((isTabContainer && childrenSection?.clip !== false) || isScrollArea || childrenSection?.clip === true);
   let childScroll = $derived(isScrollArea ? clampScroll(
     previewSession?.scrollOffset ?? { x: control?._children?.ScrollArea?.scrollX ?? 0, y: control?._children?.ScrollArea?.scrollY ?? 0 },
     displayW, displayH, control) : { x: 0, y: 0 });
@@ -785,6 +795,40 @@
   // Flow layout wins where both apply: it is an explicit "the container places everything" mode,
   // and an anchor inside it would be a control opting out of the layout it was put in.
   let childPositions = $derived(childFlowPositions ?? childAnchoredPositions);
+
+  // --- Scenery inside a container ---
+  // The surface folds a panel's inert controls — captions, frames — into one frozen ground
+  // (utils/sceneryRenderPlan.js), but only at the top level. A panel built from real sections puts
+  // almost all of them inside containers, where that fold never looked: the GAIA's baked ground went
+  // from 107 controls to 1 when its sections became containers. So a container folds its own
+  // children the same way, with the same rule, into a ground of its own. It has to be its own: the
+  // section's frame is this container's background, and a panel-level ground is drawn below every
+  // live control on the layer — the frame would cover the captions printed on it.
+  //
+  // Same switch as the surface: the editor's preference on the editing canvas, always in preview,
+  // where this control is not editable.
+  let foldChildren = $derived(childControls.length > 1 && (editorInteractionEnabled ? $foldSceneryInEditor : true));
+  let childFold = $derived.by(() => {
+    if (!foldChildren) return null;
+    // Anything the container itself places (flow layout, anchors) stays live: the ground draws a
+    // control where its own Transform says, and for these that is not where it is drawn. Anything a
+    // script has written to stays live too, as it does at the top level.
+    const stayLive = new Set($scriptTouchedControlIds);
+    for (const child of childControls) {
+      const id = child?._children?.Core?.id;
+      if (id != null && childPositions?.get(id)) stayLive.add(String(id));
+    }
+    const plan = planSceneryFold(childControls, stayLive);
+    return plan.ground.length ? plan : null;
+  });
+  // A selected folded child is drawn live over its own ground — handles and a drag need a real
+  // control — with whatever it would otherwise cover, exactly as PanelSurface does for its grounds.
+  let childHold = $derived(childFold && editorInteractionEnabled
+    ? sceneryHoldSet(childFold.ground, (child) => $selectedComponentIds.has(child?._children?.Core?.id))
+    : null);
+  // What is mounted as components, in paint order: the held copies first (directly above the
+  // ground), then everything live, which the fold guarantees nothing folded is on top of.
+  let childLiveControls = $derived(childFold ? [...(childHold?.held ?? []), ...childFold.live] : childControls);
   let childParentOffset = $derived({
     x: parentOffset.x + displayX + childrenPad.left - childScroll.x,
     y: parentOffset.y + displayY + childrenPad.top - childScroll.y,
@@ -912,16 +956,37 @@
     }
   }
 
-  function drillIntoChildAt(px, py) {
-    const local = panelToLocalPoint(panelControls, core?.id, px, py);
-    const child = sortControlsForHitTest(getChildControls(sourceControl ?? control)).find((candidate) => {
+  /**
+   * The child of `container` under a panel-space point, or null.
+   *
+   * Only the children that are DRAWN: a Tab Container shows one page, and its other pages' children
+   * sit at the same coordinates — the GAIA envelopes put the graph exactly where the faders are — so
+   * hit-testing all of them picked controls nobody could see.
+   */
+  function childAt(container, px, py) {
+    const id = container?._children?.Core?.id;
+    if (id == null) return null;
+    const local = panelToLocalPoint(panelControls, id, px, py);
+    const tabs = container._children?.TabContainer;
+    const drawn = getChildControls(container).filter((child) => !tabs || isChildOnActivePage(child, container));
+    return sortControlsForHitTest(drawn).find((candidate) => {
       const t = candidate._children?.Transform;
       return t && local.x >= t.x && local.x <= t.x + t.width && local.y >= t.y && local.y <= t.y + t.height;
-    });
-    const childId = child?._children?.Core?.id;
+    }) ?? null;
+  }
+
+  function drillIntoChildAt(px, py) {
+    const childId = childAt(sourceControl ?? control, px, py)?._children?.Core?.id;
     if (!childId) return false;
     selectComponent(childId, false);
     return true;
+  }
+
+  /** The innermost control under a panel-space point, starting inside this one; null if none. */
+  function deepestChildAt(px, py) {
+    let found = null;
+    for (let next = childAt(sourceControl ?? control, px, py); next; next = childAt(next, px, py)) found = next;
+    return found?._children?.Core?.id ?? null;
   }
 
   function handleDoubleClick(e) {
@@ -942,6 +1007,19 @@
     // Selecting a control ends any guide selection — a stale selected guide
     // used to hijack the next Delete press away from the controls.
     selectedGuide.set(null);
+
+    // Alt+click selects the innermost control under the pointer, however deep, instead of drilling
+    // in one double-click per level. Only when there IS something deeper: on a leaf, Alt falls
+    // through to the ordinary press, so Alt+drag-duplicate keeps working on whatever is selected.
+    if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && childControls.length) {
+      const p = surfacePointFromClient(e.clientX, e.clientY);
+      const deepest = p ? deepestChildAt(p.x, p.y) : null;
+      if (deepest) {
+        selectComponent(deepest, false);
+        swallowNextCanvasClick();
+        return;
+      }
+    }
 
     // Shift+click is the industry-standard extend gesture; Ctrl/Cmd+click
     // does the same for muscle memory from file managers.
@@ -4212,8 +4290,20 @@
          displays resolve a data source out of it by name, which is a lookup, not geometry. -->
     <div class="children-clip" class:clipped={childrenClip} class:children-interactive={mouseChildrenTakePointer}
       style={`${childrenClip && childrenClipRadius ? `border-radius:${childrenClipRadius}px;` : ''}${scrollViewport ? `width:${scrollViewport.w}px;height:${scrollViewport.h}px;` : ''}${tabPageRect ? `left:${tabPageRect.x}px;top:${tabPageRect.y}px;width:${tabPageRect.w}px;height:${tabPageRect.h}px;` : ''}`}>
-      <div class="children-origin" style="left:{childrenPad.left - childScroll.x - (tabPageRect?.x ?? 0)}px; top:{childrenPad.top - childScroll.y - (tabPageRect?.y ?? 0)}px;">
-        {#each childControls as child (child._children?.Core?.id)}
+      <div class="children-origin" class:scope-open={childScopeOpen} style="left:{childrenPad.left - childScroll.x - (tabPageRect?.x ?? 0)}px; top:{childrenPad.top - childScroll.y - (tabPageRect?.y ?? 0)}px;">
+        {#if childFold}
+          <SceneryGround
+            annotate={!editorInteractionEnabled}
+            controls={childFold.ground}
+            {allControls}
+            {panelControls}
+            panelWidth={childFrameSize.width}
+            panelHeight={childFrameSize.height}
+            {scale}
+            hiddenIds={childHold?.heldIds ?? new Set()}
+          />
+        {/if}
+        {#each childLiveControls as child (child._children?.Core?.id)}
           <CanvasControlNested
             control={child}
             {scale}
@@ -4360,6 +4450,13 @@
      then on the child can be dragged/resized itself. Deselect (Esc steps back
      out to the parent) and the container is one draggable unit again. */
   .children-origin :global(.canvas-control.selected) {
+    pointer-events: auto;
+  }
+
+  /* ...and so are its SIBLINGS, once something inside this container is selected (see
+     stores/selectionScope.js). Direct children only: a sibling that is itself a container takes the
+     click as a whole, one double-click from its own contents, as the Figma model has it. */
+  .children-origin.scope-open > :global(.canvas-control) {
     pointer-events: auto;
   }
 
@@ -4809,7 +4906,7 @@
      (a blanket `none` once made every nested control unreachable in preview), and here it is the
      wanted behaviour rather than an accident: hiding a container dims its whole subtree, because
      the opacity applies to the subtree, and a child you cannot see must not be clickable either.
-     Which means the two deliberate re-enables — .preview-interactive and .selected — would punch
+     Which means the deliberate re-enables — .preview-interactive, .selected and .scope-open — would punch
      straight back through it, and a selected child inside a hidden container would be the one
      clickable thing in an invisible group. `!important` on the descendant selector shuts both off
      inside a hidden subtree, and on the host selector too, so a hidden control that is itself a
@@ -4832,7 +4929,7 @@
      place that cursor can still be seen).
 
      Inheriting into the subtree is correct here too — locking a container locks what is inside it,
-     which is already how buildDropCandidates treats one — and the same two re-enables have to be
+     which is already how buildDropCandidates treats one — and the same re-enables have to be
      shut off for the same reason as above. */
   .canvas-control.lock-click-through,
   .canvas-control.lock-click-through :global(.canvas-control) {

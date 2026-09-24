@@ -27,7 +27,7 @@
   import Square from 'lucide-svelte/icons/square';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Image from 'lucide-svelte/icons/image';
-  import { selectedControl, getSection, updateControlProperty, updateSelectedProperty, applyControlPatchesById } from '../stores/controls.js';
+  import { selectedControl, getSection, updateControlProperty, updateSelectedProperty, applyControlPatchesById, renameControl } from '../stores/controls.js';
   import { selectedComponentIds, resolvedActivePanelId } from '../stores/panels.js';
   import { componentWorkspaceMode } from '../stores/componentWorkspace.js';
   import { availableFonts, availableIcons } from '../stores/appSettings.js';
@@ -278,7 +278,13 @@
         disabled={multiSelect}
         title={multiSelect ? 'Name editing is single-selection only' : 'Component name'}
         onfocus={(event) => event.target.select()}
-        onchange={(event) => set('Core.name', event.target.value)}
+        onchange={(event) => {
+          // Through renameControl like the Core card and the tree: unique, never blank, no dots.
+          // Writing Core.name directly skipped all three. The field shows what was applied.
+          if (!core?.id) return;
+          const result = renameControl(core.id, event.target.value);
+          event.target.value = result?.applied ?? core?.name ?? '';
+        }}
       />
       {#if controlType}
         <span class="type-badge" title="Control type">{multiSelect ? `${$selectedComponentIds.size} selected` : controlType}</span>

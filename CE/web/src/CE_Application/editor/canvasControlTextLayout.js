@@ -330,10 +330,12 @@ export function buildBlockTextLayoutState(content, {
   };
 
   const baseLayout = buildBlockTextLayout(content, layoutArgs);
-  const safeWidth = Math.max(0.0001, maxWidth);
-  const safeHeight = Math.max(0.0001, maxHeight);
-  const baseScale = fitMode === 'shrink'
-    ? Math.min(1, safeWidth / Math.max(0.0001, baseLayout.width), safeHeight / Math.max(0.0001, baseLayout.height))
+  // No room at all — padding larger than the control, say — is not something shrinking can solve.
+  // Scaling against the 0.0001 stand-in made the text a hundred-thousandth of its size, so a button
+  // squeezed below its own padding went blank; unscaled, it at least shows what it says.
+  const roomToFit = maxWidth > 0 && maxHeight > 0;
+  const baseScale = fitMode === 'shrink' && roomToFit
+    ? Math.min(1, maxWidth / Math.max(0.0001, baseLayout.width), maxHeight / Math.max(0.0001, baseLayout.height))
     : 1;
 
   if (

@@ -19,6 +19,7 @@
 
 import { get } from 'svelte/store';
 import { panels, scriptRuntimePanelId, updatePanel } from '../stores/panels.js';
+import { sanitizeControlName } from '../utils/controlNames.js';
 import {
   applyControlPatchesById, applyResolvedValue, updateControlProperty, removeControlNode,
 } from '../stores/controls.js';
@@ -589,6 +590,8 @@ function setValue(path, value, formOrOpts = '') {
   }
 
   const modelPath = resolveModelPath(control, segs);
+  // A script renaming a control follows the same rule as the editor: no dots in a name.
+  if (modelPath === 'Core.name') value = sanitizeControlName(value);
 
   // intercept(): the script's filters get the value before the model does, so a rule like "this
   // knob only takes even numbers" holds for every write rather than being re-checked at each
@@ -4738,7 +4741,7 @@ function controlNamed(name) {
 /** A name nothing else is using, so a generated control never collides with an authored one. */
 function uniqueControlName(base) {
   const taken = new Set(allControls().map((c) => String(c?._children?.Core?.name ?? '').toLowerCase()));
-  const root = String(base ?? 'control');
+  const root = sanitizeControlName(String(base ?? 'control'));
   if (!taken.has(root.toLowerCase())) return root;
   for (let i = 2; i < 10000; i++) {
     const candidate = `${root}${i}`;

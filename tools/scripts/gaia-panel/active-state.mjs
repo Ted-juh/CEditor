@@ -9,10 +9,9 @@ import { createScript } from '../../../CE/web/src/CE_Application/scripting/scrip
 // defaults to OFF in the profile, so dimming from the defaults would open an unconnected panel with
 // the whole instrument greyed out, which says less than it seems to.
 //
-// A tone row is dimmed, not locked: you can still set a tone up before switching it on. Its
-// controls take their opacity from the script, so the section frames and printed captions dim with
-// the knobs. The script only writes when something changes, because a write takes a caption out of
-// the baked scenery layer.
+// A tone row is dimmed, not locked: you can still set a tone up before switching it on. The script
+// fades the row's section containers, so frames, captions and controls dim together, and it only
+// writes when something changes.
 export const DIMMED = 0.35;
 
 export function activeStateScript(config) {
@@ -63,34 +62,40 @@ function onPanelLoad() {
 `;
 }
 
+/**
+ * Runs on the SECTIONED panel, after names lose their dots: a tone row is the section containers
+ * in its `toneN` group (LFO, OSC, FILTER, AMP, MOD LFO), so dimming a row is five writes and takes
+ * the section frames, captions and controls with it. The group's TONE SELECT / ON / COPY controls
+ * are not sections and are never dimmed — TONE n ON is how you bring the row back.
+ */
 export function applyActiveState(panel, role) {
   const all = flatControls(panel.controls);
-  const named = name => all.find(c => c._children.Core.name === name);
-  const id = name => {
+  const named = (name) => all.find(c => c._children.Core.name === name);
+  const need = (name) => {
     const c = named(name);
-    if (!c) throw new Error(`Missing ${name}`);
-    return c._children.Core.id;
+    if (!c) throw new Error(`active-state: missing ${name}`);
+    return c;
   };
-  const rect = c => c._children.Transform;
-  const rows = name => panel.controls.filter(c => c._children.Core.name === name).sort((a, b) => rect(a).y - rect(b).y);
-  const lfo = rows('box_LFO'), mod = rows('box_MOD LFO');
+  const id = (name) => need(name)._children.Core.id;
+  const parameterOf = (control) => control._children.DeviceBindings?.bindings?.find(b => b.parameterId)?.parameterId;
   const tones = [1, 2, 3].map(tone => {
-    const left = rect(lfo[tone - 1]), right = rect(mod[tone - 1]);
-    const bounds = { x0: left.x, x1: right.x + right.width, y0: left.y, y1: left.y + left.height };
-    // Everything drawn inside the row, frames and captions included, but never the TONE buttons
-    // to its left: TONE n ON is how you bring the row back.
-    const members = panel.controls.filter(c => {
-      const t = rect(c), cx = t.x + t.width / 2, cy = t.y + t.height / 2;
-      return cx >= bounds.x0 && cx <= bounds.x1 && cy >= bounds.y0 && cy <= bounds.y1;
-    }).map(c => c._children.Core.id);
-    return { parameter: `common.tone${tone}Switch`, switchId: id(`common.tone${tone}Switch`), members };
+    const group = need(`tone${tone}`);
+    const members = Object.values(group._children.Children?._children ?? {})
+      .filter(c => c._children.Core.controlType === 'Container')
+      .map(c => c._children.Core.id);
+    if (members.length === 0) throw new Error(`active-state: tone${tone} has no sections`);
+    const toneSwitch = need(`common_tone${tone}Switch`);
+    return { parameter: parameterOf(toneSwitch) ?? `common.tone${tone}Switch`, switchId: toneSwitch._children.Core.id, members };
   });
-  const effects = ['distortion', 'flanger', 'delay', 'reverb'].map(effect => ({
-    parameter: `${effect}.type`,
-    typeId: id(`${effect}.type`),
-    knobs: [1, 2, 3, 4].map(i => id(`${effect}.parameter${i}`)),
-    captions: [1, 2, 3, 4].map(i => id(`${effect}.parameter${i}.caption`)),
-  }));
+  const effects = ['distortion', 'flanger', 'delay', 'reverb'].map(effect => {
+    const type = need(`${effect}_type`);
+    return {
+      parameter: parameterOf(type) ?? `${effect}.type`,
+      typeId: type._children.Core.id,
+      knobs: [1, 2, 3, 4].map(i => id(`${effect}_parameter${i}`)),
+      captions: [1, 2, 3, 4].map(i => id(`${effect}_parameter${i}_caption`)),
+    };
+  });
   const script = createScript({
     id: 'gaia_active_state', name: 'Dim what is switched off', language: 'javascript',
     scope: 'panel', event: 'onPanelLoad', target: '*',

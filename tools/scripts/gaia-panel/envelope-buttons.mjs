@@ -1,10 +1,31 @@
 import { createControl } from '../../../CE/web/src/CE_Application/models/componentTypes.js';
 import { createScript } from '../../../CE/web/src/CE_Application/scripting/scriptModel.js';
+import { gaiaCornerTab } from './components.mjs';
 
-export const SHOW_GRAPH = 'GRAPH \u203a', SHOW_FADERS = 'FADERS \u203a';
+const TAB_HEIGHT = 20;
+const TAB_WIDTH = 64;
+
+/** The section box a view sits in: the smallest `box_*` whose rectangle contains it. */
+function boxAround(panel, view) {
+  const v = view._children.Transform;
+  return panel.controls
+    .filter((c) => String(c._children.Core.name ?? '').startsWith('box_'))
+    .filter((c) => {
+      const b = c._children.Transform;
+      return v.x >= b.x && v.y >= b.y && v.x + v.width <= b.x + b.width + 1 && v.y + v.height <= b.y + b.height + 1;
+    })
+    .sort((a, b) => a._children.Transform.width * a._children.Transform.height
+      - b._children.Transform.width * b._children.Transform.height)[0] ?? null;
+}
 
 // Use an ordinary panel button, so a saved panel never relies on a special tab
 // renderer to turn two page tabs into one alternating control.
+//
+// It sits flush in the section's top-RIGHT corner, in the section name's tab mirrored and drawn as
+// an outline (gaiaCornerTab), so the two ends of the section's top edge read as a pair: what the
+// section is on the left, which view it shows on the right. The Button stays the click target and
+// keeps its script; it is transparent, over the outline, with the section title's bold capitals in
+// the pale yellow the switch always had, so it is not mistaken for a second section name.
 export function applyEnvelopeButtons(panel) {
   for (const tone of [1, 2, 3]) for (const kind of ['osc.pitchEnv', 'filter.env', 'amp.env']) {
     const view = panel.controls.find(c => c._children.Core.name === `tone${tone}.${kind}.view`);
@@ -15,29 +36,45 @@ export function applyEnvelopeButtons(panel) {
     cfg.showStrip = false;
     delete cfg.cycleButton;
     const name = `${s.Core.name}Button`, id = `${s.Core.id}_button`;
+    if (panel.controls.some(c => c._children.Core.id === id)) continue;
+
+    const box = boxAround(panel, view);
+    if (!box) throw new Error(`envelope-buttons: no section box around ${s.Core.name}`);
+    const b = box._children.Transform;
+    const border = box._children.Background?._children?.Border ?? {};
+    const tint = border.colour ?? 'FFE2A52C';
+    // Flush with the box's right edge, so the outline's right side is the section border itself;
+    // at the same height as the section name's tab.
+    const at = { x: b.x + b.width - TAB_WIDTH, y: b.y + 2, width: TAB_WIDTH, height: TAB_HEIGHT };
+
+    const shape = gaiaCornerTab({ width: TAB_WIDTH, height: TAB_HEIGHT, tint, thickness: Number(border.thickness) || 2 });
+    Object.assign(shape._children.Core, { id: `${s.Core.id}_button_tab`, name: `${s.Core.name}ButtonTab` });
+    Object.assign(shape._children.Transform, at);
+    panel.controls.push(shape);
+
+    const button = createControl('Button', {
+      Core: { id, name, tooltip: 'Switch between envelope faders and graph.' },
+      Transform: { ...at },
+      Text: {
+        content: cfg.pageIndex === 1 ? 'GRAPH' : 'FADER',
+        _children: { Font: { size: 10, bold: true, weight: 'Bold', weightValue: 700, letterSpacing: 1 }, Fill: { colour: 'FFFFE1A0' } },
+      },
+      // Text centred on the tab's body, clear of the slant at its left end.
+      ContentLayout: { paddingLeft: Math.round(TAB_HEIGHT * 0.6), paddingRight: 2, paddingTop: 0, paddingBottom: 0 },
+      Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false, thickness: 0 }, Corners: { radius: 0 } } },
+    });
+    // A Button's own hover, press and focus fill its BOX — a square over a slanted outline. The
+    // shape is the corner tab's, so the button's states leave the background alone and answer in
+    // the letters: brighter under the pointer, amber while pressed.
+    const states = button._children.States?._children ?? {};
+    if (states.Hover) states.Hover.patches.component = { 'Text.Fill.colour': 'FFFFFFFF' };
+    if (states.Pressed) states.Pressed.patches.component = { 'Text.Fill.colour': 'FFE2A52C', 'Transform.scale': 0.985 };
+    if (states.Focused) states.Focused.patches.component = {};
+    panel.controls.push(button);
     const pagePath = `${s.Core.id}.TabContainer.pageIndex`;
-    // The label names what a click SHOWS, not what is showing: a button reading "Fader" beside
-    // faders reads as a caption, not as a way to reach the graph.
-    const label = page => page === 1 ? SHOW_FADERS : SHOW_GRAPH;
-    const tooltip = 'Switch between envelope faders and graph.';
-    const source = `function onClick() { const next = Number(get('${pagePath}')) === 1 ? 0 : 1; set('${pagePath}', next); set('${id}.Text.content', next === 1 ? '${SHOW_FADERS}' : '${SHOW_GRAPH}'); }`;
-    const existing = panel.controls.find(c => c._children.Core.id === id);
-    if (existing) {
-      // A saved panel: bring the wording up to date without moving or restyling the button.
-      existing._children.Text.content = label(cfg.pageIndex);
-      const click = panel.scripts.find(x => x.id === `${id}_click`);
-      if (click) click.source = source;
-      continue;
-    }
-    panel.controls.push(createControl('Button', {
-      Core: { id, name, tooltip },
-      Transform: { x: t.x + t.width - 62, y: t.y + 2, width: 58, height: 16 },
-      Text: { content: label(cfg.pageIndex), _children: { Font: { size: 9 }, Fill: { colour: 'FFFFE1A0' } } },
-      ContentLayout: { paddingLeft: 2, paddingRight: 2, paddingTop: 0, paddingBottom: 0 },
-      Background: { _children: { Fill: { colour: 'FF39372B' }, Border: { colour: 'FFE2A52C', thickness: 1 }, Corners: { radius: 4 } } },
-    }));
     panel.scripts.push(createScript({ id: `${id}_click`, name: `Tone ${tone} ${kind} view`, scope: 'panel', target: name,
-      language: 'javascript', event: 'onClick', source,
+      language: 'javascript', event: 'onClick',
+      source: `function onClick() { const next = Number(get('${pagePath}')) === 1 ? 0 : 1; set('${pagePath}', next); set('${id}.Text.content', next ? 'GRAPH' : 'FADER'); }`,
     }));
   }
   return panel;

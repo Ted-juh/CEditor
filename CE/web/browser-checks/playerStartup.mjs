@@ -81,12 +81,12 @@ try {
 
     // The plugin pushes the restored value: the control moves, nothing goes to the synth.
     const before = named(await sent(), 'setDeviceParameter').length;
-    await page.evaluate(() => window.__startup.fire('paramSync', { id: 'tone1.filter.cutoff.value', value: 99 }));
+    await page.evaluate(() => window.__startup.fire('paramSync', { id: 'tone1_filter_cutoff.value', value: 99 }));
     await page.waitForTimeout(300);
     assert.equal(await page.evaluate(() => window.__startup.value('cutoff')), 99, 'the restored value did not reach the control');
     assert.equal(named(await sent(), 'setDeviceParameter').length, before, 'opening the window sent the restored value');
     // Automation after that is a real instruction and reaches the synth.
-    await page.evaluate(() => window.__startup.fire('paramSync', { id: 'tone1.filter.cutoff.value', value: 40 }));
+    await page.evaluate(() => window.__startup.fire('paramSync', { id: 'tone1_filter_cutoff.value', value: 40 }));
     await page.waitForTimeout(400);
     const automation = named(await sent(), 'setDeviceParameter').map((e) => e.payload);
     assert.ok(automation.some((p) => p.parameterId === 'tone1.filter.cutoff' && p.deviceRole === ROLE),

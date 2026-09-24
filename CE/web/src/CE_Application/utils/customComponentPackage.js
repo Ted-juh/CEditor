@@ -3,6 +3,7 @@ import { materializedCustomComponentSnapshot } from './customComponentMaterializ
 import { summarizeCustomArpeggiator } from './customComponentArpeggiator.js';
 import { migrateCustomComponentPlan } from './customComponentMigrations.js';
 import { numberOr } from './primitives.js';
+import { sanitizeControlName } from './controlNames.js';
 
 export const CUSTOM_COMPONENT_PACKAGE_FORMAT = 'ceditor-component';
 export const CUSTOM_COMPONENT_PACKAGE_VERSION = 1;
@@ -1080,7 +1081,9 @@ export function instantiateCustomComponentPackageControl(value, options = {}) {
     _type: 'Core',
     id: String(options.id ?? children.Core?.id ?? '').trim() || `ctrl_${Date.now()}`,
     controlType: 'CustomComponent',
-    name: String(options.name ?? children.Core?.name ?? envelope.metadata?.name ?? 'Custom Component').trim() || 'Custom Component',
+    // The placed control's handle, so no dots (utils/controlNames.js) — a package called "Macro v1.2"
+    // would otherwise land as a control no script can address.
+    name: sanitizeControlName(String(options.name ?? children.Core?.name ?? envelope.metadata?.name ?? 'Custom Component').trim() || 'Custom Component'),
   };
   children.Designer = {
     ...(children.Designer ?? {}),

@@ -5,20 +5,29 @@ import { flatControls } from '../../../CE/web/src/CE_Application/utils/containme
 // page uses. Landing a knob on exactly 120 BPM or +2 octaves is a fiddle; a counter is one click per
 // step and takes typing. LEVEL and PORTA TIME stay knobs: they are amounts you turn by ear.
 //
-// Final geometry, applied last. Each counter replaces its knob in place and keeps the knob's ID,
-// name, tooltip, page and status-display readout, so the arpeggio caption script, the status
-// display and any saved script that names the control still find it.
-const PATCH_ROW = { y: 175, width: 96, height: 20 };
-export const STEP_COUNTERS = {
-  'common.patchTempo': { x: 456, ...PATCH_ROW },
-  'common.octaveShift': { x: 568, ...PATCH_ROW },
-  'common.pitchBendRangeUp': { x: 1124, ...PATCH_ROW },
-  'common.pitchBendRangeDown': { x: 1293, ...PATCH_ROW },
-  // Three rows under MOTIF / NOTE ORDER: the column is too narrow for three counters side by side.
-  'arp.accentRate': { x: 76, y: 139, width: 86, height: 20 },
-  'arp.velocity': { x: 76, y: 171, width: 86, height: 20 },
-  'arp.octaveRange': { x: 76, y: 203, width: 86, height: 20 },
-};
+// Each counter replaces its knob in place and keeps the knob's ID, name, tooltip, page and
+// status-display readout, so the arpeggio caption script, the status display and any saved script
+// that names the control still find it.
+//
+// Where each counter goes, worked out from the finished layout rather than written down: a counter
+// is centred on the knob it replaces, so a later layout change to the PATCH strip carries the
+// counters with it. The arpeggio's three stack under MOTIF / NOTE ORDER, because its column is too
+// narrow for three counters side by side.
+const COUNTER = { width: 96, height: 20 };
+const ARP_ROWS = ['arp.accentRate', 'arp.velocity', 'arp.octaveRange'];
+export const STEP_COUNTERS = ['common.patchTempo', 'common.octaveShift', 'common.pitchBendRangeUp',
+  'common.pitchBendRangeDown', ...ARP_ROWS];
+
+function counterRect(name, knob, named) {
+  const arpRow = ARP_ROWS.indexOf(name);
+  if (arpRow >= 0) {
+    const motif = named('arp.motif')._children.Transform;
+    const box = named('box_ARPEGGIO')._children.Transform;
+    return { x: box.x + 76, y: motif.y + motif.height + 20 + arpRow * 32, width: box.width - 82, height: COUNTER.height };
+  }
+  const k = knob._children.Transform;
+  return { x: Math.round(k.x + k.width / 2 - COUNTER.width / 2), y: Math.round(k.y + k.height / 2 - COUNTER.height / 2), ...COUNTER };
+}
 
 /** `number(parameterId, box)` builds a bound Number control; the generator passes its `bound`. */
 export function applyStepCounters(panel, number) {
@@ -31,9 +40,11 @@ export function applyStepCounters(panel, number) {
     }
   })(panel.controls, panel.controls);
   const all = flatControls(panel.controls);
-  for (const [name, rect] of Object.entries(STEP_COUNTERS)) {
-    const knob = all.find(c => c._children.Core.name === name);
+  const named = (name) => all.find(c => c._children.Core.name === name);
+  for (const name of STEP_COUNTERS) {
+    const knob = named(name);
     if (!knob) throw new Error(`Missing ${name}`);
+    const rect = counterRect(name, knob, named);
     const parameterId = knob._children.DeviceBindings?.bindings?.find(b => b.parameterId)?.parameterId ?? name;
     const counter = knob._children.Core.controlType === 'Number' ? knob
       : number(parameterId, { x: rect.x, y: rect.y, w: rect.width, h: rect.height });

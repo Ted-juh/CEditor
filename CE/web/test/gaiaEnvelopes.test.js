@@ -9,7 +9,7 @@ import { linkedEnvelopeStages, linkedEnvelopePoints, linkedEnvelopeDragValue, re
 const panel=buildGaiaPanel(), controls=flatControls(panel.controls);
 const graphs=controls.filter(c=>c._children.Envelope?.stageSources);
 test('envelope views match the other faders inside unchanged tone sections and keep source IDs',()=>{
-  const views=controls.filter(c=>/^tone\d\.(osc\.pitchEnv|filter\.env|amp\.env)\.view$/.test(c._children.Core.name));
+  const views=controls.filter(c=>/^tone\d_(osc_pitchEnv|filter_env|amp_env)_view$/.test(c._children.Core.name));
   assert.equal(views.length,9);
   for(const view of views){
     const cfg=view._children.TabContainer,children=Object.values(view._children.Children._children);
@@ -17,8 +17,6 @@ test('envelope views match the other faders inside unchanged tone sections and k
     assert.equal(cfg.pageIndex,0);
     assert.equal(cfg.showStrip,false);
     assert.equal(controls.find(c=>c._children.Core.name===view._children.Core.name+'Button')._children.Core.controlType,'Button');
-    // The button names what a click shows: faders are up, so it offers the graph.
-    assert.equal(controls.find(c=>c._children.Core.name===view._children.Core.name+'Button')._children.Text.content,'GRAPH \u203a');
     assert.equal(view._children.Transform.height,229);
     const graph=children.find(c=>c._children.Envelope?.stageSources);
     assert.equal(graph._children.Core.tabPageId,'graph');
@@ -30,8 +28,11 @@ test('envelope views match the other faders inside unchanged tone sections and k
       assert.equal(fader._children.Transform.y,graph._children.Transform.y);
     }
   }
-  const before=JSON.stringify(panel);applyEnvelopeViews(panel);assert.equal(JSON.stringify(panel),before);
-  refineToneSpacing(panel);assert.equal(JSON.stringify(panel),before,'spacing migration is idempotent');
+  // Idempotence is a property of the layout passes, on the flat layout they run on; the finished
+  // panel has been sectioned since.
+  const flat=buildGaiaPanel({sections:false}),before=JSON.stringify(flat);
+  applyEnvelopeViews(flat);assert.equal(JSON.stringify(flat),before);
+  refineToneSpacing(flat);assert.equal(JSON.stringify(flat),before,'spacing migration is idempotent');
 });
 test('nine native graphs link only their own tone faders, without duplicate MIDI bindings',()=>{
   assert.equal(graphs.length,9);
@@ -44,19 +45,23 @@ test('nine native graphs link only their own tone faders, without duplicate MIDI
     for(const stage of stages){
       const link=graph._children.Envelope.stageSources[stage];
       const source=controls.find(c=>c._children.Core.id===link.controlId);
-      assert.ok(source._children.Core.name.startsWith(tone+'.'));
+      assert.ok(source._children.Core.name.startsWith(tone+'_'));
       assert.equal(source._children.DeviceBindings.bindings.length,1);
       assert.equal(link.min,0);assert.equal(link.max,127);
     }
   }
-  const before=JSON.stringify(panel);applyEditableEnvelopes(panel);assert.equal(JSON.stringify(panel),before);
+  // Idempotence of the pass, on the flat layout it runs on.
+  const flat=buildGaiaPanel({sections:false}),before=JSON.stringify(flat);applyEditableEnvelopes(flat);assert.equal(JSON.stringify(flat),before);
 });
 test('stage mapping spans every parameter independently, including all-zero/all-maximum envelopes',()=>{
   for(const graph of graphs)for(const v of [0,1,63,126,127]){
     const stages=linkedEnvelopeStages(graph), values=Object.fromEntries(stages.map(s=>[s,v]));
     const points=linkedEnvelopePoints(graph,values);
     assert.equal(points.length,stages.length+1);
-    points.forEach((p,i)=>{assert.ok(p.x>=0 && p.x<=1+1e-12);assert.ok(p.y>=0&&p.y<=1);if(i)assert.ok(p.x>points[i-1].x,'even zero values remain selectable');});
+    // Every HANDLE stays apart, so even zero values remain selectable. The origin is not a handle:
+    // an attack of 0 is instant and sits straight above it.
+    points.forEach((p,i)=>{assert.ok(p.x>=0 && p.x<=1+1e-12);assert.ok(p.y>=0&&p.y<=1);if(i>1)assert.ok(p.x>points[i-1].x,'even zero values remain selectable');});
+    assert.equal(points[1].x>points[0].x,v>0,'attack is vertical exactly when its time is zero');
     const cfg=graph._children.Envelope.stageSources;
     assert.equal(points[1].y,1,'peak is fixed');
     assert.equal(points.at(-1).y,0,'end is fixed');

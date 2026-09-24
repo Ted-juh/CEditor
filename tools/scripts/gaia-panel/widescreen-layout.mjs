@@ -2,7 +2,7 @@ import { flatControls } from '../../../CE/web/src/CE_Application/utils/containme
 import { addInstrumentBranding } from './status-display.mjs';
 import { createControl } from '../../../CE/web/src/CE_Application/models/componentTypes.js';
 import { tabGeometry } from '../../../CE/web/src/CE_Application/utils/tabContainerLayout.js';
-import { applyEnvelopeViews } from './envelope-views.mjs';
+import { alignPitchEnvelopeGraphs, applyEnvelopeViews } from './envelope-views.mjs';
 import { refineToneSpacing } from './tone-spacing.mjs';
 import { moveDBeamToSystem } from './dbeam-system.mjs';
 import { expandStatusDisplay } from './status-space.mjs';
@@ -150,7 +150,7 @@ export function applyWidescreenLayout(panel) {
   }
   Object.assign(rect(named('plate')),{x:10,y:30,width:1900,height:960});
   panel.width=1920; panel.height=1000;
-  return applyEnvelopeButtons(expandStatusDisplay(moveDBeamToSystem(refineToneSpacing(applyEnvelopeViews(compactPanelRows(moveSyncRingIntoOsc(expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel))))))))));
+  return layoutPatchBanks(fillLowerPages(alignPitchEnvelopeGraphs(applyEnvelopeButtons(expandStatusDisplay(moveDBeamToSystem(refineToneSpacing(applyEnvelopeViews(compactPanelRows(moveSyncRingIntoOsc(expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel)))))))))))));
 }
 
 // Reuse the decorative header's 18px for the controls: the upper controls move
@@ -279,7 +279,9 @@ export function compactPanelRows(panel) {
   t.y = Math.max(...panel.controls.filter(c => c._children.Core.name === 'box_OSC')
     .map(c => c._children.Transform.y + c._children.Transform.height));
   t.height = end - t.y;
-  Object.assign(bottom._children.TabContainer, { appearance: 'buttons', stripSize: 32, stripColour: '00000000' });
+  // The four page buttons span the strip edge to edge, each its full share with no gap, rather
+  // than sitting as 180px islands in 392px cells.
+  Object.assign(bottom._children.TabContainer, { appearance: 'buttons', stripSize: 32, stripColour: '00000000', buttonMaxWidth: 10000, buttonGap: 0 });
   return expandArpeggioWorkspace(panel);
 }
 
@@ -319,5 +321,121 @@ export function moveSyncRingIntoOsc(panel) {
     if (typeof zone.payload === 'number') zone.payload = { value: zone.payload };
   }
   panel.controls.push(sync);
+  return panel;
+}
+
+/**
+ * Let the System and Patch Banks pages use the lower workspace's full height.
+ *
+ * The status display and arpeggiator pages are sized to the page area by their own passes; System
+ * and Patch Banks kept the height the proportional squeeze left them (205 and 216 of 244px), so
+ * both stopped short with an empty band underneath. Their frames — section boxes, the bank tabs —
+ * now stretch to the page, and everything in them keeps its size and moves down in proportion, so
+ * the rows spread out rather than the fields and buttons getting taller. A page already full is
+ * left alone, so this is safe to run twice.
+ */
+export function fillLowerPages(panel) {
+  const bottom = flatControls(panel.controls).find((c) => c._children.Core.name === 'bottom_pages');
+  if (!bottom) return panel;
+  const frame = (c) => String(c._children.Core.name ?? '').startsWith('box_') || !!c._children.TabContainer;
+  const pageOf = (c, tabs) => String(c._children.Core.tabPageId || tabs._children.TabContainer.pages[0]?.id);
+
+  // Spread one list of siblings over `factor` times its height; frames grow, controls move.
+  function spread(list, factor) {
+    for (const c of list) {
+      const t = c._children.Transform;
+      t.y = (t.y ?? 0) * factor;
+      if (!frame(c)) continue;
+      const before = t.height;
+      t.height = before * factor;
+      if (c._children.TabContainer) {
+        // Its children live in its page area, below the strip; that area grows by what the tab did.
+        const strip = c._children.TabContainer.stripSize ?? 0;
+        const inner = (before - strip) > 0 ? (t.height - strip) / (before - strip) : 1;
+        spread(Object.values(c._children.Children?._children ?? {}), inner);
+      }
+    }
+  }
+
+  const t = bottom._children.Transform;
+  const pageHeight = tabGeometry(t.width, t.height, bottom).page.h;
+  const kids = Object.values(bottom._children.Children?._children ?? {});
+  for (const page of ['system', 'banks']) {
+    const onPage = kids.filter((c) => pageOf(c, bottom) === page);
+    const used = Math.max(...onPage.map((c) => (c._children.Transform.y ?? 0) + c._children.Transform.height));
+    if (!(used > 0) || used >= pageHeight - 0.5) continue;
+    spread(onPage, pageHeight / used);
+  }
+  return panel;
+}
+
+/**
+ * The Patch Banks page: the banks get the whole page, and READ / STOP / CHECK move up onto the tab row.
+ *
+ * The bank tabs (PRESET / ROM, USER, USB MEMORY, PCM / ROM) shared the full strip between four
+ * words, while READ NAMES, STOP, CHECK SELECTION and the status line took a whole row under the
+ * banks, and the bank grid sat 52px in from both sides of the page. The tabs are now a fixed width
+ * on the left of the strip (TabContainer.tabWidth), each page's own READ / STOP / CHECK and status
+ * sit on the strip to their right — still page children, so each page keeps its own, bank-specific
+ * set — and the grid spreads over the full width and height that frees: wider, taller buttons.
+ *
+ * Runs last, on final geometry, and sets absolute positions from the page's size, so a second run
+ * lands in the same place.
+ */
+export function layoutPatchBanks(panel) {
+  const all = flatControls(panel.controls);
+  const banks = all.find((c) => c._children.Core.name === 'patch_banks');
+  const bottom = all.find((c) => c._children.Core.name === 'bottom_pages');
+  if (!banks || !bottom) return panel;
+  const cfg = banks._children.TabContainer;
+  const t = banks._children.Transform;
+  const margin = 8;
+  const tabWidth = 132;
+  Object.assign(t, { x: 0, width: bottom._children.Transform.width });
+  cfg.tabWidth = tabWidth;
+  // The row of actions lives on the strip, above the page area its controls belong to.
+  banks._children.Children.clip = false;
+
+  const strip = cfg.stripSize;
+  const page = tabGeometry(t.width, t.height, banks).page;
+  const kids = Object.values(banks._children.Children._children);
+  const rowH = strip - 2;
+  const rowY = -strip + (strip - rowH) / 2;
+  for (const { id } of cfg.pages) {
+    const safe = id.replace(/-/g, '_');
+    const onPage = kids.filter((c) => c._children.Core.tabPageId === id);
+    const named = (n) => onPage.find((c) => c._children.Core.name === n);
+
+    // Actions, then the status line in whatever is left of the strip.
+    let x = cfg.pages.length * tabWidth + margin * 2;
+    for (const [n, w] of [[`names_read_${safe}`, 172], [`names_stop_${safe}`, 72], [`names_check_${safe}`, 142]]) {
+      Object.assign(named(n)._children.Transform, { x, y: rowY, width: w, height: rowH });
+      x += w + margin;
+    }
+    Object.assign(named(`names_status_${safe}`)._children.Transform, { x: x + 4, y: rowY, width: t.width - margin - x - 4, height: rowH });
+
+    // The grid: every column across the full width, every row down the full height.
+    const headers = onPage.filter((c) => c._children.Core.name.startsWith(`patch_bank_header_${safe}_`));
+    const columns = headers.length;
+    const gap = 12;
+    const columnWidth = (t.width - margin * 2 - gap * 7) / 8;   // eight columns' worth, even on PCM
+    const headerHeight = 14;
+    const pitch = (page.h - headerHeight - 4) / 8;
+    for (const [i, header] of headers.entries()) {
+      const left = margin + i * (columnWidth + gap);
+      Object.assign(header._children.Transform, { x: left, y: 1, width: columnWidth, height: headerHeight });
+      const letter = header._children.Core.name.split('_').at(-1);
+      for (let row = 0; row < 8; row++) {
+        const button = named(`recall_${safe}_${letter}${row + 1}`);
+        Object.assign(button._children.Transform, { x: left, y: headerHeight + 3 + row * pitch, width: columnWidth, height: pitch - 2 });
+      }
+    }
+    // PCM has one column; its explanation sits in the room the other seven would take.
+    if (columns === 1) {
+      const note = onPage.find((c) => c._children.Core.controlType === 'Label' && !headers.includes(c)
+        && !c._children.Core.name.startsWith('names_'));
+      if (note) Object.assign(note._children.Transform, { x: margin + columnWidth + gap * 2, y: headerHeight + 3, width: t.width - (margin + columnWidth + gap * 2) - margin, height: pitch * 3 });
+    }
+  }
   return panel;
 }

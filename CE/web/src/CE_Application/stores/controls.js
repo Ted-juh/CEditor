@@ -1,6 +1,7 @@
 import { derived, get } from 'svelte/store';
 import { panels, resolvedActivePanelId, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, keyObjectId } from './panels.js';
 import { createControl as createControlFromType, getSection, hasSection } from '../models/componentTypes.js';
+import { sanitizeControlName } from '../utils/controlNames.js';
 import { insertOffset, duplicateOffset } from './runtimePreferences.js';
 import { viewportPanelCenter } from './editorView.js';
 import { recordInsertUse } from './insertRecents.js';
@@ -524,7 +525,9 @@ export function duplicateControlsInPlace(ids) {
  * @param {string} fallback - used when `desired` is blank; the control's type, normally
  */
 export function uniqueControlName(existingNames, desired, fallback = 'control') {
-  const base = String(desired ?? '').trim() || String(fallback ?? '').trim() || 'control';
+  // No dots: a name is the first segment of a script path, and a dot would end it early. See
+  // utils/controlNames.js.
+  const base = sanitizeControlName(String(desired ?? '').trim() || String(fallback ?? '').trim() || 'control');
   if (!existingNames.has(base)) return base;
   let n = 2;
   while (existingNames.has(`${base}_${n}`)) n++;
@@ -553,6 +556,7 @@ export function uniqueControlName(existingNames, desired, fallback = 'control') 
 export function renameControl(controlId, requestedName) {
   if (controlId == null) return null;
   const requested = String(requestedName ?? '').trim();
+  const allowed = sanitizeControlName(requested);
 
   const panelId = get(resolvedActivePanelId);
   const panel = panelId == null ? null : get(panels).find((p) => p.id === panelId);
@@ -562,9 +566,9 @@ export function renameControl(controlId, requestedName) {
   // Applying the trimmed name unchecked is what happened before and is still the honest thing to
   // do there — better a name than a silently dropped edit.
   if (!panel || !control) {
-    if (!requested) return null;
-    updateControlProperty(controlId, 'Core.name', requested);
-    return { applied: requested, requested, changed: true };
+    if (!allowed) return null;
+    updateControlProperty(controlId, 'Core.name', allowed);
+    return { applied: allowed, requested, changed: true };
   }
 
   const core = control._children?.Core ?? {};

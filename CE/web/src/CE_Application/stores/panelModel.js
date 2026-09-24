@@ -9,6 +9,7 @@ import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
 import { DEFAULT_CONTROL_SET_ID, normalizeControlSet, normalizeControlSetList, serializeControlSet } from '../models/controlSets.js';
 import { resolveControlForSet } from '../models/controlSetFamilies.js';
 import { dedupeSnapshotIds } from '../utils/snapshotModel.js';
+import { migrateDottedControlNames } from '../utils/controlNames.js';
 
 let nextId = 1;
 
@@ -433,7 +434,7 @@ export function deserializePanel(json, filePath, name) {
   // to spend a hundred milliseconds.
   const controls = repairGaiaNoteChoices((data.controls ?? []).map(expandControl));
 
-  return {
+  const panel = {
     ...createPanel(),
     ...data,
     controls,
@@ -454,4 +455,11 @@ export function deserializePanel(json, filePath, name) {
     name: name || data.name || `Untitled ${id}`,
     modified: false,
   };
+  // A document from before control names lost their dots is converted on the way in, names and
+  // the references that address controls by name together (utils/controlNames.js). Marked
+  // modified, because what is open is no longer what is on disk and saving it should be offered.
+  const migrated = migrateDottedControlNames(panel);
+  if (migrated === panel) return panel;
+  console.info(`[panels] ${panel.name}: control names with dots were converted to underscores`);
+  return { ...migrated, modified: true };
 }

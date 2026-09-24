@@ -22,6 +22,7 @@ import {
 } from '../../../CE/web/src/CE_Application/utils/customComponentFactory.js';
 import { createControl } from '../../../CE/web/src/CE_Application/models/componentTypes.js';
 import { SECTION_DEFAULTS } from '../../../CE/web/src/CE_Application/models/sectionDefaults.js';
+import { SHAPE_POLYGONS } from '../../../CE/web/src/CE_Application/utils/shapeGeometry.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -53,7 +54,7 @@ function radial(centerX, centerY, stops, { radiusX = 60, radiusY = 60 } = {}) {
 /** A filled rectangle part. `radius: 0` is what keeps a fader cap square. */
 function rect(name, { x, y, width, height }, colour, {
   zIndex = 0, radius = 0, borderColour = '00000000', borderThickness = 0, opacity = 1, gradient = null,
-  pivotX = null, pivotY = null,
+  pivotX = null, pivotY = null, kind = 'rectangle', rotation = 0,
 } = {}) {
   const background = clone(SECTION_DEFAULTS.Background);
   background._children.Fill.colour = colour;
@@ -69,6 +70,8 @@ function rect(name, { x, y, width, height }, colour, {
 
   return createPartNode(name, {
     role: 'custom',
+    // A polygon kind (utils/shapeGeometry.js) draws the same fill as an SVG shape instead of a box.
+    kind,
     zIndex,
     opacity,
     layout: {
@@ -81,6 +84,7 @@ function rect(name, { x, y, width, height }, colour, {
       // come out wrong.
       ...(pivotX === null ? {} : { pivotX }),
       ...(pivotY === null ? {} : { pivotY }),
+      ...(rotation ? { rotation } : {}),
     },
     sections: { Background: background },
   });
@@ -198,6 +202,18 @@ function component({
  */
 export function gaiaSectionTab({ title, width, height = 20, tint }) {
   const corner = 5;
+  // The SH-01 prints its section names in a tab whose right end is cut on a slant: the top edge
+  // runs further right than the bottom one. Inside the tab's own width, so nothing that places or
+  // sizes the tab has to know about it — the body's bottom edge stops `slant` short of the end.
+  //
+  // The shape library has one right triangle, and it leans the other way; parts cannot be
+  // mirrored. A parallelogram's RIGHT edge has exactly this lean, so one is laid over the body's
+  // end with its left edge hidden underneath, sized from the library's own skew so the visible
+  // edge runs `slant` across.
+  const slant = Math.round(height * 0.6);
+  const bodyWidth = width - slant;
+  const skew = SHAPE_POLYGONS.parallelogram[0][0];
+  const slantWidth = slant / skew;
   const titlePart = text('title', title, {
     x: 0, y: 1, width, height: height - 2,
   }, { size: 11, colour: 'FF13161A', align: 'left' });
@@ -210,15 +226,53 @@ export function gaiaSectionTab({ title, width, height = 20, tint }) {
     width,
     height,
     parts: {
-      body: rect('body', { x: 0, y: 0, width, height }, tint, { zIndex: 0, radius: corner }),
-      // Square the inner end of the top edge while preserving the outside top-left curve.
-      topRight: rect('topRight', { x: width - corner, y: 0, width: corner, height: corner }, tint, { zIndex: 1 }),
+      body: rect('body', { x: 0, y: 0, width: bodyWidth, height }, tint, { zIndex: 0, radius: corner }),
+      // Square the inner end of the top edge, where the slant begins, while preserving the outside
+      // top-left curve.
+      topRight: rect('topRight', { x: bodyWidth - corner, y: 0, width: corner, height: corner }, tint, { zIndex: 1 }),
       // Both lower corners meet the section interior at 90 degrees.
-      bottom: rect('bottom', { x: 0, y: height - corner, width, height: corner }, tint, { zIndex: 1 }),
+      bottom: rect('bottom', { x: 0, y: height - corner, width: bodyWidth, height: corner }, tint, { zIndex: 1 }),
+      // The slanted end: bottom-right corner at the body's end, top-right corner `slant` beyond it.
+      slant: rect('slant', { x: width - slantWidth, y: 0, width: slantWidth, height }, tint, { zIndex: 1, kind: 'parallelogram' }),
       title: titlePart,
     },
     // Pure chrome: unlike a knob or selector, a section tab must not publish a phantom automation
     // parameter merely because it is implemented as a custom component.
+    channels: {},
+    published: {
+      _type: 'PublishedProperties', inputs: {}, outputs: {}, editableProperties: {},
+    },
+  });
+}
+
+/**
+ * The section name's tab, mirrored and drawn as an OUTLINE, for the top-right corner of a section
+ * where the Fader/Graph switch sits. Transparent: a filled tab in the section's colour reads as a
+ * second section name, which is what this is not.
+ *
+ * It sits flush in the corner, so its top and right edges ARE the section's own border and only
+ * the other two are drawn: the bottom edge, and the slant on the left whose top reaches further
+ * out than its bottom — the name tab's lean, mirrored. Same colour and thickness as the section
+ * border, so the two read as one frame with no seam.
+ *
+ * The slant is a thin bar turned to the slant's angle about its own centre (a line part only runs
+ * horizontally). Shape only: the switch is an ordinary Button laid over it.
+ */
+export function gaiaCornerTab({ width, height = 20, tint, thickness = 2 }) {
+  const slant = Math.round(height * 0.6);
+  // From the top-left corner down to where the bottom edge begins, ending on that edge's centre line.
+  const run = slant;
+  const rise = height - thickness / 2;
+  const length = Math.hypot(run, rise);
+  const angle = (Math.atan2(rise, run) * 180) / Math.PI;
+  return component({
+    name: 'GAIA Corner Tab',
+    width,
+    height,
+    parts: {
+      slant: rect('slant', { x: run / 2 - length / 2, y: rise / 2 - thickness / 2, width: length, height: thickness }, tint, { rotation: angle }),
+      bottom: rect('bottom', { x: slant, y: height - thickness, width: width - slant, height: thickness }, tint),
+    },
     channels: {},
     published: {
       _type: 'PublishedProperties', inputs: {}, outputs: {}, editableProperties: {},

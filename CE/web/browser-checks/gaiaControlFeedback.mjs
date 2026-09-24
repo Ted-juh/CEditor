@@ -62,7 +62,7 @@ try {
   // Check all tone knobs/faders, with the graph layer hidden so the faders can be reached.
   for (let tone = 1; tone <= 3; tone++) for (const section of ['osc.pitchEnv', 'filter.env', 'amp.env']) {
     const button = await ctl(`tone${tone}.${section}.viewButton`);
-    if ((await button.innerText()).trim() === 'FADERS ›') await button.click(); // graph showing
+    if ((await button.innerText()).trim() === 'GRAPH') await button.click(); // graph showing
   }
   const ranges = await page.evaluate(() => window.__gaia.controls.filter(c =>
     /^tone[123]\./.test(c._children.Core.name) && ['slider', 'knob'].includes(c._children.Behaviors?._children?.drive?.role)

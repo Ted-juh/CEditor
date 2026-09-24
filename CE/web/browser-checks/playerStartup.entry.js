@@ -35,7 +35,7 @@ window.__JUCE__ = {
 const fire = (name, payload) => { for (const fn of [...(listeners.get(name)?.values() ?? [])]) fn(payload); };
 
 const ROLE = 'Roland GAIA SH-01';
-const cutoff = createControl('Knob', { Core: { id: 'cutoff', name: 'tone1.filter.cutoff' }, Transform: { x: 20, y: 20, width: 60, height: 60 } });
+const cutoff = createControl('Knob', { Core: { id: 'cutoff', name: 'tone1_filter_cutoff' }, Transform: { x: 20, y: 20, width: 60, height: 60 } });
 cutoff._children.DeviceBindings = { bindings: [{ kind: 'deviceParameter', port: 'value', deviceRole: ROLE,
   parameterId: 'tone1.filter.cutoff', dryRun: false, feedback: { receiveUpdates: true, ignoreOwnEchoes: true, echoWindowMs: 250 } }] };
 
@@ -44,8 +44,9 @@ const panelDocument = {
   // The generated GAIA panel names its role and profile this way; the Player must connect as it.
   requiredProfiles: [{ role: ROLE, profileId: 'roland-gaia-sh01', version: '*' }],
   controls: [cutoff],
-  exportParameters: [{ id: 'tone1.filter.cutoff.value', label: 'tone1.filter.cutoff', controlName: 'tone1.filter.cutoff',
-    path: 'tone1.filter.cutoff.value', min: 0, max: 127, defaultValue: 0, unit: '', midiCC: null, valueKind: 'float',
+  // Named as the generator writes them now: a control name has no dots, the device parameter id does.
+  exportParameters: [{ id: 'tone1_filter_cutoff.value', label: 'tone1_filter_cutoff', controlName: 'tone1_filter_cutoff',
+    path: 'tone1_filter_cutoff.value', min: 0, max: 127, defaultValue: 0, unit: '', midiCC: null, valueKind: 'float',
     deviceRole: ROLE, deviceParameterId: 'tone1.filter.cutoff' }],
 };
 profileSources.set({ 'roland-gaia-sh01': { profileId: 'roland-gaia-sh01', source: JSON.stringify(gaiaProfile), native: true } });

@@ -1,3 +1,6 @@
+1x shape polygon
+1x stroke none @ 0
+1x fill rgba(224, 160, 48, 1.000)
 3x bg #E0A030FF
 1x radius 5px 5px 5px 5px
 1x font-family Arial

@@ -20,7 +20,7 @@ try {
     // regression for that rendering crash after the GAIA note migration runs.
     function duplicateDBeamIds(controls) {
       for (const control of controls) {
-        if (control._children?.Core?.name === 'common.dBeamAssign') {
+        if (control._children?.Core?.name === 'common_dBeamAssign') {
           for (const row of control._children.Value.rows) row.id = '';
         }
         duplicateDBeamIds(Object.values(control._children?.Children?._children ?? {}));
@@ -37,8 +37,8 @@ try {
     .map(c => ({ name: c._children.Core.name, id: c._children.Core.id,
       rows: c._children.Value.rows.filter(r => r.enabled !== false && !r.isHeader)
         .map(r => ({ id: r.id, value: r.internalValue ?? r.id ?? '', label: r.displayText ?? r.label ?? r.internalValue ?? r.id ?? '' })) })));
-  assert.ok(menus.some(m => m.name === 'common.dBeamAssign'));
-  assert.equal(menus.filter(m => /^(tone[123])\.(modLfo|lfo)\.tempoSyncNote$/.test(m.name)).length, 6);
+  assert.ok(menus.some(m => m.name === 'common_dBeamAssign'));
+  assert.equal(menus.filter(m => /^(tone[123])[._](modLfo|lfo)[._]tempoSyncNote$/.test(m.name)).length, 6);
   // Which bottom_pages page holds a control, read from the document rather than guessed from its
   // name: D BEAM ASSIGN is common.* and lives on System, so a name prefix picks the wrong page.
   const bottomPage = id => page.evaluate(id => {
@@ -80,7 +80,7 @@ try {
     await menu.waitFor({ state: 'visible' });
     assert.equal(await menu.getByRole('option', { selected: true }).innerText(), String(choice.label));
     await options.first().click();
-    if (/^tone[123]\.(modLfo|lfo)\.tempoSyncNote$/.test(combo.name)) {
+    if (/^tone[123][._](modLfo|lfo)[._]tempoSyncNote$/.test(combo.name)) {
       assert.equal(new Set(combo.rows.map(row => row.value)).size, combo.rows.length);
       for (const label of ['12', '1/2', '16', '1/6']) {
         await control.click();
@@ -95,7 +95,7 @@ try {
     checked++;
   }
   // The nested D Beam popup must keep its anchor at non-100% zoom too.
-  const dbeam = menus.find(m => m.name === 'common.dBeamAssign');
+  const dbeam = menus.find(m => m.name === 'common_dBeamAssign');
   await showBottomPage(dbeam.id);
   await page.locator('.panel-surface.preview-surface').evaluate(node => node.style.transform = 'scale(0.75)');
   const dbeamControl = page.locator(`.canvas-control[data-control-id="${dbeam.id}"]`);

@@ -8,7 +8,9 @@ import { classifyParts } from '../src/CE_Application/utils/staticPartBaking.js';
 import { gaiaKnob } from '../../../tools/scripts/gaia-panel/components.mjs';
 import { STEP_COUNTERS } from '../../../tools/scripts/gaia-panel/step-counters.mjs';
 const controls = flatControls(buildGaiaPanel().controls);
-const named = name => controls.find(c => c._children.Core.name === name);
+// Looked up by the parameter id, which is what these tests think in. A control is named after its
+// parameter with the dots made underscores (utils/controlNames.js), so the id is converted here.
+const named = name => controls.find(c => c._children.Core.name === name.replace(/\./g, '_'));
 test('numeric inputs fit inside their controls so focusing never scrolls the knob away', () => {
   for (const size of [42, 54]) {
     const control = gaiaKnob({ size, numeric: true });
@@ -40,7 +42,7 @@ test('numeric fields clamp, reject invalid input, and map displayed octaves back
 });
 test('GAIA sets exact values with step counters and end step with the ruler, with no duplicate numeric boxes', () => {
   assert.equal(named('arp.endStep'), undefined);
-  for (const name of Object.keys(STEP_COUNTERS)) assert.equal(named(name)._children.Core.controlType, 'Number', name);
+  for (const name of STEP_COUNTERS) assert.equal(named(name)._children.Core.controlType, 'Number', name);
   // Amounts turned by ear stay knobs, without a second numeric box beside them.
   for (const name of ['common.patchLevel', 'common.portamentoTime']) {
     assert.equal(named(name)._children.Core.controlType, 'CustomComponent', name);
