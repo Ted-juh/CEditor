@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { buildGaiaPanel } from '../../../tools/scripts/gaia-panel/make-gaia-panel.mjs';
 import { ARP_LABELS, arpKnobCaption, applyArpeggioLabels } from '../../../tools/scripts/gaia-panel/arpeggio-labels.mjs';
 import { flatControls } from '../src/CE_Application/utils/containment.js';
-import { mountPanel, loadScript, controlNamed, idOf, moveChannel } from './support/gaiaScriptHarness.mjs';
+import { mountPanel, loadScript, controlNamed, idOf } from './support/gaiaScriptHarness.mjs';
+import { updatePanelPreviewSession } from '../src/CE_Application/stores/interactionPreview.js';
 import { syncDeviceParameterToPanelPreview } from '../src/CE_Application/utils/deviceBindingSync.js';
 
 test('all arpeggio choices retain their original wire mapping and identifiers', () => {
@@ -43,7 +44,8 @@ test('real script runtime updates captions from local and incoming values withou
   script.onPanelLoad();
   const text=name=>mounted.controls().find(c=>c._children.Core.name===`${name}.caption`)._children.Text.content;
   assert.equal(text('arp.velocity'),'VELOCITY\nREAL (played)');
-  moveChannel(idOf(controlNamed(panel,'arp.velocity')),{value:96}); script.settle();
+  // A step counter's local edit is a preview value override, not a custom channel move.
+  updatePanelPreviewSession(idOf(controlNamed(panel,'arp.velocity')),{valueOverrideEnabled:true,valueOverride:96}); script.settle();
   assert.equal(text('arp.velocity'),'VELOCITY\n96 (fixed)');
   syncDeviceParameterToPanelPreview('Roland GAIA SH-01','arp.velocity',0); script.settle();
   assert.equal(text('arp.velocity'),'VELOCITY\nREAL (played)');

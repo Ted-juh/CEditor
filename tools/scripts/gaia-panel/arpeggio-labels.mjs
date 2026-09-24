@@ -89,7 +89,10 @@ export function applyArpeggioLabels(panel) {
       if (!compact) Object.assign(caption._children.Transform, { x: t.x + t.width / 2 - 79, width: 158, height: 28 });
       const text = caption._children.Text;
       text._children.Multiline = { ...text._children.Multiline, maxLines: compact ? 3 : 2, lineHeight: 1.15, wrapMode: 'word', fitMode: 'shrink' };
-      text.content = arpKnobCaption(name, control._children.ValueChannels._children.value.currentValue ?? control._children.ValueChannels._children.value.defaultValue);
+      // A knob keeps its value in a channel; the step counter that replaces it (step-counters.mjs)
+      // keeps it in Behavior.
+      const channel = control._children.ValueChannels?._children?.value;
+      text.content = arpKnobCaption(name, channel ? channel.currentValue ?? channel.defaultValue : control._children.Behavior?.defaultValue);
       entries.push({ parameter: name, control: control._children.Core.id, caption: caption._children.Core.id });
     }
   }

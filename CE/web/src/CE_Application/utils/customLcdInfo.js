@@ -3,6 +3,10 @@
 export function formatLcdInfo(info, meta = {}) {
   if (!info) return info;
   if (meta.label) info = { ...info, name: meta.label };
+  // A named raw value ("REAL (played velocity)" for 0) reads the same on a native control as on a
+  // custom one, which applies it before it gets here.
+  const special = meta.special?.[info.value];
+  if (special !== undefined) return { ...info, text: special };
   if (meta.display && !meta.choices?.length && info.max !== info.min) {
     const { min, max, precision = 0, unit = '' } = meta.display;
     const value = min + (info.value - info.min) / (info.max - info.min) * (max - min);

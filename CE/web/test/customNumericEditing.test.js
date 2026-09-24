@@ -6,6 +6,7 @@ import { customNumericFields, customNumericPatch } from '../src/CE_Application/u
 import { seedCustomValues } from '../src/CE_Application/utils/customComponentInteraction.js';
 import { classifyParts } from '../src/CE_Application/utils/staticPartBaking.js';
 import { gaiaKnob } from '../../../tools/scripts/gaia-panel/components.mjs';
+import { STEP_COUNTERS } from '../../../tools/scripts/gaia-panel/step-counters.mjs';
 const controls = flatControls(buildGaiaPanel().controls);
 const named = name => controls.find(c => c._children.Core.name === name);
 test('numeric inputs fit inside their controls so focusing never scrolls the knob away', () => {
@@ -26,19 +27,24 @@ test('numeric fields clamp, reject invalid input, and map displayed octaves back
     assert.equal(customNumericPatch(end, {}, 'customValueField', input).customValues.value, expected);
   }
   for (const invalid of ['', ' ', 'abc', 'Infinity']) assert.equal(customNumericPatch(end, {}, 'customValueField', invalid), null);
-  const octave = structuredClone(named('arp.octaveRange'));
-  octave._children.Parts._children.numericValue = end._children.Parts._children.numericValue;
-  assert.equal(customNumericFields(octave, { value: 64 }).customValueField.value, '0');
-  assert.equal(customNumericPatch(octave, {}, 'customValueField', '-2').customValues.value, 62);
-  const velocity = structuredClone(named('arp.velocity'));
-  velocity._children.Parts._children.numericValue = gaiaKnob({ numeric: true, zeroLabel: 'REAL' })._children.Parts._children.numericValue;
+  // Tone PITCH has the same centred mapping the arpeggio's octave knob had (wire 64 reads 0); that
+  // knob is a step counter now, so the offset mapping is exercised on a knob that still is one.
+  const pitch = structuredClone(named('tone1.osc.pitch'));
+  pitch._children.Parts._children.numericValue = end._children.Parts._children.numericValue;
+  assert.equal(customNumericFields(pitch, { value: 64 }).customValueField.value, '0');
+  assert.equal(customNumericPatch(pitch, {}, 'customValueField', '-2').customValues.value, 62);
+  const velocity = gaiaKnob({ numeric: true, zeroLabel: 'REAL' });
+  Object.assign(velocity._children.ValueChannels._children.value, { type: 'int', min: 0, max: 127, step: 1 });
   assert.equal(customNumericFields(velocity, { value: 0 }).customValueField.value, 'REAL');
   assert.equal(customNumericPatch(velocity, {}, 'customValueField', 'real').customValues.value, 0);
 });
-test('GAIA uses only rotaries for parameters and the ruler for end step, with no duplicate numeric boxes', () => {
+test('GAIA sets exact values with step counters and end step with the ruler, with no duplicate numeric boxes', () => {
   assert.equal(named('arp.endStep'), undefined);
-  for (const name of ['common.patchTempo', 'arp.velocity', 'arp.accentRate', 'arp.octaveRange']) {
-    assert.equal(named(name)._children.Parts._children.numericValue, undefined);
+  for (const name of Object.keys(STEP_COUNTERS)) assert.equal(named(name)._children.Core.controlType, 'Number', name);
+  // Amounts turned by ear stay knobs, without a second numeric box beside them.
+  for (const name of ['common.patchLevel', 'common.portamentoTime']) {
+    assert.equal(named(name)._children.Core.controlType, 'CustomComponent', name);
+    assert.equal(named(name)._children.Parts._children.numericValue, undefined, name);
   }
 });
 test('note numeric edits preserve other notes, selection and loop end; no selection is read-only', () => {

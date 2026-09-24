@@ -20,9 +20,13 @@ try {
     const id = await page.evaluate(n => window.__gaia.id(n), name);
     return page.locator(`[data-control-id="${id}"]`).first();
   }
-  for (const name of ['common.patchTempo', 'arp.velocity', 'arp.octaveRange', 'arp.accentRate', 'arp.endStep']) {
-    assert.equal(await page.getByRole('textbox', { name: `${name} value`, exact: true }).count(), 0, 'no duplicate numeric entry');
+  // These are step counters: the counter's own field is the one numeric entry, never a second box.
+  // (TEMPO's counter is on the Patch Banks page, not mounted here; customNumericEditing.test.js
+  // checks it is a counter.)
+  for (const name of ['arp.velocity', 'arp.octaveRange', 'arp.accentRate']) {
+    assert.equal(await page.getByRole('textbox', { name: `${name} value`, exact: true }).count(), 1, `${name}: one numeric entry`);
   }
+  assert.equal(await page.getByRole('textbox', { name: 'arp.endStep value', exact: true }).count(), 0, 'END STEP is the ruler');
   const grid = await control('arp_pattern_grid');
   const ruler = await grid.boundingBox();
   await page.mouse.click(ruler.x + 44 + 15.5 * (ruler.width - 184) / 32, ruler.y + 12);

@@ -35,6 +35,7 @@ import { applyPerformanceLayout } from './performance-layout.mjs';
 import { applyGaiaTabStyle } from './tab-style.mjs';
 import { applyCompactHeader } from './compact-header.mjs';
 import { applyWidescreenLayout } from './widescreen-layout.mjs';
+import { applyStepCounters } from './step-counters.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -878,7 +879,8 @@ export function buildGaiaPanel() {
   panel.scriptId = 'roland_gaia_sh01';
   panel.filePath = null;
 
-  return applyWidescreenLayout(applyGaiaTabStyle(applyCompactHeader(applyPerformanceLayout(moveStatusDisplayToBottom(applyToneControls(applyEditableEnvelopes(applyStatusDisplay(applyArpeggioLabels(panel), profile))))))));
+  const laidOut = applyWidescreenLayout(applyGaiaTabStyle(applyCompactHeader(applyPerformanceLayout(moveStatusDisplayToBottom(applyToneControls(applyEditableEnvelopes(applyStatusDisplay(applyArpeggioLabels(panel), profile))))))));
+  return applyStepCounters(laidOut, (id, box) => bound(byId.get(id), 'Number', box));
 }
 
 export function serializeGaiaPanel() {

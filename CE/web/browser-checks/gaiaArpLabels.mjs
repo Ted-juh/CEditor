@@ -39,7 +39,7 @@ try {
   await textHas('arp.velocity.caption','127 (fixed)'); await textHas('arp.accentRate.caption','100% (pattern)'); await textHas('arp.octaveRange.caption','-3 octaves');
   await page.evaluate(()=>window.__gaia.feedbackEvent('dumpMessageParsed',{ok:true,requestId:'incoming_arp_labels_real',deviceRole:'Roland GAIA SH-01',values:{'arp.velocity':0}}));
   await textHas('arp.velocity.caption','REAL (played)');
-  assert.equal(await page.getByRole('textbox',{name:'arp.velocity value',exact:true}).count(),0);
+  assert.equal(await page.getByRole('textbox',{name:'arp.velocity value',exact:true}).count(),1,'the step counter is the one numeric entry');
   assert.match(await (await ctl('arp.duration')).getAttribute('title'),/not simply 100%/);
   assert.match(await (await ctl('arp.motif')).getAttribute('title'),/L&H/);
   assert.deepEqual(errors,[]);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildGaiaPanel } from '../../../tools/scripts/gaia-panel/make-gaia-panel.mjs';
 import { applyStatusDisplay, updateGaiaScreen } from '../../../tools/scripts/gaia-panel/status-display.mjs';
-import { customLcdInfo } from '../src/CE_Application/utils/customLcdInfo.js';
+import { customLcdInfo, formatLcdInfo } from '../src/CE_Application/utils/customLcdInfo.js';
 import { composeLayout } from '../src/CE_Application/utils/lcdZones.js';
 import { mountPanel, controlNamed } from './support/gaiaScriptHarness.mjs';
 import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
@@ -29,8 +29,12 @@ test('custom LCD sources report real channel values, LED labels, tone identity a
   assert.match(info('tone2.filter.cutoff',{value:97}).name,/TONE 2/);
   assert.equal(info('tone1.osc.wave',{value:6}).text,'SUPER-SAW');
   assert.equal(info('tone1.osc.wave',{value:6}).kind,'choice');
-  assert.equal(info('arp.velocity',{value:0}).text,'REAL (played velocity)');
-  assert.equal(info('arp.octaveRange',{value:61}).value,-3);
+  // VELOCITY and OCTAVE RANGE are step counters, so the native resolver reads them and hands its
+  // raw range to formatLcdInfo with the same readout metadata.
+  const native=(name,value)=>{const c=controlNamed(p,name);assert.equal(c._children.Core.controlType,'Number',name);
+    return formatLcdInfo({present:true,value,min:c._children.Behavior.min??0,max:c._children.Behavior.max??127,text:''},c._children.Designer.lcdReadout);};
+  assert.equal(native('arp.velocity',0).text,'REAL (played velocity)');
+  assert.equal(native('arp.octaveRange',61).value,-3);
   assert.equal(info('tone1.osc.detune',{value:14}).text,'-50');
   assert.equal(info('tone1.osc.pitch',{value:64}).text,'0');
   assert.equal(info('arp_pattern_grid',{arpEndStep:12,arpCurrentStep:0}).value,12);
