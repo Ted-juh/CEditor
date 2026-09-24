@@ -275,9 +275,9 @@ export function compactPanelRows(panel) {
   t.y = Math.max(...panel.controls.filter(c => c._children.Core.name === 'box_OSC')
     .map(c => c._children.Transform.y + c._children.Transform.height));
   t.height = end - t.y;
-  // The four page buttons span the strip, each its full share less the gap between them, rather
+  // The four page buttons span the strip edge to edge, each its full share with no gap, rather
   // than sitting as 180px islands in 392px cells.
-  Object.assign(bottom._children.TabContainer, { appearance: 'buttons', stripSize: 32, stripColour: '00000000', buttonMaxWidth: 10000 });
+  Object.assign(bottom._children.TabContainer, { appearance: 'buttons', stripSize: 32, stripColour: '00000000', buttonMaxWidth: 10000, buttonGap: 0 });
   return expandArpeggioWorkspace(panel);
 }
 
