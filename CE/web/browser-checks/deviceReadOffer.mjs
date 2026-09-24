@@ -21,13 +21,13 @@ const browser = await chromium.launch(chromiumLaunchOptions());
 const page = await browser.newPage({ viewport: { width: 1920, height: 1000 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
-const connect = (id) => page.evaluate(async ({ url, id }) => {
+const connect = (id, role = 'Roland GAIA SH-01') => page.evaluate(async ({ url, id, role }) => {
   const session = await import(url);
-  session.mapDeviceRole('Roland GAIA SH-01', 'roland-gaia-sh01', {
+  session.mapDeviceRole(role, 'roland-gaia-sh01', {
     midiDestination: { type: 'hardwareOutput', id, name: 'GAIA' },
     midiInput: { type: 'hardwareInput', id: `${id}-in`, name: 'GAIA' },
   });
-}, { url: SESSION, id });
+}, { url: SESSION, id, role });
 const reads = () => page.evaluate(() => window.__gaia.feedbackSent()
   .filter((e) => e.name === 'startDeviceSync').map((e) => e.payload));
 
@@ -40,6 +40,11 @@ try {
   await page.evaluate(() => window.__gaia.load('/gaia-panel.json', { fullApp: true }));
   await page.waitForTimeout(3000);
   assert.equal(await page.getByRole('dialog').count(), 0, 'asked before any synth was connected');
+  // A synth no open panel uses is not asked about — the editor restores last session's mappings on
+  // the start screen, before any panel is open, and that was when this used to pop up.
+  await connect('usb-other', 'Some Other Synth');
+  await page.waitForTimeout(800);
+  assert.equal(await page.getByRole('dialog').count(), 0, 'asked about a synth no open panel uses');
 
   await connect('usb-gaia');
   const dialog = page.getByRole('dialog');
@@ -60,7 +65,7 @@ try {
   await page.waitForTimeout(800);
   assert.equal(await page.getByRole('dialog').count(), 0, 'asked twice about the same port');
   assert.deepEqual(errors, []);
-  console.log('device read offer: ok (none before a synth, asked once naming it, Read now runs the full read, same port not asked again)');
+  console.log('device read offer: ok (none before a synth, none for a synth no panel uses, asked once naming it, Read now runs the full read, same port not asked again)');
 } catch (error) {
   console.error('device read offer: FAILED\n', error);
   process.exitCode = 1;

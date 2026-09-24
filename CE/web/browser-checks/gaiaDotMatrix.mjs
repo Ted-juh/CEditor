@@ -53,7 +53,8 @@ try {
   await has('99');
   await menu(0);
   await selectLower(1);
-  const banks=await(await ctl('patch_banks')).boundingBox();await page.mouse.click(banks.x+banks.width*.375,banks.y+12);
+  // The USER tab, where the app draws it (harness tabCenter): the bank tabs share their row with the actions.
+  const banks=await(await ctl('patch_banks')).boundingBox();const userTab=await page.evaluate(()=>window.__gaia.tabCenter('patch_banks',1));await page.mouse.click(banks.x+userTab.x,banks.y+userTab.y);
   await(await ctl('recall_user_C3')).click();await selectLower(0);await has('Requested User Patch C-3');await selectLower(1);
   await(await ctl('names_check_user')).click();
   await page.evaluate(()=>window.__gaia.receive([240,126,19,6,2,65,65,2,0,0,0,0,0,0,247]));

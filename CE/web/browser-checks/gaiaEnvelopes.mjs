@@ -36,8 +36,12 @@ try{
     const container=await ctl(`tone${tone}.${kind}.view`), button=await ctl(`tone${tone}.${kind}.viewButton`);
     assert.equal(await container.locator('svg.tabs').count(),0,'no tab strip is rendered');
     assert.equal(await button.innerText(),'FADER','faders are the default view');
-    const frame=await container.boundingBox(), label=await button.boundingBox();
-    assert.ok(Math.abs(label.x+label.width/2-(frame.x+frame.width-33))<1,'button is at the section right edge');
+    // The switch is a corner tab flush with its SECTION's right edge (envelope-buttons.mjs), level
+    // with the section title, not with the envelope view inside the section.
+    const section=await ctl(`tone${tone}_${kind.split('.')[0]}`);
+    const frame=await section.boundingBox(), label=await button.boundingBox();
+    assert.ok(Math.abs(label.x+label.width-(frame.x+frame.width))<1.5,`button is at the section right edge (${label.x+label.width} vs ${frame.x+frame.width})`);
+    assert.ok(label.y-frame.y<6,'and at the top, level with the section title');
   }
   // Other controls overlap the transparent view container and must stay reachable.
   for(const mode of ['fader','graph']){

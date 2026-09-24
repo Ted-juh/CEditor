@@ -28,13 +28,16 @@ try {
   const sends = () => page.evaluate(() => window.__gaia.feedbackSent().filter(e => e.name === 'setDeviceParameter'));
   const until = async (check, context = '') => { for (let i = 0; i < 40; i++) { if (await check()) return; await page.waitForTimeout(50); } assert.fail(`Control feedback timed out: ${context}`); };
   const selectors = await page.evaluate(() => window.__gaia.controls.filter(c =>
-    /^tone[123]\./.test(c._children.Core.name) && c._children.Behaviors?._children?.drive?.type === 'selector'
-  ).map(c => ({ name: c._children.Core.name, zones: Object.values(c._children.HitZones._children) })));
+    /^tone[123][._]/.test(c._children.Core.name) && c._children.Behaviors?._children?.drive?.type === 'selector'
+  // The control's name finds it on screen; MIDI in and out use its device parameter, which keeps its
+  // dots while the name lost them (utils/controlNames.js).
+  ).map(c => ({ name: c._children.Core.name, parameter: c._children.DeviceBindings?.bindings?.find(b => b.parameterId)?.parameterId,
+    zones: Object.values(c._children.HitZones._children) })));
   assert.equal(selectors.length, 18);
   let choicesChecked = 0;
-  for (const { name, zones } of selectors) {
+  for (const { name, parameter, zones } of selectors) {
     const control = await ctl(name), rect = await control.boundingBox();
-    await incoming({ [name]: zones.at(-1).payload });
+    await incoming({ [parameter]: zones.at(-1).payload });
     await until(async () => await value(name) === zones.at(-1).payload);
     for (const [index, zone] of zones.entries()) {
       const expected = zone.payload?.value ?? zone.payload;
@@ -43,12 +46,12 @@ try {
         rect.y + rect.height * (b.y + b.height / 2) / 100, { delay: 50 });
       await until(async () => await value(name) === expected, `${name} click ${expected}, actual ${await value(name)}`);
       assert.deepEqual(await lamps(control), zones.map((_, i) => i === index ? 'rgb(255, 59, 48)' : 'rgb(43, 23, 24)'), name);
-      try { await until(async () => (await sends()).some(e => e.payload.parameterId === name && e.payload.value === expected)); }
+      try { await until(async () => (await sends()).some(e => e.payload.parameterId === parameter && e.payload.value === expected)); }
       catch (error) { console.log('missing send', name, expected, (await sends()).slice(-3)); throw error; }
       choicesChecked++;
     }
     // Return to zero after a nonzero selection; zero must not fall through to pointer position.
-    await incoming({ [name]: zones[0].payload });
+    await incoming({ [parameter]: zones[0].payload });
     await until(async () => await value(name) === zones[0].payload);
     assert.equal((await lamps(control))[0], 'rgb(255, 59, 48)', `${name}: incoming MIDI`);
   }
@@ -65,19 +68,20 @@ try {
     if ((await button.innerText()).trim() === 'GRAPH') await button.click(); // graph showing
   }
   const ranges = await page.evaluate(() => window.__gaia.controls.filter(c =>
-    /^tone[123]\./.test(c._children.Core.name) && ['slider', 'knob'].includes(c._children.Behaviors?._children?.drive?.role)
-  ).map(c => ({ name: c._children.Core.name, channel: c._children.ValueChannels._children.value,
+    /^tone[123][._]/.test(c._children.Core.name) && ['slider', 'knob'].includes(c._children.Behaviors?._children?.drive?.role)
+  ).map(c => ({ name: c._children.Core.name, parameter: c._children.DeviceBindings?.bindings?.find(b => b.parameterId)?.parameterId,
+    channel: c._children.ValueChannels._children.value,
     meta: c._children.Designer?.lcdReadout ?? {} })));
   assert.ok(ranges.length > 50);
-  for (const { name, channel, meta } of ranges) {
+  for (const { name, parameter, channel, meta } of ranges) {
     const lo = meta.display?.min ?? channel.format?.displayMin ?? channel.min + (meta.offset ?? 0);
     const hi = meta.display?.max ?? channel.format?.displayMax ?? channel.max + (meta.offset ?? 0);
     const expected = lo < 0 && hi > 0 ? channel.min + (-lo / (hi - lo)) * (channel.max - channel.min) : channel.defaultValue;
-    await incoming({ [name]: expected === channel.max ? channel.min : channel.max });
+    await incoming({ [parameter]: expected === channel.max ? channel.min : channel.max });
     const before = (await sends()).length;
     await (await ctl(name)).dblclick({ delay: 70 });
     await until(async () => await value(name) === expected, `${name} reset ${expected}, actual ${await value(name)}`);
-    await until(async () => (await sends()).slice(before).some(e => e.payload.parameterId === name && e.payload.value === expected));
+    await until(async () => (await sends()).slice(before).some(e => e.payload.parameterId === parameter && e.payload.value === expected));
     assert.equal(await value(name), expected, `${name}: reset survives pointer-up`);
     assert.equal(await page.evaluate(n => window.__gaia.session(n).dragging, name), false);
   }

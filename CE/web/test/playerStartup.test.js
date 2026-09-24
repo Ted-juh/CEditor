@@ -62,12 +62,23 @@ test('the editor offers a read once per role and port, only on hardware that can
     pending: hw('usb3', 'not-loaded-yet'),
   };
   const offered = new Set();
-  const { ready, waiting } = readOfferCandidates(mappings, sources, offered);
+  const bound = new Set(['Roland GAIA SH-01', 'mainSynth', 'preview', 'pending']);
+  const { ready, waiting } = readOfferCandidates(mappings, sources, offered, bound);
   assert.deepEqual(ready.map((r) => r.role), ['Roland GAIA SH-01']);
   assert.equal(ready[0].name, 'Port usb1');
   assert.deepEqual(waiting, [{ role: 'pending', profileId: 'not-loaded-yet' }], 'fetched, then offered when it lands');
   offered.add(readOfferKey('Roland GAIA SH-01', mappings['Roland GAIA SH-01']));
-  assert.deepEqual(readOfferCandidates(mappings, sources, offered).ready, [], 'asked once');
+  assert.deepEqual(readOfferCandidates(mappings, sources, offered, bound).ready, [], 'asked once');
   mappings['Roland GAIA SH-01'] = hw('usb9', 'roland-gaia-sh01');
-  assert.equal(readOfferCandidates(mappings, sources, offered).ready.length, 1, 'a different port is a new connection');
+  assert.equal(readOfferCandidates(mappings, sources, offered, bound).ready.length, 1, 'a different port is a new connection');
+});
+
+test('nothing is offered for a synth no open panel uses — not on the start screen', () => {
+  // The editor restores last session's mappings before any panel is open. Asking then is a
+  // question about nothing on screen.
+  const sources = { 'roland-gaia-sh01': { source: JSON.stringify(SH01) } };
+  const mappings = { 'Roland GAIA SH-01': { profileId: 'roland-gaia-sh01', midiDestination: { type: 'hardwareOutput', id: 'usb1', name: 'SH-01' } } };
+  assert.deepEqual(readOfferCandidates(mappings, sources, new Set(), new Set()).ready, [], 'no panel open');
+  assert.deepEqual(readOfferCandidates(mappings, sources, new Set(), new Set(['Lead'])).ready, [], 'a panel for another synth');
+  assert.equal(readOfferCandidates(mappings, sources, new Set(), new Set(['Roland GAIA SH-01'])).ready.length, 1, 'the GAIA panel open');
 });

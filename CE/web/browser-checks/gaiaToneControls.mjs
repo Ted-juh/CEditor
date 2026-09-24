@@ -5,12 +5,13 @@ import { readFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
-import { applyToneControls } from '../../../tools/scripts/gaia-panel/tone-controls.mjs';
 import { deserializePanel, serializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { PATCH_TONE } from '../../../tools/scripts/qa/roland-gaia/address-map.mjs';
 
 const saved=deserializePanel(await readFile(new URL('../../panels/Roland GAIA SH-01.cepanel',import.meta.url),'utf8'));
-const panel=applyToneControls(saved);
+// The saved panel as generated. applyToneControls is a generator pass over the flat, dotted layout
+// that exists only before sectioning; the saved panel already carries its result.
+const panel=saved;
 const server=await createServer({configFile:fileURLToPath(new URL('./vite.config.mjs',import.meta.url)),server:{host:'127.0.0.1',port:0}});
 await server.listen();
 const browser=await chromium.launch(chromiumLaunchOptions());

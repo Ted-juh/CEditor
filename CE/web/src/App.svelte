@@ -22,7 +22,7 @@
   import ContextBar from './CE_Application/layout/ContextBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
-  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, clearSelection, closeActiveEditorTab, openPanelFromFile, saveActiveEditorDocument, selectComponent, selectedComponentIds } from './CE_Application/stores/panels.js';
+  import { initPanelBridge, panels, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, clearSelection, closeActiveEditorTab, openPanelFromFile, saveActiveEditorDocument, selectComponent, selectedComponentIds } from './CE_Application/stores/panels.js';
   import { get } from 'svelte/store';
   import { duplicateControl, groupSelectionIntoContainer, removeControl, ungroupContainer, updateControlProperty } from './CE_Application/stores/controls.js';
   import { copySelection, cutSelection, pasteSelection, selectAll } from './CE_Application/stores/clipboard.js';
@@ -94,7 +94,7 @@
     initAppSettingsBridge();
     initHistory();
     initPresetChoiceSync(); // preset-sourced selector rows follow scans + profile sources
-    initDeviceReadOffer();  // offer to read a synth when it connects (the Player reads by itself)
+    initDeviceReadOffer(panels);  // offer to read a synth an open panel uses (the Player reads by itself)
   }
 
   function saveActiveTab({ saveAs = false } = {}) {

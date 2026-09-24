@@ -7,6 +7,7 @@ import { updateControlProperty } from '../src/CE_Application/stores/controls.js'
 import { deserializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { panels, addPanel, setActivePanel } from '../src/CE_Application/stores/panels.js';
 import { flatControls } from '../src/CE_Application/utils/containment.js';
+import { tabGeometry, tabRect, tabPages } from '../src/CE_Application/utils/tabContainerLayout.js';
 import { panelPreviewSessions, createInteractionPreviewSession, setPreviewModeEnabled, updatePanelPreviewSession } from '../src/CE_Application/stores/interactionPreview.js';
 import * as runtime from '../src/CE_Application/scripting/panelRuntime.js';
 import { deviceRoleMappings, profileSources } from '../src/CE_Application/stores/deviceProfileStores.js';
@@ -17,6 +18,14 @@ import { initDeviceProfileBridge } from '../src/CE_Application/stores/deviceProf
 import { gaiaExpectedArpValues } from '../src/CE_Application/utils/gaiaSyncStatus.js';
 import { sceneryMarkupStats } from '../src/CE_Application/utils/sceneryMarkupCache.js';
 window.__JUCE__ = undefined;
+// Checks written against the drawn boxes, by the name of the section each became.
+const SECTION_NAMES = {
+  'box_ARPEGGIO': 'arp_arpeggio',
+  'box_ARPEGGIO PATTERN': 'arp_arpeggio_pattern',
+  'box_D BEAM': 'system_d_beam',
+  'box_DISTORTION': 'effects_distortion',
+  'box_EFFECTS / OUTPUT': 'effects_output',
+};
 window.__gaia = {
   preparationStats: sceneryMarkupStats,
   preview: setPreviewModeEnabled,
@@ -56,9 +65,20 @@ window.__gaia = {
   },
   // Names lost their dots (utils/controlNames.js: a dot becomes an underscore), and the checks are
   // written with the parameter ids they were named after. Either spelling finds the control.
+  // The drawn section boxes became real sections (section-tree.mjs), named after their title.
   id(name) {
     const find = n => window.__gaia.controls.find(c=>c._children.Core.name===n)?._children.Core.id;
-    return find(name) ?? find(String(name).replace(/\./g, '_'));
+    const n = SECTION_NAMES[name] ?? name;
+    return find(n) ?? find(String(n).replace(/\./g, '_'));
+  },
+  // Where a Tab Container draws its tab `index`, as the centre point relative to the control, from
+  // the same geometry the renderer uses — page buttons, a narrowed strip or a tab row with actions
+  // beside it all land on the right spot.
+  tabCenter(name, index) {
+    const c = window.__gaia.controls.find(x => x._children.Core.id === window.__gaia.id(name));
+    const t = c._children.Transform;
+    const r = tabRect(tabGeometry(t.width, t.height, c), index, tabPages(c).length);
+    return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
   },
   session(name) { return get(panelPreviewSessions)[window.__gaia.id(name)]; },
   receive(bytes) { runtime.deliverSysexForTesting({ hex: bytes.map(b=>b.toString(16).padStart(2,'0')).join(' ') }); },

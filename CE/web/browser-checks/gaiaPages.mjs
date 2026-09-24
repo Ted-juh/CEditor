@@ -15,12 +15,14 @@ try {
   await page.goto(`${server.resolvedUrls.local[0]}gaiaPages.html`);
   await page.waitForFunction(()=>!!window.__gaia,null,{timeout:90000});
   const size=await page.evaluate(()=>window.__gaia.load('/gaia-panel.json'));
-  const initialMounted = await page.evaluate(() => document.querySelectorAll('[data-control-id]').length);
-  const topLevelControls = await page.evaluate(() => window.__gaia.panel.controls.length);
-  assert.ok(initialMounted > 0 && initialMounted < topLevelControls,
-    'large previews paint a first slice before mounting every control');
-  await page.waitForFunction(total => document.querySelectorAll('[data-control-id]').length >= total,
-    topLevelControls, { timeout: 30000 });
+  // The panel is sectioned: six top-level controls (plate, three tones, effects, lower pages), which
+  // is below the size progressive mounting slices, so the whole top level mounts at once and the
+  // sections bring their controls with them.
+  const topLevel = await page.evaluate(() => window.__gaia.panel.controls.map(c => c._children.Core.id));
+  await page.waitForFunction(ids => ids.every(id => document.querySelector(`[data-control-id="${id}"]`)),
+    topLevel, { timeout: 30000 });
+  assert.ok(await page.evaluate(() => document.querySelectorAll('[data-control-id]').length) > 300,
+    'the sections did not bring their controls with them');
   assert.ok((await page.evaluate(()=>window.__gaia.actions())).includes('gaiaNamesScan'),
     'ordinary preview must initialize embedded panel scripts without a script editor or manual Run');
   async function control(name) {
@@ -29,7 +31,8 @@ try {
   }
   async function select(name,index,count) {
     const rect=await (await control(name)).boundingBox();
-    await page.mouse.click(rect.x+rect.width*(index+0.5)/count,rect.y+12);
+    const at=await page.evaluate(([n,i])=>window.__gaia.tabCenter(n,i),[name,index]);
+    await page.mouse.click(rect.x+at.x,rect.y+at.y);
     await page.waitForTimeout(180);
     const session=await page.evaluate(n=>window.__gaia.session(n),name);
     assert.equal(session.sectionValues.TabContainer.pageIndex,index,`${name} switched by pointer`);

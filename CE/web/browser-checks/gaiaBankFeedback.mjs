@@ -25,7 +25,8 @@ try {
   await page.evaluate(()=>window.__gaia.feedbackConnect());
   await page.waitForTimeout(1300);
   async function ctl(name){const id=await page.evaluate(n=>window.__gaia.id(n),name);return page.locator(`[data-control-id="${id}"]`).first();}
-  async function select(name,index,count){const b=await(await ctl(name)).boundingBox();await page.mouse.click(b.x+(index+0.5)*b.width/count,b.y+12);}
+  // Where the app draws the tab (harness tabCenter): the bank tabs share their row with the actions.
+  async function select(name,index){const b=await(await ctl(name)).boundingBox();const at=await page.evaluate(([n,i])=>window.__gaia.tabCenter(n,i),[name,index]);await page.mouse.click(b.x+at.x,b.y+at.y);}
   async function has(name,text){for(let i=0;i<60;i++){if((await(await ctl(name)).textContent()).includes(text))return;await page.waitForTimeout(100);}assert.fail(`${name}: ${await(await ctl(name)).textContent()}`);}
   await select('bottom_pages',1,4); await select('patch_banks',1,4);
   await has('recall_user_A1','○ A-1  CACHED 1');

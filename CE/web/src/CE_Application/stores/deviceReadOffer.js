@@ -18,6 +18,7 @@ import { requestProfileSource } from './deviceProfileSession.js';
 import { startDeviceSync } from './deviceMidiOps.js';
 import { openDialog } from './scriptUi.js';
 import { hasStartupRead } from '../utils/playerStartup.js';
+import { countRolesInPanels } from '../utils/deviceRoles.js';
 
 export const READ_NOW = 'Read now';
 export const NOT_NOW = 'Not now';
@@ -31,17 +32,22 @@ export function readOfferKey(role, mapping) {
 
 /**
  * Which roles to offer a read for right now. Pure: the mappings, the profile sources as loaded,
- * and the keys already offered this session.
+ * the keys already offered this session, and the roles the open panels bind.
+ *
+ * Only a role an open panel uses is offered. The editor restores the last session's device
+ * mappings at startup, before any panel is open, and asking about a synth on the start screen is a
+ * question about nothing on screen. Opening the panel that uses it is when the question means
+ * something.
  *
  * A role whose profile source has not arrived yet is returned under `waiting`, so the caller can
  * fetch it; it is offered when it lands, not skipped.
  */
-export function readOfferCandidates(mappings, sources, offered) {
+export function readOfferCandidates(mappings, sources, offered, boundRoles = new Set()) {
   const ready = [];
   const waiting = [];
   for (const [role, mapping] of Object.entries(mappings ?? {})) {
     const key = readOfferKey(role, mapping);
-    if (!key || offered.has(key)) continue;
+    if (!key || offered.has(key) || !boundRoles.has(role)) continue;
     const profileId = String(mapping?.profileId ?? '');
     if (!profileId) continue;
     const text = sources?.[profileId]?.source;
@@ -57,9 +63,11 @@ export function readOfferCandidates(mappings, sources, offered) {
 
 const offered = new Set();
 let started = false;
+let openPanels = null;   // the editor's panels store, handed in by initDeviceReadOffer
 
 function offerNext() {
-  const { ready, waiting } = readOfferCandidates(get(deviceRoleMappings), get(profileSources), offered);
+  const bound = new Set(countRolesInPanels(openPanels ? get(openPanels) : []).keys());
+  const { ready, waiting } = readOfferCandidates(get(deviceRoleMappings), get(profileSources), offered, bound);
   for (const { profileId } of waiting) requestProfileSource(profileId);
   const next = ready[0];
   if (!next) return;
@@ -81,10 +89,16 @@ function offerNext() {
   if (id != null) offered.add(next.key);
 }
 
-/** Start offering. Editor only — the Player makes this decision itself. Idempotent. */
-export function initDeviceReadOffer() {
+/**
+ * Start offering. Editor only — the Player makes this decision itself. Idempotent.
+ * `panelsStore` is the editor's open-panels store, passed in rather than imported so this module
+ * does not pull the whole panel store in behind it.
+ */
+export function initDeviceReadOffer(panelsStore) {
   if (started) return;
   started = true;
+  openPanels = panelsStore ?? null;
   deviceRoleMappings.subscribe(() => offerNext());
   profileSources.subscribe(() => offerNext());
+  openPanels?.subscribe(() => offerNext());
 }
