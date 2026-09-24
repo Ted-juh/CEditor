@@ -66,7 +66,8 @@ try {
   }
   await page.mouse.click(box.x + 44 + 15.5 * (box.width - 184) / 32, box.y + 12);
   assert.doesNotMatch(await status.innerText(), /SYNCED/);
-  await page.mouse.click(box.x + 601, box.y + box.height - 15);
+  // By label: SEND PATTERN moved into the side column, and a fixed offset silently clicked nothing.
+  await grid.getByText('SEND PATTERN', { exact: true }).click();
   await has('529 PENDING / UNVERIFIED');
   const send = await page.evaluate(() => window.__gaia.feedbackSent().filter(e => e.name === 'setDeviceParameter' && e.payload.parameterId === 'arp.endStep').at(-1));
   assert.equal(send.payload.value, 16);

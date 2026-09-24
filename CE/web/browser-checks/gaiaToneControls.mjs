@@ -50,7 +50,9 @@ try {
   const data=Array(62).fill(0);for(const p of PATCH_TONE)data[parseInt(p.offset.split(' ')[1],16)]=Math.floor((p.min+p.max)/2);
   const reply=async tone=>page.evaluate(({tone,data})=>{const body=[16,0,tone,0,...data];window.__gaia.receive([240,65,19,0,0,65,18,...body,(128-body.reduce((a,b)=>a+b,0)%128)%128,247]);},{tone,data});
   await reply(1);await page.waitForTimeout(160);await reply(2);
-  await (await ctl('tone1_copy_status')).getByText('Copied to Tone 2',{exact:true}).waitFor();
+  // The status wraps in the narrow tone column, one span per line, so compare without whitespace.
+  const copyStatus=await page.evaluate(n=>window.__gaia.id(n),'tone1_copy_status');
+  await page.waitForFunction(id=>document.querySelector(`[data-control-id="${id}"]`)?.textContent.replace(/\s+/g,'')==='CopiedtoTone2',copyStatus);
   await incoming({'common.tone1Select':'on','common.tone1Switch':'on'});
   if(process.env.GAIA_TONES_OUT){await mkdir(process.env.GAIA_TONES_OUT,{recursive:true});await page.screenshot({path:join(process.env.GAIA_TONES_OUT,'gaia-tone-controls.png'),clip:{x:0,y:170,width:1740,height:670}});}
   assert.deepEqual(errors,[]);

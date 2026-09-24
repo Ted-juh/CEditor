@@ -38,15 +38,28 @@ try {
         .map(r => ({ id: r.id, value: r.internalValue ?? r.id ?? '', label: r.displayText ?? r.label ?? r.internalValue ?? r.id ?? '' })) })));
   assert.ok(menus.some(m => m.name === 'common.dBeamAssign'));
   assert.equal(menus.filter(m => /^(tone[123])\.(modLfo|lfo)\.tempoSyncNote$/.test(m.name)).length, 6);
+  // Which bottom_pages page holds a control, read from the document rather than guessed from its
+  // name: D BEAM ASSIGN is common.* and lives on System, so a name prefix picks the wrong page.
+  const bottomPage = id => page.evaluate(id => {
+    const bottom = window.__gaia.controls.find(c => c._children.Core.name === 'bottom_pages')._children;
+    const contains = c => c._children.Core.id === id
+      || Object.values(c._children.Children?._children ?? {}).some(contains);
+    const child = Object.values(bottom.Children._children).find(contains);
+    return child ? bottom.TabContainer.pages.findIndex(p => p.id === child._children.Core.tabPageId) : -1;
+  }, id);
+  async function showBottomPage(id) {
+    const index = await bottomPage(id);
+    if (index < 0) return;
+    const tabsId = await page.evaluate(() => window.__gaia.id('bottom_pages'));
+    const pages = await page.evaluate(() => window.__gaia.controls.find(c => c._children.Core.name === 'bottom_pages')._children.TabContainer.pages.length);
+    const rect = await page.locator(`.canvas-control[data-control-id="${tabsId}"]`).boundingBox();
+    await page.mouse.click(rect.x + rect.width * (index + .5) / pages, rect.y + 10);
+  }
   let checked = 0;
   for (const combo of menus) {
     const control = page.locator(`.canvas-control[data-control-id="${combo.id}"]`);
     if (!(await control.isVisible())) {
-      const tabsId = await page.evaluate(() => window.__gaia.id('bottom_pages'));
-      const tabs = page.locator(`.canvas-control[data-control-id="${tabsId}"]`);
-      const rect = await tabs.boundingBox();
-      const index = combo.name.startsWith('system.') ? 3 : combo.name.startsWith('arp.') ? 2 : 0;
-      await page.mouse.click(rect.x + rect.width * (index+.5)/4, rect.y + 10);
+      await showBottomPage(combo.id);
       await control.waitFor({ state: 'visible' });
     }
     assert.ok(await control.isVisible(), `${combo.name} must be exercised`);
@@ -82,9 +95,7 @@ try {
   }
   // The nested D Beam popup must keep its anchor at non-100% zoom too.
   const dbeam = menus.find(m => m.name === 'common.dBeamAssign');
-  const tabsId = await page.evaluate(() => window.__gaia.id('bottom_pages'));
-  const tabsBox = await page.locator(`.canvas-control[data-control-id="${tabsId}"]`).boundingBox();
-  await page.mouse.click(tabsBox.x + tabsBox.width / 10, tabsBox.y + 12);
+  await showBottomPage(dbeam.id);
   await page.locator('.panel-surface.preview-surface').evaluate(node => node.style.transform = 'scale(0.75)');
   const dbeamControl = page.locator(`.canvas-control[data-control-id="${dbeam.id}"]`);
   await dbeamControl.focus();

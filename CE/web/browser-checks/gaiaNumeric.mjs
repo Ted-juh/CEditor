@@ -65,9 +65,11 @@ try {
   await page.keyboard.press(']');
   assert.equal(await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.__arpeggiator.selectedBlock), 'arp_seed_0');
   // Footer arrows are single selection operations, never repeated drag edits.
-  await page.mouse.click(box.x + 222, box.y + box.height - 43);
+  // Located by part, not by offset: the footer has moved before, and a stale offset lands in the
+  // note field and draws a new note instead of selecting one.
+  await grid.locator('[data-part-name="arp_numeric_previous"]').click();
   assert.equal(await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.__arpeggiator.selectedBlock), 'arp_seed_7');
-  await page.mouse.click(box.x + 258, box.y + box.height - 43);
+  await grid.locator('[data-part-name="arp_numeric_next"]').click();
   assert.equal(await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.__arpeggiator.selectedBlock), 'arp_seed_0');
   await page.keyboard.press('Home');
   assert.equal(await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.__arpeggiator.selectedBlock), 'arp_seed_1');
