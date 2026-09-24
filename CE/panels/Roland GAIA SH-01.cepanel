@@ -5929,7 +5929,7 @@
       "id": "gaia_arpeggio_captions",
       "name": "Arpeggio readable values",
       "language": "javascript",
-      "source": "function arpKnobCaption(parameter, raw) {\n  const n = Math.round(Number(raw));\n  if (!Number.isFinite(n)) return '';\n  if (parameter === 'arp.velocity') return 'VELOCITY\\n' + (n === 0 ? 'REAL (played)' : n + ' (fixed)');\n  if (parameter === 'arp.accentRate') return 'ACCENT\\n' + n + '%' + (n === 0 ? ' (even)' : n === 100 ? ' (pattern)' : '');\n  const oct = n - 64;\n  return 'OCTAVE RANGE\\n' + (oct === 0 ? '0 (played range)' : (oct > 0 ? '+' : '') + oct + (Math.abs(oct) === 1 ? ' octave' : ' octaves'));\n}\nvar ENTRIES = [{\"parameter\":\"arp.velocity\",\"control\":\"gaia_arp_velocity_622\",\"caption\":\"gaia_lbl_623\"},{\"parameter\":\"arp.accentRate\",\"control\":\"gaia_arp_accentRate_620\",\"caption\":\"gaia_lbl_621\"},{\"parameter\":\"arp.octaveRange\",\"control\":\"gaia_arp_octaveRange_618\",\"caption\":\"gaia_lbl_619\"}];\nfunction onPanelLoad() {\n  ENTRIES.forEach(function (e) {\n    function refresh() {\n      var text = arpKnobCaption(e.parameter, get(e.control + \".value\"));\n      if (text) set(e.caption + \".text.content\", text);\n    }\n    refresh();\n    watch(e.control + \".value\", refresh);\n  });\n}\n",
+      "source": "function arpKnobCaption(parameter, raw) {\n  const n = Math.round(Number(raw));\n  if (!Number.isFinite(n)) return '';\n  if (parameter === 'arp.velocity') return 'VELOCITY\\n' + (n === 0 ? 'REAL (played)' : n + ' (fixed)');\n  if (parameter === 'arp.accentRate') return 'ACCENT\\n' + n + '%' + (n === 0 ? ' (even)' : n === 100 ? ' (pattern)' : '');\n  const oct = n - 64;\n  return 'OCTAVE RANGE\\n' + (oct === 0 ? '0 (played)' : (oct > 0 ? '+' : '') + oct + (Math.abs(oct) === 1 ? ' octave' : ' octaves'));\n}\nvar ENTRIES = [{\"parameter\":\"arp.velocity\",\"control\":\"gaia_arp_velocity_622\",\"caption\":\"gaia_lbl_623\"},{\"parameter\":\"arp.accentRate\",\"control\":\"gaia_arp_accentRate_620\",\"caption\":\"gaia_lbl_621\"},{\"parameter\":\"arp.octaveRange\",\"control\":\"gaia_arp_octaveRange_618\",\"caption\":\"gaia_lbl_619\"}];\nfunction onPanelLoad() {\n  ENTRIES.forEach(function (e) {\n    function refresh() {\n      var text = arpKnobCaption(e.parameter, get(e.control + \".value\"));\n      if (text) set(e.caption + \".text.content\", text);\n    }\n    refresh();\n    watch(e.control + \".value\", refresh);\n  });\n}\n",
       "scope": "panel",
       "target": "*",
       "event": "onPanelLoad",
@@ -50895,59 +50895,6 @@
               }
             ]
           }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "visible": false,
-          "id": "gaia_lbl_386",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1413.3205741626793,
-          "y": 99,
-          "width": 73.14832535885168,
-          "height": 12
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "",
-          "_children": {
-            "Fill": {
-              "colour": "FFAEBAC6"
-            },
-            "Font": {
-              "size": 9,
-              "letterSpacing": 0.3,
-              "bold": false
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            }
-          }
-        },
-        "ContentLayout": {
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
         }
       },
       "_type": "Control"
@@ -100896,59 +100843,6 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "visible": false,
-          "id": "gaia_lbl_493",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1413.3205741626793,
-          "y": 333,
-          "width": 73.14832535885168,
-          "height": 12
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "",
-          "_children": {
-            "Fill": {
-              "colour": "FFAEBAC6"
-            },
-            "Font": {
-              "size": 9,
-              "letterSpacing": 0.3,
-              "bold": false
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            }
-          }
-        },
-        "ContentLayout": {
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
           "name": "tone2.modLfo.pitchDepth",
           "id": "gaia_tone2_modLfo_pitchDepth_494",
           "description": "Modulation LFO Pitch Depth — 10 00 02 2C",
@@ -150890,59 +150784,6 @@
     {
       "_children": {
         "Core": {
-          "name": "label",
-          "visible": false,
-          "id": "gaia_lbl_600",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1413.3205741626793,
-          "y": 567,
-          "width": 73.14832535885168,
-          "height": 12
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "",
-          "_children": {
-            "Fill": {
-              "colour": "FFAEBAC6"
-            },
-            "Font": {
-              "size": 9,
-              "letterSpacing": 0.3,
-              "bold": false
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            }
-          }
-        },
-        "ContentLayout": {
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
           "name": "tone3.modLfo.pitchDepth",
           "id": "gaia_tone3_modLfo_pitchDepth_601",
           "description": "Modulation LFO Pitch Depth — 10 00 03 2C",
@@ -189765,7 +189606,7 @@
                   "x": 112,
                   "y": 174.89285714285714,
                   "width": 56,
-                  "height": 25.285714285714285
+                  "height": 36
                 },
                 "Background": {
                   "_children": {
@@ -189779,7 +189620,7 @@
                   }
                 },
                 "Text": {
-                  "content": "OCTAVE RANGE\n0 (played range)",
+                  "content": "OCTAVE RANGE\n0 (played)",
                   "_children": {
                     "Fill": {
                       "colour": "FFAEBAC6"
@@ -190632,7 +190473,7 @@
                 "Transform": {
                   "y": 174.89285714285714,
                   "width": 56,
-                  "height": 25.285714285714285
+                  "height": 36
                 },
                 "Background": {
                   "_children": {
@@ -191503,7 +191344,7 @@
                   "x": 56,
                   "y": 174.89285714285714,
                   "width": 56,
-                  "height": 25.285714285714285
+                  "height": 36
                 },
                 "Background": {
                   "_children": {
@@ -202396,6 +202237,12 @@
                               "size": 10
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 0,
+                          "paddingBottom": 0
                         }
                       },
                       "_type": "Control"
@@ -206144,6 +205991,12 @@
                               "size": 10
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 0,
+                          "paddingBottom": 0
                         }
                       },
                       "_type": "Control"
@@ -209892,6 +209745,12 @@
                               "size": 10
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 0,
+                          "paddingBottom": 0
                         }
                       },
                       "_type": "Control"
@@ -210568,6 +210427,12 @@
                               "size": 10
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 0,
+                          "paddingBottom": 0
                         }
                       },
                       "_type": "Control"
@@ -211815,7 +211680,7 @@
         },
         "Transform": {
           "x": 1604,
-          "y": 840,
+          "y": 848,
           "width": 140,
           "height": 22
         },
@@ -211929,7 +211794,7 @@
         },
         "Transform": {
           "x": 1604,
-          "y": 828,
+          "y": 834,
           "width": 280,
           "height": 10
         },
@@ -211982,7 +211847,7 @@
         },
         "Transform": {
           "x": 1752,
-          "y": 840,
+          "y": 848,
           "width": 140,
           "height": 22
         },
@@ -212097,7 +211962,7 @@
         },
         "Transform": {
           "x": 1604,
-          "y": 868,
+          "y": 876,
           "width": 140,
           "height": 22
         },
@@ -212212,7 +212077,7 @@
         },
         "Transform": {
           "x": 1752,
-          "y": 868,
+          "y": 876,
           "width": 140,
           "height": 22
         },
@@ -212327,7 +212192,7 @@
         },
         "Transform": {
           "x": 1604,
-          "y": 896,
+          "y": 904,
           "width": 140,
           "height": 22
         },
@@ -212442,7 +212307,7 @@
         },
         "Transform": {
           "x": 1752,
-          "y": 896,
+          "y": 904,
           "width": 140,
           "height": 22
         },
@@ -212557,7 +212422,7 @@
         },
         "Transform": {
           "x": 1604,
-          "y": 924,
+          "y": 932,
           "width": 140,
           "height": 22
         },
@@ -212672,7 +212537,7 @@
         },
         "Transform": {
           "x": 1830,
-          "y": 920,
+          "y": 930,
           "width": 34,
           "height": 34,
           "contentScaleMode": "scaleInternals"
@@ -213483,7 +213348,7 @@
         },
         "Transform": {
           "x": 1806,
-          "y": 955,
+          "y": 965,
           "width": 84,
           "height": 13
         },

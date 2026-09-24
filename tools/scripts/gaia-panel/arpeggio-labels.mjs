@@ -29,7 +29,7 @@ export function arpKnobCaption(parameter, raw) {
   if (parameter === 'arp.velocity') return 'VELOCITY\n' + (n === 0 ? 'REAL (played)' : n + ' (fixed)');
   if (parameter === 'arp.accentRate') return 'ACCENT\n' + n + '%' + (n === 0 ? ' (even)' : n === 100 ? ' (pattern)' : '');
   const oct = n - 64;
-  return 'OCTAVE RANGE\n' + (oct === 0 ? '0 (played range)' : (oct > 0 ? '+' : '') + oct + (Math.abs(oct) === 1 ? ' octave' : ' octaves'));
+  return 'OCTAVE RANGE\n' + (oct === 0 ? '0 (played)' : (oct > 0 ? '+' : '') + oct + (Math.abs(oct) === 1 ? ' octave' : ' octaves'));
 }
 
 export function arpCaptionScript(entries) {

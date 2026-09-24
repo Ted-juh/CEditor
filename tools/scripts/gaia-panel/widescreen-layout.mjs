@@ -105,13 +105,15 @@ export function applyWidescreenLayout(panel) {
   }
   Object.assign(rect(output), {x:1594,y:828,width:314,height:160});
   for (const [i, name] of ['effectsDistortionSelect','effectsFlangerSelect','effectsDelaySelect','effectsReverbSelect','lowBoostSwitch','tempoSyncSwitch','effectsMasterSwitch'].entries()) {
-    Object.assign(rect(named(`common.${name}`)), {x:1604+(i%2)*148,y:860+Math.floor(i/2)*28,width:140,height:22});
+    Object.assign(rect(named(`common.${name}`)), {x:1604+(i%2)*148,y:868+Math.floor(i/2)*28,width:140,height:22});
   }
   const volume = named('master.volume');
-  Object.assign(rect(volume), {x:1830,y:940}); resize(volume,34,34);
+  // Below the third button row, which now starts 8px lower to clear the caption.
+  Object.assign(rect(volume), {x:1830,y:950}); resize(volume,34,34);
   for (const c of outputControls.filter(c=>c._children.Core.controlType==='Label')) {
-    if(c._children.Text?.content==='OUTPUT') Object.assign(rect(c),{x:1806,y:975,width:84,height:13});
-    else Object.assign(rect(c),{x:1604,y:848,width:280,height:10});
+    if(c._children.Text?.content==='OUTPUT') Object.assign(rect(c),{x:1806,y:985,width:84,height:13});
+    // Clear of the 22px section tab: at y 848 the caption ran into the EFFECTS / OUTPUT title.
+    else Object.assign(rect(c),{x:1604,y:854,width:280,height:10});
   }
 
   // Retain the lower pages and their bindings, fitting their content into the
@@ -227,7 +229,9 @@ export function expandArpeggioWorkspace(panel) {
   }
   for (const [i, name] of ['arp.accentRate', 'arp.velocity', 'arp.octaveRange'].entries()) {
     Object.assign(named(name)._children.Transform, { x: 10 + i * 56, width: 36, height: 36 });
-    Object.assign(named(name + '.caption')._children.Transform, { x: i * 56, width: 56 });
+    // Three lines: the title wraps at this width ("OCTAVE / RANGE") and the value still needs one.
+    // At the old 25px the value line was cut to "0 (played".
+    Object.assign(named(name + '.caption')._children.Transform, { x: i * 56, width: 56, height: 36 });
   }
   const tab = named('tab_ARPEGGIO PATTERN');
   children[tab._children.Core.id] = createControl('Label', {

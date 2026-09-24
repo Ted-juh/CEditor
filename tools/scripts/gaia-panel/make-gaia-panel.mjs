@@ -674,6 +674,9 @@ function patchBanks(profile, scripts) {
       Transform: { x: 290, y: 178, width: 132, height: 22 },
       Text: { content: 'CHECK SELECTION', _children: { Font: { size: 10 } } },
       Background: { _children: { Fill: { colour: 'FF333D46' }, Border: { thickness: 1, colour: 'FF65717C' }, Corners: { radius: 3 } } },
+      // The default 6px top and bottom padding leaves a 22px button no room for one line, so the
+      // label wrapped to "CHECK / SELECTION" and was clipped at both edges.
+      ContentLayout: { paddingLeft: 4, paddingRight: 4, paddingTop: 0, paddingBottom: 0 },
     }));
     scripts.push(createScript({ id: checkName, name: 'Check current patch', scope: 'panel', target: checkName, language: 'javascript', event: 'onClick',
       source: 'function onClick() { run("gaiaNamesCheck"); }' }));

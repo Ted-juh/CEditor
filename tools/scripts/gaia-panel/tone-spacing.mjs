@@ -57,12 +57,14 @@ export function refineToneSpacing(panel) {
       Object.assign(rect(note), { x: columnX, y: b.y + (mod ? 100 : 68), width: columnWidth, height: 18 });
       placeCaption(box, 'NOTE', { x: columnX, y: b.y + (mod ? 89 : 57), width: columnWidth, height: 10 });
       if (mod) {
-        const tempo = caption(box, 'TEMPO');
-        if (tempo) {
-          tempo._children.Text.content = '';
-          // The old caption's transparent box otherwise covers the lower shape choices.
-          tempo._children.Core.visible = false;
-        }
+        // SYNC is self-explanatory on its own, so its TEMPO caption goes. Removed rather than
+        // hidden: its box sits over the lower shape choices, and a hidden control still paints a
+        // dashed placeholder in the editor preview — a stray frame around RND on every MOD LFO.
+        const tempo = caption(box, 'TEMPO')
+          ?? panel.controls.find(c => c._children.Core.controlType === 'Label' && c._children.Core.visible === false
+            && !String(c._children.Text?.content ?? '').trim() && rect(c).x >= b.x && rect(c).x < b.x + b.width
+            && rect(c).y >= b.y && rect(c).y < b.y + b.height);
+        if (tempo) panel.controls.splice(panel.controls.indexOf(tempo), 1);
       } else {
         Object.assign(rect(named(`tone${tone}.lfo.keyTrigger`)), { x: columnX, y: b.y + 96, width: columnWidth, height: 18 });
       }

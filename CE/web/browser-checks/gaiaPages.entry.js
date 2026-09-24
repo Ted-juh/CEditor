@@ -1,3 +1,4 @@
+import '../src/assets/fonts/panelFonts.css';
 import { mount } from 'svelte';
 import { get } from 'svelte/store';
 import GaiaPagesHarness from './GaiaPagesHarness.svelte';

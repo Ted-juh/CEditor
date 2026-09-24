@@ -27,6 +27,7 @@ test('special values are readable without adding an input or changing the stored
   assert.equal(arpKnobCaption('arp.velocity',0),'VELOCITY\nREAL (played)');
   assert.equal(arpKnobCaption('arp.velocity',1),'VELOCITY\n1 (fixed)');
   assert.equal(arpKnobCaption('arp.velocity',127),'VELOCITY\n127 (fixed)');
+  assert.equal(arpKnobCaption('arp.octaveRange',64),'OCTAVE RANGE\n0 (played)');
   assert.equal(arpKnobCaption('arp.octaveRange',61),'OCTAVE RANGE\n-3 octaves');
   assert.equal(arpKnobCaption('arp.octaveRange',67),'OCTAVE RANGE\n+3 octaves');
   assert.equal(arpKnobCaption('arp.accentRate',100),'ACCENT\n100% (pattern)');

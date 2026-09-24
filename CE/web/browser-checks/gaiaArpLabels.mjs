@@ -20,7 +20,9 @@ try {
   async function ctl(name){const id=await page.evaluate(n=>window.__gaia.id(n),name);return page.locator(`[data-control-id="${id}"]`).first();}
   async function textHas(name,text){
     const c=await ctl(name);
-    for(let i=0;i<60;i++){if((await c.textContent()).includes(text))return; await page.waitForTimeout(100);}
+    // Wrapped text renders one span per line, so textContent loses the space at each break.
+    const squash=s=>s.replace(/\s+/g,'');
+    for(let i=0;i<60;i++){if(squash(await c.textContent()).includes(squash(text)))return; await page.waitForTimeout(100);}
     assert.fail(`${name}: expected ${text}, actual ${await c.textContent()}`);
   }
   await textHas('arp.velocity.caption','REAL (played)');
