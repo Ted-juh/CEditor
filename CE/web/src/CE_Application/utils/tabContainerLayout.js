@@ -83,6 +83,10 @@ export function tabGeometry(width, height, control) {
       return { strip: { x: w - strip, y: 0, w: strip, h }, page: { x: 0, y: 0, w: w - strip, h }, edge, vertical: true };
     default:
       return { strip: { x: 0, y: 0, w, h: strip }, page: { x: 0, y: strip, w, h: h - strip }, edge, vertical: false,
+        // A fixed width per tab, left-aligned, instead of the strip shared out equally. What it
+        // buys is the rest of the strip: a page can put its own controls on the tab row
+        // (the GAIA bank pages put their READ / STOP / CHECK there).
+        ...(num(config.tabWidth, 0) > 0 ? { tabWidth: num(config.tabWidth, 0) } : {}),
         ...(config.appearance === 'buttons' ? { buttons: true, buttonGroupWidth: config.buttonGroupWidth,
           buttonHeight: config.buttonHeight, buttonGap: config.buttonGap,
           cycleButton: config.cycleButton === true, activeIndex: activePageIndex(control) } : {}) };
@@ -97,7 +101,7 @@ export function tabRect(geom, index, count) {
     const each = geom.strip.h / total;
     return { x: geom.strip.x, y: geom.strip.y + index * each, w: geom.strip.w, h: each };
   }
-  const each = geom.strip.w / total;
+  const each = geom.tabWidth ? Math.min(geom.tabWidth, geom.strip.w / total) : geom.strip.w / total;
   if (geom.buttons) {
     const groupWidth = Math.min(geom.strip.w, Math.max(1, num(geom.buttonGroupWidth, geom.strip.w)));
     const cell = groupWidth / total;
@@ -124,7 +128,7 @@ export function tabAtPoint(geom, px, py, count) {
   }
   const index = geom.vertical
     ? Math.floor(((y - strip.y) / strip.h) * count)
-    : Math.floor(((x - strip.x) / strip.w) * count);
+    : Math.floor((x - strip.x) / tabRect(geom, 0, count).w);
   return index >= 0 && index < count ? index : null;
 }
 

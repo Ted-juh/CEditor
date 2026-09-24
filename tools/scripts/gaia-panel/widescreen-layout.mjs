@@ -148,7 +148,7 @@ export function applyWidescreenLayout(panel) {
   }
   Object.assign(rect(named('plate')),{x:10,y:30,width:1900,height:960});
   panel.width=1920; panel.height=1000;
-  return fillLowerPages(alignPitchEnvelopeGraphs(applyEnvelopeButtons(expandStatusDisplay(moveDBeamToSystem(refineToneSpacing(applyEnvelopeViews(compactPanelRows(moveSyncRingIntoOsc(expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel))))))))))));
+  return layoutPatchBanks(fillLowerPages(alignPitchEnvelopeGraphs(applyEnvelopeButtons(expandStatusDisplay(moveDBeamToSystem(refineToneSpacing(applyEnvelopeViews(compactPanelRows(moveSyncRingIntoOsc(expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel)))))))))))));
 }
 
 // Reuse the decorative header's 18px for the controls: the upper controls move
@@ -359,6 +359,77 @@ export function fillLowerPages(panel) {
     const used = Math.max(...onPage.map((c) => (c._children.Transform.y ?? 0) + c._children.Transform.height));
     if (!(used > 0) || used >= pageHeight - 0.5) continue;
     spread(onPage, pageHeight / used);
+  }
+  return panel;
+}
+
+/**
+ * The Patch Banks page: the banks get the whole page, and READ / STOP / CHECK move up onto the tab row.
+ *
+ * The bank tabs (PRESET / ROM, USER, USB MEMORY, PCM / ROM) shared the full strip between four
+ * words, while READ NAMES, STOP, CHECK SELECTION and the status line took a whole row under the
+ * banks, and the bank grid sat 52px in from both sides of the page. The tabs are now a fixed width
+ * on the left of the strip (TabContainer.tabWidth), each page's own READ / STOP / CHECK and status
+ * sit on the strip to their right — still page children, so each page keeps its own, bank-specific
+ * set — and the grid spreads over the full width and height that frees: wider, taller buttons.
+ *
+ * Runs last, on final geometry, and sets absolute positions from the page's size, so a second run
+ * lands in the same place.
+ */
+export function layoutPatchBanks(panel) {
+  const all = flatControls(panel.controls);
+  const banks = all.find((c) => c._children.Core.name === 'patch_banks');
+  const bottom = all.find((c) => c._children.Core.name === 'bottom_pages');
+  if (!banks || !bottom) return panel;
+  const cfg = banks._children.TabContainer;
+  const t = banks._children.Transform;
+  const margin = 8;
+  const tabWidth = 132;
+  Object.assign(t, { x: 0, width: bottom._children.Transform.width });
+  cfg.tabWidth = tabWidth;
+  // The row of actions lives on the strip, above the page area its controls belong to.
+  banks._children.Children.clip = false;
+
+  const strip = cfg.stripSize;
+  const page = tabGeometry(t.width, t.height, banks).page;
+  const kids = Object.values(banks._children.Children._children);
+  const rowH = strip - 2;
+  const rowY = -strip + (strip - rowH) / 2;
+  for (const { id } of cfg.pages) {
+    const safe = id.replace(/-/g, '_');
+    const onPage = kids.filter((c) => c._children.Core.tabPageId === id);
+    const named = (n) => onPage.find((c) => c._children.Core.name === n);
+
+    // Actions, then the status line in whatever is left of the strip.
+    let x = cfg.pages.length * tabWidth + margin * 2;
+    for (const [n, w] of [[`names_read_${safe}`, 172], [`names_stop_${safe}`, 72], [`names_check_${safe}`, 142]]) {
+      Object.assign(named(n)._children.Transform, { x, y: rowY, width: w, height: rowH });
+      x += w + margin;
+    }
+    Object.assign(named(`names_status_${safe}`)._children.Transform, { x: x + 4, y: rowY, width: t.width - margin - x - 4, height: rowH });
+
+    // The grid: every column across the full width, every row down the full height.
+    const headers = onPage.filter((c) => c._children.Core.name.startsWith(`patch_bank_header_${safe}_`));
+    const columns = headers.length;
+    const gap = 12;
+    const columnWidth = (t.width - margin * 2 - gap * 7) / 8;   // eight columns' worth, even on PCM
+    const headerHeight = 14;
+    const pitch = (page.h - headerHeight - 4) / 8;
+    for (const [i, header] of headers.entries()) {
+      const left = margin + i * (columnWidth + gap);
+      Object.assign(header._children.Transform, { x: left, y: 1, width: columnWidth, height: headerHeight });
+      const letter = header._children.Core.name.split('_').at(-1);
+      for (let row = 0; row < 8; row++) {
+        const button = named(`recall_${safe}_${letter}${row + 1}`);
+        Object.assign(button._children.Transform, { x: left, y: headerHeight + 3 + row * pitch, width: columnWidth, height: pitch - 2 });
+      }
+    }
+    // PCM has one column; its explanation sits in the room the other seven would take.
+    if (columns === 1) {
+      const note = onPage.find((c) => c._children.Core.controlType === 'Label' && !headers.includes(c)
+        && !c._children.Core.name.startsWith('names_'));
+      if (note) Object.assign(note._children.Transform, { x: margin + columnWidth + gap * 2, y: headerHeight + 3, width: t.width - (margin + columnWidth + gap * 2) - margin, height: pitch * 3 });
+    }
   }
   return panel;
 }

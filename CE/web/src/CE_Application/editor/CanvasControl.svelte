@@ -761,7 +761,9 @@
     } : pad;
   });
   let childrenGap = $derived(Number(childrenSection?.gap ?? 0));
-  let childrenClip = $derived(isTabContainer || isScrollArea || childrenSection?.clip === true);
+  // A Tab Container clips its pages by default. `clip: false` opts out, for a page that puts its own
+  // controls on the tab strip beside the tabs (TabContainer.tabWidth leaves the room for them).
+  let childrenClip = $derived((isTabContainer && childrenSection?.clip !== false) || isScrollArea || childrenSection?.clip === true);
   let childScroll = $derived(isScrollArea ? clampScroll(
     previewSession?.scrollOffset ?? { x: control?._children?.ScrollArea?.scrollX ?? 0, y: control?._children?.ScrollArea?.scrollY ?? 0 },
     displayW, displayH, control) : { x: 0, y: 0 });
