@@ -1,4 +1,5 @@
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { createServer } from 'node:http';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
@@ -17,7 +18,7 @@ const server = createServer(async (req, res) => {
   } catch { res.writeHead(404); res.end(); }
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' });
+const browser = await chromium.launch(chromiumLaunchOptions({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' }));
 const page = await browser.newPage({ viewport: { width: 1680, height: 1050 } });
 const errors = [];
 const ledger = [];

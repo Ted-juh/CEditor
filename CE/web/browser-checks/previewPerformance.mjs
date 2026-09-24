@@ -3,6 +3,7 @@
 // regression check is that an unrelated knob's DOM is never rewritten.
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -11,7 +12,7 @@ const server = process.env.PREVIEW_URL
   ? { resolvedUrls: { local: [process.env.PREVIEW_URL] }, async listen() {}, async close() {} }
   : await createServer({ configFile: fileURLToPath(new URL('./vite.config.mjs', import.meta.url)), server: { host: '127.0.0.1', port: 0 } });
 await server.listen();
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH });
+const browser = await chromium.launch(chromiumLaunchOptions());
 const page = await browser.newPage({ viewport: { width: 1600, height: 2300 } });
 const errors = [];
 page.on('pageerror', error => errors.push(String(error)));

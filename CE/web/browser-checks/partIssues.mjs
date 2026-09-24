@@ -1,6 +1,7 @@
 import { createServer } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 
@@ -11,8 +12,7 @@ const server = await createServer({ configFile: false, plugins: [svelte()],
   define: { __APP_BUILD__: JSON.stringify({ sha: 'check', branch: 'check', version: '0.0.0' }) },
   server: { host: '127.0.0.1', port: 18771 }, logLevel: 'error' });
 await server.listen();
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH
-  ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
+const browser = await chromium.launch(chromiumLaunchOptions({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe' }));
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   page.setDefaultTimeout(10000);

@@ -1,13 +1,14 @@
 /** Screen dock: property coverage, selection, document edits and history. */
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 const root=fileURLToPath(new URL('..',import.meta.url));
 const server=await createServer({root,configFile:join(root,'vite.config.js'),server:{host:'127.0.0.1',port:0}});
 await server.listen();
-const browser=await chromium.launch(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{channel:'msedge'});
+const browser=await chromium.launch(chromiumLaunchOptions({ channel: 'msedge' }));
 const page=await browser.newPage({viewport:{width:1700,height:1000}});
 const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
 const dock=page.locator('.screen-dock'), side=page.locator('.properties-panel');

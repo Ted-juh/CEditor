@@ -1,5 +1,6 @@
 import { preview } from 'vite';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -9,7 +10,7 @@ import assert from 'node:assert/strict';
 const server = process.env.PREVIEW_URL
   ? { resolvedUrls: { local: [process.env.PREVIEW_URL] }, httpServer: null }
   : await preview({ configFile: fileURLToPath(new URL('./vite.config.mjs', import.meta.url)), preview: { host: '127.0.0.1', port: 0 } });
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH });
+const browser = await chromium.launch(chromiumLaunchOptions());
 try {
   const page = await browser.newPage({ viewport: { width: 1600, height: 2300 } });
   const errors = [];

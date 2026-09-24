@@ -1,4 +1,5 @@
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { extname, join, dirname } from 'node:path';
@@ -15,7 +16,7 @@ const server = createServer(async (req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 let browser;
 try {
-  browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH });
+  browser = await chromium.launch(chromiumLaunchOptions());
   const page = await browser.newPage({ viewport: { width:1280, height:1000 }, deviceScaleFactor:1 });
   const errors=[];
   page.on('pageerror', e => errors.push(e.message));

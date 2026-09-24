@@ -2,6 +2,7 @@
 // Fixtures use real document loading. Property edits and gestures use the actual App UI.
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
+import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -12,7 +13,7 @@ const out = process.env.CEDITOR_BEHAVIOR_OUT ?? fileURLToPath(new URL('../../../
 await mkdir(out, { recursive: true });
 const server = await createServer({ root, configFile: join(root, 'vite.config.js'), server: { host: '127.0.0.1', port: 0 } });
 await server.listen();
-const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : { channel: 'msedge' });
+const browser = await chromium.launch(chromiumLaunchOptions({ channel: 'msedge' }));
 const page = await browser.newPage({ viewport: { width: 1680, height: 1050 } });
 page.setDefaultTimeout(6000);
 const errors = [], results = [];
