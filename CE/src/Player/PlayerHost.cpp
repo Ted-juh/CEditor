@@ -180,9 +180,9 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         if (onResyncRequest != nullptr) onResyncRequest();
     });
 
-    // The answer to the restore question. Only "always" and "never" reach the processor; the
-    // panel's third button ("not now") simply dismisses the bar, because a restore the user
-    // deferred is still pending and should be offered again next time the project opens.
+    // The answer to the restore question: "always", "never", or "load" (take the synth's patch
+    // instead). "Not now" simply dismisses the bar, because a restore the user deferred is still
+    // pending and should be offered again next time the project opens.
     options = options.withEventListener ("restoreAnswer", [this] (const juce::var& payload)
     {
         if (onRestoreAnswer != nullptr)
@@ -234,6 +234,11 @@ void PlayerHost::showRestorePrompt (const juce::String& deviceName)
     emitToWebView ("restorePrompt", juce::var (obj));
 }
 
+void PlayerHost::notifySessionRestored()
+{
+    emitToWebView ("sessionRestored", juce::var (new juce::DynamicObject()));
+}
+
 void PlayerHost::emitToWebView (const juce::String& eventName, const juce::var& payload)
 {
     if (webView != nullptr)
@@ -275,7 +280,12 @@ void PlayerHost::loadPanelIntoWebView()
     // the native event channel (emitEventIfBrowserIsVisible) because the latter does not
     // deliver reliably in this standalone WebView2 config, whereas evaluateJavascript does.
     // The panel JSON is itself a valid JS object literal, so it can be passed directly.
-    webView->evaluateJavascript ("if (window.__CE_LOAD_PANEL__) window.__CE_LOAD_PANEL__(" + panelJson + ");");
+    // Before the panel, so the Player knows at connect time whether this is a reopened project,
+    // whose saved sound must not be read over, or a new instance, which reads the synth.
+    const bool restored = isSessionRestored != nullptr && isSessionRestored();
+    webView->evaluateJavascript (juce::String ("window.__CE_PLAYER_SESSION__ = { restored: ")
+                                 + (restored ? "true" : "false") + " };"
+                                 + "if (window.__CE_LOAD_PANEL__) window.__CE_LOAD_PANEL__(" + panelJson + ");");
 }
 
 void PlayerHost::showStatusMessage (const juce::String& title, const juce::String& message)

@@ -398,6 +398,8 @@ public:
                     currentProgram = index;
             }
 
+            markSessionRestored();
+
             // ARM THE RESTORE PUSH — do not send here. This call can arrive before the ports are
             // open, before prepareToPlay, and on a thread with no business emitting SysEx. The
             // message-thread timer picks it up when the device says it is ready.
@@ -428,6 +430,7 @@ public:
         else if (xml->hasTagName (apvts.state.getType())) // backward-compat: APVTS-only state
         {
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
+            markSessionRestored();
         }
 #else
         juce::ignoreUnused (data, sizeInBytes);
@@ -611,7 +614,15 @@ private:
         serviceProgramChange();
 
         if (windowOpen) { wasWindowOpen = true; return; }
-        if (wasWindowOpen) { lastSentMidi.clear(); wasWindowOpen = false; } // just closed -> resend all
+        if (wasWindowOpen)
+        {
+            // Just closed. While it was open the panel sent every change itself, so the synth already
+            // has what the parameters hold: take them as sent. Clearing the cache here resent every
+            // parameter on close, which pushed a reopened project at the synth after the user had
+            // answered "Not now" or "Never" — the restore decision is the only thing that may do that.
+            rebaselineSentMidi();
+            wasWindowOpen = false;
+        }
         for (const auto& desc : panelParams)
         {
             // A raw-MIDI-bound control has no deviceParameterId and still has something to send.
@@ -682,16 +693,29 @@ private:
     // driven by RestorePolicyTests on any machine. What is here is the wiring: arming the flag,
     // asking the service whether the device is ready, raising the question, and doing the send.
 
+    /** Take every parameter's current value as already on the synth. Sends nothing. */
+    void rebaselineSentMidi()
+    {
+        lastSentMidi.clear();
+        for (const auto& desc : panelParams)
+            if (auto* raw = apvts.getRawParameterValue (desc.id))
+                lastSentMidi[desc.id] = raw->load();
+    }
+
+    /** Saved state arrived: this is a reopened project, not a new instance. Any thread. */
+    void markSessionRestored()
+    {
+        sessionRestored.store (true);
+        sessionRestoreCount.fetch_add (1);
+    }
+
     /** Called from setStateInformation. Never sends — see the comment there for why. */
     void armRestorePush()
     {
         // Treat the restored snapshot as the baseline until the restore policy decides what may
         // be sent. Otherwise the ordinary automation loop sees an empty cache on its first tick
         // and pushes every parameter even when the policy is Never or still waiting for an answer.
-        lastSentMidi.clear();
-        for (const auto& desc : panelParams)
-            if (auto* raw = apvts.getRawParameterValue (desc.id))
-                lastSentMidi[desc.id] = raw->load();
+        rebaselineSentMidi();
         restorePending = true;
         restorePromptSent = false;
         restoreArmedAtMs = juce::Time::getMillisecondCounterHiRes();
@@ -1054,10 +1078,28 @@ public:
     void answerRestorePrompt (const juce::String& answer)
     {
         const auto a = answer.trim().toLowerCase();
+        if (a == "load")
+        {
+            // The patch goes the other way: the Player reads the synth and what arrives becomes the
+            // project's values. So the pending push is settled without sending, and nothing is
+            // remembered — the next time this project opens it holds the loaded sound and is asked
+            // about that, which is the honest question.
+            if (restorePending)
+            {
+                restorePending = false;
+                scriptLogLine ("[restore] not pushing: the user chose to load the device's patch instead");
+            }
+            return;
+        }
         if (a != "always" && a != "never") return;
         restoreAnswer = a;
         updateHostDisplay();   // the project is dirty: this choice is saved with it
     }
+
+    /** True once saved state has been loaded — a reopened project rather than a new instance. */
+    bool wasSessionRestored() const { return sessionRestored.load(); }
+    /** Bumped on every state load, so the editor can tell a host restoring into an open window. */
+    int sessionRestoreGeneration() const { return sessionRestoreCount.load(); }
 
     /** True while a restore is armed and unresolved — the editor shows the question off this. */
     bool isRestorePending() const { return restorePending; }
@@ -1153,6 +1195,8 @@ private:
     // `restoreAnswer` is the user's decision, which outranks it and is saved with the project.
     ce::RestorePolicy restorePolicy = ce::RestorePolicy::Ask;
     juce::String restoreAnswer;          // "", "always" or "never"
+    std::atomic<bool> sessionRestored { false };   // setStateInformation ran: a reopened project
+    std::atomic<int> sessionRestoreCount { 0 };
     bool restorePending = false;
     bool restorePromptSent = false;
     double restoreArmedAtMs = 0.0;
@@ -2288,6 +2332,9 @@ public:
         // thing that outlives the window and the answer has to be remembered by something that does.
         p.onRestorePrompt = [this] (const juce::String& deviceName) { host.showRestorePrompt (deviceName); };
         host.onRestoreAnswer = [&p] (const juce::String& answer) { p.answerRestorePrompt (answer); };
+        // A new instance reads the synth on connect; a reopened project must not be read over.
+        host.isSessionRestored = [&p] { return p.wasSessionRestored(); };
+        seenSessionRestore = p.sessionRestoreGeneration();
         // host parameter -> UI: poll the (atomic) parameter values and push changes to the panel so
         // automation playback moves the on-screen controls. Polling keeps us off the audio thread.
         startTimerHz (30);
@@ -2317,6 +2364,13 @@ private:
         pushHostTransportIfChanged();
 
        #if CEDITOR_VALUE_LAYER
+        // A host restoring state into a window that is already open (a preset switch, an undo of a
+        // project load): tell the Player before it runs a startup read over the restored sound.
+        if (const int generation = processor.sessionRestoreGeneration(); generation != seenSessionRestore)
+        {
+            seenSessionRestore = generation;
+            host.notifySessionRestored();
+        }
         for (const auto& desc : processor.parameterDescriptors())
         {
             if (auto* raw = processor.parameters().getRawParameterValue (desc.id))
@@ -2389,6 +2443,7 @@ private:
 
    #if CEDITOR_VALUE_LAYER
     std::map<juce::String, float> lastPushed;
+    int seenSessionRestore = 0;   // the processor's state-load generation this window has reported
    #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PlayerAudioProcessorEditor)

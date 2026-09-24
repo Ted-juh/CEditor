@@ -12,9 +12,10 @@
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
   import { choiceValueAt } from './CE_Application/utils/exportParameters.js';
-  import { choiceParameterForControl, controlParamValue, hostValuePatch } from './CE_Application/utils/playerParameterSession.js';
+  import { choiceParameterForControl, controlParamValue, hostValuePatch, hostParameterLeaf } from './CE_Application/utils/playerParameterSession.js';
   import { fileCache, loadFile } from './CE_Application/stores/fileCache.js';
-  import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState, requestProfileSource } from './CE_Application/stores/deviceProfiles.js';
+  import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState, requestProfileSource, startDeviceSync } from './CE_Application/stores/deviceProfiles.js';
+  import { playerDeviceTarget, startupReadPlan, createHostSeedTracker } from './CE_Application/utils/playerStartup.js';
   import { profileSources, latestPresetListScan } from './CE_Application/stores/deviceProfileStores.js';
   import { injectPresetRowsIntoPanel } from './CE_Application/utils/presetChoiceRows.js';
   import { decodeInbound, inboundReadTargets } from './CE_Application/utils/inboundParameterIndex.js';
@@ -42,6 +43,14 @@
   let inPorts = $state([{ type: 'none', id: 'none', name: 'No MIDI Input' }]);
   let selectedOut = $state('previewOnly');
   let profileId = $state('roland-gaia');
+  // The role this panel's controls are bound to — see playerDeviceTarget. The GAIA SH-01 panel binds
+  // "Roland GAIA SH-01", not the generic mainSynth, and connecting the wrong one left every edit and
+  // the whole restore addressed to a role nothing had mapped.
+  let deviceRole = $state(DEFAULT_DEVICE_ROLE);
+  // Whether the plugin loaded saved state (a reopened DAW project) before this window opened. The
+  // processor says so in window.__CE_PLAYER_SESSION__ and again with a 'sessionRestored' event if a
+  // host restores state into an already-open window. A restored project is never read over.
+  let sessionRestored = $state(false);
   // When the plugin reloads, the processor restores the role→port mapping into its DeviceProfileService
   // BEFORE the window opens. On open we ADOPT that restored port (show it in the dropdown, don't
   // re-map) so the SH-01 selection survives a project reload instead of resetting to Preview Only.
@@ -65,6 +74,9 @@
     const backend = typeof window !== 'undefined' && window.__JUCE__ && window.__JUCE__.backend;
     if (backend && answer) backend.emitEvent('restoreAnswer', { answer });
     restorePromptDevice = '';
+    // "Load from the synth": the processor drops the pending push and remembers nothing; the patch
+    // comes the other way, and what arrives becomes this project's values (emitChangedParams).
+    if (answer === 'load') runStartupRead(startupReadPlan({ restored: false, profile: loadedProfile() }) ?? 'pull');
   }
 
   // --- Incoming MIDI (bidirectional): the panel follows the synth ---
@@ -135,11 +147,13 @@
   let controlByParam = {};
   let lastParamValue = {};   // parameterId -> last value seen (dedup, both directions, no loop)
   let paramSyncReady = false; // skip emitting the initial seed (would clobber restored automation)
+  const hostSeeds = createHostSeedTracker();  // first host value per parameter moves, never sends
 
   function rebuildHostParamMaps(p) {
     controlByParam = {};
     lastParamValue = {};
     paramSyncReady = false;
+    hostSeeds.reset();
     const idByName = {};
     const controlsById = {};
     for (const c of flatControls(p?.controls ?? [])) {
@@ -150,7 +164,7 @@
     for (const param of p?.exportParameters ?? []) {
       const controlId = idByName[param.controlName] ?? idByName[String(param.id).split('.')[0]];
       if (!controlId) continue;
-      const leaf = String(param.path ?? '').split('.').slice(1).join('.') || 'value';
+      const leaf = hostParameterLeaf(param);
       // A parameter that drives a field on the component's OWN section (an Arp's rate, a joystick's
       // x) says so, and goes through sectionValues rather than customValues. Without this it
       // reached the host, automated, saved with the session — and moved nothing.
@@ -175,7 +189,11 @@
   function applyParamSync(parameterId, value) {
     const m = controlByParam[parameterId];
     const v = Number(value);
-    if (!m || !Number.isFinite(v) || lastParamValue[parameterId] === v) return;
+    if (!m || !Number.isFinite(v)) return;
+    // Marked before the duplicate check: a saved value equal to what the control already shows is
+    // still this parameter's seed, and leaving it unmarked would swallow the first real automation.
+    const seed = hostSeeds.isSeed(parameterId);
+    if (lastParamValue[parameterId] === v) return;
     lastParamValue[parameterId] = v;
     // Store-by-name selector: the host index maps back to a choice name to write.
     const writeValue = m.choiceParam ? choiceValueAt(m.choiceParam, v) : v;
@@ -184,12 +202,17 @@
     //    CustomComponent value channel, or the plain Behavior value.
     const patch = hostValuePatch(m, v, writeValue, get(panelPreviewSessions)?.[m.controlId]);
     updatePanelPreviewSession(m.controlId, patch);
+    // The first value after the panel loads is the saved or current state, pushed so the controls
+    // show it. It is not an instruction to the synth: sending it is what used to push a reopened
+    // project at the hardware on window open, whatever the restore policy said. The processor's
+    // restore decision is the only thing that sends a saved patch.
+    if (seed) return;
     // 2. Send the bound device parameter(s) to the synth — the same call a user drag makes, so
     //    automation playback drives the hardware. 'continuous' = rate-limited stream.
     for (const b of m.bindings ?? []) {
       commitDeviceParameter({
         requestId: `automation_${parameterId}_${Date.now()}`,
-        deviceRole: b.deviceRole || DEFAULT_DEVICE_ROLE,
+        deviceRole: b.deviceRole || deviceRole,
         parameterId: b.parameterId,
         value: writeValue,
         interactionPhase: 'continuous',
@@ -340,18 +363,47 @@
       const body = [0xF0, 0x41, 0x7F, 0x00, 0x00, 0x41, 0x11, ...addrBytes, ...size,
         rolandChecksum([...addrBytes, ...size]), 0xF7];
       const message = body.map((v) => v.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-      triggerRawMidiAction({ deviceRole: DEFAULT_DEVICE_ROLE, actionId: `rq1_${target.parameterId}`, message, dryRun: false });
+      triggerRawMidiAction({ deviceRole, actionId: `rq1_${target.parameterId}`, message, dryRun: false });
     }
   }
 
+  // --- Startup read: what the synth is told when the port opens (utils/playerStartup.js) ---
   let synthSyncTimer = 0;
-  function scheduleSynthSync() {
+  let startupReadPort = null;   // the port the startup read already ran for — once per port
+  let portOpen = $state(null);  // the open hardware output's id, or null
+
+  function loadedProfile() {
+    try { return JSON.parse($profileSources?.[profileId]?.source ?? 'null'); } catch { return null; }
+  }
+
+  function runStartupRead(plan) {
+    if (!hasBridge || !plan) return;
+    if (plan === 'pull') {
+      // The profile's startup chain: identity, then every block of the current patch. Replies land
+      // through the same parsed-dump path as a manual read and move the controls.
+      startDeviceSync({ deviceRole, profileId, syncDirection: 'pull', dryRun: false });
+      return;
+    }
+    // Identity alone changes nothing on the synth. It is what makes the role ready, which is what
+    // the processor waits for before it will restore the project or ask about it.
+    startDeviceSync({ deviceRole, profileId, request: 'identityRequest', dryRun: false });
+    if (plan === 'legacy') syncFromSynth();
+  }
+
+  // Once per opened port, after a moment for the port to settle, and only when the plan is known:
+  // a new instance needs the profile to know which read to run. Re-pairing the input on the same
+  // port (the input list arriving late) must not read again.
+  $effect(() => {
+    const port = portOpen;
+    const plan = startupReadPlan({ restored: sessionRestored, profile: loadedProfile() });
+    if (!port || !plan || startupReadPort === port) return;
+    startupReadPort = port;
     if (synthSyncTimer) clearTimeout(synthSyncTimer);
     synthSyncTimer = setTimeout(() => {
       synthSyncTimer = 0;
-      syncFromSynth();
+      runStartupRead(startupReadPlan({ restored: sessionRestored, profile: loadedProfile() }) ?? plan);
     }, 600);
-  }
+  });
 
   function mapRole() {
     const dest = ports.find((p) => p.id === selectedOut)
@@ -365,11 +417,11 @@
       : null)
       ?? { type: 'none', id: 'none', name: 'No MIDI Input' };
     // Updates the role mapping AND tells C++ to open the MIDI output + input (setDeviceRoleMapping).
-    mapDeviceRole(DEFAULT_DEVICE_ROLE, profileId, { midiDestination: dest, midiInput: input });
+    mapDeviceRole(deviceRole, profileId, { midiDestination: dest, midiInput: input });
     // Load this profile's parameter list so resolveParameterSend recognizes the bound params.
-    if (profileId) listProfileParameters({ profileId, deviceRole: DEFAULT_DEVICE_ROLE });
-    // Pull current values from the synth via RQ1 once the hardware port is open (SysEx read-back).
-    if (dest.type === 'hardwareOutput') scheduleSynthSync();
+    if (profileId) listProfileParameters({ profileId, deviceRole });
+    // The startup read runs once the port is open — see the effect above.
+    portOpen = dest.type === 'hardwareOutput' ? dest.id : null;
   }
   function selectPort(id) {
     selectedOut = id;
@@ -381,14 +433,18 @@
   // stale default, clobber it). Retried as the session and the port list arrive (either order).
   function maybeAdoptMapping(session) {
     if (mappingAdopted || !hasBridge) return;
-    const m = session?.mainSynth;
+    const own = session?.[deviceRole];
+    const m = own ?? session?.[DEFAULT_DEVICE_ROLE];
     const dest = m?.midiDestination;
     if (dest?.type === 'hardwareOutput' && dest.id && ports.some((p) => p.id === dest.id)) {
       mappingAdopted = true;
       selectedOut = dest.id;
+      // A project saved before the Player used the panel's own role holds the port under mainSynth.
+      // Keep the port, and map it under the role the panel binds so edits and the restore reach it.
+      if (!own) { mapRole(); return; }
       if (m.profileId) profileId = m.profileId;
-      if (profileId) listProfileParameters({ profileId, deviceRole: DEFAULT_DEVICE_ROLE });
-      scheduleSynthSync();
+      if (profileId) listProfileParameters({ profileId, deviceRole });
+      portOpen = dest.id;
     }
   }
 
@@ -430,7 +486,8 @@
     for (const c of flatControls(next.controls ?? []))
       for (const b of c?._children?.DeviceBindings?.bindings ?? [])
         if (b && typeof b === 'object') b.dryRun = false;
-    profileId = next.deviceSession?.mainSynth?.profileId || 'roland-gaia';
+    ({ deviceRole, profileId } = playerDeviceTarget(next));
+    if (typeof window !== 'undefined' && window.__CE_PLAYER_SESSION__?.restored) sessionRestored = true;
     // Start (or restart) the panel script runtime for this panel — the SAME Lua/JS runtime the editor
     // preview uses, now driving the shipped plugin. Close the previous panel while the old host still
     // points at it, then install and index the new document before seeding its sessions. The session
@@ -531,6 +588,7 @@
     let paramSyncToken = null;
     let deviceUnsub = null;
     let restoreToken = null;
+    let sessionToken = null;
     if (backend) {
       initDeviceProfileBridge();   // register device event listeners (incl. the port-list reply)
       listDeviceProfiles();        // populate the profile list — resolveParameterSend gates on it
@@ -560,6 +618,12 @@
       restoreToken = backend.addEventListener('restorePrompt', (payload) => {
         restorePromptDevice = String(payload?.deviceName ?? 'the connected device');
       });
+      // A host that restores state into an open window: from here on this is a saved project, and
+      // a read that has not started yet must not run over it.
+      sessionToken = backend.addEventListener('sessionRestored', () => {
+        sessionRestored = true;
+        if (synthSyncTimer) { clearTimeout(synthSyncTimer); synthSyncTimer = 0; startupReadPort = null; }
+      });
       backend.emitEvent('playerReady', {});
     } else if (window.__CE_PANEL__ != null) {
       // Browser/dev fallback: boot from a pre-injected document.
@@ -579,6 +643,7 @@
       if (backend && loadToken != null) backend.removeEventListener(loadToken);
       if (backend && paramSyncToken != null) backend.removeEventListener(paramSyncToken);
       if (backend && restoreToken != null) backend.removeEventListener(restoreToken);
+      if (backend && sessionToken != null) backend.removeEventListener(sessionToken);
       if (portsUnsub) portsUnsub();
       if (inputsUnsub) inputsUnsub();
       if (inMsgUnsub) inMsgUnsub();
@@ -599,12 +664,16 @@
          modal over a plugin window in a DAW is a good way to lose a take. -->
     <div class="restore-bar" role="status">
       <span class="restore-text">
-        Send this session's saved values to <strong>{restorePromptDevice}</strong>?
-        The synth is still on whatever patch it was left on.
+        This project has a saved sound. <strong>{restorePromptDevice}</strong> is still on whatever
+        patch it was left on.
       </span>
-      <button class="restore-btn primary" onclick={() => answerRestore('always')}>Restore</button>
+      <button class="restore-btn primary" onclick={() => answerRestore('always')}
+        title="Send the project's saved sound to the synth, now and whenever this project opens.">Send saved sound</button>
+      <button class="restore-btn" onclick={() => answerRestore('load')}
+        title="Keep the synth's current patch and make it this project's sound.">Load from {restorePromptDevice}</button>
       <button class="restore-btn" onclick={() => answerRestore('')}>Not now</button>
-      <button class="restore-btn" onclick={() => answerRestore('never')}>Never</button>
+      <button class="restore-btn" onclick={() => answerRestore('never')}
+        title="Never send this project's sound to the synth.">Never</button>
     </div>
   {/if}
   <div class="player-viewport">

@@ -280,6 +280,39 @@ having changed, which is true and useless. `PatchDiff.h` is juce_core only and p
 the byte-diff the Capture Session below needs: a byte that moves when one knob moves is that
 knob's address.
 
+## Where the patch comes from at startup — built, 2026-09-24
+
+Restore answered "push the project at the synth". It left the other direction unstated, and the
+Player filled the gap badly: 600ms after any port opened it read every bound parameter with a
+hand-built RQ1, reopened project or not, so with the window open the synth's values overwrote the
+ones the project had just restored. Opening the window also committed every restored value to the
+synth, whatever the policy said, and closing it resent them all. Meanwhile the Player connected
+every panel as `mainSynth` with the slim demo profile, while the GAIA panel binds its own role, so
+the processor's restore waited for a role nobody mapped and gave up after 30 seconds.
+
+The rule now has two halves, one per source of truth:
+
+- **A new plugin instance** has nothing of its own, so the synth is the truth. When the port opens,
+  the Player runs the profile's own `startup.sync` chain (identity, then every block of the patch).
+  A profile whose chain only identifies falls back to the per-parameter read.
+- **A reopened project** is the patch that song was made with, so it is never read over. The Player
+  only sends the identity request, which changes nothing and is what makes the role *ready*; the
+  restore policy then decides. The bar offers **Send saved sound** (remembered as "always"),
+  **Load from <synth>** (a one-off read; what arrives becomes the project's values), **Not now**
+  and **Never**.
+
+The processor tells the Player which case it is before the panel loads (`__CE_PLAYER_SESSION__`),
+and again with `sessionRestored` if a host restores state into an open window. The first host value
+per parameter after a load is a seed: it moves the control and sends nothing. Closing the window
+takes current values as sent instead of resending them. The Player connects under the role and
+profile the panel declares (`requiredProfiles`, else its most-bound role).
+
+The editor does not read on its own: when a synth connects it asks once per role and port, "Read
+the current patch from …?", because a read that replaced values under an author's hands would be
+the wrong surprise. Code: `utils/playerStartup.js`, `stores/deviceReadOffer.js`; checks:
+`test/playerStartup.test.js`, `browser-checks/playerStartup.mjs`, `browser-checks/deviceReadOffer.mjs`.
+Like the rest of this plan, not yet exercised against a real synth in a real DAW.
+
 ## Verification
 
 The failure modes here are all timing and ordering, so test those rather than the happy path:

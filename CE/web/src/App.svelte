@@ -44,6 +44,7 @@
   import { initPanelRuntime } from './CE_Application/scripting/panelRuntime.js';
   import { initHistory, undo, redo, flushHistory } from './CE_Application/stores/history.js';
   import { initPresetChoiceSync } from './CE_Application/stores/presetChoiceSync.js';
+  import { initDeviceReadOffer } from './CE_Application/stores/deviceReadOffer.js';
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
   import { aboutSignal, documentationSignal, requestFitToWindow, requestZoomStep, requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
   import { componentWorkspaceMode } from './CE_Application/stores/componentWorkspace.js';
@@ -93,6 +94,7 @@
     initAppSettingsBridge();
     initHistory();
     initPresetChoiceSync(); // preset-sourced selector rows follow scans + profile sources
+    initDeviceReadOffer();  // offer to read a synth when it connects (the Player reads by itself)
   }
 
   function saveActiveTab({ saveAs = false } = {}) {

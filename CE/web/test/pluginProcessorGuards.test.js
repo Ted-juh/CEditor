@@ -141,9 +141,13 @@ test('the header defines the raw-MIDI funnel in every configuration that calls i
 });
 
 test('arming a restore seeds the automation cache before policy resolution', () => {
+  // The seeding lives in rebaselineSentMidi, which closing the window shares: both must take the
+  // current values as sent rather than leave the cache empty.
   const arm = /void armRestorePush\(\)[\s\S]*?\n\s*}/.exec(SOURCE)?.[0] ?? '';
-  assert.match(arm, /lastSentMidi\.clear\(\)/);
-  assert.match(arm, /lastSentMidi\[desc\.id\]\s*=\s*raw->load\(\)/,
+  assert.match(arm, /rebaselineSentMidi\(\);[\s\S]*restorePending = true;/, 'the cache is not seeded before the restore is armed');
+  const rebaseline = /void rebaselineSentMidi\(\)[\s\S]*?\n\s*}/.exec(SOURCE)?.[0] ?? '';
+  assert.match(rebaseline, /lastSentMidi\.clear\(\)/);
+  assert.match(rebaseline, /lastSentMidi\[desc\.id\]\s*=\s*raw->load\(\)/,
     'an empty cache would make the first timer tick bypass Never and Ask by sending every value');
 });
 

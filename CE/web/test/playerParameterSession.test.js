@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { choiceValueAt } from '../src/CE_Application/utils/exportParameters.js';
-import { choiceParameterForControl, controlParamValue, hostValuePatch } from '../src/CE_Application/utils/playerParameterSession.js';
+import { choiceParameterForControl, controlParamValue, hostValuePatch, hostParameterLeaf } from '../src/CE_Application/utils/playerParameterSession.js';
 
 test('host automation wins over a slider drag that left its role-specific override set', () => {
   const session = {
@@ -33,3 +33,14 @@ test('a boolean host parameter reads the toggle state', () => {
   assert.equal(controlParamValue({ checked: true, valueOverrideEnabled: false }, 'value'), 1);
   assert.equal(controlParamValue({ checked: false, valueOverrideEnabled: false }, 'value'), 0);
 });
+
+test('an export parameter addresses its control\'s value even when the control name has dots', () => {
+  // Every generated GAIA control is named like this. Splitting at the first dot addressed
+  // "filter.cutoff.value", so the host and the control never met.
+  assert.equal(hostParameterLeaf({ controlName: 'tone1.filter.cutoff', path: 'tone1.filter.cutoff.value' }), 'value');
+  assert.equal(hostParameterLeaf({ controlName: 'arp', path: 'arp.rate' }), 'rate');
+  assert.equal(hostParameterLeaf({ controlName: 'pad.x', path: 'pad.x.position.x' }), 'position.x');
+  assert.equal(hostParameterLeaf({ path: 'cutoff.value' }), 'value', 'no control name: the old reading');
+  assert.equal(hostParameterLeaf({ controlName: 'knob', path: 'knob' }), 'value');
+});
+

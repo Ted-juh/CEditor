@@ -60,8 +60,16 @@ public:
     // to ask it in, which is why the processor holds the pending restore until there is one.
     void showRestorePrompt (const juce::String& deviceName);
 
-    /** The user's answer: "always" or "never". Set by the plugin editor. */
+    /** The user's answer: "always", "never" or "load" (take the synth's patch). Set by the editor. */
     std::function<void (const juce::String& answer)> onRestoreAnswer;
+
+    // --- Where the patch comes from on startup ---------------------------------------------------
+    // A new instance reads the synth; a reopened project is never read over, because the project is
+    // the patch that song was made with. The Player needs to know which one it is before it opens
+    // the port, so the page is told before the panel loads, and told again if a host restores state
+    // into a window that is already open.
+    std::function<bool()> isSessionRestored;
+    void notifySessionRestored();
 
 private:
     void showStatusMessage (const juce::String& title, const juce::String& message);

@@ -103,14 +103,70 @@ test('the question travels to the panel and the answer comes back', () => {
   assert.match(PROCESSOR, /p\.answerRestorePrompt \(answer\)/);
 });
 
-test('the answer is persisted with the project, and only always/never are accepted', () => {
+test('the answer is persisted with the project, and only always/never are remembered', () => {
   // Saved with the project rather than globally: the decision was made about this session's patch
   // and this session's synth, and a different project is a different question.
   assert.match(PROCESSOR, /createNewChildElement \("RestoreAnswer"\)/);
   assert.match(PROCESSOR, /getChildByName \("RestoreAnswer"\)/);
   const answer = PROCESSOR.slice(PROCESSOR.indexOf('void answerRestorePrompt'));
-  assert.match(answer.slice(0, 400), /if \(a != "always" && a != "never"\) return;/,
+  const body = answer.slice(0, answer.indexOf('\n    }\n'));
+  assert.match(body, /if \(a != "always" && a != "never"\) return;[\s\S]*restoreAnswer = a;/,
     'anything other than always/never must be ignored, not stored');
+});
+
+test('"load" settles the pending push without sending or remembering anything', () => {
+  // Load from the synth: the Player reads the patch and what arrives becomes the project's values.
+  // Pushing the saved sound as well would overwrite the patch the user just chose to keep.
+  const answer = PROCESSOR.slice(PROCESSOR.indexOf('void answerRestorePrompt'));
+  const load = answer.slice(answer.indexOf('if (a == "load")'), answer.indexOf('if (a != "always"'));
+  assert.ok(load.length > 0, 'the load answer is not handled');
+  assert.match(load, /restorePending = false;/, 'the pending restore is not settled');
+  assert.match(load, /scriptLogLine/, 'a restore that did not happen must say why');
+  assert.ok(!/restoreAnswer = /.test(load), 'load is a one-off, never remembered');
+  assert.ok(!/runRestorePush|sendParamMidi/.test(load), 'and never sends');
+  assert.match(PLAYER, /answerRestore\('load'\)/, 'the bar has no Load button');
+  assert.match(PLAYER, /if \(answer === 'load'\) runStartupRead\(/, 'Load does not read the synth');
+});
+
+test('closing the window does not resend every parameter behind the restore decision', () => {
+  // The panel sent every change itself while it was open. Clearing the cache on close resent the
+  // whole project to the synth after "Not now" or "Never".
+  const timer = PROCESSOR.slice(PROCESSOR.indexOf('void timerCallback() override'));
+  const closed = timer.slice(timer.indexOf('if (wasWindowOpen)'), timer.indexOf('for (const auto& desc : panelParams)'));
+  assert.match(closed, /rebaselineSentMidi\(\);/, 'closing the window must take current values as sent');
+  assert.ok(!closed.includes('lastSentMidi.clear()'), 'clearing the cache on close resends the whole project');
+});
+
+test('the Player learns whether this is a reopened project before it touches the port', () => {
+  const set = PROCESSOR.slice(PROCESSOR.indexOf('void setStateInformation'), PROCESSOR.indexOf('bool isBusesLayoutSupported'));
+  assert.equal((set.match(/markSessionRestored\(\);/g) ?? []).length, 2, 'both state formats mark the session restored');
+  const load = HOST_CPP.slice(HOST_CPP.indexOf('void PlayerHost::loadPanelIntoWebView'));
+  const flag = load.indexOf('__CE_PLAYER_SESSION__'), panel = load.indexOf('__CE_LOAD_PANEL__(');
+  assert.ok(flag > -1 && flag < panel, 'the restored flag must be set before the panel loads');
+  assert.match(PROCESSOR, /host\.isSessionRestored = \[&p\] \{ return p\.wasSessionRestored\(\); \};/);
+  assert.match(PROCESSOR, /host\.notifySessionRestored\(\);/, 'a restore into an open window is not reported');
+  assert.match(HOST_CPP, /emitToWebView \("sessionRestored"/);
+  assert.match(PLAYER, /addEventListener\('sessionRestored'/);
+  assert.match(PLAYER, /window\.__CE_PLAYER_SESSION__\?\.restored/);
+});
+
+test('opening the window moves the controls to the saved values and sends none of them', () => {
+  // Before, applyParamSync committed every restored value to the synth on open, so an Ask panel
+  // pushed without asking. The first host value per parameter is a seed now.
+  const sync = PLAYER.slice(PLAYER.indexOf('function applyParamSync'), PLAYER.indexOf('function emitChangedParams'));
+  const seed = sync.indexOf('hostSeeds.isSeed(parameterId)'), dedup = sync.indexOf('lastParamValue[parameterId] === v');
+  assert.ok(seed > -1 && seed < dedup, 'the seed must be marked before the duplicate check');
+  assert.ok(sync.indexOf('if (seed) return;') < sync.indexOf('commitDeviceParameter'), 'a seed must return before sending');
+});
+
+test('the Player connects under the panel\'s own role, and identifies a restored device', () => {
+  assert.match(PLAYER, /\(\{ deviceRole, profileId \} = playerDeviceTarget\(next\)\);/);
+  assert.match(PLAYER, /mapDeviceRole\(deviceRole, profileId,/, 'the port is still mapped under the default role');
+  assert.ok(!/mapDeviceRole\(DEFAULT_DEVICE_ROLE/.test(PLAYER));
+  // The processor waits for a READY role before it restores or asks. The identity handshake is
+  // what makes it ready, and changes nothing on the synth.
+  const run = PLAYER.slice(PLAYER.indexOf('function runStartupRead'));
+  assert.match(run.slice(0, 1200), /request: 'identityRequest'/);
 });
 
 test('a question nobody could see is asked again', () => {

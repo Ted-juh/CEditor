@@ -13,6 +13,22 @@ export function choiceParameterForControl(param, control) {
   return { ...param, choiceMode: 'value', choiceValues: values };
 }
 
+/**
+ * Which value of its control an export parameter addresses: `path` is "<controlName>.<leaf>".
+ *
+ * The control name is stripped whole. Taking everything after the first dot instead is what the
+ * Player did, and a dotted name — every generated GAIA control is one, "tone1.filter.cutoff" — then
+ * addressed "filter.cutoff.value": a custom channel nothing reads. DAW values and automation moved
+ * no GAIA control, and a GAIA control moved never reached its host parameter, so none of it was
+ * recorded or saved with the project.
+ */
+export function hostParameterLeaf(param) {
+  const path = String(param?.path ?? '');
+  const name = String(param?.controlName ?? '');
+  if (name && path.startsWith(`${name}.`)) return path.slice(name.length + 1) || 'value';
+  return path.split('.').slice(1).join('.') || 'value';
+}
+
 export function controlParamValue(session, leaf, choiceParam = null, sectionField = null) {
   if (!session) return undefined;
   if (sectionField) {
