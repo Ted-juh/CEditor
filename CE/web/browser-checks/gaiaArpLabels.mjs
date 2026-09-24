@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import assert from 'node:assert/strict';
 const server=await createServer({configFile:fileURLToPath(new URL('./vite.config.mjs',import.meta.url)),server:{host:'127.0.0.1',port:0}});
 await server.listen();
-const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});
+const browser=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const page=await browser.newPage({viewport:{width:1800,height:2200}}), errors=[];
 page.on('pageerror',e=>errors.push(String(e)));
 try {

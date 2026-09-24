@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
 const server=await createServer({configFile:fileURLToPath(new URL('./vite.config.mjs',import.meta.url)),server:{host:'127.0.0.1',port:0}});await server.listen();
-const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});
+const browser=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const page=await browser.newPage({viewport:{width:1920,height:1000}}),errors=[];
 page.on('pageerror',error=>errors.push(String(error)));
 const out=process.env.GAIA_PAGES_OUT;
