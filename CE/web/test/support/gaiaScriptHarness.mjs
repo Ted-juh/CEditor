@@ -47,6 +47,9 @@ export function loadScript(source, { scriptId = 'harness' } = {}) {
     get: api.get,
     set: api.set,
     watch: api.watch,
+    // Device events (onParameterReceived and friends) reach the script through the runtime's own
+    // dispatcher, the same one a read from the synth goes through.
+    on: api.on,
     log: (message) => logs.push(String(message)),
     after: (ms, fn) => { timers.push(fn); return timers.length; },
     ce: { device: { write: (parameterId, value) => writes.push([parameterId, value]) } },

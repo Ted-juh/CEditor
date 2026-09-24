@@ -17,6 +17,8 @@ test('envelope views match the other faders inside unchanged tone sections and k
     assert.equal(cfg.pageIndex,0);
     assert.equal(cfg.showStrip,false);
     assert.equal(controls.find(c=>c._children.Core.name===view._children.Core.name+'Button')._children.Core.controlType,'Button');
+    // The button names what a click shows: faders are up, so it offers the graph.
+    assert.equal(controls.find(c=>c._children.Core.name===view._children.Core.name+'Button')._children.Text.content,'GRAPH \u203a');
     assert.equal(view._children.Transform.height,229);
     const graph=children.find(c=>c._children.Envelope?.stageSources);
     assert.equal(graph._children.Core.tabPageId,'graph');

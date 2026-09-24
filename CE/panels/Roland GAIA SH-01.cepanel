@@ -6001,7 +6001,7 @@
       "id": "tone1_osc_pitchEnv_view_button_click",
       "name": "Tone 1 osc.pitchEnv view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone1_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone1_osc_pitchEnv_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone1_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone1_osc_pitchEnv_view_button.Text.content', next === 1 ? 'FADERS ›' : 'GRAPH ›'); }",
       "scope": "panel",
       "target": "tone1.osc.pitchEnv.viewButton",
       "event": "onClick",
@@ -6013,7 +6013,7 @@
       "id": "tone1_filter_env_view_button_click",
       "name": "Tone 1 filter.env view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone1_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_filter_env_view.TabContainer.pageIndex', next); set('tone1_filter_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone1_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_filter_env_view.TabContainer.pageIndex', next); set('tone1_filter_env_view_button.Text.content', next === 1 ? 'FADERS ›' : 'GRAPH ›'); }",
       "scope": "panel",
       "target": "tone1.filter.env.viewButton",
       "event": "onClick",
@@ -6025,7 +6025,7 @@
       "id": "tone1_amp_env_view_button_click",
       "name": "Tone 1 amp.env view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone1_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_amp_env_view.TabContainer.pageIndex', next); set('tone1_amp_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone1_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_amp_env_view.TabContainer.pageIndex', next); set('tone1_amp_env_view_button.Text.content', next === 1 ? 'FADERS ›' : 'GRAPH ›'); }",
       "scope": "panel",
       "target": "tone1.amp.env.viewButton",
       "event": "onClick",
@@ -6037,7 +6037,7 @@
       "id": "tone2_osc_pitchEnv_view_button_click",
       "name": "Tone 2 osc.pitchEnv view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone2_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone2_osc_pitchEnv_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone2_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone2_osc_pitchEnv_view_button.Text.content', next === 1 ? 'FADERS ›' : 'GRAPH ›'); }",
       "scope": "panel",
       "target": "tone2.osc.pitchEnv.viewButton",
       "event": "onClick",
@@ -6049,7 +6049,7 @@
       "id": "tone2_filter_env_view_button_click",
       "name": "Tone 2 filter.env view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone2_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_filter_env_view.TabContainer.pageIndex', next); set('tone2_filter_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone2_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_filter_env_view.TabContainer.pageIndex', next); set('tone2_filter_env_view_button.Text.content', next === 1 ? 'FADERS ›' : 'GRAPH ›'); }",
       "scope": "panel",
       "target": "tone2.filter.env.viewButton",
       "event": "onClick",
@@ -6061,7 +6061,7 @@
       "id": "tone2_amp_env_view_button_click",
       "name": "Tone 2 amp.env view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone2_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_amp_env_view.TabContainer.pageIndex', next); set('tone2_amp_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone2_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_amp_env_view.TabContainer.pageIndex', next); set('tone2_amp_env_view_button.Text.content', next === 1 ? 'FADERS ›' : 'GRAPH ›'); }",
       "scope": "panel",
       "target": "tone2.amp.env.viewButton",
       "event": "onClick",
@@ -6073,7 +6073,7 @@
       "id": "tone3_osc_pitchEnv_view_button_click",
       "name": "Tone 3 osc.pitchEnv view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone3_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone3_osc_pitchEnv_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone3_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone3_osc_pitchEnv_view_button.Text.content', next === 1 ? 'FADERS ›' : 'GRAPH ›'); }",
       "scope": "panel",
       "target": "tone3.osc.pitchEnv.viewButton",
       "event": "onClick",
@@ -6085,7 +6085,7 @@
       "id": "tone3_filter_env_view_button_click",
       "name": "Tone 3 filter.env view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone3_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_filter_env_view.TabContainer.pageIndex', next); set('tone3_filter_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone3_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_filter_env_view.TabContainer.pageIndex', next); set('tone3_filter_env_view_button.Text.content', next === 1 ? 'FADERS ›' : 'GRAPH ›'); }",
       "scope": "panel",
       "target": "tone3.filter.env.viewButton",
       "event": "onClick",
@@ -6097,12 +6097,24 @@
       "id": "tone3_amp_env_view_button_click",
       "name": "Tone 3 amp.env view",
       "language": "javascript",
-      "source": "function onClick() { const next = Number(get('tone3_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_amp_env_view.TabContainer.pageIndex', next); set('tone3_amp_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "source": "function onClick() { const next = Number(get('tone3_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_amp_env_view.TabContainer.pageIndex', next); set('tone3_amp_env_view_button.Text.content', next === 1 ? 'FADERS ›' : 'GRAPH ›'); }",
       "scope": "panel",
       "target": "tone3.amp.env.viewButton",
       "event": "onClick",
       "enabled": true,
       "description": "",
+      "group": ""
+    },
+    {
+      "id": "gaia_active_state",
+      "name": "Dim what is switched off",
+      "language": "javascript",
+      "source": "// Dim switched-off tones and lock effect knobs while TYPE is OFF.\n// Generated by tools/scripts/gaia-panel/active-state.mjs. Controls are addressed by ID.\n\nvar CONFIG = {\n  \"role\": \"Roland GAIA SH-01\",\n  \"dimmed\": 0.35,\n  \"tones\": [\n    {\n      \"parameter\": \"common.tone1Switch\",\n      \"switchId\": \"gaia_common_tone1Switch_21\",\n      \"members\": [\n        \"gaia_box_294\",\n        \"gaia_tab_295\",\n        \"gaia_tone1_lfo_shape_296\",\n        \"gaia_lbl_297\",\n        \"gaia_tone1_lfo_rate_298\",\n        \"gaia_lbl_299\",\n        \"gaia_tone1_lfo_tempoSyncSwitch_300\",\n        \"gaia_tone1_lfo_tempoSyncNote_301\",\n        \"gaia_lbl_302\",\n        \"gaia_tone1_lfo_keyTrigger_303\",\n        \"gaia_tone1_lfo_fadeTime_304\",\n        \"gaia_lbl_305\",\n        \"gaia_tone1_lfo_pitchDepth_306\",\n        \"gaia_lbl_307\",\n        \"gaia_tone1_lfo_filterDepth_308\",\n        \"gaia_lbl_309\",\n        \"gaia_tone1_lfo_ampDepth_310\",\n        \"gaia_lbl_311\",\n        \"gaia_tone1_lfo_panDepth_312\",\n        \"gaia_lbl_313\",\n        \"gaia_box_314\",\n        \"tone1_osc_pitchEnv_view\",\n        \"gaia_tab_315\",\n        \"gaia_tone1_osc_wave_317\",\n        \"gaia_lbl_318\",\n        \"gaia_tone1_osc_waveVariation_319\",\n        \"gaia_lbl_320\",\n        \"gaia_tone1_osc_pitch_321\",\n        \"gaia_lbl_322\",\n        \"gaia_tone1_osc_detune_323\",\n        \"gaia_lbl_324\",\n        \"gaia_tone1_osc_pulseWidthModDepth_325\",\n        \"gaia_lbl_326\",\n        \"gaia_tone1_osc_pulseWidth_327\",\n        \"gaia_lbl_328\",\n        \"gaia_tone1_osc_pitchEnvDepth_333\",\n        \"gaia_lbl_334\",\n        \"gaia_box_335\",\n        \"tone1_filter_env_view\",\n        \"gaia_tab_336\",\n        \"gaia_tone1_filter_mode_338\",\n        \"gaia_lbl_339\",\n        \"gaia_tone1_filter_slope_340\",\n        \"gaia_lbl_341\",\n        \"gaia_tone1_filter_cutoff_342\",\n        \"gaia_lbl_343\",\n        \"gaia_tone1_filter_resonance_344\",\n        \"gaia_lbl_345\",\n        \"gaia_tone1_filter_envDepth_354\",\n        \"gaia_lbl_355\",\n        \"gaia_tone1_filter_envVelocitySens_356\",\n        \"gaia_lbl_357\",\n        \"gaia_tone1_filter_cutoffKeyfollow_358\",\n        \"gaia_lbl_359\",\n        \"gaia_box_360\",\n        \"tone1_amp_env_view\",\n        \"gaia_tab_361\",\n        \"gaia_tone1_amp_level_363\",\n        \"gaia_lbl_364\",\n        \"gaia_tone1_amp_pan_365\",\n        \"gaia_lbl_366\",\n        \"gaia_tone1_amp_levelVelocitySens_367\",\n        \"gaia_lbl_368\",\n        \"gaia_box_377\",\n        \"gaia_tab_378\",\n        \"gaia_tone1_modLfo_shape_379\",\n        \"gaia_lbl_380\",\n        \"gaia_tone1_modLfo_rate_381\",\n        \"gaia_lbl_382\",\n        \"gaia_tone1_modLfo_tempoSyncNote_383\",\n        \"gaia_lbl_384\",\n        \"gaia_tone1_modLfo_tempoSyncSwitch_385\",\n        \"gaia_tone1_modLfo_pitchDepth_387\",\n        \"gaia_lbl_388\",\n        \"gaia_tone1_modLfo_filterDepth_389\",\n        \"gaia_lbl_390\",\n        \"gaia_tone1_modLfo_ampDepth_391\",\n        \"gaia_lbl_392\",\n        \"gaia_tone1_modLfo_panDepth_393\",\n        \"gaia_lbl_394\",\n        \"gaia_common_syncRingSelect_29\",\n        \"tone1_osc_pitchEnv_view_button\",\n        \"tone1_filter_env_view_button\",\n        \"tone1_amp_env_view_button\"\n      ]\n    },\n    {\n      \"parameter\": \"common.tone2Switch\",\n      \"switchId\": \"gaia_common_tone2Switch_23\",\n      \"members\": [\n        \"gaia_box_401\",\n        \"gaia_tab_402\",\n        \"gaia_tone2_lfo_shape_403\",\n        \"gaia_lbl_404\",\n        \"gaia_tone2_lfo_rate_405\",\n        \"gaia_lbl_406\",\n        \"gaia_tone2_lfo_tempoSyncSwitch_407\",\n        \"gaia_tone2_lfo_tempoSyncNote_408\",\n        \"gaia_lbl_409\",\n        \"gaia_tone2_lfo_keyTrigger_410\",\n        \"gaia_tone2_lfo_fadeTime_411\",\n        \"gaia_lbl_412\",\n        \"gaia_tone2_lfo_pitchDepth_413\",\n        \"gaia_lbl_414\",\n        \"gaia_tone2_lfo_filterDepth_415\",\n        \"gaia_lbl_416\",\n        \"gaia_tone2_lfo_ampDepth_417\",\n        \"gaia_lbl_418\",\n        \"gaia_tone2_lfo_panDepth_419\",\n        \"gaia_lbl_420\",\n        \"gaia_box_421\",\n        \"tone2_osc_pitchEnv_view\",\n        \"gaia_tab_422\",\n        \"gaia_tone2_osc_wave_424\",\n        \"gaia_lbl_425\",\n        \"gaia_tone2_osc_waveVariation_426\",\n        \"gaia_lbl_427\",\n        \"gaia_tone2_osc_pitch_428\",\n        \"gaia_lbl_429\",\n        \"gaia_tone2_osc_detune_430\",\n        \"gaia_lbl_431\",\n        \"gaia_tone2_osc_pulseWidthModDepth_432\",\n        \"gaia_lbl_433\",\n        \"gaia_tone2_osc_pulseWidth_434\",\n        \"gaia_lbl_435\",\n        \"gaia_tone2_osc_pitchEnvDepth_440\",\n        \"gaia_lbl_441\",\n        \"gaia_box_442\",\n        \"tone2_filter_env_view\",\n        \"gaia_tab_443\",\n        \"gaia_tone2_filter_mode_445\",\n        \"gaia_lbl_446\",\n        \"gaia_tone2_filter_slope_447\",\n        \"gaia_lbl_448\",\n        \"gaia_tone2_filter_cutoff_449\",\n        \"gaia_lbl_450\",\n        \"gaia_tone2_filter_resonance_451\",\n        \"gaia_lbl_452\",\n        \"gaia_tone2_filter_envDepth_461\",\n        \"gaia_lbl_462\",\n        \"gaia_tone2_filter_envVelocitySens_463\",\n        \"gaia_lbl_464\",\n        \"gaia_tone2_filter_cutoffKeyfollow_465\",\n        \"gaia_lbl_466\",\n        \"gaia_box_467\",\n        \"tone2_amp_env_view\",\n        \"gaia_tab_468\",\n        \"gaia_tone2_amp_level_470\",\n        \"gaia_lbl_471\",\n        \"gaia_tone2_amp_pan_472\",\n        \"gaia_lbl_473\",\n        \"gaia_tone2_amp_levelVelocitySens_474\",\n        \"gaia_lbl_475\",\n        \"gaia_box_484\",\n        \"gaia_tab_485\",\n        \"gaia_tone2_modLfo_shape_486\",\n        \"gaia_lbl_487\",\n        \"gaia_tone2_modLfo_rate_488\",\n        \"gaia_lbl_489\",\n        \"gaia_tone2_modLfo_tempoSyncNote_490\",\n        \"gaia_lbl_491\",\n        \"gaia_tone2_modLfo_tempoSyncSwitch_492\",\n        \"gaia_tone2_modLfo_pitchDepth_494\",\n        \"gaia_lbl_495\",\n        \"gaia_tone2_modLfo_filterDepth_496\",\n        \"gaia_lbl_497\",\n        \"gaia_tone2_modLfo_ampDepth_498\",\n        \"gaia_lbl_499\",\n        \"gaia_tone2_modLfo_panDepth_500\",\n        \"gaia_lbl_501\",\n        \"tone2_osc_pitchEnv_view_button\",\n        \"tone2_filter_env_view_button\",\n        \"tone2_amp_env_view_button\"\n      ]\n    },\n    {\n      \"parameter\": \"common.tone3Switch\",\n      \"switchId\": \"gaia_common_tone3Switch_25\",\n      \"members\": [\n        \"gaia_plate\",\n        \"gaia_box_508\",\n        \"gaia_tab_509\",\n        \"gaia_tone3_lfo_shape_510\",\n        \"gaia_lbl_511\",\n        \"gaia_tone3_lfo_rate_512\",\n        \"gaia_lbl_513\",\n        \"gaia_tone3_lfo_tempoSyncSwitch_514\",\n        \"gaia_tone3_lfo_tempoSyncNote_515\",\n        \"gaia_lbl_516\",\n        \"gaia_tone3_lfo_keyTrigger_517\",\n        \"gaia_tone3_lfo_fadeTime_518\",\n        \"gaia_lbl_519\",\n        \"gaia_tone3_lfo_pitchDepth_520\",\n        \"gaia_lbl_521\",\n        \"gaia_tone3_lfo_filterDepth_522\",\n        \"gaia_lbl_523\",\n        \"gaia_tone3_lfo_ampDepth_524\",\n        \"gaia_lbl_525\",\n        \"gaia_tone3_lfo_panDepth_526\",\n        \"gaia_lbl_527\",\n        \"gaia_box_528\",\n        \"tone3_osc_pitchEnv_view\",\n        \"gaia_tab_529\",\n        \"gaia_tone3_osc_wave_531\",\n        \"gaia_lbl_532\",\n        \"gaia_tone3_osc_waveVariation_533\",\n        \"gaia_lbl_534\",\n        \"gaia_tone3_osc_pitch_535\",\n        \"gaia_lbl_536\",\n        \"gaia_tone3_osc_detune_537\",\n        \"gaia_lbl_538\",\n        \"gaia_tone3_osc_pulseWidthModDepth_539\",\n        \"gaia_lbl_540\",\n        \"gaia_tone3_osc_pulseWidth_541\",\n        \"gaia_lbl_542\",\n        \"gaia_tone3_osc_pitchEnvDepth_547\",\n        \"gaia_lbl_548\",\n        \"gaia_box_549\",\n        \"tone3_filter_env_view\",\n        \"gaia_tab_550\",\n        \"gaia_tone3_filter_mode_552\",\n        \"gaia_lbl_553\",\n        \"gaia_tone3_filter_slope_554\",\n        \"gaia_lbl_555\",\n        \"gaia_tone3_filter_cutoff_556\",\n        \"gaia_lbl_557\",\n        \"gaia_tone3_filter_resonance_558\",\n        \"gaia_lbl_559\",\n        \"gaia_tone3_filter_envDepth_568\",\n        \"gaia_lbl_569\",\n        \"gaia_tone3_filter_envVelocitySens_570\",\n        \"gaia_lbl_571\",\n        \"gaia_tone3_filter_cutoffKeyfollow_572\",\n        \"gaia_lbl_573\",\n        \"gaia_box_574\",\n        \"tone3_amp_env_view\",\n        \"gaia_tab_575\",\n        \"gaia_tone3_amp_level_577\",\n        \"gaia_lbl_578\",\n        \"gaia_tone3_amp_pan_579\",\n        \"gaia_lbl_580\",\n        \"gaia_tone3_amp_levelVelocitySens_581\",\n        \"gaia_lbl_582\",\n        \"gaia_box_591\",\n        \"gaia_tab_592\",\n        \"gaia_tone3_modLfo_shape_593\",\n        \"gaia_lbl_594\",\n        \"gaia_tone3_modLfo_rate_595\",\n        \"gaia_lbl_596\",\n        \"gaia_tone3_modLfo_tempoSyncNote_597\",\n        \"gaia_lbl_598\",\n        \"gaia_tone3_modLfo_tempoSyncSwitch_599\",\n        \"gaia_tone3_modLfo_pitchDepth_601\",\n        \"gaia_lbl_602\",\n        \"gaia_tone3_modLfo_filterDepth_603\",\n        \"gaia_lbl_604\",\n        \"gaia_tone3_modLfo_ampDepth_605\",\n        \"gaia_lbl_606\",\n        \"gaia_tone3_modLfo_panDepth_607\",\n        \"gaia_lbl_608\",\n        \"tone3_osc_pitchEnv_view_button\",\n        \"tone3_filter_env_view_button\",\n        \"tone3_amp_env_view_button\"\n      ]\n    }\n  ],\n  \"effects\": [\n    {\n      \"parameter\": \"distortion.type\",\n      \"typeId\": \"gaia_distortion_type_628\",\n      \"knobs\": [\n        \"gaia_distortion_parameter1_630\",\n        \"gaia_distortion_parameter2_632\",\n        \"gaia_distortion_parameter3_634\",\n        \"gaia_distortion_parameter4_636\"\n      ],\n      \"captions\": [\n        \"gaia_lbl_631\",\n        \"gaia_lbl_633\",\n        \"gaia_lbl_635\",\n        \"gaia_lbl_637\"\n      ]\n    },\n    {\n      \"parameter\": \"flanger.type\",\n      \"typeId\": \"gaia_flanger_type_640\",\n      \"knobs\": [\n        \"gaia_flanger_parameter1_642\",\n        \"gaia_flanger_parameter2_644\",\n        \"gaia_flanger_parameter3_646\",\n        \"gaia_flanger_parameter4_648\"\n      ],\n      \"captions\": [\n        \"gaia_lbl_643\",\n        \"gaia_lbl_645\",\n        \"gaia_lbl_647\",\n        \"gaia_lbl_649\"\n      ]\n    },\n    {\n      \"parameter\": \"delay.type\",\n      \"typeId\": \"gaia_delay_type_652\",\n      \"knobs\": [\n        \"gaia_delay_parameter1_654\",\n        \"gaia_delay_parameter2_656\",\n        \"gaia_delay_parameter3_658\",\n        \"gaia_delay_parameter4_660\"\n      ],\n      \"captions\": [\n        \"gaia_lbl_655\",\n        \"gaia_lbl_657\",\n        \"gaia_lbl_659\",\n        \"gaia_lbl_661\"\n      ]\n    },\n    {\n      \"parameter\": \"reverb.type\",\n      \"typeId\": \"gaia_reverb_type_664\",\n      \"knobs\": [\n        \"gaia_reverb_parameter1_666\",\n        \"gaia_reverb_parameter2_668\",\n        \"gaia_reverb_parameter3_670\",\n        \"gaia_reverb_parameter4_672\"\n      ],\n      \"captions\": [\n        \"gaia_lbl_667\",\n        \"gaia_lbl_669\",\n        \"gaia_lbl_671\",\n        \"gaia_lbl_673\"\n      ]\n    }\n  ]\n};\n\nfunction isOn(v) { return v === true || v === 1 || v === \"1\" || String(v).toLowerCase() === \"on\"; }\nfunction isOff(v) { return v === false || v === 0 || v === \"0\" || String(v).toLowerCase() === \"off\"; }\n\nfunction opacity(id, value) {\n  var current = get(id + \".opacity\");\n  if ((current == null ? 1 : Number(current)) !== value) set(id + \".opacity\", value);\n}\nfunction enabled(id, value) {\n  var current = get(id + \".enabled\");\n  if ((current == null ? true : current !== false) !== value) set(id + \".enabled\", value);\n}\n\nfunction showTone(tone, on) {\n  for (var i = 0; i < tone.members.length; i++) opacity(tone.members[i], on ? 1 : CONFIG.dimmed);\n}\nfunction showEffect(effect, off) {\n  for (var i = 0; i < effect.knobs.length; i++) {\n    enabled(effect.knobs[i], !off);\n    opacity(effect.knobs[i], off ? CONFIG.dimmed : 1);\n  }\n  for (var j = 0; j < effect.captions.length; j++) opacity(effect.captions[j], off ? CONFIG.dimmed : 1);\n}\n\nfunction onPanelLoad() {\n  // Unknown until told: undo anything a saved panel carried over, then wait for a real value.\n  CONFIG.tones.forEach(function (tone) {\n    showTone(tone, true);\n    watch(tone.switchId + \".value\", function () { showTone(tone, isOn(get(tone.switchId))); });\n  });\n  CONFIG.effects.forEach(function (effect) {\n    showEffect(effect, false);\n    watch(effect.typeId + \".value\", function () { showEffect(effect, isOff(get(effect.typeId))); });\n  });\n  on(\"*\", \"onParameterReceived\", function (info) {\n    if (!info || (info.role && info.role !== CONFIG.role)) return;\n    CONFIG.tones.forEach(function (tone) { if (info.parameter === tone.parameter) showTone(tone, isOn(info.value)); });\n    CONFIG.effects.forEach(function (effect) { if (info.parameter === effect.parameter) showEffect(effect, isOff(info.value)); });\n  });\n}\n",
+      "scope": "panel",
+      "target": "*",
+      "event": "onPanelLoad",
+      "enabled": true,
+      "description": "Dims a switched-off tone row and locks effect knobs while TYPE is OFF, once the value is known. Sends no MIDI.",
       "group": ""
     }
   ],
@@ -208769,7 +208781,7 @@
           }
         },
         "Text": {
-          "content": "Fader",
+          "content": "GRAPH ›",
           "_children": {
             "Fill": {
               "colour": "FFFFE1A0"
@@ -208816,7 +208828,7 @@
           }
         },
         "Text": {
-          "content": "Fader",
+          "content": "GRAPH ›",
           "_children": {
             "Fill": {
               "colour": "FFFFE1A0"
@@ -208863,7 +208875,7 @@
           }
         },
         "Text": {
-          "content": "Fader",
+          "content": "GRAPH ›",
           "_children": {
             "Fill": {
               "colour": "FFFFE1A0"
@@ -208910,7 +208922,7 @@
           }
         },
         "Text": {
-          "content": "Fader",
+          "content": "GRAPH ›",
           "_children": {
             "Fill": {
               "colour": "FFFFE1A0"
@@ -208957,7 +208969,7 @@
           }
         },
         "Text": {
-          "content": "Fader",
+          "content": "GRAPH ›",
           "_children": {
             "Fill": {
               "colour": "FFFFE1A0"
@@ -209004,7 +209016,7 @@
           }
         },
         "Text": {
-          "content": "Fader",
+          "content": "GRAPH ›",
           "_children": {
             "Fill": {
               "colour": "FFFFE1A0"
@@ -209051,7 +209063,7 @@
           }
         },
         "Text": {
-          "content": "Fader",
+          "content": "GRAPH ›",
           "_children": {
             "Fill": {
               "colour": "FFFFE1A0"
@@ -209098,7 +209110,7 @@
           }
         },
         "Text": {
-          "content": "Fader",
+          "content": "GRAPH ›",
           "_children": {
             "Fill": {
               "colour": "FFFFE1A0"
@@ -209145,7 +209157,7 @@
           }
         },
         "Text": {
-          "content": "Fader",
+          "content": "GRAPH ›",
           "_children": {
             "Fill": {
               "colour": "FFFFE1A0"
