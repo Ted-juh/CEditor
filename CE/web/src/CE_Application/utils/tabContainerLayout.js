@@ -88,7 +88,7 @@ export function tabGeometry(width, height, control) {
         // (the GAIA bank pages put their READ / STOP / CHECK there).
         ...(num(config.tabWidth, 0) > 0 ? { tabWidth: num(config.tabWidth, 0) } : {}),
         ...(config.appearance === 'buttons' ? { buttons: true, buttonGroupWidth: config.buttonGroupWidth,
-          buttonHeight: config.buttonHeight, buttonGap: config.buttonGap,
+          buttonHeight: config.buttonHeight, buttonGap: config.buttonGap, buttonMaxWidth: config.buttonMaxWidth,
           cycleButton: config.cycleButton === true, activeIndex: activePageIndex(control) } : {}) };
   }
 }
@@ -105,7 +105,9 @@ export function tabRect(geom, index, count) {
   if (geom.buttons) {
     const groupWidth = Math.min(geom.strip.w, Math.max(1, num(geom.buttonGroupWidth, geom.strip.w)));
     const cell = groupWidth / total;
-    const w = Math.max(1, Math.min(180, cell - num(geom.buttonGap, 12)));
+    // 180px unless the container says otherwise: a row of page buttons meant to span the strip
+    // (the GAIA's lower pages) sets a larger maximum instead of sitting as islands in wide cells.
+    const w = Math.max(1, Math.min(num(geom.buttonMaxWidth, 180) || 180, cell - num(geom.buttonGap, 12)));
     const h = Math.max(1, Math.min(num(geom.buttonHeight, 20), geom.strip.h - (geom.buttonHeight ? 0 : 8)));
     return { x: geom.strip.x + geom.strip.w - groupWidth + index * cell + (cell - w) / 2,
       y: geom.strip.y + (geom.strip.h - h) / 2, w, h };

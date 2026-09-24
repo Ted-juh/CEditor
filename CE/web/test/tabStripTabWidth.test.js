@@ -42,3 +42,13 @@ test('a tabWidth wider than an equal share falls back to the equal share', () =>
   assert.equal(tabRect(geom, 3, 4).x, 300);
   assert.equal(tabRect(geom, 3, 4).w, 100);
 });
+
+test('page buttons are 180px at most unless the container raises the limit', () => {
+  const buttons = (extra) => tabGeometry(800, 200, tabs({ appearance: 'buttons', ...extra }));
+  assert.equal(tabRect(buttons({}), 0, 4).w, 180, 'the default cap is unchanged');
+  // The GAIA's lower pages: four buttons spanning the strip, each its share less the gap.
+  const wide = buttons({ buttonMaxWidth: 10000 });
+  assert.deepEqual([0, 1, 2, 3].map((i) => tabRect(wide, i, 4).w), [188, 188, 188, 188]);
+  assert.equal(tabRect(wide, 0, 4).x, 6);
+  assert.equal(tabAtPoint(wide, 750, 10, 4), 3, 'clicks follow the wider buttons');
+});

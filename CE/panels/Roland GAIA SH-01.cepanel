@@ -180856,7 +180856,8 @@
           "tabColour": "FF252D32",
           "activeTabColour": "FF39372B",
           "labelColour": "FFB8C3CA",
-          "activeLabelColour": "FFFFE1A0"
+          "activeLabelColour": "FFFFE1A0",
+          "buttonMaxWidth": 10000
         },
         "Children": {
           "_children": {
