@@ -11,6 +11,8 @@ import labBg from '../../../tools/ctrl49/screen-lab/lab_bg.png?url';
 import vuFace from '../../../tools/ctrl49/screen-lab/vu_face.png?url';
 import vuNeedle from '../../../tools/ctrl49/screen-lab/vu_needle.png?url';
 import stressBlock from '../../../tools/ctrl49/screen-lab/stress_block.png?url';
+import logoStrip from '../../../tools/ctrl49/screen-lab/logo_strip.png?url';
+import spinnerStrip from '../../../tools/ctrl49/screen-lab/spinner_strip.png?url';
 
 const load = async (url) => createImageBitmap(await (await fetch(url)).blob());
 
@@ -18,8 +20,9 @@ const load = async (url) => createImageBitmap(await (await fetch(url)).blob());
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const WIDTH = 440, COLUMNS = 110, TOP = 132, VU_FRAMES = 48;
 export function showcaseFrame(page, frame, enc, last, playhead, vuL, vuR, pads) {
-  return [clamp(page, 0, 4), frame & 0xff, ...enc.map((v) => clamp(v, 0, 127)),
-    clamp(last, 0, 7), clamp(playhead, 0, 15), clamp(vuL, 0, VU_FRAMES - 1), clamp(vuR, 0, VU_FRAMES - 1), pads];
+  return [clamp(page, 0, 5), frame & 0xff, ...enc.map((v) => clamp(v, 0, 127)),
+    clamp(last, 0, 7), clamp(playhead, 0, 15), clamp(vuL, 0, VU_FRAMES - 1), clamp(vuR, 0, VU_FRAMES - 1), pads,
+    (frame >> 8) & 0xff];
 }
 const ms = (v) => Math.pow(10000, clamp(v, 0, 127) / 127);
 const timeText = (v) => (ms(v) < 1000 ? `${Math.round(ms(v))} ms` : `${(ms(v) / 1000).toFixed(1)} s`);
@@ -51,6 +54,7 @@ export function envelope(attack, decay, sustain, release) {
 const assets = {
   0x0220: await load(surfaceAtlas), 0x0230: await load(labBg), 0x0232: await load(richAtlas),
   0x0234: await load(vuFace), 0x0236: await load(vuNeedle),
+  0x0238: await load(logoStrip), 0x023a: await load(spinnerStrip),
 };
 const block = await load(stressBlock);
 for (let i = 0; i < 8; i++) assets[0x0250 + i] = block;

@@ -13,6 +13,12 @@ Writes:
   vu_face.png        an analog VU face
   vu_needle.png      the needle as a 48-frame filmstrip (rotation is the one thing that must be baked)
   stress_block.png   a 256x1024 block that decodes to 1 MB, for the stress page's memory test
+  logo_strip.png     the HoSTage logo as a 16-frame flipbook, a sheen sweeping across it
+  spinner_strip.png  a white 16-frame loading spinner the device tints
+
+Any GIF becomes a flipbook the same way — the device has no GIF, but a GIF is only frames:
+
+    python make_lab_assets.py --gif in.gif out_strip.png [--width 120]
 
 and rewrites the sprite tables between the BEGIN/END SPRITES markers in the Lua pages, so the
 coordinates the pages crop by can never drift from the PNGs they crop.
@@ -209,6 +215,64 @@ def vu():
     strip.save(path('vu_needle.png'), optimize=True)
 
 
+# --- flipbooks: animation the device can play --------------------------------------------------
+
+LOGO_W, LOGO_H, LOGO_FRAMES = 220, 40, 16
+SPIN, SPIN_FRAMES = 32, 16
+
+
+def logo_strip():
+    """The HoSTage logo (tools/ctrl49/hostage_logo.png, an alpha mask) in orange, with a band of
+    light sweeping across it once per loop: 16 frames the device steps through."""
+    mask = Image.open(os.path.join(HERE, '..', 'hostage_logo.png')).convert('RGBA').split()[3]
+    mask = mask.resize((LOGO_W, LOGO_H), Image.LANCZOS)
+    strip = Image.new('RGBA', (LOGO_W, LOGO_H * LOGO_FRAMES), (0, 0, 0, 0))
+    for f in range(LOGO_FRAMES):
+        colour = Image.new('RGBA', (LOGO_W, LOGO_H), (255, 148, 8, 255))
+        sheen = Image.new('L', (LOGO_W, LOGO_H), 0)
+        centre = -60 + (LOGO_W + 120) * f / (LOGO_FRAMES - 1)
+        ImageDraw.Draw(sheen).polygon([(centre - 18, LOGO_H), (centre + 2, 0), (centre + 26, 0), (centre + 6, LOGO_H)], fill=235)
+        sheen = sheen.filter(ImageFilter.GaussianBlur(4))
+        colour = Image.composite(Image.new('RGBA', colour.size, (255, 244, 220, 255)), colour, sheen)
+        colour.putalpha(mask)
+        strip.paste(colour, (0, f * LOGO_H))
+    strip.save(path('logo_strip.png'), optimize=True)
+
+
+def spinner_strip():
+    """A loading spinner, white so the device can tint it: a ring of 12 dashes, brightest at
+    the head, rotated one step per frame. Rotation is baked — the device cannot rotate."""
+    strip = Image.new('RGBA', (SPIN, SPIN * SPIN_FRAMES), (255, 255, 255, 0))
+    for f in range(SPIN_FRAMES):
+        im = canvas(SPIN, SPIN)
+        d = ImageDraw.Draw(im)
+        c = SPIN * S / 2
+        for k in range(12):
+            a = 2 * math.pi * (k / 12 + f / SPIN_FRAMES)
+            alpha = int(255 * (k + 1) / 12)
+            d.line((c + 7 * S * math.sin(a), c - 7 * S * math.cos(a), c + 14 * S * math.sin(a), c - 14 * S * math.cos(a)),
+                   fill=(255, 255, 255, alpha), width=3 * S)
+        strip.paste(down(im), (0, f * SPIN))
+    strip.save(path('spinner_strip.png'), optimize=True)
+
+
+def gif_to_strip(gif, out, width=None):
+    """Any GIF as a vertical flipbook PNG: frame N at y = N * height. Prints what the device
+    needs to know — frame size, frame count, and what it costs in device memory."""
+    from PIL import ImageSequence
+    frames = [f.convert('RGBA') for f in ImageSequence.Iterator(Image.open(gif))]
+    w, h = frames[0].size
+    if width:
+        h, w = round(h * width / w), width
+        frames = [f.resize((w, h), Image.LANCZOS) for f in frames]
+    strip = Image.new('RGBA', (w, h * len(frames)), (0, 0, 0, 0))
+    for i, f in enumerate(frames):
+        strip.paste(f, (0, i * h))
+    strip.save(out, optimize=True)
+    print(f'{out}: {len(frames)} frames of {w}x{h}, {os.path.getsize(out)} bytes, '
+          f'decodes to ~{w * h * 4 * len(frames) // 1024} KB on the device')
+
+
 # --- the stress page's memory block ------------------------------------------------------------
 
 def stress_block():
@@ -224,14 +288,22 @@ def stress_block():
 
 
 if __name__ == '__main__':
+    import sys
+    if len(sys.argv) >= 4 and sys.argv[1] == '--gif':
+        width = int(sys.argv[sys.argv.index('--width') + 1]) if '--width' in sys.argv else None
+        gif_to_strip(sys.argv[2], sys.argv[3], width)
+        sys.exit(0)
     flat = pack(flat_sprites(), 'surface_atlas.png')
     background()
     rich = pack(rich_sprites(), 'rich_atlas.png')
     vu()
     stress_block()
+    logo_strip()
+    spinner_strip()
     write_tables('Hostage_Showcase.lua', [lua_table('SPR', flat), lua_table('R', rich)])
     write_tables('Hostage_Stress.lua', [lua_table('SPR', flat)])
-    for f in ('surface_atlas.png', 'rich_atlas.png', 'lab_bg.png', 'vu_face.png', 'vu_needle.png', 'stress_block.png'):
+    for f in ('surface_atlas.png', 'rich_atlas.png', 'lab_bg.png', 'vu_face.png', 'vu_needle.png',
+              'stress_block.png', 'logo_strip.png', 'spinner_strip.png'):
         im = Image.open(path(f))
         print(f'{f:18s} {im.size[0]:4d}x{im.size[1]:<5d} {os.path.getsize(path(f)):7d} bytes  '
               f'decodes to ~{im.size[0] * im.size[1] * 4 // 1024} KB')

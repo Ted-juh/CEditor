@@ -26,9 +26,10 @@ namespace ceditor::ctrl49::lab
 
 // --- the showcase ------------------------------------------------------------------------------
 
-inline constexpr int kShowcasePages = 5;   // faders, pads, sequencer, envelope, meters
+inline constexpr int kShowcasePages = 6;   // faders, pads, sequencer, envelope, meters, animation
 inline constexpr const char* kShowcasePageNames[kShowcasePages] {
-    "FADERS", "PADS", "SEQUENCER", "ENVELOPE", "METERS" };
+    "FADERS", "PADS", "SEQUENCER", "ENVELOPE", "METERS", "ANIMATION" };
+inline constexpr int kAnimationPage = 5;
 
 // The envelope graph's geometry, shared with Hostage_Showcase.lua: 110 columns of 4 px.
 inline constexpr int kEnvelopeWidth   = 440;
@@ -39,9 +40,11 @@ inline constexpr int kEnvelopeTop     = kEnvelopeHeight - 8;   // the peak's hei
 inline constexpr int kVuFrames = 48;       // frames in vu_needle.png
 
 /** Everything that moves on the showcase, once a frame:
-    [page][frame][e1..e8][lastEncoder][playhead][vuLeft][vuRight][padsLit]. Encoders are
-    0..127, lastEncoder 0..7, playhead 0..15, the VU values are needle frames, padsLit has bit
-    N set for pad N+1. */
+    [page][frameLo][e1..e8][lastEncoder][playhead][vuLeft][vuRight][padsLit][frameHi].
+    Encoders are 0..127, lastEncoder 0..7, playhead 0..15, the VU values are needle frames,
+    padsLit has bit N set for pad N+1. The frame counter is 16 bits so an animation's loop
+    does not jump when an 8-bit counter would wrap; its high byte is last, so the layout of
+    everything before it is what it always was. */
 inline Bytes buildShowcaseFrame (int page, int frame, const std::array<int, 8>& encoders,
                                  int lastEncoder, int playhead, int vuLeft, int vuRight,
                                  std::uint8_t padsLit)
@@ -56,7 +59,18 @@ inline Bytes buildShowcaseFrame (int page, int frame, const std::array<int, 8>& 
     out.push_back ((std::uint8_t) std::clamp (vuLeft, 0, kVuFrames - 1));
     out.push_back ((std::uint8_t) std::clamp (vuRight, 0, kVuFrames - 1));
     out.push_back (padsLit);
+    out.push_back ((std::uint8_t) ((frame >> 8) & 0xFF));
     return out;
+}
+
+/** The device keeps no time: every animation frame is a redraw the host asks for. The
+    animation page's E1 sets how many per second (5-30), so how smooth each rate looks can be
+    seen on the unit; every other showcase page redraws at the proven 10. */
+inline int animationFps (int e1) { return 5 + std::clamp (e1, 0, 127) * 25 / 127; }
+
+inline int showcaseIntervalMs (int page, int e1)
+{
+    return page == kAnimationPage ? 1000 / animationFps (e1) : 100;
 }
 
 /** An envelope stage time for an encoder value: 1 ms at 0 to 10 s at 127, exponential, the way

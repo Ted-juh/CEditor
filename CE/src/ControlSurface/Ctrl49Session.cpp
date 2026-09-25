@@ -21,7 +21,8 @@ namespace
 } // namespace
 
 std::vector<Ctrl49Session::TimedFrame>
-Ctrl49Session::buildStartupSequence (const Bytes& rawLua, const std::vector<PngAsset>& assets)
+Ctrl49Session::buildStartupSequence (const Bytes& rawLua, const std::vector<PngAsset>& assets,
+                                     int keepaliveEveryUploadFrames)
 {
     const ObjectKey key { kObjectTypeLua, kLuaObjectId };
 
@@ -81,9 +82,17 @@ Ctrl49Session::buildStartupSequence (const Bytes& rawLua, const std::vector<PngA
         sequence.push_back ({ objectFrames[index], 2 });
 
     // Upload PNG assets before bind/init so the page's decode_image calls succeed.
+    int sinceKeepalive = 0;
     for (const auto& frames : assetFrames)
         for (const auto& frame : frames)
+        {
             sequence.push_back ({ frame, 2 });
+            if (keepaliveEveryUploadFrames > 0 && ++sinceKeepalive >= keepaliveEveryUploadFrames)
+            {
+                sequence.push_back ({ buildKeepalive(), 2 });
+                sinceKeepalive = 0;
+            }
+        }
 
     sequence.push_back ({ buildBindLua (kTarget, kLuaObjectId), 8 });
     sequence.push_back ({ buildLuaCall (kTarget, "init", {}), 3 });
@@ -134,7 +143,7 @@ void Ctrl49Session::start()
     options_.log ("Starting CTRL49 display session: uploading one original Lua page.");
     {
         std::lock_guard<std::mutex> lock (midiMutex_);
-        for (const auto& step : buildStartupSequence (rawLua_, assets_))
+        for (const auto& step : buildStartupSequence (rawLua_, assets_, options_.keepaliveEveryUploadFrames))
         {
             sendLocked (step.frame);
             if (step.pauseMs > 0)

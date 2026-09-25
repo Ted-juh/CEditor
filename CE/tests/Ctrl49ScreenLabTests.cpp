@@ -38,15 +38,26 @@ int main()
     {   // --- the showcase frame ------------------------------------------------------------
         const auto frame = lab::buildShowcaseFrame (2, 300, { 0, 10, 127, 200, -5, 64, 64, 64 },
                                                     3, 7, 12, 99, 0b10000001);
-        check (frame.size() == 15, "a showcase frame is 15 bytes");
+        check (frame.size() == 16, "a showcase frame is 16 bytes");
         check (frame[0] == 2 && frame[1] == (300 & 0xFF), "page, then the frame counter's low byte");
         check (frame[2] == 0 && frame[4] == 127 && frame[5] == 127 && frame[6] == 0,
                "encoders are clamped to 0..127");
         check (frame[10] == 3 && frame[11] == 7, "then the last encoder moved and the playhead");
         check (frame[13] == lab::kVuFrames - 1, "a needle frame past the strip is pinned to its last frame");
-        check (frame[14] == 0b10000001, "and the lit pads as a bitmask");
+        check (frame[14] == 0b10000001, "then the lit pads as a bitmask");
+        check (frame[15] == (300 >> 8), "and last the frame counter's high byte, so a loop never jumps at 255");
         check (lab::buildShowcaseFrame (9, 0, {}, 0, 0, 0, 0, 0)[0] == lab::kShowcasePages - 1,
                "and a page past the end is the last page");
+    }
+
+    {   // --- the animation page's clock -------------------------------------------------
+        check (lab::kShowcasePageNames[lab::kAnimationPage] == std::string ("ANIMATION"),
+               "the animation page is the showcase's last");
+        check (lab::animationFps (0) == 5 && lab::animationFps (127) == 30,
+               "its E1 sets 5 to 30 redraws per second");
+        check (lab::showcaseIntervalMs (lab::kAnimationPage, 127) == 33
+                 && lab::showcaseIntervalMs (0, 127) == 100,
+               "which only the animation page follows; the others redraw at the proven 10");
     }
 
     {   // --- the envelope ------------------------------------------------------------------

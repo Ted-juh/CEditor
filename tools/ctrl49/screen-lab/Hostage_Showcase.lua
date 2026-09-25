@@ -1,12 +1,12 @@
--- CTRL49 screen lab: the showcase. Five pages of how far pre-rendered PNGs take the screen past
+-- CTRL49 screen lab: the showcase. Six pages of how far pre-rendered PNGs take the screen past
 -- flat rectangles — flat faders and RGB pads with tinted white shapes, then a step sequencer,
--- an envelope and a pair of analog VU meters in full colour.
+-- an envelope and a pair of analog VU meters in full colour, and a page of animation.
 --
 -- The firmware draws filled rectangles, text boxes, and sub-rectangles of uploaded PNGs with a
 -- tint. Nothing else: no lines, arcs, pixels, scaling or rotation. So every gradient, gloss,
 -- glow, shadow and rotated needle is baked into the PNGs (make_lab_assets.py), and this page
 -- only crops and places them. The host does the maths (Ctrl49ScreenLab.h) and sends
---   set_frame     [page][frame][e1..e8][lastEncoder][playhead][vuL][vuR][padsLit]
+--   set_frame     [page][frameLo][e1..e8][lastEncoder][playhead][vuL][vuR][padsLit][frameHi]
 --   set_envelope  [110 column heights][attackCol][decayEndCol][releaseStartCol][sustain] + 4 texts
 -- This page keeps the demo content itself, so the lab needs no synth.
 --
@@ -23,10 +23,13 @@ local BG, BG_PNG         = 0x0231, 0x0230
 local RICH, RICH_PNG     = 0x0233, 0x0232
 local VUFACE, VUFACE_PNG = 0x0235, 0x0234
 local NEEDLE, NEEDLE_PNG = 0x0237, 0x0236
+local LOGO, LOGO_PNG     = 0x0239, 0x0238     -- 220x40 x 16 frames
+local SPIN, SPIN_PNG     = 0x023B, 0x023A     -- 32x32 x 16 frames, white
 
 local BLACK, WHITE, GREY = 0xFF07090D, 0xFFFFFFFF, 0xFFAAB2BF
 local DIM, DARK, ORANGE  = 0xFF5A6B82, 0xFF3A4352, 0xFFFF9408
 local TRACK, LINE, GRID  = 0xFF1C222B, 0xFF222933, 0xFF1E2A36
+local CYAN_TEXT          = 0xFF9FE8FF
 
 local function floor (x) return x - x % 1 end
 -- A whole number as text. Lua 5.3+ keeps floor()'s result a float ("78.0"); 5.2, which the
@@ -102,6 +105,8 @@ function init (args)
     decode_image(14, RICH_PNG, 18, RICH, WHITE)
     decode_image(14, VUFACE_PNG, 18, VUFACE, WHITE)
     decode_image(14, NEEDLE_PNG, 18, NEEDLE, WHITE)
+    decode_image(14, LOGO_PNG, 18, LOGO, WHITE)
+    decode_image(14, SPIN_PNG, 18, SPIN, WHITE)
     initialized = true
 end
 
@@ -119,6 +124,7 @@ function set_frame (args)
     vuL = get_byte(args, 12)
     vuR = get_byte(args, 13)
     padsLit = get_byte(args, 14)
+    frame = frame + get_byte(args, 15) * 256
 end
 
 function set_envelope (args)
@@ -152,7 +158,7 @@ end
 
 local function footer (text)
     draw_rect(0, 252, 480, 1, LINE)
-    say(FOOT, text .. "     PAGE < > " .. (page + 1) .. "/5", DIM, 0, 255, 480, 15)
+    say(FOOT, text .. "     PAGE < > " .. (page + 1) .. "/6", DIM, 0, 255, 480, 15)
 end
 
 -- Faders, flat: rectangles and a tinted cap. The encoders stand in for the physical faders,
@@ -305,11 +311,86 @@ local function draw_meters ()
     footer("E1 = LEVEL  (demo signal)")
 end
 
+-- Animation. The device keeps no time, so every frame here is a redraw the host asked for, and
+-- the frame counter it sends is the only clock: everything below is a function of it. Four
+-- kinds, all from calls the page already uses —
+--   flipbook  a frame of a filmstrip (the logo's sheen, the spinner): what a GIF becomes
+--   movement  x/y from the counter, with easing (the cards)
+--   masking   text scrolled through a strip whose ends are painted over it (the marquee)
+--   tint      a colour from the counter (the breathing buttons), which costs no memory at all
+local PRESETS = { "Warm Analog Pad", "Glass Bells", "Moog Bass 1974", "Choir of Machines", "Tape Strings" }
+local MARQUEE = "NOW PLAYING  -  Warm Analog Pad  -  slow filter sweep, chorus, long release  -  HoSTage  -  "
+local BREATHE = { { 255, 148, 8 }, { 0, 200, 255 }, { 224, 64, 255 }, { 64, 255, 96 } }
+
+local function rgb (r, g, b) return 0xFF000000 + floor(r) * 65536 + floor(g) * 256 + floor(b) end
+
+local function draw_animation ()
+    local fps = 5 + floor(enc[1] * 25 / 127)
+    rich_chrome("ANIMATION", whole(fps) .. " redraws/s  -  E1")
+
+    -- Flipbooks: the logo's sheen sweeps once every 16 frames, then rests for 16.
+    local sweep = frame % 32
+    if sweep > 15 then sweep = 15 end
+    draw_image(18, LOGO, 130, 36, 0, sweep * 40, 220, 40, WHITE)
+    draw_image(18, SPIN, 430, 40, 0, (frame % 16) * 32, 32, 32, ORANGE)
+
+    -- A marquee: the text slides left through a strip; its two ends are painted over it after,
+    -- so it appears to scroll inside the strip whether or not the device clips text.
+    local strip = 0xFF0A0D12
+    draw_rect(0, 88, 480, 30, strip)
+    local width = #MARQUEE * 7
+    local x = 20 - (frame * 3) % width
+    say(TITLE, MARQUEE, CYAN_TEXT, x, 91, width, 24)
+    say(TITLE, MARQUEE, CYAN_TEXT, x + width, 91, width, 24)
+    draw_image(18, BG, 0, 88, 0, 88, 20, 30, WHITE)       -- the ends: the background, put back
+    draw_image(18, BG, 460, 88, 460, 88, 20, 30, WHITE)
+    draw_rect(20, 88, 440, 1, LINE)
+    draw_rect(20, 117, 440, 1, LINE)
+
+    -- Cards: each preset slides in from the right, holds, and slides out to the left, eased —
+    -- in fast and settling (ease-out), out slow then quick (ease-in). 60 frames per card.
+    local t = frame % 60
+    local card = PRESETS[floor(frame / 60) % #PRESETS + 1]
+    local cx
+    if t < 14 then
+        local u = 1 - t / 14
+        cx = 140 + floor(340 * u * u * u)
+    elseif t < 46 then
+        cx = 140
+    else
+        local u = (t - 46) / 14
+        cx = 140 - floor(340 * u * u * u)
+    end
+    if cx < 480 and cx > -200 then
+        draw_rect(cx, 128, 200, 58, 0xFF141A22)
+        draw_rect(cx, 128, 4, 58, ORANGE)
+        say(SMALL, "PRESET " .. whole(floor(frame / 60) % #PRESETS + 1) .. " / " .. #PRESETS, DIM, cx + 10, 132, 180, 14)
+        say(BIG, card, WHITE, cx + 10, 150, 180, 26)
+    end
+    -- The screen's edges are put back over the card too, so it slides out of view rather than
+    -- off the glass, whatever the device does with a rectangle that runs past the edge.
+    draw_image(18, BG, 0, 128, 0, 128, 20, 58, WHITE)
+    draw_image(18, BG, 460, 128, 460, 128, 20, 58, WHITE)
+
+    -- Breathing: eight buttons in four colours, each on its own phase of a 40-frame breath.
+    for i = 1, 8 do
+        local phase = (frame + i * 5) % 40
+        local level = phase
+        if level > 20 then level = 40 - level end
+        level = 0.25 + 0.75 * level / 20
+        local c = BREATHE[(i - 1) % 4 + 1]
+        flat("btn", 22 + (i - 1) * 56, 204, rgb(c[1] * level, c[2] * level, c[3] * level))
+        say(BTN, "PAD " .. i, BLACK, 22 + (i - 1) * 56, 204, 44, 20)
+    end
+    footer("FLIPBOOK - MOVEMENT - MASKING - TINT")
+end
+
 function draw (args)
     if not initialized then init("") end
     if page == 0 then draw_faders()
     elseif page == 1 then draw_pads()
     elseif page == 2 then draw_sequencer()
     elseif page == 3 then draw_envelope()
-    else draw_meters() end
+    elseif page == 4 then draw_meters()
+    else draw_animation() end
 end

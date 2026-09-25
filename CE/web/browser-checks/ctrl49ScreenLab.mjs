@@ -36,12 +36,12 @@ try {
     'the preview builds the same envelope bytes the tool sends');
 
   const shot = async (name) => { if (shots) await page.locator('#screen').screenshot({ path: path.join(shots, `${name}.png`) }); };
-  const names = ['faders', 'pads', 'sequencer', 'envelope', 'meters'];
+  const names = ['faders', 'pads', 'sequencer', 'envelope', 'meters', 'animation'];
   for (let p = 0; p < names.length; p++) {
     const calls = await page.evaluate((p) => {
       const lab = window.lab;
       lab.showcase.call('set_envelope', lab.envelope(20, 70, 90, 60));
-      lab.showcase.call('set_frame', lab.showcaseFrame(p, 12, [70, 30, 110, 64, 96, 50, 0, 88], 1, 6, 30, 26, 0b00010001));
+      lab.showcase.call('set_frame', lab.showcaseFrame(p, 300, [70, 30, 110, 64, 96, 50, 0, 88], 1, 6, 30, 26, 0b00010001));
       return lab.showcase.draw();
     }, p);
     const colours = await page.evaluate(() => window.lab.colours());
@@ -50,6 +50,23 @@ try {
     await shot(`showcase-${p + 1}-${names[p]}`);
     console.log(`  ${names[p].padEnd(10)} ${calls.rect} rects, ${calls.image} images, ${calls.text} texts`);
   }
+
+  // The animation page is a function of the frame counter: two frames apart it draws the same
+  // amount of work, and a different picture — the proof it moves. A run of frames is saved as a
+  // strip when screenshots are asked for, so the motion can be looked at.
+  const frames = [];
+  for (const f of [300, 305, 310, 330, 360, 400]) {
+    frames.push(await page.evaluate((f) => {
+      const lab = window.lab;
+      lab.showcase.call('set_frame', lab.showcaseFrame(5, f, [80, 0, 0, 0, 0, 0, 0, 0], 0, 0, 0, 0, 0));
+      lab.showcase.draw();
+      return document.getElementById('screen').toDataURL();
+    }, f));
+    await shot(`animation-frame-${f}`);
+  }
+  assert.equal(new Set(frames).size, frames.length, 'every animation frame is a different picture');
+  assert.equal(frames[0] === frames[3], false);
+  console.log(`  animation  ${frames.length} distinct frames`);
 
   // The stress page at a middling load: it draws what it is asked, and decodes memory blocks
   // one per redraw until it has as many as asked.
@@ -66,5 +83,5 @@ try {
   console.log(`  stress     ${stress.rect} rects, ${stress.image} images, ${stress.text} texts`);
 
   assert.deepEqual(errors, []);
-  console.log('CTRL49 screen lab checks passed: payload ports match the C++ golden, all six pages render.');
+  console.log('CTRL49 screen lab checks passed: payload ports match the C++ golden, all seven pages render, the animation moves.');
 } finally { await browser.close(); await server.close(); }

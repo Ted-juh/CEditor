@@ -13,6 +13,7 @@ namespace
 {
 using ceditor::ctrl49::Bytes;
 using ceditor::ctrl49::Ctrl49Reducer;
+using ceditor::ctrl49::buildKeepalive;
 
 int failures = 0;
 
@@ -205,6 +206,42 @@ int main()
         check (sawPngObject, "PNG asset uploaded as an object of type 0x000E");
         check (lastBeginBeforeBind >= 0 && bindIndex > lastBeginBeforeBind,
                "All object uploads (Lua + PNG) precede the bind");
+    }
+
+    {   // --- keepalives during a long upload: opt-in, and nothing else moves ---------------------
+        Bytes rawLua (600, static_cast<std::uint8_t> ('-'));
+        Bytes png (512 * 10, static_cast<std::uint8_t> (0x7E));   // ~11 chunk frames
+        const std::vector<Ctrl49Session::PngAsset> assets { { 0x0200, png } };
+        const auto keepalive = buildKeepalive();
+        const auto countKeepalives = [&keepalive] (const std::vector<Ctrl49Session::TimedFrame>& seq)
+        {
+            int n = 0;
+            for (const auto& step : seq) n += step.frame == keepalive ? 1 : 0;
+            return n;
+        };
+
+        const auto proven = Ctrl49Session::buildStartupSequence (rawLua, assets);
+        const auto interleaved = Ctrl49Session::buildStartupSequence (rawLua, assets, 4);
+        const auto same = [] (const std::vector<Ctrl49Session::TimedFrame>& a,
+                              const std::vector<Ctrl49Session::TimedFrame>& b)
+        {
+            if (a.size() != b.size()) return false;
+            for (std::size_t i = 0; i < a.size(); ++i)
+                if (a[i].frame != b[i].frame || a[i].pauseMs != b[i].pauseMs) return false;
+            return true;
+        };
+        check (same (proven, Ctrl49Session::buildStartupSequence (rawLua, assets, 0)),
+               "without the option the startup sequence is the proven one, unchanged");
+        const auto extra = countKeepalives (interleaved) - countKeepalives (proven);
+        check (extra >= 2, "with it, keepalives are interleaved into the PNG upload");
+        check (interleaved.size() == proven.size() + (std::size_t) extra,
+               "and nothing is added but keepalives");
+        std::vector<Bytes> provenFrames, interleavedFrames;
+        for (const auto& step : proven) provenFrames.push_back (step.frame);
+        for (const auto& step : interleaved) if (step.frame != keepalive) interleavedFrames.push_back (step.frame);
+        std::vector<Bytes> provenWithout;
+        for (const auto& f : provenFrames) if (f != keepalive) provenWithout.push_back (f);
+        check (interleavedFrames == provenWithout, "every upload frame is still there, in order");
     }
 
     std::cout << "-------------------\n"

@@ -1,14 +1,19 @@
 // CTRL49 screen lab — the on-hardware half of tools/ctrl49/screen-lab. Uploads one of two Lua
 // pages with its PNGs and drives it from the keyboard:
 //
-//   Ctrl49ScreenLab showcase <screen-lab dir>   five pages of what baked PNGs can look like:
-//                                               Page </> walks them, the encoders and pads play
+//   Ctrl49ScreenLab showcase <screen-lab dir>   six pages of what baked PNGs can look like,
+//                                               the last one animated: Page </> walks them, the
+//                                               encoders and pads play
 //   Ctrl49ScreenLab stress   <screen-lab dir>   E1-E6 raise the drawing load until the screen
 //                                               stutters or the watchdog gives up; the console
 //                                               prints the load that did it
 //
 // Everything sent is built in Ctrl49ScreenLab.h, where it is tested and where the browser
 // preview gets the same bytes. Windows-only. Single-owner named mutex; Ctrl+C exits cleanly.
+//
+// A third argument, --no-upload-keepalive, uploads the way HoSTage does (no keepalives between
+// PNG chunks). The lab uploads far more than HoSTage, so by default it keeps the watchdog fed
+// during the upload; turning that off shows whether the upload alone is too long for it.
 
 #ifdef _WIN32
 
@@ -70,7 +75,7 @@ double millisecondsSince (Clock::time_point start)
 
 int usage()
 {
-    std::printf ("usage: Ctrl49ScreenLab showcase|stress <tools\\ctrl49\\screen-lab folder>\n");
+    std::printf ("usage: Ctrl49ScreenLab showcase|stress <tools\\ctrl49\\screen-lab folder> [--no-upload-keepalive]\n");
     return 2;
 }
 } // namespace
@@ -85,6 +90,7 @@ int wmain (int argc, wchar_t** argv)
     if (! stress && mode != L"showcase")
         return usage();
     const std::filesystem::path labDir = argv[2];
+    const bool uploadKeepalive = ! (argc >= 4 && std::wstring (argv[3]) == L"--no-upload-keepalive");
 
     Bytes rawLua;
     std::vector<Ctrl49Session::PngAsset> assets;
@@ -105,6 +111,8 @@ int wmain (int argc, wchar_t** argv)
             assets.push_back ({ 0x0232, readFile (labDir / "rich_atlas.png") });
             assets.push_back ({ 0x0234, readFile (labDir / "vu_face.png") });
             assets.push_back ({ 0x0236, readFile (labDir / "vu_needle.png") });
+            assets.push_back ({ 0x0238, readFile (labDir / "logo_strip.png") });
+            assets.push_back ({ 0x023A, readFile (labDir / "spinner_strip.png") });
         }
     }
     catch (const std::exception& error)
@@ -143,10 +151,14 @@ int wmain (int argc, wchar_t** argv)
 
         Ctrl49SessionOptions options;
         options.log = logLine;
+        // ~48 chunks is ~24 KB between keepalives: well inside the ~900 ms watchdog even over
+        // a slow link, and still few enough extra frames to be invisible in the upload time.
+        options.keepaliveEveryUploadFrames = uploadKeepalive ? 48 : 0;
         Ctrl49Session session (output, rawLua, assets, options);
 
         logLine ("Uploading " + std::to_string (uploadBytes / 1024) + " KB (page + "
-                 + std::to_string (assets.size()) + " PNGs)...");
+                 + std::to_string (assets.size()) + " PNGs), "
+                 + (uploadKeepalive ? "keeping the watchdog fed..." : "with no keepalives, as HoSTage does..."));
         const auto uploadStart = Clock::now();
         session.start();
         logLine ("Upload and startup took " + std::to_string ((int) millisecondsSince (uploadStart)) + " ms.");
@@ -177,8 +189,9 @@ int wmain (int argc, wchar_t** argv)
                      "E6 redraws/s. Raise one at a time; note the load when the orange bar stops "
                      "gliding. Ctrl+C to stop.");
         else
-            logLine ("Showcase. Page < > walks FADERS, PADS, SEQUENCER, ENVELOPE, METERS; the "
-                     "encoders and pads play each page. Ctrl+C to stop.");
+            logLine ("Showcase. Page < > walks FADERS, PADS, SEQUENCER, ENVELOPE, METERS, "
+                     "ANIMATION; the encoders and pads play each page (on ANIMATION, E1 sets the "
+                     "redraw rate). Ctrl+C to stop.");
 
         while (! g_quit.load())
         {
@@ -218,7 +231,8 @@ int wmain (int argc, wchar_t** argv)
             }
 
             const auto load = lab::stressLoad (encoders[0]);
-            const auto interval = std::chrono::milliseconds (stress ? 1000 / load.fps : 100);
+            const auto interval = std::chrono::milliseconds (
+                stress ? 1000 / load.fps : lab::showcaseIntervalMs (page, encoders[(std::size_t) page][0]));
             if (Clock::now() < nextRedraw)
             {
                 std::this_thread::sleep_for (std::chrono::milliseconds (1));
@@ -252,6 +266,12 @@ int wmain (int argc, wchar_t** argv)
                 const auto elapsedMs = millisecondsSince (start);
                 const int playhead = (int) (elapsedMs / 125.0) % 16;      // 120 BPM sixteenths
                 const int gain = encoders[4][0];
+                if (page == lab::kAnimationPage)
+                {
+                    static int loggedFps = -1;
+                    if (const auto fps = lab::animationFps (e[0]); fps != loggedFps)
+                        logLine ("Animation: " + std::to_string (loggedFps = fps) + " redraws/s");
+                }
                 session.callLua ("set_frame",
                                  lab::buildShowcaseFrame (page, frame, e, lastEncoder, playhead,
                                                           lab::vuFrame (lab::demoLevel (0, frame, gain)),

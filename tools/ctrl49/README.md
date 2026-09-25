@@ -171,7 +171,7 @@ Ctrl49ScreenLab.exe stress   tools/ctrl49/screen-lab
 
 Close VIP, your DAW and HoSTage / CEditor first: only one program can own the screen.
 
-**Showcase** (`Hostage_Showcase.lua`) — five pages, **Page < >** walks them:
+**Showcase** (`Hostage_Showcase.lua`) — six pages, **Page < >** walks them:
 
 | Page | What it shows | How |
 |---|---|---|
@@ -180,6 +180,18 @@ Close VIP, your DAW and HoSTage / CEditor first: only one program can own the sc
 | Sequencer | 16 glossy steps, velocity bars, playhead | full-colour baked steps; bars cropped from one gradient sprite; E1–E8 set steps 1–8 |
 | Envelope | an ADSR with a gradient fill and a glowing curve | 4 px columns cropped from one sprite, glow dots along the curve; E1–E4 = A D S R |
 | Meters | two analog VU meters | a baked face + a 48-frame needle filmstrip; E1 = level of a demo signal |
+| Animation | a logo with a sweeping sheen, a spinner, a scrolling marquee, sliding preset cards, breathing buttons | flipbooks (frame N of a strip — what a GIF becomes), movement with easing, masking (the strip's ends painted over the text), tint; **E1 sets the redraw rate, 5–30/s** |
+
+The device keeps no time: every animation frame is a redraw the host asks for, and the frame
+counter the host sends is the only clock. There is no GIF on the device either, but a GIF is only
+frames — `python make_lab_assets.py --gif in.gif out_strip.png [--width 120]` turns one into a
+flipbook strip, and prints what it will cost in device memory.
+
+The lab uploads ~290 KB of PNGs, far more than HoSTage does, so it sends a keepalive every 48
+upload chunks to keep the watchdog fed during the upload (`keepaliveEveryUploadFrames`; HoSTage's
+own startup is unchanged). A third argument, `--no-upload-keepalive`, uploads without them —
+if the stock screen comes back during the upload that way and not the other, the upload length
+is what the watchdog objects to.
 
 **Stress** (`Hostage_Stress.lua`) — the encoders set the load, per redraw:
 E1 rectangles (×16), E2 sprites (×8), E3 text boxes, E4 full-screen image blits (0–7),
@@ -195,6 +207,8 @@ What to watch, and write down:
   (or the keyboard giving up while E5 rises) is the image-memory ceiling. The knob filmstrip
   (~2 MB) and the VU needle (~4 MB) are the sizes this decides.
 - **The envelope and sequencer pages** — whether the gradients band on the panel.
+- **The animation page** — the lowest E1 rate at which the motion looks smooth, and whether it
+  still keeps up at 30.
 
 Raise one encoder at a time from zero; E6 last.
 
