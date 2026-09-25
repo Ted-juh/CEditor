@@ -514,6 +514,23 @@ public:
         unresolved slot. */
     bool nudgeControlSlot (const juce::String& pageId, const juce::String& slotId, int delta);
 
+    /** A long press on a pad's layer button: the pad steps to its next layer, wrapping at its
+        count. Returns the layer now active, or -1 for an unknown page. */
+    int cyclePadLayer (const juce::String& pageId, int padIndex);
+
+    /** The colour a pad should be lit on the hardware, 0xRRGGBB with its state already in the
+        brightness: the active layer's colour at full strength when it is assigned (and ON, for
+        a latching pad), a third of it for a latching pad that is off, a tenth for an empty
+        layer of a pad that has several (so the layer still reads), and dark for a plain empty
+        pad. An assignment that no longer resolves is dim red. */
+    int padLight (const juce::String& pageId, int padIndex) const;
+
+    /** A pad struck (down) or released on the surface's own port: drives the slot on the pad's
+        active layer the way a learned note would — momentary follows the pad, a latching pad
+        flips on the strike. Skipped (false) when that slot has a learned binding, because the
+        learned path already plays it and a toggle driven twice is a toggle that did nothing. */
+    bool pressSurfacePad (const juce::String& pageId, int padIndex, bool down);
+
     /** The surface broker reports manual page changes so a captured scene can remember the
         layout the player was actually looking at. Recall is a one-shot request: consuming it
         prevents the service from fighting later Page Left/Right presses. */
@@ -1706,6 +1723,8 @@ private:
         note, false the rest of the time so ordinary playing costs the MIDI thread nothing. */
     std::atomic<bool> slotNotesWanted { false };
     void refreshSlotNoteListening();
+    /** After a pad changes layer: re-listen, drop stale pickups, save, and tell the page. */
+    void padLayerChanged (const juce::String& pageId);
 
     // Last arp playhead step announced per part, so the drain only speaks on change.
     std::map<juce::String, int> lastArpStepByPart;

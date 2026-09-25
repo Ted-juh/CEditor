@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include <map>
 #include "PartMidiRules.h"
 #include "SessionRecovery.h"
 #include "Performance/PatternModel.h"
@@ -256,7 +257,21 @@ struct ControlSlot
     // The toggle's own memory, kept with the slot so a latched pad is still latched when the
     // session comes back rather than silently reset under a lit LED.
     bool latched = false;
+
+    // A pad can carry up to four assignments, one per LAYER, and plays whichever one its page
+    // says is active (ControlPage::padLayers). 0 is the first layer, and the only one every
+    // encoder and fader has. Each layer is a slot of its own, so an assignment, a learned
+    // binding and a latch all belong to one layer and nothing is shared between them.
+    int layer = 0;
+    // The pad's colour on this layer, as 0xRRGGBB, lit on the hardware and in the drawing.
+    // -1 = the layer's default colour (padLayerColour below), which is what makes the layer
+    // readable off the pad itself before anybody has chosen anything.
+    int colour = -1;
 };
+
+/** The colour a pad shows on a layer when nobody has chosen one: the unit's own stock orange
+    on the first, then colours far enough apart to tell at a glance which layer a pad is on. */
+int padLayerColour (int layer);
 
 // The neutral page: named control slots over parameter addresses, no hardware bytes anywhere.
 // Stage 3 compiles pages for actual surfaces; until then the Web UI drives the same slots.
@@ -278,9 +293,37 @@ struct ControlPage
     ControlSlot* findSlot (const juce::String& slotId);
     const ControlSlot* findSlot (const juce::String& slotId) const;
 
-    /** The slot riding one physical control, or null when nothing has been put there yet. */
-    ControlSlot* findSurfaceSlot (const juce::String& kind, int index);
-    const ControlSlot* findSurfaceSlot (const juce::String& kind, int index) const;
+    /** The slot riding one physical control on one layer, or null when nothing has been put
+        there yet. Only pads have layers above 0. */
+    ControlSlot* findSurfaceSlot (const juce::String& kind, int index, int layer = 0);
+    const ControlSlot* findSurfaceSlot (const juce::String& kind, int index, int layer = 0) const;
+
+    // --- pad layers --------------------------------------------------------------------------
+    //
+    // How many layers each pad has and which one it is playing, by pad index. A pad that is not
+    // in the map has one layer and plays it, which is every pad on every page written before
+    // layers existed. The active layer is part of the page rather than of the session so a pad
+    // comes back on the layer it was left on, the way a latched pad comes back latched.
+    struct PadLayers
+    {
+        int count = 1;
+        int active = 0;
+    };
+    std::map<int, PadLayers> padLayers;
+    static constexpr int maxPadLayers = 4;
+
+    int padLayerCount (int padIndex) const;
+    int activePadLayer (int padIndex) const;
+    /** Sets how many layers a pad cycles through (clamped 1..4). Slots on layers above the new
+        count are kept, only unreachable, so lowering and raising it again loses nothing. */
+    void setPadLayerCount (int padIndex, int count);
+    /** False when the layer is outside the pad's count. */
+    bool setActivePadLayer (int padIndex, int layer);
+    /** The next layer, wrapping at the pad's count; returns the layer now active. */
+    int cyclePadLayer (int padIndex);
+    /** Whether a slot is the one its control is currently playing: always, unless it is a pad
+        slot on a layer other than its pad's active one. */
+    bool isLive (const ControlSlot& slot) const;
 
     /** Encoders, faders and pads of a big desk, with room to spare; a bound on hand-edited
         manifests rather than a number anybody should reach. */

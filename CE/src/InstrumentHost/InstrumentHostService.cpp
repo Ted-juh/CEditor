@@ -190,7 +190,7 @@ namespace
             "removeScene", "renameScene", "captureScene", "setSceneOptions", "setSceneClip",
             "addSetlistItem", "removeSetlistItem", "moveSetlistItem", "setSetlistItem", "setSetlistOptions",
             "addArrangementItem", "removeArrangementItem", "setArrangementItem", "moveArrangementItem", "setArrangementOptions",
-            "setPresetAudition"
+            "setPresetAudition", "setPadLayers", "setPadActiveLayer"
         };
         if (! edits.contains (cmd)) return {};
         juce::String label;
@@ -1733,7 +1733,17 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         if (pageId.isEmpty() && ! rack.getPerformance().pages.isEmpty())
             pageId = rack.getPerformance().pages.getReference (0).pageId;
 
-        const auto slotId = rack.ensureSurfaceSlot (pageId, kind, index);
+        // A pad lands on the layer the drawing names, or else on the one it is playing: what
+        // you see on the pad is what you assign to.
+        // Anything but a pad naming a layer above the first is refused by ensureSurfaceSlot.
+        int layer = 0;
+        if (payload.hasProperty ("layer"))
+            layer = (int) payload.getProperty ("layer", 0);
+        else if (kind == "pad")
+            if (const auto* page = rack.getPerformance().findPage (pageId))
+                layer = page->activePadLayer (index);
+
+        const auto slotId = rack.ensureSurfaceSlot (pageId, kind, index, layer);
         if (slotId.isEmpty())
         {
             emitError (rack.getPerformance().findPage (pageId) == nullptr
@@ -1883,11 +1893,32 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         const bool pickup = (bool) payload.getProperty ("midiPickup", slot->midiPickup);
         const bool relative = (bool) payload.getProperty ("midiRelative", slot->midiRelative);
+        const int colour = (int) payload.getProperty ("colour", slot->colour);
         rack.setSlotBinding (pageId, slotId, std::move (binding));
         rack.setSlotMidiOptions (pageId, slotId, pickup, relative);
+        rack.setSlotColour (pageId, slotId, colour);
         midiPickups.erase ({ pageId, slotId });
         savePerformance();
         emitState();
+        return;
+    }
+
+    if (cmd == "setPadLayers" || cmd == "setPadActiveLayer")
+    {
+        // A pad's layers (ControlPage::padLayers): how many it cycles through, and which one it
+        // plays. The hardware steps the same state with a long press on the pad's button.
+        const auto pageId = payload.getProperty ("pageId", {}).toString();
+        const auto index = (int) payload.getProperty ("index", -1);
+        const auto ok = cmd == "setPadLayers"
+                          ? rack.setPadLayerCount (pageId, index, (int) payload.getProperty ("count", 1))
+                          : rack.setActivePadLayer (pageId, index, (int) payload.getProperty ("layer", 0));
+        if (! ok)
+        {
+            emitError (rack.getPerformance().findPage (pageId) == nullptr
+                         ? "Unknown control page." : "That pad has no such layer.");
+            return;
+        }
+        padLayerChanged (pageId);
         return;
     }
 
@@ -12826,6 +12857,88 @@ juce::Array<InstrumentHostService::SurfaceSlot> InstrumentHostService::surfaceSl
     return out;
 }
 
+int InstrumentHostService::cyclePadLayer (const juce::String& pageId, int padIndex)
+{
+    const auto layer = rack.cyclePadLayer (pageId, padIndex);
+    if (layer >= 0)
+        padLayerChanged (pageId);
+    return layer;
+}
+
+void InstrumentHostService::padLayerChanged (const juce::String& pageId)
+{
+    // The pad now answers to another slot's binding, so the listening set and any pickup
+    // waiting on the old one are both stale.
+    for (auto it = midiPickups.begin(); it != midiPickups.end();)
+        it = it->first.first == pageId ? midiPickups.erase (it) : std::next (it);
+    refreshSlotNoteListening();
+    savePerformance();
+    emitState();
+}
+
+int InstrumentHostService::padLight (const juce::String& pageId, int padIndex) const
+{
+    const auto* page = rack.getPerformance().findPage (pageId);
+    if (page == nullptr)
+        return 0;
+
+    const auto scaled = [] (int rgb, float amount)
+    {
+        const auto channel = [&] (int shift) { return juce::roundToInt ((float) ((rgb >> shift) & 0xFF) * amount); };
+        return (channel (16) << 16) | (channel (8) << 8) | channel (0);
+    };
+
+    const auto layer = page->activePadLayer (padIndex);
+    const auto* slot = page->findSurfaceSlot ("pad", padIndex, layer);
+    const auto colour = slot != nullptr && slot->colour >= 0 ? slot->colour : padLayerColour (layer);
+
+    if (slot == nullptr || slot->binding.isEmpty())
+        return page->padLayerCount (padIndex) > 1 ? scaled (colour, 0.1f) : 0;
+    if (! bindingResolves (slot->binding))
+        return scaled (0xFF0000, 0.3f);
+    if (slot->binding.toggle && ! slot->latched)
+        return scaled (colour, 0.3f);
+    return colour;
+}
+
+bool InstrumentHostService::pressSurfacePad (const juce::String& pageId, int padIndex, bool down)
+{
+    const auto* page = rack.getPerformance().findPage (pageId);
+    if (page == nullptr)
+        return false;
+    const auto* slot = page->findSurfaceSlot ("pad", padIndex, page->activePadLayer (padIndex));
+    if (slot == nullptr || slot->binding.isEmpty() || ! bindingResolves (slot->binding)
+        || slot->midiCc >= 0 || slot->midiNote >= 0)
+        return false;
+
+    const auto binding = slot->binding;
+    const auto slotId = slot->slotId;
+    float normalised = down ? 1.0f : 0.0f;
+    if (binding.toggle)
+    {
+        if (! down)
+            return false;
+        const auto latched = ! slot->latched;
+        rack.setSlotLatched (pageId, slotId, latched);
+        normalised = latched ? 1.0f : 0.0f;
+    }
+
+    writeMappedBinding (binding, normalised);
+    auto* action = new juce::DynamicObject();
+    action->setProperty ("cmd", "setControlSlotValue");
+    action->setProperty ("pageId", pageId);
+    action->setProperty ("slotId", slotId);
+    action->setProperty ("value", normalised);
+    recordPerformanceAction (juce::var (action));
+    const auto positioned = binding.inverted ? 1.0f - normalised : normalised;
+    recordGestureValue (binding.partId, binding.parameterId,
+                        binding.rangeMin + positioned * (binding.rangeMax - binding.rangeMin));
+    if (binding.toggle || isVirtualParameterId (binding.parameterId))
+        savePerformance();
+    emitState();
+    return true;
+}
+
 bool InstrumentHostService::nudgeControlSlot (const juce::String& pageId, const juce::String& slotId,
                                               int delta)
 {
@@ -15471,10 +15584,17 @@ void InstrumentHostService::drainControllerEvents()
 
             // One controller drives one slot: learning a controller that is already bound
             // elsewhere moves it, because two slots silently riding one knob is a support call.
+            // The one exception is the other layers of the same pad: they are the same pad, only
+            // one of them answers at a time, and sharing its note is the point of them.
+            const auto* learningPage = rack.getPerformance().findPage (pageId);
+            const auto* learning = learningPage != nullptr ? learningPage->findSlot (slotId) : nullptr;
             for (const auto& page : rack.getPerformance().pages)
                 for (const auto& other : page.slots)
                 {
                     if (page.pageId == pageId && other.slotId == slotId)
+                        continue;
+                    if (page.pageId == pageId && learning != nullptr && learning->kind == "pad"
+                        && other.kind == "pad" && other.index == learning->index)
                         continue;
                     if (other.midiChannel != first.channel)
                         continue;
@@ -15550,6 +15670,10 @@ void InstrumentHostService::drainControllerEvents()
                 if (isNote ? slot.midiNote != event.note : slot.midiCc != event.cc)
                     continue;
                 if (slot.midiChannel != 0 && slot.midiChannel != event.channel)
+                    continue;
+                // A pad plays only the layer it is on: the same hardware note can be learned on
+                // every layer, and exactly one of them answers.
+                if (! page.isLive (slot))
                     continue;
                 if (slot.binding.isEmpty() || ! bindingResolves (slot.binding))
                     continue;
@@ -16589,6 +16713,8 @@ juce::var InstrumentHostService::buildStatePayload()
             s->setProperty ("index",       slot.index);
             s->setProperty ("toggle",      b.toggle);
             s->setProperty ("latched",     slot.latched);
+            s->setProperty ("layer",       slot.layer);
+            s->setProperty ("colour",      slot.colour);
             if (slotIndex < liveSlots.size())
             {
                 const auto& live = liveSlots.getReference (slotIndex);
@@ -16608,6 +16734,18 @@ juce::var InstrumentHostService::buildStatePayload()
         pg->setProperty ("name",   page.name);
         pg->setProperty ("generated", page.generated);
         pg->setProperty ("slots",  slots);
+        // Every pad with more than one layer, and the one it is playing. A pad that is not
+        // listed has a single layer — the drawing's default, as it is the model's.
+        juce::Array<juce::var> padLayers;
+        for (const auto& [padIndex, layers] : page.padLayers)
+        {
+            auto* l = new juce::DynamicObject();
+            l->setProperty ("index",  padIndex);
+            l->setProperty ("count",  layers.count);
+            l->setProperty ("active", layers.active);
+            padLayers.add (juce::var (l));
+        }
+        pg->setProperty ("padLayers", padLayers);
         pages.add (juce::var (pg));
     }
 

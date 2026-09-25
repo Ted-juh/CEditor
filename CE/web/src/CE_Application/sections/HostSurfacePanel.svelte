@@ -31,6 +31,7 @@
     hostMidiLearn, cancelMidiLearn, clearControlSlotMidi,
     hostParamDrag, clearControlSlot, hostParameters, requestParameters,
     filterParameters, parameterShortlist, surfaceControlSlot, assignSurfaceControl, learnSurfaceControl,
+    padLayers, padColourCss, surfaceSlotId, setPadLayers, setPadActiveLayer, MAX_PAD_LAYERS,
     setControlSlotOptions, focusRackPart,
     setUserSurface, clearUserSurface, learnUserSurface, finishUserSurfaceLearn,
   } from '../stores/instrumentHost.js';
@@ -125,10 +126,31 @@
   const addressable = (control) =>
     control.index >= 0 && ['encoder', 'fader', 'pad'].includes(control.kind);
 
+  // A pad's layers on this page (count, and the one it is playing); one layer for any other.
+  const layersOf = (control) => control.kind === 'pad' ? padLayers(page, control.index) : { count: 1, active: 0 };
+
   const learningControl = (control) => $hostMidiLearn.armed
     && $hostMidiLearn.pageId === (page?.pageId ?? '')
     && ($hostMidiLearn.slotId === slotFor(control)?.slotId
-      || $hostMidiLearn.slotId === `${control.kind}-${control.index + 1}`);
+      || $hostMidiLearn.slotId === surfaceSlotId(control.kind, control.index, layersOf(control).active));
+
+  // A pad is lit in its layer's colour — the colour chosen for it, or the layer's default —
+  // exactly as the host lights the real one (InstrumentHostService::padLight), so the drawing
+  // and the keyboard agree about which layer every pad is on. Left to the state classes when
+  // there is something they must say instead: the pad you are hitting, or an assignment gone.
+  function padStyle(control, slot) {
+    if (control.kind !== 'pad' || control.index < 0) return '';
+    if (slot && litSlotId === slot.slotId) return '';
+    const layers = layersOf(control);
+    if (slot?.assigned) return slot.resolved ? `--led:${padColourCss(slot, layers.active)};` : '';
+    return layers.count > 1 ? `--led:${padColourCss(null, layers.active)};` : '';
+  }
+  // One pip per layer, in that layer's colour, the one playing drawn full.
+  const layerPips = (control) => Array.from({ length: layersOf(control).count }, (_, layer) => ({
+    layer,
+    active: layer === layersOf(control).active,
+    colour: padColourCss(surfaceControlSlot(page, control, layer), layer),
+  }));
   let mappedCount = $derived(layout.controls.filter((control) => addressable(control)
     && slotFor(control)?.assigned && slotFor(control)?.resolved).length);
 
@@ -158,16 +180,18 @@
     const what = kindLabel[control.kind] ?? control.kind;
     const named = control.label ? `${what} ${control.label}` : what;
     if (control.index < 0) return `${named} — on the keyboard, but CEditor does not map it`;
+    const layers = layersOf(control);
+    const onLayer = layers.count > 1 ? ` (layer ${layers.active + 1} of ${layers.count})` : '';
 
     const slot = slotFor(control);
     const bound = slot?.midiNote >= 0 ? ` · note ${slot.midiNote}` : slot?.midiCc >= 0 ? ` · CC ${slot.midiCc}` : '';
     if (slot?.assigned)
-      return `${named} — ${slot.displayName}${slot.partName ? ` (${slot.partName})` : ''}${bound}`
+      return `${named}${onLayer} — ${slot.displayName}${slot.partName ? ` (${slot.partName})` : ''}${bound}`
              + (slot.resolved ? '' : ' — the part no longer has this parameter')
              + (slot.toggle ? (slot.latched ? ' — latching, ON' : ' — latching, off') : '')
              + '\nClick to inspect, or drop a parameter here to reassign it.';
     if (addressable(control))
-      return `${named} — unassigned. Click to inspect, or drag a parameter onto it.`;
+      return `${named}${onLayer} — unassigned. Click to inspect, or drag a parameter onto it.`;
     return `${named} — CEditor addresses this as ${control.kind} ${control.index}`;
   }
 
@@ -271,7 +295,8 @@
   function learnSelected() {
     if (!selectedControl || !addressable(selectedControl)) return;
     if ($hostMidiLearn.armed) cancelMidiLearn();
-    else learnSurfaceControl(page?.pageId ?? '', selectedControl.kind, selectedControl.index);
+    else learnSurfaceControl(page?.pageId ?? '', selectedControl.kind, selectedControl.index,
+                             selectedControl.kind === 'pad' ? layersOf(selectedControl).active : undefined);
   }
 
   function clearSelected() {
@@ -486,7 +511,7 @@
                   style={`left:${((control.x - view.x) / view.w) * 100}%;
                           top:${((control.y - view.y) / view.h) * 100}%;
                           width:${(control.w / view.w) * 100}%;
-                          height:${(control.h / view.h) * 100}%`}>
+                          height:${(control.h / view.h) * 100}%;${padStyle(control, slot)}`}>
             <!-- The hardware face. Decoration only: state is on the button's classes and its
                  title, so nothing a screen reader or a test needs lives in here. -->
             <span class="hw" aria-hidden="true">
@@ -516,6 +541,16 @@
               <HostPickupIndicator direction={slot.pickupDirection} />
             {:else if control.kind !== 'keys' && control.kind !== 'display'}
               <span class="ctl-label" class:glyph={[...control.label].length <= 2}>{control.label}</span>
+            {/if}
+            {#if control.kind === 'pad' && layersOf(control).count > 1}
+              <!-- Which layer the pad is on, under its name: a pip per layer in that layer's
+                   colour, the one it is playing drawn full. -->
+              <span class="pad-layers" data-testid={`surface-layers-${control.controlId}`}
+                    aria-hidden="true" data-active={layersOf(control).active + 1}>
+                {#each layerPips(control) as pip (pip.layer)}
+                  <i class:active={pip.active} style={`--pip:${pip.colour}`}></i>
+                {/each}
+              </span>
             {/if}
           </button>
         {/each}
@@ -552,6 +587,50 @@
           {#if selectedControl.index < 0}
             <p class="empty-hint">This control is shown because it exists on the hardware, but the current profile cannot address it.</p>
           {:else}
+            {#if selectedControl.kind === 'pad'}
+              {@const layers = layersOf(selectedControl)}
+              <!-- A pad's layers. Choosing one here is choosing what the pad plays — the same
+                   state a long press on the small button above the pad steps through — so the
+                   assignment below is always the one you would hear. -->
+              <div class="pad-layer-editor" data-testid="surface-pad-layers">
+                <label>Layers
+                  <select aria-label="Number of layers on this pad" value={layers.count}
+                          data-testid="surface-pad-layer-count"
+                          onchange={(e) => setPadLayers(page?.pageId ?? '', selectedControl.index,
+                                                        Number(e.currentTarget.value))}>
+                    {#each Array.from({ length: MAX_PAD_LAYERS }, (_, i) => i + 1) as count (count)}
+                      <option value={count}>{count === 1 ? '1 (no layers)' : count}</option>
+                    {/each}
+                  </select>
+                </label>
+                {#if layers.count > 1}
+                  <div class="layer-tabs" role="group" aria-label="Layer this pad plays">
+                    {#each layerPips(selectedControl) as pip (pip.layer)}
+                      <button type="button" aria-pressed={pip.active} data-testid={`surface-pad-layer-${pip.layer + 1}`}
+                              style={`--pip:${pip.colour}`}
+                              onclick={() => setPadActiveLayer(page?.pageId ?? '', selectedControl.index, pip.layer)}>
+                        <i></i>L{pip.layer + 1}
+                      </button>
+                    {/each}
+                  </div>
+                  <p class="dim layer-hint">Hold the small button above the pad to step through its layers.</p>
+                {/if}
+                <label class="colour-row">Pad colour
+                  <span>
+                    <input type="color" aria-label="Pad colour on this layer" data-testid="surface-pad-colour"
+                           disabled={!selectedSlot}
+                           value={padColourCss(selectedSlot, layers.active)}
+                           onchange={(e) => updateSelectedOptions({ colour: parseInt(e.currentTarget.value.slice(1), 16) })} />
+                    {#if selectedSlot && selectedSlot.colour >= 0}
+                      <button type="button" class="ghost" onclick={() => updateSelectedOptions({ colour: -1 })}>Default</button>
+                    {/if}
+                  </span>
+                </label>
+                {#if !selectedSlot}
+                  <p class="dim layer-hint">Assign something to this layer to give it a colour of its own.</p>
+                {/if}
+              </div>
+            {/if}
             <div class="assignment-summary">
               <strong>{selectedSlot?.assigned ? selectedSlot.displayName : 'No parameter assigned'}
                 <HostPickupIndicator direction={selectedSlot?.pickupDirection} /></strong>
@@ -1030,6 +1109,31 @@
   .inspector-empty > :global(svg) { color: var(--host-text-dim); margin-bottom: 8px; }
   .inspector-empty p { margin: 4px 0; }
 
+  /* The layer pips on a pad, under its name. */
+  .pad-layers {
+    position: absolute; left: 50%; bottom: 10%; transform: translateX(-50%); z-index: 1;
+    display: flex; gap: max(2px, 5cqw); pointer-events: none;
+  }
+  .pad-layers i {
+    width: max(3px, 8cqw); height: max(3px, 8cqw); border-radius: 50%;
+    background: color-mix(in srgb, var(--pip) 35%, #000); box-shadow: 0 0 0 1px #0008;
+  }
+  .pad-layers i.active { background: var(--pip); box-shadow: 0 0 0 1px #000a, 0 0 4px var(--pip); transform: scale(1.3); }
+
+  .pad-layer-editor { display: flex; flex-direction: column; gap: 8px; padding: 10px;
+    border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-control); }
+  .pad-layer-editor > label { display: flex; flex-direction: column; gap: 4px; color: #aab5be; font-size: 11px; }
+  .layer-tabs { display: flex; gap: 4px; }
+  .layer-tabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 12px; }
+  .layer-tabs button i { width: 8px; height: 8px; border-radius: 50%; background: var(--pip); }
+  /* Out-specified to beat the host theme's own button rules, like the other chips here. */
+  :global(.host-workspace.host-workspace) .surface .layer-tabs button[aria-pressed='true'] {
+    border-color: var(--pip); color: var(--host-text);
+    background: color-mix(in srgb, var(--pip) 24%, var(--host-surface-raised));
+  }
+  .layer-hint { margin: 0; font-size: 10px; }
+  .colour-row > span { display: flex; align-items: center; gap: 6px; }
+  .colour-row input[type='color'] { width: 44px; min-height: 30px; padding: 2px; }
   .surface-regions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .state-key { display: inline-flex; align-items: center; gap: 4px; color: #8f9ba5; font-size: 10px; }
   /* The same lights the faces use, so the key reads as the drawing does. */

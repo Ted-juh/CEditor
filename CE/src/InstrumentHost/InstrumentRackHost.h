@@ -308,7 +308,15 @@ public:
         have theirs from the day the page was made; a fader or a pad gets one the first time
         something is dropped on it. Empty when the page is unknown, the kind is not one the
         surface addresses, or the page is full. */
-    juce::String ensureSurfaceSlot (const juce::String& pageId, const juce::String& kind, int index);
+    juce::String ensureSurfaceSlot (const juce::String& pageId, const juce::String& kind, int index,
+                                    int layer = 0);
+    /** A pad slot's colour on its layer, 0xRRGGBB; -1 goes back to the layer's default. */
+    bool setSlotColour (const juce::String& pageId, const juce::String& slotId, int colour);
+    /** Pad layers (ControlPage::padLayers): how many a pad cycles through, which one plays,
+        and the step a long press takes. False / -1 when the page is unknown. */
+    bool setPadLayerCount (const juce::String& pageId, int padIndex, int count);
+    bool setActivePadLayer (const juce::String& pageId, int padIndex, int layer);
+    int cyclePadLayer (const juce::String& pageId, int padIndex);
     /** Records the part's place in the preset walk (empty strings clear it). */
     bool setPartLastPreset (const juce::String& partId, const juce::String& recordId,
                             const juce::String& name);

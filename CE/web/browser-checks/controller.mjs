@@ -148,6 +148,18 @@ try {
   await page.getByTestId('surface-pad-1').click();
   await page.getByTestId('surface-param').first().dragTo(page.getByTestId('surface-pad-1'));
   assert.equal(await page.evaluate(() => window.controllerCommands.findLast(c => c.cmd === 'assignSurfaceControl').kind), 'pad');
+  // Pad layers: the count, then which one the pad plays, both from the inspector.
+  await page.getByTestId('surface-pad-layer-count').selectOption('3');
+  assert.deepEqual(await page.evaluate(() => window.controllerCommands.findLast(c => c.cmd === 'setPadLayers')),
+    { cmd: 'setPadLayers', pageId: 'page-1', index: 1, count: 3 });
+  await page.getByTestId('surface-layers-pad-1').waitFor();
+  assert.equal(await page.getByTestId('surface-layers-pad-1').locator('i').count(), 3, 'a pip per layer on the pad');
+  await page.getByTestId('surface-pad-layer-2').click();
+  assert.deepEqual(await page.evaluate(() => window.controllerCommands.findLast(c => c.cmd === 'setPadActiveLayer')),
+    { cmd: 'setPadActiveLayer', pageId: 'page-1', index: 1, layer: 1 });
+  assert.equal(await page.getByTestId('surface-layers-pad-1').getAttribute('data-active'), '2',
+    'the pad shows the layer it is playing');
+  assert.equal(await page.getByTestId('surface-pad-layer-2').getAttribute('aria-pressed'), 'true');
   await page.getByTestId('surface-back').click();
   await page.getByTestId('surface-keys').click();
   assert.equal(await page.getByTestId('surface-assign-selected').count(), 0, 'unavailable controls cannot assign');

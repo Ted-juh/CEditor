@@ -269,6 +269,7 @@ void Ctrl49SurfaceBroker::tick()
             }
 
             reducer = Ctrl49Reducer();
+            forgetPadState();
             enter (State::connected, endpoints->description);
             lastDisplayMs = 0.0;   // paint immediately
             return;
@@ -312,6 +313,7 @@ void Ctrl49SurfaceBroker::tick()
             }
 
             pumpInput();
+            paintPads();
 
             if (now - lastDisplayMs >= options.displayIntervalMs)
             {
@@ -384,8 +386,18 @@ void Ctrl49SurfaceBroker::pumpInput()
             emitStatus();
 
         if (previousPage != reducer.page())
+        {
             service.noteSurfacePage (reducer.page() < controlPages
                 ? performance.pages.getReference (reducer.page()).pageId : juce::String());
+            switchDownAt.fill (-1.0);   // a hold does not carry over to another page's pads
+        }
+
+        if (action->switchChanged && action->switchSlot >= 0 && action->switchSlot < 8)
+        {
+            const auto slot = (std::size_t) action->switchSlot;
+            switchDownAt[slot] = action->switchDown ? options.now() : -1.0;
+            switchFired[slot] = false;
+        }
 
         if (reducer.page() == performancePage)
         {
@@ -444,6 +456,67 @@ void Ctrl49SurfaceBroker::pumpInput()
             service.nudgeControlSlot (page.pageId,
                                       "s" + juce::String (action->encoderSlot + 1),
                                       action->encoderDelta);
+        }
+        else if (controlPages > 0 && reducer.page() < controlPages
+                 && action->padChanged && action->pad >= 1)
+        {
+            // Pad N drives whatever pad N is playing on its active layer — by number, the way
+            // the encoders drive their slots, so a pad needs no learning to work.
+            service.pressSurfacePad (performance.pages.getReference (reducer.page()).pageId,
+                                     action->pad, action->velocity > 0);
+        }
+    }
+
+    // A held button steps its pad to the next layer once it has been held long enough. The
+    // buttons sit one above each pad and are numbered as the pads are, 1..8.
+    if (controlPages > 0 && reducer.page() < controlPages)
+    {
+        const auto pageId = performance.pages.getReference (reducer.page()).pageId;
+        const auto now = options.now();
+        for (std::size_t slot = 0; slot < switchDownAt.size(); ++slot)
+            if (switchDownAt[slot] >= 0.0 && ! switchFired[slot]
+                && now - switchDownAt[slot] >= longPressMs)
+            {
+                switchFired[slot] = true;
+                service.cyclePadLayer (pageId, (int) slot + 1);
+            }
+    }
+}
+
+void Ctrl49SurfaceBroker::forgetPadState()
+{
+    switchDownAt.fill (-1.0);
+    switchFired.fill (false);
+    paintedPads.fill (-1);
+}
+
+void Ctrl49SurfaceBroker::paintPads()
+{
+    if (session == nullptr)
+        return;
+
+    // On a control page each pad shows its active layer and its state (padLight). Everywhere
+    // else the pads keep the stock orange they have always had here, because the performance
+    // and browse pages give them meanings of their own.
+    const auto& performance = service.getRackHost().getPerformance();
+    const auto page = reducer.page();
+    const auto onControlPage = page < pages().control;
+    for (int pad = 1; pad <= 8; ++pad)
+    {
+        const auto rgb = onControlPage
+                           ? service.padLight (performance.pages.getReference (page).pageId, pad)
+                           : 0xFFA500;
+        auto& painted = paintedPads[(std::size_t) (pad - 1)];
+        if (painted == rgb)
+            continue;
+        try
+        {
+            session->setPadRgb (pad, (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+            painted = rgb;
+        }
+        catch (const std::exception&)
+        {
+            return;   // not ready yet: the next tick tries again, the cache still says unknown
         }
     }
 }

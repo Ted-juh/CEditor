@@ -96,11 +96,18 @@ std::optional<Ctrl49Action> Ctrl49Reducer::process (const std::uint8_t* data, st
         return action;
     }
 
-    if (data1 >= 19 && data1 <= 26)  // encoder switch (or Time Division choice while held)
+    if (data1 >= 19 && data1 <= 26)  // the eight small buttons (or Time Division choice while held)
     {
-        if (data2 != 127)
-            return std::nullopt;
         const int slot = data1 - 19;
+        if (data2 != 127)
+        {
+            // The release changes nothing here; it is reported so the host can time the press.
+            Ctrl49Action action = makeAction ("Switch " + std::to_string (slot + 1) + " released", false);
+            action.switchChanged = true;
+            action.switchSlot    = slot;
+            action.switchDown    = false;
+            return action;
+        }
         activeSlot_ = slot;
         if (timeDivisionDown_)
         {
@@ -108,9 +115,13 @@ std::optional<Ctrl49Action> Ctrl49Reducer::process (const std::uint8_t* data, st
             return makeAction ("Time Division " + std::to_string (division_) + " selected", true);
         }
         switches_[page_][slot] = ! switches_[page_][slot];
-        return makeAction ("Switch " + std::to_string (slot + 1)
-                               + (switches_[page_][slot] ? " ON" : " OFF"),
-                           true);
+        Ctrl49Action action = makeAction ("Switch " + std::to_string (slot + 1)
+                                              + (switches_[page_][slot] ? " ON" : " OFF"),
+                                          true);
+        action.switchChanged = true;
+        action.switchSlot    = slot;
+        action.switchDown    = true;
+        return action;
     }
 
     if (data1 == 34)  // data dial adjusts the active slot

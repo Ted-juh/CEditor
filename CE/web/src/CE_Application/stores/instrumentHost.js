@@ -474,19 +474,46 @@ export function normalizeSurfaceLayout(payload) {
   };
 }
 
+/** The id the host mints for a control's slot (InstrumentRackHost::ensureSurfaceSlot): the
+    first layer keeps the id every slot always had, later layers carry theirs. */
+export function surfaceSlotId(kind, index, layer = 0) {
+  return `${kind}-${index + 1}${layer > 0 ? `-L${layer + 1}` : ''}`;
+}
+
+/** How many layers a pad has on a page and which one it is playing (CE RackModel
+    ControlPage::padLayers). A pad the page does not list has one layer, and plays it. */
+export function padLayers(page, index) {
+  const found = (Array.isArray(page?.padLayers) ? page.padLayers : []).find((l) => l.index === index);
+  return found ? { count: found.count, active: found.active } : { count: 1, active: 0 };
+}
+
+/** The colour a pad shows on a layer when nobody chose one — the same four the host lights the
+    hardware with (padLayerColour in RackModel.cpp): the unit's stock orange first. */
+export const PAD_LAYER_COLOURS = ['#ffa500', '#00c8ff', '#e040ff', '#40ff60'];
+export const MAX_PAD_LAYERS = 4;
+
+export function padColourCss(slot, layer) {
+  const colour = Number.isInteger(slot?.colour) && slot.colour >= 0 ? slot.colour : -1;
+  return colour >= 0 ? `#${colour.toString(16).padStart(6, '0')}`
+    : PAD_LAYER_COLOURS[Math.max(0, Math.min(MAX_PAD_LAYERS - 1, layer))];
+}
+
 /** The control-page slot a physical control drives, or null for one the runtime cannot reach.
 
     One number joins the drawing to the assignments. A control page has eight slots; the
     profile gives its encoders index 0..7 (SurfaceProfile.cpp, "Ctrl49Reducer: encoderSlot
-    0..7"), and the runtime addresses slot N with encoder N. Only encoders address slots
-    today: a fader or a pad is drawn, labelled and inert, which is the truth about them rather
-    than a gap in this function. */
-export function surfaceControlSlot(page, control) {
+    0..7"), and the runtime addresses slot N with encoder N. Encoders, faders and pads address
+    slots; everything else is drawn, labelled and inert.
+
+    A pad has a slot per LAYER. Asked without one, this answers for the layer the pad is
+    playing, because that is the slot the pad drives and the one the drawing shows. */
+export function surfaceControlSlot(page, control, layer) {
   if (!page || !control) return null;
   const kind = String(control.kind ?? '');
   if (kind !== 'encoder' && kind !== 'fader' && kind !== 'pad') return null;
   const index = Number(control.index);
   if (!Number.isInteger(index) || index < 0) return null;
+  const wanted = kind === 'pad' ? (Number.isInteger(layer) ? layer : padLayers(page, index).active) : 0;
   // A slot says which physical control it rides. One that says nothing is from before slots
   // could — an encoder, at its place among the encoders — which is the join the drawing has
   // always used and must keep using for every page saved before faders and pads had slots.
@@ -495,7 +522,7 @@ export function surfaceControlSlot(page, control) {
     const slotKind = slot?.kind ?? 'encoder';
     const slotIndex = Number.isInteger(slot?.index) && slot.index >= 0
       ? slot.index : (slotKind === 'encoder' ? legacyEncoders++ : -1);
-    if (slotKind === kind && slotIndex === index) return slot;
+    if (slotKind === kind && slotIndex === index && (slot?.layer ?? 0) === wanted) return slot;
   }
   return null;
 }
@@ -4002,9 +4029,20 @@ export function normalizeHostState(payload) {
             ? slot.pickupDirection : 0,
           toggle: slot?.toggle === true,
           latched: slot?.latched === true,
+          // A pad's layer (0..3) and its colour on it, 0xRRGGBB; -1 = the layer's default.
+          layer: slot?.kind === 'pad' && Number.isInteger(slot?.layer)
+            ? Math.max(0, Math.min(MAX_PAD_LAYERS - 1, slot.layer)) : 0,
+          colour: Number.isInteger(slot?.colour) && slot.colour >= 0 ? slot.colour & 0xffffff : -1,
           value: Math.max(0, Math.min(1, Number(slot?.value ?? 0) || 0)),
           valueText: String(slot?.valueText ?? ''),
         })),
+        padLayers: (Array.isArray(page?.padLayers) ? page.padLayers : [])
+          .filter((l) => Number.isInteger(l?.index) && l.index >= 0)
+          .map((l) => {
+            const count = Math.max(1, Math.min(MAX_PAD_LAYERS, Number.isInteger(l?.count) ? l.count : 1));
+            const active = Number.isInteger(l?.active) && l.active >= 0 && l.active < count ? l.active : 0;
+            return { index: l.index, count, active };
+          }),
       })),
       parts: (Array.isArray(rack.parts) ? rack.parts : []).map((part) => ({
         partId: String(part?.partId ?? ''),
@@ -5734,7 +5772,7 @@ export function applyMockCommand(state, payload) {
         resolved: true,
       });
     } else {
-      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'toggle', 'label', 'midiPickup', 'midiRelative'])
+      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'toggle', 'label', 'midiPickup', 'midiRelative', 'colour'])
         if (payload[key] !== undefined) slot[key] = payload[key];
       slot.pickupDirection = 0;
       if (payload.label !== undefined && payload.label) slot.displayName = String(payload.label);
@@ -5764,6 +5802,26 @@ export function applyMockCommand(state, payload) {
     });
     return working;
   }
+  if (cmd === 'setPadLayers' || cmd === 'setPadActiveLayer') {
+    // Mirrors ControlPage::setPadLayerCount / setActivePadLayer: 1..4 layers, a pad never
+    // left playing one it no longer has, and a single-layer pad not listed at all.
+    const page = next.rack.pages.find((p) => p.pageId === payload.pageId);
+    const index = Number(payload.index);
+    if (!page || !Number.isInteger(index) || index < 0) return next;
+    const current = padLayers(page, index);
+    let { count, active } = current;
+    if (cmd === 'setPadLayers') {
+      count = Math.max(1, Math.min(MAX_PAD_LAYERS, Number(payload.count) || 1));
+      if (active >= count) active = 0;
+    } else {
+      const layer = Number(payload.layer);
+      if (!Number.isInteger(layer) || layer < 0 || layer >= count) return next;
+      active = layer;
+    }
+    page.padLayers = (page.padLayers ?? []).filter((l) => l.index !== index);
+    if (count > 1 || active > 0) page.padLayers.push({ index, count, active });
+    return next;
+  }
   if (cmd === 'assignSurfaceControl' || cmd === 'learnSurfaceControl') {
     // The drawing names the control; the slot is minted here the first time, then the
     // ordinary slot command does the rest — exactly the native shape.
@@ -5779,10 +5837,13 @@ export function applyMockCommand(state, payload) {
     const page = working.rack.pages.find((p) => p.pageId === payload.pageId)
       ?? (payload.pageId ? null : working.rack.pages[0]);
     if (!page) return working;
-    let slot = surfaceControlSlot(page, { kind, index });
+    const layer = kind === 'pad'
+      ? (Number.isInteger(payload.layer) ? payload.layer : padLayers(page, index).active) : 0;
+    if (layer < 0 || layer >= MAX_PAD_LAYERS) return working;
+    let slot = surfaceControlSlot(page, { kind, index }, layer);
     if (!slot) {
       slot = normalizeHostState({ rack: { pages: [{ pageId: 'x', slots: [
-        { slotId: `${kind}-${index + 1}`, kind, index },
+        { slotId: surfaceSlotId(kind, index, layer), kind, index, layer },
       ] }] } }).rack.pages[0].slots[0];
       page.slots.push(slot);
     }
@@ -8437,15 +8498,22 @@ export const renameControlPage = (pageId, name) => send({ cmd: 'renameControlPag
 export const assignControlSlot = (pageId, slotId, partId, parameterId) =>
   send({ cmd: 'assignControlSlot', pageId, slotId, partId, parameterId });
 /** Assign straight onto a physical control — a fader or a pad gets a slot minted for it the
-    first time something is dropped there; an encoder's slot already exists. */
-export const assignSurfaceControl = (pageId, kind, index, partId, parameterId) =>
-  send({ cmd: 'assignSurfaceControl', pageId, kind, index, partId, parameterId });
+    first time something is dropped there; an encoder's slot already exists.
+
+    A pad takes the layer to land on; without one it lands on the layer it is playing. */
+export const assignSurfaceControl = (pageId, kind, index, partId, parameterId, layer) =>
+  send({ cmd: 'assignSurfaceControl', pageId, kind, index, partId, parameterId,
+         ...(Number.isInteger(layer) ? { layer } : {}) });
 /** Arm MIDI learn on a physical control's slot, minting the slot if it has none yet. */
-export const learnSurfaceControl = (pageId, kind, index) => {
+export const learnSurfaceControl = (pageId, kind, index, layer) => {
   if (!isJuceAvailable()) hostMidiLearn.set({ armed: false, pageId: '', slotId: '' });
-  else hostMidiLearn.set({ armed: true, pageId, slotId: `${kind}-${index + 1}` });
-  send({ cmd: 'learnSurfaceControl', pageId, kind, index });
+  else hostMidiLearn.set({ armed: true, pageId, slotId: surfaceSlotId(kind, index, layer ?? 0) });
+  send({ cmd: 'learnSurfaceControl', pageId, kind, index, ...(Number.isInteger(layer) ? { layer } : {}) });
 };
+/** How many layers a pad cycles through (1..4), and which one it plays. */
+export const setPadLayers = (pageId, index, count) => send({ cmd: 'setPadLayers', pageId, index, count });
+export const setPadActiveLayer = (pageId, index, layer) =>
+  send({ cmd: 'setPadActiveLayer', pageId, index, layer });
 export const clearControlSlot = (pageId, slotId) => send({ cmd: 'clearControlSlot', pageId, slotId });
 export const setControlSlotOptions = (pageId, slotId, fields) =>
   send({ cmd: 'setControlSlotOptions', pageId, slotId, ...fields });
