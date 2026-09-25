@@ -156,6 +156,54 @@ Follow-up: auto-populating a bank from the synth (reading patch NAMES via SysEx 
 the list page in the Screen Builder (the device path is proven; VIP's own scripts use the
 same `args:sub` + `get_byte` list pattern).
 
+## Screen lab: how far PNGs go, and what the screen can take
+
+`screen-lab/` answers two questions at once. **How far pre-rendered PNGs take the look** beyond
+flat rectangles — and **how much the screen can draw** before it stutters or the watchdog gives
+up (the open measurements below).
+
+```bash
+tools/ctrl49/Start_CTRL49_Screen_Lab.cmd                 # asks: 1 showcase, 2 stress
+# or:
+Ctrl49ScreenLab.exe showcase tools/ctrl49/screen-lab
+Ctrl49ScreenLab.exe stress   tools/ctrl49/screen-lab
+```
+
+Close VIP, your DAW and HoSTage / CEditor first: only one program can own the screen.
+
+**Showcase** (`Hostage_Showcase.lua`) — five pages, **Page < >** walks them:
+
+| Page | What it shows | How |
+|---|---|---|
+| Faders | nine faders, B1–B8, pickup | rectangles + tinted white cap/button shapes; E1–E8 move the faders, and a fader only takes its parameter once it reaches it (the outline is the fader, the cap the value) |
+| Pads | the 2×4 pads in their own colours, with layers | one white rounded square tinted per pad; strike a pad to light it |
+| Sequencer | 16 glossy steps, velocity bars, playhead | full-colour baked steps; bars cropped from one gradient sprite; E1–E8 set steps 1–8 |
+| Envelope | an ADSR with a gradient fill and a glowing curve | 4 px columns cropped from one sprite, glow dots along the curve; E1–E4 = A D S R |
+| Meters | two analog VU meters | a baked face + a 48-frame needle filmstrip; E1 = level of a demo signal |
+
+**Stress** (`Hostage_Stress.lua`) — the encoders set the load, per redraw:
+E1 rectangles (×16), E2 sprites (×8), E3 text boxes, E4 full-screen image blits (0–7),
+E5 1 MB image blocks decoded (0–8, never freed), E6 redraws per second (1–30).
+The console prints every load and how long each redraw took to send.
+
+What to watch, and write down:
+
+- **The orange bar under the header** moves 8 px per redraw. Gliding = the screen keeps up.
+  Jerky = it does not: note the console's last `Load:` line.
+- **The stock screen coming back** = the watchdog gave up; the console prints the last load.
+- **The swatches along the bottom** are one per decoded 1 MB block. One that does not appear
+  (or the keyboard giving up while E5 rises) is the image-memory ceiling. The knob filmstrip
+  (~2 MB) and the VU needle (~4 MB) are the sizes this decides.
+- **The envelope and sequencer pages** — whether the gradients band on the panel.
+
+Raise one encoder at a time from zero; E6 last.
+
+Everything the tool sends is built in `CE/src/ControlSurface/Ctrl49ScreenLab.h` (tested by the
+`Ctrl49ScreenLab` ctest). `npm run test:screen-lab` in `CE/web` renders all six pages in the
+editor's draw-API shim from the same bytes (`CTRL49_LAB_SHOTS=<dir>` writes PNGs of them), so a
+page can be worked on without the keyboard. `python make_lab_assets.py` rebuilds the PNGs and
+rewrites the pages' sprite tables; the PNGs are committed, so running the lab needs no Python.
+
 ## Still requires hardware (open Phase-3 measurements)
 
 - **RAM / object budget** — how many/large filmstrips fit in device RAM before upload or
