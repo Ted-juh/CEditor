@@ -864,23 +864,41 @@
     transform: translateX(-50%); border-radius: 1px; background: #e9ecef; box-shadow: 0 0 2px #fff6;
   }
 
-  /* Pad: soft rubber with a backlit edge — the RGB ring on the real thing. */
+  /* Pad: translucent silicone over an RGB LED, the way the real ones are built — the whole
+     pad glows in its colour, dimly at rest and at full brightness when it is ON. The colour
+     is the pad's state, the same --led every other face uses, so the key under the drawing
+     reads for pads as it does for knobs. A pad CEditor cannot reach stays unlit. */
   .ctl.pad .body {
     inset: 3%; border-radius: 9%;
-    background: linear-gradient(165deg, #3e4146 0%, #2b2e32 55%, #232528 100%);
-    box-shadow: inset 0 1px 0 #ffffff24, inset 0 -3px 6px #0008, 0 2px 3px #000b,
-                0 0 0 max(1px, 2.5cqw) color-mix(in srgb, var(--led) 70%, #000),
-                0 0 max(2px, 6cqw) color-mix(in srgb, var(--led) 45%, transparent);
+    background:
+      radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--led) 42%, #1a1c1f) 0%,
+                                         color-mix(in srgb, var(--led) 22%, #141518) 70%,
+                                         color-mix(in srgb, var(--led) 12%, #0f1012) 100%),
+      #141518;
+    box-shadow: inset 0 1px 0 #ffffff2a, inset 0 -3px 6px #0009, 0 2px 3px #000b,
+                inset 0 0 max(2px, 10cqw) color-mix(in srgb, var(--led) 35%, transparent),
+                0 0 max(2px, 5cqw) color-mix(in srgb, var(--led) 30%, transparent);
   }
-  .ctl.pad:not(.mapped) .body { box-shadow: inset 0 1px 0 #ffffff1a, inset 0 -3px 6px #0008, 0 2px 3px #000b; }
-  /* A latched pad is a pad that is ON, and it has to say so from across a room — the LED on
-     the real one does: the whole pad lights. Out-specified like .assigned, for the same
-     source-order reason. */
-  .surface-plate .ctl.mapped.assigned.latched { --led: #ffb347; color: #241504; }
-  .surface-plate .ctl.mapped.assigned.latched .body {
-    background: radial-gradient(circle at 50% 45%, #ffd9a0 0%, #f0a340 60%, #b86d18 100%);
+  /* The glow is light spilling past the pad, so the box must not clip it into a square. */
+  .ctl.pad { overflow: visible; }
+  .ctl.pad:not(.mapped) .body {
+    background: linear-gradient(165deg, #3a3d42 0%, #2a2d31 55%, #222427 100%);
+    box-shadow: inset 0 1px 0 #ffffff1a, inset 0 -3px 6px #0008, 0 2px 3px #000b;
   }
-  .surface-plate .ctl.mapped.assigned.latched .ctl-assigned { text-shadow: none; }
+  /* ON: a latched pad that is latched, or the pad you are hitting. It has to say so from
+     across a room — the real one does, and so the whole pad lights at full strength in its
+     own colour rather than switching to some other one. Out-specified like .assigned, for the
+     same source-order reason. */
+  .surface-plate .ctl.pad.mapped.assigned.latched .body, .surface-plate .ctl.pad.mapped.lit .body {
+    background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--led) 45%, #fff) 0%,
+                                                   var(--led) 55%,
+                                                   color-mix(in srgb, var(--led) 70%, #000) 100%);
+    box-shadow: inset 0 1px 0 #ffffff66, inset 0 -3px 6px #0005,
+                0 0 max(4px, 14cqw) color-mix(in srgb, var(--led) 75%, transparent);
+  }
+  .surface-plate .ctl.pad.mapped.assigned.latched, .surface-plate .ctl.pad.mapped.lit { color: #101214; }
+  .surface-plate .ctl.pad.mapped.assigned.latched .ctl-assigned,
+  .surface-plate .ctl.pad.mapped.lit .ctl-assigned { text-shadow: 0 0 3px #fff8; }
 
   /* Fader: a scale, the slot, and a cap with its grip line. With no value to show, the cap
      sits where a fader at rest usually does. */
