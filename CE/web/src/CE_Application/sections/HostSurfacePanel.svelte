@@ -171,6 +171,30 @@
     return `${named} — CEditor addresses this as ${control.kind} ${control.index}`;
   }
 
+  // --- what the controls look like ------------------------------------------------------
+  //
+  // Each kind is drawn as the hardware it is: a knurled knob with an LED arc, a rubber pad
+  // with a backlit edge, a fader cap in its slot, a keybed with black keys. The look is per
+  // KIND, never per device, so every profile (and every controller somebody describes) gets
+  // it from the same layout data, and nothing here knows it is drawing a CTRL49.
+  //
+  // The keybed is the one control whose face depends on more than its box: the label carries
+  // the key count ("49 keys"), and a layout that says nothing gets the commonest one. It
+  // starts on C because nearly every controller keybed does; the drawing is for recognising
+  // your keyboard, not for reading pitches off it.
+  const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
+  function keybed(control) {
+    const count = Math.max(12, Math.min(128, Number(control.label.match(/\d+/)?.[0]) || 49));
+    let whites = 0;
+    const blacks = [];
+    for (let note = 0; note < count; note += 1) {
+      if (BLACK_KEYS.has(note % 12)) blacks.push(whites);
+      else whites += 1;
+    }
+    const width = 100 / whites;
+    return { width, blacks: blacks.map((before) => before * width - width * 0.3) };
+  }
+
   // Declared before the handlers that write it. Svelte 5 hoists nothing here for you, and a
   // rune assigned above its own declaration is a class that never appears and no error.
   let hoveredId = $state('');
@@ -463,13 +487,34 @@
                           top:${((control.y - view.y) / view.h) * 100}%;
                           width:${(control.w / view.w) * 100}%;
                           height:${(control.h / view.h) * 100}%`}>
+            <!-- The hardware face. Decoration only: state is on the button's classes and its
+                 title, so nothing a screen reader or a test needs lives in here. -->
+            <span class="hw" aria-hidden="true">
+              {#if control.kind === 'encoder'}
+                <i class="arc"></i><i class="skirt"></i><i class="cap"></i>
+              {:else if control.kind === 'fader'}
+                <i class="scale"></i><i class="slot"></i><i class="cap"></i>
+              {:else if control.kind === 'wheel'}
+                <i class="well"></i><i class="roller"></i>
+              {:else if control.kind === 'keys'}
+                {@const bed = keybed(control)}
+                <i class="whites" style={`--kw:${bed.width}%`}></i>
+                {#each bed.blacks as left, i (i)}
+                  <i class="black" style={`left:${left}%;width:${bed.width * 0.6}%`}></i>
+                {/each}
+              {:else if control.kind === 'display'}
+                <i class="glass"><b>{page?.name || control.label}</b><small>{layout.displayName}</small></i>
+              {:else}
+                <i class="body"></i>
+              {/if}
+            </span>
             <!-- What the knob DOES, when it does anything: the whole reason for drawing it
                  rather than listing it. The physical label stays underneath for the ones
-                 that drive nothing. -->
+                 that drive nothing. The keybed and the screen draw their own faces. -->
             {#if slot?.assigned}
               <span class="ctl-assigned">{slot.displayName}</span>
               <HostPickupIndicator direction={slot.pickupDirection} />
-            {:else}
+            {:else if control.kind !== 'keys' && control.kind !== 'display'}
               <span class="ctl-label">{control.label}</span>
             {/if}
           </button>
@@ -701,9 +746,13 @@
     position: relative;
     flex: none;
     width: min(100cqw, calc(100cqh * var(--surface-aspect)));
-    border: 1px solid var(--host-line);
+    border: 1px solid #000;
     border-radius: var(--host-radius-panel);
-    background: var(--host-bg-deep);
+    /* The chassis: matte black, lit from above, with a sheen along the front edge. */
+    background:
+      linear-gradient(180deg, #ffffff14 0, #ffffff05 1.5%, transparent 6%),
+      radial-gradient(120% 90% at 50% 0%, #2a2d31 0%, #1a1c1f 55%, #111214 100%);
+    box-shadow: inset 0 1px 0 #ffffff1f, inset 0 -2px 0 #00000080, 0 10px 24px #0008;
     overflow: hidden;
   }
   .controller-canvas { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 12px; border: 1px solid var(--host-line); border-radius: var(--host-radius-panel); background: var(--host-surface); }
@@ -714,14 +763,17 @@
   /* This line never wraps: starting a drag must not move the target under the pointer. */
   .canvas-caption { flex: none; height: 18px; line-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--host-text-dim); }
 
-  /* .ctl.mapped further down sets a background at EQUAL specificity, so a plain .ctl.assigned
-     rule loses to it on source order and every assigned knob stays the unassigned blue —
-     visible only by looking at one. Out-specified rather than reordered, because a rule that
-     depends on where it sits in the file breaks again the next time somebody tidies. This is
-     the fourth colour in this project eaten that way; the first three were .ghost. */
-  .ctl.mapped.assigned { border-color: #5f9e79; background: #22362a; color: #d6ecdd; }
-  .ctl.mapped.assigned:hover { border-color: #7fc79b; background: #2a4434; }
-  .ctl.mapped.assigned.unresolved { border-color: #7f5050; background: #2a1d1d; color: #e4b3b3; }
+  /* State is one colour, --led, and each hardware face decides where its light is: the arc
+     round a knob, the backlit edge of a pad, the cap of a button. .ctl.mapped further down
+     sets it at EQUAL specificity, so a plain .ctl.assigned rule would lose on source order and
+     every assigned knob would stay the unassigned blue — visible only by looking at one.
+     Out-specified rather than reordered, because a rule that depends on where it sits in the
+     file breaks again the next time somebody tidies. This is the fourth colour in this
+     project eaten that way; the first three were .ghost. */
+  .ctl.mapped.assigned { --led: #5fcf8c; color: #e4f4ea; }
+  .ctl.mapped.assigned.unresolved { --led: #e06868; color: #f2c4c4; }
+  /* The knob you are turning, over whatever it already says. */
+  .surface-plate .ctl.mapped.lit { --led: #ffd15c; }
   /* The drop target and the knob you are turning. Both are outlines rather than fills: the
      assigned colour already means something, and a second fill on top would fight it. */
   .ctl.target { outline: 2px solid #5b9bd5; outline-offset: 1px; }
@@ -752,31 +804,163 @@
     justify-content: center;
     padding: 0;
     min-height: 0;
-    border: 1px solid #333d47;
+    border: 0;
     border-radius: 2px;
-    background: #1b2127;
-    color: #5f6a75;
+    background: transparent;
+    color: #8d969f;
     font: inherit;
     font-size: 10px;
     overflow: hidden;
     cursor: default;
+    /* No light at all on a control CEditor cannot reach: it is on the box and not ours. */
+    --led: transparent;
   }
-  /* Mapped controls carry weight; the rest are visibly on the box and visibly not ours. */
-  .ctl.mapped { border-color: #4d7fae; background: #22303c; color: #b8c6d2; cursor: pointer; }
-  .ctl.mapped:hover { border-color: #7fb4e0; background: #2a3c4b; }
+  /* Mapped controls carry a light; the rest are visibly on the box and visibly not ours. */
+  .ctl.mapped { --led: #4f8cc4; color: #d3dce4; cursor: pointer; }
+  .ctl.mapped:hover .hw { filter: brightness(1.18); }
+  /* The global button hover paints a background; the face is the control here, not the box. */
+  .surface-plate .ctl:hover:not(:disabled) { background: transparent; }
 
-  .ctl.encoder { border-radius: 50%; box-shadow: inset 0 2px 6px #0005; }
-  .ctl.encoder::before { content: ''; position: absolute; top: 8%; left: calc(50% - 1px); width: 2px; height: 12%; background: currentColor; opacity: .65; }
-  .ctl.pad { border-radius: 3px; }
-  .ctl.fader { border-radius: 1px; background: #171c21; }
-  /* A latched pad is a pad that is ON, and it has to say so from across a room — the LED on
-     the real one does. Out-specified like .assigned, for the same source-order reason. */
-  .surface-plate .ctl.mapped.assigned.latched { background: #d8a24a; color: #1a1408; }
-  .ctl.wheel { border-radius: 40%; background: #171c21; }
-  .ctl.keys { background: #2a2f34; border-color: #3b4652; }
-  .ctl.display { background: #16202a; border-color: #3f5162; }
-
+  .ctl-assigned, .ctl-label, .ctl :global([data-testid='pickup-direction']) {
+    position: relative; z-index: 1; text-shadow: 0 1px 2px #000;
+  }
   .ctl-label { pointer-events: none; white-space: nowrap; font-size: clamp(7px, 15cqw, 14px); }
+
+  /* --- the hardware faces. Every size is a share of the control's own box (cqw/cqh), so a
+         knob is the same knob at 17px in the overview and 130px zoomed into its region. --- */
+  .hw, .hw > i { position: absolute; pointer-events: none; box-sizing: border-box; }
+  .hw { inset: 0; }
+  .hw > i { display: block; }
+
+  /* Encoder: the LED arc (270°, like the scale printed round a real one), then a knurled
+     skirt, then the domed cap with its pointer. */
+  .ctl.encoder { border-radius: 50%; }
+  .ctl.encoder .hw { inset: auto; width: min(100cqw, 100cqh); aspect-ratio: 1; }
+  .ctl.encoder .arc {
+    inset: 0; border-radius: 50%;
+    background: conic-gradient(from 225deg, var(--led) 0 270deg, transparent 270deg);
+    -webkit-mask: radial-gradient(circle, transparent 63.5%, #000 65%, #000 69.5%, transparent 71%);
+            mask: radial-gradient(circle, transparent 63.5%, #000 65%, #000 69.5%, transparent 71%);
+    filter: drop-shadow(0 0 2px var(--led));
+  }
+  .ctl.encoder:not(.mapped) .arc {
+    background: conic-gradient(from 225deg, #2c3035 0 270deg, transparent 270deg);
+    filter: none;
+  }
+  .ctl.encoder .skirt {
+    inset: 16%; border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 40%, transparent 55%, #0009 100%),
+      repeating-conic-gradient(#303338 0 5deg, #16171a 5deg 10deg);
+    box-shadow: 0 2px 4px #000c, 0 0 0 1px #000;
+  }
+  .ctl.encoder .cap {
+    inset: 25%; border-radius: 50%;
+    background: radial-gradient(circle at 38% 30%, #54585e 0%, #2a2d31 45%, #16181a 100%);
+    box-shadow: inset 0 1px 1px #ffffff2e, inset 0 -2px 3px #0009;
+  }
+  .ctl.encoder .cap::after {
+    content: ''; position: absolute; left: 50%; top: 6%; width: max(1.5px, 6%); height: 34%;
+    transform: translateX(-50%); border-radius: 1px; background: #e9ecef; box-shadow: 0 0 2px #fff6;
+  }
+
+  /* Pad: soft rubber with a backlit edge — the RGB ring on the real thing. */
+  .ctl.pad .body {
+    inset: 3%; border-radius: 9%;
+    background: linear-gradient(165deg, #3e4146 0%, #2b2e32 55%, #232528 100%);
+    box-shadow: inset 0 1px 0 #ffffff24, inset 0 -3px 6px #0008, 0 2px 3px #000b,
+                0 0 0 max(1px, 2.5cqw) color-mix(in srgb, var(--led) 70%, #000),
+                0 0 max(2px, 6cqw) color-mix(in srgb, var(--led) 45%, transparent);
+  }
+  .ctl.pad:not(.mapped) .body { box-shadow: inset 0 1px 0 #ffffff1a, inset 0 -3px 6px #0008, 0 2px 3px #000b; }
+  /* A latched pad is a pad that is ON, and it has to say so from across a room — the LED on
+     the real one does: the whole pad lights. Out-specified like .assigned, for the same
+     source-order reason. */
+  .surface-plate .ctl.mapped.assigned.latched { --led: #ffb347; color: #241504; }
+  .surface-plate .ctl.mapped.assigned.latched .body {
+    background: radial-gradient(circle at 50% 45%, #ffd9a0 0%, #f0a340 60%, #b86d18 100%);
+  }
+  .surface-plate .ctl.mapped.assigned.latched .ctl-assigned { text-shadow: none; }
+
+  /* Fader: a scale, the slot, and a cap with its grip line. With no value to show, the cap
+     sits where a fader at rest usually does. */
+  .ctl.fader .scale {
+    inset: 8% 8% 8% auto; width: 22%;
+    background: repeating-linear-gradient(to bottom, #6d737a 0 1px, transparent 1px 12.5%);
+    opacity: .7;
+  }
+  .ctl.fader .slot {
+    left: 50%; top: 5%; bottom: 5%; width: max(2px, 12%); transform: translateX(-50%);
+    border-radius: 3px; background: #050506; box-shadow: inset 0 1px 2px #000, 0 1px 0 #ffffff14;
+  }
+  .ctl.fader .cap {
+    left: 8%; right: 8%; top: 52%; height: max(6px, 20%); border-radius: 12%;
+    background: linear-gradient(180deg, #62666c 0%, #34373b 42%, #1c1e21 58%, #3b3e42 100%);
+    box-shadow: 0 2px 3px #000c, inset 0 1px 0 #ffffff33;
+  }
+  .ctl.fader .cap::after {
+    content: ''; position: absolute; left: 10%; right: 10%; top: calc(50% - 0.5px); height: 1px; background: #f2f2f2;
+  }
+  .ctl.fader.mapped .cap::after { background: var(--led); box-shadow: 0 0 3px var(--led); }
+  .ctl.fader .ctl-label, .ctl.fader .ctl-assigned {
+    position: absolute; bottom: -1px; font-size: clamp(6px, 34cqw, 12px);
+  }
+
+  /* Button: a raised rubber cap with its legend printed on it. */
+  .ctl.button .body {
+    inset: 6%; border-radius: max(2px, 18cqh);
+    background: linear-gradient(180deg, #3a3d42 0%, #26282c 100%);
+    box-shadow: inset 0 1px 0 #ffffff26, inset 0 -1px 2px #0009, 0 1px 2px #000c;
+  }
+  .ctl.button.mapped .body { box-shadow: inset 0 1px 0 #ffffff26, 0 1px 2px #000c, 0 0 0 1px var(--led); }
+  .ctl.button .ctl-label { font-size: clamp(6px, 42cqh, 13px); color: #c5ccd2; letter-spacing: .02em; }
+
+  /* Wheel: a ribbed roller in its well, shaded as a cylinder. */
+  .ctl.wheel .well {
+    inset: 0; border-radius: max(3px, 22cqw);
+    background: #08090a; box-shadow: inset 0 2px 5px #000, 0 1px 0 #ffffff1a;
+  }
+  .ctl.wheel .roller {
+    inset: 10% 20%; border-radius: max(2px, 12cqw) / max(2px, 5cqh);
+    background:
+      linear-gradient(90deg, #000a 0%, transparent 32%, #ffffff12 50%, transparent 68%, #000a 100%),
+      repeating-linear-gradient(180deg, #34373c 0 2px, #16181a 2px 5px);
+    box-shadow: 0 0 0 1px #000;
+  }
+  .ctl.wheel .ctl-label { position: absolute; bottom: -1px; font-size: clamp(6px, 28cqw, 12px); }
+
+  /* The keybed: white keys as one repeating gradient (one element, however many keys), the
+     black keys over them, and the dark lip the keys disappear under. */
+  .ctl.keys { border-radius: 0 0 4px 4px; }
+  .ctl.keys .whites {
+    inset: 0; border-radius: 0 0 3px 3px;
+    background:
+      linear-gradient(180deg, #000 0, #0009 2%, transparent 7%, transparent 94%, #0000001f 100%),
+      repeating-linear-gradient(90deg, #f7f7f4 0, #ecece8 calc(var(--kw) - 1.5px),
+                                       #8e8e8a calc(var(--kw) - 1.5px), #6e6e6a var(--kw));
+    box-shadow: 0 0 0 2px #0b0b0c;
+  }
+  .ctl.keys .black {
+    top: 0; height: 60%; border-radius: 0 0 2px 2px;
+    background: linear-gradient(180deg, #111 0%, #262626 78%, #3c3c3c 86%, #0d0d0d 100%);
+    box-shadow: 1px 2px 3px #0009, inset 0 -1px 0 #ffffff1a;
+  }
+
+  /* The screen: a bezel round a lit LCD, showing the page the drawing is set to. */
+  .ctl.display .glass {
+    inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 6%;
+    padding: 6% 8%; border-radius: 3px; border: max(3px, 3cqw) solid #0a0b0c;
+    background: radial-gradient(120% 90% at 30% 20%, #1d4a6b 0%, #0d2a40 55%, #071624 100%);
+    box-shadow: 0 0 0 1px #2b2f34, inset 0 0 12px #000a;
+    color: #bfe6ff; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; text-align: left;
+    overflow: hidden;
+  }
+  .ctl.display .glass b, .ctl.display .glass small {
+    display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    text-shadow: 0 0 4px #6cc4ff99;
+  }
+  .ctl.display .glass b { font-size: clamp(7px, 11cqw, 20px); font-weight: 600; }
+  .ctl.display .glass small { font-size: clamp(6px, 7cqw, 13px); opacity: .7; }
 
   .control-inspector {
     min-width: 0;
@@ -817,10 +1001,11 @@
 
   .surface-regions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .state-key { display: inline-flex; align-items: center; gap: 4px; color: #8f9ba5; font-size: 10px; }
-  .state-key i { width: 8px; height: 8px; border: 1px solid #4d7fae; background: #22303c; }
-  .state-key i.mapped { border-color: #5f9e79; background: #22362a; }
-  .state-key i.problem { border-color: #7f5050; background: #2a1d1d; }
-  .state-key i.moving { border-color: #e0c060; background: #4a4021; }
+  /* The same lights the faces use, so the key reads as the drawing does. */
+  .state-key i { width: 8px; height: 8px; border-radius: 50%; background: #4f8cc4; box-shadow: 0 0 4px #4f8cc4; }
+  .state-key i.mapped { background: #5fcf8c; box-shadow: 0 0 4px #5fcf8c; }
+  .state-key i.problem { background: #e06868; box-shadow: 0 0 4px #e06868; }
+  .state-key i.moving { background: #ffd15c; box-shadow: 0 0 4px #ffd15c; }
   @container (max-width: 900px) {
     .surface-body { flex: none; grid-template-columns: minmax(170px, .7fr) minmax(240px, 1.3fr); }
     .param-column, .controller-canvas { height: 330px; box-sizing: border-box; }
