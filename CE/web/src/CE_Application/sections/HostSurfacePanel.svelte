@@ -32,6 +32,7 @@
     hostParamDrag, clearControlSlot, hostParameters, requestParameters,
     filterParameters, parameterShortlist, surfaceControlSlot, assignSurfaceControl, learnSurfaceControl,
     padLayers, padColourCss, surfaceSlotId, setPadLayers, setPadActiveLayer, MAX_PAD_LAYERS,
+    setFaderLayers, setFaderActiveLayer,
     setControlSlotOptions, focusRackPart,
     setUserSurface, clearUserSurface, learnUserSurface, finishUserSurfaceLearn,
   } from '../stores/instrumentHost.js';
@@ -120,14 +121,20 @@
     layout.controls.find((control) => control.controlId === selectedControlId) ?? null);
   let selectedSlot = $derived(selectedControl ? slotFor(selectedControl) : null);
 
-  // A control the runtime can reach: an encoder, a fader or a pad the layout gave an index.
-  // Encoders have a slot from the day the page was made; a fader or a pad gets one minted
-  // the first time something lands on it, so "no slot yet" is not "cannot be assigned".
+  // A control the runtime can reach: an encoder, a fader, a pad or a button the layout gave an
+  // index. Encoders have a slot from the day the page was made; the rest get one minted the
+  // first time something lands on them, so "no slot yet" is not "cannot be assigned".
   const addressable = (control) =>
-    control.index >= 0 && ['encoder', 'fader', 'pad'].includes(control.kind);
+    control.index >= 0 && ['encoder', 'fader', 'pad', 'button'].includes(control.kind);
+  // Pressed rather than moved: momentary or latching.
+  const pressable = (control) => control.kind === 'pad' || control.kind === 'button';
 
   // A pad's layers on this page (count, and the one it is playing); one layer for any other.
-  const layersOf = (control) => control.kind === 'pad' ? padLayers(page, control.index) : { count: 1, active: 0 };
+  // The faders share one set of layers, stepped together by Bank ◀ ▶.
+  const layersOf = (control) => control.kind === 'pad' ? padLayers(page, control.index)
+    : control.kind === 'fader' ? (page?.faderLayers ?? { count: 1, active: 0 }) : { count: 1, active: 0 };
+  let faderLayerCount = $derived(page?.faderLayers?.count ?? 1);
+  let faderLayerActive = $derived(page?.faderLayers?.active ?? 0);
 
   const learningControl = (control) => $hostMidiLearn.armed
     && $hostMidiLearn.pageId === (page?.pageId ?? '')
@@ -296,7 +303,7 @@
     if (!selectedControl || !addressable(selectedControl)) return;
     if ($hostMidiLearn.armed) cancelMidiLearn();
     else learnSurfaceControl(page?.pageId ?? '', selectedControl.kind, selectedControl.index,
-                             selectedControl.kind === 'pad' ? layersOf(selectedControl).active : undefined);
+                             ['pad', 'fader'].includes(selectedControl.kind) ? layersOf(selectedControl).active : undefined);
   }
 
   function clearSelected() {
@@ -528,7 +535,8 @@
                   <i class="black" style={`left:${left}%;width:${bed.width * 0.6}%`}></i>
                 {/each}
               {:else if control.kind === 'display'}
-                <i class="glass"><b>{page?.name || control.label}</b><small>{layout.displayName}</small></i>
+                <i class="glass"><b>{page?.name || control.label}</b><small>{layout.displayName}{faderLayerCount > 1
+                  ? ` · Faders L${faderLayerActive + 1}/${faderLayerCount}` : ''}</small></i>
               {:else}
                 <i class="body"></i>
               {/if}
@@ -587,6 +595,32 @@
           {#if selectedControl.index < 0}
             <p class="empty-hint">This control is shown because it exists on the hardware, but the current profile cannot address it.</p>
           {:else}
+            {#if selectedControl.kind === 'fader'}
+              <!-- The faders' layers: one set for the whole bank. Choosing one here is what
+                   Bank ◀ ▶ does on the keyboard, and the faders pick their new parameters up
+                   where they are rather than jumping them. -->
+              <div class="pad-layer-editor" data-testid="surface-fader-layers">
+                <label>Fader layers
+                  <select aria-label="Number of fader layers" value={faderLayerCount}
+                          data-testid="surface-fader-layer-count"
+                          onchange={(e) => setFaderLayers(page?.pageId ?? '', Number(e.currentTarget.value))}>
+                    {#each Array.from({ length: MAX_PAD_LAYERS }, (_, i) => i + 1) as count (count)}
+                      <option value={count}>{count === 1 ? '1 (no layers)' : count}</option>
+                    {/each}
+                  </select>
+                </label>
+                {#if faderLayerCount > 1}
+                  <div class="layer-tabs" role="group" aria-label="Layer the faders play">
+                    {#each Array.from({ length: faderLayerCount }, (_, i) => i) as layer (layer)}
+                      <button type="button" aria-pressed={layer === faderLayerActive}
+                              data-testid={`surface-fader-layer-${layer + 1}`} style="--pip: var(--host-accent)"
+                              onclick={() => setFaderActiveLayer(page?.pageId ?? '', layer)}>L{layer + 1}</button>
+                    {/each}
+                  </div>
+                  <p class="dim layer-hint">Bank ◀ ▶ on the keyboard steps every fader to its previous or next layer.</p>
+                {/if}
+              </div>
+            {/if}
             {#if selectedControl.kind === 'pad'}
               {@const layers = layersOf(selectedControl)}
               <!-- A pad's layers. Choosing one here is choosing what the pad plays — the same
@@ -682,8 +716,8 @@
                   onchange={(value) => updateSelectedOptions({ inverted: value })}
                 />
               </div>
-              {#if selectedControl.kind === 'pad'}
-                <label>Pad mode
+              {#if pressable(selectedControl)}
+                <label>{selectedControl.kind === 'pad' ? 'Pad mode' : 'Button mode'}
                   <select value={selectedSlot.toggle ? 'latching' : 'momentary'}
                           onchange={(e) => updateSelectedOptions({ toggle: e.currentTarget.value === 'latching' })}>
                     <option value="momentary">Momentary</option>
@@ -691,7 +725,7 @@
                   </select>
                 </label>
               {/if}
-              {#if selectedSlot.midiCc >= 0 && selectedSlot.midiNote < 0 && selectedControl.kind !== 'pad' && !selectedSlot.toggle}
+              {#if selectedSlot.midiCc >= 0 && selectedSlot.midiNote < 0 && !pressable(selectedControl) && !selectedSlot.toggle}
                 <label>MIDI mode
                   <select aria-label="MIDI control mode" value={selectedSlot.midiRelative ? 'relative' : 'absolute'}
                           onchange={(e) => updateSelectedOptions({ midiRelative: e.currentTarget.value === 'relative' })}>
@@ -723,7 +757,7 @@
           <div class="inspector-empty">
             <SlidersHorizontal size={26} />
             <strong>Select a control</strong>
-            <p>Choose a knob, fader or pad on the controller to assign a parameter and learn MIDI.</p>
+            <p>Choose a knob, fader, pad or button on the controller to assign a parameter and learn MIDI.</p>
           </div>
         {/if}
       </aside>
@@ -1014,12 +1048,17 @@
   }
   .ctl.button.mapped .body { box-shadow: inset 0 1px 0 #ffffff26, 0 1px 2px #000c, 0 0 0 1px var(--led); }
   .ctl.button .ctl-label { font-size: clamp(6px, 42cqh, 13px); color: #c5ccd2; letter-spacing: .02em; }
+  /* A latching button that is ON lights its whole cap, as the unit's own LEDs do. */
+  .surface-plate .ctl.button.mapped.assigned.latched .body {
+    background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--led) 40%, #fff), var(--led));
+    box-shadow: 0 0 max(3px, 20cqw) var(--led);
+  }
   /* A small square button has no room for its legend, and the real unit does not try: it prints
      it on the panel beside the button. So a near-square one prints it underneath — unless it
      is a glyph (an arrow, a transport symbol, a digit), which is printed on the cap itself. */
   .ctl.button { overflow: visible; }
   @container (aspect-ratio < 1.6) {
-    .ctl.button .ctl-label:not(.glyph) {
+    .ctl.button .ctl-assigned, .ctl.button .ctl-label:not(.glyph) {
       position: absolute; top: calc(100% + 1px); left: 50%; transform: translateX(-50%);
       font-size: clamp(6px, 55cqh, 12px); color: #aeb6bd; text-shadow: none;
     }

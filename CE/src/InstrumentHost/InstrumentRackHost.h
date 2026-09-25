@@ -317,6 +317,10 @@ public:
     bool setPadLayerCount (const juce::String& pageId, int padIndex, int count);
     bool setActivePadLayer (const juce::String& pageId, int padIndex, int layer);
     int cyclePadLayer (const juce::String& pageId, int padIndex);
+    /** The fader bank's layers (ControlPage::faderLayers), all faders at once. */
+    bool setFaderLayerCount (const juce::String& pageId, int count);
+    bool setActiveFaderLayer (const juce::String& pageId, int layer);
+    int stepFaderLayer (const juce::String& pageId, int delta);
     /** Records the part's place in the preset walk (empty strings clear it). */
     bool setPartLastPreset (const juce::String& partId, const juce::String& recordId,
                             const juce::String& name);

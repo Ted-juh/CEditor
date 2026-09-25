@@ -160,6 +160,22 @@ try {
   assert.equal(await page.getByTestId('surface-layers-pad-1').getAttribute('data-active'), '2',
     'the pad shows the layer it is playing');
   assert.equal(await page.getByTestId('surface-pad-layer-2').getAttribute('aria-pressed'), 'true');
+  // The faders' layers are one set for the whole bank.
+  await page.getByTestId('surface-back').click();
+  await page.getByTestId('surface-fader-3').click();
+  await page.getByTestId('surface-fader-layer-count').selectOption('2');
+  assert.deepEqual(await page.evaluate(() => window.controllerCommands.findLast(c => c.cmd === 'setFaderLayers')),
+    { cmd: 'setFaderLayers', pageId: 'page-1', count: 2 });
+  await page.getByTestId('surface-fader-layer-2').click();
+  assert.deepEqual(await page.evaluate(() => window.controllerCommands.findLast(c => c.cmd === 'setFaderActiveLayer')),
+    { cmd: 'setFaderActiveLayer', pageId: 'page-1', layer: 1 });
+  assert.equal(await page.getByTestId('surface-fader-layer-2').getAttribute('aria-pressed'), 'true');
+  // B1-B8 take assignments like pads.
+  await page.getByTestId('surface-param').first().dragTo(page.getByTestId('surface-button-b1'));
+  assert.deepEqual(await page.evaluate(() => {
+    const c = window.controllerCommands.findLast(c => c.cmd === 'assignSurfaceControl');
+    return [c.kind, c.index];
+  }), ['button', 0]);
   await page.getByTestId('surface-back').click();
   await page.getByTestId('surface-keys').click();
   assert.equal(await page.getByTestId('surface-assign-selected').count(), 0, 'unavailable controls cannot assign');

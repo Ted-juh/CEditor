@@ -1415,11 +1415,12 @@ juce::String InstrumentRackHost::ensureSurfaceSlot (const juce::String& pageId,
     auto* page = model.findPage (pageId);
     if (page == nullptr || index < 0 || index > 127)
         return {};
-    if (kind != "encoder" && kind != "fader" && kind != "pad")
+    if (kind != "encoder" && kind != "fader" && kind != "pad" && kind != "button")
         return {};
-    // Only a pad has layers, and only as many as it may have at most: minting a slot on a
-    // layer above the pad's current count is how you prepare one before raising the count.
-    if (layer < 0 || layer >= ControlPage::maxPadLayers || (layer > 0 && kind != "pad"))
+    // Only pads and faders have layers, and only as many as they may have at most: minting a
+    // slot on a layer above the current count is how you prepare one before raising it.
+    if (layer < 0 || layer >= ControlPage::maxPadLayers
+        || (layer > 0 && kind != "pad" && kind != "fader"))
         return {};
 
     if (auto* existing = page->findSurfaceSlot (kind, index, layer))
@@ -1466,6 +1467,27 @@ bool InstrumentRackHost::setActivePadLayer (const juce::String& pageId, int padI
     auto* page = model.findPage (pageId);
     return page != nullptr && padIndex >= 0 && padIndex <= 127
            && page->setActivePadLayer (padIndex, layer);
+}
+
+bool InstrumentRackHost::setFaderLayerCount (const juce::String& pageId, int count)
+{
+    auto* page = model.findPage (pageId);
+    if (page == nullptr)
+        return false;
+    page->setFaderLayerCount (count);
+    return true;
+}
+
+bool InstrumentRackHost::setActiveFaderLayer (const juce::String& pageId, int layer)
+{
+    auto* page = model.findPage (pageId);
+    return page != nullptr && page->setActiveFaderLayer (layer);
+}
+
+int InstrumentRackHost::stepFaderLayer (const juce::String& pageId, int delta)
+{
+    auto* page = model.findPage (pageId);
+    return page != nullptr ? page->stepFaderLayer (delta) : -1;
 }
 
 int InstrumentRackHost::cyclePadLayer (const juce::String& pageId, int padIndex)

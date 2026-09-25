@@ -609,3 +609,34 @@ New ideas go here with a date, so nothing gets lost between sessions.
   Not verified on the unit: that the eight buttons are CC 19-26 on the private port (the
   reducer's Time Division handling says so, a MIDI log will confirm it), and how the pads
   render the dimmed colours.
+
+  **The Mackie section, and fader layers — 2026-09-25.** The nine faders, B1-B8, Bank and the
+  transport sit in the unit's Mackie Control section, on a port of its own ("CTRL49
+  Mackie/HUI"), and the screen-builder bridge deliberately never opened it so a DAW could. The
+  host, it turned out, always had: `startAudio` enables every input, so that port was already
+  HoSTage's — and fed straight to the instruments, where moving fader 1 bent the pitch of
+  whatever listened on channel 1.
+
+  So the question was never who opens the port but what HoSTage does with it, and that is now
+  a setting, on by default (`setMackieSection`, persisted in `mackie-section.json`). On, a
+  Mackie/HUI port — known by its name — is decoded as Mackie Control (`MackieControl.h`):
+  pitch bend on channels 1-9 is fader N, the four rows of strip notes are button N (which row
+  B1-B8 send is the unit's own Button Mode, so all four read the same), bank and channel
+  left/right step, and Play, Stop and Rewind drive the transport. A gate in front of the player
+  keeps the port away from the instruments, and the decoded events never reach MIDI learn. Off,
+  the port is plain MIDI again, as it always was.
+
+  The faders drive the fader slots of the page the hardware is on, by number, as the encoders
+  do. They have no motors, so soft takeover is always on for them: after a page or layer change
+  a fader only takes over once it reaches the value it would otherwise jump. B1-B8 are a new
+  slot kind, `button`, pressed like pads — momentary, or latching with the slot's `toggle`.
+
+  The faders have layers too, but as a BANK: one set for all nine (`ControlPage::faderLayers`,
+  1-4), stepped together by Bank ◀ ▶ — faders are played as a row where pads are played one by
+  one. Button Mode was the other candidate and was left alone: on the unit it most likely
+  changes what B1-B8 send, and a switch the firmware already means something by is a switch
+  two owners would fight over.
+
+  Not verified on the unit: which notes Bank ◀ ▶ send (bank or channel left/right — both are
+  read), which row B1-B8 send, and whether the unit is set to Mackie rather than HUI, which
+  encodes the faders differently and is not decoded.

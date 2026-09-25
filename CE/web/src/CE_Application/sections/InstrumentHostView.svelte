@@ -25,7 +25,7 @@
     filterInstruments, filterEffects, scanForInstruments, addScanPath, browseScanPath, removeScanPath, clearQuarantine,
     addRackPart, removeRackPart, moveRackPart, focusRackPart, loadInstrument, unloadInstrument,
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor, floatEditor, closeEditorWindow,
-    requestAudioDevices, setAudioDevice, setMidiInputEnabled,
+    requestAudioDevices, setAudioDevice, setMidiInputEnabled, setMackieSection,
     hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct,
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
     parameterControlKind, setParameterText, groupParameters, assignedParameterIds, quickLearnParameter,
@@ -802,6 +802,24 @@
             CTRL49 failed{$hostSurface.detail ? ` — ${$hostSurface.detail}` : ''}
           {:else}
             Looking for a CTRL49 — plug it in and it connects by itself
+          {/if}
+        </span>
+        <!-- The Mackie section: read as controls (faders, B1-B8, Bank, transport), or passed to
+             the instruments as plain MIDI — where fader 1 bends the pitch of channel 1. -->
+        <span class="device-midi-row" data-testid="host-mackie-section">
+          <PropertyToggle compact value={$hostAudioDevices.mackieSection}
+                          ariaLabel="HoSTage uses the Mackie section"
+                          onchange={(enabled) => setMackieSection(enabled)} />
+          HoSTage uses the Mackie section
+        </span>
+        <span class="device-midi-empty">
+          {#if $hostAudioDevices.mackiePorts.length === 0}
+            No Mackie/HUI port connected.
+          {:else if $hostAudioDevices.mackieSection}
+            {$hostAudioDevices.mackiePorts.join(', ')}: faders, B1–B8, Bank ◀ ▶ and transport drive
+            HoSTage, and never reach the instruments. Turn off to hand the section to a DAW.
+          {:else}
+            {$hostAudioDevices.mackiePorts.join(', ')} is passed to the instruments as plain MIDI.
           {/if}
         </span>
       </div>

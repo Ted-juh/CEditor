@@ -217,8 +217,11 @@ namespace
 // The picture is authored as numbers rather than shipped as an image on purpose: a product
 // photograph belongs to its maker, and this repository is AGPLv3. Coordinates are ours.
 //
-// Note what is drawn but NOT addressable (index -1): nine faders, every button outside the
-// pads, the dial, the wheels, the keybed. That is not an oversight — see `faders = 0` below.
+// Note what is drawn but NOT addressable (index -1): the buttons outside the pads and the
+// Mackie strip, the dial, the wheels, the keybed. The faders and B1-B8 are addressable through
+// the unit's Mackie section, which HoSTage reads as controls (MackieControl.h): fader N is
+// pitch bend on channel N, master on 9; B-button N is strip note N in whichever row the unit's
+// Button Mode sends.
 SurfaceLayout buildCtrl49Layout()
 {
     constexpr float photoW = 1200.0f, photoH = 483.0f;
@@ -234,14 +237,15 @@ SurfaceLayout buildCtrl49Layout()
 
     // --- the Mackie device-control section: one master and eight channel faders, and the
     //     eight assignable buttons under the channel faders, each centred on its fader.
-    add ("fader-master", "fader", "Vol", 168.0f, 47.0f, 30.0f, 112.0f);
+    //     Indices are Mackie's: faders 0..7 are channels 1-8, the master is channel 9.
+    add ("fader-master", "fader", "Vol", 168.0f, 47.0f, 30.0f, 112.0f, 8);
     for (int i = 0; i < 8; ++i)
     {
         const auto centre = 237.0f + (float) i * 35.8f;
         add ("fader-" + juce::String (i + 1), "fader", "F" + juce::String (i + 1),
-             centre - 15.0f, 47.0f, 30.0f, 112.0f);
+             centre - 15.0f, 47.0f, 30.0f, 112.0f, i);
         add ("button-b" + juce::String (i + 1), "button", "B" + juce::String (i + 1),
-             centre - 7.0f, 186.0f, 14.0f, 14.0f);
+             centre - 7.0f, 186.0f, 14.0f, 14.0f, i);
     }
     add ("button-bank-left",   "button", "◀",    166.0f, 186.0f, 14.0f, 14.0f);
     add ("button-bank-right",  "button", "▶",    190.0f, 186.0f, 14.0f, 14.0f);
@@ -337,11 +341,11 @@ void registerCtrl49Profile()
     profile.vendor = "M-Audio";
 
     profile.capabilities.encoders = 8;
-    // Nine faders are on the box and the layout draws all nine. None is addressable here: they
-    // sit in the unit's Mackie device-control section, and CEditor speaks nothing that maps
-    // them. Capabilities say what we can DRIVE; the layout says what is THERE. Conformance
-    // below ties the two together, so this zero is a statement rather than an omission.
-    profile.capabilities.faders = 0;
+    // Nine faders are on the box and all nine are driveable: they sit in the unit's Mackie
+    // device-control section, which HoSTage reads as controls when the Mackie section setting
+    // is on (the default). Capabilities say what we can DRIVE; the layout says what is THERE;
+    // conformance ties the two together.
+    profile.capabilities.faders = 9;
     profile.capabilities.pads = 8;
     profile.capabilities.padBanks = 4;
     profile.capabilities.hasDisplay = true;

@@ -7808,9 +7808,9 @@ void testPadsAndFaders()
 
         // A control the surface does not address mints nothing and says so.
         h.emits.clear();
-        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "button" }, { "index", 0 },
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "wheel" }, { "index", 0 },
                                          { "partId", partId }, { "parameterId", "cutoff" } });
-        check (h.emits.lastError().contains ("does not address"), "a button is refused aloud");
+        check (h.emits.lastError().contains ("does not address"), "a wheel is refused aloud");
         h.emits.clear();
         h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", -1 },
                                          { "partId", partId }, { "parameterId", "cutoff" } });
@@ -8057,6 +8057,167 @@ void testPadLayers()
         }
         check (layersBack, "a pad comes back with its layer count and the layer it was on");
         check (secondBack && colourBack, "and every layer's slot with its assignment and colour");
+    }
+}
+
+// The Mackie section read as controls: faders are pitch bend on channels 1-9, the strip
+// buttons are notes, Bank steps the fader layer. HoSTage used to hand all of it to the
+// instruments, so fader 1 bent the pitch of whatever listened on channel 1.
+void testMackieSection()
+{
+    std::cout << "\nthe Mackie section" << std::endl;
+    namespace mackie = ceditor::host::mackie;
+
+    // The vocabulary, on its own.
+    {
+        const auto fader = mackie::decode (juce::MidiMessage::pitchWheel (3, 16383));
+        check (fader.kind == mackie::Event::Kind::fader && fader.index == 2 && std::abs (fader.value - 1.0f) < 0.001f,
+               "pitch bend on channel 3 is fader 3, all the way up");
+        check (mackie::decode (juce::MidiMessage::pitchWheel (9, 0)).index == 8, "channel 9 is the master");
+        check (mackie::decode (juce::MidiMessage::pitchWheel (10, 0)).kind == mackie::Event::Kind::none,
+               "and there is no tenth fader");
+        const auto mute3 = mackie::decode (juce::MidiMessage::noteOn (1, 0x12, (juce::uint8) 127));
+        check (mute3.kind == mackie::Event::Kind::button && mute3.index == 2 && mute3.down,
+               "a strip button in any row is button N, pressed");
+        check (! mackie::decode (juce::MidiMessage::noteOn (1, 0x12, (juce::uint8) 0)).down,
+               "and a note-on at velocity 0 is its release");
+        const auto bank = mackie::decode (juce::MidiMessage::noteOn (1, 0x2F, (juce::uint8) 127));
+        check (bank.kind == mackie::Event::Kind::bank && bank.step == 1, "Bank ▶ steps forward");
+        check (mackie::decode (juce::MidiMessage::noteOn (1, 0x2E, (juce::uint8) 127)).step == -1, "Bank ◀ back");
+        check (mackie::decode (juce::MidiMessage::noteOn (1, 0x5E, (juce::uint8) 127)).index == mackie::play,
+               "and the transport has its own notes");
+        check (mackie::isMackiePort ("CTRL49 Mackie/HUI") && ! mackie::isMackiePort ("CTRL49 USB"),
+               "the section is known by its port's name");
+    }
+
+    const auto dir = freshDataDir ("mackie-section");
+    seedTwoSynthCatalog (dir);
+    juce::String pageId;
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("addControlPage", { { "name", "Faders" } });
+        for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+            if (pg.getProperty ("name", {}).toString() == "Faders")
+                pageId = pg.getProperty ("pageId", {}).toString();
+        h.service->noteSurfacePage (pageId);
+
+        const auto cutoff = [&h] { return h.lastStub->getParameters()[0]->getValue(); };
+        const auto pan = [&h, &partId] ()
+        {
+            for (const auto& part : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {}).getArray())
+                if (part.getProperty ("partId", {}).toString() == partId)
+                    return (float) (double) part.getProperty ("pan", 0.0);
+            return 9.0f;
+        };
+        const auto faderLayers = [&h, &pageId] () -> juce::var
+        {
+            for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+                if (pg.getProperty ("pageId", {}).toString() == pageId)
+                    return pg.getProperty ("faderLayers", {});
+            return {};
+        };
+        const auto send = [&h] (const juce::MidiMessage& message, const char* port = "CTRL49 Mackie/HUI")
+        {
+            h.service->noteMidiActivity (port, message);
+            h.service->drainParameterEvents();
+        };
+        const auto fader = [&send] (int channel, float position)
+        { send (juce::MidiMessage::pitchWheel (channel, juce::roundToInt (position * 16383.0f))); };
+
+        check (h.service->mackieSectionEnabled(), "the section is read as controls by default");
+
+        // Fader 1 drives its slot, with no learning — and only from where the parameter already is.
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", 0 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "fader-1" }, { "value", 0.5 } });
+        fader (1, 0.9f);
+        check (std::abs (cutoff() - 0.5f) < 0.01f,
+               "a fader far from the value does not jump it — these faders have no motors");
+        fader (1, 0.5f);
+        fader (1, 0.2f);
+        check (std::abs (cutoff() - 0.2f) < 0.02f, "once it has reached the value it takes over");
+        fader (2, 0.8f);
+        check (std::abs (cutoff() - 0.2f) < 0.02f, "and a fader with nothing on it moves nothing");
+
+        // Fader layers: all faders at once, stepped by Bank.
+        h.cmd ("setFaderLayers", { { "pageId", pageId }, { "count", 2 } });
+        check ((int) faderLayers().getProperty ("count", 0) == 2, "the faders can be given two layers");
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", 0 }, { "layer", 1 },
+                                         { "partId", partId }, { "parameterId", "@pan" } });
+        send (juce::MidiMessage::noteOn (1, 0x2F, (juce::uint8) 127));
+        send (juce::MidiMessage::noteOn (1, 0x2F, (juce::uint8) 0));
+        check ((int) faderLayers().getProperty ("active", -1) == 1, "Bank ▶ steps the faders to their next layer");
+        const auto panBefore = pan();
+        fader (1, 0.2f);           // where it was left, which is not where pan is
+        check (std::abs (pan() - panBefore) < 0.01f && std::abs (cutoff() - 0.2f) < 0.02f,
+               "after the step the fader drives the new layer, and waits to pick it up");
+        fader (1, 0.5f);           // pan sits in the middle
+        fader (1, 1.0f);
+        check (std::abs (pan() - panBefore) > 0.1f && std::abs (cutoff() - 0.2f) < 0.02f,
+               "then moves layer 2's parameter, never layer 1's");
+        send (juce::MidiMessage::noteOn (1, 0x2E, (juce::uint8) 127));
+        check ((int) faderLayers().getProperty ("active", -1) == 0, "Bank ◀ steps back");
+        check (h.service->stepFaderLayer (pageId, 1) == 1 && h.service->stepFaderLayer (pageId, 1) == 0,
+               "and the steps wrap at the count");
+        h.emits.clear();
+        h.cmd ("setFaderActiveLayer", { { "pageId", pageId }, { "layer", 2 } });
+        check (h.emits.lastError().contains ("no such layer"), "the faders cannot play a layer they have not got");
+
+        // B1-B8 are buttons: momentary by default, latching if you say so.
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "button" }, { "index", 2 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        send (juce::MidiMessage::noteOn (1, 0x12, (juce::uint8) 127));       // mute row, strip 3
+        check (std::abs (cutoff() - 1.0f) < 0.01f, "B3 pressed drives its slot");
+        send (juce::MidiMessage::noteOn (1, 0x12, (juce::uint8) 0));
+        check (std::abs (cutoff() - 0.0f) < 0.01f, "and lets go");
+        h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "button-3" }, { "toggle", true } });
+        send (juce::MidiMessage::noteOn (1, 0x02, (juce::uint8) 127));       // record row, strip 3
+        send (juce::MidiMessage::noteOn (1, 0x02, (juce::uint8) 0));
+        check (std::abs (cutoff() - 1.0f) < 0.01f, "a latching button latches on, whatever row it sends");
+
+        // Transport.
+        send (juce::MidiMessage::noteOn (1, 0x5E, (juce::uint8) 127));
+        check (h.service->surfaceTransport().playing, "Play plays");
+        send (juce::MidiMessage::noteOn (1, 0x5D, (juce::uint8) 127));
+        check (! h.service->surfaceTransport().playing, "Stop stops");
+
+        // None of it is playing: the section never reaches the learn path as notes.
+        h.cmd ("learnSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", 4 } });
+        send (juce::MidiMessage::noteOn (1, 0x12, (juce::uint8) 127));
+        check ((int) [&] { for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+                               for (const auto& sl : *pg.getProperty ("slots", {}).getArray())
+                                   if (sl.getProperty ("slotId", {}).toString() == "fader-5")
+                                       return (int) sl.getProperty ("midiNote", -1);
+                           return -2; }() == -1,
+               "a Mackie button cannot be learned as a note while the section is read as controls");
+        h.cmd ("cancelMidiLearn");
+
+        // Off: the section is ordinary MIDI again, and faders stop driving slots.
+        h.cmd ("setMackieSection", { { "enabled", false } });
+        check (! h.service->mackieSectionEnabled(), "the section can be handed back");
+        const auto* devices = h.emits.last ("instrumentHostAudioDevices");
+        check (devices != nullptr && ! (bool) devices->getProperty ("mackieSection", true),
+               "and the device list says so");
+        h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "fader-1" }, { "value", 0.3 } });
+        fader (1, 0.3f);
+        fader (1, 0.9f);
+        check (std::abs (cutoff() - 0.3f) < 0.02f, "with it off a fader drives nothing");
+    }
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        check (! h.service->mackieSectionEnabled(), "the setting survives a restart");
+        juce::var layers;
+        for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+            if (pg.getProperty ("pageId", {}).toString() == pageId)
+                layers = pg.getProperty ("faderLayers", {});
+        check ((int) layers.getProperty ("count", 0) == 2, "and so do the fader layers");
+        h.cmd ("setMackieSection", { { "enabled", true } });
     }
 }
 
@@ -10022,8 +10183,9 @@ void testGeneratedProduct()
             keys     += control.kind == "keys"    ? 1 : 0;
         }
         check (faders == 9, "all nine faders are drawn — they are on the box");
-        check (layout.addressableCount ("fader") == 0 && profile->capabilities.faders == 0,
-               "and none is addressable, which is what faders = 0 has always meant");
+        check (layout.addressableCount ("fader") == 9 && profile->capabilities.faders == 9,
+               "and all nine are addressable, through the Mackie section");
+        check (layout.addressableCount ("button") == 8, "as are B1-B8, and no other button");
         check (encoders == 8 && layout.addressableCount ("encoder") == 8,
                "every encoder is drawn and every one can be reached");
         check (pads == 8 && layout.addressableCount ("pad") == 8, "and so is every pad");
@@ -12572,6 +12734,7 @@ int main (int argc, char* argv[])
     testHardwarePatchesInTheLibrary();
     testPadsAndFaders();
     testPadLayers();
+    testMackieSection();
     testMidiSourceCommands();
     testLayerGroupCommands();
     testPatchCompare();

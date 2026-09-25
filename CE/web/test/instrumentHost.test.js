@@ -15,6 +15,7 @@ import {
   filterInstruments,
   mockHostState,
   applyMockCommand,
+  normalizeAudioDevices,
   advanceMockMidiLfos,
   advanceMockEnvelopes,
   advanceMockMsegs,
@@ -2208,7 +2209,7 @@ test('mock reducer: dropping on a fader or a pad mints its slot, then it is an o
   assert.equal(surfaceControlSlot(state.rack.pages.find((p) => p.pageId === pageId), { kind: 'pad', index: 5 }).toggle, true,
     'toggle is a slot option like any other');
 
-  state = applyMockCommand(state, { cmd: 'assignSurfaceControl', pageId, kind: 'button', index: 0,
+  state = applyMockCommand(state, { cmd: 'assignSurfaceControl', pageId, kind: 'wheel', index: 0,
                                     partId: 'mock-part-1', parameterId: 'cutoff' });
   assert.equal(state.rack.pages.find((p) => p.pageId === pageId).slots.length, before + 2,
     'a kind the surface does not address mints nothing');
@@ -2265,6 +2266,40 @@ test('mock reducer: pad layers mirror the native rules', () => {
   assert.ok(page().slots.some((s) => s.slotId === 'pad-3-L3'), 'and keeps the slot');
   state = applyMockCommand(state, { cmd: 'setPadLayers', pageId, index: 2, count: 1 });
   assert.equal((page().padLayers ?? []).length, 0, 'one layer is not listed at all');
+});
+
+test('the Mackie section: buttons are slots, the faders share layers, and the setting is on by default', () => {
+  const state = normalizeHostState({ rack: { pages: [{ pageId: 'p', slots: [
+    { slotId: 'button-3', kind: 'button', index: 2, assigned: true, parameterId: 'cutoff', layer: 2 },
+    { slotId: 'fader-1', kind: 'fader', index: 0, assigned: true, parameterId: 'cutoff' },
+    { slotId: 'fader-1-L2', kind: 'fader', index: 0, layer: 1, assigned: true, parameterId: '@pan' },
+  ], faderLayers: { count: 2, active: 1 } }, { pageId: 'q', slots: [], faderLayers: { count: 7, active: 5 } }] } });
+  const [page, other] = state.rack.pages;
+  assert.equal(page.slots[0].kind, 'button', 'a button is a slot kind');
+  assert.equal(page.slots[0].layer, 0, 'and has no layers');
+  assert.deepEqual(page.faderLayers, { count: 2, active: 1 });
+  assert.deepEqual(other.faderLayers, { count: 4, active: 0 }, 'at most four, never a layer it has not got');
+  assert.equal(surfaceControlSlot(page, { kind: 'fader', index: 0 }).slotId, 'fader-1-L2',
+    'a fader answers for the layer the bank is playing');
+  assert.equal(surfaceControlSlot(page, { kind: 'button', index: 2 }).slotId, 'button-3');
+
+  let mock = applyMockCommand(mockHostState(), { cmd: 'addControlPage', name: 'Live' });
+  const pageId = mock.rack.pages.at(-1).pageId;
+  mock = applyMockCommand(mock, { cmd: 'setFaderLayers', pageId, count: 3 });
+  mock = applyMockCommand(mock, { cmd: 'setFaderActiveLayer', pageId, layer: 2 });
+  mock = applyMockCommand(mock, { cmd: 'assignSurfaceControl', pageId, kind: 'fader', index: 4,
+                                  partId: 'mock-part-1', parameterId: 'cutoff' });
+  const live = mock.rack.pages.find((p) => p.pageId === pageId);
+  assert.equal(surfaceControlSlot(live, { kind: 'fader', index: 4 }).slotId, 'fader-5-L3',
+    'a drop on a fader lands on the layer the bank is playing');
+  mock = applyMockCommand(mock, { cmd: 'assignSurfaceControl', pageId, kind: 'button', index: 1, layer: 1,
+                                  partId: 'mock-part-1', parameterId: 'cutoff' });
+  assert.equal(surfaceControlSlot(mock.rack.pages.find((p) => p.pageId === pageId), { kind: 'button', index: 1 }), null,
+    'a button has no layer to land on');
+
+  assert.equal(normalizeAudioDevices({}).mackieSection, true, 'the section is read as controls unless it is turned off');
+  assert.equal(normalizeAudioDevices({ mackieSection: false }).mackieSection, false);
+  assert.deepEqual(normalizeAudioDevices({ mackiePorts: ['CTRL49 Mackie/HUI'] }).mackiePorts, ['CTRL49 Mackie/HUI']);
 });
 
 test('a controller move carries which controller it was', () => {
@@ -2869,7 +2904,7 @@ test('normalizeSurfaceLayout groups controls into the regions a person thinks in
   assert.equal(byId.encoders.addressable, 8, 'every encoder can be reached');
   assert.equal(byId.pads.addressable, 8, 'and every pad');
   assert.equal(byId.faders.count, 9, 'all nine faders are drawn');
-  assert.equal(byId.faders.addressable, 0, 'and none of them is ours to drive');
+  assert.equal(byId.faders.addressable, 9, 'and all nine are ours to drive, through the Mackie section');
 
   // A region's box has to actually contain its controls, or zooming to it shows the wrong thing.
   const pads = shaped.controls.filter((c) => c.kind === 'pad');

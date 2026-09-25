@@ -29,7 +29,7 @@ window.__JUCE__ = { backend: {
   emitEvent(event, command) {
     if (event !== 'instrumentHost') return;
     window.controllerCommands.push(command);
-    if (['setControlSlotOptions', 'setPadLayers', 'setPadActiveLayer'].includes(command.cmd))
+    if (['setControlSlotOptions', 'setPadLayers', 'setPadActiveLayer', 'setFaderLayers', 'setFaderActiveLayer'].includes(command.cmd))
       hostState.update(s => normalizeHostState(applyMockCommand(s, command)));
     if (command.cmd === 'focusPart') hostState.update(s => normalizeHostState({ ...s,
       rack: { ...s.rack, focusedPartId: command.partId } }));

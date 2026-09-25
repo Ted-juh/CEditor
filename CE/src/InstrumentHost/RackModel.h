@@ -239,7 +239,7 @@ struct ControlSlot
     // reads back as: a slot with no kind is an encoder, and its index is its place among the
     // encoders. Faders and pads get slots of their own, minted the first time something is
     // dropped on one, which is why a page is no longer exactly eight of anything.
-    juce::String kind { "encoder" };   // "encoder" | "fader" | "pad"
+    juce::String kind { "encoder" };   // "encoder" | "fader" | "pad" | "button"
     int index = -1;
 
     // MIDI learn: a controller number bound to this slot drives it from any enabled MIDI
@@ -259,9 +259,10 @@ struct ControlSlot
     bool latched = false;
 
     // A pad can carry up to four assignments, one per LAYER, and plays whichever one its page
-    // says is active (ControlPage::padLayers). 0 is the first layer, and the only one every
-    // encoder and fader has. Each layer is a slot of its own, so an assignment, a learned
-    // binding and a latch all belong to one layer and nothing is shared between them.
+    // says is active (ControlPage::padLayers); the faders have layers too, switched all together
+    // (ControlPage::faderLayers). 0 is the first layer, and the only one encoders and buttons
+    // have. Each layer is a slot of its own, so an assignment, a learned binding and a latch
+    // all belong to one layer and nothing is shared between them.
     int layer = 0;
     // The pad's colour on this layer, as 0xRRGGBB, lit on the hardware and in the drawing.
     // -1 = the layer's default colour (padLayerColour below), which is what makes the layer
@@ -321,8 +322,21 @@ struct ControlPage
     bool setActivePadLayer (int padIndex, int layer);
     /** The next layer, wrapping at the pad's count; returns the layer now active. */
     int cyclePadLayer (int padIndex);
+    // The faders' layers: one set for the whole fader bank, stepped together (Bank ◀ ▶ on a
+    // Mackie section), because faders are played as a bank where pads are played one by one.
+    struct FaderLayers
+    {
+        int count = 1;
+        int active = 0;
+    };
+    FaderLayers faderLayers;
+    void setFaderLayerCount (int count);
+    bool setActiveFaderLayer (int layer);
+    /** Steps the fader layer by delta, wrapping at the count; returns the layer now active. */
+    int stepFaderLayer (int delta);
+
     /** Whether a slot is the one its control is currently playing: always, unless it is a pad
-        slot on a layer other than its pad's active one. */
+        or fader slot on a layer other than the active one. */
     bool isLive (const ControlSlot& slot) const;
 
     /** Encoders, faders and pads of a big desk, with room to spare; a bound on hand-edited
