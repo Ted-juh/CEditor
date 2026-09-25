@@ -95,7 +95,7 @@
 
   const kindLabel = {
     encoder: 'Encoder', pad: 'Pad', fader: 'Fader', button: 'Button',
-    wheel: 'Wheel', keys: 'Keys', display: 'Screen',
+    wheel: 'Wheel', keys: 'Keys', display: 'Screen', dial: 'Dial',
   };
 
   // --- what each control currently does ------------------------------------------------
@@ -490,7 +490,7 @@
             <!-- The hardware face. Decoration only: state is on the button's classes and its
                  title, so nothing a screen reader or a test needs lives in here. -->
             <span class="hw" aria-hidden="true">
-              {#if control.kind === 'encoder'}
+              {#if control.kind === 'encoder' || control.kind === 'dial'}
                 <i class="arc"></i><i class="skirt"></i><i class="cap"></i>
               {:else if control.kind === 'fader'}
                 <i class="scale"></i><i class="slot"></i><i class="cap"></i>
@@ -515,7 +515,7 @@
               <span class="ctl-assigned">{slot.displayName}</span>
               <HostPickupIndicator direction={slot.pickupDirection} />
             {:else if control.kind !== 'keys' && control.kind !== 'display'}
-              <span class="ctl-label">{control.label}</span>
+              <span class="ctl-label" class:glyph={[...control.label].length <= 2}>{control.label}</span>
             {/if}
           </button>
         {/each}
@@ -834,8 +834,11 @@
 
   /* Encoder: the LED arc (270°, like the scale printed round a real one), then a knurled
      skirt, then the domed cap with its pointer. */
-  .ctl.encoder { border-radius: 50%; }
-  .ctl.encoder .hw { inset: auto; width: min(100cqw, 100cqh); aspect-ratio: 1; }
+  /* The data dial is the same knob without the arc: it has no slot of its own to show. */
+  .ctl.encoder, .ctl.dial { border-radius: 50%; }
+  .ctl.encoder .hw, .ctl.dial .hw { inset: auto; width: min(100cqw, 100cqh); aspect-ratio: 1; }
+  .ctl.dial .arc { display: none; }
+  .ctl.dial .ctl-label { display: none; }
   .ctl.encoder .arc {
     inset: 0; border-radius: 50%;
     background: conic-gradient(from 225deg, var(--led) 0 270deg, transparent 270deg);
@@ -847,19 +850,19 @@
     background: conic-gradient(from 225deg, #2c3035 0 270deg, transparent 270deg);
     filter: none;
   }
-  .ctl.encoder .skirt {
+  .ctl.encoder .skirt, .ctl.dial .skirt {
     inset: 16%; border-radius: 50%;
     background:
       radial-gradient(circle at 50% 40%, transparent 55%, #0009 100%),
       repeating-conic-gradient(#303338 0 5deg, #16171a 5deg 10deg);
     box-shadow: 0 2px 4px #000c, 0 0 0 1px #000;
   }
-  .ctl.encoder .cap {
+  .ctl.encoder .cap, .ctl.dial .cap {
     inset: 25%; border-radius: 50%;
     background: radial-gradient(circle at 38% 30%, #54585e 0%, #2a2d31 45%, #16181a 100%);
     box-shadow: inset 0 1px 1px #ffffff2e, inset 0 -2px 3px #0009;
   }
-  .ctl.encoder .cap::after {
+  .ctl.encoder .cap::after, .ctl.dial .cap::after {
     content: ''; position: absolute; left: 50%; top: 6%; width: max(1.5px, 6%); height: 34%;
     transform: translateX(-50%); border-radius: 1px; background: #e9ecef; box-shadow: 0 0 2px #fff6;
   }
@@ -932,6 +935,16 @@
   }
   .ctl.button.mapped .body { box-shadow: inset 0 1px 0 #ffffff26, 0 1px 2px #000c, 0 0 0 1px var(--led); }
   .ctl.button .ctl-label { font-size: clamp(6px, 42cqh, 13px); color: #c5ccd2; letter-spacing: .02em; }
+  /* A small square button has no room for its legend, and the real unit does not try: it prints
+     it on the panel beside the button. So a near-square one prints it underneath — unless it
+     is a glyph (an arrow, a transport symbol, a digit), which is printed on the cap itself. */
+  .ctl.button { overflow: visible; }
+  @container (aspect-ratio < 1.6) {
+    .ctl.button .ctl-label:not(.glyph) {
+      position: absolute; top: calc(100% + 1px); left: 50%; transform: translateX(-50%);
+      font-size: clamp(6px, 55cqh, 12px); color: #aeb6bd; text-shadow: none;
+    }
+  }
 
   /* Wheel: a ribbed roller in its well, shaded as a cylinder. */
   .ctl.wheel .well {

@@ -406,7 +406,7 @@ const SURFACE_REGIONS = [
   { id: 'encoders',  label: 'Encoders',  kinds: ['encoder'] },
   { id: 'pads',      label: 'Pads',      kinds: ['pad'] },
   { id: 'faders',    label: 'Faders',    kinds: ['fader'] },
-  { id: 'buttons',   label: 'Buttons',   kinds: ['button'] },
+  { id: 'buttons',   label: 'Buttons',   kinds: ['button', 'dial'] },
   { id: 'keys',      label: 'Keys',      kinds: ['keys', 'wheel'] },
 ];
 
@@ -519,7 +519,7 @@ export function mockSurfaceLayout() {
                     x: 0.788 + (i % 4) * 0.044, y: 0.062 + Math.floor(i / 4) * 0.089,
                     w: 0.035, h: 0.08, index: i });
     controls.push({ controlId: `pad-${i + 1}`, kind: 'pad', label: `${i + 1}`,
-                    x: 0.787 + (i % 4) * 0.044, y: i >= 4 ? 0.289 : 0.38,
+                    x: 0.787 + (i % 4) * 0.044, y: i >= 4 ? 0.38 : 0.289,
                     w: 0.037, h: 0.08, index: i + 1 });
     controls.push({ controlId: `button-b${i + 1}`, kind: 'button', label: `B${i + 1}`,
                     x: 0.174 + i * 0.0345, y: 0.384, w: 0.024, h: 0.04, index: -1 });
