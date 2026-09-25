@@ -18746,7 +18746,7 @@ void InstrumentHostService::savePerformanceModel()
 
 bool InstrumentHostService::writePerformanceDocument (const juce::var& document)
 {
-    performanceConflictCopy = {};
+    performanceConflictCopy = juce::File();
     const auto reportFailure = [this] (const juce::String& message)
     {
         if (! performanceWriteErrorReported)
