@@ -206,6 +206,17 @@ juce::Image capture (juce::Component& editor)
     if (editor.getWidth() < 2 || editor.getHeight() < 2)
         return {};
 
+    // A borrowed window from another process: its pixels are there and nowhere else. Until it
+    // exists there is nothing to photograph, and the component underneath is a placeholder.
+    if (auto* foreign = dynamic_cast<ForeignWindowSource*> (&editor))
+    {
+       #if JUCE_WINDOWS
+        if (const auto handle = foreign->foreignWindowHandle(); handle != 0)
+            return captureWindow ((HWND) (juce::pointer_sized_int) handle);
+       #endif
+        return {};
+    }
+
    #if JUCE_WINDOWS
     // The embedded window first: for a vendor editor that is where the pixels actually are,
     // and the component on top of it paints black.

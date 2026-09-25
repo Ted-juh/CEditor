@@ -446,6 +446,17 @@ void testSnapshotPathsStayInsideTheBundle()
              && ! isSafeVst3SnapshotRelativePath ("Resources/Snapshots/x.png."),
            "traversal, active content and ambiguous Windows extensions are rejected lexically");
 
+    // The form the SDK actually writes: moduleinfocreator.cpp strips the BUNDLE path, so every
+    // generated moduleinfo.json names "Contents/Resources/Snapshots/...". Refusing it refused
+    // the artwork of every plug-in that ships a manifest.
+    check (isSafeVst3SnapshotRelativePath ("Contents/Resources/Snapshots/synth.png")
+             && validatedVst3Snapshot (bundle, "Contents/Resources/Snapshots/synth.png") == valid,
+           "the SDK's bundle-relative snapshot path is accepted and resolves to the same file");
+    check (! isSafeVst3SnapshotRelativePath ("Contents/Resources/Snapshots/../../x.png")
+             && ! isSafeVst3SnapshotRelativePath ("Contents/x.png")
+             && validatedVst3Snapshot (bundle, "Contents/Resources/Snapshots/../../../../secret.png") == juce::File(),
+           "and is held to every rule the other form is");
+
     const auto link = snapshots.getChildFile ("linked.png");
     if (secret.createSymbolicLink (link, false))
         check (validatedVst3Snapshot (bundle, "Resources/Snapshots/linked.png") == juce::File(),

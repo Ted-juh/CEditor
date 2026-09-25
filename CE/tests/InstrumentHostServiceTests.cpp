@@ -11388,6 +11388,28 @@ void testEditorThumbnails()
     check (editorSnapshot::downscaled (realPicture, 4096).getWidth() == 320,
            "a picture already small enough is left alone rather than blown up");
 
+    // An isolated plug-in's editor borrows the worker's window. Before that window arrives the
+    // component shows "Opening …" — a picture that is not blank, and the one picture that must
+    // never be cached as a plug-in's face. It says where its pixels are, or that it has none.
+    {
+        struct Borrowing final : juce::Component, editorSnapshot::ForeignWindowSource
+        {
+            juce::int64 handle = 0;
+            juce::int64 foreignWindowHandle() const override { return handle; }
+            void paint (juce::Graphics& g) override
+            {
+                g.fillAll (juce::Colours::darkgrey);
+                g.setColour (juce::Colours::white);
+                g.drawText ("Opening Synth...", getLocalBounds(), juce::Justification::centred);
+            }
+        } placeholder;
+        placeholder.setSize (320, 180);
+        check (! editorSnapshot::isBlank (placeholder.createComponentSnapshot (placeholder.getLocalBounds())),
+               "the placeholder is a picture of something");
+        check (! editorSnapshot::capture (placeholder).isValid(),
+               "and a borrowed-window editor with no window yet is never photographed");
+    }
+
     Harness h (dir);
     h.cmd ("getState");
     h.cmd ("addPart");

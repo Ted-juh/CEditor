@@ -5,15 +5,26 @@
 namespace ceditor::host
 {
 
+/** A moduleinfo snapshot path as the SDK writes it, relative to the BUNDLE
+    ("Contents/Resources/Snapshots/<CID>_snapshot.png" — moduleinfocreator.cpp strips the
+    bundle path off the front), made relative to Contents, which is what the rest of this file
+    resolves against. A path already relative to Contents is returned as it is. */
+inline juce::String contentsRelativeSnapshotPath (juce::String path)
+{
+    path = path.replaceCharacter ('\\', '/');
+    return path.startsWith ("Contents/") ? path.substring (9) : path;
+}
+
 /** Rejects dangerous moduleinfo path syntax before any filesystem query can follow a UNC
-    path or other attacker-controlled root. VST3 paths are relative to Contents. */
+    path or other attacker-controlled root. Accepts the SDK's bundle-relative form and a
+    Contents-relative one; both must land under Resources/Snapshots. */
 inline bool isSafeVst3SnapshotRelativePath (juce::String path)
 {
     if (path.isEmpty() || juce::File::isAbsolutePath (path)
         || path.startsWithChar ('/') || path.startsWithChar ('\\') || path.containsChar (':'))
         return false;
 
-    path = path.replaceCharacter ('\\', '/');
+    path = contentsRelativeSnapshotPath (path);
     if (! path.startsWith ("Resources/Snapshots/")
         || path.endsWithChar ('.') || path.endsWithChar (' '))
         return false;
@@ -39,7 +50,8 @@ inline juce::File validatedVst3Snapshot (const juce::File& moduleFileOrBundle,
     const auto contents = bundle.getChildFile ("Contents");
     const auto snapshots = contents.getChildFile ("Resources").getChildFile ("Snapshots");
     const auto candidate = juce::File::isAbsolutePath (path)
-                             ? juce::File (path) : contents.getChildFile (path);
+                             ? juce::File (path)
+                             : contents.getChildFile (contentsRelativeSnapshotPath (path));
 
     if (! candidate.isAChildOf (snapshots)
         || ! candidate.hasFileExtension ("png")

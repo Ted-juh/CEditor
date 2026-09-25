@@ -1,4 +1,5 @@
 #include "IsolatedPluginProxy.h"
+#include "EditorSnapshot.h"
 #include "LiveWorkerDiagnostics.h"
 #include "PluginWorkerJob.h"
 #include <juce_cryptography/juce_cryptography.h>
@@ -131,6 +132,7 @@ private:
 // HWNDComponent itself, whose destructor destroys the window it hosts and reparents it to
 // the desktop first — right for a window this process created, wrong for one it borrowed.
 class IsolatedPluginProxy::RemoteEditor final : public juce::AudioProcessorEditor,
+                                                 public editorSnapshot::ForeignWindowSource,
                                                 private juce::Timer
 {
 public:
@@ -151,6 +153,9 @@ public:
         if (hostWindow != 0)
             owner.sendEditorClose();
     }
+
+    // The worker's window, for the thumbnail capture: the pixels are there, not in this.
+    juce::int64 foreignWindowHandle() const override { return child; }
 
     void paint (juce::Graphics& graphics) override
     {

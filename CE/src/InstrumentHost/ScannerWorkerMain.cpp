@@ -104,7 +104,9 @@ static int runScan (const juce::String& modulePath)
                 if (const auto* shots = entry.getProperty ("Snapshots", {}).getArray())
                     for (const auto& shot : *shots)
                     {
-                        const auto scale = (float) (double) shot.getProperty ("ScaleFactor", 1.0);
+                        // "Scale Factor", with the space, is the SDK's key (moduleinfocreator.cpp).
+                        const auto scale = (float) (double) shot.getProperty ("Scale Factor",
+                                                                  shot.getProperty ("ScaleFactor", 1.0));
                         const auto relative = shot.getProperty ("Path", {}).toString();
                         if (! ceditor::host::isSafeVst3SnapshotRelativePath (relative))
                             continue;
