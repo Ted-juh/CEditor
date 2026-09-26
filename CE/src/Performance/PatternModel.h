@@ -418,6 +418,14 @@ struct ArpSettings
     bool patternSemitones = false;
     bool constrainToScale = false;
 
+    // The step lane's other rows, each cycled on its own length like the velocities (the UI
+    // keeps them all the lane's length). Empty means the plain behaviour for every step.
+    juce::Array<int> ratchetPattern;    // 1..4 hits inside the step
+    juce::Array<int> tiePattern;        // 1 = hold into the next step (legato), 0 = gate
+    juce::Array<int> octavePattern;     // -2..+2 octaves added to the step's note(s)
+    juce::Array<int> chancePattern;     // 0..100 % that the step plays at all
+    juce::String feel = "straight";     // straight | triplet (2/3 step) | dotted (1.5 step)
+
     static const char* modeName (Mode mode) noexcept;
     static Mode modeFromName (const juce::String& name) noexcept;
 };

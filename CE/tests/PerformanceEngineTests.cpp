@@ -1632,6 +1632,114 @@ void testArpeggiator()
         check (fromF.size() >= 3 && fromF[0] == 65 && fromF[1] == 72 && fromF[2] == 77,
                "and the same drawing transposes with the finger — that is the point");
     }
+
+    // --- the step lane: repeats, octave jumps, chance, ties and the feel --------------------
+    {
+        struct Hit { int block; int sample; bool on; int note; };
+        // Holds `keys` for `blocks` blocks (one beat is ~93), then lets go and drains.
+        auto runLane = [] (const ArpSettings& s, std::initializer_list<int> keys, int blocks)
+        {
+            ArpEngine lane;
+            lane.setSettings (s);
+            Transport clock;
+            clock.setTempo (120.0);
+            clock.start();
+            std::vector<Hit> hits;
+            juce::MidiBuffer hold, lift;
+            for (const auto key : keys)
+            {
+                hold.addEvent (juce::MidiMessage::noteOn (1, key, (juce::uint8) 100), 0);
+                lift.addEvent (juce::MidiMessage::noteOff (1, key), 0);
+            }
+            for (int b = 0; b < blocks + 40; ++b)
+            {
+                juce::MidiBuffer out;
+                lane.process (b == 0 ? hold : b == blocks ? lift : juce::MidiBuffer(), out,
+                              clock.advance (blockSize, sampleRate), blockSize);
+                for (const auto metadata : out)
+                    if (metadata.getMessage().isNoteOnOrOff())
+                        hits.push_back ({ b, metadata.samplePosition, metadata.getMessage().isNoteOn(),
+                                          metadata.getMessage().getNoteNumber() });
+            }
+            juce::MidiBuffer rest;
+            lane.allNotesOff (rest, 0);
+            for (const auto metadata : rest)
+                hits.push_back ({ blocks + 40, 0, false, metadata.getMessage().getNoteNumber() });
+            return hits;
+        };
+        auto ons = [] (const std::vector<Hit>& hits)
+        {
+            std::vector<int> notes;
+            for (const auto& h : hits)
+                if (h.on) notes.push_back (h.note);
+            return notes;
+        };
+        auto balanced = [] (const std::vector<Hit>& hits)
+        {
+            std::map<int, int> sounding;
+            for (const auto& h : hits)
+                sounding[h.note] += h.on ? 1 : -1;
+            for (const auto& [note, count] : sounding)
+                if (count != 0)
+                    return false;
+            return true;
+        };
+
+        ArpSettings s;
+        s.enabled = true;
+        s.mode = ArpSettings::Mode::up;
+        s.stepsPerBeat = 4;
+        s.gate = 0.5f;
+
+        s.ratchetPattern = { 2, 1, 1, 4 };
+        auto hits = runLane (s, { 60 }, 92);
+        check (ons (hits).size() == 2 + 1 + 1 + 4, "repeats: a step plays its hits inside its own time");
+        check (balanced (hits), "and every repeat ends");
+        s.ratchetPattern.clear();
+
+        s.octavePattern = { 0, 1, 0, -1 };
+        check (ons (runLane (s, { 60 }, 92)) == std::vector<int> ({ 60, 72, 60, 48 }),
+               "octave jumps move a step up or down by whole octaves");
+        s.octavePattern.clear();
+
+        s.chancePattern = { 0 };
+        check (ons (runLane (s, { 60, 64 }, 92)).empty(), "a step with no chance never plays");
+        s.chancePattern = { 100, 0 };
+        check (ons (runLane (s, { 60, 64 }, 92)).size() == 2,
+               "and the lane keeps counting through the skipped ones");
+        s.chancePattern.clear();
+
+        s.tiePattern = { 1, 0 };
+        hits = runLane (s, { 60, 64 }, 50);
+        int firstOff = -1, secondOn = -1;
+        for (int i = 0; i < (int) hits.size(); ++i)
+        {
+            if (! hits[(size_t) i].on && hits[(size_t) i].note == 60 && firstOff < 0) firstOff = i;
+            if (hits[(size_t) i].on && hits[(size_t) i].note == 64 && secondOn < 0) secondOn = i;
+        }
+        check (firstOff > secondOn && secondOn >= 0,
+               "a tied step is still sounding when the next one starts: legato");
+        check (balanced (hits), "and it ends after all");
+        s.tiePattern.clear();
+
+        s.feel = "triplet";
+        check (ons (runLane (s, { 60 }, 92)).size() == 6, "triplet sixteenths are six to the beat");
+        s.feel = "dotted";
+        const auto dotted = ons (runLane (s, { 60 }, 185));   // two beats
+        check (dotted.size() == 6, "dotted sixteenths fall every 3/8 beat: six in two beats");
+
+        ArpSettings saved = s;
+        saved.ratchetPattern = { 1, 3 };
+        saved.tiePattern = { 0, 1 };
+        saved.octavePattern = { -2, 2 };
+        saved.chancePattern = { 100, 40 };
+        ArpSettings restored;
+        arpFromVar (arpToVar (saved), restored);
+        check (restored.ratchetPattern == saved.ratchetPattern && restored.tiePattern == saved.tiePattern
+                 && restored.octavePattern == saved.octavePattern
+                 && restored.chancePattern == saved.chancePattern && restored.feel == "dotted",
+               "the lane's rows and the feel survive the trip");
+    }
 }
 
 // The MIDI insert chain: the event chain stops being welded to the part. What must hold is

@@ -259,6 +259,27 @@ namespace
                     arp.degreePattern.add (juce::jlimit (-1, 63, (int) degree));
                 }
         }
+
+        // The lane's other rows, each clamped to what the engine plays.
+        const auto row = [&payload, &fields] (const char* key, int low, int high, juce::Array<int>& into)
+        {
+            if (! fields.hasProperty (key))
+                return;
+            into.clear();
+            if (const auto* values = payload[key].getArray())
+                for (const auto& value : *values)
+                    if (into.size() < perf::ArpEngine::maxPatternSteps)
+                        into.add (juce::jlimit (low, high, (int) value));
+        };
+        row ("ratchetPattern", 1, 4, arp.ratchetPattern);
+        row ("tiePattern", 0, 1, arp.tiePattern);
+        row ("octavePattern", -2, 2, arp.octavePattern);
+        row ("chancePattern", 0, 100, arp.chancePattern);
+        if (fields.hasProperty ("feel"))
+        {
+            const auto feel = payload["feel"].toString();
+            arp.feel = feel == "triplet" || feel == "dotted" ? feel : "straight";
+        }
     }
 
     /** The note-shaping fields, same contract. */

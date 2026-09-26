@@ -27,6 +27,39 @@ try {
   await page.getByRole('button', { name: 'Rack', exact: true }).first().click();
   await page.getByRole('button', { name: 'MIDI', exact: true }).first().click();
   const add = page.getByLabel('Add a MIDI module');
+
+  // Arpeggiator: the lane
+  const arpRow = page.locator('[data-testid=midi-slot] .slot-name', { hasText: /^Arpeggiator/ });
+  await arpRow.click();
+  const arpEd = page.getByTestId('arp-editor');
+  await arpEd.getByRole('switch', { name: 'Arpeggiator' }).click();
+  await arpEd.locator('[data-testid=arp-mode] [data-value=pattern]').click();
+  assert.equal(await arpEd.getByTestId('arp-melody').count(), 1, 'Drawn mode puts the melody on the lane');
+  const cellsOf = (row) => arpEd.locator(`[data-row=${row}] .cell`);
+  assert.equal(await cellsOf('repeats').count(), 16, 'sixteen steps to start');
+  await cellsOf('repeats').nth(2).click();
+  await cellsOf('repeats').nth(2).click();
+  assert.equal(await cellsOf('repeats').nth(2).locator('.dots i').count(), 3, 'clicking a step adds repeats');
+  await cellsOf('octave').nth(1).click();
+  assert.equal(await cellsOf('octave').nth(1).innerText(), '+1');
+  await cellsOf('chance').nth(3).click();
+  assert.equal(await cellsOf('chance').nth(3).innerText(), '75');
+  assert.match(await arpEd.getByTestId('arp-lane').innerText(), /as played/, 'untouched velocities read as played');
+  const vbox = await arpEd.getByTestId('arp-velocity').boundingBox();
+  await page.mouse.move(vbox.x + 4, vbox.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(vbox.x + vbox.width - 4, vbox.y + vbox.height - 2, { steps: 12 });
+  await page.mouse.up();
+  assert.doesNotMatch(await arpEd.getByTestId('arp-lane').innerText(), /as played/, 'dragging draws the velocities');
+  assert.ok(await arpEd.locator('.vcol.rest').count() > 0, 'and the bottom band draws rests');
+  await arpEd.getByTestId('arp-length').press('ArrowDown');
+  assert.equal(await cellsOf('repeats').count(), 12, 'the lane shortens as one');
+  assert.equal(await cellsOf('repeats').nth(2).locator('.dots i').count(), 3, 'keeping what was drawn');
+  await arpEd.locator('[data-testid=arp-patterns] [data-value=rolls]').click();
+  assert.equal(await cellsOf('repeats').nth(15).locator('.dots i').count(), 4, 'a pattern fills the lane');
+  assert.equal(await cellsOf('chance').nth(3).innerText(), '', 'and clears the rows it does not use');
+  await arpEd.locator('[data-testid=arp-feel] [data-value=triplet]').click();
+  assert.match(await arpRow.innerText(), /1\/16T.*repeats/, 'the collapsed row names the feel and the repeats');
   await add.selectOption('strum');
   await add.selectOption('humanize');
 
@@ -148,7 +181,7 @@ try {
   assert.doesNotMatch(await chordRow.innerText(), /follow/, 'the light switches following off');
 
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('noteModules: strum, humanize and chords editors draw, change and summarise');
+  console.log('noteModules: arp, strum, humanize and chords editors draw, change and summarise');
 } finally {
   await browser.close();
   await server.close();

@@ -2647,7 +2647,17 @@ const normalizeArp = (a) => ({
   velocityPattern: (Array.isArray(a?.velocityPattern) ? a.velocityPattern : []).map(Number),
   degreePattern: (Array.isArray(a?.degreePattern) ? a.degreePattern : []).map(Number),
   patternSemitones: a?.patternSemitones === true,
+  // The step lane's other rows (ArpSettings): empty means the plain behaviour on every step.
+  ratchetPattern: laneRow(a?.ratchetPattern, 1, 4, 1),
+  tiePattern: laneRow(a?.tiePattern, 0, 1, 0),
+  octavePattern: laneRow(a?.octavePattern, -2, 2, 0),
+  chancePattern: laneRow(a?.chancePattern, 0, 100, 100),
+  feel: ['triplet', 'dotted'].includes(a?.feel) ? a.feel : 'straight',
 });
+
+function laneRow(values, low, high, fallback) {
+  return (Array.isArray(values) ? values : []).slice(0, 32).map((v) => clampInt(v, low, high, fallback));
+}
 
 // One MIDI insert. A slot carries both settings blocks and shows the one its type needs —
 // the same shape the native side keeps, so the UI never has to guess which half is live.

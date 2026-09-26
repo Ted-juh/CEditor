@@ -1700,6 +1700,20 @@ juce::var arpToVar (const ArpSettings& arp)
     a->setProperty ("octaves",           arp.octaves);
     a->setProperty ("latch",             arp.latch);
     a->setProperty ("constrainToScale",  arp.constrainToScale);
+    {
+        const auto list = [] (const juce::Array<int>& values)
+        {
+            juce::Array<juce::var> out;
+            for (const auto value : values)
+                out.add (value);
+            return juce::var (out);
+        };
+        a->setProperty ("ratchetPattern", list (arp.ratchetPattern));
+        a->setProperty ("tiePattern",     list (arp.tiePattern));
+        a->setProperty ("octavePattern",  list (arp.octavePattern));
+        a->setProperty ("chancePattern",  list (arp.chancePattern));
+        a->setProperty ("feel",           arp.feel);
+    }
     a->setProperty ("velocityPattern",   velocities);
     a->setProperty ("degreePattern",     degrees);
     a->setProperty ("patternSemitones",  arp.patternSemitones);
@@ -1720,6 +1734,22 @@ void arpFromVar (const juce::var& stored, ArpSettings& out)
     out.octaves          = intOf (stored, "octaves", 1, 1, 4);
     out.latch            = (bool) stored.getProperty ("latch", false);
     out.constrainToScale = (bool) stored.getProperty ("constrainToScale", false);
+    {
+        const auto read = [&stored] (const char* key, int low, int high, juce::Array<int>& into)
+        {
+            into.clear();
+            if (const auto* values = stored.getProperty (key, {}).getArray())
+                for (const auto& value : *values)
+                    if (into.size() < 32)
+                        into.add (juce::jlimit (low, high, (int) value));
+        };
+        read ("ratchetPattern", 1, 4, out.ratchetPattern);
+        read ("tiePattern", 0, 1, out.tiePattern);
+        read ("octavePattern", -2, 2, out.octavePattern);
+        read ("chancePattern", 0, 100, out.chancePattern);
+        const auto feel = stored.getProperty ("feel", "straight").toString();
+        out.feel = feel == "triplet" || feel == "dotted" ? feel : "straight";
+    }
 
     if (const auto* velocities = stored.getProperty ("velocityPattern", {}).getArray())
         for (const auto& velocity : *velocities)

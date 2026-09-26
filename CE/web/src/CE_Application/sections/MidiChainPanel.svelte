@@ -20,6 +20,8 @@
   import StrumEditor from './midiModules/StrumEditor.svelte';
   import HumanizeEditor from './midiModules/HumanizeEditor.svelte';
   import ChordsEditor from './midiModules/ChordsEditor.svelte';
+  import ArpEditor from './midiModules/ArpEditor.svelte';
+  import { RATE_CHOICES } from '../utils/arpLane.js';
   import { shapeLabel } from '../utils/chordBuilder.js';
   import { HUMANIZE_FEELS, humanizeFeelOf, beatsToMs } from '../utils/noteModuleViews.js';
   import {
@@ -57,7 +59,12 @@
   function summary(slot) {
     if (slot.type === 'arp')
       return slot.arp.enabled
-        ? `${slot.arp.mode} · ${slot.arp.stepsPerBeat}/beat · ${slot.arp.octaves} oct`
+        ? [slot.arp.mode === 'pattern' ? 'drawn' : slot.arp.mode,
+           `${RATE_CHOICES.find(([n]) => n === slot.arp.stepsPerBeat)?.[1] ?? `${slot.arp.stepsPerBeat}/beat`}`
+             + (slot.arp.feel === 'triplet' ? 'T' : slot.arp.feel === 'dotted' ? '.' : ''),
+           `${slot.arp.octaves} oct`,
+           ...(slot.arp.ratchetPattern.some((n) => n > 1) ? ['repeats'] : []),
+           ...(slot.arp.latch ? ['latched'] : [])].join(' · ')
         : 'off';
     if (slot.type === 'transpose')
       return slot.fx.transpose === 0 ? 'no change'
@@ -191,97 +198,6 @@
   const beatLabel = (beats) =>
     BEAT_CHOICES.find(([value]) => Math.abs(value - beats) < 1e-6)?.[1]
       ?? `${Number(beats).toFixed(3).replace(/0+$/, '').replace(/\.$/, '')} beats`;
-
-  // --- the arp grids, per slot ---------------------------------------------------------
-  const NOTE_ROWS_DEGREE = 8;
-  const NOTE_ROWS_FREE = 25;
-  let noteRows = $derived(openSlot?.arp.patternSemitones ? NOTE_ROWS_FREE : NOTE_ROWS_DEGREE);
-
-  let velDraft = $state(null);
-  let velEl = $state(null);
-  let velDragging = $state(false);
-  let velPattern = $derived(velDraft ?? openSlot?.arp.velocityPattern ?? []);
-
-  let noteDraft = $state(null);
-  let noteEl = $state(null);
-  let noteDragging = $state(false);
-  let notePainting = $state(false);
-  let notePattern = $derived(noteDraft ?? openSlot?.arp.degreePattern ?? []);
-
-  function velCell(event) {
-    const rect = velEl.getBoundingClientRect();
-    const count = Math.max(1, velPattern.length || 16);
-    const step = Math.max(0, Math.min(count - 1,
-      Math.floor(((event.clientX - rect.left) / rect.width) * count)));
-    // The bottom band snaps to a rest: nobody can hit a one-pixel floor.
-    const raw = Math.max(0, Math.min(127,
-      Math.round((1 - (event.clientY - rect.top) / rect.height) * 127)));
-    return { step, velocity: raw < 7 ? 0 : raw };
-  }
-
-  function velDown(event) {
-    if (!openSlot) return;
-    event.preventDefault();
-    velDraft = velPattern.length > 0 ? [...velPattern] : Array.from({ length: 16 }, () => 100);
-    velDragging = true;
-    velEl.setPointerCapture?.(event.pointerId);
-    const { step, velocity } = velCell(event);
-    velDraft[step] = velocity;
-  }
-  function velMove(event) {
-    if (!velDragging || velDraft === null) return;
-    const { step, velocity } = velCell(event);
-    velDraft[step] = velocity;
-  }
-  function velUp() {
-    if (!velDragging) return;
-    velDragging = false;
-    if (velDraft !== null && openSlot) set(openSlot, { velocityPattern: [...velDraft] });
-    velDraft = null;
-  }
-
-  function noteCell(event) {
-    const rect = noteEl.getBoundingClientRect();
-    const count = Math.max(1, notePattern.length || 16);
-    const step = Math.max(0, Math.min(count - 1,
-      Math.floor(((event.clientX - rect.left) / rect.width) * count)));
-    const row = Math.max(0, Math.min(noteRows - 1,
-      noteRows - 1 - Math.floor(((event.clientY - rect.top) / rect.height) * noteRows)));
-    return { step, row };
-  }
-
-  function noteDown(event) {
-    if (!openSlot) return;
-    event.preventDefault();
-    noteDraft = notePattern.length > 0 ? [...notePattern] : Array.from({ length: 16 }, () => -1);
-    noteDragging = true;
-    noteEl.setPointerCapture?.(event.pointerId);
-    const { step, row } = noteCell(event);
-    if (noteDraft[step] === row) { noteDraft[step] = -1; notePainting = false; }
-    else { noteDraft[step] = row; notePainting = true; }
-  }
-  function noteMove(event) {
-    if (!noteDragging || !notePainting || noteDraft === null) return;
-    const { step, row } = noteCell(event);
-    noteDraft[step] = row;
-  }
-  function noteUp() {
-    if (!noteDragging) return;
-    noteDragging = false;
-    if (noteDraft !== null && openSlot) set(openSlot, { degreePattern: [...noteDraft] });
-    noteDraft = null;
-  }
-
-  function resizePatterns(slot, length) {
-    const degrees = slot.arp.degreePattern;
-    const velocities = slot.arp.velocityPattern;
-    set(slot, {
-      degreePattern: Array.from({ length }, (_, i) => degrees[i] ?? -1),
-      velocityPattern: velocities.length > 0
-        ? Array.from({ length }, (_, i) => velocities[i] ?? 100)
-        : [],
-    });
-  }
 
   // --- dragging a module to reorder the chain ----------------------------------------------
   //
@@ -836,120 +752,8 @@
           {/if}
 
           {#if slot.type === 'arp'}
-            <div class="arp-controls">
-              <PropertyToggle compact label={slot.arp.enabled ? 'On' : 'Off'} value={slot.arp.enabled}
-                              ariaLabel="Arpeggiator" onchange={(on) => set(slot, { enabled: on })} />
-              <label class="mini-field">Mode
-                <select value={slot.arp.mode} aria-label="Arpeggiator mode"
-                        onchange={(e) => set(slot, { mode: e.currentTarget.value })}>
-                  {#each ['up', 'down', 'up-down', 'down-up', 'order', 'random', 'chord', 'pattern'] as mode (mode)}
-                    <option value={mode}>{mode}</option>
-                  {/each}
-                </select>
-              </label>
-              <label class="mini-field">Rate
-                <select value={slot.arp.stepsPerBeat} aria-label="Arpeggiator rate"
-                        onchange={(e) => set(slot, { stepsPerBeat: Number(e.currentTarget.value) })}>
-                  {#each [1, 2, 3, 4, 6, 8, 12, 16] as rate (rate)}
-                    <option value={rate}>{rate}/beat</option>
-                  {/each}
-                </select>
-              </label>
-              <label class="mini-field">Octaves
-                <select value={slot.arp.octaves} aria-label="Arpeggiator octaves"
-                        onchange={(e) => set(slot, { octaves: Number(e.currentTarget.value) })}>
-                  {#each [1, 2, 3, 4] as octaves (octaves)}
-                    <option value={octaves}>{octaves}</option>
-                  {/each}
-                </select>
-              </label>
-              <label class="mini-field">Gate — {Math.round(slot.arp.gate * 100)}%
-                <input type="range" min="0.05" max="1" step="0.05" value={slot.arp.gate}
-                       aria-label="Arpeggiator gate"
-                       oninput={(e) => set(slot, { gate: Number(e.currentTarget.value) })} />
-              </label>
-              <label class="mini-field">Swing — {Math.round(slot.arp.swing * 100)}%
-                <input type="range" min="0" max="0.75" step="0.01" value={slot.arp.swing}
-                       aria-label="Arpeggiator swing"
-                       oninput={(e) => set(slot, { swing: Number(e.currentTarget.value) })} />
-              </label>
-              <PropertyToggle compact label={slot.arp.latch ? 'Latched' : 'Latch'} value={slot.arp.latch}
-                              ariaLabel="Latch the held chord" onchange={(on) => set(slot, { latch: on })} />
-            </div>
-
-            {#if slot.arp.enabled && slot.arp.mode === 'pattern'}
-              <!-- Draw the melody: a column is a step, the lit row is which note plays. -->
-              <div class="grid-row">
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div class="note-grid" class:empty={notePattern.length === 0}
-                     data-testid="arp-note-grid" bind:this={noteEl}
-                     onpointerdown={noteDown} onpointermove={noteMove}
-                     onpointerup={noteUp} onpointercancel={noteUp}>
-                  {#each (notePattern.length > 0 ? notePattern : Array.from({ length: 16 }, () => -1)) as degree, i (i)}
-                    <div class="note-col" class:playing={notePattern.length > 0
-                                                         && $hostArpStep[part.partId] === i}>
-                      {#each Array.from({ length: noteRows }, (_, r) => noteRows - 1 - r) as row (row)}
-                        <div class="note-cell" class:on={degree === row}
-                             class:octave={!slot.arp.patternSemitones && row >= 4 && degree !== row}
-                             class:ground={slot.arp.patternSemitones && row === 12 && degree !== row}></div>
-                      {/each}
-                    </div>
-                  {/each}
-                </div>
-                <div class="grid-side">
-                  {#if notePattern.length > 0}
-                    <select value={notePattern.length} aria-label="Melody length"
-                            onchange={(e) => resizePatterns(slot, Number(e.currentTarget.value))}>
-                      {#each [4, 8, 12, 16, 24, 32] as length (length)}
-                        <option value={length}>{length} steps</option>
-                      {/each}
-                    </select>
-                    <HostConfirmButton identity={slot.slotId} title="Clear arpeggiator pattern"
-                            onclick={() => set(slot, { degreePattern: [] })}>Clear</HostConfirmButton>
-                  {:else}
-                    <span class="hint">{slot.arp.patternSemitones
-                      ? 'rows are semitones around your lowest key'
-                      : 'rows are notes of your held chord'}</span>
-                  {/if}
-                  <span class="row-mode">
-                    <button type="button" class:on={!slot.arp.patternSemitones}
-                            title="Rows are chord degrees — the drawing re-voices with what you hold"
-                            onclick={() => set(slot, { patternSemitones: false })}>chord</button>
-                    <button type="button" class:on={slot.arp.patternSemitones}
-                            data-testid="arp-rows-free"
-                            title="Rows are semitones around your lowest key"
-                            onclick={() => set(slot, { patternSemitones: true })}>free</button>
-                  </span>
-                </div>
-              </div>
-            {/if}
-
-            {#if slot.arp.enabled}
-              <!-- Dynamics per step; a bar on the floor is a rest the engine skips. -->
-              <div class="grid-row">
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div class="vel-grid" class:empty={velPattern.length === 0}
-                     data-testid="arp-grid" bind:this={velEl}
-                     onpointerdown={velDown} onpointermove={velMove}
-                     onpointerup={velUp} onpointercancel={velUp}>
-                  {#each (velPattern.length > 0 ? velPattern : Array.from({ length: 16 }, () => 100)) as velocity, i (i)}
-                    <div class="vel-col" class:playing={velPattern.length > 0
-                                                        && $hostArpStep[part.partId] === i}
-                         class:rest={velPattern.length > 0 && velocity === 0}>
-                      <div class="vel-bar" style={`height: ${Math.max(velocity / 127 * 100, velocity === 0 ? 0 : 4)}%`}></div>
-                    </div>
-                  {/each}
-                </div>
-                <div class="grid-side">
-                  {#if velPattern.length > 0}
-                    <button type="button" class="ghost" title="Back to the velocities you played"
-                            onclick={() => set(slot, { velocityPattern: [] })}>as played</button>
-                  {:else}
-                    <span class="hint">as played — draw to shape it</span>
-                  {/if}
-                </div>
-              </div>
-            {/if}
+            <ArpEditor arp={slot.arp} set={(fields) => set(slot, fields)} identity={slot.slotId}
+                       playStep={$hostArpStep[part.partId] ?? -1} />
           {/if}
         </div>
       {/if}
@@ -986,7 +790,6 @@
   .slot-summary { color: #7d8894; font-size: 10px; }
   .slot-body { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 8px 8px; }
   .mini-field { display: flex; flex-direction: column; gap: 3px; color: #9aa5b1; font-size: 11px; }
-  .arp-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; width: 100%; }
   .mpe-controls, .mpe-routing { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; width: 100%; }
   .mpe-routing { padding-top: 7px; border-top: 1px solid var(--host-line-soft); }
   .mpe-controls select { min-width: 142px; }
@@ -1030,34 +833,6 @@
   .range-pair > span { display: flex; align-items: center; gap: 4px; color: var(--host-text-dim); }
   .hint { color: #66707b; font-size: 10px; max-width: 150px; }
   .empty-hint { color: #66707b; font-size: 12px; }
-  .grid-row { display: flex; gap: 8px; align-items: stretch; width: 100%; }
-  .note-grid { flex: 1; display: flex; gap: 1px; height: 150px; background: #10161c;
-               border: 1px solid #232c36; border-radius: 4px; padding: 2px;
-               cursor: crosshair; touch-action: none; }
-  .vel-grid { flex: 1; display: flex; gap: 1px; height: 72px; background: #10161c;
-              border: 1px solid #232c36; border-radius: 4px; padding: 2px;
-              cursor: crosshair; touch-action: none; }
-  /* "nothing drawn yet". NOT .ghost — that is the button utility below, same specificity
-     and declared later, so it would take the grid's own background and border with it. */
-  .note-grid.empty, .vel-grid.empty { opacity: 0.45; }
-  .note-col { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 4px; }
-  .note-col.playing { background: #24384c; border-radius: 1px; }
-  .note-cell { flex: 1; background: #161e27; border-radius: 1px; }
-  .note-cell.octave { background: #131a22; }
-  .note-cell.ground { background: #1f2a36; }
-  .note-cell.on { background: #4aa88c; }
-  .note-col.playing .note-cell.on { background: #7fd4b8; }
-  .vel-col { flex: 1; display: flex; align-items: flex-end; background: #161e27;
-             border-radius: 1px; min-width: 4px; }
-  .vel-col.playing { background: #24384c; }
-  .vel-col.rest { background: #12181f; }
-  .vel-bar { width: 100%; background: #3d81c4; border-radius: 1px 1px 0 0; }
-  .vel-col.playing .vel-bar { background: #7fb4e0; }
-  .grid-side { display: flex; flex-direction: column; gap: 4px; justify-content: flex-start; }
-  .row-mode { display: flex; gap: 2px; }
-  .row-mode button { flex: 1; font-size: 10px; padding: 2px 4px; background: var(--host-surface-raised);
-                     color: var(--host-text-soft); border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-control); cursor: pointer; }
-  .row-mode button.on { background: var(--host-accent-surface); color: var(--host-text); border-color: var(--host-accent); }
   .ghost { background: none; border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-control); color: var(--host-text-soft);
            cursor: pointer; font-size: 11px; padding: 2px 6px; }
   .ghost:disabled { opacity: 0.35; cursor: default; }
