@@ -1809,6 +1809,8 @@ juce::var midiFxToVar (const MidiFxSettings& fx)
     f->setProperty ("progressionLow",     fx.progressionLow);
     f->setProperty ("progressionHigh",    fx.progressionHigh);
     f->setProperty ("constrainToScale", fx.constrainToScale);
+    f->setProperty ("scaleFold",        fx.scaleFold);
+    f->setProperty ("followSongKey",    fx.followSongKey);
     f->setProperty ("scaleRoot",        fx.scaleRoot);
     f->setProperty ("scaleType",        fx.scaleType);
     f->setProperty ("chord",            MidiFxSettings::chordTypeName (fx.chord));
@@ -1863,6 +1865,8 @@ void midiFxFromVar (const juce::var& stored, MidiFxSettings& out)
     if (out.transposeMode != "diatonic")
         out.transposeMode = "chromatic";
     out.constrainToScale = (bool) stored.getProperty ("constrainToScale", false);
+    out.scaleFold        = stored.getProperty ("scaleFold", "snap").toString() == "drop" ? "drop" : "snap";
+    out.followSongKey    = (bool) stored.getProperty ("followSongKey", false);
     out.scaleRoot        = intOf (stored, "scaleRoot", 0, 0, 11);
     out.scaleType        = stored.getProperty ("scaleType", "major").toString();
     out.chord            = MidiFxSettings::chordTypeFromName (stored.getProperty ("chord", {}).toString());
@@ -2007,16 +2011,36 @@ juce::StringArray MidiSlot::types()
 {
     // Order is the order the UI offers them: the two that reorder or repeat what you play,
     // then the shapers, then the performance processors in the order somebody reaches for them.
-    return { "arp", "transpose", "scale", "chord", "velocity", "fx",
+    return { "arp", "key", "chord", "velocity", "fx",
              "echo", "strum", "humanize", "chance", "length", "latch", "mpe",
              "articulation" };
+}
+
+bool MidiSlot::isNoteModule (const juce::String& type)
+{
+    // The ones whose settings live in `mod` rather than `fx` or `arp`.
+    return juce::StringArray { "echo", "strum", "humanize", "chance", "length", "latch", "mpe",
+                               "articulation" }.contains (type);
+}
+
+juce::Array<MidiSlot> withSongKey (juce::Array<MidiSlot> chain, const juce::String& scaleType, int root)
+{
+    for (auto& slot : chain)
+        if (slot.fx.followSongKey)
+        {
+            slot.fx.scaleType = scaleType;
+            slot.fx.scaleRoot = juce::jlimit (0, 11, root);
+        }
+    return chain;
 }
 
 MidiSlot MidiSlot::create (const juce::String& type, const juce::String& slotId)
 {
     MidiSlot slot;
     slot.slotId = slotId;
-    slot.type = types().contains (type) ? type : "arp";
+    slot.type = types().contains (canonicalType (type)) ? canonicalType (type) : juce::String ("arp");
+    // A module added now reads the part's song key; one from before keeps its own scale.
+    slot.fx.followSongKey = true;
     // Defaults are already transparent: ArpSettings starts disabled, MidiFxSettings starts
     // at no transpose, no scale, no chord, unity velocity. An inserted module must not
     // change the sound by existing — it changes it when you set it up.
@@ -2237,7 +2261,9 @@ void midiSlotFromVar (const juce::var& stored, MidiSlot& out)
 
     out.slotId   = stored.getProperty ("slotId", {}).toString();
     const auto type = stored.getProperty ("type", {}).toString();
-    out.type     = MidiSlot::types().contains (type) ? type : juce::String ("arp");
+    // Transpose and Scale became one Key module, which does both jobs with the same fields.
+    const auto migrated = MidiSlot::canonicalType (type);
+    out.type     = MidiSlot::types().contains (migrated) ? migrated : juce::String ("arp");
     out.bypassed = (bool) stored.getProperty ("bypassed", false);
     arpFromVar (stored.getProperty ("arp", {}), out.arp);
     midiFxFromVar (stored.getProperty ("fx", {}), out.fx);

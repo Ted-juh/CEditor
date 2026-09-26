@@ -126,6 +126,10 @@ struct RackPart
     // compose (see perf::MidiSlot). A part loaded from a pre-chain session gets the two
     // slots its old settings describe, so it opens sounding identical.
     juce::Array<perf::MidiSlot> midiChain;
+    // The part's song key: the modules that follow it (MidiFxSettings::followSongKey) take
+    // their scale from here when the chain is handed to the engine (perf::withSongKey).
+    int keyRoot = 0;                  // 0..11, C..B
+    juce::String keyScale = "major";
     bool enabled = true;
     bool mute = false;
     bool solo = false;

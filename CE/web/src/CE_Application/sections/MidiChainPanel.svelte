@@ -22,6 +22,7 @@
   import ArpEditor from './midiModules/ArpEditor.svelte';
   import ResponseEditor from './midiModules/ResponseEditor.svelte';
   import EchoEditor from './midiModules/EchoEditor.svelte';
+  import KeyEditor from './midiModules/KeyEditor.svelte';
   import SmallModuleEditors from './midiModules/SmallModuleEditors.svelte';
   import { RATE_CHOICES } from '../utils/arpLane.js';
   import { shapeLabel } from '../utils/chordBuilder.js';
@@ -33,7 +34,7 @@
     reorderIndexForDrop,
     hostNote,
     learnKeyChord, cancelKeyChordLearn, clearKeyChord, hostChordsLive, chordPad, chordStep,
-    hostMidiActivity, saveResponseProfile, removeResponseProfile,
+    hostMidiActivity, saveResponseProfile, removeResponseProfile, setPartKey,
   } from '../stores/instrumentHost.js';
 
   let { part } = $props();
@@ -57,6 +58,9 @@
   const keyName = (n) => `${NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`;
 
   const set = (slot, fields) => setMidiSlotOptions(part.partId, slot.slotId, fields);
+  /** The key a module plays in: the part's song key when it follows it, else its own. */
+  const songKeyOf = (slot) => (slot.fx.followSongKey
+    ? { root: part.keyRoot, scale: part.keyScale } : { root: slot.fx.scaleRoot, scale: slot.fx.scaleType });
 
   /** What a slot is doing, in a few words, so a collapsed chain still reads. */
   function summary(slot) {
@@ -69,12 +73,13 @@
            ...(slot.arp.ratchetPattern.some((n) => n > 1) ? ['repeats'] : []),
            ...(slot.arp.latch ? ['latched'] : [])].join(' · ')
         : 'off';
-    if (slot.type === 'transpose')
-      return slot.fx.transpose === 0 ? 'no change'
-        : `${slot.fx.transpose > 0 ? '+' : ''}${slot.fx.transpose} ${slot.fx.transposeMode === 'diatonic'
-            ? `scale steps · ${NOTE_NAMES[slot.fx.scaleRoot]} ${slot.fx.scaleType}` : 'semitones'}`;
-    if (slot.type === 'scale')
-      return slot.fx.constrainToScale ? `${NOTE_NAMES[slot.fx.scaleRoot]} ${slot.fx.scaleType}` : 'off';
+    if (slot.type === 'key') {
+      const key = songKeyOf(slot);
+      const parts = [`${NOTE_NAMES[key.root]} ${key.scale}${slot.fx.followSongKey ? '' : ' (own)'}`];
+      if (slot.fx.transpose) parts.push(`${slot.fx.transpose > 0 ? '+' : ''}${slot.fx.transpose} ${slot.fx.transposeMode === 'diatonic' ? 'steps' : 'st'}`);
+      parts.push(!slot.fx.constrainToScale ? 'all notes' : slot.fx.scaleFold === 'drop' ? 'drops others' : 'snaps');
+      return parts.join(' · ');
+    }
     if (slot.type === 'chord') {
       const follows = slot.fx.chordFollow && slot.fx.chord !== 'off';
       const maps = slot.fx.chordKeyMap && slot.fx.keyMap.length > 0;
@@ -300,64 +305,13 @@
 
       {#if openSlotId === slot.slotId}
         <div class="slot-body">
-          {#if slot.type === 'transpose' || slot.type === 'fx'}
-            <label class="mini-field">Mode
-              <select value={slot.fx.transposeMode}
-                      onchange={(e) => set(slot, { transposeMode: e.currentTarget.value })}>
-                <option value="chromatic">Chromatic</option>
-                <option value="diatonic">Diatonic / key-aware</option>
-              </select>
-            </label>
-            <label class="mini-field">{slot.fx.transposeMode === 'diatonic' ? 'Scale steps' : 'Semitones'}
-              <input type="number" min={slot.fx.transposeMode === 'diatonic' ? -28 : -48}
-                     max={slot.fx.transposeMode === 'diatonic' ? 28 : 48} value={slot.fx.transpose}
-                     onchange={(e) => set(slot, { transpose: Number(e.currentTarget.value) })} />
-            </label>
-            {#if slot.fx.transposeMode === 'diatonic'}
-              <label class="mini-field">Key
-                <select value={slot.fx.scaleRoot}
-                        onchange={(e) => set(slot, { scaleRoot: Number(e.currentTarget.value) })}>
-                  {#each NOTE_NAMES as name, i (name)}
-                    <option value={i}>{name}</option>
-                  {/each}
-                </select>
-              </label>
-              <label class="mini-field">Scale
-                <select value={slot.fx.scaleType}
-                        onchange={(e) => set(slot, { scaleType: e.currentTarget.value })}>
-                  {#each scales as name (name)}
-                    <option value={name}>{name}</option>
-                  {/each}
-                </select>
-              </label>
-              <span class="hint">Moves by scale degree: in C major, +2 turns C→E, D→F and E→G.</span>
-            {/if}
-          {/if}
-
-          {#if slot.type === 'scale' || slot.type === 'fx'}
-            <label class="mini-field">Scale
-              <select value={slot.fx.constrainToScale ? slot.fx.scaleType : ''}
-                      onchange={(e) => set(slot, e.currentTarget.value
-                                             ? { constrainToScale: true, scaleType: e.currentTarget.value }
-                                             : { constrainToScale: false })}>
-                <option value="">off</option>
-                {#each scales as name (name)}
-                  <option value={name}>{name}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="mini-field">Root
-              <select value={slot.fx.scaleRoot}
-                      onchange={(e) => set(slot, { scaleRoot: Number(e.currentTarget.value) })}>
-                {#each NOTE_NAMES as name, i (name)}
-                  <option value={i}>{name}</option>
-                {/each}
-              </select>
-            </label>
+          {#if slot.type === 'key' || slot.type === 'fx'}
+            <KeyEditor fx={slot.fx} set={(fields) => set(slot, fields)} {part} {scales} {chain} labels={midiSlotLabels}
+                       onsetkey={(fields) => setPartKey(part.partId, fields)} onsetslot={(s, fields) => set(s, fields)} />
           {/if}
 
           {#if slot.type === 'chord' || slot.type === 'fx'}
-            <ChordsEditor fx={slot.fx} set={(fields) => set(slot, fields)} partId={part.partId} slotId={slot.slotId}
+            <ChordsEditor fx={slot.fx} songKey={songKeyOf(slot)} set={(fields) => set(slot, fields)} partId={part.partId} slotId={slot.slotId}
                           {scales} learn={$hostChordLearn}
                           onlearn={() => learnKeyChord(part.partId, slot.slotId)}
                           oncancel={() => cancelKeyChordLearn()}
@@ -377,7 +331,7 @@
 
           {#if slot.type === 'echo'}
             <EchoEditor mod={slot.mod} set={(fields) => set(slot, fields)} tempo={tempo} beatChoices={BEAT_CHOICES}
-                        scale={{ type: slot.fx.scaleType, root: slot.fx.scaleRoot }} />
+                        scale={{ type: songKeyOf(slot).scale, root: songKeyOf(slot).root }} />
           {/if}
 
           {#if slot.type === 'strum'}

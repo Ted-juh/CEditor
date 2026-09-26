@@ -15,16 +15,13 @@ namespace
         if (slot.type == "fx")
             return slot.fx;
 
-        if (slot.type == "transpose")
+        if (slot.type == "key")
         {
+            // Transpose and scale, the two halves of "what key am I playing in".
             out.transpose = slot.fx.transpose;
             out.transposeMode = slot.fx.transposeMode;
-            out.scaleType = slot.fx.scaleType;
-            out.scaleRoot = slot.fx.scaleRoot;
-        }
-        else if (slot.type == "scale")
-        {
             out.constrainToScale = slot.fx.constrainToScale;
+            out.scaleFold = slot.fx.scaleFold;
             out.scaleType = slot.fx.scaleType;
             out.scaleRoot = slot.fx.scaleRoot;
         }

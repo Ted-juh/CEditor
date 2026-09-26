@@ -2663,12 +2663,15 @@ function laneRow(values, low, high, fallback) {
 
 // One MIDI insert. A slot carries both settings blocks and shows the one its type needs —
 // the same shape the native side keeps, so the UI never has to guess which half is live.
-export const midiSlotTypes = ['arp', 'transpose', 'scale', 'chord', 'velocity', 'fx',
+export const midiSlotTypes = ['arp', 'key', 'chord', 'velocity', 'fx',
                               'echo', 'strum', 'humanize', 'chance', 'length', 'latch', 'mpe',
                               'articulation'];
 
+/** Old names still say what they mean: Transpose and Scale are the Key module now. */
+export const canonicalSlotType = (type) => (type === 'transpose' || type === 'scale' ? 'key' : type);
+
 export const midiSlotLabels = {
-  arp: 'Arpeggiator', transpose: 'Transpose', scale: 'Scale', chord: 'Chords',
+  arp: 'Arpeggiator', key: 'Key', chord: 'Chords',
   velocity: 'Velocity / Expression', fx: 'Note shaping',
   echo: 'Echo', strum: 'Strum', humanize: 'Humanize', chance: 'Chance',
   length: 'Note length', latch: 'Latch', mpe: 'MPE Transformer',
@@ -2676,7 +2679,7 @@ export const midiSlotLabels = {
 };
 
 export function normalizeMidiSlot(slot) {
-  const type = String(slot?.type ?? '');
+  const type = canonicalSlotType(String(slot?.type ?? ''));
   return {
     slotId: String(slot?.slotId ?? ''),
     type: midiSlotTypes.includes(type) ? type : 'arp',
@@ -2942,6 +2945,8 @@ const normalizeMidiFx = (f) => {
     transpose: Number(f?.transpose ?? 0),
     transposeMode: f?.transposeMode === 'diatonic' ? 'diatonic' : 'chromatic',
     constrainToScale: f?.constrainToScale === true,
+    scaleFold: f?.scaleFold === 'drop' ? 'drop' : 'snap',
+    followSongKey: f?.followSongKey === true,
     scaleRoot: Number(f?.scaleRoot ?? 0),
     scaleType: String(f?.scaleType ?? 'major'),
     ...normalizeChordLayers(f),
@@ -4419,6 +4424,9 @@ export function normalizeHostState(payload) {
         arp: normalizeArp(part?.arp),
         midiFx: normalizeMidiFx(part?.midiFx),
         midiChain: (Array.isArray(part?.midiChain) ? part.midiChain : []).map(normalizeMidiSlot),
+        // The song key; modules that follow it (fx.followSongKey) read it instead of their own.
+        keyRoot: clampInt(part?.keyRoot, 0, 11, clampInt(part?.midiFx?.scaleRoot, 0, 11, 0)),
+        keyScale: String(part?.keyScale ?? part?.midiFx?.scaleType ?? 'major'),
         enabled: part?.enabled !== false,
         mute: part?.mute === true,
         solo: part?.solo === true,
@@ -5190,6 +5198,13 @@ export function applyMockCommand(state, payload) {
       // One editor per processor: docking pulls a floating part back in.
       next.floatingEditorPartIds = next.floatingEditorPartIds.filter((id) => id !== payload.partId);
     }
+    return next;
+  }
+  if (cmd === 'setPartKey') {
+    const target = part(payload.partId);
+    if (!target) return next;
+    if ('root' in payload) target.keyRoot = clampInt(payload.root, 0, 11, target.keyRoot);
+    if ('scale' in payload) target.keyScale = String(payload.scale);
     return next;
   }
   if (cmd === 'saveResponseProfile' || cmd === 'removeResponseProfile') {
@@ -7366,9 +7381,10 @@ export function applyMockCommand(state, payload) {
     const index = chain.findIndex((s) => s.slotId === payload.slotId);
 
     if (cmd === 'addMidiSlot') {
-      if (!midiSlotTypes.includes(payload.type) || chain.length >= 8) return next;
-      chain.push(normalizeMidiSlot({ slotId: nextMockId('mock-slot'),
-                                     type: payload.type }));
+      const type = canonicalSlotType(payload.type);
+      if (!midiSlotTypes.includes(type) || chain.length >= 8) return next;
+      // A module added now follows the part's song key, as MidiSlot::create does.
+      chain.push(normalizeMidiSlot({ slotId: nextMockId('mock-slot'), type, fx: { followSongKey: true } }));
       return next;
     }
     if (index < 0) return next;
@@ -7398,6 +7414,11 @@ export function applyMockCommand(state, payload) {
           : String(value);
       }
       if (block === chain[index].fx) applyLegacyChordField(block, payload);
+      // The arp's scale lives in its fx block, as on the native side.
+      if (chain[index].type === 'arp')
+        for (const key of ['followSongKey', 'scaleType', 'scaleRoot'])
+          if (key in payload) chain[index].fx[key] = key === 'followSongKey' ? payload[key] === true
+            : key === 'scaleRoot' ? Number(payload[key]) : String(payload[key]);
       if (chain[index].type === 'strum') {
         if ('strumDown' in payload && !('strumPattern' in payload))
           block.strumPattern = payload.strumDown === true ? 'descending' : 'ascending';
@@ -8966,6 +8987,8 @@ export const cancelSoundComparison = () => send({ cmd: 'cancelSoundComparison' }
 export const learnKeyChord = (partId, slotId = '') =>
   send({ cmd: 'learnKeyChord', partId, ...(slotId ? { slotId } : {}) });
 export const cancelKeyChordLearn = () => send({ cmd: 'cancelKeyChordLearn' });
+/** The part's song key: { root?: 0..11, scale?: name }. */
+export const setPartKey = (partId, fields) => send({ cmd: 'setPartKey', partId, ...fields });
 /** Saves (or replaces, by name) a keyboard's velocity/expression calibration. */
 export const saveResponseProfile = (name, portHint, fields) => send({
   cmd: 'saveResponseProfile', name, portHint,

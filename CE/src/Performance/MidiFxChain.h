@@ -79,6 +79,7 @@ public:
         mask.store (settings.constrainToScale
                       ? scaleMask (settings.scaleType, settings.scaleRoot)
                       : (juce::uint16) 0x0fff);
+        dropOutOfScale.store (settings.constrainToScale && settings.scaleFold == "drop");
         // Diatonic stacking needs the REAL scale even when constrain is off — a chromatic
         // mask would stack minor thirds and call them chords.
         diatonicMask.store (scaleMask (settings.scaleType, settings.scaleRoot));
@@ -179,6 +180,7 @@ public:
     bool isTransparent() const noexcept
     {
         return transpose.load() == 0
+            && ! dropOutOfScale.load()
             && chordType.load() == (int) MidiFxSettings::ChordType::off
             && ! keyMapActive.load()
             && progressionLength.load() == 0
@@ -260,6 +262,13 @@ public:
                 const auto transposed = useDiatonicTranspose
                     ? scaleSteps (sourceNote, semitones, diatonicMask.load())
                     : juce::jlimit (0, 127, sourceNote + semitones);
+                // Dropping instead of snapping: a note outside the scale is not played at all,
+                // and since nothing is tracked for it, its note-off ends nothing either.
+                if (dropOutOfScale.load() && (scale & (juce::uint16) (1 << (transposed % 12))) == 0)
+                {
+                    releaseTracked (channel, sourceNote, out, position);
+                    continue;
+                }
                 const auto root = constrainNoteToScale (transposed, scale);
 
                 // Retrigger without an off: release what is sounding for this source note
@@ -884,6 +893,7 @@ private:
     std::array<std::atomic<int>, MidiFxSettings::responseCurvePoints> expressionCurveValues {};
     std::atomic<juce::uint16> mask { 0x0fff };
     std::atomic<juce::uint16> diatonicMask { 0x0fff };
+    std::atomic<bool> dropOutOfScale { false };
     std::array<std::array<std::atomic<juce::uint8>, 6>, 128> mappedNotes {};
     std::array<std::atomic<juce::uint8>, 128> mappedCount {};
     std::array<std::atomic<int>, 128> mappedChord {};

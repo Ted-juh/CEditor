@@ -5043,6 +5043,25 @@ test('response profiles: normalized as calibrations, saved and removed by name i
   assert.deepEqual(mock.responseProfiles, []);
 });
 
+test('the Key module and the song key: old names migrate, parts carry a key, new modules follow it', () => {
+  assert.equal(normalizeMidiSlot({ type: 'transpose' }).type, 'key');
+  assert.equal(normalizeMidiSlot({ type: 'scale' }).type, 'key');
+  assert.equal(normalizeMidiSlot({ type: 'key' }).fx.scaleFold, 'snap');
+  assert.equal(normalizeMidiSlot({ type: 'key', fx: { scaleFold: 'drop', followSongKey: true } }).fx.scaleFold, 'drop');
+  const legacy = normalizeHostState({ rack: { parts: [{ partId: 'p', midiFx: { scaleType: 'dorian', scaleRoot: 2 } }] } });
+  assert.deepEqual([legacy.rack.parts[0].keyRoot, legacy.rack.parts[0].keyScale], [2, 'dorian'],
+    'a part from before the song key takes its old note-shaping scale');
+
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'scale' });
+  const added = state.rack.parts[0].midiChain.at(-1);
+  assert.equal(added.type, 'key', 'adding by the old name makes a Key module');
+  assert.equal(added.fx.followSongKey, true, 'which follows the song key');
+  state = applyMockCommand(state, { cmd: 'setPartKey', partId, root: 7, scale: 'mixolydian' });
+  assert.deepEqual([state.rack.parts[0].keyRoot, state.rack.parts[0].keyScale], [7, 'mixolydian']);
+});
+
 test('Smart Chorder inversion, voicing and nearest-motion rules match the native engine', () => {
   assert.deepEqual(applySmartChordVoicing([60, 64, 67], { inversion: 1 }), [64, 67, 72]);
   assert.deepEqual(applySmartChordVoicing([60, 64, 67], { voicing: 'open' }), [60, 67, 76]);

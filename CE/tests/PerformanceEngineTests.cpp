@@ -1813,6 +1813,50 @@ void testMidiInsertRack()
     }
 
     {
+        // The Key module: transpose and scale in one, snapping or dropping what falls outside.
+        check (slot ("transpose").type == "key" && slot ("scale").type == "key",
+               "Transpose and Scale are the Key module now, by their old names too");
+        auto key = slot ("key");
+        key.fx.transpose = 2;
+        key.fx.constrainToScale = true;
+        key.fx.scaleType = "major";
+        key.fx.scaleRoot = 0;
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ key });
+        check (notesFrom (rack, 60) == std::vector<int> { 62 } && notesFrom (rack, 62) == std::vector<int> { 64 },
+               "a Key module transposes and folds in one place");
+        check (notesFrom (rack, 61) == std::vector<int> { 64 }, "snap: C# up a tone is D#, which snaps up to E");
+
+        key.fx.scaleFold = "drop";
+        rack.setSlots ({ key });
+        check (notesFrom (rack, 61).empty(), "drop: a note that lands outside the scale is not played");
+        check (notesFrom (rack, 60) == std::vector<int> { 62 }, "and the ones inside still are");
+
+        // The song key reaches the modules that follow it, and only those.
+        auto follows = slot ("key");
+        follows.fx.constrainToScale = true;
+        follows.fx.scaleType = "major";
+        follows.fx.followSongKey = true;
+        auto own = MidiSlot::create ("key", "slot-key-own");
+        own.fx.followSongKey = false;
+        own.fx.scaleType = "dorian";
+        const auto resolved = withSongKey ({ follows, own }, "minor", 9);
+        check (resolved[0].fx.scaleType == "minor" && resolved[0].fx.scaleRoot == 9
+                 && resolved[1].fx.scaleType == "dorian",
+               "following modules take the song key; one with its own key keeps it");
+        check (MidiSlot::create ("chord", "x").fx.followSongKey, "a module added now follows the song key");
+
+        MidiSlot old;
+        auto* stored = new juce::DynamicObject();
+        stored->setProperty ("slotId", "s1");
+        stored->setProperty ("type", "scale");
+        midiSlotFromVar (juce::var (stored), old);
+        check (old.type == "key" && ! old.fx.followSongKey,
+               "a saved Scale module loads as Key, keeping its own scale until told otherwise");
+    }
+
+    {
         // Several of a kind: two transposes stack, which the one-of-each chain could not do.
         auto octave = slot ("transpose");
         octave.fx.transpose = 12;

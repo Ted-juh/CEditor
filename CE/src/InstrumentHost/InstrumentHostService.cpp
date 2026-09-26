@@ -192,7 +192,8 @@ namespace
             "removeScene", "renameScene", "captureScene", "setSceneOptions", "setSceneClip",
             "addSetlistItem", "removeSetlistItem", "moveSetlistItem", "setSetlistItem", "setSetlistOptions",
             "addArrangementItem", "removeArrangementItem", "setArrangementItem", "moveArrangementItem", "setArrangementOptions",
-            "setPresetAudition", "setPadLayers", "setPadActiveLayer", "setFaderLayers", "setFaderActiveLayer"
+            "setPresetAudition", "setPadLayers", "setPadActiveLayer", "setFaderLayers", "setFaderActiveLayer",
+            "setPartKey"
         };
         if (! edits.contains (cmd)) return {};
         juce::String label;
@@ -292,6 +293,8 @@ namespace
         if (fields.hasProperty ("constrainToScale")) fx.constrainToScale = (bool) payload["constrainToScale"];
         if (fields.hasProperty ("scaleRoot"))        fx.scaleRoot = juce::jlimit (0, 11, (int) payload["scaleRoot"]);
         if (fields.hasProperty ("scaleType"))        fx.scaleType = payload["scaleType"].toString();
+        if (fields.hasProperty ("scaleFold"))        fx.scaleFold = payload["scaleFold"].toString() == "drop" ? "drop" : "snap";
+        if (fields.hasProperty ("followSongKey"))    fx.followSongKey = (bool) payload["followSongKey"];
         if (fields.hasProperty ("chord"))
         {
             // Alone, "chord" still speaks its old one-field language (off / a shape /
@@ -5848,7 +5851,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         if (cmd == "addMidiSlot")
         {
-            const auto type = payload.getProperty ("type", {}).toString();
+            const auto type = perf::MidiSlot::canonicalType (payload.getProperty ("type", {}).toString());
             if (! perf::MidiSlot::types().contains (type))
             {
                 emitError ("Unknown MIDI module: " + type);
@@ -5901,8 +5904,19 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             if (const auto* fields = payload.getDynamicObject())
             {
                 if (slot.type == "arp")
+                {
                     applyArpFields (slot.arp, payload, *fields);
-                else if (perf::MidiSlot::types().indexOf (slot.type) >= 6)
+                    // The arp's scale lives in its fx block (it folds into it), so the key
+                    // fields go there: which key it plays in, and whether that is the song key.
+                    for (const auto* key : { "followSongKey", "scaleType", "scaleRoot" })
+                        if (fields->hasProperty (key))
+                        {
+                            if (juce::String (key) == "followSongKey") slot.fx.followSongKey = (bool) payload[key];
+                            else if (juce::String (key) == "scaleType") slot.fx.scaleType = payload[key].toString();
+                            else slot.fx.scaleRoot = juce::jlimit (0, 11, (int) payload[key]);
+                        }
+                }
+                else if (perf::MidiSlot::isNoteModule (slot.type))
                     applyNoteModuleFields (slot.mod, payload, *fields);
                 else
                     applyMidiFxFields (slot.fx, payload, *fields);
@@ -7594,6 +7608,29 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         chordLearn = {};
         chordLearnListening.store (false);
         emitChordLearn (false, "cancelled", -1, 0);
+        return;
+    }
+
+    if (cmd == "setPartKey")
+    {
+        // The part's song key. Every module that follows it hears the change at once; the
+        // ones with a key of their own keep theirs.
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        const auto scale = payload.getProperty ("scale", part->keyScale).toString();
+        if (! perf::scaleNames().contains (scale))
+        {
+            emitError ("Unknown scale: " + scale);
+            return;
+        }
+        rack.setPartKey (partId, (int) payload.getProperty ("root", part->keyRoot), scale);
+        savePerformance();
+        emitState();
         return;
     }
 
@@ -17420,6 +17457,8 @@ juce::var InstrumentHostService::buildStatePayload()
                                          / rack.getSampleRate() * 1000.0);
         obj->setProperty ("arp",    perf::arpToVar (part.arp));
         obj->setProperty ("midiFx", perf::midiFxToVar (part.midiFx));
+        obj->setProperty ("keyRoot", part.keyRoot);
+        obj->setProperty ("keyScale", part.keyScale);
         {
             // The chain the UI actually edits. The legacy blocks above stay in the payload
             // because the part-level controls still read them — they are the first slot of

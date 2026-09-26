@@ -275,6 +275,8 @@ public:
     bool setPartMidiChain (const juce::String& partId, juce::Array<perf::MidiSlot> chain);
     /** The arp's live pattern step for the UI playhead; -1 when idle or the part isn't live. */
     int arpLiveStep (const juce::String& partId) const;
+    /** The part's song key; every module following it takes the new scale at once. */
+    bool setPartKey (const juce::String& partId, int root, const juce::String& scale);
     /** A part's Chords module (named, or the first): pad hits, progression steps, readout.
         All false / not present when the part is not live. */
     bool triggerChordPad (const juce::String& partId, const juce::String& slotId, int pad, int velocity);

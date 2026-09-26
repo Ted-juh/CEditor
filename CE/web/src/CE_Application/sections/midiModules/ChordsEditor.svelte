@@ -25,11 +25,14 @@
   } from '../../utils/chordBuilder.js';
 
   let {
-    fx, set, partId, slotId = '', scales = [], learn = { armed: false },
+    fx: ownFx, songKey = null, set, partId, slotId = '', scales = [], learn = { armed: false },
     onlearn = () => {}, oncancel = () => {}, onclear = () => {},
     live = { chord: -1, step: 0, pads: 0 }, onpad = () => {}, onstep = () => {},
   } = $props();
 
+  // Following the song key, the module plays in the part's key; everything below reads that.
+  const fx = $derived(ownFx.followSongKey && songKey
+    ? { ...ownFx, scaleType: songKey.scale, scaleRoot: songKey.root } : ownFx);
   const MAX_SET = 32;
   const LOW = 36, HIGH = 96;
   const NOTE_CHOICES = Array.from({ length: 128 }, (_, n) => [n, noteLabel(n)]);
@@ -259,7 +262,10 @@
                   onclick={() => set({ chord: s.id, chordFollow: true })}>{s.label}</button>
         {/each}
       </div>
-      {#if isDiatonic}
+      {#if isDiatonic && ownFx.followSongKey}
+        <span class="sub" data-testid="chords-song-key">In {NOTE_NAMES[fx.scaleRoot]} {fx.scaleType}, the part's song key.
+          <button type="button" class="ctl link" onclick={() => set({ followSongKey: false })}>use a key of its own</button></span>
+      {:else if isDiatonic}
         <div class="row">
           <div class="mf"><span class="lbl">Key</span>
             <ScrubValue value={fx.scaleRoot} choices={NOTE_NAMES.map((n, i) => [i, n])} label="Key root"
@@ -511,6 +517,7 @@
   .step .x { background: none; border: 0; color: var(--host-text-dim, #7f8b96); cursor: pointer; padding: 0 3px; font-size: 13px; }
   .step .x:hover { color: var(--host-text, #d9e0e6); }
   .step-buttons { display: flex; gap: 4px; }
+  .link { background: none; border: 0; padding: 0; color: var(--host-accent-strong, #79b9ee); font-size: 11px; cursor: pointer; text-decoration: underline; }
   select { font: 12px var(--host-font, sans-serif); color: var(--host-text, #d9e0e6); background: var(--host-field, #12171b);
            border: 1px solid var(--host-line, #3b4652); border-radius: 3px; padding: 3px 5px; }
 </style>

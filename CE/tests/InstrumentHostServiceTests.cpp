@@ -6812,6 +6812,65 @@ void testResponseProfiles()
            "every note of a chord and the pressure reach the readout, in order");
 }
 
+// The song key: set on the part, applied to the modules that follow it, saved with the part,
+// and migrated from the part's old note-shaping scale for a session written before it existed.
+void testSongKey()
+{
+    std::cout << "\nthe song key" << std::endl;
+
+    const auto dir = freshDataDir ("song-key");
+    seedTwoSynthCatalog (dir);
+    juce::String partId;
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("setPartKey", { { "partId", partId }, { "root", 9 }, { "scale", "minor" } });
+        const auto part = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
+        check ((int) part.getProperty ("keyRoot", -1) == 9 && part.getProperty ("keyScale", {}).toString() == "minor",
+               "the part carries its song key");
+        h.emits.clear();
+        h.cmd ("setPartKey", { { "partId", partId }, { "scale", "mixolydian-ish" } });
+        check (h.emits.lastError().contains ("Unknown scale"), "a scale the engine does not know is refused");
+
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "transpose" } });
+        const auto chain = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                               .getProperty ("midiChain", {});
+        juce::var key;
+        for (int i = 0; i < chain.size(); ++i)
+            if (chain[i].getProperty ("type", {}).toString() == "key")
+                key = chain[i];
+        check (key.isObject() && (bool) key.getProperty ("fx", {}).getProperty ("followSongKey", false),
+               "adding a Transpose makes a Key module that follows the song key");
+
+        // The arp's scale lives in its fx block; its key fields reach it through the slot options.
+        juce::String arpId;
+        for (int i = 0; i < chain.size(); ++i)
+            if (chain[i].getProperty ("type", {}).toString() == "arp")
+                arpId = chain[i].getProperty ("slotId", {}).toString();
+        h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", arpId },
+                                       { "followSongKey", false }, { "scaleType", "dorian" }, { "scaleRoot", 2 } });
+        const auto after = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                               .getProperty ("midiChain", {});
+        juce::var arpFx;
+        for (int i = 0; i < after.size(); ++i)
+            if (after[i].getProperty ("slotId", {}).toString() == arpId)
+                arpFx = after[i].getProperty ("fx", {});
+        check (! (bool) arpFx.getProperty ("followSongKey", true) && arpFx.getProperty ("scaleType", {}).toString() == "dorian"
+                 && (int) arpFx.getProperty ("scaleRoot", 0) == 2,
+               "the arpeggiator can be given a key of its own");
+    }
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        const auto part = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
+        check ((int) part.getProperty ("keyRoot", -1) == 9 && part.getProperty ("keyScale", {}).toString() == "minor",
+               "and keeps it across a restart");
+    }
+}
+
 void testChordLearn()
 {
     std::cout << "\nchord learn (the chorder's capture)" << std::endl;
@@ -13400,6 +13459,7 @@ int main (int argc, char* argv[])
     testFloatingEditors();
     testChordLearn();
     testResponseProfiles();
+    testSongKey();
     testMidiChainCommands();
     testChainPresets();
     testGroupBuses();

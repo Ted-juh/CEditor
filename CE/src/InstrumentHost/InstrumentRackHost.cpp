@@ -330,7 +330,7 @@ void InstrumentRackHost::syncEngineBindings()
                                         i < LayerRouter::maxParts ? i : -1);
             lp->gain->setLayerRouter (&layerRouter,
                                       i < LayerRouter::maxParts ? i : -1);
-            lp->filter->setMidiChain (part.midiChain);
+            lp->filter->setMidiChain (perf::withSongKey (part.midiChain, part.keyScale, part.keyRoot));
         }
     }
     refreshLayerRouting();
@@ -415,7 +415,19 @@ bool InstrumentRackHost::setPartMidiChain (const juce::String& partId,
         chain.removeLast();
 
     part->midiChain = std::move (chain);
-    lp->filter->setMidiChain (part->midiChain);
+    lp->filter->setMidiChain (perf::withSongKey (part->midiChain, part->keyScale, part->keyRoot));
+    return true;
+}
+
+bool InstrumentRackHost::setPartKey (const juce::String& partId, int root, const juce::String& scale)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+    part->keyRoot = juce::jlimit (0, 11, root);
+    part->keyScale = scale;
+    if (auto* lp = findLive (partId))
+        lp->filter->setMidiChain (perf::withSongKey (part->midiChain, part->keyScale, part->keyRoot));
     return true;
 }
 

@@ -560,6 +560,8 @@ juce::var Performance::toVar() const
             p->setProperty ("morphAmount",    part.morphAmount);
         }
         p->setProperty ("microtuningEnabled", part.microtuningEnabled);
+        p->setProperty ("keyRoot",          part.keyRoot);
+        p->setProperty ("keyScale",         part.keyScale);
         p->setProperty ("outputPair",       part.outputPair);
         p->setProperty ("effects",          effectsToVar (part.effects));
         // The legacy blocks are mirrors now, not the source of truth: they carry the first
@@ -1160,6 +1162,23 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
             // the two slots its old settings describe, in the order the old code ran them —
             // the combined note-shaping block first, the arpeggiator after it.
             part.midiChain = perf::migrateLegacyEventChain (part.midiFx, part.arp);
+        }
+
+        if (p.hasProperty ("keyScale"))
+        {
+            part.keyRoot  = intOf (p, "keyRoot", 0, 0, 11);
+            part.keyScale = p.getProperty ("keyScale", "major").toString();
+        }
+        else
+        {
+            // Saved before the song key: the part's key is the scale its note shaping used,
+            // and the modules already in that key follow it from now on. Nothing sounds
+            // different; one change of key afterwards reaches all of them.
+            part.keyRoot  = part.midiFx.scaleRoot;
+            part.keyScale = part.midiFx.scaleType;
+            for (auto& slot : part.midiChain)
+                if (slot.fx.scaleType == part.keyScale && slot.fx.scaleRoot == part.keyRoot)
+                    slot.fx.followSongKey = true;
         }
 
         part.enabled    = (bool) p.getProperty ("enabled", true);

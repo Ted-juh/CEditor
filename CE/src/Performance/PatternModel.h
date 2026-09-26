@@ -473,8 +473,14 @@ struct MidiFxSettings
     int transpose = 0;              // semitones or scale steps, -48..48
     juce::String transposeMode = "chromatic"; // chromatic | diatonic
     bool constrainToScale = false;
+    juce::String scaleFold = "snap"; // what constraining does to a note outside the scale:
+                                     // snap = move it to the nearest scale note, drop = silence it
     int scaleRoot = 0;              // 0..11, C..B
     juce::String scaleType = "major";
+    // Take the scale from the part's song key (RackPart::keyRoot/keyScale) instead of this
+    // module's own. On for a module added now; a module from before the song key keeps the
+    // scale it had (midiFxFromVar reads a missing field as false).
+    bool followSongKey = false;
     // The Chords module: one set of chords and the layers that trigger them. A layer has its
     // own on/off so switching it off keeps what it was set to.
     //   Follow key — every key plays `chord` built on itself (the old chorder), inside
@@ -700,12 +706,23 @@ struct MidiSlot
     /** A slot of `type` with its settings defaulted so it is audibly transparent until
         configured — an inserted module must never change the sound by existing. */
     static MidiSlot create (const juce::String& type, const juce::String& slotId);
+    /** True for the modules whose settings are `mod` (echo, strum, humanize, chance, length,
+        latch, mpe, articulation). */
+    static bool isNoteModule (const juce::String& type);
+    /** Old names still say what they mean: "transpose" and "scale" are the Key module now. */
+    static juce::String canonicalType (const juce::String& type)
+    {
+        return type == "transpose" || type == "scale" ? juce::String ("key") : type;
+    }
 };
 
 /** The two slots a pre-chain part's welded settings describe, in the order the old code
     ran them. Public because the migration is a fact worth testing directly. */
 juce::Array<MidiSlot> migrateLegacyEventChain (const MidiFxSettings& fx, const ArpSettings& arp);
 
+/** The chain with every module that follows the song key reading this scale and root. Done
+    where the chain reaches the engine, so the stored modules keep what they had of their own. */
+juce::Array<MidiSlot> withSongKey (juce::Array<MidiSlot> chain, const juce::String& scaleType, int root);
 juce::var noteModuleToVar (const NoteModuleSettings& settings);
 void noteModuleFromVar (const juce::var& stored, NoteModuleSettings& out);
 

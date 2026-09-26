@@ -113,6 +113,28 @@ try {
   await resp.locator('[data-testid=response-which] [data-value=expression]').click();
   assert.equal(await resp.getByTestId('expression-curve').isVisible(), true, 'the expression tab has its own curve');
 
+  // Key: the song key and this module's transpose and scale
+  await page.locator('[data-testid=midi-slot] .slot-name', { hasText: /^Note shaping/ }).click();
+  const keyEd = page.getByTestId('key-editor');
+  await keyEd.locator('[data-testid=song-key-root] [data-value="9"]').click();
+  await keyEd.locator('[data-testid=song-key-scale] [data-value=minor]').click();
+  assert.match(await keyEd.innerText(), /for the whole part: A minor/, 'the song key is set on the part');
+  assert.ok(await keyEd.locator('[data-testid=key-readers] .chip').count() >= 2, 'and lists the modules that read a key');
+  const readerArp = keyEd.locator('[data-testid=key-readers] .chip', { hasText: 'Arpeggiator' });
+  const before = await readerArp.getAttribute('aria-pressed');
+  await readerArp.click();
+  assert.notEqual(await readerArp.getAttribute('aria-pressed'), before, 'a module can be switched to or from the song key here');
+  await keyEd.locator('[data-testid=key-follows] [data-value=true]').click();
+  assert.equal(await keyEd.getByTestId('key-keys').locator('rect.root').count(), 3, 'the keyboard lights the song key root (A) in each octave');
+  await keyEd.locator('[data-testid=key-fold] [data-value=drop]').click();
+  await keyEd.getByTestId('key-transpose').press('ArrowUp');
+  assert.equal(await keyEd.locator('[data-testid=key-fold] [aria-pressed=true]').innerText(), 'drop',
+    'notes outside the key can be dropped');
+  assert.equal(await keyEd.getByTestId('key-transpose').innerText(), '+1', 'and the transpose sits beside it');
+  // Back to C major, which the checks below are written in.
+  await keyEd.locator('[data-testid=song-key-root] [data-value="0"]').click();
+  await keyEd.locator('[data-testid=song-key-scale] [data-value=major]').click();
+
   // Echo, Chance, Length, Latch
   const rowOf = (name) => page.locator('[data-testid=midi-slot] .slot-name', { hasText: new RegExp(`^${name}`) });
   await add.selectOption('echo');
