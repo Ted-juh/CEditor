@@ -81,6 +81,16 @@ the justification box. `font` indexes sixteen Aileron faces in alphabetical orde
 … F7`. It is described here only so nobody mistakes it for something to try: it is a different
 device's protocol and must never be sent to the CTRL49.
 
+### Probe: does the CTRL49 carry images of its own?
+
+The ADVANCE's asset flash holds 512 tintable knob frames and other sprites, under asset types
+other than the 14/18 a host uploads. If the CTRL49 has them too, pages could draw them with no
+upload and no decode. `Start_CTRL49_Asset_Probe.cmd` finds out, read-only: its page
+(`CEditor_Asset_Probe.lua`) only asks `asset_get_valid(type, id)` for each type the ADVANCE
+uses (ids 0..600) and tries `draw_image` on the first few, plain and tinted orange. It writes
+nothing to the keyboard. Close HoSTage/CEditor, VIP and your DAW first; turn encoder 1 to step
+through the types that have images. Result: not yet run.
+
 ### The VIP screen keyboards and their ids
 
 VIP's own device table (`VIP_x64.dll`, 2018) names exactly five keyboards with a VIP screen. The
