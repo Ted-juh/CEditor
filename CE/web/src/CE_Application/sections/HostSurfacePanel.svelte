@@ -39,7 +39,7 @@
     setFaderLayers, setFaderActiveLayer,
     setControlSlotOptions, focusRackPart,
     setUserSurface, clearUserSurface, learnUserSurface, finishUserSurfaceLearn,
-    addControlPage, removeControlPage, renameControlPage, generateControlPages, ctrl49Screen,
+    addControlPage, removeControlPage, renameControlPage, generateControlPages, ctrl49Screen, surfaceStatusText,
   } from '../stores/instrumentHost.js';
 
   let zoom = $state('');        // '' = the whole instrument, else a region id
@@ -362,7 +362,7 @@
     <div class="workspace-heading"><SlidersHorizontal size={18} /><div><h2>MIDI learn</h2>
       <p>Drag a parameter onto a control, then learn its hardware binding.</p></div></div>
     <span class="connection-state" class:connected={$hostSurface.state === 'connected'}>
-      <i></i>{$hostSurface.state === 'connected' ? ($hostSurface.device || 'Controller connected') : ($hostSurface.state || 'No controller connected')}
+      <i></i><span title={surfaceStatusText($hostSurface).detail}>{surfaceStatusText($hostSurface).short}</span>
     </span>
   </div>
   <div class="surface-head">

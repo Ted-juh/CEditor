@@ -280,7 +280,7 @@ export const hostMidiActivity = writable({ device: '', text: '', cc: -1, note: -
 // host store — a malformed payload lands on 'searching', never a crash.
 export const hostSurface = writable({
   state: 'searching', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
-  movementSeq: 0, movingSlot: -1, deviceError: '', deviceRefusals: 0,
+  movementSeq: 0, movingSlot: -1, deviceError: '', deviceRefusals: 0, searchReason: '',
 });
 
 // --- the CTRL49 screen in the app ---------------------------------------------------------------
@@ -485,7 +485,33 @@ export function normalizeHostSurface(payload) {
     // out of memory"), and how many there have been this connection.
     deviceError: String(payload?.deviceError ?? ''),
     deviceRefusals: Math.max(0, Math.trunc(Number(payload?.deviceRefusals ?? 0) || 0)),
+    // Why it is not connected, when that is known: see surfaceStatusText.
+    searchReason: ['unplugged', 'noDriver', 'portBusy', 'captureFailed', 'error'].includes(payload?.searchReason)
+      ? payload.searchReason : '',
   };
+}
+
+/** The CTRL49's status in words, for every place that shows it. `short` is one line for a
+    status row; `detail` is the broker's own explanation (a driver hint, the port error), shown
+    wherever there is room. Each reason is a different thing to do, so each reads differently —
+    before, a keyboard with no driver and a keyboard in a drawer both said "looking for a CTRL49". */
+export function surfaceStatusText(surface) {
+  const detail = String(surface?.detail ?? '');
+  switch (surface?.state) {
+    case 'connected': return { short: `${surface.device || 'CTRL49'} connected`, detail: '', tone: 'ok' };
+    case 'connecting': return { short: 'CTRL49 found, starting its display…', detail: '', tone: 'busy' };
+    case 'heldElsewhere': return { short: 'CTRL49 is in use by another HoSTage window', detail: '', tone: 'warn' };
+    case 'failed': return { short: 'The CTRL49 did not start', detail, tone: 'error' };
+    case 'paused': return { short: 'CTRL49 released (HoSTage is closed)', detail: '', tone: 'idle' };
+    default: break;
+  }
+  switch (surface?.searchReason) {
+    case 'noDriver': return { short: 'CTRL49 plugged in, but its driver is missing', detail, tone: 'error' };
+    case 'portBusy': return { short: 'CTRL49 is in use by another program', detail, tone: 'warn' };
+    case 'captureFailed': return { short: "CTRL49's display port would not open", detail, tone: 'error' };
+    case 'error': return { short: 'CTRL49 could not be opened', detail, tone: 'error' };
+    default: return { short: 'No CTRL49 connected — plug it in and it connects by itself', detail: '', tone: 'idle' };
+  }
 }
 
 // --- the surface as a picture --------------------------------------------------------------------

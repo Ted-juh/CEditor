@@ -60,7 +60,9 @@
     midiSlotTypes, midiSlotLabels,
     addMidiSlot, removeMidiSlot, moveMidiSlot, setMidiSlotBypassed, setMidiSlotOptions,
     setStageLock, beginStageUnlock, cancelStageUnlock,
+    surfaceStatusText,
   } from '../stores/instrumentHost.js';
+  const surfaceStatus = $derived(surfaceStatusText($hostSurface));
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PerformancePanel from './PerformancePanel.svelte';
   import HostMixerPanel from './HostMixerPanel.svelte';
@@ -793,17 +795,8 @@
         <span class="device-midi-title">Control surface</span>
         <span class="device-midi-row surface-row" data-testid="host-surface-status">
           <span class="surface-dot {$hostSurface.state}"></span>
-          {#if $hostSurface.state === 'connected'}
-            {$hostSurface.device || 'CTRL49'} connected
-          {:else if $hostSurface.state === 'connecting'}
-            Starting the CTRL49 display…
-          {:else if $hostSurface.state === 'heldElsewhere'}
-            CTRL49 is in use by another instance
-          {:else if $hostSurface.state === 'failed'}
-            CTRL49 failed{$hostSurface.detail ? ` — ${$hostSurface.detail}` : ''}
-          {:else}
-            Looking for a CTRL49 — plug it in and it connects by itself
-          {/if}
+          <span title={surfaceStatus.detail}>{surfaceStatus.short}</span>
+          {#if surfaceStatus.detail}<span class="surface-detail" data-testid="host-surface-detail">{surfaceStatus.detail}</span>{/if}
         </span>
         <!-- The Mackie section: read as controls (faders, B1-B8, Bank, transport), or passed to
              the instruments as plain MIDI — where fader 1 bends the pitch of channel 1. -->
@@ -2407,6 +2400,8 @@
 
   .device-midi-title { color: #aab4bd; font-size: 12px; }
   .surface-row { color: #aab4bd; font-size: 12px; align-items: center; }
+  .surface-row { flex-wrap: wrap; }
+  .surface-detail { flex-basis: 100%; color: #d6a3a3; font-size: 11px; line-height: 1.35; }
   .surface-dot { width: 7px; height: 7px; border-radius: 50%; background: #5c6672;
                  display: inline-block; flex: 0 0 auto; }
   .surface-dot.connected { background: #35c46f; }

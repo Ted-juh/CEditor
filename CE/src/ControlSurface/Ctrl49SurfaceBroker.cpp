@@ -76,6 +76,7 @@ void Ctrl49SurfaceBroker::emitStatus() const
     // this connection started. Empty and zero when all is well.
     obj->setProperty ("deviceError", deviceError);
     obj->setProperty ("deviceRefusals", deviceRefusals);
+    obj->setProperty ("searchReason", searchReason);
     options.emit ("instrumentHostSurface", juce::var (obj));
 }
 
@@ -113,20 +114,29 @@ void Ctrl49SurfaceBroker::beginDiscovery()
     worker = std::thread ([this]
     {
         std::unique_ptr<Ctrl49SurfaceEndpoints> found;
-        juce::String failure;
+        juce::String failure, reason;
         try
         {
             if (options.discover != nullptr)
                 found = options.discover();
+            if (found == nullptr)
+                reason = "unplugged";
+        }
+        catch (const Ctrl49DiscoveryProblem& problem)
+        {
+            failure = problem.what();
+            reason = problem.reason;
         }
         catch (const std::exception& e)
         {
             failure = e.what();
+            reason = "error";
         }
 
         const std::scoped_lock lock (handoffLock);
         discovered = std::move (found);
         workerFailure = failure;
+        workerReason = reason;
         workerDone = true;
     });
 }
@@ -239,7 +249,7 @@ void Ctrl49SurfaceBroker::tick()
             // is out. §17.4: this never blocks — absence costs one cheap check per interval.
             bool done = false;
             std::unique_ptr<Ctrl49SurfaceEndpoints> found;
-            juce::String failure;
+            juce::String failure, reason;
             {
                 const std::scoped_lock lock (handoffLock);
                 if (workerDone)
@@ -248,6 +258,7 @@ void Ctrl49SurfaceBroker::tick()
                     workerDone = false;
                     found = std::move (discovered);
                     failure = workerFailure;
+                    reason = workerReason;
                 }
             }
 
@@ -257,9 +268,16 @@ void Ctrl49SurfaceBroker::tick()
 
                 if (found == nullptr)
                 {
-                    enter (currentState == State::heldElsewhere ? State::heldElsewhere
-                                                                : State::searching,
-                           failure.isNotEmpty() ? failure : statusDetail);
+                    // The reason is news only when it changes: the poll runs every two
+                    // seconds, and an unchanged "unplugged" should not re-announce itself.
+                    const auto reasonChanged = reason != searchReason;
+                    searchReason = reason;
+                    const auto next = currentState == State::heldElsewhere ? State::heldElsewhere
+                                                                           : State::searching;
+                    const auto detailNow = reason == "unplugged" ? juce::String() : failure;
+                    if (reasonChanged && currentState == next && statusDetail == detailNow)
+                        emitStatus();
+                    enter (next, detailNow);
                     return;
                 }
 
@@ -278,6 +296,7 @@ void Ctrl49SurfaceBroker::tick()
                 endpoints = std::move (found);
                 deviceError.clear();
                 deviceRefusals = 0;
+                searchReason.clear();
                 enter (State::connecting, endpoints->description);
                 beginSessionStart();
                 return;

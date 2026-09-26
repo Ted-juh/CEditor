@@ -7,6 +7,8 @@
 #include "InstrumentHost/InstrumentHostService.h"
 
 #include <memory>
+#include <stdexcept>
+#include <string>
 #include <optional>
 #include <thread>
 
@@ -53,6 +55,19 @@
 
 namespace ceditor::ctrl49
 {
+
+/** Why the keyboard is not connected, when discovery can tell. The discover hook throws this
+    instead of returning null when the answer is more useful than "not found": a keyboard that
+    is plugged in but has no MIDI port (the M-Audio driver is missing), a port another program
+    holds (VIP, a DAW), a private capture that would not open. Returning null still means what
+    it always meant: no keyboard here. All of these used to read "searching" in the app. */
+struct Ctrl49DiscoveryProblem : std::runtime_error
+{
+    /** "noDriver", "portBusy" or "captureFailed". */
+    Ctrl49DiscoveryProblem (std::string reasonCode, const std::string& message)
+        : std::runtime_error (message), reason (std::move (reasonCode)) {}
+    std::string reason;
+};
 
 /** The transport half of a connected CTRL49, built by the discover hook. Output sends
     complete SysEx frames; input hands back the VIP-layer messages the reducer reads. */
@@ -168,6 +183,7 @@ private:
     std::unique_ptr<Ctrl49SurfaceEndpoints> discovered;
     bool sessionReady = false;
     juce::String workerFailure;
+    juce::String workerReason;
 
     std::unique_ptr<Ctrl49SurfaceEndpoints> endpoints;
     std::unique_ptr<Ctrl49Session> session;
@@ -179,6 +195,9 @@ private:
     bool shownOnKeyboard = false;
     juce::String deviceError;                // the keyboard's last refusal, by name
     int deviceRefusals = 0;
+    // Why discovery last came back empty: "unplugged", "noDriver", "portBusy",
+    // "captureFailed", or "error" for anything else. Empty while connecting or connected.
+    juce::String searchReason;
 
     // The eight small buttons above the pads, one per pad: when each went down (-1 = up) and
     // whether its hold has already fired, so a held button steps its pad's layer ONCE, at the

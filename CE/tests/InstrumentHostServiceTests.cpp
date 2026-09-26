@@ -4565,6 +4565,75 @@ struct FakeSurface
     std::atomic<bool> running { false };
 };
 
+void testCtrl49DiscoveryReasons()
+{
+    std::cout << "\nthe CTRL49 says why it is not connected" << std::endl;
+
+    using ceditor::ctrl49::Ctrl49SurfaceBroker;
+    using ceditor::ctrl49::Ctrl49DiscoveryProblem;
+
+    const auto dir = freshDataDir ("surface-reasons");
+    Harness h (dir);
+    h.cmd ("getState");
+
+    double fakeNow = 0.0;
+    std::function<std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints>()> behave =
+        []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+
+    Ctrl49SurfaceBroker::Options options;
+    options.discover = [&behave] { return behave(); };
+    options.emit = [&h] (const juce::String& name, const juce::var& payload)
+    {
+        h.emits.entries.push_back ({ name, payload });
+    };
+    options.pageLua = { 't' };
+    options.now = [&fakeNow] { return fakeNow; };
+    options.searchIntervalMs = 10.0;
+    Ctrl49SurfaceBroker broker (*h.service, options);
+
+    const auto settle = [&]
+    {
+        for (int i = 0; i < 50; ++i)
+        {
+            fakeNow += 20.0;
+            broker.tick();
+            std::this_thread::sleep_for (std::chrono::milliseconds (2));
+        }
+        return h.emits.last ("instrumentHostSurface");
+    };
+
+    auto* status = settle();
+    check (status != nullptr && status->getProperty ("state", {}).toString() == "searching"
+             && status->getProperty ("searchReason", {}).toString() == "unplugged",
+           "no keyboard at all reads as unplugged");
+
+    behave = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints>
+    { throw Ctrl49DiscoveryProblem ("noDriver", "Install the M-Audio CTRL49 driver"); };
+    status = settle();
+    check (status != nullptr && status->getProperty ("searchReason", {}).toString() == "noDriver"
+             && status->getProperty ("detail", {}).toString().contains ("Install"),
+           "a keyboard without its driver says so, with what to do");
+
+    behave = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints>
+    { throw Ctrl49DiscoveryProblem ("portBusy", "Close VIP or your DAW"); };
+    status = settle();
+    check (status != nullptr && status->getProperty ("searchReason", {}).toString() == "portBusy",
+           "a port another program holds reads as busy, not as missing");
+
+    behave = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints>
+    { throw std::runtime_error ("something odd"); };
+    status = settle();
+    check (status != nullptr && status->getProperty ("searchReason", {}).toString() == "error"
+             && status->getProperty ("detail", {}).toString() == "something odd",
+           "anything else is still reported, with its own words");
+
+    behave = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+    status = settle();
+    check (status != nullptr && status->getProperty ("searchReason", {}).toString() == "unplugged"
+             && status->getProperty ("detail", {}).toString().isEmpty(),
+           "and unplugging it afterwards clears the old explanation");
+}
+
 void testCtrl49AppScreen()
 {
     std::cout << "\nthe CTRL49 screen in the app: pages walked and painted with no keyboard" << std::endl;
@@ -12914,6 +12983,7 @@ int main (int argc, char* argv[])
     testGroupBuses();
     testCtrl49Broker();
     testCtrl49AppScreen();
+    testCtrl49DiscoveryReasons();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();
     testSupersededLoad();
