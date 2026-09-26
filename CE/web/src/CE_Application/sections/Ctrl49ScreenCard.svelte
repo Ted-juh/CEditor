@@ -264,8 +264,8 @@
         {/each}
       </div>
 
+      <span class="group-label">Pads</span>
       <div class="pads" role="group" aria-label="Pads">
-        <span class="pads-label">Pads</span>
         {#each Array(8) as _, index}
           <button type="button" class="pad" title={`Pad ${index + 1}`} onclick={() => pad(index)}>{index + 1}</button>
         {/each}
@@ -297,7 +297,7 @@
   }
   canvas.over-knob { cursor: ns-resize; }
   canvas:focus-visible { outline: 2px solid var(--host-accent, #ff9408); outline-offset: 2px; }
-  .controls { flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .controls { flex: 1 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
   .pager { display: flex; align-items: center; gap: 8px; }
   .page { font-size: 12px; color: var(--host-text-dim, #8791a0); min-width: 130px; text-align: center; }
   .page b { color: var(--host-text, #d7dde6); font-weight: 600; }
@@ -309,25 +309,26 @@
     background: var(--host-surface-raised, #1d2229); color: inherit;
   }
   button:hover { border-color: var(--host-accent, #ff9408); }
-  .encoders { display: grid; grid-template-columns: repeat(4, 116px); gap: 8px 10px; }
+  /* Encoders and pads share one four-column grid, as on the keyboard: pad N sits under
+     encoder N's column, and both fill whatever width the card has. */
+  .encoders, .pads { display: grid; grid-template-columns: repeat(4, minmax(104px, 1fr)); gap: 8px 12px; }
   .encoder { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 4px; border-radius: 6px; border: 1px solid transparent; }
   .encoder.hover { background: var(--host-surface-raised, #1d2229); }
   .encoder.active { border-color: var(--host-accent, #ff9408); }
   .label { font-size: 11px; color: var(--host-text-dim, #8791a0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .encoder.active .label { color: var(--host-text, #d7dde6); }
-  .stepper { display: grid; grid-template-columns: 26px 1fr 26px; gap: 3px; align-items: stretch; }
-  .stepper button { padding: 0; min-height: 26px; }
+  .stepper { display: grid; grid-template-columns: 30px 1fr 30px; gap: 4px; align-items: stretch; }
+  .stepper button { padding: 0; min-height: 28px; }
   .value {
-    display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 26px;
+    display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 28px;
     box-sizing: border-box; padding: 0 4px; font: inherit; font-size: 12px; font-variant-numeric: tabular-nums;
     border: 1px solid var(--host-line, #2d343e); border-radius: var(--host-radius-control, 5px);
     background: #0f1216; color: var(--host-text, #d7dde6); cursor: ns-resize; user-select: none; touch-action: none;
   }
   input.value { width: 100%; text-align: center; cursor: text; user-select: text; outline: none; border-color: var(--host-accent, #ff9408); }
   span.value:focus-visible { outline: 2px solid var(--host-accent, #ff9408); outline-offset: 1px; }
-  .pads { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-  .pads-label { font-size: 11px; color: var(--host-text-dim, #8791a0); margin-right: 4px; }
-  .pad { width: 32px; padding: 0; }
+  .group-label { font-size: 11px; color: var(--host-text-dim, #8791a0); margin-bottom: -4px; }
+  .pad { min-height: 34px; padding: 0; }
   .hint { margin: 0; font-size: 11px; color: var(--host-text-dim, #8791a0); }
   .failure { margin: 0; font-size: 12px; color: #ffb4b4; }
 </style>

@@ -27,6 +27,7 @@ local TITLE = text_data.new()
 local VAL   = text_data.new()
 local LBL   = text_data.new()
 local SPLASH = text_data.new()
+local WORDMARK = text_data.new()
 
 local function configure_text()
     text_data.set(TITLE, {
@@ -43,6 +44,13 @@ local function configure_text()
     })
     text_data.set(LBL, {
         text = "", color = GREY, font = 9, font_size = 11,
+        just_ver = 1, just_hor = 1, bk_color = 0x00000000,
+        border_width_top = 0, border_width_bottom = 0,
+        border_width_left = 0, border_width_right = 0
+    })
+    -- The wordmark in type, for when the logo image cannot be drawn (see draw_splash).
+    text_data.set(WORDMARK, {
+        text = "HOSTAGE", color = ORANGE, font = 10, font_size = 48,
         just_ver = 1, just_hor = 1, bk_color = 0x00000000,
         border_width_top = 0, border_width_bottom = 0,
         border_width_left = 0, border_width_right = 0
@@ -92,9 +100,20 @@ local function knob_pos(slot)
     return 31 + col * 118, 32 + row * 118
 end
 
+-- The logo is the one large image this page draws (440 px wide; the knob frames are 64). If the
+-- device will not draw it, the error must not take the rest of the splash with it: on the first
+-- hardware run the keyboard showed a black screen here while the app's preview showed the logo.
+-- So the text goes first, the logo is attempted under pcall, and the wordmark in type stands in
+-- when it fails. What the keyboard shows now says which it was.
 local function draw_splash()
-    draw_image(18, LOGO_DECODED_ID, 20, 84, 0, 0, 440, 80, ORANGE)
     draw_text(SPLASH, 0, 180, 480, 24)
+    local drawn = false
+    if pcall then
+        drawn = pcall(draw_image, 18, LOGO_DECODED_ID, 20, 84, 0, 0, 440, 80, ORANGE)
+    end
+    if not drawn then
+        draw_text(WORDMARK, 0, 84, 480, 80)
+    end
     draw_rect(192, 222, 96, 2, DIM)
     draw_rect(192, 222, 48, 2, ORANGE)
 end
