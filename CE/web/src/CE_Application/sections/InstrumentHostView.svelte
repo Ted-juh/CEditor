@@ -89,6 +89,7 @@
   import KeyboardMusic from 'lucide-svelte/icons/keyboard-music';
   import Crosshair from 'lucide-svelte/icons/crosshair';
   import SoundBrowser from './SoundBrowser.svelte';
+  import { sounds } from './sounds/soundsBrowser.svelte.js';
   import HostLibraryPanel from './HostLibraryPanel.svelte';
   import HostSurfacePanel from './HostSurfacePanel.svelte';
   import Ctrl49ScreenCard from './Ctrl49ScreenCard.svelte';
@@ -133,6 +134,7 @@
 
   const buildWorkspaces = [
     { id: 'rack', label: 'Rack' },
+    { id: 'sounds', label: 'Sounds' },
     { id: 'performance', label: 'Performance' },
     { id: 'mixer', label: 'Mixer' },
     { id: 'layers', label: 'Layers' },
@@ -336,11 +338,14 @@
 
 
   async function showSounds(text = '') {
-    buildWorkspace = 'rack';
-    dockTab = 'sounds';
-    dockOpen = true;
-    await tick();
-    soundBrowser?.search(text);
+    // The Sounds page, when it is open, is where a search lands; otherwise the dock's tab.
+    if (buildWorkspace !== 'sounds') {
+      buildWorkspace = 'rack';
+      dockTab = 'sounds';
+      dockOpen = true;
+      await tick();
+    }
+    sounds.search(text);
   }
 
   function chooseUtility(id) {
@@ -938,11 +943,59 @@
     </div>
   {/if}
 
-  {#if buildWorkspace === 'rack' || buildWorkspace === 'mixer' || buildWorkspace === 'layers'}
+  {#if buildWorkspace === 'rack' || buildWorkspace === 'mixer' || buildWorkspace === 'layers' || buildWorkspace === 'sounds'}
     <HostKeyboard />
   {/if}
 
-  {#if buildWorkspace === 'performance'}
+  {#snippet soundSaveActions()}
+    <div class="sound-save-actions">
+      <!-- A hardware part saves the patch it captured. The library is where a sound lives
+           whichever box makes it, so "warm pad" finds the Serum preset and the Juno patch
+           in one list. -->
+      <button type="button"
+              disabled={!(focusedPart?.hasInstrument
+                          || (focusedPart?.hardware && focusedPart?.hardwarePatchBytes > 0))}
+              title={focusedPart?.hasInstrument ? `Save ${partTitle(focusedPart)}'s current instrument settings as a preset in the library`
+                     : focusedPart?.hardware
+                       ? (focusedPart.hardwarePatchBytes > 0
+                            ? `Save ${partTitle(focusedPart)}'s captured patch to the library`
+                            : 'Capture a patch from the synth first (Routing tab)')
+                       : 'Focus a part with an instrument first'}
+              onclick={() => saveUserPreset(focusedPart.partId)}
+              data-testid="host-save-preset">{focusedPart?.hardware ? 'Save patch' : 'Save preset'}</button>
+      <button type="button"  disabled={!focusedPart?.hasInstrument}
+              title={focusedPart?.hasInstrument
+                     ? `Save ${partTitle(focusedPart)} with its instrument settings, MIDI modules and insert effects to the library`
+                     : 'Focus a part with an instrument first'}
+              onclick={() => saveChainToLibrary(focusedPart.partId)}
+              data-testid="host-save-chain">Save chain</button>
+      <button type="button"  onclick={() => saveRackToLibrary()}
+              title="Save the complete Hostage rack and performance settings to the library"
+              data-testid="host-save-rack">Save rack</button>
+    </div>
+  {/snippet}
+
+  {#if buildWorkspace === 'sounds'}
+    <!-- The library with the whole screen. The part it loads into is named at the top, and Esc
+         (or Rack) goes back to the rack with the new sound playing. -->
+    <main class="primary-workspace sounds-workspace" data-testid="host-primary-sounds">
+      <div class="sounds-page-bar">
+        <button type="button" class="ghost" data-testid="sounds-back-to-rack" title="Back to the rack (Esc)"
+                onclick={() => (buildWorkspace = 'rack')}>◂ Rack</button>
+        <HostPartPicker {parts} partId={focusedPartId || ''} label="LOADING INTO" ariaLabel="Sounds target part"
+                        onchange={(id) => focusRackPart(id, { followEditor: false })} />
+        {@render soundSaveActions()}
+        <span class="sounds-page-spacer"></span>
+        <button type="button" class="manage-library" data-testid="sounds-page-manage-library"
+                aria-expanded={activeUtility === 'library'} onclick={() => activeUtility = 'library'}>Manage library</button>
+      </div>
+      <SoundBrowser layout="page" {focusedPart} partTitle={soundTargetTitle}
+                    onManageLibrary={() => activeUtility = 'library'}
+                    onBack={() => (buildWorkspace = 'rack')}
+                    auditionOn={audition.enabled}
+                    onToggleAudition={() => setPresetAudition({ enabled: !audition.enabled })} />
+    </main>
+  {:else if buildWorkspace === 'performance'}
     <main class="primary-workspace" data-testid="host-primary-performance">
       <PerformancePanel onShowMixer={() => buildWorkspace = 'mixer'} />
     </main>
@@ -1433,6 +1486,9 @@
         <span class="dock-subject">{dockSubject}</span>
       {/if}
       {#if dockTab === 'sounds'}
+        <button type="button" class="ghost" data-testid="sounds-open-page"
+                title="The library with the whole screen: a rail, sortable columns, a map and several sounds at once"
+                onclick={() => (buildWorkspace = 'sounds')}>⤢ Full page</button>
         <button type="button" class="manage-library" data-testid="sounds-manage-library"
           aria-expanded={activeUtility === 'library'} onclick={() => activeUtility = 'library'}>Manage library</button>
       {/if}
@@ -1457,32 +1513,7 @@
               onchange={(id) => focusRackPart(id, { followEditor: false })} />
           {/if}
           {#if dockTab === 'sounds'}
-            <div class="sound-save-actions">
-      <!-- A hardware part saves the patch it captured. The library is where a sound lives
-           whichever box makes it, so "warm pad" finds the Serum preset and the Juno patch
-           in one list. -->
-      <button type="button"
-              disabled={!(focusedPart?.hasInstrument
-                          || (focusedPart?.hardware && focusedPart?.hardwarePatchBytes > 0))}
-              title={focusedPart?.hasInstrument ? `Save ${partTitle(focusedPart)}'s current instrument settings as a preset in the library`
-                     : focusedPart?.hardware
-                       ? (focusedPart.hardwarePatchBytes > 0
-                            ? `Save ${partTitle(focusedPart)}'s captured patch to the library`
-                            : 'Capture a patch from the synth first (Routing tab)')
-                       : 'Focus a part with an instrument first'}
-              onclick={() => saveUserPreset(focusedPart.partId)}
-              data-testid="host-save-preset">{focusedPart?.hardware ? 'Save patch' : 'Save preset'}</button>
-      <button type="button"  disabled={!focusedPart?.hasInstrument}
-              title={focusedPart?.hasInstrument
-                     ? `Save ${partTitle(focusedPart)} with its instrument settings, MIDI modules and insert effects to the library`
-                     : 'Focus a part with an instrument first'}
-              onclick={() => saveChainToLibrary(focusedPart.partId)}
-              data-testid="host-save-chain">Save chain</button>
-      <button type="button"  onclick={() => saveRackToLibrary()}
-              title="Save the complete Hostage rack and performance settings to the library"
-              data-testid="host-save-rack">Save rack</button>
-
-            </div>
+            {@render soundSaveActions()}
           {/if}
           {#if dockTab === 'params' && paramContext}
             <span class="target-separator" aria-hidden="true">›</span>
@@ -2296,6 +2327,10 @@
   }
   .primary-workspace :global(.mixer) { min-height: 100%; box-sizing: border-box; }
   .controller-workspace { display: flex; overflow: hidden; }
+  .sounds-workspace { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+  .sounds-page-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: none; padding: 6px 12px;
+                     border-bottom: 1px solid var(--host-line); background: var(--host-surface-raised); }
+  .sounds-page-spacer { flex: 1; }
 
   .utility-drawer {
     position: absolute;

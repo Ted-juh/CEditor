@@ -114,9 +114,11 @@ try {
   assert.equal(await page.evaluate(() => window.soundCommands.at(-1).cmd), 'cancelSoundComparison');
   await page.evaluate(() => window.setSoundsComparison(false));
   await page.getByTestId('host-audition').click();
-  await page.getByRole('button', { name: /^Filters/ }).click();
+  // One audition bar: the phrase is picked there, and the preview plays the same phrase.
   await page.locator('[data-testid=audition-phrase] [data-value=riff]').click();
-  assert.deepEqual(await page.evaluate(() => window.soundCommands.at(-1)), { cmd: 'setPresetAudition', phrase: 'riff' });
+  assert.deepEqual(await page.evaluate(() => window.soundCommands.findLast(c => c.cmd === 'setPresetAudition')), { cmd: 'setPresetAudition', phrase: 'riff' });
+  assert.deepEqual(await page.evaluate(() => window.soundCommands.at(-1)), { cmd: 'setAuditionPhrase', phrase: 'phrase' });
+  await page.getByRole('button', { name: /^Filters/ }).click();
   assert.ok(await page.getByTestId('preset-list').evaluate(el => el.clientHeight) >= 32);
   await page.getByRole('button', { name: /^Filters/ }).click();
   await page.getByTestId('host-audition').click();

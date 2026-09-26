@@ -616,6 +616,10 @@ test('every command-sending store export is reachable from Svelte or deliberatel
     // The Performance modulators each own their card, and the commands it sends.
     'performance/LfoCard.svelte', 'performance/EnvelopeCard.svelte', 'performance/MsegCard.svelte',
     'performance/RandomCard.svelte',
+    // The sound browser's parts, and the state they share.
+    'sounds/SoundsRail.svelte', 'sounds/SoundsInspector.svelte', 'sounds/SoundsMap.svelte',
+    'sounds/SoundsAuditionBar.svelte', 'sounds/SoundsBulkBar.svelte', 'sounds/SoundsShootout.svelte',
+    'sounds/soundsBrowser.svelte.js',
   ].map((name) => readFileSync(path.join(
     repoRoot, 'CE', 'web', 'src', 'CE_Application', 'sections', name), 'utf8')).join('\n');
 
