@@ -63,16 +63,28 @@ local function configure_text()
     })
 end
 
+-- The knob filmstrip decodes to 64 x 8192 pixels, about 2 MB, and the keyboard does nothing else
+-- while it decodes. Decoding it in init put that work between upload and the splash's first
+-- draw, and every splash draw then waited behind it, running just before set_mode(1) replaced
+-- it: the keyboard showed black and then the knobs. So init decodes only the small logo, and the
+-- strip is decoded when the knob page is first needed, which is while the splash is on screen.
+local knobs_decoded = false
+local function ensure_knobs()
+    if knobs_decoded then return end
+    decode_image(14, KNOB_PNG_ID, 18, KNOB_DECODED_ID, WHITE)
+    knobs_decoded = true
+end
+
 function init(args)
     if initialized then return end
     configure_text()
-    decode_image(14, KNOB_PNG_ID, 18, KNOB_DECODED_ID, WHITE)
     decode_image(14, LOGO_PNG_ID, 18, LOGO_DECODED_ID, WHITE)
     initialized = true
 end
 
 function set_mode(args)
     mode = get_byte(args, 0)
+    if mode ~= 0 then ensure_knobs() end
 end
 
 -- args is a Lua string (see VIP's set_text pattern): get_byte is 0-based, :sub is 1-based.
@@ -129,6 +141,7 @@ function draw(args)
         return
     end
 
+    ensure_knobs()
     text_data.set(TITLE, { text = title, color = WHITE })
     draw_text(TITLE, 0, 5, 480, 22)
 

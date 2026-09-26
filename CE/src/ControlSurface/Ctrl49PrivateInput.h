@@ -28,6 +28,7 @@
 
 #include <atomic>
 #include <deque>
+#include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -61,6 +62,10 @@ public:
     // reply), or nullopt when the queue is empty.
     std::optional<Bytes> dequeue();
 
+    // Optional: sees every complete message as it arrives, on the capture thread, before it is
+    // queued. For diagnostics (arrival times are otherwise lost in the queue). Set before start().
+    void setObserver (std::function<void (const Bytes&)> observerToUse) { observer_ = std::move (observerToUse); }
+
     bool running() const { return running_.load(); }
     std::string failure() const;
 
@@ -74,6 +79,8 @@ private:
 
     mutable std::mutex queueMutex_;
     std::deque<Bytes> messages_;
+
+    std::function<void (const Bytes&)> observer_;
 
     mutable std::mutex failureMutex_;
     std::string failure_;
