@@ -1464,6 +1464,9 @@ private:
     juce::String currentSurfacePageId;
     juce::String requestedSurfacePageId;
     std::vector<std::vector<std::uint8_t>> virtualSurfaceInput;
+    // Each part's loaded preset as last seen, so a change can show that preset's page.
+    std::map<juce::String, juce::String> seenPartPresets;
+    void followPresetPages();
     bool surfaceWanted = true;
     struct WarmSetlistProcessor
     {

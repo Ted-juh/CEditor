@@ -157,7 +157,7 @@ namespace
             "startPerformanceRecording", "finishPerformanceRecording",
             "cancelPerformanceRecording", "removePerformanceTake",
             "replayPerformanceTake", "stopPerformanceReplay", "surfacePerformanceEncoder",
-            "surfaceStepPad", "surfaceInput", "setSurfaceActive", "retryFailedProcessor", "dismissFailoverEvent",
+            "surfaceStepPad", "surfaceInput", "setSurfaceActive", "showControlPage", "retryFailedProcessor", "dismissFailoverEvent",
 
             // Escape/cancellation actions must never be trapped behind the lock.
             "cancelHardwarePatchCapture", "cancelKeyChordLearn",
@@ -644,6 +644,40 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             (SurfaceEncoder) juce::jlimit (0, (int) SurfaceEncoder::velocity,
                                             (int) payload.getProperty ("encoder", 0)),
             juce::jlimit (-127, 127, (int) payload.getProperty ("delta", 0)));
+        return;
+    }
+    if (cmd == "setControlPagePreset")
+    {
+        // Ties a page to the preset a part has loaded now ("show this page with Warm Pad"),
+        // or unties it when no part is given.
+        const auto pageId = payload.getProperty ("pageId", {}).toString();
+        if (rack.getPerformance().findPage (pageId) == nullptr)
+        {
+            emitError ("Unknown control page.");
+            return;
+        }
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto* part = partId.isNotEmpty() ? rack.getPerformance().findPart (partId) : nullptr;
+        if (partId.isNotEmpty() && (part == nullptr || part->lastPresetRecordId.isEmpty()))
+        {
+            emitError ("That part has no preset loaded to tie this page to.");
+            return;
+        }
+        rack.setPagePreset (pageId, part != nullptr ? part->lastPresetRecordId : juce::String(),
+                            part != nullptr ? part->lastPresetName : juce::String());
+        savePerformance();
+        emitState();
+        return;
+    }
+    if (cmd == "showControlPage")
+    {
+        // One shown page for everything: the keyboard (or its screen card) moves to it, the
+        // drawing follows, and learned knobs shared between pages drive this one.
+        const auto pageId = payload.getProperty ("pageId", {}).toString();
+        if (rack.getPerformance().findPage (pageId) == nullptr)
+            return;
+        currentSurfacePageId = pageId;
+        requestedSurfacePageId = pageId;
         return;
     }
     if (cmd == "setSurfaceActive")
@@ -1911,6 +1945,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             if (fields->hasProperty ("inverted")) binding.inverted = (bool) payload["inverted"];
             if (fields->hasProperty ("bipolar"))  binding.bipolar  = (bool) payload["bipolar"];
             if (fields->hasProperty ("toggle"))   binding.toggle   = (bool) payload["toggle"];
+            if (fields->hasProperty ("steps"))    binding.steps    = juce::jlimit (0, 128, (int) payload["steps"]);
             if (fields->hasProperty ("label"))    binding.label    = payload["label"].toString().trim();
         }
 
@@ -10043,6 +10078,9 @@ bool InstrumentHostService::targetParameterExists (const juce::String& targetId,
 
 void InstrumentHostService::writeMappedBinding (const ControlBinding& binding, float value01)
 {
+    // Stepped controls land only on their steps, whoever writes them: a knob, a slider on
+    // screen, a scene recall.
+    value01 = binding.snap (value01);
     const auto positioned = binding.inverted ? 1.0f - value01 : value01;
     const auto mapped = binding.rangeMin + positioned * (binding.rangeMax - binding.rangeMin);
 
@@ -13151,8 +13189,9 @@ bool InstrumentHostService::nudgeControlSlot (const juce::String& pageId, const 
         return false;
     }
 
-    const auto position = juce::jlimit (0.0f, 1.0f,
-                                        slotPositionFor (b, current) + (float) delta / 127.0f);
+    const auto position = b.stepped()
+        ? b.stepBy (slotPositionFor (b, current), delta)
+        : juce::jlimit (0.0f, 1.0f, slotPositionFor (b, current) + (float) delta / 127.0f);
     writeMappedBinding (b, position);
     if (! handlingCommand)
     {
@@ -15823,16 +15862,20 @@ void InstrumentHostService::drainControllerEvents()
             const auto first = *firstPress;
             const auto isNote = first.note >= 0;
 
-            // One controller drives one slot: learning a controller that is already bound
-            // elsewhere moves it, because two slots silently riding one knob is a support call.
-            // The one exception is the other layers of the same pad: they are the same pad, only
-            // one of them answers at a time, and sharing its note is the point of them.
+            // One controller drives one slot PER PAGE: learning a controller already bound on
+            // this page moves it, because two slots silently riding one knob is a support call.
+            // On other pages it stays: the same knob meaning different things on different pages
+            // is what pages are for, and only the shown page answers it (the drain below).
+            // The one exception on this page is the other layers of the same pad: they are the
+            // same pad, only one answers at a time, and sharing its note is the point of them.
             const auto* learningPage = rack.getPerformance().findPage (pageId);
             const auto* learning = learningPage != nullptr ? learningPage->findSlot (slotId) : nullptr;
             for (const auto& page : rack.getPerformance().pages)
                 for (const auto& other : page.slots)
                 {
-                    if (page.pageId == pageId && other.slotId == slotId)
+                    if (page.pageId != pageId)
+                        continue;
+                    if (other.slotId == slotId)
                         continue;
                     if (page.pageId == pageId && learning != nullptr && learning->kind == "pad"
                         && other.kind == "pad" && other.index == learning->index)
@@ -15903,18 +15946,42 @@ void InstrumentHostService::drainControllerEvents()
     // momentary through the ordinary write.
     bool virtualWritten = false;
     bool latchChanged = false;
+    const auto answers = [] (const ControlPage& page, const ControlSlot& slot, const PendingCc& event)
+    {
+        const auto isNote = event.note >= 0;
+        if (isNote ? slot.midiNote != event.note : slot.midiCc != event.cc)
+            return false;
+        if (slot.midiChannel != 0 && slot.midiChannel != event.channel)
+            return false;
+        // A pad plays only the layer it is on: the same hardware note can be learned on
+        // every layer, and exactly one of them answers.
+        return page.isLive (slot);
+    };
+    const auto shownPage = hardwarePageId();
     for (const auto& event : events)
+    {
+        // The same knob learned on several pages drives only the page that is shown (on the
+        // keyboard, its screen card, or picked in the Controller view): a page is a set of
+        // assignments, and turning one knob should not move a parameter on a page you are not
+        // looking at. A binding learned on a single page answers from anywhere, as before.
+        int pagesAnswering = 0;
         for (const auto& page : rack.getPerformance().pages)
+            for (const auto& slot : page.slots)
+                if (answers (page, slot, event))
+                {
+                    ++pagesAnswering;
+                    break;
+                }
+        const auto onlyShown = pagesAnswering > 1;
+
+        for (const auto& page : rack.getPerformance().pages)
+        {
+            if (onlyShown && page.pageId != shownPage)
+                continue;
             for (const auto& slot : page.slots)
             {
                 const auto isNote = event.note >= 0;
-                if (isNote ? slot.midiNote != event.note : slot.midiCc != event.cc)
-                    continue;
-                if (slot.midiChannel != 0 && slot.midiChannel != event.channel)
-                    continue;
-                // A pad plays only the layer it is on: the same hardware note can be learned on
-                // every layer, and exactly one of them answers.
-                if (! page.isLive (slot))
+                if (! answers (page, slot, event))
                     continue;
                 if (slot.binding.isEmpty() || ! bindingResolves (slot.binding))
                     continue;
@@ -15938,6 +16005,9 @@ void InstrumentHostService::drainControllerEvents()
                 {
                     const auto f = (size_t) juce::jlimit (0, 2, slot.midiRelativeFormat);
                     if (event.relativeDelta[f] == 0 && event.relativeMinimum[f] == 0 && event.relativeMaximum[f] == 127) continue;
+                    if (slot.binding.stepped())
+                        normalised = slot.binding.stepBy (controlBindingPosition (slot.binding), event.relativeDelta[f]);
+                    else
                     normalised = juce::jlimit ((float) event.relativeMinimum[f] / 127.0f,
                         (float) event.relativeMaximum[f] / 127.0f,
                         controlBindingPosition (slot.binding) + (float) event.relativeDelta[f] / 127.0f);
@@ -15966,6 +16036,8 @@ void InstrumentHostService::drainControllerEvents()
                                       + positioned * (slot.binding.rangeMax - slot.binding.rangeMin));
                 virtualWritten = virtualWritten || isVirtualParameterId (slot.binding.parameterId);
             }
+        }
+    }
 
     // A virtual write changed the manifest (fader, send, macro): one save and one announce
     // per drain however many controllers moved — the contract the CTRL49 encoders set. A
@@ -16218,8 +16290,57 @@ void InstrumentHostService::drainHardwarePatchSends()
         patchSends.pop_front();
 }
 
+void InstrumentHostService::followPresetPages()
+{
+    // Watches every part's loaded preset rather than hooking each of the ten ways one gets
+    // loaded (browser, walking, comparison, recall, capture...): a change is a change,
+    // wherever it came from. The first sighting of a part only records it, so opening a
+    // session does not jump the pages about.
+    const auto& performance = rack.getPerformance();
+    juce::String showPage;
+    bool leavePresetPage = false;
+    for (const auto& part : performance.parts)
+    {
+        auto [it, first] = seenPartPresets.try_emplace (part.partId, part.lastPresetRecordId);
+        if (first || it->second == part.lastPresetRecordId)
+            continue;
+        it->second = part.lastPresetRecordId;
+        if (part.lastPresetRecordId.isEmpty())
+            continue;
+        for (const auto& page : performance.pages)
+            if (page.presetRecordId == part.lastPresetRecordId)
+            {
+                showPage = page.pageId;
+                break;
+            }
+        if (showPage.isEmpty())
+            leavePresetPage = true;
+    }
+
+    if (showPage.isEmpty() && leavePresetPage)
+    {
+        // A preset without a page of its own: if a preset page is showing, it belongs to a
+        // sound that is no longer there, so go back to the first ordinary page.
+        const auto* shown = performance.findPage (hardwarePageId());
+        if (shown != nullptr && shown->presetRecordId.isNotEmpty())
+            for (const auto& page : performance.pages)
+                if (page.presetRecordId.isEmpty())
+                {
+                    showPage = page.pageId;
+                    break;
+                }
+    }
+
+    if (showPage.isNotEmpty() && showPage != currentSurfacePageId)
+    {
+        currentSurfacePageId = showPage;
+        requestedSurfacePageId = showPage;
+    }
+}
+
 void InstrumentHostService::drainParameterEvents()
 {
+    followPresetPages();
     drainProcessorFailures();
     tickAutomaticFailover();
     drainPerformanceRecordingMidi();
@@ -16960,6 +17081,7 @@ juce::var InstrumentHostService::buildStatePayload()
             s->setProperty ("kind",        slot.kind);
             s->setProperty ("index",       slot.index);
             s->setProperty ("toggle",      b.toggle);
+            s->setProperty ("steps",       b.steps);
             s->setProperty ("latched",     slot.latched);
             s->setProperty ("layer",       slot.layer);
             s->setProperty ("colour",      slot.colour);
@@ -16981,6 +17103,8 @@ juce::var InstrumentHostService::buildStatePayload()
         pg->setProperty ("pageId", page.pageId);
         pg->setProperty ("name",   page.name);
         pg->setProperty ("generated", page.generated);
+        pg->setProperty ("presetRecordId", page.presetRecordId);
+        pg->setProperty ("presetName", page.presetName);
         pg->setProperty ("slots",  slots);
         // Every pad with more than one layer, and the one it is playing. A pad that is not
         // listed has a single layer — the drawing's default, as it is the model's.

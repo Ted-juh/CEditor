@@ -292,6 +292,8 @@ public:
     void adoptControlPage (ControlPage page)      { model.pages.add (std::move (page)); }
     bool removeControlPage (const juce::String& pageId);
     bool renameControlPage (const juce::String& pageId, const juce::String& name);
+    /** Ties a page to a preset (empty unties it); see ControlPage::presetRecordId. */
+    bool setPagePreset (const juce::String& pageId, const juce::String& recordId, const juce::String& name);
     /** Writes the slot's binding (an empty binding clears the slot). */
     bool setSlotBinding (const juce::String& pageId, const juce::String& slotId,
                          ControlBinding binding);

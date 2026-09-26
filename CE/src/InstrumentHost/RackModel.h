@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <juce_core/juce_core.h>
 #include <map>
 #include "PartMidiRules.h"
@@ -224,8 +225,30 @@ struct ControlBinding
         the control's position. What a pad wants for "filter open" or "reverb on": momentary
         by default (down is the top of the range, up is the bottom), latching with this. */
     bool toggle = false;
+    /** Stepped: 0 (or 1) is smooth; N >= 2 snaps the control to N evenly spaced positions
+        across its range, for a waveform selector or an on/off/auto switch. A relative encoder
+        then moves one step per detent, so a small turn is never rounded back to where it was. */
+    int steps = 0;
 
     bool isEmpty() const          { return parameterId.isEmpty(); }
+
+    bool stepped() const noexcept { return steps >= 2; }
+
+    /** A 0..1 control position snapped to this binding's steps (unchanged when smooth). */
+    float snap (float position) const noexcept
+    {
+        if (! stepped()) return position;
+        const auto last = (float) (steps - 1);
+        return std::round (juce::jlimit (0.0f, 1.0f, position) * last) / last;
+    }
+
+    /** The position `detents` steps away from `position`, clamped to the ends. */
+    float stepBy (float position, int detents) const noexcept
+    {
+        const auto last = steps - 1;
+        const auto index = juce::jlimit (0, last, (int) std::lround (juce::jlimit (0.0f, 1.0f, position) * (float) last) + detents);
+        return (float) index / (float) last;
+    }
 };
 
 struct ControlSlot
@@ -288,6 +311,11 @@ struct ControlPage
     // registry produced them, so regenerating one part leaves another part's pages alone.
     bool generated = false;
     juce::String generatedForPartId;
+    /** A page made for one preset: loading that preset (on any part) shows this page, and
+        loading one without a page of its own goes back to an ordinary page. Empty is an
+        ordinary page. The name is kept for display, as the library may not be loaded. */
+    juce::String presetRecordId;
+    juce::String presetName;
 
     /** Mints a page with a fresh stable id and `numSlots` empty encoder slots ("s1".."sN",
         indexed 0..N-1). */

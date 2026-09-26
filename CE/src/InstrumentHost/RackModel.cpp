@@ -644,6 +644,8 @@ juce::var Performance::toVar() const
             s->setProperty ("inverted",    slot.binding.inverted);
             s->setProperty ("bipolar",     slot.binding.bipolar);
             s->setProperty ("toggle",      slot.binding.toggle);
+            if (slot.binding.steps >= 2)
+                s->setProperty ("steps",   slot.binding.steps);
             s->setProperty ("kind",        slot.kind);
             s->setProperty ("index",       slot.index);
             s->setProperty ("midiCc",      slot.midiCc);
@@ -678,6 +680,11 @@ juce::var Performance::toVar() const
         pg->setProperty ("name",   page.name);
         pg->setProperty ("generated", page.generated);
         pg->setProperty ("generatedForPartId", page.generatedForPartId);
+        if (page.presetRecordId.isNotEmpty())
+        {
+            pg->setProperty ("presetRecordId", page.presetRecordId);
+            pg->setProperty ("presetName", page.presetName);
+        }
         pg->setProperty ("slots",  slotVars);
         if (! padLayerVars.isEmpty())
             pg->setProperty ("padLayers", padLayerVars);
@@ -1649,6 +1656,8 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
             page.name = pg.getProperty ("name", {}).toString();
             page.generated = (bool) pg.getProperty ("generated", false);
             page.generatedForPartId = pg.getProperty ("generatedForPartId", {}).toString();
+            page.presetRecordId = pg.getProperty ("presetRecordId", {}).toString();
+            page.presetName = pg.getProperty ("presetName", {}).toString();
 
             juce::StringArray seenSlotIds;
             int legacyEncoders = 0;   // a slot with no kind is an encoder at its place among them
@@ -1688,6 +1697,7 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
                     slot.binding.inverted    = (bool) s.getProperty ("inverted", false);
                     slot.binding.bipolar     = (bool) s.getProperty ("bipolar", false);
                     slot.binding.toggle      = (bool) s.getProperty ("toggle", false);
+                    slot.binding.steps       = juce::jlimit (0, 128, (int) s.getProperty ("steps", 0));
                     slot.midiCc      = juce::jlimit (-1, 127, (int) s.getProperty ("midiCc", -1));
                     slot.midiChannel = juce::jlimit (0, 16, (int) s.getProperty ("midiChannel", 0));
                     slot.midiNote    = juce::jlimit (-1, 127, (int) s.getProperty ("midiNote", -1));

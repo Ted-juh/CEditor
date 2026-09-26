@@ -795,7 +795,7 @@
         <span class="device-midi-title">Control surface</span>
         <span class="device-midi-row surface-row" data-testid="host-surface-status">
           <span class="surface-dot {$hostSurface.state}"></span>
-          <span title={surfaceStatus.detail}>{surfaceStatus.short}</span>
+          <span title={surfaceStatus.detail}>{surfaceStatus.short}{surfaceStatus.hint ? ` — ${surfaceStatus.hint}` : ''}</span>
           {#if surfaceStatus.detail}<span class="surface-detail" data-testid="host-surface-detail">{surfaceStatus.detail}</span>{/if}
         </span>
         <!-- The Mackie section: read as controls (faders, B1-B8, Bank, transport), or passed to

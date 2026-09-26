@@ -1309,6 +1309,17 @@ bool InstrumentRackHost::setSlotBinding (const juce::String& pageId, const juce:
     return true;
 }
 
+bool InstrumentRackHost::setPagePreset (const juce::String& pageId, const juce::String& recordId,
+                                        const juce::String& name)
+{
+    auto* page = model.findPage (pageId);
+    if (page == nullptr)
+        return false;
+    page->presetRecordId = recordId;
+    page->presetName = recordId.isEmpty() ? juce::String() : name;
+    return true;
+}
+
 bool InstrumentRackHost::setPartLastPreset (const juce::String& partId, const juce::String& recordId,
                                             const juce::String& name)
 {

@@ -101,7 +101,7 @@ try {
     return orange > 300;
   });
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the card ran the display page');
-  assert.match(await host.getByTestId('ctrl49-screen-status').innerText(), /No keyboard connected/);
+  assert.match(await host.getByTestId('ctrl49-screen-status').innerText(), /No CTRL49 connected — shown here only/);
   assert.match(await host.getByTestId('ctrl49-page').innerText(), /1\s*\/\s*1\s*Performance/,
     'a rack with no control pages shows the performance page, as the keyboard would');
   if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-card.png` });

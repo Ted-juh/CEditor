@@ -28,6 +28,7 @@
   import Pencil from 'lucide-svelte/icons/pencil';
   import Trash2 from 'lucide-svelte/icons/trash-2';
   import Plus from 'lucide-svelte/icons/plus';
+  import Link from 'lucide-svelte/icons/link';
   import HostPartPicker from './HostPartPicker.svelte';
   import Ctrl49ScreenCard from './Ctrl49ScreenCard.svelte';
   import {
@@ -40,6 +41,7 @@
     setControlSlotOptions, focusRackPart,
     setUserSurface, clearUserSurface, learnUserSurface, finishUserSurfaceLearn,
     addControlPage, removeControlPage, renameControlPage, generateControlPages, ctrl49Screen, surfaceStatusText,
+    showControlPage, setControlPagePreset,
   } from '../stores/instrumentHost.js';
 
   let zoom = $state('');        // '' = the whole instrument, else a region id
@@ -47,6 +49,9 @@
   let defaultedLayout = '';
   let selectedControlId = $state('');
   let selectedParameterId = $state('');
+  // A rack macro is assignable like a parameter: the knob drives the macro, the macro drives
+  // everything it targets, on any part. The backend has always accepted it ('@macro').
+  let selectedMacroId = $state('');
   let clearArmed = $state(false);
   let clearTimer;
 
@@ -318,9 +323,17 @@
       selectedParameterId = '';
   });
 
+  let macros = $derived($hostState.rack.macros ?? []);
+  let selectedMacro = $derived(macros.find((m) => m.macroId === selectedMacroId) ?? null);
+
   function assignSelected() {
-    if (!selectedControl || !selectedParameter || !focusedPart
-        || !addressable(selectedControl)) return;
+    if (!selectedControl || !addressable(selectedControl)) return;
+    if (selectedMacro) {
+      assignSurfaceControl(page?.pageId ?? '', selectedControl.kind, selectedControl.index,
+                           selectedMacro.macroId, '@macro');
+      return;
+    }
+    if (!selectedParameter || !focusedPart) return;
     assignSurfaceControl(page?.pageId ?? '', selectedControl.kind, selectedControl.index,
                          focusedPart.partId, selectedParameter.id);
   }
@@ -402,13 +415,27 @@
         {:else}
           <select data-testid="surface-page" aria-label="Control page shown on the drawing"
                   value={page?.pageId ?? ''}
-                  onchange={(e) => (pageId = e.currentTarget.value)}>
+                  onchange={(e) => { pageId = e.currentTarget.value; showControlPage(pageId); }}>
             {#each pages as p (p.pageId)}
               <option value={p.pageId}>{p.name}</option>
             {/each}
           </select>
           <button type="button" class="ghost" title="Rename this page" aria-label="Rename page"
                   data-testid="surface-page-rename-start" onclick={() => (renaming = true)}><Pencil size={14} /></button>
+          <!-- Tie this page to the preset the focused part has loaded, so loading that preset
+               shows it; tied, the same button unties it. -->
+          {#if page?.presetRecordId}
+            <button type="button" class="toggle on preset-tie" data-testid="surface-page-preset"
+                    title={`Shown when "${page.presetName || 'its preset'}" is loaded. Click to make it an ordinary page.`}
+                    onclick={() => setControlPagePreset(page.pageId)}><Link size={14} /> {page.presetName || 'Preset'}</button>
+          {:else}
+            <button type="button" class="ghost preset-tie" data-testid="surface-page-preset"
+                    disabled={!focusedPart?.presetRecordId}
+                    title={focusedPart?.presetRecordId
+                      ? `Show this page whenever "${focusedPart.presetName}" is loaded`
+                      : 'Load a preset on the focused part to tie this page to it'}
+                    onclick={() => setControlPagePreset(page.pageId, focusedPart.partId)}><Link size={14} /></button>
+          {/if}
           <HostConfirmButton identity={`surface-page:${page?.pageId ?? ''}`} type="button" class="ghost"
                              title="Remove this page" aria-label="Remove page" data-testid="surface-page-remove"
                              onclick={() => page && removeControlPage(page.pageId)}><Trash2 size={14} /></HostConfirmButton>
@@ -499,7 +526,7 @@
                    class:selected={selectedParameterId === parameter.id}
                    data-testid="surface-param"
                    title={`${parameter.name || parameter.id} — select or drag onto a control`}
-                   onclick={() => (selectedParameterId = parameter.id)}
+                   onclick={() => { selectedParameterId = parameter.id; selectedMacroId = ''; }}
                    ondragstart={(e) => {
                      hostParamDrag.set({ partId: focusedPart.partId, parameterId: parameter.id,
                                          name: parameter.name });
@@ -519,6 +546,26 @@
             {/if}
           </div>
           <p class="parameter-hint">Drag to map · or select and assign</p>
+        {/if}
+        {#if macros.length > 0}
+          <div class="panel-heading macro-heading"><strong>Macros</strong><span>{macros.length}</span></div>
+          <div class="param-scroll macro-list" data-testid="surface-macros">
+            {#each macros as macro (macro.macroId)}
+              <button type="button" class="param-chip" draggable="true"
+                   class:selected={selectedMacroId === macro.macroId}
+                   data-testid="surface-macro"
+                   title={`${macro.name || 'Macro'} — one knob for everything this macro targets, on any part`}
+                   onclick={() => { selectedMacroId = macro.macroId; selectedParameterId = ''; }}
+                   ondragstart={(e) => {
+                     hostParamDrag.set({ partId: macro.macroId, parameterId: '@macro', name: macro.name || 'Macro' });
+                     e.dataTransfer?.setData('text/plain', macro.name || 'Macro');
+                     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+                   }}
+                   ondragend={() => hostParamDrag.set({ partId: '', parameterId: '', name: '' })}>
+                <GripVertical size={13} /><span>{macro.name || 'Macro'}</span>
+              </button>
+            {/each}
+          </div>
         {/if}
       </div>
 
@@ -717,7 +764,8 @@
                 <HostPickupIndicator direction={selectedSlot?.pickupDirection} /></strong>
               <span>{selectedSlot?.partName || (selectedParameter
                 ? `Ready to assign ${selectedParameter.name || selectedParameter.id}`
-                : 'Select a parameter or drag one onto the control')}</span>
+                : selectedMacro ? `Ready to assign macro ${selectedMacro.name || ''}`
+                : 'Select a parameter or macro, or drag one onto the control')}</span>
               {#if selectedSlot?.midiNote >= 0}
                 <span>Hardware binding · note {selectedSlot.midiNote}</span>
               {:else if selectedSlot?.midiCc >= 0}
@@ -728,7 +776,7 @@
             </div>
 
             <div class="inspector-actions">
-              <button type="button" disabled={!selectedParameter || !focusedPart}
+              <button type="button" disabled={!selectedMacro && (!selectedParameter || !focusedPart)}
                       data-testid="surface-assign-selected" onclick={assignSelected}>Assign selected</button>
               <button type="button" class="toggle" class:on={$hostMidiLearn.armed}
                       data-testid="surface-learn-selected" onclick={learnSelected}>
@@ -752,6 +800,13 @@
                 <label>Maximum
                   <input type="number" min="0" max="1" step="0.01" value={selectedSlot.rangeMax}
                          onchange={(e) => updateSelectedOptions({ rangeMax: Number(e.currentTarget.value) })} />
+                </label>
+                <!-- Stepped: a waveform selector with 4 shapes wants 4 positions, not 128. -->
+                <label title="0 = smooth. 2 or more = the control snaps to that many positions, and an encoder moves one position per click.">Steps
+                  <input type="number" min="0" max="128" step="1" value={selectedSlot.steps ?? 0}
+                         data-testid="slot-steps"
+                         onfocus={(e) => e.currentTarget.select()}
+                         onchange={(e) => updateSelectedOptions({ steps: Math.max(0, Math.min(128, Math.round(Number(e.currentTarget.value) || 0))) })} />
                 </label>
               </div>
               <div class="check-row">
@@ -851,6 +906,7 @@
   .page-picker select { min-width: 150px; font-weight: 650; }
   .page-picker .page-rename { width: 170px; font-weight: 650; }
   .plugged-in { color: #8fd0a4; font-size: 11px; }
+  .preset-tie { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .page-picker button { display: inline-flex; align-items: center; gap: 4px; }
 
   .describe { display: flex; flex-direction: column; gap: 6px; padding: 8px;

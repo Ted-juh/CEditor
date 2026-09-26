@@ -5612,6 +5612,160 @@ void testSetlistSoundcheck()
     check ((double) row().getProperty ("peak", 0) == peak, "reference recheck retains measured levels");
 }
 
+void testSteppedControlsAndShownPage()
+{
+    std::cout << "\nstepped controls, and a knob shared between pages drives the shown one" << std::endl;
+    const auto dir = freshDataDir ("stepped-shown");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    auto* stub = h.lastStub;
+    const auto near = [stub] (float a, float b)
+    {
+        const auto expected = stub->cutoff->getNormalisableRange().snapToLegalValue (b);
+        const bool matches = std::abs (a - expected) < 0.001f;
+        if (! matches) std::cout << "    actual " << a << ", expected " << expected << std::endl;
+        return matches;
+    };
+    const auto pageAt = [&h] (int i) { return h.emits.lastState()->getProperty ("rack", {})
+        .getProperty ("pages", {})[i].getProperty ("pageId", {}).toString(); };
+    const auto move = [&h] (int value)
+    {
+        h.service->noteMidiActivity ("Keys", juce::MidiMessage::controllerEvent (1, 74, value));
+        h.service->drainParameterEvents();
+    };
+
+    h.cmd ("addControlPage", { { "name", "A" } });
+    const auto pageA = pageAt (0);
+    h.cmd ("assignControlSlot", { { "pageId", pageA }, { "slotId", "s1" },
+        { "partId", partId }, { "parameterId", "cutoff" } });
+    h.cmd ("setControlSlotOptions", { { "pageId", pageA }, { "slotId", "s1" }, { "steps", 5 } });
+
+    h.cmd ("setControlSlotValue", { { "pageId", pageA }, { "slotId", "s1" }, { "value", 0.3 } });
+    check (near (stub->cutoff->get(), 0.25f), "five steps: 0.3 snaps to the nearest step, 0.25");
+    h.service->nudgeControlSlot (pageA, "s1", 1);
+    check (near (stub->cutoff->get(), 0.5f), "one encoder detent is one step, not 1/127");
+    h.service->nudgeControlSlot (pageA, "s1", -9);
+    check (near (stub->cutoff->get(), 0.0f), "and the steps stop at the ends");
+
+    h.cmd ("learnControlSlotMidi", { { "pageId", pageA }, { "slotId", "s1" } });
+    move (0);
+    h.cmd ("setControlSlotOptions", { { "pageId", pageA }, { "slotId", "s1" }, { "midiRelative", true } });
+    move (1);
+    check (near (stub->cutoff->get(), 0.25f), "a relative CC also moves one step per detent");
+    move (100);
+    h.cmd ("setControlSlotOptions", { { "pageId", pageA }, { "slotId", "s1" }, { "midiRelative", false } });
+    move (100);
+    check (near (stub->cutoff->get(), 0.75f), "and an absolute CC lands on a step (100/127 -> 0.75)");
+    {
+        ceditor::host::Performance saved;
+        check (ceditor::host::Performance::fromVar (h.service->captureStateVar(), saved)
+                 && saved.pages[0].slots[0].binding.steps == 5,
+               "the step count survives a session round trip");
+    }
+
+    // The same CC learned on a second page, bound to something else.
+    h.cmd ("setControlSlotOptions", { { "pageId", pageA }, { "slotId", "s1" }, { "steps", 0 } });
+    h.cmd ("addControlPage", { { "name", "B" } });
+    const auto pageB = pageAt (1);
+    h.cmd ("assignControlSlot", { { "pageId", pageB }, { "slotId", "s1" },
+        { "partId", partId }, { "parameterId", "drive" } });
+    h.cmd ("learnControlSlotMidi", { { "pageId", pageB }, { "slotId", "s1" } });
+    move (0);
+
+    h.cmd ("showControlPage", { { "pageId", pageA } });
+    stub->cutoff->setValueNotifyingHost (0.5f);
+    move (127);
+    check (near (stub->cutoff->get(), 1.0f), "with page A shown, the shared knob drives page A");
+
+    h.cmd ("showControlPage", { { "pageId", pageB } });
+    stub->cutoff->setValueNotifyingHost (0.5f);
+    move (20);
+    check (near (stub->cutoff->get(), 0.5f), "with page B shown, page A's parameter is left alone");
+
+    // A knob learned on one page only still answers from any page.
+    h.cmd ("clearControlSlotMidi", { { "pageId", pageB }, { "slotId", "s1" } });
+    move (127);
+    check (near (stub->cutoff->get(), 1.0f), "a knob learned on a single page answers whatever page is shown");
+}
+
+void testPresetPages()
+{
+    std::cout << "\na page made for a preset is shown when that preset loads" << std::endl;
+
+    const auto dir = freshDataDir ("preset-pages");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    h.service->drainParameterEvents();
+
+    const auto recordId = [&h] (const juce::String& name)
+    {
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        if (const auto* lib = h.emits.last ("instrumentHostLibrary"))
+            for (const auto& r : *lib->getProperty ("records", {}).getArray())
+                if (r.getProperty ("name", {}).toString() == name)
+                    return r.getProperty ("recordId", {}).toString();
+        return juce::String();
+    };
+    h.cmd ("saveUserPreset", { { "partId", partId }, { "name", "Warm" } });
+    h.cmd ("saveUserPreset", { { "partId", partId }, { "name", "Cold" } });
+    const auto warm = recordId ("Warm"), cold = recordId ("Cold");
+    check (warm.isNotEmpty() && cold.isNotEmpty(), "two presets to switch between");
+
+    const auto load = [&] (const juce::String& id)
+    {
+        h.cmd ("loadLibraryRecord", { { "recordId", id }, { "action", "replace" }, { "partId", partId } });
+        h.service->drainParameterEvents();
+    };
+    const auto pageAt = [&h] (int i) { return h.emits.lastState()->getProperty ("rack", {})
+        .getProperty ("pages", {})[i].getProperty ("pageId", {}).toString(); };
+
+    h.cmd ("addControlPage", { { "name", "Ordinary" } });
+    h.cmd ("addControlPage", { { "name", "For Warm" } });
+    const auto ordinary = pageAt (0), forWarm = pageAt (1);
+
+    load (warm);
+    h.service->consumeSurfacePageRequest();
+    h.cmd ("setControlPagePreset", { { "pageId", forWarm }, { "partId", partId } });
+    check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {})[1]
+               .getProperty ("presetName", {}).toString() == "Warm",
+           "a page is tied to the preset the part has loaded");
+
+    h.cmd ("showControlPage", { { "pageId", ordinary } });
+    h.service->consumeSurfacePageRequest();
+
+    load (cold);
+    check (h.service->consumeSurfacePageRequest().isEmpty(),
+           "a preset with no page of its own leaves an ordinary page where it is");
+
+    load (warm);
+    check (h.service->consumeSurfacePageRequest() == forWarm, "loading the preset shows its page");
+
+    load (cold);
+    check (h.service->consumeSurfacePageRequest() == ordinary,
+           "and loading another sound goes back to an ordinary page, not the old preset's");
+
+    h.cmd ("setControlPagePreset", { { "pageId", forWarm } });
+    load (warm);
+    check (h.service->consumeSurfacePageRequest().isEmpty(), "an untied page is ordinary again");
+
+    {
+        h.cmd ("setControlPagePreset", { { "pageId", forWarm }, { "partId", partId } });
+        ceditor::host::Performance saved;
+        check (ceditor::host::Performance::fromVar (h.service->captureStateVar(), saved)
+                 && saved.pages[1].presetRecordId == warm && saved.pages[1].presetName == "Warm",
+               "the tie survives a session round trip");
+    }
+}
+
 void testMidiPickup()
 {
     std::cout << "\nOptional MIDI pickup and relative CCs" << std::endl;
@@ -13051,6 +13205,8 @@ int main (int argc, char* argv[])
     testFirstClickAndTheOnScreenKeyboard();
     testMidiLearn();
     testMidiPickup();
+    testSteppedControlsAndShownPage();
+    testPresetPages();
     testSetlistSoundcheck();
     testPresetWalking();
     testFloatingEditors();

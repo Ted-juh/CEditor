@@ -314,6 +314,15 @@ export const hostSurfaceScreen = writable(emptySurfaceScreen());
 /** Press or turn one of the keyboard's controls from the app: the three bytes the hidden cable
     would carry (CC 11-18 encoders, 01 up / 7F down; 19-26 encoder switches; 39/40 Page Left/Right;
     1-8 pads). The broker cannot tell these from the real keyboard, which is the point. */
+/** Shows a control page: the keyboard (or its screen card) moves there, the drawing follows,
+    and knobs learned on several pages drive this one. */
+export const showControlPage = (pageId) => send({ cmd: 'showControlPage', pageId });
+
+/** Ties a page to the preset `partId` has loaded now, so loading that preset shows it; with no
+    partId the page is untied and becomes an ordinary page again. */
+export const setControlPagePreset = (pageId, partId = '') =>
+  send({ cmd: 'setControlPagePreset', pageId, partId });
+
 export const surfaceInput = (cc, value) =>
   send({ cmd: 'surfaceInput', data: [0xB0, Math.trunc(cc) & 0x7f, Math.trunc(value) & 0x7f] });
 
@@ -510,7 +519,7 @@ export function surfaceStatusText(surface) {
     case 'portBusy': return { short: 'CTRL49 is in use by another program', detail, tone: 'warn' };
     case 'captureFailed': return { short: "CTRL49's display port would not open", detail, tone: 'error' };
     case 'error': return { short: 'CTRL49 could not be opened', detail, tone: 'error' };
-    default: return { short: 'No CTRL49 connected — plug it in and it connects by itself', detail: '', tone: 'idle' };
+    default: return { short: 'No CTRL49 connected', detail: '', tone: 'idle', hint: 'plug it in and it connects by itself' };
   }
 }
 
@@ -4135,6 +4144,9 @@ export function normalizeHostState(payload) {
         name: String(page?.name ?? ''),
         generated: page?.generated === true,
         generatedForPartId: String(page?.generatedForPartId ?? ''),
+        // A page made for one preset: loading it shows this page (see setControlPagePreset).
+        presetRecordId: String(page?.presetRecordId ?? ''),
+        presetName: String(page?.presetName ?? ''),
         slots: (Array.isArray(page?.slots) ? page.slots : []).map((slot, position, all) => ({
           slotId: String(slot?.slotId ?? ''),
           // Which control on the surface: kind and index in the layout's own terms. Absent
@@ -4162,6 +4174,8 @@ export function normalizeHostState(payload) {
           midiRelative: slot?.midiRelative === true,
           // 0 two's complement (1 = +1, 127 = -1), 1 offset binary (64 +/- n), 2 sign bit.
           midiRelativeFormat: [0, 1, 2].includes(slot?.midiRelativeFormat) ? slot.midiRelativeFormat : 0,
+          // 0 = smooth; 2+ = snaps to that many positions.
+          steps: Math.max(0, Math.min(128, Math.trunc(Number(slot?.steps ?? 0) || 0))),
           pickupDirection: slot?.midiPickup === true && slot?.midiRelative !== true && slot?.toggle !== true
             && slot?.midiCc >= 0 && !(slot?.midiNote >= 0) && [-1, 1].includes(slot?.pickupDirection)
             ? slot.pickupDirection : 0,
@@ -5919,7 +5933,7 @@ export function applyMockCommand(state, payload) {
         resolved: true,
       });
     } else {
-      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'toggle', 'label', 'midiPickup', 'midiRelative', 'midiRelativeFormat', 'colour'])
+      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'toggle', 'label', 'midiPickup', 'midiRelative', 'midiRelativeFormat', 'steps', 'colour'])
         if (payload[key] !== undefined) slot[key] = payload[key];
       slot.pickupDirection = 0;
       if (payload.label !== undefined && payload.label) slot.displayName = String(payload.label);
@@ -7594,6 +7608,11 @@ function send(payload) {
   if (!isJuceAvailable()) {
     if (payload?.cmd === 'surfaceInput') {
       mockSurfaceInput(payload.data);
+      return;
+    }
+    if (payload?.cmd === 'showControlPage') {
+      const index = (get(hostState)?.rack?.pages ?? []).findIndex((p) => p.pageId === payload.pageId);
+      if (index >= 0) mockSurfaceCursor.update((c) => ({ ...c, page: index, active: 0 }));
       return;
     }
     if (payload?.cmd === 'beginStageUnlock') {
