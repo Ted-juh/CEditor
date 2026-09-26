@@ -1,7 +1,6 @@
 -- Hostage CTRL49 page: a branded startup screen followed by the live eight-knob page.
 -- The session draws once while mode is 0, keeps that splash visible for its loading dwell,
--- then calls set_mode(1) and redraws. The logo is a controller-sized alpha mask uploaded as
--- object 0x0210; the device tints it orange, just like the knob filmstrip.
+-- then calls set_mode(1) and redraws. The logo is uploaded as object 0x0210, already orange.
 
 local FRAME           = 64
 local KNOB_PNG_ID     = 0x0200
@@ -116,12 +115,13 @@ end
 -- device will not draw it, the error must not take the rest of the splash with it: on the first
 -- hardware run the keyboard showed a black screen here while the app's preview showed the logo.
 -- So the text goes first, the logo is attempted under pcall, and the wordmark in type stands in
--- when it fails. What the keyboard shows now says which it was.
+-- when it fails. The logo carries its own orange: tinted at draw time, a white mask came out
+-- white on the keyboard, so the colour is in the image and the tint is white (no change).
 local function draw_splash()
     draw_text(SPLASH, 0, 180, 480, 24)
     local drawn = false
     if pcall then
-        drawn = pcall(draw_image, 18, LOGO_DECODED_ID, 20, 84, 0, 0, 440, 80, ORANGE)
+        drawn = pcall(draw_image, 18, LOGO_DECODED_ID, 20, 84, 0, 0, 440, 80, WHITE)
     end
     if not drawn then
         draw_text(WORDMARK, 0, 84, 480, 80)
