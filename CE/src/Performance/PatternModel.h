@@ -427,31 +427,63 @@ struct ArpSettings
     path; four named, bounded operations. */
 struct MidiFxSettings
 {
+    // keyChords is the old "custom keys" mode, kept only so a stored name can be read and
+    // turned into the key-map layer; nothing sets it any more. New shapes append, so the
+    // stored numbers of the old ones never move.
     enum class ChordType { off = 0, powerFifth, triad, triadFirstInversion, seventh,
-                           octaveDouble, diatonic, diatonicSeventh, keyChords };
+                           octaveDouble, diatonic, diatonicSeventh, keyChords,
+                           minor, major7, minor7, sus2, sus4, sixth, add9, ninth,
+                           diminished, augmented, halfDiminished };
     enum class ChordVoicing { close = 0, open, drop2, wide };
     enum class ResponseCurve { linear = 0, soft, hard, sCurve, custom };
     static constexpr int responseCurvePoints = 9;
 
-    /** One learned chord: pressing `key` plays key+each offset (offset 0 = the key itself).
-        Captured by the learn flow — arm, tap the target key, play the chord — and only in
-        effect while the chord type is keyChords; unmapped keys then pass through plain. */
-    struct KeyChord
+    /** One chord in the module's set: the notes it plays, exactly. How the builder made it
+        (root, quality, inversion, voicing, bass) rides along so it can be edited again; a
+        learned chord has no quality and is just its notes. The key map, and later the pads
+        and the progression, point at these by index. */
+    struct SetChord
+    {
+        juce::String name;              // the user's own label; empty = named from the notes
+        juce::Array<int> notes;         // absolute MIDI notes, sorted, at most maxVoices
+        int root = -1;                  // builder root note, -1 for a learned chord
+        juce::String quality;           // builder shape name, empty for a learned chord
+        int inversion = 0;
+        juce::String voicing = "close";
+        bool bass = false;
+    };
+
+    /** A key of the key-map layer: pressing `key` plays chord `chord` of the set. */
+    struct KeyMapping
     {
         int key = 60;
-        juce::Array<int> offsets;
+        int chord = 0;
     };
+
+    static constexpr int maxSetChords = 32;
 
     int transpose = 0;              // semitones or scale steps, -48..48
     juce::String transposeMode = "chromatic"; // chromatic | diatonic
     bool constrainToScale = false;
     int scaleRoot = 0;              // 0..11, C..B
     juce::String scaleType = "major";
-    ChordType chord = ChordType::off;
+    // The Chords module: one set of chords and the layers that trigger them. A layer has its
+    // own on/off so switching it off keeps what it was set to.
+    //   Follow key — every key plays `chord` built on itself (the old chorder), inside
+    //                chordFollowLow..High; outside the range keys pass through plain.
+    //   Key map    — a mapped key plays its set chord exactly, and wins over follow.
+    ChordType chord = ChordType::off;   // the follow shape; off = following plays nothing extra
+    bool chordFollow = true;            // the layer's light: off keeps the shape but mutes it
+    int chordFollowLow = 0;
+    int chordFollowHigh = 127;
     int chordInversion = 0;         // 0 = root position, then rotate bottom voices upward
     ChordVoicing chordVoicing = ChordVoicing::close;
     bool chordVoiceLeading = false; // choose the nearest inversion/octave to the last chord
-    juce::Array<KeyChord> keyChords;
+    bool chordBass = false;         // follow: add the chord's root an octave below
+    int chordTopAccent = 0;         // 0..40, velocity added to the top voice of any chord
+    bool chordKeyMap = false;
+    juce::Array<SetChord> chordSet;
+    juce::Array<KeyMapping> keyMap;
     int velocityFixed = 0;          // 0 = keep played velocity, else 1..127
     float velocityScale = 1.0f;     // 0.1..2.0 applied before the fixed override
 
@@ -476,6 +508,18 @@ struct MidiFxSettings
     int expressionOutputMin = 0;
     int expressionOutputMax = 127;
     juce::Array<int> expressionCurveValues;
+
+    /** The set chord that plays exactly `notes` (sorted, capped at six), added when none
+        does. -1 when the set is full. */
+    int findOrAddSetChord (juce::Array<int> notes);
+    /** Points `key` at set chord `chordIndex`, replacing what it pointed at; -1 unmaps it. */
+    void mapKey (int key, int chordIndex);
+    /** Removes set chord `index`, unmapping the keys that played it and renumbering the rest. */
+    void removeSetChord (int index);
+    /** The one-field meaning `chord` had before the layers: "off" switches following off,
+        "custom keys" means the key map alone, any shape means following with that shape.
+        What the part-level setter and old saves still speak. */
+    void applyLegacyChord (ChordType type);
 
     static const char* chordTypeName (ChordType type) noexcept;
     static ChordType chordTypeFromName (const juce::String& name) noexcept;

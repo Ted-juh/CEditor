@@ -102,7 +102,7 @@
       <Segmented options={STROKES} value={mod.strumPattern} label="Stroke" testid="strum-stroke"
                  onchange={(v) => { secondStroke = false; set({ strumPattern: v }); }} />
       {#if mod.strumPattern === 'alternate'}
-        <button type="button" class="link" onclick={() => (secondStroke = !secondStroke)}>
+        <button type="button" class="ctl link" onclick={() => (secondStroke = !secondStroke)}>
           show the {secondStroke ? 'first (up)' : 'next (down)'} stroke</button>
       {/if}
     </div>

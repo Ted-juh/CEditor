@@ -2,6 +2,7 @@
 
 #include <array>
 #include <deque>
+#include <functional>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -249,7 +250,10 @@
 //   setPartArp {partId, enabled?,mode?,stepsPerBeat?,gate?,swing?,octaves?,latch?,
 //     constrainToScale?,velocityPattern?}
 //   setPartMidiFx {partId, transpose?,constrainToScale?,scaleRoot?,scaleType?,chord?,
+//     chordFollow?,chordFollowLow?,chordFollowHigh?,chordBass?,chordTopAccent?,chordKeyMap?,
+//     chordSet?[{name,notes,root,quality,inversion,voicing,bass}],keyMap?[{key,chord}],
 //     velocityFixed?,velocityScale?}
+//   learnKeyChord {partId, slotId?} | cancelKeyChordLearn | clearKeyChord {partId, slotId?, key}
 //     (both are modes over the shared transport, applied in the part's own event chain.)
 //
 // VIRTUAL PARAMETER ADDRESSES (Stage 5). A parameterId starting with '@' resolves against
@@ -1824,6 +1828,7 @@ private:
     {
         bool armed = false;
         juce::String partId;
+        juce::String slotId;           // the Chords module learning; empty = the part's first
         int key = -1;                  // -1 until the target key was tapped
         juce::Array<int> groupNotes;   // the notes of the group currently held
         int downCount = 0;
@@ -1833,6 +1838,10 @@ private:
     struct PendingNoteEvent { int note = 0; bool on = false; };
     std::vector<PendingNoteEvent> pendingChordNotes;
     void drainChordLearn();
+    /** Edits one chord module's settings: the slot named, else the part's first Chords slot,
+        else the part-level block. `edit` returns false to change nothing. */
+    bool editChordModule (const juce::String& partId, const juce::String& slotId,
+                          const std::function<bool (perf::MidiFxSettings&)>& edit);
     void emitChordLearn (bool armed, const juce::String& stage, int key, int chordSize);
 
     // -- hardware total recall -------------------------------------------------------------

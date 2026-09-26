@@ -6784,25 +6784,92 @@ void testChordLearn()
 
         const auto fx = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
                             .getProperty ("midiFx", {});
-        const auto chords = fx.getProperty ("keyChords", {});
-        check (chords.size() == 1 && (int) chords[0].getProperty ("key", -1) == 62,
-               "the capture sits in the part's MIDI FX");
-        const auto offsets = chords[0].getProperty ("offsets", {});
-        check (offsets.size() == 3 && (int) offsets[0] == -2 && (int) offsets[1] == 2
-                 && (int) offsets[2] == 5,
-               "stored as offsets from the target key, sorted");
+        const auto set = fx.getProperty ("chordSet", {});
+        const auto keys = fx.getProperty ("keyMap", {});
+        check (set.size() == 1 && keys.size() == 1 && (int) keys[0].getProperty ("key", -1) == 62
+                 && (int) keys[0].getProperty ("chord", -1) == 0,
+               "the capture joins the part's chord set and the key points at it");
+        const auto notes = set[0].getProperty ("notes", {});
+        check (notes.size() == 3 && (int) notes[0] == 60 && (int) notes[1] == 64
+                 && (int) notes[2] == 67 && (bool) fx.getProperty ("chordKeyMap", false),
+               "stored as the notes played, sorted, with the key-map layer on");
     }
 
     {
         // Manifest state: a fresh service still knows the chord; clearing removes it.
         Harness h (dir);
         h.cmd ("getState");
-        auto chordsOf = [&h] { return h.emits.lastState()->getProperty ("rack", {})
-                                        .getProperty ("parts", {})[0]
-                                        .getProperty ("midiFx", {}).getProperty ("keyChords", {}); };
-        check (chordsOf().size() == 1, "the learned chord survives restart with the part");
+        auto fxOf = [&h] { return h.emits.lastState()->getProperty ("rack", {})
+                                    .getProperty ("parts", {})[0].getProperty ("midiFx", {}); };
+        check (fxOf().getProperty ("keyMap", {}).size() == 1,
+               "the learned chord survives restart with the part");
         h.cmd ("clearKeyChord", { { "partId", partId }, { "key", 62 } });
-        check (chordsOf().size() == 0, "and clearing takes exactly it away");
+        check (fxOf().getProperty ("keyMap", {}).size() == 0
+                 && fxOf().getProperty ("chordSet", {}).size() == 1,
+               "clearing forgets the key and keeps the chord in the set");
+    }
+
+    {
+        // A Chords module in the chain learns into itself, named by its slot.
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "chord" } });
+        auto chainOf = [&h] { return h.emits.lastState()->getProperty ("rack", {})
+                                       .getProperty ("parts", {})[0].getProperty ("midiChain", {}); };
+        juce::var chordSlot;
+        for (int i = 0; i < chainOf().size(); ++i)
+            if (chainOf()[i].getProperty ("type", {}).toString() == "chord")
+                chordSlot = chainOf()[i];
+        const auto slotId = chordSlot.getProperty ("slotId", {}).toString();
+        check (slotId.isNotEmpty(), "a Chords module is in the chain");
+
+        h.cmd ("learnKeyChord", { { "partId", partId }, { "slotId", slotId } });
+        h.service->noteMidiActivity ("Keys", on (48));
+        h.service->noteMidiActivity ("Keys", off (48));
+        h.service->drainParameterEvents();
+        for (const auto note : { 57, 60, 64 }) h.service->noteMidiActivity ("Keys", on (note));
+        for (const auto note : { 57, 60, 64 }) h.service->noteMidiActivity ("Keys", off (note));
+        h.service->drainParameterEvents();
+
+        juce::var fx;
+        for (int i = 0; i < chainOf().size(); ++i)
+            if (chainOf()[i].getProperty ("slotId", {}).toString() == slotId)
+                fx = chainOf()[i].getProperty ("fx", {});
+        check (fx.getProperty ("keyMap", {}).size() == 1
+                 && (int) fx.getProperty ("keyMap", {})[0].getProperty ("key", -1) == 48
+                 && fx.getProperty ("chordSet", {})[0].getProperty ("notes", {}).size() == 3,
+               "the named module holds the learned chord, not the part-level block");
+
+        // The set and the map can be written whole, and a key past the set is dropped.
+        juce::Array<juce::var> set;
+        auto* chord = new juce::DynamicObject();
+        chord->setProperty ("notes", juce::Array<juce::var> { 50, 53, 57 });
+        chord->setProperty ("quality", "minor");
+        chord->setProperty ("root", 50);
+        set.add (juce::var (chord));
+        juce::Array<juce::var> map;
+        auto* good = new juce::DynamicObject();
+        good->setProperty ("key", 36); good->setProperty ("chord", 0);
+        auto* stray = new juce::DynamicObject();
+        stray->setProperty ("key", 37); stray->setProperty ("chord", 4);
+        map.add (juce::var (good));
+        map.add (juce::var (stray));
+        h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", slotId },
+                                       { "chordSet", set }, { "keyMap", map },
+                                       { "chord", "m7" }, { "chordFollow", false },
+                                       { "chordFollowHigh", 59 }, { "chordBass", true } });
+        for (int i = 0; i < chainOf().size(); ++i)
+            if (chainOf()[i].getProperty ("slotId", {}).toString() == slotId)
+                fx = chainOf()[i].getProperty ("fx", {});
+        check (fx.getProperty ("chordSet", {}).size() == 1
+                 && fx.getProperty ("keyMap", {}).size() == 1
+                 && (int) fx.getProperty ("keyMap", {})[0].getProperty ("key", -1) == 36,
+               "the set and map are replaced whole, and a key pointing past the set is dropped");
+        check (fx.getProperty ("chord", {}).toString() == "m7"
+                 && ! (bool) fx.getProperty ("chordFollow", true)
+                 && (int) fx.getProperty ("chordFollowHigh", 0) == 59
+                 && (bool) fx.getProperty ("chordBass", false),
+               "beside chordFollow, chord only picks the shape; the light stays where it was put");
     }
 }
 

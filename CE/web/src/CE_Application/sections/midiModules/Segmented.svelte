@@ -8,7 +8,7 @@
 
 <div class="seg" role="group" aria-label={label} data-testid={testid}>
   {#each options as option (option.value)}
-    <button type="button" aria-pressed={option.value === value} title={option.title ?? option.label}
+    <button type="button" class="ctl" aria-pressed={option.value === value} title={option.title ?? option.label}
             data-value={option.value}
             onclick={() => { if (option.value !== value) onchange(option.value); }}>{option.label}</button>
   {/each}

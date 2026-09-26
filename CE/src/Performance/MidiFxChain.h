@@ -4,6 +4,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <initializer_list>
 #include <limits>
 #include "PatternModel.h"
 
@@ -37,10 +38,15 @@ public:
     {
         transpose.store (juce::jlimit (-48, 48, settings.transpose));
         transposeDiatonic.store (settings.transposeMode == "diatonic");
-        chordType.store ((int) settings.chord);
+        chordType.store (settings.chordFollow && settings.chord != MidiFxSettings::ChordType::keyChords
+                           ? (int) settings.chord : (int) MidiFxSettings::ChordType::off);
         chordInversion.store (juce::jlimit (0, 3, settings.chordInversion));
         chordVoicing.store ((int) settings.chordVoicing);
         chordVoiceLeading.store (settings.chordVoiceLeading);
+        followLow.store (juce::jlimit (0, 127, juce::jmin (settings.chordFollowLow, settings.chordFollowHigh)));
+        followHigh.store (juce::jlimit (0, 127, juce::jmax (settings.chordFollowLow, settings.chordFollowHigh)));
+        chordBass.store (settings.chordBass);
+        topAccent.store (juce::jlimit (0, 40, settings.chordTopAccent));
         velocityFixed.store (juce::jlimit (0, 127, settings.velocityFixed));
         velocityScale.store (juce::jlimit (0.1f, 2.0f, settings.velocityScale));
         velocityCurve.store ((int) settings.velocityCurve);
@@ -77,20 +83,27 @@ public:
         // mask would stack minor thirds and call them chords.
         diatonicMask.store (scaleMask (settings.scaleType, settings.scaleRoot));
 
-        // The learned per-key map: offsets stored +64 so 0 can mean "unused"; a key's
-        // count of 0 means unmapped and the note passes through plain in keyChords mode.
+        // The key map, flattened: each key holds its set chord's notes directly, so the
+        // audio thread never looks at the set. A count of 0 means the key is not mapped
+        // (or the layer is off) and falls through to following, or plays plain.
+        auto anyMapped = false;
         for (int key = 0; key < 128; ++key)
-            customCount[(size_t) key].store (0);
-        for (const auto& keyChord : settings.keyChords)
-        {
-            if (! juce::isPositiveAndBelow (keyChord.key, 128))
-                continue;
-            const auto count = juce::jmin (maxVoices, keyChord.offsets.size());
-            for (int i = 0; i < count; ++i)
-                customOffsets[(size_t) keyChord.key][(size_t) i].store (
-                    (juce::uint8) (juce::jlimit (-60, 60, keyChord.offsets[i]) + 64));
-            customCount[(size_t) keyChord.key].store ((juce::uint8) count);
-        }
+            mappedCount[(size_t) key].store (0);
+        if (settings.chordKeyMap)
+            for (const auto& mapping : settings.keyMap)
+            {
+                if (! juce::isPositiveAndBelow (mapping.key, 128)
+                    || ! juce::isPositiveAndBelow (mapping.chord, settings.chordSet.size()))
+                    continue;
+                const auto& notes = settings.chordSet.getReference (mapping.chord).notes;
+                const auto count = juce::jmin (maxVoices, notes.size());
+                for (int i = 0; i < count; ++i)
+                    mappedNotes[(size_t) mapping.key][(size_t) i].store (
+                        (juce::uint8) juce::jlimit (0, 127, notes[i]));
+                mappedCount[(size_t) mapping.key].store ((juce::uint8) count);
+                anyMapped = anyMapped || count > 0;
+            }
+        keyMapActive.store (anyMapped);
     }
 
     /** True when nothing in the chain would change a note — the caller can skip the copy. */
@@ -98,6 +111,7 @@ public:
     {
         return transpose.load() == 0
             && chordType.load() == (int) MidiFxSettings::ChordType::off
+            && ! keyMapActive.load()
             && velocityFixed.load() == 0
             && juce::approximatelyEqual (velocityScale.load(), 1.0f)
             && velocityCurve.load() == (int) MidiFxSettings::ResponseCurve::linear
@@ -119,6 +133,11 @@ public:
         const auto inversion = chordInversion.load();
         const auto voicing = (MidiFxSettings::ChordVoicing) chordVoicing.load();
         const auto voiceLeading = chordVoiceLeading.load();
+        const auto rangeLow = followLow.load();
+        const auto rangeHigh = followHigh.load();
+        const auto addBass = chordBass.load();
+        const auto accent = topAccent.load();
+        const auto keyMapOn = keyMapActive.load();
         const auto fixed = velocityFixed.load();
         const auto scaleVelocity = velocityScale.load();
         const auto velocityCurveType = (MidiFxSettings::ResponseCurve) velocityCurve.load();
@@ -170,26 +189,56 @@ public:
                 releaseTracked (channel, sourceNote, out, position);
 
                 int notes[maxVoices];
-                const auto count = chordNotes (chord, root, scale, diatonicMask.load(), notes);
-                if (chord != MidiFxSettings::ChordType::off && count > 1)
+                auto count = 0;
+                const auto mapped = keyMapOn ? (int) mappedCount[(size_t) sourceNote].load() : 0;
+                if (mapped > 0)
                 {
-                    // With all three Smart Chorder controls at their defaults, retain the
-                    // exact legacy ordering too (not merely the same pitch set).
-                    if (inversion != 0 || voicing != MidiFxSettings::ChordVoicing::close
-                        || voiceLeading)
-                        applyVoicing (notes, count, inversion, voicing);
-                    if (voiceLeading)
-                        chooseNearestVoicing (channel - 1, notes, count);
-                    rememberVoicing (channel - 1, notes, count);
+                    // Key map: exactly the set chord, moved by whatever transpose and scale
+                    // did to the key itself. It wins over following and is never re-voiced.
+                    for (int i = 0; i < mapped; ++i)
+                        notes[i] = juce::jlimit (0, 127, (int) mappedNotes[(size_t) sourceNote][(size_t) i].load()
+                                                            + root - sourceNote);
+                    count = mapped;
+                    clearVoiceHistory (channel - 1);
                 }
                 else
                 {
-                    clearVoiceHistory (channel - 1);
+                    const auto follows = chord != MidiFxSettings::ChordType::off
+                                      && sourceNote >= rangeLow && sourceNote <= rangeHigh;
+                    count = chordNotes (follows ? chord : MidiFxSettings::ChordType::off,
+                                        root, scale, diatonicMask.load(), notes);
+                    if (follows && count > 1)
+                    {
+                        const auto bassNote = notes[0] - 12;
+                        // With all three Smart Chorder controls at their defaults, retain the
+                        // exact legacy ordering too (not merely the same pitch set).
+                        if (inversion != 0 || voicing != MidiFxSettings::ChordVoicing::close
+                            || voiceLeading)
+                            applyVoicing (notes, count, inversion, voicing);
+                        if (voiceLeading)
+                            chooseNearestVoicing (channel - 1, notes, count);
+                        rememberVoicing (channel - 1, notes, count);
+                        // The bass sits under the chord after voice leading has chosen it,
+                        // so it anchors the root instead of dragging the voices around.
+                        if (addBass && count < maxVoices && bassNote >= 0)
+                            notes[count++] = bassNote;
+                    }
+                    else
+                    {
+                        clearVoiceHistory (channel - 1);
+                    }
                 }
+
+                auto top = 0;
+                for (int i = 1; i < count; ++i)
+                    if (notes[i] > notes[top])
+                        top = i;
                 for (int i = 0; i < count; ++i)
                 {
+                    const auto noteVelocity = count > 1 && i == top
+                        ? juce::jmin (127, velocity + accent) : velocity;
                     out.addEvent (juce::MidiMessage::noteOn (channel, notes[i],
-                                                             (juce::uint8) velocity), position);
+                                                             (juce::uint8) noteVelocity), position);
                     track (channel, sourceNote, i, notes[i]);
                 }
             }
@@ -545,24 +594,39 @@ private:
             }
 
             case MidiFxSettings::ChordType::keyChords:
-            {
-                // The learned map: a mapped key plays exactly what was captured for it,
-                // an unmapped key passes through plain — per-key chord sets, VIP-style.
-                const auto count = (int) customCount[(size_t) juce::jlimit (0, 127, root)].load();
-                if (count == 0)
-                {
-                    out[0] = root;
-                    return 1;
-                }
-                for (int i = 0; i < count; ++i)
-                    out[i] = juce::jlimit (0, 127,
-                        root + (int) customOffsets[(size_t) root][(size_t) i].load() - 64);
-                return count;
-            }
+                break;   // the key map is its own layer now; never a follow shape
+
+            case MidiFxSettings::ChordType::minor:          return shape (root, { 0, 3, 7 }, add, out);
+            case MidiFxSettings::ChordType::major7:         return shape (root, { 0, 4, 7, 11 }, add, out);
+            case MidiFxSettings::ChordType::minor7:         return shape (root, { 0, 3, 7, 10 }, add, out);
+            case MidiFxSettings::ChordType::sus2:           return shape (root, { 0, 2, 7 }, add, out);
+            case MidiFxSettings::ChordType::sus4:           return shape (root, { 0, 5, 7 }, add, out);
+            case MidiFxSettings::ChordType::sixth:          return shape (root, { 0, 4, 7, 9 }, add, out);
+            case MidiFxSettings::ChordType::add9:           return shape (root, { 0, 4, 7, 14 }, add, out);
+            case MidiFxSettings::ChordType::ninth:          return shape (root, { 0, 4, 7, 10, 14 }, add, out);
+            case MidiFxSettings::ChordType::diminished:     return shape (root, { 0, 3, 6 }, add, out);
+            case MidiFxSettings::ChordType::augmented:      return shape (root, { 0, 4, 8 }, add, out);
+            case MidiFxSettings::ChordType::halfDiminished: return shape (root, { 0, 3, 6, 10 }, add, out);
         }
 
         out[0] = root;
         return 1;
+    }
+
+    /** A plain interval shape on `root`, each tone after the root folded by `add`. */
+    template <typename Add>
+    static int shape (int root, std::initializer_list<int> intervals, const Add& add,
+                      int (&out)[maxVoices]) noexcept
+    {
+        auto count = 0;
+        for (const auto interval : intervals)
+        {
+            if (count >= maxVoices)
+                break;
+            out[count] = count == 0 ? root : add (root + interval);
+            ++count;
+        }
+        return count;
     }
 
     void track (int channel, int sourceNote, int voice, int emittedNote) noexcept
@@ -600,6 +664,10 @@ private:
     std::atomic<int> chordInversion { 0 };
     std::atomic<int> chordVoicing { 0 };
     std::atomic<bool> chordVoiceLeading { false };
+    std::atomic<int> followLow { 0 }, followHigh { 127 };
+    std::atomic<bool> chordBass { false };
+    std::atomic<int> topAccent { 0 };
+    std::atomic<bool> keyMapActive { false };
     std::atomic<int> velocityFixed { 0 };
     std::atomic<float> velocityScale { 1.0f };
     std::atomic<int> velocityCurve { (int) MidiFxSettings::ResponseCurve::linear };
@@ -615,8 +683,8 @@ private:
     std::array<std::atomic<int>, MidiFxSettings::responseCurvePoints> expressionCurveValues {};
     std::atomic<juce::uint16> mask { 0x0fff };
     std::atomic<juce::uint16> diatonicMask { 0x0fff };
-    std::array<std::array<std::atomic<juce::uint8>, 6>, 128> customOffsets {};
-    std::array<std::atomic<juce::uint8>, 128> customCount {};
+    std::array<std::array<std::atomic<juce::uint8>, 6>, 128> mappedNotes {};
+    std::array<std::atomic<juce::uint8>, 128> mappedCount {};
 };
 
 } // namespace ceditor::perf

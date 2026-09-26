@@ -2631,7 +2631,7 @@ export const midiSlotTypes = ['arp', 'transpose', 'scale', 'chord', 'velocity', 
                               'articulation'];
 
 export const midiSlotLabels = {
-  arp: 'Arpeggiator', transpose: 'Transpose', scale: 'Scale', chord: 'Chorder',
+  arp: 'Arpeggiator', transpose: 'Transpose', scale: 'Scale', chord: 'Chords',
   velocity: 'Velocity / Expression', fx: 'Note shaping',
   echo: 'Echo', strum: 'Strum', humanize: 'Humanize', chance: 'Chance',
   length: 'Note length', latch: 'Latch', mpe: 'MPE Transformer',
@@ -2897,11 +2897,13 @@ const normalizeMidiFx = (f) => {
     constrainToScale: f?.constrainToScale === true,
     scaleRoot: Number(f?.scaleRoot ?? 0),
     scaleType: String(f?.scaleType ?? 'major'),
-    chord: String(f?.chord ?? 'off'),
+    ...normalizeChordLayers(f),
     chordInversion: clampInt(f?.chordInversion, 0, 3, 0),
     chordVoicing: CHORD_VOICINGS.includes(String(f?.chordVoicing ?? 'close'))
       ? String(f?.chordVoicing ?? 'close') : 'close',
     chordVoiceLeading: f?.chordVoiceLeading === true,
+    chordBass: f?.chordBass === true,
+    chordTopAccent: clampInt(f?.chordTopAccent, 0, 40, 0),
     velocityFixed: clampInt(f?.velocityFixed, 0, 127, 0),
     velocityScale: clampNumber(f?.velocityScale, 0.1, 2, 1),
     responseProfileName: String(f?.responseProfileName ?? '').trim().slice(0, 80),
@@ -2921,12 +2923,78 @@ const normalizeMidiFx = (f) => {
     expressionOutputMin: expressionOutput[0],
     expressionOutputMax: expressionOutput[1],
     expressionCurveValues: normalizeResponseCurvePoints(f?.expressionCurveValues),
-    keyChords: (Array.isArray(f?.keyChords) ? f.keyChords : []).map((kc) => ({
-      key: Number(kc?.key ?? 60),
-      offsets: (Array.isArray(kc?.offsets) ? kc.offsets : []).map(Number),
-    })),
   };
 };
+
+const MAX_SET_CHORDS = 32;
+
+const normalizeSetChord = (c) => ({
+  name: String(c?.name ?? '').slice(0, 40),
+  notes: (Array.isArray(c?.notes) ? c.notes : []).slice(0, 6)
+    .map((n) => clampInt(n, 0, 127, 60)).sort((a, b) => a - b),
+  root: clampInt(c?.root, -1, 127, -1),
+  quality: String(c?.quality ?? ''),
+  inversion: clampInt(c?.inversion, 0, 3, 0),
+  voicing: CHORD_VOICINGS.includes(String(c?.voicing)) ? String(c.voicing) : 'close',
+  bass: c?.bass === true,
+});
+
+/** The Chords module's set and layers (MidiFxSettings in PatternModel.h), including the
+    reading of a state from before the layers, where `chord` alone said everything and learned
+    chords were offsets from their key. */
+function normalizeChordLayers(f) {
+  let chord = String(f?.chord ?? 'off');
+  const chordSet = (Array.isArray(f?.chordSet) ? f.chordSet : []).slice(0, MAX_SET_CHORDS)
+    .map(normalizeSetChord);
+  const keyMap = [];
+  const mapKey = (key, index) => {
+    const at = keyMap.findIndex((m) => m.key === key);
+    if (at >= 0) keyMap.splice(at, 1);
+    if (key >= 0 && key <= 127 && index >= 0 && index < chordSet.length) keyMap.push({ key, chord: index });
+  };
+  for (const m of Array.isArray(f?.keyMap) ? f.keyMap : [])
+    mapKey(clampInt(m?.key, -1, 127, -1), clampInt(m?.chord, -1, 1000, -1));
+  for (const kc of Array.isArray(f?.keyChords) ? f.keyChords : []) {
+    const key = clampInt(kc?.key, 0, 127, 60);
+    const notes = (Array.isArray(kc?.offsets) ? kc.offsets : [])
+      .map((o) => clampInt(key + Number(o), 0, 127, key)).slice(0, 6).sort((a, b) => a - b);
+    if (notes.length === 0) continue;
+    let index = chordSet.findIndex((c) => c.notes.join() === notes.join());
+    if (index < 0 && chordSet.length < MAX_SET_CHORDS) {
+      chordSet.push(normalizeSetChord({ notes }));
+      index = chordSet.length - 1;
+    }
+    if (index >= 0) mapKey(key, index);
+  }
+  let chordFollow = f?.chordFollow !== false;
+  let chordKeyMap = f?.chordKeyMap === true;
+  if (typeof f?.chordFollow !== 'boolean') {
+    chordFollow = chord !== 'off' && chord !== 'custom keys';
+    chordKeyMap = chord === 'custom keys';
+  }
+  if (chord === 'custom keys') chord = 'triad';
+  const low = clampInt(f?.chordFollowLow, 0, 127, 0);
+  const high = clampInt(f?.chordFollowHigh, 0, 127, 127);
+  return {
+    chord, chordFollow, chordKeyMap,
+    chordFollowLow: Math.min(low, high), chordFollowHigh: Math.max(low, high),
+    chordSet, keyMap: keyMap.sort((a, b) => a.key - b.key),
+  };
+}
+
+/** The native applyMidiFxFields rule for `chord` sent without `chordFollow`: its old
+    one-field meaning. The mock applies it so localhost behaves like the host. */
+function applyLegacyChordField(block, payload) {
+  if (!('chord' in payload) || 'chordFollow' in payload) return;
+  const chord = String(payload.chord);
+  if (chord === 'off') { block.chordFollow = false; return; }
+  if (chord === 'custom keys') { block.chordFollow = false; block.chordKeyMap = true; return; }
+  block.chord = chord;
+  block.chordFollow = true;
+}
+
+/** Array fields of the note-shaping block whose entries are objects, not numbers. */
+const OBJECT_ARRAY_FIELDS = ['chordSet', 'keyMap', 'articulations'];
 
 export function normalizePerformance(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
@@ -6065,21 +6133,36 @@ export function applyMockCommand(state, payload) {
                           displayName: first.name, partName: part.pluginName, resolved: true });
     return next;
   }
-  if (cmd === 'learnKeyChord') {
-    // No keys to hear in the browser: the mock captures a C-major triad onto middle C at
-    // once, enough to demo the map, the badge, and the clear.
+  if (cmd === 'learnKeyChord' || cmd === 'clearKeyChord') {
+    // Which module: the slot named, else the part's first Chords slot, else the part-level
+    // block — InstrumentHostService::editChordModule's order.
     const target = part(payload.partId);
     if (!target) return next;
-    target.midiFx.keyChords = [
-      ...target.midiFx.keyChords.filter((kc) => kc.key !== 60),
-      { key: 60, offsets: [0, 4, 7] },
-    ];
-    return next;
-  }
-  if (cmd === 'clearKeyChord') {
-    const target = part(payload.partId);
-    if (!target) return next;
-    target.midiFx.keyChords = target.midiFx.keyChords.filter((kc) => kc.key !== Number(payload.key));
+    const slot = payload.slotId
+      ? target.midiChain.find((s) => s.slotId === payload.slotId)
+      : target.midiChain.find((s) => s.type === 'chord');
+    if (payload.slotId && !slot) return next;
+    const fx = slot ? slot.fx : target.midiFx;
+    if (cmd === 'learnKeyChord') {
+      // No keys to hear in the browser: the mock captures a C-major triad onto middle C at
+      // once, enough to demo the set, the map and the clear.
+      const notes = [60, 64, 67];
+      let index = fx.chordSet.findIndex((c) => c.notes.join() === notes.join());
+      if (index < 0) {
+        if (fx.chordSet.length >= MAX_SET_CHORDS) return next;
+        fx.chordSet.push(normalizeSetChord({ notes }));
+        index = fx.chordSet.length - 1;
+      }
+      fx.keyMap = [...fx.keyMap.filter((m) => m.key !== 60), { key: 60, chord: index }]
+        .sort((a, b) => a.key - b.key);
+      fx.chordKeyMap = true;
+    } else {
+      fx.keyMap = fx.keyMap.filter((m) => m.key !== Number(payload.key));
+    }
+    if (!slot) {
+      const mirror = target.midiChain.find((s) => s.type !== 'arp');
+      if (mirror) mirror.fx = { ...fx };
+    }
     return next;
   }
   if (cmd === 'walkPartPreset') {
@@ -7208,13 +7291,14 @@ export function applyMockCommand(state, payload) {
         : chain[index].fx;
       for (const [key, value] of Object.entries(payload)) {
         if (['cmd', 'partId', 'slotId'].includes(key) || !(key in block)) continue;
-        block[key] = key === 'articulations'
+        block[key] = OBJECT_ARRAY_FIELDS.includes(key)
           ? (Array.isArray(value) ? value.map((entry) => ({ ...entry })) : block[key])
           : typeof block[key] === 'boolean' ? value === true
           : typeof block[key] === 'number' ? Number(value)
           : Array.isArray(block[key]) ? (Array.isArray(value) ? value.map(Number) : block[key])
           : String(value);
       }
+      if (block === chain[index].fx) applyLegacyChordField(block, payload);
       if (chain[index].type === 'strum') {
         if ('strumDown' in payload && !('strumPattern' in payload))
           block.strumPattern = payload.strumDown === true ? 'descending' : 'ascending';
@@ -7233,11 +7317,14 @@ export function applyMockCommand(state, payload) {
     const block = cmd === 'setPartArp' ? target.arp : target.midiFx;
     for (const [key, value] of Object.entries(payload)) {
       if (key === 'cmd' || key === 'partId' || !(key in block)) continue;
-      block[key] = typeof block[key] === 'boolean' ? value === true
+      block[key] = OBJECT_ARRAY_FIELDS.includes(key)
+        ? (Array.isArray(value) ? value.map((entry) => ({ ...entry })) : block[key])
+        : typeof block[key] === 'boolean' ? value === true
         : typeof block[key] === 'number' ? Number(value)
         : Array.isArray(block[key]) ? (Array.isArray(value) ? value.map(Number) : block[key])
         : String(value);
     }
+    if (cmd === 'setPartMidiFx') applyLegacyChordField(block, payload);
     // The part-level setters are doors onto the chain's first slot of that family, exactly
     // as the native side treats them — mirroring here keeps one truth on screen.
     const wantsArp = cmd === 'setPartArp';
@@ -8758,9 +8845,11 @@ export const startSoundComparison = (partId, recordIds = []) =>
 export const stepSoundComparison = (delta = 1) => send({ cmd: 'stepSoundComparison', delta });
 export const keepSoundComparison = () => send({ cmd: 'keepSoundComparison' });
 export const cancelSoundComparison = () => send({ cmd: 'cancelSoundComparison' });
-export const learnKeyChord = (partId) => send({ cmd: 'learnKeyChord', partId });
+export const learnKeyChord = (partId, slotId = '') =>
+  send({ cmd: 'learnKeyChord', partId, ...(slotId ? { slotId } : {}) });
 export const cancelKeyChordLearn = () => send({ cmd: 'cancelKeyChordLearn' });
-export const clearKeyChord = (partId, key) => send({ cmd: 'clearKeyChord', partId, key });
+export const clearKeyChord = (partId, key, slotId = '') =>
+  send({ cmd: 'clearKeyChord', partId, key, ...(slotId ? { slotId } : {}) });
 /** Ask for a view of the library. Takes either the older (text, type) pair or a whole
     LibraryQuery — the native side reads both, so the two callers can coexist. */
 export const requestLibrary = (query = '', type = '') =>

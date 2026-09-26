@@ -19,6 +19,8 @@
   import ResponseCurveDesigner from '../components/ResponseCurveDesigner.svelte';
   import StrumEditor from './midiModules/StrumEditor.svelte';
   import HumanizeEditor from './midiModules/HumanizeEditor.svelte';
+  import ChordsEditor from './midiModules/ChordsEditor.svelte';
+  import { shapeLabel } from '../utils/chordBuilder.js';
   import { HUMANIZE_FEELS, humanizeFeelOf, beatsToMs } from '../utils/noteModuleViews.js';
   import {
     hostState, hostArpStep, hostChordLearn,
@@ -64,12 +66,17 @@
     if (slot.type === 'scale')
       return slot.fx.constrainToScale ? `${NOTE_NAMES[slot.fx.scaleRoot]} ${slot.fx.scaleType}` : 'off';
     if (slot.type === 'chord') {
-      if (slot.fx.chord === 'off') return 'off';
-      const details = [slot.fx.chord === 'custom keys'
-        ? `custom · ${slot.fx.keyChords.length} keys` : slot.fx.chord];
-      if (slot.fx.chordInversion > 0) details.push(`inv ${slot.fx.chordInversion}`);
-      if (slot.fx.chordVoicing !== 'close') details.push(slot.fx.chordVoicing);
-      if (slot.fx.chordVoiceLeading) details.push('voice lead');
+      const follows = slot.fx.chordFollow && slot.fx.chord !== 'off';
+      const maps = slot.fx.chordKeyMap && slot.fx.keyMap.length > 0;
+      if (!follows && !maps) return 'off';
+      const details = [];
+      if (follows) {
+        details.push(`follow ${shapeLabel(slot.fx.chord)}`);
+        if (slot.fx.chordInversion > 0) details.push(`inv ${slot.fx.chordInversion}`);
+        if (slot.fx.chordVoicing !== 'close') details.push(slot.fx.chordVoicing);
+        if (slot.fx.chordVoiceLeading) details.push('voice lead');
+      }
+      if (maps) details.push(`${slot.fx.keyMap.length} mapped ${slot.fx.keyMap.length === 1 ? 'key' : 'keys'}`);
       return details.join(' · ');
     }
     if (slot.type === 'velocity') {
@@ -419,83 +426,11 @@
           {/if}
 
           {#if slot.type === 'chord' || slot.type === 'fx'}
-            <label class="mini-field">Chord
-              <select value={slot.fx.chord}
-                      onchange={(e) => set(slot, { chord: e.currentTarget.value })}>
-                {#each ['off', 'power fifth', 'triad', 'triad (1st inv)', 'seventh', 'octave', 'diatonic', 'diatonic 7th', 'custom keys'] as type (type)}
-                  <option value={type}>{type}</option>
-                {/each}
-              </select>
-            </label>
-            {#if slot.fx.chord === 'diatonic' || slot.fx.chord === 'diatonic 7th'}
-              {#if slot.type === 'chord'}
-                <label class="mini-field">Scale
-                  <select value={slot.fx.scaleType}
-                          onchange={(e) => set(slot, { scaleType: e.currentTarget.value })}>
-                    {#each scales as name (name)}
-                      <option value={name}>{name}</option>
-                    {/each}
-                  </select>
-                </label>
-                <label class="mini-field">Root
-                  <select value={slot.fx.scaleRoot}
-                          onchange={(e) => set(slot, { scaleRoot: Number(e.currentTarget.value) })}>
-                    {#each NOTE_NAMES as name, i (name)}
-                      <option value={i}>{name}</option>
-                    {/each}
-                  </select>
-                </label>
-              {/if}
-              <span class="hint">builds the chord that belongs to each scale degree</span>
-            {/if}
-            {#if slot.fx.chord !== 'off'}
-              <label class="mini-field">Inversion
-                <select value={slot.fx.chordInversion}
-                        onchange={(e) => set(slot, { chordInversion: Number(e.currentTarget.value) })}>
-                  <option value={0}>root position</option>
-                  <option value={1}>1st</option>
-                  <option value={2}>2nd</option>
-                  <option value={3}>3rd</option>
-                </select>
-              </label>
-              <label class="mini-field">Voicing
-                <select value={slot.fx.chordVoicing}
-                        onchange={(e) => set(slot, { chordVoicing: e.currentTarget.value })}>
-                  <option value="close">close</option>
-                  <option value="open">open</option>
-                  <option value="drop 2">drop 2</option>
-                  <option value="wide">wide</option>
-                </select>
-              </label>
-              <label class="mini-field">Motion
-                <PropertyToggle compact label="Voice leading" value={slot.fx.chordVoiceLeading}
-                                title="Choose the nearest inversion and octave to the previous chord"
-                                ariaLabel="Automatic chord voice leading"
-                                onchange={(on) => set(slot, { chordVoiceLeading: on })} />
-              </label>
-            {/if}
-            {#if slot.fx.chord === 'custom keys'}
-              <div class="key-chords" data-testid="key-chords">
-                {#if $hostChordLearn.armed && $hostChordLearn.partId === part.partId}
-                  <button type="button" class="ghost learn armed" data-testid="chord-learn-armed"
-                          onclick={() => cancelKeyChordLearn()}>
-                    {$hostChordLearn.stage === 'chord'
-                      ? `now play the chord for ${keyName($hostChordLearn.key)}…`
-                      : 'tap the target key…'}</button>
-                {:else}
-                  <button type="button" class="ghost learn" data-testid="chord-learn"
-                          title="Click, tap the target key, then play the chord"
-                          onclick={() => learnKeyChord(part.partId)}>+ learn chord</button>
-                {/if}
-                {#each slot.fx.keyChords as keyChord (keyChord.key)}
-                  <span class="key-badge">
-                    {keyName(keyChord.key)} · {keyChord.offsets.length}
-                    <HostConfirmButton title="Clear key chord" identity={JSON.stringify([part.partId, keyChord.key])} type="button" class="ghost danger"
-                            onclick={() => clearKeyChord(part.partId, keyChord.key)}>×</HostConfirmButton>
-                  </span>
-                {/each}
-              </div>
-            {/if}
+            <ChordsEditor fx={slot.fx} set={(fields) => set(slot, fields)} partId={part.partId} slotId={slot.slotId}
+                          {scales} learn={$hostChordLearn}
+                          onlearn={() => learnKeyChord(part.partId, slot.slotId)}
+                          oncancel={() => cancelKeyChordLearn()}
+                          onclear={(key) => clearKeyChord(part.partId, key, slot.slotId)} />
           {/if}
 
           {#if slot.type === 'velocity' || slot.type === 'fx'}
@@ -1089,12 +1024,6 @@
   .range-pair > span { display: flex; align-items: center; gap: 4px; color: var(--host-text-dim); }
   .hint { color: #66707b; font-size: 10px; max-width: 150px; }
   .empty-hint { color: #66707b; font-size: 12px; }
-  .key-chords { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; }
-  .key-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: #7fb4e0;
-               background: #22303c; border-radius: 3px; padding: 1px 4px; }
-  .learn { font-size: 10px; color: #9aa5b1; }
-  .learn.armed { color: #d9a13c; border-color: #d9a13c; animation: learn-pulse 1s ease-in-out infinite; }
-  @keyframes learn-pulse { 50% { opacity: 0.45; } }
   .grid-row { display: flex; gap: 8px; align-items: stretch; width: 100%; }
   .note-grid { flex: 1; display: flex; gap: 1px; height: 150px; background: #10161c;
                border: 1px solid #232c36; border-radius: 4px; padding: 2px;

@@ -2063,26 +2063,39 @@ void testMidiFxChain()
         check (notesFor (leading, 65) == std::vector<int> { 60, 65, 69 },
                "then chooses F/C so C stays put and the other voices move minimally");
 
-        // --- and its learned half: per-key chords, exactly as captured ------------------
+        // --- and its key-map layer: a key plays its set chord, exactly -----------------
         MidiFxChain learned;
         MidiFxSettings learnedSettings;
-        learnedSettings.chord = MidiFxSettings::ChordType::keyChords;
-        MidiFxSettings::KeyChord captured;
-        captured.key = 60;
-        captured.offsets = { 0, 3, 7, 12 };
-        learnedSettings.keyChords.add (captured);
+        learnedSettings.chordKeyMap = true;
+        learnedSettings.mapKey (60, learnedSettings.findOrAddSetChord ({ 60, 63, 67, 72 }));
         learned.setSettings (learnedSettings);
 
         check (notesFor (learned, 60) == std::vector<int> { 60, 63, 67, 72 },
-               "a mapped key plays exactly the chord captured for it");
+               "a mapped key plays exactly the chord in the set");
         check (notesFor (learned, 61) == std::vector<int> { 61 },
-               "an unmapped key passes through plain — the map is the whole rule");
+               "an unmapped key passes through plain when nothing follows");
+
+        learnedSettings.chord = MidiFxSettings::ChordType::triad;
+        learned.setSettings (learnedSettings);
+        check (notesFor (learned, 60) == std::vector<int> { 60, 63, 67, 72 }
+                 && notesFor (learned, 62) == std::vector<int> { 62, 66, 69 },
+               "with following on too, the mapped key keeps its chord and the rest follow");
+
+        learnedSettings.chordKeyMap = false;
+        learned.setSettings (learnedSettings);
+        check (notesFor (learned, 60) == std::vector<int> { 60, 64, 67 },
+               "switching the key map off keeps the map but stops playing it");
+        learnedSettings.chordKeyMap = true;
+        learnedSettings.chord = MidiFxSettings::ChordType::off;
+
+        learnedSettings.transpose = 2;
+        learned.setSettings (learnedSettings);
+        check (notesFor (learned, 60) == std::vector<int> { 62, 65, 69, 74 },
+               "transpose moves a mapped chord with its key");
+        learnedSettings.transpose = 0;
 
         // Six voices release cleanly: press a wide mapped chord, lift, count the offs.
-        MidiFxSettings::KeyChord wide;
-        wide.key = 48;
-        wide.offsets = { 0, 4, 7, 12, 16, 19 };
-        learnedSettings.keyChords.add (wide);
+        learnedSettings.mapKey (48, learnedSettings.findOrAddSetChord ({ 48, 52, 55, 60, 64, 67 }));
         learned.setSettings (learnedSettings);
         juce::MidiBuffer press, sound, lift, silence;
         press.addEvent (juce::MidiMessage::noteOn (1, 48, (juce::uint8) 100), 0);
@@ -2093,6 +2106,79 @@ void testMidiFxChain()
         for (const auto metadata : sound) ons += metadata.getMessage().isNoteOn() ? 1 : 0;
         for (const auto metadata : silence) offs += metadata.getMessage().isNoteOff() ? 1 : 0;
         check (ons == 6 && offs == 6, "six captured voices sound and all six release");
+
+        // Removing a chord from the set unmaps its keys and renumbers the rest.
+        learnedSettings.removeSetChord (0);
+        check (learnedSettings.chordSet.size() == 1 && learnedSettings.keyMap.size() == 1
+                 && learnedSettings.keyMap[0].key == 48 && learnedSettings.keyMap[0].chord == 0,
+               "removing a set chord forgets its key and keeps the others pointing right");
+        check (learnedSettings.findOrAddSetChord ({ 67, 48, 52, 55, 60, 64 }) == 0,
+               "the same notes in any order are the same set chord, not a second copy");
+    }
+
+    {
+        // --- the builder's shapes, the follow range, the bass and the top voice ----------
+        MidiFxChain chords;
+        MidiFxSettings settings;
+        auto shapeAt = [&] (MidiFxSettings::ChordType type, int key)
+        {
+            settings.chord = type;
+            chords.setSettings (settings);
+            juce::MidiBuffer press, result, lift, flush;
+            press.addEvent (juce::MidiMessage::noteOn (1, key, (juce::uint8) 100), 0);
+            chords.process (press, result);
+            std::vector<int> notes;
+            for (const auto metadata : result)
+                notes.push_back (metadata.getMessage().getNoteNumber());
+            lift.addEvent (juce::MidiMessage::noteOff (1, key), 0);
+            chords.process (lift, flush);
+            return notes;
+        };
+        using T = MidiFxSettings::ChordType;
+        check (shapeAt (T::minor, 60) == std::vector<int> { 60, 63, 67 }
+                 && shapeAt (T::major7, 60) == std::vector<int> { 60, 64, 67, 71 }
+                 && shapeAt (T::minor7, 60) == std::vector<int> { 60, 63, 67, 70 }
+                 && shapeAt (T::sus2, 60) == std::vector<int> { 60, 62, 67 }
+                 && shapeAt (T::sus4, 60) == std::vector<int> { 60, 65, 67 }
+                 && shapeAt (T::sixth, 60) == std::vector<int> { 60, 64, 67, 69 }
+                 && shapeAt (T::add9, 60) == std::vector<int> { 60, 64, 67, 74 }
+                 && shapeAt (T::ninth, 60) == std::vector<int> { 60, 64, 67, 70, 74 }
+                 && shapeAt (T::diminished, 60) == std::vector<int> { 60, 63, 66 }
+                 && shapeAt (T::augmented, 60) == std::vector<int> { 60, 64, 68 }
+                 && shapeAt (T::halfDiminished, 60) == std::vector<int> { 60, 63, 66, 70 },
+               "every builder shape plays its intervals on the key");
+        check (MidiFxSettings::chordTypeFromName ("m7b5") == T::halfDiminished
+                 && MidiFxSettings::chordTypeFromName (MidiFxSettings::chordTypeName (T::add9)) == T::add9,
+               "and each shape's name reads back as itself");
+
+        settings.chordFollowLow = 0;
+        settings.chordFollowHigh = 59;
+        check (shapeAt (T::minor, 48) == std::vector<int> { 48, 51, 55 }
+                 && shapeAt (T::minor, 60) == std::vector<int> { 60 },
+               "following stops at the top of its range — a split with melody above");
+        settings.chordFollowHigh = 127;
+
+        settings.chordFollow = false;
+        check (shapeAt (T::minor, 60) == std::vector<int> { 60 },
+               "the follow light off keeps the shape and plays the key alone");
+        settings.chordFollow = true;
+
+        settings.chordBass = true;
+        check (shapeAt (T::triad, 60) == std::vector<int> { 60, 64, 67, 48 },
+               "the bass adds the chord's root an octave down");
+        settings.chordBass = false;
+
+        settings.chordTopAccent = 20;
+        settings.chord = T::triad;
+        chords.setSettings (settings);
+        juce::MidiBuffer press, result;
+        press.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        chords.process (press, result);
+        std::vector<int> velocities;
+        for (const auto metadata : result)
+            velocities.push_back (metadata.getMessage().getVelocity());
+        check (velocities == std::vector<int> { 100, 100, 120 },
+               "the top voice is played harder by the accent, the others as played");
     }
 }
 
@@ -2439,11 +2525,16 @@ void testScalesAndSerialization()
     fx.chordInversion = 2;
     fx.chordVoicing = MidiFxSettings::ChordVoicing::drop2;
     fx.chordVoiceLeading = true;
+    fx.chordFollowHigh = 59;
+    fx.chordBass = true;
+    fx.chordTopAccent = 12;
+    fx.chordKeyMap = true;
     {
-        MidiFxSettings::KeyChord kc;
-        kc.key = 62;
-        kc.offsets = { -2, 2, 5 };
-        fx.keyChords.add (kc);
+        const auto index = fx.findOrAddSetChord ({ 60, 64, 67 });
+        fx.chordSet.getReference (index).name = "Home";
+        fx.chordSet.getReference (index).root = 60;
+        fx.chordSet.getReference (index).quality = "triad";
+        fx.mapKey (62, index);
     }
     fx.constrainToScale = true;
     fx.scaleType = "dorian";
@@ -2479,9 +2570,40 @@ void testScalesAndSerialization()
              && restoredFx.expressionInputMin == 4 && restoredFx.expressionInputMax == 110
              && restoredFx.expressionOutputMin == 10 && restoredFx.expressionOutputMax == 118,
            "and so do the MIDI FX");
-    check (restoredFx.keyChords.size() == 1 && restoredFx.keyChords[0].key == 62
-             && restoredFx.keyChords[0].offsets == juce::Array<int> { -2, 2, 5 },
-           "the learned key map survives the trip");
+    check (restoredFx.chordSet.size() == 1 && restoredFx.chordSet[0].name == "Home"
+             && restoredFx.chordSet[0].notes == juce::Array<int> { 60, 64, 67 }
+             && restoredFx.chordSet[0].root == 60 && restoredFx.chordSet[0].quality == "triad"
+             && restoredFx.keyMap.size() == 1 && restoredFx.keyMap[0].key == 62
+             && restoredFx.keyMap[0].chord == 0,
+           "the chord set and the key map survive the trip");
+    check (restoredFx.chordFollow && restoredFx.chordKeyMap && restoredFx.chordFollowHigh == 59
+             && restoredFx.chordBass && restoredFx.chordTopAccent == 12,
+           "and so do the layers' lights, the follow range, the bass and the accent");
+
+    {
+        // A save from before the set: "custom keys" and offsets from each key.
+        auto* old = new juce::DynamicObject();
+        old->setProperty ("chord", "custom keys");
+        auto* kc = new juce::DynamicObject();
+        kc->setProperty ("key", 62);
+        kc->setProperty ("offsets", juce::Array<juce::var> { -2, 2, 5 });
+        old->setProperty ("keyChords", juce::Array<juce::var> { juce::var (kc) });
+        MidiFxSettings migrated;
+        midiFxFromVar (juce::var (old), migrated);
+        check (migrated.chordKeyMap && ! migrated.chordFollow
+                 && migrated.chordSet.size() == 1
+                 && migrated.chordSet[0].notes == juce::Array<int> { 60, 64, 67 }
+                 && migrated.keyMap.size() == 1 && migrated.keyMap[0].key == 62,
+               "an old learned key chord becomes a set chord its key points at");
+
+        auto* shaped = new juce::DynamicObject();
+        shaped->setProperty ("chord", "seventh");
+        MidiFxSettings following;
+        midiFxFromVar (juce::var (shaped), following);
+        check (following.chordFollow && ! following.chordKeyMap
+                 && following.chord == MidiFxSettings::ChordType::seventh,
+               "and an old shape becomes the follow layer, on");
+    }
 
     NoteModuleSettings strum;
     strum.strumBeats = 0.5;

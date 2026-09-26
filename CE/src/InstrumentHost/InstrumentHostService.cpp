@@ -270,10 +270,45 @@ namespace
         if (fields.hasProperty ("constrainToScale")) fx.constrainToScale = (bool) payload["constrainToScale"];
         if (fields.hasProperty ("scaleRoot"))        fx.scaleRoot = juce::jlimit (0, 11, (int) payload["scaleRoot"]);
         if (fields.hasProperty ("scaleType"))        fx.scaleType = payload["scaleType"].toString();
-        if (fields.hasProperty ("chord"))            fx.chord = perf::MidiFxSettings::chordTypeFromName (payload["chord"].toString());
+        if (fields.hasProperty ("chord"))
+        {
+            // Alone, "chord" still speaks its old one-field language (off / a shape /
+            // custom keys) — the part-level setter, control pages and panels all send it.
+            // Beside "chordFollow" it only picks the follow shape.
+            const auto type = perf::MidiFxSettings::chordTypeFromName (payload["chord"].toString());
+            if (! fields.hasProperty ("chordFollow"))
+                fx.applyLegacyChord (type);
+            else if (type != perf::MidiFxSettings::ChordType::off
+                     && type != perf::MidiFxSettings::ChordType::keyChords)
+                fx.chord = type;
+        }
+        if (fields.hasProperty ("chordFollow"))      fx.chordFollow = (bool) payload["chordFollow"];
+        if (fields.hasProperty ("chordFollowLow"))   fx.chordFollowLow = juce::jlimit (0, 127, (int) payload["chordFollowLow"]);
+        if (fields.hasProperty ("chordFollowHigh"))  fx.chordFollowHigh = juce::jlimit (0, 127, (int) payload["chordFollowHigh"]);
+        if (fx.chordFollowLow > fx.chordFollowHigh)
+            std::swap (fx.chordFollowLow, fx.chordFollowHigh);
         if (fields.hasProperty ("chordInversion"))   fx.chordInversion = juce::jlimit (0, 3, (int) payload["chordInversion"]);
         if (fields.hasProperty ("chordVoicing"))     fx.chordVoicing = perf::MidiFxSettings::chordVoicingFromName (payload["chordVoicing"].toString());
         if (fields.hasProperty ("chordVoiceLeading")) fx.chordVoiceLeading = (bool) payload["chordVoiceLeading"];
+        if (fields.hasProperty ("chordBass"))        fx.chordBass = (bool) payload["chordBass"];
+        if (fields.hasProperty ("chordTopAccent"))   fx.chordTopAccent = juce::jlimit (0, 40, (int) payload["chordTopAccent"]);
+        if (fields.hasProperty ("chordKeyMap"))      fx.chordKeyMap = (bool) payload["chordKeyMap"];
+        if (fields.hasProperty ("chordSet") || fields.hasProperty ("keyMap"))
+        {
+            // The set and the map arrive whole, and go through the same reader a saved
+            // Performance does, so a key pointing past the set is dropped the same way.
+            const auto current = perf::midiFxToVar (fx);
+            auto* both = new juce::DynamicObject();
+            both->setProperty ("chordFollow", fx.chordFollow);
+            both->setProperty ("chordSet", fields.hasProperty ("chordSet") ? payload["chordSet"]
+                                                                           : current["chordSet"]);
+            both->setProperty ("keyMap", fields.hasProperty ("keyMap") ? payload["keyMap"]
+                                                                       : current["keyMap"]);
+            perf::MidiFxSettings parsed;
+            perf::midiFxFromVar (juce::var (both), parsed);
+            fx.chordSet = parsed.chordSet;
+            fx.keyMap = parsed.keyMap;
+        }
         if (fields.hasProperty ("velocityFixed"))    fx.velocityFixed = juce::jlimit (0, 127, (int) payload["velocityFixed"]);
         if (fields.hasProperty ("velocityScale"))    fx.velocityScale = juce::jlimit (0.1f, 2.0f, (float) (double) payload["velocityScale"]);
         if (fields.hasProperty ("responseProfileName"))
@@ -7466,7 +7501,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         // The chorder's capture, one arm per chord: tap the key that should carry it,
         // play the chord, done — grouped by "pressed together until released together",
-        // heard through the same observer the other learns use.
+        // heard through the same observer the other learns use. The chord joins the
+        // module's set and the key is mapped to it.
         const auto partId = payload.getProperty ("partId", {}).toString();
         if (rack.getPerformance().findPart (partId) == nullptr)
         {
@@ -7476,6 +7512,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         chordLearn = {};
         chordLearn.armed = true;
         chordLearn.partId = partId;
+        chordLearn.slotId = payload.getProperty ("slotId", {}).toString();
         {
             const std::scoped_lock lock (midiActivityLock);
             pendingChordNotes.clear();
@@ -7503,11 +7540,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
         const auto key = (int) payload.getProperty ("key", -1);
-        auto fx = part->midiFx;
-        for (int i = fx.keyChords.size(); --i >= 0;)
-            if (fx.keyChords.getReference (i).key == key)
-                fx.keyChords.remove (i);
-        rack.setPartMidiFx (partId, fx);
+        // The key forgets its chord; the chord stays in the set for other keys and pads.
+        editChordModule (partId, payload.getProperty ("slotId", {}).toString(),
+                         [key] (perf::MidiFxSettings& fx) { fx.mapKey (key, -1); return true; });
         savePerformance();
         emitState();
         return;
@@ -16049,6 +16084,37 @@ void InstrumentHostService::drainControllerEvents()
     }
 }
 
+bool InstrumentHostService::editChordModule (const juce::String& partId, const juce::String& slotId,
+                                             const std::function<bool (perf::MidiFxSettings&)>& edit)
+{
+    // Which chord module: the named slot; unnamed, the part's first Chords slot; with none,
+    // the part-level block (the old chorder, which the "fx" slot mirrors).
+    const auto* part = rack.getPerformance().findPart (partId);
+    if (part == nullptr)
+        return false;
+
+    auto chain = part->midiChain;
+    int index = -1;
+    for (int i = 0; i < chain.size() && index < 0; ++i)
+        if (slotId.isNotEmpty() ? chain.getReference (i).slotId == slotId
+                                : chain.getReference (i).type == "chord")
+            index = i;
+
+    if (index >= 0)
+    {
+        if (! edit (chain.getReference (index).fx))
+            return false;
+        return rack.setPartMidiChain (partId, std::move (chain));
+    }
+    if (slotId.isNotEmpty())
+        return false;
+
+    auto fx = part->midiFx;
+    if (! edit (fx))
+        return false;
+    return rack.setPartMidiFx (partId, fx);
+}
+
 void InstrumentHostService::emitChordLearn (bool armed, const juce::String& stage, int key,
                                             int chordSize)
 {
@@ -16114,27 +16180,29 @@ void InstrumentHostService::drainChordLearn()
             continue;
         }
 
-        // The chord itself. Capture as offsets from the target key, sorted, six voices max.
+        // The chord itself: its notes join the set (or find the identical chord already
+        // there), the key points at it, and the key-map layer switches on — learning a key
+        // chord and then not hearing it would be a strange reward.
         auto notes = chordLearn.groupNotes;
         notes.sort();
-        perf::MidiFxSettings::KeyChord captured;
-        captured.key = chordLearn.key;
-        for (const auto note : notes)
-        {
-            if (captured.offsets.size() >= perf::MidiFxChain::maxVoices)
-                break;
-            captured.offsets.add (juce::jlimit (-60, 60, note - chordLearn.key));
-        }
-
-        auto fx = part->midiFx;
-        for (int i = fx.keyChords.size(); --i >= 0;)
-            if (fx.keyChords.getReference (i).key == captured.key)
-                fx.keyChords.remove (i);
-        fx.keyChords.add (captured);
-        rack.setPartMidiFx (chordLearn.partId, fx);
-
+        while (notes.size() > perf::MidiFxChain::maxVoices)
+            notes.removeLast();
         const auto key = chordLearn.key;
-        const auto size = captured.offsets.size();
+        const auto learned = editChordModule (chordLearn.partId, chordLearn.slotId,
+            [&notes, key] (perf::MidiFxSettings& fx)
+            {
+                const auto index = fx.findOrAddSetChord (notes);
+                if (index < 0)
+                    return false;
+                fx.mapKey (key, index);
+                fx.chordKeyMap = true;
+                return true;
+            });
+        if (! learned)
+            emitError ("This chord set is full (" + juce::String (perf::MidiFxSettings::maxSetChords)
+                       + " chords) — remove one to learn another.");
+
+        const auto size = learned ? notes.size() : 0;
         chordLearn = {};
         chordLearnListening.store (false);
         savePerformance();

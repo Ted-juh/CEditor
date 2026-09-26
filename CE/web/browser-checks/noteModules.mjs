@@ -65,8 +65,52 @@ try {
     'changing an amount by hand leaves the named feels');
   assert.equal(await page.getByTestId('humanize-picture').locator('rect.stem').count(), 16, 'a bar of sixteen notes');
 
+  // Chords: the set, the builder, and the two layers
+  await add.selectOption('chord');
+  const chordRow = page.locator('[data-testid=midi-slot] .slot-name', { hasText: /^Chords/ });
+  await chordRow.click();
+  const editor = page.getByTestId('chords-editor');
+  await editor.getByTestId('chord-add').click();
+  const cards = editor.locator('[data-testid=chord-set] .set-card');
+  assert.equal(await cards.count(), 1, 'a new chord joins the set');
+  assert.match(await cards.first().innerText(), /^C\b/, 'a C major triad to start from');
+  await editor.locator('[data-testid=chord-shape] [data-shape=m7]').click();
+  await editor.getByTestId('chord-root').press('ArrowUp');
+  await editor.getByTestId('chord-root').press('ArrowUp');
+  assert.match(await cards.first().innerText(), /^Dm7/, 'shape and root rebuild the chord, and its name follows');
+  assert.equal(await editor.getByTestId('chord-builder-keys').locator('rect.on').count(), 4,
+    'the builder keyboard shows the four notes');
+  await editor.getByTestId('chord-fill').click();
+  assert.equal(await cards.count(), 8, 'the seven chords of the key join it');
+
+  await editor.locator('[data-testid=follow-shape] [data-shape=minor]').click();
+  assert.equal(await editor.getByTestId('layer-light-follow').getAttribute('aria-pressed'), 'true',
+    'picking a follow shape lights the layer');
+  assert.match(await editor.getByTestId('follow-preview').innerText(), /C4 plays Cm/);
+  await editor.getByTestId('follow-high').click();
+  await editor.getByTestId('follow-high').fill('B3');
+  await editor.getByTestId('follow-high').press('Enter');
+  await editor.getByTestId('follow-keys').locator('rect[data-note="48"]').click();
+  assert.match(await editor.getByTestId('follow-preview').innerText(), /C3 plays Cm/);
+  await editor.getByTestId('follow-keys').locator('rect[data-note="60"]').click();
+  assert.match(await editor.getByTestId('follow-preview').innerText(), /C4 plays itself/,
+    'above the follow range a key plays alone');
+
+  await editor.getByTestId('layer-tab-keys').click();
+  await editor.getByTestId('chord-learn').click();
+  const badges = editor.locator('[data-testid=key-chords] .key-badge');
+  assert.equal(await badges.count(), 1, 'learning maps a key');
+  assert.match(await badges.first().innerText(), /C4 → C/);
+  assert.equal(await editor.getByTestId('layer-light-keys').getAttribute('aria-pressed'), 'true');
+  await editor.getByTestId('keymap-keys').locator('rect[data-note="62"]').click();
+  await editor.locator('[data-testid=keymap-assign] .tile[data-index="0"]').click();
+  assert.equal(await badges.count(), 2, 'a clicked key can be pointed at any set chord');
+  assert.match(await chordRow.innerText(), /follow min.*2 mapped keys/, 'the collapsed row names both layers');
+  await editor.getByTestId('layer-light-follow').click();
+  assert.doesNotMatch(await chordRow.innerText(), /follow/, 'the light switches following off');
+
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('noteModules: strum and humanize editors draw, change and summarise');
+  console.log('noteModules: strum, humanize and chords editors draw, change and summarise');
 } finally {
   await browser.close();
   await server.close();

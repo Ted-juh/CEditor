@@ -4936,26 +4936,59 @@ test('floating and stacked editors move each processor between the two hosts', (
     'absent reads as an empty set, never undefined');
 });
 
-test('the chorder: key maps normalize, and the mock learns and clears', () => {
+test('Chords: the set and layers normalize, old key chords migrate, the mock learns and clears', () => {
   const shaped = normalizeHostState({ rack: { parts: [
     { partId: 'p1', midiFx: { chord: 'custom keys',
       keyChords: [{ key: 62, offsets: [-2, 2, 5] }] } },
   ] } });
-  assert.equal(shaped.rack.parts[0].midiFx.chord, 'custom keys');
-  assert.equal(shaped.rack.parts[0].midiFx.chordInversion, 0);
-  assert.equal(shaped.rack.parts[0].midiFx.chordVoicing, 'close');
-  assert.equal(shaped.rack.parts[0].midiFx.chordVoiceLeading, false);
-  assert.deepEqual(shaped.rack.parts[0].midiFx.keyChords, [{ key: 62, offsets: [-2, 2, 5] }]);
+  const fx = shaped.rack.parts[0].midiFx;
+  assert.equal(fx.chordKeyMap, true, 'the old "custom keys" is the key-map layer');
+  assert.equal(fx.chordFollow, false, 'and following stays off');
+  assert.equal(fx.chord, 'triad', 'custom keys is never left as a follow shape');
+  assert.deepEqual(fx.chordSet.map((c) => c.notes), [[60, 64, 67]],
+    'the learned offsets become a set chord of the notes they played');
+  assert.deepEqual(fx.keyMap, [{ key: 62, chord: 0 }]);
+  assert.equal(fx.chordInversion, 0);
+  assert.equal(fx.chordVoicing, 'close');
+  assert.equal(fx.chordVoiceLeading, false);
+  assert.equal(fx.chordFollowLow, 0);
+  assert.equal(fx.chordFollowHigh, 127);
+  const following = normalizeHostState({ rack: { parts: [{ partId: 'p1', midiFx: { chord: 'seventh' } }] } })
+    .rack.parts[0].midiFx;
+  assert.equal(following.chordFollow, true, 'an old shape is the follow layer, on');
+  assert.equal(following.chordKeyMap, false);
+  const stray = normalizeHostState({ rack: { parts: [{ partId: 'p1', midiFx: {
+    chordFollow: true, chordSet: [{ notes: [67, 60, 64] }], keyMap: [{ key: 40, chord: 0 }, { key: 41, chord: 3 }],
+  } }] } }).rack.parts[0].midiFx;
+  assert.deepEqual(stray.chordSet[0].notes, [60, 64, 67], 'set notes are sorted');
+  assert.deepEqual(stray.keyMap, [{ key: 40, chord: 0 }], 'a key pointing past the set is dropped');
   assert.deepEqual(normalizeHostState({}).rack.parts, [], 'nothing crashes on nothing');
 
   let state = mockHostState();
   const partId = state.rack.parts[0].partId;
   state = applyMockCommand(state, { cmd: 'learnKeyChord', partId });
-  const learned = state.rack.parts[0].midiFx.keyChords;
-  assert.deepEqual(learned, [{ key: 60, offsets: [0, 4, 7] }],
-    'the mock hears a triad onto middle C at once');
+  assert.deepEqual(state.rack.parts[0].midiFx.chordSet.map((c) => c.notes), [[60, 64, 67]],
+    'the mock hears a triad at once and adds it to the set');
+  assert.deepEqual(state.rack.parts[0].midiFx.keyMap, [{ key: 60, chord: 0 }], 'onto middle C');
+  assert.equal(state.rack.parts[0].midiFx.chordKeyMap, true, 'learning switches the key map on');
   state = applyMockCommand(state, { cmd: 'clearKeyChord', partId, key: 60 });
-  assert.deepEqual(state.rack.parts[0].midiFx.keyChords, [], 'clear takes it away');
+  assert.deepEqual(state.rack.parts[0].midiFx.keyMap, [], 'clear forgets the key');
+  assert.equal(state.rack.parts[0].midiFx.chordSet.length, 1, 'and keeps the chord in the set');
+
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'chord' });
+  const slot = () => state.rack.parts[0].midiChain.find((s) => s.type === 'chord');
+  state = applyMockCommand(state, { cmd: 'learnKeyChord', partId, slotId: slot().slotId });
+  assert.deepEqual(slot().fx.keyMap, [{ key: 60, chord: 0 }], 'a named Chords module learns into itself');
+  state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId: slot().slotId,
+    chordSet: [{ name: 'Home', notes: [48, 52, 55] }, { notes: [50, 53, 57] }],
+    keyMap: [{ key: 36, chord: 1 }] });
+  assert.equal(slot().fx.chordSet[0].name, 'Home', 'the set is written whole');
+  assert.deepEqual(slot().fx.keyMap, [{ key: 36, chord: 1 }], 'and so is the map');
+  state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId: slot().slotId, chord: 'off' });
+  assert.equal(slot().fx.chordFollow, false, 'chord alone still speaks its old meaning: off stops following');
+  state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId: slot().slotId, chord: 'm7' });
+  assert.equal(slot().fx.chordFollow, true, 'and a shape starts it');
+  assert.equal(slot().fx.chord, 'm7');
 });
 
 test('Smart Chorder inversion, voicing and nearest-motion rules match the native engine', () => {

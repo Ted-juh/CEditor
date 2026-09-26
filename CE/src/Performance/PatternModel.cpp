@@ -99,16 +99,85 @@ const char* MidiFxSettings::chordTypeName (ChordType type) noexcept
         case ChordType::diatonic:            return "diatonic";
         case ChordType::diatonicSeventh:     return "diatonic 7th";
         case ChordType::keyChords:           return "custom keys";
+        case ChordType::minor:               return "minor";
+        case ChordType::major7:              return "maj7";
+        case ChordType::minor7:              return "m7";
+        case ChordType::sus2:                return "sus2";
+        case ChordType::sus4:                return "sus4";
+        case ChordType::sixth:               return "6";
+        case ChordType::add9:                return "add9";
+        case ChordType::ninth:               return "9";
+        case ChordType::diminished:          return "dim";
+        case ChordType::augmented:           return "aug";
+        case ChordType::halfDiminished:      return "m7b5";
     }
     return "off";
 }
 
 MidiFxSettings::ChordType MidiFxSettings::chordTypeFromName (const juce::String& name) noexcept
 {
-    for (int i = 0; i <= (int) ChordType::keyChords; ++i)
+    for (int i = 0; i <= (int) ChordType::halfDiminished; ++i)
         if (name == chordTypeName ((ChordType) i))
             return (ChordType) i;
     return ChordType::off;
+}
+
+int MidiFxSettings::findOrAddSetChord (juce::Array<int> notes)
+{
+    notes.sort();
+    while (notes.size() > 6)
+        notes.removeLast();
+    for (int i = 0; i < chordSet.size(); ++i)
+        if (chordSet.getReference (i).notes == notes)
+            return i;
+    if (chordSet.size() >= maxSetChords || notes.isEmpty())
+        return -1;
+    SetChord chord;
+    chord.notes = std::move (notes);
+    chordSet.add (std::move (chord));
+    return chordSet.size() - 1;
+}
+
+void MidiFxSettings::mapKey (int key, int chordIndex)
+{
+    for (int i = keyMap.size(); --i >= 0;)
+        if (keyMap.getReference (i).key == key)
+            keyMap.remove (i);
+    if (juce::isPositiveAndBelow (key, 128) && juce::isPositiveAndBelow (chordIndex, chordSet.size()))
+        keyMap.add ({ key, chordIndex });
+}
+
+void MidiFxSettings::removeSetChord (int index)
+{
+    if (! juce::isPositiveAndBelow (index, chordSet.size()))
+        return;
+    chordSet.remove (index);
+    for (int i = keyMap.size(); --i >= 0;)
+    {
+        auto& mapping = keyMap.getReference (i);
+        if (mapping.chord == index)
+            keyMap.remove (i);
+        else if (mapping.chord > index)
+            --mapping.chord;
+    }
+}
+
+void MidiFxSettings::applyLegacyChord (ChordType type)
+{
+    if (type == ChordType::off)
+    {
+        chordFollow = false;
+    }
+    else if (type == ChordType::keyChords)
+    {
+        chordFollow = false;
+        chordKeyMap = true;
+    }
+    else
+    {
+        chord = type;
+        chordFollow = true;
+    }
 }
 
 const char* MidiFxSettings::chordVoicingName (ChordVoicing voicing) noexcept
@@ -1592,17 +1661,32 @@ juce::var midiFxToVar (const MidiFxSettings& fx)
     f->setProperty ("transposeMode",    fx.transposeMode);
     {
         juce::Array<juce::var> chords;
-        for (const auto& keyChord : fx.keyChords)
+        for (const auto& chord : fx.chordSet)
         {
-            juce::Array<juce::var> offsets;
-            for (const auto offset : keyChord.offsets)
-                offsets.add (offset);
-            auto* kc = new juce::DynamicObject();
-            kc->setProperty ("key", keyChord.key);
-            kc->setProperty ("offsets", offsets);
-            chords.add (juce::var (kc));
+            juce::Array<juce::var> notes;
+            for (const auto note : chord.notes)
+                notes.add (note);
+            auto* c = new juce::DynamicObject();
+            c->setProperty ("name", chord.name);
+            c->setProperty ("notes", notes);
+            c->setProperty ("root", chord.root);
+            c->setProperty ("quality", chord.quality);
+            c->setProperty ("inversion", chord.inversion);
+            c->setProperty ("voicing", chord.voicing);
+            c->setProperty ("bass", chord.bass);
+            chords.add (juce::var (c));
         }
-        f->setProperty ("keyChords", chords);
+        f->setProperty ("chordSet", chords);
+
+        juce::Array<juce::var> keys;
+        for (const auto& mapping : fx.keyMap)
+        {
+            auto* k = new juce::DynamicObject();
+            k->setProperty ("key", mapping.key);
+            k->setProperty ("chord", mapping.chord);
+            keys.add (juce::var (k));
+        }
+        f->setProperty ("keyMap", keys);
     }
     f->setProperty ("constrainToScale", fx.constrainToScale);
     f->setProperty ("scaleRoot",        fx.scaleRoot);
@@ -1611,6 +1695,12 @@ juce::var midiFxToVar (const MidiFxSettings& fx)
     f->setProperty ("chordInversion",   fx.chordInversion);
     f->setProperty ("chordVoicing",     MidiFxSettings::chordVoicingName (fx.chordVoicing));
     f->setProperty ("chordVoiceLeading", fx.chordVoiceLeading);
+    f->setProperty ("chordFollow",      fx.chordFollow);
+    f->setProperty ("chordFollowLow",   fx.chordFollowLow);
+    f->setProperty ("chordFollowHigh",  fx.chordFollowHigh);
+    f->setProperty ("chordBass",        fx.chordBass);
+    f->setProperty ("chordTopAccent",   fx.chordTopAccent);
+    f->setProperty ("chordKeyMap",      fx.chordKeyMap);
     f->setProperty ("velocityFixed",    fx.velocityFixed);
     f->setProperty ("velocityScale",    fx.velocityScale);
     f->setProperty ("responseProfileName", fx.responseProfileName);
@@ -1660,6 +1750,26 @@ void midiFxFromVar (const juce::var& stored, MidiFxSettings& out)
     out.chordVoicing     = MidiFxSettings::chordVoicingFromName (
                               stored.getProperty ("chordVoicing", "close").toString());
     out.chordVoiceLeading = (bool) stored.getProperty ("chordVoiceLeading", false);
+    out.chordFollowLow   = intOf (stored, "chordFollowLow", 0, 0, 127);
+    out.chordFollowHigh  = intOf (stored, "chordFollowHigh", 127, 0, 127);
+    if (out.chordFollowLow > out.chordFollowHigh)
+        std::swap (out.chordFollowLow, out.chordFollowHigh);
+    out.chordBass        = (bool) stored.getProperty ("chordBass", false);
+    out.chordTopAccent   = intOf (stored, "chordTopAccent", 0, 0, 40);
+    if (stored.hasProperty ("chordFollow"))
+    {
+        out.chordFollow  = (bool) stored.getProperty ("chordFollow", true);
+        out.chordKeyMap  = (bool) stored.getProperty ("chordKeyMap", false);
+    }
+    else
+    {
+        // Saved before the layers: the one field said everything.
+        out.chordFollow = true;
+        out.chordKeyMap = false;
+        out.applyLegacyChord (out.chord);
+    }
+    if (out.chord == MidiFxSettings::ChordType::keyChords)
+        out.chord = MidiFxSettings::ChordType::triad;
     out.velocityFixed    = intOf (stored, "velocityFixed", 0, 0, 127);
     out.velocityScale    = floatOf (stored, "velocityScale", 1.0f, 0.1f, 2.0f);
     out.responseProfileName = stored.getProperty ("responseProfileName", {}).toString()
@@ -1707,20 +1817,47 @@ void midiFxFromVar (const juce::var& stored, MidiFxSettings& out)
             out.expressionCurveValues.add (juce::jlimit (0, 127, (int) value));
         }
 
+    out.chordSet.clear();
+    out.keyMap.clear();
+    if (const auto* chords = stored.getProperty ("chordSet", {}).getArray())
+        for (const auto& entry : *chords)
+        {
+            if (out.chordSet.size() >= MidiFxSettings::maxSetChords)
+                break;
+            MidiFxSettings::SetChord chord;
+            chord.name = entry.getProperty ("name", {}).toString().substring (0, 40);
+            if (const auto* notes = entry.getProperty ("notes", {}).getArray())
+                for (const auto& note : *notes)
+                    if (chord.notes.size() < 6)
+                        chord.notes.add (juce::jlimit (0, 127, (int) note));
+            chord.notes.sort();
+            chord.root = intOf (entry, "root", -1, -1, 127);
+            chord.quality = entry.getProperty ("quality", {}).toString();
+            chord.inversion = intOf (entry, "inversion", 0, 0, 3);
+            chord.voicing = entry.getProperty ("voicing", "close").toString();
+            chord.bass = (bool) entry.getProperty ("bass", false);
+            // An empty chord still holds its place: the key map counts by index.
+            out.chordSet.add (std::move (chord));
+        }
+    if (const auto* keys = stored.getProperty ("keyMap", {}).getArray())
+        for (const auto& entry : *keys)
+            out.mapKey (intOf (entry, "key", -1, -1, 127), intOf (entry, "chord", -1, -1, 1000));
+
+    // Saved before the set: each learned key chord (offsets from its key) becomes a set
+    // chord of the notes it played, and the key points at it.
     if (const auto* chords = stored.getProperty ("keyChords", {}).getArray())
         for (const auto& entry : *chords)
         {
-            MidiFxSettings::KeyChord keyChord;
-            keyChord.key = juce::jlimit (0, 127, (int) entry.getProperty ("key", 60));
+            const auto key = juce::jlimit (0, 127, (int) entry.getProperty ("key", 60));
+            juce::Array<int> notes;
             if (const auto* offsets = entry.getProperty ("offsets", {}).getArray())
                 for (const auto& offset : *offsets)
-                {
-                    if (keyChord.offsets.size() >= 6)
-                        break;
-                    keyChord.offsets.add (juce::jlimit (-60, 60, (int) offset));
-                }
-            if (! keyChord.offsets.isEmpty())
-                out.keyChords.add (std::move (keyChord));
+                    notes.add (juce::jlimit (0, 127, key + juce::jlimit (-60, 60, (int) offset)));
+            if (notes.isEmpty())
+                continue;
+            const auto index = out.findOrAddSetChord (notes);
+            if (index >= 0)
+                out.mapKey (key, index);
         }
 }
 

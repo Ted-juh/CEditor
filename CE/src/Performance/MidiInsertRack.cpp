@@ -31,10 +31,17 @@ namespace
         else if (slot.type == "chord")
         {
             out.chord = slot.fx.chord;
+            out.chordFollow = slot.fx.chordFollow;
+            out.chordFollowLow = slot.fx.chordFollowLow;
+            out.chordFollowHigh = slot.fx.chordFollowHigh;
             out.chordInversion = slot.fx.chordInversion;
             out.chordVoicing = slot.fx.chordVoicing;
             out.chordVoiceLeading = slot.fx.chordVoiceLeading;
-            out.keyChords = slot.fx.keyChords;
+            out.chordBass = slot.fx.chordBass;
+            out.chordTopAccent = slot.fx.chordTopAccent;
+            out.chordKeyMap = slot.fx.chordKeyMap;
+            out.chordSet = slot.fx.chordSet;
+            out.keyMap = slot.fx.keyMap;
             // Diatonic chords are chosen per scale degree, so the chorder reads the scale
             // even when it is not folding anything into it.
             out.scaleType = slot.fx.scaleType;

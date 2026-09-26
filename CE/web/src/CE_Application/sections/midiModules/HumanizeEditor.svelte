@@ -35,7 +35,7 @@
                  value={feel} label="Feel" testid="humanize-feel" onchange={pickFeel} />
       <span class="sub">{feel ? 'a named feel — fine-tune below' : 'your own amounts'}</span>
     </div>
-    <button type="button" class="again" onclick={() => (seed = (seed * 48271) % 2147483647)}
+    <button type="button" class="ctl again" onclick={() => (seed = (seed * 48271) % 2147483647)}
             title="Show another bar with the same amounts">↻ another bar</button>
   </div>
 
