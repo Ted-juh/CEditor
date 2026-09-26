@@ -81,6 +81,24 @@ test('the preview runs the file the app embeds, not a copy of it', () => {
   assert.match(vite, /tools\/ctrl49/, 'the dev server may read that directory');
 });
 
+test('the images the keyboard tints are grey palette PNGs, the only kind it tints', () => {
+  // An RGBA PNG decodes to a colour buffer on the CTRL49 and draw_image's colour is ignored:
+  // the logo and every knob came out white on the hardware. VIP's own tinted images (captured
+  // from its uploads) are all 8-bit palette PNGs of greys.
+  for (const file of ['knob_strip.png', 'hostage_logo.png']) {
+    const png = fs.readFileSync(new URL(`../../../tools/ctrl49/${file}`, import.meta.url));
+    assert.equal(png[24], 8, `${file} is 8-bit`);
+    assert.equal(png[25], 3, `${file} is a palette PNG`);
+    const at = png.indexOf('PLTE');
+    const length = png.readUInt32BE(at - 4);
+    for (let i = 0; i < length; i += 3) {
+      const [r, g, b] = [png[at + 4 + i], png[at + 5 + i], png[at + 6 + i]];
+      assert.ok(r === g && g === b, `${file}'s palette is greys only`);
+    }
+    assert.equal(png.indexOf('tRNS'), -1, `${file} carries coverage in the grey, not in transparency`);
+  }
+});
+
 test('every function the broker calls is one the page defines', () => {
   const lua = read('../../../tools/ctrl49/Hostage_MultiKnob.lua');
   const broker = read('../../src/ControlSurface/Ctrl49SurfaceBroker.cpp');

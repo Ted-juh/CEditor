@@ -13,10 +13,14 @@ import { ScreenDrawApi } from './screenDrawApi.js';
 
 // Load as an ImageBitmap (exact pixels) rather than an HTMLImageElement: a tall filmstrip
 // used as a drawImage source can be downscaled/mis-sampled at high source-Y as an <img>.
+// The PNG's colour type decides whether the device can tint it (see ScreenDrawApi.decode_image):
+// greyscale (0) or palette (3) can, colour cannot. IHDR's colour type is byte 25 of the file.
 async function loadImage(src) {
   const res = await fetch(src);
   const blob = await res.blob();
-  return createImageBitmap(blob);
+  const head = new Uint8Array(await blob.slice(0, 26).arrayBuffer());
+  const tintable = head[25] === 0 || head[25] === 3;
+  return { image: await createImageBitmap(blob), tintable };
 }
 
 // A host function returning null crashes wasmoon's promise extension; normalise to nil.

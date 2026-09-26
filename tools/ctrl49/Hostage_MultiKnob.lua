@@ -115,13 +115,18 @@ end
 -- device will not draw it, the error must not take the rest of the splash with it: on the first
 -- hardware run the keyboard showed a black screen here while the app's preview showed the logo.
 -- So the text goes first, the logo is attempted under pcall, and the wordmark in type stands in
--- when it fails. The logo carries its own orange: tinted at draw time, a white mask came out
--- white on the keyboard, so the colour is in the image and the tint is white (no change).
+-- when it fails.
+--
+-- COLOUR. The device tints an image only if it decodes to an 8-bit buffer, and it does that only
+-- for an 8-bit grey palette PNG, the grey level being coverage: every image VIP tints is one (its
+-- arc filmstrips, arrows, tabs), and VIP says so beside its decode_image ("Passing white to create
+-- an 8-bit buffer"). An RGBA PNG decodes to colour and the tint is ignored, which is why the logo
+-- and every knob came out white. Both images are grey palette PNGs now; see make_filmstrip.py.
 local function draw_splash()
     draw_text(SPLASH, 0, 180, 480, 24)
     local drawn = false
     if pcall then
-        drawn = pcall(draw_image, 18, LOGO_DECODED_ID, 20, 84, 0, 0, 440, 80, WHITE)
+        drawn = pcall(draw_image, 18, LOGO_DECODED_ID, 20, 84, 0, 0, 440, 80, ORANGE)
     end
     if not drawn then
         draw_text(WORDMARK, 0, 84, 480, 80)
