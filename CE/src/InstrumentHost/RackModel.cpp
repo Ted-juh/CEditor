@@ -33,19 +33,104 @@ ControlPage ControlPage::create (const juce::String& name, int numSlots)
     return page;
 }
 
-ControlSlot* ControlPage::findSurfaceSlot (const juce::String& kind, int index)
+ControlSlot* ControlPage::findSurfaceSlot (const juce::String& kind, int index, int layer)
 {
     if (index < 0)
         return nullptr;
     for (auto& slot : slots)
-        if (slot.kind == kind && slot.index == index)
+        if (slot.kind == kind && slot.index == index && slot.layer == layer)
             return &slot;
     return nullptr;
 }
 
-const ControlSlot* ControlPage::findSurfaceSlot (const juce::String& kind, int index) const
+const ControlSlot* ControlPage::findSurfaceSlot (const juce::String& kind, int index, int layer) const
 {
-    return const_cast<ControlPage*> (this)->findSurfaceSlot (kind, index);
+    return const_cast<ControlPage*> (this)->findSurfaceSlot (kind, index, layer);
+}
+
+int padLayerColour (int layer)
+{
+    switch (layer)
+    {
+        case 0:  return 0xFFA500;   // the CTRL49's stock orange, as the VIP profile paints it
+        case 1:  return 0x00C8FF;
+        case 2:  return 0xE040FF;
+        default: return 0x40FF60;
+    }
+}
+
+int ControlPage::padLayerCount (int padIndex) const
+{
+    const auto found = padLayers.find (padIndex);
+    return found != padLayers.end() ? found->second.count : 1;
+}
+
+int ControlPage::activePadLayer (int padIndex) const
+{
+    const auto found = padLayers.find (padIndex);
+    return found != padLayers.end() ? found->second.active : 0;
+}
+
+void ControlPage::setPadLayerCount (int padIndex, int count)
+{
+    auto& layers = padLayers[padIndex];
+    layers.count = juce::jlimit (1, maxPadLayers, count);
+    // A pad cannot be left playing a layer it no longer has.
+    if (layers.active >= layers.count)
+        layers.active = 0;
+    if (layers.count == 1 && layers.active == 0)
+        padLayers.erase (padIndex);     // the default says the same thing, and writes nothing
+}
+
+bool ControlPage::setActivePadLayer (int padIndex, int layer)
+{
+    if (layer < 0 || layer >= padLayerCount (padIndex))
+        return false;
+    if (layer == 0 && padLayerCount (padIndex) == 1)
+        return true;
+    padLayers[padIndex].active = layer;
+    return true;
+}
+
+int ControlPage::cyclePadLayer (int padIndex)
+{
+    const auto count = padLayerCount (padIndex);
+    if (count <= 1)
+        return 0;
+    auto& layers = padLayers[padIndex];
+    layers.active = (layers.active + 1) % count;
+    return layers.active;
+}
+
+void ControlPage::setFaderLayerCount (int count)
+{
+    faderLayers.count = juce::jlimit (1, maxPadLayers, count);
+    if (faderLayers.active >= faderLayers.count)
+        faderLayers.active = 0;
+}
+
+bool ControlPage::setActiveFaderLayer (int layer)
+{
+    if (layer < 0 || layer >= faderLayers.count)
+        return false;
+    faderLayers.active = layer;
+    return true;
+}
+
+int ControlPage::stepFaderLayer (int delta)
+{
+    const auto count = faderLayers.count;
+    faderLayers.active = ((faderLayers.active + delta) % count + count) % count;
+    return faderLayers.active;
+}
+
+bool ControlPage::isLive (const ControlSlot& slot) const
+{
+    if (slot.kind == "pad")
+        return slot.layer == activePadLayer (slot.index);
+    if (slot.kind == "fader")
+        return slot.layer == faderLayers.active;
+    return true;
 }
 
 ControlSlot* ControlPage::findSlot (const juce::String& slotId)
@@ -567,7 +652,23 @@ juce::var Performance::toVar() const
             s->setProperty ("midiPickup",  slot.midiPickup);
             s->setProperty ("midiRelative", slot.midiRelative);
             s->setProperty ("latched",     slot.latched);
+            // Written only when they say something, so a page without layers or colours
+            // reads exactly as it did before either existed.
+            if (slot.layer != 0)
+                s->setProperty ("layer",   slot.layer);
+            if (slot.colour >= 0)
+                s->setProperty ("colour",  slot.colour);
             slotVars.add (juce::var (s));
+        }
+
+        juce::Array<juce::var> padLayerVars;
+        for (const auto& [padIndex, layers] : page.padLayers)
+        {
+            auto* l = new juce::DynamicObject();
+            l->setProperty ("index",  padIndex);
+            l->setProperty ("count",  layers.count);
+            l->setProperty ("active", layers.active);
+            padLayerVars.add (juce::var (l));
         }
 
         auto* pg = new juce::DynamicObject();
@@ -576,6 +677,15 @@ juce::var Performance::toVar() const
         pg->setProperty ("generated", page.generated);
         pg->setProperty ("generatedForPartId", page.generatedForPartId);
         pg->setProperty ("slots",  slotVars);
+        if (! padLayerVars.isEmpty())
+            pg->setProperty ("padLayers", padLayerVars);
+        if (page.faderLayers.count > 1)
+        {
+            auto* f = new juce::DynamicObject();
+            f->setProperty ("count",  page.faderLayers.count);
+            f->setProperty ("active", page.faderLayers.active);
+            pg->setProperty ("faderLayers", juce::var (f));
+        }
         pageVars.add (juce::var (pg));
     }
 
@@ -1554,7 +1664,8 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
                     // which is the join those pages were built on and must keep.
                     {
                         const auto kind = s.getProperty ("kind", {}).toString();
-                        slot.kind = (kind == "fader" || kind == "pad") ? kind : juce::String ("encoder");
+                        slot.kind = (kind == "fader" || kind == "pad" || kind == "button")
+                                      ? kind : juce::String ("encoder");
                         const auto index = (int) s.getProperty ("index", -1);
                         if (index >= 0)
                             slot.index = juce::jmin (127, index);
@@ -1581,8 +1692,32 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
                     slot.midiPickup  = (bool) s.getProperty ("midiPickup", false);
                     slot.midiRelative = (bool) s.getProperty ("midiRelative", false);
                     slot.latched     = (bool) s.getProperty ("latched", false);
+                    // Only pads and faders have layers; anything else claiming one is a hand
+                    // edit, and reads as the single layer it can actually be.
+                    slot.layer = (slot.kind == "pad" || slot.kind == "fader")
+                                   ? juce::jlimit (0, ControlPage::maxPadLayers - 1,
+                                                   (int) s.getProperty ("layer", 0))
+                                   : 0;
+                    const auto colour = (int) s.getProperty ("colour", -1);
+                    slot.colour = colour >= 0 ? (colour & 0xFFFFFF) : -1;
                     page.slots.add (std::move (slot));
                 }
+
+            if (const auto* layerArray = pg.getProperty ("padLayers", {}).getArray())
+                for (const auto& l : *layerArray)
+                {
+                    const auto padIndex = (int) l.getProperty ("index", -1);
+                    if (padIndex < 0 || padIndex > 127)
+                        continue;
+                    page.setPadLayerCount (padIndex, (int) l.getProperty ("count", 1));
+                    page.setActivePadLayer (padIndex, (int) l.getProperty ("active", 0));
+                }
+
+            if (const auto faders = pg.getProperty ("faderLayers", {}); faders.isObject())
+            {
+                page.setFaderLayerCount ((int) faders.getProperty ("count", 1));
+                page.setActiveFaderLayer ((int) faders.getProperty ("active", 0));
+            }
 
             parsed.pages.add (std::move (page));
         }

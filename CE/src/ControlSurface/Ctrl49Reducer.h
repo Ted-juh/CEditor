@@ -35,6 +35,12 @@ struct Ctrl49Action
     int  encoderSlot  = -1;    // 0..7 when encoderMoved
     int  encoderDelta = 0;     // signed detents when encoderMoved
     bool pageChanged  = false; // page navigation (mode buttons, Page Left/Right)
+    // One of the eight small buttons above the pads (CC 19..26, printed 1/4 .. 1/32T), pressed
+    // or released — not while Time Division is held, when they choose a division instead. The
+    // release is reported so a host can tell a long press from a short one.
+    bool switchChanged = false;
+    int  switchSlot    = -1;   // 0..7 when switchChanged
+    bool switchDown    = false;
     std::string text;          // human-readable description for logging
 };
 

@@ -13,6 +13,7 @@ namespace
 {
 using ceditor::ctrl49::Bytes;
 using ceditor::ctrl49::Ctrl49Reducer;
+using ceditor::ctrl49::buildKeepalive;
 
 int failures = 0;
 
@@ -48,9 +49,12 @@ int main()
         feed (r, 0xB0, 0x0B, 0x7F);
         check (r.displayArguments()[6] == 64, "Relative encoder decrement interpreted as -1");
 
-        feed (r, 0xB0, 0x14, 0x7F);
+        const std::uint8_t switch2[3] { 0xB0, 0x14, 0x7F };
+        const auto pressed = r.process (switch2, 3);
         check (r.activeSlot() == 1 && r.displayArguments()[15] == 1,
                "Switch 2 selects and toggles slot 2 on");
+        check (pressed.has_value() && pressed->switchChanged && pressed->switchSlot == 1 && pressed->switchDown,
+               "and reports the press, for timing");
 
         feed (r, 0xB0, 0x28, 0x7F);
         check (r.page() == 1, "Page Right selects page 2");
@@ -69,8 +73,11 @@ int main()
                "Pad strike produces a pad-feedback action (velocity 99)");
 
         feed (r, 0xB0, 0x39, 0x7F);           // Time Division down
-        feed (r, 0xB0, 0x15, 0x7F);           // Encoder switch 3 -> division 3
+        const std::uint8_t switch3[3] { 0xB0, 0x15, 0x7F };  // Switch 3 -> division 3
+        const auto division = r.process (switch3, 3);
         check (r.division() == 3, "Time Division + Switch 3 retained as division 3");
+        check (division.has_value() && ! division->switchChanged,
+               "and is a division choice, not a switch press anybody should time");
 
         check (r.displayArguments().size() == 22, "Display-state payload is exactly 22 bytes");
     }
@@ -82,8 +89,14 @@ int main()
         const std::uint8_t shortMsg[2] { 0xB0, 0x0B };
         check (! r.process (shortMsg, 2).has_value(), "Sub-3-byte message produces no action");
         check (! r.process (nullptr, 0).has_value(), "Null message produces no action");
+        // The release changes no state and asks for no redraw — it is only reported, so a host
+        // can tell a long press from a short one.
         const std::uint8_t switchUp[3] { 0xB0, 0x13, 0x00 };
-        check (! r.process (switchUp, 3).has_value(), "Encoder-switch release produces no action");
+        const auto released = r.process (switchUp, 3);
+        check (released.has_value() && ! released->render && released->switchChanged
+                   && released->switchSlot == 0 && ! released->switchDown
+                   && r.displayArguments()[14] == 0,
+               "Switch release is reported, changes nothing and redraws nothing");
     }
 
     {   // --- per-page value isolation --------------------------------------------------------------
@@ -212,6 +225,42 @@ int main()
         check (sawPngObject, "PNG asset uploaded as an object of type 0x000E");
         check (lastBeginBeforeBind >= 0 && bindIndex > lastBeginBeforeBind,
                "All object uploads (Lua + PNG) precede the bind");
+    }
+
+    {   // --- keepalives during a long upload: opt-in, and nothing else moves ---------------------
+        Bytes rawLua (600, static_cast<std::uint8_t> ('-'));
+        Bytes png (512 * 10, static_cast<std::uint8_t> (0x7E));   // ~11 chunk frames
+        const std::vector<Ctrl49Session::PngAsset> assets { { 0x0200, png } };
+        const auto keepalive = buildKeepalive();
+        const auto countKeepalives = [&keepalive] (const std::vector<Ctrl49Session::TimedFrame>& seq)
+        {
+            int n = 0;
+            for (const auto& step : seq) n += step.frame == keepalive ? 1 : 0;
+            return n;
+        };
+
+        const auto proven = Ctrl49Session::buildStartupSequence (rawLua, assets);
+        const auto interleaved = Ctrl49Session::buildStartupSequence (rawLua, assets, 4);
+        const auto same = [] (const std::vector<Ctrl49Session::TimedFrame>& a,
+                              const std::vector<Ctrl49Session::TimedFrame>& b)
+        {
+            if (a.size() != b.size()) return false;
+            for (std::size_t i = 0; i < a.size(); ++i)
+                if (a[i].frame != b[i].frame || a[i].pauseMs != b[i].pauseMs) return false;
+            return true;
+        };
+        check (same (proven, Ctrl49Session::buildStartupSequence (rawLua, assets, 0)),
+               "without the option the startup sequence is the proven one, unchanged");
+        const auto extra = countKeepalives (interleaved) - countKeepalives (proven);
+        check (extra >= 2, "with it, keepalives are interleaved into the PNG upload");
+        check (interleaved.size() == proven.size() + (std::size_t) extra,
+               "and nothing is added but keepalives");
+        std::vector<Bytes> provenFrames, interleavedFrames;
+        for (const auto& step : proven) provenFrames.push_back (step.frame);
+        for (const auto& step : interleaved) if (step.frame != keepalive) interleavedFrames.push_back (step.frame);
+        std::vector<Bytes> provenWithout;
+        for (const auto& f : provenFrames) if (f != keepalive) provenWithout.push_back (f);
+        check (interleavedFrames == provenWithout, "every upload frame is still there, in order");
     }
 
     std::cout << "-------------------\n"

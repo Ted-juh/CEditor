@@ -944,6 +944,21 @@ target_include_directories(CEditorCtrl49ReducerTests PRIVATE
 add_test(NAME Ctrl49Reducer COMMAND CEditorCtrl49ReducerTests)
 ce_configure_test(CEditorCtrl49ReducerTests)
 
+# CTRL49 screen lab payloads (Ctrl49ScreenLab.h): what the lab tool sends its pages, checked
+# where no keyboard is needed. Header-only, pure std.
+add_executable(CEditorCtrl49ScreenLabTests
+    "${CE_ROOT}/tests/Ctrl49ScreenLabTests.cpp"
+)
+
+target_compile_features(CEditorCtrl49ScreenLabTests PRIVATE cxx_std_23)
+
+target_include_directories(CEditorCtrl49ScreenLabTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+add_test(NAME Ctrl49ScreenLab COMMAND CEditorCtrl49ScreenLabTests)
+ce_configure_test(CEditorCtrl49ScreenLabTests)
+
 # CTRL49 rack surface display payloads + the reducer's normalized control events (Stage 3).
 # Pure std like the protocol tests; the payload shapes follow contracts proven on hardware.
 add_executable(CEditorCtrl49RackDisplayTests
@@ -1118,6 +1133,20 @@ if(WIN32)
     target_compile_features(Ctrl49KnobTest PRIVATE cxx_std_23)
     target_include_directories(Ctrl49KnobTest PRIVATE "${CE_ROOT}/src")
     target_link_libraries(Ctrl49KnobTest PRIVATE winmm)
+
+    # CTRL49 screen lab (tools/ctrl49/screen-lab): a showcase of baked-PNG pages, and a stress
+    # page that raises the drawing load until the screen stutters, to measure its limits.
+    add_executable(Ctrl49ScreenLab
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49ScreenLab.cpp"
+    )
+    target_compile_features(Ctrl49ScreenLab PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49ScreenLab PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49ScreenLab PRIVATE winmm)
 
     # CTRL49 -> real synth first light (Phase 4): encoder 1 drives a device-profile
     # parameter (GAIA cutoff) via the DeviceProfile intent compiler. Links juce_core.

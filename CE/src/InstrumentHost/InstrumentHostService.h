@@ -14,6 +14,7 @@
 #include "InstrumentRackHost.h"
 #include "HostEditHistory.h"
 #include "MidiPickup.h"
+#include "MackieControl.h"
 #include "SetlistSoundcheck.h"
 #include "ParameterModel.h"
 #include "Library.h"
@@ -513,6 +514,41 @@ public:
         position to snap to. Returns false, moving nothing, for an unknown, unassigned or
         unresolved slot. */
     bool nudgeControlSlot (const juce::String& pageId, const juce::String& slotId, int delta);
+
+    /** A long press on a pad's layer button: the pad steps to its next layer, wrapping at its
+        count. Returns the layer now active, or -1 for an unknown page. */
+    int cyclePadLayer (const juce::String& pageId, int padIndex);
+
+    /** The colour a pad should be lit on the hardware, 0xRRGGBB with its state already in the
+        brightness: the active layer's colour at full strength when it is assigned (and ON, for
+        a latching pad), a third of it for a latching pad that is off, a tenth for an empty
+        layer of a pad that has several (so the layer still reads), and dark for a plain empty
+        pad. An assignment that no longer resolves is dim red. */
+    int padLight (const juce::String& pageId, int padIndex) const;
+
+    /** A pad struck (down) or released on the surface's own port: drives the slot on the pad's
+        active layer the way a learned note would — momentary follows the pad, a latching pad
+        flips on the strike. Skipped (false) when that slot has a learned binding, because the
+        learned path already plays it and a toggle driven twice is a toggle that did nothing. */
+    bool pressSurfacePad (const juce::String& pageId, int padIndex, bool down)
+    { return pressSurfaceControl (pageId, "pad", padIndex, down); }
+    /** The same for any pressable control — a pad or a button, on the layer it is playing. */
+    bool pressSurfaceControl (const juce::String& pageId, const juce::String& kind, int index, bool down);
+
+    /** A fader on the surface's own section moved to position 0..1 (minimum/maximum: what it
+        swept through since the last call). Drives the fader slot on the active fader layer,
+        with soft takeover always on: these faders have no motors, so after a page or layer
+        change the fader only takes over once it reaches the value it would otherwise jump. */
+    bool moveSurfaceFader (const juce::String& pageId, int faderIndex, float position,
+                           float minimum, float maximum);
+
+    /** Bank ◀ ▶: the whole fader bank steps to its previous or next layer. Returns the layer now
+        active, -1 for an unknown page. */
+    int stepFaderLayer (const juce::String& pageId, int delta);
+
+    /** Whether HoSTage reads Mackie Control / HUI ports as controls (the default) rather than
+        passing them to the instruments as MIDI. Persisted in mackie-section.json. */
+    bool mackieSectionEnabled() const { return mackieSection.load(); }
 
     /** The surface broker reports manual page changes so a captured scene can remember the
         layout the player was actually looking at. Recall is a one-shot request: consuming it
@@ -1619,6 +1655,22 @@ private:
         InstrumentHostService& owner;
     };
     MidiActivityObserver midiObserver { *this };
+
+    /** Stands between the MIDI inputs and the player, so a Mackie section being read as
+        controls never also reaches the instruments as pitch bend and notes. Everything else
+        passes straight through. */
+    struct MidiPlayerGate : juce::MidiInputCallback
+    {
+        explicit MidiPlayerGate (InstrumentHostService& ownerToUse) : owner (ownerToUse) {}
+        void handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message) override
+        {
+            if (source != nullptr && owner.mackieSection.load() && mackie::isMackiePort (source->getName()))
+                return;
+            owner.player.handleIncomingMidiMessage (source, message);
+        }
+        InstrumentHostService& owner;
+    };
+    MidiPlayerGate playerGate { *this };
     // Written on the MIDI thread, drained on the controlling thread; the mutex spans a few
     // string copies, far from any audio path.
     std::mutex midiActivityLock;
@@ -1724,6 +1776,29 @@ private:
         note, false the rest of the time so ordinary playing costs the MIDI thread nothing. */
     std::atomic<bool> slotNotesWanted { false };
     void refreshSlotNoteListening();
+    /** After a pad or the fader bank changes layer: re-listen, drop stale pickups, save, and
+        tell the page. */
+    void surfaceLayerChanged (const juce::String& pageId);
+
+    // -- the Mackie section ---------------------------------------------------------------
+    std::atomic<bool> mackieSection { true };
+    juce::File mackieSectionFile() const { return options.dataDirectory.getChildFile ("mackie-section.json"); }
+    void loadMackieSection();
+    bool saveMackieSection() const;
+    // Decoded on the MIDI thread, applied on the controlling thread (drainMackieEvents), under
+    // midiActivityLock. A fader sweep between drains is one entry with its latest position
+    // and extremes, as a knob's is.
+    struct PendingMackie
+    {
+        mackie::Event event;
+        float minimum = 0.0f, maximum = 0.0f;
+    };
+    std::vector<PendingMackie> pendingMackie;
+    void drainMackieEvents();
+    /** The page the hardware is looking at: the one the surface broker last reported, else the
+        first. Empty when there are no pages. */
+    juce::String hardwarePageId() const;
+    std::map<std::pair<juce::String, juce::String>, MidiPickup> faderPickups;
 
     // Last arp playhead step announced per part, so the drain only speaks on change.
     std::map<juce::String, int> lastArpStepByPart;

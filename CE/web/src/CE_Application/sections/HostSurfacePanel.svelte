@@ -35,6 +35,8 @@
     hostMidiLearn, cancelMidiLearn, clearControlSlotMidi,
     hostParamDrag, clearControlSlot, hostParameters, requestParameters,
     filterParameters, parameterShortlist, surfaceControlSlot, assignSurfaceControl, learnSurfaceControl,
+    padLayers, padColourCss, surfaceSlotId, setPadLayers, setPadActiveLayer, MAX_PAD_LAYERS,
+    setFaderLayers, setFaderActiveLayer,
     setControlSlotOptions, focusRackPart,
     setUserSurface, clearUserSurface, learnUserSurface, finishUserSurfaceLearn,
     addControlPage, removeControlPage, renameControlPage, generateControlPages, ctrl49Screen,
@@ -100,7 +102,7 @@
 
   const kindLabel = {
     encoder: 'Encoder', pad: 'Pad', fader: 'Fader', button: 'Button',
-    wheel: 'Wheel', keys: 'Keys', display: 'Screen',
+    wheel: 'Wheel', keys: 'Keys', display: 'Screen', dial: 'Dial',
   };
 
   // --- what each control currently does ------------------------------------------------
@@ -145,16 +147,43 @@
     layout.controls.find((control) => control.controlId === selectedControlId) ?? null);
   let selectedSlot = $derived(selectedControl ? slotFor(selectedControl) : null);
 
-  // A control the runtime can reach: an encoder, a fader or a pad the layout gave an index.
-  // Encoders have a slot from the day the page was made; a fader or a pad gets one minted
-  // the first time something lands on it, so "no slot yet" is not "cannot be assigned".
+  // A control the runtime can reach: an encoder, a fader, a pad or a button the layout gave an
+  // index. Encoders have a slot from the day the page was made; the rest get one minted the
+  // first time something lands on them, so "no slot yet" is not "cannot be assigned".
   const addressable = (control) =>
-    control.index >= 0 && ['encoder', 'fader', 'pad'].includes(control.kind);
+    control.index >= 0 && ['encoder', 'fader', 'pad', 'button'].includes(control.kind);
+  // Pressed rather than moved: momentary or latching.
+  const pressable = (control) => control.kind === 'pad' || control.kind === 'button';
+
+  // A pad's layers on this page (count, and the one it is playing); one layer for any other.
+  // The faders share one set of layers, stepped together by Bank ◀ ▶.
+  const layersOf = (control) => control.kind === 'pad' ? padLayers(page, control.index)
+    : control.kind === 'fader' ? (page?.faderLayers ?? { count: 1, active: 0 }) : { count: 1, active: 0 };
+  let faderLayerCount = $derived(page?.faderLayers?.count ?? 1);
+  let faderLayerActive = $derived(page?.faderLayers?.active ?? 0);
 
   const learningControl = (control) => $hostMidiLearn.armed
     && $hostMidiLearn.pageId === (page?.pageId ?? '')
     && ($hostMidiLearn.slotId === slotFor(control)?.slotId
-      || $hostMidiLearn.slotId === `${control.kind}-${control.index + 1}`);
+      || $hostMidiLearn.slotId === surfaceSlotId(control.kind, control.index, layersOf(control).active));
+
+  // A pad is lit in its layer's colour — the colour chosen for it, or the layer's default —
+  // exactly as the host lights the real one (InstrumentHostService::padLight), so the drawing
+  // and the keyboard agree about which layer every pad is on. Left to the state classes when
+  // there is something they must say instead: the pad you are hitting, or an assignment gone.
+  function padStyle(control, slot) {
+    if (control.kind !== 'pad' || control.index < 0) return '';
+    if (slot && litSlotId === slot.slotId) return '';
+    const layers = layersOf(control);
+    if (slot?.assigned) return slot.resolved ? `--led:${padColourCss(slot, layers.active)};` : '';
+    return layers.count > 1 ? `--led:${padColourCss(null, layers.active)};` : '';
+  }
+  // One pip per layer, in that layer's colour, the one playing drawn full.
+  const layerPips = (control) => Array.from({ length: layersOf(control).count }, (_, layer) => ({
+    layer,
+    active: layer === layersOf(control).active,
+    colour: padColourCss(surfaceControlSlot(page, control, layer), layer),
+  }));
   let mappedCount = $derived(layout.controls.filter((control) => addressable(control)
     && slotFor(control)?.assigned && slotFor(control)?.resolved).length);
 
@@ -184,17 +213,43 @@
     const what = kindLabel[control.kind] ?? control.kind;
     const named = control.label ? `${what} ${control.label}` : what;
     if (control.index < 0) return `${named} — on the keyboard, but CEditor does not map it`;
+    const layers = layersOf(control);
+    const onLayer = layers.count > 1 ? ` (layer ${layers.active + 1} of ${layers.count})` : '';
 
     const slot = slotFor(control);
     const bound = slot?.midiNote >= 0 ? ` · note ${slot.midiNote}` : slot?.midiCc >= 0 ? ` · CC ${slot.midiCc}` : '';
     if (slot?.assigned)
-      return `${named} — ${slot.displayName}${slot.partName ? ` (${slot.partName})` : ''}${bound}`
+      return `${named}${onLayer} — ${slot.displayName}${slot.partName ? ` (${slot.partName})` : ''}${bound}`
              + (slot.resolved ? '' : ' — the part no longer has this parameter')
              + (slot.toggle ? (slot.latched ? ' — latching, ON' : ' — latching, off') : '')
              + '\nClick to inspect, or drop a parameter here to reassign it.';
     if (addressable(control))
-      return `${named} — unassigned. Click to inspect, or drag a parameter onto it.`;
+      return `${named}${onLayer} — unassigned. Click to inspect, or drag a parameter onto it.`;
     return `${named} — CEditor addresses this as ${control.kind} ${control.index}`;
+  }
+
+  // --- what the controls look like ------------------------------------------------------
+  //
+  // Each kind is drawn as the hardware it is: a knurled knob with an LED arc, a rubber pad
+  // with a backlit edge, a fader cap in its slot, a keybed with black keys. The look is per
+  // KIND, never per device, so every profile (and every controller somebody describes) gets
+  // it from the same layout data, and nothing here knows it is drawing a CTRL49.
+  //
+  // The keybed is the one control whose face depends on more than its box: the label carries
+  // the key count ("49 keys"), and a layout that says nothing gets the commonest one. It
+  // starts on C because nearly every controller keybed does; the drawing is for recognising
+  // your keyboard, not for reading pitches off it.
+  const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
+  function keybed(control) {
+    const count = Math.max(12, Math.min(128, Number(control.label.match(/\d+/)?.[0]) || 49));
+    let whites = 0;
+    const blacks = [];
+    for (let note = 0; note < count; note += 1) {
+      if (BLACK_KEYS.has(note % 12)) blacks.push(whites);
+      else whites += 1;
+    }
+    const width = 100 / whites;
+    return { width, blacks: blacks.map((before) => before * width - width * 0.3) };
   }
 
   // Declared before the handlers that write it. Svelte 5 hoists nothing here for you, and a
@@ -273,7 +328,8 @@
   function learnSelected() {
     if (!selectedControl || !addressable(selectedControl)) return;
     if ($hostMidiLearn.armed) cancelMidiLearn();
-    else learnSurfaceControl(page?.pageId ?? '', selectedControl.kind, selectedControl.index);
+    else learnSurfaceControl(page?.pageId ?? '', selectedControl.kind, selectedControl.index,
+                             ['pad', 'fader'].includes(selectedControl.kind) ? layersOf(selectedControl).active : undefined);
   }
 
   function clearSelected() {
@@ -508,15 +564,47 @@
                   style={`left:${((control.x - view.x) / view.w) * 100}%;
                           top:${((control.y - view.y) / view.h) * 100}%;
                           width:${(control.w / view.w) * 100}%;
-                          height:${(control.h / view.h) * 100}%`}>
+                          height:${(control.h / view.h) * 100}%;${padStyle(control, slot)}`}>
+            <!-- The hardware face. Decoration only: state is on the button's classes and its
+                 title, so nothing a screen reader or a test needs lives in here. -->
+            <span class="hw" aria-hidden="true">
+              {#if control.kind === 'encoder' || control.kind === 'dial'}
+                <i class="arc"></i><i class="skirt"></i><i class="cap"></i>
+              {:else if control.kind === 'fader'}
+                <i class="scale"></i><i class="slot"></i><i class="cap"></i>
+              {:else if control.kind === 'wheel'}
+                <i class="well"></i><i class="roller"></i>
+              {:else if control.kind === 'keys'}
+                {@const bed = keybed(control)}
+                <i class="whites" style={`--kw:${bed.width}%`}></i>
+                {#each bed.blacks as left, i (i)}
+                  <i class="black" style={`left:${left}%;width:${bed.width * 0.6}%`}></i>
+                {/each}
+              {:else if control.kind === 'display'}
+                <i class="glass"><b>{page?.name || control.label}</b><small>{layout.displayName}{faderLayerCount > 1
+                  ? ` · Faders L${faderLayerActive + 1}/${faderLayerCount}` : ''}</small></i>
+              {:else}
+                <i class="body"></i>
+              {/if}
+            </span>
             <!-- What the knob DOES, when it does anything: the whole reason for drawing it
                  rather than listing it. The physical label stays underneath for the ones
-                 that drive nothing. -->
+                 that drive nothing. The keybed and the screen draw their own faces. -->
             {#if slot?.assigned}
               <span class="ctl-assigned">{slot.displayName}</span>
               <HostPickupIndicator direction={slot.pickupDirection} />
-            {:else}
-              <span class="ctl-label">{control.label}</span>
+            {:else if control.kind !== 'keys' && control.kind !== 'display'}
+              <span class="ctl-label" class:glyph={[...control.label].length <= 2}>{control.label}</span>
+            {/if}
+            {#if control.kind === 'pad' && layersOf(control).count > 1}
+              <!-- Which layer the pad is on, under its name: a pip per layer in that layer's
+                   colour, the one it is playing drawn full. -->
+              <span class="pad-layers" data-testid={`surface-layers-${control.controlId}`}
+                    aria-hidden="true" data-active={layersOf(control).active + 1}>
+                {#each layerPips(control) as pip (pip.layer)}
+                  <i class:active={pip.active} style={`--pip:${pip.colour}`}></i>
+                {/each}
+              </span>
             {/if}
           </button>
         {/each}
@@ -553,6 +641,76 @@
           {#if selectedControl.index < 0}
             <p class="empty-hint">This control is shown because it exists on the hardware, but the current profile cannot address it.</p>
           {:else}
+            {#if selectedControl.kind === 'fader'}
+              <!-- The faders' layers: one set for the whole bank. Choosing one here is what
+                   Bank ◀ ▶ does on the keyboard, and the faders pick their new parameters up
+                   where they are rather than jumping them. -->
+              <div class="pad-layer-editor" data-testid="surface-fader-layers">
+                <label>Fader layers
+                  <select aria-label="Number of fader layers" value={faderLayerCount}
+                          data-testid="surface-fader-layer-count"
+                          onchange={(e) => setFaderLayers(page?.pageId ?? '', Number(e.currentTarget.value))}>
+                    {#each Array.from({ length: MAX_PAD_LAYERS }, (_, i) => i + 1) as count (count)}
+                      <option value={count}>{count === 1 ? '1 (no layers)' : count}</option>
+                    {/each}
+                  </select>
+                </label>
+                {#if faderLayerCount > 1}
+                  <div class="layer-tabs" role="group" aria-label="Layer the faders play">
+                    {#each Array.from({ length: faderLayerCount }, (_, i) => i) as layer (layer)}
+                      <button type="button" aria-pressed={layer === faderLayerActive}
+                              data-testid={`surface-fader-layer-${layer + 1}`} style="--pip: var(--host-accent)"
+                              onclick={() => setFaderActiveLayer(page?.pageId ?? '', layer)}>L{layer + 1}</button>
+                    {/each}
+                  </div>
+                  <p class="dim layer-hint">Bank ◀ ▶ on the keyboard steps every fader to its previous or next layer.</p>
+                {/if}
+              </div>
+            {/if}
+            {#if selectedControl.kind === 'pad'}
+              {@const layers = layersOf(selectedControl)}
+              <!-- A pad's layers. Choosing one here is choosing what the pad plays — the same
+                   state a long press on the small button above the pad steps through — so the
+                   assignment below is always the one you would hear. -->
+              <div class="pad-layer-editor" data-testid="surface-pad-layers">
+                <label>Layers
+                  <select aria-label="Number of layers on this pad" value={layers.count}
+                          data-testid="surface-pad-layer-count"
+                          onchange={(e) => setPadLayers(page?.pageId ?? '', selectedControl.index,
+                                                        Number(e.currentTarget.value))}>
+                    {#each Array.from({ length: MAX_PAD_LAYERS }, (_, i) => i + 1) as count (count)}
+                      <option value={count}>{count === 1 ? '1 (no layers)' : count}</option>
+                    {/each}
+                  </select>
+                </label>
+                {#if layers.count > 1}
+                  <div class="layer-tabs" role="group" aria-label="Layer this pad plays">
+                    {#each layerPips(selectedControl) as pip (pip.layer)}
+                      <button type="button" aria-pressed={pip.active} data-testid={`surface-pad-layer-${pip.layer + 1}`}
+                              style={`--pip:${pip.colour}`}
+                              onclick={() => setPadActiveLayer(page?.pageId ?? '', selectedControl.index, pip.layer)}>
+                        <i></i>L{pip.layer + 1}
+                      </button>
+                    {/each}
+                  </div>
+                  <p class="dim layer-hint">Hold the small button above the pad to step through its layers.</p>
+                {/if}
+                <label class="colour-row">Pad colour
+                  <span>
+                    <input type="color" aria-label="Pad colour on this layer" data-testid="surface-pad-colour"
+                           disabled={!selectedSlot}
+                           value={padColourCss(selectedSlot, layers.active)}
+                           onchange={(e) => updateSelectedOptions({ colour: parseInt(e.currentTarget.value.slice(1), 16) })} />
+                    {#if selectedSlot && selectedSlot.colour >= 0}
+                      <button type="button" class="ghost" onclick={() => updateSelectedOptions({ colour: -1 })}>Default</button>
+                    {/if}
+                  </span>
+                </label>
+                {#if !selectedSlot}
+                  <p class="dim layer-hint">Assign something to this layer to give it a colour of its own.</p>
+                {/if}
+              </div>
+            {/if}
             <div class="assignment-summary">
               <strong>{selectedSlot?.assigned ? selectedSlot.displayName : 'No parameter assigned'}
                 <HostPickupIndicator direction={selectedSlot?.pickupDirection} /></strong>
@@ -604,8 +762,8 @@
                   onchange={(value) => updateSelectedOptions({ inverted: value })}
                 />
               </div>
-              {#if selectedControl.kind === 'pad'}
-                <label>Pad mode
+              {#if pressable(selectedControl)}
+                <label>{selectedControl.kind === 'pad' ? 'Pad mode' : 'Button mode'}
                   <select value={selectedSlot.toggle ? 'latching' : 'momentary'}
                           onchange={(e) => updateSelectedOptions({ toggle: e.currentTarget.value === 'latching' })}>
                     <option value="momentary">Momentary</option>
@@ -613,7 +771,7 @@
                   </select>
                 </label>
               {/if}
-              {#if selectedSlot.midiCc >= 0 && selectedSlot.midiNote < 0 && selectedControl.kind !== 'pad' && !selectedSlot.toggle}
+              {#if selectedSlot.midiCc >= 0 && selectedSlot.midiNote < 0 && !pressable(selectedControl) && !selectedSlot.toggle}
                 <label>MIDI mode
                   <select aria-label="MIDI control mode" value={selectedSlot.midiRelative ? 'relative' : 'absolute'}
                           onchange={(e) => updateSelectedOptions({ midiRelative: e.currentTarget.value === 'relative' })}>
@@ -645,7 +803,7 @@
           <div class="inspector-empty">
             <SlidersHorizontal size={26} />
             <strong>Select a control</strong>
-            <p>Choose a knob, fader or pad on the controller to assign a parameter and learn MIDI.</p>
+            <p>Choose a knob, fader, pad or button on the controller to assign a parameter and learn MIDI.</p>
           </div>
         {/if}
       </aside>
@@ -752,9 +910,13 @@
     position: relative;
     flex: none;
     width: min(100cqw, calc(100cqh * var(--surface-aspect)));
-    border: 1px solid var(--host-line);
+    border: 1px solid #000;
     border-radius: var(--host-radius-panel);
-    background: var(--host-bg-deep);
+    /* The chassis: matte black, lit from above, with a sheen along the front edge. */
+    background:
+      linear-gradient(180deg, #ffffff14 0, #ffffff05 1.5%, transparent 6%),
+      radial-gradient(120% 90% at 50% 0%, #2a2d31 0%, #1a1c1f 55%, #111214 100%);
+    box-shadow: inset 0 1px 0 #ffffff1f, inset 0 -2px 0 #00000080, 0 10px 24px #0008;
     overflow: hidden;
   }
   .controller-canvas { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 12px; border: 1px solid var(--host-line); border-radius: var(--host-radius-panel); background: var(--host-surface); }
@@ -765,14 +927,17 @@
   /* This line never wraps: starting a drag must not move the target under the pointer. */
   .canvas-caption { flex: none; height: 18px; line-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--host-text-dim); }
 
-  /* .ctl.mapped further down sets a background at EQUAL specificity, so a plain .ctl.assigned
-     rule loses to it on source order and every assigned knob stays the unassigned blue —
-     visible only by looking at one. Out-specified rather than reordered, because a rule that
-     depends on where it sits in the file breaks again the next time somebody tidies. This is
-     the fourth colour in this project eaten that way; the first three were .ghost. */
-  .ctl.mapped.assigned { border-color: #5f9e79; background: #22362a; color: #d6ecdd; }
-  .ctl.mapped.assigned:hover { border-color: #7fc79b; background: #2a4434; }
-  .ctl.mapped.assigned.unresolved { border-color: #7f5050; background: #2a1d1d; color: #e4b3b3; }
+  /* State is one colour, --led, and each hardware face decides where its light is: the arc
+     round a knob, the backlit edge of a pad, the cap of a button. .ctl.mapped further down
+     sets it at EQUAL specificity, so a plain .ctl.assigned rule would lose on source order and
+     every assigned knob would stay the unassigned blue — visible only by looking at one.
+     Out-specified rather than reordered, because a rule that depends on where it sits in the
+     file breaks again the next time somebody tidies. This is the fourth colour in this
+     project eaten that way; the first three were .ghost. */
+  .ctl.mapped.assigned { --led: #5fcf8c; color: #e4f4ea; }
+  .ctl.mapped.assigned.unresolved { --led: #e06868; color: #f2c4c4; }
+  /* The knob you are turning, over whatever it already says. */
+  .surface-plate .ctl.mapped.lit { --led: #ffd15c; }
   /* The drop target and the knob you are turning. Both are outlines rather than fills: the
      assigned colour already means something, and a second fill on top would fight it. */
   .ctl.target { outline: 2px solid #5b9bd5; outline-offset: 1px; }
@@ -803,31 +968,199 @@
     justify-content: center;
     padding: 0;
     min-height: 0;
-    border: 1px solid #333d47;
+    border: 0;
     border-radius: 2px;
-    background: #1b2127;
-    color: #5f6a75;
+    background: transparent;
+    color: #8d969f;
     font: inherit;
     font-size: 10px;
     overflow: hidden;
     cursor: default;
+    /* No light at all on a control CEditor cannot reach: it is on the box and not ours. */
+    --led: transparent;
   }
-  /* Mapped controls carry weight; the rest are visibly on the box and visibly not ours. */
-  .ctl.mapped { border-color: #4d7fae; background: #22303c; color: #b8c6d2; cursor: pointer; }
-  .ctl.mapped:hover { border-color: #7fb4e0; background: #2a3c4b; }
+  /* Mapped controls carry a light; the rest are visibly on the box and visibly not ours. */
+  .ctl.mapped { --led: #4f8cc4; color: #d3dce4; cursor: pointer; }
+  .ctl.mapped:hover .hw { filter: brightness(1.18); }
+  /* The global button hover paints a background; the face is the control here, not the box. */
+  .surface-plate .ctl:hover:not(:disabled) { background: transparent; }
 
-  .ctl.encoder { border-radius: 50%; box-shadow: inset 0 2px 6px #0005; }
-  .ctl.encoder::before { content: ''; position: absolute; top: 8%; left: calc(50% - 1px); width: 2px; height: 12%; background: currentColor; opacity: .65; }
-  .ctl.pad { border-radius: 3px; }
-  .ctl.fader { border-radius: 1px; background: #171c21; }
-  /* A latched pad is a pad that is ON, and it has to say so from across a room — the LED on
-     the real one does. Out-specified like .assigned, for the same source-order reason. */
-  .surface-plate .ctl.mapped.assigned.latched { background: #d8a24a; color: #1a1408; }
-  .ctl.wheel { border-radius: 40%; background: #171c21; }
-  .ctl.keys { background: #2a2f34; border-color: #3b4652; }
-  .ctl.display { background: #16202a; border-color: #3f5162; }
-
+  .ctl-assigned, .ctl-label, .ctl :global([data-testid='pickup-direction']) {
+    position: relative; z-index: 1; text-shadow: 0 1px 2px #000;
+  }
   .ctl-label { pointer-events: none; white-space: nowrap; font-size: clamp(7px, 15cqw, 14px); }
+
+  /* --- the hardware faces. Every size is a share of the control's own box (cqw/cqh), so a
+         knob is the same knob at 17px in the overview and 130px zoomed into its region. --- */
+  .hw, .hw > i { position: absolute; pointer-events: none; box-sizing: border-box; }
+  .hw { inset: 0; }
+  .hw > i { display: block; }
+
+  /* Encoder: the LED arc (270°, like the scale printed round a real one), then a knurled
+     skirt, then the domed cap with its pointer. */
+  /* The data dial is the same knob without the arc: it has no slot of its own to show. */
+  .ctl.encoder, .ctl.dial { border-radius: 50%; }
+  .ctl.encoder .hw, .ctl.dial .hw { inset: auto; width: min(100cqw, 100cqh); aspect-ratio: 1; }
+  .ctl.dial .arc { display: none; }
+  .ctl.dial .ctl-label { display: none; }
+  .ctl.encoder .arc {
+    inset: 0; border-radius: 50%;
+    background: conic-gradient(from 225deg, var(--led) 0 270deg, transparent 270deg);
+    -webkit-mask: radial-gradient(circle, transparent 63.5%, #000 65%, #000 69.5%, transparent 71%);
+            mask: radial-gradient(circle, transparent 63.5%, #000 65%, #000 69.5%, transparent 71%);
+    filter: drop-shadow(0 0 2px var(--led));
+  }
+  .ctl.encoder:not(.mapped) .arc {
+    background: conic-gradient(from 225deg, #2c3035 0 270deg, transparent 270deg);
+    filter: none;
+  }
+  .ctl.encoder .skirt, .ctl.dial .skirt {
+    inset: 16%; border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 40%, transparent 55%, #0009 100%),
+      repeating-conic-gradient(#303338 0 5deg, #16171a 5deg 10deg);
+    box-shadow: 0 2px 4px #000c, 0 0 0 1px #000;
+  }
+  .ctl.encoder .cap, .ctl.dial .cap {
+    inset: 25%; border-radius: 50%;
+    background: radial-gradient(circle at 38% 30%, #54585e 0%, #2a2d31 45%, #16181a 100%);
+    box-shadow: inset 0 1px 1px #ffffff2e, inset 0 -2px 3px #0009;
+  }
+  .ctl.encoder .cap::after, .ctl.dial .cap::after {
+    content: ''; position: absolute; left: 50%; top: 6%; width: max(1.5px, 6%); height: 34%;
+    transform: translateX(-50%); border-radius: 1px; background: #e9ecef; box-shadow: 0 0 2px #fff6;
+  }
+
+  /* Pad: translucent silicone over an RGB LED, the way the real ones are built — the whole
+     pad glows in its colour, dimly at rest and at full brightness when it is ON. The colour
+     is the pad's state, the same --led every other face uses, so the key under the drawing
+     reads for pads as it does for knobs. A pad CEditor cannot reach stays unlit. */
+  .ctl.pad .body {
+    inset: 3%; border-radius: 9%;
+    background:
+      radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--led) 42%, #1a1c1f) 0%,
+                                         color-mix(in srgb, var(--led) 22%, #141518) 70%,
+                                         color-mix(in srgb, var(--led) 12%, #0f1012) 100%),
+      #141518;
+    box-shadow: inset 0 1px 0 #ffffff2a, inset 0 -3px 6px #0009, 0 2px 3px #000b,
+                inset 0 0 max(2px, 10cqw) color-mix(in srgb, var(--led) 35%, transparent),
+                0 0 max(2px, 5cqw) color-mix(in srgb, var(--led) 30%, transparent);
+  }
+  /* The glow is light spilling past the pad, so the box must not clip it into a square. */
+  .ctl.pad { overflow: visible; }
+  .ctl.pad:not(.mapped) .body {
+    background: linear-gradient(165deg, #3a3d42 0%, #2a2d31 55%, #222427 100%);
+    box-shadow: inset 0 1px 0 #ffffff1a, inset 0 -3px 6px #0008, 0 2px 3px #000b;
+  }
+  /* ON: a latched pad that is latched, or the pad you are hitting. It has to say so from
+     across a room — the real one does, and so the whole pad lights at full strength in its
+     own colour rather than switching to some other one. Out-specified like .assigned, for the
+     same source-order reason. */
+  .surface-plate .ctl.pad.mapped.assigned.latched .body, .surface-plate .ctl.pad.mapped.lit .body {
+    background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--led) 45%, #fff) 0%,
+                                                   var(--led) 55%,
+                                                   color-mix(in srgb, var(--led) 70%, #000) 100%);
+    box-shadow: inset 0 1px 0 #ffffff66, inset 0 -3px 6px #0005,
+                0 0 max(4px, 14cqw) color-mix(in srgb, var(--led) 75%, transparent);
+  }
+  .surface-plate .ctl.pad.mapped.assigned.latched, .surface-plate .ctl.pad.mapped.lit { color: #101214; }
+  .surface-plate .ctl.pad.mapped.assigned.latched .ctl-assigned,
+  .surface-plate .ctl.pad.mapped.lit .ctl-assigned { text-shadow: 0 0 3px #fff8; }
+
+  /* Fader: a scale, the slot, and a cap with its grip line. With no value to show, the cap
+     sits where a fader at rest usually does. */
+  .ctl.fader .scale {
+    inset: 8% 8% 8% auto; width: 22%;
+    background: repeating-linear-gradient(to bottom, #6d737a 0 1px, transparent 1px 12.5%);
+    opacity: .7;
+  }
+  .ctl.fader .slot {
+    left: 50%; top: 5%; bottom: 5%; width: max(2px, 12%); transform: translateX(-50%);
+    border-radius: 3px; background: #050506; box-shadow: inset 0 1px 2px #000, 0 1px 0 #ffffff14;
+  }
+  .ctl.fader .cap {
+    left: 8%; right: 8%; top: 52%; height: max(6px, 20%); border-radius: 12%;
+    background: linear-gradient(180deg, #62666c 0%, #34373b 42%, #1c1e21 58%, #3b3e42 100%);
+    box-shadow: 0 2px 3px #000c, inset 0 1px 0 #ffffff33;
+  }
+  .ctl.fader .cap::after {
+    content: ''; position: absolute; left: 10%; right: 10%; top: calc(50% - 0.5px); height: 1px; background: #f2f2f2;
+  }
+  .ctl.fader.mapped .cap::after { background: var(--led); box-shadow: 0 0 3px var(--led); }
+  .ctl.fader .ctl-label, .ctl.fader .ctl-assigned {
+    position: absolute; bottom: -1px; font-size: clamp(6px, 34cqw, 12px);
+  }
+
+  /* Button: a raised rubber cap with its legend printed on it. */
+  .ctl.button .body {
+    inset: 6%; border-radius: max(2px, 18cqh);
+    background: linear-gradient(180deg, #3a3d42 0%, #26282c 100%);
+    box-shadow: inset 0 1px 0 #ffffff26, inset 0 -1px 2px #0009, 0 1px 2px #000c;
+  }
+  .ctl.button.mapped .body { box-shadow: inset 0 1px 0 #ffffff26, 0 1px 2px #000c, 0 0 0 1px var(--led); }
+  .ctl.button .ctl-label { font-size: clamp(6px, 42cqh, 13px); color: #c5ccd2; letter-spacing: .02em; }
+  /* A latching button that is ON lights its whole cap, as the unit's own LEDs do. */
+  .surface-plate .ctl.button.mapped.assigned.latched .body {
+    background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--led) 40%, #fff), var(--led));
+    box-shadow: 0 0 max(3px, 20cqw) var(--led);
+  }
+  /* A small square button has no room for its legend, and the real unit does not try: it prints
+     it on the panel beside the button. So a near-square one prints it underneath — unless it
+     is a glyph (an arrow, a transport symbol, a digit), which is printed on the cap itself. */
+  .ctl.button { overflow: visible; }
+  @container (aspect-ratio < 1.6) {
+    .ctl.button .ctl-assigned, .ctl.button .ctl-label:not(.glyph) {
+      position: absolute; top: calc(100% + 1px); left: 50%; transform: translateX(-50%);
+      font-size: clamp(6px, 55cqh, 12px); color: #aeb6bd; text-shadow: none;
+    }
+  }
+
+  /* Wheel: a ribbed roller in its well, shaded as a cylinder. */
+  .ctl.wheel .well {
+    inset: 0; border-radius: max(3px, 22cqw);
+    background: #08090a; box-shadow: inset 0 2px 5px #000, 0 1px 0 #ffffff1a;
+  }
+  .ctl.wheel .roller {
+    inset: 10% 20%; border-radius: max(2px, 12cqw) / max(2px, 5cqh);
+    background:
+      linear-gradient(90deg, #000a 0%, transparent 32%, #ffffff12 50%, transparent 68%, #000a 100%),
+      repeating-linear-gradient(180deg, #34373c 0 2px, #16181a 2px 5px);
+    box-shadow: 0 0 0 1px #000;
+  }
+  .ctl.wheel .ctl-label { position: absolute; bottom: -1px; font-size: clamp(6px, 28cqw, 12px); }
+
+  /* The keybed: white keys as one repeating gradient (one element, however many keys), the
+     black keys over them, and the dark lip the keys disappear under. */
+  .ctl.keys { border-radius: 0 0 4px 4px; }
+  .ctl.keys .whites {
+    inset: 0; border-radius: 0 0 3px 3px;
+    background:
+      linear-gradient(180deg, #000 0, #0009 2%, transparent 7%, transparent 94%, #0000001f 100%),
+      repeating-linear-gradient(90deg, #f7f7f4 0, #ecece8 calc(var(--kw) - 1.5px),
+                                       #8e8e8a calc(var(--kw) - 1.5px), #6e6e6a var(--kw));
+    box-shadow: 0 0 0 2px #0b0b0c;
+  }
+  .ctl.keys .black {
+    top: 0; height: 60%; border-radius: 0 0 2px 2px;
+    background: linear-gradient(180deg, #111 0%, #262626 78%, #3c3c3c 86%, #0d0d0d 100%);
+    box-shadow: 1px 2px 3px #0009, inset 0 -1px 0 #ffffff1a;
+  }
+
+  /* The screen: a bezel round a lit LCD, showing the page the drawing is set to. */
+  .ctl.display .glass {
+    inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 6%;
+    padding: 6% 8%; border-radius: 3px; border: max(3px, 3cqw) solid #0a0b0c;
+    background: radial-gradient(120% 90% at 30% 20%, #1d4a6b 0%, #0d2a40 55%, #071624 100%);
+    box-shadow: 0 0 0 1px #2b2f34, inset 0 0 12px #000a;
+    color: #bfe6ff; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; text-align: left;
+    overflow: hidden;
+  }
+  .ctl.display .glass b, .ctl.display .glass small {
+    display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    text-shadow: 0 0 4px #6cc4ff99;
+  }
+  .ctl.display .glass b { font-size: clamp(7px, 11cqw, 20px); font-weight: 600; }
+  .ctl.display .glass small { font-size: clamp(6px, 7cqw, 13px); opacity: .7; }
 
   .control-inspector {
     min-width: 0;
@@ -866,12 +1199,38 @@
   .inspector-empty > :global(svg) { color: var(--host-text-dim); margin-bottom: 8px; }
   .inspector-empty p { margin: 4px 0; }
 
+  /* The layer pips on a pad, under its name. */
+  .pad-layers {
+    position: absolute; left: 50%; bottom: 10%; transform: translateX(-50%); z-index: 1;
+    display: flex; gap: max(2px, 5cqw); pointer-events: none;
+  }
+  .pad-layers i {
+    width: max(3px, 8cqw); height: max(3px, 8cqw); border-radius: 50%;
+    background: color-mix(in srgb, var(--pip) 35%, #000); box-shadow: 0 0 0 1px #0008;
+  }
+  .pad-layers i.active { background: var(--pip); box-shadow: 0 0 0 1px #000a, 0 0 4px var(--pip); transform: scale(1.3); }
+
+  .pad-layer-editor { display: flex; flex-direction: column; gap: 8px; padding: 10px;
+    border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-control); }
+  .pad-layer-editor > label { display: flex; flex-direction: column; gap: 4px; color: #aab5be; font-size: 11px; }
+  .layer-tabs { display: flex; gap: 4px; }
+  .layer-tabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 12px; }
+  .layer-tabs button i { width: 8px; height: 8px; border-radius: 50%; background: var(--pip); }
+  /* Out-specified to beat the host theme's own button rules, like the other chips here. */
+  :global(.host-workspace.host-workspace) .surface .layer-tabs button[aria-pressed='true'] {
+    border-color: var(--pip); color: var(--host-text);
+    background: color-mix(in srgb, var(--pip) 24%, var(--host-surface-raised));
+  }
+  .layer-hint { margin: 0; font-size: 10px; }
+  .colour-row > span { display: flex; align-items: center; gap: 6px; }
+  .colour-row input[type='color'] { width: 44px; min-height: 30px; padding: 2px; }
   .surface-regions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .state-key { display: inline-flex; align-items: center; gap: 4px; color: #8f9ba5; font-size: 10px; }
-  .state-key i { width: 8px; height: 8px; border: 1px solid #4d7fae; background: #22303c; }
-  .state-key i.mapped { border-color: #5f9e79; background: #22362a; }
-  .state-key i.problem { border-color: #7f5050; background: #2a1d1d; }
-  .state-key i.moving { border-color: #e0c060; background: #4a4021; }
+  /* The same lights the faces use, so the key reads as the drawing does. */
+  .state-key i { width: 8px; height: 8px; border-radius: 50%; background: #4f8cc4; box-shadow: 0 0 4px #4f8cc4; }
+  .state-key i.mapped { background: #5fcf8c; box-shadow: 0 0 4px #5fcf8c; }
+  .state-key i.problem { background: #e06868; box-shadow: 0 0 4px #e06868; }
+  .state-key i.moving { background: #ffd15c; box-shadow: 0 0 4px #ffd15c; }
   @container (max-width: 900px) {
     .surface-body { flex: none; grid-template-columns: minmax(170px, .7fr) minmax(240px, 1.3fr); }
     .param-column, .controller-canvas { height: 330px; box-sizing: border-box; }

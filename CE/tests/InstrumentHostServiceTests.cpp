@@ -28,7 +28,9 @@
 #include "InstrumentHost/RecentPlay.h"
 #include <juce_cryptography/juce_cryptography.h>
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
+#include "ControlSurface/Ctrl49Protocol.h"
 #include "StubSynthProcessor.h"
+#include <algorithm>
 #include <cstring>
 #include <atomic>
 #include <barrier>
@@ -4878,6 +4880,103 @@ void testCtrl49Broker()
                "no longer exists");
     }
 
+    // -- pad layers from the keys ------------------------------------------------------------
+    //
+    // The eight small buttons sit one above each pad. Held, a button steps its pad to the next
+    // layer — once, at the threshold, not on release — and the pad is repainted in the new
+    // layer's colour. A pad struck on a control page drives the slot of the layer it is on.
+    {
+        h.cmd ("addControlPage", { { "name", "Layers" } });
+        const auto pageId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {})[0]
+                              .getProperty ("pageId", {}).toString();
+        const auto partId = h.firstPartId();
+        fake.feed (0xB0, 0x23, 0x7F);          // Main: the first control page
+        broker.tick();
+        check (broker.currentPage() == 0 && broker.pages().control > 0, "the keys are on a control page");
+
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "pad" }, { "index", 3 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        h.cmd ("setPadLayers", { { "pageId", pageId }, { "index", 3 }, { "count", 2 } });
+
+        const auto activeLayer = [&h, &pageId]
+        {
+            for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+                if (pg.getProperty ("pageId", {}).toString() == pageId)
+                    for (const auto& l : *pg.getProperty ("padLayers", {}).getArray())
+                        if ((int) l.getProperty ("index", -1) == 3)
+                            return (int) l.getProperty ("active", -1);
+            return -1;
+        };
+        const auto sentPadColour = [&fake] (int pad, int rgb)
+        {
+            const auto frame = ceditor::ctrl49::buildPadRgb ((std::uint8_t) pad, (std::uint8_t) ((rgb >> 16) & 0xFF),
+                                                             (std::uint8_t) ((rgb >> 8) & 0xFF), (std::uint8_t) (rgb & 0xFF));
+            const std::scoped_lock scoped (fake.lock);
+            return std::find (fake.frames.begin(), fake.frames.end(), frame) != fake.frames.end();
+        };
+
+        broker.tick();
+        check (sentPadColour (3, 0xFFA500), "an assigned pad on its first layer is lit the stock orange");
+        check (sentPadColour (5, 0), "and a pad with nothing on it is dark");
+
+        // A short press does nothing to the layer — only a hold does.
+        fake.feed (0xB0, 19 + 2, 0x7F);        // the button above pad 3, down
+        broker.tick();
+        fakeNow += 200.0;
+        fake.feed (0xB0, 19 + 2, 0x00);        // and up again before the threshold
+        broker.tick();
+        fakeNow += 1000.0;
+        broker.tick();
+        check (activeLayer() == 0, "a short press leaves the pad on its layer");
+
+        fake.feed (0xB0, 19 + 2, 0x7F);
+        broker.tick();
+        fakeNow += 300.0;
+        broker.tick();
+        check (activeLayer() == 0, "held, it waits for the threshold");
+        fakeNow += 200.0;
+        broker.tick();
+        check (activeLayer() == 1, "and at the threshold the pad steps to its next layer");
+        check (sentPadColour (3, h.service->padLight (pageId, 3)) && h.service->padLight (pageId, 3) != 0xFFA500,
+               "and is repainted for it");
+        fakeNow += 2000.0;
+        broker.tick();
+        check (activeLayer() == 1, "a hold steps once, however long it lasts");
+        fake.feed (0xB0, 19 + 2, 0x00);
+        broker.tick();
+
+        fake.feed (0xB0, 19 + 2, 0x7F);
+        broker.tick();
+        fakeNow += 500.0;
+        broker.tick();
+        fake.feed (0xB0, 19 + 2, 0x00);
+        broker.tick();
+        check (activeLayer() == 0, "the next hold wraps at the pad's two layers");
+
+        // With Time Division held the buttons pick a division, as the unit prints on them.
+        fake.feed (0xB0, 0x39, 0x7F);
+        fake.feed (0xB0, 19 + 2, 0x7F);
+        broker.tick();
+        fakeNow += 1000.0;
+        broker.tick();
+        fake.feed (0xB0, 19 + 2, 0x00);
+        fake.feed (0xB0, 0x39, 0x00);
+        broker.tick();
+        check (activeLayer() == 0, "while Time Division is held, a held button is a division choice");
+
+        // Pad 3 is struck — the reducer numbers pads 1..8, as the drawing indexes them.
+        const auto cutoff = [&h] { return h.lastStub->getParameters()[0]->getValue(); };
+        fake.feed (0xB0, 0x03, 100);
+        broker.tick();
+        check (std::abs (cutoff() - 1.0f) < 0.01f, "a pad struck on a control page drives its slot");
+        fake.feed (0xB0, 0x03, 0);
+        broker.tick();
+        check (std::abs (cutoff() - 0.0f) < 0.01f, "and lets go when released");
+
+        h.cmd ("removeControlPage", { { "pageId", pageId } });
+        broker.tick();
+    }
+
     // Every control page reaches the keyboard. The surface used to stop at two — the reducer's
     // four mode-button pages less the performance and browser pages — so a third page existed on
     // the computer and Page Right never arrived at it.
@@ -7867,9 +7966,9 @@ void testPadsAndFaders()
 
         // A control the surface does not address mints nothing and says so.
         h.emits.clear();
-        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "button" }, { "index", 0 },
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "wheel" }, { "index", 0 },
                                          { "partId", partId }, { "parameterId", "cutoff" } });
-        check (h.emits.lastError().contains ("does not address"), "a button is refused aloud");
+        check (h.emits.lastError().contains ("does not address"), "a wheel is refused aloud");
         h.emits.clear();
         h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", -1 },
                                          { "partId", partId }, { "parameterId", "cutoff" } });
@@ -7933,6 +8032,350 @@ void testPadsAndFaders()
         }
         check (faderBack, "the fader slot comes back with its address and controller");
         check (padBack, "the pad slot comes back with its note, its toggle and its latch");
+    }
+}
+
+// A pad with layers: up to four assignments on one pad, each its own slot, of which only the
+// active one answers the pad. A long press on the button above the pad steps the layer.
+void testPadLayers()
+{
+    std::cout << "\npad layers" << std::endl;
+
+    const auto dir = freshDataDir ("pad-layers");
+    seedTwoSynthCatalog (dir);
+
+    juce::String pageId;
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("setUserSurface", { { "name", "Desk" }, { "encoders", 8 }, { "faders", 0 }, { "pads", 8 } });
+        h.cmd ("addControlPage", { { "name", "Live" } });
+        for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+            if (pg.getProperty ("name", {}).toString() == "Live")
+                pageId = pg.getProperty ("pageId", {}).toString();
+
+        const auto pageOf = [&h, &pageId]
+        {
+            for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+                if (pg.getProperty ("pageId", {}).toString() == pageId)
+                    return pg;
+            return juce::var();
+        };
+        const auto padSlot = [&pageOf] (int index, int layer) -> juce::var
+        {
+            for (const auto& s : *pageOf().getProperty ("slots", {}).getArray())
+                if (s.getProperty ("kind", {}).toString() == "pad" && (int) s.getProperty ("index", -2) == index
+                    && (int) s.getProperty ("layer", -1) == layer)
+                    return s;
+            return {};
+        };
+        const auto layersOf = [&pageOf] (int index) -> juce::var
+        {
+            for (const auto& l : *pageOf().getProperty ("padLayers", {}).getArray())
+                if ((int) l.getProperty ("index", -1) == index)
+                    return l;
+            return {};
+        };
+        const auto cutoff = [&h] () { return h.lastStub->getParameters()[0]->getValue(); };
+        const auto pan = [&h, &partId] ()
+        {
+            for (const auto& part : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {}).getArray())
+                if (part.getProperty ("partId", {}).toString() == partId)
+                    return (float) (double) part.getProperty ("pan", 0.0);
+            return 9.0f;
+        };
+        const auto note = [&h] (bool on)
+        {
+            h.service->noteMidiActivity ("Desk", on ? juce::MidiMessage::noteOn (1, 40, (juce::uint8) 100)
+                                                    : juce::MidiMessage::noteOff (1, 40));
+            h.service->drainParameterEvents();
+        };
+
+        // One layer is the default and says nothing: the first layer keeps the id pads always had.
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "pad" }, { "index", 3 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        check (padSlot (3, 0).getProperty ("slotId", {}).toString() == "pad-4",
+               "a pad's first layer keeps the slot id every pad has always had");
+        check (layersOf (3).isVoid(), "and a pad with one layer is not listed at all");
+
+        h.cmd ("setPadLayers", { { "pageId", pageId }, { "index", 3 }, { "count", 3 } });
+        check ((int) layersOf (3).getProperty ("count", 0) == 3 && (int) layersOf (3).getProperty ("active", -1) == 0,
+               "a pad can be given three layers, and plays the first");
+        h.cmd ("setPadLayers", { { "pageId", pageId }, { "index", 3 }, { "count", 9 } });
+        check ((int) layersOf (3).getProperty ("count", 0) == 4, "and never more than four");
+        h.cmd ("setPadLayers", { { "pageId", pageId }, { "index", 3 }, { "count", 3 } });
+
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "pad" }, { "index", 3 }, { "layer", 1 },
+                                         { "partId", partId }, { "parameterId", "@pan" } });
+        const auto second = padSlot (3, 1);
+        check (second.getProperty ("slotId", {}).toString() == "pad-4-L2"
+                 && second.getProperty ("parameterId", {}).toString() == "@pan"
+                 && padSlot (3, 0).getProperty ("parameterId", {}).toString() == "cutoff",
+               "the second layer is a slot of its own, and the first keeps its assignment");
+
+        h.emits.clear();
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "encoder" }, { "index", 0 }, { "layer", 1 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        check (h.emits.lastError().contains ("does not address"), "an encoder has no layers to land on");
+        h.emits.clear();
+        h.cmd ("setPadActiveLayer", { { "pageId", pageId }, { "index", 3 }, { "layer", 3 } });
+        check (h.emits.lastError().contains ("no such layer"), "a pad cannot play a layer it does not have");
+
+        // Only the active layer answers the pad. Learn the same note on both layers.
+        h.cmd ("learnSurfaceControl", { { "pageId", pageId }, { "kind", "pad" }, { "index", 3 } });
+        note (true);
+        check ((int) padSlot (3, 0).getProperty ("midiNote", -1) == 40, "layer 1 learns the pad's note");
+        check (std::abs (cutoff() - 1.0f) < 0.01f, "and plays it");
+        note (false);
+        const auto panBefore = pan();
+
+        h.cmd ("setPadActiveLayer", { { "pageId", pageId }, { "index", 3 }, { "layer", 1 } });
+        h.cmd ("learnSurfaceControl", { { "pageId", pageId }, { "kind", "pad" }, { "index", 3 } });
+        note (true);
+        check ((int) padSlot (3, 1).getProperty ("midiNote", -1) == 40,
+               "learning on a pad lands on the layer it is playing");
+        check (std::abs (cutoff() - 0.0f) < 0.01f && std::abs (pan() - panBefore) > 0.1f,
+               "and the same note now moves layer 2's parameter, not layer 1's");
+        note (false);
+
+        h.cmd ("setPadActiveLayer", { { "pageId", pageId }, { "index", 3 }, { "layer", 0 } });
+        const auto panOnLayerTwo = pan();
+        note (true);
+        check (std::abs (cutoff() - 1.0f) < 0.01f && std::abs (pan() - panOnLayerTwo) < 0.01f,
+               "switch back and only layer 1 answers again");
+        note (false);
+
+        // The long press: next layer, wrapping at the pad's own count.
+        check (h.service->cyclePadLayer (pageId, 3) == 1 && h.service->cyclePadLayer (pageId, 3) == 2
+                 && h.service->cyclePadLayer (pageId, 3) == 0,
+               "a long press steps through the pad's three layers and wraps");
+        check ((int) layersOf (3).getProperty ("active", -1) == 0, "and the page says which one is playing");
+        check (h.service->cyclePadLayer (pageId, 5) == 0, "a pad with one layer stays on it");
+        check (h.service->cyclePadLayer ("no-such-page", 3) == -1, "an unknown page is refused");
+
+        h.cmd ("setPadActiveLayer", { { "pageId", pageId }, { "index", 3 }, { "layer", 2 } });
+        h.cmd ("setPadLayers", { { "pageId", pageId }, { "index", 3 }, { "count", 2 } });
+        check ((int) layersOf (3).getProperty ("active", -1) == 0,
+               "lowering the count never leaves a pad on a layer it no longer has");
+        check (padSlot (3, 1).getProperty ("parameterId", {}).toString() == "@pan",
+               "and loses nothing: the layers above are kept, only unreachable");
+
+        // The light: the active layer's colour, at a strength that says its state.
+        check (h.service->padLight (pageId, 3) == 0xFFA500, "an assigned first layer is the stock orange");
+        h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "pad-4" }, { "colour", 0x123456 } });
+        check (h.service->padLight (pageId, 3) == 0x123456 && (int) padSlot (3, 0).getProperty ("colour", -1) == 0x123456,
+               "or the colour somebody chose for it");
+        h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "pad-4" }, { "toggle", true } });
+        const auto dimmed = h.service->padLight (pageId, 3);
+        check (dimmed != 0x123456 && ((dimmed >> 16) & 0xFF) < 0x12, "a latching pad that is off is dimmed");
+        h.cmd ("setPadActiveLayer", { { "pageId", pageId }, { "index", 3 }, { "layer", 1 } });
+        check (h.service->padLight (pageId, 3) == 0x00C8FF, "the second layer has a default colour of its own");
+        h.cmd ("setPadLayers", { { "pageId", pageId }, { "index", 6 }, { "count", 2 } });
+        const auto faint = h.service->padLight (pageId, 6);
+        check (faint != 0 && faint < 0x202020, "an empty pad with layers glows faintly, so its layer still reads");
+        check (h.service->padLight (pageId, 7) == 0, "a plain empty pad is dark");
+
+        // The surface's own pad port drives the active layer, by number, with no learning.
+        h.cmd ("setPadActiveLayer", { { "pageId", pageId }, { "index", 3 }, { "layer", 0 } });
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "pad" }, { "index", 5 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        check (h.service->pressSurfacePad (pageId, 5, true) && std::abs (cutoff() - 1.0f) < 0.01f,
+               "a pad struck on the surface drives its slot");
+        check (h.service->pressSurfacePad (pageId, 5, false) && std::abs (cutoff() - 0.0f) < 0.01f,
+               "and letting go lets go");
+        check (! h.service->pressSurfacePad (pageId, 3, true),
+               "a pad with a learned binding is left to it, so a toggle is never driven twice");
+        check (! h.service->pressSurfacePad (pageId, 7, true), "an empty pad drives nothing");
+    }
+
+    // Layers, the active one, which slot rides which layer and its colour all survive.
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        juce::var page;
+        for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+            if (pg.getProperty ("pageId", {}).toString() == pageId)
+                page = pg;
+        bool layersBack = false;
+        for (const auto& l : *page.getProperty ("padLayers", {}).getArray())
+            layersBack = layersBack || ((int) l.getProperty ("index", -1) == 3
+                                        && (int) l.getProperty ("count", 0) == 2
+                                        && (int) l.getProperty ("active", -1) == 0);
+        bool secondBack = false, colourBack = false;
+        for (const auto& s : *page.getProperty ("slots", {}).getArray())
+        {
+            if (s.getProperty ("slotId", {}).toString() == "pad-4-L2")
+                secondBack = (int) s.getProperty ("layer", -1) == 1
+                          && s.getProperty ("parameterId", {}).toString() == "@pan";
+            if (s.getProperty ("slotId", {}).toString() == "pad-4")
+                colourBack = (int) s.getProperty ("colour", -1) == 0x123456;
+        }
+        check (layersBack, "a pad comes back with its layer count and the layer it was on");
+        check (secondBack && colourBack, "and every layer's slot with its assignment and colour");
+    }
+}
+
+// The Mackie section read as controls: faders are pitch bend on channels 1-9, the strip
+// buttons are notes, Bank steps the fader layer. HoSTage used to hand all of it to the
+// instruments, so fader 1 bent the pitch of whatever listened on channel 1.
+void testMackieSection()
+{
+    std::cout << "\nthe Mackie section" << std::endl;
+    namespace mackie = ceditor::host::mackie;
+
+    // The vocabulary, on its own.
+    {
+        const auto fader = mackie::decode (juce::MidiMessage::pitchWheel (3, 16383));
+        check (fader.kind == mackie::Event::Kind::fader && fader.index == 2 && std::abs (fader.value - 1.0f) < 0.001f,
+               "pitch bend on channel 3 is fader 3, all the way up");
+        check (mackie::decode (juce::MidiMessage::pitchWheel (9, 0)).index == 8, "channel 9 is the master");
+        check (mackie::decode (juce::MidiMessage::pitchWheel (10, 0)).kind == mackie::Event::Kind::none,
+               "and there is no tenth fader");
+        const auto mute3 = mackie::decode (juce::MidiMessage::noteOn (1, 0x12, (juce::uint8) 127));
+        check (mute3.kind == mackie::Event::Kind::button && mute3.index == 2 && mute3.down,
+               "a strip button in any row is button N, pressed");
+        check (! mackie::decode (juce::MidiMessage::noteOn (1, 0x12, (juce::uint8) 0)).down,
+               "and a note-on at velocity 0 is its release");
+        const auto bank = mackie::decode (juce::MidiMessage::noteOn (1, 0x2F, (juce::uint8) 127));
+        check (bank.kind == mackie::Event::Kind::bank && bank.step == 1, "Bank ▶ steps forward");
+        check (mackie::decode (juce::MidiMessage::noteOn (1, 0x2E, (juce::uint8) 127)).step == -1, "Bank ◀ back");
+        check (mackie::decode (juce::MidiMessage::noteOn (1, 0x5E, (juce::uint8) 127)).index == mackie::play,
+               "and the transport has its own notes");
+        check (mackie::isMackiePort ("CTRL49 Mackie/HUI") && ! mackie::isMackiePort ("CTRL49 USB"),
+               "the section is known by its port's name");
+    }
+
+    const auto dir = freshDataDir ("mackie-section");
+    seedTwoSynthCatalog (dir);
+    juce::String pageId;
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("addControlPage", { { "name", "Faders" } });
+        for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+            if (pg.getProperty ("name", {}).toString() == "Faders")
+                pageId = pg.getProperty ("pageId", {}).toString();
+        h.service->noteSurfacePage (pageId);
+
+        const auto cutoff = [&h] { return h.lastStub->getParameters()[0]->getValue(); };
+        const auto pan = [&h, &partId] ()
+        {
+            for (const auto& part : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {}).getArray())
+                if (part.getProperty ("partId", {}).toString() == partId)
+                    return (float) (double) part.getProperty ("pan", 0.0);
+            return 9.0f;
+        };
+        const auto faderLayers = [&h, &pageId] () -> juce::var
+        {
+            for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+                if (pg.getProperty ("pageId", {}).toString() == pageId)
+                    return pg.getProperty ("faderLayers", {});
+            return {};
+        };
+        const auto send = [&h] (const juce::MidiMessage& message, const char* port = "CTRL49 Mackie/HUI")
+        {
+            h.service->noteMidiActivity (port, message);
+            h.service->drainParameterEvents();
+        };
+        const auto fader = [&send] (int channel, float position)
+        { send (juce::MidiMessage::pitchWheel (channel, juce::roundToInt (position * 16383.0f))); };
+
+        check (h.service->mackieSectionEnabled(), "the section is read as controls by default");
+
+        // Fader 1 drives its slot, with no learning — and only from where the parameter already is.
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", 0 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "fader-1" }, { "value", 0.5 } });
+        fader (1, 0.9f);
+        check (std::abs (cutoff() - 0.5f) < 0.01f,
+               "a fader far from the value does not jump it — these faders have no motors");
+        fader (1, 0.5f);
+        fader (1, 0.2f);
+        check (std::abs (cutoff() - 0.2f) < 0.02f, "once it has reached the value it takes over");
+        fader (2, 0.8f);
+        check (std::abs (cutoff() - 0.2f) < 0.02f, "and a fader with nothing on it moves nothing");
+
+        // Fader layers: all faders at once, stepped by Bank.
+        h.cmd ("setFaderLayers", { { "pageId", pageId }, { "count", 2 } });
+        check ((int) faderLayers().getProperty ("count", 0) == 2, "the faders can be given two layers");
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", 0 }, { "layer", 1 },
+                                         { "partId", partId }, { "parameterId", "@pan" } });
+        send (juce::MidiMessage::noteOn (1, 0x2F, (juce::uint8) 127));
+        send (juce::MidiMessage::noteOn (1, 0x2F, (juce::uint8) 0));
+        check ((int) faderLayers().getProperty ("active", -1) == 1, "Bank ▶ steps the faders to their next layer");
+        const auto panBefore = pan();
+        fader (1, 0.2f);           // where it was left, which is not where pan is
+        check (std::abs (pan() - panBefore) < 0.01f && std::abs (cutoff() - 0.2f) < 0.02f,
+               "after the step the fader drives the new layer, and waits to pick it up");
+        fader (1, 0.5f);           // pan sits in the middle
+        fader (1, 1.0f);
+        check (std::abs (pan() - panBefore) > 0.1f && std::abs (cutoff() - 0.2f) < 0.02f,
+               "then moves layer 2's parameter, never layer 1's");
+        send (juce::MidiMessage::noteOn (1, 0x2E, (juce::uint8) 127));
+        check ((int) faderLayers().getProperty ("active", -1) == 0, "Bank ◀ steps back");
+        check (h.service->stepFaderLayer (pageId, 1) == 1 && h.service->stepFaderLayer (pageId, 1) == 0,
+               "and the steps wrap at the count");
+        h.emits.clear();
+        h.cmd ("setFaderActiveLayer", { { "pageId", pageId }, { "layer", 2 } });
+        check (h.emits.lastError().contains ("no such layer"), "the faders cannot play a layer they have not got");
+
+        // B1-B8 are buttons: momentary by default, latching if you say so.
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "button" }, { "index", 2 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        send (juce::MidiMessage::noteOn (1, 0x12, (juce::uint8) 127));       // mute row, strip 3
+        check (std::abs (cutoff() - 1.0f) < 0.01f, "B3 pressed drives its slot");
+        send (juce::MidiMessage::noteOn (1, 0x12, (juce::uint8) 0));
+        check (std::abs (cutoff() - 0.0f) < 0.01f, "and lets go");
+        h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "button-3" }, { "toggle", true } });
+        send (juce::MidiMessage::noteOn (1, 0x02, (juce::uint8) 127));       // record row, strip 3
+        send (juce::MidiMessage::noteOn (1, 0x02, (juce::uint8) 0));
+        check (std::abs (cutoff() - 1.0f) < 0.01f, "a latching button latches on, whatever row it sends");
+
+        // Transport.
+        send (juce::MidiMessage::noteOn (1, 0x5E, (juce::uint8) 127));
+        check (h.service->surfaceTransport().playing, "Play plays");
+        send (juce::MidiMessage::noteOn (1, 0x5D, (juce::uint8) 127));
+        check (! h.service->surfaceTransport().playing, "Stop stops");
+
+        // None of it is playing: the section never reaches the learn path as notes.
+        h.cmd ("learnSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", 4 } });
+        send (juce::MidiMessage::noteOn (1, 0x12, (juce::uint8) 127));
+        check ((int) [&] { for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+                               for (const auto& sl : *pg.getProperty ("slots", {}).getArray())
+                                   if (sl.getProperty ("slotId", {}).toString() == "fader-5")
+                                       return (int) sl.getProperty ("midiNote", -1);
+                           return -2; }() == -1,
+               "a Mackie button cannot be learned as a note while the section is read as controls");
+        h.cmd ("cancelMidiLearn");
+
+        // Off: the section is ordinary MIDI again, and faders stop driving slots.
+        h.cmd ("setMackieSection", { { "enabled", false } });
+        check (! h.service->mackieSectionEnabled(), "the section can be handed back");
+        const auto* devices = h.emits.last ("instrumentHostAudioDevices");
+        check (devices != nullptr && ! (bool) devices->getProperty ("mackieSection", true),
+               "and the device list says so");
+        h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "fader-1" }, { "value", 0.3 } });
+        fader (1, 0.3f);
+        fader (1, 0.9f);
+        check (std::abs (cutoff() - 0.3f) < 0.02f, "with it off a fader drives nothing");
+    }
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        check (! h.service->mackieSectionEnabled(), "the setting survives a restart");
+        juce::var layers;
+        for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+            if (pg.getProperty ("pageId", {}).toString() == pageId)
+                layers = pg.getProperty ("faderLayers", {});
+        check ((int) layers.getProperty ("count", 0) == 2, "and so do the fader layers");
+        h.cmd ("setMackieSection", { { "enabled", true } });
     }
 }
 
@@ -9898,8 +10341,9 @@ void testGeneratedProduct()
             keys     += control.kind == "keys"    ? 1 : 0;
         }
         check (faders == 9, "all nine faders are drawn — they are on the box");
-        check (layout.addressableCount ("fader") == 0 && profile->capabilities.faders == 0,
-               "and none is addressable, which is what faders = 0 has always meant");
+        check (layout.addressableCount ("fader") == 9 && profile->capabilities.faders == 9,
+               "and all nine are addressable, through the Mackie section");
+        check (layout.addressableCount ("button") == 8, "as are B1-B8, and no other button");
         check (encoders == 8 && layout.addressableCount ("encoder") == 8,
                "every encoder is drawn and every one can be reached");
         check (pads == 8 && layout.addressableCount ("pad") == 8, "and so is every pad");
@@ -11101,6 +11545,28 @@ void testEditorThumbnails()
     check (shrunk.getWidth() * 180 == shrunk.getHeight() * 320, "and keeps the aspect ratio");
     check (editorSnapshot::downscaled (realPicture, 4096).getWidth() == 320,
            "a picture already small enough is left alone rather than blown up");
+
+    // An isolated plug-in's editor borrows the worker's window. Before that window arrives the
+    // component shows "Opening …" — a picture that is not blank, and the one picture that must
+    // never be cached as a plug-in's face. It says where its pixels are, or that it has none.
+    {
+        struct Borrowing final : juce::Component, editorSnapshot::ForeignWindowSource
+        {
+            juce::int64 handle = 0;
+            juce::int64 foreignWindowHandle() const override { return handle; }
+            void paint (juce::Graphics& g) override
+            {
+                g.fillAll (juce::Colours::darkgrey);
+                g.setColour (juce::Colours::white);
+                g.drawText ("Opening Synth...", getLocalBounds(), juce::Justification::centred);
+            }
+        } placeholder;
+        placeholder.setSize (320, 180);
+        check (! editorSnapshot::isBlank (placeholder.createComponentSnapshot (placeholder.getLocalBounds())),
+               "the placeholder is a picture of something");
+        check (! editorSnapshot::capture (placeholder).isValid(),
+               "and a borrowed-window editor with no window yet is never photographed");
+    }
 
     Harness h (dir);
     h.cmd ("getState");
@@ -12448,6 +12914,8 @@ int main (int argc, char* argv[])
     testHardwareTotalRecall();
     testHardwarePatchesInTheLibrary();
     testPadsAndFaders();
+    testPadLayers();
+    testMackieSection();
     testMidiSourceCommands();
     testLayerGroupCommands();
     testPatchCompare();

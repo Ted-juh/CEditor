@@ -564,3 +564,79 @@ New ideas go here with a date, so nothing gets lost between sessions.
   whose state is kept with the slot so a latched pad survives a restart rather than resetting
   under a lit LED. The CTRL49's own pads keep their performance role; this is the generic
   path, which is the one the drawing above exists for.
+
+  **Drawn as hardware, retraced, and pads with layers — 2026-09-25.** Three steps, each asked
+  for by the owner looking at the tab next to the keyboard.
+
+  *The faces.* Every control kind now draws as what it is — a knurled encoder with a 270° LED
+  arc, a fader cap in its slot, raised rubber buttons, ribbed wheels, a real keybed, an LCD,
+  and translucent pads lit from inside. Per KIND, never per device: a described controller
+  gets the same faces from the same layout data. State is one colour, `--led`, and each face
+  puts it where its real light is.
+
+  *The retrace.* A straight-on photo of the owner's unit showed what the first tracing got
+  wrong: pads 1-4 are the TOP row (the MPC convention was assumed and is not what the unit
+  prints), there are eight small buttons between the encoders and the pads — one above each
+  pad, printed 1/4 … 1/32T for Time Division — where four were drawn, and the middle of the
+  navigation cross is the data dial. The layout is now written in that photo's pixels and
+  divided out in one place; the photo itself stays out of the repository.
+
+  *Pad layers.* A pad can carry up to four assignments, one per layer, each a slot of its own
+  (`ControlSlot::layer`; the first layer keeps the id pads always had, so every earlier page is
+  layer 1 unchanged). The page records per pad how many layers it cycles through and which one
+  is playing (`ControlPage::padLayers`), and only that slot answers the pad — which is also the
+  one exception to "learning a controller moves it": the other layers of the same pad keep the
+  note, because sharing it is the point. Holding the small button above a pad for 450 ms steps
+  that pad, and only that pad, to its next layer, wrapping at its count; a short press is left
+  free, and with Time Division held the buttons still pick a division. The buttons send CC
+  19-26 with a release, which the reducer now reports so the hold can be timed; the step fires
+  at the threshold rather than on release, so the pad changes under your finger.
+
+  The layer is readable off the pad itself. Each layer has a colour — chosen, or a default per
+  layer number (L1 the unit's stock orange, then cyan, magenta, green) — and on a control page
+  the broker paints every pad from `InstrumentHostService::padLight`: full for an assigned
+  layer, a third for a latching pad that is off, a tenth for an empty layer of a layered pad,
+  dark for a plain empty pad, dim red for an assignment that no longer resolves. Only changed
+  pads are sent; the other pages keep the stock orange. The drawing uses the same colours and
+  shows a pip per layer on the pad. Whether the small buttons themselves can be coloured is
+  not known yet, so nothing relies on it.
+
+  One gap closed on the way: on a control page the CTRL49's own pad hits used to go nowhere —
+  pads only worked through MIDI learn on the public port. Pad N now drives pad N's live slot
+  by number, as the encoders drive theirs, unless that slot has a learned binding, which is
+  then left to play it alone (a latching pad driven by both would flip twice and do nothing).
+
+  Not verified on the unit: that the eight buttons are CC 19-26 on the private port (the
+  reducer's Time Division handling says so, a MIDI log will confirm it), and how the pads
+  render the dimmed colours.
+
+  **The Mackie section, and fader layers — 2026-09-25.** The nine faders, B1-B8, Bank and the
+  transport sit in the unit's Mackie Control section, on a port of its own ("CTRL49
+  Mackie/HUI"), and the screen-builder bridge deliberately never opened it so a DAW could. The
+  host, it turned out, always had: `startAudio` enables every input, so that port was already
+  HoSTage's — and fed straight to the instruments, where moving fader 1 bent the pitch of
+  whatever listened on channel 1.
+
+  So the question was never who opens the port but what HoSTage does with it, and that is now
+  a setting, on by default (`setMackieSection`, persisted in `mackie-section.json`). On, a
+  Mackie/HUI port — known by its name — is decoded as Mackie Control (`MackieControl.h`):
+  pitch bend on channels 1-9 is fader N, the four rows of strip notes are button N (which row
+  B1-B8 send is the unit's own Button Mode, so all four read the same), bank and channel
+  left/right step, and Play, Stop and Rewind drive the transport. A gate in front of the player
+  keeps the port away from the instruments, and the decoded events never reach MIDI learn. Off,
+  the port is plain MIDI again, as it always was.
+
+  The faders drive the fader slots of the page the hardware is on, by number, as the encoders
+  do. They have no motors, so soft takeover is always on for them: after a page or layer change
+  a fader only takes over once it reaches the value it would otherwise jump. B1-B8 are a new
+  slot kind, `button`, pressed like pads — momentary, or latching with the slot's `toggle`.
+
+  The faders have layers too, but as a BANK: one set for all nine (`ControlPage::faderLayers`,
+  1-4), stepped together by Bank ◀ ▶ — faders are played as a row where pads are played one by
+  one. Button Mode was the other candidate and was left alone: on the unit it most likely
+  changes what B1-B8 send, and a switch the firmware already means something by is a switch
+  two owners would fight over.
+
+  Not verified on the unit: which notes Bank ◀ ▶ send (bank or channel left/right — both are
+  read), which row B1-B8 send, and whether the unit is set to Mackie rather than HUI, which
+  encodes the faders differently and is not decoded.

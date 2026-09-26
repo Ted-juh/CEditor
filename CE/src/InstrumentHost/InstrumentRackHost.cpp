@@ -1410,15 +1410,20 @@ bool InstrumentRackHost::setSlotLatched (const juce::String& pageId, const juce:
 }
 
 juce::String InstrumentRackHost::ensureSurfaceSlot (const juce::String& pageId,
-                                                    const juce::String& kind, int index)
+                                                    const juce::String& kind, int index, int layer)
 {
     auto* page = model.findPage (pageId);
     if (page == nullptr || index < 0 || index > 127)
         return {};
-    if (kind != "encoder" && kind != "fader" && kind != "pad")
+    if (kind != "encoder" && kind != "fader" && kind != "pad" && kind != "button")
+        return {};
+    // Only pads and faders have layers, and only as many as they may have at most: minting a
+    // slot on a layer above the current count is how you prepare one before raising it.
+    if (layer < 0 || layer >= ControlPage::maxPadLayers
+        || (layer > 0 && kind != "pad" && kind != "fader"))
         return {};
 
-    if (auto* existing = page->findSurfaceSlot (kind, index))
+    if (auto* existing = page->findSurfaceSlot (kind, index, layer))
         return existing->slotId;
     if (page->slots.size() >= ControlPage::maxSlots)
         return {};
@@ -1426,11 +1431,71 @@ juce::String InstrumentRackHost::ensureSurfaceSlot (const juce::String& pageId,
     ControlSlot slot;
     slot.kind = kind;
     slot.index = index;
-    slot.slotId = kind + "-" + juce::String (index + 1);
+    slot.layer = layer;
+    // The first layer keeps the id every pad slot has always had, so a page written before
+    // layers existed is layer 1 of the same pad without a rename.
+    slot.slotId = kind + "-" + juce::String (index + 1)
+                + (layer > 0 ? "-L" + juce::String (layer + 1) : juce::String());
     if (page->findSlot (slot.slotId) != nullptr)     // a hand-edited manifest got there first
         slot.slotId += "-" + juce::Uuid().toDashedString();
     page->slots.add (slot);
     return slot.slotId;
+}
+
+bool InstrumentRackHost::setSlotColour (const juce::String& pageId, const juce::String& slotId,
+                                        int colour)
+{
+    auto* page = model.findPage (pageId);
+    auto* slot = page != nullptr ? page->findSlot (slotId) : nullptr;
+    if (slot == nullptr)
+        return false;
+    slot->colour = colour >= 0 ? (colour & 0xFFFFFF) : -1;
+    return true;
+}
+
+bool InstrumentRackHost::setPadLayerCount (const juce::String& pageId, int padIndex, int count)
+{
+    auto* page = model.findPage (pageId);
+    if (page == nullptr || padIndex < 0 || padIndex > 127)
+        return false;
+    page->setPadLayerCount (padIndex, count);
+    return true;
+}
+
+bool InstrumentRackHost::setActivePadLayer (const juce::String& pageId, int padIndex, int layer)
+{
+    auto* page = model.findPage (pageId);
+    return page != nullptr && padIndex >= 0 && padIndex <= 127
+           && page->setActivePadLayer (padIndex, layer);
+}
+
+bool InstrumentRackHost::setFaderLayerCount (const juce::String& pageId, int count)
+{
+    auto* page = model.findPage (pageId);
+    if (page == nullptr)
+        return false;
+    page->setFaderLayerCount (count);
+    return true;
+}
+
+bool InstrumentRackHost::setActiveFaderLayer (const juce::String& pageId, int layer)
+{
+    auto* page = model.findPage (pageId);
+    return page != nullptr && page->setActiveFaderLayer (layer);
+}
+
+int InstrumentRackHost::stepFaderLayer (const juce::String& pageId, int delta)
+{
+    auto* page = model.findPage (pageId);
+    return page != nullptr ? page->stepFaderLayer (delta) : -1;
+}
+
+int InstrumentRackHost::cyclePadLayer (const juce::String& pageId, int padIndex)
+{
+    auto* page = model.findPage (pageId);
+    if (page == nullptr || padIndex < 0 || padIndex > 127)
+        return -1;
+    return page->cyclePadLayer (padIndex);
 }
 
 bool InstrumentRackHost::removePart (const juce::String& partId)

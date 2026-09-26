@@ -14,6 +14,7 @@
     "test:effects-dock": "node browser-checks/effectsTab.mjs",
     "test:shape-effects": "node browser-checks/shapeEffects.mjs",
     "test:screen-dock": "node browser-checks/screenTab.mjs",
+    "test:screen-lab": "node browser-checks/ctrl49ScreenLab.mjs",
     "test:screen-animation": "node browser-checks/screenAnimation.mjs",
     "test:display-gap": "node browser-checks/displayGapReview.mjs",
     "test:screen-runtime": "node browser-checks/screenRuntime.mjs",

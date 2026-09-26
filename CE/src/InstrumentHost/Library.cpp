@@ -549,7 +549,7 @@ Library::LoadResult Library::loadFrom (const juce::File& file)
 
 bool Library::saveTo (const juce::File& file) const
 {
-    conflictCopy = {};
+    conflictCopy = juce::File();
     // The refusal is the point. After a failed read this object is empty because the read
     // failed, not because the library is empty, and writing it out is how a disk hiccup turns
     // into deleted curation.

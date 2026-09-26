@@ -138,7 +138,8 @@ private:
             startTimer (captureDelaysMs[captureAttempt]);
     }
 
-    static constexpr int captureDelaysMs[] { 900, 2200, 4500 };
+    // The last try is for an isolated editor, whose worker may still be starting cold.
+    static constexpr int captureDelaysMs[] { 900, 2200, 4500, 9000 };
     static constexpr int headerHeight = 28;
 
     PluginEditorHost& owner;

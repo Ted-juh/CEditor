@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 #include "Ctrl49Reducer.h"
 #include "Ctrl49Session.h"
 #include "InstrumentHost/InstrumentHostService.h"
@@ -144,6 +146,8 @@ private:
     void pumpInput (bool fromHardware);
     void refreshDisplay (bool toHardware);
     void emitScreen (const Bytes& labels, const Bytes& state) const;
+    void paintPads();
+    void forgetPadState();
 
     host::InstrumentHostService& service;
     Options options;
@@ -171,6 +175,15 @@ private:
     Bytes lastLabels, lastState;             // last sent to the keyboard
     Bytes shownLabels, shownState;           // last emitted to the app's screen
     bool shownOnKeyboard = false;
+
+    // The eight small buttons above the pads, one per pad: when each went down (-1 = up) and
+    // whether its hold has already fired, so a held button steps its pad's layer ONCE, at the
+    // threshold, rather than on release — you feel the pad change under your finger.
+    static constexpr double longPressMs = 450.0;
+    std::array<double, 8> switchDownAt { -1, -1, -1, -1, -1, -1, -1, -1 };
+    std::array<bool, 8> switchFired {};
+    // What each pad was last painted (0xRRGGBB, -1 = unknown), so only a change is sent.
+    std::array<int, 8> paintedPads { -1, -1, -1, -1, -1, -1, -1, -1 };
 };
 
 } // namespace ceditor::ctrl49

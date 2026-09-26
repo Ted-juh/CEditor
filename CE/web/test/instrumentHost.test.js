@@ -15,6 +15,7 @@ import {
   filterInstruments,
   mockHostState,
   applyMockCommand,
+  normalizeAudioDevices,
   advanceMockMidiLfos,
   advanceMockEnvelopes,
   advanceMockMsegs,
@@ -120,6 +121,9 @@ import {
   TILE_PATTERNS,
   normalizeSurfaceLayout,
   surfaceControlSlot,
+  padLayers,
+  padColourCss,
+  surfaceSlotId,
   filterEffects,
   mockSurfaceLayout,
   emptySurfaceLayout,
@@ -2205,10 +2209,97 @@ test('mock reducer: dropping on a fader or a pad mints its slot, then it is an o
   assert.equal(surfaceControlSlot(state.rack.pages.find((p) => p.pageId === pageId), { kind: 'pad', index: 5 }).toggle, true,
     'toggle is a slot option like any other');
 
-  state = applyMockCommand(state, { cmd: 'assignSurfaceControl', pageId, kind: 'button', index: 0,
+  state = applyMockCommand(state, { cmd: 'assignSurfaceControl', pageId, kind: 'wheel', index: 0,
                                     partId: 'mock-part-1', parameterId: 'cutoff' });
   assert.equal(state.rack.pages.find((p) => p.pageId === pageId).slots.length, before + 2,
     'a kind the surface does not address mints nothing');
+});
+
+test('pad layers: a slot per layer, the drawing answers for the one the pad is playing', () => {
+  // The native shape: page.padLayers lists only pads with more than one layer; slots carry
+  // their layer; the first layer keeps the id pads always had (RackModel / ensureSurfaceSlot).
+  const state = normalizeHostState({ rack: { pages: [{ pageId: 'p', slots: [
+    { slotId: 'pad-4', kind: 'pad', index: 3, assigned: true, parameterId: 'cutoff' },
+    { slotId: 'pad-4-L2', kind: 'pad', index: 3, layer: 1, assigned: true, parameterId: '@pan', colour: 0x123456 },
+    { slotId: 's1', kind: 'encoder', index: 0, layer: 2 },
+  ], padLayers: [{ index: 3, count: 2, active: 1 }, { index: 5, count: 9, active: 7 }, { index: -1, count: 2 }] }] } });
+  const page = state.rack.pages[0];
+  assert.deepEqual(padLayers(page, 3), { count: 2, active: 1 });
+  assert.deepEqual(padLayers(page, 5), { count: 4, active: 0 }, 'at most four, and never playing one it has not got');
+  assert.deepEqual(padLayers(page, 6), { count: 1, active: 0 }, 'a pad not listed has one layer');
+  assert.equal(page.slots[2].layer, 0, 'only a pad has layers');
+
+  assert.equal(surfaceControlSlot(page, { kind: 'pad', index: 3 }).slotId, 'pad-4-L2',
+    'without a layer the drawing answers for the one the pad is playing');
+  assert.equal(surfaceControlSlot(page, { kind: 'pad', index: 3 }, 0).slotId, 'pad-4');
+  assert.equal(surfaceControlSlot(page, { kind: 'pad', index: 3 }, 2), null);
+
+  assert.equal(padColourCss(page.slots[1], 1), '#123456', 'a colour somebody chose');
+  assert.equal(padColourCss(page.slots[0], 0), '#ffa500', 'or the layer default, the stock orange first');
+  assert.equal(padColourCss(null, 1), '#00c8ff');
+  assert.equal(surfaceSlotId('pad', 3, 1), 'pad-4-L2');
+  assert.equal(surfaceSlotId('encoder', 0), 'encoder-1');
+});
+
+test('mock reducer: pad layers mirror the native rules', () => {
+  let state = applyMockCommand(mockHostState(), { cmd: 'addControlPage', name: 'Live' });
+  const pageId = state.rack.pages.at(-1).pageId;
+  const page = () => state.rack.pages.find((p) => p.pageId === pageId);
+
+  state = applyMockCommand(state, { cmd: 'setPadLayers', pageId, index: 2, count: 3 });
+  assert.deepEqual(padLayers(page(), 2), { count: 3, active: 0 });
+  state = applyMockCommand(state, { cmd: 'setPadActiveLayer', pageId, index: 2, layer: 2 });
+  assert.equal(padLayers(page(), 2).active, 2);
+  state = applyMockCommand(state, { cmd: 'setPadActiveLayer', pageId, index: 2, layer: 3 });
+  assert.equal(padLayers(page(), 2).active, 2, 'a layer the pad does not have is refused');
+
+  state = applyMockCommand(state, { cmd: 'assignSurfaceControl', pageId, kind: 'pad', index: 2,
+                                    partId: 'mock-part-1', parameterId: 'cutoff' });
+  const minted = surfaceControlSlot(page(), { kind: 'pad', index: 2 });
+  assert.equal(minted.slotId, 'pad-3-L3', 'a drop lands on the layer the pad is playing');
+  assert.equal(minted.layer, 2);
+  state = applyMockCommand(state, { cmd: 'setControlSlotOptions', pageId, slotId: minted.slotId, colour: 0xff0000 });
+  assert.equal(surfaceControlSlot(page(), { kind: 'pad', index: 2 }).colour, 0xff0000, 'colour is a slot option');
+
+  state = applyMockCommand(state, { cmd: 'setPadLayers', pageId, index: 2, count: 2 });
+  assert.deepEqual(padLayers(page(), 2), { count: 2, active: 0 }, 'lowering the count moves the pad off a lost layer');
+  assert.ok(page().slots.some((s) => s.slotId === 'pad-3-L3'), 'and keeps the slot');
+  state = applyMockCommand(state, { cmd: 'setPadLayers', pageId, index: 2, count: 1 });
+  assert.equal((page().padLayers ?? []).length, 0, 'one layer is not listed at all');
+});
+
+test('the Mackie section: buttons are slots, the faders share layers, and the setting is on by default', () => {
+  const state = normalizeHostState({ rack: { pages: [{ pageId: 'p', slots: [
+    { slotId: 'button-3', kind: 'button', index: 2, assigned: true, parameterId: 'cutoff', layer: 2 },
+    { slotId: 'fader-1', kind: 'fader', index: 0, assigned: true, parameterId: 'cutoff' },
+    { slotId: 'fader-1-L2', kind: 'fader', index: 0, layer: 1, assigned: true, parameterId: '@pan' },
+  ], faderLayers: { count: 2, active: 1 } }, { pageId: 'q', slots: [], faderLayers: { count: 7, active: 5 } }] } });
+  const [page, other] = state.rack.pages;
+  assert.equal(page.slots[0].kind, 'button', 'a button is a slot kind');
+  assert.equal(page.slots[0].layer, 0, 'and has no layers');
+  assert.deepEqual(page.faderLayers, { count: 2, active: 1 });
+  assert.deepEqual(other.faderLayers, { count: 4, active: 0 }, 'at most four, never a layer it has not got');
+  assert.equal(surfaceControlSlot(page, { kind: 'fader', index: 0 }).slotId, 'fader-1-L2',
+    'a fader answers for the layer the bank is playing');
+  assert.equal(surfaceControlSlot(page, { kind: 'button', index: 2 }).slotId, 'button-3');
+
+  let mock = applyMockCommand(mockHostState(), { cmd: 'addControlPage', name: 'Live' });
+  const pageId = mock.rack.pages.at(-1).pageId;
+  mock = applyMockCommand(mock, { cmd: 'setFaderLayers', pageId, count: 3 });
+  mock = applyMockCommand(mock, { cmd: 'setFaderActiveLayer', pageId, layer: 2 });
+  mock = applyMockCommand(mock, { cmd: 'assignSurfaceControl', pageId, kind: 'fader', index: 4,
+                                  partId: 'mock-part-1', parameterId: 'cutoff' });
+  const live = mock.rack.pages.find((p) => p.pageId === pageId);
+  assert.equal(surfaceControlSlot(live, { kind: 'fader', index: 4 }).slotId, 'fader-5-L3',
+    'a drop on a fader lands on the layer the bank is playing');
+  mock = applyMockCommand(mock, { cmd: 'assignSurfaceControl', pageId, kind: 'button', index: 1, layer: 1,
+                                  partId: 'mock-part-1', parameterId: 'cutoff' });
+  assert.equal(surfaceControlSlot(mock.rack.pages.find((p) => p.pageId === pageId), { kind: 'button', index: 1 }), null,
+    'a button has no layer to land on');
+
+  assert.equal(normalizeAudioDevices({}).mackieSection, true, 'the section is read as controls unless it is turned off');
+  assert.equal(normalizeAudioDevices({ mackieSection: false }).mackieSection, false);
+  assert.deepEqual(normalizeAudioDevices({ mackiePorts: ['CTRL49 Mackie/HUI'] }).mackiePorts, ['CTRL49 Mackie/HUI']);
 });
 
 test('a controller move carries which controller it was', () => {
@@ -2813,7 +2904,7 @@ test('normalizeSurfaceLayout groups controls into the regions a person thinks in
   assert.equal(byId.encoders.addressable, 8, 'every encoder can be reached');
   assert.equal(byId.pads.addressable, 8, 'and every pad');
   assert.equal(byId.faders.count, 9, 'all nine faders are drawn');
-  assert.equal(byId.faders.addressable, 0, 'and none of them is ours to drive');
+  assert.equal(byId.faders.addressable, 9, 'and all nine are ours to drive, through the Mackie section');
 
   // A region's box has to actually contain its controls, or zooming to it shows the wrong thing.
   const pads = shaped.controls.filter((c) => c.kind === 'pad');

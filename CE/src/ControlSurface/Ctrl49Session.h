@@ -27,6 +27,13 @@ namespace ceditor::ctrl49
 
 struct Ctrl49SessionOptions
 {
+    // A keepalive after every this many PNG upload frames (0 = none, the proven sequence).
+    // The device's watchdog restores its stock screen when keepalives stop for ~900 ms, and
+    // the proven startup sends none while it uploads: fine for one 19 KB filmstrip, not for
+    // the hundreds of KB a rich page carries. Opt-in, because interleaving is not what VIP
+    // was captured doing; the screen lab turns it on and can turn it off to compare.
+    int keepaliveEveryUploadFrames = 0;
+
     // Time the loading page stays up before the landing/main page is shown.
     int loadingMilliseconds = 900;
 
@@ -61,7 +68,8 @@ public:
     // PNGs. Uploads any PNG assets before the bind/init so the page can decode them.
     // Pure; exposed for golden-sequence tests.
     static std::vector<TimedFrame> buildStartupSequence (const Bytes& rawLua,
-                                                         const std::vector<PngAsset>& assets = {});
+                                                         const std::vector<PngAsset>& assets = {},
+                                                         int keepaliveEveryUploadFrames = 0);
 
     Ctrl49Session (IControllerOutput& output, Bytes rawLua, Ctrl49SessionOptions options = {});
     Ctrl49Session (IControllerOutput& output, Bytes rawLua, std::vector<PngAsset> assets,

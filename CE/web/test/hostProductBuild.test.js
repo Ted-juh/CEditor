@@ -573,6 +573,7 @@ test('every command exposed by the Hostage store has a native service handler', 
   const internalNativeCommands = [
     'addLibraryPath',            // continuation of the native directory chooser
     'getLicence',                // state-refresh compatibility route
+    'setSurfaceActive',          // sent by the editor's HoSTage tab opening and closing (panels.js)
     'surfacePerformanceEncoder', // CTRL49 callback and recorded replay action
     'surfaceStepPad',            // CTRL49 callback and recorded replay action
   ];
@@ -611,6 +612,7 @@ test('every command-sending store export is reachable from Svelte or deliberatel
     'MidiChainPanel.svelte', 'LayerGroupsPanel.svelte', 'LayerGroupEditor.svelte', 'HostRackCanvas.svelte',
     'ProductPanel.svelte', 'ReliabilityPanel.svelte', 'LicencePanel.svelte',
     'StageView.svelte', 'HostSurfacePanel.svelte', 'SoundBrowser.svelte', 'HostLibraryPanel.svelte',
+    'Ctrl49ScreenCard.svelte',
   ].map((name) => readFileSync(path.join(
     repoRoot, 'CE', 'web', 'src', 'CE_Application', 'sections', name), 'utf8')).join('\n');
 

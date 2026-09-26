@@ -69,7 +69,8 @@ private:
     // The same waiting the docked pane does, for the same reason: a plug-in is not finished
     // drawing when its editor is constructed, and a blank result is retried rather than
     // believed. PluginEditorHost.h carries the full reasoning.
-    static constexpr int captureDelaysMs[] { 900, 2200, 4500 };
+    // The last try is for an isolated editor, whose worker may still be starting cold.
+    static constexpr int captureDelaysMs[] { 900, 2200, 4500, 9000 };
 
     void timerCallback() override
     {

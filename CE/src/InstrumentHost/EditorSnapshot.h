@@ -46,6 +46,18 @@ juce::Image downscaled (const juce::Image& image, int maxEdge);
     guessing involved to protect them from. */
 bool writePng (const juce::Image& image, const juce::File& destination, bool rejectBlank = true);
 
+/** An editor whose pixels live in a native window it borrows rather than wraps: the isolated
+    worker's editor (IsolatedPluginProxy::RemoteEditor), a window owned by ANOTHER PROCESS and
+    parented into ours. It is no HWNDComponent, so without saying where that window is, a
+    capture would photograph the component underneath — a flat fill once the plug-in covers
+    it, or the "Opening …" placeholder before it does, which is the one picture that must never
+    become a plug-in's face. 0 = the window is not there yet: nothing to capture. */
+struct ForeignWindowSource
+{
+    virtual ~ForeignWindowSource() = default;
+    virtual juce::int64 foreignWindowHandle() const = 0;
+};
+
 /** The editor's own pixels, or an empty image when the platform could not get them. */
 juce::Image capture (juce::Component& editor);
 

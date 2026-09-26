@@ -206,121 +206,122 @@ SurfaceLayout buildGenericLayout (const SurfaceCapabilities& capabilities)
 namespace
 {
 
-// The CTRL49's face, traced by eye from a straight-on product photo. Positions are normalised
-// against the unit's bounding box and they are APPROXIMATE — close enough that you recognise
-// your own keyboard and can point at the right knob, not a mechanical drawing. Nobody should
-// measure anything with them.
+// The CTRL49's face, traced from a straight-on photograph of an owner's own unit (1200 x 483,
+// the unit's bounding box) and written down here in that photo's pixels. It replaced a first
+// tracing, made by eye from a smaller product shot, that had the pads' rows upside down,
+// four division buttons where there are eight, and no data dial. The pixels are divided out
+// below, so the numbers read as what they are: measurements off a picture of the real thing.
+// They are APPROXIMATE all the same — close enough that you recognise your own keyboard and
+// can point at the right knob, not a mechanical drawing.
 //
 // The picture is authored as numbers rather than shipped as an image on purpose: a product
 // photograph belongs to its maker, and this repository is AGPLv3. Coordinates are ours.
 //
-// Note what is drawn but NOT addressable (index -1): nine faders, every button outside the
-// pads, the wheels, the keybed. That is not an oversight — see `faders = 0` below.
+// Note what is drawn but NOT addressable (index -1): the buttons outside the pads and the
+// Mackie strip, the dial, the wheels, the keybed. The faders and B1-B8 are addressable through
+// the unit's Mackie section, which HoSTage reads as controls (MackieControl.h): fader N is
+// pitch bend on channel N, master on 9; B-button N is strip note N in whichever row the unit's
+// Button Mode sends.
 SurfaceLayout buildCtrl49Layout()
 {
-    SurfaceLayout layout;
-    layout.aspect = 2.31f;      // ~1040 x 450 on the reference photo
+    constexpr float photoW = 1200.0f, photoH = 483.0f;
 
-    const auto add = [&layout] (const char* id, const char* kind, const char* label,
+    SurfaceLayout layout;
+    layout.aspect = photoW / photoH;
+
+    const auto add = [&layout] (const juce::String& id, const char* kind, const juce::String& label,
                                 float x, float y, float w, float h, int index = -1)
     {
-        layout.controls.add ({ id, kind, label, x, y, w, h, index });
+        layout.controls.add ({ id, kind, label, x / photoW, y / photoH, w / photoW, h / photoH, index });
     };
 
-    // --- the Mackie device-control section: one master and eight channel faders, the bank
-    //     buttons beside them, and the eight assignable buttons underneath.
-    add ("fader-master", "fader", "Vol", 0.122f, 0.085f, 0.024f, 0.175f);
+    // --- the Mackie device-control section: one master and eight channel faders, and the
+    //     eight assignable buttons under the channel faders, each centred on its fader.
+    //     Indices are Mackie's: faders 0..7 are channels 1-8, the master is channel 9.
+    add ("fader-master", "fader", "Vol", 168.0f, 47.0f, 30.0f, 112.0f, 8);
     for (int i = 0; i < 8; ++i)
     {
-        const auto x = 0.186f + (float) i * 0.0345f - 0.012f;
-        layout.controls.add ({ "fader-" + juce::String (i + 1), "fader",
-                               "F" + juce::String (i + 1), x, 0.085f, 0.024f, 0.175f, -1 });
-        layout.controls.add ({ "button-b" + juce::String (i + 1), "button",
-                               "B" + juce::String (i + 1), x, 0.384f, 0.024f, 0.040f, -1 });
+        const auto centre = 237.0f + (float) i * 35.8f;
+        add ("fader-" + juce::String (i + 1), "fader", "F" + juce::String (i + 1),
+             centre - 15.0f, 47.0f, 30.0f, 112.0f, i);
+        add ("button-b" + juce::String (i + 1), "button", "B" + juce::String (i + 1),
+             centre - 7.0f, 186.0f, 14.0f, 14.0f, i);
     }
-    add ("button-bank-left",  "button", "◀", 0.122f, 0.370f, 0.016f, 0.045f);
-    add ("button-bank-right", "button", "▶", 0.142f, 0.370f, 0.016f, 0.045f);
-    add ("button-button-mode", "button", "Mode", 0.442f, 0.384f, 0.021f, 0.040f);
+    add ("button-bank-left",   "button", "◀",    166.0f, 186.0f, 14.0f, 14.0f);
+    add ("button-bank-right",  "button", "▶",    190.0f, 186.0f, 14.0f, 14.0f);
+    add ("button-button-mode", "button", "Mode", 515.0f, 186.0f, 14.0f, 14.0f);
 
-    // --- the screen, and the navigation cluster under it.
-    add ("display", "display", "Screen", 0.463f, 0.058f, 0.128f, 0.204f);
-    add ("button-page-left",  "button", "Page ◀", 0.466f, 0.291f, 0.037f, 0.033f);
-    add ("button-page-right", "button", "Page ▶", 0.553f, 0.291f, 0.037f, 0.033f);
-    add ("button-main",    "button", "Main",    0.466f, 0.342f, 0.032f, 0.033f);
-    add ("button-browse",  "button", "Browse",  0.466f, 0.400f, 0.035f, 0.033f);
-    add ("button-preset",  "button", "Preset",  0.562f, 0.330f, 0.037f, 0.030f);
-    add ("button-control", "button", "Control", 0.562f, 0.371f, 0.037f, 0.030f);
-    add ("button-multi",   "button", "Multi",   0.562f, 0.412f, 0.037f, 0.030f);
-    add ("button-nav-up",     "button", "▲", 0.520f, 0.296f, 0.020f, 0.050f);
-    add ("button-nav-left",   "button", "◀", 0.500f, 0.348f, 0.020f, 0.050f);
-    add ("button-nav-enter",  "button", "•", 0.520f, 0.348f, 0.020f, 0.050f);
-    add ("button-nav-right",  "button", "▶", 0.540f, 0.348f, 0.020f, 0.050f);
-    add ("button-nav-down",   "button", "▼", 0.520f, 0.400f, 0.020f, 0.050f);
+    // --- the screen, the navigation cluster under it, and the data dial at its centre (the
+    //     reducer's CC 34, which nudges whichever slot is active).
+    add ("display", "display", "Screen", 552.0f, 28.0f, 162.0f, 90.0f);
+    add ("button-page-left",  "button", "Page ◀", 560.0f, 139.0f, 29.0f, 12.0f);
+    add ("button-main",       "button", "Main",   560.0f, 166.0f, 29.0f, 12.0f);
+    add ("button-browse",     "button", "Browse", 560.0f, 194.0f, 29.0f, 12.0f);
+    add ("button-page-right", "button", "Page ▶", 679.0f, 139.0f, 29.0f, 12.0f);
+    add ("button-control",    "button", "Control", 679.0f, 166.0f, 29.0f, 12.0f);
+    add ("button-multi",      "button", "Multi",  679.0f, 194.0f, 29.0f, 12.0f);
+    add ("button-nav-up",    "button", "▲", 624.0f, 138.0f, 19.0f, 14.0f);
+    add ("button-nav-down",  "button", "▼", 624.0f, 191.0f, 19.0f, 14.0f);
+    add ("button-nav-left",  "button", "◀", 600.0f, 162.0f, 13.0f, 19.0f);
+    add ("button-nav-right", "button", "▶", 654.0f, 162.0f, 13.0f, 19.0f);
+    add ("dial-data", "dial", "Data", 620.0f, 157.0f, 27.0f, 28.0f);
 
-    // --- the mode, arpeggiator, pad-bank, favourite and transport buttons.
-    const char* modeRow[]  = { "Setup", "Global", "MIDI", "Split" };
-    const char* modeIds[]  = { "setup", "global", "midi", "split" };
-    const char* arpRow[]   = { "Arp", "Latch", "Full level", "Roll" };
-    const char* arpIds[]   = { "arp", "latch", "full-level", "roll" };
+    // --- the mode, arpeggiator, pad, tap/division/shift, pad-bank, favourite and transport
+    //     buttons: four columns, with Shift spanning the last two.
+    const float column[] = { 750.0f, 793.0f, 836.0f, 880.0f };
+    const char* modeRow[] = { "Setup", "Global", "MIDI", "Split" };
+    const char* modeIds[] = { "setup", "global", "midi", "split" };
+    const char* arpRow[]  = { "Arp", "Latch", "Full level", "Roll" };
+    const char* arpIds[]  = { "arp", "latch", "full-level", "roll" };
     for (int i = 0; i < 4; ++i)
     {
-        const auto x = 0.629f + (float) i * 0.0355f;
-        layout.controls.add ({ juce::String ("button-") + modeIds[i], "button", modeRow[i],
-                               x, 0.080f, 0.030f, 0.036f, -1 });
-        layout.controls.add ({ juce::String ("button-") + arpIds[i], "button", arpRow[i],
-                               x, 0.147f, 0.030f, 0.036f, -1 });
+        add (juce::String ("button-") + modeIds[i], "button", modeRow[i], column[i], 34.0f, 29.0f, 13.0f);
+        add (juce::String ("button-") + arpIds[i],  "button", arpRow[i],  column[i], 64.0f, 29.0f, 13.0f);
+        add ("button-pad-bank-" + juce::String::charToString ((juce::juce_wchar) ('a' + i)), "button",
+             juce::String::charToString ((juce::juce_wchar) ('A' + i)), column[i], 137.0f, 29.0f, 13.0f);
     }
-    add ("button-tap-tempo",     "button", "Tap",   0.629f, 0.213f, 0.030f, 0.036f);
-    add ("button-time-division", "button", "Div",   0.664f, 0.213f, 0.030f, 0.036f);
-    add ("button-shift",         "button", "Shift",         0.700f, 0.213f, 0.030f, 0.036f);
-    for (int i = 0; i < 4; ++i)
-        layout.controls.add ({ "button-pad-bank-" + juce::String ((char) ('a' + i)), "button",
-                               juce::String::charToString ((juce::juce_wchar) ('A' + i)),
-                               0.632f + (float) i * 0.0337f, 0.298f, 0.019f, 0.035f, -1 });
-    for (int i = 0; i < 5; ++i)
-        layout.controls.add ({ "button-favourite-" + juce::String (i), "button",
-                               juce::String (i), 0.632f + (float) i * 0.030f, 0.356f,
-                               0.024f, 0.031f, -1 });
-    const char* transport[] = { "◀◀", "▶▶", "■", "▶", "●" };
+    add ("button-tap-tempo",     "button", "Tap",   750.0f, 94.0f, 29.0f, 13.0f);
+    add ("button-time-division", "button", "Div",   793.0f, 94.0f, 29.0f, 13.0f);
+    add ("button-shift",         "button", "Shift", 836.0f, 94.0f, 73.0f, 13.0f);
+
+    const char* transport[]    = { "◀◀", "▶▶", "■", "▶", "●" };
     const char* transportIds[] = { "rewind", "forward", "stop", "play", "record" };
     for (int i = 0; i < 5; ++i)
-        layout.controls.add ({ juce::String ("button-") + transportIds[i], "button", transport[i],
-                               0.633f + (float) i * 0.029f, 0.409f, 0.021f, 0.040f, -1 });
+    {
+        const auto x = 750.0f + (float) i * 34.8f;
+        add ("button-favourite-" + juce::String (i), "button", juce::String (i), x, 165.0f, 20.0f, 13.0f);
+        add (juce::String ("button-") + transportIds[i], "button", transport[i], x, 194.0f, 20.0f, 16.0f);
+    }
 
-    // --- the eight encoders and the eight pads: the two groups the runtime can actually
-    //     address, which is why these are the only controls carrying an index.
-    for (int i = 0; i < 8; ++i)
-        layout.controls.add ({ "encoder-" + juce::String (i + 1), "encoder",
-                               juce::String (i + 1),
-                               0.788f + (float) (i % 4) * 0.044f,
-                               0.062f + (float) (i / 4) * 0.089f,
-                               0.035f, 0.080f, i });              // Ctrl49Reducer: encoderSlot 0..7
-
-    // The row of small buttons under the encoders. They are unlabelled here because the
-    // reference photo cannot be read with confidence at that size, and inventing four labels
-    // would be worse than four blanks.
-    for (int i = 0; i < 4; ++i)
-        layout.controls.add ({ "button-encoder-bank-" + juce::String (i + 1), "button", "",
-                               0.794f + (float) i * 0.044f, 0.238f, 0.022f, 0.030f, -1 });
-
+    // --- the eight encoders, the eight division buttons and the eight pads: three grids of
+    //     four columns, numbered 1-4 on the top row and 5-8 below, as the unit prints them.
+    //     Encoders and pads are the two groups the runtime can address, which is why they are
+    //     the only controls carrying an index.
     for (int i = 0; i < 8; ++i)
     {
-        // Pads 1-4 sit on the bottom row and 5-8 above them, the way every MPC-descended
-        // surface is laid out and the way the numerals read on the unit.
-        const auto column = i % 4;
-        const auto onTopRow = i >= 4;
-        layout.controls.add ({ "pad-" + juce::String (i + 1), "pad", juce::String (i + 1),
-                               0.787f + (float) column * 0.044f,
-                               onTopRow ? 0.289f : 0.380f,
-                               0.037f, 0.080f, i + 1 });           // buildPadRgb: pad ID 1..8
+        const auto col = (float) (i % 4);
+        const auto lowerRow = i >= 4;
+        add ("encoder-" + juce::String (i + 1), "encoder", juce::String (i + 1),
+             945.0f + col * 47.0f, lowerRow ? 56.0f : 19.0f, 30.0f, 30.0f,
+             i);                                                   // Ctrl49Reducer: encoderSlot 0..7
+
+        // One per pad, directly above the pad it belongs to — printed with the note values the
+        // unit uses them for when Time Division is held.
+        const char* division[] = { "1/4", "1/8", "1/16", "1/32", "1/4T", "1/8T", "1/16T", "1/32T" };
+        add ("button-division-" + juce::String (i + 1), "button", division[i],
+             952.0f + col * 47.0f, lowerRow ? 113.0f : 91.0f, 15.0f, 15.0f);
+
+        add ("pad-" + juce::String (i + 1), "pad", juce::String (i + 1),
+             939.0f + col * 47.0f, lowerRow ? 178.0f : 138.0f, 41.0f, 34.0f,
+             i + 1);                                               // buildPadRgb: pad ID 1..8
     }
 
     // --- what your left hand does, and the keys.
-    add ("button-octave-down", "button", "Oct −", 0.034f, 0.502f, 0.026f, 0.040f);
-    add ("button-octave-up",   "button", "Oct +", 0.063f, 0.502f, 0.031f, 0.040f);
-    add ("wheel-pitch", "wheel", "Pitch", 0.024f, 0.629f, 0.031f, 0.184f);
-    add ("wheel-mod",   "wheel", "Mod",   0.063f, 0.629f, 0.030f, 0.184f);
-    add ("keys", "keys", "49 keys", 0.109f, 0.511f, 0.879f, 0.462f);
+    add ("button-octave-down", "button", "Oct −", 40.0f, 245.0f, 30.0f, 17.0f);
+    add ("button-octave-up",   "button", "Oct +", 85.0f, 245.0f, 31.0f, 17.0f);
+    add ("wheel-pitch", "wheel", "Pitch", 39.0f, 307.0f, 30.0f, 89.0f);
+    add ("wheel-mod",   "wheel", "Mod",   90.0f, 307.0f, 29.0f, 89.0f);
+    add ("keys", "keys", "49 keys", 146.0f, 254.0f, 998.0f, 206.0f);
 
     return layout;
 }
@@ -340,11 +341,11 @@ void registerCtrl49Profile()
     profile.vendor = "M-Audio";
 
     profile.capabilities.encoders = 8;
-    // Nine faders are on the box and the layout draws all nine. None is addressable here: they
-    // sit in the unit's Mackie device-control section, and CEditor speaks nothing that maps
-    // them. Capabilities say what we can DRIVE; the layout says what is THERE. Conformance
-    // below ties the two together, so this zero is a statement rather than an omission.
-    profile.capabilities.faders = 0;
+    // Nine faders are on the box and all nine are driveable: they sit in the unit's Mackie
+    // device-control section, which HoSTage reads as controls when the Mackie section setting
+    // is on (the default). Capabilities say what we can DRIVE; the layout says what is THERE;
+    // conformance ties the two together.
+    profile.capabilities.faders = 9;
     profile.capabilities.pads = 8;
     profile.capabilities.padBanks = 4;
     profile.capabilities.hasDisplay = true;
