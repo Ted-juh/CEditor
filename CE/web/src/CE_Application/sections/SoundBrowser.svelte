@@ -25,6 +25,7 @@
   import { onMount, tick, untrack } from 'svelte';
   import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
   import { matchesPresetKind, presetWindow } from '../utils/soundBrowserLayout.js';
+  import { TAG_FAMILIES, canonicalTag, suggestTags } from '../utils/tagVocabulary.js';
 
   let {
     focusedPart = null,
@@ -186,6 +187,26 @@
   // carried on every record in every library payload.
   let lastAskedSimilar = $state('');
   let selected = $derived(records.find((r) => r.recordId === selectedId) ?? records[0] ?? null);
+
+  // Tags: yours to add and remove, spelled the vocabulary's way when it is one of its words, and
+  // a few suggestions from the name that apply only when clicked.
+  let tagDraft = $state('');
+  const tagSuggestions = $derived(selected ? suggestTags(selected) : []);
+  const knownTags = $derived([...new Set([...TAG_FAMILIES.flatMap((f) => f.tags),
+    ...records.flatMap((r) => r.tags ?? [])])].sort((a, b) => a.localeCompare(b)));
+  function writeTags(record, tags) {
+    setLibraryUserMetadata(record.recordId, { tags: [...new Set(tags.map(canonicalTag).filter(Boolean))] });
+  }
+  function addTag(record, tag) {
+    const text = canonicalTag(tag);
+    if (!record || !text) return;
+    if (!(record.tags ?? []).some((t) => t.toLowerCase() === text.toLowerCase()))
+      writeTags(record, [...(record.tags ?? []), text]);
+    tagDraft = '';
+  }
+  function removeTag(record, tag) {
+    writeTags(record, (record.tags ?? []).filter((t) => t !== tag));
+  }
   let loadResult = $derived($hostLibraryLoad.recordId === selected?.recordId ? $hostLibraryLoad : null);
   let updateIssues = $derived($hostLibrary.scanReport.filter((row) => row.reason || row.unavailable > 0).length);
   let facets = $derived($hostLibrary.facets);
@@ -914,15 +935,28 @@
               >{selected.rating >= star ? '★' : '☆'}</button>
             {/each}
           </div>
-          {#if selected.tags.length > 0}
-            <div class="tags">
-              {#each selected.tags as tag (tag)}
+          <div class="tags" data-testid="record-tags">
+            {#each selected.tags as tag (tag)}
+              <span class="tag-chip">
                 <button type="button" class="chip small"
                         title={`Show everything tagged ${tag}`}
                         onclick={() => ask(cycleLibraryFacet(emptyLibraryQuery(), 'tags', tag))}>{tag}</button>
-              {/each}
-            </div>
-          {/if}
+                <button type="button" class="ghost tag-remove" aria-label={`Remove tag ${tag}`}
+                        title={`Remove ${tag}`} onclick={() => removeTag(selected, tag)}>×</button>
+              </span>
+            {/each}
+            {#each tagSuggestions as suggestion (suggestion.tag)}
+              <button type="button" class="chip small suggested" data-testid="tag-suggestion"
+                      title={`Suggested from the name — click to add ${suggestion.tag}`}
+                      onclick={() => addTag(selected, suggestion.tag)}>+ {suggestion.tag}</button>
+            {/each}
+          </div>
+          <input type="text" class="tag-input" list="library-tag-words" placeholder="Add a tag…"
+                 aria-label="Add a tag" data-testid="tag-input" bind:value={tagDraft}
+                 onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(selected, tagDraft); } }} />
+          <datalist id="library-tag-words">
+            {#each knownTags as word (word)}<option value={word}></option>{/each}
+          </datalist>
           {#if selected.notes}<div class="notes">{selected.notes}</div>{/if}
         </div>
 
@@ -1578,6 +1612,12 @@
   .kv .v.bad { color: #d6a3a3; }
   .rating { display: flex; gap: 1px; }
   .tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
+  .tag-chip { display: inline-flex; align-items: center; }
+  .tag-remove { padding: 0 4px; min-height: 0; font-size: 12px; line-height: 1; opacity: .55; }
+  .tag-remove:hover { opacity: 1; }
+  .chip.suggested { border-style: dashed; opacity: .75; }
+  .chip.suggested:hover { opacity: 1; }
+  .tag-input { margin-top: 6px; width: 100%; box-sizing: border-box; font-size: 11px; }
   .notes { color: var(--host-text-soft); font-size: 11px; margin-top: 6px; }
   .inspector :global(button.insp-remove) { align-self: flex-start; font-size: 11px; padding: 3px 6px; }
   .empty-hint { color: var(--host-text-dim); font-size: 12px; padding: 12px 0; }

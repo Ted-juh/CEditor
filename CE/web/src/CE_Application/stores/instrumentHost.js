@@ -8245,7 +8245,8 @@ function send(payload) {
           ? { ...r,
               favourite: payload.favourite !== undefined ? payload.favourite === true : r.favourite,
               rating: payload.rating !== undefined ? Number(payload.rating) : r.rating,
-              notes: payload.notes !== undefined ? String(payload.notes) : r.notes }
+              notes: payload.notes !== undefined ? String(payload.notes) : r.notes,
+              tags: Array.isArray(payload.tags) ? payload.tags.map(String) : r.tags }
           : r),
       }));
       return;
