@@ -17,6 +17,9 @@
    */
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import ResponseCurveDesigner from '../components/ResponseCurveDesigner.svelte';
+  import StrumEditor from './midiModules/StrumEditor.svelte';
+  import HumanizeEditor from './midiModules/HumanizeEditor.svelte';
+  import { HUMANIZE_FEELS, humanizeFeelOf, beatsToMs } from '../utils/noteModuleViews.js';
   import {
     hostState, hostArpStep, hostChordLearn,
     midiSlotTypes, midiSlotLabels,
@@ -31,6 +34,8 @@
   let chain = $derived(part?.midiChain ?? []);
   // The scale names the build understands come from the native side, like everywhere else.
   let scales = $derived($hostState.performance.scales);
+  // The pictures label time in milliseconds at the tempo actually set.
+  let tempo = $derived($hostState.performance.transport?.tempo ?? 120);
   let openSlotId = $state('');
   let openSlot = $derived(chain.find((slot) => slot.slotId === openSlotId) ?? null);
 
@@ -87,7 +92,9 @@
     if (slot.type === 'humanize')
       return slot.mod.humanizeTimingBeats === 0 && slot.mod.humanizeVelocity === 0
           && slot.mod.humanizeGatePercent === 0 ? 'off'
-        : `${beatLabel(slot.mod.humanizeTimingBeats)} · ±${slot.mod.humanizeVelocity} vel`
+        : (HUMANIZE_FEELS.find((f) => f.id === humanizeFeelOf({ timing: slot.mod.humanizeTimingBeats,
+              velocity: slot.mod.humanizeVelocity, gate: slot.mod.humanizeGatePercent }))?.label
+            ?? `${beatsToMs(slot.mod.humanizeTimingBeats, tempo)} ms · ±${slot.mod.humanizeVelocity} vel`)
           + (slot.mod.humanizeGatePercent ? ` · ±${slot.mod.humanizeGatePercent}% gate` : '')
           + (slot.mod.humanizePreserveChords ? ' · chord lock' : '')
           + (slot.mod.humanizeProtectBeats ? ' · beat anchors' : '');
@@ -337,6 +344,7 @@
               ondragstart={(e) => slotDragStart(e, slot.slotId)}
               ondragend={slotDragEnd}>⠿</span>
         <span class="slot-index">{index + 1}</span>
+        <span class="slot-light" class:on={!slot.bypassed} title={slot.bypassed ? 'Bypassed' : 'On'} aria-hidden="true"></span>
         <button type="button" class="ghost slot-name"
                 onclick={() => (openSlotId = openSlotId === slot.slotId ? '' : slot.slotId)}>
           {midiSlotLabels[slot.type]}
@@ -631,69 +639,11 @@
           {/if}
 
           {#if slot.type === 'strum'}
-            <label class="mini-field">Spread
-              <select value={slot.mod.strumBeats}
-                      onchange={(e) => set(slot, { strumBeats: Number(e.currentTarget.value) })}>
-                <option value={0}>off</option>
-                {#each BEAT_CHOICES.slice(0, 7) as [value, label] (value)}
-                  <option value={value}>{label}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="mini-field">Stroke
-              <select value={slot.mod.strumPattern}
-                      onchange={(e) => set(slot, { strumPattern: e.currentTarget.value })}>
-                <option value="ascending">low → high</option>
-                <option value="descending">high → low</option>
-                <option value="alternate">alternate strokes</option>
-                <option value="outside in">outside → in</option>
-                <option value="inside out">inside → out</option>
-                <option value="random">harp scatter</option>
-              </select>
-            </label>
-            <label class="mini-field">Feel — {slot.mod.strumCurve < -0.15 ? 'slow start'
-                                                : slot.mod.strumCurve > 0.15 ? 'quick start' : 'even'}
-              <input type="range" min="-1" max="1" step="0.05" value={slot.mod.strumCurve}
-                     aria-label="Strum timing curve"
-                     oninput={(e) => set(slot, { strumCurve: Number(e.currentTarget.value) })} />
-            </label>
-            <label class="mini-field">Last-note velocity — {slot.mod.strumVelocityRamp > 0 ? '+' : ''}{slot.mod.strumVelocityRamp}
-              <input type="range" min="-64" max="64" step="1" value={slot.mod.strumVelocityRamp}
-                     aria-label="Strum velocity ramp"
-                     oninput={(e) => set(slot, { strumVelocityRamp: Number(e.currentTarget.value) })} />
-            </label>
-            <span class="hint">Original note lengths are preserved across the stroke.</span>
+            <StrumEditor mod={slot.mod} set={(fields) => set(slot, fields)} tempo={tempo} beatChoices={BEAT_CHOICES} />
           {/if}
 
           {#if slot.type === 'humanize'}
-            <label class="mini-field">Timing
-              <select value={slot.mod.humanizeTimingBeats}
-                      title="Notes are pushed later by up to this much — earlier would need the future"
-                      onchange={(e) => set(slot, { humanizeTimingBeats: Number(e.currentTarget.value) })}>
-                <option value={0}>off</option>
-                <option value={0.01}>tight</option>
-                <option value={0.03}>loose</option>
-                <option value={0.08}>sloppy</option>
-              </select>
-            </label>
-            <label class="mini-field">Velocity ±
-              <input type="number" min="0" max="64" value={slot.mod.humanizeVelocity}
-                     onchange={(e) => set(slot, { humanizeVelocity: Number(e.currentTarget.value) })} />
-            </label>
-            <label class="mini-field">Gate variation — ±{slot.mod.humanizeGatePercent}%
-              <input type="range" min="0" max="100" step="1" value={slot.mod.humanizeGatePercent}
-                     aria-label="Humanize gate length"
-                     oninput={(e) => set(slot, { humanizeGatePercent: Number(e.currentTarget.value) })} />
-            </label>
-            <div class="toggle-line">
-              <PropertyToggle compact label="Keep chords together"
-                              value={slot.mod.humanizePreserveChords}
-                              onchange={(on) => set(slot, { humanizePreserveChords: on })} />
-              <PropertyToggle compact label="Protect whole beats"
-                              value={slot.mod.humanizeProtectBeats}
-                              onchange={(on) => set(slot, { humanizeProtectBeats: on })} />
-            </div>
-            <span class="hint">Gate changes are bounded so a release can never precede its note-on.</span>
+            <HumanizeEditor mod={slot.mod} set={(fields) => set(slot, fields)} tempo={tempo} />
           {/if}
 
           {#if slot.type === 'chance'}
@@ -1079,6 +1029,8 @@
   .slot-grip { flex: none; cursor: grab; color: #66707b; font-size: 13px; line-height: 1; user-select: none; }
   .slot-grip:hover { color: #d6dbe0; }
   .slot-head { display: flex; align-items: center; gap: 6px; padding: 5px 6px; }
+  .slot-light { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--host-text-faint, #65717c); }
+  .slot-light.on { background: var(--host-active, #58a879); box-shadow: 0 0 5px var(--host-active, #58a879); }
   .slot-index { color: #66707b; font-size: 10px; width: 12px; }
   /* Green runs, red is bypassed — the same language as the insert rows.
      The selector carries .slot-head for weight, not for reach: this name is also a .ghost
