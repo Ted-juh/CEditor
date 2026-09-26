@@ -641,7 +641,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (cmd == "surfacePerformanceEncoder")
     {
         nudgePerformanceEncoder (
-            (SurfaceEncoder) juce::jlimit (0, (int) SurfaceEncoder::velocity,
+            (SurfaceEncoder) juce::jlimit (0, (int) SurfaceEncoder::masterLevel,
                                             (int) payload.getProperty ("encoder", 0)),
             juce::jlimit (-127, 127, (int) payload.getProperty ("delta", 0)));
         return;
@@ -17521,6 +17521,7 @@ InstrumentHostService::SurfaceTransport InstrumentHostService::surfaceTransport(
     view.tempo = transport.getTempo();
     double fraction = 0.0;
     transport.positionInBarsBeats (view.bar, view.beat, fraction);
+    view.beatsPerBar = transport.getTimeSignatureNumerator();
     view.externalClock = transport.isExternalClockEnabled();
     view.clockLost = transport.hasLostExternalClock();
     return view;
@@ -17670,6 +17671,18 @@ bool InstrumentHostService::nudgePerformanceEncoder (SurfaceEncoder encoder, int
         transport.setTempo (tempo);
         const_cast<Performance&> (rack.getPerformance()).transport.tempo = tempo;
         savePerformance();
+        emitState();
+        return true;
+    }
+
+    if (encoder == SurfaceEncoder::masterLevel)
+    {
+        // The eighth encoder: the whole rack's level, as a hardware master knob. 0..2 like
+        // the mixer's, so a full turn up from unity has somewhere to go.
+        // The rack directly: this nudge is already recorded above as itself, and going through
+        // setMasterLevel would record it a second time for replay.
+        rack.setMasterLevel (juce::jlimit (0.0f, 2.0f, rack.getPerformance().masterLevel + amount));
+        schedulePerformanceSave();
         emitState();
         return true;
     }

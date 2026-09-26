@@ -138,6 +138,41 @@ try {
     screen.dispose();
     return { listened, border: px(1, 50), fill: px(20, 50), inset: px(30, 10), heard: px(475, 265), noAsset: px(5, 265) };
   });
+  // The real HoSTage page's performance extras: beat dots from bytes 9..11, and held notes from
+  // the note hook, drawn as a strip along the bottom.
+  const pagePath = fileURLToPath(new URL('../../../tools/ctrl49/Hostage_MultiKnob.lua', import.meta.url)).split('\\').join('/');
+  const perf = await page.evaluate(async (luaPath) => {
+    const { createCtrl49Screen } = await import('/src/CE_Application/screen/ctrl49Runtime.js');
+    const lua = (await import(`/@fs/${luaPath.replace(/^\//, '')}?raw`).catch(() => null))?.default;
+    if (!lua) return { skipped: true };
+    const canvas = Object.assign(document.createElement('canvas'), { width: 480, height: 272 });
+    const screen = await createCtrl49Screen(canvas, { lua, assets: {} });
+    const labels = [5, 62, 32, 49, 46, 49, 0, 0, 0, 0, 0, 0, 0, 0];   // "> 1.1" and no clips
+    const px = (x, y) => [...canvas.getContext('2d').getImageData(x, y, 1, 1).data].slice(0, 3);
+    screen.call('init', []);
+    screen.call('set_mode', [1]);
+    screen.call('set_labels', labels);
+    screen.call('set_values', [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 4]);   // performance, beat 1 of 4
+    const heard = screen.note(0x90, 60, 110);
+    screen.call('draw', []);
+    const beatOne = px(470 - 4 * 11 + 2, 15), beatTwo = px(470 - 3 * 11 + 2, 15);
+    const noteAt = px(Math.floor((60 - 36) * (480 / 61)) + 1, 260);
+    screen.note(0x80, 60, 0);
+    screen.call('set_values', [0, 0, 0, 0, 0, 0, 0, 0, 0]);         // a control page's nine bytes
+    screen.call('draw', []);
+    const noDotsOnControlPage = px(470 - 4 * 11 + 2, 15);
+    screen.dispose();
+    return { heard, beatOne, beatTwo, noteAt, noDotsOnControlPage };
+  }, pagePath);
+  assert.ok(!perf.skipped, 'the HoSTage page was loaded for the performance check');
+  {
+    assert.equal(perf.heard, true, 'the HoSTage page turns the note hook on');
+    assert.deepEqual(perf.beatOne, [255, 148, 8], 'beat one of the bar is lit orange');
+    assert.deepEqual(perf.beatTwo, [89, 98, 115], 'the other beats are dim');
+    assert.deepEqual(perf.noteAt, [255, 148, 8], 'a held note shows in the strip, orange when played hard');
+    assert.notDeepEqual(perf.noDotsOnControlPage, [89, 98, 115], 'a control page draws no beat dots');
+  }
+
   assert.equal(surface.listened, true, 'a page that enabled hook 2 hears notes');
   assert.deepEqual(surface.heard.slice(0, 3), [255, 0, 0], 'and its note() saw note 60');
   assert.deepEqual(surface.border.slice(0, 3), [255, 148, 8], 'text borders draw in border_color');

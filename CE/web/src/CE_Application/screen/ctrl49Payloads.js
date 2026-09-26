@@ -64,12 +64,17 @@ export function performanceLabelPayload(transport, clips) {
   return out;
 }
 
-/** buildPerformanceStatePayload: the active clip, then each clip's phase as a knob. */
-export function performanceStatePayload(activeClip, clips) {
+/** buildPerformanceStatePayload: the active clip, then each clip's phase as a knob. With a
+    transport, three more bytes the page reads only on the performance page: [9] kind (1),
+    [10] the beat in the bar (0 when stopped), [11] beats per bar. */
+export function performanceStatePayload(activeClip, clips, transport) {
   const out = [clamp127(activeClip)];
   for (let i = 0; i < 8; i++) {
     const phase = Math.max(0, Math.min(1, Number(clips[i]?.phase) || 0));
     out.push(clamp127(Math.trunc(phase * 127)));
+  }
+  if (transport) {
+    out.push(1, transport.playing ? clamp127(transport.beat ?? 1) : 0, clamp127(transport.beatsPerBar ?? 4));
   }
   return out;
 }

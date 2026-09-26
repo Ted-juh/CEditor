@@ -526,7 +526,7 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
                     SurfaceEncoder::tempo,  SurfaceEncoder::swing,
                     SurfaceEncoder::rate,   SurfaceEncoder::length,
                     SurfaceEncoder::gate,   SurfaceEncoder::velocity,
-                    SurfaceEncoder::probability, SurfaceEncoder::tempo,
+                    SurfaceEncoder::probability, SurfaceEncoder::masterLevel,
                 };
                 service.nudgePerformanceEncoder (
                     encoders[(std::size_t) juce::jlimit (0, 7, action->encoderSlot)],
@@ -696,7 +696,7 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     else if (reducer.page() == performancePage)
     {
         const auto t = service.surfaceTransport();
-        PerformanceTransportView transport { t.playing, t.tempo, t.bar, t.beat,
+        PerformanceTransportView transport { t.playing, t.tempo, t.bar, t.beat, t.beatsPerBar,
                                              t.externalClock, t.clockLost };
 
         PerformanceClipViews clipViews {};
@@ -717,7 +717,7 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
         }
 
         labels = buildPerformanceLabelPayload (transport, clipViews);
-        state = buildPerformanceStatePayload (reducer.activeSlot(), clipViews);
+        state = buildPerformanceStatePayload (reducer.activeSlot(), clipViews, transport);
     }
     else if (controlPages > 0)
     {

@@ -85,4 +85,14 @@ Bytes buildPerformanceStatePayload (int activeClip, const PerformanceClipViews& 
     return result;
 }
 
+Bytes buildPerformanceStatePayload (int activeClip, const PerformanceClipViews& clips,
+                                    const PerformanceTransportView& transport)
+{
+    auto result = buildPerformanceStatePayload (activeClip, clips);
+    result.push_back (1);   // page kind: performance
+    result.push_back (static_cast<std::uint8_t> (transport.playing ? clamp127 (transport.beat) : 0));
+    result.push_back (static_cast<std::uint8_t> (clamp127 (transport.beatsPerBar)));
+    return result;
+}
+
 } // namespace ceditor::ctrl49

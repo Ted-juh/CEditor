@@ -611,6 +611,7 @@ public:
         double tempo = 120.0;
         int bar = 1;
         int beat = 1;
+        int beatsPerBar = 4;
         bool externalClock = false;
         bool clockLost = false;
     };
@@ -639,7 +640,7 @@ public:
     /** Which lane the surface's encoders and step pads address. */
     bool setSurfaceLane (const juce::String& patternId, const juce::String& laneId);
 
-    enum class SurfaceEncoder { tempo = 0, swing, gate, rate, length, probability, velocity };
+    enum class SurfaceEncoder { tempo = 0, swing, gate, rate, length, probability, velocity, masterLevel };
 
     /** A relative encoder movement on the performance page. Returns false when there is
         nothing focused for that encoder to move. */

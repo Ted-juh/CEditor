@@ -348,8 +348,8 @@ export function mockSurfaceScreen(state, cursor) {
              pageIndex, pageCount, pageKind: 'control', pageId: page.pageId, onKeyboard: false, received: true };
   }
   const tempo = Number(state?.performance?.transport?.tempo ?? 120) || 120;
-  const transport = { playing: false, bar: 1, beat: 1, tempo };
-  return { labels: performanceLabelPayload(transport, []), values: performanceStatePayload(cursor.active, []),
+  const transport = { playing: false, bar: 1, beat: 1, tempo, beatsPerBar: 4 };
+  return { labels: performanceLabelPayload(transport, []), values: performanceStatePayload(cursor.active, [], transport),
            pageIndex, pageCount, pageKind: 'performance', pageId: '', onKeyboard: false, received: true };
 }
 

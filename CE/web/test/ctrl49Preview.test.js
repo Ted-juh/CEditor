@@ -45,6 +45,10 @@ test('performance: ASCII transport title, clip marks, phase as knob', () => {
   const labels = performanceLabelPayload({ playing: true, bar: 1, beat: 1, tempo: 120 }, clips);
   assert.deepEqual(labels.slice(labels[0] + 1, labels[0] + 1 + 8), [2, ...ascii('*A'), 2, ...ascii('>B'), 1, ...ascii('C')]);
   assert.deepEqual(performanceStatePayload(1, clips), [1, 0, 0, 63, 0, 0, 0, 0, 0]);
+  assert.deepEqual(performanceStatePayload(1, clips, { playing: true, beat: 3, beatsPerBar: 4 }),
+    [1, 0, 0, 63, 0, 0, 0, 0, 0, 1, 3, 4], 'the performance page adds its kind, the beat and the bar length');
+  assert.deepEqual(performanceStatePayload(0, [], { playing: false, beat: 2, beatsPerBar: 3 }).slice(9),
+    [1, 0, 3], 'stopped, no beat is lit');
 });
 
 test('browse: the cursor row takes a full knob, long names end in a dot', () => {

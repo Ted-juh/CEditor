@@ -4712,6 +4712,18 @@ void testCtrl49AppScreen()
     check (screen != nullptr && screen->getProperty ("pageKind", {}).toString() == "performance",
            "and on to the performance page after them");
 
+    const auto masterBefore = h.service->getRackHost().getPerformance().masterLevel;
+    const auto tempoBefore = h.service->surfaceTransport().tempo;
+    for (int i = 0; i < 12; ++i)
+        press (18, 1);                          // encoder 8, clockwise
+    tickPast();
+    check (h.service->getRackHost().getPerformance().masterLevel > masterBefore
+             && juce::approximatelyEqual (h.service->surfaceTransport().tempo, tempoBefore),
+           "on the performance page encoder 8 is the master level, not a second tempo knob");
+    screen = h.emits.last ("instrumentHostSurfaceScreen");
+    check (screen != nullptr && screen->getProperty ("values", {}).size() == 12,
+           "and the page is sent its beat and bar length with the clip phases");
+
     h.cmd ("setStageLock", { { "enabled", true } });
     h.emits.clear();
     press (39, 127);                            // Page Left, while playing

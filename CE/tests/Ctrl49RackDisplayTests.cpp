@@ -143,6 +143,16 @@ int main()
         PerformanceClipViews empty {};
         const auto emptyState = buildPerformanceStatePayload (0, empty);
         check (emptyState.size() == 9, "an empty bank still builds a valid payload");
+
+        PerformanceTransportView playing;
+        playing.playing = true;
+        playing.beat = 3;
+        playing.beatsPerBar = 7;
+        const auto withBeat = buildPerformanceStatePayload (0, clips, playing);
+        check (withBeat.size() == 12 && withBeat[9] == 1 && withBeat[10] == 3 && withBeat[11] == 7,
+               "the performance page's payload adds its kind, the beat and the beats per bar");
+        playing.playing = false;
+        check (buildPerformanceStatePayload (0, clips, playing)[10] == 0, "stopped, no beat is lit");
         for (std::size_t i = 1; i < 9; ++i)
             check (emptyState[i] == 0, "with nothing turning");
     }

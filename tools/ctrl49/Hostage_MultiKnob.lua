@@ -22,6 +22,25 @@ local active = 0
 local labels = { "", "", "", "", "", "", "", "" }
 local values = { 0, 0, 0, 0, 0, 0, 0, 0 }
 
+-- The performance page's extras, read from set_values bytes 9..11 (a control page sends nine
+-- bytes, so they read 0 there and nothing extra is drawn): page kind, the beat in the bar
+-- (1-based, 0 when stopped) and beats per bar.
+local page_kind = 0
+local beat = 0
+local beats_per_bar = 4
+
+-- Notes being held, by note number, with their velocity. Filled by the firmware's note hook
+-- (hook 2), which calls note(args) with the raw MIDI bytes -- if this keyboard has it: the hook
+-- is read from the Akai ADVANCE firmware, which runs the same runtime, and is not yet seen on a
+-- CTRL49. Without it this stays empty and the strip is never drawn.
+local held = {}
+local held_count = 0
+
+-- Which widget to mark dirty when a note arrives, so it shows without waiting for the host's
+-- next redraw. The firmware tells a widget its id through set_widget_id; until it does, this
+-- page's own target (2) is the best guess.
+local WID = 2
+
 local TITLE = text_data.new()
 local VAL   = text_data.new()
 local LBL   = text_data.new()
@@ -78,7 +97,24 @@ function init(args)
     if initialized then return end
     configure_text()
     decode_image(14, LOGO_PNG_ID, 18, LOGO_DECODED_ID, WHITE)
+    if pcall and set_hook_enabled then pcall(set_hook_enabled, 2, 1) end
     initialized = true
+end
+
+function set_widget_id(args)
+    WID = get_byte(args, 0)
+end
+
+function note(args)
+    local status = get_byte(args, 0)
+    local number = get_byte(args, 1)
+    local velocity = get_byte(args, 2)
+    local kind = status - (status % 16)
+    local on = kind == 144 and velocity > 0
+    if on and held[number] == nil then held_count = held_count + 1 end
+    if (not on) and held[number] ~= nil then held_count = held_count - 1 end
+    if on then held[number] = velocity else held[number] = nil end
+    if page_kind == 1 and pcall and lua_widget_make_dirty then pcall(lua_widget_make_dirty, WID) end
 end
 
 function set_mode(args)
@@ -101,6 +137,40 @@ function set_values(args)
     active = get_byte(args, 0)
     for slot = 1, 8 do
         values[slot] = get_byte(args, slot)
+    end
+    page_kind = get_byte(args, 9)
+    beat = get_byte(args, 10)
+    beats_per_bar = get_byte(args, 11)
+    if beats_per_bar < 1 then beats_per_bar = 4 end
+    if beats_per_bar > 16 then beats_per_bar = 16 end
+end
+
+-- Beat dots at the right of the title: one per beat in the bar, the current one lit.
+local function draw_beats()
+    local size, gap = 6, 5
+    local x = 470 - beats_per_bar * (size + gap)
+    for b = 1, beats_per_bar do
+        local colour = DARK
+        if b == beat then
+            if b == 1 then colour = ORANGE else colour = WHITE end
+        end
+        draw_rect(x + (b - 1) * (size + gap), 13, size, size, colour)
+    end
+end
+
+-- The notes held on the keyboard, as a strip along the bottom: C2..C7, brighter for harder.
+local LOW_NOTE, HIGH_NOTE = 36, 96
+local function draw_held_notes()
+    if held_count <= 0 then return end
+    local span = HIGH_NOTE - LOW_NOTE + 1
+    local width = 480 / span
+    draw_rect(0, 266, 480, 1, DARK)
+    for number, velocity in pairs(held) do
+        if number >= LOW_NOTE and number <= HIGH_NOTE then
+            local colour = DIM
+            if velocity >= 96 then colour = ORANGE elseif velocity >= 48 then colour = WHITE end
+            draw_rect(math.floor((number - LOW_NOTE) * width), 256, math.max(2, math.floor(width) - 1), 10, colour)
+        end
     end
 end
 
@@ -163,5 +233,10 @@ function draw(args)
 
         text_data.set(LBL, { text = labels[slot], color = is_active and WHITE or DARK })
         draw_text(LBL, x - 8, y + 66, 80, 14)
+    end
+
+    if page_kind == 1 then
+        draw_beats()
+        draw_held_notes()
     end
 end
