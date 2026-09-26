@@ -4,6 +4,8 @@
 #include <optional>
 #include <juce_gui_extra/juce_gui_extra.h>
 #include "PluginInstantiator.h"
+#include "PluginCatalog.h"
+#include "PngResourceValidation.h"
 #include "BinaryData.h" // PlayerWebData — the embedded web bundle (host.html rides in it)
 
 // HostRuntimeShared — the glue both generated Hostage targets share.
@@ -77,6 +79,22 @@ provideHostRuntimeResource (const juce::String& rawPath)
                        .upToFirstOccurrenceOf ("#", false, false);
     if (path.isEmpty() || path == "/") path = "/host.html";
     if (path.contains ("..")) return std::nullopt;
+
+    // Plug-in pictures, the same token route the editor serves (WebViewHost.cpp): the registry
+    // maps token -> file, and only a PNG that passes the resource check is served, as PNG. The
+    // generated product had no such route, so its tiles always showed initials.
+    if (path.startsWith ("/plugin-snapshot/"))
+    {
+        const auto token = path.fromFirstOccurrenceOf ("/plugin-snapshot/", false, false);
+        const auto file = PluginSnapshotRegistry::instance().resolve (token);
+        juce::MemoryBlock png;
+        if (token.isEmpty() || ! file.existsAsFile() || ! file.hasFileExtension ("png")
+            || ! file.loadFileAsData (png) || ! ceditor::isSafePngResource (png.getData(), png.getSize()))
+            return std::nullopt;
+        std::vector<std::byte> bytes (png.getSize());
+        if (! bytes.empty()) std::memcpy (bytes.data(), png.getData(), png.getSize());
+        return juce::WebBrowserComponent::Resource { std::move (bytes), "image/png" };
+    }
     auto basename = path.fromLastOccurrenceOf ("/", false, false);
     if (basename.isEmpty()) basename = "host.html";
     const auto mimeName = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile (basename);

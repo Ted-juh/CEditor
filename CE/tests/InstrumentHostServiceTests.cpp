@@ -11455,7 +11455,9 @@ void testPluginSnapshots()
             check (shot.isEmpty(), "a class with no artwork carries no snapshotUrl at all");
     }
 
-    check (url.startsWith ("/plugin-snapshot/"), "the class with artwork carries a route, not a path");
+    check (url.contains ("plugin-snapshot/"), "the class with artwork carries a route, not a path");
+    check (url.startsWith ("https://juce.backend/plugin-snapshot/") || url.startsWith ("juce://juce.backend/plugin-snapshot/"),
+           "at the resource provider's root, so a page served by Vite in a dev build still reaches it");
     check (! url.containsIgnoreCase (dir.getFullPathName()) && ! url.contains ("good-synth.png"),
            "and the route says nothing about where the file is");
 

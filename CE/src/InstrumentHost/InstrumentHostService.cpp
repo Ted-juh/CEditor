@@ -16696,7 +16696,12 @@ juce::var InstrumentHostService::buildStatePayload()
                                      .publish (record.ceId, artworkFor (record));
                 token.isNotEmpty())
             {
-                obj->setProperty ("snapshotUrl", "/plugin-snapshot/" + token);
+                // Absolute, at the resource provider's own root. A relative route resolved
+                // against wherever the page came from: fine from the embedded bundle, but a dev
+                // build's page comes from Vite, which answered with index.html, and every tile
+                // showed its initials although the pictures were on disk and published. The
+                // provider root is intercepted whichever origin loaded the page.
+                obj->setProperty ("snapshotUrl", PluginSnapshotRegistry::routeUrl (token));
                 // Which of the three is showing, so the UI can offer "use its own picture
                 // again" only where there is one to go back to.
                 obj->setProperty ("artworkSource", artworkSourceFor (record));
