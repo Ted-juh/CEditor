@@ -171,8 +171,46 @@ try {
   assert.equal(await page.locator('[data-testid=perf-lane-options] input[type=number]').count(), 0, 'no number boxes in the lane options');
   assert.equal(await page.locator('[data-testid=perf-lane-options] select').count(), 1, 'and one list, the target part');
 
+  // Clips and scenes: follow actions as pictures, the fill in its own panel, one line a clip.
+  await page.locator('.pattern-row').last().getByRole('button', { name: '+ Clip' }).click();
+  await page.locator('.pattern-row').last().getByRole('button', { name: '+ Clip' }).click();
+  await tool('playback', 'clips');
+  const clipRow = page.getByTestId('perf-clip').last();
+  const clip = async () => (await perf()).clips.at(-1);
+  assert.equal(await clipRow.locator('[data-testid=clip-follow] button svg').count(), 5, 'five follow actions, each drawn');
+  await clipRow.locator('[data-testid=clip-follow] [data-value=next]').click();
+  assert.equal((await clip()).followAction, 'next');
+  await clipRow.getByTestId('clip-follow-loops').press('ArrowUp');
+  assert.equal((await clip()).followAfterLoops, 2, 'the loop count drags or steps');
+  const quantize = (await clip()).launchQuantize;
+  await clipRow.getByTestId('clip-quantize').press('ArrowUp');
+  assert.notEqual((await clip()).launchQuantize, quantize, 'the launch quantize steps through its choices');
+  assert.equal(await page.getByTestId('clip-fill-panel').count(), 0, 'the fill settings stay closed until asked for');
+  await clipRow.getByTestId('clip-fill-open').click();
+  const fill = page.getByTestId('clip-fill-panel');
+  const cc = (await clip()).fillCc;
+  await fill.getByTestId('clip-fill-cc').press('ArrowUp');
+  assert.equal((await clip()).fillCc, cc + 1, 'the pedal CC steps');
+  await fill.getByLabel(/fill pattern/).selectOption({ index: 1 });
+  assert.ok((await clip()).fillPatternId, 'a fill pattern is chosen in the panel');
+  assert.equal(await clipRow.locator('.fill-hold').count(), 1, 'and the row gains the button you hold');
+  assert.equal(await clipRow.locator('select:not(.follow-target), input[type=number]').count(), 0, 'the row has no small dropdowns or number boxes');
+  await shot(page.locator('.clip-column'), 'clips');
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.addControlPage('Leads');
+  });
+  await page.getByTestId('perf-add-scene').click();
+  const sceneRow = page.getByTestId('perf-scene').last();
+  const scene = async () => (await perf()).scenes.at(-1);
+  await sceneRow.getByTestId('scene-morph').press('ArrowUp');
+  assert.ok((await scene()).morphBeats > 0, 'the morph time steps');
+  await sceneRow.locator('[data-testid=scene-page] button').last().click();
+  assert.ok((await scene()).pageId, 'the recalled controller page is a toggle row');
+  assert.equal(await sceneRow.locator('select').count(), 0);
+
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('performanceTools: LFO, envelope, MSEG, random and pattern step rows draw and drag');
+  console.log('performanceTools: LFO, envelope, MSEG, random, pattern step rows, clips and scenes draw and drag');
 } finally {
   await browser.close();
   await server.close();

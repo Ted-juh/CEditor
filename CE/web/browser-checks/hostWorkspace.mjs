@@ -75,7 +75,11 @@ try {
   for (let i = 0; i < 4; i++) { await tap.click(); await page.waitForTimeout(500); }
   const tapped = (await state()).performance.transport.tempo;
   assert.ok(tapped > 100 && tapped < 125, `four taps half a second apart set about 120 (${tapped})`);
-  await page.locator('[data-testid=host-ts-denominator] [data-value="8"]').click();
+  await page.getByTestId('host-ts-denominator').press('ArrowUp');
+  await page.setViewportSize({ width: 1280, height: 1400 });
+  const header = await page.locator('.host-header').evaluate((el) => [el.scrollWidth, el.clientWidth]);
+  assert.ok(header[0] <= header[1], `the header fits a 1280 px window (${header[0]} > ${header[1]})`);
+  await page.setViewportSize({ width: 1400, height: 1400 });
   await page.getByTestId('host-ts-numerator').press('ArrowUp');
   const ts = (await state()).performance.transport;
   assert.deepEqual([ts.numerator, ts.denominator], [5, 8], 'beats per bar and the beat unit');
@@ -153,8 +157,46 @@ try {
   await mixerPan.dblclick();
   assert.equal((await part0()).pan, 0);
 
+  // Macros and returns: the macro is a knob, each target a band whose ends you drag.
+  await page.getByRole('button', { name: 'Rack', exact: true }).first().click();
+  await page.getByTestId('dock-tab-rack').click();
+  await page.getByTestId('host-add-macro').click();
+  const macroId = (await state()).rack.macros.at(-1).macroId;
+  const partId = (await state()).rack.parts[0].partId;
+  await page.evaluate(async ([id, part]) => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.addMacroTarget(id, part, 'cutoff');
+  }, [macroId, partId]);
+  const macro = async () => (await state()).rack.macros.find((m) => m.macroId === macroId);
+  const band = page.getByTestId('macro-band').last();
+  await band.scrollIntoViewIfNeeded();
+  const track = await band.locator('.track').boundingBox();
+  const start = await band.getByTestId('macro-band-start').boundingBox();
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(track.x + track.width * 0.3, start.y + start.height / 2, { steps: 6 });
+  await page.mouse.up();
+  assert.ok(Math.abs((await macro()).targets[0].rangeMin - 0.3) < 0.03, 'dragging the start end sets where the macro at 0 puts it');
+  const end = await band.getByTestId('macro-band-end').boundingBox();
+  await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(track.x + track.width * 0.1, end.y + end.height / 2, { steps: 8 });
+  await page.mouse.up();
+  const reversed = (await macro()).targets[0];
+  assert.equal(reversed.inverted, true, 'dragging the ends past each other reverses the target');
+  assert.ok(reversed.rangeMin < 0.15 && reversed.rangeMax > 0.25, `and keeps both ends (${reversed.rangeMin}-${reversed.rangeMax})`);
+  assert.match(await band.innerText(), /reversed/);
+  if (process.env.HOST_SCREENSHOTS) await page.getByTestId('host-macros').screenshot({ path: `${process.env.HOST_SCREENSHOTS}/macros.png` });
+  await page.getByTestId('macro-knob').last().press('ArrowUp');
+  assert.ok((await macro()).value > 0, 'the macro knob turns');
+  await page.getByTestId('host-add-return').click();
+  const returnLevel = page.getByTestId('return-level').last();
+  const level = (await state()).rack.returns.at(-1).level;
+  await returnLevel.press('ArrowDown');
+  assert.ok((await state()).rack.returns.at(-1).level < level, 'a return level is a knob');
+
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows and mixer work as drawn');
+  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros and returns work as drawn');
 } finally {
   await browser.close();
   await server.close();

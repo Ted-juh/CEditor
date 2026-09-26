@@ -20,6 +20,7 @@
     pixelsPerStep = 4,
     fineStep = null,          // with Shift held (drag or arrows): this step instead; null = step / 10
     stepper = null,           // (value, steps, fine) => next: for values that step by ratio, like a rate in Hz
+    compact = false,          // narrow, for a value of a character or two in a crowded row
     onchange = () => {},
     testid = undefined,
   } = $props();
@@ -98,7 +99,7 @@
          onkeydown={(e) => { if (e.key === 'Enter') commit(draft); if (e.key === 'Escape') editing = false; }}
          onblur={() => { if (editing) commit(draft); }} />
 {:else}
-  <span class="scrub" role="spinbutton" tabindex="0" aria-label={label} aria-valuenow={value}
+  <span class="scrub" class:compact role="spinbutton" tabindex="0" aria-label={label} aria-valuenow={value}
         aria-valuemin={choices ? undefined : min} aria-valuemax={choices ? undefined : max} aria-valuetext={shown}
         {title} data-testid={testid}
         onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}
@@ -121,5 +122,6 @@
   .scrub:hover { border-color: var(--host-line-strong, #526170); }
   .scrub:focus-visible { outline: 2px solid var(--host-accent-strong, #79b9ee); outline-offset: 1px; }
   .scrub small { font-weight: 400; color: var(--host-text-dim, #7f8b96); }
+  .scrub.compact { min-width: 34px; padding: 4px 6px; }
   input.scrub { width: 88px; cursor: text; user-select: text; text-align: center; border-color: var(--host-accent, #5b9bd5); outline: none; }
 </style>

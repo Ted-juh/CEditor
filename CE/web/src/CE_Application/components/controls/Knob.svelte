@@ -7,12 +7,14 @@
   let {
     value = 0, min = 0, max = 1, reset = 0, step = 0.01, size = 30, label = '',
     format = (v) => v.toFixed(2), onchange = () => {}, testid = undefined,
+    oncommit = null,          // (value) once a gesture ends: the release of a drag, a key, a reset
   } = $props();
 
   const span = $derived(max - min);
   const t = $derived((Math.max(min, Math.min(max, value)) - min) / (span || 1));
   const centred = $derived(min < 0 && max > 0);
   let drag = null;
+  let last = null;
 
   const A0 = -135, A1 = 135;
   const point = (a, r) => [20 + r * Math.sin((a * Math.PI) / 180), 20 - r * Math.cos((a * Math.PI) / 180)];
@@ -28,31 +30,36 @@
 
   const set = (v) => {
     const snapped = Math.max(min, Math.min(max, Math.round(v / step) * step));
-    if (snapped !== value) onchange(Number(snapped.toFixed(6)));
+    last = Number(snapped.toFixed(6));
+    if (snapped !== value) onchange(last);
   };
   function down(e) {
     if (e.button !== 0) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     drag = { y: e.clientY, v: value };
+    last = null;
   }
   function move(e) {
     if (!drag) return;
     const pixels = e.shiftKey ? 600 : 150;
     set(drag.v + ((drag.y - e.clientY) / pixels) * span);
   }
-  function up() { drag = null; }
+  function up() {
+    if (drag && last !== null) oncommit?.(last);
+    drag = null;
+  }
   function key(e) {
     const s = e.shiftKey ? step : Math.max(step, span / 50);
-    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { set(value + s); e.preventDefault(); }
-    if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { set(value - s); e.preventDefault(); }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { set(value + s); oncommit?.(last); e.preventDefault(); }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { set(value - s); oncommit?.(last); e.preventDefault(); }
   }
 </script>
 
 <svg class="knob" width={size} height={size} viewBox="0 0 40 40" role="slider" tabindex="0" aria-label={label}
      aria-valuemin={min} aria-valuemax={max} aria-valuenow={value} aria-valuetext={format(value)}
      data-testid={testid} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}
-     ondblclick={() => set(reset)} onkeydown={key}>
+     ondblclick={() => { set(reset); oncommit?.(last); }} onkeydown={key}>
   <title>{label}: {format(value)} · drag up or down, double-click to reset</title>
   <path d={arc(A0, A1)} class="track" />
   <path d={arc(zeroAngle, angle)} class="value" class:centred />

@@ -22,6 +22,10 @@
   } from '../stores/instrumentHost.js';
   import { noteName } from '../utils/pianoGeometry.js';
   import PluginTile from './PluginTile.svelte';
+  import Segmented from '../components/controls/Segmented.svelte';
+  import ScrubValue from '../components/controls/ScrubValue.svelte';
+  import RangeBand from '../components/controls/RangeBand.svelte';
+  import MiniKeys from '../components/controls/MiniKeys.svelte';
   import { onMount, tick, untrack } from 'svelte';
   import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
   import { matchesPresetKind, presetWindow } from '../utils/soundBrowserLayout.js';
@@ -174,6 +178,30 @@
     range.active = true;
     ask(next);
   }
+
+  // Both ends at once, from the band: a range dragged is a range applied.
+  function setRangePair(axis, { min, max }) {
+    const next = normalizeLibraryQuery(query);
+    next.ranges[axis] = { ...next.ranges[axis], min, max, active: true };
+    ask(next);
+  }
+
+  // Pictures for the view and spacing toggles, in the toggle row's 24 × 14 box.
+  const VIEW_OPTIONS = [
+    { value: 'list', label: 'List', path: 'M5 3 H19 M5 7 H19 M5 11 H19' },
+    { value: 'grid', label: 'Grid', path: 'M5 2 H10 V6 H5 Z M14 2 H19 V6 H14 Z M5 8 H10 V12 H5 Z M14 8 H19 V12 H14 Z' },
+    { value: 'map', label: 'Map', path: 'M6 10 L6.5 10 M11 4 L11.5 4 M16 8 L16.5 8 M9 7 L9.5 7 M18 3 L18.5 3 M13 11 L13.5 11' },
+  ];
+  const SPACING_OPTIONS = [
+    { value: 'compact', label: 'Compact', path: 'M5 3 H19 M5 6 H19 M5 9 H19 M5 12 H19' },
+    { value: 'comfortable', label: 'Comfortable', path: 'M5 3 H19 M5 8 H19 M5 13 H19' },
+  ];
+  const PHRASES = [
+    { value: 'single', label: 'Note', title: 'A single note' },
+    { value: 'chord', label: 'Chord', title: 'A major chord' },
+    { value: 'scale', label: 'Scale', title: 'A major scale' },
+    { value: 'riff', label: 'Riff', title: 'A short riff' },
+  ];
 
   function toggleRange(axis) {
     const next = normalizeLibraryQuery(query);
@@ -401,49 +429,44 @@
       {#if audition.enabled}
         <div class="audition-config" data-testid="host-audition-config">
           <strong>Audition phrase</strong>
-          <label>Phrase
-            <select value={audition.phrase}
-                    onchange={(e) => setPresetAudition({ phrase: e.currentTarget.value })}>
-              <option value="single">Single note</option>
-              <option value="chord">Major chord</option>
-              <option value="scale">Major scale</option>
-              <option value="riff">Short riff</option>
-            </select>
-          </label>
-          <label>Root
-            <span class="number-with-note">
-              <input type="number" min="0" max="127" value={audition.rootNote}
-                     onchange={(e) => setPresetAudition({ rootNote: Number(e.currentTarget.value) })} />
-              <small>{noteName(audition.rootNote)}</small>
+          <div class="audition-field">Phrase
+            <Segmented options={PHRASES} value={audition.phrase} label="Audition phrase" testid="audition-phrase"
+                       onchange={(phrase) => setPresetAudition({ phrase })} />
+          </div>
+          <div class="audition-field">Root
+            <span class="root-pick">
+              <MiniKeys low={36} high={83} selected={audition.rootNote} label="Audition root note: click a key"
+                        testid="audition-root-keys" onkey={(rootNote) => setPresetAudition({ rootNote })} />
+              <ScrubValue value={audition.rootNote} min={0} max={127} format={noteName} label="Audition root note"
+                          testid="audition-root" onchange={(rootNote) => setPresetAudition({ rootNote })} />
             </span>
-          </label>
-          <label>Velocity
-            <input type="number" min="1" max="127" value={audition.velocity}
-                   onchange={(e) => setPresetAudition({ velocity: Number(e.currentTarget.value) })} />
-          </label>
-          <label>Length
-            <span class="number-unit"><input type="number" min="40" max="4000" step="10"
-                     value={audition.noteLengthMs}
-                     onchange={(e) => setPresetAudition({ noteLengthMs: Number(e.currentTarget.value) })} /><small>ms</small></span>
-          </label>
+          </div>
+          <div class="audition-field">Velocity
+            <ScrubValue value={audition.velocity} min={1} max={127} label="Audition velocity" testid="audition-velocity"
+                        onchange={(velocity) => setPresetAudition({ velocity })} />
+          </div>
+          <div class="audition-field">Length
+            <ScrubValue value={audition.noteLengthMs} min={40} max={4000} step={10} unit="ms" label="Audition note length"
+                        testid="audition-length" onchange={(noteLengthMs) => setPresetAudition({ noteLengthMs })} />
+          </div>
           {#if audition.phrase === 'scale' || audition.phrase === 'riff'}
-            <label>Gap
-              <span class="number-unit"><input type="number" min="0" max="2000" step="10"
-                       value={audition.gapMs}
-                       onchange={(e) => setPresetAudition({ gapMs: Number(e.currentTarget.value) })} /><small>ms</small></span>
-            </label>
+            <div class="audition-field">Gap
+              <ScrubValue value={audition.gapMs} min={0} max={2000} step={10} unit="ms" label="Gap between notes"
+                          testid="audition-gap" onchange={(gapMs) => setPresetAudition({ gapMs })} />
+            </div>
           {/if}
           <span class="audition-help">Click a preset name to load and hear it.</span>
         </div>
       {/if}
 
-        <div class="browse-settings">      <label class="rail-setting">View <select aria-label="Browser view" bind:value={view}>
-        <option value="list">List</option><option value="grid">Grid</option><option value="map">Map</option>
-      </select></label>
-      <label class="rail-setting">Spacing <select aria-label="Preset row spacing" value={comfortable ? 'comfortable' : 'compact'}
-        onchange={(event) => { comfortable = event.currentTarget.value === 'comfortable'; scrollTop = 0; if (listElement) listElement.scrollTop = 0; }}>
-        <option value="compact">Compact</option><option value="comfortable">Comfortable</option>
-      </select></label>
+        <div class="browse-settings">
+      <span class="rail-setting">View
+        <Segmented options={VIEW_OPTIONS} value={view} label="Browser view" testid="browser-view"
+                   onchange={(next) => (view = next)} /></span>
+      <span class="rail-setting">Spacing
+        <Segmented options={SPACING_OPTIONS} value={comfortable ? 'comfortable' : 'compact'} label="Preset row spacing"
+                   testid="row-spacing"
+                   onchange={(next) => { comfortable = next === 'comfortable'; scrollTop = 0; if (listElement) listElement.scrollTop = 0; }} /></span>
       <button type="button" class="toggle" class:on={$hostSurfaceBrowse.browsing} data-testid="mirror-toggle"
               onclick={() => browseOnSurface(!$hostSurfaceBrowse.browsing)}>⌘ Browse on controller</button>
 </div>
@@ -589,12 +612,9 @@
                       : 'any'}
                   </span>
                 </button>
-                <input type="range" min="0" max="1" step="0.01" value={range.min}
-                       aria-label={`${AXIS_LABELS[axis]} minimum`}
-                       oninput={(e) => setRange(axis, 'min', e.currentTarget.value)} />
-                <input type="range" min="0" max="1" step="0.01" value={range.max}
-                       aria-label={`${AXIS_LABELS[axis]} maximum`}
-                       oninput={(e) => setRange(axis, 'max', e.currentTarget.value)} />
+                <RangeBand min={range.min} max={range.max} active={range.active} label={AXIS_LABELS[axis]}
+                           format={(v) => measuredLabel(axis, v)} testid={`axis-band-${axis}`}
+                           onchange={(pair) => setRangePair(axis, pair)} />
               </div>
             {/each}
           </div>
@@ -1273,8 +1293,9 @@
         : focusedPart ? `${selected?.isEffect ? 'Insert on' : 'Load into'} ${partTitle(focusedPart)}`
         : 'Select a target part, or add an instrument as a new part'}</span>
     </div>
-    <label class="audition-toggle"><input type="checkbox" checked={auditionOn} onchange={onToggleAudition}
-           data-testid="host-audition" />Audition on load</label>
+    <button type="button" class="toggle audition-toggle" class:on={auditionOn} aria-pressed={auditionOn}
+            data-testid="host-audition" title="Play the audition phrase each time a preset loads"
+            onclick={onToggleAudition}>♪ Audition on load</button>
         <button type="button" data-testid="host-start-sound-comparison"
                 disabled={soundComparison.active || comparisonCandidates.length < 2}
                 title={comparisonCandidates.length >= 2
@@ -1365,14 +1386,13 @@
     background: #171c21;
   }
   .audition-config strong { align-self: center; color: #d7dde3; font-size: 12px; }
-  .audition-config label {
+  .audition-field {
     display: flex; flex-direction: column; gap: 3px;
     color: #96a2ad; font-size: 10px; text-transform: uppercase;
   }
-  .audition-config select { width: 112px; }
-  .audition-config input[type="number"] { width: 66px; }
-  .number-with-note, .number-unit { display: inline-flex; align-items: center; gap: 4px; }
-  .number-with-note small, .number-unit small { color: #b7c1ca; font-size: 11px; text-transform: none; }
+  .root-pick { display: flex; align-items: center; gap: 8px; text-transform: none; }
+  .root-pick :global(svg.keys) { width: 300px; }
+  .browse-settings .rail-setting { display: inline-flex; align-items: center; gap: 6px; }
   .audition-help { align-self: center; color: #78848f; font-size: 11px; }
   .sound-compare {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -1481,24 +1501,6 @@
   .axis.on button.axis-name { color: #7fb4e0; }
   .axis-value { text-transform: none; letter-spacing: 0; color: var(--host-text-dim); font-size: 10px; }
   .axis.on .axis-value { color: var(--host-text-soft); }
-  /* The range inputs wear the workspace, not the browser: WebView2 is Chromium, so the
-     -webkit- track and thumb are the ones that apply, and the bare rule keeps a plain browser
-     from drawing a default control beside a styled one. */
-  .axis input[type='range'] {
-    width: 100%; height: 12px; margin: 0; padding: 0;
-    -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
-  }
-  .axis input[type='range']::-webkit-slider-runnable-track {
-    height: 3px; border-radius: 2px; background: var(--host-line-soft);
-  }
-  .axis input[type='range']::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none;
-    width: 9px; height: 12px; margin-top: -4.5px; border-radius: 2px;
-    background: var(--host-text-dim); border: 1px solid var(--host-bg-deep);
-  }
-  .axis.on input[type='range']::-webkit-slider-runnable-track { background: #24313d; }
-  .axis.on input[type='range']::-webkit-slider-thumb { background: #7fb4e0; }
-
   .thumb { display: block; width: 100%; height: 22px; background: var(--host-bg-deep); border-radius: 3px; }
   .thumb.unheard {
     display: flex; align-items: center; justify-content: center;
@@ -1883,7 +1885,6 @@
   .selection-info strong { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .selection-info > span { font-size: 11px; color: var(--host-text-soft, #9aa5b1); overflow-wrap: anywhere; }
   .audition-toggle { display: flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
-  .audition-toggle input { margin: 0; }
   .load-selected { border-color: var(--host-accent, #80d8bc); color: var(--host-text, #d6dbe0); min-width: 70px; }
   .browser-status { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px;
                     min-height: 23px; padding: 2px 10px; color: var(--host-text-soft, #9aa5b1); font-size: 11px;

@@ -1,5 +1,8 @@
 <script>
   import HostConfirmButton from './HostConfirmButton.svelte';
+  import SlotResponse from './SlotResponse.svelte';
+  import Segmented from '../components/controls/Segmented.svelte';
+  import ScrubValue from '../components/controls/ScrubValue.svelte';
   import HostPickupIndicator from './HostPickupIndicator.svelte';
   /**
    * HostSurfacePanel.svelte — the controller as a picture (rack-canvas plan, the surface note).
@@ -166,6 +169,15 @@
     : control.kind === 'fader' ? (page?.faderLayers ?? { count: 1, active: 0 }) : { count: 1, active: 0 };
   let faderLayerCount = $derived(page?.faderLayers?.count ?? 1);
   let faderLayerActive = $derived(page?.faderLayers?.active ?? 0);
+  const LAYER_COUNTS = Array.from({ length: MAX_PAD_LAYERS }, (_, i) => ({
+    value: i + 1, label: String(i + 1), title: i === 0 ? 'One layer: no layers' : `${i + 1} layers` }));
+  // How a CC control sends: a position, or one of the three ways encoders send a turn.
+  const MIDI_MODES = [
+    { value: 'absolute', label: 'Absolute', title: 'A position, 0-127' },
+    { value: 'relative-0', label: '1 / 127', title: 'Relative: 1 = up one, 127 = down one; 2..63 up faster, 126..65 down faster' },
+    { value: 'relative-1', label: '64 centre', title: 'Relative: 64 = rest; 65.. up, ..63 down' },
+    { value: 'relative-2', label: 'Sign bit', title: 'Relative: 1..63 up; 65..127 down' },
+  ];
 
   const learningControl = (control) => $hostMidiLearn.armed
     && $hostMidiLearn.pageId === (page?.pageId ?? '')
@@ -694,15 +706,11 @@
                    Bank ◀ ▶ does on the keyboard, and the faders pick their new parameters up
                    where they are rather than jumping them. -->
               <div class="pad-layer-editor" data-testid="surface-fader-layers">
-                <label>Fader layers
-                  <select aria-label="Number of fader layers" value={faderLayerCount}
-                          data-testid="surface-fader-layer-count"
-                          onchange={(e) => setFaderLayers(page?.pageId ?? '', Number(e.currentTarget.value))}>
-                    {#each Array.from({ length: MAX_PAD_LAYERS }, (_, i) => i + 1) as count (count)}
-                      <option value={count}>{count === 1 ? '1 (no layers)' : count}</option>
-                    {/each}
-                  </select>
-                </label>
+                <div class="layer-count">Fader layers
+                  <Segmented options={LAYER_COUNTS} value={faderLayerCount} label="Number of fader layers"
+                             testid="surface-fader-layer-count"
+                             onchange={(count) => setFaderLayers(page?.pageId ?? '', count)} />
+                </div>
                 {#if faderLayerCount > 1}
                   <div class="layer-tabs" role="group" aria-label="Layer the faders play">
                     {#each Array.from({ length: faderLayerCount }, (_, i) => i) as layer (layer)}
@@ -721,16 +729,11 @@
                    state a long press on the small button above the pad steps through — so the
                    assignment below is always the one you would hear. -->
               <div class="pad-layer-editor" data-testid="surface-pad-layers">
-                <label>Layers
-                  <select aria-label="Number of layers on this pad" value={layers.count}
-                          data-testid="surface-pad-layer-count"
-                          onchange={(e) => setPadLayers(page?.pageId ?? '', selectedControl.index,
-                                                        Number(e.currentTarget.value))}>
-                    {#each Array.from({ length: MAX_PAD_LAYERS }, (_, i) => i + 1) as count (count)}
-                      <option value={count}>{count === 1 ? '1 (no layers)' : count}</option>
-                    {/each}
-                  </select>
-                </label>
+                <div class="layer-count">Layers
+                  <Segmented options={LAYER_COUNTS} value={layers.count} label="Number of layers on this pad"
+                             testid="surface-pad-layer-count"
+                             onchange={(count) => setPadLayers(page?.pageId ?? '', selectedControl.index, count)} />
+                </div>
                 {#if layers.count > 1}
                   <div class="layer-tabs" role="group" aria-label="Layer this pad plays">
                     {#each layerPips(selectedControl) as pip (pip.layer)}
@@ -792,58 +795,41 @@
             {/if}
 
             {#if selectedSlot?.assigned}
+              <!-- The mapping, drawn: the control's travel across, the parameter up. Its ends are
+                   rangeMin and rangeMax, swapped when the control is inverted. -->
+              <SlotResponse slot={selectedSlot} onset={(fields) => updateSelectedOptions(fields)} />
               <div class="option-grid">
-                <label>Minimum
-                  <input type="number" min="0" max="1" step="0.01" value={selectedSlot.rangeMin}
-                         onchange={(e) => updateSelectedOptions({ rangeMin: Number(e.currentTarget.value) })} />
-                </label>
-                <label>Maximum
-                  <input type="number" min="0" max="1" step="0.01" value={selectedSlot.rangeMax}
-                         onchange={(e) => updateSelectedOptions({ rangeMax: Number(e.currentTarget.value) })} />
-                </label>
                 <!-- Stepped: a waveform selector with 4 shapes wants 4 positions, not 128. -->
-                <label title="0 = smooth. 2 or more = the control snaps to that many positions, and an encoder moves one position per click.">Steps
-                  <input type="number" min="0" max="128" step="1" value={selectedSlot.steps ?? 0}
-                         data-testid="slot-steps"
-                         onfocus={(e) => e.currentTarget.select()}
-                         onchange={(e) => updateSelectedOptions({ steps: Math.max(0, Math.min(128, Math.round(Number(e.currentTarget.value) || 0))) })} />
-                </label>
-              </div>
-              <div class="check-row">
-                <span>Invert control direction</span>
-                <PropertyToggle
-                  compact
-                  value={selectedSlot.inverted}
-                  ariaLabel="Invert control direction"
-                  onchange={(value) => updateSelectedOptions({ inverted: value })}
-                />
+                <div class="option" title="Smooth, or snap to that many positions: an encoder then moves one position per click.">Steps
+                  <ScrubValue value={selectedSlot.steps ?? 0} min={0} max={128} pixelsPerStep={6}
+                              format={(n) => (n < 2 ? 'smooth' : `${n}`)} label="Steps" testid="slot-steps"
+                              onchange={(steps) => updateSelectedOptions({ steps: steps === 1 ? 0 : steps })} />
+                </div>
+                <div class="option">Direction
+                  <button type="button" class="toggle" class:on={selectedSlot.inverted} aria-pressed={selectedSlot.inverted}
+                          aria-label="Invert control direction" data-testid="slot-invert"
+                          title="Swap the ends: the parameter goes down as the control goes up"
+                          onclick={() => updateSelectedOptions({ inverted: !selectedSlot.inverted })}>
+                    ⇅ {selectedSlot.inverted ? 'Inverted' : 'Normal'}</button>
+                </div>
               </div>
               {#if pressable(selectedControl)}
-                <label>{selectedControl.kind === 'pad' ? 'Pad mode' : 'Button mode'}
-                  <select value={selectedSlot.toggle ? 'latching' : 'momentary'}
-                          onchange={(e) => updateSelectedOptions({ toggle: e.currentTarget.value === 'latching' })}>
-                    <option value="momentary">Momentary</option>
-                    <option value="latching">Latching</option>
-                  </select>
-                </label>
+                <div class="option">{selectedControl.kind === 'pad' ? 'Pad mode' : 'Button mode'}
+                  <Segmented options={[{ value: false, label: 'Momentary', title: 'Down is the top of the range, up is the bottom' },
+                                       { value: true, label: 'Latching', title: 'Each press flips between the two ends' }]}
+                             value={selectedSlot.toggle} label={selectedControl.kind === 'pad' ? 'Pad mode' : 'Button mode'}
+                             testid="slot-press-mode" onchange={(toggle) => updateSelectedOptions({ toggle })} />
+                </div>
               {/if}
               {#if selectedSlot.midiCc >= 0 && selectedSlot.midiNote < 0 && !pressable(selectedControl) && !selectedSlot.toggle}
-                <label>MIDI mode
+                <div class="option">MIDI mode
                   <!-- A relative encoder sends a turn, not a position, and controllers disagree on how:
                        which one yours uses is in its manual (or try each and turn the knob). -->
-                  <select aria-label="MIDI control mode" data-testid="slot-midi-mode"
-                          value={selectedSlot.midiRelative ? `relative-${selectedSlot.midiRelativeFormat ?? 0}` : 'absolute'}
-                          onchange={(e) => {
-                            const v = e.currentTarget.value;
-                            updateSelectedOptions(v === 'absolute' ? { midiRelative: false }
-                              : { midiRelative: true, midiRelativeFormat: Number(v.slice(-1)) });
-                          }}>
-                    <option value="absolute">Absolute (0-127)</option>
-                    <option value="relative-0" title="1 = up one, 127 = down one; 2..63 up faster, 126..65 down faster">Relative: 1 up / 127 down</option>
-                    <option value="relative-1" title="64 = rest; 65.. up, ..63 down">Relative: 64 centre (65 up / 63 down)</option>
-                    <option value="relative-2" title="1..63 up; 65..127 down">Relative: sign bit (1 up / 65 down)</option>
-                  </select>
-                </label>
+                  <Segmented options={MIDI_MODES} label="MIDI control mode" testid="slot-midi-mode"
+                             value={selectedSlot.midiRelative ? `relative-${selectedSlot.midiRelativeFormat ?? 0}` : 'absolute'}
+                             onchange={(v) => updateSelectedOptions(v === 'absolute' ? { midiRelative: false }
+                               : { midiRelative: true, midiRelativeFormat: Number(v.slice(-1)) })} />
+                </div>
                 {#if !selectedSlot.midiRelative}
                   <div class="check-row">
                     <span title="Wait until the physical control reaches the current software value">Pickup</span>
@@ -1258,8 +1244,8 @@
   .learning-notice span { display: flex; flex-direction: column; gap: 3px; }
   .inspector-actions.secondary { display: flex; flex-wrap: wrap; }
   .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .option-grid label, .control-inspector > label { display: flex; flex-direction: column; gap: 4px; color: #aab5be; font-size: 11px; }
-  .option-grid input { width: 100%; box-sizing: border-box; }
+  .option-grid .option, .control-inspector .option, .pad-layer-editor .layer-count {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px; color: #aab5be; font-size: 11px; }
   .control-inspector .check-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; color: #aab5be; font-size: 11px; }
   .control-inspector button.confirming { border-color: #c57575; background: #51282c; color: #ffd8d8; }
   .inspector-empty { margin: auto 0; text-align: center; align-items: center; padding: 12px; }

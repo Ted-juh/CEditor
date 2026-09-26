@@ -69,7 +69,7 @@
   import ParamBar from '../components/controls/ParamBar.svelte';
   import Knob from '../components/controls/Knob.svelte';
   import HostZoneEditor from './HostZoneEditor.svelte';
-  import Segmented from '../components/controls/Segmented.svelte';
+  import MacroTargetBand from './MacroTargetBand.svelte';
   import PerformancePanel from './PerformancePanel.svelte';
   import HostMixerPanel from './HostMixerPanel.svelte';
   import LayerGroupsPanel from './LayerGroupsPanel.svelte';
@@ -710,12 +710,13 @@
                         onchange={(v) => setTempo(v)} />
             <button type="button" class="ghost transport-action tap" data-testid="host-tap-tempo"
                     title="Tap on the beat: the tempo follows your last four taps" onclick={tapTempo}>tap</button>
-            <ScrubValue value={transport.numerator} min={1} max={32} label="Beats per bar" testid="host-ts-numerator"
+            <ScrubValue value={transport.numerator} min={1} max={32} label="Beats per bar" testid="host-ts-numerator" compact
                         pixelsPerStep={8} onchange={(v) => setTimeSignature(v, transport.denominator)} />
             <span class="ts-slash">/</span>
-            <Segmented options={[2, 4, 8, 16].map((d) => ({ value: d, label: String(d) }))} value={transport.denominator}
-                       label="Beat unit" testid="host-ts-denominator"
-                       onchange={(v) => setTimeSignature(transport.numerator, v)} />
+            <!-- The beat unit is a value like the beats: four toggles do not fit a full header. -->
+            <ScrubValue value={transport.denominator} choices={[[2, '2'], [4, '4'], [8, '8'], [16, '16']]} pixelsPerStep={10} compact
+                        label="Beat unit" testid="host-ts-denominator"
+                        onchange={(v) => setTimeSignature(transport.numerator, v)} />
             <button type="button" class="toggle" class:on={transport.externalClock}
                     class:warn={transport.clockLost}
                     title={transport.clockLost
@@ -2036,11 +2037,12 @@
                 <input type="text" class="send-name editable-name" value={ret.name}
                        aria-label="Return name" title="Rename return"
                        onchange={(e) => renameReturn(ret.returnId, e.currentTarget.value)} />
-                <label class="mini return-level" title="Return level">
-                  <input type="range" min="0" max="2" step="0.01" value={ret.level}
-                         aria-label={`${ret.name} level`}
-                         oninput={(e) => setReturnLevel(ret.returnId, Number(e.currentTarget.value))} />
-                </label>
+                <span class="return-level" title="Return level: drag up or down, double-click for 0 dB">
+                  <Knob value={ret.level} min={0} max={2} reset={1} size={28} label={`${ret.name} level`}
+                        testid="return-level" format={(v) => (v <= 0.001 ? '-∞ dB' : `${(20 * Math.log10(v)).toFixed(1)} dB`)}
+                        onchange={(v) => setReturnLevel(ret.returnId, v)} />
+                  <small>{ret.level <= 0.001 ? '-∞' : (20 * Math.log10(ret.level)).toFixed(1)} dB</small>
+                </span>
                 <button type="button" class="ghost danger" class:confirming={pendingDestructive === `return:${ret.returnId}`}
                         title={pendingDestructive === `return:${ret.returnId}` ? 'Click again to confirm' : 'Remove this return (its sends go with it)'}
                         onclick={() => guardedAction(`return:${ret.returnId}`, () => removeReturn(ret.returnId))}>
@@ -2065,9 +2067,12 @@
                      onfocus={() => (selectedMacroId = macro.macroId)}
                      onclick={() => (selectedMacroId = macro.macroId)}
                      onchange={(e) => renameMacro(macro.macroId, e.currentTarget.value)} />
-              <input type="range" min="0" max="1" step="0.001" value={macro.value} aria-label={macro.name}
-                     oninput={(e) => setMacroValue(macro.macroId, Number(e.currentTarget.value))}
-                     onchange={(e) => setMacroValue(macro.macroId, Number(e.currentTarget.value), true)} />
+              <!-- The macro's value: a knob that sends as you turn and settles once you let go. -->
+              <Knob value={macro.value} min={0} max={1} reset={0} step={0.001} size={30} label={macro.name}
+                    testid="macro-knob" format={(v) => `${Math.round(v * 100)}%`}
+                    onchange={(v) => setMacroValue(macro.macroId, v)}
+                    oncommit={(v) => setMacroValue(macro.macroId, v, true)} />
+              <span class="macro-value">{Math.round(macro.value * 100)}%</span>
               <button type="button" class="ghost danger" class:confirming={pendingDestructive === `macro:${macro.macroId}`}
                       title={pendingDestructive === `macro:${macro.macroId}` ? 'Click again to confirm' : 'Remove this macro'}
                       onclick={() => guardedAction(`macro:${macro.macroId}`, () => removeMacro(macro.macroId))}>
@@ -2083,30 +2088,10 @@
                     <span class="macro-target-name">
                       {target.displayName} — {target.targetName || 'missing'}
                     </span>
-                    <label class="macro-bound" title="Output when the macro is at minimum">
-                      <span>Min</span>
-                      <input type="number" min="0" max={target.rangeMax} step="0.01" value={target.rangeMin}
-                             aria-label={`${target.displayName} minimum`}
-                             onchange={(e) => setMacroTargetOptions(
-                               macro.macroId, target.targetId, target.parameterId,
-                               { rangeMin: Number(e.currentTarget.value) })} />
-                    </label>
-                    <label class="macro-bound" title="Output when the macro is at maximum">
-                      <span>Max</span>
-                      <input type="number" min={target.rangeMin} max="1" step="0.01" value={target.rangeMax}
-                             aria-label={`${target.displayName} maximum`}
-                             onchange={(e) => setMacroTargetOptions(
-                               macro.macroId, target.targetId, target.parameterId,
-                               { rangeMax: Number(e.currentTarget.value) })} />
-                    </label>
-                    <span class="macro-invert">
-                      <PropertyToggle value={target.inverted} label="Inv" compact
-                                      title="Reverse this target's response"
-                                      ariaLabel={`Invert ${target.displayName}`}
-                                      onchange={(inverted) => setMacroTargetOptions(
-                                        macro.macroId, target.targetId, target.parameterId,
-                                        { inverted })} />
-                    </span>
+                    <!-- The range as a band: drag its ends, past each other to reverse it. -->
+                    <MacroTargetBand {target} position={macro.value}
+                                     onset={(fields) => setMacroTargetOptions(
+                                       macro.macroId, target.targetId, target.parameterId, fields)} />
                     <button type="button" class="ghost danger"
                             class:confirming={pendingDestructive === `macro-target:${macro.macroId}:${target.targetId}:${target.parameterId}`}
                             title={pendingDestructive === `macro-target:${macro.macroId}:${target.targetId}:${target.parameterId}`
@@ -2817,7 +2802,8 @@
   .send-row input[type='range'] { flex: 1; min-width: 60px; }
   .return-block { display: flex; flex-direction: column; gap: 4px; }
   .return-block .fx-chain { border-top: none; padding-top: 0; margin-left: 8px; }
-  .return-level input[type='range'] { width: 120px; }
+  .return-level { display: inline-flex; align-items: center; gap: 6px; }
+  .return-level small { font: 11px var(--host-font-mono, monospace); color: var(--host-text-soft); min-width: 52px; }
   .hw-error {
     padding: 4px 8px;
     border: 1px solid #7a4a4a;
@@ -2917,32 +2903,20 @@
   .macro-row { display: flex; align-items: center; gap: 8px; }
   .macro-row.on .macro-name { color: #d6dbe0; border-color: #5b9bd5; }
   .macro-name { box-sizing: border-box; flex: 0 0 112px; min-width: 0; font-size: 12px; }
-  .macro-row input[type='range'] { flex: 1; min-width: 60px; }
-  .macro-targets { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 8px; }
+  .macro-value { font: 600 12px var(--host-font-mono, monospace); color: var(--host-text-soft); min-width: 38px; }
+  /* One target a row: its name, the band it drives, remove. */
+  .macro-targets { display: flex; flex-direction: column; gap: 4px; margin-left: 8px; }
   .macro-target {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 10px;
     border: 1px solid #3b4652;
     border-radius: 3px;
-    padding: 1px 4px;
+    padding: 3px 6px;
     font-size: 11px;
     color: #9aa5b1;
   }
-  .macro-target-name { white-space: nowrap; }
-  .macro-bound, .macro-invert { display: inline-flex; align-items: center; gap: 2px; }
-  .macro-bound span, .macro-invert span { color: #74808b; font-size: 9px; text-transform: uppercase; }
-  .macro-bound input[type='number'] {
-    width: 42px;
-    min-width: 42px;
-    height: 20px;
-    padding: 1px 3px;
-    border: 1px solid #46515d;
-    border-radius: 2px;
-    background: #171c21;
-    color: #cbd2d8;
-    font-size: 10px;
-  }
+  .macro-target-name { flex: 0 0 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .macro-target.unresolved { color: #d6a3a3; border-color: #7a4a4a; }
 
   .pages {

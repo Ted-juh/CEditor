@@ -345,6 +345,24 @@
     { value: 8, label: '8 beats' },
     { value: 16, label: '16 beats' },
   ];
+  const QUANTIZE_CHOICES = quantizeOptions.map((option) => [option, option]);
+  const MORPH_CHOICES = snapshotMorphOptions.map((option) => [option.value, option.label]);
+  // What a clip does after its loops, as pictures (24 × 14): nothing, stop, the next clip, a
+  // random one, or a clip you name.
+  const FOLLOW_ACTIONS = [
+    { value: 'none', label: 'No follow action', path: 'M5 7 H19', iconOnly: true },
+    { value: 'stop', label: 'Stop', path: 'M8 3 H16 V11 H8 Z', iconOnly: true },
+    { value: 'next', label: 'Next clip', path: 'M4 7 H18 M14 3 L18 7 L14 11', iconOnly: true },
+    { value: 'random', label: 'A random clip', path: 'M4 4 H8 L15 10 H20 M4 10 H8 L15 4 H20 M17 2 L20 4 L17 6 M17 8 L20 10 L17 12', iconOnly: true },
+    { value: 'clip', label: 'A clip you choose', path: 'M5 12 V6 H18 M14 2 L18 6 L14 10', iconOnly: true },
+  ];
+  const FILL_CHANNELS = [[0, 'any'], ...Array.from({ length: 16 }, (_, i) => [i + 1, String(i + 1)])];
+  let openFills = $state(new Set());
+  const toggleFill = (clipId) => {
+    const next = new Set(openFills);
+    if (next.has(clipId)) next.delete(clipId); else next.add(clipId);
+    openFills = next;
+  };
   const laneTypes = ['note', 'chord', 'drum', 'cc', 'parameter'];
   const noteName = (note) => {
     const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -1865,15 +1883,12 @@
       <div class="clip-column">
         <div class="perf-head">
           <strong>Clips</strong>
-          <label class="freeze-cycles" title="How many source cycles become one deterministic clip">
+          <div class="freeze-cycles" title="How many source cycles become one deterministic clip">
             Freeze
-            <select aria-label="MIDI freeze cycles" value={freezeCycles}
-                    onchange={(e) => (freezeCycles = Number(e.currentTarget.value))}>
-              {#each [1, 2, 4, 8] as cycles (cycles)}
-                <option value={cycles}>{cycles}×</option>
-              {/each}
-            </select>
-          </label>
+            <Segmented options={[1, 2, 4, 8].map((cycles) => ({ value: cycles, label: `${cycles}×`, title: `${cycles} source cycles` }))}
+                       value={freezeCycles} label="MIDI freeze cycles" testid="freeze-cycles"
+                       onchange={(cycles) => (freezeCycles = cycles)} />
+          </div>
           <button type="button" class="ghost" onclick={() => stopAllClips()}>Stop all</button>
         </div>
         {#if performance.clips.length === 0}
@@ -1901,72 +1916,53 @@
             <span class="clip-phase" aria-hidden="true">
               <span class="clip-phase-fill" style={`width: ${Math.round(clip.phase * 100)}%`}></span>
             </span>
-            <select value={clip.launchQuantize} aria-label={`${clip.name} launch quantization`}
-                    onchange={(e) => setClipOptions(clip.clipId, { launchQuantize: e.currentTarget.value })}>
-              {#each quantizeOptions as option (option)}
-                <option value={option}>{option}</option>
-              {/each}
-            </select>
+            <ScrubValue value={clip.launchQuantize} choices={QUANTIZE_CHOICES} pixelsPerStep={10}
+                        label={`${clip.name} launch quantization`} testid="clip-quantize"
+                        title="Launches on this boundary: drag up or down, or click to type"
+                        onchange={(launchQuantize) => setClipOptions(clip.clipId, { launchQuantize })} />
             <PropertyToggle compact label="Loop" value={clip.loop} ariaLabel={`${clip.name} loops`}
                             onchange={(on) => setClipOptions(clip.clipId, { loop: on })} />
-            <select class="follow-action" value={clip.followAction}
-                    aria-label={`${clip.name} follow action`}
-                    title="What happens after the configured number of loops"
-                    onchange={(e) => {
-                      const followAction = e.currentTarget.value;
-                      const patch = {
-                        followAction,
-                        followAfterLoops: followAction === 'none'
-                          ? 0 : Math.max(1, clip.followAfterLoops || 1),
-                      };
-                      if (followAction === 'clip' && !clip.followClipId)
-                        patch.followClipId = followTargetsFor(clip)[0]?.clipId ?? '';
-                      setClipOptions(clip.clipId, patch);
-                    }}>
-              <option value="none">No follow</option>
-              <option value="clip">Target clip</option>
-              <option value="next">Next clip</option>
-              <option value="random">Random clip</option>
-              <option value="stop">Stop</option>
-            </select>
-            {#if clip.followAction !== 'none'}
-              <label class="follow-loops" title="Complete this many loops before the action">
-                after
-                <input type="number" min="1" max="64" value={Math.max(1, clip.followAfterLoops)}
-                       aria-label={`${clip.name} follow loops`}
-                       onchange={(e) => setClipOptions(clip.clipId,
-                         { followAfterLoops: Number(e.currentTarget.value) })} />
-              </label>
-            {/if}
-            {#if clip.followAction === 'clip'}
-              <select class="follow-target" value={clip.followClipId}
-                      aria-label={`${clip.name} follow target`}
-                      onchange={(e) => setClipOptions(clip.clipId, { followClipId: e.currentTarget.value })}>
-                <option value="">Choose clip…</option>
-                {#each followTargetsFor(clip) as target (target.clipId)}
-                  <option value={target.clipId}>{target.name}</option>
-                {/each}
-              </select>
-            {/if}
-            <select class="fill-pattern" value={clip.fillPatternId}
-                    aria-label={`${clip.name} fill pattern`}
-                    title="Temporary pattern used while Fill is held"
-                    onchange={(e) => setClipOptions(clip.clipId, { fillPatternId: e.currentTarget.value })}>
-              <option value="">No fill</option>
-              {#each fillPatternsFor(clip) as pattern (pattern.patternId)}
-                <option value={pattern.patternId}>
-                  {pattern.variationLabel ? `${pattern.variationLabel} · ` : ''}{pattern.name}
-                </option>
-              {/each}
-            </select>
-            <select class="fill-quantize" value={clip.fillQuantize}
-                    aria-label={`${clip.name} fill quantization`}
-                    title="Boundary used for both press and release"
-                    onchange={(e) => setClipOptions(clip.clipId, { fillQuantize: e.currentTarget.value })}>
-              {#each quantizeOptions as option (option)}
-                <option value={option}>{option}</option>
-              {/each}
-            </select>
+            <Segmented options={FOLLOW_ACTIONS} value={clip.followAction} label={`${clip.name} follow action`}
+                       testid="clip-follow"
+                       onchange={(followAction) => {
+                         const patch = {
+                           followAction,
+                           followAfterLoops: followAction === 'none' ? 0 : Math.max(1, clip.followAfterLoops || 1),
+                         };
+                         if (followAction === 'clip' && !clip.followClipId)
+                           patch.followClipId = followTargetsFor(clip)[0]?.clipId ?? '';
+                         setClipOptions(clip.clipId, patch);
+                       }} />
+            <!-- Fixed slots, filled or not, so every clip's controls line up in columns. -->
+            <span class="follow-slot loops">
+              {#if clip.followAction !== 'none'}
+                <ScrubValue value={Math.max(1, clip.followAfterLoops)} min={1} max={64} pixelsPerStep={8}
+                            format={(n) => `after ${n} ${n === 1 ? 'loop' : 'loops'}`}
+                            label={`${clip.name} follow loops`} testid="clip-follow-loops"
+                            onchange={(followAfterLoops) => setClipOptions(clip.clipId, { followAfterLoops })} />
+              {/if}
+            </span>
+            <span class="follow-slot target">
+              {#if clip.followAction === 'clip'}
+                <select class="follow-target" value={clip.followClipId}
+                        aria-label={`${clip.name} follow target`}
+                        onchange={(e) => setClipOptions(clip.clipId, { followClipId: e.currentTarget.value })}>
+                  <option value="">Choose clip…</option>
+                  {#each followTargetsFor(clip) as target (target.clipId)}
+                    <option value={target.clipId}>{target.name}</option>
+                  {/each}
+                </select>
+              {/if}
+            </span>
+            <!-- The fill's settings live in a panel under the row; the row keeps the button you
+                 hold while playing, once there is a fill to hold. -->
+            <button type="button" class="ghost fill-open" aria-expanded={openFills.has(clip.clipId)}
+                    data-testid="clip-fill-open" title="The pattern a held Fill plays, and its pedal"
+                    onclick={() => toggleFill(clip.clipId)}>
+              Fill{clip.fillPatternId ? ' ✓' : ''} {openFills.has(clip.clipId) ? '▴' : '▾'}
+            </button>
+            <span class="follow-slot hold">
+            {#if clip.fillPatternId}
             <button type="button" class="fill-hold" class:on={clip.fillActive || clip.fillPending}
                     disabled={!clip.active || !clip.fillPatternId}
                     title="Hold for the temporary fill; release to return without restarting the clip"
@@ -1989,18 +1985,8 @@
                     }}>
               {clip.fillPending ? 'Fill…' : clip.fillActive ? 'Filling' : 'Hold Fill'}
             </button>
-            <label class="fill-midi" title="Momentary MIDI controller; -1 disables the pedal">
-              CC
-              <input type="number" min="-1" max="127" value={clip.fillCc}
-                     aria-label={`${clip.name} fill pedal CC`}
-                     onchange={(e) => setClipOptions(clip.clipId, { fillCc: Number(e.currentTarget.value) })} />
-            </label>
-            <label class="fill-midi" title="0 accepts the fill pedal on any MIDI channel">
-              Ch
-              <input type="number" min="0" max="16" value={clip.fillChannel}
-                     aria-label={`${clip.name} fill pedal channel`}
-                     onchange={(e) => setClipOptions(clip.clipId, { fillChannel: Number(e.currentTarget.value) })} />
-            </label>
+            {/if}
+            </span>
             <button type="button" class="ghost freeze-button" disabled={clip.frozenMidi}
                     title={clip.frozenMidi
                       ? 'This clip already contains rendered post-MIDI-FX notes'
@@ -2010,6 +1996,38 @@
             </button>
             <HostConfirmButton identity={JSON.stringify([clip.clipId])} title="Remove clip" aria-label="Remove clip" type="button" class="ghost danger" onclick={() => removeClip(clip.clipId)}>×</HostConfirmButton>
           </div>
+          {#if openFills.has(clip.clipId)}
+            <div class="fill-panel" data-testid="clip-fill-panel">
+              <div class="mini-field">Fill pattern
+                <select class="fill-pattern" value={clip.fillPatternId}
+                        aria-label={`${clip.name} fill pattern`}
+                        title="Temporary pattern used while Fill is held"
+                        onchange={(e) => setClipOptions(clip.clipId, { fillPatternId: e.currentTarget.value })}>
+                  <option value="">No fill</option>
+                  {#each fillPatternsFor(clip) as pattern (pattern.patternId)}
+                    <option value={pattern.patternId}>
+                      {pattern.variationLabel ? `${pattern.variationLabel} · ` : ''}{pattern.name}
+                    </option>
+                  {/each}
+                </select>
+              </div>
+              <div class="mini-field" title="Boundary used for both press and release">On
+                <ScrubValue value={clip.fillQuantize} choices={QUANTIZE_CHOICES} pixelsPerStep={10}
+                            label={`${clip.name} fill quantization`} testid="clip-fill-quantize"
+                            onchange={(fillQuantize) => setClipOptions(clip.clipId, { fillQuantize })} />
+              </div>
+              <div class="mini-field" title="A momentary MIDI controller that holds the fill">Pedal CC
+                <ScrubValue value={clip.fillCc} min={-1} max={127} format={(n) => (n < 0 ? 'off' : `CC ${n}`)}
+                            label={`${clip.name} fill pedal CC`} testid="clip-fill-cc"
+                            onchange={(fillCc) => setClipOptions(clip.clipId, { fillCc })} />
+              </div>
+              <div class="mini-field" title="The channel the pedal is heard on">Channel
+                <ScrubValue value={clip.fillChannel} choices={FILL_CHANNELS} pixelsPerStep={8}
+                            label={`${clip.name} fill pedal channel`} testid="clip-fill-channel"
+                            onchange={(fillChannel) => setClipOptions(clip.clipId, { fillChannel })} />
+              </div>
+            </div>
+          {/if}
         {/each}
       </div>
 
@@ -2051,33 +2069,22 @@
               </span>
             {/if}
             <span class="scene-detail">{scene.clipIds.length} clips · {scene.numSlots} slots · {scene.numMacros} macros · {scene.numParameters} mapped</span>
-            <select value={scene.launchQuantize} aria-label={`${scene.name} launch quantization`}
-                    onchange={(e) => setSceneOptions(scene.sceneId, { launchQuantize: e.currentTarget.value })}>
-              {#each quantizeOptions as option (option)}
-                <option value={option}>{option}</option>
-              {/each}
-            </select>
-            <label class="scene-morph" title="Continuous scene values move together; clips, mute and tempo still land on the boundary">
+            <ScrubValue value={scene.launchQuantize} choices={QUANTIZE_CHOICES} pixelsPerStep={10}
+                        label={`${scene.name} launch quantization`} testid="scene-quantize"
+                        onchange={(launchQuantize) => setSceneOptions(scene.sceneId, { launchQuantize })} />
+            <span class="scene-morph" title="Continuous scene values move together; clips, mute and tempo still land on the boundary">
               Morph
-              <select value={String(scene.morphBeats)} aria-label={`${scene.name} snapshot morph time`}
-                      onchange={(e) => setSceneOptions(scene.sceneId,
-                        { morphBeats: Number(e.currentTarget.value) })}>
-                {#each snapshotMorphOptions as option (option.value)}
-                  <option value={String(option.value)}>{option.label}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="scene-morph" title="CTRL49 control layout recalled with this scene">
+              <ScrubValue value={scene.morphBeats} choices={MORPH_CHOICES} pixelsPerStep={10}
+                          label={`${scene.name} snapshot morph time`} testid="scene-morph"
+                          onchange={(morphBeats) => setSceneOptions(scene.sceneId, { morphBeats })} />
+            </span>
+            <span class="scene-morph" title="CTRL49 control layout recalled with this scene">
               Controls
-              <select value={scene.pageId} aria-label={`${scene.name} CTRL49 controls`}
-                      onchange={(e) => setSceneOptions(scene.sceneId,
-                        { pageId: e.currentTarget.value })}>
-                <option value="">Keep page</option>
-                {#each $hostState.rack.pages.slice(0, 3) as page (page.pageId)}
-                  <option value={page.pageId}>{page.name}</option>
-                {/each}
-              </select>
-            </label>
+              <Segmented options={[{ value: '', label: 'Keep', title: 'Keep the page that is showing' },
+                                   ...$hostState.rack.pages.slice(0, 3).map((page) => ({ value: page.pageId, label: page.name }))]}
+                         value={scene.pageId} label={`${scene.name} CTRL49 controls`} testid="scene-page"
+                         onchange={(pageId) => setSceneOptions(scene.sceneId, { pageId })} />
+            </span>
             <button type="button" class="ghost" title="Replace this scene's contents with the rig as it stands"
                     onclick={() => captureScene(scene.sceneId)}>Capture</button>
             <!-- A variation of the thing you are PLAYING, not of one lane of it. Each clip gets
@@ -2767,7 +2774,6 @@
 
   .clip-column, .scene-column { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .freeze-cycles { display: inline-flex; align-items: center; gap: 4px; color: #98a4ae; font-size: 11px; }
-  .freeze-cycles select { width: auto; min-width: 46px; }
   .freeze-button { white-space: nowrap; border-color: #456579; color: #a9ccdf; }
   /* --- the gesture library --------------------------------------------------------------- */
   .gesture-library { margin-top: 14px; border-top: 1px solid #262c33; padding-top: 10px; }
@@ -2791,23 +2797,23 @@
   .clip-launch { padding: 2px 8px; }
   .clip-row.active .clip-launch { color: #9fd6a3; border-color: #4a7a52; }
   .clip-row.pending .clip-launch { color: #e0cf9a; border-color: #7a6a3a; }
-  .fill-pattern { max-width: 130px; }
-  .fill-quantize { max-width: 82px; }
-  .follow-action { max-width: 104px; }
-  .follow-target { max-width: 120px; }
-  .follow-loops { display: inline-flex; align-items: center; gap: 3px; color: #98a4ae; }
-  .follow-loops input { width: 42px; }
+  .follow-slot { flex: none; display: inline-flex; }
+  .follow-slot.loops { width: 116px; }
+  .follow-slot.target { width: 124px; }
+  .follow-slot.hold { width: 84px; }
+  .follow-target { width: 100%; }
+  .fill-open { white-space: nowrap; }
   .fill-hold { white-space: nowrap; border-color: #8c592e; }
   .fill-hold.on { color: #18120d; border-color: #f0a45a; background: #f0a45a; }
-  .fill-midi { display: inline-flex; align-items: center; gap: 3px; color: #98a4ae; }
-  .fill-midi input { width: 44px; }
+  .fill-panel { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 0 0 6px 38px; padding: 8px 10px;
+                border: 1px solid #3a3129; border-left: 3px solid #8c592e; background: #1a1714; }
+  .fill-pattern { max-width: 180px; }
   .clip-name { flex: 0 0 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .scene-name-input { box-sizing: border-box; min-width: 0; }
   .clip-phase { flex: 1; height: 4px; background: #14171a; border-radius: 2px; overflow: hidden; min-width: 30px; }
   .clip-phase-fill { display: block; height: 100%; background: #5b9bd5; }
   .scene-detail { flex: 1; color: #98a4ae; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .scene-morph { display: inline-flex; align-items: center; gap: 4px; color: #98a4ae; font-size: 10px; }
-  .scene-morph select { width: auto; min-width: 70px; }
   .snapshot-morph-status {
     display: grid; grid-template-columns: auto auto minmax(70px, 1fr); align-items: center; gap: 8px;
     min-height: 28px; padding: 4px 7px; border: 1px solid #80542f;
