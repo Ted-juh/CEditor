@@ -6870,6 +6870,32 @@ void testChordLearn()
                  && (int) fx.getProperty ("chordFollowHigh", 0) == 59
                  && (bool) fx.getProperty ("chordBass", false),
                "beside chordFollow, chord only picks the shape; the light stays where it was put");
+
+        // Pads and the progression are fields like the rest; steps past the set are dropped.
+        h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", slotId },
+                                       { "chordPads", true }, { "padMap", juce::Array<juce::var> { 0, -1, 7 } },
+                                       { "chordProgression", true }, { "progression", juce::Array<juce::var> { 0, 3, 0 } },
+                                       { "progressionAdvance", "pedal" }, { "progressionHigh", 59 } });
+        for (int i = 0; i < chainOf().size(); ++i)
+            if (chainOf()[i].getProperty ("slotId", {}).toString() == slotId)
+                fx = chainOf()[i].getProperty ("fx", {});
+        const auto pads = fx.getProperty ("padMap", {});
+        const auto steps = fx.getProperty ("progression", {});
+        check ((bool) fx.getProperty ("chordPads", false) && pads.size() == 3 && (int) pads[0] == 0
+                 && (int) pads[2] == -1,
+               "pads keep their places, and a pad past the set is empty");
+        check ((bool) fx.getProperty ("chordProgression", false) && steps.size() == 2
+                 && fx.getProperty ("progressionAdvance", {}).toString() == "pedal"
+                 && (int) fx.getProperty ("progressionHigh", 0) == 59,
+               "the progression keeps its steps in order, without the one past the set");
+
+        h.emits.clear();
+        h.cmd ("chordPad", { { "partId", partId }, { "pad", 0 }, { "velocity", 100 } });
+        h.cmd ("chordPad", { { "partId", partId }, { "pad", 0 }, { "velocity", 0 } });
+        h.cmd ("chordStep", { { "partId", partId }, { "delta", 1 } });
+        check (h.emits.lastError().isEmpty(), "playing a pad and stepping are accepted");
+        h.cmd ("chordPad", { { "partId", "nope" }, { "pad", 0 } });
+        check (h.emits.lastError().contains ("Unknown rack part"), "and an unknown part says so");
     }
 }
 

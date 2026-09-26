@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  strokePosition, strumOrder, strumNotes, HUMANIZE_FEELS, humanizeFeelOf, beatsToMs, humanizeExample,
+  strokePosition, strumOrder, strumNotes, HUMANIZE_FEELS, humanizeFeelOf, beatsToMs, humanizeExample, guitarVoicing,
 } from '../src/CE_Application/utils/noteModuleViews.js';
 
 test('stroke order follows the engine for every pattern', () => {
@@ -52,4 +52,14 @@ test('the example bar only delays, stays in range, repeats, and respects protect
   assert.deepEqual(humanizeExample({ timing: 0.05, velocity: 20 }, 11), bar, 'same seed, same bar');
   const guarded = humanizeExample({ timing: 0.05, velocity: 20, protectBeats: true }, 11);
   assert.ok([0, 4, 8, 12].every((i) => guarded[i].lateBeats === 0), 'notes on the beat stay put');
+});
+
+test('guitar mode frets chords the way StrumEngine::guitarVoicing does', () => {
+  const notes = (chord) => guitarVoicing(chord).map((v) => v.note);
+  assert.deepEqual(notes([60, 64, 67]), [48, 52, 55, 60, 64], 'C: x32010');
+  assert.deepEqual(notes([55, 59, 62]), [43, 47, 50, 55, 59, 67], 'G: 320003');
+  assert.deepEqual(notes([57, 60, 64]), [45, 52, 57, 60, 64], 'Am: x02210');
+  assert.deepEqual(notes([62, 66, 69]), [50, 57, 62, 66], 'D: xx0232');
+  assert.deepEqual(guitarVoicing([60, 64, 67]).map((v) => v.string), [1, 2, 3, 4, 5],
+    'and says which string each note is on');
 });

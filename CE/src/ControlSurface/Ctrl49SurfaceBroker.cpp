@@ -568,8 +568,10 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
         {
             // Pad N drives whatever pad N is playing on its active layer — by number, the way
             // the encoders drive their slots, so a pad needs no learning to work.
+            // A pad with nothing on it plays the Chords pads, in the keyboard's own bank.
             service.pressSurfacePad (performance.pages.getReference (reducer.page()).pageId,
-                                     action->pad, action->velocity > 0);
+                                     action->pad, action->velocity > 0, action->velocity,
+                                     reducer.padBank());
         }
     };
 
@@ -617,7 +619,8 @@ void Ctrl49SurfaceBroker::paintPads()
     for (int pad = 1; pad <= 8; ++pad)
     {
         const auto rgb = onControlPage
-                           ? service.padLight (performance.pages.getReference (page).pageId, pad)
+                           ? service.padLight (performance.pages.getReference (page).pageId, pad,
+                                               reducer.padBank())
                            : 0xFFA500;
         auto& painted = paintedPads[(std::size_t) (pad - 1)];
         if (painted == rgb)
@@ -732,7 +735,8 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
                                        s.assigned, s.resolved };
         }
 
-        labels = buildRackLabelPayload (page.name.toStdString(), views);
+        labels = buildRackLabelPayload ((page.name + service.surfaceChordTitle (reducer.padBank()))
+                                            .toStdString(), views);
         state = buildRackStatePayload (reducer.activeSlot(), views);
     }
 

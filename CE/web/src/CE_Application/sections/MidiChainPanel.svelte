@@ -28,7 +28,7 @@
     addMidiSlot, removeMidiSlot, moveMidiSlot, setMidiSlotBypassed, setMidiSlotOptions,
     reorderIndexForDrop,
     hostNote,
-    learnKeyChord, cancelKeyChordLearn, clearKeyChord,
+    learnKeyChord, cancelKeyChordLearn, clearKeyChord, hostChordsLive, chordPad, chordStep,
   } from '../stores/instrumentHost.js';
 
   let { part } = $props();
@@ -68,7 +68,9 @@
     if (slot.type === 'chord') {
       const follows = slot.fx.chordFollow && slot.fx.chord !== 'off';
       const maps = slot.fx.chordKeyMap && slot.fx.keyMap.length > 0;
-      if (!follows && !maps) return 'off';
+      const pads = slot.fx.chordPads && slot.fx.padMap.some((p) => p >= 0);
+      const steps = slot.fx.chordProgression && slot.fx.progression.length > 0;
+      if (!follows && !maps && !pads && !steps) return 'off';
       const details = [];
       if (follows) {
         details.push(`follow ${shapeLabel(slot.fx.chord)}`);
@@ -77,6 +79,8 @@
         if (slot.fx.chordVoiceLeading) details.push('voice lead');
       }
       if (maps) details.push(`${slot.fx.keyMap.length} mapped ${slot.fx.keyMap.length === 1 ? 'key' : 'keys'}`);
+      if (pads) details.push(`${slot.fx.padMap.filter((p) => p >= 0).length} pads`);
+      if (steps) details.push(`${slot.fx.progression.length}-step progression`);
       return details.join(' · ');
     }
     if (slot.type === 'velocity') {
@@ -430,7 +434,10 @@
                           {scales} learn={$hostChordLearn}
                           onlearn={() => learnKeyChord(part.partId, slot.slotId)}
                           oncancel={() => cancelKeyChordLearn()}
-                          onclear={(key) => clearKeyChord(part.partId, key, slot.slotId)} />
+                          onclear={(key) => clearKeyChord(part.partId, key, slot.slotId)}
+                          live={$hostChordsLive[part.partId]}
+                          onpad={(pad, velocity) => chordPad(part.partId, slot.slotId, pad, velocity)}
+                          onstep={(move) => chordStep(part.partId, slot.slotId, move)} />
           {/if}
 
           {#if slot.type === 'velocity' || slot.type === 'fx'}
@@ -979,7 +986,6 @@
   .slot-summary { color: #7d8894; font-size: 10px; }
   .slot-body { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 8px 8px; }
   .mini-field { display: flex; flex-direction: column; gap: 3px; color: #9aa5b1; font-size: 11px; }
-  .toggle-line { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; width: 100%; }
   .arp-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; width: 100%; }
   .mpe-controls, .mpe-routing { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; width: 100%; }
   .mpe-routing { padding-top: 7px; border-top: 1px solid var(--host-line-soft); }

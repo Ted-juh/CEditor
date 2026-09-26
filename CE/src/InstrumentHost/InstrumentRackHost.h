@@ -275,6 +275,11 @@ public:
     bool setPartMidiChain (const juce::String& partId, juce::Array<perf::MidiSlot> chain);
     /** The arp's live pattern step for the UI playhead; -1 when idle or the part isn't live. */
     int arpLiveStep (const juce::String& partId) const;
+    /** A part's Chords module (named, or the first): pad hits, progression steps, readout.
+        All false / not present when the part is not live. */
+    bool triggerChordPad (const juce::String& partId, const juce::String& slotId, int pad, int velocity);
+    bool moveChordProgression (const juce::String& partId, const juce::String& slotId, int value, bool absolute);
+    perf::MidiInsertRack::ChordsLive chordsLive (const juce::String& partId, const juce::String& slotId = {}) const;
 
     // -- macros (Stage 5) ---------------------------------------------------------------
     // Model-only, like pages: a macro is stored fan-out; the writes go through the service's

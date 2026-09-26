@@ -41,6 +41,7 @@ import {
   onInstrumentHostMsegActivity,
   onInstrumentHostRandomModulatorActivity,
   onInstrumentHostChordLearn,
+  onInstrumentHostChordsLive,
   onInstrumentHostHardwarePatchCapture,
   onInstrumentHostHardwarePatchSend,
   onInstrumentHostHardwarePatchPrompt,
@@ -399,6 +400,30 @@ export const hostArpStep = writable({});
 // then the chord). Driven by instrumentHostChordLearn events; the map itself lands in the
 // part's midiFx via the state.
 export const hostChordLearn = writable({ armed: false, partId: '', stage: '', key: -1 });
+
+// The Chords module playing, by part: { chord, step, pads } — the set chord it last played,
+// the progression step that plays next, a bit per sounding pad. instrumentHostChordsLive.
+export const hostChordsLive = writable({});
+
+/** What localhost pretends the engine did with a chordPad / chordStep (MidiFxChain's rules),
+    so the editor's lights can be tried without a host. */
+export function applyMockChordsLive(live, fx, payload) {
+  const was = live ?? { chord: -1, step: 0, pads: 0 };
+  const steps = fx?.chordProgression ? (fx.progression ?? []).length : 0;
+  if (payload?.cmd === 'chordPad') {
+    const pad = Number(payload.pad);
+    if (!(pad >= 0 && pad < 32)) return was;
+    if (Number(payload.velocity ?? 100) <= 0) return { ...was, pads: was.pads & ~(1 << pad) };
+    const chord = fx?.chordPads ? (fx.padMap?.[pad] ?? -1) : -1;
+    if (chord < 0 || chord >= (fx.chordSet ?? []).length) return was;
+    return { ...was, chord, pads: was.pads | (1 << pad) };
+  }
+  if (payload?.cmd === 'chordStep' && steps > 0) {
+    const to = 'step' in payload ? Number(payload.step) : was.step + Number(payload.delta ?? 1);
+    return { ...was, step: ((to % steps) + steps) % steps };
+  }
+  return was;
+}
 
 // The one keyboard on screen has two jobs. `play`: a selectable span to audition with. `range`: all
 // 128 keys with every part's key range drawn beneath, for setting a split by dragging — the
@@ -2692,6 +2717,7 @@ const normalizeNoteModule = (m) => {
     strumPattern,
     strumCurve: clampNumber(m?.strumCurve, -1, 1, 0),
     strumVelocityRamp: clampInt(m?.strumVelocityRamp, -64, 64, 0),
+    strumGuitar: m?.strumGuitar === true,
     humanizeTimingBeats: clampNumber(m?.humanizeTimingBeats, 0, 0.25, 0),
     humanizeVelocity: clampInt(m?.humanizeVelocity, 0, 64, 0),
     humanizeGatePercent: clampInt(m?.humanizeGatePercent, 0, 100, 0),
@@ -2903,6 +2929,7 @@ const normalizeMidiFx = (f) => {
       ? String(f?.chordVoicing ?? 'close') : 'close',
     chordVoiceLeading: f?.chordVoiceLeading === true,
     chordBass: f?.chordBass === true,
+    ...normalizePadsAndProgression(f),
     chordTopAccent: clampInt(f?.chordTopAccent, 0, 40, 0),
     velocityFixed: clampInt(f?.velocityFixed, 0, 127, 0),
     velocityScale: clampNumber(f?.velocityScale, 0.1, 2, 1),
@@ -2982,6 +3009,25 @@ function normalizeChordLayers(f) {
   };
 }
 
+/** The Pads and Progression layers: 32 pad places (bank * 8 + pad, -1 empty) and the steps in
+    order. A pad past the set is empty; a step past it is dropped (midiFxFromVar's rule). */
+function normalizePadsAndProgression(f) {
+  const setSize = Math.min(MAX_SET_CHORDS, Array.isArray(f?.chordSet) ? f.chordSet.length : 0);
+  const inSet = (n) => Number.isInteger(Number(n)) && Number(n) >= 0 && Number(n) < setSize;
+  const pads = Array.isArray(f?.padMap) ? f.padMap : [];
+  const low = clampInt(f?.progressionLow, 0, 127, 0);
+  const high = clampInt(f?.progressionHigh, 0, 127, 59);
+  return {
+    chordPads: f?.chordPads === true,
+    padMap: Array.from({ length: 32 }, (_, i) => (inSet(pads[i]) ? Number(pads[i]) : -1)),
+    chordProgression: f?.chordProgression === true,
+    progression: (Array.isArray(f?.progression) ? f.progression : []).filter(inSet).map(Number).slice(0, 32),
+    progressionAdvance: f?.progressionAdvance === 'pedal' ? 'pedal' : 'key',
+    progressionLow: Math.min(low, high),
+    progressionHigh: Math.max(low, high),
+  };
+}
+
 /** The native applyMidiFxFields rule for `chord` sent without `chordFollow`: its old
     one-field meaning. The mock applies it so localhost behaves like the host. */
 function applyLegacyChordField(block, payload) {
@@ -2995,6 +3041,7 @@ function applyLegacyChordField(block, payload) {
 
 /** Array fields of the note-shaping block whose entries are objects, not numbers. */
 const OBJECT_ARRAY_FIELDS = ['chordSet', 'keyMap', 'articulations'];
+// (padMap and progression are arrays of numbers, which the generic rule already handles.)
 
 export function normalizePerformance(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
@@ -7564,6 +7611,14 @@ export function initInstrumentHostBridge() {
       },
     };
   }));
+  onInstrumentHostChordsLive((payload) => hostChordsLive.update((all) => ({
+    ...all,
+    [String(payload?.partId ?? '')]: {
+      chord: Number.isInteger(payload?.chord) ? payload.chord : -1,
+      step: Number.isInteger(payload?.step) ? payload.step : 0,
+      pads: Number(payload?.pads ?? 0) >>> 0,
+    },
+  })));
   onInstrumentHostChordLearn((payload) => hostChordLearn.set({
     armed: payload?.armed === true,
     partId: String(payload?.partId ?? ''),
@@ -7693,6 +7748,13 @@ function send(payload) {
     hostLastError.set('');
   }
   if (!isJuceAvailable()) {
+    if (payload?.cmd === 'chordPad' || payload?.cmd === 'chordStep') {
+      const part = (get(hostState)?.rack?.parts ?? []).find((p) => p.partId === payload.partId);
+      const slot = part?.midiChain.find((s) => (payload.slotId ? s.slotId === payload.slotId : s.type === 'chord'));
+      if (slot) hostChordsLive.update((all) => ({
+        ...all, [payload.partId]: applyMockChordsLive(all[payload.partId], slot.fx, payload) }));
+      return;
+    }
     if (payload?.cmd === 'surfaceInput') {
       mockSurfaceInput(payload.data);
       return;
@@ -8848,6 +8910,12 @@ export const cancelSoundComparison = () => send({ cmd: 'cancelSoundComparison' }
 export const learnKeyChord = (partId, slotId = '') =>
   send({ cmd: 'learnKeyChord', partId, ...(slotId ? { slotId } : {}) });
 export const cancelKeyChordLearn = () => send({ cmd: 'cancelKeyChordLearn' });
+/** Plays (velocity > 0) or releases a pad of a Chords module: bank * 8 + pad. */
+export const chordPad = (partId, slotId, pad, velocity) =>
+  send({ cmd: 'chordPad', partId, pad, velocity, ...(slotId ? { slotId } : {}) });
+/** Moves a Chords progression: { step } jumps there, { delta } steps by that much. */
+export const chordStep = (partId, slotId, move) =>
+  send({ cmd: 'chordStep', partId, ...move, ...(slotId ? { slotId } : {}) });
 export const clearKeyChord = (partId, key, slotId = '') =>
   send({ cmd: 'clearKeyChord', partId, key, ...(slotId ? { slotId } : {}) });
 /** Ask for a view of the library. Takes either the older (text, type) pair or a whole

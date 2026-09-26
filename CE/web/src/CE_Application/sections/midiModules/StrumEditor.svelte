@@ -6,12 +6,15 @@
    */
   import ScrubValue from './ScrubValue.svelte';
   import Segmented from './Segmented.svelte';
-  import { strumNotes, beatsToMs } from '../../utils/noteModuleViews.js';
+  import { strumNotes, beatsToMs, guitarVoicing } from '../../utils/noteModuleViews.js';
+  import PropertyToggle from '../../properties/PropertyToggle.svelte';
 
   let { mod, set, tempo = 120, beatChoices = [] } = $props();
 
   // An open E major guitar chord: six notes wide enough to show every stroke clearly.
-  const EXAMPLE = [40, 47, 52, 56, 59, 64];
+  const GUITAR_CHORD = [40, 47, 52, 56, 59, 64];
+  // Guitar mode shows what it does to a chord played on the keys: C major, re-fretted.
+  const example = $derived(mod.strumGuitar ? guitarVoicing([60, 64, 67]).map((v) => v.note) : GUITAR_CHORD);
   const NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
   const name = (n) => NAMES[n % 12] + (Math.floor(n / 12) - 1);
 
@@ -28,13 +31,13 @@
   let secondStroke = $state(false);
   const params = $derived({ pattern: mod.strumPattern, spreadBeats: mod.strumBeats,
                             feel: mod.strumCurve, velocityRamp: mod.strumVelocityRamp });
-  const played = $derived(strumNotes(params, EXAMPLE, 100, secondStroke));
+  const played = $derived(strumNotes(params, example, 100, secondStroke));
 
   // Geometry. The grid always shows a little past the spread, so the last note is not on the edge.
   const W = 560, LEFT = 44, ROW = 20, TOP = 8;
   const span = $derived(Math.max(0.0625, mod.strumBeats) * 1.35);
   const x = (beats) => LEFT + (beats / span) * (W - LEFT - 12);
-  const rowY = (note) => TOP + (EXAMPLE.length - 1 - EXAMPLE.indexOf(note)) * ROW;
+  const rowY = (note) => TOP + (example.length - 1 - example.indexOf(note)) * ROW;
   const gridStep = $derived(span > 0.5 ? 0.125 : span > 0.2 ? 0.0625 : 0.03125);
   const ticks = $derived(Array.from({ length: Math.floor(span / gridStep) + 1 }, (_, i) => i * gridStep));
   const curve = $derived([...played].sort((a, b) => a.rank - b.rank)
@@ -59,14 +62,14 @@
 </script>
 
 <div class="editor" data-testid="strum-editor">
-  <svg class="picture" viewBox={`0 0 ${W} ${TOP + EXAMPLE.length * ROW + 18}`} role="img"
+  <svg class="picture" viewBox={`0 0 ${W} ${TOP + example.length * ROW + 18}`} role="img"
        aria-label="When each note of the chord sounds, and how hard" data-testid="strum-picture">
     {#each ticks as t (t)}
-      <line x1={x(t)} x2={x(t)} y1={TOP - 4} y2={TOP + EXAMPLE.length * ROW}
+      <line x1={x(t)} x2={x(t)} y1={TOP - 4} y2={TOP + example.length * ROW}
             class:bar={Math.abs(t % 0.25) < 1e-6} class="tick" />
     {/each}
     {#if mod.strumBeats > 0}
-      <line x1={x(mod.strumBeats)} x2={x(mod.strumBeats)} y1={TOP - 4} y2={TOP + EXAMPLE.length * ROW} class="spread-end" />
+      <line x1={x(mod.strumBeats)} x2={x(mod.strumBeats)} y1={TOP - 4} y2={TOP + example.length * ROW} class="spread-end" />
     {/if}
     {#each played as n (n.note)}
       {@const y = rowY(n.note)}
@@ -90,9 +93,9 @@
         <title>Drag sideways to change the feel</title>
       </circle>
     {/if}
-    <text x={LEFT} y={TOP + EXAMPLE.length * ROW + 13} class="axis">chord struck</text>
+    <text x={LEFT} y={TOP + example.length * ROW + 13} class="axis">chord struck</text>
     {#if mod.strumBeats > 0}
-      <text x={x(mod.strumBeats)} y={TOP + EXAMPLE.length * ROW + 13} class="axis end"
+      <text x={x(mod.strumBeats)} y={TOP + example.length * ROW + 13} class="axis end"
             text-anchor="middle">+{spreadChoices.find(([v]) => Math.abs(v - mod.strumBeats) < 1e-6)?.[1] ?? mod.strumBeats}</text>
     {/if}
   </svg>
@@ -116,6 +119,12 @@
                   format={(v) => feelName(v)} title="Drag up for a quicker start, down for a slower one; or drag the handle in the picture"
                   onchange={(v) => set({ strumCurve: v })} />
       <span class="sub">{mod.strumCurve > 0 ? '+' : ''}{mod.strumCurve.toFixed(2)}</span>
+    </div>
+    <div class="mf"><span class="lbl">Guitar</span>
+      <PropertyToggle compact label="Six strings" value={mod.strumGuitar}
+                      title="Re-fret every chord onto six guitar strings before strumming: C played on the keys comes out as the open C chord"
+                      onchange={(on) => set({ strumGuitar: on })} />
+      <span class="sub">{mod.strumGuitar ? 'C on the keys → x32010' : 'notes as played'}</span>
     </div>
     <div class="mf"><span class="lbl">Last note</span>
       <ScrubValue value={mod.strumVelocityRamp} min={-64} max={64} step={1} unit="vel" label="Last-note velocity change"

@@ -42,6 +42,13 @@ namespace
             out.chordKeyMap = slot.fx.chordKeyMap;
             out.chordSet = slot.fx.chordSet;
             out.keyMap = slot.fx.keyMap;
+            out.chordPads = slot.fx.chordPads;
+            out.padMap = slot.fx.padMap;
+            out.chordProgression = slot.fx.chordProgression;
+            out.progression = slot.fx.progression;
+            out.progressionAdvance = slot.fx.progressionAdvance;
+            out.progressionLow = slot.fx.progressionLow;
+            out.progressionHigh = slot.fx.progressionHigh;
             // Diatonic chords are chosen per scale degree, so the chorder reads the scale
             // even when it is not folding anything into it.
             out.scaleType = slot.fx.scaleType;
@@ -302,6 +309,49 @@ void MidiInsertRack::allNotesOff (juce::MidiBuffer& out, int position)
         out.addEvent (metadata.getMessage(), position);
     pendingFlush.clear();
     hasPendingFlush = false;
+}
+
+namespace
+{
+    template <typename Modules>
+    auto* findChords (const Modules& modules, const juce::String& slotId)
+    {
+        for (const auto& module : modules)
+            if (module != nullptr && module->fx != nullptr
+                && (slotId.isNotEmpty() ? module->slotId == slotId : module->type == "chord"))
+                return module.get();
+        return static_cast<decltype (modules.front().get())> (nullptr);
+    }
+}
+
+bool MidiInsertRack::triggerChordPad (const juce::String& slotId, int pad, int velocity)
+{
+    const juce::SpinLock::ScopedLockType sl (lock);
+    auto* module = findChords (modules, slotId);
+    return module != nullptr && ! module->bypassed && module->fx->triggerPad (pad, velocity);
+}
+
+bool MidiInsertRack::moveChordProgression (const juce::String& slotId, int value, bool absolute)
+{
+    const juce::SpinLock::ScopedLockType sl (lock);
+    auto* module = findChords (modules, slotId);
+    return module != nullptr && module->fx->moveProgression (value, absolute);
+}
+
+MidiInsertRack::ChordsLive MidiInsertRack::chordsLive (const juce::String& slotId) const
+{
+    ChordsLive live;
+    const juce::SpinLock::ScopedLockType sl (lock);
+    const auto* module = findChords (modules, slotId);
+    if (module == nullptr)
+        return live;
+    live.present = true;
+    live.lastChord = module->fx->lastSetChord();
+    live.step = module->fx->progressionStep();
+    live.pads = module->fx->soundingPads();
+    for (int pad = 0; pad < MidiFxSettings::maxPads; ++pad)
+        live.padChords[pad] = module->fx->padSetChord (pad);
+    return live;
 }
 
 int MidiInsertRack::arpPatternStep() const noexcept

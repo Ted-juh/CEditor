@@ -150,6 +150,7 @@ import {
   buildStrumPlan,
   buildArticulationMessages,
   applySmartChordVoicing,
+  applyMockChordsLive,
   factoryGrooveTemplates,
   normalizeGrooveTemplate,
   applyGrooveToPattern,
@@ -4989,6 +4990,32 @@ test('Chords: the set and layers normalize, old key chords migrate, the mock lea
   state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId: slot().slotId, chord: 'm7' });
   assert.equal(slot().fx.chordFollow, true, 'and a shape starts it');
   assert.equal(slot().fx.chord, 'm7');
+});
+
+test('Chords pads and progression normalize, and localhost plays them as the engine does', () => {
+  const fx = normalizeHostState({ rack: { parts: [{ partId: 'p1', midiFx: {
+    chordFollow: true, chordSet: [{ notes: [60, 64, 67] }, { notes: [57, 60, 64] }],
+    chordPads: true, padMap: [1, 0, 9], chordProgression: true, progression: [0, 5, 1],
+    progressionAdvance: 'pedal', progressionLow: 70, progressionHigh: 40,
+  } }] } }).rack.parts[0].midiFx;
+  assert.equal(fx.padMap.length, 32, 'always 32 pad places, 8 pads x 4 banks');
+  assert.deepEqual(fx.padMap.slice(0, 4), [1, 0, -1, -1], 'a pad past the set is empty');
+  assert.deepEqual(fx.progression, [0, 1], 'a step past the set is dropped');
+  assert.equal(fx.progressionAdvance, 'pedal');
+  assert.deepEqual([fx.progressionLow, fx.progressionHigh], [40, 70], 'the range is put in order');
+  const plain = normalizeHostState({ rack: { parts: [{ partId: 'p1', midiFx: {} }] } }).rack.parts[0].midiFx;
+  assert.equal(plain.chordPads, false);
+  assert.equal(plain.progressionAdvance, 'key');
+
+  let live = applyMockChordsLive(undefined, fx, { cmd: 'chordPad', pad: 0, velocity: 100 });
+  assert.deepEqual(live, { chord: 1, step: 0, pads: 1 }, 'a pad plays its chord and lights');
+  live = applyMockChordsLive(live, fx, { cmd: 'chordPad', pad: 0, velocity: 0 });
+  assert.equal(live.pads, 0, 'and goes out when let go');
+  assert.equal(applyMockChordsLive(live, fx, { cmd: 'chordPad', pad: 2, velocity: 100 }).pads, 0,
+    'an empty pad does nothing');
+  live = applyMockChordsLive(live, fx, { cmd: 'chordStep', delta: -1 });
+  assert.equal(live.step, 1, 'stepping back from the first step wraps to the last');
+  assert.equal(applyMockChordsLive(live, fx, { cmd: 'chordStep', step: 0 }).step, 0);
 });
 
 test('Smart Chorder inversion, voicing and nearest-motion rules match the native engine', () => {

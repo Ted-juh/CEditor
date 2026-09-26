@@ -69,6 +69,24 @@ public:
     /** The first arpeggiator's live pattern step, for the UI playhead; -1 when none. */
     int arpPatternStep() const noexcept;
 
+    // -- the Chords module's triggers and readout -----------------------------------------
+    // `slotId` names a module; empty means the first Chords module in the chain.
+
+    /** Message thread: a Pads-layer pad (bank * 8 + pad), velocity 0 = release. */
+    bool triggerChordPad (const juce::String& slotId, int pad, int velocity);
+    /** Message thread: steps the progression by `value`, or to step `value` when absolute. */
+    bool moveChordProgression (const juce::String& slotId, int value, bool absolute);
+
+    struct ChordsLive
+    {
+        bool present = false;
+        int lastChord = -1;         // set index last played from the set
+        int step = 0;               // the progression step that plays next
+        juce::uint32 pads = 0;      // bit N = pad N sounding
+        int padChords[MidiFxSettings::maxPads] {};   // set chord per pad, -1 empty
+    };
+    ChordsLive chordsLive (const juce::String& slotId = {}) const;
+
 private:
     struct Module
     {

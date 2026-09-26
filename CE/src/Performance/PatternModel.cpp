@@ -122,6 +122,73 @@ MidiFxSettings::ChordType MidiFxSettings::chordTypeFromName (const juce::String&
     return ChordType::off;
 }
 
+juce::String MidiFxSettings::chordNameOf (const juce::Array<int>& notes)
+{
+    static const char* names[] { "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B" };
+    // Simplest first, so a plain triad is never called something exotic (as chordBuilder.js).
+    struct Named { std::initializer_list<int> intervals; const char* suffix; };
+    static const Named named[] {
+        { { 0, 4, 7 }, "" }, { { 0, 3, 7 }, "m" }, { { 0, 7 }, "5" }, { { 0, 4, 7, 10 }, "7" },
+        { { 0, 4, 7, 11 }, "maj7" }, { { 0, 3, 7, 10 }, "m7" }, { { 0, 2, 7 }, "sus2" },
+        { { 0, 5, 7 }, "sus4" }, { { 0, 4, 7, 9 }, "6" }, { { 0, 3, 7, 9 }, "m6" },
+        { { 0, 2, 4, 7 }, "add9" }, { { 0, 2, 3, 7 }, "madd9" }, { { 0, 2, 4, 7, 10 }, "9" },
+        { { 0, 2, 4, 7, 11 }, "maj9" }, { { 0, 2, 3, 7, 10 }, "m9" }, { { 0, 3, 6 }, "dim" },
+        { { 0, 4, 8 }, "aug" }, { { 0, 3, 6, 10 }, "m7b5" }, { { 0, 3, 6, 9 }, "dim7" },
+        { { 0, 5, 7, 10 }, "7sus4" }, { { 0, 3, 7, 11 }, "m(maj7)" },
+    };
+    if (notes.isEmpty())
+        return "-";
+    auto lowest = notes[0];
+    juce::uint16 classes = 0;
+    for (const auto note : notes)
+    {
+        lowest = juce::jmin (lowest, note);
+        classes |= (juce::uint16) (1 << (((note % 12) + 12) % 12));
+    }
+    const auto bass = ((lowest % 12) + 12) % 12;
+    if ((classes & (classes - 1)) == 0)
+        return names[bass];
+
+    const auto rotated = [classes] (int root)
+    {
+        juce::uint16 set = 0;
+        for (int c = 0; c < 12; ++c)
+            if ((classes & (1 << c)) != 0)
+                set |= (juce::uint16) (1 << ((c - root + 12) % 12));
+        return set;
+    };
+    for (int attempt = 0; attempt < 13; ++attempt)
+    {
+        const auto root = attempt == 0 ? bass : attempt - 1;
+        if ((attempt > 0 && root == bass) || (classes & (1 << root)) == 0)
+            continue;
+        const auto set = rotated (root);
+        for (const auto& n : named)
+        {
+            juce::uint16 wanted = 0;
+            for (const auto i : n.intervals)
+                wanted |= (juce::uint16) (1 << (i % 12));
+            if (wanted == set)
+                return juce::String (names[root]) + n.suffix
+                     + (root == bass ? juce::String() : "/" + juce::String (names[bass]));
+        }
+    }
+    juce::StringArray parts;
+    auto sorted = notes;
+    sorted.sort();
+    for (const auto note : sorted)
+        parts.addIfNotAlreadyThere (names[((note % 12) + 12) % 12]);
+    return parts.joinIntoString (".");
+}
+
+juce::String MidiFxSettings::setChordName (int index) const
+{
+    if (! juce::isPositiveAndBelow (index, chordSet.size()))
+        return {};
+    const auto& chord = chordSet.getReference (index);
+    return chord.name.isNotEmpty() ? chord.name : chordNameOf (chord.notes);
+}
+
 int MidiFxSettings::findOrAddSetChord (juce::Array<int> notes)
 {
     notes.sort();
@@ -159,6 +226,16 @@ void MidiFxSettings::removeSetChord (int index)
             keyMap.remove (i);
         else if (mapping.chord > index)
             --mapping.chord;
+    }
+    for (auto& pad : padMap)
+        pad = pad == index ? -1 : pad > index ? pad - 1 : pad;
+    for (int i = progression.size(); --i >= 0;)
+    {
+        auto& step = progression.getReference (i);
+        if (step == index)
+            progression.remove (i);
+        else if (step > index)
+            --step;
     }
 }
 
@@ -1687,7 +1764,20 @@ juce::var midiFxToVar (const MidiFxSettings& fx)
             keys.add (juce::var (k));
         }
         f->setProperty ("keyMap", keys);
+
+        juce::Array<juce::var> pads, steps;
+        for (const auto pad : fx.padMap)
+            pads.add (pad);
+        for (const auto step : fx.progression)
+            steps.add (step);
+        f->setProperty ("padMap", pads);
+        f->setProperty ("progression", steps);
     }
+    f->setProperty ("chordPads",          fx.chordPads);
+    f->setProperty ("chordProgression",   fx.chordProgression);
+    f->setProperty ("progressionAdvance", fx.progressionAdvance);
+    f->setProperty ("progressionLow",     fx.progressionLow);
+    f->setProperty ("progressionHigh",    fx.progressionHigh);
     f->setProperty ("constrainToScale", fx.constrainToScale);
     f->setProperty ("scaleRoot",        fx.scaleRoot);
     f->setProperty ("scaleType",        fx.scaleType);
@@ -1843,6 +1933,28 @@ void midiFxFromVar (const juce::var& stored, MidiFxSettings& out)
         for (const auto& entry : *keys)
             out.mapKey (intOf (entry, "key", -1, -1, 127), intOf (entry, "chord", -1, -1, 1000));
 
+    // Pads keep their positions (an empty pad is -1, a pad past the set too); steps that
+    // point past the set are dropped, since a progression has no gaps.
+    out.padMap.clear();
+    out.progression.clear();
+    if (const auto* pads = stored.getProperty ("padMap", {}).getArray())
+        for (const auto& pad : *pads)
+            if (out.padMap.size() < MidiFxSettings::maxPads)
+                out.padMap.add (juce::isPositiveAndBelow ((int) pad, out.chordSet.size()) ? (int) pad : -1);
+    if (const auto* steps = stored.getProperty ("progression", {}).getArray())
+        for (const auto& step : *steps)
+            if (out.progression.size() < MidiFxSettings::maxProgression
+                && juce::isPositiveAndBelow ((int) step, out.chordSet.size()))
+                out.progression.add ((int) step);
+    out.chordPads = (bool) stored.getProperty ("chordPads", false);
+    out.chordProgression = (bool) stored.getProperty ("chordProgression", false);
+    out.progressionAdvance = stored.getProperty ("progressionAdvance", "key").toString() == "pedal"
+                               ? "pedal" : "key";
+    out.progressionLow  = intOf (stored, "progressionLow", 0, 0, 127);
+    out.progressionHigh = intOf (stored, "progressionHigh", 59, 0, 127);
+    if (out.progressionLow > out.progressionHigh)
+        std::swap (out.progressionLow, out.progressionHigh);
+
     // Saved before the set: each learned key chord (offsets from its key) becomes a set
     // chord of the notes it played, and the key points at it.
     if (const auto* chords = stored.getProperty ("keyChords", {}).getArray())
@@ -1893,6 +2005,7 @@ juce::var noteModuleToVar (const NoteModuleSettings& settings)
     m->setProperty ("strumPattern",    NoteModuleSettings::strumPatternName (settings.strumPattern));
     m->setProperty ("strumCurve",      settings.strumCurve);
     m->setProperty ("strumVelocityRamp", settings.strumVelocityRamp);
+    m->setProperty ("strumGuitar",     settings.strumGuitar);
     m->setProperty ("humanizeTimingBeats", settings.humanizeTimingBeats);
     m->setProperty ("humanizeVelocity",    settings.humanizeVelocity);
     m->setProperty ("humanizeGatePercent", settings.humanizeGatePercent);
@@ -1969,6 +2082,7 @@ void noteModuleFromVar (const juce::var& stored, NoteModuleSettings& out)
     out.strumDown     = out.strumPattern == NoteModuleSettings::StrumPattern::descending;
     out.strumCurve    = (float) doubleOf ("strumCurve", 0.0, -1.0, 1.0);
     out.strumVelocityRamp = intOf ("strumVelocityRamp", 0, -64, 64);
+    out.strumGuitar   = (bool) stored.getProperty ("strumGuitar", false);
     out.humanizeTimingBeats = doubleOf ("humanizeTimingBeats", 0.0, 0.0, 0.25);
     out.humanizeVelocity    = intOf ("humanizeVelocity", 0, 0, 64);
     out.humanizeGatePercent = intOf ("humanizeGatePercent", 0, 0, 100);

@@ -73,9 +73,18 @@ test('the chords of a key fill the set, and removing or mapping keeps the map ho
 
   const state = fx({ chordSet: [{ notes: [60] }, { notes: [62] }, { notes: [64] }],
                      keyMap: [{ key: 36, chord: 0 }, { key: 37, chord: 1 }, { key: 38, chord: 2 }] });
-  const removed = withoutSetChord(state, 1);
+  const removed = withoutSetChord({ ...state, padMap: [0, 1, 2, -1], progression: [2, 1, 0, 1] }, 1);
   assert.deepEqual(removed.keyMap, [{ key: 36, chord: 0 }, { key: 38, chord: 1 }]);
+  assert.deepEqual(removed.padMap, [0, -1, 1, -1], 'its pads empty, later pads renumber');
+  assert.deepEqual(removed.progression, [1, 0], 'its steps go, later steps renumber');
   assert.deepEqual(withKeyMapped(state, 37, 2).find((m) => m.key === 37), { key: 37, chord: 2 });
   assert.equal(withKeyMapped(state, 37, -1).some((m) => m.key === 37), false);
   assert.equal(withKeyMapped(state, 39, 9).some((m) => m.key === 39), false, 'nothing past the set');
+});
+
+test('the progression wins over following for keys in its range', () => {
+  const state = fx({ chord: 'triad', chordProgression: true, progression: [0], progressionLow: 36, progressionHigh: 59,
+                     chordSet: [{ notes: [57, 60, 64] }] });
+  assert.deepEqual(chordForKey(state, 48), { source: 'progression', notes: [57, 60, 64] });
+  assert.deepEqual(chordForKey(state, 60).notes, [60, 64, 67], 'above the range, following again');
 });

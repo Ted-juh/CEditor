@@ -5,7 +5,10 @@
    *   The set      — chords you build (root, shape, inversion, voicing, bass) or learn by
    *                  playing. Everything else points at these.
    *   Follow key   — every key plays a shape built on itself (the old chorder), in a range.
-   *   Key map      — chosen keys play chosen set chords exactly; they win over following.
+   *   Key map      — chosen keys play chosen set chords exactly; they win over everything.
+   *   Pads         — 8 pads x 4 banks, each a set chord: here, or on the CTRL49's own pads.
+   *   Progression  — keys in a range play the set's chords in an order, stepping on each
+   *                  press or with the sustain pedal. It wins over following.
    *
    * Each layer has a light: off keeps its settings and stops it playing. What a key will do is
    * drawn with the engine's own rules (chordBuilder.js mirrors MidiFxChain), so clicking a key
@@ -24,6 +27,7 @@
   let {
     fx, set, partId, slotId = '', scales = [], learn = { armed: false },
     onlearn = () => {}, oncancel = () => {}, onclear = () => {},
+    live = { chord: -1, step: 0, pads: 0 }, onpad = () => {}, onstep = () => {},
   } = $props();
 
   const MAX_SET = 32;
@@ -44,6 +48,14 @@
   let editing = $state(-1);
   let previewKey = $state(60);
   let mapKeySel = $state(-1);
+  let bank = $state(0);
+  let padSel = $state(-1);
+
+  const BANKS = ['A', 'B', 'C', 'D'].map((label, value) => ({ value, label, title: `Pad bank ${label}` }));
+  const ADVANCE = [
+    { value: 'key', label: 'each key press', title: 'Every key in the range plays the next chord' },
+    { value: 'pedal', label: 'sustain pedal', title: 'The pedal steps to the next chord; keys in the range play the current one' },
+  ];
 
   const nameOf = (c) => (c?.name ? c.name : chordName(c?.notes));
   const followLit = $derived(fx.chordFollow && fx.chord !== 'off');
@@ -52,6 +64,19 @@
   const edited = $derived(fx.chordSet[editing] ?? null);
   const isDiatonic = $derived(fx.chord === 'diatonic' || fx.chord === 'diatonic 7th');
   const keysOf = (index) => fx.keyMap.filter((m) => m.chord === index).map((m) => noteLabel(m.key));
+  const padsLit = $derived(fx.chordPads && fx.padMap.some((p) => p >= 0));
+  const progLit = $derived(fx.chordProgression && fx.progression.length > 0);
+  const layers = $derived([
+    { id: 'follow', name: 'Follow key', lit: followLit, note: followLit ? shapeLabel(fx.chord) : 'off' },
+    { id: 'keys', name: 'Key map', lit: keyMapLit,
+      note: `${fx.keyMap.length} ${fx.keyMap.length === 1 ? 'key' : 'keys'}${fx.chordKeyMap ? '' : ' · off'}` },
+    { id: 'pads', name: 'Pads', lit: padsLit,
+      note: `${fx.padMap.filter((p) => p >= 0).length} pads${fx.chordPads ? '' : ' · off'}` },
+    { id: 'prog', name: 'Progression', lit: progLit,
+      note: `${fx.progression.length} ${fx.progression.length === 1 ? 'step' : 'steps'}${fx.chordProgression ? '' : ' · off'}` },
+  ]);
+  // A chord's colour is its root around the circle of fifths: the CTRL49 pads use the same rule.
+  const chordHue = (c) => ((((c.root >= 0 ? c.root : (c.notes[0] ?? 0)) % 12) * 7) % 12) * 30;
 
   // --- the set -------------------------------------------------------------------------------
   function writeSet(chordSet, extra = {}) { set({ chordSet, ...extra }); }
@@ -94,12 +119,46 @@
     set({ keyMap: withKeyMapped(fx, mapKeySel, index), ...(index >= 0 ? { chordKeyMap: true } : {}) });
   }
 
+  // --- pads --------------------------------------------------------------------------------
+  function assignPad(index) {
+    const padMap = [...fx.padMap];
+    padMap[padSel] = index;
+    set({ padMap, ...(index >= 0 ? { chordPads: true } : {}) });
+  }
+  function fillBank() {
+    const padMap = [...fx.padMap];
+    for (let i = 0; i < 8; i += 1) padMap[bank * 8 + i] = i < fx.chordSet.length ? i : -1;
+    set({ padMap, chordPads: true });
+  }
+  function padDown(e, pad, playable) {
+    padSel = pad;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    if (playable) onpad(pad, 100);
+  }
+
+  // --- progression ---------------------------------------------------------------------------
+  const addStep = (index) => {
+    if (fx.progression.length < 32) set({ progression: [...fx.progression, index], chordProgression: true });
+  };
+  const removeStep = (at) => set({ progression: fx.progression.filter((_, i) => i !== at) });
+  function moveStep(at, by) {
+    const to = at + by;
+    if (to < 0 || to >= fx.progression.length) return;
+    const progression = [...fx.progression];
+    [progression[at], progression[to]] = [progression[to], progression[at]];
+    set({ progression });
+  }
+
   function toggleLayer(which) {
     if (which === 'follow') {
       if (followLit) set({ chordFollow: false });
       else set({ chordFollow: true, chord: fx.chord === 'off' ? 'triad' : fx.chord });
-    } else {
+    } else if (which === 'keys') {
       set({ chordKeyMap: !fx.chordKeyMap });
+    } else if (which === 'pads') {
+      set({ chordPads: !fx.chordPads });
+    } else {
+      set({ chordProgression: !fx.chordProgression });
     }
   }
 </script>
@@ -179,22 +238,16 @@
   <!-- The layers -->
   <section class="block">
     <div class="layer-tabs" role="tablist" aria-label="Layers">
-      <div class="layer" class:active={tab === 'follow'}>
-        <button type="button" class="ctl light" class:lit={followLit} aria-pressed={followLit}
-                aria-label="Follow key on or off" data-testid="layer-light-follow"
-                onclick={() => toggleLayer('follow')}></button>
-        <button type="button" role="tab" aria-selected={tab === 'follow'} class="ctl tab-name"
-                data-testid="layer-tab-follow" onclick={() => (tab = 'follow')}>
-          Follow key <small>{followLit ? shapeLabel(fx.chord) : 'off'}</small></button>
-      </div>
-      <div class="layer" class:active={tab === 'keys'}>
-        <button type="button" class="ctl light" class:lit={keyMapLit} aria-pressed={keyMapLit}
-                aria-label="Key map on or off" data-testid="layer-light-keys"
-                onclick={() => toggleLayer('keys')}></button>
-        <button type="button" role="tab" aria-selected={tab === 'keys'} class="ctl tab-name"
-                data-testid="layer-tab-keys" onclick={() => (tab = 'keys')}>
-          Key map <small>{fx.keyMap.length} {fx.keyMap.length === 1 ? 'key' : 'keys'}{fx.chordKeyMap ? '' : ' · off'}</small></button>
-      </div>
+      {#each layers as layer (layer.id)}
+        <div class="layer" class:active={tab === layer.id}>
+          <button type="button" class="ctl light" class:lit={layer.lit} aria-pressed={layer.lit}
+                  aria-label={`${layer.name} on or off`} data-testid={`layer-light-${layer.id}`}
+                  onclick={() => toggleLayer(layer.id)}></button>
+          <button type="button" role="tab" aria-selected={tab === layer.id} class="ctl tab-name"
+                  data-testid={`layer-tab-${layer.id}`} onclick={() => (tab = layer.id)}>
+            {layer.name} <small>{layer.note}</small></button>
+        </div>
+      {/each}
     </div>
 
     <div class="panel" role="tabpanel" style:display={tab === 'follow' ? 'flex' : 'none'} data-testid="layer-follow">
@@ -260,7 +313,7 @@
       <span class="preview" data-testid="follow-preview">
         {noteLabel(previewKey)} plays
         <b>{followPreview.notes.length > 1 ? chordName(followPreview.notes) : 'itself'}</b>
-        {#if followPreview.source === 'map'}(from the key map){:else if followPreview.notes.length > 1}({followPreview.notes.map(noteLabel).join(' ')}){:else if fx.chordFollow && fx.chord !== 'off'}— outside the range{/if}
+        {#if followPreview.source === 'map'}(from the key map){:else if followPreview.source === 'progression'}(from the progression){:else if followPreview.notes.length > 1}({followPreview.notes.map(noteLabel).join(' ')}){:else if fx.chordFollow && fx.chord !== 'off'}— outside the range{/if}
       </span>
     </div>
 
@@ -300,6 +353,85 @@
           {/each}
         </div>
       {/if}
+    </div>
+    <div class="panel" role="tabpanel" style:display={tab === 'pads' ? 'flex' : 'none'} data-testid="layer-pads">
+      <span class="sub">Eight pads in four banks, each playing a chord from the set. Press a pad to hear it.
+        On the CTRL49, any pad with nothing assigned on a control page plays these, in the keyboard's own bank.</span>
+      <div class="row">
+        <div class="mf"><span class="lbl">Bank</span>
+          <Segmented options={BANKS} value={bank} label="Pad bank" testid="pad-bank"
+                     onchange={(v) => { bank = v; padSel = -1; }} />
+        </div>
+        <button type="button" class="ctl pill" data-testid="pad-fill" disabled={fx.chordSet.length === 0}
+                onclick={fillBank}>fill bank {BANKS[bank].label} with the set</button>
+      </div>
+      <div class="pads" data-testid="pad-grid">
+        {#each Array(8) as _, i (i)}
+          {@const pad = bank * 8 + i}
+          {@const chord = fx.chordSet[fx.padMap[pad]] ?? null}
+          <button type="button" class="ctl pad" class:sel={padSel === pad} class:lit={((live.pads >>> pad) & 1) === 1}
+                  class:empty={!chord} data-pad={pad} style:--hue={chord ? chordHue(chord) : 0}
+                  onpointerdown={(e) => padDown(e, pad, !!chord)}
+                  onpointerup={() => { if (chord) onpad(pad, 0); }}
+                  onpointercancel={() => { if (chord) onpad(pad, 0); }}>
+            <span class="pad-num">{BANKS[bank].label}{i + 1}</span>
+            <b>{chord ? nameOf(chord) : '—'}</b>
+          </button>
+        {/each}
+      </div>
+      {#if padSel >= 0}
+        <div class="row assign" data-testid="pad-assign">
+          <span class="lbl">{BANKS[Math.floor(padSel / 8)].label}{(padSel % 8) + 1} plays</span>
+          {#each fx.chordSet as c, i (i)}
+            <button type="button" class="ctl tile" aria-pressed={fx.padMap[padSel] === i} data-index={i}
+                    onclick={() => assignPad(i)}>{nameOf(c)}</button>
+          {/each}
+          <button type="button" class="ctl tile" aria-pressed={fx.padMap[padSel] < 0} onclick={() => assignPad(-1)}>nothing</button>
+          {#if fx.chordSet.length === 0}<span class="sub">— the set is empty; add a chord above first</span>{/if}
+        </div>
+      {/if}
+    </div>
+
+    <div class="panel" role="tabpanel" style:display={tab === 'prog' ? 'flex' : 'none'} data-testid="layer-prog">
+      <span class="sub">Keys in the range play these chords in order: one song from one finger. The highlighted step plays next.</span>
+      <div class="steps" data-testid="prog-steps">
+        {#each fx.progression as s, i (i)}
+          <span class="step" class:next={live.step === i} data-step={i}>
+            <small>{i + 1}</small><b>{nameOf(fx.chordSet[s])}</b>
+            <button type="button" class="ctl x" title="Earlier" onclick={() => moveStep(i, -1)}>‹</button>
+            <button type="button" class="ctl x" title="Later" onclick={() => moveStep(i, 1)}>›</button>
+            <button type="button" class="ctl x" title="Remove this step" onclick={() => removeStep(i)}>×</button>
+          </span>
+        {/each}
+        {#if fx.progression.length === 0}<span class="sub">No steps yet. Add chords from the set below.</span>{/if}
+      </div>
+      <div class="row assign" data-testid="prog-add">
+        <span class="lbl">Add</span>
+        {#each fx.chordSet as c, i (i)}
+          <button type="button" class="ctl tile" data-index={i} onclick={() => addStep(i)}>+ {nameOf(c)}</button>
+        {/each}
+      </div>
+      <div class="row">
+        <div class="mf"><span class="lbl">Next chord on</span>
+          <Segmented options={ADVANCE} value={fx.progressionAdvance} label="Progression advance" testid="prog-advance"
+                     onchange={(v) => set({ progressionAdvance: v })} />
+        </div>
+        <div class="mf"><span class="lbl">Lowest key</span>
+          <ScrubValue value={fx.progressionLow} choices={NOTE_CHOICES} label="Progression from" testid="prog-low"
+                      onchange={(v) => set({ progressionLow: Math.min(v, fx.progressionHigh) })} />
+        </div>
+        <div class="mf"><span class="lbl">Highest key</span>
+          <ScrubValue value={fx.progressionHigh} choices={NOTE_CHOICES} label="Progression to" testid="prog-high"
+                      onchange={(v) => set({ progressionHigh: Math.max(v, fx.progressionLow) })} />
+        </div>
+        <div class="mf"><span class="lbl">Step</span>
+          <div class="step-buttons">
+            <button type="button" class="ctl pill" data-testid="prog-back" onclick={() => onstep({ delta: -1 })}>◀</button>
+            <button type="button" class="ctl pill" data-testid="prog-restart" onclick={() => onstep({ step: 0 })}>restart</button>
+            <button type="button" class="ctl pill" data-testid="prog-next" onclick={() => onstep({ delta: 1 })}>▶</button>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 </div>
@@ -360,6 +492,25 @@
   .key-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: #ffb45a;
                border: 1px solid #5a4020; border-radius: 10px; padding: 1px 4px 1px 8px; }
   :global(.key-badge .x) { background: none; border: 0; color: var(--host-text-dim, #7f8b96); cursor: pointer; padding: 0 3px; }
+  .pads { display: grid; grid-template-columns: repeat(4, minmax(0, 110px)); gap: 8px; }
+  .pad { position: relative; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;
+         aspect-ratio: 1.4; padding: 7px 9px; border-radius: 7px; cursor: pointer; text-align: left;
+         color: var(--host-text, #d9e0e6); background: linear-gradient(160deg, #232b33, #171c21);
+         border: 1px solid hsl(var(--hue) 60% 40%); box-shadow: inset 0 -4px 0 hsl(var(--hue) 80% 45% / .8); touch-action: none; }
+  .pad.empty { border-color: var(--host-line-soft, #2c353e); box-shadow: none; color: var(--host-text-faint, #65717c); }
+  .pad b { font: 700 16px var(--host-font, sans-serif); }
+  .pad-num { font: 600 10px var(--host-font-mono, monospace); color: var(--host-text-dim, #7f8b96); }
+  .pad.sel { outline: 2px solid var(--host-accent-strong, #79b9ee); outline-offset: 1px; }
+  .pad.lit { background: hsl(var(--hue) 70% 30%); box-shadow: 0 0 18px -4px hsl(var(--hue) 90% 55%), inset 0 -4px 0 hsl(var(--hue) 90% 55%); }
+  .steps { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .step { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 8px; border-radius: 5px;
+          border: 1px solid var(--host-line, #3b4652); background: var(--host-field, #12171b); }
+  .step small { font: 10px var(--host-font-mono, monospace); color: var(--host-text-dim, #7f8b96); }
+  .step b { font: 600 13px var(--host-font, sans-serif); }
+  .step.next { border-color: var(--host-active, #58a879); box-shadow: 0 0 0 1px var(--host-active, #58a879); }
+  .step .x { background: none; border: 0; color: var(--host-text-dim, #7f8b96); cursor: pointer; padding: 0 3px; font-size: 13px; }
+  .step .x:hover { color: var(--host-text, #d9e0e6); }
+  .step-buttons { display: flex; gap: 4px; }
   select { font: 12px var(--host-font, sans-serif); color: var(--host-text, #d9e0e6); background: var(--host-field, #12171b);
            border: 1px solid var(--host-line, #3b4652); border-radius: 3px; padding: 3px 5px; }
 </style>

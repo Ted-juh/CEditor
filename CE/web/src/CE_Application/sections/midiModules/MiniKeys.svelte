@@ -39,6 +39,7 @@
 <svg class="keys" viewBox={`0 0 ${width} ${TOP + WHITE_H + 1}`} role="group" aria-label={label}
      data-testid={testid} style:max-width={`${width * 1.6}px`}>
   {#each whites as n (n)}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <rect x={x(n)} y={TOP} width={w(n) - 1} height={WHITE_H} rx="2" data-note={n}
           class={keyClass(n, 'white')}
           role={onkey ? 'button' : undefined} tabindex={onkey ? -1 : undefined}
@@ -47,6 +48,7 @@
     {#if n % 12 === 0}<text x={x(n) + 3} y={TOP + WHITE_H - 4} class="c-label">{noteLabel(n)}</text>{/if}
   {/each}
   {#each blacks as n (n)}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <rect x={x(n)} y={TOP} width={w(n)} height={BLACK_H} rx="1.5" data-note={n}
           class={keyClass(n, 'black')}
           role={onkey ? 'button' : undefined} tabindex={onkey ? -1 : undefined}

@@ -466,6 +466,28 @@ int InstrumentRackHost::arpLiveStep (const juce::String& partId) const
     return lp != nullptr ? lp->filter->getMidiInserts().arpPatternStep() : -1;
 }
 
+bool InstrumentRackHost::triggerChordPad (const juce::String& partId, const juce::String& slotId,
+                                          int pad, int velocity)
+{
+    auto* lp = findLive (partId);
+    return lp != nullptr && lp->filter->getMidiInserts().triggerChordPad (slotId, pad, velocity);
+}
+
+bool InstrumentRackHost::moveChordProgression (const juce::String& partId, const juce::String& slotId,
+                                               int value, bool absolute)
+{
+    auto* lp = findLive (partId);
+    return lp != nullptr && lp->filter->getMidiInserts().moveChordProgression (slotId, value, absolute);
+}
+
+perf::MidiInsertRack::ChordsLive InstrumentRackHost::chordsLive (const juce::String& partId,
+                                                                const juce::String& slotId) const
+{
+    const auto* lp = findLive (partId);
+    return lp != nullptr ? lp->filter->getMidiInserts().chordsLive (slotId)
+                         : perf::MidiInsertRack::ChordsLive {};
+}
+
 bool InstrumentRackHost::setPartArp (const juce::String& partId, const perf::ArpSettings& settings)
 {
     auto* part = model.findPart (partId);

@@ -157,7 +157,8 @@ namespace
             "startPerformanceRecording", "finishPerformanceRecording",
             "cancelPerformanceRecording", "removePerformanceTake",
             "replayPerformanceTake", "stopPerformanceReplay", "surfacePerformanceEncoder",
-            "surfaceStepPad", "surfaceInput", "setSurfaceActive", "showControlPage", "retryFailedProcessor", "dismissFailoverEvent",
+            "surfaceStepPad", "surfaceInput", "setSurfaceActive", "showControlPage",
+            "chordPad", "chordStep", "retryFailedProcessor", "dismissFailoverEvent",
 
             // Escape/cancellation actions must never be trapped behind the lock.
             "cancelHardwarePatchCapture", "cancelKeyChordLearn",
@@ -293,7 +294,16 @@ namespace
         if (fields.hasProperty ("chordBass"))        fx.chordBass = (bool) payload["chordBass"];
         if (fields.hasProperty ("chordTopAccent"))   fx.chordTopAccent = juce::jlimit (0, 40, (int) payload["chordTopAccent"]);
         if (fields.hasProperty ("chordKeyMap"))      fx.chordKeyMap = (bool) payload["chordKeyMap"];
-        if (fields.hasProperty ("chordSet") || fields.hasProperty ("keyMap"))
+        if (fields.hasProperty ("chordPads"))        fx.chordPads = (bool) payload["chordPads"];
+        if (fields.hasProperty ("chordProgression")) fx.chordProgression = (bool) payload["chordProgression"];
+        if (fields.hasProperty ("progressionAdvance"))
+            fx.progressionAdvance = payload["progressionAdvance"].toString() == "pedal" ? "pedal" : "key";
+        if (fields.hasProperty ("progressionLow"))   fx.progressionLow = juce::jlimit (0, 127, (int) payload["progressionLow"]);
+        if (fields.hasProperty ("progressionHigh"))  fx.progressionHigh = juce::jlimit (0, 127, (int) payload["progressionHigh"]);
+        if (fx.progressionLow > fx.progressionHigh)
+            std::swap (fx.progressionLow, fx.progressionHigh);
+        if (fields.hasProperty ("chordSet") || fields.hasProperty ("keyMap")
+            || fields.hasProperty ("padMap") || fields.hasProperty ("progression"))
         {
             // The set and the map arrive whole, and go through the same reader a saved
             // Performance does, so a key pointing past the set is dropped the same way.
@@ -304,10 +314,16 @@ namespace
                                                                            : current["chordSet"]);
             both->setProperty ("keyMap", fields.hasProperty ("keyMap") ? payload["keyMap"]
                                                                        : current["keyMap"]);
+            both->setProperty ("padMap", fields.hasProperty ("padMap") ? payload["padMap"]
+                                                                       : current["padMap"]);
+            both->setProperty ("progression", fields.hasProperty ("progression") ? payload["progression"]
+                                                                                 : current["progression"]);
             perf::MidiFxSettings parsed;
             perf::midiFxFromVar (juce::var (both), parsed);
             fx.chordSet = parsed.chordSet;
             fx.keyMap = parsed.keyMap;
+            fx.padMap = parsed.padMap;
+            fx.progression = parsed.progression;
         }
         if (fields.hasProperty ("velocityFixed"))    fx.velocityFixed = juce::jlimit (0, 127, (int) payload["velocityFixed"]);
         if (fields.hasProperty ("velocityScale"))    fx.velocityScale = juce::jlimit (0.1f, 2.0f, (float) (double) payload["velocityScale"]);
@@ -413,6 +429,7 @@ namespace
         }
         if (fields.hasProperty ("strumCurve"))     mod.strumCurve = juce::jlimit (-1.0f, 1.0f, (float) (double) payload["strumCurve"]);
         if (fields.hasProperty ("strumVelocityRamp")) mod.strumVelocityRamp = juce::jlimit (-64, 64, (int) payload["strumVelocityRamp"]);
+        if (fields.hasProperty ("strumGuitar"))    mod.strumGuitar = (bool) payload["strumGuitar"];
         if (fields.hasProperty ("humanizeTimingBeats")) mod.humanizeTimingBeats = juce::jlimit (0.0, 0.25, (double) payload["humanizeTimingBeats"]);
         if (fields.hasProperty ("humanizeVelocity"))    mod.humanizeVelocity = juce::jlimit (0, 64, (int) payload["humanizeVelocity"]);
         if (fields.hasProperty ("humanizeGatePercent")) mod.humanizeGatePercent = juce::jlimit (0, 100, (int) payload["humanizeGatePercent"]);
@@ -7530,6 +7547,28 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "chordPad" || cmd == "chordStep")
+    {
+        // Playing, not editing: a pad of a Chords module struck (velocity 0 lets it go), or
+        // its progression moved. Nothing is saved; the readout follows on the next drain.
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto slotId = payload.getProperty ("slotId", {}).toString();
+        if (rack.getPerformance().findPart (partId) == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        const auto* fields = payload.getDynamicObject();
+        if (cmd == "chordPad")
+            rack.triggerChordPad (partId, slotId, (int) payload.getProperty ("pad", 0),
+                                  (int) payload.getProperty ("velocity", 100));
+        else if (fields != nullptr && fields->hasProperty ("step"))
+            rack.moveChordProgression (partId, slotId, (int) payload.getProperty ("step", 0), true);
+        else
+            rack.moveChordProgression (partId, slotId, (int) payload.getProperty ("delta", 1), false);
+        return;
+    }
+
     if (cmd == "clearKeyChord")
     {
         const auto partId = payload.getProperty ("partId", {}).toString();
@@ -13136,6 +13175,106 @@ void InstrumentHostService::surfaceLayerChanged (const juce::String& pageId)
     emitState();
 }
 
+juce::String InstrumentHostService::surfaceChordsPart() const
+{
+    const auto padsOn = [this] (const juce::String& partId)
+    {
+        const auto live = rack.chordsLive (partId);
+        if (! live.present)
+            return false;
+        for (const auto chord : live.padChords)
+            if (chord >= 0)
+                return true;
+        return false;
+    };
+    const auto& performance = rack.getPerformance();
+    if (performance.focusedPartId.isNotEmpty() && padsOn (performance.focusedPartId))
+        return performance.focusedPartId;
+    for (const auto& part : performance.parts)
+        if (padsOn (part.partId))
+            return part.partId;
+    return {};
+}
+
+bool InstrumentHostService::padIsFree (const juce::String& pageId, int padIndex) const
+{
+    const auto* page = rack.getPerformance().findPage (pageId);
+    if (page == nullptr)
+        return false;
+    const auto* slot = page->findSurfaceSlot ("pad", padIndex, page->activePadLayer (padIndex));
+    return slot == nullptr || (slot->binding.isEmpty() && slot->midiCc < 0 && slot->midiNote < 0);
+}
+
+bool InstrumentHostService::pressSurfacePad (const juce::String& pageId, int padIndex, bool down,
+                                             int velocity, int bank)
+{
+    if (pressSurfaceControl (pageId, "pad", padIndex, down))
+        return true;
+    if (! padIsFree (pageId, padIndex) || ! juce::isPositiveAndBelow (padIndex - 1, 8))
+        return false;
+    auto& held = surfaceChordPadsHeld[(size_t) (padIndex - 1)];
+    if (! down)
+    {
+        if (held.first.isEmpty())
+            return false;
+        const auto released = rack.triggerChordPad (held.first, {}, held.second, 0);
+        held = {};
+        return released;
+    }
+    const auto partId = surfaceChordsPart();
+    if (partId.isEmpty())
+        return false;
+    held = { partId, juce::jlimit (0, 3, bank) * 8 + padIndex - 1 };
+    return rack.triggerChordPad (partId, {}, held.second, juce::jlimit (1, 127, velocity));
+}
+
+int InstrumentHostService::padLight (const juce::String& pageId, int padIndex, int bank) const
+{
+    if (padIsFree (pageId, padIndex) && juce::isPositiveAndBelow (padIndex - 1, 8))
+        if (const auto partId = surfaceChordsPart(); partId.isNotEmpty())
+        {
+            const auto live = rack.chordsLive (partId);
+            const auto pad = juce::jlimit (0, 3, bank) * 8 + padIndex - 1;
+            const auto chord = live.padChords[pad];
+            if (chord < 0)
+                return 0;
+            // A chord's colour is its root around the circle of fifths, so neighbouring keys
+            // get neighbouring colours and the same chord is the same colour on every pad.
+            auto root = 0;
+            if (const auto* part = rack.getPerformance().findPart (partId))
+                for (const auto& slot : part->midiChain)
+                    if (slot.type == "chord" && juce::isPositiveAndBelow (chord, slot.fx.chordSet.size()))
+                    {
+                        const auto& set = slot.fx.chordSet.getReference (chord);
+                        root = set.root >= 0 ? set.root : set.notes.isEmpty() ? 0 : set.notes[0];
+                        break;
+                    }
+            const auto hue = (float) (((root % 12) * 7) % 12) / 12.0f;
+            const auto sounding = (live.pads & (1u << pad)) != 0;
+            return (int) (juce::Colour::fromHSV (hue, 0.9f, sounding ? 1.0f : 0.3f, 1.0f).getARGB() & 0xFFFFFF);
+        }
+    return padLight (pageId, padIndex);
+}
+
+juce::String InstrumentHostService::surfaceChordTitle (int bank) const
+{
+    const auto partId = surfaceChordsPart();
+    if (partId.isEmpty())
+        return {};
+    const auto live = rack.chordsLive (partId);
+    const auto* part = rack.getPerformance().findPart (partId);
+    juce::String name;
+    if (part != nullptr && live.lastChord >= 0)
+        for (const auto& slot : part->midiChain)
+            if (slot.type == "chord")
+            {
+                name = slot.fx.setChordName (live.lastChord);
+                break;
+            }
+    return juce::String (" | ") + juce::String::charToString ((juce::juce_wchar) ('A' + juce::jlimit (0, 3, bank)))
+         + (name.isNotEmpty() ? " " + name : juce::String());
+}
+
 int InstrumentHostService::padLight (const juce::String& pageId, int padIndex) const
 {
     const auto* page = rack.getPerformance().findPage (pageId);
@@ -16506,6 +16645,29 @@ void InstrumentHostService::drainParameterEvents()
             obj->setProperty ("partId", part.partId);
             obj->setProperty ("step", step);
             options.emit ("instrumentHostArpStep", juce::var (obj));
+        }
+
+    // The Chords readout: what it last played from the set, the progression's next step and
+    // which pads sound — one small event on change, for the editor's lights.
+    if (options.emit != nullptr)
+        for (const auto& part : rack.getPerformance().parts)
+        {
+            const auto live = rack.chordsLive (part.partId);
+            if (! live.present)
+                continue;
+            const auto key = juce::String (live.lastChord) + ":" + juce::String (live.step)
+                           + ":" + juce::String ((juce::int64) live.pads);
+            auto& last = lastChordsLiveByPart[part.partId];
+            if (key == last)
+                continue;
+            last = key;
+
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("partId", part.partId);
+            obj->setProperty ("chord", live.lastChord);
+            obj->setProperty ("step", live.step);
+            obj->setProperty ("pads", (juce::int64) live.pads);
+            options.emit ("instrumentHostChordsLive", juce::var (obj));
         }
 
     // The hardware claim is a heartbeat, not a lock: an instance that dies stops writing and

@@ -227,6 +227,117 @@ public:
         pattern.store ((int) chosenPattern);
         curve.store (juce::jlimit (-1.0f, 1.0f, settings.strumCurve));
         velocityRamp.store (juce::jlimit (-64, 64, settings.strumVelocityRamp));
+        guitar.store (settings.strumGuitar);
+    }
+
+    static constexpr int strings = 6;
+    /** Standard tuning, low E to high E. */
+    static constexpr int tuning[strings] = { 40, 45, 50, 55, 59, 64 };
+
+    /** A chord laid onto six strings the way a guitarist would fret it: the lowest sounding
+        string plays the chord's bass note, every other string the nearest chord tone inside a
+        four-fret hand position (open strings always allowed), duplicate pitches skipped. Of all
+        hand positions up to the ninth fret, the one covering every chord tone with the most
+        strings wins; ties go to the lower position. `owner[i]` is the index in `notes` whose
+        pitch class string `i` of the result plays. Returns how many strings sound. */
+    static int guitarVoicing (const int* notes, int count, int (&out)[strings],
+                              int (&owner)[strings]) noexcept
+    {
+        if (count <= 0)
+            return 0;
+        auto lowest = 0;
+        for (int i = 1; i < count; ++i)
+            if (notes[i] < notes[lowest])
+                lowest = i;
+        const auto bassClass = notes[lowest] % 12;
+        auto ownerOf = [&] (int note)
+        {
+            if (note % 12 == bassClass)
+                return lowest;
+            for (int i = 0; i < count; ++i)
+                if (notes[i] % 12 == note % 12)
+                    return i;
+            return -1;
+        };
+
+        auto bestScore = std::numeric_limits<int>::max();
+        auto bestCount = 0;
+        for (int base = 0; base <= 9; ++base)
+        {
+            const auto low = juce::jmax (1, base);
+            // The lowest note on string `s` in this hand position that is a chord tone above
+            // `floor` (open string first), or -1 for a muted string.
+            auto fret = [&] (int s, int floor, bool bassOnly)
+            {
+                auto fits = [&] (int note)
+                {
+                    return note > floor && ownerOf (note) >= 0 && (! bassOnly || note % 12 == bassClass);
+                };
+                if (fits (tuning[s]))
+                    return tuning[s];
+                for (int f = low; f <= low + 3; ++f)
+                    if (fits (tuning[s] + f))
+                        return tuning[s] + f;
+                return -1;
+            };
+
+            // The bass string is the lowest that can play the bass note; everything under it
+            // is muted, and nothing above it may sound lower than it.
+            auto first = 0, bassNote = -1;
+            for (; first < strings; ++first)
+                if ((bassNote = fret (first, -1, true)) >= 0)
+                    break;
+            if (first == strings)
+                continue;
+
+            int fretted[strings];
+            for (int s = 0; s < strings; ++s)
+                fretted[s] = s < first ? -1 : s == first ? bassNote : fret (s, bassNote, false);
+
+            int voiced[strings], owners[strings];
+            auto sounding = 0, innerMutes = 0;
+            juce::uint16 covered = 0;
+            for (int s = first; s < strings; ++s)
+            {
+                if (fretted[s] < 0)
+                {
+                    ++innerMutes;
+                    continue;
+                }
+                auto duplicate = false;
+                for (int k = 0; k < sounding; ++k)
+                    duplicate = duplicate || voiced[k] == fretted[s];
+                if (duplicate)
+                    continue;
+                voiced[sounding] = fretted[s];
+                owners[sounding] = ownerOf (fretted[s]);
+                covered |= (juce::uint16) (1 << (fretted[s] % 12));
+                ++sounding;
+            }
+
+            auto missing = 0;
+            for (int i = 0; i < count; ++i)
+                if ((covered & (1 << (notes[i] % 12))) == 0)
+                {
+                    ++missing;
+                    covered |= (juce::uint16) (1 << (notes[i] % 12));   // count each class once
+                }
+
+            // Every chord tone first, then no gaps inside the chord, then the lowest position:
+            // guitarists reach for the open shape before a barre.
+            const auto score = missing * 1000 + innerMutes * 20 + base * 3 + first;
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestCount = sounding;
+                for (int k = 0; k < sounding; ++k)
+                {
+                    out[k] = voiced[k];
+                    owner[k] = owners[k];
+                }
+            }
+        }
+        return bestCount;
     }
 
     void process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
@@ -238,7 +349,7 @@ public:
 
         // Spreading nothing must not cost the collection window's latency. A strum turned off
         // is a wire, not a very fast strum.
-        if (spreadPpq.load() <= 0.0 && collecting == 0 && trackedNotes == 0
+        if (spreadPpq.load() <= 0.0 && ! guitar.load() && collecting == 0 && trackedNotes == 0
             && pending.isEmpty())
         {
             for (const auto metadata : in)
@@ -277,6 +388,11 @@ public:
                         goto nextEvent;
                     }
 
+                // A key whose chord went out on strings releases the strings it owns.
+                if (releaseStrings (message.getChannel(), message.getNoteNumber(), at, out,
+                                    metadata.samplePosition))
+                    goto nextEvent;
+
                 double releaseDelay = 0.0;
                 if (takeReleaseDelay (message.getChannel(), message.getNoteNumber(), releaseDelay))
                 {
@@ -313,9 +429,87 @@ public:
                 entry.active = false;
             }
         trackedNotes = 0;
+        for (auto& channel : stringsOf)
+            for (auto& key : channel)
+                key.count = 0;
     }
 
 private:
+    /** Which string notes a played key put out, so its note-off can release them. */
+    struct StringSet
+    {
+        juce::uint8 notes[strings] {};
+        juce::uint8 count = 0;
+    };
+
+    bool releaseStrings (int channel, int note, double at, juce::MidiBuffer& out, int position) noexcept
+    {
+        if (channel < 1 || channel > 16 || ! juce::isPositiveAndBelow (note, 128))
+            return false;
+        auto& set = stringsOf[(size_t) (channel - 1)][(size_t) note];
+        if (set.count == 0)
+            return false;
+        for (int i = 0; i < set.count; ++i)
+        {
+            const auto emitted = (int) set.notes[i];
+            const auto off = juce::MidiMessage::noteOff (channel, emitted);
+            double delay = 0.0;
+            if (takeReleaseDelay (channel, emitted, delay) && delay > 0.0)
+                pending.add (at + delay, off);
+            else
+                out.addEvent (off, position);
+        }
+        set.count = 0;
+        return true;
+    }
+
+    /** Guitar mode: replaces the collected chord with its six-string voicing. Every string
+        note inherits the velocity, timing and (if it already came) the release of the key
+        that owns it, and each key remembers its strings for a note-off that comes later. */
+    void voiceOnStrings() noexcept
+    {
+        if (collecting <= 0)
+            return;
+        int notes[maxChord], voiced[strings], owner[strings];
+        for (int i = 0; i < collecting; ++i)
+            notes[i] = collected[(size_t) i].message.getNoteNumber();
+        const auto sounding = guitarVoicing (notes, collecting, voiced, owner);
+        if (sounding == 0)
+            return;
+
+        std::array<Waiting, maxChord> source = collected;
+        for (int i = 0; i < collecting; ++i)
+        {
+            // A key struck again while its last strings still ring lets those go first.
+            const auto& key = source[(size_t) i].message;
+            auto& old = stringsOf[(size_t) (key.getChannel() - 1)][(size_t) key.getNoteNumber()];
+            for (int k = 0; k < old.count; ++k)
+            {
+                double ignored = 0.0;
+                takeReleaseDelay (key.getChannel(), old.notes[k], ignored);
+                pending.add (collectUntil, juce::MidiMessage::noteOff (key.getChannel(), old.notes[k]));
+            }
+            old.count = 0;
+        }
+        for (int k = 0; k < sounding; ++k)
+        {
+            const auto& from = source[(size_t) owner[k]];
+            const auto channel = from.message.getChannel();
+            auto& w = collected[(size_t) k];
+            w = from;
+            w.message = juce::MidiMessage::noteOn (channel, voiced[k], from.message.getVelocity());
+            if (from.hasNoteOff)
+                w.noteOff = juce::MidiMessage::noteOff (channel, voiced[k]);
+            else
+            {
+                auto& set = stringsOf[(size_t) (channel - 1)][(size_t) from.message.getNoteNumber()];
+                if (set.count < strings)
+                    set.notes[set.count++] = (juce::uint8) voiced[k];
+            }
+        }
+        collecting = sounding;
+    }
+
     struct Waiting
     {
         juce::MidiMessage message;
@@ -429,6 +623,9 @@ private:
     void dealOut (juce::MidiBuffer& out, const Transport::BlockTime& block, int numSamples,
                   ModuleClock::Window window) noexcept
     {
+        if (guitar.load())
+            voiceOnStrings();
+
         // Insertion sort by pitch: sixteen notes at most, and no allocation.
         for (int i = 1; i < collecting; ++i)
         {
@@ -491,6 +688,8 @@ private:
     std::atomic<int> pattern { (int) NoteModuleSettings::StrumPattern::ascending };
     std::atomic<float> curve { 0.0f };
     std::atomic<int> velocityRamp { 0 };
+    std::atomic<bool> guitar { false };
+    std::array<std::array<StringSet, 128>, 16> stringsOf {};
     bool alternateDescending = false;
     juce::uint32 randomState = 0x51f15e1du;
 };

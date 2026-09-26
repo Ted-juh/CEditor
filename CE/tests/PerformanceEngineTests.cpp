@@ -2117,6 +2117,121 @@ void testMidiFxChain()
     }
 
     {
+        // --- pads and the progression: chords of the set, from a pad or in order ----------
+        MidiFxSettings settings;
+        const auto c = settings.findOrAddSetChord ({ 60, 64, 67 });
+        const auto am = settings.findOrAddSetChord ({ 57, 60, 64 });
+        const auto f = settings.findOrAddSetChord ({ 53, 57, 60 });
+        const auto g = settings.findOrAddSetChord ({ 55, 59, 62 });
+        settings.chordPads = true;
+        settings.padMap = { c, am, -1, -1, -1, -1, -1, -1, f };   // A1 = C, A2 = Am, B1 = F
+        MidiFxChain chords;
+        chords.setSettings (settings);
+
+        auto block = [&chords] (juce::MidiBuffer in = {})
+        {
+            juce::MidiBuffer out;
+            chords.process (in, out);
+            std::vector<std::pair<bool, int>> events;
+            for (const auto metadata : out)
+                if (metadata.getMessage().isNoteOnOrOff())
+                    events.push_back ({ metadata.getMessage().isNoteOn(), metadata.getMessage().getNoteNumber() });
+            return events;
+        };
+        using Ev = std::vector<std::pair<bool, int>>;
+
+        check (chords.triggerPad (1, 90) && block() == Ev { { true, 57 }, { true, 60 }, { true, 64 } },
+               "a struck pad plays its set chord");
+        check (chords.lastSetChord() == am && chords.soundingPads() == 2u,
+               "and says which set chord that was, and that pad 2 sounds");
+        chords.triggerPad (1, 0);
+        check (block() == Ev { { false, 57 }, { false, 60 }, { false, 64 } } && chords.soundingPads() == 0u,
+               "letting go releases exactly what it played");
+        chords.triggerPad (8, 100);
+        check (block().size() == 3 && chords.lastSetChord() == f, "bank B starts at pad index 8");
+        chords.triggerPad (2, 100);
+        check (block().empty(), "an empty pad plays nothing");
+        chords.triggerPad (0, 100);
+        chords.triggerPad (0, 100);
+        const auto restruck = block();
+        check (restruck.size() == 3 + 3 + 3,
+               "a pad struck twice restrikes: its notes end before they start again");
+        juce::MidiBuffer panic;
+        chords.allNotesOff (panic, 0);
+        auto released = 0;
+        for (const auto metadata : panic)
+            released += metadata.getMessage().isNoteOff() ? 1 : 0;
+        check (released == 6, "panic releases every sounding pad");
+
+        // The progression: each press plays the next step, whatever the key.
+        settings.chordProgression = true;
+        settings.progression = { c, am, f, g };
+        settings.progressionLow = 36;
+        settings.progressionHigh = 59;
+        chords.setSettings (settings);
+        auto press = [&block] (int key)
+        {
+            juce::MidiBuffer on, off;
+            on.addEvent (juce::MidiMessage::noteOn (1, key, (juce::uint8) 100), 0);
+            std::vector<int> notes;
+            for (const auto& [isOn, note] : block (on))
+                if (isOn) notes.push_back (note);
+            off.addEvent (juce::MidiMessage::noteOff (1, key), 0);
+            block (off);
+            return notes;
+        };
+        check (press (48) == std::vector<int> ({ 60, 64, 67 }) && press (40) == std::vector<int> ({ 57, 60, 64 })
+                 && press (50) == std::vector<int> ({ 53, 57, 60 }) && press (48) == std::vector<int> ({ 55, 59, 62 })
+                 && press (48) == std::vector<int> ({ 60, 64, 67 }),
+               "each press in range plays the next chord of the progression, and it wraps");
+        check (press (72) == std::vector<int> ({ 72 }), "a key above the range plays alone");
+        chords.moveProgression (2, true);
+        block();
+        check (chords.progressionStep() == 2 && press (48) == std::vector<int> ({ 53, 57, 60 }),
+               "a step command jumps to a step");
+        chords.moveProgression (-1, false);
+        block();
+        check (press (48) == std::vector<int> ({ 53, 57, 60 }), "and a relative one steps back");
+
+        settings.progressionAdvance = "pedal";
+        chords.setSettings (settings);
+        chords.moveProgression (0, true);
+        block();
+        check (press (48) == std::vector<int> ({ 60, 64, 67 }) && press (52) == std::vector<int> ({ 60, 64, 67 }),
+               "with the pedal stepping, keys replay the current chord");
+        juce::MidiBuffer pedal;
+        pedal.addEvent (juce::MidiMessage::controllerEvent (1, 64, 127), 0);
+        pedal.addEvent (juce::MidiMessage::controllerEvent (1, 64, 0), 1);
+        juce::MidiBuffer pedalOut;
+        chords.process (pedal, pedalOut);
+        check (pedalOut.isEmpty() && press (48) == std::vector<int> ({ 57, 60, 64 }),
+               "one press of the pedal is one step, and the pedal itself is consumed");
+
+        // Removing a set chord lets go of it everywhere and renumbers what follows.
+        settings.removeSetChord (am);
+        check (settings.padMap[0] == c && settings.padMap[1] == -1 && settings.padMap[8] == f - 1
+                 && settings.progression == juce::Array<int> { c, f - 1, g - 1 },
+               "removing a chord empties its pads, drops its steps and renumbers the rest");
+
+        MidiFxSettings restored;
+        midiFxFromVar (midiFxToVar (settings), restored);
+        check (restored.chordPads && restored.padMap == settings.padMap
+                 && restored.chordProgression && restored.progression == settings.progression
+                 && restored.progressionAdvance == "pedal" && restored.progressionLow == 36
+                 && restored.progressionHigh == 59,
+               "pads and the progression survive the trip");
+
+        check (MidiFxSettings::chordNameOf ({ 60, 64, 67 }) == "C"
+                 && MidiFxSettings::chordNameOf ({ 64, 67, 72 }) == "C/E"
+                 && MidiFxSettings::chordNameOf ({ 57, 60, 64, 67 }) == "Am7"
+                 && MidiFxSettings::chordNameOf ({ 60, 63, 66, 70 }) == "Cm7b5"
+                 && MidiFxSettings::chordNameOf ({ 55, 60, 62 }) == "Gsus4"
+                 && MidiFxSettings::chordNameOf ({ 66, 69, 72 }) == "F#dim"
+                 && MidiFxSettings::chordNameOf ({ 60, 61 }) == "C.C#",
+               "chords are named the way the editor names them, in ASCII for the screen");
+    }
+
+    {
         // --- the builder's shapes, the follow range, the bass and the top voice ----------
         MidiFxChain chords;
         MidiFxSettings settings;
@@ -2810,6 +2925,75 @@ void testNoteModules()
             wrapped = wrapped || event.note < 100;
         check (! wrapped, "a repeat past the top of the keyboard is dropped, never wrapped");
         check (balanced (ceilingEvents), "and what did sound still stops");
+    }
+
+    // -- strum in guitar mode -------------------------------------------------------------
+    {
+        auto shape = [] (std::initializer_list<int> chord)
+        {
+            std::vector<int> notes (chord);
+            int out[StrumEngine::strings], owner[StrumEngine::strings];
+            const auto count = StrumEngine::guitarVoicing (notes.data(), (int) notes.size(), out, owner);
+            return std::vector<int> (out, out + count);
+        };
+        check (shape ({ 60, 64, 67 }) == std::vector<int> ({ 48, 52, 55, 60, 64 }),
+               "guitar mode frets C major as the open C chord (x32010)");
+        check (shape ({ 55, 59, 62 }) == std::vector<int> ({ 43, 47, 50, 55, 59, 67 }),
+               "G major as the open G (320003)");
+        check (shape ({ 57, 60, 64 }) == std::vector<int> ({ 45, 52, 57, 60, 64 }),
+               "A minor as x02210");
+        check (shape ({ 62, 66, 69 }) == std::vector<int> ({ 50, 57, 62, 66 }),
+               "and D major as xx0232, the bass on the lowest sounding string");
+
+        auto guitar = slot ("strum");
+        guitar.mod.strumBeats = 0.25;
+        guitar.mod.strumGuitar = true;
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ guitar });
+
+        // Hold the chord well past the strum, then let go: every string must stop.
+        Transport clock;
+        clock.setTempo (120.0);
+        std::vector<Event> events;
+        for (int block = 0; block < 300; ++block)
+        {
+            juce::MidiBuffer in, out;
+            if (block == 0)
+                for (const auto note : { 60, 64, 67 })
+                    in.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 100), 0);
+            if (block == 150)
+                for (const auto note : { 60, 64, 67 })
+                    in.addEvent (juce::MidiMessage::noteOff (1, note), 0);
+            rack.process (in, out, clock.advance (blockSize, sampleRate), blockSize);
+            for (const auto metadata : out)
+            {
+                const auto message = metadata.getMessage();
+                if (message.isNoteOnOrOff())
+                    events.push_back ({ block, metadata.samplePosition, message.isNoteOn(),
+                                        message.getNoteNumber(), message.getVelocity() });
+            }
+        }
+        std::vector<int> strung;
+        for (const auto& event : events)
+            if (event.on) strung.push_back (event.note);
+        check (strung == std::vector<int> ({ 48, 52, 55, 60, 64 }),
+               "a played C major goes out as the five strings, strummed low to high");
+        check (balanced (events), "and releasing the three keys stops all five strings");
+
+        // Released inside the collection window, before the strings were dealt.
+        MidiInsertRack quick;
+        quick.prepare (blockSize);
+        quick.setSlots ({ guitar });
+        juce::MidiBuffer stab;
+        for (const auto note : { 57, 60, 64 })
+        {
+            stab.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 90), 0);
+            stab.addEvent (juce::MidiMessage::noteOff (1, note), 20);
+        }
+        const auto stabbed = run (quick, stab, 300);
+        check (onsOf (stabbed) == 5 && balanced (stabbed),
+               "a stab released before the strum still sounds every string and ends every one");
     }
 
     // -- strum --------------------------------------------------------------------------

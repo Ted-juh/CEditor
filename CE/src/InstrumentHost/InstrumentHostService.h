@@ -535,8 +535,17 @@ public:
         active layer the way a learned note would — momentary follows the pad, a latching pad
         flips on the strike. Skipped (false) when that slot has a learned binding, because the
         learned path already plays it and a toggle driven twice is a toggle that did nothing. */
-    bool pressSurfacePad (const juce::String& pageId, int padIndex, bool down)
-    { return pressSurfaceControl (pageId, "pad", padIndex, down); }
+    /** A pad with NOTHING on its active layer (no binding, no learned note) plays the Chords
+        pads instead, in the CTRL49's own bank (0..3 = A..D): the focused part's Chords module
+        when it has the Pads layer on, else the first part that does. */
+    bool pressSurfacePad (const juce::String& pageId, int padIndex, bool down,
+                          int velocity = 100, int bank = 0);
+    /** padLight for the pad bank the surface is on: a free pad playing chords is lit in its
+        chord's colour, bright while it sounds. */
+    int padLight (const juce::String& pageId, int padIndex, int bank) const;
+    /** " | B Am7" — the bank and the chord the surface's Chords part last played from the
+        set, for a control page's title; empty when no part plays chords from pads. */
+    juce::String surfaceChordTitle (int bank) const;
     /** The same for any pressable control — a pad or a button, on the layer it is playing. */
     bool pressSurfaceControl (const juce::String& pageId, const juce::String& kind, int index, bool down);
 
@@ -1838,6 +1847,14 @@ private:
     struct PendingNoteEvent { int note = 0; bool on = false; };
     std::vector<PendingNoteEvent> pendingChordNotes;
     void drainChordLearn();
+    /** The part whose Chords pads the surface plays: focused first. Empty when none. */
+    juce::String surfaceChordsPart() const;
+    /** True when the pad's active layer has no binding and no learned MIDI of its own. */
+    bool padIsFree (const juce::String& pageId, int padIndex) const;
+    std::map<juce::String, juce::String> lastChordsLiveByPart;
+    // What each surface pad struck, so its release reaches the same chord pad even if the
+    // bank or the focused part changed while it was held.
+    std::array<std::pair<juce::String, int>, 8> surfaceChordPadsHeld {};
     /** Edits one chord module's settings: the slot named, else the part's first Chords slot,
         else the part-level block. `edit` returns false to change nothing. */
     bool editChordModule (const juce::String& partId, const juce::String& slotId,

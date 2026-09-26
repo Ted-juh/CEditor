@@ -52,6 +52,9 @@ try {
     'and an up-stroke the lowest');
   assert.equal(await picture.locator('circle.handle').count(), 1, 'the feel has a handle on the curve');
   assert.match(await strumRow.innerText(), /1\/16/, 'the collapsed row says what the strum does');
+  await page.getByTestId('strum-editor').getByRole('switch', { name: 'Six strings' }).click();
+  assert.equal(await picture.locator('rect.note').count(), 5,
+    'guitar mode draws C on the keys as the five strings of the open C chord');
 
   // Humanize
   const humanRow = page.locator('[data-testid=midi-slot] .slot-name', { hasText: 'Humanize' });
@@ -106,6 +109,41 @@ try {
   await editor.locator('[data-testid=keymap-assign] .tile[data-index="0"]').click();
   assert.equal(await badges.count(), 2, 'a clicked key can be pointed at any set chord');
   assert.match(await chordRow.innerText(), /follow min.*2 mapped keys/, 'the collapsed row names both layers');
+  // Pads: fill a bank, hear a pad light while held, point an empty pad at a chord.
+  await editor.getByTestId('layer-tab-pads').click();
+  await editor.getByTestId('pad-fill').click();
+  const pads = editor.locator('[data-testid=pad-grid] .pad');
+  assert.equal(await pads.locator('xpath=self::*[not(contains(@class, "empty"))]').count(), 8,
+    'filling bank A puts the first eight set chords on its pads');
+  const firstPad = editor.locator('[data-testid=pad-grid] .pad[data-pad="0"]');
+  const box = await firstPad.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  assert.equal(await editor.locator('[data-testid=pad-grid] .pad.lit').count(), 1, 'a held pad lights');
+  await page.mouse.up();
+  assert.equal(await editor.locator('[data-testid=pad-grid] .pad.lit').count(), 0, 'and goes out when let go');
+  await editor.locator('[data-testid=pad-bank] [data-value="1"]').click();
+  assert.equal(await editor.locator('[data-testid=pad-grid] .pad.empty').count(), 8, 'bank B starts empty');
+  await editor.locator('[data-testid=pad-grid] .pad[data-pad="8"]').click();
+  await editor.locator('[data-testid=pad-assign] .tile[data-index="4"]').click();
+  assert.match(await editor.locator('[data-testid=pad-grid] .pad[data-pad="8"]').innerText(), /F/,
+    'an empty pad can be pointed at any set chord');
+
+  // Progression: C, Am, F, G, stepped from the buttons.
+  await editor.getByTestId('layer-tab-prog').click();
+  for (const index of [1, 6, 4, 5])
+    await editor.locator(`[data-testid=prog-add] .tile[data-index="${index}"]`).click();
+  const steps = editor.locator('[data-testid=prog-steps] .step');
+  assert.equal(await steps.count(), 4, 'four steps');
+  assert.match(await steps.nth(1).innerText(), /Am/);
+  assert.equal(await steps.nth(0).getAttribute('class').then((c) => c.includes('next')), true, 'step 1 plays next');
+  await editor.getByTestId('prog-next').click();
+  assert.equal(await steps.nth(1).getAttribute('class').then((c) => c.includes('next')), true, 'the step button moves on');
+  await editor.getByTestId('prog-back').click();
+  await editor.getByTestId('prog-back').click();
+  assert.equal(await steps.nth(3).getAttribute('class').then((c) => c.includes('next')), true, 'and back, wrapping');
+  assert.match(await chordRow.innerText(), /9 pads.*4-step progression/, 'the collapsed row counts pads and steps');
+
   await editor.getByTestId('layer-light-follow').click();
   assert.doesNotMatch(await chordRow.innerText(), /follow/, 'the light switches following off');
 

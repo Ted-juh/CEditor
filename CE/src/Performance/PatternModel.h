@@ -471,7 +471,12 @@ struct MidiFxSettings
     // own on/off so switching it off keeps what it was set to.
     //   Follow key — every key plays `chord` built on itself (the old chorder), inside
     //                chordFollowLow..High; outside the range keys pass through plain.
-    //   Key map    — a mapped key plays its set chord exactly, and wins over follow.
+    //   Key map    — a mapped key plays its set chord exactly, and wins over everything.
+    //   Pads       — pad N of bank B plays set chord padMap[B*8+N], hit from the app or from
+    //                a CTRL49 pad that has nothing else to do on a control page.
+    //   Progression— keys in its range play the progression's chords in order: each press
+    //                the next one, or the sustain pedal steps and the keys play the current.
+    //                It wins over following.
     ChordType chord = ChordType::off;   // the follow shape; off = following plays nothing extra
     bool chordFollow = true;            // the layer's light: off keeps the shape but mutes it
     int chordFollowLow = 0;
@@ -484,6 +489,16 @@ struct MidiFxSettings
     bool chordKeyMap = false;
     juce::Array<SetChord> chordSet;
     juce::Array<KeyMapping> keyMap;
+    bool chordPads = false;
+    juce::Array<int> padMap;            // maxPads set-chord indexes, -1 = an empty pad
+    bool chordProgression = false;
+    juce::Array<int> progression;       // set-chord indexes in playing order
+    juce::String progressionAdvance = "key";   // "key": each press plays the next step
+                                               // "pedal": the sustain pedal steps instead
+    int progressionLow = 0;
+    int progressionHigh = 59;           // below middle C: the left hand steps, the right is free
+    static constexpr int maxPads = 32;          // 8 pads x 4 banks, the CTRL49's own banks
+    static constexpr int maxProgression = 32;
     int velocityFixed = 0;          // 0 = keep played velocity, else 1..127
     float velocityScale = 1.0f;     // 0.1..2.0 applied before the fixed override
 
@@ -514,12 +529,20 @@ struct MidiFxSettings
     int findOrAddSetChord (juce::Array<int> notes);
     /** Points `key` at set chord `chordIndex`, replacing what it pointed at; -1 unmaps it. */
     void mapKey (int key, int chordIndex);
-    /** Removes set chord `index`, unmapping the keys that played it and renumbering the rest. */
+    /** Removes set chord `index`: keys, pads and progression steps that played it let go of
+        it, and everything pointing further along is renumbered. */
     void removeSetChord (int index);
     /** The one-field meaning `chord` had before the layers: "off" switches following off,
         "custom keys" means the key map alone, any shape means following with that shape.
         What the part-level setter and old saves still speak. */
     void applyLegacyChord (ChordType type);
+
+    /** A chord's name from its notes — "Cm7", "F/C", or the note names when it is no chord
+        we know. ASCII (b and #), because the CTRL49 screen is. chordBuilder.js is the
+        browser's copy and names the same notes the same way. */
+    static juce::String chordNameOf (const juce::Array<int>& notes);
+    /** The set chord's own label, else the name of its notes. */
+    juce::String setChordName (int index) const;
 
     static const char* chordTypeName (ChordType type) noexcept;
     static ChordType chordTypeFromName (const juce::String& name) noexcept;
@@ -580,6 +603,7 @@ struct NoteModuleSettings
     StrumPattern strumPattern = StrumPattern::ascending;
     float strumCurve = 0.0f;         // -1 slow start, 0 even, +1 quick start
     int strumVelocityRamp = 0;       // velocity change from first to last note, -64..64
+    bool strumGuitar = false;        // re-voice each chord onto six strings before strumming
 
     // Humanize: bounded jitter. Notes move LATER only — earlier would need the future.
     double humanizeTimingBeats = 0.0;

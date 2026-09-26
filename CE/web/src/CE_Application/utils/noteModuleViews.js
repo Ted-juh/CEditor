@@ -56,6 +56,49 @@ export function strumNotes({ pattern, spreadBeats, feel, velocityRamp }, notes, 
   });
 }
 
+/** Standard tuning, low E to high E: StrumEngine::tuning. */
+export const GUITAR_TUNING = [40, 45, 50, 55, 59, 64];
+
+/** StrumEngine::guitarVoicing: the chord laid onto six strings as a guitarist frets it. The
+    lowest sounding string plays the bass note and nothing sounds below it; each other string
+    takes the nearest chord tone in a four-fret hand position (open strings always), duplicates
+    skipped. Every chord tone first, then no gaps, then the lowest position. Returns the string
+    notes low to high, with the string each sits on. */
+export function guitarVoicing(notes) {
+  const chord = (notes ?? []).map(Number);
+  if (chord.length === 0) return [];
+  const bassClass = Math.min(...chord) % 12;
+  const classes = new Set(chord.map((n) => n % 12));
+  let best = null;
+  let bestScore = Infinity;
+  for (let base = 0; base <= 9; base += 1) {
+    const low = Math.max(1, base);
+    const fret = (s, floor, bassOnly) => {
+      const fits = (n) => n > floor && classes.has(n % 12) && (!bassOnly || n % 12 === bassClass);
+      if (fits(GUITAR_TUNING[s])) return GUITAR_TUNING[s];
+      for (let f = low; f <= low + 3; f += 1) if (fits(GUITAR_TUNING[s] + f)) return GUITAR_TUNING[s] + f;
+      return -1;
+    };
+    let first = 0;
+    let bassNote = -1;
+    for (; first < 6; first += 1) if ((bassNote = fret(first, -1, true)) >= 0) break;
+    if (first === 6) continue;
+    const voiced = [];
+    let innerMutes = 0;
+    for (let s = first; s < 6; s += 1) {
+      const n = s === first ? bassNote : fret(s, bassNote, false);
+      if (n < 0) { innerMutes += 1; continue; }
+      if (voiced.some((v) => v.note === n)) continue;
+      voiced.push({ note: n, string: s });
+    }
+    const covered = new Set(voiced.map((v) => v.note % 12));
+    const missing = [...classes].filter((c) => !covered.has(c)).length;
+    const score = missing * 1000 + innerMutes * 20 + base * 3 + first;
+    if (score < bestScore) { bestScore = score; best = voiced; }
+  }
+  return (best ?? []).sort((a, b) => a.note - b.note);
+}
+
 /** The feel names Humanize offers: each sets all three amounts at once. The engine limits are
     HumanizeEngine's: timing 0..0.25 beat, velocity 0..64, gate 0..100 %. */
 export const HUMANIZE_FEELS = [

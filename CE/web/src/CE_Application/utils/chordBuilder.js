@@ -121,6 +121,9 @@ export function chordForKey(fx, key) {
   const mapping = fx.chordKeyMap ? fx.keyMap.find((m) => m.key === key) : null;
   const mapped = mapping ? fx.chordSet[mapping.chord] : null;
   if (mapped && mapped.notes.length > 0) return { source: 'map', notes: [...mapped.notes] };
+  const steps = fx.chordProgression ? (fx.progression ?? []) : [];
+  if (steps.length > 0 && key >= fx.progressionLow && key <= fx.progressionHigh)
+    return { source: 'progression', notes: [...(fx.chordSet[steps[0]]?.notes ?? [key])] };
   const follows = fx.chordFollow && fx.chord !== 'off' && fx.chord !== 'custom keys'
     && key >= fx.chordFollowLow && key <= fx.chordFollowHigh;
   if (!follows) return { source: 'plain', notes: [key] };
@@ -175,13 +178,16 @@ export function chordsOfKey(scaleType, scaleRoot, { seventh = false, octave = 4 
   });
 }
 
-/** removeSetChord's mirror: the set without chord `index`, and the key map renumbered. */
+/** removeSetChord's mirror: the set without chord `index`; keys, pads and progression steps
+    that played it let go, and everything further along is renumbered. */
 export function withoutSetChord(fx, index) {
   const chordSet = fx.chordSet.filter((_, i) => i !== index);
   const keyMap = fx.keyMap
     .filter((m) => m.chord !== index)
     .map((m) => (m.chord > index ? { ...m, chord: m.chord - 1 } : m));
-  return { chordSet, keyMap };
+  const padMap = (fx.padMap ?? []).map((p) => (p === index ? -1 : p > index ? p - 1 : p));
+  const progression = (fx.progression ?? []).filter((s) => s !== index).map((s) => (s > index ? s - 1 : s));
+  return { chordSet, keyMap, padMap, progression };
 }
 
 /** mapKey's mirror: `key` points at `chord` (or at nothing, for -1). */

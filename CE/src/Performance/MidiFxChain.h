@@ -104,6 +104,75 @@ public:
                 anyMapped = anyMapped || count > 0;
             }
         keyMapActive.store (anyMapped);
+
+        // Pads and progression steps, flattened the same way: each holds its chord's notes
+        // and which set chord it is (for the screen and the lights).
+        const auto flatten = [&settings] (int chord, auto& notes, auto& count, auto& index)
+        {
+            count.store (0);
+            index.store (-1);
+            if (! juce::isPositiveAndBelow (chord, settings.chordSet.size()))
+                return;
+            const auto& source = settings.chordSet.getReference (chord).notes;
+            const auto n = juce::jmin (maxVoices, source.size());
+            for (int i = 0; i < n; ++i)
+                notes[(size_t) i].store ((juce::uint8) juce::jlimit (0, 127, source[i]));
+            count.store ((juce::uint8) n);
+            index.store (chord);
+        };
+        for (int pad = 0; pad < MidiFxSettings::maxPads; ++pad)
+            flatten (settings.chordPads && pad < settings.padMap.size() ? settings.padMap[pad] : -1,
+                     padNotes[(size_t) pad], padCount[(size_t) pad], padChord[(size_t) pad]);
+        auto steps = 0;
+        if (settings.chordProgression)
+            for (const auto chord : settings.progression)
+                if (steps < MidiFxSettings::maxProgression
+                    && juce::isPositiveAndBelow (chord, settings.chordSet.size()))
+                {
+                    flatten (chord, stepNotes[(size_t) steps], stepCount[(size_t) steps],
+                             stepChord[(size_t) steps]);
+                    ++steps;
+                }
+        progressionLength.store (steps);
+        progressionPedal.store (settings.progressionAdvance == "pedal");
+        progressionLow.store (juce::jlimit (0, 127, juce::jmin (settings.progressionLow, settings.progressionHigh)));
+        progressionHigh.store (juce::jlimit (0, 127, juce::jmax (settings.progressionLow, settings.progressionHigh)));
+        for (int i = 0; i < 128; ++i)
+            mappedChord[(size_t) i].store (-1);
+        if (settings.chordKeyMap)
+            for (const auto& mapping : settings.keyMap)
+                if (juce::isPositiveAndBelow (mapping.key, 128))
+                    mappedChord[(size_t) mapping.key].store (mapping.chord);
+    }
+
+    // --- triggers from the message thread (the app's pads, the CTRL49's pads, step buttons)
+
+    /** Message thread: a pad of the Pads layer, 0..maxPads-1 (bank * 8 + pad). Velocity 0
+        releases it. Returns false when the queue is full or the pad is out of range. */
+    bool triggerPad (int pad, int velocity) noexcept
+    {
+        if (! juce::isPositiveAndBelow (pad, MidiFxSettings::maxPads))
+            return false;
+        return pushTrigger ({ velocity > 0 ? Trigger::padOn : Trigger::padOff, pad,
+                              juce::jlimit (0, 127, velocity) });
+    }
+
+    /** Message thread: move the progression by `delta` steps, or to `step` when absolute. */
+    bool moveProgression (int value, bool absolute) noexcept
+    {
+        return pushTrigger ({ absolute ? Trigger::stepTo : Trigger::stepBy, value, 0 });
+    }
+
+    /** What the module last played from the set (-1 for a followed shape or nothing yet),
+        which progression step plays next, and which pads are sounding — read by the UI and
+        the CTRL49, never by the audio path. */
+    int lastSetChord() const noexcept         { return livePlayedChord.load(); }
+    int progressionStep() const noexcept      { return liveStep.load(); }
+    juce::uint32 soundingPads() const noexcept { return livePads.load(); }
+    /** Which set chord a pad plays, -1 for an empty pad or pads off. */
+    int padSetChord (int pad) const noexcept
+    {
+        return juce::isPositiveAndBelow (pad, MidiFxSettings::maxPads) ? padChord[(size_t) pad].load() : -1;
     }
 
     /** True when nothing in the chain would change a note — the caller can skip the copy. */
@@ -112,6 +181,8 @@ public:
         return transpose.load() == 0
             && chordType.load() == (int) MidiFxSettings::ChordType::off
             && ! keyMapActive.load()
+            && progressionLength.load() == 0
+            && livePads.load() == 0 && triggerFifo.getNumReady() == 0
             && velocityFixed.load() == 0
             && juce::approximatelyEqual (velocityScale.load(), 1.0f)
             && velocityCurve.load() == (int) MidiFxSettings::ResponseCurve::linear
@@ -138,6 +209,13 @@ public:
         const auto addBass = chordBass.load();
         const auto accent = topAccent.load();
         const auto keyMapOn = keyMapActive.load();
+        const auto steps = progressionLength.load();
+        const auto stepByPedal = progressionPedal.load();
+        const auto stepLow = progressionLow.load();
+        const auto stepHigh = progressionHigh.load();
+        if (steps > 0)
+            progressionAt = ((progressionAt % steps) + steps) % steps;
+        drainTriggers (out, accent);
         const auto fixed = velocityFixed.load();
         const auto scaleVelocity = velocityScale.load();
         const auto velocityCurveType = (MidiFxSettings::ResponseCurve) velocityCurve.load();
@@ -188,11 +266,34 @@ public:
                 // before the table forgets it.
                 releaseTracked (channel, sourceNote, out, position);
 
+                lastChannel = channel;
                 int notes[maxVoices];
                 auto count = 0;
                 const auto mapped = keyMapOn ? (int) mappedCount[(size_t) sourceNote].load() : 0;
-                if (mapped > 0)
+                if (mapped == 0 && steps > 0 && sourceNote >= stepLow && sourceNote <= stepHigh)
                 {
+                    // Progression: this key plays the current step, moved by what transpose
+                    // and scale did to the key (as the key map is); pressing on moves on,
+                    // unless the pedal does the stepping.
+                    const auto step = progressionAt;
+                    count = (int) stepCount[(size_t) step].load();
+                    for (int i = 0; i < count; ++i)
+                        notes[i] = juce::jlimit (0, 127, (int) stepNotes[(size_t) step][(size_t) i].load()
+                                                            + root - sourceNote);
+                    livePlayedChord.store (stepChord[(size_t) step].load());
+                    if (! stepByPedal)
+                        progressionAt = (step + 1) % steps;
+                    liveStep.store (progressionAt);
+                    clearVoiceHistory (channel - 1);
+                    if (count == 0)
+                    {
+                        notes[0] = root;
+                        count = 1;
+                    }
+                }
+                else if (mapped > 0)
+                {
+                    livePlayedChord.store (mappedChord[(size_t) sourceNote].load());
                     // Key map: exactly the set chord, moved by whatever transpose and scale
                     // did to the key itself. It wins over following and is never re-voiced.
                     for (int i = 0; i < mapped; ++i)
@@ -246,6 +347,19 @@ public:
             {
                 releaseTracked (message.getChannel(), message.getNoteNumber(), out, position);
             }
+            else if (steps > 0 && stepByPedal && message.isController()
+                     && message.getControllerNumber() == 64)
+            {
+                // The pedal is the progression's step button here, not a sustain: consumed,
+                // and one step per press.
+                const auto down = message.getControllerValue() >= 64;
+                if (down && ! pedalDown)
+                {
+                    progressionAt = (progressionAt + 1) % steps;
+                    liveStep.store (progressionAt);
+                }
+                pedalDown = down;
+            }
             else if (mapExpression && expressionMatches (message, expressionKind, mappedCc))
             {
                 const auto value = shape7Bit (expressionValue (message), expressionInLow,
@@ -275,6 +389,8 @@ public:
         for (int channel = 0; channel < 16; ++channel)
             for (int note = 0; note < 128; ++note)
                 releaseTracked (channel + 1, note, out, position);
+        for (int pad = 0; pad < MidiFxSettings::maxPads; ++pad)
+            releasePad (pad, out, position);
         clearVoiceHistory();
     }
 
@@ -613,6 +729,91 @@ private:
         return 1;
     }
 
+    struct Trigger
+    {
+        enum Kind { padOn, padOff, stepTo, stepBy };
+        int kind = padOn;
+        int a = 0;
+        int b = 0;
+    };
+
+    bool pushTrigger (Trigger trigger) noexcept
+    {
+        const auto scope = triggerFifo.write (1);
+        if (scope.blockSize1 > 0)
+            triggers[(size_t) scope.startIndex1] = trigger;
+        else if (scope.blockSize2 > 0)
+            triggers[(size_t) scope.startIndex2] = trigger;
+        else
+            return false;
+        return true;
+    }
+
+    /** Audio thread: plays and releases the queued pad hits at the top of the block. */
+    void drainTriggers (juce::MidiBuffer& out, int accent) noexcept
+    {
+        const auto ready = triggerFifo.getNumReady();
+        if (ready == 0)
+            return;
+        const auto scope = triggerFifo.read (ready);
+        const auto run = [&] (int start, int size)
+        {
+            for (int i = start; i < start + size; ++i)
+            {
+                const auto& t = triggers[(size_t) i];
+                if (t.kind == Trigger::padOff)
+                    releasePad (t.a, out, 0);
+                else if (t.kind == Trigger::padOn)
+                    playPad (t.a, t.b, accent, out);
+                else if (const auto steps = progressionLength.load(); steps > 0)
+                {
+                    const auto to = t.kind == Trigger::stepTo ? t.a : progressionAt + t.a;
+                    progressionAt = ((to % steps) + steps) % steps;
+                    liveStep.store (progressionAt);
+                }
+            }
+        };
+        run (scope.startIndex1, scope.blockSize1);
+        run (scope.startIndex2, scope.blockSize2);
+    }
+
+    void playPad (int pad, int velocity, int accent, juce::MidiBuffer& out) noexcept
+    {
+        releasePad (pad, out, 0);   // a pad hit again restrikes rather than stacking
+        const auto count = (int) padCount[(size_t) pad].load();
+        if (count == 0)
+            return;
+        auto top = 0;
+        for (int i = 0; i < count; ++i)
+        {
+            const auto note = (int) padNotes[(size_t) pad][(size_t) i].load();
+            if (note > (int) padNotes[(size_t) pad][(size_t) top].load())
+                top = i;
+        }
+        for (int i = 0; i < count; ++i)
+        {
+            const auto note = (int) padNotes[(size_t) pad][(size_t) i].load();
+            const auto v = count > 1 && i == top ? juce::jmin (127, velocity + accent) : velocity;
+            out.addEvent (juce::MidiMessage::noteOn (lastChannel, note, (juce::uint8) juce::jmax (1, v)), 0);
+            padSounding[(size_t) pad][(size_t) i] = (juce::uint8) (note + 1);
+        }
+        padChannel[(size_t) pad] = lastChannel;
+        livePads.store (livePads.load() | (1u << pad));
+        livePlayedChord.store (padChord[(size_t) pad].load());
+    }
+
+    void releasePad (int pad, juce::MidiBuffer& out, int position) noexcept
+    {
+        for (auto& slot : padSounding[(size_t) pad])
+        {
+            if (slot == 0)
+                continue;
+            out.addEvent (juce::MidiMessage::noteOff (padChannel[(size_t) pad], (int) slot - 1), position);
+            slot = 0;
+        }
+        livePads.store (livePads.load() & ~(1u << pad));
+    }
+
     /** A plain interval shape on `root`, each tone after the root folded by `add`. */
     template <typename Add>
     static int shape (int root, std::initializer_list<int> intervals, const Add& add,
@@ -685,6 +886,32 @@ private:
     std::atomic<juce::uint16> diatonicMask { 0x0fff };
     std::array<std::array<std::atomic<juce::uint8>, 6>, 128> mappedNotes {};
     std::array<std::atomic<juce::uint8>, 128> mappedCount {};
+    std::array<std::atomic<int>, 128> mappedChord {};
+
+    std::array<std::array<std::atomic<juce::uint8>, 6>, MidiFxSettings::maxPads> padNotes {};
+    std::array<std::atomic<juce::uint8>, MidiFxSettings::maxPads> padCount {};
+    std::array<std::atomic<int>, MidiFxSettings::maxPads> padChord {};
+    std::array<std::array<std::atomic<juce::uint8>, 6>, MidiFxSettings::maxProgression> stepNotes {};
+    std::array<std::atomic<juce::uint8>, MidiFxSettings::maxProgression> stepCount {};
+    std::array<std::atomic<int>, MidiFxSettings::maxProgression> stepChord {};
+    std::atomic<int> progressionLength { 0 };
+    std::atomic<bool> progressionPedal { false };
+    std::atomic<int> progressionLow { 0 }, progressionHigh { 59 };
+
+    // Audio thread only.
+    juce::uint8 padSounding[MidiFxSettings::maxPads][maxVoices] = {};
+    int padChannel[MidiFxSettings::maxPads] = {};
+    int lastChannel = 1;
+    int progressionAt = 0;
+    bool pedalDown = false;
+
+    // Written by the audio thread, read by the message thread.
+    std::atomic<int> livePlayedChord { -1 };
+    std::atomic<int> liveStep { 0 };
+    std::atomic<juce::uint32> livePads { 0 };
+
+    juce::AbstractFifo triggerFifo { 64 };
+    std::array<Trigger, 64> triggers {};
 };
 
 } // namespace ceditor::perf
