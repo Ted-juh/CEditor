@@ -1387,13 +1387,14 @@ bool InstrumentRackHost::setSlotMidiNote (const juce::String& pageId, const juce
 }
 
 bool InstrumentRackHost::setSlotMidiOptions (const juce::String& pageId, const juce::String& slotId,
-                                            bool pickup, bool relative)
+                                            bool pickup, bool relative, int relativeFormat)
 {
     auto* page = model.findPage (pageId);
     auto* slot = page != nullptr ? page->findSlot (slotId) : nullptr;
     if (slot == nullptr) return false;
     slot->midiPickup = pickup;
     slot->midiRelative = relative;
+    slot->midiRelativeFormat = juce::jlimit (0, 2, relativeFormat);
     return true;
 }
 

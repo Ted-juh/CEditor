@@ -88,7 +88,10 @@ try {
     await page.screenshot({ path: process.env.CONTROLLER_SCREENSHOT.replace('.png', '-pickup.png') });
   await page.evaluate(() => window.setPickupDirection(-1));
   assert.equal(await page.getByTestId('surface-encoder-1').getByTestId('pickup-direction').innerText(), '↓');
-  await page.getByLabel('MIDI control mode').selectOption('relative');
+  // Four modes now: absolute, and the three ways encoders send a turn. Pick 64-centre.
+  assert.equal(await page.getByLabel('MIDI control mode').locator('option').count(), 4, 'absolute plus three relative formats');
+  await page.getByLabel('MIDI control mode').selectOption('relative-1');
+  assert.equal(await page.getByLabel('MIDI control mode').inputValue(), 'relative-1', 'the chosen relative format sticks');
   assert.equal(await pickup.count(), 0, 'relative controls have no pickup setting to wait on');
   assert.equal(await page.getByTestId('pickup-direction').count(), 0);
   await page.getByLabel('MIDI control mode').selectOption('absolute');

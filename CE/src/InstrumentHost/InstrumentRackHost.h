@@ -298,7 +298,7 @@ public:
     /** Binds or clears the slot's learned MIDI controller. cc -1 clears; channel 0 = any. */
     bool setSlotMidi (const juce::String& pageId, const juce::String& slotId, int cc, int channel);
     bool setSlotMidiOptions (const juce::String& pageId, const juce::String& slotId,
-                            bool pickup, bool relative);
+                            bool pickup, bool relative, int relativeFormat = 0);
     /** Binds a note instead of a controller (a pad, or a key used as one). One controller per
         slot: this clears the controller binding, as setSlotMidi clears the note. */
     bool setSlotMidiNote (const juce::String& pageId, const juce::String& slotId, int note, int channel);

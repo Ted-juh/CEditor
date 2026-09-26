@@ -253,7 +253,9 @@ struct ControlSlot
     // controller per slot — binding a note clears the controller and the other way round.
     int midiNote = -1;
     bool midiPickup = false;     // opt-in soft takeover for learned absolute CCs
-    bool midiRelative = false;   // learned CC: 1 = increment, 127 = decrement
+    bool midiRelative = false;   // learned CC is a relative encoder, decoded by midiRelativeFormat
+    int midiRelativeFormat = 0;  // MidiPickup::RelativeFormat: 0 two's complement (1 = +1,
+                                 // 127 = -1), 1 offset binary (64 +/- n), 2 sign bit
     // The toggle's own memory, kept with the slot so a latched pad is still latched when the
     // session comes back rather than silently reset under a lit LED.
     bool latched = false;

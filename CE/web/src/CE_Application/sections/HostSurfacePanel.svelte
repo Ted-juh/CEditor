@@ -381,6 +381,7 @@
       </select>
     {:else}
       <strong>{layout.displayName || 'No controller profile'}</strong>
+      {#if layout.connected}<span class="plugged-in" data-testid="surface-connected" title="This controller is plugged in">● plugged in</span>{/if}
       {#if layout.vendor}<span class="dim">{layout.vendor}</span>{/if}
     {/if}
     <button type="button" class="ghost" data-testid="surface-describe"
@@ -773,10 +774,19 @@
               {/if}
               {#if selectedSlot.midiCc >= 0 && selectedSlot.midiNote < 0 && !pressable(selectedControl) && !selectedSlot.toggle}
                 <label>MIDI mode
-                  <select aria-label="MIDI control mode" value={selectedSlot.midiRelative ? 'relative' : 'absolute'}
-                          onchange={(e) => updateSelectedOptions({ midiRelative: e.currentTarget.value === 'relative' })}>
-                    <option value="absolute">Absolute</option>
-                    <option value="relative">Relative (1 / 127)</option>
+                  <!-- A relative encoder sends a turn, not a position, and controllers disagree on how:
+                       which one yours uses is in its manual (or try each and turn the knob). -->
+                  <select aria-label="MIDI control mode" data-testid="slot-midi-mode"
+                          value={selectedSlot.midiRelative ? `relative-${selectedSlot.midiRelativeFormat ?? 0}` : 'absolute'}
+                          onchange={(e) => {
+                            const v = e.currentTarget.value;
+                            updateSelectedOptions(v === 'absolute' ? { midiRelative: false }
+                              : { midiRelative: true, midiRelativeFormat: Number(v.slice(-1)) });
+                          }}>
+                    <option value="absolute">Absolute (0-127)</option>
+                    <option value="relative-0" title="1 = up one, 127 = down one; 2..63 up faster, 126..65 down faster">Relative: 1 up / 127 down</option>
+                    <option value="relative-1" title="64 = rest; 65.. up, ..63 down">Relative: 64 centre (65 up / 63 down)</option>
+                    <option value="relative-2" title="1..63 up; 65..127 down">Relative: sign bit (1 up / 65 down)</option>
                   </select>
                 </label>
                 {#if !selectedSlot.midiRelative}
@@ -840,6 +850,7 @@
   .page-picker > span, .eyebrow { color: #81acd0; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
   .page-picker select { min-width: 150px; font-weight: 650; }
   .page-picker .page-rename { width: 170px; font-weight: 650; }
+  .plugged-in { color: #8fd0a4; font-size: 11px; }
   .page-picker button { display: inline-flex; align-items: center; gap: 4px; }
 
   .describe { display: flex; flex-direction: column; gap: 6px; padding: 8px;

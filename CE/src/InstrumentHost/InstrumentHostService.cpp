@@ -1916,9 +1916,11 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         const bool pickup = (bool) payload.getProperty ("midiPickup", slot->midiPickup);
         const bool relative = (bool) payload.getProperty ("midiRelative", slot->midiRelative);
+        const int relativeFormat = juce::jlimit (0, 2, (int) payload.getProperty ("midiRelativeFormat",
+                                                                                 slot->midiRelativeFormat));
         const int colour = (int) payload.getProperty ("colour", slot->colour);
         rack.setSlotBinding (pageId, slotId, std::move (binding));
-        rack.setSlotMidiOptions (pageId, slotId, pickup, relative);
+        rack.setSlotMidiOptions (pageId, slotId, pickup, relative, relativeFormat);
         rack.setSlotColour (pageId, slotId, colour);
         midiPickups.erase ({ pageId, slotId });
         savePerformance();
@@ -15477,9 +15479,13 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     {
         PendingCc event { message.getChannel(), message.getControllerNumber(),
                                 message.getControllerValue() };
-        event.relativeDelta = MidiPickup::relativeStep (event.value);
-        event.relativeMinimum = juce::jlimit (0, 127, event.relativeDelta);
-        event.relativeMaximum = juce::jlimit (0, 127, 127 + event.relativeDelta);
+        for (int f = 0; f < MidiPickup::relativeFormatCount; ++f)
+        {
+            const auto step = MidiPickup::relativeStep (event.value, (MidiPickup::RelativeFormat) f);
+            event.relativeDelta[(size_t) f] = step;
+            event.relativeMinimum[(size_t) f] = juce::jlimit (0, 127, step);
+            event.relativeMaximum[(size_t) f] = juce::jlimit (0, 127, 127 + step);
+        }
         event.minimum = event.maximum = event.value;
         for (auto& queued : pendingCcs)
             if (queued.note < 0 && queued.channel == event.channel && queued.cc == event.cc)
@@ -15487,14 +15493,28 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
                 queued.value = event.value;
                 queued.minimum = std::min (queued.minimum, event.value);
                 queued.maximum = std::max (queued.maximum, event.value);
-                queued.relativeDelta = juce::jlimit (-65536, 65536, queued.relativeDelta + event.relativeDelta);
-                queued.relativeMinimum = juce::jlimit (0, 127, queued.relativeMinimum + event.relativeDelta);
-                queued.relativeMaximum = juce::jlimit (0, 127, queued.relativeMaximum + event.relativeDelta);
+                for (size_t f = 0; f < queued.relativeDelta.size(); ++f)
+                {
+                    const auto step = event.relativeDelta[f];
+                    queued.relativeDelta[f] = juce::jlimit (-65536, 65536, queued.relativeDelta[f] + step);
+                    queued.relativeMinimum[f] = juce::jlimit (0, 127, queued.relativeMinimum[f] + step);
+                    queued.relativeMaximum[f] = juce::jlimit (0, 127, queued.relativeMaximum[f] + step);
+                }
                 return;
             }
         if (pendingCcs.size() < 64)
             pendingCcs.push_back (event);
     }
+}
+
+juce::StringArray InstrumentHostService::currentMidiPortNames()
+{
+    juce::StringArray names;
+    for (const auto& input : juce::MidiInput::getAvailableDevices())
+        names.addIfNotAlreadyThere (input.name);
+    for (const auto& output : juce::MidiOutput::getAvailableDevices())
+        names.addIfNotAlreadyThere (output.name);
+    return names;
 }
 
 void InstrumentHostService::emitSurfaceLayout (const juce::String& requestedProfileId)
@@ -15504,6 +15524,15 @@ void InstrumentHostService::emitSurfaceLayout (const juce::String& requestedProf
     const auto& registry = ctrl49::SurfaceProfileRegistry::instance();
     const ctrl49::SurfaceProfile* profile = requestedProfileId.isNotEmpty()
                                               ? registry.find (requestedProfileId) : nullptr;
+
+    // Unasked, the drawing is of what is plugged in: a profile whose port hints match a
+    // connected MIDI port. Before, it was simply the first profile registered, whatever the
+    // desk held.
+    const auto connectedPorts = midiPortNamesForProfiles != nullptr ? midiPortNamesForProfiles()
+                                                                    : currentMidiPortNames();
+    const ctrl49::SurfaceProfile* connected = registry.findForPorts (connectedPorts);
+    if (profile == nullptr && requestedProfileId.isEmpty())
+        profile = connected;
 
     if (profile == nullptr && requestedProfileId.isEmpty())
         for (const auto& id : registry.profileIds())
@@ -15531,6 +15560,8 @@ void InstrumentHostService::emitSurfaceLayout (const juce::String& requestedProf
         root->setProperty ("vendor",      useOwn ? juce::String ("Described by you")
                                                  : profile->vendor);
         root->setProperty ("aspect",      layout.aspect);
+        // Whether this drawing is of a controller that is plugged in right now.
+        root->setProperty ("connected",   ! useOwn && profile != nullptr && profile == connected);
         juce::Array<juce::var> controls;
         for (const auto& control : layout.controls)
         {
@@ -15905,10 +15936,11 @@ void InstrumentHostService::drainControllerEvents()
                 }
                 else if (slot.midiRelative)
                 {
-                    if (event.relativeDelta == 0 && event.relativeMinimum == 0 && event.relativeMaximum == 127) continue;
-                    normalised = juce::jlimit ((float) event.relativeMinimum / 127.0f,
-                        (float) event.relativeMaximum / 127.0f,
-                        controlBindingPosition (slot.binding) + (float) event.relativeDelta / 127.0f);
+                    const auto f = (size_t) juce::jlimit (0, 2, slot.midiRelativeFormat);
+                    if (event.relativeDelta[f] == 0 && event.relativeMinimum[f] == 0 && event.relativeMaximum[f] == 127) continue;
+                    normalised = juce::jlimit ((float) event.relativeMinimum[f] / 127.0f,
+                        (float) event.relativeMaximum[f] / 127.0f,
+                        controlBindingPosition (slot.binding) + (float) event.relativeDelta[f] / 127.0f);
                 }
                 else if (slot.midiPickup && slot.binding.rangeMin != slot.binding.rangeMax)
                 {
@@ -16919,6 +16951,7 @@ juce::var InstrumentHostService::buildStatePayload()
             s->setProperty ("midiNote",    slot.midiNote);
             s->setProperty ("midiPickup",  slot.midiPickup);
             s->setProperty ("midiRelative", slot.midiRelative);
+            s->setProperty ("midiRelativeFormat", slot.midiRelativeFormat);
             int pickupDirection = 0;
             if (auto it = midiPickups.find ({ page.pageId, slot.slotId });
                 it != midiPickups.end() && it->second.matches (slot) && resolved && slotIndex < liveSlots.size())

@@ -118,6 +118,10 @@ struct SurfaceProfile
     SurfaceCapabilities capabilities;
     SurfaceLayout layout;        // optional; empty means "draw it generically from the counts"
     SurfaceRenderers renderers;
+    /** How to recognise the controller when it is plugged in: pieces of its MIDI port names,
+        matched without regard to case ("CTRL49" matches "CTRL49 USB" and "2- CTRL49 USB").
+        Empty means the profile is only ever chosen by hand. */
+    juce::StringArray portNameHints;
     /** Conformance: the checks this profile must pass before support is CLAIMED (§18.9.5's
         step 4, and §18.9.10's refusal to promise controllers on paper). Returns the failures;
         empty means conformant. */
@@ -133,6 +137,8 @@ public:
 
     void registerProfile (SurfaceProfile profile);
     const SurfaceProfile* find (const juce::String& profileId) const;
+    /** The first profile whose portNameHints match one of these MIDI port names, or null. */
+    const SurfaceProfile* findForPorts (const juce::StringArray& portNames) const;
     juce::StringArray profileIds() const;
     int size() const { return (int) profiles.size(); }
 

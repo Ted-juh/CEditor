@@ -517,7 +517,7 @@ export function surfaceStatusText(surface) {
 // --- the surface as a picture --------------------------------------------------------------------
 
 export function emptySurfaceLayout() {
-  return { displayName: '', vendor: '', aspect: 0, controls: [], regions: [],
+  return { displayName: '', vendor: '', aspect: 0, controls: [], regions: [], connected: false,
            // The owner's own controller, when they described one: what to prefill the form
            // with, and whether a count is running.
            profileId: '', own: false, profiles: [], userSurface: '', userEncoders: 0, userFaders: 0, userPads: 0,
@@ -573,6 +573,8 @@ export function normalizeSurfaceLayout(payload) {
 
   return {
     profileId: String(p.profileId ?? ''),
+    // The drawing is of a controller plugged in right now (matched by its MIDI port name).
+    connected: p.connected === true,
     displayName: String(p.displayName ?? ''),
     vendor: String(p.vendor ?? ''),
     aspect: Number(p.aspect ?? 0) || 0,
@@ -4158,6 +4160,8 @@ export function normalizeHostState(payload) {
           midiNote: Number.isInteger(slot?.midiNote) ? Math.max(-1, Math.min(127, slot.midiNote)) : -1,
           midiPickup: slot?.midiPickup === true,
           midiRelative: slot?.midiRelative === true,
+          // 0 two's complement (1 = +1, 127 = -1), 1 offset binary (64 +/- n), 2 sign bit.
+          midiRelativeFormat: [0, 1, 2].includes(slot?.midiRelativeFormat) ? slot.midiRelativeFormat : 0,
           pickupDirection: slot?.midiPickup === true && slot?.midiRelative !== true && slot?.toggle !== true
             && slot?.midiCc >= 0 && !(slot?.midiNote >= 0) && [-1, 1].includes(slot?.pickupDirection)
             ? slot.pickupDirection : 0,
@@ -5915,7 +5919,7 @@ export function applyMockCommand(state, payload) {
         resolved: true,
       });
     } else {
-      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'toggle', 'label', 'midiPickup', 'midiRelative', 'colour'])
+      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'toggle', 'label', 'midiPickup', 'midiRelative', 'midiRelativeFormat', 'colour'])
         if (payload[key] !== undefined) slot[key] = payload[key];
       slot.pickupDirection = 0;
       if (payload.label !== undefined && payload.label) slot.displayName = String(payload.label);

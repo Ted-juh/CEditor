@@ -651,6 +651,8 @@ juce::var Performance::toVar() const
             s->setProperty ("midiNote",    slot.midiNote);
             s->setProperty ("midiPickup",  slot.midiPickup);
             s->setProperty ("midiRelative", slot.midiRelative);
+            if (slot.midiRelativeFormat != 0)
+                s->setProperty ("midiRelativeFormat", slot.midiRelativeFormat);
             s->setProperty ("latched",     slot.latched);
             // Written only when they say something, so a page without layers or colours
             // reads exactly as it did before either existed.
@@ -1691,6 +1693,7 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
                     slot.midiNote    = juce::jlimit (-1, 127, (int) s.getProperty ("midiNote", -1));
                     slot.midiPickup  = (bool) s.getProperty ("midiPickup", false);
                     slot.midiRelative = (bool) s.getProperty ("midiRelative", false);
+                    slot.midiRelativeFormat = juce::jlimit (0, 2, (int) s.getProperty ("midiRelativeFormat", 0));
                     slot.latched     = (bool) s.getProperty ("latched", false);
                     // Only pads and faders have layers; anything else claiming one is a hand
                     // edit, and reads as the single layer it can actually be.

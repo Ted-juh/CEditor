@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <deque>
 #include <cstddef>
 #include <cstdint>
@@ -574,6 +575,11 @@ public:
         rather than when the whole program exits; reopening the tab sets it again. A shell with
         no such tab never sends it, and the default is on. */
     bool hardwareSurfaceWanted() const noexcept { return surfaceWanted; }
+
+    /** The MIDI port names the controller drawing is matched against (SurfaceProfile::
+        portNameHints). Null uses the system's ports; tests put fake ones here. */
+    std::function<juce::StringArray()> midiPortNamesForProfiles;
+    static juce::StringArray currentMidiPortNames();
 
     // -- the Stage 6 performance system ------------------------------------------------------
 
@@ -1764,8 +1770,12 @@ private:
     // and a key is a pad if you say so. Notes are never coalesced — each press counts.
     struct PendingCc {
         int channel = 0; int cc = 0; int value = 0; int note = -1; bool on = false;
-        int relativeDelta = 0, minimum = 0, maximum = 0;
-        int relativeMinimum = 0, relativeMaximum = 127;
+        int minimum = 0, maximum = 0;
+        // One running total per relative format (MidiPickup::RelativeFormat): the queue does
+        // not know which slot a CC feeds, and the same value means different turns in each.
+        std::array<int, 3> relativeDelta {};
+        std::array<int, 3> relativeMinimum {};
+        std::array<int, 3> relativeMaximum { 127, 127, 127 };
     };
     std::vector<PendingCc> pendingCcs;
 

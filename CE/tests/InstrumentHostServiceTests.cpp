@@ -5698,6 +5698,37 @@ void testMidiPickup()
     h.service->drainParameterEvents();
     check (near (stub->cutoff->get(), 1.0f / 127.0f), "relative turns retain their order at the lower limit");
 
+    // The other two encoder formats, and faster turns (steps above one).
+    stub->cutoff->setValueNotifyingHost (0.5f);
+    move (3);
+    check (near (stub->cutoff->get(), 0.5f + 3.0f / 127.0f), "two's complement: 3 is three steps up, not ignored");
+    move (125);
+    check (near (stub->cutoff->get(), 0.5f), "and 125 is three steps down");
+
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" }, { "midiRelativeFormat", 1 } });
+    stub->cutoff->setValueNotifyingHost (0.5f);
+    move (66);
+    check (near (stub->cutoff->get(), 0.5f + 2.0f / 127.0f), "offset binary: 66 is two steps up");
+    move (63);
+    check (near (stub->cutoff->get(), 0.5f + 1.0f / 127.0f), "and 63 is one step down");
+    move (64);
+    check (near (stub->cutoff->get(), 0.5f + 1.0f / 127.0f), "and 64 is rest");
+
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" }, { "midiRelativeFormat", 2 } });
+    stub->cutoff->setValueNotifyingHost (0.5f);
+    move (2);
+    check (near (stub->cutoff->get(), 0.5f + 2.0f / 127.0f), "sign bit: 2 is two steps up");
+    move (66);
+    check (near (stub->cutoff->get(), 0.5f), "and 66 is two steps down");
+    check ((int) slot().getProperty ("midiRelativeFormat", -1) == 2, "the format is part of the slot's state");
+    {
+        ceditor::host::Performance withFormat;
+        check (ceditor::host::Performance::fromVar (h.service->captureStateVar(), withFormat)
+                 && withFormat.pages[0].slots[0].midiRelativeFormat == 2,
+               "and survives a session round trip");
+    }
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" }, { "midiRelativeFormat", 0 } });
+
     ceditor::host::Performance restored;
     check (ceditor::host::Performance::fromVar (h.service->captureStateVar(), restored)
         && restored.pages[0].slots[0].midiPickup && restored.pages[0].slots[0].midiRelative,
@@ -12242,6 +12273,52 @@ void testParameterLearnAndFavourites()
 // many of each control it has. The owner says, or CEditor counts while they sweep. Everything
 // downstream — the drawing, assignment on it, live feedback, page generation — then works
 // exactly as it does for the CTRL49, because it all keys off the same indices.
+void testSurfaceByConnectedPort()
+{
+    std::cout << "\nthe controller drawing is of what is plugged in" << std::endl;
+
+    ceditor::ctrl49::SurfaceProfile fake;
+    fake.profileId = "test-fakekeys";
+    fake.displayName = "FakeKeys 25";
+    fake.vendor = "Test";
+    fake.capabilities.encoders = 4;
+    fake.layout = ceditor::ctrl49::buildGenericLayout (fake.capabilities);
+    fake.portNameHints = { "FakeKeys" };
+    ceditor::ctrl49::SurfaceProfileRegistry::instance().registerProfile (fake);
+
+    Harness h (freshDataDir ("surface-by-port"));
+    h.cmd ("getState");
+    juce::StringArray ports { "2- FAKEKEYS MIDI 1", "Some Other Synth" };
+    h.service->midiPortNamesForProfiles = [&ports] { return ports; };
+
+    const auto layout = [&h]
+    {
+        h.cmd ("getSurfaceLayout");
+        const auto* emitted = h.emits.last ("instrumentHostSurfaceLayout");
+        return emitted != nullptr ? *emitted : juce::var();
+    };
+
+    auto shown = layout();
+    check (shown.getProperty ("profileId", {}).toString() == "test-fakekeys"
+             && (bool) shown.getProperty ("connected", false),
+           "a connected controller's own drawing is shown, matched by its port name");
+
+    ports = { "Some Other Synth" };
+    shown = layout();
+    check (shown.getProperty ("profileId", {}).toString() == "akai-ctrl49"
+             && ! (bool) shown.getProperty ("connected", true),
+           "with nothing recognised plugged in, the first authored drawing answers, not claiming to be connected");
+
+    ports = { "CTRL49 USB", "2- FAKEKEYS MIDI 1" };
+    shown = layout();
+    check ((bool) shown.getProperty ("connected", false), "a CTRL49 is recognised by its port too");
+
+    h.cmd ("getSurfaceLayout", { { "profileId", "test-fakekeys" } });
+    const auto* asked = h.emits.last ("instrumentHostSurfaceLayout");
+    check (asked != nullptr && asked->getProperty ("profileId", {}).toString() == "test-fakekeys",
+           "and a drawing asked for by name is still the one shown");
+}
+
 void testUserDescribedSurface()
 {
     std::cout << "\na controller nobody profiled" << std::endl;
@@ -13063,6 +13140,7 @@ int main (int argc, char* argv[])
     testCustomArtwork();
     testParameterLearnAndFavourites();
     testUserDescribedSurface();
+    testSurfaceByConnectedPort();
     testMicrotuningManager();
     testWholePerformanceRecorderAndReplay();
     testAutomaticFailover();
