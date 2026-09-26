@@ -17,6 +17,23 @@ export const SCREEN_H = 272;
 export const ASSET_PNG = 14;       // uploaded PNG object
 export const ASSET_BUFFER2D = 18;  // decoded Buffer2D
 
+// The device's sixteen fonts, by `font` id: the Aileron family in alphabetical order of face name
+// (read from the Akai ADVANCE 1.0.10 asset flash, the same VIP runtime as the CTRL49).
+export const AILERON_FACES = [
+  { name: 'Black', weight: 900 }, { name: 'Black Italic', weight: 900, italic: true },
+  { name: 'Bold', weight: 700 }, { name: 'Bold Italic', weight: 700, italic: true },
+  { name: 'Heavy', weight: 800 }, { name: 'Heavy Italic', weight: 800, italic: true },
+  { name: 'Italic', weight: 400, italic: true },
+  { name: 'Light', weight: 300 }, { name: 'Light Italic', weight: 300, italic: true },
+  { name: 'Regular', weight: 400 },
+  { name: 'SemiBold', weight: 600 }, { name: 'SemiBold Italic', weight: 600, italic: true },
+  { name: 'Thin', weight: 100 }, { name: 'Thin Italic', weight: 100, italic: true },
+  { name: 'UltraLight', weight: 200 }, { name: 'UltraLight Italic', weight: 200, italic: true },
+];
+
+// A text object holds at most this many characters on the device.
+export const MAX_TEXT_CHARACTERS = 100;
+
 function argbToCss(argb) {
   // argb is an unsigned 32-bit number 0xAARRGGBB.
   const a = ((argb >>> 24) & 0xff) / 255;
@@ -60,21 +77,56 @@ export class ScreenDrawApi {
     Object.assign(obj, props);
   }
 
+  // The firmware's text object, as its text_data.set parser reads it (Akai ADVANCE 1.0.10, the same
+  // VIP runtime): text, color, font, font_size, just_hor, just_ver, padding_hor, padding_ver,
+  // bk_color, border_color, border_width_left/top/right/bottom. Text is cut at ~100 characters.
+  //
+  // `font` indexes the device's sixteen Aileron faces, alphabetically by name; VIP only ever uses
+  // 9 (Regular) and 10 (SemiBold). `font_size` is a real point size, so any size draws. The
+  // preview asks for Aileron by weight and falls back to a clean sans where it is not installed.
   draw_text(handle, x, y, w, h) {
     const obj = this.textObjects[handle - 1];
     if (!obj || obj.text == null) return;
     const ctx = this.ctx;
     const size = obj.font_size || 14;
     ctx.save();
+
+    const bk = obj.bk_color >>> 0;
+    if (bk >>> 24) {
+      ctx.fillStyle = argbToCss(bk);
+      ctx.fillRect(x, y, w, h);
+    }
+    const [bl, bt, br, bb] = [obj.border_width_left, obj.border_width_top,
+                              obj.border_width_right, obj.border_width_bottom].map((v) => Math.max(0, Number(v) || 0));
+    if ((bl || bt || br || bb) && ((obj.border_color >>> 0) >>> 24)) {
+      ctx.fillStyle = argbToCss(obj.border_color >>> 0);
+      if (bt) ctx.fillRect(x, y, w, bt);
+      if (bb) ctx.fillRect(x, y + h - bb, w, bb);
+      if (bl) ctx.fillRect(x, y, bl, h);
+      if (br) ctx.fillRect(x + w - br, y, br, h);
+    }
+
+    const face = AILERON_FACES[obj.font] ?? AILERON_FACES[9];
     ctx.fillStyle = argbToCss((obj.color >>> 0) || 0xffffffff);
-    // font 9/10 are the confirmed device fonts; approximate with a clean sans.
-    ctx.font = `${obj.font === 10 ? '600 ' : ''}${size}px "Segoe UI", system-ui, sans-serif`;
+    ctx.font = `${face.italic ? 'italic ' : ''}${face.weight} ${size}px Aileron, "Segoe UI", system-ui, sans-serif`;
+
+    // Padding insets the box the text is justified in, on both sides.
+    const ph = Math.max(0, Number(obj.padding_hor) || 0);
+    const pv = Math.max(0, Number(obj.padding_ver) || 0);
+    const ix = x + ph, iy = y + pv, iw = Math.max(0, w - 2 * ph), ih = Math.max(0, h - 2 * pv);
+
     ctx.textAlign = obj.just_hor === 1 ? 'center' : (obj.just_hor === 2 ? 'right' : 'left');
     ctx.textBaseline = obj.just_ver === 1 ? 'middle' : (obj.just_ver === 2 ? 'bottom' : 'top');
-    const tx = obj.just_hor === 1 ? x + w / 2 : (obj.just_hor === 2 ? x + w : x);
-    const ty = obj.just_ver === 1 ? y + h / 2 : (obj.just_ver === 2 ? y + h : y);
-    ctx.fillText(String(obj.text), tx, ty, w);
+    const tx = obj.just_hor === 1 ? ix + iw / 2 : (obj.just_hor === 2 ? ix + iw : ix);
+    const ty = obj.just_ver === 1 ? iy + ih / 2 : (obj.just_ver === 2 ? iy + ih : iy);
+    ctx.fillText(String(obj.text).slice(0, MAX_TEXT_CHARACTERS), tx, ty, iw || w);
     ctx.restore();
+  }
+
+  // draw_system_text(handle): the system-font sibling of draw_text. Its exact placement is not
+  // known, so the preview draws the object across the full screen width at its own settings.
+  draw_system_text(handle) {
+    this.draw_text(handle, 0, 0, SCREEN_W, 24);
   }
 
   // --- images / filmstrips ----------------------------------------------------------------------
@@ -83,6 +135,9 @@ export class ScreenDrawApi {
   // how much of the colour a pixel takes, black none — and draw_image's colour tints only such a
   // buffer. A colour (RGBA) PNG decodes to colour and the tint is ignored. This preview once
   // tinted RGBA masks happily while the keyboard drew every knob white, so it now refuses too.
+  // The firmware says the same: draw_image blits with the STM32's DMA2D, and only an 8-bit
+  // source is set up as an A8 foreground multiplied by the colour; a colour source is copied as
+  // ARGB8888 with the colour unused (Akai ADVANCE 1.0.10, the same VIP runtime).
   //
   // An asset is an image, or { image, tintable } when the caller knows the PNG's type
   // (ctrl49Runtime reads it from the file). A bare image is treated as colour, as the device would.

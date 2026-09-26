@@ -74,6 +74,23 @@ export async function createCtrl49Screen(canvas, { lua: source, assets = {} }) {
   engine.global.set('led_control_set_level', () => {});
   engine.global.set('lua_widget_make_dirty', () => {});
 
+  // The rest of the firmware's Lua surface (the full registered list, read from the Akai ADVANCE
+  // 1.0.10 firmware, which runs the same VIP runtime), so a page that uses them runs here too.
+  engine.global.set('draw_system_text', nilSafe((handle) => api.draw_system_text(handle)));
+  engine.global.set('clear_errors', () => {});        // clears the on-screen Lua error overlay
+  engine.global.set('asset_get_valid', (id) => id in assets || Number(id) in assets);
+  engine.global.set('mem_usage', () => 0);           // a heap statistic; its selectors are unknown
+  engine.global.set('print', (...a) => console.log('[ctrl49 lua]', ...a));
+  engine.global.set('lua_ifc_load_script', () => {
+    throw new Error('lua_ifc_load_script: the preview runs one page only');
+  });
+  // set_hook_enabled(id, on) sets bit 1<<id in the firmware's hook mask. Hook 2 is MIDI notes:
+  // while it is on the firmware calls the page's global `note`. The preview's note() does the same.
+  const hooks = new Set();
+  engine.global.set('set_hook_enabled', (id, on) => {
+    if (on) hooks.add(Number(id)); else hooks.delete(Number(id));
+  });
+
   try {
     await engine.doString(source);
     await engine.doString(HELPERS);
@@ -85,6 +102,14 @@ export async function createCtrl49Screen(canvas, { lua: source, assets = {} }) {
   const invoke = engine.global.get('__invoke');
   return {
     call(name, bytes = []) { invoke(name, bytes); },
+    /** A played note, as the firmware delivers it to a page that enabled hook 2: the page's
+        `note(args)` gets the raw three MIDI bytes (status, note, velocity). Returns whether the
+        page was listening. */
+    note(status, noteNumber, velocity) {
+      if (!hooks.has(2) || engine.global.get('note') == null) return false;
+      invoke('note', [status & 0xff, noteNumber & 0x7f, velocity & 0x7f]);
+      return true;
+    },
     dispose() {
       try { engine.global.close(); } catch { /* best effort */ }
     },

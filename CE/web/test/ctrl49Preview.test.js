@@ -28,7 +28,7 @@ test('rack labels: title first, then eight length-prefixed labels, ASCII only', 
     5, ...ascii('!Gone'),                  // unresolved is marked, not hidden
     0, 0, 0, 0, 0,                         // unassigned and missing slots carry no label
   ]);
-  assert.equal(rackLabelPayload('x'.repeat(300), [])[0], 255, 'a label caps at its length byte');
+  assert.equal(rackLabelPayload('x'.repeat(300), [])[0], 90, 'a label caps at 90, the most a frame can carry nine of');
 });
 
 test('rack state: the nine bytes the knob page reads', () => {
@@ -97,6 +97,13 @@ test('the images the keyboard tints are grey palette PNGs, the only kind it tint
     }
     assert.equal(png.indexOf('tRNS'), -1, `${file} carries coverage in the grey, not in transparency`);
   }
+});
+
+test("the page keeps its ids inside the device's 1024-entry object table", () => {
+  const lua = read('../../../tools/ctrl49/Hostage_MultiKnob.lua');
+  const ids = [...lua.matchAll(/^local \w+_ID\s*=\s*(0x[0-9A-Fa-f]+|\d+)/gm)].map((m) => Number(m[1]));
+  assert.ok(ids.length >= 4, 'the page declares its image ids');
+  for (const id of ids) assert.ok(id < 1024, `id ${id} is under 1024`);
 });
 
 test('every function the broker calls is one the page defines', () => {

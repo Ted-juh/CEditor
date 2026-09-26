@@ -2,16 +2,20 @@
 // draws what the keyboard would be sent. Each function names the one it mirrors; when those
 // change, these change with them. test/ctrl49Payloads.test.js pins the byte layouts.
 //
-//   set_labels  [titleLen][title][ 8 x [labelLen][label] ]   ASCII, '?' for anything else, 255 cap
+//   set_labels  [titleLen][title][ 8 x [labelLen][label] ]   ASCII, '?' for anything else, 90 cap
 //   set_values  [activeSlot][v0..v7]                          each 0..127
 
 const encoder = new TextEncoder();
+
+// kMaxLabelCharacters in Ctrl49RackDisplay.h: nine strings this long still fit the device's
+// 1000-byte frame.
+export const MAX_LABEL_CHARACTERS = 90;
 
 // appendString in Ctrl49RackDisplay.cpp / Ctrl49PerformanceDisplay.cpp: the std::string is UTF-8,
 // and every byte at or above 0x80 becomes '?' — so "é" is two question marks, as on the device.
 function appendString(out, text) {
   const bytes = encoder.encode(String(text ?? ''));
-  const length = Math.min(255, bytes.length);
+  const length = Math.min(MAX_LABEL_CHARACTERS, bytes.length);
   out.push(length);
   for (let i = 0; i < length; i++) out.push(bytes[i] < 0x80 ? bytes[i] : 0x3f);
 }

@@ -258,7 +258,7 @@ Mackie/HUI anything.
 | Redraw cost / watchdog tolerance of slow draws | Timed draw calls of increasing complexity |
 | Screen color depth (gradient banding) | One gradient test image on hardware; bake dithering if banded |
 | Full Lua stdlib inventory (55 globals) | One more capability-explorer page listing them |
-| Unproven natives: `asset_get_valid`, `clear_errors`, `draw_system`, `set_hook_enabled`, `led_control_set_level` | Leave uncalled; static/passive reference first. `set_hook_enabled` is the only one that could change the programming model — do not design around it |
+| Natives read from firmware (2026-09-26, Akai ADVANCE 1.0.10 — same VIP runtime; see `tools/ctrl49/README.md`, "What the firmware says"): `asset_get_valid(id)` → bool; `clear_errors()` clears the on-screen Lua error text; `draw_system_text(handle)` (not `draw_system` — the old name was a truncation); `set_hook_enabled(id, on)` with hook 2 = MIDI notes into the page's `note(args)`; `led_control_set_level(_midi)`; `lua_ifc_load_script`; `mem_usage(selector)` | Static reference now exists. Still unconfirmed on the CTRL49 itself, so a page must work without them; the note hook is the one that could change the programming model |
 | Advance private-input path | Its own capture project, later |
 
 ## Constraints

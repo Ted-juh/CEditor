@@ -4547,6 +4547,12 @@ struct FakeSurface
         input.push_back ({ a, b, c });
     }
 
+    void feedFrame (ceditor::ctrl49::Bytes frame)
+    {
+        const std::scoped_lock scoped (lock);
+        input.push_back (std::move (frame));
+    }
+
     int frameCount()
     {
         const std::scoped_lock scoped (lock);
@@ -4737,6 +4743,29 @@ void testCtrl49Broker()
     broker.tick();
     check (fake.frameCount() == afterFirstPaint,
            "and an unchanged display sends nothing — only bytes that changed travel");
+
+    // The keyboard's replies: an OK passes unremarked, a refusal reaches the app by name.
+    {
+        using ceditor::ctrl49::Bytes;
+        const Bytes okDraw { 0xF0, 0x00, 0x01, 0x05, 0x31, 0x08, 0x02, 0x3D, 0x00, 0x04, 0x0D, 0x02, 0x3B, 0x40, 0xF7 };
+        fake.feedFrame (okDraw);
+        broker.tick();
+        const auto* quiet = h.emits.last ("instrumentHostSurface");
+        check (quiet != nullptr && quiet->getProperty ("deviceError", {}).toString().isEmpty(),
+               "an acknowledged draw is not an error");
+
+        auto refused = okDraw;
+        refused[13] = 0x42;                       // out of memory
+        fake.feedFrame (refused);
+        broker.tick();
+        const auto* status = h.emits.last ("instrumentHostSurface");
+        check (status != nullptr
+                 && status->getProperty ("deviceError", {}).toString() == "The keyboard refused draw: out of memory"
+                 && (int) status->getProperty ("deviceRefusals", 0) == 1,
+               "a refused draw reaches the app with the command and the reason");
+        check (broker.state() == Ctrl49SurfaceBroker::State::connected,
+               "and the surface keeps running: a refusal is news, not a disconnect");
+    }
 
     // Loss (§17.4): stop sending immediately, release the claim, go back to searching.
     fake.running.store (false);

@@ -82,7 +82,8 @@ namespace
             std::string name;
             if (f[6] == 0x03 && f[7] == 0x00) name = "keepalive ";
             else if (f[6] == 0x02 && f[7] == 0x3B) name = "draw ";
-            else if (f[6] == 0x02 && f[7] == 0x3D) name = "ack ";
+            else if (const auto ack = parseAck (f))
+                name = "ack " + displayCommandName (ack->command) + ": " + ackStatusName (ack->status) + " ";
             else if (f[6] == 0x05) name = "upload ";
             else if (f[6] == 0x02 && f[7] == 0x3C && f.size() > 16)
             {

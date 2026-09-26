@@ -275,6 +275,11 @@
     </div>
   </div>
 
+  {#if $hostSurface.deviceError}
+    <p class="failure" role="status" data-testid="ctrl49-device-error">
+      {$hostSurface.deviceError}{$hostSurface.deviceRefusals > 1 ? ` (${$hostSurface.deviceRefusals} refusals this connection)` : ''}
+    </p>
+  {/if}
   {#if failure}
     <p class="failure" role="alert" data-testid="ctrl49-screen-failure">{failure}</p>
   {/if}

@@ -9,7 +9,7 @@ namespace
 {
     void appendString (Bytes& out, const std::string& s)
     {
-        const auto length = s.size() > 255 ? std::size_t { 255 } : s.size();
+        const auto length = s.size() > kMaxLabelCharacters ? kMaxLabelCharacters : s.size();
         out.push_back (static_cast<std::uint8_t> (length));
         for (std::size_t i = 0; i < length; ++i)
         {

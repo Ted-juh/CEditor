@@ -4679,26 +4679,27 @@ test('normalizeHostSurface shapes broker payloads and fails safe on garbage', ()
                            pageIndex: 2, activeSlot: 5, padBank: 1,
                            movementSeq: 12, movingSlot: 5 }),
     { state: 'connected', detail: 'ready', device: 'CTRL49 USB',
-      pageIndex: 2, activeSlot: 5, padBank: 1, movementSeq: 12, movingSlot: 5 });
+      pageIndex: 2, activeSlot: 5, padBank: 1, movementSeq: 12, movingSlot: 5,
+      deviceError: '', deviceRefusals: 0 });
   assert.deepEqual(
     normalizeHostSurface({ state: 'heldElsewhere', detail: '', device: '' }),
     { state: 'heldElsewhere', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
-      movementSeq: 0, movingSlot: -1 });
+      movementSeq: 0, movingSlot: -1, deviceError: '', deviceRefusals: 0 });
 
   // Anything else — unknown states, missing fields, non-objects — lands on searching,
   // because a status row must never be the thing that crashes the devices panel.
   assert.equal(normalizeHostSurface({ state: 'exploded' }).state, 'searching');
   assert.deepEqual(normalizeHostSurface(null),
     { state: 'searching', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
-      movementSeq: 0, movingSlot: -1 });
+      movementSeq: 0, movingSlot: -1, deviceError: '', deviceRefusals: 0 });
   assert.deepEqual(normalizeHostSurface('nonsense'),
     { state: 'searching', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
-      movementSeq: 0, movingSlot: -1 });
+      movementSeq: 0, movingSlot: -1, deviceError: '', deviceRefusals: 0 });
   assert.equal(normalizeHostSurface({ detail: 7, device: 9 }).detail, '7');
   assert.deepEqual(
     normalizeHostSurface({ pageIndex: 99, activeSlot: -4, padBank: 8 }),
     { state: 'searching', detail: '', device: '', pageIndex: 99, activeSlot: 0, padBank: 3,
-      movementSeq: 0, movingSlot: -1 },
+      movementSeq: 0, movingSlot: -1, deviceError: '', deviceRefusals: 0 },
     'hardware indices clamp to the physical surface');
 });
 

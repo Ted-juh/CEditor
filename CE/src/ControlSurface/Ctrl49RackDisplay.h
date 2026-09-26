@@ -34,7 +34,7 @@ struct RackSlotView
 using RackSlotViews = std::array<RackSlotView, 8>;
 
 /** set_labels payload: [titleLen][title][ 8x [labelLen][label] ]. Non-ASCII bytes become
-    '?', labels cap at 255 (the length byte), an unassigned slot shows an empty label. */
+    '?', every string caps at kMaxLabelCharacters, an unassigned slot shows an empty label. */
 Bytes buildRackLabelPayload (const std::string& title, const RackSlotViews& slots);
 
 /** The 22-byte set_values state in the reducer's documented shape:

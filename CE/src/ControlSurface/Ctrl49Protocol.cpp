@@ -107,8 +107,8 @@ Bytes decodeMidi7 (const Bytes& encoded, std::size_t rawSize)
 
 Bytes buildFrame (std::uint8_t type, std::uint8_t command, const Bytes& payload)
 {
-    if (payload.size() > 0x3FFF)
-        throw std::invalid_argument ("payload exceeds two base-128 length digits");
+    if (payload.size() > kMaxPayloadBytes)
+        throw std::invalid_argument ("payload exceeds the device's 1000-byte frame limit");
     if (type >= 0x80 || command >= 0x80)
         throw std::invalid_argument ("frame type/command has high bit set");
     for (const std::uint8_t b : payload)
@@ -284,6 +284,58 @@ Bytes buildPadRgb (std::uint8_t padId, std::uint8_t red, std::uint8_t green, std
     appendBase128 (payload, green, 2);
     appendBase128 (payload, blue, 2);
     return buildFrame (0x04, 0x06, payload);
+}
+
+//==================================================================================================
+// Replies
+
+std::optional<Ctrl49Ack> parseAck (const Bytes& f)
+{
+    // F0 00 01 05 31 08 02 3D L0 L1 [route][route][command][status] F7
+    if (f.size() < 15 || f[0] != 0xF0 || f[6] != 0x02 || f[7] != 0x3D)
+        return std::nullopt;
+    for (std::size_t i = 0; i < sizeof (kHeader); ++i)
+        if (f[i] != kHeader[i])
+            return std::nullopt;
+    if (decodeBase128 (f.data() + 8, 2) < 4)
+        return std::nullopt;
+    return Ctrl49Ack { f[12], f[13] };
+}
+
+std::string ackStatusName (std::uint8_t status)
+{
+    switch (status)
+    {
+        case kAckOk:          return "OK";
+        case kAckBadArgument: return "bad argument";
+        case kAckOutOfMemory: return "out of memory";
+        case kAckNotFound:    return "not found";
+        case kAckScriptError: return "Lua script error";
+        case kAckError:       return "error";
+        default: break;
+    }
+    static const char* hex = "0123456789ABCDEF";
+    return std::string ("status 0x") + hex[status >> 4] + hex[status & 0x0F];
+}
+
+std::string displayCommandName (std::uint8_t command)
+{
+    switch (command)
+    {
+        case 0x0D: return "scene begin";
+        case 0x0E: return "layer position";
+        case 0x10: return "scene activate";
+        case 0x31: return "create canvas";
+        case 0x32: return "select canvas";
+        case 0x33: return "decode into canvas";
+        case 0x39: return "create target";
+        case 0x3A: return "bind Lua";
+        case 0x3B: return "draw";
+        case 0x3C: return "Lua call";
+        default: break;
+    }
+    static const char* hex = "0123456789ABCDEF";
+    return std::string ("02/") + hex[command >> 4] + hex[command & 0x0F];
 }
 
 } // namespace ceditor::ctrl49

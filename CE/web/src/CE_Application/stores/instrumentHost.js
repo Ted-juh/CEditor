@@ -280,7 +280,7 @@ export const hostMidiActivity = writable({ device: '', text: '', cc: -1, note: -
 // host store — a malformed payload lands on 'searching', never a crash.
 export const hostSurface = writable({
   state: 'searching', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
-  movementSeq: 0, movingSlot: -1,
+  movementSeq: 0, movingSlot: -1, deviceError: '', deviceRefusals: 0,
 });
 
 // --- the CTRL49 screen in the app ---------------------------------------------------------------
@@ -481,6 +481,10 @@ export function normalizeHostSurface(payload) {
     padBank: Math.max(0, Math.min(3, Number(payload?.padBank ?? 0) || 0)),
     movementSeq: Math.max(0, Math.trunc(Number(payload?.movementSeq ?? 0) || 0)),
     movingSlot: Math.max(-1, Math.min(7, Math.trunc(Number(payload?.movingSlot ?? -1) || 0))),
+    // The keyboard's last refusal of a display command, by name ("The keyboard refused draw:
+    // out of memory"), and how many there have been this connection.
+    deviceError: String(payload?.deviceError ?? ''),
+    deviceRefusals: Math.max(0, Math.trunc(Number(payload?.deviceRefusals ?? 0) || 0)),
   };
 }
 

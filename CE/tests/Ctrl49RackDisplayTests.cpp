@@ -50,7 +50,13 @@ int main()
     RackSlotViews longSlots {};
     longSlots[0] = { std::string (300, 'x'), 0, true, true };
     const auto capped = buildRackLabelPayload ("t", longSlots);
-    check (capped[2] == 255, "a runaway label caps at the length byte's reach");
+    check (capped[2] == kMaxLabelCharacters, "a runaway label caps at kMaxLabelCharacters");
+
+    RackSlotViews allLong {};
+    for (auto& s : allLong) s = { std::string (300, 'x'), 0, true, true };
+    const auto worst = buildRackLabelPayload (std::string (300, 't'), allLong);
+    check (buildLuaCall (2, "set_labels", worst).size() - 11 <= kMaxPayloadBytes,
+           "the longest possible labels call still fits the device's 1000-byte frame");
 
     // --- the 22-byte state -------------------------------------------------------------
     slots[1].resolved = false;   // assigned but unresolved: the label must say so

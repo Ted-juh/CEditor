@@ -72,6 +72,10 @@ void Ctrl49SurfaceBroker::emitStatus() const
     // advances it even when the same encoder remains focused or a parameter value is clamped.
     obj->setProperty ("movementSeq", movementSequence);
     obj->setProperty ("movingSlot", movingSlot);
+    // The last thing the keyboard refused, and how many times it has refused anything since
+    // this connection started. Empty and zero when all is well.
+    obj->setProperty ("deviceError", deviceError);
+    obj->setProperty ("deviceRefusals", deviceRefusals);
     options.emit ("instrumentHostSurface", juce::var (obj));
 }
 
@@ -272,6 +276,8 @@ void Ctrl49SurfaceBroker::tick()
                 }
 
                 endpoints = std::move (found);
+                deviceError.clear();
+                deviceRefusals = 0;
                 enter (State::connecting, endpoints->description);
                 beginSessionStart();
                 return;
@@ -436,6 +442,18 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
     // below knows or cares which it was.
     const auto handle = [&] (const std::uint8_t* data, std::size_t size)
     {
+        // The keyboard answers every display command. A refusal used to be dropped with the
+        // rest of the SysEx here, which is how a page it would not draw became a black screen
+        // with no reason given; now the reason reaches the app.
+        if (const auto ack = parseAck (Bytes (data, data + size)); ack && ! ack->ok())
+        {
+            ++deviceRefusals;
+            deviceError = "The keyboard refused " + juce::String (displayCommandName (ack->command))
+                          + ": " + juce::String (ackStatusName (ack->status));
+            emitStatus();
+            return;
+        }
+
         const auto previousPage = reducer.page();
         const auto previousSlot = reducer.activeSlot();
         const auto previousBank = reducer.padBank();

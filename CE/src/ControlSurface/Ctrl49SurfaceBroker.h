@@ -177,6 +177,8 @@ private:
     Bytes lastLabels, lastState;             // last sent to the keyboard
     Bytes shownLabels, shownState;           // last emitted to the app's screen
     bool shownOnKeyboard = false;
+    juce::String deviceError;                // the keyboard's last refusal, by name
+    int deviceRefusals = 0;
 
     // The eight small buttons above the pads, one per pad: when each went down (-1 = up) and
     // whether its hold has already fired, so a held button steps its pad's layer ONCE, at the

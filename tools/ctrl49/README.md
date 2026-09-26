@@ -33,8 +33,53 @@ Checks: `node --test test/ctrl49Preview.test.js` (payload bytes, and that every 
 broker calls exists in the page) and `node browser-checks/ctrl49Screen.mjs` (every scene runs
 the real page and draws; `CTRL49_SCREENSHOT=dir/` saves a PNG per scene).
 
-What the preview cannot tell you: the device's fonts (9/10 are approximated), colour depth, RAM
-for uploaded images, and redraw rate. Those need the keyboard.
+What the preview cannot tell you: the device's fonts (Aileron, asked for by weight, falls back
+to a system sans), colour depth, RAM for uploaded images, and redraw rate. Those need the keyboard.
+
+## What the firmware says
+
+Read statically on 2026-09-26 from the Akai ADVANCE Firmware Updater 1.0.10, whose firmware runs
+the same VIP display runtime as the CTRL49 (same Lua globals, same command families; our captured
+CTRL49 frames decode against its dispatcher). Nothing was run and nothing was sent to a device.
+It is not the CTRL49's own firmware, so each point is "very likely the same" until the keyboard
+shows it. The first one already has.
+
+**Images and tint (confirmed on the CTRL49).** `draw_image`'s colour applies only to an image that
+decodes to an 8-bit buffer: an 8-bit grey palette PNG (grey = coverage, no transparency), decoded
+with a colour. An RGBA PNG decodes to colour and is drawn as it is. `make_filmstrip.py` writes the
+tintable kind; the preview (`screenDrawApi.js`) follows the same rule. A large decode blocks the
+device while it runs, so decode big images after the splash is up, not in `init`.
+
+**Limits.** At most **1000 bytes** of payload per frame (`kMaxPayloadBytes`; `buildFrame` refuses
+more instead of building a frame the keyboard drops). Target, widget, canvas and decoded-buffer
+ids below **1024**. A text object keeps about **100 characters**; labels are capped at 90 so the
+nine strings of a `set_labels` call always fit one frame.
+
+**Replies.** Every type-02 command except 02/11 and 02/23 is acknowledged with 02/3D
+`[route][route][command][status]`. Status: `0x40` OK, `0x41` bad argument, `0x42` out of memory,
+`0x4C` not found, `0x4D` Lua script error, `0x4E` error. HoSTage shows a refusal on the CTRL49
+screen card, and the startup trace (`%APPDATA%\CEditor\ctrl49-trace.log`) names every reply.
+
+**Commands we had not named.** 02/31 creates an off-screen canvas, 02/32 selects or resizes one,
+02/33 decodes a PNG into one; 02/11 writes a control/colour state; 02/23 sets a device parameter.
+The canvas family is unused by CEditor (it redraws per frame) and is noted for later.
+
+**Lua functions.** The full registered set: `get_byte`, `print`, `mem_usage(selector)`,
+`clear_errors()` (clears the on-screen Lua error), `set_hook_enabled(id, on)`,
+`led_control_set_level(_midi)`, `lua_ifc_load_script`, `draw_rect`, `draw_image`, `decode_image`,
+`draw_text`, **`draw_system_text`** (earlier notes had it as `draw_system`),
+`lua_widget_make_dirty`, `asset_get_valid`, `text_data.new/set`. Hook 2 is MIDI notes: with
+`set_hook_enabled(2, 1)` the firmware calls the page's `note(args)` with the three MIDI bytes
+(status, note, velocity). The preview runtime implements all of these (`note()` fires the hook).
+
+**Text.** `text_data.set` reads `text, color, font, font_size, just_hor, just_ver, padding_hor,
+padding_ver, bk_color, border_color, border_width_left/top/right/bottom`. `padding_hor/ver` inset
+the justification box. `font` indexes sixteen Aileron faces in alphabetical order (0 Black …
+9 Regular, 10 SemiBold … 15 UltraLight Italic); `font_size` is a real point size.
+
+**Firmware update protocol.** The Advance updater sends its images as Akai SysEx `F0 47 00 2E 70
+… F7`. It is described here only so nobody mistakes it for something to try: it is a different
+device's protocol and must never be sent to the CTRL49.
 
 ## The product exe: Ctrl49Bridge (start here)
 
