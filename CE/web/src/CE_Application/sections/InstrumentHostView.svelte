@@ -17,7 +17,7 @@
    * The native plug-in editor pane is the NEXT increment — loading works from here already,
    * the vendor UI does not show yet.
    */
-  import { onDestroy, tick } from 'svelte';
+  import { onDestroy, tick, untrack } from 'svelte';
   import {
     hostState,
     undoHostEdit, redoHostEdit,
@@ -28,7 +28,7 @@
     requestAudioDevices, setAudioDevice, setMidiInputEnabled, setMackieSection,
     hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct,
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
-    parameterControlKind, setParameterText, groupParameters, assignedParameterIds, quickLearnParameter,
+    parameterControlKind, setParameterText, groupParameters, assignedParameterIds, parameterPlaces, isBipolarParameter, quickLearnParameter,
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
     addControlPage, removeControlPage, renameControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
     hostMidiLearn, learnControlSlotMidi, cancelMidiLearn, clearControlSlotMidi,
@@ -65,6 +65,11 @@
   const surfaceStatus = $derived(surfaceStatusText($hostSurface));
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import { selectAllOnFocus } from '../utils/selectOnFocus.js';
+  import ScrubValue from '../components/controls/ScrubValue.svelte';
+  import ParamBar from '../components/controls/ParamBar.svelte';
+  import Knob from '../components/controls/Knob.svelte';
+  import HostZoneEditor from './HostZoneEditor.svelte';
+  import Segmented from '../components/controls/Segmented.svelte';
   import PerformancePanel from './PerformancePanel.svelte';
   import HostMixerPanel from './HostMixerPanel.svelte';
   import LayerGroupsPanel from './LayerGroupsPanel.svelte';
@@ -366,7 +371,7 @@
       dockOpen = true;
       if (issue.target === 'routing') requestAudioDevices();
       await tick();
-      document.querySelector(issue.target === 'zone' ? '.midi-zone select' : '.hw-config select')?.focus();
+      document.querySelector(issue.target === 'zone' ? '[data-testid="zone-channel"]' : '.hw-config select')?.focus();
     }
   }
 
@@ -374,6 +379,8 @@
   let effects = $derived(filterEffects($hostState.effectClasses, search));
 
   let assignedIds = $derived(assignedParameterIds($hostState, paramTargetId));
+  let places = $derived(parameterPlaces($hostState, paramTargetId));
+  const focusOnMount = (node) => { node.focus(); node.select(); };
   let paramAssignedOnly = $state(false);
   let visibleParameters = $derived(
     filterParameters($hostParameters.parameters, paramSearch)
@@ -443,10 +450,6 @@
   let selectedMacro = $derived(
     $hostState.rack.macros.find((m) => m.macroId === selectedMacroId) ?? $hostState.rack.macros[0] ?? null);
 
-  function stepFor(parameter) {
-    return parameter.numSteps > 1 ? 1 / (parameter.numSteps - 1) : 0.001;
-  }
-
   // Typed entry: double-click the value, type what the plug-in itself would print.
   let editingParamId = $state(null);
   let editingParamText = $state('');
@@ -480,7 +483,21 @@
     assignControlSlot(selectedPage.pageId, firstEmptySlot.slotId, paramTargetId, parameter.id);
   }
   let parts = $derived($hostState.rack.parts);
+  // Part levels are linear 0..2 underneath (1 = unity); the rows read and write them in dB.
+  const volumeDb = (v) => (v <= 0.001 ? -60 : Math.max(-60, Math.min(6, Math.round(20 * Math.log10(v) * 10) / 10)));
+  const volumeFromDb = (db) => (db <= -60 ? 0 : Math.min(2, Math.pow(10, db / 20)));
   let transport = $derived($hostState.performance.transport);
+
+  // Tap tempo: the average gap of the last four taps, if they came within two and a half
+  // seconds of each other. One tap alone changes nothing.
+  let taps = [];
+  function tapTempo() {
+    const now = performance.now();
+    taps = [...taps.filter((t) => now - t < 2500), now].slice(-4);
+    if (taps.length < 2) return;
+    const gap = (taps.at(-1) - taps[0]) / (taps.length - 1);
+    setTempo(Math.max(20, Math.min(300, Math.round(600000 / gap) / 10)));
+  }
   let scales = $derived($hostState.performance.scales);
   let focusedPartId = $derived($hostState.rack.focusedPartId);
   let focusedPart = $derived(parts.find((p) => p.partId === focusedPartId) ?? null);
@@ -536,6 +553,9 @@
       $hostState.rack.macros.length,
     ].join(':');
     contentStamp;
+    // Not while the grip is held: a state push mid-drag would re-fit the dock and snap it back
+    // to the height it had when the drag began.
+    if (untrack(() => gripping)) return;
     void fitDock(dockTab);
   });
 
@@ -677,18 +697,25 @@
             <button type="button" class="ghost transport-action"
                     title="Return to the beginning" aria-label="Return transport to start"
                     onclick={() => setTransportPosition(0)}>↤</button>
-            <input type="number" class="tempo" min="20" max="300" step="0.1" value={transport.tempo}
-                   aria-label="Tempo" title="Tempo"
-                   onchange={(e) => setTempo(Number(e.currentTarget.value))} />
             <span class="transport-position" title="Bar and beat">{transport.bar}.{transport.beat}</span>
-            <input type="number" class="ts" min="1" max="32" value={transport.numerator}
-                   aria-label="Time signature numerator"
-                   onchange={(e) => setTimeSignature(Number(e.currentTarget.value), transport.denominator)} />
+            <!-- Where the bar is, at a glance: one dot per beat, the current one lit while it runs. -->
+            <span class="beat-dots" aria-hidden="true" data-testid="host-beat-dots">
+              {#each Array(Math.min(16, transport.numerator)) as _, i (i)}
+                <i class:on={transport.playing && transport.beat === i + 1}></i>
+              {/each}
+            </span>
+            <ScrubValue value={transport.tempo} min={20} max={300} step={1} fineStep={0.1} label="Tempo"
+                        testid="host-tempo" format={(v) => (Number.isInteger(v) ? String(v) : v.toFixed(1))}
+                        title="Tempo: drag up or down (Shift for tenths), or click to type"
+                        onchange={(v) => setTempo(v)} />
+            <button type="button" class="ghost transport-action tap" data-testid="host-tap-tempo"
+                    title="Tap on the beat: the tempo follows your last four taps" onclick={tapTempo}>tap</button>
+            <ScrubValue value={transport.numerator} min={1} max={32} label="Beats per bar" testid="host-ts-numerator"
+                        pixelsPerStep={8} onchange={(v) => setTimeSignature(v, transport.denominator)} />
             <span class="ts-slash">/</span>
-            <select class="ts" value={transport.denominator} aria-label="Time signature denominator"
-                    onchange={(e) => setTimeSignature(transport.numerator, Number(e.currentTarget.value))}>
-              {#each [2, 4, 8, 16] as d (d)}<option value={d}>{d}</option>{/each}
-            </select>
+            <Segmented options={[2, 4, 8, 16].map((d) => ({ value: d, label: String(d) }))} value={transport.denominator}
+                       label="Beat unit" testid="host-ts-denominator"
+                       onchange={(v) => setTimeSignature(transport.numerator, v)} />
             <button type="button" class="toggle" class:on={transport.externalClock}
                     class:warn={transport.clockLost}
                     title={transport.clockLost
@@ -1083,19 +1110,20 @@
                     onclick={() => setPartMixer(part.partId, { mute: !part.mute })}>Mute</button>
             <button type="button" class="toggle" class:on={part.solo} title="Solo"
                     onclick={() => setPartMixer(part.partId, { solo: !part.solo })}>Solo</button>
-            <!-- Two sliders with nothing written on them were two sliders nobody could name.
-                 The word is the label; the number is in the tooltip, where it is wanted
-                 while dragging and not otherwise. -->
-            <label class="mini" title={`Volume ${part.volume.toFixed(2)} (1.00 is unity)`}>
+            <!-- The level as a value you read, drag or type, in dB (0 is unity, -∞ is off);
+                 the pan as a knob that a double-click centres. -->
+            <span class="mini">
               <span class="mini-label">Vol</span>
-              <input type="range" min="0" max="2" step="0.01" value={part.volume} aria-label="Volume"
-                     oninput={(e) => setPartMixer(part.partId, { volume: Number(e.currentTarget.value) })} />
-            </label>
-            <label class="mini" title={`Pan ${panLabel(part.pan)}`}>
+              <ScrubValue value={volumeDb(part.volume)} min={-60} max={6} step={0.5} fineStep={0.1} label="Volume"
+                          testid="part-volume" format={(v) => (v <= -60 ? '-∞' : `${v > 0 ? '+' : ''}${v.toFixed(1)}`)}
+                          unit="dB" title="Level: drag up or down (Shift for fine), click to type"
+                          onchange={(v) => setPartMixer(part.partId, { volume: volumeFromDb(v) })} />
+            </span>
+            <span class="mini">
               <span class="mini-label">Pan</span>
-              <input type="range" min="-1" max="1" step="0.01" value={part.pan} aria-label="Pan"
-                     oninput={(e) => setPartMixer(part.partId, { pan: Number(e.currentTarget.value) })} />
-            </label>
+              <Knob value={part.pan} min={-1} max={1} reset={0} size={26} label="Pan" testid="part-pan"
+                    format={panLabel} onchange={(v) => setPartMixer(part.partId, { pan: v })} />
+            </span>
             </div>
           </div>
           </div>
@@ -1562,40 +1590,10 @@
                         onToggleAudition={() => setPresetAudition({ enabled: !audition.enabled })} />
         {:else if dockTab === 'zone'}
         {#if focusedPart}
-          <div class="midi-zone">
-            <strong>MIDI zone — {partTitle(focusedPart)}</strong>
-            <div class="zone-grid">
-              <label>Channel
-                <select value={focusedPart.channel}
-                        onchange={(e) => setPartMidiRules(focusedPart.partId, { channel: Number(e.currentTarget.value) })}>
-                  <option value={0}>Omni</option>
-                  {#each Array.from({ length: 16 }, (_, i) => i + 1) as ch}
-                    <option value={ch}>{ch}</option>
-                  {/each}
-                </select>
-              </label>
-              <label>Key low
-                <input type="number" min="0" max="127" value={focusedPart.keyLow}
-                       onchange={(e) => setPartMidiRules(focusedPart.partId, { keyLow: Number(e.currentTarget.value) })} />
-              </label>
-              <label>Key high
-                <input type="number" min="0" max="127" value={focusedPart.keyHigh}
-                       onchange={(e) => setPartMidiRules(focusedPart.partId, { keyHigh: Number(e.currentTarget.value) })} />
-              </label>
-              <label>Vel low
-                <input type="number" min="1" max="127" value={focusedPart.velocityLow}
-                       onchange={(e) => setPartMidiRules(focusedPart.partId, { velocityLow: Number(e.currentTarget.value) })} />
-              </label>
-              <label>Vel high
-                <input type="number" min="1" max="127" value={focusedPart.velocityHigh}
-                       onchange={(e) => setPartMidiRules(focusedPart.partId, { velocityHigh: Number(e.currentTarget.value) })} />
-              </label>
-              <label>Transpose
-                <input type="number" min="-60" max="60" value={focusedPart.transpose}
-                       onchange={(e) => setPartMidiRules(focusedPart.partId, { transpose: Number(e.currentTarget.value) })} />
-              </label>
-            </div>
-          </div>
+          <HostZoneEditor part={focusedPart} activity={$hostMidiActivity}
+                          others={$hostState.rack.parts.filter((p) => p.partId !== focusedPart.partId)
+                                    .map((p) => ({ partId: p.partId, name: partTitle(p), keyLow: p.keyLow, keyHigh: p.keyHigh }))}
+                          onset={(fields) => setPartMidiRules(focusedPart.partId, fields)} />
         {/if}
         {:else if dockTab === 'midi'}
         {#if focusedPart}
@@ -1924,29 +1922,34 @@
                               onclick={() => nudgeParameterStep(parameter, 1)}>›</button>
                     </span>
                   {:else}
-                    <input type="range" min="0" max="1" step={stepFor(parameter)} value={parameter.value}
-                           aria-label={parameter.name}
-                           onpointerdown={() => startParameterGesture(paramTargetId, parameter.id)}
-                           onpointerup={finishParameterGesture}
-                           onpointercancel={finishParameterGesture}
-                           onlostpointercapture={finishParameterGesture}
-                           oninput={(e) => setParameter(paramTargetId, parameter.id, Number(e.currentTarget.value))} />
+                    <!-- One bar: drag sideways, click the number to type, double-click to reset. -->
+                    <ParamBar value={parameter.value} text={parameter.text} unit={parameter.label} label={parameter.name}
+                              bipolar={isBipolarParameter(parameter)} steps={parameter.numSteps}
+                              testid="param-bar"
+                              onstart={() => startParameterGesture(paramTargetId, parameter.id)}
+                              onchange={(v) => setParameter(paramTargetId, parameter.id, v)}
+                              onend={finishParameterGesture}
+                              ontype={(t) => setParameterText(paramTargetId, parameter.id, t)}
+                              onreset={() => resetParameter(paramTargetId, parameter.id)} />
                   {/if}
-                  {#if editingParamId === parameter.id}
-                    <!-- svelte-ignore a11y_autofocus -->
-                    <input class="param-edit" type="text" bind:value={editingParamText} autofocus
-                           aria-label={`Type a value for ${parameter.name}`}
-                           onkeydown={(e) => {
-                             if (e.key === 'Enter') commitParamEdit(parameter);
-                             if (e.key === 'Escape') editingParamId = null;
-                           }}
-                           onblur={() => (editingParamId = null)} />
-                  {:else}
-                    <span class="param-value" role="button" tabindex="-1"
-                          title="Double-click to type a value"
-                          ondblclick={() => beginParamEdit(parameter)}
-                          onkeydown={(e) => e.key === 'Enter' && beginParamEdit(parameter)}>
-                      {parameter.text}{parameter.label ? ` ${parameter.label}` : ''}</span>
+                  {#if parameterControlKind(parameter) !== 'slider'}
+                    {#if editingParamId === parameter.id}
+                      <input class="param-edit" type="text" bind:value={editingParamText} use:focusOnMount
+                             aria-label={`Type a value for ${parameter.name}`}
+                             onkeydown={(e) => {
+                               if (e.key === 'Enter') commitParamEdit(parameter);
+                               if (e.key === 'Escape') editingParamId = null;
+                             }}
+                             onblur={() => (editingParamId = null)} />
+                    {:else}
+                      <button type="button" class="ctl param-value" title="Click to type a value"
+                              onclick={() => beginParamEdit(parameter)}>
+                        {parameter.text}{parameter.label ? ` ${parameter.label}` : ''}</button>
+                    {/if}
+                  {/if}
+                  {#if places.get(parameter.id)}
+                    <span class="param-place" data-testid="param-place" title={places.get(parameter.id).join(', ')}>
+                      {places.get(parameter.id)[0]}{places.get(parameter.id).length > 1 ? ` +${places.get(parameter.id).length - 1}` : ''}</span>
                   {/if}
                   <button type="button" class="ghost" title="Reset to the plug-in's default"
                           onclick={() => resetParameter(paramTargetId, parameter.id)}>↺</button>
@@ -2692,24 +2695,6 @@
   .part-vendor { color: #96a2ad; font-size: 12px; }
 
   .part-controls { flex: 1; min-width: 290px; display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
-  .mini input[type="range"] { width: 84px; }
-
-  .midi-zone {
-    border: 1px solid #2c343d;
-    border-radius: 5px;
-    padding: 8px;
-    background: #1c2126;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .zone-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .zone-grid label { display: flex; flex-direction: column; gap: 3px; color: #9aa5b1; font-size: 11px; }
-  .zone-grid input, .zone-grid select { width: 100%; }
 
   .instrument-list { display: flex; flex-direction: column; gap: 4px; }
   .instrument {
@@ -2764,7 +2749,10 @@
     color: #e0cf9a;
     font-size: 12px;
   }
-  .param-list { overflow-y: auto; max-height: 260px; display: flex; flex-direction: column; gap: 4px; }
+  /* The list fills the dock; the dock is what you size (the grip above it). */
+  .param-list { display: flex; flex-direction: column; gap: 4px; }
+  .param-place { flex: none; font: 600 9px var(--host-font-mono, monospace); color: #ff9408; letter-spacing: .04em;
+                 border: 1px solid #5a4020; border-radius: 9px; padding: 1px 6px; white-space: nowrap; }
   .param-group { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
                  background: #161e27; border: 1px solid #232c36; border-radius: 4px;
                  color: #aab4bd; font-size: 12px; font-weight: 600; padding: 4px 8px;
@@ -2798,15 +2786,16 @@
   .param-edit { width: 90px; font-size: 11px; background: #10161c; color: #d6dbe0;
                 border: 1px solid #3d81c4; border-radius: 3px; padding: 1px 4px; }
   .param-name { flex: 0 0 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-  .param-row input[type='range'] { flex: 1; min-width: 60px; }
-  .param-value { flex: 0 0 92px; text-align: right; color: #aab4bd; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .param-value { background: none; border: 0; padding: 0; font: inherit; cursor: text; flex: 0 0 92px; text-align: right; color: #aab4bd; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .param-diag { color: #8795a0; font-size: 11px; margin: -2px 0 0 138px; }
 
   .transport { display: flex; align-items: center; gap: 4px; }
   .transport-action { min-width: 26px; padding: 2px 5px; }
   .transport-action:disabled { opacity: 0.35; cursor: default; }
-  .transport .tempo { width: 62px; }
-  .transport .ts { width: 44px; }
+  .beat-dots { display: inline-flex; gap: 3px; align-items: center; }
+  .beat-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--host-line, #3b4652); display: block; }
+  .beat-dots i.on { background: #ff9408; box-shadow: 0 0 5px #ff9408; }
+  .transport-action.tap { min-width: 34px; font-size: 11px; }
   .ts-slash { color: #7d8894; }
   .transport-position {
     min-width: 44px;
@@ -3038,7 +3027,6 @@
     }
     .preset-walk { width: 100%; min-width: 0; }
     .part-controls { width: 100%; min-width: 0; justify-content: flex-start; gap: 5px; }
-    .mini input[type="range"] { width: 64px; }
   }
 
   /* Below this, even an asymmetric pair cannot give a useful width to both columns. Keep

@@ -1573,6 +1573,17 @@ export function normalizeHostParameters(payload) {
  *  rendering them all as one continuous slider is what made a three-value switch mostly
  *  dead travel. Booleans toggle; a labelled handful gets segments; a countable set gets a
  *  stepper that snaps exactly; only the genuinely continuous get the slider. */
+/** Whether a parameter is two-sided (pan, detune, an envelope amount): its default sits in the
+    middle AND it says so, by name or by printing a sign or a side. A default of one half alone
+    is not enough: plenty of plug-ins start a cutoff there. The Params bar fills these from the
+    centre. */
+export function isBipolarParameter(parameter) {
+  if (Math.abs(Number(parameter?.defaultValue ?? 0) - 0.5) > 0.01) return false;
+  if (/pan|balance|detune|fine|bend|spread|offset|amount|width/i.test(String(parameter?.name ?? ''))) return true;
+  const text = String(parameter?.text ?? '').trim();
+  return /^[+\-−]\s*\d/.test(text) || /^[LR]\s*\d/.test(text) || text === 'C';
+}
+
 export function parameterControlKind(parameter) {
   if (parameter?.boolean) return 'toggle';
   const steps = Number(parameter?.numSteps ?? 0);
@@ -1619,6 +1630,21 @@ export function groupParameters(parameters) {
 
 /** Every parameterId of this target that some control slot, macro or modulation route drives — the
  *  "assigned" filter's ground truth, read from the same state the panels render. */
+/** Where each of a part's parameters sits, for the Params rows: "Page 1 · knob 3", "Macro
+    Brightness". A parameter in several places lists them all, control pages first. */
+export function parameterPlaces(state, targetId) {
+  const places = new Map();
+  const add = (id, text) => places.set(id, [...(places.get(id) ?? []), text]);
+  for (const page of state?.rack?.pages ?? [])
+    for (const slot of page.slots)
+      if (slot.assigned && slot.partId === targetId)
+        add(slot.parameterId, `${page.name} · ${slot.kind === 'encoder' ? 'knob' : slot.kind} ${slot.index + 1}`);
+  for (const macro of state?.rack?.macros ?? [])
+    for (const target of macro.targets)
+      if (target.targetId === targetId) add(target.parameterId, `Macro ${macro.name}`);
+  return places;
+}
+
 export function assignedParameterIds(state, targetId) {
   const ids = new Set();
   for (const page of state?.rack?.pages ?? [])

@@ -18,6 +18,17 @@ const server = await createServer({
 await server.listen();
 const browser = await chromium.launch(chromiumLaunchOptions({ channel: 'msedge' }));
 
+async function settledBox(locator) {
+  let last = null;
+  for (let i = 0; i < 40; i++) {
+    const box = await locator.boundingBox();
+    if (last && box && Math.abs(box.x - last.x) < 0.5 && Math.abs(box.y - last.y) < 0.5) return box;
+    last = box;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return last;
+}
+
 try {
   const page = await browser.newPage({ viewport: { width: 1500, height: 1400 } });
   page.setDefaultTimeout(20000);
@@ -72,7 +83,9 @@ try {
   assert.equal(await resp.locator('[data-testid=velocity-shape] [aria-pressed=true]').innerText(), 'linear');
   const point = curve.locator('[data-point="4"]');
   await curve.scrollIntoViewIfNeeded();
-  const pbox = await point.boundingBox();
+  // The dock re-fits a moment after an editor opens; press where the point has settled, not
+  // where it was a frame ago (that lands on the band behind it).
+  const pbox = await settledBox(point);
   await page.mouse.move(pbox.x + pbox.width / 2, pbox.y + pbox.height / 2);
   await page.mouse.down();
   await page.mouse.move(pbox.x + pbox.width / 2, pbox.y - 60, { steps: 6 });

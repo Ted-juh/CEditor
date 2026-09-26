@@ -16,8 +16,9 @@
     format = (v) => String(v),
     unit = '',
     label = '',
-    title = 'Drag up or down, or click to type',
+    title = 'Drag up or down (Shift for fine), or click to type',
     pixelsPerStep = 4,
+    fineStep = null,          // with Shift held (drag or arrows): this step instead; null = step / 10
     onchange = () => {},
     testid = undefined,
   } = $props();
@@ -35,14 +36,15 @@
   };
   const shown = $derived(choices ? (choices[indexOf(value)]?.[1] ?? format(value)) : format(value));
 
-  function stepBy(n) {
+  function stepBy(n, fine = false) {
     if (n === 0) return;
     if (choices) {
       const i = Math.max(0, Math.min(choices.length - 1, indexOf(value) + n));
       if (choices[i][0] !== value) onchange(choices[i][0]);
       return;
     }
-    const next = clamp(Math.round((value + n * step) / step) * step);
+    const s = fine ? (fineStep ?? step / 10) : step;
+    const next = clamp(Math.round((value + n * s) / s) * s);
     if (next !== value) onchange(Number(next.toFixed(6)));
   }
 
@@ -58,7 +60,7 @@
     if (steps === 0) return;
     drag.lastY -= steps * pixelsPerStep;
     drag.moved = true;
-    stepBy(steps);
+    stepBy(steps, e.shiftKey);
   }
   function up(e) {
     if (!drag) return;
@@ -95,8 +97,8 @@
         {title} data-testid={testid}
         onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}
         onkeydown={(e) => {
-          if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { stepBy(1); e.preventDefault(); }
-          else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { stepBy(-1); e.preventDefault(); }
+          if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { stepBy(1, e.shiftKey); e.preventDefault(); }
+          else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { stepBy(-1, e.shiftKey); e.preventDefault(); }
           else if (e.key === 'Enter') { draft = shown; editing = true; }
         }}>{shown}{#if unit}<small>{unit}</small>{/if}</span>
 {/if}
