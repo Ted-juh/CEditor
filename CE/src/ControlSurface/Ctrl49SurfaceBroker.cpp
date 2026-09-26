@@ -149,6 +149,10 @@ void Ctrl49SurfaceBroker::beginSessionStart()
         {
             Ctrl49SessionOptions sessionOptions;
             sessionOptions.loadingMilliseconds = options.loadingMilliseconds;
+            // Keepalives during the upload. The proven sequence sends none, which was fine for
+            // one 19 KB filmstrip; HoSTage uploads the logo too, and a keyboard whose watchdog
+            // fires mid-upload never shows the splash that follows. Every 16 chunks is ~8 KB.
+            sessionOptions.keepaliveEveryUploadFrames = options.keepaliveEveryUploadFrames;
             sessionOptions.sleep = options.sessionSleep;
             session = std::make_unique<Ctrl49Session> (*endpoints->output, options.pageLua,
                                                        options.pngAssets, sessionOptions);

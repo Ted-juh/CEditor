@@ -6,6 +6,7 @@
 #include "ControlSurface/Ctrl49Reducer.h"
 #include "ControlSurface/Ctrl49Session.h"
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 
@@ -261,6 +262,36 @@ int main()
         std::vector<Bytes> provenWithout;
         for (const auto& f : provenFrames) if (f != keepalive) provenWithout.push_back (f);
         check (interleavedFrames == provenWithout, "every upload frame is still there, in order");
+    }
+
+    {   // --- the loading page is redrawn, and the watchdog fed, through the dwell -----------------
+        struct Recorder final : IControllerOutput
+        {
+            std::vector<Bytes> frames;
+            void sendSysEx (const Bytes& frame) override { frames.push_back (frame); }
+        } out;
+
+        Ctrl49SessionOptions options;
+        options.loadingMilliseconds = 2500;
+        int slept = 0;
+        options.sleep = [&slept] (int ms) { slept += ms; };
+        Ctrl49Session session (out, Bytes (100, static_cast<std::uint8_t> ('-')), options);
+
+        const auto startup = Ctrl49Session::buildStartupSequence (Bytes (100, static_cast<std::uint8_t> ('-')));
+        session.start();
+        session.stop();
+
+        const auto keepalive = buildKeepalive();
+        const auto splashDraw = buildDraw (0x02, {});
+        int keepalives = 0, splashDraws = 0;
+        const auto dwellEnd = std::min (out.frames.size(), startup.size() + 12);
+        for (std::size_t i = startup.size(); i < dwellEnd; ++i)
+        {
+            keepalives  += out.frames[i] == keepalive ? 1 : 0;
+            splashDraws += out.frames[i] == splashDraw ? 1 : 0;
+        }
+        check (splashDraws == 6 && keepalives >= 6,
+               "a 2.5 s loading page is redrawn six times with keepalives, never 900 ms without one");
     }
 
     std::cout << "-------------------\n"

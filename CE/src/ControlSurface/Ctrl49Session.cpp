@@ -1,5 +1,6 @@
 #include "Ctrl49Session.h"
 
+#include <algorithm>
 #include <chrono>
 
 namespace ceditor::ctrl49
@@ -151,9 +152,24 @@ void Ctrl49Session::start()
         }
     }
 
+    // The loading page. One draw straight after init was not enough: on the keyboard the HoSTage
+    // splash never appeared (black until the landing page), while every later redraw — the same
+    // frame — lands. The first draw follows init by 3 ms, and init decodes the page's images,
+    // so it is re-sent through the dwell, with a keepalive, every 400 ms (the watchdog allows ~900): a draw the device
+    // was not ready for is followed by one it is, and the watchdog is fed while it waits.
     options_.log ("Loading page displayed.");
-    if (options_.loadingMilliseconds > 0)
-        options_.sleep (options_.loadingMilliseconds);
+    for (int waited = 0; waited < options_.loadingMilliseconds;)
+    {
+        const auto step = std::min (400, options_.loadingMilliseconds - waited);
+        options_.sleep (step);
+        waited += step;
+        if (waited < options_.loadingMilliseconds)
+        {
+            std::lock_guard<std::mutex> lock (midiMutex_);
+            sendLocked (buildKeepalive());
+            sendLocked (buildDraw (kTarget, {}));
+        }
+    }
 
     {
         std::lock_guard<std::mutex> lock (midiMutex_);

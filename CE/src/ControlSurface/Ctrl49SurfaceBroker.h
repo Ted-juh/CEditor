@@ -88,6 +88,8 @@ public:
         /** How long the HoSTage splash stays up before the first page. The demo's 900 ms was
             gone before anyone saw it; the startup is paced anyway, so this is time well spent. */
         int loadingMilliseconds = 2500;
+        /** A keepalive every this many upload chunks during startup (see Ctrl49SessionOptions). */
+        int keepaliveEveryUploadFrames = 16;
 
         /** Clock and cadences. `now` is milliseconds, monotonic. */
         std::function<double()> now = [] { return juce::Time::getMillisecondCounterHiRes(); };
