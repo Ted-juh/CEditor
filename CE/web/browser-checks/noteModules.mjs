@@ -63,6 +63,56 @@ try {
   await add.selectOption('strum');
   await add.selectOption('humanize');
 
+  // Velocity & Expression: drag the curve, learn from played notes, save a profile
+  await add.selectOption('velocity');
+  const velRow = page.locator('[data-testid=midi-slot] .slot-name', { hasText: /^Velocity/ });
+  await velRow.click();
+  const resp = page.getByTestId('response-editor');
+  const curve = resp.getByTestId('velocity-curve');
+  assert.equal(await resp.locator('[data-testid=velocity-shape] [aria-pressed=true]').innerText(), 'linear');
+  const point = curve.locator('[data-point="4"]');
+  const pbox = await point.boundingBox();
+  await page.mouse.move(pbox.x + pbox.width / 2, pbox.y + pbox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(pbox.x + pbox.width / 2, pbox.y - 60, { steps: 6 });
+  await page.mouse.up();
+  assert.equal(await resp.locator('[data-testid=velocity-shape] [aria-pressed=true]').innerText(), 'custom',
+    'dragging a point of a named curve makes it custom');
+  assert.ok(Number(await point.getAttribute('aria-valuenow')) > 70, 'and moves that point up');
+  const grip = curve.locator('[data-grip=inputMin]');
+  const gbox = await grip.boundingBox();
+  await page.mouse.move(gbox.x + gbox.width / 2, gbox.y + gbox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(gbox.x + 80, gbox.y + gbox.height / 2, { steps: 6 });
+  await page.mouse.up();
+  assert.ok(Number(await grip.getAttribute('aria-valuenow')) > 10, 'the softest-used edge drags');
+
+  // Played notes arrive through the same store the host's touch readout fills.
+  const touch = (list) => page.evaluate(async (t) => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostMidiActivity.update((a) => ({ ...a, touch: t, seq: a.seq + 1 }));
+  }, list);
+  await resp.getByTestId('response-learn').click();
+  await touch([[0, 60, 22], [0, 64, 35]]);
+  await touch([[0, 67, 96], [1, 1, 40]]);
+  await touch([[0, 72, 118]]);
+  assert.ok(await curve.locator('.dot').count() >= 4, 'played notes show as dots on the curve');
+  assert.match(await resp.getByTestId('response-learn-text').innerText(), /softest 22, hardest 118 \(4\)/,
+    'learning counts the notes, not the controller');
+  await resp.getByTestId('response-learn').click();
+  assert.equal(await curve.locator('[data-grip=inputMin]').getAttribute('aria-valuenow'), '22',
+    'done: the used range is what was played');
+  assert.equal(await curve.locator('[data-grip=inputMax]').getAttribute('aria-valuenow'), '118');
+
+  await resp.getByTestId('response-save').click();
+  await resp.getByLabel('Profile name').fill('My keys');
+  await resp.getByLabel('Keyboard port name').fill('CTRL49');
+  await resp.getByLabel('Keyboard port name').press('Enter');
+  assert.equal(await resp.locator('[data-testid=response-profiles] .chip[data-name="My keys"]').count(), 1,
+    'a profile is saved and listed');
+  await resp.locator('[data-testid=response-which] [data-value=expression]').click();
+  assert.equal(await resp.getByTestId('expression-curve').isVisible(), true, 'the expression tab has its own curve');
+
   // Strum
   const strumRow = page.locator('[data-testid=midi-slot] .slot-name', { hasText: 'Strum' });
   await strumRow.click();
@@ -181,7 +231,7 @@ try {
   assert.doesNotMatch(await chordRow.innerText(), /follow/, 'the light switches following off');
 
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('noteModules: arp, strum, humanize and chords editors draw, change and summarise');
+  console.log('noteModules: arp, velocity, strum, humanize and chords editors draw, change and summarise');
 } finally {
   await browser.close();
   await server.close();

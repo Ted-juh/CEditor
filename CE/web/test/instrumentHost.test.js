@@ -5018,6 +5018,31 @@ test('Chords pads and progression normalize, and localhost plays them as the eng
   assert.equal(applyMockChordsLive(live, fx, { cmd: 'chordStep', step: 0 }).step, 0);
 });
 
+test('response profiles: normalized as calibrations, saved and removed by name in the mock', () => {
+  const state = normalizeHostState({ responseProfiles: [
+    { name: '  Stage keys ', portHint: 'CTRL49', velocityCurve: 'custom', velocityInputMin: 130,
+      velocityCurveValues: [0, 30, 50, 66, 80, 92, 104, 116, 127], velocityFixed: 90 },
+    { name: '' },
+  ], responseProfileForPorts: 'Stage keys' });
+  assert.equal(state.responseProfiles.length, 1, 'a profile without a name is dropped');
+  const profile = state.responseProfiles[0];
+  assert.equal(profile.name, 'Stage keys');
+  assert.equal(profile.velocityInputMax, 127);
+  assert.equal(profile.velocityInputMin, 127, 'ranges clamp like the module fields');
+  assert.equal(profile.velocityCurveValues[1], 30);
+  assert.equal('velocityFixed' in profile, false, 'a profile carries the calibration, not the part settings');
+  assert.equal(state.responseProfileForPorts, 'Stage keys');
+  assert.deepEqual(normalizeHostState({}).responseProfiles, []);
+
+  let mock = mockHostState();
+  mock = applyMockCommand(mock, { cmd: 'saveResponseProfile', name: 'Mine', portHint: 'X', velocityCurve: 'soft' });
+  mock = applyMockCommand(mock, { cmd: 'saveResponseProfile', name: 'Mine', portHint: 'Y', velocityCurve: 'hard' });
+  assert.equal(mock.responseProfiles.length, 1, 'saving the same name replaces it');
+  assert.equal(mock.responseProfiles[0].velocityCurve, 'hard');
+  mock = applyMockCommand(mock, { cmd: 'removeResponseProfile', name: 'Mine' });
+  assert.deepEqual(mock.responseProfiles, []);
+});
+
 test('Smart Chorder inversion, voicing and nearest-motion rules match the native engine', () => {
   assert.deepEqual(applySmartChordVoicing([60, 64, 67], { inversion: 1 }), [64, 67, 72]);
   assert.deepEqual(applySmartChordVoicing([60, 64, 67], { voicing: 'open' }), [60, 67, 76]);

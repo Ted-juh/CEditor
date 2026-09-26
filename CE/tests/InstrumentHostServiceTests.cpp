@@ -6729,6 +6729,89 @@ void testChainPresets()
     }
 }
 
+// Response profiles: a keyboard's velocity/expression calibration saved by name, with the port
+// it belongs to. Saving and removing go to a file beside the catalogue; a new Velocity module
+// starts from the profile of the keyboard that is connected; the touch readout lists every
+// note of a chord, not just the last message.
+void testResponseProfiles()
+{
+    std::cout << "\nresponse profiles and the touch readout" << std::endl;
+
+    const auto dir = freshDataDir ("response-profiles");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    juce::StringArray ports { "Some Other Port" };
+    h.service->midiPortNamesForProfiles = [&ports] { return ports; };
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+
+    h.cmd ("saveResponseProfile", { { "name", "Stage keys" }, { "portHint", "CTRL49" },
+                                    { "velocityCurve", "custom" },
+                                    { "velocityCurveValues", juce::Array<juce::var> { 0, 30, 50, 66, 80, 92, 104, 116, 127 } },
+                                    { "velocityInputMin", 12 }, { "velocityInputMax", 110 },
+                                    { "velocityFixed", 90 } });
+    auto profiles = [&h] { return h.emits.lastState()->getProperty ("responseProfiles", {}); };
+    check (profiles().size() == 1 && profiles()[0].getProperty ("name", {}).toString() == "Stage keys"
+             && (int) profiles()[0].getProperty ("velocityInputMin", 0) == 12,
+           "a saved profile is listed in the state");
+    check (! profiles()[0].getDynamicObject()->hasProperty ("velocityFixed"),
+           "and carries the calibration only, not what the part does with it");
+    check (dir.getChildFile ("response-profiles.json").existsAsFile(), "it is written beside the catalogue");
+    check (h.emits.lastState()->getProperty ("responseProfileForPorts", {}).toString().isEmpty(),
+           "with its keyboard not connected, nothing matches");
+
+    auto velocitySlot = [&h]
+    {
+        const auto chain = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                               .getProperty ("midiChain", {});
+        juce::var found;
+        for (int i = 0; i < chain.size(); ++i)
+            if (chain[i].getProperty ("type", {}).toString() == "velocity")
+                found = chain[i];
+        return found;
+    };
+    h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "velocity" } });
+    check (velocitySlot().getProperty ("fx", {}).getProperty ("velocityCurve", {}).toString() == "linear",
+           "a new Velocity module without its keyboard starts plain");
+
+    ports.add ("CTRL49 USB");
+    h.cmd ("saveResponseProfile", { { "name", "Stage keys" }, { "portHint", "CTRL49" },
+                                    { "velocityCurve", "custom" },
+                                    { "velocityCurveValues", juce::Array<juce::var> { 0, 30, 50, 66, 80, 92, 104, 116, 127 } },
+                                    { "velocityInputMin", 12 }, { "velocityInputMax", 110 } });
+    check (profiles().size() == 1, "saving the same name replaces it");
+    check (h.emits.lastState()->getProperty ("responseProfileForPorts", {}).toString() == "Stage keys",
+           "with its keyboard connected, the profile is the one that matches");
+    h.cmd ("removeMidiSlot", { { "partId", partId }, { "slotId", velocitySlot().getProperty ("slotId", {}) } });
+    h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "velocity" } });
+    const auto fx = velocitySlot().getProperty ("fx", {});
+    check (fx.getProperty ("velocityCurve", {}).toString() == "custom"
+             && (int) fx.getProperty ("velocityInputMin", 0) == 12
+             && (int) fx.getProperty ("velocityCurveValues", {})[1] == 30
+             && fx.getProperty ("responseProfileName", {}).toString() == "Stage keys",
+           "and a new Velocity module starts from it, named");
+
+    h.cmd ("removeResponseProfile", { { "name", "Stage keys" } });
+    check (profiles().size() == 0, "removing takes it away");
+    h.emits.clear();
+    h.cmd ("saveResponseProfile", { { "name", "  " } });
+    check (h.emits.lastError().contains ("needs a name"), "a profile without a name is refused");
+
+    // The touch readout: three notes of a chord in one tick arrive as three touches.
+    h.emits.clear();
+    for (const auto note : { 60, 64, 67 })
+        h.service->noteMidiActivity ("Keys", juce::MidiMessage::noteOn (1, note, (juce::uint8) (40 + note - 60)));
+    h.service->noteMidiActivity ("Keys", juce::MidiMessage::channelPressureChange (1, 77));
+    h.service->drainParameterEvents();
+    const auto* activity = h.emits.last ("instrumentHostMidiActivity");
+    const auto touch = activity != nullptr ? activity->getProperty ("touch", {}) : juce::var();
+    check (touch.size() == 4 && (int) touch[0][0] == 0 && (int) touch[1][1] == 64 && (int) touch[2][2] == 47
+             && (int) touch[3][0] == 2 && (int) touch[3][2] == 77,
+           "every note of a chord and the pressure reach the readout, in order");
+}
+
 void testChordLearn()
 {
     std::cout << "\nchord learn (the chorder's capture)" << std::endl;
@@ -13316,6 +13399,7 @@ int main (int argc, char* argv[])
     testPresetWalking();
     testFloatingEditors();
     testChordLearn();
+    testResponseProfiles();
     testMidiChainCommands();
     testChainPresets();
     testGroupBuses();

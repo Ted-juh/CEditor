@@ -275,7 +275,7 @@ export const hostSupportBundle = writable(emptySupportBundle());
 export const hostLicenceReceipt = writable('');
 /** The latest MIDI message seen on any enabled input, with a monotonically increasing `seq`
  *  so the view can flash on every arrival even when two identical notes repeat. */
-export const hostMidiActivity = writable({ device: '', text: '', cc: -1, note: -1, channel: 0, value: 0, seq: 0 });
+export const hostMidiActivity = writable({ device: '', text: '', cc: -1, note: -1, channel: 0, value: 0, touch: [], seq: 0 });
 // The CTRL49 hardware surface as the broker reports it: searching (no device), connecting,
 // connected, heldElsewhere (another instance owns it), failed. Fail-safe like every other
 // host store — a malformed payload lands on 'searching', never a crash.
@@ -1825,6 +1825,8 @@ export function emptyHostState() {
     editorOpenPartId: '',
     editorOpenPartIds: [],
     floatingEditorPartIds: [],
+    responseProfiles: [],
+    responseProfileForPorts: '',
     audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0,
              inputChannels: 0, cpu: 0, xruns: 0 },
     rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], returns: [], buses: [],
@@ -3053,6 +3055,25 @@ function applyLegacyChordField(block, payload) {
 const OBJECT_ARRAY_FIELDS = ['chordSet', 'keyMap', 'articulations'];
 // (padMap and progression are arrays of numbers, which the generic rule already handles.)
 
+/** The calibration fields a response profile carries: which keyboard, not what a part does
+    with it (fixed velocity and the final scale stay per part). saveResponseProfile's list. */
+export const RESPONSE_PROFILE_FIELDS = [
+  'velocityCurve', 'velocityCurveValues', 'velocityInputMin', 'velocityInputMax',
+  'velocityOutputMin', 'velocityOutputMax', 'expressionSource', 'expressionCc', 'expressionCurve',
+  'expressionCurveValues', 'expressionInputMin', 'expressionInputMax', 'expressionOutputMin',
+  'expressionOutputMax',
+];
+
+/** A saved keyboard calibration, read with the same rules as a module's own fields. */
+export function normalizeResponseProfile(profile) {
+  const fx = normalizeMidiFx(profile ?? {});
+  return {
+    name: String(profile?.name ?? '').trim().slice(0, 80),
+    portHint: String(profile?.portHint ?? '').trim().slice(0, 80),
+    ...Object.fromEntries(RESPONSE_PROFILE_FIELDS.map((key) => [key, fx[key]])),
+  };
+}
+
 export function normalizePerformance(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   const t = p.transport && typeof p.transport === 'object' ? p.transport : {};
@@ -4015,6 +4036,9 @@ export function normalizeHostState(payload) {
     editorOpenPartId: editorOpenPartIds.at(-1) ?? '',
     editorOpenPartIds,
     floatingEditorPartIds: (Array.isArray(p.floatingEditorPartIds) ? p.floatingEditorPartIds : []).map(String),
+    responseProfiles: (Array.isArray(p.responseProfiles) ? p.responseProfiles : []).map(normalizeResponseProfile)
+      .filter((profile) => profile.name),
+    responseProfileForPorts: String(p.responseProfileForPorts ?? ''),
     audio: {
       enabled: p.audio?.enabled === true,
       running: p.audio?.running === true,
@@ -5157,6 +5181,15 @@ export function applyMockCommand(state, payload) {
       // One editor per processor: docking pulls a floating part back in.
       next.floatingEditorPartIds = next.floatingEditorPartIds.filter((id) => id !== payload.partId);
     }
+    return next;
+  }
+  if (cmd === 'saveResponseProfile' || cmd === 'removeResponseProfile') {
+    const name = String(payload.name ?? '').trim().slice(0, 80);
+    if (!name) return next;
+    const kept = (next.responseProfiles ?? []).filter((profile) => profile.name !== name);
+    next.responseProfiles = cmd === 'saveResponseProfile'
+      ? [...kept, normalizeResponseProfile({ ...payload, name })]
+      : kept;
     return next;
   }
   if (cmd === 'floatEditor') {
@@ -7488,6 +7521,10 @@ export function initInstrumentHostBridge() {
     note: Number.isInteger(payload?.note) ? payload.note : -1,
     channel: Number(payload?.channel ?? 0),
     value: Number(payload?.value ?? 0),
+    // Every touch since the last tick ([kind, a, b]): 0 note-on (note, velocity), 1 controller
+    // (number, value), 2 channel pressure (-, value), 3 poly aftertouch (note, value).
+    touch: (Array.isArray(payload?.touch) ? payload.touch : [])
+      .filter((t) => Array.isArray(t) && t.length === 3).map((t) => t.map(Number)),
     seq: a.seq + 1,
   })));
   onInstrumentHostSurface((payload) => hostSurface.set(normalizeHostSurface(payload)));
@@ -8920,6 +8957,12 @@ export const cancelSoundComparison = () => send({ cmd: 'cancelSoundComparison' }
 export const learnKeyChord = (partId, slotId = '') =>
   send({ cmd: 'learnKeyChord', partId, ...(slotId ? { slotId } : {}) });
 export const cancelKeyChordLearn = () => send({ cmd: 'cancelKeyChordLearn' });
+/** Saves (or replaces, by name) a keyboard's velocity/expression calibration. */
+export const saveResponseProfile = (name, portHint, fields) => send({
+  cmd: 'saveResponseProfile', name, portHint,
+  ...Object.fromEntries(RESPONSE_PROFILE_FIELDS.filter((key) => key in fields).map((key) => [key, fields[key]])),
+});
+export const removeResponseProfile = (name) => send({ cmd: 'removeResponseProfile', name });
 /** Plays (velocity > 0) or releases a pad of a Chords module: bank * 8 + pad. */
 export const chordPad = (partId, slotId, pad, velocity) =>
   send({ cmd: 'chordPad', partId, pad, velocity, ...(slotId ? { slotId } : {}) });

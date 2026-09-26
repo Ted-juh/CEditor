@@ -1073,6 +1073,22 @@ private:
         for the same dozen on the same synth every time, whichever rack it happens to be in
         today. A per-user preference about a plug-in, so it lives beside the catalogue and the
         thumbnails rather than in the Performance. */
+    /** Velocity/expression calibrations, per keyboard: named, with the port name they belong
+        to. A fact about the owner's hands and desk, so it lives beside the catalogue. */
+    juce::File responseProfilesFile() const
+    {
+        return options.dataDirectory.getChildFile ("response-profiles.json");
+    }
+    /** The saved profiles, read once and again after each save. */
+    const juce::Array<juce::var>& loadResponseProfiles() const;
+    /** The saved profile whose port hint matches a connected MIDI port, or a void var. The
+        port list is refreshed at most every two seconds: state goes out on every edit. */
+    juce::var responseProfileForPorts() const;
+    mutable juce::Array<juce::var> responseProfilesCache;
+    mutable bool responseProfilesLoaded = false;
+    mutable juce::StringArray responseProfilePorts;
+    mutable juce::uint32 responseProfilePortsAt = 0;
+
     juce::File parameterFavouritesFile() const
     {
         return options.dataDirectory.getChildFile ("parameter-favourites.json");
@@ -1778,6 +1794,13 @@ private:
     // carries the numbers rather than a second lookup living here.
     int midiActivityCc = -1, midiActivityChannel = 0, midiActivityValue = 0;
     int midiActivityNote = -1;   // the drawing lights a pad the same way it lights a knob
+    // Everything touch-shaped since the last drain, for the Velocity designer's live dots: a
+    // chord is several notes in one UI tick, and "the latest message" would show one of them.
+    // kind: 0 = note-on (a = note, b = velocity), 1 = controller (a = number, b = value),
+    // 2 = channel pressure (b), 3 = poly aftertouch (a = note, b).
+    struct TouchEvent { int kind = 0; int a = 0; int b = 0; };
+    std::array<TouchEvent, 32> recentTouch {};
+    int recentTouchCount = 0;
     juce::int64 midiActivitySeq = 0, midiActivityEmittedSeq = 0;
 
     // Controller changes captured by the same observer, coalesced per (channel, cc) so a

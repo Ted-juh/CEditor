@@ -16,11 +16,11 @@
    * arpeggiators drawing two different patterns.
    */
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import ResponseCurveDesigner from '../components/ResponseCurveDesigner.svelte';
   import StrumEditor from './midiModules/StrumEditor.svelte';
   import HumanizeEditor from './midiModules/HumanizeEditor.svelte';
   import ChordsEditor from './midiModules/ChordsEditor.svelte';
   import ArpEditor from './midiModules/ArpEditor.svelte';
+  import ResponseEditor from './midiModules/ResponseEditor.svelte';
   import { RATE_CHOICES } from '../utils/arpLane.js';
   import { shapeLabel } from '../utils/chordBuilder.js';
   import { HUMANIZE_FEELS, humanizeFeelOf, beatsToMs } from '../utils/noteModuleViews.js';
@@ -31,6 +31,7 @@
     reorderIndexForDrop,
     hostNote,
     learnKeyChord, cancelKeyChordLearn, clearKeyChord, hostChordsLive, chordPad, chordStep,
+    hostMidiActivity, saveResponseProfile, removeResponseProfile,
   } from '../stores/instrumentHost.js';
 
   let { part } = $props();
@@ -357,118 +358,11 @@
           {/if}
 
           {#if slot.type === 'velocity' || slot.type === 'fx'}
-            <div class="response-editor" data-testid="velocity-expression-designer">
-              <div class="response-profile">
-                <label class="mini-field profile-name">Device calibration
-                  <input type="text" maxlength="80" value={slot.fx.responseProfileName}
-                         placeholder="e.g. CTRL49 studio"
-                         onchange={(e) => set(slot, { responseProfileName: e.currentTarget.value })} />
-                </label>
-                <span class="hint">This named calibration is saved with the part. When several MIDI inputs are enabled, isolate its controller with the part’s MIDI channel/range.</span>
-              </div>
-
-              <div class="response-block">
-                <div class="response-row">
-                  <strong>Velocity</strong>
-                  <label class="mini-field">Curve
-                    <select value={slot.fx.velocityCurve}
-                            onchange={(e) => set(slot, { velocityCurve: e.currentTarget.value })}>
-                      <option value="linear">Linear</option>
-                      <option value="soft">Soft touch</option>
-                      <option value="hard">Hard touch</option>
-                      <option value="s curve">S curve</option>
-                      <option value="custom">Custom · 9 point</option>
-                    </select>
-                  </label>
-                  <label class="mini-field range-pair">Device range
-                    <span><input type="number" min="1" max="127" value={slot.fx.velocityInputMin}
-                                 aria-label="Velocity device range minimum"
-                                 onchange={(e) => set(slot, { velocityInputMin: Number(e.currentTarget.value) })} />
-                      – <input type="number" min="1" max="127" value={slot.fx.velocityInputMax}
-                               aria-label="Velocity device range maximum"
-                               onchange={(e) => set(slot, { velocityInputMax: Number(e.currentTarget.value) })} /></span>
-                  </label>
-                  <label class="mini-field range-pair">Instrument range
-                    <span><input type="number" min="1" max="127" value={slot.fx.velocityOutputMin}
-                                 aria-label="Velocity instrument range minimum"
-                                 onchange={(e) => set(slot, { velocityOutputMin: Number(e.currentTarget.value) })} />
-                      – <input type="number" min="1" max="127" value={slot.fx.velocityOutputMax}
-                               aria-label="Velocity instrument range maximum"
-                               onchange={(e) => set(slot, { velocityOutputMax: Number(e.currentTarget.value) })} /></span>
-                  </label>
-                  <label class="mini-field">Final scale
-                    <input type="number" min="0.1" max="2" step="0.05" value={slot.fx.velocityScale}
-                           onchange={(e) => set(slot, { velocityScale: Number(e.currentTarget.value) })} />
-                  </label>
-                  <label class="mini-field">Fixed (0 = off)
-                    <input type="number" min="0" max="127" value={slot.fx.velocityFixed}
-                           onchange={(e) => set(slot, { velocityFixed: Number(e.currentTarget.value) })} />
-                  </label>
-                </div>
-                <ResponseCurveDesigner label="Velocity" curve={slot.fx.velocityCurve}
-                  points={slot.fx.velocityCurveValues}
-                  onchange={(points) => set(slot, { velocityCurveValues: points })}
-                  onmakecustom={(points) => set(slot, {
-                    velocityCurve: 'custom', velocityCurveValues: points,
-                  })} />
-              </div>
-
-              <div class="response-block expression" class:off={!slot.fx.expressionEnabled}>
-                <div class="response-row">
-                  <strong>Expression</strong>
-                  <PropertyToggle compact label={slot.fx.expressionEnabled ? 'On' : 'Off'}
-                                  value={slot.fx.expressionEnabled} ariaLabel="Expression response mapping"
-                                  onchange={(on) => set(slot, { expressionEnabled: on })} />
-                  <label class="mini-field">Source
-                    <select value={slot.fx.expressionSource}
-                            onchange={(e) => set(slot, { expressionSource: e.currentTarget.value })}>
-                      <option value="cc">MIDI CC</option>
-                      <option value="channel pressure">Channel aftertouch</option>
-                      <option value="poly aftertouch">Poly aftertouch</option>
-                    </select>
-                  </label>
-                  {#if slot.fx.expressionSource === 'cc'}
-                    <label class="mini-field">CC
-                      <input type="number" min="0" max="127" value={slot.fx.expressionCc}
-                             onchange={(e) => set(slot, { expressionCc: Number(e.currentTarget.value) })} />
-                    </label>
-                  {/if}
-                  <label class="mini-field">Curve
-                    <select value={slot.fx.expressionCurve}
-                            onchange={(e) => set(slot, { expressionCurve: e.currentTarget.value })}>
-                      <option value="linear">Linear</option>
-                      <option value="soft">Soft touch</option>
-                      <option value="hard">Hard touch</option>
-                      <option value="s curve">S curve</option>
-                      <option value="custom">Custom · 9 point</option>
-                    </select>
-                  </label>
-                  <label class="mini-field range-pair">Device range
-                    <span><input type="number" min="0" max="127" value={slot.fx.expressionInputMin}
-                                 aria-label="Expression device range minimum"
-                                 onchange={(e) => set(slot, { expressionInputMin: Number(e.currentTarget.value) })} />
-                      – <input type="number" min="0" max="127" value={slot.fx.expressionInputMax}
-                               aria-label="Expression device range maximum"
-                               onchange={(e) => set(slot, { expressionInputMax: Number(e.currentTarget.value) })} /></span>
-                  </label>
-                  <label class="mini-field range-pair">Instrument range
-                    <span><input type="number" min="0" max="127" value={slot.fx.expressionOutputMin}
-                                 aria-label="Expression instrument range minimum"
-                                 onchange={(e) => set(slot, { expressionOutputMin: Number(e.currentTarget.value) })} />
-                      – <input type="number" min="0" max="127" value={slot.fx.expressionOutputMax}
-                               aria-label="Expression instrument range maximum"
-                               onchange={(e) => set(slot, { expressionOutputMax: Number(e.currentTarget.value) })} /></span>
-                  </label>
-                </div>
-                <ResponseCurveDesigner label="Expression" curve={slot.fx.expressionCurve}
-                  points={slot.fx.expressionCurveValues}
-                  onchange={(points) => set(slot, { expressionCurveValues: points })}
-                  onmakecustom={(points) => set(slot, {
-                    expressionCurve: 'custom', expressionCurveValues: points,
-                  })} />
-                <span class="hint">Only the selected expression message is reshaped. Put the MPE Transformer before or after this insert when format conversion is also needed.</span>
-              </div>
-            </div>
+            <ResponseEditor fx={slot.fx} set={(fields) => set(slot, fields)} identity={slot.slotId}
+                            profiles={$hostState.responseProfiles} portProfile={$hostState.responseProfileForPorts}
+                            activity={$hostMidiActivity}
+                            onsaveprofile={(name, portHint, fx) => saveResponseProfile(name, portHint, fx)}
+                            onremoveprofile={(name) => removeResponseProfile(name)} />
           {/if}
 
           {#if slot.type === 'echo'}
@@ -816,21 +710,6 @@
   .articulation-trigger span { font: 600 11px var(--host-font-mono, monospace); }
   .articulation-trigger small { color: var(--host-text-dim); font-size: 8px; text-transform: uppercase; }
   .slot :global(.articulation-remove) { align-self: center; margin-left: auto; }
-  .response-editor { width: 100%; display: flex; flex-direction: column; gap: 10px; }
-  .response-profile { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
-  .profile-name { flex: 0 1 260px; }
-  .profile-name input { width: 240px; }
-  .response-profile .hint { max-width: 540px; }
-  .response-block { padding: 8px; display: flex; gap: 10px; flex-wrap: wrap;
-                    border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-panel);
-                    background: #111820; }
-  .response-block.expression.off { opacity: 0.65; }
-  .response-row { flex: 1 1 330px; min-width: 300px; display: flex; align-content: flex-start;
-                  align-items: flex-end; flex-wrap: wrap; gap: 8px; }
-  .response-row > strong { width: 100%; color: var(--host-text); font-size: 12px; }
-  .response-row select { min-width: 120px; }
-  .response-row input[type="number"] { width: 58px; }
-  .range-pair > span { display: flex; align-items: center; gap: 4px; color: var(--host-text-dim); }
   .hint { color: #66707b; font-size: 10px; max-width: 150px; }
   .empty-hint { color: #66707b; font-size: 12px; }
   .ghost { background: none; border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-control); color: var(--host-text-soft);

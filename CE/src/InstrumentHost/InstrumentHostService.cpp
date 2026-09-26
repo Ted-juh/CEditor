@@ -5845,6 +5845,14 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             // arpeggiator and chorder always did.
             minted.fx.scaleType = part->midiFx.scaleType;
             minted.fx.scaleRoot = part->midiFx.scaleRoot;
+            // A fresh Velocity module starts from the calibration of the keyboard that is
+            // connected, when one was saved for it.
+            if (type == "velocity")
+                if (const auto profile = responseProfileForPorts(); profile.isObject())
+                {
+                    applyMidiFxFields (minted.fx, profile, *profile.getDynamicObject());
+                    minted.fx.responseProfileName = profile.getProperty ("name", {}).toString();
+                }
             chain.add (std::move (minted));
         }
         else if (index < 0)
@@ -7565,6 +7573,58 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         chordLearn = {};
         chordLearnListening.store (false);
         emitChordLearn (false, "cancelled", -1, 0);
+        return;
+    }
+
+    if (cmd == "saveResponseProfile" || cmd == "removeResponseProfile")
+    {
+        // A keyboard's velocity/expression calibration, kept by name beside the catalogue.
+        // Saving replaces a profile of the same name; the port hint is what makes a new
+        // Velocity module start from it when that keyboard is connected.
+        const auto name = payload.getProperty ("name", {}).toString().trim().substring (0, 80);
+        if (name.isEmpty())
+        {
+            emitError ("A response profile needs a name.");
+            return;
+        }
+        if (options.dataDirectory == juce::File())
+        {
+            emitError ("Response profiles need a data folder, and this host has none.");
+            return;
+        }
+        const auto saved = updateSharedJsonObject (responseProfilesFile(), [&] (juce::DynamicObject& root)
+        {
+            juce::Array<juce::var> kept;
+            if (const auto* list = root.getProperty ("profiles").getArray())
+                for (const auto& profile : *list)
+                    if (profile.getProperty ("name", {}).toString() != name)
+                        kept.add (profile);
+            if (cmd == "saveResponseProfile")
+            {
+                auto* profile = new juce::DynamicObject();
+                profile->setProperty ("name", name);
+                profile->setProperty ("portHint", payload.getProperty ("portHint", {}).toString().trim().substring (0, 80));
+                // Only the calibration travels: which keyboard it is, not what this part does
+                // with it (fixed velocity and the final scale stay per part).
+                for (const auto* key : { "velocityCurve", "velocityCurveValues", "velocityInputMin",
+                                         "velocityInputMax", "velocityOutputMin", "velocityOutputMax",
+                                         "expressionSource", "expressionCc", "expressionCurve",
+                                         "expressionCurveValues", "expressionInputMin", "expressionInputMax",
+                                         "expressionOutputMin", "expressionOutputMax" })
+                    if (payload.getDynamicObject() != nullptr && payload.getDynamicObject()->hasProperty (key))
+                        profile->setProperty (key, payload[key]);
+                kept.add (juce::var (profile));
+            }
+            root.setProperty ("profiles", kept);
+        });
+        responseProfilesLoaded = false;
+        responseProfilePortsAt = 0;
+        if (! saved)
+        {
+            emitError ("Could not write the response profiles file.");
+            return;
+        }
+        emitState();
         return;
     }
 
@@ -15638,6 +15698,17 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     midiActivityValue = message.isController() ? message.getControllerValue()
                       : message.isNoteOn()     ? message.getVelocity() : 0;
     ++midiActivitySeq;
+    if (recentTouchCount < (int) recentTouch.size())
+    {
+        if (message.isNoteOn())
+            recentTouch[(size_t) recentTouchCount++] = { 0, message.getNoteNumber(), message.getVelocity() };
+        else if (message.isController())
+            recentTouch[(size_t) recentTouchCount++] = { 1, message.getControllerNumber(), message.getControllerValue() };
+        else if (message.isChannelPressure())
+            recentTouch[(size_t) recentTouchCount++] = { 2, 0, message.getChannelPressureValue() };
+        else if (message.isAftertouch())
+            recentTouch[(size_t) recentTouchCount++] = { 3, message.getNoteNumber(), message.getAfterTouchValue() };
+    }
 
     // Health bookkeeping, still under the lock: the judging is the controlling thread's.
     {
@@ -15739,6 +15810,45 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
         if (pendingCcs.size() < 64)
             pendingCcs.push_back (event);
     }
+}
+
+const juce::Array<juce::var>& InstrumentHostService::loadResponseProfiles() const
+{
+    if (! responseProfilesLoaded)
+    {
+        responseProfilesLoaded = true;
+        responseProfilesCache.clear();
+        if (options.dataDirectory != juce::File() && responseProfilesFile().existsAsFile())
+        {
+            // Held in a named var: a pointer into a temporary's array would dangle.
+            const auto stored = juce::JSON::parse (responseProfilesFile().loadFileAsString());
+            if (const auto* list = stored.getProperty ("profiles", {}).getArray())
+                responseProfilesCache = *list;
+        }
+    }
+    return responseProfilesCache;
+}
+
+juce::var InstrumentHostService::responseProfileForPorts() const
+{
+    if (loadResponseProfiles().isEmpty())
+        return {};
+    const auto now = juce::Time::getMillisecondCounter();
+    if (responseProfilePortsAt == 0 || now - responseProfilePortsAt > 2000)
+    {
+        responseProfilePorts = midiPortNamesForProfiles != nullptr ? midiPortNamesForProfiles()
+                                                                   : currentMidiPortNames();
+        responseProfilePortsAt = juce::jmax ((juce::uint32) 1, now);
+    }
+    for (const auto& profile : loadResponseProfiles())
+    {
+        const auto hint = profile.getProperty ("portHint", {}).toString();
+        if (hint.isNotEmpty())
+            for (const auto& port : responseProfilePorts)
+                if (port.containsIgnoreCase (hint))
+                    return profile;
+    }
+    return {};
 }
 
 juce::StringArray InstrumentHostService::currentMidiPortNames()
@@ -16613,8 +16723,15 @@ void InstrumentHostService::drainParameterEvents()
         juce::String device, text;
         int cc = -1, note = -1, channel = 0, value = 0;
         bool changed = false;
+        juce::Array<juce::var> touch;
         {
             const std::scoped_lock lock (midiActivityLock);
+            for (int i = 0; i < recentTouchCount; ++i)
+            {
+                const auto& t = recentTouch[(size_t) i];
+                touch.add (juce::Array<juce::var> { t.kind, t.a, t.b });
+            }
+            recentTouchCount = 0;
             if (midiActivitySeq != midiActivityEmittedSeq)
             {
                 midiActivityEmittedSeq = midiActivitySeq;
@@ -16638,6 +16755,9 @@ void InstrumentHostService::drainParameterEvents()
             obj->setProperty ("note", note);
             obj->setProperty ("channel", channel);
             obj->setProperty ("value", value);
+            // [kind, a, b] per touch since the last drain: 0 note-on (note, velocity),
+            // 1 controller (number, value), 2 channel pressure (-, value), 3 poly AT (note, value).
+            obj->setProperty ("touch", touch);
             options.emit ("instrumentHostMidiActivity", juce::var (obj));
         }
     }
@@ -17756,6 +17876,9 @@ juce::var InstrumentHostService::buildStatePayload()
             floating.add (partId);
         root->setProperty ("floatingEditorPartIds", floating);
     }
+    root->setProperty ("responseProfiles", loadResponseProfiles());
+    root->setProperty ("responseProfileForPorts",
+                       responseProfileForPorts().getProperty ("name", {}).toString());
     root->setProperty ("audio", juce::var (audio));
     root->setProperty ("rack", juce::var (rackObj));
     return juce::var (root);
