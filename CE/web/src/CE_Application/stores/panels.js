@@ -14,6 +14,7 @@ import {
   buildVst3 as bridgeBuildVst3,
   onBuildProgress,
   onBuildComplete,
+  sendInstrumentHostCommand,
 } from '../bridge/bridge.js';
 import { clog, cinfo, cwarn, cerror } from './console.js';
 import { notify } from './scriptUi.js';
@@ -419,6 +420,16 @@ export const settingsTabOpen = writable(false);
 /** Settings page requested by a menu or a contextual "Manage" link. */
 export const settingsSection = writable('general');
 export const instrumentHostTabOpen = writable(false);
+
+// The CTRL49 belongs to HoSTage while its tab is open, and goes back to its own screen when the
+// tab closes — not only when the whole program exits. Sent on changes only, and never before the
+// tab has been open once, so starting CEditor does not start the host just to say "not now".
+let instrumentHostTabWasOpen = false;
+instrumentHostTabOpen.subscribe((open) => {
+  if (open === instrumentHostTabWasOpen) return;
+  instrumentHostTabWasOpen = open;
+  sendInstrumentHostCommand({ cmd: 'setSurfaceActive', active: open });
+});
 
 /** Open device profile editor tabs */
 export const deviceProfileTabs = writable([]);

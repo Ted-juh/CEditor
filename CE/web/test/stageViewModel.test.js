@@ -89,6 +89,15 @@ test('stage surface mirrors the selected CTRL49 control page as exactly eight sl
   assert.equal(model.entries[1].assigned, false);
 });
 
+test('stage surface follows the keyboard past the fourth page', () => {
+  const rack = { pages: Array.from({ length: 6 }, (_, i) => ({ pageId: `p${i + 1}`, name: `Page ${i + 1}`, slots: [] })) };
+  const sixth = stageSurfaceModel(rack, {}, { pageIndex: 5 });
+  assert.equal(sixth.type, 'controls');
+  assert.equal(sixth.name, 'Page 6');
+  assert.equal(sixth.pageCount, 7, 'every control page, then Performance');
+  assert.notEqual(stageSurfaceModel(rack, {}, { pageIndex: 6 }).type, 'controls', 'Performance follows them');
+});
+
 test('stage movement feedback follows a real value change, not page redraws', () => {
   const before = [
     { slotId: 's1', assigned: true, value: 0.2, valueText: '20%' },

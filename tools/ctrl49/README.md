@@ -4,6 +4,38 @@ Probe tooling and assets for the CTRL49 screen integration. Design record:
 [`docs/design/screen-builder-design.md`](../../docs/design/screen-builder-design.md). Byte-level
 protocol ground truth is the external reverse-engineering handoff.
 
+## The HoSTage screen, without the keyboard
+
+`Hostage_MultiKnob.lua` is the page HoSTage uploads to the keyboard (embedded by
+`embed_assets.cmake`). To see it without the keyboard:
+
+```bash
+cd CE/web
+npm run dev            # then open http://localhost:5173/ctrl49.html
+```
+
+The preview runs **this file**, not a copy, in wasmoon against the firmware draw-API shim, fed
+with payloads built the way the C++ builds them (`CE/web/src/CE_Application/screen/ctrl49Payloads.js`).
+Save the `.lua` and the screen redraws, keeping what you typed. The scenes are the pages the
+broker drives: splash (mode 0), control page, performance, browser. **Custom calls** takes any
+call list (`set_values 1 64 0x7f`, `set_labels s"TITLE" s"one"`) so a new mode can be drawn
+before any C++ exists for it. The bytes of every call are listed under the screen.
+
+Adding a new kind of page:
+
+1. Draw it in `Hostage_MultiKnob.lua` (a new `mode`, and whatever `set_*` calls it needs),
+   and iterate on it in **Custom calls**.
+2. Write its payload builder in C++ beside `Ctrl49RackDisplay` / `Ctrl49PerformanceDisplay`,
+   with a byte test, and the same builder in `ctrl49Payloads.js` with a scene in the preview.
+3. Give it a page in `Ctrl49SurfaceBroker`: `pages()`, `pumpInput()`, `refreshDisplay()`.
+
+Checks: `node --test test/ctrl49Preview.test.js` (payload bytes, and that every function the
+broker calls exists in the page) and `node browser-checks/ctrl49Screen.mjs` (every scene runs
+the real page and draws; `CTRL49_SCREENSHOT=dir/` saves a PNG per scene).
+
+What the preview cannot tell you: the device's fonts (9/10 are approximated), colour depth, RAM
+for uploaded images, and redraw rate. Those need the keyboard.
+
 ## The product exe: Ctrl49Bridge (start here)
 
 **`build/native/Debug/Ctrl49Bridge.exe`** is the self-contained bridge — every asset (the

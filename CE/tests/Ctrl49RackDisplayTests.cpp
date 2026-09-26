@@ -270,6 +270,9 @@ int main()
         check (views[1].position == 127 && views[0].position == 0 && views[2].position == 0,
                "the row under the cursor takes a full knob and the rest take none");
 
+        check (browseTitleForDisplay ("SOUNDS \xC2\xB7 Pad \xC2\xB7 5/40") == "SOUNDS - Pad - 5/40",
+               "the keyboard's title is ASCII: the dot between its parts would draw as '??'");
+
         const auto labels = buildRackLabelPayload (browseTitle ({}, 1, 3), views);
         const std::string asText (labels.begin(), labels.end());
         check (asText.find ("Wool Pad") != std::string::npos

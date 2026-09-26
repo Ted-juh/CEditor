@@ -98,9 +98,9 @@ export function surfaceSlotForMidiActivity(entries = [], activity = {}) {
     && ((cc >= 0 && entry.midiCc === cc) || (note >= 0 && entry.midiNote === note)));
 }
 
-/** Mirrors the broker's four-page rule: up to three rack-control pages, then Performance. */
+/** Mirrors the broker's page order: every rack-control page, then Performance. */
 export function stageSurfaceModel(rack = {}, performance = {}, surface = {}) {
-  const controlPages = (Array.isArray(rack.pages) ? rack.pages : []).slice(0, 3);
+  const controlPages = Array.isArray(rack.pages) ? rack.pages : [];
   const pageCount = controlPages.length + 1;
   const requested = Number(surface.pageIndex ?? 0);
   const pageIndex = Math.max(0, Math.min(pageCount - 1,

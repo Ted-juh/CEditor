@@ -25,7 +25,11 @@
   import GripVertical from 'lucide-svelte/icons/grip-vertical';
   import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
   import Radio from 'lucide-svelte/icons/radio';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
+  import Plus from 'lucide-svelte/icons/plus';
   import HostPartPicker from './HostPartPicker.svelte';
+  import Ctrl49ScreenCard from './Ctrl49ScreenCard.svelte';
   import {
     hostSurface, hostSurfaceLayout, requestSurfaceLayout, hostState, hostMidiActivity,
     hostMidiLearn, cancelMidiLearn, clearControlSlotMidi,
@@ -33,6 +37,7 @@
     filterParameters, parameterShortlist, surfaceControlSlot, assignSurfaceControl, learnSurfaceControl,
     setControlSlotOptions, focusRackPart,
     setUserSurface, clearUserSurface, learnUserSurface, finishUserSurfaceLearn,
+    addControlPage, removeControlPage, renameControlPage, generateControlPages, ctrl49Screen,
   } from '../stores/instrumentHost.js';
 
   let zoom = $state('');        // '' = the whole instrument, else a region id
@@ -113,6 +118,27 @@
   // Follows the rack when the chosen page disappears, rather than showing an empty drawing
   // and no explanation for it.
   let page = $derived(pages.find((p) => p.pageId === pageId) ?? pages[0] ?? null);
+
+  // Pages are built here, beside the drawing they fill, rather than only in the Rack view.
+  let renaming = $state(false);
+  let pickNewestPage = $state(-1);       // the page count when + Page was pressed
+  $effect(() => {
+    if (pickNewestPage >= 0 && pages.length > pickNewestPage) {
+      pageId = pages[pages.length - 1].pageId;
+      pickNewestPage = -1;
+    }
+  });
+  const focusOnMount = (node) => { node.focus(); };
+
+  // The drawing follows the keyboard (or the screen card standing in for it) when it pages, so
+  // the knobs under your hands and the labels on the drawing are the same eight.
+  let followedScreenPage = -1;
+  $effect(() => {
+    const index = $ctrl49Screen.pageIndex;
+    if (index === followedScreenPage) return;
+    followedScreenPage = index;
+    if ($ctrl49Screen.pageKind === 'control' && index < pages.length) pageId = pages[index].pageId;
+  });
 
   const slotFor = (control) => surfaceControlSlot(page, control);
   let selectedControl = $derived(
@@ -304,21 +330,41 @@
     <button type="button" class="ghost" data-testid="surface-describe"
             title="Any controller works — CEditor just needs to know what is on yours"
             onclick={() => (describing = !describing)}>{layout.userSurface ? 'Edit controller' : 'Describe controller'}</button>
-    {#if pages.length > 0}
-      <!-- Which page the drawing is showing. Eight knobs mean eight assignments, and which
-           eight depends entirely on the page — a drawing that did not say which would be
-           showing one set of labels and implying another. -->
-      <label class="page-picker">
+    <div class="page-picker">
+      {#if pages.length > 0}
+        <!-- Which page the drawing is showing. Eight knobs mean eight assignments, and which
+             eight depends entirely on the page — a drawing that did not say which would be
+             showing one set of labels and implying another. -->
         <span>CONTROL PAGE {Math.max(1, pages.indexOf(page) + 1)} / {pages.length}</span>
-        <select data-testid="surface-page" aria-label="Control page shown on the drawing"
-                value={page?.pageId ?? ''}
-                onchange={(e) => (pageId = e.currentTarget.value)}>
-          {#each pages as p (p.pageId)}
-            <option value={p.pageId}>{p.name}</option>
-          {/each}
-        </select>
-      </label>
-    {/if}
+        {#if renaming && page}
+          <input type="text" class="page-rename" data-testid="surface-page-rename" aria-label="Page name"
+                 value={page.name} onfocus={(e) => e.currentTarget.select()}
+                 onkeydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { renaming = false; } }}
+                 onblur={(e) => { const name = e.currentTarget.value.trim(); if (renaming && name && name !== page.name) renameControlPage(page.pageId, name); renaming = false; }}
+                 use:focusOnMount />
+        {:else}
+          <select data-testid="surface-page" aria-label="Control page shown on the drawing"
+                  value={page?.pageId ?? ''}
+                  onchange={(e) => (pageId = e.currentTarget.value)}>
+            {#each pages as p (p.pageId)}
+              <option value={p.pageId}>{p.name}</option>
+            {/each}
+          </select>
+          <button type="button" class="ghost" title="Rename this page" aria-label="Rename page"
+                  data-testid="surface-page-rename-start" onclick={() => (renaming = true)}><Pencil size={14} /></button>
+          <HostConfirmButton identity={`surface-page:${page?.pageId ?? ''}`} type="button" class="ghost"
+                             title="Remove this page" aria-label="Remove page" data-testid="surface-page-remove"
+                             onclick={() => page && removeControlPage(page.pageId)}><Trash2 size={14} /></HostConfirmButton>
+      {/if}
+      {/if}
+      <button type="button" data-testid="surface-page-add" title="Add an empty page of eight controls"
+              onclick={() => { pickNewestPage = pages.length; addControlPage(); }}><Plus size={14} /> Page</button>
+      <button type="button" data-testid="surface-page-auto" disabled={!focusedPart?.hasInstrument}
+              title={focusedPart?.hasInstrument
+                       ? 'Build pages from this instrument\'s parameters (replaces its earlier auto pages)'
+                       : 'Focus a part with an instrument first'}
+              onclick={() => generateControlPages(focusedPart.partId)}>Auto pages</button>
+    </div>
   </div>
 
   {#if describing}
@@ -606,6 +652,9 @@
     </div>
 
   {/if}
+
+  <!-- What the keyboard's own screen shows for these pages, keyboard or not. -->
+  <Ctrl49ScreenCard />
 </div>
 
 <style>
@@ -632,6 +681,8 @@
   .page-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
   .page-picker > span, .eyebrow { color: #81acd0; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
   .page-picker select { min-width: 150px; font-weight: 650; }
+  .page-picker .page-rename { width: 170px; font-weight: 650; }
+  .page-picker button { display: inline-flex; align-items: center; gap: 4px; }
 
   .describe { display: flex; flex-direction: column; gap: 6px; padding: 8px;
               border: 1px solid var(--host-line); border-radius: var(--host-radius-panel); background: var(--host-surface); }

@@ -156,7 +156,7 @@ namespace
             "startPerformanceRecording", "finishPerformanceRecording",
             "cancelPerformanceRecording", "removePerformanceTake",
             "replayPerformanceTake", "stopPerformanceReplay", "surfacePerformanceEncoder",
-            "surfaceStepPad", "retryFailedProcessor", "dismissFailoverEvent",
+            "surfaceStepPad", "surfaceInput", "setSurfaceActive", "retryFailedProcessor", "dismissFailoverEvent",
 
             // Escape/cancellation actions must never be trapped behind the lock.
             "cancelHardwarePatchCapture", "cancelKeyChordLearn",
@@ -643,6 +643,28 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             (SurfaceEncoder) juce::jlimit (0, (int) SurfaceEncoder::velocity,
                                             (int) payload.getProperty ("encoder", 0)),
             juce::jlimit (-127, 127, (int) payload.getProperty ("delta", 0)));
+        return;
+    }
+    if (cmd == "setSurfaceActive")
+    {
+        surfaceWanted = (bool) payload.getProperty ("active", true);
+        return;
+    }
+    if (cmd == "surfaceInput")
+    {
+        // The screen in the app pressing the keyboard's buttons. Only control changes: the
+        // hidden cable carries nothing else the reducer acts on, and a payload that is not one
+        // is dropped rather than guessed at.
+        const auto* data = payload.getProperty ("data", {}).getArray();
+        if (data == nullptr || data->size() != 3)
+            return;
+        std::vector<std::uint8_t> message;
+        for (const auto& byte : *data)
+            message.push_back ((std::uint8_t) juce::jlimit (0, 255, (int) byte));
+        if ((message[0] & 0xF0) != 0xB0 || message[1] > 127 || message[2] > 127)
+            return;
+        if (virtualSurfaceInput.size() < 256)
+            virtualSurfaceInput.push_back (std::move (message));
         return;
     }
     if (cmd == "surfaceStepPad")

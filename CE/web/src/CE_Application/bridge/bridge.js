@@ -1038,6 +1038,14 @@ export function onInstrumentHostSurface(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** The CTRL49 display page's bytes, as the broker built them ({ labels, values, pageIndex,
+    pageCount, pageKind, onKeyboard }) — sent whether or not a keyboard is there to show them. */
+export function onInstrumentHostSurfaceScreen(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostSurfaceScreen', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 export function onInstrumentHostSurfaceLayout(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('instrumentHostSurfaceLayout', callback);

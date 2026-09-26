@@ -156,8 +156,7 @@ int wmain (int argc, wchar_t** argv)
         // The performance page is the last one: control pages 0..N-1, then the Stage 6 page
         // where pads launch clips, the encoders shape the focused lane and the display reads
         // the transport (§18.8.10).
-        const auto controlPages = juce::jmin (Ctrl49Reducer::kPageCount - 1,
-                                              performance.pages.size());
+        const auto controlPages = performance.pages.size();
         const auto performancePage = controlPages;
         reducer.setPageCount (controlPages + 1);
         logLine ("Rack surface up: " + std::to_string (controlPages)

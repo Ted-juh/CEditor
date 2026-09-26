@@ -523,6 +523,22 @@ public:
         return std::exchange (requestedSurfacePageId, {});
     }
 
+    /** Hardware-surface input from the screen in the app ("surfaceInput"): three-byte CC
+        messages shaped exactly as the keyboard's hidden cable sends them, so the broker reads
+        a click on the app's Page Right and a press of the real one through the same reducer.
+        Drained by the broker on its tick; the queue is bounded so a UI with nobody draining
+        it cannot grow it without end. */
+    std::vector<std::vector<std::uint8_t>> consumeVirtualSurfaceInput()
+    {
+        return std::exchange (virtualSurfaceInput, {});
+    }
+
+    /** Whether the hardware surface should be driven at all ("setSurfaceActive"). The editor
+        clears it when its HoSTage tab closes, so the keyboard goes back to its own screen then
+        rather than when the whole program exits; reopening the tab sets it again. A shell with
+        no such tab never sends it, and the default is on. */
+    bool hardwareSurfaceWanted() const noexcept { return surfaceWanted; }
+
     // -- the Stage 6 performance system ------------------------------------------------------
 
     /** Recompiles the patterns and clips and publishes them to the engine. Called after any
@@ -1405,6 +1421,8 @@ private:
     std::map<int, juce::String> pendingScenes;
     juce::String currentSurfacePageId;
     juce::String requestedSurfacePageId;
+    std::vector<std::vector<std::uint8_t>> virtualSurfaceInput;
+    bool surfaceWanted = true;
     struct WarmSetlistProcessor
     {
         juce::String ceId;

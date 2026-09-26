@@ -32,6 +32,7 @@ import {
   onInstrumentHostMidiHealth,
   onInstrumentHostSurface,
   onInstrumentHostSurfaceLayout,
+  onInstrumentHostSurfaceScreen,
   onInstrumentHostMidiLearn,
   onInstrumentHostParamLearn,
   onInstrumentHostArpStep,
@@ -54,6 +55,7 @@ import {
   onInstrumentHostSurfaceBrowse,
 } from '../bridge/bridge.js';
 import { stageCommandAllowed } from '../utils/stageLock.js';
+import { rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload } from '../screen/ctrl49Payloads.js';
 import { receiveHostMeters, resetHostMeters } from './hostMeters.js';
 import {
   RESPONSE_CURVES, normalizeResponseCurvePoints,
@@ -281,6 +283,99 @@ export const hostSurface = writable({
   movementSeq: 0, movingSlot: -1,
 });
 
+// --- the CTRL49 screen in the app ---------------------------------------------------------------
+//
+// The display page's own bytes, exactly as the broker built them for the keyboard, sent whether a
+// keyboard is connected or not. The app runs the same Lua page on them (Ctrl49ScreenCard), so what
+// it shows is what the device shows. `received` stays false until the broker has said anything.
+
+export function emptySurfaceScreen() {
+  return { labels: [], values: [], pageIndex: 0, pageCount: 1, pageKind: 'control', pageId: '', onKeyboard: false, received: false };
+}
+
+export function normalizeSurfaceScreen(payload) {
+  const bytes = (list) => (Array.isArray(list) ? list : [])
+    .map((b) => Math.max(0, Math.min(255, Math.trunc(Number(b) || 0))));
+  const count = Math.max(1, Math.trunc(Number(payload?.pageCount ?? 1) || 1));
+  return {
+    labels: bytes(payload?.labels),
+    values: bytes(payload?.values),
+    pageIndex: Math.max(0, Math.min(count - 1, Math.trunc(Number(payload?.pageIndex ?? 0) || 0))),
+    pageCount: count,
+    pageKind: ['control', 'performance', 'browse'].includes(payload?.pageKind) ? payload.pageKind : 'control',
+    pageId: String(payload?.pageId ?? ''),
+    onKeyboard: payload?.onKeyboard === true,
+    received: payload != null && typeof payload === 'object',
+  };
+}
+
+export const hostSurfaceScreen = writable(emptySurfaceScreen());
+
+/** Press or turn one of the keyboard's controls from the app: the three bytes the hidden cable
+    would carry (CC 11-18 encoders, 01 up / 7F down; 19-26 encoder switches; 39/40 Page Left/Right;
+    1-8 pads). The broker cannot tell these from the real keyboard, which is the point. */
+export const surfaceInput = (cc, value) =>
+  send({ cmd: 'surfaceInput', data: [0xB0, Math.trunc(cc) & 0x7f, Math.trunc(value) & 0x7f] });
+
+// Without the native bridge (Vite, the browser checks) there is no broker, so this stands in for
+// it over the mock rack: control pages then Performance, Page Left/Right wrapping, an encoder turn
+// nudging its slot. Built with the same payload builders the C++ uses, so the screen still draws.
+// The mock does not keep slot values (setControlSlotValue only drives its parameter view), so
+// the stand-in remembers where it turned each knob.
+const mockSurfaceCursor = writable({ page: 0, active: 0, turned: {} });
+
+export function mockSurfaceScreen(state, cursor) {
+  const pages = Array.isArray(state?.rack?.pages) ? state.rack.pages : [];
+  const pageCount = pages.length + 1;
+  const pageIndex = Math.max(0, Math.min(pageCount - 1, cursor.page));
+  if (pageIndex < pages.length) {
+    const page = pages[pageIndex];
+    const slots = (page.slots ?? []).slice(0, 8).map((slot) => ({
+      label: slot.displayName,
+      position: Math.round((cursor.turned[`${page.pageId}/${slot.slotId}`] ?? slot.value ?? 0) * 127),
+      assigned: slot.assigned, resolved: slot.resolved,
+    }));
+    return { labels: rackLabelPayload(page.name, slots), values: rackStatePayload(cursor.active, slots),
+             pageIndex, pageCount, pageKind: 'control', pageId: page.pageId, onKeyboard: false, received: true };
+  }
+  const tempo = Number(state?.performance?.transport?.tempo ?? 120) || 120;
+  const transport = { playing: false, bar: 1, beat: 1, tempo };
+  return { labels: performanceLabelPayload(transport, []), values: performanceStatePayload(cursor.active, []),
+           pageIndex, pageCount, pageKind: 'performance', pageId: '', onKeyboard: false, received: true };
+}
+
+function mockSurfaceInput(data) {
+  const [status, cc, value] = Array.isArray(data) ? data : [];
+  if ((status & 0xf0) !== 0xb0) return;
+  const pageCount = (get(hostState)?.rack?.pages?.length ?? 0) + 1;
+  const cursor = get(mockSurfaceCursor);
+  if ((cc === 39 || cc === 40) && value === 127) {
+    const page = (cursor.page + (cc === 40 ? 1 : pageCount - 1)) % pageCount;
+    mockSurfaceCursor.set({ ...cursor, page, active: 0 });
+  } else if (cc >= 19 && cc <= 26 && value === 127) {
+    mockSurfaceCursor.set({ ...cursor, active: cc - 19 });
+  } else if (cc >= 11 && cc <= 18) {
+    const active = cc - 11;
+    mockSurfaceCursor.set({ ...cursor, active });
+    const page = get(hostState)?.rack?.pages?.[cursor.page];
+    const slot = page?.slots?.[active];
+    if (slot?.assigned && slot?.resolved) {
+      const key = `${page.pageId}/${slot.slotId}`;
+      const delta = value === 127 ? -1 : value;
+      const next = Math.max(0, Math.min(1, (cursor.turned[key] ?? slot.value ?? 0) + delta / 127));
+      mockSurfaceCursor.set({ ...cursor, active, turned: { ...cursor.turned, [key]: next } });
+      send({ cmd: 'setControlSlotValue', pageId: page.pageId, slotId: slot.slotId, value: next });
+    }
+  }
+}
+
+/** What the app's CTRL49 screen draws: the broker's bytes in the application, the stand-in
+    everywhere else. */
+export const ctrl49Screen = derived(
+  [hostSurfaceScreen, hostState, mockSurfaceCursor],
+  ([live, state, cursor]) => (isJuceAvailable() ? live : mockSurfaceScreen(state, cursor)),
+);
+
 // MIDI learn: which slot is armed and listening right now. The bind itself lands in the
 // state (each slot's midiCc/midiChannel); this store only tracks the transient arming.
 export const hostMidiLearn = writable({ armed: false, pageId: '', slotId: '' });
@@ -375,13 +470,13 @@ export function normalizeMidiLearn(payload) {
 }
 
 export function normalizeHostSurface(payload) {
-  const known = ['searching', 'heldElsewhere', 'connecting', 'connected', 'failed'];
+  const known = ['searching', 'heldElsewhere', 'connecting', 'connected', 'failed', 'paused'];
   const state = String(payload?.state ?? '');
   return {
     state: known.includes(state) ? state : 'searching',
     detail: String(payload?.detail ?? ''),
     device: String(payload?.device ?? ''),
-    pageIndex: Math.max(0, Math.min(3, Number(payload?.pageIndex ?? 0) || 0)),
+    pageIndex: Math.max(0, Math.trunc(Number(payload?.pageIndex ?? 0) || 0)),
     activeSlot: Math.max(0, Math.min(7, Number(payload?.activeSlot ?? 0) || 0)),
     padBank: Math.max(0, Math.min(3, Number(payload?.padBank ?? 0) || 0)),
     movementSeq: Math.max(0, Math.trunc(Number(payload?.movementSeq ?? 0) || 0)),
@@ -7108,6 +7203,7 @@ export function initInstrumentHostBridge() {
   })));
   onInstrumentHostSurface((payload) => hostSurface.set(normalizeHostSurface(payload)));
   onInstrumentHostSurfaceLayout((payload) => hostSurfaceLayout.set(normalizeSurfaceLayout(payload)));
+  onInstrumentHostSurfaceScreen((payload) => hostSurfaceScreen.set(normalizeSurfaceScreen(payload)));
   onInstrumentHostMidiLearn((payload) => hostMidiLearn.set(normalizeMidiLearn(payload)));
   onInstrumentHostParamLearn((payload) => hostParamLearn.set({
     armed: payload?.armed === true,
@@ -7365,6 +7461,10 @@ function send(payload) {
     hostLastError.set('');
   }
   if (!isJuceAvailable()) {
+    if (payload?.cmd === 'surfaceInput') {
+      mockSurfaceInput(payload.data);
+      return;
+    }
     if (payload?.cmd === 'beginStageUnlock') {
       if (get(hostState).stageLocked && mockStageUnlockStartedAt <= 0)
         mockStageUnlockStartedAt = Date.now();
@@ -8208,6 +8308,7 @@ function send(payload) {
       const slot = page?.slots.find((s) => s.slotId === payload.slotId);
       if (!slot?.resolved) return;
       const raw = Math.min(1, Math.max(0, Number(payload.value ?? 0)));
+      mockSurfaceCursor.update((c) => ({ ...c, turned: { ...c.turned, [`${payload.pageId}/${payload.slotId}`]: raw } }));
       const positioned = slot.inverted ? 1 - raw : raw;
       const mapped = slot.rangeMin + positioned * (slot.rangeMax - slot.rangeMin);
       hostParameters.update((registry) => {

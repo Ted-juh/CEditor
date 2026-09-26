@@ -29,6 +29,13 @@
 // controlling thread, because the service is controlling-thread-only and that rule does not
 // bend for hardware.
 //
+// THE SCREEN IN THE APP. Every display payload the broker builds is also emitted to the UI
+// ("instrumentHostSurfaceScreen", the exact bytes), and the UI's own buttons and knobs arrive
+// as the same CC messages the hidden cable carries (the service's "surfaceInput"). Neither
+// needs the keyboard: without one the broker still pages, reduces and paints — to the app's
+// screen only — so the pages a person builds can be seen and walked on any machine, in the
+// real build, with the real Lua page drawing the real bytes.
+//
 // RECONNECT is §17.4 verbatim: on loss stop sending immediately, mark offline, keep the
 // software state, no blocking retry loops — the worker polls for the device at a slow rate
 // and the session is rebuilt from scratch when it returns (device RAM is gone; a fresh
@@ -76,7 +83,9 @@ public:
 
         /** Session pacing, injectable so tests do not sleep out the real loading page. */
         std::function<void (int)> sessionSleep;
-        int loadingMilliseconds = 900;
+        /** How long the HoSTage splash stays up before the first page. The demo's 900 ms was
+            gone before anyone saw it; the startup is paced anyway, so this is time well spent. */
+        int loadingMilliseconds = 2500;
 
         /** Clock and cadences. `now` is milliseconds, monotonic. */
         std::function<double()> now = [] { return juce::Time::getMillisecondCounterHiRes(); };
@@ -85,7 +94,9 @@ public:
         double displayIntervalMs = 100.0;     // the demo's proven 10 Hz
     };
 
-    enum class State { searching, heldElsewhere, connecting, connected, failed };
+    /** `paused` is the service saying not to drive the keyboard at all — the editor's HoSTage
+        tab is closed. The claim is released and discovery stops until it says so again. */
+    enum class State { searching, heldElsewhere, connecting, connected, failed, paused };
 
     Ctrl49SurfaceBroker (host::InstrumentHostService& serviceToDrive, Options optionsToUse);
     ~Ctrl49SurfaceBroker();
@@ -128,9 +139,11 @@ private:
     void beginDiscovery();
     void beginSessionStart();
     void joinWorker();
+    void dropFinishedDiscovery();
     void disconnect (const juce::String& why, State next);
-    void pumpInput();
-    void refreshDisplay();
+    void pumpInput (bool fromHardware);
+    void refreshDisplay (bool toHardware);
+    void emitScreen (const Bytes& labels, const Bytes& state) const;
 
     host::InstrumentHostService& service;
     Options options;
@@ -155,7 +168,9 @@ private:
     Ctrl49Reducer reducer;
     juce::int64 movementSequence = 0;
     int movingSlot = -1;
-    Bytes lastLabels, lastState;
+    Bytes lastLabels, lastState;             // last sent to the keyboard
+    Bytes shownLabels, shownState;           // last emitted to the app's screen
+    bool shownOnKeyboard = false;
 };
 
 } // namespace ceditor::ctrl49

@@ -4557,6 +4557,99 @@ struct FakeSurface
     std::atomic<bool> running { false };
 };
 
+void testCtrl49AppScreen()
+{
+    std::cout << "\nthe CTRL49 screen in the app: pages walked and painted with no keyboard" << std::endl;
+
+    using ceditor::ctrl49::Ctrl49SurfaceBroker;
+
+    const auto dir = freshDataDir ("surface-app-screen");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    auto* synth = h.lastStub;
+    for (int i = 0; i < 5; ++i)
+        h.cmd ("addControlPage");
+    const auto firstPage = h.service->getRackHost().getPerformance().pages.getReference (0).pageId;
+    h.cmd ("assignControlSlot", { { "pageId", firstPage }, { "slotId", "s1" },
+                                  { "partId", partId }, { "parameterId", "cutoff" } });
+
+    double fakeNow = 0.0;
+    Ctrl49SurfaceBroker::Options options;
+    options.discover = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+    options.emit = [&h] (const juce::String& name, const juce::var& payload)
+    {
+        h.emits.entries.push_back ({ name, payload });
+    };
+    options.pageLua = { 't' };
+    options.now = [&fakeNow] { return fakeNow; };
+    Ctrl49SurfaceBroker broker (*h.service, options);
+
+    const auto tickPast = [&]
+    {
+        fakeNow += 150.0;
+        broker.tick();
+    };
+    const auto press = [&] (int cc, int value)
+    {
+        juce::Array<juce::var> data { 0xB0, cc, value };
+        h.cmd ("surfaceInput", { { "data", juce::var (data) } });
+    };
+
+    tickPast();
+    check (broker.state() != Ctrl49SurfaceBroker::State::connected, "there is no keyboard here");
+    const auto* screen = h.emits.last ("instrumentHostSurfaceScreen");
+    check (screen != nullptr
+             && ! (bool) screen->getProperty ("onKeyboard", true)
+             && (int) screen->getProperty ("pageCount", 0) == 6
+             && screen->getProperty ("pageKind", {}).toString() == "control"
+             && screen->getProperty ("values", {}).size() == 9
+             && screen->getProperty ("labels", {}).size() > 9,
+           "the app is still sent the page, in the bytes the keyboard would get");
+
+    const auto cutoffBefore = synth->cutoff->get();
+    for (int i = 0; i < 10; ++i)
+        press (11, 1);                          // encoder 1, clockwise
+    tickPast();
+    check (synth->cutoff->get() > cutoffBefore,
+           "turning a knob on the app's screen moves the bound parameter");
+
+    for (int i = 0; i < 4; ++i)
+        press (40, 127);                        // Page Right
+    tickPast();
+    screen = h.emits.last ("instrumentHostSurfaceScreen");
+    check (broker.currentPage() == 4 && screen != nullptr && (int) screen->getProperty ("pageIndex", -1) == 4,
+           "Page Right on the app's screen walks to the fifth control page, and it is painted");
+
+    h.emits.clear();
+    tickPast();
+    check (h.emits.last ("instrumentHostSurfaceScreen") == nullptr,
+           "an unchanged screen is not sent again");
+
+    press (40, 127);                            // past the last control page
+    tickPast();
+    screen = h.emits.last ("instrumentHostSurfaceScreen");
+    check (screen != nullptr && screen->getProperty ("pageKind", {}).toString() == "performance",
+           "and on to the performance page after them");
+
+    h.cmd ("setStageLock", { { "enabled", true } });
+    h.emits.clear();
+    press (39, 127);                            // Page Left, while playing
+    tickPast();
+    check (broker.currentPage() == 4 && h.emits.lastError().isEmpty(),
+           "the app's screen stays playable under Stage Lock, like the keyboard it stands in for");
+
+    juce::Array<juce::var> noteOn { 0x90, 60, 100 };
+    h.cmd ("surfaceInput", { { "data", juce::var (noteOn) } });
+    juce::Array<juce::var> tooLong { 0xB0, 40, 127, 0 };
+    h.cmd ("surfaceInput", { { "data", juce::var (tooLong) } });
+    tickPast();
+    check (broker.currentPage() == 4, "and anything that is not a control change is dropped");
+}
+
 void testCtrl49Broker()
 {
     std::cout << "\nthe CTRL49 broker: the hardware path in the app, not in a demo" << std::endl;
@@ -4683,7 +4776,7 @@ void testCtrl49Broker()
         // it cannot arrive at one: a surface does not grow a browser under somebody's hands.
         broker.tick();
         check (broker.pages().browse < 0, "with browsing off the page is not there to walk on to");
-        for (int i = 0; i < ceditor::ctrl49::Ctrl49Reducer::kPageCount + 1; ++i)
+        for (int i = 0; i < broker.pages().count + 1; ++i)
         {
             fake.feed (0xB0, 40, 127);
             broker.tick();
@@ -4698,7 +4791,7 @@ void testCtrl49Broker()
         // Page Right walks towards the browser, which is last. How many presses that takes
         // depends on how many control pages the rack has, so walk until it arrives rather than
         // assuming — the point being that it IS reachable by walking, from wherever you were.
-        for (int i = 0; i < ceditor::ctrl49::Ctrl49Reducer::kPageCount
+        for (int i = 0; i < broker.pages().count
                         && broker.currentPage() != broker.pages().browse; ++i)
         {
             fake.feed (0xB0, 40, 127);
@@ -4783,6 +4876,71 @@ void testCtrl49Broker()
         check (broker.state() == Ctrl49SurfaceBroker::State::connected,
                "and the surface goes on driving the rack rather than sitting on a page that "
                "no longer exists");
+    }
+
+    // Every control page reaches the keyboard. The surface used to stop at two — the reducer's
+    // four mode-button pages less the performance and browser pages — so a third page existed on
+    // the computer and Page Right never arrived at it.
+    {
+        while (h.service->getRackHost().getPerformance().pages.size() < 6)
+            h.cmd ("addControlPage");
+        broker.tick();
+
+        const auto controlPages = h.service->getRackHost().getPerformance().pages.size();
+        check (broker.pages().control == controlPages && broker.pages().performance == controlPages,
+               "all six control pages are on the surface, and the performance page follows them");
+
+        juce::Array<int> visited;
+        for (int i = 0; i < broker.pages().count; ++i)
+        {
+            visited.addIfNotAlreadyThere (broker.currentPage());
+            fake.feed (0xB0, 40, 127);        // Page Right
+            broker.tick();
+        }
+        check (visited.size() == broker.pages().count,
+               "and Page Right walks through every one of them");
+
+        while (broker.currentPage() != 5)
+        {
+            fake.feed (0xB0, 40, 127);
+            broker.tick();
+        }
+        const auto* status = h.emits.last ("instrumentHostSurface");
+        check (status != nullptr && (int) status->getProperty ("pageIndex", -1) == 5,
+               "the sixth page is one the Stage view is told about, like any other");
+    }
+
+    // Closing the editor's HoSTage tab hands the keyboard back then, not when the program exits;
+    // reopening it takes the keyboard again.
+    {
+        check (pumpUntil (Ctrl49SurfaceBroker::State::connected), "connected before the tab closes");
+        h.emits.clear();
+        fakeNow += 150.0;
+        broker.tick();
+        const auto* live = h.emits.last ("instrumentHostSurfaceScreen");
+        check (live == nullptr || (bool) live->getProperty ("onKeyboard", false),
+               "while connected the app is told the keyboard shows the page too");
+
+        const auto discoveriesBefore = discoveries;
+        h.cmd ("setSurfaceActive", { { "active", false } });
+        broker.tick();
+        check (broker.state() == Ctrl49SurfaceBroker::State::paused,
+               "closing HoSTage pauses the surface");
+        check (! h.service->ownsHardwareSurface(), "and releases the keyboard straight away");
+        for (int i = 0; i < 20; ++i)
+        {
+            fakeNow += 150.0;
+            broker.tick();
+        }
+        check (broker.state() == Ctrl49SurfaceBroker::State::paused && discoveries == discoveriesBefore,
+               "and does not go looking for it again while closed");
+        const auto* screen = h.emits.last ("instrumentHostSurfaceScreen");
+        check (screen != nullptr && ! (bool) screen->getProperty ("onKeyboard", true),
+               "the app is told the keyboard no longer shows the page");
+
+        h.cmd ("setSurfaceActive", { { "active", true } });
+        check (pumpUntil (Ctrl49SurfaceBroker::State::connected), "reopening HoSTage takes the keyboard again");
+        check (h.service->ownsHardwareSurface(), "with the claim");
     }
 
     // Another instance holding the surface: the broker must refuse to drive, aloud.
@@ -12258,6 +12416,7 @@ int main (int argc, char* argv[])
     testChainPresets();
     testGroupBuses();
     testCtrl49Broker();
+    testCtrl49AppScreen();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();
     testSupersededLoad();

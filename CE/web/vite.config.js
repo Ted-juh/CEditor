@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, searchForWorkspaceRoot } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
@@ -68,6 +68,15 @@ export default defineConfig(({ command }) => ({
   server: {
     port: 5173,
     strictPort: true,
+    // The CTRL49 screen preview (ctrl49.html) runs the display page the app embeds, from where
+    // the app embeds it, so the preview and the keyboard can never be running different files.
+    // That directory sits outside CE/web; this lets the dev server read it, and nothing more.
+    fs: {
+      allow: [
+        searchForWorkspaceRoot(process.cwd()),
+        fileURLToPath(new URL('../../tools/ctrl49', import.meta.url)),
+      ],
+    },
     headers: {
       'Cache-Control': 'no-store, no-cache, must-revalidate',
       'Pragma': 'no-cache',

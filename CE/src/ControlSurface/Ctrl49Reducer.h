@@ -10,8 +10,10 @@
 
 #include "Ctrl49Protocol.h"
 
+#include <array>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace ceditor::ctrl49
 {
@@ -39,13 +41,18 @@ struct Ctrl49Action
 class Ctrl49Reducer
 {
 public:
-    static constexpr int kPageCount = 4;
+    // The page count a fresh reducer starts with: the four mode buttons' worth the VIP layer
+    // was proven with. It is a default, not a ceiling — a host with more pages says so.
+    static constexpr int kDefaultPageCount = 4;
     static constexpr int kSlotCount = 8;
 
-    // Limits Page Left/Right and mode-button navigation to [0, count). Values/switches
-    // storage always covers all kPageCount pages; this only bounds navigation so a host
-    // with fewer real pages never lands on an empty one. Clamped to [1, kPageCount].
+    // Bounds Page Left/Right and mode-button navigation to [0, count), so a host never lands
+    // on a page it does not have. Any count of at least one is taken as given: the rack's
+    // control pages are the user's, and the keyboard reaching only the first few of them was
+    // a limit nobody chose. Per-page values/switches grow to cover it and are kept when the
+    // count shrinks, so a page that comes back keeps what it had.
     void setPageCount (int count);
+    int pageCount() const   { return pageCount_; }
     /** Programmatic recall used by a scene or setlist item. Returns true only when the page
         actually changed; physical Page Left/Right continues from the recalled page. */
     bool setPage (int page);
@@ -68,11 +75,19 @@ private:
     static int clamp (int value);
     static int delta (int value);
 
-    int  values_[kPageCount][kSlotCount] {};
-    bool switches_[kPageCount][kSlotCount] {};
+    struct PageState
+    {
+        std::array<int, kSlotCount>  values;
+        std::array<bool, kSlotCount> switches {};
+        PageState() { values.fill (64); }
+    };
+
+    std::vector<PageState> pages_;
+    PageState&       current()       { return pages_[(std::size_t) page_]; }
+    const PageState& current() const { return pages_[(std::size_t) page_]; }
     bool shiftDown_        = false;
     bool timeDivisionDown_ = false;
-    int  pageCount_    = kPageCount;
+    int  pageCount_    = kDefaultPageCount;
     int  page_         = 0;
     int  activeSlot_   = 0;
     int  padBank_      = 0;

@@ -36,6 +36,7 @@ juce::String Ctrl49SurfaceBroker::stateName() const
         case State::connecting:    return "connecting";
         case State::connected:     return "connected";
         case State::failed:        return "failed";
+        case State::paused:        return "paused";
     }
     return "searching";
 }
@@ -78,6 +79,21 @@ void Ctrl49SurfaceBroker::joinWorker()
 {
     if (worker.joinable())
         worker.join();
+}
+
+void Ctrl49SurfaceBroker::dropFinishedDiscovery()
+{
+    std::unique_ptr<Ctrl49SurfaceEndpoints> found;
+    {
+        const std::scoped_lock lock (handoffLock);
+        if (! workerDone)
+            return;
+        workerDone = false;
+        found = std::move (discovered);
+    }
+    joinWorker();
+    if (found != nullptr && found->closeInput != nullptr)
+        found->closeInput();
 }
 
 void Ctrl49SurfaceBroker::beginDiscovery()
@@ -178,12 +194,39 @@ void Ctrl49SurfaceBroker::tick()
 {
     const auto now = options.now();
 
+    // No keyboard driving yet: the app's screen still pages and paints. Everything below
+    // touches only the service and the reducer, never a session or an endpoint.
+    if (currentState != State::connected)
+    {
+        pumpInput (false);
+        if (now - lastDisplayMs >= options.displayIntervalMs)
+        {
+            lastDisplayMs = now;
+            refreshDisplay (false);
+        }
+    }
+
     switch (currentState)
     {
         case State::searching:
         case State::heldElsewhere:
         case State::failed:
+        case State::paused:
         {
+            // Not wanted: leave the keyboard alone. A discovery already out is collected and
+            // what it found is let go, so nothing is held open while paused.
+            if (! service.hardwareSurfaceWanted())
+            {
+                dropFinishedDiscovery();
+                enter (State::paused, "HoSTage is closed");
+                return;
+            }
+            if (currentState == State::paused)
+            {
+                enter (State::searching, {});
+                lastAttemptMs = -1.0e12;          // look straight away, not in two seconds
+            }
+
             // Collect a finished discovery, or start one when the poll is due and no worker
             // is out. §17.4: this never blocks — absence costs one cheap check per interval.
             bool done = false;
@@ -261,6 +304,12 @@ void Ctrl49SurfaceBroker::tick()
 
             joinWorker();
 
+            if (ready && ! service.hardwareSurfaceWanted())
+            {
+                disconnect ("HoSTage is closed", State::paused);
+                return;
+            }
+
             if (! ready)
             {
                 disconnect (failure.isNotEmpty() ? failure : "the startup sequence failed",
@@ -268,7 +317,11 @@ void Ctrl49SurfaceBroker::tick()
                 return;
             }
 
-            reducer = Ctrl49Reducer();
+            // The keyboard starts where the app's screen was, rather than on page one: the
+            // reducer is kept, only what was last SENT is forgotten, so the first refresh
+            // paints the device in full.
+            lastLabels.clear();
+            lastState.clear();
             enter (State::connected, endpoints->description);
             lastDisplayMs = 0.0;   // paint immediately
             return;
@@ -276,6 +329,14 @@ void Ctrl49SurfaceBroker::tick()
 
         case State::connected:
         {
+            if (! service.hardwareSurfaceWanted())
+            {
+                // Stop sending and hand the keyboard back: its watchdog restores its own
+                // screen once the keepalive stops.
+                disconnect ("HoSTage is closed", State::paused);
+                return;
+            }
+
             if (! service.ownsHardwareSurface())
             {
                 disconnect ("hardware ownership was lost", State::heldElsewhere);
@@ -311,12 +372,12 @@ void Ctrl49SurfaceBroker::tick()
                 service.handleCommand (juce::var (payload));
             }
 
-            pumpInput();
+            pumpInput (true);
 
             if (now - lastDisplayMs >= options.displayIntervalMs)
             {
                 lastDisplayMs = now;
-                refreshDisplay();
+                refreshDisplay (true);
             }
             return;
         }
@@ -326,15 +387,17 @@ void Ctrl49SurfaceBroker::tick()
 Ctrl49SurfaceBroker::Pages Ctrl49SurfaceBroker::pages() const
 {
     Pages layout;
-    layout.control = juce::jmin (Ctrl49Reducer::kPageCount - 2,
-                                 service.getRackHost().getPerformance().pages.size());
+    // Every control page reaches the keyboard. This used to stop at two — the reducer's four
+    // mode-button pages less the performance and browser pages — so a third page existed on the
+    // computer and Page Right simply never arrived at it.
+    layout.control = service.getRackHost().getPerformance().pages.size();
     layout.performance = layout.control;
     layout.browse = service.browsingOnSurface() ? layout.performance + 1 : -1;
     layout.count = layout.browse >= 0 ? layout.browse + 1 : layout.performance + 1;
     return layout;
 }
 
-void Ctrl49SurfaceBroker::pumpInput()
+void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
 {
     const auto& performance = service.getRackHost().getPerformance();
     const auto layout = pages();
@@ -363,14 +426,16 @@ void Ctrl49SurfaceBroker::pumpInput()
     service.noteSurfacePage (reducer.page() < controlPages
         ? performance.pages.getReference (reducer.page()).pageId : juce::String());
 
-    for (auto message = endpoints->dequeueInput(); message; message = endpoints->dequeueInput())
+    // One reading for both sources: the app's screen sends what the cable sends, so nothing
+    // below knows or cares which it was.
+    const auto handle = [&] (const std::uint8_t* data, std::size_t size)
     {
         const auto previousPage = reducer.page();
         const auto previousSlot = reducer.activeSlot();
         const auto previousBank = reducer.padBank();
-        const auto action = reducer.process (message->data(), message->size());
+        const auto action = reducer.process (data, size);
         if (! action)
-            continue;
+            return;
 
         const auto encoderMoved = action->encoderMoved && action->encoderSlot >= 0;
         if (encoderMoved)
@@ -445,10 +510,49 @@ void Ctrl49SurfaceBroker::pumpInput()
                                       "s" + juce::String (action->encoderSlot + 1),
                                       action->encoderDelta);
         }
-    }
+    };
+
+    for (const auto& message : service.consumeVirtualSurfaceInput())
+        handle (message.data(), message.size());
+
+    if (fromHardware)
+        for (auto message = endpoints->dequeueInput(); message; message = endpoints->dequeueInput())
+            handle (message->data(), message->size());
 }
 
-void Ctrl49SurfaceBroker::refreshDisplay()
+void Ctrl49SurfaceBroker::emitScreen (const Bytes& labels, const Bytes& state) const
+{
+    if (options.emit == nullptr)
+        return;
+
+    const auto toArray = [] (const Bytes& bytes)
+    {
+        juce::Array<juce::var> out;
+        for (const auto b : bytes)
+            out.add ((int) b);
+        return juce::var (out);
+    };
+
+    const auto layout = pages();
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("labels", toArray (labels));
+    obj->setProperty ("values", toArray (state));
+    obj->setProperty ("pageIndex", reducer.page());
+    obj->setProperty ("pageCount", layout.count);
+    obj->setProperty ("pageKind", reducer.page() == layout.browse        ? "browse"
+                                : reducer.page() == layout.performance   ? "performance"
+                                                                         : "control");
+    // Which control page it is, so the app can set a slot by typing its value.
+    const auto& performance = service.getRackHost().getPerformance();
+    obj->setProperty ("pageId", reducer.page() < layout.control
+                                  ? performance.pages.getReference (reducer.page()).pageId
+                                  : juce::String());
+    // Whether the keyboard is showing this too, or only the app is.
+    obj->setProperty ("onKeyboard", currentState == State::connected);
+    options.emit ("instrumentHostSurfaceScreen", juce::var (obj));
+}
+
+void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
 {
     const auto& performance = service.getRackHost().getPerformance();
     const auto layout = pages();
@@ -469,8 +573,8 @@ void Ctrl49SurfaceBroker::refreshDisplay()
         const auto views = browseSlotViews (rows, cursor.index - cursor.firstVisible,
                                             hardware.displayColumns);
 
-        labels = buildRackLabelPayload (surface::browseTitle (service.browseFacets(), cursor.index,
-                                                              (int) results.size()),
+        labels = buildRackLabelPayload (browseTitleForDisplay (surface::browseTitle (
+                                            service.browseFacets(), cursor.index, (int) results.size())),
                                         views);
         state = buildRackStatePayload (juce::jlimit (0, 7, cursor.index - cursor.firstVisible),
                                        views);
@@ -519,15 +623,33 @@ void Ctrl49SurfaceBroker::refreshDisplay()
     }
 
     // Only bytes that changed travel — the display link is slow and redraws flicker.
-    if (! labels.empty() && labels != lastLabels)
+    if (toHardware && session != nullptr)
     {
-        session->callLua ("set_labels", labels, false);
-        lastLabels = std::move (labels);
+        if (! labels.empty() && labels != lastLabels)
+        {
+            session->callLua ("set_labels", labels, false);
+            lastLabels = labels;
+        }
+        if (! state.empty() && state != lastState)
+        {
+            session->callLua ("set_values", state, true);
+            lastState = state;
+        }
     }
-    if (! state.empty() && state != lastState)
+
+    // The app's screen gets the same bytes on the same rule. Emitting after the keyboard
+    // was sent to keeps the device first in line; the order a person sees them in is the
+    // order they happened.
+    // A keyboard arriving or leaving changes nothing on the page, but it changes what the app
+    // says about it — so that alone is a reason to send.
+    const auto onKeyboard = currentState == State::connected;
+    if (! labels.empty() && ! state.empty()
+        && (labels != shownLabels || state != shownState || onKeyboard != shownOnKeyboard))
     {
-        session->callLua ("set_values", state, true);
-        lastState = std::move (state);
+        shownOnKeyboard = onKeyboard;
+        emitScreen (labels, state);
+        shownLabels = std::move (labels);
+        shownState = std::move (state);
     }
 }
 

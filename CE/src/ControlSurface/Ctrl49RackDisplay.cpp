@@ -68,4 +68,13 @@ RackSlotViews browseSlotViews (const std::vector<surface::BrowseEntry>& rows,
     return views;
 }
 
+std::string browseTitleForDisplay (const std::string& title)
+{
+    static const std::string dot = " \xC2\xB7 ";
+    std::string out = title;
+    for (auto at = out.find (dot); at != std::string::npos; at = out.find (dot, at + 3))
+        out.replace (at, dot.size(), " - ");
+    return out;
+}
+
 } // namespace ceditor::ctrl49

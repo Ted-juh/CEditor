@@ -83,6 +83,7 @@
   import SoundBrowser from './SoundBrowser.svelte';
   import HostLibraryPanel from './HostLibraryPanel.svelte';
   import HostSurfacePanel from './HostSurfacePanel.svelte';
+  import Ctrl49ScreenCard from './Ctrl49ScreenCard.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
   import LicencePanel from './LicencePanel.svelte';
@@ -1346,6 +1347,9 @@
           <div class="empty-hint">No pages yet — a page holds eight control slots for hardware and macros.</div>
         {/if}
       </div>
+
+      <!-- The pages above, as the keyboard's screen draws them — with or without the keyboard. -->
+      <Ctrl49ScreenCard />
 
       <!-- Nothing about scanned modules here. What the scanner did is a Health question, and
            the browser is for browsing. -->

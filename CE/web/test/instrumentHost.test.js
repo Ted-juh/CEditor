@@ -4606,7 +4606,7 @@ test('normalizeHostSurface shapes broker payloads and fails safe on garbage', ()
   assert.equal(normalizeHostSurface({ detail: 7, device: 9 }).detail, '7');
   assert.deepEqual(
     normalizeHostSurface({ pageIndex: 99, activeSlot: -4, padBank: 8 }),
-    { state: 'searching', detail: '', device: '', pageIndex: 3, activeSlot: 0, padBank: 3,
+    { state: 'searching', detail: '', device: '', pageIndex: 99, activeSlot: 0, padBank: 3,
       movementSeq: 0, movingSlot: -1 },
     'hardware indices clamp to the physical surface');
 });

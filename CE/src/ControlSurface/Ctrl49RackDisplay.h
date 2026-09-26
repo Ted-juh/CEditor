@@ -1,7 +1,7 @@
 // Ctrl49RackDisplay — Hostage rack display payloads for the CTRL49.
 //
 // The proven multiknob Lua page takes two calls: set_labels ([titleLen][title][8x[len][label]],
-// ASCII) and set_values (the 22-byte state the reducer documents). For the RACK surface the
+// ASCII) and set_values ([activeSlot][v0..v7]). For the RACK surface the
 // value truth lives in the parameter model, not the reducer — so this builds both payloads
 // from the host's slot views: labels from display names, knob positions from the bindings'
 // 0..1 positions, switches marking unresolved slots so a broken binding is visible on the
@@ -58,5 +58,11 @@ Bytes buildRackStatePayload (int activeSlot, const RackSlotViews& slots);
     point of browsing without looking at the computer. */
 RackSlotViews browseSlotViews (const std::vector<surface::BrowseEntry>& rows,
                                int cursorRowInWindow, int columns);
+
+/** The browser's title as the screen can draw it. surface::browseTitle separates its parts with
+    " · " for the computer's screen; the label payload turns each byte of that UTF-8 dot into '?',
+    so the keyboard read "SOUNDS ?? Pad ?? 5/40". The HoSTage screen preview showed it before
+    anyone had to look at the hardware. */
+std::string browseTitleForDisplay (const std::string& title);
 
 } // namespace ceditor::ctrl49

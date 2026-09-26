@@ -17,15 +17,15 @@ namespace
 } // namespace
 
 Ctrl49Reducer::Ctrl49Reducer()
+    : pages_ ((std::size_t) kDefaultPageCount)
 {
-    for (auto& pageValues : values_)
-        for (auto& value : pageValues)
-            value = 64;
 }
 
 void Ctrl49Reducer::setPageCount (int count)
 {
-    pageCount_ = count < 1 ? 1 : (count > kPageCount ? kPageCount : count);
+    pageCount_ = count < 1 ? 1 : count;
+    if (pages_.size() < (std::size_t) pageCount_)
+        pages_.resize ((std::size_t) pageCount_);
     if (page_ >= pageCount_)
         page_ = pageCount_ - 1;
 }
@@ -86,9 +86,9 @@ std::optional<Ctrl49Action> Ctrl49Reducer::process (const std::uint8_t* data, st
     {
         const int slot = data1 - 11;
         activeSlot_ = slot;
-        values_[page_][slot] = clamp (values_[page_][slot] + delta (data2));
+        current().values[(std::size_t) slot] = clamp (current().values[(std::size_t) slot] + delta (data2));
         Ctrl49Action action = makeAction ("Encoder " + std::to_string (slot + 1) + " = "
-                                              + std::to_string (values_[page_][slot]),
+                                              + std::to_string (current().values[(std::size_t) slot]),
                                           true);
         action.encoderMoved = true;
         action.encoderSlot  = slot;
@@ -107,17 +107,17 @@ std::optional<Ctrl49Action> Ctrl49Reducer::process (const std::uint8_t* data, st
             division_ = slot + 1;
             return makeAction ("Time Division " + std::to_string (division_) + " selected", true);
         }
-        switches_[page_][slot] = ! switches_[page_][slot];
+        current().switches[(std::size_t) slot] = ! current().switches[(std::size_t) slot];
         return makeAction ("Switch " + std::to_string (slot + 1)
-                               + (switches_[page_][slot] ? " ON" : " OFF"),
+                               + (current().switches[(std::size_t) slot] ? " ON" : " OFF"),
                            true);
     }
 
     if (data1 == 34)  // data dial adjusts the active slot
     {
-        values_[page_][activeSlot_] = clamp (values_[page_][activeSlot_] + delta (data2));
+        current().values[(std::size_t) activeSlot_] = clamp (current().values[(std::size_t) activeSlot_] + delta (data2));
         Ctrl49Action action = makeAction ("Data Dial / slot " + std::to_string (activeSlot_ + 1) + " = "
-                                              + std::to_string (values_[page_][activeSlot_]),
+                                              + std::to_string (current().values[(std::size_t) activeSlot_]),
                                           true);
         action.encoderMoved = true;
         action.encoderSlot  = activeSlot_;
@@ -192,8 +192,8 @@ Bytes Ctrl49Reducer::displayArguments() const
     result[5] = static_cast<std::uint8_t> (division_);
     for (int slot = 0; slot < kSlotCount; ++slot)
     {
-        result[6 + static_cast<std::size_t> (slot)]  = static_cast<std::uint8_t> (values_[page_][slot]);
-        result[14 + static_cast<std::size_t> (slot)] = switches_[page_][slot] ? 1 : 0;
+        result[6 + static_cast<std::size_t> (slot)]  = static_cast<std::uint8_t> (current().values[(std::size_t) slot]);
+        result[14 + static_cast<std::size_t> (slot)] = current().switches[(std::size_t) slot] ? 1 : 0;
     }
     return result;
 }

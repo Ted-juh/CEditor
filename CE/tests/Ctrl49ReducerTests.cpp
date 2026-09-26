@@ -112,6 +112,25 @@ int main()
                "Recall clamps at page one and preserves each page's values");
     }
 
+    {   // --- more pages than the four mode buttons -------------------------------------------------
+        Ctrl49Reducer r;
+        r.setPageCount (12);
+        check (r.pageCount() == 12, "A host with twelve pages gets twelve, not the four mode buttons' worth");
+        for (int i = 0; i < 9; ++i)
+            feed (r, 0xB0, 0x28, 0x7F);       // Page Right x9 -> page 10
+        check (r.page() == 9, "Page Right walks past the fourth page");
+        feed (r, 0xB0, 0x0B, 0x01);           // page 10 slot 1 -> 65
+        check (r.displayArguments()[0] == 9 && r.displayArguments()[6] == 65,
+               "A page beyond the fourth keeps its own values");
+        for (int i = 0; i < 3; ++i)
+            feed (r, 0xB0, 0x28, 0x7F);       // pages 11, 12, then wrap to page 1
+        check (r.page() == 0 && r.displayArguments()[6] == 64, "Page Right wraps at the real count");
+        r.setPageCount (3);
+        r.setPageCount (12);
+        r.setPage (9);
+        check (r.displayArguments()[6] == 65, "Shrinking the count and growing it back keeps a page's values");
+    }
+
     std::cout << "\nCtrl49 session sequence test\n----------------------------\n";
 
     {   // --- startup sequence shape ----------------------------------------------------------------
