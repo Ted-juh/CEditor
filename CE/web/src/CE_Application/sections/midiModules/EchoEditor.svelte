@@ -4,8 +4,8 @@
    * gap is time (in milliseconds at the tempo). noteModuleViews.echoNotes mirrors
    * NoteEchoEngine, so the picture is what plays.
    */
-  import ScrubValue from './ScrubValue.svelte';
-  import Segmented from './Segmented.svelte';
+  import ScrubValue from '../../components/controls/ScrubValue.svelte';
+  import Segmented from '../../components/controls/Segmented.svelte';
   import PropertyToggle from '../../properties/PropertyToggle.svelte';
   import { echoNotes, beatsToMs } from '../../utils/noteModuleViews.js';
 

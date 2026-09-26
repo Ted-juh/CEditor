@@ -8,8 +8,8 @@
    */
   import { untrack } from 'svelte';
   import ResponseCurvePicture from './ResponseCurvePicture.svelte';
-  import ScrubValue from './ScrubValue.svelte';
-  import Segmented from './Segmented.svelte';
+  import ScrubValue from '../../components/controls/ScrubValue.svelte';
+  import Segmented from '../../components/controls/Segmented.svelte';
   import PropertyToggle from '../../properties/PropertyToggle.svelte';
   import HostConfirmButton from '../HostConfirmButton.svelte';
   import { RESPONSE_PROFILE_FIELDS } from '../../stores/instrumentHost.js';

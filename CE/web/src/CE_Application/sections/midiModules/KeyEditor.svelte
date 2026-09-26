@@ -7,9 +7,9 @@
    * (perf::withSongKey), so changing the key once changes it everywhere. A module can keep a
    * key of its own instead.
    */
-  import ScrubValue from './ScrubValue.svelte';
-  import Segmented from './Segmented.svelte';
-  import MiniKeys from './MiniKeys.svelte';
+  import ScrubValue from '../../components/controls/ScrubValue.svelte';
+  import Segmented from '../../components/controls/Segmented.svelte';
+  import MiniKeys from '../../components/controls/MiniKeys.svelte';
   import { HOST_SCALES, NOTE_NAMES } from '../../utils/chordBuilder.js';
 
   let {

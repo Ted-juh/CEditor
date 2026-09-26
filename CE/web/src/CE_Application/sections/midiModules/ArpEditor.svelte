@@ -8,8 +8,8 @@
    * Rows the player has not touched stay empty, which the engine reads as "plain" — so a fresh
    * arp plays the velocities you played, every step once, until something is drawn.
    */
-  import ScrubValue from './ScrubValue.svelte';
-  import Segmented from './Segmented.svelte';
+  import ScrubValue from '../../components/controls/ScrubValue.svelte';
+  import Segmented from '../../components/controls/Segmented.svelte';
   import PropertyToggle from '../../properties/PropertyToggle.svelte';
   import HostConfirmButton from '../HostConfirmButton.svelte';
   import {

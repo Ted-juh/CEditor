@@ -4,8 +4,8 @@
    * hard it plays. The picture is computed by the engine's own rules (noteModuleViews.js mirrors
    * StrumEngine), so what you see is what you will hear. The feel is a handle on the curve.
    */
-  import ScrubValue from './ScrubValue.svelte';
-  import Segmented from './Segmented.svelte';
+  import ScrubValue from '../../components/controls/ScrubValue.svelte';
+  import Segmented from '../../components/controls/Segmented.svelte';
   import { strumNotes, beatsToMs, guitarVoicing } from '../../utils/noteModuleViews.js';
   import PropertyToggle from '../../properties/PropertyToggle.svelte';
 

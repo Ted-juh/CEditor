@@ -10,8 +10,8 @@
    * rack), an A/B switch to compare two versions while playing, and for Strum, Humanize, Echo and
    * Chance an Amount that scales the effect, which a control-page knob can ride.
    */
-  import ScrubValue from './ScrubValue.svelte';
-  import Segmented from './Segmented.svelte';
+  import ScrubValue from '../../components/controls/ScrubValue.svelte';
+  import Segmented from '../../components/controls/Segmented.svelte';
   import HostConfirmButton from '../HostConfirmButton.svelte';
 
   let { slot, presets = [], set, onsave = () => {}, onremove = () => {} } = $props();

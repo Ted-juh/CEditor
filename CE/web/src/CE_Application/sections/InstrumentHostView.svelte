@@ -64,6 +64,7 @@
   } from '../stores/instrumentHost.js';
   const surfaceStatus = $derived(surfaceStatusText($hostSurface));
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import { selectAllOnFocus } from '../utils/selectOnFocus.js';
   import PerformancePanel from './PerformancePanel.svelte';
   import HostMixerPanel from './HostMixerPanel.svelte';
   import LayerGroupsPanel from './LayerGroupsPanel.svelte';
@@ -626,7 +627,7 @@
 }} onblur={cancelTransientInput} />
 <svelte:document onvisibilitychange={cancelBuildHoldWhenHidden} />
 
-<div class="host-workspace" data-testid="instrument-host-workspace">
+<div class="host-workspace" data-testid="instrument-host-workspace" use:selectAllOnFocus>
   <header class="host-header">
     <div class="host-brand">
       <span class="host-logo-frame">
@@ -2488,14 +2489,21 @@
     background: var(--host-surface);
   }
   .host-dock.collapsed { height: auto; }
+  /* The grip is visible: a bar with a handle in the middle, so the dock reads as something
+     you can pull up. Dragging up grows it; a double-click fits it to the tab. */
   .dock-grip {
-    height: 10px;
-    margin-top: -5px;
+    height: 9px;
+    flex: none;
     cursor: ns-resize;
     touch-action: none;
-    background: transparent;
+    background: var(--host-surface-raised, #20272e);
+    border-bottom: 1px solid var(--host-line-soft, #2c353e);
+    display: grid;
+    place-items: center;
   }
-  .dock-grip:hover { background: #2c6ca8; }
+  .dock-grip::after { content: ''; width: 44px; height: 3px; border-radius: 2px; background: var(--host-line-strong, #526170); }
+  .dock-grip:hover { background: #24313d; }
+  .dock-grip:hover::after { background: #5b9bd5; }
   .dock-tabs {
     display: flex;
     align-items: center;

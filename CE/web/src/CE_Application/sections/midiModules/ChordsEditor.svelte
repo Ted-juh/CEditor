@@ -14,9 +14,9 @@
    * drawn with the engine's own rules (chordBuilder.js mirrors MidiFxChain), so clicking a key
    * on either keyboard shows what you will hear.
    */
-  import ScrubValue from './ScrubValue.svelte';
-  import Segmented from './Segmented.svelte';
-  import MiniKeys from './MiniKeys.svelte';
+  import ScrubValue from '../../components/controls/ScrubValue.svelte';
+  import Segmented from '../../components/controls/Segmented.svelte';
+  import MiniKeys from '../../components/controls/MiniKeys.svelte';
   import PropertyToggle from '../../properties/PropertyToggle.svelte';
   import HostConfirmButton from '../HostConfirmButton.svelte';
   import {

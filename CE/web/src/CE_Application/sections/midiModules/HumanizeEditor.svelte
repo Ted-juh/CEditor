@@ -4,8 +4,8 @@
    * hard it plays, computed with the engine's rules (late only; protected beats stay put). Pick a
    * named feel to set all the amounts at once, or set them one by one.
    */
-  import ScrubValue from './ScrubValue.svelte';
-  import Segmented from './Segmented.svelte';
+  import ScrubValue from '../../components/controls/ScrubValue.svelte';
+  import Segmented from '../../components/controls/Segmented.svelte';
   import PropertyToggle from '../../properties/PropertyToggle.svelte';
   import { HUMANIZE_FEELS, humanizeFeelOf, humanizeExample, beatsToMs } from '../../utils/noteModuleViews.js';
 

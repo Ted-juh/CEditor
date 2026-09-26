@@ -71,6 +71,7 @@ try {
   const curve = resp.getByTestId('velocity-curve');
   assert.equal(await resp.locator('[data-testid=velocity-shape] [aria-pressed=true]').innerText(), 'linear');
   const point = curve.locator('[data-point="4"]');
+  await curve.scrollIntoViewIfNeeded();
   const pbox = await point.boundingBox();
   await page.mouse.move(pbox.x + pbox.width / 2, pbox.y + pbox.height / 2);
   await page.mouse.down();
