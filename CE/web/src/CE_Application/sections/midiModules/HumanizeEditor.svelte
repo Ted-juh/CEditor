@@ -14,7 +14,15 @@
   let seed = $state(7);
   const amounts = $derived({ timing: mod.humanizeTimingBeats, velocity: mod.humanizeVelocity, gate: mod.humanizeGatePercent });
   const feel = $derived(humanizeFeelOf(amounts));
-  const bar = $derived(humanizeExample({ ...amounts, protectBeats: mod.humanizeProtectBeats }, seed));
+  const bar = $derived(humanizeExample({ ...amounts, protectBeats: mod.humanizeProtectBeats,
+    layBack: mod.humanizeLayBackBeats, swing: mod.humanizeSwing, swingGrid: mod.humanizeSwingGrid,
+    accent: mod.humanizeAccent }, mod.humanizeFreeze ? mod.humanizeSeed * 7919 : seed));
+  const GRIDS = [{ value: 0.5, label: '1/8' }, { value: 0.25, label: '1/16' }];
+  // Frozen, "another roll" picks the next fixed roll; loose, it just shows another bar.
+  function reroll() {
+    if (mod.humanizeFreeze) set({ humanizeSeed: (mod.humanizeSeed % 9999) + 1 });
+    else seed = (seed * 48271) % 2147483647;
+  }
 
   const W = 560, H = 132, LEFT = 10, BOTTOM = 112;
   const stepW = (W - LEFT * 2) / 16;
@@ -35,8 +43,9 @@
                  value={feel} label="Feel" testid="humanize-feel" onchange={pickFeel} />
       <span class="sub">{feel ? 'a named feel — fine-tune below' : 'your own amounts'}</span>
     </div>
-    <button type="button" class="ctl again" onclick={() => (seed = (seed * 48271) % 2147483647)}
-            title="Show another bar with the same amounts">↻ another bar</button>
+    <button type="button" class="ctl again" onclick={reroll} data-testid="humanize-reroll"
+            title={mod.humanizeFreeze ? 'Try the next frozen roll' : 'Show another bar with the same amounts'}>
+      ↻ {mod.humanizeFreeze ? `another roll (#${mod.humanizeSeed})` : 'another bar'}</button>
   </div>
 
   <svg class="picture" viewBox={`0 0 ${W} ${H}`} role="img" data-testid="humanize-picture"
@@ -73,7 +82,26 @@
       <ScrubValue value={mod.humanizeGatePercent} min={0} max={100} unit="%" label="Humanize note length" testid="humanize-gate"
                   format={(v) => (v === 0 ? 'off' : `±${v}`)} onchange={(v) => set({ humanizeGatePercent: v })} />
     </div>
+    <div class="mf"><span class="lbl">Lay back</span>
+      <ScrubValue value={mod.humanizeLayBackBeats} min={0} max={0.125} step={0.005} label="Lay back" testid="humanize-layback"
+                  format={(v) => (v === 0 ? 'off' : `${beatsToMs(v, tempo)} ms`)}
+                  title="Every note this much late: a relaxed, behind-the-beat feel"
+                  onchange={(v) => set({ humanizeLayBackBeats: v })} />
+    </div>
+    <div class="mf"><span class="lbl">Swing</span>
+      <ScrubValue value={Math.round(mod.humanizeSwing * 100)} min={0} max={75} label="Swing" testid="humanize-swing"
+                  format={(v) => (v === 0 ? 'off' : `${v}%`)} onchange={(v) => set({ humanizeSwing: v / 100 })} />
+      <Segmented options={GRIDS} value={mod.humanizeSwingGrid} label="Swing grid" testid="humanize-swing-grid"
+                 onchange={(v) => set({ humanizeSwingGrid: v })} />
+    </div>
+    <div class="mf"><span class="lbl">Beat accent</span>
+      <ScrubValue value={mod.humanizeAccent} min={0} max={40} label="Beat accent" testid="humanize-accent"
+                  format={(v) => (v === 0 ? 'off' : `+${v}`)} onchange={(v) => set({ humanizeAccent: v })} />
+    </div>
     <div class="toggles">
+      <PropertyToggle compact label="Freeze the roll" value={mod.humanizeFreeze}
+                      title="The same notes in the same place of the bar come out the same way every time"
+                      onchange={(on) => set({ humanizeFreeze: on })} />
       <PropertyToggle compact label="Keep chords together" value={mod.humanizePreserveChords}
                       onchange={(on) => set({ humanizePreserveChords: on })} />
       <PropertyToggle compact label="Protect whole beats" value={mod.humanizeProtectBeats}

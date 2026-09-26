@@ -131,14 +131,29 @@ void MidiInsertRack::configure (Module& module, const MidiSlot& slot)
     }
     else
     {
+        // The Amount scales the module's main effect here, on the way to the engine; the
+        // slot keeps the values that were set.
+        auto mod = slot.mod;
+        const auto a = juce::jlimit (0.0f, 1.0f, slot.amount);
+        if (a < 1.0f)
+        {
+            mod.strumBeats *= (double) a;
+            mod.humanizeTimingBeats *= (double) a;
+            mod.humanizeVelocity = juce::roundToInt ((float) mod.humanizeVelocity * a);
+            mod.humanizeGatePercent = juce::roundToInt ((float) mod.humanizeGatePercent * a);
+            mod.humanizeLayBackBeats *= (double) a;
+            mod.humanizeSwing *= a;
+            mod.echoRepeats = juce::roundToInt ((float) mod.echoRepeats * a);
+            mod.chance = 1.0f - (1.0f - mod.chance) * a;
+        }
         if (module.echo != nullptr)
         {
-            module.echo->setSettings (slot.mod);
+            module.echo->setSettings (mod);
             module.echo->setScaleMask (scaleMask (slot.fx.scaleType, slot.fx.scaleRoot));
         }
-        if (module.strum != nullptr)    module.strum->setSettings (slot.mod);
-        if (module.humanize != nullptr) module.humanize->setSettings (slot.mod);
-        if (module.chance != nullptr)   module.chance->setSettings (slot.mod);
+        if (module.strum != nullptr)    module.strum->setSettings (mod);
+        if (module.humanize != nullptr) module.humanize->setSettings (mod);
+        if (module.chance != nullptr)   module.chance->setSettings (mod);
         if (module.length != nullptr)   module.length->setSettings (slot.mod);
         if (module.latch != nullptr)    module.latch->setSettings (slot.mod);
         if (module.mpe != nullptr)      module.mpe->setSettings (slot.mod);
@@ -276,6 +291,10 @@ void MidiInsertRack::process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
             continue;
         }
 
+        // The module's light: did it change anything this block?
+        if (! sameEvents (front, back))
+            module->activity.fetch_add (1, std::memory_order_relaxed);
+
         front.swapWith (back);
     }
 
@@ -353,6 +372,33 @@ MidiInsertRack::ChordsLive MidiInsertRack::chordsLive (const juce::String& slotI
     for (int pad = 0; pad < MidiFxSettings::maxPads; ++pad)
         live.padChords[pad] = module->fx->padSetChord (pad);
     return live;
+}
+
+bool MidiInsertRack::sameEvents (const juce::MidiBuffer& a, const juce::MidiBuffer& b) noexcept
+{
+    if (a.getNumEvents() != b.getNumEvents())
+        return false;
+    auto i = a.begin();
+    auto j = b.begin();
+    for (; i != a.end() && j != b.end(); ++i, ++j)
+    {
+        const auto x = *i;
+        const auto y = *j;
+        if (x.samplePosition != y.samplePosition || x.numBytes != y.numBytes
+            || std::memcmp (x.data, y.data, (size_t) x.numBytes) != 0)
+            return false;
+    }
+    return true;
+}
+
+int MidiInsertRack::moduleActivity (std::array<ModuleActivity, maxSlots>& out) const
+{
+    const juce::SpinLock::ScopedLockType sl (lock);
+    int count = 0;
+    for (const auto& module : modules)
+        if (module != nullptr && count < maxSlots)
+            out[(size_t) count++] = { module->slotId, module->activity.load (std::memory_order_relaxed) };
+    return count;
 }
 
 int MidiInsertRack::arpPatternStep() const noexcept

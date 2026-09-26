@@ -23,6 +23,7 @@
   import ResponseEditor from './midiModules/ResponseEditor.svelte';
   import EchoEditor from './midiModules/EchoEditor.svelte';
   import KeyEditor from './midiModules/KeyEditor.svelte';
+  import ModuleBar from './midiModules/ModuleBar.svelte';
   import SmallModuleEditors from './midiModules/SmallModuleEditors.svelte';
   import { RATE_CHOICES } from '../utils/arpLane.js';
   import { shapeLabel } from '../utils/chordBuilder.js';
@@ -35,6 +36,7 @@
     hostNote,
     learnKeyChord, cancelKeyChordLearn, clearKeyChord, hostChordsLive, chordPad, chordStep,
     hostMidiActivity, saveResponseProfile, removeResponseProfile, setPartKey,
+    hostModuleActivity, saveModulePreset, removeModulePreset,
   } from '../stores/instrumentHost.js';
 
   let { part } = $props();
@@ -58,6 +60,19 @@
   const keyName = (n) => `${NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`;
 
   const set = (slot, fields) => setMidiSlotOptions(part.partId, slot.slotId, fields);
+
+  // The modules' lights: a count from the host that moves whenever a module changes a note. A
+  // move lights the module for a moment, so you can see which one is doing something.
+  let busy = $state(new Set());
+  let seenCounts = {};
+  $effect(() => {
+    const counts = $hostModuleActivity[part?.partId] ?? {};
+    const moved = Object.keys(counts).filter((id) => seenCounts[id] !== undefined && counts[id] !== seenCounts[id]);
+    seenCounts = { ...counts };
+    if (!moved.length) return;
+    busy = new Set([...busy, ...moved]);
+    setTimeout(() => { busy = new Set([...busy].filter((id) => !moved.includes(id))); }, 140);
+  });
   /** The key a module plays in: the part's song key when it follows it, else its own. */
   const songKeyOf = (slot) => (slot.fx.followSongKey
     ? { root: part.keyRoot, scale: part.keyScale } : { root: slot.fx.scaleRoot, scale: slot.fx.scaleType });
@@ -287,7 +302,8 @@
               ondragstart={(e) => slotDragStart(e, slot.slotId)}
               ondragend={slotDragEnd}>⠿</span>
         <span class="slot-index">{index + 1}</span>
-        <span class="slot-light" class:on={!slot.bypassed} title={slot.bypassed ? 'Bypassed' : 'On'} aria-hidden="true"></span>
+        <span class="slot-light" class:on={!slot.bypassed} class:busy={busy.has(slot.slotId)}
+              data-testid="slot-light" title={slot.bypassed ? 'Bypassed' : 'On — flickers when it changes a note'} aria-hidden="true"></span>
         <button type="button" class="ghost slot-name"
                 onclick={() => (openSlotId = openSlotId === slot.slotId ? '' : slot.slotId)}>
           {midiSlotLabels[slot.type]}
@@ -305,6 +321,12 @@
 
       {#if openSlotId === slot.slotId}
         <div class="slot-body">
+          {#if slot.type !== 'articulation'}
+            <ModuleBar {slot} presets={$hostState.modulePresets.filter((p) => p.type === slot.type)}
+                       set={(fields) => set(slot, fields)}
+                       onsave={(name, settings) => saveModulePreset(slot.type, name, settings)}
+                       onremove={(name) => removeModulePreset(slot.type, name)} />
+          {/if}
           {#if slot.type === 'key' || slot.type === 'fx'}
             <KeyEditor fx={slot.fx} set={(fields) => set(slot, fields)} {part} {scales} {chain} labels={midiSlotLabels}
                        onsetkey={(fields) => setPartKey(part.partId, fields)} onsetslot={(s, fields) => set(s, fields)} />
@@ -584,6 +606,7 @@
   .slot-head { display: flex; align-items: center; gap: 6px; padding: 5px 6px; }
   .slot-light { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--host-text-faint, #65717c); }
   .slot-light.on { background: var(--host-active, #58a879); box-shadow: 0 0 5px var(--host-active, #58a879); }
+  .slot-light.on.busy { background: #b5ffd2; box-shadow: 0 0 9px #8cf5b5; }
   .slot-index { color: #66707b; font-size: 10px; width: 12px; }
   /* Green runs, red is bypassed — the same language as the insert rows.
      The selector carries .slot-head for weight, not for reach: this name is also a .ghost

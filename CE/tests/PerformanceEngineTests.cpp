@@ -3148,6 +3148,174 @@ void testNoteModules()
                "a stab released before the strum still sounds every string and ends every one");
     }
 
+    // -- strum and humanize extras: stroke by velocity, harder is faster, rhythm re-strums,
+    //    lay back, swing, beat accents and a frozen roll -------------------------------------
+    {
+        // A timed script through one rack: {block, sample, message}. Parked transport, so
+        // block b sample s is at (b * 256 + s) / 24000 beats.
+        struct At { int block; int sample; juce::MidiMessage message; };
+        const auto play = [] (const MidiSlot& s, std::vector<At> script, int blocks)
+        {
+            MidiInsertRack rack;
+            rack.prepare (blockSize);
+            rack.setSlots ({ s });
+            Transport clock;
+            clock.setTempo (120.0);
+            std::vector<Event> events;
+            for (int block = 0; block < blocks; ++block)
+            {
+                juce::MidiBuffer in, out;
+                for (const auto& a : script)
+                    if (a.block == block)
+                        in.addEvent (a.message, a.sample);
+                rack.process (in, out, clock.advance (blockSize, sampleRate), blockSize);
+                for (const auto metadata : out)
+                    if (metadata.getMessage().isNoteOnOrOff())
+                        events.push_back ({ block, metadata.samplePosition, metadata.getMessage().isNoteOn(),
+                                            metadata.getMessage().getNoteNumber(), metadata.getMessage().getVelocity() });
+            }
+            return events;
+        };
+        const auto on  = [] (int note, int velocity = 100) { return juce::MidiMessage::noteOn (1, note, (juce::uint8) velocity); };
+        const auto off = [] (int note) { return juce::MidiMessage::noteOff (1, note); };
+        const auto onsIn = [] (const std::vector<Event>& events)
+        {
+            std::vector<int> notes;
+            for (const auto& e : events) if (e.on) notes.push_back (e.note);
+            return notes;
+        };
+
+        auto strum = slot ("strum");
+        strum.mod.strumBeats = 0.25;
+        strum.mod.strumPattern = NoteModuleSettings::StrumPattern::byVelocity;
+        check (onsIn (play (strum, { { 0, 0, on (60, 127) }, { 0, 1, on (64, 127) }, { 0, 2, on (67, 127) } }, 60))
+                 == std::vector<int> ({ 67, 64, 60 })
+               && onsIn (play (strum, { { 0, 0, on (60, 50) }, { 0, 1, on (64, 50) }, { 0, 2, on (67, 50) } }, 60))
+                 == std::vector<int> ({ 60, 64, 67 }),
+               "by velocity: a hard hit strums down, a soft one up");
+
+        strum.mod.strumPattern = NoteModuleSettings::StrumPattern::ascending;
+        strum.mod.strumHarderFaster = true;
+        const auto spanOf = [&] (int velocity)
+        {
+            const auto events = play (strum, { { 0, 0, on (60, velocity) }, { 0, 1, on (64, velocity) }, { 0, 2, on (67, velocity) } }, 80);
+            int first = -1, last = -1;
+            for (const auto& e : events) if (e.on) { if (first < 0) first = e.block; last = e.block; }
+            return last - first;
+        };
+        check (spanOf (127) < spanOf (20), "harder is faster: a hard hit strums tighter than a soft one");
+        strum.mod.strumHarderFaster = false;
+
+        strum.mod.strumBeats = 0.0625;
+        strum.mod.strumRepeatPerBeat = 4;
+        const auto rhythm = play (strum, { { 0, 0, on (60) }, { 0, 1, on (64) }, { 0, 2, on (67) },
+                                            { 93, 0, off (60) }, { 93, 0, off (64) }, { 93, 0, off (67) } }, 160);
+        check (onsIn (rhythm).size() == 12, "re-strum: a chord held for a beat is struck on each quarter of it");
+        check (balanced (rhythm), "and every strike ends when the keys come up");
+        const auto struck = onsIn (rhythm);
+        const std::vector<int> firstTwoStrokes (struck.begin() + 3, struck.begin() + 6);
+        check (firstTwoStrokes == std::vector<int> ({ 67, 64, 60 }), "the strokes alternate: the next one is a down-stroke");
+
+        auto human = slot ("humanize");
+        human.mod.humanizeLayBackBeats = 0.1;
+        const auto laidBack = play (human, { { 0, 0, on (60) }, { 20, 0, off (60) } }, 40);
+        check (! laidBack.empty() && laidBack[0].on && laidBack[0].block == 9, "lay back: every note a tenth of a beat late");
+        human.mod.humanizeLayBackBeats = 0.0;
+
+        human.mod.humanizeSwing = 0.5f;
+        const auto swung = play (human, { { 0, 0, on (60) }, { 23, 112, on (62) }, { 40, 0, off (60) }, { 40, 0, off (62) } }, 60);
+        int onBeatBlock = -1, offBeatBlock = -1;
+        for (const auto& e : swung)
+        {
+            if (e.on && e.note == 60) onBeatBlock = e.block;
+            if (e.on && e.note == 62) offBeatBlock = e.block;
+        }
+        check (onBeatBlock == 0 && offBeatBlock == 29, "swing: the off-beat sixteenth moves late, the on-beat stays");
+        human.mod.humanizeSwing = 0.0f;
+
+        human.mod.humanizeAccent = 20;
+        std::vector<int> accented;
+        for (const auto& e : play (human, { { 0, 0, on (60) }, { 47, 0, on (62) }, { 60, 0, off (60) }, { 60, 0, off (62) } }, 70))
+            if (e.on) accented.push_back (e.velocity);
+        check (accented == std::vector<int> ({ 120, 100 }), "accent: a note on the beat is louder, one between is not");
+        human.mod.humanizeAccent = 0;
+
+        human.mod.humanizeVelocity = 30;
+        human.mod.humanizeFreeze = true;
+        std::vector<int> frozenVelocities;
+        for (const auto& e : play (human, { { 0, 0, on (60) }, { 10, 0, off (60) },
+                                            { 375, 0, on (60) }, { 385, 0, off (60) } }, 400))
+            if (e.on) frozenVelocities.push_back (e.velocity);
+        check (frozenVelocities.size() == 2 && frozenVelocities[0] == frozenVelocities[1],
+               "freeze: the same note in the same place of the bar varies the same way");
+
+        NoteModuleSettings saved;
+        saved.strumPattern = NoteModuleSettings::StrumPattern::byVelocity;
+        saved.strumHarderFaster = true;
+        saved.strumRepeatPerBeat = 3;
+        saved.humanizeLayBackBeats = 0.05;
+        saved.humanizeSwing = 0.4f;
+        saved.humanizeSwingGrid = 0.5;
+        saved.humanizeAccent = 12;
+        saved.humanizeFreeze = true;
+        saved.humanizeSeed = 77;
+        NoteModuleSettings restored;
+        noteModuleFromVar (noteModuleToVar (saved), restored);
+        check (restored.strumPattern == NoteModuleSettings::StrumPattern::byVelocity && restored.strumHarderFaster
+                 && restored.strumRepeatPerBeat == 3 && restored.humanizeLayBackBeats == 0.05
+                 && juce::approximatelyEqual (restored.humanizeSwing, 0.4f) && restored.humanizeSwingGrid == 0.5
+                 && restored.humanizeAccent == 12 && restored.humanizeFreeze && restored.humanizeSeed == 77,
+               "the strum and humanize extras survive the trip");
+    }
+
+    // -- every module: the Amount scales the effect, the light counts what it changed ------
+    {
+        auto strum = slot ("strum");
+        strum.mod.strumBeats = 0.5;
+        strum.amount = 0.0f;
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ strum });
+        juce::MidiBuffer chord;
+        for (const auto note : { 60, 64, 67 })
+            chord.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 100), 0);
+        std::set<int> blocks;
+        for (const auto& e : run (rack, chord, 60))
+            if (e.on) blocks.insert (e.block);
+        check (blocks.size() == 1, "Amount 0: a strum plays the chord at once");
+        strum.amount = 1.0f;
+        rack.setSlots ({ strum });
+        std::set<int> spread;
+        juce::MidiBuffer again;
+        for (const auto note : { 48, 52, 55 })
+            again.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 100), 0);
+        for (const auto& e : run (rack, again, 80))
+            if (e.on) spread.insert (e.block);
+        check (spread.size() == 3, "and at full Amount it spreads again, the settings untouched");
+
+        auto chance = slot ("chance");
+        chance.mod.chance = 0.0f;
+        chance.amount = 0.0f;
+        MidiInsertRack thinning;
+        thinning.prepare (blockSize);
+        thinning.setSlots ({ chance });
+        juce::MidiBuffer note;
+        note.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        check (onsOf (run (thinning, note, 2)) == 1, "Amount 0 on Chance lets every note through");
+
+        auto key = slot ("key");
+        key.fx.transpose = 12;
+        auto idle = MidiSlot::create ("key", "slot-key-idle");
+        MidiInsertRack lights;
+        lights.prepare (blockSize);
+        lights.setSlots ({ idle, key });
+        run (lights, note, 2);
+        std::array<MidiInsertRack::ModuleActivity, MidiInsertRack::maxSlots> counts;
+        const auto n = lights.moduleActivity (counts);
+        check (n == 2 && counts[0].count == 0 && counts[1].count > 0,
+               "the light counts only the module that changed something");
+    }
+
     // -- strum --------------------------------------------------------------------------
     {
         auto strum = slot ("strum");

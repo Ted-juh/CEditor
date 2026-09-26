@@ -310,6 +310,7 @@ const char* NoteModuleSettings::strumPatternName (StrumPattern pattern) noexcept
         case StrumPattern::outsideIn:  return "outside in";
         case StrumPattern::insideOut:  return "inside out";
         case StrumPattern::random:     return "random";
+        case StrumPattern::byVelocity: return "by velocity";
     }
     return "ascending";
 }
@@ -317,7 +318,7 @@ const char* NoteModuleSettings::strumPatternName (StrumPattern pattern) noexcept
 NoteModuleSettings::StrumPattern NoteModuleSettings::strumPatternFromName (
     const juce::String& name) noexcept
 {
-    for (int i = 0; i <= (int) StrumPattern::random; ++i)
+    for (int i = 0; i <= (int) StrumPattern::byVelocity; ++i)
         if (name == strumPatternName ((StrumPattern) i))
             return (StrumPattern) i;
     return StrumPattern::ascending;
@@ -2064,6 +2065,14 @@ juce::var noteModuleToVar (const NoteModuleSettings& settings)
     m->setProperty ("strumCurve",      settings.strumCurve);
     m->setProperty ("strumVelocityRamp", settings.strumVelocityRamp);
     m->setProperty ("strumGuitar",     settings.strumGuitar);
+    m->setProperty ("strumHarderFaster", settings.strumHarderFaster);
+    m->setProperty ("strumRepeatPerBeat", settings.strumRepeatPerBeat);
+    m->setProperty ("humanizeLayBackBeats", settings.humanizeLayBackBeats);
+    m->setProperty ("humanizeSwing",   settings.humanizeSwing);
+    m->setProperty ("humanizeSwingGrid", settings.humanizeSwingGrid);
+    m->setProperty ("humanizeAccent",  settings.humanizeAccent);
+    m->setProperty ("humanizeFreeze",  settings.humanizeFreeze);
+    m->setProperty ("humanizeSeed",    settings.humanizeSeed);
     m->setProperty ("humanizeTimingBeats", settings.humanizeTimingBeats);
     m->setProperty ("humanizeVelocity",    settings.humanizeVelocity);
     m->setProperty ("humanizeGatePercent", settings.humanizeGatePercent);
@@ -2153,6 +2162,17 @@ void noteModuleFromVar (const juce::var& stored, NoteModuleSettings& out)
     out.strumCurve    = (float) doubleOf ("strumCurve", 0.0, -1.0, 1.0);
     out.strumVelocityRamp = intOf ("strumVelocityRamp", 0, -64, 64);
     out.strumGuitar   = (bool) stored.getProperty ("strumGuitar", false);
+    out.strumHarderFaster = (bool) stored.getProperty ("strumHarderFaster", false);
+    {
+        const auto repeat = intOf ("strumRepeatPerBeat", 0, 0, 4);
+        out.strumRepeatPerBeat = repeat == 1 ? 0 : repeat;
+    }
+    out.humanizeLayBackBeats = doubleOf ("humanizeLayBackBeats", 0.0, 0.0, 0.125);
+    out.humanizeSwing = (float) doubleOf ("humanizeSwing", 0.0, 0.0, 0.75);
+    out.humanizeSwingGrid = doubleOf ("humanizeSwingGrid", 0.25, 0.25, 0.5) >= 0.375 ? 0.5 : 0.25;
+    out.humanizeAccent = intOf ("humanizeAccent", 0, 0, 40);
+    out.humanizeFreeze = (bool) stored.getProperty ("humanizeFreeze", false);
+    out.humanizeSeed = intOf ("humanizeSeed", 1, 1, 9999);
     out.humanizeTimingBeats = doubleOf ("humanizeTimingBeats", 0.0, 0.0, 0.25);
     out.humanizeVelocity    = intOf ("humanizeVelocity", 0, 0, 64);
     out.humanizeGatePercent = intOf ("humanizeGatePercent", 0, 0, 100);
@@ -2247,6 +2267,7 @@ juce::var midiSlotToVar (const MidiSlot& slot)
     s->setProperty ("slotId",   slot.slotId);
     s->setProperty ("type",     slot.type);
     s->setProperty ("bypassed", slot.bypassed);
+    s->setProperty ("amount",   slot.amount);
     s->setProperty ("arp",      arpToVar (slot.arp));
     s->setProperty ("fx",       midiFxToVar (slot.fx));
     s->setProperty ("mod",      noteModuleToVar (slot.mod));
@@ -2265,6 +2286,7 @@ void midiSlotFromVar (const juce::var& stored, MidiSlot& out)
     const auto migrated = MidiSlot::canonicalType (type);
     out.type     = MidiSlot::types().contains (migrated) ? migrated : juce::String ("arp");
     out.bypassed = (bool) stored.getProperty ("bypassed", false);
+    out.amount   = juce::jlimit (0.0f, 1.0f, (float) (double) stored.getProperty ("amount", 1.0));
     arpFromVar (stored.getProperty ("arp", {}), out.arp);
     midiFxFromVar (stored.getProperty ("fx", {}), out.fx);
     noteModuleFromVar (stored.getProperty ("mod", {}), out.mod);

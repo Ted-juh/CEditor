@@ -6861,6 +6861,35 @@ void testSongKey()
         check (! (bool) arpFx.getProperty ("followSongKey", true) && arpFx.getProperty ("scaleType", {}).toString() == "dorian"
                  && (int) arpFx.getProperty ("scaleRoot", 0) == 2,
                "the arpeggiator can be given a key of its own");
+
+        // A module's Amount is a parameter like any other: listed, readable, writable.
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "strum" } });
+        const auto withStrum = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                                   .getProperty ("midiChain", {});
+        const auto strumId = withStrum[withStrum.size() - 1].getProperty ("slotId", {}).toString();
+        h.emits.clear();
+        h.cmd ("getParameters", { { "partId", partId } });
+        const auto params = h.emits.entries.back().payload.getProperty ("parameters", {});
+        juce::var amount;
+        for (int i = 0; i < params.size(); ++i)
+            if (params[i].getProperty ("id", {}).toString() == "@amount:" + strumId)
+                amount = params[i];
+        check (amount.isObject() && amount.getProperty ("group", {}).toString() == "MIDI modules"
+                 && amount.getProperty ("name", {}).toString() == juce::String (juce::CharPointer_UTF8 ("Amount \xe2\x80\x94 Strum"))
+                 && juce::approximatelyEqual ((float) (double) amount.getProperty ("value", 0.0), 1.0f),
+               "each strum, humanize, echo and chance module lists its Amount");
+        h.cmd ("setParameter", { { "partId", partId }, { "id", "@amount:" + strumId }, { "value", 0.25 } });
+        const auto after2 = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                                .getProperty ("midiChain", {});
+        check (juce::approximatelyEqual ((float) (double) after2[after2.size() - 1].getProperty ("amount", 0.0), 0.25f),
+               "and a knob on it sets the module's Amount");
+
+        // Module presets: saved per type, listed in the state, removed by name.
+        h.cmd ("saveModulePreset", { { "type", "strum" }, { "name", "Folk" },
+                                     { "settings", juce::var (new juce::DynamicObject()) } });
+        check (h.emits.lastState()->getProperty ("modulePresets", {}).size() == 1, "a module preset is saved");
+        h.cmd ("removeModulePreset", { { "type", "strum" }, { "name", "Folk" } });
+        check (h.emits.lastState()->getProperty ("modulePresets", {}).size() == 0, "and removed");
     }
     {
         Harness h (dir);

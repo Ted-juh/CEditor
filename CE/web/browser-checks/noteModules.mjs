@@ -220,6 +220,60 @@ try {
   assert.equal(await page.locator('[data-testid=humanize-feel] [aria-pressed=true]').count(), 0,
     'changing an amount by hand leaves the named feels');
   assert.equal(await page.getByTestId('humanize-picture').locator('rect.stem').count(), 16, 'a bar of sixteen notes');
+  // Humanize extras: freeze picks a fixed roll that "another roll" steps through.
+  const humanEd = page.getByTestId('humanize-editor');
+  await humanEd.getByRole('switch', { name: 'Freeze the roll' }).click();
+  assert.match(await humanEd.getByTestId('humanize-reroll').innerText(), /another roll \(#1\)/);
+  await humanEd.getByTestId('humanize-reroll').click();
+  assert.match(await humanEd.getByTestId('humanize-reroll').innerText(), /#2/, 'frozen, the button steps to the next roll');
+  await humanEd.getByTestId('humanize-swing').press('ArrowUp');
+  assert.equal(await humanEd.getByTestId('humanize-swing').innerText(), '1%');
+
+  // Every module: presets, A/B, Amount and the light (on the Strum module)
+  await strumRow.click();
+  const strumSlot = page.locator('[data-testid=midi-slot]').filter({ has: page.locator('.slot-name', { hasText: /^Strum/ }) });
+  const bar = strumSlot.getByTestId('module-bar');
+  const spreadNow = () => strumSlot.getByTestId('strum-spread').innerText();
+  await bar.getByTestId('module-save').click();
+  await bar.getByLabel('Preset name').fill('Folk');
+  await bar.getByLabel('Preset name').press('Enter');
+  assert.equal(await bar.locator('.chip[data-name=Folk]').count(), 1, 'a preset is saved for the Strum type');
+  const saved = await spreadNow();
+  await strumSlot.getByTestId('strum-spread').press('ArrowUp');
+  assert.notEqual(await spreadNow(), saved);
+  await bar.locator('.chip[data-name=Folk]').click();
+  assert.equal(await spreadNow(), saved, 'loading the preset brings its settings back');
+
+  await bar.locator('[data-testid=module-ab] [data-value=B]').click();
+  await strumSlot.getByTestId('strum-spread').press('ArrowUp');
+  const onB = await spreadNow();
+  await bar.locator('[data-testid=module-ab] [data-value=A]').click();
+  assert.equal(await spreadNow(), saved, 'A is what it was');
+  await bar.locator('[data-testid=module-ab] [data-value=B]').click();
+  assert.equal(await spreadNow(), onB, 'and B is the version changed on B');
+
+  await bar.getByTestId('module-amount').press('ArrowDown');
+  assert.equal(await bar.getByTestId('module-amount').getAttribute('aria-valuenow'), '95', 'the Amount scrubs');
+
+  await strumSlot.locator('[data-testid=strum-stroke] [data-value="by velocity"]').click();
+  await strumSlot.locator('[data-testid=strum-repeat] [data-value="4"]').click();
+  assert.match(await strumSlot.innerText(), /the held chord, 4× a beat/, 're-strum is set per beat');
+
+  const strumId = await strumSlot.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    let state; store.hostState.subscribe((v) => { state = v; })();
+    const part = state.rack.parts[0];
+    return [part.partId, part.midiChain.find((s) => s.type === 'strum').slotId];
+  });
+  const light = strumSlot.getByTestId('slot-light');
+  await page.evaluate(async ([partId, slotId]) => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostModuleActivity.set({ [partId]: { [slotId]: 1 } });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    store.hostModuleActivity.set({ [partId]: { [slotId]: 2 } });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }, strumId);
+  assert.match(await light.getAttribute('class'), /busy/, 'the light flickers when the module changes a note');
 
   // Chords: the set, the builder, and the two layers
   await add.selectOption('chord');

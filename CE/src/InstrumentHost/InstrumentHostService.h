@@ -1075,6 +1075,16 @@ private:
         thumbnails rather than in the Performance. */
     /** Velocity/expression calibrations, per keyboard: named, with the port name they belong
         to. A fact about the owner's hands and desk, so it lives beside the catalogue. */
+    /** Module settings saved by name, per module type ("saveModulePreset"). */
+    juce::File modulePresetsFile() const
+    {
+        return options.dataDirectory.getChildFile ("module-presets.json");
+    }
+    const juce::Array<juce::var>& loadModulePresets() const;
+    mutable juce::Array<juce::var> modulePresetsCache;
+    mutable bool modulePresetsLoaded = false;
+    std::map<juce::String, juce::String> lastModuleActivityByPart;
+
     juce::File responseProfilesFile() const
     {
         return options.dataDirectory.getChildFile ("response-profiles.json");

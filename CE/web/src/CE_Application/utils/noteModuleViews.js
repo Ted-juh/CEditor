@@ -15,9 +15,11 @@ export function strokePosition(rank, count, feel) {
 /** StrumEngine::makeOrder: which chord note (0 = lowest) sounds at each rank. `secondStroke`
     shows the other half of "alternate" (the engine flips every chord). Random uses a fixed
     shuffle here, since the picture has to stand still. */
-export function strumOrder(pattern, count, secondStroke = false) {
+export function strumOrder(pattern, count, secondStroke = false, velocity = 100) {
   const order = Array.from({ length: count }, (_, i) => i);
   let stroke = pattern;
+  // By velocity: a hard hit (90 and up) is a down-stroke, a softer one an up-stroke.
+  if (stroke === 'by velocity') stroke = velocity >= 90 ? 'descending' : 'ascending';
   if (stroke === 'alternate') stroke = secondStroke ? 'descending' : 'ascending';
   if (stroke === 'descending') return order.reverse();
   if (stroke === 'outside in') {
@@ -43,14 +45,17 @@ export function strumOrder(pattern, count, secondStroke = false) {
 
 /** One strummed chord as the engine would play it: for each rank, which note, when (in beats
     after the chord) and at what velocity. StrumEngine::dealOut. */
-export function strumNotes({ pattern, spreadBeats, feel, velocityRamp }, notes, played = 100, secondStroke = false) {
+export function strumNotes({ pattern, spreadBeats, feel, velocityRamp, harderFaster = false }, notes, played = 100,
+  secondStroke = false) {
   const sorted = [...notes].sort((a, b) => a - b);
-  return strumOrder(pattern, sorted.length, secondStroke).map((index, rank) => {
+  // Harder is faster: half the spread at full velocity, half again as much at the softest.
+  const spread = spreadBeats * (harderFaster ? Math.min(1.5, Math.max(0.5, 1.5 - played / 127)) : 1);
+  return strumOrder(pattern, sorted.length, secondStroke, played).map((index, rank) => {
     const position = strokePosition(rank, sorted.length, feel);
     return {
       note: sorted[index],
       rank,
-      atBeats: spreadBeats * position,
+      atBeats: spread * position,
       velocity: Math.max(1, Math.min(127, played + Math.round((Number(velocityRamp) || 0) * position))),
     };
   });
@@ -120,15 +125,25 @@ export const beatsToMs = (beats, tempo) => Math.round((Number(beats) || 0) * 600
 /** A repeatable example bar for the Humanize picture: sixteen sixteenth notes, each pushed late
     by up to `timing` beats and varied by up to `velocity`. HumanizeEngine only ever delays (it
     cannot play early), and so does this. Same seed, same bar. */
-export function humanizeExample({ timing, velocity, protectBeats = false }, seed = 7, base = 96) {
+export function humanizeExample({ timing, velocity, protectBeats = false, layBack = 0, swing = 0, swingGrid = 0.25,
+  accent = 0 }, seed = 7, base = 96) {
   let state = seed >>> 0 || 7;
   const next = () => { state ^= state << 13; state >>>= 0; state ^= state >>> 17; state ^= state << 5; state >>>= 0; return state / 4294967296; };
-  return Array.from({ length: 16 }, (_, i) => ({
-    step: i,
-    // "Protect whole beats": a note on the beat (every fourth sixteenth) is never moved.
-    lateBeats: (protectBeats && i % 4 === 0 ? (next(), 0) : next()) * Math.max(0, Number(timing) || 0),
-    velocity: Math.max(1, Math.min(127, Math.round(base + (next() * 2 - 1) * (Number(velocity) || 0)))),
-  }));
+  return Array.from({ length: 16 }, (_, i) => {
+    const at = i * 0.25;
+    // HumanizeEngine::swingDelay: the off-beat of each pair on the swing grid moves late.
+    const pos = at / swingGrid;
+    const swung = swing > 0 && Math.abs(pos - Math.round(pos)) <= 0.1 && Math.round(pos) % 2 === 1
+      ? swingGrid * swing * 0.5 : 0;
+    return {
+      step: i,
+      // "Protect whole beats": a note on the beat (every fourth sixteenth) is never moved at random.
+      lateBeats: (protectBeats && i % 4 === 0 ? (next(), 0) : next()) * Math.max(0, Number(timing) || 0)
+        + (Number(layBack) || 0) + swung,
+      velocity: Math.max(1, Math.min(127, Math.round(base + (i % 4 === 0 ? Number(accent) || 0 : 0)
+        + (next() * 2 - 1) * (Number(velocity) || 0)))),
+    };
+  });
 }
 
 const SCALE_DEGREES = {

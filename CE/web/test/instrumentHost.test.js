@@ -5062,6 +5062,25 @@ test('the Key module and the song key: old names migrate, parts carry a key, new
   assert.deepEqual([state.rack.parts[0].keyRoot, state.rack.parts[0].keyScale], [7, 'mixolydian']);
 });
 
+test('module Amount and presets: normalized, and the mock saves, replaces and removes by type and name', () => {
+  assert.equal(normalizeMidiSlot({ type: 'strum' }).amount, 1, 'a module applies all of its effect by default');
+  assert.equal(normalizeMidiSlot({ type: 'strum', amount: 3 }).amount, 1);
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'strum' });
+  const slotId = state.rack.parts[0].midiChain.at(-1).slotId;
+  state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId, amount: 0.4 });
+  assert.equal(state.rack.parts[0].midiChain.at(-1).amount, 0.4);
+  state = applyMockCommand(state, { cmd: 'saveModulePreset', type: 'strum', name: 'Folk', settings: { strumBeats: 0.25 } });
+  state = applyMockCommand(state, { cmd: 'saveModulePreset', type: 'strum', name: 'Folk', settings: { strumBeats: 0.5 } });
+  assert.equal(state.modulePresets.length, 1);
+  assert.equal(state.modulePresets[0].settings.strumBeats, 0.5, 'saving a name again replaces it');
+  const shaped = normalizeHostState({ modulePresets: [{ type: 'scale', name: 'Old', settings: {} }, { type: 'wobble', name: 'x' }] });
+  assert.deepEqual(shaped.modulePresets.map((p) => p.type), ['key'], 'old type names read as Key; unknown ones are dropped');
+  state = applyMockCommand(state, { cmd: 'removeModulePreset', type: 'strum', name: 'Folk' });
+  assert.deepEqual(state.modulePresets, []);
+});
+
 test('Smart Chorder inversion, voicing and nearest-motion rules match the native engine', () => {
   assert.deepEqual(applySmartChordVoicing([60, 64, 67], { inversion: 1 }), [64, 67, 72]);
   assert.deepEqual(applySmartChordVoicing([60, 64, 67], { voicing: 'open' }), [60, 67, 76]);

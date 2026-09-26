@@ -88,3 +88,18 @@ test('echo, chance and length pictures follow the engines', async () => {
   assert.deepEqual(lengthOut({ lengthBeats: 0.25, lengthMode: 'fixed', legato: false }, played), [0.25, 0.25]);
   assert.deepEqual(lengthOut({ lengthBeats: 0, legato: true }, played), [1, 0.6]);
 });
+
+test('strum by velocity and harder-is-faster, humanize lay back, swing and accents', async () => {
+  const { strumNotes, strumOrder, humanizeExample } = await import('../src/CE_Application/utils/noteModuleViews.js');
+  assert.deepEqual(strumOrder('by velocity', 3, false, 127), [2, 1, 0], 'a hard hit strums down');
+  assert.deepEqual(strumOrder('by velocity', 3, false, 50), [0, 1, 2], 'a soft one up');
+  const base = { pattern: 'ascending', spreadBeats: 0.5, feel: 0, velocityRamp: 0, harderFaster: true };
+  const loud = strumNotes(base, [60, 64, 67], 127).at(-1).atBeats;
+  const soft = strumNotes(base, [60, 64, 67], 20).at(-1).atBeats;
+  assert.ok(loud < soft, 'harder is faster');
+  const bar = humanizeExample({ timing: 0, velocity: 0, layBack: 0.05, swing: 0.5, swingGrid: 0.25, accent: 10 }, 7, 90);
+  assert.equal(bar[0].lateBeats, 0.05, 'lay back moves every note');
+  assert.equal(bar[1].lateBeats, 0.05 + 0.0625, 'swing moves the off-beat sixteenth on top');
+  assert.equal(bar[0].velocity, 100, 'the beat is accented');
+  assert.equal(bar[1].velocity, 90);
+});

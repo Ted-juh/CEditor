@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -92,6 +93,19 @@ public:
         for (int i = 0; i < count; ++i)
             out.addEvent (events[(size_t) i].message, position);
         count = 0;
+    }
+
+    /** Removes every queued note-on for this note (a key let go before its re-strum came). */
+    void removeNoteOns (int channel, int note) noexcept
+    {
+        int kept = 0;
+        for (int i = 0; i < count; ++i)
+        {
+            const auto& message = events[(size_t) i].message;
+            if (! (message.isNoteOn() && message.getChannel() == channel && message.getNoteNumber() == note))
+                events[(size_t) kept++] = events[(size_t) i];
+        }
+        count = kept;
     }
 
     /** Removes the first queued note-off for this note. False when there was none. */
@@ -286,6 +300,8 @@ public:
         curve.store (juce::jlimit (-1.0f, 1.0f, settings.strumCurve));
         velocityRamp.store (juce::jlimit (-64, 64, settings.strumVelocityRamp));
         guitar.store (settings.strumGuitar);
+        harderFaster.store (settings.strumHarderFaster);
+        repeatPerBeat.store (settings.strumRepeatPerBeat >= 2 ? juce::jmin (4, settings.strumRepeatPerBeat) : 0);
     }
 
     static constexpr int strings = 6;
@@ -407,8 +423,8 @@ public:
 
         // Spreading nothing must not cost the collection window's latency. A strum turned off
         // is a wire, not a very fast strum.
-        if (spreadPpq.load() <= 0.0 && ! guitar.load() && collecting == 0 && trackedNotes == 0
-            && pending.isEmpty())
+        if (spreadPpq.load() <= 0.0 && ! guitar.load() && repeatPerBeat.load() == 0
+            && collecting == 0 && trackedNotes == 0 && pending.isEmpty() && ringingCount == 0)
         {
             for (const auto metadata : in)
                 out.addEvent (metadata.getMessage(), metadata.samplePosition);
@@ -451,6 +467,9 @@ public:
                                     metadata.samplePosition))
                     goto nextEvent;
 
+                // It stops ringing, and a re-strum of it still waiting must not start.
+                stopRinging (message.getChannel(), message.getNoteNumber());
+
                 double releaseDelay = 0.0;
                 if (takeReleaseDelay (message.getChannel(), message.getNoteNumber(), releaseDelay))
                 {
@@ -469,6 +488,20 @@ public:
         if (collecting > 0 && window.end >= collectUntil)
             dealOut (out, block, numSamples, window);
 
+        // Rhythm: the chord still held is strummed again on each tick of the beat, the
+        // direction alternating, until its keys come up.
+        if (const auto per = repeatPerBeat.load(); per > 0 && ringingCount > 0)
+        {
+            const auto tick = 1.0 / (double) per;
+            for (auto t = std::ceil (window.start / tick) * tick; t < window.end; t += tick)
+            {
+                if (t <= lastStrumAt + tick * 0.5)
+                    continue;      // too close to the stroke you played
+                restrum (t);
+                lastStrumAt = t;
+            }
+        }
+
         // An off delayed by less than this block belongs in this block, not one buffer late.
         pending.flushDue (out, window.start, window.end, block, numSamples);
     }
@@ -476,6 +509,7 @@ public:
     void allNotesOff (juce::MidiBuffer& out, int position) noexcept
     {
         collecting = 0;
+        ringingCount = 0;
         pending.dropNoteOns();
         pending.flushAll (out, position);
         for (int channel = 0; channel < 16; ++channel)
@@ -510,6 +544,7 @@ private:
         for (int i = 0; i < set.count; ++i)
         {
             const auto emitted = (int) set.notes[i];
+            stopRinging (channel, emitted);
             const auto off = juce::MidiMessage::noteOff (channel, emitted);
             double delay = 0.0;
             if (takeReleaseDelay (channel, emitted, delay) && delay > 0.0)
@@ -602,10 +637,15 @@ private:
     }
 
     void makeOrder (NoteModuleSettings::StrumPattern stroke, int count,
-                    int (&order)[maxChord]) noexcept
+                    int (&order)[maxChord], int averageVelocity = 100) noexcept
     {
         for (int i = 0; i < count; ++i)
             order[i] = i;
+
+        // By velocity: a hard hit is a down-stroke (high to low), a soft one an up-stroke.
+        if (stroke == NoteModuleSettings::StrumPattern::byVelocity)
+            stroke = averageVelocity >= 90 ? NoteModuleSettings::StrumPattern::descending
+                                           : NoteModuleSettings::StrumPattern::ascending;
 
         if (stroke == NoteModuleSettings::StrumPattern::alternate)
         {
@@ -698,11 +738,19 @@ private:
             collected[(size_t) (j + 1)] = held;
         }
 
-        const auto spread = spreadPpq.load();
+        auto averageVelocity = 0;
+        for (int i = 0; i < collecting; ++i)
+            averageVelocity += collected[(size_t) i].message.getVelocity();
+        averageVelocity /= juce::jmax (1, collecting);
+
+        // Harder is faster: a hard hit strums in half the spread, a soft one in half again as
+        // much, the way a pick moves quicker when you dig in.
+        const auto spread = spreadPpq.load()
+                          * (harderFaster.load() ? juce::jlimit (0.5, 1.5, 1.5 - (double) averageVelocity / 127.0) : 1.0);
         const auto shape = curve.load();
         const auto velocityChange = velocityRamp.load();
         int order[maxChord] {};
-        makeOrder ((NoteModuleSettings::StrumPattern) pattern.load(), collecting, order);
+        makeOrder ((NoteModuleSettings::StrumPattern) pattern.load(), collecting, order, averageVelocity);
 
         for (int rank = 0; rank < collecting; ++rank)
         {
@@ -728,8 +776,58 @@ private:
             }
         }
 
+        // What is still held rings on, for the rhythm re-strum.
+        ringingCount = 0;
+        for (int i = 0; i < collecting && ringingCount < maxChord; ++i)
+        {
+            const auto& w = collected[(size_t) i];
+            if (! w.hasNoteOff)
+                ringing[(size_t) ringingCount++] = { w.message.getChannel(), w.message.getNoteNumber(),
+                                                     w.message.getVelocity() };
+        }
+        lastStrumAt = collectUntil;
+        restrumDown = false;
+        lastSpread = spread;
+
         collecting = 0;
         pending.flushDue (out, window.start, window.end, block, numSamples);
+    }
+
+    void stopRinging (int channel, int note) noexcept
+    {
+        for (int i = 0; i < ringingCount;)
+        {
+            if (ringing[(size_t) i].channel == channel && ringing[(size_t) i].note == note)
+            {
+                pending.removeNoteOns (channel, note);
+                ringing[(size_t) i] = ringing[(size_t) --ringingCount];
+            }
+            else
+                ++i;
+        }
+    }
+
+    /** One more stroke of the chord still held, at `t`: everything ringing stops, then plays
+        again across the spread, up and down in turn; the up-strokes a little softer. */
+    void restrum (double t) noexcept
+    {
+        // Pitch order, so the stroke order means low-to-high.
+        std::array<Ringing, maxChord> sorted = ringing;
+        std::sort (sorted.begin(), sorted.begin() + ringingCount,
+                   [] (const Ringing& a, const Ringing& b) { return a.note < b.note; });
+        for (int i = 0; i < ringingCount; ++i)
+            pending.add (t, juce::MidiMessage::noteOff (sorted[(size_t) i].channel, sorted[(size_t) i].note));
+
+        restrumDown = ! restrumDown;
+        const auto shape = curve.load();
+        for (int rank = 0; rank < ringingCount; ++rank)
+        {
+            const auto index = restrumDown ? ringingCount - 1 - rank : rank;
+            const auto& r = sorted[(size_t) index];
+            const auto velocity = restrumDown ? (int) r.velocity : juce::roundToInt ((float) r.velocity * 0.8f);
+            pending.add (t + lastSpread * strokePosition (rank, ringingCount, shape),
+                         juce::MidiMessage::noteOn (r.channel, r.note, (juce::uint8) juce::jlimit (1, 127, velocity)));
+        }
     }
 
     ModuleClock clock;
@@ -747,6 +845,14 @@ private:
     std::atomic<float> curve { 0.0f };
     std::atomic<int> velocityRamp { 0 };
     std::atomic<bool> guitar { false };
+    std::atomic<bool> harderFaster { false };
+    std::atomic<int> repeatPerBeat { 0 };
+    struct Ringing { int channel = 1; int note = 0; juce::uint8 velocity = 100; };
+    std::array<Ringing, maxChord> ringing {};
+    int ringingCount = 0;
+    double lastStrumAt = 0.0;
+    double lastSpread = 0.0;
+    bool restrumDown = false;
     std::array<std::array<StringSet, 128>, 16> stringsOf {};
     bool alternateDescending = false;
     juce::uint32 randomState = 0x51f15e1du;
@@ -773,6 +879,38 @@ public:
         gateAmount.store (juce::jlimit (0, 100, settings.humanizeGatePercent));
         preserveChords.store (settings.humanizePreserveChords);
         protectBeats.store (settings.humanizeProtectBeats);
+        layBackPpq.store (juce::jlimit (0.0, 0.125, settings.humanizeLayBackBeats));
+        swingAmount.store (juce::jlimit (0.0f, 0.75f, settings.humanizeSwing));
+        swingGrid.store (settings.humanizeSwingGrid >= 0.375 ? 0.5 : 0.25);
+        accentAmount.store (juce::jlimit (0, 40, settings.humanizeAccent));
+        frozen.store (settings.humanizeFreeze);
+        seed.store (juce::jlimit (1, 9999, settings.humanizeSeed));
+    }
+
+    /** A number in [0, 1) fixed by where a note is in a four-beat bar, which note it is and
+        what it is for, so a frozen humanize plays the same notes the same way every time. */
+    static double frozenRoll (double atPpq, int note, int salt, int seed) noexcept
+    {
+        auto place = (juce::uint32) juce::roundToInt (std::fmod (juce::jmax (0.0, atPpq), 4.0) * 96.0);
+        auto h = place * 0x9e3779b1u ^ (juce::uint32) note * 0x85ebca6bu ^ (juce::uint32) salt * 0xc2b2ae35u
+                 ^ (juce::uint32) seed * 0x27d4eb2fu;
+        h ^= h >> 15; h *= 0x2c1b3c6du;
+        h ^= h >> 12; h *= 0x297a2d39u;
+        h ^= h >> 15;
+        return (double) h / 4294967296.0;
+    }
+
+    /** How late the swing grid moves a note at `atPpq`: the off-beat of each pair, by the
+        amount the arpeggiator's swing uses (half the swing of one grid step). */
+    static double swingDelay (double atPpq, double grid, float swing) noexcept
+    {
+        if (swing <= 0.0f)
+            return 0.0;
+        const auto position = atPpq / grid;
+        const auto nearest = std::round (position);
+        if (std::abs (position - nearest) > 0.1 || ((long long) nearest % 2) == 0)
+            return 0.0;
+        return grid * (double) swing * 0.5;
     }
 
     void process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
@@ -787,6 +925,17 @@ public:
         const auto gateJitter = (double) gateAmount.load() / 100.0;
         const auto keepChordsTogether = preserveChords.load();
         const auto keepBeatAnchors = protectBeats.load();
+        const auto layBack = layBackPpq.load();
+        const auto swing = swingAmount.load();
+        const auto grid = swingGrid.load();
+        const auto accent = accentAmount.load();
+        const auto freeze = frozen.load();
+        const auto roll = seed.load();
+        // Random, or fixed by the note's place when frozen.
+        const auto chance = [&] (double atPpq, int note, int salt)
+        {
+            return freeze ? frozenRoll (atPpq, note, salt, roll) : random.nextDouble();
+        };
         auto lastAttackAt = std::numeric_limits<double>::lowest();
         auto lastAttackDelay = 0.0;
 
@@ -799,7 +948,8 @@ public:
             {
                 const auto onBeat = std::abs (at - std::round (at))
                                       <= block.ppqPerSample * 0.5;
-                auto delay = keepBeatAnchors && onBeat ? 0.0 : jitter * random.nextDouble();
+                auto delay = (keepBeatAnchors && onBeat ? 0.0 : jitter * chance (at, message.getNoteNumber(), 1))
+                             + layBack + swingDelay (at, grid, swing);
                 if (keepChordsTogether
                     && std::abs (at - lastAttackAt) <= block.ppqPerSample * 0.5)
                     delay = lastAttackDelay;
@@ -813,9 +963,11 @@ public:
                     delays[(size_t) index] = { message.getChannel(), message.getNoteNumber(),
                                               delay, at, at + delay };
 
-                auto velocity = (int) message.getVelocity();
+                auto velocity = (int) message.getVelocity() + (onBeat ? accent : 0);
                 if (velocityJitter > 0)
-                    velocity += random.nextInt (velocityJitter * 2 + 1) - velocityJitter;
+                    velocity += juce::jlimit (0, velocityJitter * 2,
+                                              (int) (chance (at, message.getNoteNumber(), 2) * (velocityJitter * 2 + 1)))
+                                - velocityJitter;
 
                 pending.add (at + delay,
                              juce::MidiMessage::noteOn (message.getChannel(),
@@ -835,7 +987,7 @@ public:
 
                 const auto playedDuration = juce::jmax (0.0, at - timing.sourceOnPpq);
                 const auto gateScale = gateJitter > 0.0
-                    ? (random.nextDouble() * 2.0 - 1.0) * gateJitter : 0.0;
+                    ? (chance (timing.sourceOnPpq, message.getNoteNumber(), 3) * 2.0 - 1.0) * gateJitter : 0.0;
                 auto releaseAt = at + timing.delayPpq + playedDuration * gateScale;
                 // The source release has arrived, so this is the earliest real-time-safe
                 // shortening. The delayed on must still sound for at least one sample.
@@ -901,6 +1053,12 @@ private:
     std::atomic<int> gateAmount { 0 };
     std::atomic<bool> preserveChords { false };
     std::atomic<bool> protectBeats { false };
+    std::atomic<double> layBackPpq { 0.0 };
+    std::atomic<float> swingAmount { 0.0f };
+    std::atomic<double> swingGrid { 0.25 };
+    std::atomic<int> accentAmount { 0 };
+    std::atomic<bool> frozen { false };
+    std::atomic<int> seed { 1 };
 };
 
 //==================================================================================================

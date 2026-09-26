@@ -25,13 +25,16 @@
     { value: 'outside in', label: '⇥ Outside in', title: 'Outer notes first, meeting in the middle' },
     { value: 'inside out', label: '⇤ Inside out', title: 'Middle notes first, spreading outwards' },
     { value: 'random', label: '✳ Scatter', title: 'A new order every chord, like a harp' },
+    { value: 'by velocity', label: '⇅ By velocity', title: 'Hard hits strum down, soft ones up' },
   ];
+  const REPEATS = [{ value: 0, label: 'off' }, { value: 2, label: '2' }, { value: 3, label: '3' }, { value: 4, label: '4' }];
+  let exampleVelocity = $state(100);
   const spreadChoices = $derived([[0, 'off'], ...beatChoices.slice(0, 7)]);
 
   let secondStroke = $state(false);
   const params = $derived({ pattern: mod.strumPattern, spreadBeats: mod.strumBeats,
-                            feel: mod.strumCurve, velocityRamp: mod.strumVelocityRamp });
-  const played = $derived(strumNotes(params, example, 100, secondStroke));
+                            feel: mod.strumCurve, velocityRamp: mod.strumVelocityRamp, harderFaster: mod.strumHarderFaster });
+  const played = $derived(strumNotes(params, example, exampleVelocity, secondStroke));
 
   // Geometry. The grid always shows a little past the spread, so the last note is not on the edge.
   const W = 560, LEFT = 44, ROW = 20, TOP = 8;
@@ -119,6 +122,21 @@
                   format={(v) => feelName(v)} title="Drag up for a quicker start, down for a slower one; or drag the handle in the picture"
                   onchange={(v) => set({ strumCurve: v })} />
       <span class="sub">{mod.strumCurve > 0 ? '+' : ''}{mod.strumCurve.toFixed(2)}</span>
+    </div>
+    <div class="mf"><span class="lbl">Harder</span>
+      <PropertyToggle compact label="is faster" value={mod.strumHarderFaster}
+                      title="A hard hit strums tighter, a soft one spreads out"
+                      onchange={(on) => set({ strumHarderFaster: on })} />
+    </div>
+    <div class="mf"><span class="lbl">Re-strum</span>
+      <Segmented options={REPEATS} value={mod.strumRepeatPerBeat} label="Re-strum per beat" testid="strum-repeat"
+                 onchange={(v) => set({ strumRepeatPerBeat: v })} />
+      <span class="sub">{mod.strumRepeatPerBeat ? `the held chord, ${mod.strumRepeatPerBeat}× a beat, down and up` : 'once per chord'}</span>
+    </div>
+    <div class="mf"><span class="lbl">Example hit</span>
+      <ScrubValue value={exampleVelocity} min={1} max={127} label="Example velocity" testid="strum-example-velocity"
+                  title="How hard the example chord is played: try it with By velocity or Harder is faster"
+                  onchange={(v) => (exampleVelocity = v)} />
     </div>
     <div class="mf"><span class="lbl">Guitar</span>
       <PropertyToggle compact label="Six strings" value={mod.strumGuitar}

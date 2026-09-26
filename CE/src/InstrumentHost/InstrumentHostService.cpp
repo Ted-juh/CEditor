@@ -454,6 +454,18 @@ namespace
         if (fields.hasProperty ("strumCurve"))     mod.strumCurve = juce::jlimit (-1.0f, 1.0f, (float) (double) payload["strumCurve"]);
         if (fields.hasProperty ("strumVelocityRamp")) mod.strumVelocityRamp = juce::jlimit (-64, 64, (int) payload["strumVelocityRamp"]);
         if (fields.hasProperty ("strumGuitar"))    mod.strumGuitar = (bool) payload["strumGuitar"];
+        if (fields.hasProperty ("strumHarderFaster")) mod.strumHarderFaster = (bool) payload["strumHarderFaster"];
+        if (fields.hasProperty ("strumRepeatPerBeat"))
+        {
+            const auto repeat = juce::jlimit (0, 4, (int) payload["strumRepeatPerBeat"]);
+            mod.strumRepeatPerBeat = repeat == 1 ? 0 : repeat;
+        }
+        if (fields.hasProperty ("humanizeLayBackBeats")) mod.humanizeLayBackBeats = juce::jlimit (0.0, 0.125, (double) payload["humanizeLayBackBeats"]);
+        if (fields.hasProperty ("humanizeSwing"))  mod.humanizeSwing = juce::jlimit (0.0f, 0.75f, (float) (double) payload["humanizeSwing"]);
+        if (fields.hasProperty ("humanizeSwingGrid")) mod.humanizeSwingGrid = (double) payload["humanizeSwingGrid"] >= 0.375 ? 0.5 : 0.25;
+        if (fields.hasProperty ("humanizeAccent")) mod.humanizeAccent = juce::jlimit (0, 40, (int) payload["humanizeAccent"]);
+        if (fields.hasProperty ("humanizeFreeze")) mod.humanizeFreeze = (bool) payload["humanizeFreeze"];
+        if (fields.hasProperty ("humanizeSeed"))   mod.humanizeSeed = juce::jlimit (1, 9999, (int) payload["humanizeSeed"]);
         if (fields.hasProperty ("humanizeTimingBeats")) mod.humanizeTimingBeats = juce::jlimit (0.0, 0.25, (double) payload["humanizeTimingBeats"]);
         if (fields.hasProperty ("humanizeVelocity"))    mod.humanizeVelocity = juce::jlimit (0, 64, (int) payload["humanizeVelocity"]);
         if (fields.hasProperty ("humanizeGatePercent")) mod.humanizeGatePercent = juce::jlimit (0, 100, (int) payload["humanizeGatePercent"]);
@@ -1616,6 +1628,10 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             // or a knob can ride it, and this list is where both go shopping.
             if (part->hasMorph())
                 ids.add ("@morph");
+            // And each MIDI module's Amount, so a knob can ride "how much strum" live.
+            for (const auto& slot : part->midiChain)
+                if (perf::MidiSlot::hasAmount (slot.type))
+                    ids.add ("@amount:" + slot.slotId);
 
             for (const auto& id : ids)
             {
@@ -1624,7 +1640,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 obj->setProperty ("index",        -1);
                 obj->setProperty ("name",         virtualParameterName (partId, id));
                 obj->setProperty ("label",        juce::String());
-                obj->setProperty ("group",        id == "@morph" ? "Morph" : "Mixer");
+                obj->setProperty ("group",        id == "@morph" ? "Morph"
+                                                  : id.startsWith ("@amount:") ? "MIDI modules" : "Mixer");
                 obj->setProperty ("value",        virtualParameterValue (partId, id));
                 obj->setProperty ("text",         virtualParameterText (partId, id));
                 obj->setProperty ("defaultValue", virtualParameterDefault (id));
@@ -5000,13 +5017,13 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                     perf::Lane added;
                     added.laneId = juce::Uuid().toDashedString();
                     added.type = perf::LaneType::parameter;
-                    added.name = "Lock — " + (isVirtualParameterId (parameterId)
+                    added.name = "Lock " + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94 ")) + (isVirtualParameterId (parameterId)
                                                   ? virtualParameterName (targetId, parameterId)
                                                   : parameterId);
                     if (const auto found = partParameters.find (targetId);
                         ! isVirtualParameterId (parameterId) && found != partParameters.end())
                         if (const auto* descriptor = found->second.inventory.find (parameterId))
-                            added.name = "Lock — " + descriptor->name;
+                            added.name = "Lock " + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94 ")) + descriptor->name;
                     added.targetId = targetId;
                     added.parameterId = parameterId;
                     added.targetCeId = targetClassCeId (targetId);
@@ -5903,6 +5920,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             auto& slot = chain.getReference (index);
             if (const auto* fields = payload.getDynamicObject())
             {
+                if (fields->hasProperty ("amount"))
+                    slot.amount = juce::jlimit (0.0f, 1.0f, (float) (double) payload["amount"]);
                 if (slot.type == "arp")
                 {
                     applyArpFields (slot.arp, payload, *fields);
@@ -7611,6 +7630,50 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "saveModulePreset" || cmd == "removeModulePreset")
+    {
+        // A module's settings saved by name, per module type, beside the catalogue: a strum
+        // you like is a strum you like in every rack.
+        const auto type = perf::MidiSlot::canonicalType (payload.getProperty ("type", {}).toString());
+        const auto name = payload.getProperty ("name", {}).toString().trim().substring (0, 80);
+        if (! perf::MidiSlot::types().contains (type) || name.isEmpty())
+        {
+            emitError ("A module preset needs a module type and a name.");
+            return;
+        }
+        if (options.dataDirectory == juce::File())
+        {
+            emitError ("Module presets need a data folder, and this host has none.");
+            return;
+        }
+        const auto saved = updateSharedJsonObject (modulePresetsFile(), [&] (juce::DynamicObject& root)
+        {
+            juce::Array<juce::var> kept;
+            if (const auto* list = root.getProperty ("presets").getArray())
+                for (const auto& preset : *list)
+                    if (preset.getProperty ("type", {}).toString() != type
+                        || preset.getProperty ("name", {}).toString() != name)
+                        kept.add (preset);
+            if (cmd == "saveModulePreset")
+            {
+                auto* preset = new juce::DynamicObject();
+                preset->setProperty ("type", type);
+                preset->setProperty ("name", name);
+                preset->setProperty ("settings", payload.getProperty ("settings", {}));
+                kept.add (juce::var (preset));
+            }
+            root.setProperty ("presets", kept);
+        });
+        modulePresetsLoaded = false;
+        if (! saved)
+        {
+            emitError ("Could not write the module presets file.");
+            return;
+        }
+        emitState();
+        return;
+    }
+
     if (cmd == "setPartKey")
     {
         // The part's song key. Every module that follows it hears the change at once; the
@@ -9151,6 +9214,10 @@ bool InstrumentHostService::virtualParameterExists (const juce::String& targetId
         return performance.findPart (targetId)->hasMorph();
     if (parameterId.startsWith ("@send:"))
         return performance.findReturn (parameterId.substring (6)) != nullptr;
+    if (parameterId.startsWith ("@amount:"))
+        for (const auto& slot : performance.findPart (targetId)->midiChain)
+            if (slot.slotId == parameterId.substring (8))
+                return perf::MidiSlot::hasAmount (slot.type);
     return false;
 }
 
@@ -9173,6 +9240,13 @@ float InstrumentHostService::virtualParameterValue (const juce::String& targetId
         return (part->pan + 1.0f) * 0.5f;               // -1..+1 → 0..1
     if (parameterId == "@morph")
         return part->morphAmount;
+    if (parameterId.startsWith ("@amount:"))
+    {
+        for (const auto& slot : part->midiChain)
+            if (slot.slotId == parameterId.substring (8))
+                return slot.amount;
+        return 1.0f;
+    }
     if (parameterId.startsWith ("@send:"))
     {
         const auto returnId = parameterId.substring (6);
@@ -9187,7 +9261,7 @@ juce::String InstrumentHostService::virtualParameterText (const juce::String& ta
                                                           const juce::String& parameterId) const
 {
     const auto value = virtualParameterValue (targetId, parameterId);
-    if (parameterId == "@macro")
+    if (parameterId == "@macro" || parameterId.startsWith ("@amount:"))
         return juce::String (juce::roundToInt (value * 100.0f)) + "%";
     if (parameterId == "@morph")
     {
@@ -9229,12 +9303,20 @@ juce::String InstrumentHostService::virtualParameterName (const juce::String& ta
         const auto* part = rack.getPerformance().findPart (targetId);
         if (part == nullptr || ! part->hasMorph())
             return "Morph";
-        return "Morph — " + part->morphNameA + " ↔ " + part->morphNameB;
+        return "Morph " + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94 ")) + part->morphNameA + juce::String (juce::CharPointer_UTF8 (" \xe2\x86\x94 ")) + part->morphNameB;
+    }
+    if (parameterId.startsWith ("@amount:"))
+    {
+        if (const auto* part = rack.getPerformance().findPart (targetId))
+            for (const auto& slot : part->midiChain)
+                if (slot.slotId == parameterId.substring (8))
+                    return "Amount " + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94 ")) + slot.type.substring (0, 1).toUpperCase() + slot.type.substring (1);
+        return "Amount";
     }
     if (parameterId.startsWith ("@send:"))
     {
         const auto* chain = rack.getPerformance().findReturn (parameterId.substring (6));
-        return "Send — " + (chain != nullptr && chain->name.isNotEmpty() ? chain->name
+        return "Send " + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94 ")) + (chain != nullptr && chain->name.isNotEmpty() ? chain->name
                                                                           : juce::String ("gone"));
     }
     return parameterId;
@@ -9246,6 +9328,8 @@ float InstrumentHostService::virtualParameterDefault (const juce::String& parame
         return 0.5f;    // unity
     if (parameterId == "@pan")
         return 0.5f;    // centre
+    if (parameterId.startsWith ("@amount:"))
+        return 1.0f;    // the module as set
     return 0.0f;        // sends, macros and morphs rest at zero (a morph at zero is A)
 }
 
@@ -9273,6 +9357,8 @@ void InstrumentHostService::setVirtualParameter (const juce::String& targetId,
         applyMorphAmount (targetId, value);
     else if (parameterId.startsWith ("@send:"))
         rack.setSendLevel (targetId, parameterId.substring (6), value * 2.0f);
+    else if (parameterId.startsWith ("@amount:"))
+        rack.setSlotAmount (targetId, parameterId.substring (8), value);
 }
 
 bool InstrumentHostService::validModulationSourceType (const juce::String& sourceType)
@@ -15870,6 +15956,22 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     }
 }
 
+const juce::Array<juce::var>& InstrumentHostService::loadModulePresets() const
+{
+    if (! modulePresetsLoaded)
+    {
+        modulePresetsLoaded = true;
+        modulePresetsCache.clear();
+        if (options.dataDirectory != juce::File() && modulePresetsFile().existsAsFile())
+        {
+            const auto stored = juce::JSON::parse (modulePresetsFile().loadFileAsString());
+            if (const auto* list = stored.getProperty ("presets", {}).getArray())
+                modulePresetsCache = *list;
+        }
+    }
+    return modulePresetsCache;
+}
+
 const juce::Array<juce::var>& InstrumentHostService::loadResponseProfiles() const
 {
     if (! responseProfilesLoaded)
@@ -16844,6 +16946,29 @@ void InstrumentHostService::drainParameterEvents()
             obj->setProperty ("partId", part.partId);
             obj->setProperty ("step", step);
             options.emit ("instrumentHostArpStep", juce::var (obj));
+        }
+
+    // The modules' lights: how many blocks each has changed something in. One small event per
+    // part when any count moved, so an idle chain costs nothing.
+    if (options.emit != nullptr)
+        for (const auto& part : rack.getPerformance().parts)
+        {
+            std::array<perf::MidiInsertRack::ModuleActivity, perf::MidiInsertRack::maxSlots> counts;
+            const auto n = rack.moduleActivity (part.partId, counts);
+            juce::String key;
+            for (int i = 0; i < n; ++i)
+                key << counts[(size_t) i].slotId << '=' << (juce::int64) counts[(size_t) i].count << ';';
+            auto& last = lastModuleActivityByPart[part.partId];
+            if (key == last)
+                continue;
+            last = key;
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("partId", part.partId);
+            auto* slots = new juce::DynamicObject();
+            for (int i = 0; i < n; ++i)
+                slots->setProperty (counts[(size_t) i].slotId, (juce::int64) counts[(size_t) i].count);
+            obj->setProperty ("slots", juce::var (slots));
+            options.emit ("instrumentHostModuleActivity", juce::var (obj));
         }
 
     // The Chords readout: what it last played from the set, the progression's next step and
@@ -17937,6 +18062,7 @@ juce::var InstrumentHostService::buildStatePayload()
         root->setProperty ("floatingEditorPartIds", floating);
     }
     root->setProperty ("responseProfiles", loadResponseProfiles());
+    root->setProperty ("modulePresets", loadModulePresets());
     root->setProperty ("responseProfileForPorts",
                        responseProfileForPorts().getProperty ("name", {}).toString());
     root->setProperty ("audio", juce::var (audio));

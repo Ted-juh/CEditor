@@ -42,6 +42,7 @@ import {
   onInstrumentHostRandomModulatorActivity,
   onInstrumentHostChordLearn,
   onInstrumentHostChordsLive,
+  onInstrumentHostModuleActivity,
   onInstrumentHostHardwarePatchCapture,
   onInstrumentHostHardwarePatchSend,
   onInstrumentHostHardwarePatchPrompt,
@@ -404,6 +405,9 @@ export const hostChordLearn = writable({ armed: false, partId: '', stage: '', ke
 // The Chords module playing, by part: { chord, step, pads } — the set chord it last played,
 // the progression step that plays next, a bit per sounding pad. instrumentHostChordsLive.
 export const hostChordsLive = writable({});
+
+// Each MIDI module's light, by part and slot: a count that moves when the module changes a note.
+export const hostModuleActivity = writable({});
 
 /** What localhost pretends the engine did with a chordPad / chordStep (MidiFxChain's rules),
     so the editor's lights can be tried without a host. */
@@ -1827,6 +1831,7 @@ export function emptyHostState() {
     floatingEditorPartIds: [],
     responseProfiles: [],
     responseProfileForPorts: '',
+    modulePresets: [],
     audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0,
              inputChannels: 0, cpu: 0, xruns: 0 },
     rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], returns: [], buses: [],
@@ -2684,6 +2689,8 @@ export function normalizeMidiSlot(slot) {
     slotId: String(slot?.slotId ?? ''),
     type: midiSlotTypes.includes(type) ? type : 'arp',
     bypassed: slot?.bypassed === true,
+    // How much of its effect the module applies (MidiSlot::amount); 1 = as set.
+    amount: clampNumber(slot?.amount, 0, 1, 1),
     arp: normalizeArp(slot?.arp),
     fx: normalizeMidiFx(slot?.fx),
     mod: normalizeNoteModule(slot?.mod),
@@ -2692,7 +2699,7 @@ export function normalizeMidiSlot(slot) {
 
 /** The later note modules' settings. Every default is transparent, which is the same rule the
     native side keeps: an inserted module must not change the sound by existing. */
-const STRUM_PATTERNS = ['ascending', 'descending', 'alternate', 'outside in', 'inside out', 'random'];
+const STRUM_PATTERNS = ['ascending', 'descending', 'alternate', 'outside in', 'inside out', 'random', 'by velocity'];
 const MPE_FORMATS = ['mpe', 'poly aftertouch', 'channel pressure', 'cc'];
 const MPE_AXES = ['pressure', 'timbre', 'pitch bend'];
 const MPE_COLLAPSE = ['latest', 'highest', 'average'];
@@ -2737,11 +2744,19 @@ const normalizeNoteModule = (m) => {
     strumCurve: clampNumber(m?.strumCurve, -1, 1, 0),
     strumVelocityRamp: clampInt(m?.strumVelocityRamp, -64, 64, 0),
     strumGuitar: m?.strumGuitar === true,
+    strumHarderFaster: m?.strumHarderFaster === true,
+    strumRepeatPerBeat: [2, 3, 4].includes(Number(m?.strumRepeatPerBeat)) ? Number(m.strumRepeatPerBeat) : 0,
     humanizeTimingBeats: clampNumber(m?.humanizeTimingBeats, 0, 0.25, 0),
     humanizeVelocity: clampInt(m?.humanizeVelocity, 0, 64, 0),
     humanizeGatePercent: clampInt(m?.humanizeGatePercent, 0, 100, 0),
     humanizePreserveChords: m?.humanizePreserveChords === true,
     humanizeProtectBeats: m?.humanizeProtectBeats === true,
+    humanizeLayBackBeats: clampNumber(m?.humanizeLayBackBeats, 0, 0.125, 0),
+    humanizeSwing: clampNumber(m?.humanizeSwing, 0, 0.75, 0),
+    humanizeSwingGrid: Number(m?.humanizeSwingGrid) >= 0.375 ? 0.5 : 0.25,
+    humanizeAccent: clampInt(m?.humanizeAccent, 0, 40, 0),
+    humanizeFreeze: m?.humanizeFreeze === true,
+    humanizeSeed: clampInt(m?.humanizeSeed, 1, 9999, 1),
     chance: clampNumber(m?.chance, 0, 1, 1),
     chanceKeepDownbeats: m?.chanceKeepDownbeats === true,
     chanceSoftFirst: m?.chanceSoftFirst === true,
@@ -4053,6 +4068,10 @@ export function normalizeHostState(payload) {
     responseProfiles: (Array.isArray(p.responseProfiles) ? p.responseProfiles : []).map(normalizeResponseProfile)
       .filter((profile) => profile.name),
     responseProfileForPorts: String(p.responseProfileForPorts ?? ''),
+    modulePresets: (Array.isArray(p.modulePresets) ? p.modulePresets : [])
+      .map((preset) => ({ type: canonicalSlotType(String(preset?.type ?? '')), name: String(preset?.name ?? '').slice(0, 80),
+                          settings: preset?.settings && typeof preset.settings === 'object' ? preset.settings : {} }))
+      .filter((preset) => preset.name && midiSlotTypes.includes(preset.type)),
     audio: {
       enabled: p.audio?.enabled === true,
       running: p.audio?.running === true,
@@ -5198,6 +5217,15 @@ export function applyMockCommand(state, payload) {
       // One editor per processor: docking pulls a floating part back in.
       next.floatingEditorPartIds = next.floatingEditorPartIds.filter((id) => id !== payload.partId);
     }
+    return next;
+  }
+  if (cmd === 'saveModulePreset' || cmd === 'removeModulePreset') {
+    const type = canonicalSlotType(String(payload.type ?? ''));
+    const name = String(payload.name ?? '').trim().slice(0, 80);
+    if (!name || !midiSlotTypes.includes(type)) return next;
+    const kept = (next.modulePresets ?? []).filter((p) => !(p.type === type && p.name === name));
+    next.modulePresets = cmd === 'saveModulePreset'
+      ? [...kept, { type, name, settings: JSON.parse(JSON.stringify(payload.settings ?? {})) }] : kept;
     return next;
   }
   if (cmd === 'setPartKey') {
@@ -7414,6 +7442,7 @@ export function applyMockCommand(state, payload) {
           : String(value);
       }
       if (block === chain[index].fx) applyLegacyChordField(block, payload);
+      if ('amount' in payload) chain[index].amount = clampNumber(payload.amount, 0, 1, 1);
       // The arp's scale lives in its fx block, as on the native side.
       if (chain[index].type === 'arp')
         for (const key of ['followSongKey', 'scaleType', 'scaleRoot'])
@@ -7688,6 +7717,11 @@ export function initInstrumentHostBridge() {
       },
     };
   }));
+  onInstrumentHostModuleActivity((payload) => hostModuleActivity.update((all) => ({
+    ...all,
+    [String(payload?.partId ?? '')]: Object.fromEntries(Object.entries(payload?.slots ?? {})
+      .map(([slotId, count]) => [slotId, Number(count) || 0])),
+  })));
   onInstrumentHostChordsLive((payload) => hostChordsLive.update((all) => ({
     ...all,
     [String(payload?.partId ?? '')]: {
@@ -8987,6 +9021,9 @@ export const cancelSoundComparison = () => send({ cmd: 'cancelSoundComparison' }
 export const learnKeyChord = (partId, slotId = '') =>
   send({ cmd: 'learnKeyChord', partId, ...(slotId ? { slotId } : {}) });
 export const cancelKeyChordLearn = () => send({ cmd: 'cancelKeyChordLearn' });
+/** Saves (or replaces) a module's settings under a name, for its module type. */
+export const saveModulePreset = (type, name, settings) => send({ cmd: 'saveModulePreset', type, name, settings });
+export const removeModulePreset = (type, name) => send({ cmd: 'removeModulePreset', type, name });
 /** The part's song key: { root?: 0..11, scale?: name }. */
 export const setPartKey = (partId, fields) => send({ cmd: 'setPartKey', partId, ...fields });
 /** Saves (or replaces, by name) a keyboard's velocity/expression calibration. */

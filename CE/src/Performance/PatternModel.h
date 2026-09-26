@@ -577,7 +577,7 @@ struct MidiFxSettings
 struct NoteModuleSettings
 {
     enum class StrumPattern { ascending = 0, descending, alternate,
-                              outsideIn, insideOut, random };
+                              outsideIn, insideOut, random, byVelocity };
 
     /** One named articulation selected by an incoming trigger note. The output channel is
         zero when the message should follow the trigger channel; bank values are -1 when that
@@ -622,6 +622,8 @@ struct NoteModuleSettings
     float strumCurve = 0.0f;         // -1 slow start, 0 even, +1 quick start
     int strumVelocityRamp = 0;       // velocity change from first to last note, -64..64
     bool strumGuitar = false;        // re-voice each chord onto six strings before strumming
+    bool strumHarderFaster = false;  // a hard hit strums tighter, a soft one spreads out
+    int strumRepeatPerBeat = 0;      // 0 = off, else re-strum the held chord 2, 3 or 4 times a beat
 
     // Humanize: bounded jitter. Notes move LATER only — earlier would need the future.
     double humanizeTimingBeats = 0.0;
@@ -629,6 +631,12 @@ struct NoteModuleSettings
     int humanizeGatePercent = 0;     // +/- percentage of the played duration, 0..100
     bool humanizePreserveChords = false; // simultaneous notes share one timing offset
     bool humanizeProtectBeats = false;   // whole-beat attacks remain on the grid
+    double humanizeLayBackBeats = 0.0;   // a steady late feel on every note, 0..0.125 beat
+    float humanizeSwing = 0.0f;          // 0..0.75: how far the off-beat of the swing grid moves late
+    double humanizeSwingGrid = 0.25;     // 0.5 = swung eighths, 0.25 = swung sixteenths
+    int humanizeAccent = 0;              // velocity added to notes on the beat, 0..40
+    bool humanizeFreeze = false;         // the same notes in the same places vary the same way
+    int humanizeSeed = 1;                // which frozen roll, 1..9999
 
     // Chance: the probability a note passes at all. 1 = everything does.
     float chance = 1.0f;
@@ -692,11 +700,19 @@ struct NoteModuleSettings
 struct MidiSlot
 {
     juce::String slotId;
-    /** "arp" | "transpose" | "scale" | "chord" | "velocity" | "fx" (the combined legacy
-        block, which is what a pre-chain session migrates into) | "echo" | "strum" |
-        "humanize" | "chance" | "length" | "latch" | "mpe" | "articulation". */
+    /** "arp" | "key" | "chord" | "velocity" | "fx" (the combined legacy block, which is what
+        a pre-chain session migrates into) | "echo" | "strum" | "humanize" | "chance" |
+        "length" | "latch" | "mpe" | "articulation". "transpose" and "scale" read as "key". */
     juce::String type { "arp" };
     bool bypassed = false;
+    /** How much of its effect the module applies, 0..1: strum spread, the humanize amounts,
+        the echo repeats, how much chance thins. Scaled where the chain is built, so the
+        settings keep their values; a control-page knob rides it as "@amount:<slotId>". */
+    float amount = 1.0f;
+    static bool hasAmount (const juce::String& type)
+    {
+        return type == "strum" || type == "humanize" || type == "echo" || type == "chance";
+    }
     ArpSettings arp;
     MidiFxSettings fx;
     NoteModuleSettings mod;

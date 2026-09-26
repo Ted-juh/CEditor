@@ -282,6 +282,10 @@ public:
     bool triggerChordPad (const juce::String& partId, const juce::String& slotId, int pad, int velocity);
     bool moveChordProgression (const juce::String& partId, const juce::String& slotId, int value, bool absolute);
     perf::MidiInsertRack::ChordsLive chordsLive (const juce::String& partId, const juce::String& slotId = {}) const;
+    int moduleActivity (const juce::String& partId,
+                        std::array<perf::MidiInsertRack::ModuleActivity, perf::MidiInsertRack::maxSlots>& out) const;
+    /** A module's Amount (0..1), which scales its main effect; pushed to the engine at once. */
+    bool setSlotAmount (const juce::String& partId, const juce::String& slotId, float amount);
 
     // -- macros (Stage 5) ---------------------------------------------------------------
     // Model-only, like pages: a macro is stored fan-out; the writes go through the service's

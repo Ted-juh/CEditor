@@ -1,6 +1,9 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
+#include <atomic>
+#include <cstring>
 #include <memory>
 #include <vector>
 
@@ -77,6 +80,10 @@ public:
     /** Message thread: steps the progression by `value`, or to step `value` when absolute. */
     bool moveChordProgression (const juce::String& slotId, int value, bool absolute);
 
+    /** How many blocks each module has changed something in, by slot id: the module's light. */
+    struct ModuleActivity { juce::String slotId; juce::uint32 count = 0; };
+    int moduleActivity (std::array<ModuleActivity, maxSlots>& out) const;
+
     struct ChordsLive
     {
         bool present = false;
@@ -104,7 +111,10 @@ private:
         std::unique_ptr<NoteLengthEngine> length;
         std::unique_ptr<LatchEngine> latch;
         std::unique_ptr<MpeTransformerEngine> mpe;
+        std::atomic<juce::uint32> activity { 0 };
     };
+
+    static bool sameEvents (const juce::MidiBuffer& a, const juce::MidiBuffer& b) noexcept;
 
     static void releaseNoteModules (Module& module, juce::MidiBuffer& out, int position);
     static std::unique_ptr<Module> build (const MidiSlot& slot);

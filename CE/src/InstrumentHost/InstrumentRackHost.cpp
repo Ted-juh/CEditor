@@ -500,6 +500,28 @@ perf::MidiInsertRack::ChordsLive InstrumentRackHost::chordsLive (const juce::Str
                          : perf::MidiInsertRack::ChordsLive {};
 }
 
+int InstrumentRackHost::moduleActivity (const juce::String& partId,
+                                        std::array<perf::MidiInsertRack::ModuleActivity, perf::MidiInsertRack::maxSlots>& out) const
+{
+    const auto* lp = findLive (partId);
+    return lp != nullptr ? lp->filter->getMidiInserts().moduleActivity (out) : 0;
+}
+
+bool InstrumentRackHost::setSlotAmount (const juce::String& partId, const juce::String& slotId, float amount)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+    auto chain = part->midiChain;
+    for (auto& slot : chain)
+        if (slot.slotId == slotId)
+        {
+            slot.amount = juce::jlimit (0.0f, 1.0f, amount);
+            return setPartMidiChain (partId, std::move (chain));
+        }
+    return false;
+}
+
 bool InstrumentRackHost::setPartArp (const juce::String& partId, const perf::ArpSettings& settings)
 {
     auto* part = model.findPart (partId);
