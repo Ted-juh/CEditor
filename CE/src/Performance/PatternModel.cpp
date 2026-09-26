@@ -2030,6 +2030,10 @@ juce::var noteModuleToVar (const NoteModuleSettings& settings)
     m->setProperty ("echoStepBeats",   settings.echoStepBeats);
     m->setProperty ("echoFeedback",    settings.echoFeedback);
     m->setProperty ("echoTranspose",   settings.echoTranspose);
+    m->setProperty ("echoFeel",        settings.echoFeel);
+    m->setProperty ("echoScaleClimb",  settings.echoScaleClimb);
+    m->setProperty ("echoShorter",     settings.echoShorter);
+    m->setProperty ("echoFloor",       settings.echoFloor);
     m->setProperty ("strumBeats",      settings.strumBeats);
     m->setProperty ("strumDown",       settings.strumDown);
     m->setProperty ("strumPattern",    NoteModuleSettings::strumPatternName (settings.strumPattern));
@@ -2042,9 +2046,14 @@ juce::var noteModuleToVar (const NoteModuleSettings& settings)
     m->setProperty ("humanizePreserveChords", settings.humanizePreserveChords);
     m->setProperty ("humanizeProtectBeats", settings.humanizeProtectBeats);
     m->setProperty ("chance",          settings.chance);
+    m->setProperty ("chanceKeepDownbeats", settings.chanceKeepDownbeats);
+    m->setProperty ("chanceSoftFirst", settings.chanceSoftFirst);
     m->setProperty ("lengthBeats",     settings.lengthBeats);
     m->setProperty ("legato",          settings.legato);
     m->setProperty ("latchOn",         settings.latchOn);
+    m->setProperty ("lengthMode",      settings.lengthMode);
+    m->setProperty ("latchMode",       settings.latchMode);
+    m->setProperty ("latchPedalRelease", settings.latchPedalRelease);
     m->setProperty ("mpeEnabled",       settings.mpeEnabled);
     m->setProperty ("mpeInput",         settings.mpeInput);
     m->setProperty ("mpeOutput",        settings.mpeOutput);
@@ -2102,6 +2111,13 @@ void noteModuleFromVar (const juce::var& stored, NoteModuleSettings& out)
     out.echoStepBeats = doubleOf ("echoStepBeats", 0.5, 0.03125, 4.0);
     out.echoFeedback  = (float) doubleOf ("echoFeedback", 0.7, 0.1, 1.0);
     out.echoTranspose = intOf ("echoTranspose", 0, -12, 12);
+    {
+        const auto feel = stored.getProperty ("echoFeel", "straight").toString();
+        out.echoFeel = feel == "dotted" || feel == "triplet" ? feel : "straight";
+    }
+    out.echoScaleClimb = (bool) stored.getProperty ("echoScaleClimb", false);
+    out.echoShorter   = (bool) stored.getProperty ("echoShorter", false);
+    out.echoFloor     = intOf ("echoFloor", 1, 1, 127);
     out.strumBeats    = doubleOf ("strumBeats", 0.0, 0.0, 1.0);
     out.strumDown     = (bool) stored.getProperty ("strumDown", false);
     const auto storedPattern = stored.getProperty ("strumPattern", {}).toString();
@@ -2122,6 +2138,15 @@ void noteModuleFromVar (const juce::var& stored, NoteModuleSettings& out)
     out.lengthBeats   = doubleOf ("lengthBeats", 0.0, 0.0, 8.0);
     out.legato        = (bool) stored.getProperty ("legato", false);
     out.latchOn       = (bool) stored.getProperty ("latchOn", false);
+    out.chanceKeepDownbeats = (bool) stored.getProperty ("chanceKeepDownbeats", false);
+    out.chanceSoftFirst = (bool) stored.getProperty ("chanceSoftFirst", false);
+    {
+        const auto mode = stored.getProperty ("lengthMode", "fixed").toString();
+        out.lengthMode = mode == "at most" || mode == "at least" ? mode : "fixed";
+        const auto latch = stored.getProperty ("latchMode", "replace").toString();
+        out.latchMode = latch == "add" || latch == "toggle" ? latch : "replace";
+    }
+    out.latchPedalRelease = (bool) stored.getProperty ("latchPedalRelease", false);
     const juce::StringArray formats { "mpe", "poly aftertouch", "channel pressure", "cc" };
     const juce::StringArray axes { "pressure", "timbre", "pitch bend" };
     const juce::StringArray collapseModes { "latest", "highest", "average" };

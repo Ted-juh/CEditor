@@ -113,6 +113,54 @@ try {
   await resp.locator('[data-testid=response-which] [data-value=expression]').click();
   assert.equal(await resp.getByTestId('expression-curve').isVisible(), true, 'the expression tab has its own curve');
 
+  // Echo, Chance, Length, Latch
+  const rowOf = (name) => page.locator('[data-testid=midi-slot] .slot-name', { hasText: new RegExp(`^${name}`) });
+  await add.selectOption('echo');
+  await rowOf('Echo').click();
+  const echoEd = page.getByTestId('echo-editor');
+  await echoEd.getByTestId('echo-repeats').press('ArrowUp');
+  await echoEd.getByTestId('echo-repeats').press('ArrowUp');
+  assert.equal(await echoEd.locator('circle.hit').count(), 3, 'the note and two repeats are drawn');
+  await echoEd.locator('[data-testid=echo-feel] [data-value=dotted]').click();
+  await echoEd.locator('[data-testid=echo-climb-by] [data-value=true]').click();
+  await echoEd.getByTestId('echo-climb').press('ArrowUp');
+  await echoEd.getByTestId('echo-climb').press('ArrowUp');
+  const echoLabels = await echoEd.locator('text.label').allTextContents();
+  assert.deepEqual(echoLabels.map((t) => t.split(' ')[0]), ['C', 'E', 'G'], 'climbing in the scale is drawn C, E, G');
+  assert.match(await rowOf('Echo').innerText(), /2× · 1\/8 dotted · \+2 steps/, 'the collapsed row reads it back');
+
+  await add.selectOption('chance');
+  await rowOf('Chance').click();
+  const chanceEd = page.getByTestId('chance-editor');
+  for (let i = 0; i < 20; i++) await chanceEd.getByTestId('chance-amount').press('ArrowDown');
+  await chanceEd.getByRole('switch', { name: 'Notes on the beat' }).click();
+  assert.match(await chanceEd.getByTestId('chance-picture').textContent(), /4 of 16 play/, 'at no chance only the four beats play');
+
+  await add.selectOption('length');
+  await rowOf('Note length').click();
+  const lengthEd = page.getByTestId('length-editor');
+  await lengthEd.locator('[data-testid=length-mode] [data-value="at most"]').click();
+  assert.equal(await lengthEd.getByTestId('length-value').count(), 1, 'a length appears for "at most"');
+  assert.match(await rowOf('Note length').innerText(), /at most 1\/16/);
+
+  // Eight modules is the most a chain holds: make room by removing the ones already checked.
+  const removeSlot = async (name) => {
+    const slot = page.locator('[data-testid=midi-slot]').filter({ has: page.locator('.slot-name', { hasText: new RegExp(`^${name}`) }) });
+    await slot.getByRole('button', { name: 'Remove this module' }).click();
+    await slot.getByRole('button', { name: 'Confirm: Remove this module' }).click();
+  };
+  await removeSlot('Chance');
+  await add.selectOption('latch');
+  await rowOf('Latch').click();
+  const latchEd = page.getByTestId('latch-editor');
+  await latchEd.getByRole('switch', { name: 'Latch held notes' }).click();
+  await latchEd.locator('[data-testid=latch-mode] [data-value=add]').click();
+  await latchEd.getByRole('switch', { name: 'With the sustain pedal' }).click();
+  assert.equal(await latchEd.locator('rect.key.held').count(), 5, 'adds: the picture holds all five notes');
+  assert.match(await rowOf('Latch').innerText(), /holding · adds · pedal lets go/);
+  await removeSlot('Latch');
+  await removeSlot('Note length');
+
   // Strum
   const strumRow = page.locator('[data-testid=midi-slot] .slot-name', { hasText: 'Strum' });
   await strumRow.click();
@@ -231,7 +279,7 @@ try {
   assert.doesNotMatch(await chordRow.innerText(), /follow/, 'the light switches following off');
 
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('noteModules: arp, velocity, strum, humanize and chords editors draw, change and summarise');
+  console.log('noteModules: arp, velocity, echo, chance, length, latch, strum, humanize and chords editors draw, change and summarise');
 } finally {
   await browser.close();
   await server.close();

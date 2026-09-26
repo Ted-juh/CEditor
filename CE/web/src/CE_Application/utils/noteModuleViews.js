@@ -130,3 +130,66 @@ export function humanizeExample({ timing, velocity, protectBeats = false }, seed
     velocity: Math.max(1, Math.min(127, Math.round(base + (next() * 2 - 1) * (Number(velocity) || 0)))),
   }));
 }
+
+const SCALE_DEGREES = {
+  chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10],
+  'harmonic minor': [0, 2, 3, 5, 7, 8, 11], 'melodic minor': [0, 2, 3, 5, 7, 9, 11], dorian: [0, 2, 3, 5, 7, 9, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10], lydian: [0, 2, 4, 6, 7, 9, 11], mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  locrian: [0, 1, 3, 5, 6, 8, 10], 'pentatonic major': [0, 2, 4, 7, 9], 'pentatonic minor': [0, 3, 5, 7, 10],
+  blues: [0, 3, 5, 6, 7, 10], 'whole tone': [0, 2, 4, 6, 8, 10],
+};
+
+/** NoteEchoEngine::climbInScale: `steps` scale degrees from `note`; -1 off the keyboard. */
+export function climbInScale(note, steps, scaleType = 'chromatic', root = 0) {
+  const degrees = new Set((SCALE_DEGREES[scaleType] ?? SCALE_DEGREES.chromatic).map((d) => (d + root) % 12));
+  if (degrees.size === 12) return note + steps >= 0 && note + steps <= 127 ? note + steps : -1;
+  let n = note;
+  const dir = steps > 0 ? 1 : -1;
+  for (let s = 0; s < Math.abs(steps); s += 1) {
+    do { n += dir; if (n < 0 || n > 127) return -1; } while (!degrees.has(((n % 12) + 12) % 12));
+  }
+  return n;
+}
+
+/** What NoteEchoEngine plays for one note: the note and its repeats, each with when it starts,
+    how long it lasts and how hard it plays (all in beats / MIDI velocity). */
+export function echoNotes(mod, note = 60, velocity = 100, scale = { type: 'major', root: 0 }) {
+  const feel = mod.echoFeel === 'dotted' ? 1.5 : mod.echoFeel === 'triplet' ? 2 / 3 : 1;
+  const step = Math.min(4, Math.max(0.03125, Number(mod.echoStepBeats) || 0.5)) * feel;
+  const out = [{ at: 0, note, velocity, length: step * 0.9 }];
+  let v = velocity;
+  let length = step * 0.9;
+  for (let r = 1; r <= mod.echoRepeats; r += 1) {
+    v = Math.max(mod.echoFloor ?? 1, v * mod.echoFeedback);
+    const n = mod.echoScaleClimb ? climbInScale(note, r * mod.echoTranspose, scale.type, scale.root)
+                                 : note + r * mod.echoTranspose;
+    if (n < 0 || n > 127 || v < 1) break;
+    if (mod.echoShorter) length *= 0.75;
+    out.push({ at: r * step, note: n, velocity: Math.max(1, Math.min(127, Math.round(v))), length });
+  }
+  return out;
+}
+
+/** An example bar for the Chance picture: sixteen sixteenths at the given velocities, and which
+    of them pass by ChanceEngine's rules (downbeats kept; soft notes weighted down). Same seed,
+    same bar. */
+export function chanceBar(mod, seed = 3, velocities = [110, 50, 80, 45, 100, 55, 75, 40, 110, 50, 85, 45, 100, 60, 80, 70]) {
+  let state = seed >>> 0 || 3;
+  const next = () => { state ^= state << 13; state >>>= 0; state ^= state >>> 17; state ^= state << 5; state >>>= 0; return state / 4294967296; };
+  return velocities.map((velocity, step) => {
+    const p = mod.chanceSoftFirst ? Math.min(1, Math.max(0, mod.chance * (0.5 + velocity / 127))) : mod.chance;
+    const roll = next();
+    return { step, velocity, plays: (mod.chanceKeepDownbeats && step % 4 === 0) || roll <= p, onBeat: step % 4 === 0 };
+  });
+}
+
+/** What NoteLengthEngine does to notes played with these lengths (beats): the length sent. */
+export function lengthOut(mod, played) {
+  return played.map(({ at, length }, i) => {
+    if (mod.legato) return played[i + 1] ? played[i + 1].at - at : length;
+    if (!(mod.lengthBeats > 0)) return length;
+    if (mod.lengthMode === 'at most') return Math.min(length, mod.lengthBeats);
+    if (mod.lengthMode === 'at least') return Math.max(length, mod.lengthBeats);
+    return mod.lengthBeats;
+  });
+}

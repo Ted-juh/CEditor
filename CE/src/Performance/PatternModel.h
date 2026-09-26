@@ -602,7 +602,11 @@ struct NoteModuleSettings
     int echoRepeats = 0;             // 0..8 repeats after the original
     double echoStepBeats = 0.5;      // 1/32 note .. 4 beats
     float echoFeedback = 0.7f;       // velocity multiplier per repeat, 0.1..1
-    int echoTranspose = 0;           // semitones added per repeat, -12..12
+    int echoTranspose = 0;           // semitones (or scale steps) added per repeat, -12..12
+    juce::String echoFeel = "straight";  // straight | dotted (1.5 x) | triplet (2/3 x)
+    bool echoScaleClimb = false;     // climb in steps of the part's scale, not semitones
+    bool echoShorter = false;        // each repeat three quarters as long as the one before
+    int echoFloor = 1;               // repeats stop getting quieter at this velocity, 1..127
 
     // Strum: a chord spread in pitch order. 0 = off, and off means the collection window is
     // skipped too — a strum of nothing must not cost the latency of one.
@@ -622,15 +626,26 @@ struct NoteModuleSettings
 
     // Chance: the probability a note passes at all. 1 = everything does.
     float chance = 1.0f;
+    bool chanceKeepDownbeats = false;   // a note on a whole beat always passes
+    bool chanceSoftFirst = false;       // soft notes are likelier to drop than loud ones
 
     // Length: a fixed note length, or hold each note until the next arrives. 0 and no legato
     // leaves the length you played alone.
     double lengthBeats = 0.0;
     bool legato = false;
+    // With a length: "fixed" plays every note exactly that long, "at most" cuts notes held
+    // longer and leaves shorter ones alone, "at least" stretches short taps and leaves longer
+    // notes alone. (A percentage of the played length cannot shorten a note live: its length
+    // is only known when the key comes up.)
+    juce::String lengthMode = "fixed";  // fixed | at most | at least
 
     // Latch: the only module that cannot be transparent by doing its job, so it has a switch
     // of its own and starts off.
     bool latchOn = false;
+    juce::String latchMode = "replace"; // replace: a new phrase replaces what is held
+                                        // add: new notes join it
+                                        // toggle: a held note played again lets go of it
+    bool latchPedalRelease = false;     // the sustain pedal lets go of everything held
 
     // MPE transformer: one chosen expression stream enters, one leaves. MPE uses the
     // standard member-channel axes (bend, CC74 timbre, channel pressure); non-MPE formats

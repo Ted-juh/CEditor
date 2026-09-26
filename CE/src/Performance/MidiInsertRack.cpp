@@ -134,7 +134,11 @@ void MidiInsertRack::configure (Module& module, const MidiSlot& slot)
     }
     else
     {
-        if (module.echo != nullptr)     module.echo->setSettings (slot.mod);
+        if (module.echo != nullptr)
+        {
+            module.echo->setSettings (slot.mod);
+            module.echo->setScaleMask (scaleMask (slot.fx.scaleType, slot.fx.scaleRoot));
+        }
         if (module.strum != nullptr)    module.strum->setSettings (slot.mod);
         if (module.humanize != nullptr) module.humanize->setSettings (slot.mod);
         if (module.chance != nullptr)   module.chance->setSettings (slot.mod);
@@ -265,7 +269,7 @@ void MidiInsertRack::process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
         else if (module->length != nullptr)
             module->length->process (front, back, block, juce::jmax (1, numSamples));
         else if (module->chance != nullptr)
-            module->chance->process (front, back);
+            module->chance->process (front, back, block, juce::jmax (1, numSamples));
         else if (module->latch != nullptr)
             module->latch->process (front, back);
         else if (module->mpe != nullptr)

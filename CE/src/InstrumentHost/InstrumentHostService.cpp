@@ -460,6 +460,27 @@ namespace
         if (fields.hasProperty ("lengthBeats"))    mod.lengthBeats = juce::jlimit (0.0, 8.0, (double) payload["lengthBeats"]);
         if (fields.hasProperty ("legato"))         mod.legato = (bool) payload["legato"];
         if (fields.hasProperty ("latchOn"))        mod.latchOn = (bool) payload["latchOn"];
+        if (fields.hasProperty ("echoFeel"))
+        {
+            const auto feel = payload["echoFeel"].toString();
+            mod.echoFeel = feel == "dotted" || feel == "triplet" ? feel : "straight";
+        }
+        if (fields.hasProperty ("echoScaleClimb")) mod.echoScaleClimb = (bool) payload["echoScaleClimb"];
+        if (fields.hasProperty ("echoShorter"))    mod.echoShorter = (bool) payload["echoShorter"];
+        if (fields.hasProperty ("echoFloor"))      mod.echoFloor = juce::jlimit (1, 127, (int) payload["echoFloor"]);
+        if (fields.hasProperty ("chanceKeepDownbeats")) mod.chanceKeepDownbeats = (bool) payload["chanceKeepDownbeats"];
+        if (fields.hasProperty ("chanceSoftFirst")) mod.chanceSoftFirst = (bool) payload["chanceSoftFirst"];
+        if (fields.hasProperty ("lengthMode"))
+        {
+            const auto mode = payload["lengthMode"].toString();
+            mod.lengthMode = mode == "at most" || mode == "at least" ? mode : "fixed";
+        }
+        if (fields.hasProperty ("latchMode"))
+        {
+            const auto mode = payload["latchMode"].toString();
+            mod.latchMode = mode == "add" || mode == "toggle" ? mode : "replace";
+        }
+        if (fields.hasProperty ("latchPedalRelease")) mod.latchPedalRelease = (bool) payload["latchPedalRelease"];
         const juce::StringArray mpeFormats { "mpe", "poly aftertouch", "channel pressure", "cc" };
         const juce::StringArray mpeAxes { "pressure", "timbre", "pitch bend" };
         const juce::StringArray mpeCollapseModes { "latest", "highest", "average" };

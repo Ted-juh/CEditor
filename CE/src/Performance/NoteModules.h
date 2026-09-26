@@ -94,6 +94,23 @@ public:
         count = 0;
     }
 
+    /** Removes the first queued note-off for this note. False when there was none. */
+    bool removeNoteOff (int channel, int note) noexcept
+    {
+        for (int i = 0; i < count; ++i)
+        {
+            const auto& message = events[(size_t) i].message;
+            if (message.isNoteOff() && message.getChannel() == channel && message.getNoteNumber() == note)
+            {
+                for (int j = i; j + 1 < count; ++j)
+                    events[(size_t) j] = events[(size_t) (j + 1)];
+                --count;
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Drops everything that is not a note-off. Used when a module is asked to let go: the
         offs still have to happen, the ons must not. */
     void dropNoteOns() noexcept
@@ -140,9 +157,36 @@ public:
     void setSettings (const NoteModuleSettings& settings) noexcept
     {
         repeats.store (juce::jlimit (0, 8, settings.echoRepeats));
-        stepPpq.store (juce::jlimit (0.03125, 4.0, settings.echoStepBeats));
+        const auto feel = settings.echoFeel == "dotted" ? 1.5 : settings.echoFeel == "triplet" ? 2.0 / 3.0 : 1.0;
+        stepPpq.store (juce::jlimit (0.03125, 4.0, settings.echoStepBeats) * feel);
         feedback.store (juce::jlimit (0.1f, 1.0f, settings.echoFeedback));
         semitones.store (juce::jlimit (-12, 12, settings.echoTranspose));
+        scaleClimb.store (settings.echoScaleClimb);
+        shorter.store (settings.echoShorter);
+        floorVelocity.store (juce::jlimit (1, 127, settings.echoFloor));
+    }
+
+    /** The part's scale, for climbing in scale steps; 0x0fff = chromatic. */
+    void setScaleMask (juce::uint16 newMask) noexcept { mask.store (newMask); }
+
+    /** `note` moved `steps` scale degrees up or down within `scale` (chromatic when the scale
+        is empty or has every note). Off the keyboard returns -1. */
+    static int climbInScale (int note, int steps, juce::uint16 scale) noexcept
+    {
+        if (scale == 0 || scale == (juce::uint16) 0x0fff)
+            return juce::isPositiveAndBelow (note + steps, 128) ? note + steps : -1;
+        auto n = note;
+        const auto direction = steps > 0 ? 1 : -1;
+        for (int s = 0; s < std::abs (steps); ++s)
+        {
+            do
+            {
+                n += direction;
+                if (! juce::isPositiveAndBelow (n, 128))
+                    return -1;
+            } while ((scale & (1 << (n % 12))) == 0);
+        }
+        return n;
     }
 
     void process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
@@ -156,6 +200,10 @@ public:
         const auto step = stepPpq.load();
         const auto decay = feedback.load();
         const auto climb = semitones.load();
+        const auto inScale = scaleClimb.load();
+        const auto scale = mask.load();
+        const auto shortening = shorter.load();
+        const auto floorAt = (float) floorVelocity.load();
 
         for (const auto metadata : in)
         {
@@ -170,20 +218,26 @@ public:
             const auto at = window.start + (double) metadata.samplePosition * block.ppqPerSample;
             auto velocity = (float) message.getVelocity();
 
+            auto length = step * 0.9;
             for (int repeat = 1; repeat <= count; ++repeat)
             {
-                velocity *= decay;
-                const auto note = message.getNoteNumber() + repeat * climb;
+                // Quieter each time, but never below the floor, so a tail stays audible on
+                // synths that fade out quiet notes.
+                velocity = juce::jmax (floorAt, velocity * decay);
+                const auto note = inScale ? climbInScale (message.getNoteNumber(), repeat * climb, scale)
+                                          : message.getNoteNumber() + repeat * climb;
                 if (! juce::isPositiveAndBelow (note, 128) || velocity < 1.0f)
                     break;      // off the keyboard or below hearing: stop, do not wrap
 
+                if (shortening)
+                    length *= 0.75;
                 const auto onAt = at + (double) repeat * step;
                 pending.add (onAt, juce::MidiMessage::noteOn (message.getChannel(), note,
                                                               (juce::uint8) juce::jlimit (1, 127,
                                                                   juce::roundToInt (velocity))));
                 // Nine tenths of a step: long enough to sound, short enough that consecutive
                 // repeats of the same pitch do not overlap into one held note.
-                pending.add (onAt + step * 0.9,
+                pending.add (onAt + length,
                              juce::MidiMessage::noteOff (message.getChannel(), note));
             }
         }
@@ -202,6 +256,10 @@ private:
     std::atomic<double> stepPpq { 0.5 };
     std::atomic<float> feedback { 0.7f };
     std::atomic<int> semitones { 0 };
+    std::atomic<bool> scaleClimb { false };
+    std::atomic<bool> shorter { false };
+    std::atomic<int> floorVelocity { 1 };
+    std::atomic<juce::uint16> mask { 0x0fff };
 };
 
 //==================================================================================================
@@ -857,12 +915,18 @@ public:
     void setSettings (const NoteModuleSettings& settings) noexcept
     {
         probability.store (juce::jlimit (0.0f, 1.0f, settings.chance));
+        keepDownbeats.store (settings.chanceKeepDownbeats);
+        softFirst.store (settings.chanceSoftFirst);
     }
 
-    void process (const juce::MidiBuffer& in, juce::MidiBuffer& out) noexcept
+    void process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
+                  const Transport::BlockTime& block, int numSamples) noexcept
     {
         out.clear();
         const auto pass = probability.load();
+        const auto window = clock.advance (block, numSamples);
+        const auto beats = keepDownbeats.load();
+        const auto weighted = softFirst.load();
 
         for (const auto metadata : in)
         {
@@ -870,7 +934,15 @@ public:
 
             if (message.isNoteOn())
             {
-                if (random.nextFloat() <= pass)
+                // A note within a 64th of a whole beat is ON the beat: those always pass, so
+                // the pulse survives however much is thinned out around it.
+                const auto at = window.start + (double) metadata.samplePosition * block.ppqPerSample;
+                const auto onBeat = beats && std::abs (at - std::round (at)) < 1.0 / 64.0;
+                // Soft notes drop first: the chance scales from half (silent) to one and a half
+                // times (full) with velocity, so loud notes carry the phrase.
+                const auto p = weighted ? juce::jlimit (0.0f, 1.0f, pass * (0.5f + (float) message.getVelocity() / 127.0f))
+                                        : pass;
+                if (onBeat || random.nextFloat() <= p)
                     out.addEvent (message, metadata.samplePosition);
                 else
                     mark (message.getChannel(), message.getNoteNumber());
@@ -910,7 +982,10 @@ private:
 
     std::array<juce::uint64, 16> dropped {};
     juce::Random random { 0x1a2b3c4d };
+    ModuleClock clock;
     std::atomic<float> probability { 1.0f };
+    std::atomic<bool> keepDownbeats { false };
+    std::atomic<bool> softFirst { false };
 };
 
 //==================================================================================================
@@ -926,6 +1001,7 @@ public:
     {
         lengthPpq.store (juce::jlimit (0.0, 8.0, settings.lengthBeats));
         legato.store (settings.legato);
+        mode.store (settings.lengthMode == "at most" ? atMost : settings.lengthMode == "at least" ? atLeast : fixed);
     }
 
     void process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
@@ -937,11 +1013,15 @@ public:
 
         const auto length = lengthPpq.load();
         const auto holding = legato.load();
+        const auto rule = mode.load();
 
         for (const auto metadata : in)
         {
             const auto message = metadata.getMessage();
             const auto at = window.start + (double) metadata.samplePosition * block.ppqPerSample;
+            const auto channel = message.getChannel();
+            const auto note = message.getNoteNumber();
+            const auto tracked = channel >= 1 && channel <= 16 && juce::isPositiveAndBelow (note, 128);
 
             if (message.isNoteOn())
             {
@@ -949,12 +1029,38 @@ public:
                     releaseSounding (out, metadata.samplePosition);
 
                 out.addEvent (message, metadata.samplePosition);
-                remember (message.getChannel(), message.getNoteNumber());
+                remember (channel, note);
+                if (tracked)
+                    startedAt[(size_t) (channel - 1)][(size_t) note] = at;
 
-                if (! holding && length > 0.0)
-                    pending.add (at + length,
-                                 juce::MidiMessage::noteOff (message.getChannel(),
-                                                             message.getNoteNumber()));
+                // Fixed and "at most" both plan the end now; "at most" lets an earlier key-up
+                // win (below). "At least" decides at key-up.
+                if (! holding && length > 0.0 && rule != atLeast)
+                    pending.add (at + length, juce::MidiMessage::noteOff (channel, note));
+                continue;
+            }
+
+            if (message.isNoteOff() && ! holding && length > 0.0 && rule == atMost)
+            {
+                // Let go before the cut: end it now and forget the planned end. After the cut
+                // it has already ended, and this off belongs to nothing.
+                if (pending.removeNoteOff (channel, note))
+                {
+                    out.addEvent (message, metadata.samplePosition);
+                    forget (channel, note);
+                }
+                continue;
+            }
+
+            if (message.isNoteOff() && ! holding && length > 0.0 && rule == atLeast && tracked)
+            {
+                // A tap shorter than the length rings on to it; a longer note ends as played.
+                const auto earliest = startedAt[(size_t) (channel - 1)][(size_t) note] + length;
+                if (at < earliest)
+                    pending.add (earliest, message);
+                else
+                    out.addEvent (message, metadata.samplePosition);
+                forget (channel, note);
                 continue;
             }
 
@@ -1008,6 +1114,9 @@ private:
     std::array<Sounding, 32> sounding {};
     std::atomic<double> lengthPpq { 0.5 };
     std::atomic<bool> legato { false };
+    enum Rule { fixed = 0, atMost, atLeast };
+    std::atomic<int> mode { fixed };
+    std::array<std::array<double, 128>, 16> startedAt {};
 };
 
 //==================================================================================================
@@ -1023,6 +1132,8 @@ public:
     void setSettings (const NoteModuleSettings& settings) noexcept
     {
         on.store (settings.latchOn);
+        mode.store (settings.latchMode == "add" ? add : settings.latchMode == "toggle" ? toggle : replace);
+        pedalReleases.store (settings.latchPedalRelease);
     }
 
     void process (const juce::MidiBuffer& in, juce::MidiBuffer& out) noexcept
@@ -1039,6 +1150,9 @@ public:
             return;
         }
 
+        const auto rule = mode.load();
+        const auto pedal = pedalReleases.load();
+
         for (const auto metadata : in)
         {
             const auto message = metadata.getMessage();
@@ -1046,12 +1160,29 @@ public:
 
             if (message.isNoteOn())
             {
-                if (keysDown == 0)
+                ++keysDown;
+                if (rule == toggle && forget (message.getChannel(), message.getNoteNumber()))
+                {
+                    // Played again while held: that note lets go instead of retriggering.
+                    out.addEvent (juce::MidiMessage::noteOff (message.getChannel(), message.getNoteNumber()), position);
+                    continue;
+                }
+                if (rule == replace && keysDown == 1)
                     releaseLatched (out, position);      // a new phrase replaces the old one
 
-                ++keysDown;
                 out.addEvent (message, position);
                 remember (message.getChannel(), message.getNoteNumber());
+                continue;
+            }
+
+            if (pedal && message.isController() && message.getControllerNumber() == 64)
+            {
+                // The pedal is the release here, not a sustain: consumed, and one press lets
+                // go of everything held.
+                const auto down = message.getControllerValue() >= 64;
+                if (down && ! pedalDown)
+                    releaseLatched (out, position);
+                pedalDown = down;
                 continue;
             }
 
@@ -1088,6 +1219,17 @@ private:
             }
     }
 
+    bool forget (int channel, int note) noexcept
+    {
+        for (auto& entry : latched)
+            if (entry.channel == channel && entry.note == note)
+            {
+                entry.note = -1;
+                return true;
+            }
+        return false;
+    }
+
     void releaseLatched (juce::MidiBuffer& out, int position) noexcept
     {
         for (auto& entry : latched)
@@ -1100,7 +1242,11 @@ private:
 
     std::array<Held, 32> latched {};
     int keysDown = 0;
+    bool pedalDown = false;
     std::atomic<bool> on { false };
+    enum Rule { replace = 0, add, toggle };
+    std::atomic<int> mode { replace };
+    std::atomic<bool> pedalReleases { false };
 };
 
 } // namespace ceditor::perf

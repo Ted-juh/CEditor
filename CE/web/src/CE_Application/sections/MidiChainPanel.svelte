@@ -21,6 +21,8 @@
   import ChordsEditor from './midiModules/ChordsEditor.svelte';
   import ArpEditor from './midiModules/ArpEditor.svelte';
   import ResponseEditor from './midiModules/ResponseEditor.svelte';
+  import EchoEditor from './midiModules/EchoEditor.svelte';
+  import SmallModuleEditors from './midiModules/SmallModuleEditors.svelte';
   import { RATE_CHOICES } from '../utils/arpLane.js';
   import { shapeLabel } from '../utils/chordBuilder.js';
   import { HUMANIZE_FEELS, humanizeFeelOf, beatsToMs } from '../utils/noteModuleViews.js';
@@ -104,7 +106,9 @@
     if (slot.type === 'echo')
       return slot.mod.echoRepeats === 0 ? 'off'
         : `${slot.mod.echoRepeats}× · ${beatLabel(slot.mod.echoStepBeats)}`
-          + (slot.mod.echoTranspose ? ` · ${slot.mod.echoTranspose > 0 ? '+' : ''}${slot.mod.echoTranspose}st` : '');
+          + (slot.mod.echoFeel === 'dotted' ? ' dotted' : slot.mod.echoFeel === 'triplet' ? ' triplet' : '')
+          + (slot.mod.echoTranspose ? ` · ${slot.mod.echoTranspose > 0 ? '+' : ''}${slot.mod.echoTranspose}`
+             + (slot.mod.echoScaleClimb ? ' steps' : 'st') : '');
     if (slot.type === 'strum')
       return slot.mod.strumBeats === 0 ? 'off'
         : `${beatLabel(slot.mod.strumBeats)} · ${STRUM_LABELS[slot.mod.strumPattern] ?? slot.mod.strumPattern}`;
@@ -118,12 +122,18 @@
           + (slot.mod.humanizePreserveChords ? ' · chord lock' : '')
           + (slot.mod.humanizeProtectBeats ? ' · beat anchors' : '');
     if (slot.type === 'chance')
-      return slot.mod.chance >= 1 ? 'every note' : `${Math.round(slot.mod.chance * 100)}%`;
+      return (slot.mod.chance >= 1 ? 'every note' : `${Math.round(slot.mod.chance * 100)}%`)
+        + (slot.mod.chance < 1 && slot.mod.chanceKeepDownbeats ? ' · beats kept' : '')
+        + (slot.mod.chance < 1 && slot.mod.chanceSoftFirst ? ' · soft first' : '');
     if (slot.type === 'length')
       return slot.mod.legato ? 'legato'
-        : slot.mod.lengthBeats === 0 ? 'as played' : beatLabel(slot.mod.lengthBeats);
+        : slot.mod.lengthBeats === 0 ? 'as played'
+        : `${slot.mod.lengthMode === 'fixed' ? '' : `${slot.mod.lengthMode} `}${beatLabel(slot.mod.lengthBeats)}`;
     if (slot.type === 'latch')
-      return slot.mod.latchOn ? 'holding' : 'off';
+      return slot.mod.latchOn
+        ? `holding · ${slot.mod.latchMode === 'add' ? 'adds' : slot.mod.latchMode === 'toggle' ? 'toggles' : 'replaces'}`
+          + (slot.mod.latchPedalRelease ? ' · pedal lets go' : '')
+        : 'off';
     if (slot.type === 'mpe')
       return slot.mod.mpeEnabled
         ? `${MPE_FORMAT_LABELS[slot.mod.mpeInput]} → ${MPE_FORMAT_LABELS[slot.mod.mpeOutput]}`
@@ -366,28 +376,8 @@
           {/if}
 
           {#if slot.type === 'echo'}
-            <label class="mini-field">Repeats
-              <input type="number" min="0" max="8" value={slot.mod.echoRepeats}
-                     onchange={(e) => set(slot, { echoRepeats: Number(e.currentTarget.value) })} />
-            </label>
-            <label class="mini-field">Every
-              <select value={slot.mod.echoStepBeats}
-                      onchange={(e) => set(slot, { echoStepBeats: Number(e.currentTarget.value) })}>
-                {#each BEAT_CHOICES as [value, label] (value)}
-                  <option value={value}>{label}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="mini-field">Decay
-              <input type="range" min="0.1" max="1" step="0.05" value={slot.mod.echoFeedback}
-                     aria-label="Echo decay"
-                     oninput={(e) => set(slot, { echoFeedback: Number(e.currentTarget.value) })} />
-            </label>
-            <label class="mini-field">Climb
-              <input type="number" min="-12" max="12" value={slot.mod.echoTranspose}
-                     title="Semitones added to each repeat"
-                     onchange={(e) => set(slot, { echoTranspose: Number(e.currentTarget.value) })} />
-            </label>
+            <EchoEditor mod={slot.mod} set={(fields) => set(slot, fields)} tempo={tempo} beatChoices={BEAT_CHOICES}
+                        scale={{ type: slot.fx.scaleType, root: slot.fx.scaleRoot }} />
           {/if}
 
           {#if slot.type === 'strum'}
@@ -398,39 +388,8 @@
             <HumanizeEditor mod={slot.mod} set={(fields) => set(slot, fields)} tempo={tempo} />
           {/if}
 
-          {#if slot.type === 'chance'}
-            <label class="mini-field">Notes played
-              <input type="range" min="0" max="1" step="0.05" value={slot.mod.chance}
-                     aria-label="Chance a note plays"
-                     oninput={(e) => set(slot, { chance: Number(e.currentTarget.value) })} />
-            </label>
-            <span class="dim">{Math.round(slot.mod.chance * 100)}% of them</span>
-          {/if}
-
-          {#if slot.type === 'length'}
-            <label class="mini-field">Length
-              <select value={slot.mod.lengthBeats} disabled={slot.mod.legato}
-                      onchange={(e) => set(slot, { lengthBeats: Number(e.currentTarget.value) })}>
-                <option value={0}>as played</option>
-                {#each BEAT_CHOICES as [value, label] (value)}
-                  <option value={value}>{label}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="mini-field">Legato
-              <PropertyToggle compact label="Hold to the next note" value={slot.mod.legato}
-                              ariaLabel="Hold each note until the next"
-                              onchange={(on) => set(slot, { legato: on })} />
-            </label>
-          {/if}
-
-          {#if slot.type === 'latch'}
-            <label class="mini-field">Latch
-              <PropertyToggle compact label="Keep the chord sounding" value={slot.mod.latchOn}
-                              ariaLabel="Latch held notes"
-                              onchange={(on) => set(slot, { latchOn: on })} />
-            </label>
-            <span class="dim">Play another chord to replace it.</span>
+          {#if slot.type === 'chance' || slot.type === 'length' || slot.type === 'latch'}
+            <SmallModuleEditors kind={slot.type} mod={slot.mod} set={(fields) => set(slot, fields)} beatChoices={BEAT_CHOICES} />
           {/if}
 
           {#if slot.type === 'mpe'}

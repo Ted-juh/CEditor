@@ -63,3 +63,28 @@ test('guitar mode frets chords the way StrumEngine::guitarVoicing does', () => {
   assert.deepEqual(guitarVoicing([60, 64, 67]).map((v) => v.string), [1, 2, 3, 4, 5],
     'and says which string each note is on');
 });
+
+test('echo, chance and length pictures follow the engines', async () => {
+  const { echoNotes, climbInScale, chanceBar, lengthOut } = await import('../src/CE_Application/utils/noteModuleViews.js');
+  const base = { echoRepeats: 2, echoStepBeats: 0.5, echoFeedback: 0.7, echoTranspose: 0, echoFeel: 'straight',
+                 echoScaleClimb: false, echoShorter: false, echoFloor: 1 };
+  assert.deepEqual(echoNotes({ ...base, echoFeel: 'dotted' }).map((n) => n.at), [0, 0.75, 1.5],
+    'a dotted echo repeats every three sixteenths, as the engine test pins');
+  assert.deepEqual(echoNotes({ ...base, echoTranspose: 2, echoScaleClimb: true }).map((n) => n.note), [60, 64, 67]);
+  assert.deepEqual(echoNotes({ ...base, echoRepeats: 3, echoFeedback: 0.1, echoFloor: 40 }).map((n) => n.velocity),
+    [100, 40, 40, 40]);
+  const short = echoNotes({ ...base, echoShorter: true });
+  assert.ok(short[2].length < short[1].length);
+  assert.equal(climbInScale(64, -1, 'major', 0), 62);
+  assert.equal(climbInScale(126, 3, 'chromatic', 0), -1, 'off the keyboard stops');
+
+  const none = chanceBar({ chance: 0, chanceKeepDownbeats: true, chanceSoftFirst: false });
+  assert.deepEqual(none.filter((n) => n.plays).map((n) => n.step), [0, 4, 8, 12], 'at no chance only the beats play');
+  assert.equal(chanceBar({ chance: 1 }).every((n) => n.plays), true);
+
+  const played = [{ at: 0, length: 0.1 }, { at: 1, length: 0.6 }];
+  assert.deepEqual(lengthOut({ lengthBeats: 0.25, lengthMode: 'at most', legato: false }, played), [0.1, 0.25]);
+  assert.deepEqual(lengthOut({ lengthBeats: 0.25, lengthMode: 'at least', legato: false }, played), [0.25, 0.6]);
+  assert.deepEqual(lengthOut({ lengthBeats: 0.25, lengthMode: 'fixed', legato: false }, played), [0.25, 0.25]);
+  assert.deepEqual(lengthOut({ lengthBeats: 0, legato: true }, played), [1, 0.6]);
+});

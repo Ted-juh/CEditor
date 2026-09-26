@@ -3478,6 +3478,171 @@ void testNoteModules()
         check (! panic.isEmpty(), "panic reaches what a latch is holding");
     }
 
+    // -- the small modules' new options: echo feel/scale/floor/shorter, chance keeping the
+    //    beat and dropping soft notes first, length at most/at least, latch add/toggle/pedal.
+    {
+        // Feeds `script` (block -> messages) through a rack and records every note event. The
+        // transport is parked, so block b starts at b * 256 / 48000 * 2 beats (~0.0107 beat).
+        const auto play = [] (MidiInsertRack& rack, const std::map<int, juce::MidiBuffer>& script, int blocks)
+        {
+            Transport clock;
+            clock.setTempo (120.0);
+            std::vector<Event> events;
+            for (int block = 0; block < blocks; ++block)
+            {
+                juce::MidiBuffer out;
+                const auto found = script.find (block);
+                rack.process (found != script.end() ? found->second : juce::MidiBuffer(), out,
+                              clock.advance (blockSize, sampleRate), blockSize);
+                for (const auto metadata : out)
+                {
+                    const auto message = metadata.getMessage();
+                    if (message.isNoteOnOrOff())
+                        events.push_back ({ block, metadata.samplePosition, message.isNoteOn(),
+                                            message.getNoteNumber(), message.getVelocity() });
+                }
+            }
+            return events;
+        };
+        const auto rackOf = [] (const MidiSlot& s)
+        {
+            auto rack = std::make_unique<MidiInsertRack>();
+            rack->prepare (blockSize);
+            rack->setSlots ({ s });
+            return rack;
+        };
+        const auto on  = [] (int note, int velocity = 100) { return juce::MidiMessage::noteOn (1, note, (juce::uint8) velocity); };
+        const auto off = [] (int note) { return juce::MidiMessage::noteOff (1, note); };
+        const auto buffer = [] (std::initializer_list<juce::MidiMessage> messages)
+        {
+            juce::MidiBuffer b;
+            for (const auto& m : messages)
+                b.addEvent (m, 0);
+            return b;
+        };
+
+        auto echo = slot ("echo");
+        echo.mod.echoRepeats = 2;
+        echo.mod.echoStepBeats = 0.5;
+        echo.mod.echoFeel = "dotted";
+        auto events = play (*rackOf (echo), { { 0, buffer ({ on (60), off (60) }) } }, 200);
+        std::vector<int> onBlocks;
+        for (const auto& e : events) if (e.on) onBlocks.push_back (e.block);
+        check (onBlocks.size() == 3 && onBlocks[1] == 70 && onBlocks[2] == 140,
+               "a dotted echo repeats every three sixteenths");
+
+        echo.mod.echoFeel = "straight";
+        echo.mod.echoTranspose = 2;
+        echo.mod.echoScaleClimb = true;
+        echo.fx.scaleType = "major";
+        echo.fx.scaleRoot = 0;
+        std::vector<int> climbed;
+        for (const auto& e : play (*rackOf (echo), { { 0, buffer ({ on (60), off (60) }) } }, 120))
+            if (e.on) climbed.push_back (e.note);
+        check (climbed == std::vector<int> ({ 60, 64, 67 }), "climbing in the scale goes C, E, G, not C, D, E");
+
+        echo.mod.echoTranspose = 0;
+        echo.mod.echoScaleClimb = false;
+        echo.mod.echoRepeats = 3;
+        echo.mod.echoFeedback = 0.1f;
+        echo.mod.echoFloor = 40;
+        std::vector<int> loudness;
+        for (const auto& e : play (*rackOf (echo), { { 0, buffer ({ on (60), off (60) }) } }, 200))
+            if (e.on) loudness.push_back (e.velocity);
+        check (loudness == std::vector<int> ({ 100, 40, 40, 40 }), "repeats stop getting quieter at the floor");
+
+        echo.mod.echoFeedback = 0.7f;
+        echo.mod.echoFloor = 1;
+        echo.mod.echoRepeats = 2;
+        echo.mod.echoShorter = true;
+        std::map<int, int> began, lasted;
+        for (const auto& e : play (*rackOf (echo), { { 0, buffer ({ on (60), off (60) }) } }, 200))
+        {
+            if (e.on) began[(int) began.size()] = e.block;
+            else if ((int) lasted.size() < (int) began.size()) lasted[(int) lasted.size()] = e.block - began[(int) lasted.size()];
+        }
+        check (lasted.size() == 3 && lasted[2] < lasted[1], "each repeat is shorter than the one before");
+
+        auto chance = slot ("chance");
+        chance.mod.chance = 0.0f;
+        chance.mod.chanceKeepDownbeats = true;
+        std::vector<int> kept;
+        for (const auto& e : play (*rackOf (chance), { { 0, buffer ({ on (60), off (60) }) },
+                                                        { 20, buffer ({ on (62), off (62) }) },
+                                                        { 94, buffer ({ on (64), off (64) }) } }, 100))
+            if (e.on) kept.push_back (e.note);
+        check (kept == std::vector<int> ({ 60, 64 }), "at no chance, only the notes on the beat get through");
+
+        chance.mod.chance = 0.5f;
+        chance.mod.chanceKeepDownbeats = false;
+        chance.mod.chanceSoftFirst = true;
+        auto weightedRack = rackOf (chance);
+        int soft = 0, loud = 0;
+        for (int i = 0; i < 400; ++i)
+        {
+            const auto velocity = i % 2 == 0 ? 10 : 127;
+            for (const auto& e : play (*weightedRack, { { 0, buffer ({ on (60, velocity), off (60) }) } }, 1))
+                if (e.on) (velocity == 10 ? soft : loud) += 1;
+        }
+        check (loud > soft + 60, "soft notes drop first: loud ones get through far more often");
+
+        auto length = slot ("length");
+        length.mod.lengthBeats = 0.25;
+        length.mod.lengthMode = "at most";
+        auto endOf = [&] (const MidiSlot& s, int releaseBlock)
+        {
+            int end = -1;
+            for (const auto& e : play (*rackOf (s), { { 0, buffer ({ on (60) }) }, { releaseBlock, buffer ({ off (60) }) } }, 120))
+                if (! e.on) end = end < 0 ? e.block : -2;   // -2: more than one off
+            return end;
+        };
+        check (endOf (length, 10) == 10, "at most: a short note ends where you let go");
+        check (endOf (length, 60) == 23, "and a long one is cut at the length, with one off only");
+        length.mod.lengthMode = "at least";
+        check (endOf (length, 5) == 23, "at least: a tap rings on to the length");
+        check (endOf (length, 60) == 60, "and a longer note ends as played");
+
+        auto latch = slot ("latch");
+        latch.mod.latchOn = true;
+        latch.mod.latchMode = "add";
+        events = play (*rackOf (latch), { { 0, buffer ({ on (60), on (64), off (60), off (64) }) },
+                                          { 5, buffer ({ on (67), off (67) }) } }, 10);
+        check (onsOf (events) == 3 && ! balanced (events) && [&] { for (auto& e : events) if (! e.on) return false; return true; }(),
+               "add: a new phrase joins what is held instead of replacing it");
+
+        latch.mod.latchMode = "toggle";
+        events = play (*rackOf (latch), { { 0, buffer ({ on (60), on (64), off (60), off (64) }) },
+                                          { 5, buffer ({ on (64), off (64) }) } }, 10);
+        check (onsOf (events) == 2 && events.back().note == 64 && ! events.back().on,
+               "toggle: playing a held note again lets go of just that note");
+
+        latch.mod.latchMode = "replace";
+        latch.mod.latchPedalRelease = true;
+        auto pedalRack = rackOf (latch);
+        juce::MidiBuffer pedal;
+        pedal.addEvent (juce::MidiMessage::controllerEvent (1, 64, 127), 0);
+        events = play (*pedalRack, { { 0, buffer ({ on (60), off (60) }) }, { 5, pedal } }, 10);
+        check (balanced (events), "the pedal lets go of everything held");
+
+        NoteModuleSettings saved;
+        saved.echoFeel = "triplet";
+        saved.echoScaleClimb = true;
+        saved.echoShorter = true;
+        saved.echoFloor = 33;
+        saved.chanceKeepDownbeats = true;
+        saved.chanceSoftFirst = true;
+        saved.lengthMode = "at least";
+        saved.latchMode = "toggle";
+        saved.latchPedalRelease = true;
+        NoteModuleSettings restored;
+        noteModuleFromVar (noteModuleToVar (saved), restored);
+        check (restored.echoFeel == "triplet" && restored.echoScaleClimb && restored.echoShorter
+                 && restored.echoFloor == 33 && restored.chanceKeepDownbeats && restored.chanceSoftFirst
+                 && restored.lengthMode == "at least" && restored.latchMode == "toggle"
+                 && restored.latchPedalRelease,
+               "the small modules' new options survive the trip");
+    }
+
     // Retyping a slot must release what the old module was holding — the same rule the arp
     // and the chorder already answer to, now with several more ways to break it.
     {
