@@ -19,6 +19,7 @@
     title = 'Drag up or down (Shift for fine), or click to type',
     pixelsPerStep = 4,
     fineStep = null,          // with Shift held (drag or arrows): this step instead; null = step / 10
+    stepper = null,           // (value, steps, fine) => next: for values that step by ratio, like a rate in Hz
     onchange = () => {},
     testid = undefined,
   } = $props();
@@ -38,6 +39,11 @@
 
   function stepBy(n, fine = false) {
     if (n === 0) return;
+    if (stepper) {
+      const next = clamp(stepper(value, n, fine));
+      if (next !== value) onchange(next);
+      return;
+    }
     if (choices) {
       const i = Math.max(0, Math.min(choices.length - 1, indexOf(value) + n));
       if (choices[i][0] !== value) onchange(choices[i][0]);

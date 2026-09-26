@@ -30,12 +30,10 @@
     startPerformanceRecording, finishPerformanceRecording, cancelPerformanceRecording,
     removePerformanceTake, replayPerformanceTake, stopPerformanceReplay,
     addModulationRoute, setModulationRoute, removeModulationRoute, clearModulationRoutes,
-    addMidiLfo, setMidiLfo, resetMidiLfo, removeMidiLfo,
-    addMidiLfoOutput, setMidiLfoOutput, removeMidiLfoOutput,
-    addEnvelope, setEnvelope, triggerEnvelope, resetEnvelope, removeEnvelope,
-    addMseg, setMseg, resetMseg, removeMseg,
-    addRandomModulator, setRandomModulator, resetRandomModulator, removeRandomModulator,
-    deterministicRandomUnit,
+    addMidiLfo,
+    addEnvelope, triggerEnvelope,
+    addMseg,
+    addRandomModulator,
     importScalaTuning, parseScalaTuning, resetMicrotuning, setMicrotuning,
     setPartMicrotuning, sendMicrotuning,
     addScene, removeScene, renameScene, captureScene, setSceneOptions, setSceneClip, launchScene,
@@ -50,6 +48,13 @@
   import { PERFORMANCE_GROUPS, performanceGroupFor, restorePerformanceNavigation,
     storePerformanceNavigation, selectPerformanceTool } from '../utils/performanceNavigation.js';
   import FollowGraph from './FollowGraph.svelte';
+  import LfoCard from './performance/LfoCard.svelte';
+  import EnvelopeCard from './performance/EnvelopeCard.svelte';
+  import MsegCard from './performance/MsegCard.svelte';
+  import RandomCard from './performance/RandomCard.svelte';
+  import PatternStepRows from './performance/PatternStepRows.svelte';
+  import ScrubValue from '../components/controls/ScrubValue.svelte';
+  import Segmented from '../components/controls/Segmented.svelte';
 
   let { onShowMixer = () => {} } = $props();
   const stopMeasurement = () => { if ($hostState.soundcheck.activeItemId) finishSoundcheck(); };
@@ -120,9 +125,6 @@
   let modAmount = $state(0.25);
   let modChannel = $state(0);
   let modCcNumber = $state(74);
-  let msegDrag = $state(null);
-  let selectedMsegId = $state('');
-  let selectedMsegPointId = $state('');
   let tuningFileMessage = $state('');
   let variationAmount = $state(0.55);
   let variationAmountPatternId = $state('');
@@ -257,20 +259,6 @@
       ? $hostParameters.parameters.filter((parameter) => parameter.automatable
           && parameter.id !== '@macro')
       : []);
-
-  const lfoSyncRates = [
-    { beats: 0.125, label: '1/32' },
-    { beats: 1 / 6, label: '1/16T' },
-    { beats: 0.25, label: '1/16' },
-    { beats: 1 / 3, label: '1/8T' },
-    { beats: 0.5, label: '1/8' },
-    { beats: 2 / 3, label: '1/4T' },
-    { beats: 1, label: '1/4' },
-    { beats: 2, label: '1/2' },
-    { beats: 4, label: '1 bar' },
-    { beats: 8, label: '2 bars' },
-    { beats: 16, label: '4 bars' },
-  ];
 
   // The clip a lane belongs to, for arming capture straight from the editor.
   let clipForSelectedPattern = $derived(
@@ -480,9 +468,10 @@
 
   const rollUp = () => (rollDrag = null);
 
-  // Velocity bars for the selected note/chord/drum lane, and value bars for cc/parameter
-  // lanes: same bar-per-step gesture the arp grid uses.
+  // Value bars for cc/parameter lanes: the same bar-per-step gesture the arp grid uses. The
+  // other per-step values are PatternStepRows under the selected lane.
   let barDrag = $state(null);   // { laneId, field, lastIndex }
+  let rollSideWidth = $state(0);
 
   function barFromEvent(lane, event) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -501,15 +490,8 @@
 
   function barApply(lane, field, event) {
     const { index, height } = barFromEvent(lane, event);
-    const step = lane.steps[index];
-    if (field === 'velocity') {
-      if (!step?.active) return;   // velocity without a note is noise
-      setStep(selectedPattern.patternId, lane.laneId, index,
-              { velocity: Math.max(1, Math.round(height * 127)) });
-    } else {
-      setStep(selectedPattern.patternId, lane.laneId, index,
-              { active: true, value: Math.round(height * 100) / 100 });
-    }
+    setStep(selectedPattern.patternId, lane.laneId, index,
+            { active: true, value: Math.round(height * 100) / 100 });
   }
 
   function barMove(lane, field, event) {
@@ -657,58 +639,6 @@
     selectTool('modulation');
   }
 
-  const randomModeLabel = (mode) => ({
-    sampleHold: 'Sample & hold', smoothRandom: 'Smooth random',
-    chaos: 'Chaos', randomWalk: 'Bounded walk',
-  })[mode] ?? 'Sample & hold';
-
-  function randomPreviewValues(random, count = 24) {
-    let target = 0.5;
-    let chaosValue = 0.05
-      + 0.9 * deterministicRandomUnit(random.seed, 0, 0x68bc21eb);
-    let walkValue = 0.5;
-    const values = [];
-    for (let step = 0; step < count; step += 1) {
-      const changes = random.probability >= 1
-        || deterministicRandomUnit(random.seed, step, 0xa341316c) < random.probability;
-      if (random.mode === 'chaos' && changes) {
-        chaosValue = Math.max(0.0001, Math.min(0.9999,
-          (3.57 + 0.43 * random.chaos) * chaosValue * (1 - chaosValue)));
-        target = chaosValue;
-      } else if (random.mode === 'randomWalk' && changes) {
-        let walked = walkValue
-          + (deterministicRandomUnit(random.seed, step, 0xad90777d) * 2 - 1)
-            * random.stepSize;
-        if (walked < 0) walked = -walked;
-        if (walked > 1) walked = 2 - walked;
-        walkValue = Math.max(0, Math.min(1, walked));
-        target = walkValue;
-      } else if (!['chaos', 'randomWalk'].includes(random.mode) && changes) {
-        target = deterministicRandomUnit(random.seed, step, 0xc8013ea4);
-      }
-      values.push(random.minimum + target * (random.maximum - random.minimum));
-    }
-    return values;
-  }
-
-  function randomPreviewPath(random) {
-    const values = randomPreviewValues(random);
-    if (values.length === 0) return '';
-    const y = (value) => (1 - value) * 60;
-    const x = (index) => index * 100 / (values.length - 1);
-    const path = [`M 0 ${y(values[0])}`];
-    for (let index = 1; index < values.length; index += 1) {
-      if (random.mode === 'sampleHold') path.push(`L ${x(index)} ${y(values[index - 1])}`);
-      path.push(`L ${x(index)} ${y(values[index])}`);
-    }
-    return path.join(' ');
-  }
-
-  function reseedRandom(random) {
-    const seed = (Math.floor(Date.now() + Math.random() * 0x3fffffff) % 0x7ffffffe) + 1;
-    setRandomModulator(random.randomId, { seed });
-  }
-
   // A pattern's seed decides how every probability rolls, on every loop, for ever — same seed,
   // same performance, across runs and machines (deterministicRoll in CompiledPattern.h). Minted
   // in the same range the native side uses, and never zero: setPatternOptions clamps to 1 and a
@@ -726,179 +656,6 @@
   // is the difference between "this control is broken" and "nothing in here rolls yet".
   const patternRolls = (pattern) => (pattern?.lanes ?? []).some(
     (lane) => (lane.steps ?? []).some((step) => step.probability > 0 && step.probability < 100));
-
-  const msegDisplayPoints = (mseg) => msegDrag?.msegId === mseg.msegId
-    ? msegDrag.points : mseg.points;
-
-  function msegPath(points) {
-    if (points.length === 0) return '';
-    const path = [`M ${points[0].position * 100} ${(1 - points[0].value) * 60}`];
-    for (let index = 1; index < points.length; index += 1) {
-      const left = points[index - 1];
-      const right = points[index];
-      const span = right.position - left.position;
-      if (span <= 0.000001) {
-        path.push(`L ${right.position * 100} ${(1 - right.value) * 60}`);
-        continue;
-      }
-      for (let sample = 1; sample <= 12; sample += 1) {
-        const progress = sample / 12;
-        const shaped = progress ** (4 ** right.curve);
-        const position = left.position + span * progress;
-        const value = left.value + (right.value - left.value) * shaped;
-        path.push(`L ${position * 100} ${(1 - value) * 60}`);
-      }
-    }
-    return path.join(' ');
-  }
-
-  function msegCoordinates(element, event) {
-    const rect = element.getBoundingClientRect();
-    return {
-      position: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
-      value: Math.max(0, Math.min(1, 1 - (event.clientY - rect.top) / rect.height)),
-    };
-  }
-
-  function selectMsegPoint(mseg, pointId) {
-    selectedMsegId = mseg.msegId;
-    selectedMsegPointId = pointId;
-  }
-
-  function addMsegPoint(mseg, event) {
-    if (mseg.points.length >= 64) return;
-    const { position, value } = msegCoordinates(event.currentTarget, event);
-    const point = {
-      pointId: `mseg-point-${Date.now()}-${mseg.points.length + 1}`,
-      position: Math.max(0.001, Math.min(0.999, position)), value, curve: 0,
-    };
-    const points = [...mseg.points, point].sort((a, b) => a.position - b.position);
-    selectMsegPoint(mseg, point.pointId);
-    setMseg(mseg.msegId, { points });
-  }
-
-  function beginMsegDrag(mseg, point, event) {
-    event.preventDefault();
-    event.stopPropagation();
-    selectMsegPoint(mseg, point.pointId);
-    msegDrag = {
-      msegId: mseg.msegId,
-      pointId: point.pointId,
-      points: mseg.points.map((candidate) => ({ ...candidate })),
-    };
-    event.currentTarget.ownerSVGElement?.setPointerCapture?.(event.pointerId);
-  }
-
-  function moveMsegPoint(mseg, event) {
-    if (msegDrag?.msegId !== mseg.msegId) return;
-    const { position, value } = msegCoordinates(event.currentTarget, event);
-    const points = msegDrag.points.map((point, index, all) => {
-      if (point.pointId !== msegDrag.pointId) return point;
-      const fixedEndpoint = index === 0 || index === all.length - 1;
-      return { ...point, position: fixedEndpoint ? point.position : position, value };
-    }).sort((a, b) => a.position - b.position);
-    points[0].position = 0;
-    points[points.length - 1].position = 1;
-    msegDrag = { ...msegDrag, points };
-  }
-
-  function endMsegDrag(mseg, event) {
-    if (msegDrag?.msegId !== mseg.msegId) return;
-    setMseg(mseg.msegId, { points: msegDrag.points });
-    event.currentTarget.releasePointerCapture?.(event.pointerId);
-    msegDrag = null;
-  }
-
-  function deleteMsegPoint(mseg, point, event) {
-    event.preventDefault();
-    event.stopPropagation();
-    const index = mseg.points.findIndex((candidate) => candidate.pointId === point.pointId);
-    if (mseg.points.length <= 2 || index <= 0 || index === mseg.points.length - 1) return;
-    const points = mseg.points.filter((candidate) => candidate.pointId !== point.pointId);
-    if (selectedMsegPointId === point.pointId) selectedMsegPointId = points[0].pointId;
-    setMseg(mseg.msegId, { points });
-  }
-
-  function msegPointKey(mseg, point, index, event) {
-    const step = event.shiftKey ? 0.05 : 0.01;
-    if (['Delete', 'Backspace'].includes(event.key)) {
-      deleteMsegPoint(mseg, point, event);
-      return;
-    }
-    const changes = {};
-    if (event.key === 'ArrowUp') changes.value = Math.min(1, point.value + step);
-    else if (event.key === 'ArrowDown') changes.value = Math.max(0, point.value - step);
-    else if (event.key === 'ArrowLeft' && index > 0 && index < mseg.points.length - 1)
-      changes.position = Math.max(0, point.position - step);
-    else if (event.key === 'ArrowRight' && index > 0 && index < mseg.points.length - 1)
-      changes.position = Math.min(1, point.position + step);
-    else return;
-    event.preventDefault();
-    selectMsegPoint(mseg, point.pointId);
-    setSelectedMsegPoint(mseg, changes);
-  }
-
-  function setSelectedMsegPoint(mseg, fields) {
-    const pointId = selectedMsegId === mseg.msegId && selectedMsegPointId
-      ? selectedMsegPointId : mseg.points[0]?.pointId;
-    if (!pointId) return;
-    selectMsegPoint(mseg, pointId);
-    const points = mseg.points.map((point, index, all) => point.pointId === pointId
-      ? {
-          ...point,
-          ...fields,
-          position: index === 0 ? 0 : index === all.length - 1 ? 1
-            : Math.max(0, Math.min(1, Number(fields.position ?? point.position))),
-        }
-      : point).sort((a, b) => a.position - b.position);
-    setMseg(mseg.msegId, { points });
-  }
-
-  function applyMsegPreset(mseg, values) {
-    const points = values.map(([position, value, curve = 0], index) => ({
-      pointId: `mseg-point-${Date.now()}-${index + 1}`, position, value, curve,
-    }));
-    selectedMsegId = mseg.msegId;
-    selectedMsegPointId = points[0].pointId;
-    setMseg(mseg.msegId, { points });
-  }
-
-  function envelopeVisual(envelope) {
-    const timeWidth = (milliseconds, width) => {
-      const normalized = Math.log10(Math.max(0, Number(milliseconds)) + 10) / Math.log10(60010);
-      return 5 + normalized * width;
-    };
-    const attackX = 2 + timeWidth(envelope.attackMs, 23);
-    const decayX = Math.min(61, attackX + timeWidth(envelope.decayMs, 22));
-    const releaseX = Math.max(72, decayX + 8);
-    const sustainY = 49 - Math.max(0, Math.min(1, envelope.sustain)) * 46;
-    let markerX = 2;
-    if (envelope.stage === 'attack') markerX = 2 + (attackX - 2) * envelope.stageProgress;
-    else if (envelope.stage === 'decay') markerX = attackX + (decayX - attackX) * envelope.stageProgress;
-    else if (envelope.stage === 'sustain') markerX = decayX + (releaseX - decayX) * 0.5;
-    else if (envelope.stage === 'release') markerX = releaseX + (98 - releaseX) * envelope.stageProgress;
-    return {
-      points: `2,49 ${attackX},3 ${decayX},${sustainY} ${releaseX},${sustainY} 98,49`,
-      attackX, decayX, releaseX,
-      markerX,
-      markerY: 49 - Math.max(0, Math.min(1, envelope.value)) * 46,
-    };
-  }
-
-  // A linear 60-second fader would make the useful first second almost impossible to set.
-  // The editor is logarithmic while the stored/native value remains ordinary milliseconds.
-  const envelopeTimePosition = (milliseconds) =>
-    Math.log10(Math.max(0, Math.min(60000, Number(milliseconds))) + 1) / Math.log10(60001);
-  const envelopeTimeFromPosition = (position) =>
-    Math.round((60001 ** Math.max(0, Math.min(1, Number(position))) - 1) / 5) * 5;
-
-  function addHardwareLfoOutput(lfo) {
-    const target = hardwareParts[0];
-    if (!target) return;
-    addMidiLfoOutput(lfo.lfoId, {
-      type: 'cc', targetPartId: target.partId, channel: target.midiOutChannel || 1, number: 1,
-    });
-  }
 
   async function importScalaFile(event) {
     const input = event.currentTarget;
@@ -1044,27 +801,23 @@
                 {selectedPattern.variationLabel}
               </span>
             {/if}
-            <label class="mini-field variation-amount"
-                   title="How far B, C and D move away from the authored A pattern">
+            <div class="mini-field variation-amount"
+                 title="How far B, C and D move away from the authored A pattern">
               Variations
-              <select value={variationAmount}
-                      onchange={(e) => { variationAmount = Number(e.currentTarget.value); }}>
-                <option value="0.25">Subtle</option>
-                <option value="0.55">Balanced</option>
-                <option value="0.85">Bold</option>
-              </select>
-            </label>
+              <Segmented options={[{ value: 0.25, label: 'Subtle' }, { value: 0.55, label: 'Balanced' }, { value: 0.85, label: 'Bold' }]}
+                         value={variationAmount} label="How far variations move" testid="variation-amount"
+                         onchange={(v) => { variationAmount = v; }} />
+            </div>
             <button type="button" class="variation-create"
                     title="Create related feel, sparse and fill patterns; existing variation clips keep working"
                     onclick={() => createPatternVariations(selectedPattern.patternId, variationAmount)}>
               {selectedPattern.variationLabel ? 'Regenerate B/C/D' : 'Create B/C/D'}
             </button>
-            <label class="mini-field" title="Delays every second step of each lane's own grid">
+            <div class="mini-field" title="Delays every second step of each lane's own grid">
               Swing
-              <input type="range" min="0" max="0.75" step="0.01" value={selectedPattern.swing}
-                     onchange={(e) => setPatternOptions(selectedPattern.patternId,
-                                                       { swing: Number(e.currentTarget.value) })} />
-            </label>
+              <ScrubValue value={Math.round(selectedPattern.swing * 100)} min={0} max={75} unit="%" label="Swing" testid="pattern-swing"
+                          onchange={(v) => setPatternOptions(selectedPattern.patternId, { swing: v / 100 })} />
+            </div>
             <label class="mini-field seed-field"
                    title={patternRolls(selectedPattern)
                      ? 'Which way every probability rolls. The same seed plays the same performance, every run and every machine — write it down and you can rehearse it.'
@@ -1096,9 +849,10 @@
                 <option value={groove.grooveId}>{groove.name}</option>
               {/each}
             </select>
-            <label class="mini-field groove-strength">Strength — {Math.round(grooveAmount * 100)}%
-              <input type="range" min="0" max="1" step="0.05" bind:value={grooveAmount} />
-            </label>
+            <div class="mini-field groove-strength">Strength
+              <ScrubValue value={Math.round(grooveAmount * 100)} min={0} max={100} step={5} fineStep={1} unit="%"
+                          label="Groove strength" testid="groove-strength" onchange={(v) => { grooveAmount = v / 100; }} />
+            </div>
             <PropertyToggle compact label="Velocity accents" value={grooveVelocity}
                             onchange={(on) => { grooveVelocity = on; }} />
             <button type="button" disabled={!selectedGroove}
@@ -1185,32 +939,13 @@
                       </div>
                     {/each}
                   </div>
-                  <div class="roll-side">
+                  <div class="roll-side" bind:clientWidth={rollSideWidth}>
                     <button type="button" class="ghost" title="One octave up"
                             onclick={() => shiftRoll(lane, 1)}>▲</button>
                     <button type="button" class="ghost" title="One octave down"
                             onclick={() => shiftRoll(lane, -1)}>▼</button>
                   </div>
                 </div>
-                {#if selectedLane?.laneId === lane.laneId}
-                  <!-- Dynamics under the melody, exactly the arp's gesture. -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <div class="bar-lane" data-testid={`velocity-lane-${lane.laneId}`}
-                       title="Velocity per step — drag"
-                       onpointerdown={(e) => barDown(lane, 'velocity', e)}
-                       onpointermove={(e) => barMove(lane, 'velocity', e)}
-                       onpointerup={barUp} onpointercancel={barUp}>
-                    {#each lane.steps as step, index (index)}
-                      <div class="bar-col" class:idle={!step.active}
-                           class:locked={stepHasLocks(lane, index)}
-                           class:playing={playingColumn(lane) === index}>
-                        {#if step.active}
-                          <div class="bar-fill" style={`height: ${Math.max(step.velocity / 127 * 100, 4)}%`}></div>
-                        {/if}
-                      </div>
-                    {/each}
-                  </div>
-                {/if}
               {:else if lane.type === 'cc' || lane.type === 'parameter'}
                 <!-- A value curve is bars, not a slider hidden behind each step. Dragging a
                      column writes and activates it; the step options still deactivate. -->
@@ -1256,45 +991,30 @@
                     </button>
                   {/each}
                 </div>
-                {#if selectedLane?.laneId === lane.laneId && lane.type === 'drum'}
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <div class="bar-lane" data-testid={`velocity-lane-${lane.laneId}`}
-                       title="Velocity per step — drag"
-                       onpointerdown={(e) => barDown(lane, 'velocity', e)}
-                       onpointermove={(e) => barMove(lane, 'velocity', e)}
-                       onpointerup={barUp} onpointercancel={barUp}>
-                    {#each lane.steps as step, index (index)}
-                      <div class="bar-col" class:idle={!step.active}
-                           class:locked={stepHasLocks(lane, index)}
-                           class:playing={playingColumn(lane) === index}>
-                        {#if step.active}
-                          <div class="bar-fill" style={`height: ${Math.max(step.velocity / 127 * 100, 4)}%`}></div>
-                        {/if}
-                      </div>
-                    {/each}
-                  </div>
-                {/if}
+              {/if}
+              {#if selectedLane?.laneId === lane.laneId}
+                <!-- The step values as rows under the lane: drag along one to draw it. -->
+                <PatternStepRows {lane} playing={playingColumn(lane)} selected={selectedStepIndex}
+                                 gutterLeft={lane.type === 'note' || lane.type === 'chord' ? 29 : 0}
+                                 gutterRight={lane.type === 'note' || lane.type === 'chord' ? rollSideWidth + 3 : 0}
+                                 onset={(index, fields) => setStep(selectedPattern.patternId, lane.laneId, index, fields)}
+                                 onselect={(index) => { selectedStepIndex = index; }} />
               {/if}
             </div>
           {/each}
 
           {#if selectedLane}
             <div class="lane-options" data-testid="perf-lane-options">
-              <label class="mini-field">Steps
-                <input type="number" min="1" max="64" value={selectedLane.stepCount}
-                       onchange={(e) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId,
-                                                       { stepCount: Number(e.currentTarget.value) })} />
-              </label>
-              <label class="mini-field" title="Steps per beat — a lane's own rate, which is what makes polymeter free">
-                Rate
-                <select value={selectedLane.stepsPerBeat}
-                        onchange={(e) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId,
-                                                        { stepsPerBeat: Number(e.currentTarget.value) })}>
-                  {#each [1, 2, 3, 4, 6, 8, 12, 16] as rate (rate)}
-                    <option value={rate}>{rate}/beat</option>
-                  {/each}
-                </select>
-              </label>
+              <div class="mini-field">Steps
+                <ScrubValue value={selectedLane.stepCount} min={1} max={64} label="Steps in this lane" testid="lane-steps"
+                            onchange={(stepCount) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId, { stepCount })} />
+              </div>
+              <div class="mini-field" title="Steps per beat — a lane's own rate, which is what makes polymeter free">
+                Steps per beat
+                <Segmented options={[1, 2, 3, 4, 6, 8, 12, 16].map((rate) => ({ value: rate, label: String(rate), title: `${rate} steps per beat` }))}
+                           value={selectedLane.stepsPerBeat} label="Steps per beat" testid="lane-rate"
+                           onchange={(stepsPerBeat) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId, { stepsPerBeat })} />
+              </div>
               {#if selectedLane.type !== 'parameter'}
                 <label class="mini-field">Part
                   <select value={selectedLane.targetPartId}
@@ -1307,30 +1027,28 @@
                 </label>
               {/if}
               {#if selectedLane.type === 'drum'}
-                <label class="mini-field">Note
-                  <input type="number" min="0" max="127" value={selectedLane.drumNote}
-                         onchange={(e) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId,
-                                                         { drumNote: Number(e.currentTarget.value) })} />
-                </label>
+                <div class="mini-field">Note
+                  <ScrubValue value={selectedLane.drumNote} min={0} max={127} format={noteName} label="Drum note" testid="lane-drum-note"
+                              onchange={(drumNote) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId, { drumNote })} />
+                </div>
               {/if}
               {#if selectedLane.type === 'cc'}
-                <label class="mini-field">CC
-                  <input type="number" min="0" max="127" value={selectedLane.ccNumber}
-                         onchange={(e) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId,
-                                                         { ccNumber: Number(e.currentTarget.value) })} />
-                </label>
+                <div class="mini-field">CC
+                  <ScrubValue value={selectedLane.ccNumber} min={0} max={127} label="CC number" testid="lane-cc"
+                              onchange={(ccNumber) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId, { ccNumber })} />
+                </div>
               {/if}
               {#if selectedLane.type === 'cc' || selectedLane.type === 'parameter'}
                 <PropertyToggle compact label="Glide" value={selectedLane.glide}
                                 ariaLabel="Interpolate between steps"
                                 onchange={(on) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId, { glide: on })} />
               {/if}
-              <label class="mini-field" title="Spread N hits evenly over the lane's steps">
+              <div class="mini-field" title="Spread N hits evenly over the lane's steps">
                 Euclid
-                <input type="number" min="0" max={selectedLane.stepCount} value={selectedLane.euclidPulses}
-                       onchange={(e) => euclidFill(selectedPattern.patternId, selectedLane.laneId,
-                                                   Number(e.currentTarget.value))} />
-              </label>
+                <ScrubValue value={selectedLane.euclidPulses} min={0} max={selectedLane.stepCount} pixelsPerStep={8}
+                            format={(n) => (n === 0 ? 'off' : `${n} hits`)} label="Euclidean hits" testid="lane-euclid"
+                            onchange={(pulses) => euclidFill(selectedPattern.patternId, selectedLane.laneId, pulses)} />
+              </div>
               <HostConfirmButton identity={JSON.stringify([selectedPattern.patternId, selectedLane.laneId])} title="Clear lane" aria-label="Clear lane" type="button" class="ghost"
                       onclick={() => clearLane(selectedPattern.patternId, selectedLane.laneId)}>Clear</HostConfirmButton>
               {#if clipForSelectedPattern}
@@ -1349,53 +1067,26 @@
             <div class="step-options" data-testid="perf-step-options">
               <strong>Step {selectedStepIndex + 1}</strong>
               {#if selectedLane.type === 'note' || selectedLane.type === 'chord'}
-                <label class="mini-field">Note
-                  <input type="number" min="0" max="127" value={selectedStep.note}
-                         onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                  { note: Number(e.currentTarget.value) })} />
-                </label>
+                <div class="mini-field">Note
+                  <ScrubValue value={selectedStep.note} min={0} max={127} format={noteName} label="Note" testid="step-note"
+                              onchange={(note) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex, { note })} />
+                </div>
               {/if}
               {#if selectedLane.type === 'cc' || selectedLane.type === 'parameter'}
-                <label class="mini-field">Value
-                  <input type="range" min="0" max="1" step="0.01" value={selectedStep.value}
-                         onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                  { value: Number(e.currentTarget.value) })} />
-                </label>
+                <div class="mini-field">Value
+                  <ScrubValue value={Math.round(selectedStep.value * 100)} min={0} max={100} unit="%" label="Value" testid="step-value"
+                              onchange={(v) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex, { value: v / 100 })} />
+                </div>
               {:else}
-                <label class="mini-field">Velocity
-                  <input type="number" min="1" max="127" value={selectedStep.velocity}
-                         onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                  { velocity: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field">Gate
-                  <input type="range" min="0.05" max="4" step="0.05" value={selectedStep.gate}
-                         onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                  { gate: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field" title="Retriggers inside this step">Ratchet
-                  <input type="number" min="1" max="8" value={selectedStep.ratchets}
-                         onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                  { ratchets: Number(e.currentTarget.value) })} />
-                </label>
                 <PropertyToggle compact label="Tie" value={selectedStep.tie} ariaLabel="Tie to the previous step"
                                 onchange={(on) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex, { tie: on })} />
               {/if}
-              <label class="mini-field" title="Rolled from the pattern's seed, so the same seed replays the same show">
-                Chance
-                <input type="number" min="0" max="100" value={selectedStep.probability}
-                       onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                { probability: Number(e.currentTarget.value) })} />
-              </label>
-              <label class="mini-field" title="Nudge, as a fraction of a step">Nudge
-                <input type="range" min="-0.5" max="0.5" step="0.01" value={selectedStep.microtiming}
-                       onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                { microtiming: Number(e.currentTarget.value) })} />
-              </label>
-              <label class="mini-field" title="Play only on every Nth loop">Every
-                <input type="number" min="1" max="16" value={selectedStep.every}
-                       onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                { every: Number(e.currentTarget.value) })} />
-              </label>
+              <div class="mini-field" title="Play only on every Nth loop">Plays
+                <ScrubValue value={selectedStep.every} min={1} max={16} pixelsPerStep={8} label="Play on every Nth loop" testid="step-every"
+                            format={(n) => (n === 1 ? 'every loop' : `every ${n} loops`)}
+                            onchange={(every) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex, { every })} />
+              </div>
+              <span class="step-hint">Velocity, length, chance, nudge and ratchet: drag them in the rows under the lane.</span>
 
               <div class="lock-editor" data-testid="perf-parameter-locks">
                 <div class="lock-head">
@@ -1963,167 +1654,7 @@
       {#if $hostState.rack.midiLfos.length > 0}
         <div class="lfo-grid">
           {#each $hostState.rack.midiLfos as lfo (lfo.lfoId)}
-            <article class="lfo-card" class:disabled={!lfo.enabled}>
-              <header class="lfo-card-head">
-                <button type="button" class="route-power" class:on={lfo.enabled}
-                        title={lfo.enabled ? 'Disable LFO' : 'Enable LFO'}
-                        onclick={() => setMidiLfo(lfo.lfoId, { enabled: !lfo.enabled })}>
-                  {lfo.enabled ? '●' : '○'}
-                </button>
-                <input class="lfo-name" value={lfo.name} aria-label="LFO name"
-                       onchange={(e) => setMidiLfo(lfo.lfoId, { name: e.currentTarget.value })} />
-                <span class="perf-spacer"></span>
-                <button type="button" class="ghost" onclick={() => resetMidiLfo(lfo.lfoId)}>
-                  Restart
-                </button>
-                <HostConfirmButton identity={JSON.stringify([lfo.lfoId])} aria-label="Remove MIDI LFO" type="button" class="ghost danger" title="Remove LFO"
-                        onclick={() => removeMidiLfo(lfo.lfoId)}>×</HostConfirmButton>
-              </header>
-
-              <div class="lfo-scope" aria-label={`${lfo.name} current value ${Math.round(lfo.value * 100)}%`}>
-                <span class="lfo-midline"></span>
-                <span class="lfo-trace" style={`width: ${Math.round(lfo.phase * 100)}%`}></span>
-                <span class="lfo-dot"
-                      style={`left: ${Math.round(lfo.phase * 100)}%; top: ${Math.round((1 - lfo.value) * 100)}%`}></span>
-                <output>{Math.round(lfo.value * 100)}%</output>
-              </div>
-
-              <div class="lfo-controls">
-                <label class="mini-field">
-                  <span>Shape</span>
-                  <select value={lfo.shape}
-                          onchange={(e) => setMidiLfo(lfo.lfoId, { shape: e.currentTarget.value })}>
-                    <option value="sine">Sine</option>
-                    <option value="triangle">Triangle</option>
-                    <option value="sawUp">Saw up</option>
-                    <option value="sawDown">Saw down</option>
-                    <option value="square">Square</option>
-                    <option value="sampleHold">Sample & hold</option>
-                  </select>
-                </label>
-                <label class="mini-field lfo-sync-field">
-                  <span>Clock</span>
-                  <button type="button" class="toggle" class:on={lfo.sync}
-                          onclick={() => setMidiLfo(lfo.lfoId, { sync: !lfo.sync })}>
-                    {lfo.sync ? 'Tempo sync' : 'Free Hz'}
-                  </button>
-                </label>
-                {#if lfo.sync}
-                  <label class="mini-field">
-                    <span>Cycle</span>
-                    <select value={lfo.syncBeats}
-                            onchange={(e) => setMidiLfo(lfo.lfoId,
-                                                       { syncBeats: Number(e.currentTarget.value) })}>
-                      {#each lfoSyncRates as rate (rate.label)}
-                        <option value={rate.beats}>{rate.label}</option>
-                      {/each}
-                    </select>
-                  </label>
-                {:else}
-                  <label class="mini-field">
-                    <span>Rate Hz</span>
-                    <input type="number" min="0.01" max="40" step="0.01" value={lfo.rateHz}
-                           onchange={(e) => setMidiLfo(lfo.lfoId,
-                                                      { rateHz: Number(e.currentTarget.value) })} />
-                  </label>
-                {/if}
-                <label class="mini-field lfo-range">
-                  <span>Phase {Math.round(lfo.phaseOffset * 360)}°</span>
-                  <input type="range" min="0" max="1" step="0.01" value={lfo.phaseOffset}
-                         onchange={(e) => setMidiLfo(lfo.lfoId,
-                                                    { phaseOffset: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field lfo-range">
-                  <span>Minimum {Math.round(lfo.minimum * 100)}%</span>
-                  <input type="range" min="0" max={lfo.maximum} step="0.01" value={lfo.minimum}
-                         onchange={(e) => setMidiLfo(lfo.lfoId,
-                                                    { minimum: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field lfo-range">
-                  <span>Maximum {Math.round(lfo.maximum * 100)}%</span>
-                  <input type="range" min={lfo.minimum} max="1" step="0.01" value={lfo.maximum}
-                         onchange={(e) => setMidiLfo(lfo.lfoId,
-                                                    { maximum: Number(e.currentTarget.value) })} />
-                </label>
-                <button type="button" class="mod-add-button route-lfo"
-                        onclick={() => routeLfo(lfo)}>Route in matrix →</button>
-              </div>
-
-              <div class="lfo-midi-head">
-                <div>
-                  <strong>Hardware MIDI</strong>
-                  <span>Outputs are added muted and must be enabled explicitly.</span>
-                </div>
-                <button type="button" class="ghost" disabled={hardwareParts.length === 0}
-                        title={hardwareParts.length === 0 ? 'Add a hardware part first' : 'Add a MIDI output'}
-                        onclick={() => addHardwareLfoOutput(lfo)}>+ Output</button>
-              </div>
-              {#if lfo.outputs.length === 0}
-                <div class="lfo-output-empty">
-                  {hardwareParts.length === 0
-                    ? 'Add a hardware part to make CC, NRPN or SysEx destinations available.'
-                    : 'No direct hardware output. Matrix routes still work.'}
-                </div>
-              {:else}
-                <div class="lfo-outputs">
-                  {#each lfo.outputs as output (output.outputId)}
-                    <div class="lfo-output" class:unresolved={!output.resolved}>
-                      <button type="button" class="route-power" class:on={output.enabled}
-                              title={output.enabled ? 'Mute output' : 'Enable output'}
-                              onclick={() => setMidiLfoOutput(lfo.lfoId, output.outputId,
-                                                              { enabled: !output.enabled })}>
-                        {output.enabled ? '●' : '○'}
-                      </button>
-                      <label class="mini-field">
-                        <span>Protocol</span>
-                        <select value={output.type}
-                                onchange={(e) => setMidiLfoOutput(lfo.lfoId, output.outputId,
-                                                                  { type: e.currentTarget.value })}>
-                          <option value="cc">CC</option>
-                          <option value="nrpn">NRPN 14-bit</option>
-                          <option value="sysex">SysEx</option>
-                        </select>
-                      </label>
-                      <label class="mini-field lfo-output-target">
-                        <span>Hardware part</span>
-                        <select value={output.targetPartId}
-                                onchange={(e) => setMidiLfoOutput(lfo.lfoId, output.outputId,
-                                                                  { targetPartId: e.currentTarget.value })}>
-                          {#each hardwareParts as part (part.partId)}
-                            <option value={part.partId}>{part.midiOutputName || part.pluginName || 'Hardware part'}</option>
-                          {/each}
-                        </select>
-                      </label>
-                      {#if output.type !== 'sysex'}
-                        <label class="mini-field lfo-output-small">
-                          <span>Channel</span>
-                          <input type="number" min="1" max="16" value={output.channel}
-                                 onchange={(e) => setMidiLfoOutput(lfo.lfoId, output.outputId,
-                                                                  { channel: Number(e.currentTarget.value) })} />
-                        </label>
-                        <label class="mini-field lfo-output-number">
-                          <span>{output.type === 'nrpn' ? 'NRPN' : 'CC'}</span>
-                          <input type="number" min="0" max={output.type === 'nrpn' ? 16383 : 127}
-                                 value={output.number}
-                                 onchange={(e) => setMidiLfoOutput(lfo.lfoId, output.outputId,
-                                                                  { number: Number(e.currentTarget.value) })} />
-                        </label>
-                      {:else}
-                        <label class="mini-field lfo-sysex">
-                          <span>Template · use {'{value7}'}, {'{valueMSB}'}, {'{valueLSB}'}</span>
-                          <input value={output.sysexTemplate} spellcheck="false"
-                                 onchange={(e) => setMidiLfoOutput(lfo.lfoId, output.outputId,
-                                                                  { sysexTemplate: e.currentTarget.value })} />
-                        </label>
-                      {/if}
-                      {#if !output.resolved}<span class="route-missing">Unresolved</span>{/if}
-                      <HostConfirmButton identity={JSON.stringify([lfo.lfoId, output.outputId])} aria-label="Remove MIDI LFO output" type="button" class="ghost danger" title="Remove output"
-                              onclick={() => removeMidiLfoOutput(lfo.lfoId, output.outputId)}>×</HostConfirmButton>
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-            </article>
+            <LfoCard {lfo} {hardwareParts} onroute={() => routeLfo(lfo)} />
           {/each}
         </div>
       {/if}
@@ -2152,133 +1683,7 @@
       {:else}
         <div class="envelope-grid">
           {#each $hostState.rack.envelopes as envelope (envelope.envelopeId)}
-            {@const visual = envelopeVisual(envelope)}
-            <article class="envelope-card" class:disabled={!envelope.enabled}>
-              <header class="lfo-card-head">
-                <button type="button" class="route-power" class:on={envelope.enabled}
-                        title={envelope.enabled ? 'Disable envelope' : 'Enable envelope'}
-                        onclick={() => setEnvelope(envelope.envelopeId,
-                                                  { enabled: !envelope.enabled })}>
-                  {envelope.enabled ? '●' : '○'}
-                </button>
-                <input class="lfo-name" value={envelope.name} aria-label="Envelope name"
-                       onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                    { name: e.currentTarget.value })} />
-                <span class="envelope-stage" class:active={envelope.stage !== 'idle'}>
-                  {envelope.stage} · {Math.round(envelope.value * 100)}%
-                </span>
-                <span class="perf-spacer"></span>
-                <button type="button" class="ghost" onclick={() => resetEnvelope(envelope.envelopeId)}>
-                  Reset
-                </button>
-                <HostConfirmButton identity={JSON.stringify([envelope.envelopeId])} aria-label="Remove envelope" type="button" class="ghost danger" title="Remove envelope"
-                        onclick={() => removeEnvelope(envelope.envelopeId)}>×</HostConfirmButton>
-              </header>
-
-              <div class="envelope-scope"
-                   aria-label={`${envelope.name}, ${envelope.stage}, ${Math.round(envelope.value * 100)} percent`}>
-                <svg viewBox="0 0 100 52" preserveAspectRatio="none" aria-hidden="true">
-                  <line x1={visual.attackX} y1="0" x2={visual.attackX} y2="52"></line>
-                  <line x1={visual.decayX} y1="0" x2={visual.decayX} y2="52"></line>
-                  <line x1={visual.releaseX} y1="0" x2={visual.releaseX} y2="52"></line>
-                  <polyline points={visual.points}></polyline>
-                  <circle cx={visual.markerX} cy={visual.markerY} r="2.2"></circle>
-                </svg>
-                <div class="envelope-stage-labels" aria-hidden="true">
-                  <span>A</span><span>D</span><span>S</span><span>R</span>
-                </div>
-              </div>
-
-              <div class="envelope-controls">
-                <label class="mini-field envelope-time">
-                  <span>Attack {Math.round(envelope.attackMs)} ms</span>
-                  <input type="range" min="0" max="1" step="0.001"
-                         value={envelopeTimePosition(envelope.attackMs)}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                           { attackMs: envelopeTimeFromPosition(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field envelope-time">
-                  <span>Decay {Math.round(envelope.decayMs)} ms</span>
-                  <input type="range" min="0" max="1" step="0.001"
-                         value={envelopeTimePosition(envelope.decayMs)}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                           { decayMs: envelopeTimeFromPosition(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field envelope-time">
-                  <span>Sustain {Math.round(envelope.sustain * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.01" value={envelope.sustain}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                      { sustain: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field envelope-time">
-                  <span>Release {Math.round(envelope.releaseMs)} ms</span>
-                  <input type="range" min="0" max="1" step="0.001"
-                         value={envelopeTimePosition(envelope.releaseMs)}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                           { releaseMs: envelopeTimeFromPosition(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field envelope-time">
-                  <span>Curve {envelope.curve > 0 ? '+' : ''}{envelope.curve.toFixed(2)}</span>
-                  <input type="range" min="-1" max="1" step="0.01" value={envelope.curve}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                      { curve: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field envelope-time">
-                  <span>Velocity {Math.round(envelope.velocityAmount * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.01" value={envelope.velocityAmount}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                      { velocityAmount: Number(e.currentTarget.value) })} />
-                </label>
-              </div>
-
-              <div class="envelope-trigger-row">
-                <label class="mini-field">
-                  <span>MIDI channel</span>
-                  <select value={envelope.channel}
-                          onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                       { channel: Number(e.currentTarget.value) })}>
-                    <option value={0}>Omni</option>
-                    {#each Array.from({ length: 16 }, (_, index) => index + 1) as channel (channel)}
-                      <option value={channel}>{channel}</option>
-                    {/each}
-                  </select>
-                </label>
-                <label class="mini-field envelope-note">
-                  <span>Lowest note</span>
-                  <input type="number" min="0" max="127" value={envelope.noteLow}
-                         title={noteName(envelope.noteLow)}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                      { noteLow: Number(e.currentTarget.value) })} />
-                  <output>{noteName(envelope.noteLow)}</output>
-                </label>
-                <label class="mini-field envelope-note">
-                  <span>Highest note</span>
-                  <input type="number" min="0" max="127" value={envelope.noteHigh}
-                         title={noteName(envelope.noteHigh)}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                      { noteHigh: Number(e.currentTarget.value) })} />
-                  <output>{noteName(envelope.noteHigh)}</output>
-                </label>
-                <label class="mini-field">
-                  <span>Held notes</span>
-                  <button type="button" class="toggle" class:on={envelope.retrigger}
-                          onclick={() => setEnvelope(envelope.envelopeId,
-                                                    { retrigger: !envelope.retrigger })}>
-                    {envelope.retrigger ? 'Retrigger' : 'Legato'}
-                  </button>
-                </label>
-                <span class="perf-spacer"></span>
-                <button type="button" class="envelope-audition" disabled={!envelope.enabled}
-                        onpointerdown={() => setEnvelopeAuditionHeld(envelope.envelopeId, true)}
-                        onpointerup={() => setEnvelopeAuditionHeld(envelope.envelopeId, false)}
-                        onpointercancel={() => setEnvelopeAuditionHeld(envelope.envelopeId, false)}
-                        onpointerleave={() => setEnvelopeAuditionHeld(envelope.envelopeId, false)}>
-                  Hold to audition
-                </button>
-                <button type="button" class="mod-add-button"
-                        onclick={() => routeEnvelope(envelope)}>Route in matrix →</button>
-              </div>
-            </article>
+            <EnvelopeCard {envelope} {setEnvelopeAuditionHeld} onroute={() => routeEnvelope(envelope)} />
           {/each}
         </div>
       {/if}
@@ -2307,148 +1712,7 @@
       {:else}
         <div class="mseg-grid">
           {#each $hostState.rack.msegs as mseg (mseg.msegId)}
-            {@const points = msegDisplayPoints(mseg)}
-            {@const selectedPoint = (selectedMsegId === mseg.msegId
-              ? points.find((point) => point.pointId === selectedMsegPointId) : null) ?? points[0]}
-            {@const selectedPointIndex = points.findIndex(
-              (point) => point.pointId === selectedPoint.pointId)}
-            <article class="mseg-card" class:disabled={!mseg.enabled}>
-              <header class="lfo-card-head">
-                <button type="button" class="route-power" class:on={mseg.enabled}
-                        title={mseg.enabled ? 'Disable MSEG' : 'Enable MSEG'}
-                        onclick={() => setMseg(mseg.msegId, { enabled: !mseg.enabled })}>
-                  {mseg.enabled ? '●' : '○'}
-                </button>
-                <input class="lfo-name" value={mseg.name} aria-label="MSEG name"
-                       onchange={(e) => setMseg(mseg.msegId, { name: e.currentTarget.value })} />
-                <span class="mseg-readout">
-                  phase {Math.round(mseg.phase * 100)}% · value {Math.round(mseg.value * 100)}%
-                </span>
-                <span class="perf-spacer"></span>
-                <button type="button" class="ghost" onclick={() => resetMseg(mseg.msegId)}>
-                  Restart
-                </button>
-                <HostConfirmButton identity={JSON.stringify([mseg.msegId])} aria-label="Remove MSEG" type="button" class="ghost danger" title="Remove MSEG"
-                        onclick={() => removeMseg(mseg.msegId)}>×</HostConfirmButton>
-              </header>
-
-              <div class="mseg-editor">
-                <svg viewBox="0 0 100 60" preserveAspectRatio="none" role="application"
-                     aria-label={`${mseg.name} curve editor. Double-click to add, drag points, right-click to remove.`}
-                     ondblclick={(e) => addMsegPoint(mseg, e)}
-                     onpointermove={(e) => moveMsegPoint(mseg, e)}
-                     onpointerup={(e) => endMsegDrag(mseg, e)}
-                     onpointercancel={(e) => endMsegDrag(mseg, e)}>
-                  <g class="mseg-grid-lines" aria-hidden="true">
-                    {#each [25, 50, 75] as x (x)}<line x1={x} y1="0" x2={x} y2="60"></line>{/each}
-                    {#each [15, 30, 45] as y (y)}<line x1="0" y1={y} x2="100" y2={y}></line>{/each}
-                  </g>
-                  <path class="mseg-curve" d={msegPath(points)}></path>
-                  <line class="mseg-playhead" x1={mseg.phase * 100} y1="0"
-                        x2={mseg.phase * 100} y2="60"></line>
-                  <rect class="mseg-live-dot" x={mseg.phase * 100 - 0.7}
-                        y={(1 - mseg.value) * 60 - 2.5} width="1.4" height="5"></rect>
-                  {#each points as point, pointIndex (point.pointId)}
-                    <rect class="mseg-point"
-                          class:selected={selectedMsegId === mseg.msegId
-                            && selectedMsegPointId === point.pointId}
-                          x={point.position * 100 - 0.85} y={(1 - point.value) * 60 - 3}
-                          width="1.7" height="6"
-                          role="button" tabindex="0"
-                          aria-label={`Point ${pointIndex + 1}, position ${Math.round(point.position * 100)} percent, value ${Math.round(point.value * 100)} percent`}
-                          onpointerdown={(e) => beginMsegDrag(mseg, point, e)}
-                          ondblclick={(e) => e.stopPropagation()}
-                          onkeydown={(e) => msegPointKey(mseg, point, pointIndex, e)}
-                          oncontextmenu={(e) => deleteMsegPoint(mseg, point, e)}>
-                      <title>{Math.round(point.position * 100)}% · {Math.round(point.value * 100)}%</title>
-                    </rect>
-                  {/each}
-                </svg>
-                <div class="mseg-axis" aria-hidden="true">
-                  <span>0</span><span>¼</span><span>½</span><span>¾</span><span>1 cycle</span>
-                </div>
-              </div>
-
-              <div class="mseg-controls">
-                <label class="mini-field mseg-clock">
-                  <span>Clock</span>
-                  <button type="button" class="toggle" class:on={mseg.sync}
-                          onclick={() => setMseg(mseg.msegId, { sync: !mseg.sync })}>
-                    {mseg.sync ? 'Tempo sync' : 'Free Hz'}
-                  </button>
-                </label>
-                {#if mseg.sync}
-                  <label class="mini-field">
-                    <span>Cycle</span>
-                    <select value={mseg.syncBeats}
-                            onchange={(e) => setMseg(mseg.msegId,
-                              { syncBeats: Number(e.currentTarget.value) })}>
-                      {#each lfoSyncRates as rate (rate.label)}
-                        <option value={rate.beats}>{rate.label}</option>
-                      {/each}
-                    </select>
-                  </label>
-                {:else}
-                  <label class="mini-field">
-                    <span>Rate Hz</span>
-                    <input type="number" min="0.01" max="40" step="0.01" value={mseg.rateHz}
-                           onchange={(e) => setMseg(mseg.msegId,
-                             { rateHz: Number(e.currentTarget.value) })} />
-                  </label>
-                {/if}
-                <label class="mini-field mseg-phase">
-                  <span>Phase {Math.round(mseg.phaseOffset * 360)}°</span>
-                  <input type="range" min="0" max="1" step="0.01" value={mseg.phaseOffset}
-                         onchange={(e) => setMseg(mseg.msegId,
-                           { phaseOffset: Number(e.currentTarget.value) })} />
-                </label>
-                <div class="mseg-presets">
-                  <span>Shape</span>
-                  <button type="button" class="ghost"
-                          onclick={() => applyMsegPreset(mseg, [[0, 0], [1, 1]])}>Ramp</button>
-                  <button type="button" class="ghost"
-                          onclick={() => applyMsegPreset(mseg,
-                            [[0, 0], [0.1, 1, -0.35], [0.45, 0.18, 0.2], [1, 0]])}>Pluck</button>
-                  <button type="button" class="ghost"
-                          onclick={() => applyMsegPreset(mseg,
-                            [[0, 0], [0.24, 0], [0.25, 1], [0.74, 1], [0.75, 0], [1, 0]])}>Pulse</button>
-                </div>
-                <span class="perf-spacer"></span>
-                <button type="button" class="mod-add-button"
-                        onclick={() => routeMseg(mseg)}>Route in matrix →</button>
-              </div>
-
-              <div class="mseg-point-inspector">
-                <strong>Point {selectedPointIndex + 1}</strong>
-                <label class="mini-field mseg-point-control">
-                  <span>Position {Math.round(selectedPoint.position * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.005" value={selectedPoint.position}
-                         disabled={selectedPointIndex === 0 || selectedPointIndex === points.length - 1}
-                         onchange={(e) => setSelectedMsegPoint(mseg,
-                           { position: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field mseg-point-control">
-                  <span>Value {Math.round(selectedPoint.value * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.005" value={selectedPoint.value}
-                         onchange={(e) => setSelectedMsegPoint(mseg,
-                           { value: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field mseg-point-control">
-                  <span>Curve {selectedPoint.curve > 0 ? '+' : ''}{selectedPoint.curve.toFixed(2)}</span>
-                  <input type="range" min="-1" max="1" step="0.01" value={selectedPoint.curve}
-                         disabled={selectedPointIndex === 0}
-                         onchange={(e) => setSelectedMsegPoint(mseg,
-                           { curve: Number(e.currentTarget.value) })} />
-                </label>
-                <HostConfirmButton identity={selectedPoint.pointId} title="Remove point"
-                        disabled={points.length <= 2 || selectedPointIndex === 0
-                          || selectedPointIndex === points.length - 1}
-                        onclick={(e) => deleteMsegPoint(mseg, selectedPoint, e)}>
-                  Remove point
-                </HostConfirmButton>
-                <span class="mseg-point-count">{points.length} / 64 points</span>
-              </div>
-            </article>
+            <MsegCard {mseg} onroute={() => routeMseg(mseg)} />
           {/each}
         </div>
       {/if}
@@ -2478,146 +1742,7 @@
       {:else}
         <div class="random-grid">
           {#each $hostState.rack.randomModulators as random (random.randomId)}
-            {@const preview = randomPreviewValues(random)}
-            {@const liveStep = ((Math.max(0, random.step) % preview.length) + preview.length)
-              % preview.length}
-            <article class="random-card" class:disabled={!random.enabled}>
-              <header class="lfo-card-head">
-                <button type="button" class="route-power" class:on={random.enabled}
-                        title={random.enabled ? 'Disable random modulator' : 'Enable random modulator'}
-                        onclick={() => setRandomModulator(random.randomId,
-                          { enabled: !random.enabled })}>
-                  {random.enabled ? '●' : '○'}
-                </button>
-                <input class="lfo-name" value={random.name} aria-label="Random modulator name"
-                       onchange={(e) => setRandomModulator(random.randomId,
-                         { name: e.currentTarget.value })} />
-                <span class="random-mode-readout">{randomModeLabel(random.mode)}</span>
-                <span class="random-value-readout">{Math.round(random.value * 100)}%</span>
-                <span class="perf-spacer"></span>
-                <button type="button" class="ghost"
-                        onclick={() => resetRandomModulator(random.randomId)}>Restart</button>
-                <HostConfirmButton identity={JSON.stringify([random.randomId])} aria-label="Remove random modulator" type="button" class="ghost danger" title="Remove random modulator"
-                        onclick={() => removeRandomModulator(random.randomId)}>×</HostConfirmButton>
-              </header>
-
-              <div class="random-scope"
-                   aria-label={`${random.name}, ${randomModeLabel(random.mode)}, current value ${Math.round(random.value * 100)} percent`}>
-                <svg viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true">
-                  <g class="random-grid-lines">
-                    {#each [25, 50, 75] as x (x)}<line x1={x} y1="0" x2={x} y2="60"></line>{/each}
-                    {#each [15, 30, 45] as y (y)}<line x1="0" y1={y} x2="100" y2={y}></line>{/each}
-                  </g>
-                  <path class="random-preview" d={randomPreviewPath(random)}></path>
-                  <line class="random-playhead"
-                        x1={(liveStep + random.phase) * 100 / preview.length} y1="0"
-                        x2={(liveStep + random.phase) * 100 / preview.length} y2="60"></line>
-                  <rect class="random-live-dot"
-                        x={(liveStep + random.phase) * 100 / preview.length - 0.8}
-                        y={(1 - random.value) * 60 - 3} width="1.6" height="6"></rect>
-                </svg>
-                <div class="random-scope-labels" aria-hidden="true">
-                  <span>Seed {random.seed}</span>
-                  <span>Step {Math.max(0, random.step) + 1}</span>
-                </div>
-              </div>
-
-              <div class="random-controls">
-                <label class="mini-field">
-                  <span>Character</span>
-                  <select value={random.mode}
-                          onchange={(e) => setRandomModulator(random.randomId,
-                            { mode: e.currentTarget.value })}>
-                    <option value="sampleHold">Sample &amp; hold</option>
-                    <option value="smoothRandom">Smooth random</option>
-                    <option value="chaos">Chaos</option>
-                    <option value="randomWalk">Bounded walk</option>
-                  </select>
-                </label>
-                <label class="mini-field random-clock">
-                  <span>Clock</span>
-                  <button type="button" class="toggle" class:on={random.sync}
-                          onclick={() => setRandomModulator(random.randomId,
-                            { sync: !random.sync })}>
-                    {random.sync ? 'Tempo sync' : 'Free Hz'}
-                  </button>
-                </label>
-                {#if random.sync}
-                  <label class="mini-field">
-                    <span>Decision rate</span>
-                    <select value={random.syncBeats}
-                            onchange={(e) => setRandomModulator(random.randomId,
-                              { syncBeats: Number(e.currentTarget.value) })}>
-                      {#each lfoSyncRates as rate (rate.label)}
-                        <option value={rate.beats}>{rate.label}</option>
-                      {/each}
-                    </select>
-                  </label>
-                {:else}
-                  <label class="mini-field">
-                    <span>Rate Hz</span>
-                    <input type="number" min="0.01" max="40" step="0.01" value={random.rateHz}
-                           onchange={(e) => setRandomModulator(random.randomId,
-                             { rateHz: Number(e.currentTarget.value) })} />
-                  </label>
-                {/if}
-                <label class="mini-field random-wide">
-                  <span>Chance {Math.round(random.probability * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.01" value={random.probability}
-                         onchange={(e) => setRandomModulator(random.randomId,
-                           { probability: Number(e.currentTarget.value) })} />
-                </label>
-                {#if random.mode === 'smoothRandom'}
-                  <label class="mini-field random-wide">
-                    <span>Glide {Math.round(random.smoothing * 100)}%</span>
-                    <input type="range" min="0" max="1" step="0.01" value={random.smoothing}
-                           onchange={(e) => setRandomModulator(random.randomId,
-                             { smoothing: Number(e.currentTarget.value) })} />
-                  </label>
-                {:else if random.mode === 'chaos'}
-                  <label class="mini-field random-wide">
-                    <span>Chaos {Math.round(random.chaos * 100)}%</span>
-                    <input type="range" min="0" max="1" step="0.01" value={random.chaos}
-                           onchange={(e) => setRandomModulator(random.randomId,
-                             { chaos: Number(e.currentTarget.value) })} />
-                  </label>
-                {:else if random.mode === 'randomWalk'}
-                  <label class="mini-field random-wide">
-                    <span>Step size {Math.round(random.stepSize * 100)}%</span>
-                    <input type="range" min="0" max="1" step="0.01" value={random.stepSize}
-                           onchange={(e) => setRandomModulator(random.randomId,
-                             { stepSize: Number(e.currentTarget.value) })} />
-                  </label>
-                {/if}
-              </div>
-
-              <div class="random-range-row">
-                <label class="mini-field random-range">
-                  <span>Minimum {Math.round(random.minimum * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.01" value={random.minimum}
-                         onchange={(e) => setRandomModulator(random.randomId,
-                           { minimum: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field random-range">
-                  <span>Maximum {Math.round(random.maximum * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.01" value={random.maximum}
-                         onchange={(e) => setRandomModulator(random.randomId,
-                           { maximum: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field random-seed">
-                  <span>Seed</span>
-                  <input type="number" min="1" max="2147483647" step="1" value={random.seed}
-                         onchange={(e) => setRandomModulator(random.randomId,
-                           { seed: Number(e.currentTarget.value) })} />
-                </label>
-                <button type="button" class="ghost" onclick={() => reseedRandom(random)}>
-                  New seed
-                </button>
-                <span class="perf-spacer"></span>
-                <button type="button" class="mod-add-button"
-                        onclick={() => routeRandom(random)}>Route in matrix →</button>
-              </div>
-            </article>
+            <RandomCard {random} onroute={() => routeRandom(random)} />
           {/each}
         </div>
       {/if}
@@ -3378,349 +2503,16 @@
 
   .lfo-body { display: flex; flex-direction: column; gap: 10px; }
   .lfo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 10px; }
-  .lfo-card {
-    min-width: 0;
-    padding: 9px;
-    border: 1px solid #393d40;
-    border-left: 3px solid #d7863b;
-    background: #181c20;
-  }
-  .lfo-card.disabled { border-left-color: #59616a; opacity: 0.67; }
-  .lfo-card-head { display: flex; align-items: center; gap: 7px; }
-  .lfo-name {
-    width: 150px !important;
-    border: 0 !important;
-    border-bottom: 1px solid #4a4f53 !important;
-    background: transparent !important;
-    color: #e0e4e7 !important;
-    font-weight: 650;
-  }
-  .lfo-scope {
-    position: relative;
-    height: 62px;
-    margin: 9px 0;
-    border: 1px solid #31383e;
-    background:
-      linear-gradient(90deg, transparent 24.8%, #2b3238 25%, transparent 25.2%, transparent 49.8%, #2b3238 50%, transparent 50.2%, transparent 74.8%, #2b3238 75%, transparent 75.2%),
-      #12171b;
-    overflow: hidden;
-  }
-  .lfo-midline { position: absolute; inset: 50% 0 auto; border-top: 1px solid #2d343a; }
-  .lfo-trace {
-    position: absolute;
-    left: 0;
-    top: calc(50% - 1px);
-    height: 2px;
-    background: linear-gradient(90deg, #774924, #d7863b);
-  }
-  .lfo-dot {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    transform: translate(-4px, -4px);
-    border: 1px solid #ffd1a5;
-    background: #df8739;
-    box-shadow: 0 0 7px #d7863b99;
-  }
-  .lfo-scope output {
-    position: absolute;
-    right: 5px;
-    bottom: 3px;
-    color: #d99a62;
-    font: 9px 'JetBrains Mono', monospace;
-  }
-  .lfo-controls { display: flex; align-items: flex-end; gap: 7px; flex-wrap: wrap; }
-  .lfo-controls select { width: auto; min-width: 90px; }
-  .lfo-sync-field .toggle { min-width: 86px; }
-  .lfo-range { min-width: 120px; flex: 1 1 120px; }
-  .lfo-range input { width: 100% !important; }
   .route-lfo { margin-left: auto; }
-  .lfo-midi-head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 10px;
-    padding-top: 8px;
-    border-top: 1px solid #30363b;
-    font-size: 10px;
-  }
-  .lfo-midi-head > div { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-  .lfo-midi-head span { color: #737f89; }
-  .lfo-output-empty { padding: 7px 0 1px; color: #717c86; font-size: 10px; }
-  .lfo-outputs { display: flex; flex-direction: column; gap: 5px; margin-top: 7px; }
-  .lfo-output {
-    display: flex;
-    align-items: flex-end;
-    gap: 7px;
-    padding: 7px;
-    border: 1px solid #323a41;
-    background: #151a1e;
-  }
 
   .envelope-body { display: flex; flex-direction: column; gap: 10px; }
   .envelope-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 10px; }
-  .envelope-card {
-    min-width: 0;
-    padding: 9px;
-    border: 1px solid #393d40;
-    border-left: 3px solid #d7863b;
-    background: #181c20;
-  }
-  .envelope-card.disabled { border-left-color: #59616a; opacity: 0.67; }
-  .envelope-stage {
-    color: #74818b;
-    font: 9px 'JetBrains Mono', monospace;
-    text-transform: uppercase;
-  }
-  .envelope-stage.active { color: #e2a46c; }
-  .envelope-scope {
-    position: relative;
-    height: 104px;
-    margin: 9px 0;
-    border: 1px solid #31383e;
-    background:
-      linear-gradient(#2a3137 1px, transparent 1px) 0 50% / 100% 50%,
-      #12171b;
-    overflow: hidden;
-  }
-  .envelope-scope svg { display: block; width: 100%; height: calc(100% - 17px); overflow: visible; }
-  .envelope-scope line { stroke: #283138; stroke-width: 0.35; vector-effect: non-scaling-stroke; }
-  .envelope-scope polyline {
-    fill: none;
-    stroke: #d7863b;
-    stroke-width: 1.35;
-    vector-effect: non-scaling-stroke;
-  }
-  .envelope-scope circle {
-    fill: #e38b3e;
-    stroke: #ffd1a5;
-    stroke-width: 0.8;
-    vector-effect: non-scaling-stroke;
-    filter: drop-shadow(0 0 2px #d7863b);
-  }
-  .envelope-stage-labels {
-    position: absolute;
-    inset: auto 7px 2px;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    color: #65717a;
-    font: 8px 'JetBrains Mono', monospace;
-    text-align: center;
-  }
-  .envelope-controls { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: 8px; }
-  .envelope-time input { width: 100% !important; }
-  .envelope-trigger-row { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-  .envelope-trigger-row select { width: auto; min-width: 68px; }
-  .envelope-note { position: relative; }
-  .envelope-note input { width: 68px !important; padding-right: 28px !important; }
-  .envelope-note output {
-    position: absolute;
-    right: 5px;
-    bottom: 5px;
-    color: #89949d;
-    font: 8px 'JetBrains Mono', monospace;
-    pointer-events: none;
-  }
-  .envelope-audition {
-    border-color: #775333;
-    color: #e6ad78;
-    user-select: none;
-    touch-action: none;
-  }
-  .envelope-audition:active { border-color: #dc8b43; background: #38271b; color: #ffd3aa; }
 
   .mseg-body { display: flex; flex-direction: column; gap: 10px; }
   .mseg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); gap: 10px; }
-  .mseg-card {
-    min-width: 0;
-    padding: 9px;
-    border: 1px solid #393d40;
-    border-left: 3px solid #d7863b;
-    background: #181c20;
-  }
-  .mseg-card.disabled { border-left-color: #59616a; opacity: 0.67; }
-  .mseg-readout {
-    color: #9a7760;
-    font: 9px 'JetBrains Mono', monospace;
-    white-space: nowrap;
-  }
-  .mseg-editor {
-    position: relative;
-    height: 190px;
-    margin: 9px 0;
-    border: 1px solid #343b40;
-    background: #11171b;
-    overflow: hidden;
-  }
-  .mseg-editor svg {
-    display: block;
-    width: 100%;
-    height: calc(100% - 18px);
-    cursor: crosshair;
-    touch-action: none;
-  }
-  .mseg-grid-lines line {
-    stroke: #273037;
-    stroke-width: 0.45;
-    vector-effect: non-scaling-stroke;
-  }
-  .mseg-curve {
-    fill: none;
-    stroke: #d7863b;
-    stroke-width: 1.5;
-    vector-effect: non-scaling-stroke;
-  }
-  .mseg-playhead {
-    stroke: #ecc79f;
-    stroke-width: 1;
-    stroke-opacity: 0.55;
-    vector-effect: non-scaling-stroke;
-    pointer-events: none;
-  }
-  .mseg-live-dot {
-    fill: #ffb673;
-    stroke: #fff0df;
-    stroke-width: 0.8;
-    vector-effect: non-scaling-stroke;
-    pointer-events: none;
-  }
-  .mseg-point {
-    fill: #151c21;
-    stroke: #db8c47;
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-    cursor: grab;
-  }
-  .mseg-point:hover, .mseg-point.selected { fill: #e28a3d; stroke: #ffe0c1; }
-  .mseg-point:active { cursor: grabbing; }
-  .mseg-axis {
-    position: absolute;
-    inset: auto 7px 2px;
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    color: #65717a;
-    font: 8px 'JetBrains Mono', monospace;
-  }
-  .mseg-axis span:nth-child(2), .mseg-axis span:nth-child(3), .mseg-axis span:nth-child(4) {
-    text-align: center;
-  }
-  .mseg-axis span:last-child { text-align: right; }
-  .mseg-controls { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
-  .mseg-controls select { width: auto; min-width: 88px; }
-  .mseg-clock .toggle { min-width: 86px; }
-  .mseg-phase { min-width: 130px; }
-  .mseg-phase input { width: 130px !important; }
-  .mseg-presets { display: flex; align-items: flex-end; gap: 4px; }
-  .mseg-presets > span {
-    align-self: center;
-    color: #77838c;
-    font-size: 9px;
-    text-transform: uppercase;
-  }
-  .mseg-point-inspector {
-    display: flex;
-    align-items: flex-end;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 10px;
-    padding: 8px;
-    border: 1px solid #30383e;
-    background: #151a1e;
-  }
-  .mseg-point-inspector > strong {
-    align-self: center;
-    min-width: 52px;
-    color: #d7a06d;
-    font: 10px 'JetBrains Mono', monospace;
-  }
-  .mseg-point-control { flex: 1 1 125px; }
-  .mseg-point-control input { width: 100% !important; }
-  .mseg-point-count {
-    align-self: center;
-    color: #707b84;
-    font: 9px 'JetBrains Mono', monospace;
-    white-space: nowrap;
-  }
 
   .random-body { display: flex; flex-direction: column; gap: 10px; }
   .random-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); gap: 10px; }
-  .random-card {
-    min-width: 0;
-    padding: 9px;
-    border: 1px solid #393d40;
-    border-left: 3px solid #d7863b;
-    background: #181c20;
-  }
-  .random-card.disabled { border-left-color: #59616a; opacity: 0.67; }
-  .random-mode-readout {
-    color: #c58b5b;
-    font: 9px 'JetBrains Mono', monospace;
-    text-transform: uppercase;
-  }
-  .random-value-readout {
-    min-width: 36px;
-    color: #efb47d;
-    font: 10px 'JetBrains Mono', monospace;
-    text-align: right;
-  }
-  .random-scope {
-    position: relative;
-    height: 142px;
-    margin: 9px 0;
-    border: 1px solid #343b40;
-    background: #11171b;
-    overflow: hidden;
-  }
-  .random-scope svg { display: block; width: 100%; height: calc(100% - 19px); }
-  .random-grid-lines line {
-    stroke: #273037;
-    stroke-width: 0.45;
-    vector-effect: non-scaling-stroke;
-  }
-  .random-preview {
-    fill: none;
-    stroke: #d7863b;
-    stroke-width: 1.25;
-    stroke-opacity: 0.86;
-    vector-effect: non-scaling-stroke;
-  }
-  .random-playhead {
-    stroke: #f1c79e;
-    stroke-width: 1;
-    stroke-opacity: 0.52;
-    vector-effect: non-scaling-stroke;
-  }
-  .random-live-dot {
-    fill: #ffb673;
-    stroke: #fff0df;
-    stroke-width: 0.8;
-    vector-effect: non-scaling-stroke;
-  }
-  .random-scope-labels {
-    position: absolute;
-    inset: auto 7px 3px;
-    display: flex;
-    justify-content: space-between;
-    color: #65717a;
-    font: 8px 'JetBrains Mono', monospace;
-  }
-  .random-controls, .random-range-row {
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .random-controls select { width: auto; min-width: 104px; }
-  .random-clock .toggle { min-width: 86px; }
-  .random-wide { min-width: 135px; flex: 1 1 135px; }
-  .random-wide input, .random-range input { width: 100% !important; }
-  .random-range-row {
-    margin-top: 10px;
-    padding-top: 8px;
-    border-top: 1px solid #30363b;
-  }
-  .random-range { min-width: 130px; flex: 1 1 130px; }
-  .random-seed input { width: 112px !important; font: 9px 'JetBrains Mono', monospace; }
 
   .tuning-body { display: flex; flex-direction: column; gap: 10px; width: 100%; }
   .tuning-card {
@@ -3803,21 +2595,10 @@
   .tuning-part-name strong { color: #cbd3da; font-size: 12px; }
   .tuning-part-name span { color: #7f8b96; font-size: 10px; }
   .tuning-part-name span.error { color: #d99086; }
-  .lfo-output.unresolved { border-color: #744d42; }
-  .lfo-output select { width: auto; min-width: 85px; }
-  .lfo-output-target { flex: 1; min-width: 130px; }
-  .lfo-output-target select { width: 100%; }
-  .lfo-output-small input { width: 48px !important; }
-  .lfo-output-number input { width: 72px !important; }
-  .lfo-sysex { flex: 1; min-width: 220px; }
-  .lfo-sysex input { width: 100% !important; font: 10px 'JetBrains Mono', monospace; }
 
   @media (max-width: 760px) {
     .lfo-grid { grid-template-columns: minmax(0, 1fr); }
     .envelope-grid, .mseg-grid, .random-grid { grid-template-columns: minmax(0, 1fr); }
-    .envelope-controls { grid-template-columns: repeat(2, minmax(100px, 1fr)); }
-    .lfo-output { align-items: stretch; flex-wrap: wrap; }
-    .lfo-sysex { flex-basis: 100%; }
     .tuning-summary { grid-template-columns: minmax(0, 1fr); }
     .tuning-file-row, .tuning-part { flex-wrap: wrap; }
   }
@@ -3842,7 +2623,6 @@
   }
   .variation-badge.editor-badge { width: 24px; height: 24px; flex-basis: 24px; }
   .variation-amount { flex-direction: row; align-items: center; }
-  .variation-amount select { width: auto; min-width: 84px; }
   .variation-create { border-color: #8c592e; }
 
   .pattern-editor { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
@@ -3926,6 +2706,7 @@
   .step.selected { outline: 2px solid #e4bd53; outline-offset: -2px; }
   .step-mark { pointer-events: none; }
 
+  .step-hint { align-self: center; color: #7f8b96; font-size: 11px; }
   .lane-options, .step-options {
     display: flex;
     align-items: flex-end;

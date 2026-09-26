@@ -613,6 +613,9 @@ test('every command-sending store export is reachable from Svelte or deliberatel
     'ProductPanel.svelte', 'ReliabilityPanel.svelte', 'LicencePanel.svelte',
     'StageView.svelte', 'HostSurfacePanel.svelte', 'SoundBrowser.svelte', 'HostLibraryPanel.svelte',
     'Ctrl49ScreenCard.svelte',
+    // The Performance modulators each own their card, and the commands it sends.
+    'performance/LfoCard.svelte', 'performance/EnvelopeCard.svelte', 'performance/MsegCard.svelte',
+    'performance/RandomCard.svelte',
   ].map((name) => readFileSync(path.join(
     repoRoot, 'CE', 'web', 'src', 'CE_Application', 'sections', name), 'utf8')).join('\n');
 

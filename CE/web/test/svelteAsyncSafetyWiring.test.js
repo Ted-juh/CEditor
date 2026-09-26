@@ -121,7 +121,13 @@ test('performance hold actions release on tab changes, blur, and unmount', () =>
   assert.match(source, /onDestroy\(releaseHeldPerformanceActions\)/);
   assert.match(source, /if \(tab !== 'clips' && heldFillClipIds\.size > 0\)/);
   assert.match(source, /if \(tab !== 'envelopes' && heldEnvelopeIds\.size > 0\)/);
-  assert.match(source, /onpointerdown=\{\(\) => setEnvelopeAuditionHeld/);
+  // The audition button lives on the envelope's own card; the panel hands it the function that
+  // records what is held, so the release paths above still see every held envelope.
+  assert.match(source, /<EnvelopeCard \{envelope\} \{setEnvelopeAuditionHeld\}/);
+  const card = src('CE_Application/sections/performance/EnvelopeCard.svelte');
+  assert.match(card, /onpointerdown=\{\(\) => setEnvelopeAuditionHeld/);
+  for (const release of ['onpointerup', 'onpointercancel', 'onpointerleave'])
+    assert.match(card, new RegExp(`${release}=\\{\\(\\) => setEnvelopeAuditionHeld\\(envelope\\.envelopeId, false\\)`));
   assert.match(source, /setFillHeld\(clip\.clipId, true\)/);
 });
 
