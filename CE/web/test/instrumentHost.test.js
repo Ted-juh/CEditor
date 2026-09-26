@@ -1790,8 +1790,10 @@ test('mock reducer: auditioning reports the stages the indicator draws', () => {
 });
 
 test('mock reducer: the audition phrase is a setting, and nonsense is refused', () => {
+  setAuditionPhrase('phrase');
+  assert.equal(get(hostAudition).phrase, 'phrase', 'the phrase from the audition settings');
   setAuditionPhrase('chord');
-  assert.equal(get(hostAudition).phrase, 'chord');
+  assert.equal(get(hostAudition).phrase, 'phrase', 'a chord is one of those settings, not a mode of its own');
   setAuditionPhrase('recent', 8);
   assert.deepEqual([get(hostAudition).phrase, get(hostAudition).bars], ['recent', 8]);
   setAuditionPhrase('nonsense');

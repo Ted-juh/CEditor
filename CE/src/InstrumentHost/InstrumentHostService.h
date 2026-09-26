@@ -964,7 +964,11 @@ private:
         unmodulated one, as with gain and pan), and why it cannot be ridden right now when it
         cannot. Void when the part has none. */
     juce::var morphProjection (const RackPart& part, float amount) const;
-    void emitLibrary (const LibraryQuery& query, const juce::String& consumer = {});
+    /** The records `query` keeps, from `offset`, at most `limit` of them (0 = all), plus the
+        counts, facets and rail. `counts.matched` is always the whole result, so a page holding
+        one slice still knows how long the list is. */
+    void emitLibrary (const LibraryQuery& query, const juce::String& consumer = {},
+                      int offset = 0, int limit = 0);
     juce::String saveCapturedLibraryRecord (LibraryRecord record);
     void scanVstPresets();
     void scanCataloguePrograms (std::shared_ptr<juce::Array<PluginClassRecord>>, int index);
@@ -1437,7 +1441,7 @@ private:
         twelve-thousand-preset library; past it, the least recently heard go first. */
     static constexpr juce::int64 snapshotBudgetBytes = 400ll * 1024 * 1024;
     RecentPlay recentPlay;
-    juce::String auditionPhraseMode { "recent" };   // "note" | "chord" | "recent"
+    juce::String auditionPhraseMode { "recent" };   // "phrase" (the audition settings) | "recent"
     int auditionBars = 4;
     juce::String auditioningRecordId;
     // Where the hardware browser is. Off until asked for, because a surface that suddenly
@@ -1450,6 +1454,10 @@ private:
     // empty query: favouriting a record must not silently drop you back to all 12,000 sounds
     // while the filter chips on screen still claim to be on.
     LibraryQuery libraryView;
+    // How much of `libraryView` the browser has asked for so far (0 = all of it). An answer the
+    // host sends on its own (a favourite toggled, a scan finished) re-sends that much from the
+    // top, so the page does not lose the rows it had scrolled to.
+    int libraryViewLimit = 0;
     juce::StringArray libraryPaths; // user-added .vstpreset folders, beside the standard roots
 
     // "When a rack asks for that sound and the plug-in is gone, I chose this one." Keyed by

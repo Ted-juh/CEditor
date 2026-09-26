@@ -6211,12 +6211,21 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         ensureLibrary();
         const auto query = libraryQueryFromVar (payload);
         const auto consumer = payload["consumer"].toString();
+        const auto offset = juce::jmax (0, (int) payload.getProperty ("offset", 0));
+        const auto limit = juce::jmax (0, (int) payload.getProperty ("limit", 0));
         // Background consumers (for example Setlist's rack picker) must not replace the
         // Sounds browser's remembered view. They receive the same payload, tagged so the web
         // store can route it to a separate cache.
         if (consumer.isEmpty())
+        {
+            // A first page starts the view over; a later one extends how far it reaches.
+            if (offset == 0)
+                libraryViewLimit = limit;
+            else if (libraryViewLimit > 0)
+                libraryViewLimit = limit > 0 ? juce::jmax (libraryViewLimit, offset + limit) : 0;
             libraryView = query;
-        emitLibrary (query, consumer);
+        }
+        emitLibrary (query, consumer, offset, limit);
         return;
     }
 
@@ -7003,7 +7012,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (cmd == "setAuditionPhrase")
     {
         const auto mode = payload.getProperty ("phrase", {}).toString();
-        if (mode == "note" || mode == "chord" || mode == "recent")
+        if (mode == "phrase" || mode == "recent")
             auditionPhraseMode = mode;
         auditionBars = juce::jlimit (1, 16, (int) payload.getProperty ("bars", auditionBars));
         emitAudition (auditioningRecordId, "phrase");
@@ -10937,6 +10946,39 @@ void InstrumentHostService::emitAudition (const juce::String& recordId, const ju
     options.emit ("instrumentHostAudition", juce::var (payload));
 }
 
+/** The audition phrase as (interval above the root, start in ms) pairs. One list for the load
+    audition and the browser's preview, so they cannot drift into two different tests. */
+static std::vector<std::pair<int, double>> auditionPhraseNotes (const PresetAuditionSettings& settings)
+{
+    std::vector<std::pair<int, double>> notes;
+    const auto stepMs = (double) settings.noteLengthMs + (double) settings.gapMs;
+
+    if (settings.phrase == "single")
+    {
+        notes.push_back ({ 0, 0.0 });
+    }
+    else if (settings.phrase == "chord")
+    {
+        for (const auto interval : { 0, 4, 7 })
+            notes.push_back ({ interval, 0.0 });
+    }
+    else if (settings.phrase == "scale")
+    {
+        static constexpr int intervals[] { 0, 2, 4, 5, 7, 9, 11, 12 };
+        for (int i = 0; i < (int) std::size (intervals); ++i)
+            notes.push_back ({ intervals[i], (double) i * stepMs });
+    }
+    else
+    {
+        // A short register-spanning phrase reveals attack, sustain and release without
+        // making somebody listen to a whole demo every time they press Down.
+        static constexpr int intervals[] { 0, 7, 12, 7, 4, 5, 0 };
+        for (int i = 0; i < (int) std::size (intervals); ++i)
+            notes.push_back ({ intervals[i], (double) i * stepMs });
+    }
+    return notes;
+}
+
 juce::Array<RecentNote> InstrumentHostService::auditionPhrase() const
 {
     juce::Array<RecentNote> out;
@@ -10951,18 +10993,17 @@ juce::Array<RecentNote> InstrumentHostService::auditionPhrase() const
         // which is what a browser with nothing to go on should do.
     }
 
-    if (auditionPhraseMode == "chord")
+    // Otherwise the audition settings: the same phrase, root, velocity and note lengths the
+    // load audition plays, so a preview and a load sound like the same test.
+    const auto& settings = rack.getPerformance().presetAudition;
+    const auto beatsPerMs = rack.getEngine().getTransport().getTempo() / 60000.0;
+    for (const auto& [interval, atMs] : auditionPhraseNotes (settings))
     {
-        for (const auto interval : { 0, 4, 7 })
-        {
-            out.add ({ 0.0, juce::MidiMessage::noteOn (1, 60 + interval, (juce::uint8) 100) });
-            out.add ({ 2.0, juce::MidiMessage::noteOff (1, 60 + interval) });
-        }
-        return out;
+        const auto note = juce::jlimit (0, 127, settings.rootNote + interval);
+        out.add ({ atMs * beatsPerMs,
+                   juce::MidiMessage::noteOn (1, note, (juce::uint8) juce::jlimit (1, 127, settings.velocity)) });
+        out.add ({ (atMs + settings.noteLengthMs) * beatsPerMs, juce::MidiMessage::noteOff (1, note) });
     }
-
-    out.add ({ 0.0, juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100) });
-    out.add ({ 1.5, juce::MidiMessage::noteOff (1, 60) });
     return out;
 }
 
@@ -11044,8 +11085,7 @@ void InstrumentHostService::handOffAudition (const juce::String& partId)
     emitAudition (auditioningRecordId, "live",
                   auditionPhraseMode == "recent" ? "Playing your last " + juce::String (auditionBars)
                                                      + " bars."
-                  : auditionPhraseMode == "chord" ? juce::String ("Playing a chord.")
-                                                  : juce::String ("Playing a note."));
+                                                 : juce::String ("Playing the audition phrase."));
     auditioningRecordId.clear();
 }
 
@@ -11466,7 +11506,8 @@ juce::String InstrumentHostService::saveCapturedLibraryRecord (LibraryRecord rec
     return recordId;
 }
 
-void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::String& consumer)
+void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::String& consumer,
+                                         int offset, int limit)
 {
     if (options.emit == nullptr)
         return;
@@ -11475,8 +11516,17 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::
     juce::Array<juce::var> recordVars;
     int presets = 0, racks = 0, chains = 0, missing = 0;
 
-    for (const auto* record : searchLibrary (library, query, isAvailable))
+    // The view the host re-sends on its own reaches as far as the page had asked.
+    if (consumer.isEmpty() && offset == 0 && limit == 0 && &query == &libraryView)
+        limit = libraryViewLimit;
+
+    const auto matches = searchLibrary (library, query, isAvailable);
+    const auto first = juce::jlimit (0, matches.size(), offset);
+    const auto last = limit > 0 ? juce::jmin (matches.size(), first + limit) : matches.size();
+
+    for (int index = first; index < last; ++index)
     {
+        const auto* record = matches.getUnchecked (index);
         const auto reason = recordUnavailableReason (*record);
 
         auto* r = new juce::DynamicObject();
@@ -11498,6 +11548,7 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::
         // Only ever true when the query asked for hidden rows, so the page can mark the folded
         // ones and offer to unfold them rather than showing them as ordinary sounds.
         r->setProperty ("hidden",       record->hidden);
+        r->setProperty ("addedAtMs",    (double) record->addedAtMs);
         r->setProperty ("loadCount",    record->loadCount);
         r->setProperty ("lastLoadedAtMs", (double) record->lastLoadedAtMs);
         r->setProperty ("auditionCount", record->auditionCount);
@@ -11591,7 +11642,7 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::
     counts->setProperty ("racks",   racks);
     counts->setProperty ("chains",  chains);
     counts->setProperty ("missing", missing);
-    counts->setProperty ("matched", recordVars.size());
+    counts->setProperty ("matched", matches.size());
     counts->setProperty ("measured", [this] { int n = 0;
                                               for (const auto& r : library.allRecords())
                                                   if (r.sonic.measured) ++n;
@@ -11726,6 +11777,7 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::
 
     auto* root = new juce::DynamicObject();
     root->setProperty ("records", recordVars);
+    root->setProperty ("offset",  first);
     root->setProperty ("duplicates", duplicateVars);
     // `query` and `type` stay the flat strings the command surface has always echoed; `request`
     // is the whole query, so a page can restore its chips from the answer alone.
@@ -12004,32 +12056,8 @@ void InstrumentHostService::startPresetAudition (const juce::String& partId, boo
         plan.push_back ({ atMs, note, settings.velocity, true });
         plan.push_back ({ atMs + (double) settings.noteLengthMs, note, 0, false });
     };
-    const auto stepMs = (double) settings.noteLengthMs + (double) settings.gapMs;
-
-    if (settings.phrase == "single")
-    {
-        addNote (0, 0.0);
-    }
-    else if (settings.phrase == "chord")
-    {
-        addNote (0, 0.0);
-        addNote (4, 0.0);
-        addNote (7, 0.0);
-    }
-    else if (settings.phrase == "scale")
-    {
-        static constexpr int intervals[] { 0, 2, 4, 5, 7, 9, 11, 12 };
-        for (int i = 0; i < (int) std::size (intervals); ++i)
-            addNote (intervals[i], (double) i * stepMs);
-    }
-    else
-    {
-        // A short register-spanning phrase reveals attack, sustain and release without
-        // making somebody listen to a whole demo every time they press Down.
-        static constexpr int intervals[] { 0, 7, 12, 7, 4, 5, 0 };
-        for (int i = 0; i < (int) std::size (intervals); ++i)
-            addNote (intervals[i], (double) i * stepMs);
-    }
+    for (const auto& [interval, atMs] : auditionPhraseNotes (settings))
+        addNote (interval, atMs);
 
     std::sort (plan.begin(), plan.end(), [] (const PresetAuditionEvent& a,
                                              const PresetAuditionEvent& b)

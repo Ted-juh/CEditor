@@ -817,7 +817,66 @@ export function emptyLibraryQuery() {
     // to "all of it" would still refuse every record the auditioner has not reached yet.
     ranges: Object.fromEntries(MEASURED_AXES.map((a) => [a, { min: 0, max: 1, active: false }])),
     measuredOnly: false,
+    // The order the host returns results in ('' = library order). The host sorts, because the
+    // page only ever holds one slice of a large result. See LIBRARY_SORTS.
+    sort: '',
+    sortDescending: false,
   };
+}
+
+/** The orders the browser offers, mirroring sortLibraryResults in Library.cpp. `descending` is
+    the direction a click first picks: newest, most loaded, brightest and best rated come first. */
+export const LIBRARY_SORTS = Object.freeze([
+  { key: '', label: 'Library order', descending: false },
+  { key: 'name', label: 'Name', descending: false },
+  { key: 'instrument', label: 'Plug-in', descending: false },
+  { key: 'category', label: 'Category', descending: false },
+  { key: 'rating', label: 'Rating', descending: true },
+  { key: 'recent', label: 'Recently loaded', descending: true },
+  { key: 'loads', label: 'Most loaded', descending: true },
+  { key: 'added', label: 'Newest', descending: true },
+  { key: 'brightness', label: 'Brightness', descending: true },
+  { key: 'attack', label: 'Attack', descending: false },
+  { key: 'tail', label: 'Tail', descending: true },
+  { key: 'width', label: 'Width', descending: true },
+]);
+const SORT_KEYS = LIBRARY_SORTS.map((s) => s.key);
+
+/** The JavaScript half of sortLibraryResults (Library.cpp), for the browser demo and its tests:
+    ties by name, and a record with no value for the key last in either direction. */
+export function sortLibraryRecords(records, key, descending = false) {
+  if (!key || !SORT_KEYS.includes(key)) return [...records];
+  const natural = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+  const textual = ['name', 'instrument', 'category'].includes(key);
+  const number = (r) => {
+    if (key === 'rating') return r.rating > 0 ? r.rating : null;
+    if (key === 'recent') return r.lastLoadedAtMs > 0 ? r.lastLoadedAtMs : null;
+    if (key === 'loads') return r.loadCount > 0 ? r.loadCount : null;
+    if (key === 'added') return r.addedAtMs > 0 ? r.addedAtMs : null;
+    return r.sonic ? Number(r.sonic[key] ?? 0) : null;
+  };
+  return records.map((r, i) => [r, i]).sort(([a, ia], [b, ib]) => {
+    if (textual) {
+      const ta = String(a[key] ?? ''), tb = String(b[key] ?? '');
+      if (!ta !== !tb) return ta ? -1 : 1;
+      const c = natural(ta, tb);
+      if (c !== 0) return descending ? -c : c;
+    } else {
+      const na = number(a), nb = number(b);
+      if ((na === null) !== (nb === null)) return na === null ? 1 : -1;
+      if (na !== null && na !== nb) return descending ? nb - na : na - nb;
+    }
+    return natural(a.name, b.name) || ia - ib;
+  }).map(([r]) => r);
+}
+
+/** A page of the library joins the rows already held when it continues the same view, and is
+    dropped when it belongs to a view that has since changed. A first page (offset 0) replaces. */
+export function mergeLibraryPage(previous, next) {
+  if (!(next.offset > 0)) return next;
+  const same = JSON.stringify(previous.request) === JSON.stringify(next.request);
+  if (!same || previous.records.length < next.offset) return previous;
+  return { ...next, offset: 0, records: [...previous.records.slice(0, next.offset), ...next.records] };
 }
 
 const strings = (value) => (Array.isArray(value) ? value.map(String).filter(Boolean) : []);
@@ -849,6 +908,8 @@ export function normalizeLibraryQuery(payload) {
       return [axis, { min: Math.min(min, max), max: Math.max(min, max), active: r.active === true }];
     })),
     measuredOnly: p.measuredOnly === true,
+    sort: SORT_KEYS.includes(p.sort) ? p.sort : '',
+    sortDescending: p.sortDescending === true,
   };
 }
 
@@ -884,6 +945,7 @@ export function cycleLibraryFacet(query, facet, value, straightToExclude = false
 
 export function emptyHostLibrary() {
   return {
+    offset: 0,
     scanning: false,
     updateFinished: false,
     scanReport: [],
@@ -921,6 +983,9 @@ function refusedByCause(raw) {
 export function normalizeHostLibrary(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   return {
+    // Where these records start in the whole result: 0 for a first page (which replaces what the
+    // browser holds), more for a page that continues it (see mergeLibraryPage).
+    offset: Math.max(0, Math.floor(Number(p.offset ?? 0)) || 0),
     scanning: p.scanning === true,
     updateFinished: p.updateFinished === true,
     scanReport: (Array.isArray(p.scanReport) ? p.scanReport : []).map((r) => ({
@@ -1413,14 +1478,18 @@ export function mockUnplayedLikeHabits(records, count = 20, minimumRecords = 5) 
   return { enough: true, from, matches };
 }
 
-export function mockHostLibrary(query = '', type = '') {
+export function mockHostLibrary(query = '', type = '', page = {}) {
   const all = mockLibraryRecords();
 
   // Both call shapes: the older (text, type) pair and the whole query object.
   const request = normalizeLibraryQuery(
     typeof query === 'object' && query !== null ? query : { text: query, type });
 
-  const records = all.filter((r) => matchesLibraryQuery(r, request));
+  const matches = sortLibraryRecords(all.filter((r) => matchesLibraryQuery(r, request)),
+                                     request.sort, request.sortDescending);
+  const offset = Math.min(matches.length, Math.max(0, Number(page.offset ?? 0) || 0));
+  const limit = Math.max(0, Number(page.limit ?? 0) || 0);
+  const records = limit > 0 ? matches.slice(offset, offset + limit) : matches.slice(offset);
 
   const statics = new Map();
   for (const record of all)
@@ -1429,12 +1498,13 @@ export function mockHostLibrary(query = '', type = '') {
 
   return normalizeHostLibrary({
     records,
+    offset,
     counts: { total: all.length,
               presets: all.filter((r) => r.type === 'preset').length,
               racks: all.filter((r) => r.type === 'rack').length,
               chains: all.filter((r) => r.type === 'chain').length,
               missing: 0,
-              matched: records.length,
+              matched: matches.length,
               snapshots: all.filter((r) => r.sonic && !r.sonic.silent).length,
               snapshotBytes: all.filter((r) => r.sonic).length * 35000,
               measured: all.filter((r) => r.sonic).length,
@@ -7567,7 +7637,7 @@ export function initInstrumentHostBridge() {
       hostRackCaptures.set(normalized.records.filter((record) => record.type === 'rack'));
       return;
     }
-    hostLibrary.set(normalized);
+    hostLibrary.update((previous) => mergeLibraryPage(previous, normalized));
   });
   onInstrumentHostVersionDiff((payload) => hostVersionDiff.set(normalizeVersionDiff(payload)));
   onInstrumentHostSimilar((payload) => hostSimilar.set(normalizeSimilar(payload)));
@@ -8123,11 +8193,12 @@ function send(payload) {
       const requestedView = payload.cmd === 'getLibrary' ? normalizeLibraryQuery(payload)
                                                          : mockLibraryView;
       if (!payload.consumer) mockLibraryView = requestedView;
-      const library = mockHostLibrary(requestedView);
+      const page = { offset: payload.offset, limit: payload.limit };
+      const library = mockHostLibrary(requestedView, '', payload.cmd === 'getLibrary' ? page : {});
       if (payload.consumer === 'setlist')
         hostRackCaptures.set(library.records.filter((record) => record.type === 'rack'));
       else
-        hostLibrary.set(library);
+        hostLibrary.update((previous) => mergeLibraryPage(previous, library));
       return;
     }
     if (payload?.cmd === 'analyseLibrary') {
@@ -8444,7 +8515,7 @@ function send(payload) {
     if (payload?.cmd === 'setAuditionPhrase') {
       hostAudition.update((was) => ({
         ...was,
-        phrase: ['note', 'chord', 'recent'].includes(payload.phrase) ? payload.phrase : was.phrase,
+        phrase: ['phrase', 'recent'].includes(payload.phrase) ? payload.phrase : was.phrase,
         bars: payload.bars ? Math.min(16, Math.max(1, Number(payload.bars))) : was.bars,
       }));
       return;
@@ -8525,16 +8596,21 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'setLibraryUserMetadata') {
-      hostLibrary.update((lib) => ({
-        ...lib,
-        records: lib.records.map((r) => r.recordId === payload.recordId
+      hostLibrary.update((lib) => {
+        const records = lib.records.map((r) => r.recordId === payload.recordId
           ? { ...r,
               favourite: payload.favourite !== undefined ? payload.favourite === true : r.favourite,
               rating: payload.rating !== undefined ? Number(payload.rating) : r.rating,
               notes: payload.notes !== undefined ? String(payload.notes) : r.notes,
-              tags: Array.isArray(payload.tags) ? payload.tags.map(String) : r.tags }
-          : r),
-      }));
+              tags: Array.isArray(payload.tags) ? payload.tags.map(String) : r.tags,
+              collections: Array.isArray(payload.collections) ? payload.collections.map(String) : r.collections }
+          : r);
+        // Collections exist because records name them, as they do in the host.
+        const counts = new Map();
+        for (const r of records) for (const name of r.collections) counts.set(name, (counts.get(name) ?? 0) + 1);
+        return { ...lib, records, collections: [...counts].map(([name, count]) => ({ name, count }))
+          .sort((x, y) => x.name.localeCompare(y.name)) };
+      });
       return;
     }
     if (payload?.cmd === 'unplayedLikeHabits') {
@@ -9072,6 +9148,10 @@ export const requestLibrary = (query = '', type = '') =>
   (typeof query === 'object' && query !== null
     ? send({ cmd: 'getLibrary', ...normalizeLibraryQuery(query) })
     : send({ cmd: 'getLibrary', query, type }));
+/** One page of a view: `limit` rows from `offset`. A first page starts the view over; a later
+    one continues it (mergeLibraryPage). */
+export const requestLibraryPage = (query, offset, limit) =>
+  send({ cmd: 'getLibrary', ...normalizeLibraryQuery(query), offset, limit });
 export const requestRackCaptures = () => send({ cmd: 'getLibrary', type: 'rack', consumer: 'setlist' });
 
 /** Save the view you are looking at as a rail entry. Omitting the query means "what is on

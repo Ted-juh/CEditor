@@ -3378,6 +3378,43 @@ void testAuditioner()
     check (library()->getProperty ("records", {}).size() == 4,
            "which is a filter, not a deletion — it is still there unfiltered");
 
+    // Paging: a slice of the result, and always the whole count, so a page holding the first
+    // rows still knows how long the list is.
+    const auto names = [&library]
+    {
+        juce::StringArray out;
+        for (const auto& r : *library()->getProperty ("records", {}).getArray())
+            out.add (r.getProperty ("name", {}).toString());
+        return out;
+    };
+    h.emits.clear();
+    h.cmd ("getLibrary", { { "sort", "name" }, { "limit", 2 } });
+    const auto firstPage = names();
+    check (firstPage.size() == 2 && counts ("matched") == 4
+             && (int) library()->getProperty ("offset", -1) == 0,
+           "a limited answer carries its slice and the whole count");
+    h.emits.clear();
+    h.cmd ("getLibrary", { { "sort", "name" }, { "offset", 2 }, { "limit", 2 } });
+    const auto secondPage = names();
+    check (secondPage.size() == 2 && (int) library()->getProperty ("offset", -1) == 2
+             && ! firstPage.contains (secondPage[0]) && ! firstPage.contains (secondPage[1]),
+           "the next page continues where the first stopped");
+    check (firstPage[0].compareNatural (firstPage[1]) <= 0 && firstPage[1].compareNatural (secondPage[0]) <= 0,
+           "in the order the query asked for, across the pages");
+    h.emits.clear();
+    h.cmd ("getLibrary", { { "sort", "name" }, { "sortDescending", true }, { "limit", 1 } });
+    check (names().size() == 1 && names()[0] == secondPage[1], "descending starts from the other end");
+    h.cmd ("getLibrary", { { "sort", "name" }, { "limit", 2 } });
+    h.cmd ("getLibrary", { { "sort", "name" }, { "offset", 2 }, { "limit", 2 } });
+    const auto someRecord = library()->getProperty ("records", {})[0].getProperty ("recordId", {});
+    h.emits.clear();
+    h.cmd ("setLibraryUserMetadata", { { "recordId", someRecord }, { "favourite", true } });
+    check (library() != nullptr && names().size() == 4 && (int) library()->getProperty ("offset", -1) == 0,
+           "an answer the host sends on its own re-sends as much as the page had scrolled to");
+    h.emits.clear();
+    h.cmd ("getLibrary", { { "sort", "name" }, { "offset", 9 }, { "limit", 5 } });
+    check (names().isEmpty() && counts ("matched") == 4, "a page past the end is empty, not an error");
+
     // Folding. The stub plays the same DC whatever program is selected, so all three programs
     // measure identically — and they are still THREE SOUNDS, because they are three different
     // presets of one plug-in with three different names. Folding on measurement alone would
@@ -3456,14 +3493,14 @@ void testAuditioner()
 
     // The phrase setting is remembered and reported.
     h.emits.clear();
-    h.cmd ("setAuditionPhrase", { { "phrase", "chord" }, { "bars", 8 } });
+    h.cmd ("setAuditionPhrase", { { "phrase", "phrase" }, { "bars", 8 } });
     const auto* phrase = h.emits.last ("instrumentHostAudition");
-    check (phrase != nullptr && phrase->getProperty ("phrase", {}).toString() == "chord"
+    check (phrase != nullptr && phrase->getProperty ("phrase", {}).toString() == "phrase"
              && (int) phrase->getProperty ("bars", 0) == 8,
            "the audition phrase is a setting, and every answer carries it");
-    h.cmd ("setAuditionPhrase", { { "phrase", "nonsense" } });
-    check (h.emits.last ("instrumentHostAudition")->getProperty ("phrase", {}).toString() == "chord",
-           "and a phrase nobody offers is refused rather than stored");
+    h.cmd ("setAuditionPhrase", { { "phrase", "chord" } });
+    check (h.emits.last ("instrumentHostAudition")->getProperty ("phrase", {}).toString() == "phrase",
+           "and a phrase nobody offers is refused rather than stored: the notes are the audition settings'");
 
 }
 
@@ -3599,6 +3636,74 @@ void testMovedLibraryRelinks()
 //
 // The other half is that folding must never be the thing that loses somebody's work: the curation
 // of every member arrives on the survivor before the rest go quiet.
+
+// Sorting the browse. The page holds one slice of a large result, so the order is the host's:
+// a page cannot sort what it has not been sent.
+void testLibrarySort()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::LibraryQuery;
+    using ceditor::host::searchLibrary;
+
+    std::cout << "\nsorting the library" << std::endl;
+
+    const auto preset = [] (const juce::String& name, const juce::String& category, int rating,
+                            juce::int64 lastLoaded, float brightness, bool measured)
+    {
+        LibraryRecord r;
+        r.type = "preset";
+        r.sourceType = "vstpreset";
+        r.sourceLocator = "/p/" + name + ".vstpreset";
+        r.name = name;
+        r.category = category;
+        r.targetCeId = "VST3-synth";
+        r.fingerprint = "fp-" + name;
+        r.factory = true;
+        r.user.rating = rating;
+        r.lastLoadedAtMs = lastLoaded;
+        r.sonic.measured = measured;
+        r.sonic.brightness = brightness;
+        return r;
+    };
+
+    Library library;
+    library.mergeVendorScan ("vstpreset", {
+        preset ("Pad 10", "Pad",  0, 0,    0.9f, true),
+        preset ("Bass",   "",     5, 3000, 0.2f, true),
+        preset ("Pad 2",  "Pad",  3, 1000, 0.0f, false),
+        preset ("Lead",   "Lead", 4, 2000, 0.6f, true),
+    });
+
+    const auto order = [&library] (const juce::String& key, bool descending)
+    {
+        LibraryQuery query;
+        query.sort = key;
+        query.sortDescending = descending;
+        juce::StringArray names;
+        for (const auto* r : searchLibrary (library, query))
+            names.add (r->name);
+        return names.joinIntoString (",");
+    };
+
+    check (order ("", false) == "Pad 10,Bass,Pad 2,Lead", "no sort is library order");
+    check (order ("name", false) == "Bass,Lead,Pad 2,Pad 10", "names sort naturally: Pad 2 before Pad 10");
+    check (order ("name", true) == "Pad 10,Pad 2,Lead,Bass", "and descending reverses them");
+    check (order ("category", false) == "Lead,Pad 2,Pad 10,Bass",
+           "an empty category is unknown and goes last; a tie goes by name");
+    check (order ("rating", true) == "Bass,Lead,Pad 2,Pad 10", "highest rated first, unrated last");
+    check (order ("rating", false) == "Pad 2,Lead,Bass,Pad 10", "and unrated stays last the other way round");
+    check (order ("recent", true) == "Bass,Lead,Pad 2,Pad 10", "most recently loaded first, never loaded last");
+    check (order ("brightness", true) == "Pad 10,Lead,Bass,Pad 2", "brightest first, the unmeasured last");
+    check (order ("brightness", false) == "Bass,Lead,Pad 10,Pad 2", "darkest first, the unmeasured still last");
+    check (order ("nonsense", false) == "Pad 10,Bass,Pad 2,Lead", "an unknown key keeps library order");
+
+    LibraryQuery stored;
+    stored.sort = "tail";
+    stored.sortDescending = true;
+    const auto back = ceditor::host::libraryQueryFromVar (ceditor::host::libraryQueryToVar (stored));
+    check (back.sort == "tail" && back.sortDescending, "a saved search keeps its order");
+}
 
 void testDuplicateFold()
 {
@@ -13560,6 +13665,7 @@ int main (int argc, char* argv[])
     testRecordRecency();
     testRecordFamily();
     testMovedLibraryRelinks();
+    testLibrarySort();
     testDuplicateFold();
     testDuplicateFoldCommands();
     testUsageCounters();
