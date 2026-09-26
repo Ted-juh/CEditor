@@ -88,7 +88,7 @@ port names are the MIDI ports `VIP_x64.exe` looks for. Checked 2026-09-26.
 
 | Keyboard | VIP code | MIDI port VIP opens | USB VID:PID | SysEx header | Source |
 |---|---|---|---|---|---|
-| M-Audio CTRL49 | `CTL49` | `CTRL 49 USB` | `0763:3108` | `F0 00 01 05 31 08` | proven: this PC's USB history; the August USB captures |
+| M-Audio CTRL49 | `CTL49` | `CTRL 49 USB` (VIP's string; the Windows port is `CTRL49 USB`) | `0763:3108` | `F0 00 01 05 31 08` | proven: this PC's USB history; the August USB captures |
 | Akai ADVANCE25 | `ADV25` | `ADVANCE25 USB PORT 1` | `09E8:002F` | `F0 47 00 2F …` | proven: Advance firmware |
 | Akai ADVANCE49 | `ADV49` | `ADVANCE49 USB PORT 1` | `09E8:002E` | `F0 47 00 2E …` | proven: Advance firmware |
 | Akai ADVANCE61 | `ADV61` | `ADVANCE61 USB PORT 1` | `09E8:0030` | `F0 47 00 30 …` | proven: Advance firmware |
@@ -98,6 +98,11 @@ How the Advance numbers are known: the firmware detects its model, then writes o
 (25), `0x2E` (49) or `0x30` (61) — into both the USB device descriptor's product id and the product
 byte of its SysEx. The `00 01 05`, `47` and `00 00 0E` makers are the MIDI manufacturer ids of
 M-Audio, Akai and Alesis; `0763`, `09E8` and `13B2` are their USB vendor ids.
+
+The CTRL49 driver (MAudioCTRL49 7.0.0.3505, `oem112.inf`) names four ports — `CTRL49 USB`,
+`CTRL49 MIDI`, `CTRL49 VIP`, `CTRL49 Mackie/HUI` — and publishes only three to Windows. `CTRL49 VIP`
+is the hidden one, which is why the display's input has to come through the private capture
+while that driver is installed.
 
 What is not known: anything about the VX49 beyond its name and port, and what the CTRL49's
 `31 08` after M-Audio's maker id encodes. VIP builds its headers at run time inside a packed
