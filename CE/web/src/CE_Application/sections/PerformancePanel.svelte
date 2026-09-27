@@ -2100,7 +2100,8 @@
             <!-- "+ Set" read like "make a set" and changed nothing you could see: it adds a song
                  to the one setlist, and the count beside it is the acknowledgement. -->
             <button type="button" class="ghost" title="Add a song to the setlist that recalls this scene"
-                    data-testid="scene-add-song" onclick={() => addSetlistItem(scene.sceneId)}>+ Song</button>
+                    data-testid="scene-add-song"
+                    onclick={() => addSetlistItem(scene.sceneId, `Song ${performance.setlist.items.length + 1}`)}>+ Song</button>
             {#if songCount(scene.sceneId) > 0}
               <span class="in-setlist" data-testid="scene-in-setlist"
                     title="Songs in the setlist (Live setup › Setlist) that recall this scene">

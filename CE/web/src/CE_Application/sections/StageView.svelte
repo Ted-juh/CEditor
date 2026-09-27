@@ -39,9 +39,9 @@
   let controller = $derived(stageControllerContext($hostSurfaceLayout, $hostAudioDevices, $hostSurface, $hostState.audio.enabled));
   let currentScene = $derived(performance.scenes.find((s) => s.sceneId === performance.currentSceneId)
     ?? (setlist.current ? performance.scenes.find((s) => s.sceneId === setlist.current.sceneId) : null) ?? null);
-  // Songs take their scene's name when added, so "Scene 1 / Scene Scene 1" said the same thing
-  // twice; the scene is named only when it is not the song's own.
-  let sceneLabel = $derived(currentScene && currentScene.name !== setlist.current?.name ? currentScene.name : '');
+  // The scene is always named, as a label, never hidden: a song and the scene it plays are two
+  // different things, and leaving one out made it look missing.
+  let sceneLabel = $derived(currentScene?.name ?? '');
   let hasMacros = $derived($hostState.rack.macros.length > 0);
   let activeParts = $derived($hostState.rack.parts.filter((part) => part.hasInstrument || part.hardware || part.unresolved));
   let troubles = $derived(stageTroubles($hostState.reliability));
@@ -249,7 +249,7 @@
                   onclick={() => tapSong(index)}>
             <span class="n">{index < setlist.currentIndex ? '✓' : index + 1}</span>
             <span class="t">{item.name}</span>
-            <span class="d">{[item.tempo > 0 ? `${Math.round(item.tempo)} BPM` : '', item.plannedSeconds > 0 ? formatDuration(item.plannedSeconds * 1000) : ''].filter(Boolean).join(' · ')}</span>
+            <span class="d">{[item.sceneName ? `scene ${item.sceneName}` : '', item.tempo > 0 ? `${Math.round(item.tempo)} BPM` : '', item.plannedSeconds > 0 ? formatDuration(item.plannedSeconds * 1000) : ''].filter(Boolean).join(' · ')}</span>
           </button>
         {/each}
         {#if setlist.items.length === 0}<div class="empty">No setlist. Add songs in Build, under Performance.</div>{/if}
@@ -307,7 +307,7 @@
     <span class="eyebrow next-label">Next song</span>
     {#if setlist.next}
       <strong class="next-name">{setlist.next.name}</strong>
-      <span class="next-meta">{[setlist.next.sceneName && setlist.next.sceneName !== setlist.next.name ? `Scene ${setlist.next.sceneName}` : '',
+      <span class="next-meta">{[setlist.next.sceneName ? `scene ${setlist.next.sceneName}` : '',
         setlist.next.tempo > 0 ? `${Math.round(setlist.next.tempo)} BPM` : '',
         setlist.next.plannedSeconds > 0 ? formatDuration(setlist.next.plannedSeconds * 1000) : ''].filter(Boolean).join(' · ')}</span>
       {#if setlist.nextReadiness}

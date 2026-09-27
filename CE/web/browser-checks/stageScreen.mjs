@@ -58,6 +58,7 @@ try {
   assert.equal(await verseRow.getByTestId('scene-in-setlist').innerText(), 'in setlist');
   await verseRow.getByTestId('scene-add-song').click();
   assert.equal(await verseRow.getByTestId('scene-in-setlist').innerText(), 'in setlist ×2', '+ Song is acknowledged on the row');
+  assert.equal((await state()).performance.setlist.items.at(-1).name, 'Song 4', 'a new song has its own name, not its scene');
 
   await page.getByRole('button', { name: 'Stage', exact: true }).click();
   const stage = page.getByTestId('host-stage-view');
@@ -74,6 +75,8 @@ try {
   assert.match(await stage.getByTestId('stage-notes-text').innerHTML(), /<mark[^>]*>INTRO<\/mark>/, 'cues in capitals stand out');
   assert.match(await stage.getByTestId('stage-now').innerText(), /Now · song 1 of 4/i);
   assert.match(await stage.getByTestId('stage-now').innerText(), /scene\s+Verse/i, 'the scene the song recalled');
+  assert.match(await stage.getByTestId('stage-song').first().innerText(), /scene Verse/, 'every song in the list says which scene it plays');
+  assert.match(await stage.getByTestId('stage-next').innerText(), /scene Chorus/, 'and so does the next song');
   await page.keyboard.press('ArrowRight');
   assert.equal((await state()).performance.setlist.currentIndex, 1, 'arrow right is the next song');
   await page.keyboard.press('ArrowLeft');
