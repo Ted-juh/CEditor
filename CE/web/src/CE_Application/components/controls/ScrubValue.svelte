@@ -21,6 +21,7 @@
     fineStep = null,          // with Shift held (drag or arrows): this step instead; null = step / 10
     stepper = null,           // (value, steps, fine) => next: for values that step by ratio, like a rate in Hz
     compact = false,          // narrow, for a value of a character or two in a crowded row
+    parse = null,             // (text) => number | null: how typed text reads, when it is not a plain number ("4:30")
     onchange = () => {},
     testid = undefined,
   } = $props();
@@ -85,7 +86,8 @@
       const byLabel = choices.find(([, l]) => l.toLowerCase() === t.toLowerCase());
       if (byLabel) { onchange(byLabel[0]); return; }
     }
-    const n = Number(t.replace(/[^0-9.+-]/g, ''));
+    const n = parse ? parse(t) : Number(t.replace(/[^0-9.+-]/g, ''));
+    if (n === null) return;
     if (!Number.isFinite(n)) return;
     onchange(choices ? choices[indexOf(n)][0] : clamp(n));
   }

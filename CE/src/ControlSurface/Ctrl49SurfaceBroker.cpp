@@ -480,6 +480,17 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
         if (! action)
             return;
 
+        // Shift + Page Left / Right steps the setlist from any page: the song is the one thing
+        // a player needs to change without looking for it. Through the command surface, so the
+        // stage lock and the screen see it like a click.
+        if (action->setlistStep != 0)
+        {
+            auto* payload = new juce::DynamicObject();
+            payload->setProperty ("cmd", action->setlistStep < 0 ? "setlistPrev" : "setlistNext");
+            service.handleCommand (juce::var (payload));
+            return;
+        }
+
         const auto encoderMoved = action->encoderMoved && action->encoderSlot >= 0;
         if (encoderMoved)
         {
@@ -700,7 +711,8 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     {
         const auto t = service.surfaceTransport();
         PerformanceTransportView transport { t.playing, t.tempo, t.bar, t.beat, t.beatsPerBar,
-                                             t.externalClock, t.clockLost };
+                                             t.externalClock, t.clockLost,
+                                             t.song.toStdString(), t.scene.toStdString() };
 
         PerformanceClipViews clipViews {};
         if (reducer.padBank() == 1)

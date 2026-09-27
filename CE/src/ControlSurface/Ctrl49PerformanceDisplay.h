@@ -32,6 +32,8 @@ struct PerformanceTransportView
     int beatsPerBar = 4;
     bool externalClock = false;
     bool clockLost = false;
+    std::string song;    // the setlist song on stage, "" when no set is running
+    std::string scene;   // the scene last applied
 };
 
 struct PerformanceClipView
@@ -45,8 +47,9 @@ struct PerformanceClipView
 using PerformanceClipViews = std::array<PerformanceClipView, 8>;
 
 /** The one line a player reads at a glance: "▶ 3.2 128" — running state, bar.beat, tempo,
-    with "EXT" appended when slaved and "NO CLK" when slaved to nothing. ASCII only, because
-    the display is. */
+    with "EXT" appended when slaved and "NO CLK" when slaved to nothing. With a set running it
+    starts with the song and the scene: "Glass Harbour / Chorus  > 3.2 96". ASCII only,
+    because the display is. */
 std::string buildPerformanceTitle (const PerformanceTransportView& transport);
 
 /** set_labels payload: the transport line as the title, then the eight clip names. A clip

@@ -627,6 +627,8 @@ public:
         int beatsPerBar = 4;
         bool externalClock = false;
         bool clockLost = false;
+        juce::String song;    // the setlist song that is on, "" before the set starts
+        juce::String scene;   // the scene last applied
     };
 
     struct SurfaceClip
@@ -1549,6 +1551,12 @@ private:
         double tempo = 0.0;
         double startedMs = 0.0;
     } pendingSetlistRecall;
+    // The stage's clocks, in wall-clock milliseconds: when the set began (the first song of a
+    // run) and when the current song did. Kept for the session only; a restart is a new set.
+    juce::int64 setlistStartedAtMs = 0;
+    juce::int64 setlistSongStartedAtMs = 0;
+    // The scene whose state was applied last: what the stage calls "the scene you are in".
+    juce::String currentSceneId;
     struct FailoverRuntime
     {
         juce::String targetId, ceId, name, error;

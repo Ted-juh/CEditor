@@ -147,6 +147,15 @@ std::optional<Ctrl49Action> Ctrl49Reducer::process (const std::uint8_t* data, st
         return action;
     }
 
+    if ((data1 == 39 || data1 == 40) && data2 == 127 && shiftDown_)  // Shift + Page: the setlist
+    {
+        Ctrl49Action action = makeAction (data1 == 39 ? "Shift + Page Left: previous song"
+                                                      : "Shift + Page Right: next song",
+                                          false);
+        action.setlistStep = data1 == 39 ? -1 : 1;
+        return action;
+    }
+
     if (data1 == 39 && data2 == 127)  // Page Left
     {
         page_ = (page_ + pageCount_ - 1) % pageCount_;

@@ -2303,7 +2303,10 @@ export function emptyPerformance() {
     snapshotMorph: {
       active: false, sceneId: '', name: '', durationBeats: 0, progress: 0, targetCount: 0,
     },
-    setlist: { items: [], currentIndex: -1, preloadAhead: 1, loadingIndex: -1, preloads: [] },
+    setlist: { items: [], currentIndex: -1, preloadAhead: 1, loadingIndex: -1, preloads: [],
+               startedAtMs: 0, songStartedAtMs: 0 },
+    currentSceneId: '',
+    queuedSceneId: '',
     arrangement: {
       items: [], loop: false, playing: false, currentIndex: -1, queuedIndex: -1,
       ending: false, progress: 0, bar: 0,
@@ -3336,6 +3339,10 @@ export function normalizePerformance(payload) {
       variationSourceSceneId: String(s?.variationSourceSceneId ?? ''),
       variationAmount: Math.max(0, Math.min(1, Number(s?.variationAmount ?? 0))),
     })),
+    // The scene whose state was applied last (the scene the stage is in), and one waiting for
+    // its boundary.
+    currentSceneId: String(p.currentSceneId ?? ''),
+    queuedSceneId: String(p.queuedSceneId ?? ''),
     snapshotMorph: {
       active: snapshotMorph.active === true,
       sceneId: String(snapshotMorph.sceneId ?? ''),
@@ -3355,8 +3362,13 @@ export function normalizePerformance(payload) {
         missing: i?.missing === true,
         notes: String(i?.notes ?? ''),
         tempo: Number(i?.tempo ?? 0),
+        // How long the song should take on stage, in seconds; 0 = not planned.
+        plannedSeconds: Math.max(0, Math.min(3600, Math.round(Number(i?.plannedSeconds ?? 0)) || 0)),
       })),
       currentIndex: Number(setlist.currentIndex ?? -1),
+      // The stage's clocks, wall-clock ms: when the set began, and when the song on stage did.
+      startedAtMs: Math.max(0, Number(setlist.startedAtMs ?? 0) || 0),
+      songStartedAtMs: Math.max(0, Number(setlist.songStartedAtMs ?? 0) || 0),
       preloadAhead: Math.max(0, Math.min(2, Number(setlist.preloadAhead ?? 1))),
       loadingIndex: Number(setlist.loadingIndex ?? -1),
       preloads: (Array.isArray(setlist.preloads) ? setlist.preloads : []).map((preload) => ({
@@ -7243,6 +7255,7 @@ export function applyMockCommand(state, payload) {
     }
     if (scene.tempo > 0) perf.transport.tempo = scene.tempo;
     applyMockSnapshot(scene, next);
+    perf.currentSceneId = scene.sceneId;
     perf.snapshotMorph = {
       active: false, sceneId: scene.sceneId, name: scene.name,
       durationBeats: scene.morphBeats, progress: 1,
@@ -7264,6 +7277,7 @@ export function applyMockCommand(state, payload) {
       missing: !!payload.sceneId && !scene,
       notes: '',
       tempo: 0,
+      plannedSeconds: 0,
     });
     return next;
   }
@@ -7287,6 +7301,8 @@ export function applyMockCommand(state, payload) {
       for (const key of ['name', 'notes', 'rackRecordId', 'pageId'])
         if (payload[key] !== undefined) item[key] = String(payload[key]);
       if (payload.tempo !== undefined) item.tempo = Number(payload.tempo);
+      if (payload.plannedSeconds !== undefined)
+        item.plannedSeconds = Math.max(0, Math.min(3600, Math.round(Number(payload.plannedSeconds)) || 0));
       if (payload.sceneId !== undefined) {
         item.sceneId = String(payload.sceneId);
         const scene = perf.scenes.find((s) => s.sceneId === item.sceneId);
@@ -7302,6 +7318,11 @@ export function applyMockCommand(state, payload) {
     const item = perf.setlist.items[target];
     // The native rule, mirrored: an item whose scene is gone leaves the rig where it was.
     if (!item || item.missing) return next;
+    // The stage's clocks, as the host keeps them: the song starts now, and so does the set
+    // when this is its first song.
+    const now = Date.now();
+    if (perf.setlist.currentIndex < 0 || !perf.setlist.startedAtMs) perf.setlist.startedAtMs = now;
+    perf.setlist.songStartedAtMs = now;
     perf.setlist.currentIndex = target;
     perf.setlist.loadingIndex = -1;
     if (item.sceneId) return applyMockCommand(next, { cmd: 'launchScene', sceneId: item.sceneId });

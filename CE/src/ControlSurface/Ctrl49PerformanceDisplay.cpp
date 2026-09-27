@@ -34,7 +34,12 @@ std::string buildPerformanceTitle (const PerformanceTransportView& transport)
 {
     // ">" and "#" rather than the usual glyphs: the display is ASCII, and a '?' where the
     // play symbol should be is worse than a character that reads as one.
-    std::string title = transport.playing ? ">" : "#";
+    std::string title;
+    if (! transport.song.empty())
+        title = transport.song + (transport.scene.empty() ? "" : " / " + transport.scene) + "  ";
+    else if (! transport.scene.empty())
+        title = transport.scene + "  ";
+    title += transport.playing ? ">" : "#";
     title += " " + std::to_string (transport.bar) + "." + std::to_string (transport.beat);
     title += " " + wholeNumber (transport.tempo);
 

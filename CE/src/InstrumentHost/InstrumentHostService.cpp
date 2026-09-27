@@ -5664,6 +5664,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             if (fields->hasProperty ("rackRecordId")) item.rackRecordId = payload["rackRecordId"].toString();
             if (fields->hasProperty ("pageId"))       item.pageId = payload["pageId"].toString();
             if (fields->hasProperty ("tempo"))   item.tempo = juce::jlimit (0.0, 300.0, (double) payload["tempo"]);
+            if (fields->hasProperty ("plannedSeconds"))
+                item.plannedSeconds = juce::jlimit (0, 3600, (int) payload["plannedSeconds"]);
         }
 
         savePerformance();
@@ -15076,6 +15078,7 @@ void InstrumentHostService::applyAutomationValue (const juce::String& targetId,
 
 void InstrumentHostService::applySceneState (const perf::Scene& scene)
 {
+    currentSceneId = scene.sceneId;
     // Boolean state remains a boundary action. Crossfading a mute or half-enabling a plug-in
     // has no useful meaning, whereas levels and normalized parameters can move coherently.
     sceneMorph = {};
@@ -15603,6 +15606,13 @@ bool InstrumentHostService::goToSetlistItem (int index)
             requestedSurfacePageId = item.pageId;
         }
     }
+
+    // The stage's timers: this song starts now, and so does the set when this is its first
+    // song (the setlist was not on any song before).
+    const auto nowMs = juce::Time::currentTimeMillis();
+    setlistSongStartedAtMs = nowMs;
+    if (previous < 0 || setlistStartedAtMs == 0)
+        setlistStartedAtMs = nowMs;
 
     auto* payload = new juce::DynamicObject();
     payload->setProperty ("index", index);
@@ -18112,6 +18122,12 @@ InstrumentHostService::SurfaceTransport InstrumentHostService::surfaceTransport(
     view.beatsPerBar = transport.getTimeSignatureNumerator();
     view.externalClock = transport.isExternalClockEnabled();
     view.clockLost = transport.hasLostExternalClock();
+
+    const auto& performance = rack.getPerformance();
+    if (juce::isPositiveAndBelow (performance.setlist.currentIndex, performance.setlist.items.size()))
+        view.song = performance.setlist.items.getReference (performance.setlist.currentIndex).name;
+    if (const auto* scene = performance.findScene (currentSceneId))
+        view.scene = scene->name;
     return view;
 }
 
@@ -19640,6 +19656,7 @@ juce::var InstrumentHostService::performancePayload() const
                                          && item.sceneId.isNotEmpty() && scene == nullptr);
         i->setProperty ("notes",     item.notes);
         i->setProperty ("tempo",     item.tempo);
+        i->setProperty ("plannedSeconds", item.plannedSeconds);
         setlistItems.add (juce::var (i));
     }
 
@@ -19647,6 +19664,8 @@ juce::var InstrumentHostService::performancePayload() const
     setlistObj->setProperty ("items",        setlistItems);
     setlistObj->setProperty ("currentIndex", performance.setlist.currentIndex);
     setlistObj->setProperty ("preloadAhead", performance.setlist.preloadAhead);
+    setlistObj->setProperty ("startedAtMs",     (double) setlistStartedAtMs);
+    setlistObj->setProperty ("songStartedAtMs", (double) setlistSongStartedAtMs);
     setlistObj->setProperty ("loadingIndex", pendingSetlistRecall.active
                                                ? pendingSetlistRecall.index : -1);
     juce::Array<juce::var> preloads;
@@ -19807,6 +19826,10 @@ juce::var InstrumentHostService::performancePayload() const
     root->setProperty ("scenes",    scenes);
     root->setProperty ("snapshotMorph", juce::var (snapshotMorph));
     root->setProperty ("setlist",   juce::var (setlistObj));
+    root->setProperty ("currentSceneId", rack.getPerformance().findScene (currentSceneId) != nullptr
+                                           ? currentSceneId : juce::String());
+    root->setProperty ("queuedSceneId", pendingScenes.empty() ? juce::String()
+                                                              : pendingScenes.rbegin()->second);
     root->setProperty ("arrangement", juce::var (arrangementObj));
     root->setProperty ("capture",   juce::var (capture));
     root->setProperty ("looper",    juce::var (looper));

@@ -1,6 +1,7 @@
-/** Commands that remain useful and safe while the rig is locked for performance. Keep this
- * list in step with InstrumentHostService.cpp: the browser preview mirrors the native deny-
- * by-default boundary, while the native service remains authoritative in the application. */
+/** Commands that remain useful and safe while the rig is locked for performance. The browser
+ * preview mirrors the native deny-by-default boundary (isStageSafeCommand in
+ * InstrumentHostService.cpp), which remains authoritative in the application;
+ * test/stageSafeParity.test.js reads the native list and fails when the two drift apart. */
 export const STAGE_SAFE_COMMANDS = new Set([
   'beginParameterGesture', 'endParameterGesture', 'getAudioDevices', 'getHostProject',
   'getLibrary', 'getLicence', 'getParameters', 'getState', 'getSurfaceLayout', 'focusPart', 'hostNote',
@@ -21,6 +22,9 @@ export const STAGE_SAFE_COMMANDS = new Set([
   'retryFailedProcessor', 'dismissFailoverEvent',
   'cancelHardwarePatchCapture', 'cancelKeyChordLearn', 'cancelLearnControlSlotParameter',
   'cancelMidiLearn', 'disarmCapture',
+  'finishSoundcheck', 'setPerformanceFill', 'sendMicrotuning', 'startArrangement', 'stopArrangement',
+  'startSoundComparison', 'stepSoundComparison', 'keepSoundComparison', 'cancelSoundComparison',
+  'chordPad', 'chordStep',
 ]);
 
 export function stageCommandAllowed(stageLocked, command) {

@@ -2739,7 +2739,7 @@ void testScalesAndSerialization()
 
     Setlist setlist;
     setlist.items.add ({ "i1", "Opener", "s1", "rack-capture-1", "page-filter",
-                         "count in on the hats", 128.0 });
+                         "count in on the hats", 128.0, 245 });
     setlist.currentIndex = 0;
     setlist.preloadAhead = 2;
     Setlist restoredSetlist;
@@ -2748,9 +2748,10 @@ void testScalesAndSerialization()
              && restoredSetlist.items[0].rackRecordId == "rack-capture-1"
              && restoredSetlist.items[0].pageId == "page-filter"
              && restoredSetlist.items[0].notes == "count in on the hats"
+             && restoredSetlist.items[0].plannedSeconds == 245
              && restoredSetlist.currentIndex == 0
              && restoredSetlist.preloadAhead == 2,
-           "and a setlist keeps full-rack/page recall, preload policy, notes and its place");
+           "and a setlist keeps full-rack/page recall, preload policy, notes, planned length and its place");
 
     Arrangement arrangement;
     arrangement.items.add ({ "a1", "Intro", "s1", 2 });

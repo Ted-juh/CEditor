@@ -10366,10 +10366,33 @@ void testPerformanceSystem()
         // -- the setlist ---------------------------------------------------------------------
         h.cmd ("addSetlistItem", { { "sceneId", sceneId }, { "name", "Opener" } });
         h.cmd ("addSetlistItem", { { "sceneId", "gone-scene" }, { "name", "Broken" } });
+        const auto beforeGo = juce::Time::currentTimeMillis();
         h.cmd ("setlistGo", { { "index", 0 } });
         check ((int) h.emits.lastState()->getProperty ("performance", {})
                    .getProperty ("setlist", {}).getProperty ("currentIndex", -1) == 0,
                "the setlist recalls its first item");
+        {
+            const auto performanceState = h.emits.lastState()->getProperty ("performance", {});
+            const auto setlistState = performanceState.getProperty ("setlist", {});
+            const auto started = (juce::int64) (double) setlistState.getProperty ("startedAtMs", 0.0);
+            const auto songStarted = (juce::int64) (double) setlistState.getProperty ("songStartedAtMs", 0.0);
+            check (started >= beforeGo && songStarted == started,
+                   "the set and its first song start their clocks together");
+            check (performanceState.getProperty ("currentSceneId", {}).toString() == sceneId,
+                   "and the scene it recalled is the scene the stage is in");
+
+            const auto itemId = setlistState.getProperty ("items", {})[0].getProperty ("itemId", {}).toString();
+            h.cmd ("setSetlistItem", { { "itemId", itemId }, { "plannedSeconds", 245 } });
+            const auto planned = (int) h.emits.lastState()->getProperty ("performance", {})
+                                     .getProperty ("setlist", {}).getProperty ("items", {})[0]
+                                     .getProperty ("plannedSeconds", 0);
+            check (planned == 245, "a song can carry how long it should take");
+            h.cmd ("setSetlistItem", { { "itemId", itemId }, { "plannedSeconds", 99999 } });
+            check ((int) h.emits.lastState()->getProperty ("performance", {})
+                       .getProperty ("setlist", {}).getProperty ("items", {})[0]
+                       .getProperty ("plannedSeconds", 0) == 3600, "at most an hour");
+            h.cmd ("setSetlistItem", { { "itemId", itemId }, { "plannedSeconds", 245 } });
+        }
 
         h.emits.clear();
         h.cmd ("setlistNext");

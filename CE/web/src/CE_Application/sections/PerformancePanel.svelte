@@ -54,6 +54,7 @@
   import RandomCard from './performance/RandomCard.svelte';
   import PatternStepRows from './performance/PatternStepRows.svelte';
   import ScrubValue from '../components/controls/ScrubValue.svelte';
+  import { parseSongLength as parseLength } from '../utils/stageScreen.js';
   import Segmented from '../components/controls/Segmented.svelte';
 
   let { onShowMixer = () => {} } = $props();
@@ -2250,8 +2251,10 @@
                 : `warming ${preload.ready}/${preload.total}`}
             </span>
           {/if}
-          <input type="text" class="setlist-notes" placeholder="notes for the stage…" value={item.notes}
-                 onchange={(e) => setSetlistItem(item.itemId, { notes: e.currentTarget.value })} />
+          <!-- Lyrics, cues, a chord chart: the stage shows all of it, and capitals stand out. -->
+          <textarea class="setlist-notes" rows="2" placeholder="notes for the stage: lyrics, cues (CHORUS: scene 2)…"
+                    value={item.notes} aria-label={`Stage notes for ${item.name}`}
+                    onchange={(e) => setSetlistItem(item.itemId, { notes: e.currentTarget.value })}></textarea>
           <label class="mini-field" title="Optional full-rack Library capture for this song">Rig
             <select value={item.rackRecordId}
                     onchange={(e) => setSetlistItem(item.itemId, { rackRecordId: e.currentTarget.value })}>
@@ -2270,10 +2273,18 @@
               {/each}
             </select>
           </label>
-          <label class="mini-field" title="0 keeps the current tempo">Tempo
-            <input type="number" min="0" max="300" value={item.tempo}
-                   onchange={(e) => setSetlistItem(item.itemId, { tempo: Number(e.currentTarget.value) })} />
-          </label>
+          <div class="mini-field" title="Keep the current tempo, or set the song's">Tempo
+            <ScrubValue value={item.tempo} min={0} max={300} step={1} fineStep={0.1} label={`Tempo for ${item.name}`}
+                        testid="setlist-tempo" format={(v) => (v > 0 ? `${Math.round(v * 10) / 10}` : 'keep')}
+                        onchange={(tempo) => setSetlistItem(item.itemId, { tempo })} />
+          </div>
+          <div class="mini-field" title="How long the song should take on stage. The stage's timers count toward it.">Length
+            <ScrubValue value={item.plannedSeconds} min={0} max={3600} step={15} fineStep={1}
+                        label={`Planned length for ${item.name}`} testid="setlist-length"
+                        format={(s) => (s > 0 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'none')}
+                        parse={parseLength}
+                        onchange={(plannedSeconds) => setSetlistItem(item.itemId, { plannedSeconds })} />
+          </div>
           <HostConfirmButton identity={JSON.stringify([item.itemId])} title="Remove setlist item" aria-label="Remove setlist item" type="button" class="ghost danger" onclick={() => removeSetlistItem(item.itemId)}>×</HostConfirmButton>
         </div>
         <SetlistSoundcheckRow {item} soundcheck={$hostState.soundcheck} onMeasure={startSoundcheck} onStop={finishSoundcheck}/>
@@ -2843,7 +2854,7 @@
   .setlist-name { flex: 0 0 140px; }
   .setlist-scene { flex: 0 0 120px; color: #98a4ae; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .setlist-item.missing .setlist-scene { color: #d6a3a3; }
-  .setlist-notes { flex: 1; min-width: 80px; }
+  .setlist-notes { flex: 1 1 220px; min-width: 160px; min-height: 36px; resize: vertical; font: inherit; font-size: 12px; }
   .preload-state { flex: 0 0 auto; font-size: 10px; color: #9aa6b0; text-transform: uppercase; }
   .preload-state.ready { color: #82bd8d; }
   .preload-state.degraded { color: #df9a76; }

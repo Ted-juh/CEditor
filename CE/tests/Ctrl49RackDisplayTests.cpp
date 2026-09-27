@@ -125,6 +125,23 @@ int main()
         check (buildPerformanceTitle (transport) == "# 3.2 128 NO CLK",
                "and a master that went quiet is named, not guessed at");
 
+        {
+            PerformanceTransportView onStage;
+            onStage.playing = true;
+            onStage.tempo = 96.0;
+            onStage.bar = 12;
+            onStage.beat = 3;
+            onStage.song = "Glass Harbour";
+            onStage.scene = "Chorus";
+            check (buildPerformanceTitle (onStage) == "Glass Harbour / Chorus  > 12.3 96",
+                   "with a set running, the song and the scene lead the line");
+            onStage.scene.clear();
+            check (buildPerformanceTitle (onStage) == "Glass Harbour  > 12.3 96", "a song with no scene yet");
+            onStage.song.clear();
+            onStage.scene = "Verse";
+            check (buildPerformanceTitle (onStage) == "Verse  > 12.3 96", "a scene without a set");
+        }
+
         PerformanceClipViews clips {};
         clips[0] = { "Verse", true, false, 0.5f };
         clips[1] = { "Chorus", false, true, 0.0f };

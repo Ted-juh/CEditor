@@ -1596,6 +1596,7 @@ juce::var setlistToVar (const Setlist& setlist)
         i->setProperty ("pageId",       item.pageId);
         i->setProperty ("notes",   item.notes);
         i->setProperty ("tempo",   item.tempo);
+        i->setProperty ("plannedSeconds", item.plannedSeconds);
         itemVars.add (juce::var (i));
     }
 
@@ -1628,6 +1629,7 @@ bool setlistFromVar (const juce::var& stored, Setlist& out)
             item.pageId       = i.getProperty ("pageId", {}).toString();
             item.notes   = i.getProperty ("notes", {}).toString();
             item.tempo   = juce::jlimit (0.0, 300.0, (double) i.getProperty ("tempo", 0.0));
+            item.plannedSeconds = juce::jlimit (0, 3600, (int) i.getProperty ("plannedSeconds", 0));
             out.items.add (std::move (item));
         }
 

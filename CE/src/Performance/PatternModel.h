@@ -368,6 +368,7 @@ struct SetlistItem
     juce::String pageId;             // CTRL49 control page recalled with the song
     juce::String notes;              // what the player needs to read on stage
     double tempo = 0.0;              // 0 = the scene's or the current tempo
+    int plannedSeconds = 0;          // how long the song should take on stage; 0 = not planned
 };
 
 struct Setlist

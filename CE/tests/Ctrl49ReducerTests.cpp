@@ -68,6 +68,16 @@ int main()
         check (bank.has_value() && bank->bankChanged && r.padBank() == 1,
                "Shift + Pad Bank B selects Bank B");
 
+        // Shift + Page Left / Right steps the setlist and leaves the page where it is.
+        const auto pageBefore = r.page();
+        auto nextSong = [&] { const std::uint8_t m[3] { 0xB0, 0x28, 0x7F }; return r.process (m, 3); }();
+        check (nextSong.has_value() && nextSong->setlistStep == 1 && ! nextSong->pageChanged
+                 && r.page() == pageBefore,
+               "Shift + Page Right is the next song, not the next page");
+        auto previousSong = [&] { const std::uint8_t m[3] { 0xB0, 0x27, 0x7F }; return r.process (m, 3); }();
+        check (previousSong.has_value() && previousSong->setlistStep == -1 && r.page() == pageBefore,
+               "and Shift + Page Left the previous song");
+
         const std::uint8_t padStrike[3] { 0xB0, 0x01, 0x63 };
         auto pad = r.process (padStrike, 3);
         check (pad.has_value() && pad->padChanged && pad->velocity == 99,
