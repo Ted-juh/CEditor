@@ -2211,6 +2211,11 @@
     <div class="perf-body setlist-body" data-testid="perf-setlist">
       <div class="perf-head">
         <strong>Setlist</strong>
+        <!-- Songs are made here. Each plays one scene; a new one takes the last song's scene. -->
+        <button type="button" data-testid="setlist-add-song"
+                title="Add a song to the end of the setlist"
+                onclick={() => addSetlistItem(performance.setlist.items.at(-1)?.sceneId ?? performance.scenes[0]?.sceneId ?? '',
+                                              `Song ${performance.setlist.items.length + 1}`)}>+ Song</button>
         <span class="soundcheck-label" title="Session soundcheck · Main output 1/2 · dBFS">Soundcheck</span>
         <button type="button" class="ghost" disabled={!performance.setlist.items.length}
           title="Check saved rig references without loading plug-ins or sending MIDI"
@@ -2229,7 +2234,8 @@
       </div>
       {#if performance.setlist.items.length === 0}
         <div class="empty-hint">
-          Nothing in the setlist — add scenes to it, then walk them with Prev and Next on stage.
+          No songs yet. Click <strong>+ Song</strong>. A song has its own name, notes and length, and plays
+          one of your scenes (the sound setups made under Patterns &amp; playback › Clips &amp; scenes).
         </div>
       {/if}
       {#each performance.setlist.items as item, index (item.itemId)}
@@ -2246,13 +2252,22 @@
                     title="Move later" aria-label={`Move ${item.name} later`}
                     onclick={() => moveSetlistItem(item.itemId, index + 1)}>↓</button>
           </span>
-          <input type="text" class="setlist-name" value={item.name}
-                 aria-label={`Song name ${index + 1}`}
-                 onchange={(e) => setSetlistItem(item.itemId, { name: e.currentTarget.value })} />
-          <span class="setlist-scene">
-            {item.missing ? 'scene is gone'
-              : performance.setlist.loadingIndex === index ? 'loading rig…' : item.sceneName}
-          </span>
+          <label class="mini-field song-field">Song
+            <input type="text" class="setlist-name" value={item.name}
+                   aria-label={`Song name ${index + 1}`} data-testid="setlist-song-name"
+                   onchange={(e) => setSetlistItem(item.itemId, { name: e.currentTarget.value })} />
+          </label>
+          <label class="mini-field" title="The sound setup this song plays">Plays scene
+            <select class="setlist-scene" value={item.sceneId} data-testid="setlist-scene"
+                    onchange={(e) => setSetlistItem(item.itemId, { sceneId: e.currentTarget.value })}>
+              <option value="">No scene (keep the sound)</option>
+              {#if item.missing}<option value={item.sceneId}>scene is gone</option>{/if}
+              {#each performance.scenes as scene (scene.sceneId)}
+                <option value={scene.sceneId}>{scene.name}</option>
+              {/each}
+            </select>
+          </label>
+          {#if performance.setlist.loadingIndex === index}<span class="setlist-loading">loading rig…</span>{/if}
           {#if preload}
             <span class={`preload-state ${preload.state}`} title={preload.error}>
               {preload.state === 'ready' ? 'ready'
@@ -2861,8 +2876,10 @@
   .setlist-order { display: inline-flex; flex-direction: column; gap: 2px; }
   .setlist-order button { width: 22px; height: 15px; padding: 0; line-height: 12px; }
   .setlist-order button:disabled { opacity: 0.28; cursor: default; }
-  .setlist-name { flex: 0 0 140px; }
-  .setlist-scene { flex: 0 0 120px; color: #98a4ae; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .setlist-name { width: 160px; }
+  .setlist-loading { color: #98a4ae; font-size: 12px; }
+  .song-field .setlist-name { font-weight: 600; }
+  .setlist-scene { width: 160px; color: #98a4ae; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .setlist-item.missing .setlist-scene { color: #d6a3a3; }
   .setlist-notes { flex: 1 1 220px; min-width: 160px; min-height: 36px; resize: vertical; font: inherit; font-size: 12px; }
   .preload-state { flex: 0 0 auto; font-size: 10px; color: #9aa6b0; text-transform: uppercase; }

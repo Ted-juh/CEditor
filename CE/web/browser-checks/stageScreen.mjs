@@ -60,6 +60,17 @@ try {
   assert.equal(await verseRow.getByTestId('scene-in-setlist').innerText(), 'in setlist ×2', '+ Song is acknowledged on the row');
   assert.equal((await state()).performance.setlist.items.at(-1).name, 'Song 4', 'a new song has its own name, not its scene');
 
+  // Live setup: songs are made and named here, each with the scene it plays chosen beside it.
+  await page.getByRole('button', { name: 'Live setup', exact: true }).click();
+  await page.getByRole('button', { name: 'Setlist', exact: true }).click();
+  await page.getByTestId('setlist-add-song').click();
+  const added = (await state()).performance.setlist.items.at(-1);
+  assert.equal(added.name, 'Song 5');
+  assert.equal(added.sceneId, (await state()).performance.scenes[0].sceneId, 'a new song plays the scene of the song before it');
+  await page.getByTestId('setlist-scene').last().selectOption({ label: 'Break' });
+  assert.equal((await state()).performance.setlist.items.at(-1).sceneName, 'Break', 'and its scene is chosen by name');
+  await shot('build-setlist');
+
   await page.getByRole('button', { name: 'Stage', exact: true }).click();
   const stage = page.getByTestId('host-stage-view');
   await stage.waitFor();
@@ -73,7 +84,7 @@ try {
   assert.equal((await state()).performance.setlist.currentIndex, 0, 'Page Down starts the set');
   assert.equal(await stage.getByTestId('stage-song-name').innerText(), 'Glass Harbour');
   assert.match(await stage.getByTestId('stage-notes-text').innerHTML(), /<mark[^>]*>INTRO<\/mark>/, 'cues in capitals stand out');
-  assert.match(await stage.getByTestId('stage-now').innerText(), /Now · song 1 of 4/i);
+  assert.match(await stage.getByTestId('stage-now').innerText(), /Now · song 1 of 5/i);
   assert.match(await stage.getByTestId('stage-now').innerText(), /scene\s+Verse/i, 'the scene the song recalled');
   assert.match(await stage.getByTestId('stage-song').first().innerText(), /scene Verse/, 'every song in the list says which scene it plays');
   assert.match(await stage.getByTestId('stage-next').innerText(), /scene Chorus/, 'and so does the next song');
