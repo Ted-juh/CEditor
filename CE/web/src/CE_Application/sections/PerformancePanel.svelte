@@ -59,6 +59,7 @@
 
   let { onShowMixer = () => {} } = $props();
   const stopMeasurement = () => { if ($hostState.soundcheck.activeItemId) finishSoundcheck(); };
+  const songCount = (sceneId) => performance.setlist.items.filter((item) => item.sceneId === sceneId).length;
   onDestroy(stopMeasurement);
   const heldFillClipIds = new Set();
   const heldEnvelopeIds = new Set();
@@ -2096,8 +2097,15 @@
                     onclick={() => createSceneVariations(scene.sceneId, variationAmount)}>
               {scene.variationLabel ? 'Regen B/C/D' : 'B/C/D'}
             </button>
-            <button type="button" class="ghost" title="Add to the setlist"
-                    onclick={() => addSetlistItem(scene.sceneId)}>+ Set</button>
+            <!-- "+ Set" read like "make a set" and changed nothing you could see: it adds a song
+                 to the one setlist, and the count beside it is the acknowledgement. -->
+            <button type="button" class="ghost" title="Add a song to the setlist that recalls this scene"
+                    data-testid="scene-add-song" onclick={() => addSetlistItem(scene.sceneId)}>+ Song</button>
+            {#if songCount(scene.sceneId) > 0}
+              <span class="in-setlist" data-testid="scene-in-setlist"
+                    title="Songs in the setlist (Live setup › Setlist) that recall this scene">
+                {songCount(scene.sceneId) === 1 ? 'in setlist' : `in setlist ×${songCount(scene.sceneId)}`}</span>
+            {/if}
             <button type="button" class="ghost" title="Add a four-bar block to the song arranger"
                     onclick={() => addArrangementItem(scene.sceneId)}>+ Arrange</button>
             <HostConfirmButton identity={JSON.stringify([scene.sceneId])} title="Remove scene" aria-label="Remove scene" type="button" class="ghost danger" onclick={() => removeScene(scene.sceneId)}>×</HostConfirmButton>
@@ -2633,6 +2641,7 @@
   .pattern-row.on .pattern-name { color: #edf5fa; border-color: #5b9bd5; background: #24384c; }
   .pattern-name { flex: 1; text-align: left; }
   .pattern-detail { color: #98a4ae; font-size: 12px; }
+  .in-setlist { font: 600 11px 'JetBrains Mono', monospace; color: #8fd19e; border: 1px solid #2f5a3a; border-radius: 10px; padding: 1px 7px; white-space: nowrap; }
   .variation-badge {
     display: inline-flex; align-items: center; justify-content: center;
     width: 20px; height: 20px; flex: 0 0 20px;

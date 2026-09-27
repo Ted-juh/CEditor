@@ -149,7 +149,7 @@ namespace
             "setPartMixer", "setReturnLevel", "setSendLevel", "setTempo",
             "sendMicrotuning",
             "setTimeSignature", "setTransportPosition", "setlistGo", "setlistNext",
-            "setlistPrev", "startArrangement", "stopArrangement",
+            "setlistPrev", "resetSetlistClock", "startArrangement", "stopArrangement",
             "stopAllClips", "stopClip", "transportContinue",
             "transportPlay", "transportStop", "walkPartPreset", "startMidiLoop",
             "finishMidiLoop", "cancelMidiLoop",
@@ -160,7 +160,10 @@ namespace
             "surfaceStepPad", "surfaceInput", "setSurfaceActive", "showControlPage",
             "chordPad", "chordStep", "retryFailedProcessor", "dismissFailoverEvent",
 
-            // Escape/cancellation actions must never be trapped behind the lock.
+            // Escape/cancellation actions must never be trapped behind the lock. Closing a
+            // plug-in's editor changes nothing in the rig, and without it the × on an editor
+            // that a scene opened did nothing on stage.
+            "closeEditor",
             "cancelHardwarePatchCapture", "cancelKeyChordLearn",
             "cancelLearnControlSlotParameter", "cancelMidiLearn", "disarmCapture"
         };
@@ -591,6 +594,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         {
             stageLocked = true;
             stageUnlockStartedMs = 0.0;
+            // The stage screen is the whole window: a docked editor left open in Build would
+            // take half of it, and opening one is a Build action. Floating windows stay put.
+            hideEditor ({});
             emitState();
             return;
         }
@@ -5670,6 +5676,15 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         savePerformance();
         refreshSetlistPreloads();
+        emitState();
+        return;
+    }
+
+    if (cmd == "resetSetlistClock")
+    {
+        // "Start counting from here": both clocks restart, the song stays where it is.
+        if (rack.getPerformance().setlist.currentIndex >= 0)
+            setlistStartedAtMs = setlistSongStartedAtMs = juce::Time::currentTimeMillis();
         emitState();
         return;
     }
@@ -15088,7 +15103,9 @@ void InstrumentHostService::applySceneState (const perf::Scene& scene)
         rack.setMute (slot.partId, slot.mute);
     }
 
-    if (scene.focusPartId.isNotEmpty() && rack.focusPart (scene.focusPartId))
+    // Recalling a scene focuses the part it was made on. In Build that also brings its editor
+    // up; on stage an editor opening over the set is the last thing wanted.
+    if (scene.focusPartId.isNotEmpty() && rack.focusPart (scene.focusPartId) && ! stageLocked)
         showEditorFor (scene.focusPartId);
 
     if (scene.pageId.isNotEmpty() && rack.getPerformance().findPage (scene.pageId) != nullptr)
@@ -15608,10 +15625,11 @@ bool InstrumentHostService::goToSetlistItem (int index)
     }
 
     // The stage's timers: this song starts now, and so does the set when this is its first
-    // song (the setlist was not on any song before).
+    // song, either because nothing was on or because going to song 1 is starting the set
+    // over (a soundcheck or a rehearsal run is not part of the show's time).
     const auto nowMs = juce::Time::currentTimeMillis();
     setlistSongStartedAtMs = nowMs;
-    if (previous < 0 || setlistStartedAtMs == 0)
+    if (previous < 0 || index == 0 || setlistStartedAtMs == 0)
         setlistStartedAtMs = nowMs;
 
     auto* payload = new juce::DynamicObject();

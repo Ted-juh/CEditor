@@ -7312,6 +7312,10 @@ export function applyMockCommand(state, payload) {
     }
     return next;
   }
+  if (cmd === 'resetSetlistClock') {
+    if (perf.setlist.currentIndex >= 0) perf.setlist.startedAtMs = perf.setlist.songStartedAtMs = Date.now();
+    return next;
+  }
   if (cmd === 'setlistGo' || cmd === 'setlistNext' || cmd === 'setlistPrev') {
     const target = cmd === 'setlistGo' ? Number(payload.index ?? 0)
       : cmd === 'setlistNext' ? perf.setlist.currentIndex + 1 : perf.setlist.currentIndex - 1;
@@ -7319,9 +7323,9 @@ export function applyMockCommand(state, payload) {
     // The native rule, mirrored: an item whose scene is gone leaves the rig where it was.
     if (!item || item.missing) return next;
     // The stage's clocks, as the host keeps them: the song starts now, and so does the set
-    // when this is its first song.
+    // when this is its first song or the set is starting over at song 1.
     const now = Date.now();
-    if (perf.setlist.currentIndex < 0 || !perf.setlist.startedAtMs) perf.setlist.startedAtMs = now;
+    if (perf.setlist.currentIndex < 0 || target === 0 || !perf.setlist.startedAtMs) perf.setlist.startedAtMs = now;
     perf.setlist.songStartedAtMs = now;
     perf.setlist.currentIndex = target;
     perf.setlist.loadingIndex = -1;
@@ -9384,6 +9388,8 @@ export const setSetlistItem = (itemId, fields) => send({ cmd: 'setSetlistItem', 
 export const moveSetlistItem = (itemId, index) => send({ cmd: 'moveSetlistItem', itemId, index });
 export const setSetlistOptions = (fields) => send({ cmd: 'setSetlistOptions', ...fields });
 export const setlistGo = (index) => send({ cmd: 'setlistGo', index });
+/** Restart the set and song clocks from now, leaving the song where it is. */
+export const resetSetlistClock = () => send({ cmd: 'resetSetlistClock' });
 export const setlistNext = () => send({ cmd: 'setlistNext' });
 export const setlistPrev = () => send({ cmd: 'setlistPrev' });
 export const addArrangementItem = (sceneId, name) =>

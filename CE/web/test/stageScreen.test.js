@@ -77,7 +77,11 @@ test('the stage keys: the ones a pedal or page turner sends run the set', () => 
   assert.deepEqual(stageKeyAction({ key: 'PageDown' }), { kind: 'next' });
   assert.deepEqual(stageKeyAction({ key: 'ArrowLeft' }), { kind: 'previous' });
   assert.deepEqual(stageKeyAction({ key: ' ' }), { kind: 'playStop' });
-  assert.deepEqual(stageKeyAction({ key: '3' }), { kind: 'scene', index: 2 });
+  assert.deepEqual(stageKeyAction({ key: '3', code: 'Digit3' }), { kind: 'song', index: 2 }, 'numbers are songs, as the list numbers them');
+  assert.deepEqual(stageKeyAction({ key: '#', code: 'Digit3', shiftKey: true }), { kind: 'scene', index: 2 }, 'Shift makes them scenes, whatever Shift+3 types');
+  assert.deepEqual(stageKeyAction({ key: '9', code: 'Numpad9' }), { kind: 'song', index: 8 });
+  assert.equal(stageKeyAction({ key: '(', code: 'Digit9', shiftKey: true }), null, 'there are eight scene keys');
+  assert.deepEqual(stageKeyAction({ key: 'Enter' }), { kind: 'go' });
   assert.deepEqual(stageKeyAction({ key: 'N', shiftKey: true }), { kind: 'notesSize', delta: -2 });
   assert.equal(stageKeyAction({ key: 'x' }), null);
 });

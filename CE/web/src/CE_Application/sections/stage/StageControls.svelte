@@ -49,9 +49,9 @@
       {#each scenes as scene, index (scene.sceneId)}
         <button type="button" class="ctl scene" class:now={performance.currentSceneId === scene.sceneId}
                 class:queued={performance.queuedSceneId === scene.sceneId} data-testid="stage-scene"
-                title={`Scene ${index + 1}: press ${index + 1} on the keyboard`}
+                title={index < 8 ? `Scene: press Shift+${index + 1} on the keyboard` : 'Scene'}
                 onclick={() => launchScene(scene.sceneId)}>
-          <span>{index + 1} · {scene.name}</span>
+          <span>{scene.name}</span>{#if index < 8}<kbd>⇧{index + 1}</kbd>{/if}
           {#if morph.active && morph.sceneId === scene.sceneId}<i style={`width:${Math.round(morph.progress * 100)}%`}></i>{/if}
         </button>
       {/each}
@@ -85,6 +85,7 @@
   button.scene { position: relative; overflow: hidden; font: 700 15px var(--stage-font); padding: 13px 6px; border-radius: 8px; cursor: pointer;
                  background: var(--stage-raised); color: var(--stage-soft); border: 1px solid var(--stage-line); white-space: nowrap; text-overflow: ellipsis; }
   button.scene span { position: relative; }
+  button.scene kbd { position: relative; margin-left: 8px; font: 600 11px var(--stage-mono); color: var(--stage-dim); }
   button.scene.now { color: var(--stage-text); border-color: var(--stage-now); box-shadow: inset 0 0 0 1px var(--stage-now); }
   button.scene.queued { border-color: var(--stage-next); color: var(--stage-next); }
   button.scene i { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--stage-now); }

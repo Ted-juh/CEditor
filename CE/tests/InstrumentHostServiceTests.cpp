@@ -5353,6 +5353,28 @@ void testEditorPolicy()
     h.cmd ("unloadInstrument", { { "partId", a } });
     check (! h.paneLog.empty() && h.paneLog.front() == "hide",
            "unloading hides the editor too");
+
+    // On stage: a scene made on a part with an instrument opens that editor in Build only,
+    // entering Stage closes the docked pane, and the × on an editor is never locked out.
+    const auto c = h.partIdAt (1);
+    h.cmd ("loadInstrument", { { "partId", c }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("focusPart", { { "partId", c } });
+    h.cmd ("addScene", { { "name", "Keys" } });
+    const auto sceneId = h.emits.lastState()->getProperty ("performance", {})
+                           .getProperty ("scenes", {})[0].getProperty ("sceneId", {}).toString();
+    h.cmd ("closeEditor", { { "partId", c } });
+    h.cmd ("launchScene", { { "sceneId", sceneId } });
+    check (h.openPaneEditors.contains (c), "in Build a scene brings up the editor of its part");
+
+    h.cmd ("setStageLock", { { "enabled", true } });
+    check (h.openPaneEditors.isEmpty(), "entering Stage closes the docked editor pane");
+    h.cmd ("launchScene", { { "sceneId", sceneId } });
+    check (h.openPaneEditors.isEmpty(), "on stage a scene never opens an editor over the set");
+
+
+    h.emits.clear();
+    h.cmd ("closeEditor", { { "partId", c } });
+    check (! h.emits.lastError().contains ("Stage Lock"), "and closing an editor is never locked out");
 }
 
 void testScan (const juce::File& stubWorker)
@@ -10392,6 +10414,20 @@ void testPerformanceSystem()
                        .getProperty ("setlist", {}).getProperty ("items", {})[0]
                        .getProperty ("plannedSeconds", 0) == 3600, "at most an hour");
             h.cmd ("setSetlistItem", { { "itemId", itemId }, { "plannedSeconds", 245 } });
+
+            juce::Thread::sleep (20);
+            h.cmd ("resetSetlistClock");
+            const auto reset = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {});
+            check ((juce::int64) (double) reset.getProperty ("startedAtMs", 0.0) > started
+                     && reset.getProperty ("startedAtMs", 0.0) == reset.getProperty ("songStartedAtMs", 1.0)
+                     && (int) reset.getProperty ("currentIndex", -1) == 0,
+                   "the clocks can restart from here without moving the song");
+            juce::Thread::sleep (20);
+            h.cmd ("setlistGo", { { "index", 0 } });
+            const auto again = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {});
+            check ((juce::int64) (double) again.getProperty ("startedAtMs", 0.0)
+                       > (juce::int64) (double) reset.getProperty ("startedAtMs", 0.0),
+                   "going to song 1 starts the set over");
         }
 
         h.emits.clear();

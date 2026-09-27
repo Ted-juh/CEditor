@@ -51,6 +51,14 @@ try {
     s.addMacro();
   });
 
+  // Build: adding a scene to the setlist says so on the scene.
+  await page.getByRole('button', { name: 'Performance', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Clips & scenes', exact: true }).click();
+  const verseRow = page.getByTestId('perf-scene').first();
+  assert.equal(await verseRow.getByTestId('scene-in-setlist').innerText(), 'in setlist');
+  await verseRow.getByTestId('scene-add-song').click();
+  assert.equal(await verseRow.getByTestId('scene-in-setlist').innerText(), 'in setlist ×2', '+ Song is acknowledged on the row');
+
   await page.getByRole('button', { name: 'Stage', exact: true }).click();
   const stage = page.getByTestId('host-stage-view');
   await stage.waitFor();
@@ -64,7 +72,8 @@ try {
   assert.equal((await state()).performance.setlist.currentIndex, 0, 'Page Down starts the set');
   assert.equal(await stage.getByTestId('stage-song-name').innerText(), 'Glass Harbour');
   assert.match(await stage.getByTestId('stage-notes-text').innerHTML(), /<mark[^>]*>INTRO<\/mark>/, 'cues in capitals stand out');
-  assert.match(await stage.getByTestId('stage-now').innerText(), /Scene\s+Verse/, 'the scene the song recalled');
+  assert.match(await stage.getByTestId('stage-now').innerText(), /Now · song 1 of 4/i);
+  assert.match(await stage.getByTestId('stage-now').innerText(), /scene\s+Verse/i, 'the scene the song recalled');
   await page.keyboard.press('ArrowRight');
   assert.equal((await state()).performance.setlist.currentIndex, 1, 'arrow right is the next song');
   await page.keyboard.press('ArrowLeft');
@@ -73,6 +82,7 @@ try {
   assert.match(await stage.getByTestId('stage-song-timer').innerText(), /^0:0[1-9]$/, 'the song timer runs');
   assert.match(await stage.getByTestId('stage-now').evaluate((el) => el.closest('main').querySelector('.stage-status').innerText), /\/ 4:05/,
     'against its planned length');
+  assert.match(await stage.getByTestId('stage-song-progress').innerText(), /^4:0\d left$/, 'and the Now panel shows how much of it is left');
 
   // Arm, then go: one tap never changes the song.
   const songs = stage.getByTestId('stage-song');
@@ -83,14 +93,28 @@ try {
   assert.equal((await state()).performance.setlist.currentIndex, 2, 'the second goes');
   await page.keyboard.press('PageUp');
 
-  // Notes size, scenes on number keys, play on Space.
+  // Numbers are songs, as the list numbers them: once arms, twice goes. Shift+number is a scene.
+  await page.keyboard.press('2');
+  assert.equal((await state()).performance.setlist.currentIndex, 1, 'from song 3, Page Up is song 2');
+  await page.keyboard.press('3');
+  assert.equal((await state()).performance.setlist.currentIndex, 1, 'one press of 3 only arms song 3');
+  assert.match(await songs.nth(2).getAttribute('class'), /armed/);
+  await page.keyboard.press('3');
+  assert.equal((await state()).performance.setlist.currentIndex, 2, 'the second goes');
+  await page.keyboard.press('1');
+  await page.keyboard.press('Enter');
+  assert.equal((await state()).performance.setlist.currentIndex, 0, 'Enter goes to the armed song');
+
+  // Notes size, scenes on Shift+number, play on Space.
   const size = () => stage.getByTestId('stage-notes-text').evaluate((el) => parseFloat(el.style.fontSize));
   const before = await size();
   await page.keyboard.press('n');
   assert.equal(await size(), before + 2, 'N makes the notes bigger');
-  await page.keyboard.press('2');
+  await page.keyboard.press('Shift+Digit2');
   const scene2 = (await state()).performance.scenes[1].sceneId;
-  assert.equal((await state()).performance.currentSceneId, scene2, 'number keys are scenes');
+  assert.equal((await state()).performance.currentSceneId, scene2, 'Shift+number keys are scenes');
+  assert.equal((await state()).performance.setlist.currentIndex, 0, 'and leave the song alone');
+  assert.match(await stage.getByTestId('stage-now').innerText(), /scene\s+Chorus/i, 'the Now panel names the scene that changed');
   await page.keyboard.press(' ');
   assert.equal((await state()).performance.transport.playing, true, 'Space plays');
   await page.keyboard.press(' ');
@@ -128,6 +152,35 @@ try {
   await page.waitForTimeout(700);
   await page.keyboard.up('p');
   assert.equal(await heldNotes(), 0, 'holding P is a panic');
+
+  // PANIC says it fired, then lets go: no ring left behind that reads as "still on".
+  const panicButton = stage.getByTestId('stage-panic');
+  await panicButton.click();
+  assert.equal(await panicButton.innerText(), 'ALL OFF');
+  assert.equal(await panicButton.evaluate((el) => document.activeElement === el), false, 'a clicked button does not keep focus');
+  await page.waitForTimeout(1400);
+  assert.equal(await panicButton.innerText(), 'PANIC');
+
+  // The clocks restart from here on a click.
+  await page.waitForTimeout(1100);
+  await stage.getByTestId('stage-reset-clock').click();
+  const clocks = (await state()).performance.setlist;
+  assert.ok(Date.now() - clocks.startedAtMs < 1000 && clocks.startedAtMs === clocks.songStartedAtMs, 'the set and song clocks restart together');
+
+  // However long the audio device's name, PANIC stays at the top right.
+  await page.evaluate(async () => {
+    const s = await import('/src/CE_Application/stores/instrumentHost.js');
+    s.hostState.update((st) => ({ ...st, audio: { ...st.audio, enabled: true, running: true,
+      deviceName: 'SteelSeries Sonar - Gaming (SteelSeries Sonar Virtual Audio Device)' } }));
+  });
+  for (const width of [1600, 1280]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const [clockBox, panicBox] = [await stage.getByTestId('stage-clock').boundingBox(), await panicButton.boundingBox()];
+    assert.ok(panicBox.y < clockBox.y + clockBox.height, `PANIC is on the clock's line at ${width} px`);
+    assert.ok(panicBox.x + panicBox.width > width - 60, `at the right edge at ${width} px`);
+  }
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await shot('status-long-device');
 
   // The layouts, and daylight contrast.
   await stage.getByTestId('stage-layout-minimal').click();

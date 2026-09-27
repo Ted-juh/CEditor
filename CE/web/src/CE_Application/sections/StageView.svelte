@@ -11,7 +11,7 @@
   import {
     hostState, hostSurface, hostMidiActivity, hostLastError, hostPanic,
     hostSurfaceLayout, hostAudioDevices, requestSurfaceLayout, requestAudioDevices,
-    setlistPrev, setlistNext, setlistGo, transportPlay, transportStop, launchScene,
+    setlistPrev, setlistNext, setlistGo, transportPlay, transportStop, launchScene, resetSetlistClock,
   } from '../stores/instrumentHost.js';
   import {
     changedSurfaceSlot, stageSetlistContext, stageSurfaceModel, surfaceSlotForMidiActivity, stageControllerContext,
@@ -39,6 +39,10 @@
   let controller = $derived(stageControllerContext($hostSurfaceLayout, $hostAudioDevices, $hostSurface, $hostState.audio.enabled));
   let currentScene = $derived(performance.scenes.find((s) => s.sceneId === performance.currentSceneId)
     ?? (setlist.current ? performance.scenes.find((s) => s.sceneId === setlist.current.sceneId) : null) ?? null);
+  // Songs take their scene's name when added, so "Scene 1 / Scene Scene 1" said the same thing
+  // twice; the scene is named only when it is not the song's own.
+  let sceneLabel = $derived(currentScene && currentScene.name !== setlist.current?.name ? currentScene.name : '');
+  let hasMacros = $derived($hostState.rack.macros.length > 0);
   let activeParts = $derived($hostState.rack.parts.filter((part) => part.hasInstrument || part.hardware || part.unresolved));
   let troubles = $derived(stageTroubles($hostState.reliability));
   let troubledParts = $derived(new Set(troubles.filter((t) => t.kind === 'note')
@@ -114,17 +118,34 @@
       event.preventDefault();
       if (event.repeat || panicHold) return;
       panicHint = true;
-      panicHold = setTimeout(() => { hostPanic(); panicHold = 'fired'; panicHint = false; }, 500);
+      panicHold = setTimeout(() => { firePanic(); panicHold = 'fired'; panicHint = false; }, 500);
       return;
     }
     if (event.repeat) return;
     if (action.kind === 'playStop') { event.preventDefault(); transport.playing ? transportStop() : transportPlay(); }
     else if (action.kind === 'next' && setlist.canNext) { event.preventDefault(); setlistNext(); }
     else if (action.kind === 'previous' && setlist.canPrevious) { event.preventDefault(); setlistPrev(); }
-    else if (action.kind === 'scene' && performance.scenes[action.index]) launchScene(performance.scenes[action.index].sceneId);
+    else if (action.kind === 'song' && setlist.items[action.index]) { event.preventDefault(); tapSong(action.index); }
+    else if (action.kind === 'go' && armed >= 0) { event.preventDefault(); tapSong(armed); }
+    else if (action.kind === 'scene' && performance.scenes[action.index]) { event.preventDefault(); launchScene(performance.scenes[action.index].sceneId); }
     else if (action.kind === 'notesSize') notesSize = Math.max(14, Math.min(40, notesSize + action.delta));
     else if (action.kind === 'disarm') armed = -1;
   }
+  // A panic says it happened: the button reads ALL NOTES OFF for a moment, then is PANIC again.
+  let panicFired = $state(false);
+  let panicFlash;
+  function firePanic() {
+    hostPanic();
+    panicFired = true;
+    clearTimeout(panicFlash);
+    panicFlash = setTimeout(() => (panicFired = false), 1200);
+  }
+  // A button clicked with the mouse lets go of focus, so it does not keep a ring that reads as
+  // "still on" (and Space, the play key, cannot press it a second time). Keyboard focus stays.
+  function releaseClickFocus(event) {
+    if (event.detail > 0) event.target?.closest?.('button')?.blur();
+  }
+
   function keyUp(event) {
     if (event.key !== 'p' && event.key !== 'P') return;
     if (panicHold && panicHold !== 'fired') clearTimeout(panicHold);
@@ -139,7 +160,7 @@
   }
   const onFullscreen = () => (fullscreen = Boolean(document.fullscreenElement));
 
-  onDestroy(() => { clearTimeout(movementTimer); clearTimeout(armTimer); clearInterval(clockTimer); if (panicHold && panicHold !== 'fired') clearTimeout(panicHold); });
+  onDestroy(() => { clearTimeout(movementTimer); clearTimeout(armTimer); clearTimeout(panicFlash); clearInterval(clockTimer); if (panicHold && panicHold !== 'fired') clearTimeout(panicHold); });
 
   const audioStatus = (audio) => {
     if (!audio.enabled) return 'Audio off';
@@ -157,16 +178,20 @@
 <svelte:window onkeydown={key} onkeyup={keyUp} />
 <svelte:document onfullscreenchange={onFullscreen} />
 
-<main class={`stage ${layout}`} class:daylight data-testid="host-stage-view">
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+<main class={`stage ${layout}`} class:daylight class:no-macros={!hasMacros} data-testid="host-stage-view" onclick={releaseClickFocus}>
   <section class="stage-status" aria-label="Performance status">
+   <div class="status-main">
     <span class="clock" data-testid="stage-clock">{clockText}</span>
-    <span class="timer" title="Since the first song of the set">set <b data-testid="stage-set-timer">{formatDuration(timers.setMs)}</b>
-      {#if timers.ahead !== null}<em class:late={timers.ahead < -5000}>{aheadText(timers.ahead)}</em>{/if}</span>
+    <button type="button" class="ctl timer" data-testid="stage-reset-clock" disabled={setlist.currentIndex < 0}
+            title="Since the first song of the set. Click to restart the set and song clocks from now."
+            onclick={() => resetSetlistClock()}>set <b data-testid="stage-set-timer">{formatDuration(timers.setMs)}</b>
+      {#if timers.ahead !== null}<em class:late={timers.ahead < -5000}>{aheadText(timers.ahead)}</em>{/if}</button>
     <span class="timer" title="Since this song began">song <b data-testid="stage-song-timer">{formatDuration(timers.songMs)}</b>{#if timers.plannedMs}
       <em class:late={timers.over}>/ {formatDuration(timers.plannedMs)}</em>{/if}</span>
     <div class="status-item" class:good={$hostState.audio.running} class:warn={$hostState.audio.xruns > 0}>
       <span class="status-dot"></span>
-      <span>{audioStatus($hostState.audio)}</span>
+      <span class="device" title={audioStatus($hostState.audio)}>{audioStatus($hostState.audio)}</span>
       {#if $hostState.audio.running && cpuHistory.length > 1}
         <svg class="spark" viewBox="0 0 80 16" aria-hidden="true"><path d={sparkPath(cpuHistory)} /></svg>
       {/if}
@@ -188,7 +213,8 @@
         <button type="button" class="ctl" aria-label="Dismiss error" onclick={() => hostLastError.set('')}>×</button>
       </span>
     {/if}
-    <span class="spacer"></span>
+   </div>
+   <div class="status-side">
     <span class="views" role="group" aria-label="Stage layout">
       {#each [['full', 'Full'], ['minimal', 'Minimal'], ['controls', 'Controls']] as [value, label] (value)}
         <button type="button" class="ctl view" aria-pressed={layout === value} data-testid={`stage-layout-${value}`}
@@ -202,15 +228,17 @@
     <span class="stage-lock" class:pending={!$hostState.stageLocked}>
       {$hostState.stageLocked ? 'STAGE LOCKED' : 'LOCKING…'}
     </span>
-    <button type="button" class="ctl stage-panic" class:hint={panicHint} data-testid="stage-panic"
-            onclick={() => hostPanic()} title="All notes off, every part. On the keyboard: hold P.">PANIC</button>
+    <button type="button" class="ctl stage-panic" class:hint={panicHint} class:fired={panicFired} data-testid="stage-panic"
+            onclick={firePanic} title="All notes off, every part, once. On the keyboard: hold P.">
+      {panicFired ? 'ALL OFF' : 'PANIC'}</button>
+   </div>
   </section>
 
   <StageTrouble {troubles} />
 
   {#if layout === 'full'}
     <nav class="set-rail" aria-label="Setlist" data-testid="stage-setlist">
-      <div class="rail-head"><span class="eyebrow">Setlist</span>
+      <div class="rail-head"><span class="eyebrow">Songs</span>
         <span class="count">{setlist.currentIndex >= 0 ? `${setlist.currentIndex + 1} / ${setlist.items.length}` : `${setlist.items.length} songs`}</span></div>
       <div class="songs">
         {#each setlist.items as item, index (item.itemId)}
@@ -232,11 +260,12 @@
 
   <section class="hero" aria-label="Now playing" data-testid="stage-now">
     <div class="hero-main">
-      <span class="eyebrow now-label">NOW{setlist.currentIndex >= 0 ? ` · ${setlist.currentIndex + 1} OF ${setlist.items.length}` : ''}</span>
+      <span class="eyebrow now-label">{setlist.currentIndex >= 0 ? `Now · song ${setlist.currentIndex + 1} of ${setlist.items.length}` : 'Now'}</span>
       <strong class="song-name" data-testid="stage-song-name">{setlist.current ? setlist.current.name : setlist.items.length ? 'Ready' : 'No setlist'}</strong>
       <span class="scene-line">
         {#if setlist.current && setlist.loadingIndex === setlist.currentIndex}Loading rig…
-        {:else if currentScene}Scene <b>{currentScene.name}</b>{#if performance.snapshotMorph.active} · morphing {Math.round(performance.snapshotMorph.progress * 100)}%{/if}
+        {:else if sceneLabel}<span class="tag">Scene</span> <b>{sceneLabel}</b>{#if performance.snapshotMorph.active} · morphing {Math.round(performance.snapshotMorph.progress * 100)}%{/if}
+        {:else if performance.snapshotMorph.active}Morphing {Math.round(performance.snapshotMorph.progress * 100)}%
         {:else if !setlist.current}{setlist.items.length ? 'Press Next, → or Page Down to begin' : 'Add scenes in Build mode'}{/if}
       </span>
     </div>
@@ -253,6 +282,13 @@
       <span class="clock-src" class:warn={transport.clockLost}>
         {transport.externalClock ? (transport.clockLost ? 'NO CLOCK' : 'EXT CLOCK') : 'INTERNAL'}</span>
     </div>
+    {#if timers.plannedMs > 0}
+      <!-- The song against its planned length: how much is left, or how far over. -->
+      <div class="song-progress" class:over={timers.over} data-testid="stage-song-progress">
+        <span class="bar"><i style={`width:${Math.min(100, (timers.songMs / timers.plannedMs) * 100)}%`}></i></span>
+        <span class="left">{timers.over ? `${formatDuration(-timers.songLeftMs)} over` : `${formatDuration(timers.songLeftMs)} left`}</span>
+      </div>
+    {/if}
     {#if blocks.playing && layout !== 'minimal'}
       <div class="arrangement" data-testid="stage-arrangement">
         <div class="blocks">
@@ -268,10 +304,12 @@
   </section>
 
   <section class="next-card" aria-label="Next song" data-testid="stage-next">
-    <span class="eyebrow next-label">NEXT</span>
+    <span class="eyebrow next-label">Next song</span>
     {#if setlist.next}
       <strong class="next-name">{setlist.next.name}</strong>
-      <span class="next-meta">{setlist.next.sceneName || 'Scene'}{setlist.next.tempo > 0 ? ` · ${Math.round(setlist.next.tempo)} BPM` : ''}{setlist.next.plannedSeconds > 0 ? ` · ${formatDuration(setlist.next.plannedSeconds * 1000)}` : ''}</span>
+      <span class="next-meta">{[setlist.next.sceneName && setlist.next.sceneName !== setlist.next.name ? `Scene ${setlist.next.sceneName}` : '',
+        setlist.next.tempo > 0 ? `${Math.round(setlist.next.tempo)} BPM` : '',
+        setlist.next.plannedSeconds > 0 ? formatDuration(setlist.next.plannedSeconds * 1000) : ''].filter(Boolean).join(' · ')}</span>
       {#if setlist.nextReadiness}
         <span class="next-readiness" class:ready={setlist.nextReadiness.state === 'ready'}
               class:warn={setlist.nextReadiness.state === 'warning'} role="status"
@@ -313,7 +351,7 @@
     <StageRig parts={activeParts} macros={$hostState.rack.macros} {troubledParts} show="macros" />
   {/if}
 
-  <span class="keys-help" aria-hidden="true">Space play · → next · ← previous · 1–8 scenes · hold P panic · N notes size</span>
+  <span class="keys-help" aria-hidden="true">→ ← songs · 1–9 pick a song (twice) · Shift+1–8 scenes · Space play · hold P panic · N notes size</span>
 </main>
 
 <style>
@@ -343,6 +381,9 @@
     grid-template-areas: 'status status' 'trouble trouble' 'hero hero' 'next notes' 'help help'; }
   .stage.controls { grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
     grid-template-areas: 'status status' 'trouble trouble' 'hero next' 'controls controls' 'macros macros' 'help help'; }
+  /* No macros: the parts take the row, and the controls the rest of the Controls layout. */
+  .stage.full.no-macros { grid-template-areas: 'status status status' 'trouble trouble trouble' 'rail hero next' 'rail hero notes' 'rail controls controls' 'rail parts parts' 'help help help'; }
+  .stage.controls.no-macros { grid-template-areas: 'status status' 'trouble trouble' 'hero next' 'controls controls' '. .' 'help help'; }
   .stage-status { grid-area: status; }
   .stage :global(.trouble) { grid-area: trouble; }
   .set-rail { grid-area: rail; }
@@ -360,10 +401,18 @@
     background: var(--stage-panel); border: 1px solid var(--stage-line-soft); border-radius: 10px; padding: 12px; min-width: 0; min-height: 0; box-sizing: border-box; }
   .eyebrow { font: 700 11px var(--stage-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--stage-dim); }
 
-  .stage-status { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-width: 0; padding: 8px 12px;
+  /* The readings wrap among themselves; the layout buttons, the lock and PANIC never leave the
+     top right, however long the audio device's name is. */
+  .stage-status { display: flex; align-items: flex-start; gap: 14px; min-width: 0; padding: 8px 12px;
                   background: var(--stage-panel); border: 1px solid var(--stage-line-soft); border-radius: 10px;
                   font: 13px var(--stage-mono); color: var(--stage-soft); }
+  .status-main { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 42px; }
+  .status-side { flex: none; display: flex; align-items: center; gap: 10px; }
+  .device { max-width: 260px; }
   .clock { font-size: 22px; font-weight: 700; color: var(--stage-text); }
+  button.timer { font: inherit; color: inherit; background: none; border: 1px solid transparent; border-radius: 5px; padding: 2px 5px; margin: -3px -5px; cursor: pointer; }
+  button.timer:hover:not(:disabled) { border-color: var(--stage-line); }
+  button.timer:disabled { cursor: default; }
   .timer b { color: var(--stage-text); }
   .timer em { font-style: normal; color: var(--stage-dim); margin-left: 4px; }
   .timer em.late { color: var(--stage-warn); }
@@ -378,7 +427,6 @@
   .stage-error { display: inline-flex; align-items: center; gap: 6px; max-width: 420px; color: var(--stage-warn); }
   .stage-error > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .stage-error button { background: none; border: 0; color: inherit; font-size: 16px; cursor: pointer; }
-  .spacer { flex: 1; }
   .views { display: inline-flex; gap: 2px; padding: 2px; background: var(--stage-field); border: 1px solid var(--stage-line-soft); border-radius: 6px; }
   button.view { font: 600 12px var(--stage-font); padding: 5px 9px; border: 0; border-radius: 4px; background: transparent; color: var(--stage-soft); cursor: pointer; }
   button.view[aria-pressed='true'] { background: var(--stage-now-surface); color: var(--stage-now); box-shadow: inset 0 0 0 1px var(--stage-now-deep); }
@@ -386,7 +434,9 @@
   .stage-lock.pending { color: var(--stage-dim); border-color: var(--stage-line); }
   button.stage-panic { font: 800 17px var(--stage-font); letter-spacing: .08em; color: #fff; background: var(--stage-panic); border: 0;
                        border-radius: 7px; padding: 10px 20px; cursor: pointer; box-shadow: 0 0 0 2px #ff4d4d55; }
+  button.stage-panic { min-width: 118px; }
   button.stage-panic.hint { box-shadow: 0 0 0 4px #ff4d4daa; }
+  button.stage-panic.fired { background: #fff; color: var(--stage-panic); box-shadow: 0 0 0 4px var(--stage-panic); }
 
   .set-rail { display: flex; flex-direction: column; gap: 6px; }
   .rail-head { display: flex; justify-content: space-between; align-items: center; }
@@ -408,19 +458,21 @@
   .rail-foot { font: 12px var(--stage-mono); color: var(--stage-dim); }
   .empty { color: var(--stage-dim); font-size: 13px; }
 
-  .hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 22px; align-content: start; }
+  /* The song name grows with the room it has: a wall screen gets a wall-sized name. */
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 22px; align-content: center; container-type: inline-size; }
   .hero-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .now-label { color: var(--stage-now); }
-  .song-name { font-size: 60px; line-height: 1.02; font-weight: 800; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .stage.minimal .song-name { font-size: 96px; }
+  .song-name { font-size: clamp(44px, 9cqw, 200px); line-height: 1.02; font-weight: 800; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stage.minimal .song-name { font-size: clamp(56px, 11cqw, 240px); }
   .stage.minimal .hero { align-content: center; }
   .scene-line { font-size: 20px; color: var(--stage-soft); }
   .scene-line b { color: var(--stage-now); }
+  .scene-line .tag { font: 700 12px var(--stage-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--stage-dim); vertical-align: middle; }
   .hero-tempo { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
   button.play { width: 58px; height: 58px; border-radius: 50%; border: 2px solid var(--stage-live); background: transparent; color: var(--stage-live); font-size: 22px; cursor: pointer; }
   button.play.playing { background: var(--stage-live); color: #04140a; }
-  .bpm { font: 700 54px var(--stage-mono); line-height: 1; }
-  .stage.minimal .bpm { font-size: 80px; }
+  .bpm { font: 700 clamp(44px, 4.5cqw, 96px) var(--stage-mono); line-height: 1; }
+  .stage.minimal .bpm { font-size: clamp(56px, 6.5cqw, 140px); }
   .bpm small { font-size: 16px; color: var(--stage-dim); margin-left: 4px; }
   .pos { font: 600 22px var(--stage-mono); color: var(--stage-soft); }
   .beats { display: flex; gap: 8px; }
@@ -430,6 +482,12 @@
   .stage.daylight .beats i.on.one { background: var(--stage-now); border-color: var(--stage-now); }
   .clock-src { font: 700 11px var(--stage-mono); letter-spacing: .1em; color: var(--stage-dim); }
   .clock-src.warn { color: var(--stage-warn); }
+  .song-progress { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+  .song-progress .bar { flex: 1; height: 12px; border-radius: 6px; background: var(--stage-raised); overflow: hidden; }
+  .song-progress .bar i { display: block; height: 100%; background: var(--stage-now); border-radius: 6px; }
+  .song-progress .left { font: 700 20px var(--stage-mono); color: var(--stage-soft); white-space: nowrap; }
+  .song-progress.over .bar i { background: var(--stage-warn); }
+  .song-progress.over .left { color: var(--stage-warn); }
   .arrangement { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 5px; }
   .blocks { display: flex; gap: 3px; height: 30px; }
   .block { position: relative; overflow: hidden; border-radius: 4px; background: var(--stage-raised); display: flex; align-items: center; padding-left: 8px; min-width: 0; }
@@ -474,6 +532,8 @@
       grid-template-areas: 'status' 'trouble' 'hero' 'next' 'notes' 'rail' 'controls' 'parts' 'macros'; }
     .song-name, .stage.minimal .song-name { font-size: 40px; }
     .bpm, .stage.minimal .bpm { font-size: 40px; }
+    .stage-status { flex-wrap: wrap; }
+    .status-side { margin-left: auto; }
     .hero { grid-template-columns: minmax(0, 1fr); }
     .hero-tempo { align-items: flex-start; }
     .keys-help { display: none; }

@@ -102,13 +102,21 @@ export function pushHistory(history = [], value, size = 60) {
   return next.length > size ? next.slice(next.length - size) : next;
 }
 
-/** The stage keys, as one table the screen and its help line both read. */
+/** The stage keys, as one table the screen and its help line both read. Numbers are songs,
+ * as numbered in the set list (tap twice to go, like the list); with Shift they are scenes.
+ * The digit is read from the key's position, since Shift+1 types "!" on most layouts. */
 export function stageKeyAction(event) {
   const key = event.key;
   if (key === ' ') return { kind: 'playStop' };
   if (key === 'ArrowRight' || key === 'PageDown') return { kind: 'next' };
   if (key === 'ArrowLeft' || key === 'PageUp') return { kind: 'previous' };
-  if (/^[1-8]$/.test(key)) return { kind: 'scene', index: Number(key) - 1 };
+  const digit = /^(?:Digit|Numpad)([1-9])$/.exec(event.code ?? '')?.[1] ?? (/^[1-9]$/.test(key) ? key : null);
+  if (digit) {
+    const index = Number(digit) - 1;
+    if (event.shiftKey) return index < 8 ? { kind: 'scene', index } : null;
+    return { kind: 'song', index };
+  }
+  if (key === 'Enter') return { kind: 'go' };
   if (key === 'p' || key === 'P') return { kind: 'panicHold' };
   if (key === 'n' || key === 'N') return { kind: 'notesSize', delta: event.shiftKey ? -2 : 2 };
   if (key === 'Escape') return { kind: 'disarm' };
