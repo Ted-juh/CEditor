@@ -75,6 +75,8 @@ export default defineConfig(({ command }) => ({
       allow: [
         searchForWorkspaceRoot(process.cwd()),
         fileURLToPath(new URL('../../tools/ctrl49', import.meta.url)),
+        // The XML reader the SVG panel importer shares with the Ctrlr importer.
+        fileURLToPath(new URL('../../tools/ctrlr-import', import.meta.url)),
       ],
     },
     headers: {

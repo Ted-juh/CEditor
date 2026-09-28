@@ -38,6 +38,7 @@
   import { clearSelection } from '../stores/panels.js';
   import { requestPropertiesTab } from '../stores/propertiesTab.js';
   import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
+  import { newPanelFromSvgArtwork } from '../stores/svgPanelImportActions.js';
   import WorkspacePicker from './WorkspacePicker.svelte';
 
   // Menu state predicates, evaluated when a dropdown opens. A menu item that
@@ -154,6 +155,9 @@
       // range, its choices and the bytes to send, and until this existed the only way to get that
       // onto a screen was to place and bind every control by hand.
       { type: 'submenu', label: 'New Panel from Device Profile', items: generateFromProfileItems },
+      // Panel artwork is drawn in a vector editor; the placeholders in its "components" layer say
+      // where every control goes. utils/svgPanelImport.js has the convention.
+      { label: 'New Panel from SVG Artwork...', action: () => newPanelFromSvgArtwork() },
       { type: 'submenu', label: 'Open Recent', enabled: () => recentGroups.length > 0, items: recentSubmenuItems },
       { type: 'separator' },
       { label: 'New Custom Component', action: () => newCustomComponent() },
