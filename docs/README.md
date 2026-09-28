@@ -23,6 +23,10 @@ system, lived in `CE/web/src/CE_Application/docs/` and were deleted with the res
   Update Panel from SVG Artwork (a revised drawing, without losing the panel's work), Edit ›
   Create Component from Selection (artwork into a reusable linked component), and the
   Source card that diffs, updates, resets and detaches a placed library component.
+- [Moving, resizing and checking components at every size](canvas-and-component-sizes.md) —
+  what the panel canvas snaps to while you move, resize and group-resize (rotation included), and
+  the Component Designer's States × sizes sheet, which draws every state at five sizes and says
+  where the layout breaks.
 - [Panel text style](property-hints.md) — the rules for user-facing strings: property hints,
   tooltips, and the notes in the panel body.
 - [The display components, filled and moving](display-gallery.md) — five recordings of the

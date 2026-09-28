@@ -67,6 +67,7 @@
   import CustomGeneratorsEditor from './CustomGeneratorsEditor.svelte';
   import CustomArpeggiatorEditor from './CustomArpeggiatorEditor.svelte';
   import CustomStateFilmstrip from './CustomStateFilmstrip.svelte';
+  import CustomContactSheet from './CustomContactSheet.svelte';
   import SurfaceToolStrip from './SurfaceToolStrip.svelte';
   import SurfaceBottomBar from './SurfaceBottomBar.svelte';
   import SurfacePalette from './SurfacePalette.svelte';
@@ -362,6 +363,7 @@
   let inlineTextEditLayer = $state('');
   let inspectorTab = $state('object');
   let filmstripCollapsed = $state(false);
+  let contactSheetOpen = $state(false);
   // Pane visibility toggles (mirrors the normal editor's bottom-left icons).
   let paletteCollapsed = $state(false);
   let dockHidden = $state(false);
@@ -3956,7 +3958,11 @@
       {duplicateStateCard}
       {removeStateCard}
       {addQuickState}
+      onOpenContactSheet={() => { contactSheetOpen = true; }}
     />
+    {/if}
+    {#if contactSheetOpen}
+      <CustomContactSheet {control} {preview} onPickState={(name) => { selectStateCard(name); contactSheetOpen = false; }} onClose={() => { contactSheetOpen = false; }} />
     {/if}
 
     <SurfaceContextMenu

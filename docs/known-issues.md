@@ -225,6 +225,30 @@ its first binding. `utils/parameterStatus.js` `parameterEntries` now gives a com
 bound channel; the first keeps the control's id, so the GAIA panel's 277 items are unchanged, and a
 further channel is `controlId::channel`. `parameterStatus.test.js` pins it.
 
+## A custom component's variants are never applied
+
+*(Found 2026-09-28, while building the States × sizes sheet.)*
+
+The Component Designer's **Publish › Variants** tab lets a component define named variants
+(Compact, Dark, Light, Vertical…), and the instance **Properties** tab lets each placed copy pick
+one (`Variants.active`). Nothing that draws a component reads either. `interactionRuntime.js`
+applies states, bindings and internal scale; the materializer applies generators; neither looks at
+`Variants`, and neither the panel renderer nor the C++ player does. Picking a variant changes the
+document and nothing on screen. The Linked components update does keep the chosen variant, which
+is right, but it is currently keeping a choice that has no effect.
+
+The built-in presets would not work even if they were applied. They write to paths components do
+not have: a part's scale and rotation live at `Parts.<name>.Layout.scale`/`.rotation`, not
+`.Transform.*`, and a patch to a path that does not exist is silently dropped; and
+`Designer.width`/`height` are not what sizes a component.
+
+The fix is not large, but it spans every place a component is drawn: apply the active variant's
+patches in `resolveInteractiveControl` before the states, the same way a state is applied, then
+teach the C++ player and the exporter the same thing. The presets also need to target real paths.
+Until then, variants are left off the States × sizes sheet
+([canvas-and-component-sizes.md](canvas-and-component-sizes.md)), which would otherwise show every
+variant looking the same.
+
 ## Compiler-free plugin export
 
 The installed exporter supports VST3. CLAP and LV2 templates are skipped because their wrappers
