@@ -210,6 +210,22 @@ longer triggers a filesystem read. Invalid package shapes show a visible error, 
 current panel and do not open an extra tab. Tests also cover nested artwork and missing assets;
 the walkthrough is not evidence for every asset format or a second computer.
 
+## A multi-channel custom component exports every channel with the FIRST channel's device binding
+
+Found 2026-09-28 while scoping "convert knobs into a component". `exportParameters.js` computes one
+device wire per control (`deviceWireFor`, the first `deviceParameter` binding, else the first
+sendable MIDI binding) and spreads it onto EVERY public channel's host parameter. It never looks at
+which channel each binding's `port` names. A component whose two channels are bound to two synth
+parameters therefore exports two host lanes that both drive the first parameter. The live editor
+routes correctly (`deviceBindingSync.js` indexes each binding by port); only the exported plugin's
+window-closed path is wrong. Single-channel components, and multi-channel components with at most
+one binding, are unaffected.
+
+The fix is to choose the wire per channel: the binding whose `port` is that channel's name, else
+none. The Parameters editor (`PanelPreviewSurface.svelte` `parameterItem`) and
+`utils/parameterStatus.js` also show one item per control from its first binding, and would want the
+same per-port treatment.
+
 ## Compiler-free plugin export
 
 The installed exporter supports VST3. CLAP and LV2 templates are skipped because their wrappers

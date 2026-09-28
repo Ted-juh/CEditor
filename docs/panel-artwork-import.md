@@ -153,7 +153,7 @@ the reason. Nothing is converted partly.
 
 | Refused, with the reason given | Why |
 |---|---|
-| Knobs, sliders, buttons and other controls with a value | Their look is drawn from their behaviour settings, which component parts can't reproduce. They also carry bindings. This is the next step. |
+| Knobs, sliders, buttons and other controls with a value | Their look is drawn from their behaviour settings, which component parts can't reproduce, and converting them would change their host-automation identity. Deliberately not supported; see below. |
 | A control a script mentions | The component can't keep the name the script uses. The script and line are named. |
 | Text wider than its box, or on more than one line | The panel wraps it; a component would not. |
 | Underline, strikethrough, text aligned to the top or bottom, an icon, a lamp, effects, scaling | The component would draw them differently. |
@@ -167,3 +167,24 @@ after with the editor's own renderer and compare them pixel by pixel.
 
 Undo puts the controls back. The saved component stays in the library, where you can remove it from
 the Library tab.
+
+### Why controls with a value are not converted
+
+Converting knobs, sliders and buttons was scoped and deliberately paused (2026-09-28), for reasons
+that belong in writing so the idea is not re-attempted blind:
+
+- **It breaks DAW automation for shipped panels.** A host parameter's id comes from the control:
+  knob `cutoff` exports as `cutoff.value`; as channel `cutoff` inside component `Filter` it becomes
+  `Filter.cutoff`, and every saved DAW session automating it loses the lane
+  (`utils/exportParameters.js`, `paramFromBehavior` versus `paramFromChannel`).
+- **Its look can only be rebuilt, not kept.** A panel knob is drawn procedurally from its
+  Behavior (SliderFamilyRenderer); parts can approximate it with arcs and a pointer, not reproduce it.
+- **Momentary buttons have no equivalent.** Component hit zones can toggle or cycle a channel;
+  none resets one on release.
+- **A value control is referenced from many places**, not only scripts: routes, LCD and display
+  sources, envelope stage sources, snapshots, exclusive button groups, the explicit export list.
+- **Multi-channel export has a binding bug** (known-issues.md), which several converted controls in
+  one component would hit.
+
+Artwork components plus ordinary controls placed beside them (and Duplicate for the whole group)
+already give reusable modules without any of this.
