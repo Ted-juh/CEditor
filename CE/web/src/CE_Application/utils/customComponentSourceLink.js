@@ -569,3 +569,105 @@ export function detachCustomComponentPatch() {
     'Designer.packageImportedAt': '',
   };
 }
+
+// ---------------------------------------------------------------------------------------------------
+// Push: this copy's design, back to the library as the next version
+
+/** The next minor version no entry in `versions` has: 1.2.0 → 1.3.0, skipping any already taken. */
+export function nextPackageVersion(versions = []) {
+  const taken = new Set(versions.map((entry) => String(entry?.version ?? '')));
+  const newest = [...versions].sort((a, b) => compareVersions(b?.version, a?.version))[0]?.version ?? '1.0.0';
+  const [major = 1, minor = 0] = versionParts(newest);
+  let next = minor + 1;
+  while (taken.has(`${major}.${next}.0`)) next += 1;
+  return `${major}.${next}.0`;
+}
+
+/**
+ * The component a push saves: this copy's DESIGN on top of the library version it came from.
+ *
+ * Push is only offered when the report says 'edited' — the copy has design edits and the library has
+ * not moved on — so the base IS the latest, and nothing in the library is lost by saving over it. What
+ * belongs to the copy stays the copy's: its position and size, name, layer, addressable name, device
+ * bindings, panel routes, variant, and the published values it set (a label, an accent). The package
+ * keeps its own for all of those, so pushing one copy's edits does not make its CUTOFF legend every
+ * copy's default.
+ *
+ * Returns `{ component, version, metadata }`, or `{ refused }` saying why not.
+ */
+export function pushCustomComponentToSource(control, report) {
+  if (!control?._children) return { refused: 'Nothing to save.' };
+  if (report?.status !== 'edited' || !report.base?.component?._children) {
+    return {
+      refused: report?.status === 'diverged'
+        ? 'The library has a newer version too. Update this copy (or reset it) first, so its changes are not saved over the library\'s.'
+        : 'This copy has no design edits of its own to save.',
+    };
+  }
+  const base = report.base.component._children;
+  const component = deepClone(control);
+  const children = component._children;
+
+  // Instance fields: the package's own, not this copy's.
+  for (const key of INSTANCE_CORE_KEYS) {
+    if (base.Core && key in base.Core) children.Core[key] = deepClone(base.Core[key]);
+    else delete children.Core[key];
+  }
+  children.Transform = { ...(children.Transform ?? {}), _type: 'Transform' };
+  for (const key of INSTANCE_TRANSFORM_KEYS) {
+    if (base.Transform && key in base.Transform) children.Transform[key] = deepClone(base.Transform[key]);
+  }
+  if (base.DeviceBindings) children.DeviceBindings = deepClone(base.DeviceBindings);
+  else delete children.DeviceBindings;
+  if (children.ExternalAPI) {
+    children.ExternalAPI = { ...children.ExternalAPI, addressableName: base.ExternalAPI?.addressableName ?? '' };
+  }
+  if (base.Children) children.Children = deepClone(base.Children);
+  else delete children.Children;
+  if (children.Variants && base.Variants && 'active' in base.Variants) children.Variants.active = base.Variants.active;
+  if (children.Links?._children) {
+    const own = Object.fromEntries(Object.entries(children.Links._children).filter(([, link]) => !isPanelRouteLink(link)));
+    const theirs = Object.fromEntries(Object.entries(base.Links?._children ?? {}).filter(([, link]) => isPanelRouteLink(link)));
+    children.Links = { ...children.Links, _children: { ...own, ...theirs } };
+  }
+
+  // Published values: the package's defaults, not what this copy set them to.
+  const baseFlat = flattenControl(report.base.component);
+  for (const path of publishedOverridePaths(control)) {
+    for (const [leaf] of flattenControl(component)) {
+      if (leaf !== path && !leaf.startsWith(`${path}.`)) continue;
+      if (baseFlat.has(leaf)) setAtPath(component, leaf, baseFlat.get(leaf));
+    }
+  }
+  for (const [name, channel] of Object.entries(children.ValueChannels?._children ?? {})) {
+    const leaf = `ValueChannels.${name}.currentValue`;
+    if (channel && baseFlat.has(leaf)) channel.currentValue = deepClone(baseFlat.get(leaf));
+  }
+
+  // Designer: no provenance of its own — the export stamps the package's.
+  if (children.Designer) {
+    for (const key of ['packageName', 'packageVersion', 'packageId', 'packageFingerprint', 'packageImportedAt', 'sourcePackage']) {
+      delete children.Designer[key];
+    }
+  }
+
+  const version = nextPackageVersion(report.versions ?? []);
+  const metadata = { ...(report.latest?.envelope?.metadata ?? {}), version };
+  return { component, version, metadata };
+}
+
+/**
+ * Re-point a copy at a library entry without changing anything else about it — used after a push,
+ * when the copy's design IS that entry's. Returns a patch for `applyControlPatch`.
+ */
+export function relinkCustomComponentPatch(control, entry, importedAt = new Date().toISOString()) {
+  const designer = stampProvenance({ ...(control?._children?.Designer ?? {}) }, entry, importedAt);
+  return {
+    'Designer.packageName': designer.packageName,
+    'Designer.packageVersion': designer.packageVersion,
+    'Designer.packageId': designer.packageId,
+    'Designer.packageFingerprint': designer.packageFingerprint,
+    'Designer.packageImportedAt': designer.packageImportedAt,
+    'Designer.sourcePackage': designer.sourcePackage,
+  };
+}

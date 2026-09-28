@@ -263,3 +263,60 @@ test('flattening reads through _children the way valueAtPath does', () => {
   assert.equal(flat.get('Parts.label.Text.content'), 'CIRCULAR');
   assert.equal(flat.has('ValueChannels.mainValue.defaultValue'), true);
 });
+
+// --- Push: this copy's design back to the library ---------------------------------------------------
+
+import {
+  nextPackageVersion, pushCustomComponentToSource, relinkCustomComponentPatch,
+} from '../src/CE_Application/utils/customComponentSourceLink.js';
+
+test('the next version is the next free minor', () => {
+  assert.equal(nextPackageVersion([{ version: '1.0.0' }]), '1.1.0');
+  assert.equal(nextPackageVersion([{ version: '1.0.0' }, { version: '1.1.0' }, { version: '1.2.0' }]), '1.3.0');
+  assert.equal(nextPackageVersion([]), '1.1.0');
+});
+
+test('a push saves the copy\'s design, and keeps its placement, bindings and published values its own', () => {
+  const v1 = entryFor(slider(), { version: '1.0.0' });
+  const copy = place(v1, 300, 40);
+  copy._children.Core.name = 'CutoffDial';
+  copy._children.Parts._children.label._children.Text.content = 'CUTOFF';
+  copy._children.DeviceBindings = { _type: 'DeviceBindings', bindings: [{ kind: 'deviceParameter', parameterId: 'cutoff' }] };
+  tint(copy);                                              // the design edit worth sharing
+
+  const report = diffCustomComponentAgainstSource(copy, [v1]);
+  assert.equal(report.status, 'edited');
+  const pushed = pushCustomComponentToSource(copy, report);
+  assert.equal(pushed.refused, undefined);
+  assert.equal(pushed.version, '1.1.0');
+  const c = pushed.component._children;
+  assert.equal(c.Parts._children.dialTrack.meta.tint, 'FFFF0000', 'the edit goes to the library');
+  assert.equal(c.Parts._children.label._children.Text.content, v1.component._children.Parts._children.label._children.Text.content, 'this copy\'s legend does not become the default');
+  assert.equal(c.Core.name, v1.component._children.Core.name);
+  assert.equal(c.Transform.x, v1.component._children.Transform.x);
+  assert.notEqual(c.DeviceBindings?.bindings?.[0]?.parameterId, 'cutoff', 'this copy\'s binding stays with it');
+  assert.equal(c.Designer.sourcePackage, undefined);
+
+  // Saved, the copy is re-pointed at it and reads as up to date, legend and all.
+  const v2 = entryFor(pushed.component, pushed.metadata);
+  assert.equal(v2.version, '1.1.0');
+  const relinked = clone(copy);
+  for (const [path, value] of Object.entries(relinkCustomComponentPatch(copy, v2))) {
+    relinked._children.Designer[path.split('.')[1]] = value;
+  }
+  const after = diffCustomComponentAgainstSource(relinked, [v2, v1]);
+  assert.equal(after.status, 'current');
+  assert.deepEqual(after.overrides.map((row) => row.path), ['Parts.label.Text.content']);
+
+  // Another copy from 1.0.0 is now offered the pushed edit.
+  assert.equal(diffCustomComponentAgainstSource(place(v1, 10, 10), [v2, v1]).status, 'update');
+});
+
+test('a push is refused when the library has moved on, or when there is nothing to push', () => {
+  const { v1, v2 } = newerVersion((c) => { tint(c); });
+  const edited = place(v1);
+  edited._children.Parts._children.pointer.hidden = true;
+  assert.match(pushCustomComponentToSource(edited, diffCustomComponentAgainstSource(edited, [v2, v1])).refused, /newer version/);
+  const clean = place(v1);
+  assert.match(pushCustomComponentToSource(clean, diffCustomComponentAgainstSource(clean, [v1])).refused, /no design edits/);
+});

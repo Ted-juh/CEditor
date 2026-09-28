@@ -20,6 +20,7 @@
   import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
   import Unlink from 'lucide-svelte/icons/unlink';
   import Layers from 'lucide-svelte/icons/layers';
+  import Upload from 'lucide-svelte/icons/upload';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { activePanel } from '../stores/panels.js';
   import { applyControlPatch, replaceControlsById } from '../stores/controls.js';
@@ -29,7 +30,9 @@
     detachCustomComponentPatch,
     diffCustomComponentAgainstSource,
     packageFamily,
+    pushCustomComponentToSource,
     rebaseCustomComponentOnSource,
+    relinkCustomComponentPatch,
   } from '../utils/customComponentSourceLink.js';
 
   let { control = null } = $props();
@@ -110,6 +113,17 @@
       + (blocked.length ? ` · ${blocked.length} left alone: they have edits of their own` : '');
   }
 
+  let pushPlan = $derived(report?.status === 'edited' ? pushCustomComponentToSource(control, report) : null);
+
+  function push() {
+    confirming = '';
+    if (!pushPlan || pushPlan.refused) { status = pushPlan?.refused ?? 'Nothing to save.'; return; }
+    const entry = customComponentLibrary.saveControl(pushPlan.component, pushPlan.metadata);
+    if (!entry) { status = 'Could not save to the library.'; return; }
+    applyControlPatch(controlId, relinkCustomComponentPatch(control, entry));
+    status = `Saved as ${entry.name} ${entry.version} — other copies can update to it`;
+  }
+
   function detach() {
     confirming = '';
     applyControlPatch(controlId, detachCustomComponentPatch());
@@ -175,6 +189,11 @@
           <RefreshCw size={13} /> Update to {report.latest.version}…
         </button>
       {/if}
+      {#if pushPlan && !pushPlan.refused}
+        <button type="button" class="act primary" onclick={() => ask('push')}>
+          <Upload size={13} /> Save to library as {pushPlan.version}…
+        </button>
+      {/if}
       {#if report.latest && report.status !== 'current'}
         <button type="button" class="act" onclick={() => ask('reset')}>
           <RotateCcw size={13} /> Reset to library
@@ -199,6 +218,11 @@
       <div class="confirm">
         <span>Returns this copy to library {report.latest?.version} exactly. Keeps position, name, bindings and panel routes; discards {report.overrides.length} published value{report.overrides.length === 1 ? '' : 's'} and {report.localEdits} design edit{report.localEdits === 1 ? '' : 's'}.</span>
         <button type="button" class="act warn" onclick={() => apply({ discardLocalEdits: true, keepOverrides: false })}>Reset</button>
+      </div>
+    {:else if confirming === 'push'}
+      <div class="confirm">
+        <span>Saves this copy's {report.localEdits} design edit{report.localEdits === 1 ? '' : 's'} as {source.name} {pushPlan?.version}. Its position, name, bindings and published values stay its own. Other copies on the panel can then update to it.</span>
+        <button type="button" class="act primary" onclick={push}>Save</button>
       </div>
     {:else if confirming === 'detach'}
       <div class="confirm">

@@ -105,7 +105,7 @@ A custom component placed from the library remembers which package and version i
 |---|---|---|
 | Up to date | Same design as the library version it came from | Detach |
 | Update available | The library has a newer version, and this copy has no design edits | **Update**, Reset, Detach |
-| Edited on this copy | This copy's design was changed; the library has nothing newer | Reset, Detach |
+| Edited on this copy | This copy's design was changed; the library has nothing newer | **Save to library** as the next version, Reset, Detach |
 | Library changed · copy edited | Both | Update (asks first), Reset, Detach |
 | Not in this library | The package it came from is not saved here | Detach |
 
@@ -119,6 +119,13 @@ are and needs a second click to go ahead.
 
 **Update N copies on panel** updates every copy of the same package on the panel that can be
 updated without losing anything, as one undo step. It leaves the others alone and says how many.
+
+**Save to library as X.Y.Z** writes this copy's design edits back as the package's next version
+(1.0.0 → 1.1.0; an existing version is never overwritten), then links the copy to it. Its position,
+name, bindings and published values (its legend, say) stay its own, not the new default. Other
+copies on the panel are then offered the update. It's only offered while the library hasn't moved on
+since the copy was placed; otherwise update or reset first, so the library's newer changes aren't
+saved over.
 
 **Reset to library** returns a copy to the library version exactly, keeping only placement and wiring.
 **Detach** keeps the component as it is and stops it tracking the library.

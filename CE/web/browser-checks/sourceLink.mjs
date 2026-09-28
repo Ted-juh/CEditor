@@ -120,6 +120,43 @@ assert.equal(await ev(() => window.__src.version('ctrl_c')), '1.0.0');
 assert.equal(await ev(() => window.__src.visible0('ctrl_c')), false);
 assert.equal(await ev(() => window.__src.version('ctrl_b')), '1.1.0', 'and only the last one');
 
+// --- Push -------------------------------------------------------------------------------------
+
+await ev(() => window.__src.select('ctrl_b'));
+await settle();
+await ev(() => window.__src.editDesign('ctrl_b'));
+await settle();
+check('a copy edited while the library stands still offers to save its edit as the next version', async () => {});
+assert.equal(await ev(() => window.__src.pill()), 'Edited on this copy');
+assert.ok((await ev(() => window.__src.buttons())).some((label) => label.startsWith('Save to library as 1.2.0')));
+
+await ev(() => window.__src.press('Save to library'));
+await settle();
+check('saving asks first, and says what stays with the copy', async () => {});
+assert.match(await ev(() => window.__src.confirmText()), /Saves this copy's 1 design edit as Dial 1\.2\.0\. Its position, name, bindings and published values stay its own/);
+assert.deepEqual(await ev(() => window.__src.libraryVersions()), ['1.0.0', '1.1.0'], 'nothing saved yet');
+
+await ev(() => window.__src.confirm());
+await settle();
+check('saved: the library has 1.2.0, and this copy is up to date with it, legend and all', async () => {});
+assert.deepEqual(await ev(() => window.__src.libraryVersions()), ['1.0.0', '1.1.0', '1.2.0']);
+assert.equal(await ev(() => window.__src.version('ctrl_b')), '1.2.0');
+assert.equal(await ev(() => window.__src.pill()), 'Up to date');
+assert.equal(await ev(() => window.__src.title('ctrl_b')), 'CUTOFF', 'its own legend did not become the package default');
+
+await ev(() => window.__src.select('ctrl_a'));
+await settle();
+check('and another copy is offered the pushed edit', async () => {});
+assert.equal(await ev(() => window.__src.pill()), 'Update available');
+assert.match(await ev(() => window.__src.line()), /Library 1\.2\.0 changes/);
+await ev(() => window.__src.press('Update to 1.2.0'));
+await settle();
+assert.equal(await ev(() => window.__src.opacity2('ctrl_a')), 0.3, 'the edit made on b arrived on a');
+assert.notEqual(await ev(() => window.__src.title('ctrl_a')), 'CUTOFF', 'and b\'s legend did not');
+
+await ev(() => window.__src.select('ctrl_c'));
+await settle();
+
 // --- Detach -----------------------------------------------------------------------------------
 
 await ev(() => window.__src.press('Detach'));

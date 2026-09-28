@@ -1664,9 +1664,8 @@ the whole control minus its id — a stable content address for a component.
 > **Status, 2026-09-28:** diff, pull (Update), reset and detach are built, along with updating every
 > clean copy on a panel at once. See `utils/customComponentSourceLink.js`,
 > `sections/CustomSourceLinkCard.svelte` and [the user doc](../panel-artwork-import.md#linked-components).
-> **Push** (write a copy's edits back as the package's next version) is not built; saving to the
-> library from the Publish tab remains the way to do it by hand. The text below is the case as it
-> was made.
+> **Push** followed the same day, as "Save to library as X.Y.Z" on the Source card, offered only
+> while the library has not moved on. The text below is the case as it was made.
 
 **What exists.** `Designer.sourcePackage` records where a component came from — name, version,
 fingerprint, readiness score, asset counts. `CustomPublicPropertiesEditor.svelte` computes the live

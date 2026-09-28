@@ -20,6 +20,7 @@ import { createCustomComponentPartsDefaults } from '../src/CE_Application/utils/
 import { customComponentLibrary } from '../src/CE_Application/stores/customComponentLibrary.js';
 import { instantiateCustomComponentPackageControl } from '../src/CE_Application/utils/customComponentPackage.js';
 import { initHistory, undo, flushHistory } from '../src/CE_Application/stores/history.js';
+import { applyControlPatch } from '../src/CE_Application/stores/controls.js';
 
 const author = createControl('CustomComponent');
 author._children.Core.name = 'Dial';
@@ -75,6 +76,10 @@ window.__src = {
   opacity: (id) => find(id)?._children?.Parts?._children?.[partNames[1]]?.opacity,
   visible0: (id) => find(id)?._children?.Parts?._children?.[partNames[0]]?.visible,
   linked: (id) => !!find(id)?._children?.Designer?.sourcePackage,
+  /** A design edit on a copy: a part that is not published, so it is design, not an override. */
+  editDesign: (id) => applyControlPatch(id, { [`Parts.${partNames[2]}.opacity`]: 0.3 }),
+  opacity2: (id) => find(id)?._children?.Parts?._children?.[partNames[2]]?.opacity,
+  libraryVersions: () => (get(customComponentLibrary) ?? []).map((entry) => entry.version).sort(),
   flush: () => flushHistory(),
   undo: () => undo(),
 };
