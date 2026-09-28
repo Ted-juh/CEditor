@@ -74,7 +74,7 @@
   import { showDistances } from '../stores/editorView.js';
   import { guides, selectedGuide } from '../stores/guides.js';
   import { fileCache, loadFile } from '../stores/fileCache.js';
-  import { findAlignmentSnap, computeDistances } from '../utils/canvasSnapping.js';
+  import { findAlignmentSnap, computeDistances, snapMovingRect, snapResizeRect } from '../utils/canvasSnapping.js';
   import { framedGuides, hasSelectedAncestor, multiDragPatches, toPanelDistances, toPanelGuides } from '../utils/canvasDragFrame.js';
   import { setActivePanelSnapGuides, clearActivePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
@@ -883,12 +883,13 @@
   // stay readable. findAlignmentSnap uses my frame's controls + ruler guides;
   // computeDistances additionally filters out co-selected siblings and
   // only runs for the dragged (key-object) component.
-  function alignSnap(x, y, w, h) {
+  function alignSnap(x, y, w, h, edges = null) {
     const align = findAlignmentSnap(
       { x, y, w, h }, core?.id, mySiblings, myFrameGuides, getSection,
       myFrameSize,
       // 5 screen px of stickiness at every zoom level.
       5 / (scale || 1),
+      edges,
     );
     // Publish the live guides so the panel rulers can mirror them (parity with
     // the component editor). Cleared on drag/resize end. The rulers are panel-space,
@@ -1314,7 +1315,10 @@
     }
 
     // Alignment snap overrides grid when within threshold
-    const align = snapSuspended ? { x: newX, y: newY, guides: [] } : alignSnap(newX, newY, displayW, displayH);
+    // A rotated control lines up by its rotated footprint — what is on screen (utils/canvasSnapping.js).
+    const align = snapSuspended
+      ? { x: newX, y: newY, guides: [] }
+      : snapMovingRect({ x: newX, y: newY, w: displayW, h: displayH }, transform?.rotation, (box) => alignSnap(box.x, box.y, box.w, box.h));
     if (snapSuspended) setActivePanelSnapGuides([]);
     transientX = Math.round(align.x);
     transientY = Math.round(align.y);
@@ -1518,13 +1522,17 @@
     // Grid snap
     if (!snapSuspended && snapToGrid) rect = snapRectToGrid(rect, gridSize, snapToGridX, snapToGridY);
 
-    // Alignment snap overrides grid when within threshold
-    const align = snapSuspended ? { x: rect.x, y: rect.y, guides: [] } : alignSnap(rect.x, rect.y, rect.w, rect.h);
+    // Alignment snap overrides grid when within threshold — on the dragged edges only, changing the
+    // size rather than moving the box (snapResizeRect).
+    const align = snapSuspended
+      ? { ...rect, guides: [] }
+      : snapResizeRect(rect, resizeHandle, (box, edges) => alignSnap(box.x, box.y, box.w, box.h, edges), resizeOpts);
     if (snapSuspended) setActivePanelSnapGuides([]);
+    else setActivePanelSnapGuides(toPanelGuides(align.guides, parentOffset));
     transientX = Math.round(align.x);
     transientY = Math.round(align.y);
-    transientW = Math.round(rect.w);
-    transientH = Math.round(rect.h);
+    transientW = Math.round(align.w);
+    transientH = Math.round(align.h);
     publishMeasurements(align, $showDistances ? distancesFor(transientX, transientY, transientW, transientH) : []);
   }
 

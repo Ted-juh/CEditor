@@ -64,3 +64,68 @@ export function groupRotationPatches(members, cx, cy, delta) {
   }
   return patches;
 }
+
+/**
+ * The per-member scale a group resize applies, in the member's OWN frame.
+ *
+ * The box scales by (sx, sy) along the panel's axes. A member at 0° or 180° takes that as it is; at
+ * 90° or 270° its width runs along the panel's y, so the two swap. At any other angle a non-uniform
+ * panel-axis scale is a shear the member cannot represent, so it scales uniformly (the geometric mean)
+ * and keeps its shape — its centre still follows the box exactly.
+ */
+export function memberScale(rotation, sx, sy) {
+  const half = (((Number(rotation) || 0) % 180) + 180) % 180;     // 0 ≤ half < 180
+  const near = (a, b) => Math.abs(a - b) < 1e-6;
+  if (near(half, 0) || near(half, 180)) return { fx: sx, fy: sy };
+  if (near(half, 90)) return { fx: sy, fy: sx };
+  const uniform = Math.sqrt(Math.abs(sx * sy));
+  return { fx: uniform, fy: uniform };
+}
+
+/**
+ * Store patches for one frame of a group resize: the box went from `startBounds` to `rect`.
+ *
+ *   members — captureMembers(): roots { id, kind: 'root', local, rotation, parentOffset } and the
+ *             descendants of a selected container { id, kind: 'descendant', local, rootId }.
+ *
+ * A ROOT's CENTRE maps linearly from the old box to the new one — correct at any rotation, where
+ * mapping its unrotated top-left (as the overlay used to) drifted a rotated member off the box. Its
+ * size scales by memberScale. A DESCENDANT's local geometry scales by its container's factors, so
+ * a container's contents keep filling it.
+ *
+ * Returns Map<id, { 'Transform.x', 'Transform.y', 'Transform.width', 'Transform.height' }>.
+ */
+export function groupResizePatches(members, startBounds, rect) {
+  const sx = startBounds.w ? rect.w / startBounds.w : 1;
+  const sy = startBounds.h ? rect.h / startBounds.h : 1;
+  const factors = new Map();
+  const patches = new Map();
+  for (const m of members) {
+    if (m.kind !== 'root') continue;
+    const { fx, fy } = memberScale(m.rotation, sx, sy);
+    factors.set(m.id, { fx, fy });
+    const cx = m.local.x + m.parentOffset.x + m.local.w / 2;
+    const cy = m.local.y + m.parentOffset.y + m.local.h / 2;
+    const ncx = rect.x + (cx - startBounds.x) * sx;
+    const ncy = rect.y + (cy - startBounds.y) * sy;
+    const w = Math.max(1, Math.round(m.local.w * fx));
+    const h = Math.max(1, Math.round(m.local.h * fy));
+    patches.set(m.id, {
+      'Transform.x': Math.round(ncx - w / 2 - m.parentOffset.x),
+      'Transform.y': Math.round(ncy - h / 2 - m.parentOffset.y),
+      'Transform.width': w,
+      'Transform.height': h,
+    });
+  }
+  for (const m of members) {
+    if (m.kind === 'root') continue;
+    const { fx, fy } = factors.get(m.rootId) ?? { fx: sx, fy: sy };
+    patches.set(m.id, {
+      'Transform.x': Math.round(m.local.x * fx),
+      'Transform.y': Math.round(m.local.y * fy),
+      'Transform.width': Math.max(1, Math.round(m.local.w * fx)),
+      'Transform.height': Math.max(1, Math.round(m.local.h * fy)),
+    });
+  }
+  return patches;
+}
