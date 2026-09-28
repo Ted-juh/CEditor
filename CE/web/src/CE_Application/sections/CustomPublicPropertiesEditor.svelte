@@ -10,7 +10,7 @@
   import CircleOff from 'lucide-svelte/icons/circle-off';
   import { getSection, applyControlPatch, updateControlProperty } from '../stores/controls.js';
   import { valueAtPath } from '../stores/controlTreeUtils.js';
-  import { fingerprintCustomComponent } from '../utils/customComponentPackage.js';
+  import CustomSourceLinkCard from './CustomSourceLinkCard.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -53,9 +53,6 @@
   ]);
   let contractLabel = $derived(api?.addressableName || core?.name || 'Custom Component');
   let sourcePackage = $derived(designer?.sourcePackage ?? null);
-  let currentFingerprint = $derived(control ? fingerprintCustomComponent(control) : '');
-  let sourceMatches = $derived(!!sourcePackage?.fingerprint && sourcePackage.fingerprint === currentFingerprint);
-  let sourceAssetCount = $derived(sourcePackage?.assetManifest?.counts?.total ?? 0);
 
   function hasValidChannel(entry) {
     return !!entry?.channel && !!channels?._children?.[entry.channel];
@@ -290,14 +287,8 @@
     </PropertyCell>
   {/if}
   {#if sourcePackage}
-    <PropertyCell label="Source" span={4} hint="Reusable package identity kept when this custom component was inserted or loaded from the library.">
-      <div class="source-card" class:changed={!sourceMatches}>
-        <strong>{sourcePackage.name} {sourcePackage.version}</strong>
-        <span>{sourcePackage.category || 'custom'} · {sourcePackage.capabilities?.primaryKind ?? 'custom'} · readiness {sourcePackage.readiness?.score ?? 0}%</span>
-        <span>{sourcePackage.publicApiSummary?.counts?.total ?? 0} public item{(sourcePackage.publicApiSummary?.counts?.total ?? 0) === 1 ? '' : 's'} · {sourceAssetCount} asset{sourceAssetCount === 1 ? '' : 's'}</span>
-        <em>{sourceMatches ? 'matches source package' : 'edited since source package load'}</em>
-        <small>{sourcePackage.fingerprint}</small>
-      </div>
+    <PropertyCell label="Source" span={4} hint="The library package this copy came from: what differs, and updating, resetting or detaching it.">
+      <CustomSourceLinkCard {control} />
     </PropertyCell>
   {/if}
 </PropertySection>
@@ -436,7 +427,6 @@
 
 <style>
   .contract-card,
-  .source-card,
   .customized-card,
   .empty-state {
     width: 100%;
@@ -451,48 +441,6 @@
     padding: 5px 7px;
     box-sizing: border-box;
     font-size: 11px;
-  }
-
-  .source-card {
-    min-height: 58px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-    gap: 3px;
-    border-color: #2F573E;
-    background: #141F18;
-    color: #A9DCB8;
-  }
-
-  .source-card.changed {
-    border-color: #665234;
-    background: #211D15;
-    color: #E8C08A;
-  }
-
-  .source-card strong,
-  .source-card span,
-  .source-card em,
-  .source-card small {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-style: normal;
-  }
-
-  .source-card strong {
-    color: #F4F7FA;
-  }
-
-  .source-card span,
-  .source-card em,
-  .source-card small {
-    color: inherit;
-  }
-
-  .source-card small {
-    opacity: 0.78;
   }
 
   .contract-card strong {

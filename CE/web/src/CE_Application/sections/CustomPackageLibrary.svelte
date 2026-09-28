@@ -1,4 +1,5 @@
 <script>
+  import CustomSourceLinkCard from './CustomSourceLinkCard.svelte';
   import { onDestroy } from 'svelte';
   import { getSection, applyControlPatch } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -107,7 +108,6 @@
     ...(selectedLibraryEntry?.validation?.warnings ?? []).map((warning) => `Warning: ${warning}`),
   ]);
   let currentSourcePackage = $derived(designer?.sourcePackage ?? null);
-  let currentPackageMatchesSource = $derived(!!currentSourcePackage?.fingerprint && currentSourcePackage.fingerprint === packageFingerprint);
   let importSurfaceItems = $derived(publicSurfaceItems(importPreview.envelope?.publicApiSummary ?? importPreview.envelope?.publicApi));
   let importAssetItems = $derived(assetManifestItems(importPreview.envelope?.assetManifest));
   const LIBRARY_KIND_OPTIONS = [
@@ -560,13 +560,8 @@
 {#if designer}
   <PropertySection title="Library" icon={LibraryBig} tools={openLibraryTab}>
     {#if $creatorMode === 'advanced' && currentSourcePackage}
-      <PropertyCell label="Source" span={4} hint="Package provenance kept when this component was inserted or loaded from a reusable package.">
-        <div class="source-package" class:changed={!currentPackageMatchesSource}>
-          <strong>{currentSourcePackage.name} {currentSourcePackage.version}</strong>
-          <span>{currentSourcePackage.category || 'custom'} · {currentSourcePackage.capabilities?.primaryKind ?? 'custom'} · readiness {currentSourcePackage.readiness?.score ?? 0}%</span>
-          <em>{currentPackageMatchesSource ? 'unchanged from source package' : 'edited since package load'}</em>
-          <small>{currentSourcePackage.fingerprint}</small>
-        </div>
+      <PropertyCell label="Source" span={4} hint="The library package this component came from: what differs, and updating, resetting or detaching it.">
+        <CustomSourceLinkCard {control} />
       </PropertyCell>
     {/if}
     <PropertyCell label="Local Saves" span={1} hint="Custom component snapshots saved in the local user library.">
@@ -979,7 +974,6 @@
   }
 
   .package-status,
-  .source-package,
   .library-summary {
     width: 100%;
     min-height: 30px;
@@ -1003,29 +997,13 @@
     color: #A9DCB8;
   }
 
-  .source-package {
-    border-color: #32495A;
-    background: #15212A;
-    color: #B8D7E8;
-  }
-
-  .source-package.changed {
-    border-color: #6B5630;
-    background: #241F14;
-    color: #E8D4A8;
-  }
-
   .package-status strong,
-  .source-package strong,
   .library-summary strong {
     color: #F4F7FA;
     font-size: 11px;
   }
 
   .package-status span,
-  .source-package span,
-  .source-package em,
-  .source-package small,
   .library-summary span,
   .library-summary em,
   .library-summary small,
@@ -1037,7 +1015,6 @@
   }
 
   .package-status em,
-  .source-package small,
   .library-summary small {
     color: #7F95A5;
     font-size: 9px;

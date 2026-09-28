@@ -671,6 +671,31 @@ export function applyControlPatch(controlId, patch) {
   applyControlPatchesById(new Map([[controlId, patch]]));
 }
 
+/**
+ * Swap whole controls in place, by id. For an operation that REBUILDS a control rather than patching
+ * paths — a linked custom component updated from its library source can gain and lose sections, and a
+ * patch can only set values. One store update, so one undo step however many controls it replaces.
+ */
+export function replaceControlsById(replacements, targetPanelId = get(resolvedActivePanelId)) {
+  if (!replacements || replacements.size === 0) return;
+  if (targetPanelId == null) {
+    for (const [controlId, next] of replacements.entries()) {
+      mutateComponentDocumentControl(controlId, (draft) => {
+        for (const key of Object.keys(draft)) delete draft[key];
+        Object.assign(draft, deepClone(next));
+        return true;
+      });
+    }
+    return;
+  }
+  panels.update((list) => mutatePanelControlsInList(
+    list,
+    targetPanelId,
+    (control) => replacements.has(control?._children?.Core?.id),
+    (draft) => deepClone(replacements.get(draft?._children?.Core?.id)),
+  ));
+}
+
 export function applyInspectorControlPatch(controlId, patch) {
   if (!patch || Object.keys(patch).length === 0) return;
   const panelId = get(resolvedActivePanelId);
