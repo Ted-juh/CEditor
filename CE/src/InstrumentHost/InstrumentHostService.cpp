@@ -10722,6 +10722,10 @@ void InstrumentHostService::verifyStateFolder (const juce::String& path)
             }
             try
             {
+                // Prepared as a part would be: some plug-ins settle their parameter list only
+                // once they are ready to play, and a snapshot taken before that disagrees with
+                // the worker about how many parameters there are.
+                processor->prepareToPlay (options.sampleRate, options.blockSize);
                 const auto state = [&processor]
                 {
                     juce::MemoryBlock block;
@@ -10779,11 +10783,18 @@ void InstrumentHostService::verifyStateFolder (const juce::String& path)
                     }
                 }
             }
+            catch (const std::exception& failure)
+            {
+                conclude ("refused", plugin.name + " failed while the files were being tested: "
+                                     + juce::String::fromUTF8 (failure.what()));
+                return;
+            }
             catch (...)
             {
                 conclude ("refused", plugin.name + " failed while the files were being tested.");
                 return;
             }
+            processor->releaseResources();
             processor.reset();
 
             const auto at = findStateFolder (path);
