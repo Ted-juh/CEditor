@@ -131,12 +131,17 @@ test('the plan becomes real, uniquely named controls', () => {
   assert.ok(!names.includes('knob_1'), 'an existing name is not reused');
   assert.ok(names.includes('Cutoff'));
   const types = controls.map((c) => c._children.Core.controlType);
-  assert.deepEqual(types, ['Knob', 'Slider', 'Button', 'Button', 'Shape', 'LcdDisplay', 'Label', 'Knob']);
+  assert.deepEqual(types, ['Knob', 'Slider', 'Button', 'Button', 'ToggleButton', 'LcdDisplay', 'Label', 'Knob']);
 
   const slider = controls[1]._children;
   assert.equal(slider.Behavior.orientation, 'vertical');
   assert.deepEqual([slider.Transform.x, slider.Transform.y, slider.Transform.width, slider.Transform.height], [140, 40, 16, 120]);
-  assert.equal(controls[4]._children.Shape.kind, 'ellipse', 'an LED is a round lamp');
+  const led = controls[4]._children;
+  assert.equal(led.ContentLayout.lamp, 'led', 'an LED is a lamp');
+  assert.equal(led.ContentLayout.lampSize, 10, 'as big as the placeholder circle');
+  assert.equal(led.Behavior.valueFlow, 'display', 'that takes no clicks and exports no host parameter');
+  assert.deepEqual(Object.keys(led.States._children), [], 'and no state repaints a plate behind it');
+  assert.equal(led.Text.content, '');
   assert.equal(controls[2]._children.Text.content, '', 'a button leaves the legend to the artwork');
   assert.equal(controls[6]._children.Text._children.Font.size, 9, 'a 16px-high label box gets 9px type');
   const long = buildSvgImportControls(inkscape).find((c) => c._children.Core.name === 'Filter_Cutoff');
@@ -148,7 +153,7 @@ test('the plan becomes real, uniquely named controls', () => {
 test('the report says what was inferred and why', () => {
   const lines = describeSvgImport(illustrator);
   assert.match(lines[0], /8 control\(s\) from the "components" layer on a 400×200 panel/);
-  assert.ok(lines.some((line) => /LED\(s\) placed as round shapes/.test(line)));
+  assert.ok(lines.some((line) => /LED\(s\) placed as display-only lamps/.test(line)));
   assert.ok(lines.some((line) => /→ Slider \(from its red long rectangle\)/.test(line)));
   assert.ok(lines.some((line) => /^skipped/.test(line)));
 });

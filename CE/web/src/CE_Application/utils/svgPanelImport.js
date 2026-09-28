@@ -57,7 +57,7 @@ const CONTROL_TYPE = {
   slider: 'Slider',
   toggle: 'ToggleButton',
   button: 'Button',
-  led: 'Shape',
+  led: 'ToggleButton',
   label: 'Label',
   display: 'LcdDisplay',
   meter: 'Meter',
@@ -462,6 +462,34 @@ export function svgDataUrl(svgText) {
 // Controls
 
 const LED_COLOUR = 'FFE0443A';
+const LED_OFF_COLOUR = 'FF3A1614';
+
+/**
+ * An LED: a display-only toggle that draws nothing but its lamp. The lamp (ContentLayout.lamp) glows
+ * when the control is checked; display-only (Behavior.valueFlow) makes it refuse clicks, take its
+ * state from feedback — a device binding on its `state` port lights it from the synth — and export
+ * no host parameter, which an indicator should not have. The plate, the legend and every state that
+ * would repaint the plate (hover, pressed, selected…) are removed, so lighting it lights only the lamp.
+ */
+function ledControl(overrides, placeholder) {
+  const size = Math.max(4, Math.round(Math.min(placeholder.width, placeholder.height)));
+  const control = createControl('ToggleButton', {
+    ...overrides,
+    Text: { content: '' },
+    Background: { _children: { Fill: { colour: '00000000', solidEnabled: false }, Border: { enabled: false } } },
+    ContentLayout: {
+      lamp: 'led',
+      lampSize: size,
+      lampColour: LED_COLOUR,
+      lampOffColour: LED_OFF_COLOUR,
+      lampBezelColour: '66000000',
+      paddingLeft: Math.max(0, Math.round((Math.round(placeholder.width) - size) / 2)),
+    },
+    Behavior: { valueFlow: 'display' },
+  });
+  control._children.States = { ...(control._children.States ?? {}), _children: {} };
+  return control;
+}
 
 /**
  * Type that fits the box the author drew: at most ~62% of its height, and narrow enough for the words
@@ -527,9 +555,7 @@ export function buildSvgImportControls(plan, existingNames = []) {
         overrides.Text = { content: '' };
         break;
       case 'led':
-        // No LED control exists; a round lamp is the honest stand-in, and the report says so.
-        overrides.Shape = { kind: 'ellipse', fillColour: LED_COLOUR, strokeEnabled: false };
-        break;
+        return ledControl(overrides, placeholder);
       default:
         break;
     }
@@ -546,7 +572,7 @@ export function describeSvgImport(plan) {
     `${plan.placeholders.length} control(s) from the "${plan.layer}" layer on a ${plan.width}×${plan.height} panel: `
       + (Object.entries(counts).map(([role, n]) => `${n} ${role}${n === 1 ? '' : 's'}`).join(', ') || 'none'),
   ];
-  if (counts.led) lines.push(`${counts.led} LED(s) placed as round shapes — CEditor has no LED control yet.`);
+  if (counts.led) lines.push(`${counts.led} LED(s) placed as display-only lamps — bind each one's "state" port to light it from the synth.`);
   for (const p of plan.placeholders.filter((entry) => !entry.reason.startsWith('named'))) {
     lines.push(`${p.source} → ${p.type} (from its ${p.reason})`);
   }

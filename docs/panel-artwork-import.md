@@ -26,7 +26,7 @@ The convention follows VCV Rack's, which has built thousands of module panels th
 | `slider`, `fader` | Slider (vertical if taller than wide) | red long rectangle |
 | `button`, `btn`, `momentary`, `trigger`, `pad` | Button | red square-ish rectangle, or green |
 | `toggle`, `switch`, `latch` | Toggle button | — |
-| `led`, `lamp`, `light`, `indicator` | Round lamp (see below) | magenta |
+| `led`, `lamp`, `light`, `indicator` | LED (see below) | magenta |
 | `label`, `text`, `caption`, `title`, `legend` | Label | blue |
 | `display`, `lcd`, `screen`, `readout` | LCD display | yellow |
 | `meter`, `vu` | Meter | — |
@@ -56,7 +56,9 @@ CSS classes, as Illustrator writes them, count.
 
 - **Only rectangles, circles and ellipses are measured.** A path, line, polygon, text or `<use>` in
   the placeholder layer is reported and skipped; convert it to a rectangle or circle.
-- **There is no LED control yet**, so LEDs are placed as round red lamps (a Shape). The report says so.
+- **LEDs** are placed as display-only lamps: a toggle showing only its lamp, dark red when off and
+  glowing when on. A click doesn't light one; bind its `state` port to a synth parameter and the synth
+  does. They export no host parameter, as an indicator shouldn't.
 - **New Panel** always makes a new panel. To bring a revised drawing into a panel you have already
   worked on, use **Update Panel** (below).
 - To discard an import, close its tab without saving. It is a new, unsaved panel until you save it.
