@@ -1,6 +1,7 @@
 <script>
   import { selectedComponentIds } from '../stores/panels.js';
   import { removeControl, duplicateControl, updateControlProperty, selectedControl, getSection, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
+  import { createComponentFromSelectionWithPrompt } from '../stores/componentFromSelectionActions.js';
   import { findControlById, flatControls, isContainerControl } from '../utils/containment.js';
   import { setFacet } from '../stores/editorFacet.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
@@ -178,6 +179,7 @@
       <button class="ctx-item ctx-danger" onclick={del}>Delete<span class="ctx-shortcut">Del</span></button>
       <div class="ctx-separator"></div>
       <button class="ctx-item" onclick={group}>Group into Container<span class="ctx-shortcut">Ctrl+G</span></button>
+      <button class="ctx-item" onclick={() => { close(); createComponentFromSelectionWithPrompt(); }}>Create Component from Selection&hellip;</button>
       {#if singleContainerSelected}
         <button class="ctx-item" onclick={ungroup}>Ungroup<span class="ctx-shortcut">Ctrl+Shift+G</span></button>
       {/if}

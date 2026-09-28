@@ -127,3 +127,43 @@ The comparison finds the exact version a copy was placed from by its fingerprint
 library change from an edit on the copy. If that version is no longer in the library, it can only
 compare with the latest one. Differences are then marked `?`, and a plain update is refused for the
 same reason.
+
+## Create Component from Selection
+
+Select some artwork on a panel (a plate, its legends, a scale, a logo) and choose **Edit › Create
+Component from Selection…** or the same item on the canvas right-click menu. You're asked for a name
+(the first label's text is suggested). The selection is saved to the library as a component, and
+the panel gets a **linked copy** in its place, so the Source card and "Update N copies" above work on
+it from then on.
+
+Every label's text is published, so each copy can carry its own legend: place the plate three times
+and label it CUTOFF, RESONANCE and DRIVE, and an update to the plate keeps all three.
+
+### Faithful or refused
+
+The command replaces what you selected, so the copy must look exactly like it. Each control either
+converts through a path that draws the same way, or the command is refused, naming the control and
+the reason. Nothing is converted partly.
+
+| Converts | How |
+|---|---|
+| Background, Image | Its background (fill, gradient, image, border, corners) is carried as-is, and drawn by the same renderer. |
+| Shape | The exact SVG the panel draws for it, as an image. |
+| Label | Its plate, plus its text over the same padded box. Font, size, weight, style, case, colour and spacing are carried. |
+
+| Refused, with the reason given | Why |
+|---|---|
+| Knobs, sliders, buttons and other controls with a value | Their look is drawn from their behaviour settings, which component parts can't reproduce. They also carry bindings. This is the next step. |
+| A control a script mentions | The component can't keep the name the script uses. The script and line are named. |
+| Text wider than its box, or on more than one line | The panel wraps it; a component would not. |
+| Underline, strikethrough, text aligned to the top or bottom, an icon, a lamp, effects, scaling | The component would draw them differently. |
+| Controls inside a container, or across layers | Select the container's contents, or one layer at a time. |
+| An unselected control painted *between* the selected ones and overlapping them | No single depth keeps it where it is. It is named; select it too, or move it. |
+
+Measured on the QA panels: 1,984 of 1,985 labels pass the settings rules, and the width check then
+refuses the ones whose text overflows its box. On the Roland Gaia sheet that leaves 909 of 924
+labels converting; on the scripting sheet, 490 of 553. Browser checks draw those panels before and
+after with the editor's own renderer and compare them pixel by pixel.
+
+Undo puts the controls back. The saved component stays in the library, where you can remove it from
+the Library tab.

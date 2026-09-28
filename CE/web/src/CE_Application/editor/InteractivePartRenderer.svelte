@@ -220,6 +220,10 @@
       `font-size:${numberOr(textFont?.size, 12)}px`,
       `font-weight:${numberOr(textFont?.weightValue, 400)}`,
       `font-style:${String(textFont?.style ?? 'Normal').toLowerCase() === 'italic' ? 'italic' : 'normal'}`,
+      // Read like the label renderer does (CanvasControl), so a label turned into a part keeps its
+      // spacing — control sets give labels some. Every text part in the QA sheets is at 0 here.
+      `letter-spacing:${numberOr(textFont?.letterSpacing, 0)}px`,
+      `word-spacing:${numberOr(textFont?.wordSpacing, 0)}px`,
       `justify-content:${justifyContentFor(textPosition?.justification)}`,
       'align-items:center',
       'display:flex',
@@ -233,7 +237,9 @@
       `line-height:${multiline ? numberOr(text._children.Multiline.lineHeight, 1.1) : 1}`,
       `padding:0 ${multiline ? 2 : 8}px`,
       'text-align:center',
-      `white-space:${multiline ? 'normal' : 'nowrap'}`,
+      // Single-line text keeps its spaces, as the label renderer's does (white-space:pre there too):
+      // "A  ·  B" is spaced on purpose. No text part in the QA sheets has a run of spaces to change.
+      `white-space:${multiline ? 'normal' : 'pre'}`,
       ...(multiline ? ['overflow-wrap:anywhere'] : []),
       'width:100%',
       'box-sizing:border-box',

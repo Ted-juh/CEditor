@@ -7,6 +7,7 @@
   import { INSERT_CATEGORIES } from '../models/insertCatalog.js';
   import { openNewPanelDialog } from '../stores/newPanelDialog.js';
   import { addControl, duplicateControl, removeControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
+  import { createComponentFromSelectionWithPrompt } from '../stores/componentFromSelectionActions.js';
   import { bringForward, bringToFront, sendBackward, sendToBack, tidyGrid, arrangeCircular } from '../stores/alignment.js';
   import { editMenuAvailability } from '../utils/editMenuAvailability.js';
   import { closeApplication } from '../bridge/bridge.js';
@@ -208,6 +209,9 @@
       } },
       { type: 'separator' },
       { label: 'Group into Container', shortcut: 'Ctrl+G', enabled: () => editAvailability().canGroup, action: () => groupSelectionIntoContainer() },
+      // Artwork into one reusable, linked component. utils/customComponentFromControls.js says what
+      // converts and why the rest is refused.
+      { label: 'Create Component from Selection...', enabled: hasSelection, action: () => createComponentFromSelectionWithPrompt() },
       { label: 'Ungroup', shortcut: 'Ctrl+Shift+G', enabled: () => editAvailability().canUngroup, action: () => {
         const id = editAvailability().ungroupTargetId;
         if (id != null) ungroupContainer(id);
