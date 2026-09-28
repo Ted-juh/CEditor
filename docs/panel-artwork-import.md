@@ -183,8 +183,8 @@ that belong in writing so the idea is not re-attempted blind:
   none resets one on release.
 - **A value control is referenced from many places**, not only scripts: routes, LCD and display
   sources, envelope stage sources, snapshots, exclusive button groups, the explicit export list.
-- **Multi-channel export has a binding bug** (known-issues.md), which several converted controls in
-  one component would hit.
+- **Multi-channel export had a binding bug**, now fixed (known-issues.md), which several converted
+  controls in one component would have hit.
 
 Artwork components plus ordinary controls placed beside them (and Duplicate for the whole group)
 already give reusable modules without any of this.

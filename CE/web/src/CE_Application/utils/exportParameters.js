@@ -160,10 +160,12 @@ function selectorChoices(valueSection) {
 //
 // A profile-backed binding still wins when a control has both: it carries the parameter's own
 // range, encoding and send policy, where a raw binding carries three bytes.
-function deviceWireFor(control) {
+function deviceWireFor(control, port = null) {
   const db = control?._children?.DeviceBindings;
   if (db?.enabled === false) return { deviceRole: '', deviceParameterId: '' };
-  const bindings = Array.isArray(db?.bindings) ? db.bindings : [];
+  const all = Array.isArray(db?.bindings) ? db.bindings : [];
+  // `port` narrows to the bindings of one custom-component channel (see the channel loop below).
+  const bindings = port == null ? all : all.filter((x) => String(x?.port ?? '') === port);
 
   const parameter = bindings.find((x) => x?.kind === 'deviceParameter' && x?.parameterId);
   if (parameter) {
@@ -322,7 +324,12 @@ export function deriveExportParameters(panel) {
       );
       const single = publicEntries.length === 1;
       for (const [channelName, channel] of publicEntries) {
-        out.push({ ...paramFromChannel(name, channelName, channel, single), ...wire });
+        // Each channel sends through ITS binding — the one whose port is the channel's name, which is
+        // how the live editor routes them (deviceBindingSync.js). Spreading one wire over every channel
+        // made two lanes bound to two synth parameters both drive the first, window-closed only
+        // (exportParametersChannelBindings.test.js). A lone channel keeps "any binding drives it".
+        const channelWire = single ? wire : deviceWireFor(control, channelName);
+        out.push({ ...paramFromChannel(name, channelName, channel, single), ...channelWire });
       }
       continue;
     }

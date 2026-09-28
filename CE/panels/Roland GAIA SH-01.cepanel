@@ -3049,8 +3049,8 @@
       "unit": "",
       "midiCC": null,
       "valueKind": "float",
-      "deviceRole": "Roland GAIA SH-01",
-      "deviceParameterId": "arp.endStep"
+      "deviceRole": "",
+      "deviceParameterId": ""
     },
     {
       "id": "arp_pattern_grid.arpStepCount",
@@ -3063,8 +3063,8 @@
       "unit": "",
       "midiCC": null,
       "valueKind": "float",
-      "deviceRole": "Roland GAIA SH-01",
-      "deviceParameterId": "arp.endStep"
+      "deviceRole": "",
+      "deviceParameterId": ""
     },
     {
       "id": "arp_pattern_grid.arpEndStep",
@@ -3091,8 +3091,8 @@
       "unit": "",
       "midiCC": null,
       "valueKind": "float",
-      "deviceRole": "Roland GAIA SH-01",
-      "deviceParameterId": "arp.endStep"
+      "deviceRole": "",
+      "deviceParameterId": ""
     },
     {
       "id": "arp_pattern_grid.arpNote",
@@ -3105,8 +3105,8 @@
       "unit": "",
       "midiCC": null,
       "valueKind": "float",
-      "deviceRole": "Roland GAIA SH-01",
-      "deviceParameterId": "arp.endStep"
+      "deviceRole": "",
+      "deviceParameterId": ""
     },
     {
       "id": "arp_pattern_grid.arpVelocity",
@@ -3119,8 +3119,8 @@
       "unit": "",
       "midiCC": null,
       "valueKind": "float",
-      "deviceRole": "Roland GAIA SH-01",
-      "deviceParameterId": "arp.endStep"
+      "deviceRole": "",
+      "deviceParameterId": ""
     },
     {
       "id": "arp_pattern_grid.arpPattern",
@@ -3133,8 +3133,8 @@
       "unit": "",
       "midiCC": null,
       "valueKind": "float",
-      "deviceRole": "Roland GAIA SH-01",
-      "deviceParameterId": "arp.endStep"
+      "deviceRole": "",
+      "deviceParameterId": ""
     },
     {
       "id": "common_switch.value",
