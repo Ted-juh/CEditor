@@ -26,6 +26,7 @@
 #include "InstrumentHost/SnapshotStore.h"
 #include "InstrumentHost/AuditionPlayer.h"
 #include "InstrumentHost/RecentPlay.h"
+#include "InstrumentHost/VendorPresetDiscovery.h"
 #include <juce_cryptography/juce_cryptography.h>
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "ControlSurface/Ctrl49Protocol.h"
@@ -5277,6 +5278,135 @@ void testCtrl49Broker()
         check (pumpUntil (Ctrl49SurfaceBroker::State::connected),
                "and takes over once the other instance lets go");
     }
+}
+
+void testStateFolders()
+{
+    std::cout << "\npreset folders a plug-in reads as its own state" << std::endl;
+
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+
+    const auto dir = freshDataDir ("state-folders");
+    seedCatalog (dir);
+    // Transfigure-shaped: the plug-in's saved state under a vendor extension, in category
+    // folders, with a readme beside them.
+    const auto good = dir.getChildFile ("Sugar/Presets");
+    good.getChildFile ("Subtle").createDirectory();
+    good.getChildFile ("Subtle/Arp.sbx").replaceWithText ("arp");
+    good.getChildFile ("Subtle/Drift.sbx").replaceWithText ("drift");
+    good.getChildFile ("Wide.sbx").replaceWithText ("wide");
+    good.getChildFile ("readme.txt").replaceWithText ("not a preset");
+    // Files the plug-in does not read: loading them leaves it as it was.
+    const auto ignored = dir.getChildFile ("Other");
+    ignored.createDirectory();
+    ignored.getChildFile ("a.xyz").replaceWithText ("a");
+    ignored.getChildFile ("b.xyz").replaceWithText ("b");
+
+    int applications = 0;
+    const auto tweak = [&applications] (InstrumentHostService::Options& options)
+    {
+        options.applyVstPreset = [&applications] (juce::AudioProcessor& processor, const juce::File& file)
+        {
+            ++applications;
+            if (file.hasFileExtension ("sbx"))
+                static_cast<StubSynthProcessor&> (processor).patch = 1 + (file.loadFileAsString().hashCode() & 0xffff);
+            return true;
+        };
+    };
+    const auto folders = [] (Harness& h) { return h.emits.last ("instrumentHostLibrary")->getProperty ("stateFolders", {}); };
+    const auto stateRecords = [&dir]
+    {
+        Library library;
+        library.loadFrom (dir.getChildFile ("library.json"));
+        juce::Array<LibraryRecord> out;
+        for (const auto& record : library.allRecords())
+            if (record.sourceType == "stateFile" && ! record.missing) out.add (record);
+        return out;
+    };
+
+    {
+        Harness h (dir, {}, tweak);
+        h.cmd ("getState");
+        h.cmd ("addStateFolder", { { "path", good.getFullPathName() }, { "ceId", "VST3-good-synth" } });
+        const auto list = folders (h);
+        check (list.size() == 1 && list[0].getProperty ("status", {}).toString() == "ok"
+                 && list[0].getProperty ("extension", {}).toString() == "sbx"
+                 && (int) list[0].getProperty ("count", 0) == 3,
+               "a folder the plug-in takes is checked, and its three presets are indexed");
+        check (applications >= 3, "the check loads two different files and the first again");
+        const auto records = stateRecords();
+        check (records.size() == 3, "the readme beside the presets is not a preset");
+        bool categorised = false;
+        juce::String arpId;
+        for (const auto& record : records)
+        {
+            categorised |= record.name == "Arp" && record.category == "Subtle";
+            if (record.name == "Arp") arpId = record.recordId;
+        }
+        check (categorised && records[0].targetCeId == "VST3-good-synth",
+               "each preset belongs to the plug-in, filed under the folder it sits in");
+
+        h.cmd ("addStateFolder", { { "path", ignored.getFullPathName() }, { "ceId", "VST3-good-synth" } });
+        const auto refused = folders (h)[1];
+        check (refused.getProperty ("status", {}).toString() == "refused"
+                 && refused.getProperty ("detail", {}).toString().contains ("as it was"),
+               "files that leave the plug-in as it was are refused, and the reason is given");
+        check (stateRecords().size() == 3, "and nothing from that folder reaches the library");
+
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        const auto before = applications;
+        h.cmd ("loadLibraryRecord", { { "recordId", arpId }, { "action", "focused" }, { "partId", partId } });
+        check (applications == before + 1 && h.lastStub != nullptr
+                 && h.lastStub->patch == 1 + (juce::String ("arp").hashCode() & 0xffff),
+               "a preset from the folder loads onto a part through the preset loader");
+    }
+    {
+        Harness h (dir, {}, tweak);
+        h.cmd ("getState");
+        h.cmd ("getLibrary");
+        const auto list = folders (h);
+        check (list.size() == 2 && list[0].getProperty ("status", {}).toString() == "ok",
+               "the folders and their verdicts survive a restart");
+        h.cmd ("removeStateFolder", { { "path", good.getFullPathName() } });
+        check (folders (h).size() == 1 && stateRecords().isEmpty(),
+               "removing a folder takes its presets out of the library");
+    }
+
+    // Finding the folder in the first place: named after the plug-in, alone or under its vendor.
+    {
+        const auto roots = dir.getChildFile ("roots");
+        roots.getChildFile ("Documents/Sugar Bytes/Transfigure/Presets/Subtle").createDirectory();
+        for (const auto* name : { "Arp", "Drift", "Hall" })
+            roots.getChildFile ("Documents/Sugar Bytes/Transfigure/Presets/Subtle").getChildFile (juce::String (name) + ".sbtr")
+                .replaceWithText (name);
+        roots.getChildFile ("ProgramData/TB-303").createDirectory();
+        roots.getChildFile ("ProgramData/TB-303/Acid.bin").replaceWithText ("bank");
+        roots.getChildFile ("ProgramData/TB-303/Names.dat").replaceWithText ("x");
+        roots.getChildFile ("ProgramData/TB-303/Techno.bin").replaceWithText ("bank");
+        roots.getChildFile ("Documents/Spire").createDirectory();
+        roots.getChildFile ("Documents/Spire/Lead.vstpreset").replaceWithText ("named format");
+        const juce::Array<juce::File> dataRoots { roots.getChildFile ("Documents"), roots.getChildFile ("ProgramData") };
+        const auto plugin = [] (const char* name, const char* vendor)
+        {
+            PluginClassRecord record;
+            record.name = name; record.vendor = vendor; record.ceId = juce::String ("VST3-") + name;
+            return record;
+        };
+        const auto transfigure = ceditor::host::findPresetCandidate (plugin ("Transfigure", "Sugar Bytes"), dataRoots);
+        check (transfigure.getProperty ("extension", {}).toString() == "sbtr" && (int) transfigure.getProperty ("files", 0) == 3
+                 && transfigure.getProperty ("path", {}).toString().endsWith ("Transfigure"),
+               "a plug-in's folder under its vendor's is found, with its format and how many files");
+        const auto tb = ceditor::host::findPresetCandidate (plugin ("TB-303", "Roland Cloud"), dataRoots);
+        check (tb.getProperty ("extension", {}).toString() == "bin" && (int) tb.getProperty ("files", 0) == 2,
+               "and one named after the plug-in at the top, counting only the commonest kind of file");
+        check (! ceditor::host::findPresetCandidate (plugin ("Spire", "Reveal Sound"), dataRoots).isObject(),
+               "formats read by name are not offered for a test load");
+        check (! ceditor::host::findPresetCandidate (plugin ("WORMHOLE", "Zynaptiq"), dataRoots).isObject(),
+               "and a plug-in with nothing on disk has no folder to offer");
+    }
+    dir.deleteRecursively();
 }
 
 void testEditorPolicy()
@@ -13669,6 +13799,7 @@ int main (int argc, char* argv[])
     testSupportBundle();
     testEditionsInTheService();
     testEditorPolicy();
+    testStateFolders();
     testScan (stubWorker);
     testWrapperContext();
     testParameterModel();

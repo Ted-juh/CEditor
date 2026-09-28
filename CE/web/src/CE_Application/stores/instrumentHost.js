@@ -960,6 +960,7 @@ export function emptyHostLibrary() {
     collections: [],
     request: emptyLibraryQuery(),
     paths: [],
+    stateFolders: [],
     query: '',
     type: '',
   };
@@ -989,11 +990,16 @@ export function normalizeHostLibrary(payload) {
     scanning: p.scanning === true,
     updateFinished: p.updateFinished === true,
     scanReport: (Array.isArray(p.scanReport) ? p.scanReport : []).map((r) => ({
-      name: String(r?.name ?? ''), kind: String(r?.kind ?? ''),
+      name: String(r?.name ?? ''), kind: String(r?.kind ?? ''), ceId: String(r?.ceId ?? ''),
       count: Number(r?.count ?? 0), reason: String(r?.reason ?? ''),
       files: Math.max(0, Number(r?.files) || 0), programs: Math.max(0, Number(r?.programs) || 0),
       unavailable: Math.max(0, Number(r?.unavailable) || 0),
       unnamedPrograms: Math.max(0, Number(r?.unnamedPrograms) || 0),
+      // A folder named after the plug-in holding files only it reads, found on the last update.
+      candidate: r?.candidate && typeof r.candidate === 'object' && r.candidate.path
+        ? { path: String(r.candidate.path), extension: String(r.candidate.extension ?? ''),
+            files: Math.max(0, Number(r.candidate.files) || 0) }
+        : null,
     })),
     records: (Array.isArray(p.records) ? p.records : []).map((r) => ({
       recordId: String(r?.recordId ?? ''),
@@ -1115,6 +1121,13 @@ export function normalizeHostLibrary(payload) {
     })).filter((c) => c.name !== ''),
     request: normalizeLibraryQuery(p.request ?? { query: p.query, type: p.type }),
     paths: (Array.isArray(p.paths) ? p.paths : []).map(String),
+    // Folders of one plug-in's presets in its own format, and what their test load said.
+    stateFolders: (Array.isArray(p.stateFolders) ? p.stateFolders : []).map((f) => ({
+      path: String(f?.path ?? ''), ceId: String(f?.ceId ?? ''), plugin: String(f?.plugin ?? ''),
+      extension: String(f?.extension ?? ''),
+      status: ['checking', 'ok', 'refused'].includes(f?.status) ? f.status : 'refused',
+      detail: String(f?.detail ?? ''), count: Math.max(0, Number(f?.count) || 0),
+    })).filter((f) => f.path !== ''),
     query: String(p.query ?? ''),
     type: String(p.type ?? ''),
   };
@@ -1263,6 +1276,23 @@ export function mockSonicDistance(a, b) {
 }
 
 let mockSmartCollections = [];
+// The demo's Library page: one plug-in with presets, two whose preset files sit in a folder
+// of their own (one of which will not read), and one with nothing on disk at all.
+let mockStateFolders = [];
+const MOCK_PRESET_REPORT = [
+  { name: 'Massive X', kind: 'Instrument', ceId: 'mock-massive', count: 4139, files: 4139 },
+  { name: 'Transfigure', kind: 'Effect', ceId: 'mock-transfigure', count: 0,
+    candidate: { path: 'C:\\Users\\You\\Documents\\Sugar Bytes\\Transfigure', extension: 'sbtr', files: 262 } },
+  { name: 'TB-303', kind: 'Instrument', ceId: 'mock-tb303', count: 0,
+    candidate: { path: 'C:\\ProgramData\\Roland Cloud\\TB-303', extension: 'bin', files: 9 } },
+  { name: 'WORMHOLE', kind: 'Effect', ceId: 'mock-wormhole', count: 0 },
+];
+function mockPresetReport() {
+  return MOCK_PRESET_REPORT.map((row) => {
+    const folder = mockStateFolders.find((f) => f.ceId === row.ceId && f.status === 'ok');
+    return folder ? { ...row, count: folder.count, files: folder.count, candidate: null } : row;
+  });
+}
 // The browser demo remembers its view for the same reason the service does: a mutation must
 // not silently drop you back to the whole library while the chips on screen still filter.
 let mockLibraryView = emptyLibraryQuery();
@@ -1529,6 +1559,8 @@ export function mockHostLibrary(query = '', type = '', page = {}) {
     collections: [...statics.entries()].map(([name, count]) => ({ name, count })),
     request,
     paths: [],
+    stateFolders: mockStateFolders,
+    scanReport: mockPresetReport(),
     query: request.text,
     type: request.type,
   });
@@ -8843,6 +8875,31 @@ function send(payload) {
     }
     if (payload?.cmd === 'addLibraryPath' || payload?.cmd === 'removeLibraryPath'
         || payload?.cmd === 'browseLibraryPath') return;
+    if (payload?.cmd === 'browseStateFolder' || payload?.cmd === 'addStateFolder' || payload?.cmd === 'removeStateFolder') {
+      // The native test load, as far as the demo can tell it: Roland's banks are not a saved
+      // state, Sugar Bytes' files are.
+      const row = MOCK_PRESET_REPORT.find((r) => r.ceId === payload.ceId);
+      if (payload.cmd === 'removeStateFolder') {
+        mockStateFolders = mockStateFolders.filter((f) => f.path !== payload.path);
+      } else {
+        const path = payload.cmd === 'addStateFolder' ? String(payload.path ?? '')
+          : row?.candidate?.path ?? `C:\\Presets\\${row?.name ?? 'Plug-in'}`;
+        const extension = row?.candidate?.extension ?? 'preset';
+        const reads = extension !== 'bin';
+        mockStateFolders = [...mockStateFolders.filter((f) => f.path !== path), {
+          path, ceId: String(payload.ceId ?? ''), plugin: row?.name ?? '', extension,
+          status: reads ? 'ok' : 'refused',
+          detail: reads ? '' : `Loading Acid House.${extension} left ${row?.name} as it was, so these are not its presets.`,
+          count: reads ? (row?.candidate?.files ?? 3) : 0,
+        }];
+      }
+      hostLibrary.update((previous) => ({
+        ...previous,
+        stateFolders: normalizeHostLibrary({ stateFolders: mockStateFolders }).stateFolders,
+        scanReport: normalizeHostLibrary({ scanReport: mockPresetReport() }).scanReport,
+      }));
+      return;
+    }
     if (payload?.cmd === 'setControlSlotValue') {
       // Mirror the native mapping far enough for the demo: drive the parameter view when the
       // bound part's registry is on screen.
@@ -9282,6 +9339,10 @@ export const setAuditionPhrase = (phrase, bars) =>
 export const scanLibrary = () => send({ cmd: 'scanLibrary' });
 export const browseLibraryPath = () => send({ cmd: 'browseLibraryPath' });
 export const removeLibraryPath = (path) => send({ cmd: 'removeLibraryPath', path });
+/** Pick a folder of one plug-in's presets; the host test-loads two of them before indexing. */
+export const browseStateFolder = (ceId) => send({ cmd: 'browseStateFolder', ceId });
+export const addStateFolder = (path, ceId) => send({ cmd: 'addStateFolder', path, ceId });
+export const removeStateFolder = (path) => send({ cmd: 'removeStateFolder', path });
 export const saveUserPreset = (partId, name) => send({ cmd: 'saveUserPreset', partId, name });
 export const saveRackToLibrary = (name) => send({ cmd: 'saveRackToLibrary', name });
 export const requestSurfaceLayout = (profileId) =>

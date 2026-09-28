@@ -1462,6 +1462,22 @@ private:
     int libraryViewLimit = 0;
     juce::StringArray libraryPaths; // user-added .vstpreset folders, beside the standard roots
 
+    // A folder of one plug-in's presets in a format only that plug-in reads (its own saved state
+    // under a vendor extension). Indexed only after a test load showed the plug-in taking two
+    // of its files as two different sounds, and taking the first again as the same one.
+    struct StateFolder
+    {
+        juce::String path, ceId, pluginName, extension;
+        juce::String status;    // "checking" | "ok" | "refused"
+        juce::String detail;
+        int count = 0;
+    };
+    juce::Array<StateFolder> stateFolders;
+    int findStateFolder (const juce::String& path) const;
+    void saveStateFolders();
+    void verifyStateFolder (const juce::String& path);
+    void indexStateFolder (int index, juce::Array<LibraryRecord> records);
+
     // "When a rack asks for that sound and the plug-in is gone, I chose this one." Keyed by
     // substitutionKey(); the value is a library record id. Machine-local — see
     // substitutionsFile() for why it is not in the library.
@@ -2000,6 +2016,11 @@ private:
     bool libraryScanBusy = false;
     bool libraryScanFinished = false;
     juce::Array<juce::var> libraryScanReport;
+    // What the last update found on disk for plug-ins with no readable presets, by ceId: a
+    // folder named after the plug-in, in a format it alone reads. Offered for a test load.
+    std::map<juce::String, juce::var> presetCandidates;
+    juce::File libraryScanReportFile() const { return options.dataDirectory.getChildFile ("library-scan-report.json"); }
+    void refreshScanReportCounts();
     juce::uint64 libraryLoadSerial = 0;
     std::atomic<bool> scanBusy { false };
     std::atomic<bool> stopRequested { false };

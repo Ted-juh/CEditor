@@ -6,9 +6,19 @@
 
 namespace ceditor::host
 {
+/** "stateFile" is a file from a preset folder assigned to one plug-in: the plug-in's own saved
+    state written to disk under a vendor's extension (Sugar Bytes' .sbtr, for one). It is only
+    ever indexed from a folder the host has test-loaded into that plug-in and seen take. */
 inline bool isVendorPresetSource (const juce::String& source)
 {
-    return source == "vstpreset" || source == "nksf" || source == "fxp" || source == "spire" || source == "h2p";
+    return source == "vstpreset" || source == "nksf" || source == "fxp" || source == "spire" || source == "h2p"
+        || source == "stateFile";
+}
+
+/** The file formats read by name rather than as a plug-in's raw saved state. */
+inline bool isNamedVendorPresetFile (const juce::File& file)
+{
+    return file.hasFileExtension ("vstpreset;nksf;fxp;spf2;h2p");
 }
 
 // Zebra3's MIDI program selector reports numbered slots, not its disk preset library.

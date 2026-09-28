@@ -7168,6 +7168,105 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "browseStateFolder")
+    {
+        if (options.pickDirectory == nullptr)
+        {
+            emitError ("A folder picker is not available in this build.");
+            return;
+        }
+        const auto ceId = payload.getProperty ("ceId", {}).toString();
+        options.pickDirectory ([this, aliveToken = alive, ceId] (const juce::String& directory)
+        {
+            if (! aliveToken->load() || directory.isEmpty())
+                return;
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("cmd", "addStateFolder");
+            obj->setProperty ("path", directory);
+            obj->setProperty ("ceId", ceId);
+            handleCommand (juce::var (obj));
+        });
+        return;
+    }
+
+    if (cmd == "addStateFolder")
+    {
+        ensureLibrary();
+        const auto path = payload.getProperty ("path", {}).toString().trim();
+        const auto ceId = payload.getProperty ("ceId", {}).toString();
+        if (! juce::File::isAbsolutePath (path) || ! juce::File (path).isDirectory())
+        {
+            emitError ("That preset folder does not exist.");
+            return;
+        }
+        const juce::File folder (path);
+        PluginClassRecord plugin;
+        {
+            const std::scoped_lock lock (catalogLock);
+            if (const auto* found = findClass (ceId)) plugin = *found;
+        }
+        if (plugin.ceId.isEmpty())
+        {
+            emitError ("Choose which plug-in these presets are for.");
+            return;
+        }
+        const auto extension = dominantPresetExtension (folder);
+        if (extension.isEmpty())
+        {
+            emitError ("There are no preset files in " + folder.getFileName() + ".");
+            return;
+        }
+        // Formats read by name need no test: the folder joins the ordinary preset folders.
+        if (isNamedVendorPresetFile (juce::File ("preset." + extension)))
+        {
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("cmd", "addLibraryPath");
+            obj->setProperty ("path", folder.getFullPathName());
+            handleCommand (juce::var (obj));
+            scanVstPresets();
+            return;
+        }
+        if (const auto existing = findStateFolder (folder.getFullPathName()); existing >= 0)
+            stateFolders.remove (existing);
+        StateFolder entry;
+        entry.path = folder.getFullPathName();
+        entry.ceId = plugin.ceId;
+        entry.pluginName = plugin.name;
+        entry.extension = extension;
+        entry.status = "checking";
+        entry.detail = "Test-loading two presets into " + plugin.name + "…";
+        stateFolders.add (entry);
+        saveStateFolders();
+        emitLibrary (libraryView);
+        verifyStateFolder (entry.path);
+        return;
+    }
+
+    if (cmd == "removeStateFolder")
+    {
+        ensureLibrary();
+        const auto index = findStateFolder (payload.getProperty ("path", {}).toString());
+        if (index < 0)
+        {
+            emitError ("That preset folder is not in the list.");
+            return;
+        }
+        // Its presets go with it: they were only ever this folder's files.
+        const auto scope = juce::File (stateFolders.getReference (index).path).getFullPathName()
+                         + juce::File::getSeparatorString();
+        juce::StringArray ids;
+        for (const auto& record : library.allRecords())
+            if (record.sourceType == "stateFile" && record.sourceLocator.startsWith (scope))
+                ids.add (record.recordId);
+        for (const auto& id : ids) library.removeRecord (id);
+        stateFolders.remove (index);
+        saveStateFolders();
+        saveLibrary();
+        refreshScanReportCounts();
+        emitLibrary (libraryView);
+        return;
+    }
+
     if (cmd == "saveUserPreset")
     {
         ensureLibrary();
@@ -10462,7 +10561,237 @@ void InstrumentHostService::ensureLibrary()
         if (const auto* arr = parsed.getProperty ("paths", {}).getArray())
             for (const auto& p : *arr)
                 libraryPaths.addIfNotAlreadyThere (p.toString());
+        if (const auto* folders = parsed.getProperty ("stateFolders", {}).getArray())
+            for (const auto& f : *folders)
+            {
+                StateFolder folder;
+                folder.path = f.getProperty ("path", {}).toString();
+                folder.ceId = f.getProperty ("ceId", {}).toString();
+                folder.pluginName = f.getProperty ("plugin", {}).toString();
+                folder.extension = f.getProperty ("extension", {}).toString();
+                folder.status = f.getProperty ("status", "refused").toString();
+                folder.detail = f.getProperty ("detail", {}).toString();
+                folder.count = (int) f.getProperty ("count", 0);
+                // A check interrupted by quitting never finished; it did not pass.
+                if (folder.status == "checking")
+                {
+                    folder.status = "refused";
+                    folder.detail = "The test load did not finish. Remove the folder and add it again.";
+                }
+                if (folder.path.isNotEmpty() && folder.ceId.isNotEmpty() && findStateFolder (folder.path) < 0)
+                    stateFolders.add (folder);
+            }
     }
+
+    // The last update's per-plug-in report, so the Library page is not blank after a restart.
+    if (const auto stored = juce::JSON::parse (libraryScanReportFile().loadFileAsString()); stored.isArray())
+        for (const auto& row : *stored.getArray())
+            if (row.isObject())
+            {
+                libraryScanReport.add (row);
+                if (const auto candidate = row.getProperty ("candidate", {}); candidate.isObject())
+                    presetCandidates[row.getProperty ("ceId", {}).toString()] = candidate;
+            }
+}
+
+void InstrumentHostService::refreshScanReportCounts()
+{
+    // The report's counts follow the library, so a folder added or removed shows at once.
+    for (auto& row : libraryScanReport)
+        if (auto* object = row.getDynamicObject())
+        {
+            const auto ceId = object->getProperty ("ceId").toString();
+            int count = 0, files = 0, programs = 0, unavailable = 0;
+            for (const auto& record : library.allRecords())
+                if (record.targetCeId == ceId
+                    && (isVendorPresetSource (record.sourceType) || record.sourceType == "programList"))
+                {
+                    if (record.missing) { ++unavailable; continue; }
+                    ++count;
+                    if (record.sourceType == "programList") ++programs; else ++files;
+                }
+            object->setProperty ("count", count);
+            object->setProperty ("files", files);
+            object->setProperty ("programs", programs);
+            object->setProperty ("unavailable", unavailable);
+            const auto candidate = presetCandidates.find (ceId);
+            object->setProperty ("candidate", count == 0 && candidate != presetCandidates.end()
+                                                ? candidate->second : juce::var());
+        }
+    juce::Array<juce::var> rows (libraryScanReport);
+    libraryScanReportFile().replaceWithText (juce::JSON::toString (juce::var (rows)));
+}
+
+int InstrumentHostService::findStateFolder (const juce::String& path) const
+{
+    for (int i = 0; i < stateFolders.size(); ++i)
+        if (juce::File (stateFolders.getReference (i).path) == juce::File (path))
+            return i;
+    return -1;
+}
+
+void InstrumentHostService::saveStateFolders()
+{
+    const auto saved = updateSharedJsonObject (libraryPathsFile(), [this] (juce::DynamicObject& root)
+    {
+        juce::Array<juce::var> values;
+        for (const auto& folder : stateFolders)
+        {
+            auto* f = new juce::DynamicObject();
+            f->setProperty ("path", folder.path);
+            f->setProperty ("ceId", folder.ceId);
+            f->setProperty ("plugin", folder.pluginName);
+            f->setProperty ("extension", folder.extension);
+            f->setProperty ("status", folder.status);
+            f->setProperty ("detail", folder.detail);
+            f->setProperty ("count", folder.count);
+            values.add (juce::var (f));
+        }
+        root.setProperty ("stateFolders", values);
+    });
+    if (! saved) emitError ("Could not save the preset folder list.");
+}
+
+void InstrumentHostService::indexStateFolder (int index, juce::Array<LibraryRecord> records)
+{
+    if (! juce::isPositiveAndBelow (index, stateFolders.size())) return;
+    auto& folder = stateFolders.getReference (index);
+    folder.count = records.size();
+    // Scoped to the folder, with its separator, so "Sugar" never claims "Sugar Bytes".
+    const auto scope = juce::File (folder.path).getFullPathName() + juce::File::getSeparatorString();
+    library.mergeVendorScan ("stateFile", std::move (records), scope);
+}
+
+void InstrumentHostService::verifyStateFolder (const juce::String& path)
+{
+    const auto index = findStateFolder (path);
+    if (index < 0) return;
+    const auto folder = stateFolders[index];
+    const auto conclude = [this, path] (const juce::String& status, const juce::String& detail)
+    {
+        const auto at = findStateFolder (path);
+        if (at < 0) return;
+        stateFolders.getReference (at).status = status;
+        stateFolders.getReference (at).detail = detail;
+        saveStateFolders();
+        saveLibrary();
+        refreshScanReportCounts();
+        emitLibrary (libraryView);
+    };
+
+    PluginClassRecord plugin;
+    juce::String refusal;
+    {
+        const std::scoped_lock lock (catalogLock);
+        const ModuleRecord* module = nullptr;
+        if (const auto* found = findClass (folder.ceId, &module); found != nullptr && module != nullptr)
+        {
+            plugin = *found;
+            if (const auto reason = module->unavailableReason(); reason.isNotEmpty()) refusal = reason;
+            else refusal = safeModeRefusal (module->path);
+        }
+        else refusal = "The plug-in is no longer in the catalogue.";
+    }
+    if (refusal.isNotEmpty()) { conclude ("refused", refusal); return; }
+    if (options.instantiate == nullptr || options.applyVstPreset == nullptr)
+    {
+        conclude ("refused", "Plug-ins cannot be test-loaded in this build.");
+        return;
+    }
+
+    // Two files that differ, so "two presets, two sounds" can be asked of them.
+    auto files = juce::File (folder.path).findChildFiles (juce::File::findFiles, true, "*." + folder.extension);
+    files.sort();
+    if (files.isEmpty()) { conclude ("refused", "There are no ." + folder.extension + " files in it."); return; }
+    const auto first = files.getFirst();
+    juce::File second;
+    const auto firstPrint = juce::SHA256 (first).toHexString();
+    for (int i = 1; i < juce::jmin (files.size(), 40) && second == juce::File(); ++i)
+        if (juce::SHA256 (files[i]).toHexString() != firstPrint) second = files[i];
+
+    options.instantiate (plugin.descriptionXml, options.sampleRate, options.blockSize,
+        [this, token = alive, path, plugin, first, second, conclude]
+        (std::unique_ptr<juce::AudioProcessor> processor, const juce::String& error)
+        {
+            if (! token->load()) return;
+            if (processor == nullptr)
+            {
+                conclude ("refused", plugin.name + " could not be opened to test the files"
+                                     + (error.isNotEmpty() ? ": " + error : juce::String (".")));
+                return;
+            }
+            try
+            {
+                const auto state = [&processor]
+                {
+                    juce::MemoryBlock block;
+                    processor->getStateInformation (block);
+                    return block;
+                };
+                const auto values = [&processor]
+                {
+                    juce::Array<float> out;
+                    for (auto* parameter : processor->getParameters()) out.add (parameter->getValue());
+                    return out;
+                };
+                const auto sameValues = [] (const juce::Array<float>& a, const juce::Array<float>& b)
+                {
+                    if (a.size() != b.size()) return false;
+                    for (int i = 0; i < a.size(); ++i)
+                        if (std::abs (a[i] - b[i]) > 1.0e-4f) return false;
+                    return true;
+                };
+                const auto initialState = state();
+                const auto initialValues = values();
+                if (! options.applyVstPreset (*processor, first))
+                {
+                    conclude ("refused", plugin.name + " refused " + first.getFileName() + ".");
+                    return;
+                }
+                const auto firstState = state();
+                const auto firstValues = values();
+                if (firstState == initialState && sameValues (firstValues, initialValues))
+                {
+                    conclude ("refused", "Loading " + first.getFileName() + " left " + plugin.name
+                                         + " as it was, so these are not its presets.");
+                    return;
+                }
+                if (second != juce::File())
+                {
+                    if (! options.applyVstPreset (*processor, second))
+                    {
+                        conclude ("refused", plugin.name + " refused " + second.getFileName() + ".");
+                        return;
+                    }
+                    const auto secondState = state();
+                    const auto secondValues = values();
+                    if (secondState == firstState && sameValues (secondValues, firstValues))
+                    {
+                        conclude ("refused", first.getFileName() + " and " + second.getFileName()
+                                             + " made the same sound, so " + plugin.name + " is not reading them.");
+                        return;
+                    }
+                    if (! options.applyVstPreset (*processor, first)
+                        || ! (state() == firstState || sameValues (values(), firstValues)))
+                    {
+                        conclude ("refused", "Loading " + first.getFileName() + " twice gave two different sounds.");
+                        return;
+                    }
+                }
+            }
+            catch (...)
+            {
+                conclude ("refused", plugin.name + " failed while the files were being tested.");
+                return;
+            }
+            processor.reset();
+
+            const auto at = findStateFolder (path);
+            if (at < 0) return;
+            const auto& current = stateFolders.getReference (at);
+            indexStateFolder (at, discoverStateFiles (juce::File (current.path), current.extension, plugin));
+            conclude ("ok", {});
+        });
 }
 
 juce::String InstrumentHostService::recordUnavailableReason (const LibraryRecord& record) const
@@ -11813,6 +12142,20 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::
     root->setProperty ("paths",   [this] { juce::Array<juce::var> a;
                                            for (const auto& p : libraryPaths) a.add (p);
                                            return a; }());
+    root->setProperty ("stateFolders", [this] { juce::Array<juce::var> a;
+        for (const auto& folder : stateFolders)
+        {
+            auto* f = new juce::DynamicObject();
+            f->setProperty ("path", folder.path);
+            f->setProperty ("ceId", folder.ceId);
+            f->setProperty ("plugin", folder.pluginName);
+            f->setProperty ("extension", folder.extension);
+            f->setProperty ("status", folder.status);
+            f->setProperty ("detail", folder.detail);
+            f->setProperty ("count", folder.count);
+            a.add (juce::var (f));
+        }
+        return a; }());
     options.emit ("instrumentHostLibrary", juce::var (root));
 }
 
@@ -11829,7 +12172,10 @@ void InstrumentHostService::scanVstPresets()
         const std::scoped_lock lock (catalogLock);
         snapshot = catalog;
     }
-    auto body = [this, token = alive, snapshot, paths = libraryPaths]() mutable
+    juce::Array<StateFolder> checkedFolders;
+    for (const auto& folder : stateFolders)
+        if (folder.status == "ok") checkedFolders.add (folder);
+    auto body = [this, token = alive, snapshot, paths = libraryPaths, checkedFolders]() mutable
     {
         const auto cancelled = [token] { return ! token->load(); };
         juce::Array<juce::File> vstRoots {
@@ -11842,10 +12188,41 @@ void InstrumentHostService::scanVstPresets()
             if (juce::File::isAbsolutePath (path)) vstRoots.add (juce::File (path));
         auto records = discoverVstPresetFiles (snapshot, vstRoots, cancelled);
         records.addArray (discoverVendorPresets (snapshot, vendorPresetRoots (snapshot, paths), cancelled));
+        // Checked preset folders are re-read, not re-tested: a file added since is the same
+        // format the test already accepted.
+        std::vector<std::pair<juce::String, juce::Array<LibraryRecord>>> folderRecords;
+        for (const auto& folder : checkedFolders)
+            for (const auto& plugin : presetCatalogueClasses (snapshot))
+                if (plugin.ceId == folder.ceId)
+                {
+                    folderRecords.emplace_back (folder.path, discoverStateFiles (juce::File (folder.path),
+                                                                                 folder.extension, plugin, cancelled));
+                    break;
+                }
+        // Plug-ins whose presets sit in a folder of their own, in a format read only by them.
+        juce::Array<juce::File> dataRoots {
+            juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+            juce::File::getSpecialLocation (juce::File::commonDocumentsDirectory),
+            juce::File::getSpecialLocation (juce::File::commonApplicationDataDirectory),
+            juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory),
+           #if JUCE_WINDOWS
+            juce::File::getSpecialLocation (juce::File::windowsLocalAppData),
+           #endif
+        };
+        std::map<juce::String, juce::var> candidates;
+        if (options.includeDefaultScanRoots)
+            for (const auto& plugin : presetCatalogueClasses (snapshot))
+                if (const auto found = findPresetCandidate (plugin, dataRoots); found.isObject())
+                    candidates[plugin.ceId] = found;
         if (cancelled()) return;
-        auto finish = [this, token, snapshot, records = std::move (records)]() mutable
+        auto finish = [this, token, snapshot, records = std::move (records),
+                       folderRecords = std::move (folderRecords), candidates = std::move (candidates)]() mutable
         {
             if (! token->load()) return;
+            presetCandidates = std::move (candidates);
+            for (auto& [path, found] : folderRecords)
+                indexStateFolder (findStateFolder (path), std::move (found));
+            saveStateFolders();
             for (const auto& source : { "vstpreset", "nksf", "fxp", "spire", "h2p" })
             {
                 juce::Array<LibraryRecord> matches;
@@ -11878,6 +12255,7 @@ void InstrumentHostService::scanCataloguePrograms (
     if (index >= classes->size())
     {
         saveLibrary();
+        refreshScanReportCounts();
         libraryScanBusy = false;
         libraryScanFinished = true;
         emitLibrary (libraryView);
@@ -11922,9 +12300,14 @@ void InstrumentHostService::scanCataloguePrograms (
         row->setProperty ("programs", programs);
         row->setProperty ("unavailable", unavailable);
         row->setProperty ("unnamedPrograms", unnamedPrograms);
+        row->setProperty ("ceId", plugin.ceId);
+        // Only a failure is a reason; a plug-in whose presets are in a format of its own is not
+        // broken, and the report says what can be done about it instead of flagging it.
         row->setProperty ("reason", error.isNotEmpty() ? error : ! instantiated
-            ? juce::String ("Plug-in could not be opened for program discovery") : count == 0
-            ? juce::String ("No presets found in supported files or named program lists. Add a preset folder; other formats may require the plug-in's own browser.") : juce::String());
+            ? juce::String ("Plug-in could not be opened for program discovery") : juce::String());
+        const auto candidate = presetCandidates.find (plugin.ceId);
+        row->setProperty ("candidate", count == 0 && candidate != presetCandidates.end()
+                                         ? candidate->second : juce::var());
         libraryScanReport.add (juce::var (row));
         emitLibrary (libraryView);
         scanCataloguePrograms (classes, index + 1);

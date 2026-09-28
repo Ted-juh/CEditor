@@ -176,9 +176,9 @@ try {
   assert.ok(await page.getByTestId('preset-row').count() > 0, 'saved sounds remain usable during the update');
   await page.evaluate(() => window.finishSoundsUpdate());
   await page.getByTestId('library-update-result').filter({ hasText: '1 plug-in needs attention' }).waitFor();
-  assert.equal(await page.locator('.scan-report').evaluate(el => el.open), true, 'issues are expanded in the update results');
   await page.locator('.scan-report').getByText('Preset files are missing.', { exact: false }).waitFor();
-  assert.ok((await page.locator('.scan-report').innerText()).includes('4139 usable presets'));
+  assert.ok((await page.locator('.scan-report').innerText()).includes('4139 presets'));
+  assert.match(await page.locator('.scan-report .report-head').innerText(), /1 need attention/, 'only the failure needs attention');
   await page.getByTestId('host-library-close').click();
   await page.getByTestId('library-update-result').click();
   await page.getByTestId('duplicate-set').click();

@@ -2,11 +2,21 @@
   import { onDestroy, onMount } from 'svelte';
   import { hostState, hostScanLog, hostLibrary, scanForInstruments, scanLibrary,
     requestLibrary, browseLibraryPath, removeLibraryPath, hostAnalysis, analyseLibrary, cancelAnalysis,
-    mergeDuplicateSet } from '../stores/instrumentHost.js';
+    mergeDuplicateSet, browseStateFolder, addStateFolder, removeStateFolder } from '../stores/instrumentHost.js';
   let { onShowSounds = () => {} } = $props();
   let pendingDestructive = $state('');
   let destructiveTimer;
+  // Only something that went wrong needs attention: a plug-in whose presets are in a format of
+  // its own is not broken, and says what can be done about it on its own row.
   let updateIssues = $derived($hostLibrary.scanReport.filter(row => row.reason || row.unavailable > 0).length);
+  const folderFor = (row) => $hostLibrary.stateFolders.find((f) => f.ceId === row.ceId) ?? null;
+  // Folders whose plug-in has no row yet (no update since) still need to be seen and removable.
+  let unlistedFolders = $derived($hostLibrary.stateFolders.filter((f) =>
+    !$hostLibrary.scanReport.some((row) => row.ceId === f.ceId)));
+  const shortPath = (path) => {
+    const parts = String(path).split(/[\\/]/).filter(Boolean);
+    return parts.length > 3 ? `…\\${parts.slice(-3).join('\\')}` : path;
+  };
   // The refusal causes C++ reports (RefusalCause in Library.h), in the order somebody would act
   // on them: the one a re-run can fix, then the ones it cannot, then anything unrecognised —
   // which appears only when a refusal string has moved and nothing classifies it any more.
@@ -38,7 +48,9 @@
     </button>
     <p role="status">{$hostScanLog.at(-1) || 'Instruments and effects'}</p>
   </section>
-  <section><div class="section-head"><h3>Preset folders</h3><button type="button" onclick={() => browseLibraryPath()}>Add folder…</button></div>
+  <section><div class="section-head"><h3>More folders to search</h3><button type="button" onclick={() => browseLibraryPath()}>Add folder…</button></div>
+      <p class="library-note">For .vstpreset, NKS, FXP, Spire and Zebra files kept outside the usual places. A plug-in with
+        presets in a format of its own gets its folder on its own row below.</p>
       {#if $hostLibrary.paths.length > 0}
         <div class="library-paths">
           {#each $hostLibrary.paths as path (path)}
@@ -56,18 +68,66 @@
   <section><h3>Preset library</h3>
       <button type="button" onclick={() => scanLibrary()} disabled={$hostLibrary.scanning} data-testid="host-scan-library">{$hostLibrary.scanning ? 'Updating library…' : 'Update library'}</button>
       <p class="library-note">Saved sounds are ready immediately. Update after adding presets or plug-ins; favourites and tags are kept.</p>
-      {#if $hostLibrary.scanReport.length || $hostLibrary.updateFinished}
-        <details class="scan-report" open={$hostLibrary.updateFinished && (updateIssues > 0 || !$hostLibrary.scanReport.length)}>
-          <summary>Update results · {$hostLibrary.scanReport.length} plug-ins{updateIssues ? ` · ${updateIssues} need attention` : ''}</summary>
-          {#if !$hostLibrary.scanReport.length}<div>No imported VST3 plug-ins were available to scan. Import a plug-in, then update the library.</div>{/if}
-          {#each $hostLibrary.scanReport as result}
-            <div><strong>{result.name}</strong> · {result.kind} · {result.count} usable presets
-              <span>{result.files} files · {result.programs} named programs{result.unavailable ? ` · ${result.unavailable} unavailable` : ''}</span>
-              {#if result.unnamedPrograms}<span>{result.unnamedPrograms} unnamed program slots excluded</span>{/if}
+      {#if $hostLibrary.scanReport.length}
+        <div class="scan-report" data-testid="plugin-presets">
+          <div class="report-head">Presets by plug-in · {$hostLibrary.scanReport.length}{updateIssues ? ` · ${updateIssues} need attention` : ''}</div>
+          {#each $hostLibrary.scanReport as result (result.ceId || result.name)}
+            {@const folder = folderFor(result)}
+            <div class="report-row" data-testid="plugin-presets-row" data-plugin={result.name}>
+              <div class="row-title"><strong>{result.name}</strong> · {result.kind} ·
+                <span class="row-count" class:none={result.count === 0}>{result.count > 0 ? `${result.count} presets` : 'no presets'}</span></div>
+              {#if result.count > 0}
+                <span>{result.files} files · {result.programs} named programs{result.unavailable ? ` · ${result.unavailable} unavailable` : ''}{result.unnamedPrograms ? ` · ${result.unnamedPrograms} unnamed program slots left out` : ''}</span>
+              {/if}
               {#if result.reason}<span class="load-failed">{result.reason}</span>{/if}
+              {#if folder}
+                <!-- The folder this plug-in's presets come from, and what the test load said. -->
+                <span class="folder-line" class:refused={folder.status === 'refused'} data-testid="plugin-presets-folder">
+                  {#if folder.status === 'ok'}From {shortPath(folder.path)} (.{folder.extension}) · {folder.count} presets
+                  {:else if folder.status === 'checking'}Test-loading two .{folder.extension} files into {result.name}…
+                  {:else}HoSTage can't read the .{folder.extension} files in {shortPath(folder.path)}. {folder.detail}{/if}
+                </span>
+                {#if folder.status !== 'checking'}
+                  <span class="row-actions">
+                    <button type="button" class="ghost danger" class:confirming={pendingDestructive === `state-folder:${folder.path}`}
+                            title="Stop using this folder; its presets leave the library"
+                            onclick={() => guardedAction(`state-folder:${folder.path}`, () => removeStateFolder(folder.path))}>
+                      {pendingDestructive === `state-folder:${folder.path}` ? 'Confirm' : 'Remove folder'}</button>
+                    {#if folder.status === 'refused'}
+                      <button type="button" class="ghost" onclick={() => browseStateFolder(result.ceId)}>Try another folder…</button>
+                    {/if}
+                  </span>
+                {/if}
+              {:else if result.count === 0 && !result.reason}
+                {#if result.candidate}
+                  <span class="found-line" data-testid="plugin-presets-found">Found {result.candidate.files} .{result.candidate.extension} files in
+                    {shortPath(result.candidate.path)} that HoSTage does not read yet.</span>
+                  <span class="row-actions">
+                    <button type="button" data-testid="plugin-presets-test"
+                            title="Load two of these into the plug-in; if it takes them, all of them join the library"
+                            onclick={() => addStateFolder(result.candidate.path, result.ceId)}>Test these files</button>
+                    <button type="button" class="ghost" onclick={() => browseStateFolder(result.ceId)}>Another folder…</button>
+                  </span>
+                {:else}
+                  <span data-testid="plugin-presets-browser-only">No preset files on this computer: its presets are only in its own browser.</span>
+                  <span class="row-actions">
+                    <button type="button" class="ghost" data-testid="plugin-presets-add"
+                            title="If the presets are files somewhere unusual, pick the folder"
+                            onclick={() => browseStateFolder(result.ceId)}>Add folder…</button>
+                  </span>
+                {/if}
+              {/if}
             </div>
           {/each}
-        </details>
+          {#each unlistedFolders as folder (folder.path)}
+            <div class="report-row"><strong>{folder.plugin}</strong>
+              <span class="folder-line">{folder.path} · {folder.status === 'ok' ? `${folder.count} presets` : folder.detail}</span>
+              <span class="row-actions"><button type="button" class="ghost danger" onclick={() => removeStateFolder(folder.path)}>Remove folder</button></span>
+            </div>
+          {/each}
+        </div>
+      {:else if $hostLibrary.updateFinished}
+        <div class="scan-report">No imported VST3 plug-ins were available to scan. Import a plug-in, then update the library.</div>
       {/if}
 
     <p>{$hostLibrary.counts.presets} presets · {$hostLibrary.counts.chains} chains · {$hostLibrary.counts.racks} racks</p>
@@ -174,9 +234,14 @@
   button:disabled { opacity: .5; cursor: default; }
   button.confirming, .load-failed { color: var(--host-danger); }
   .scan-report { margin-top: 10px; font-size: 11px; }
-  .scan-report summary { cursor: pointer; }
-  .scan-report div { padding-top: 8px; overflow-wrap: anywhere; }
-  .scan-report span { display: block; color: var(--host-text-soft); margin-top: 3px; }
+  .report-head { font-weight: 600; color: var(--host-text-soft); }
+  .report-row { padding: 8px 0; border-top: 1px solid var(--host-line); overflow-wrap: anywhere; }
+  .report-row:first-of-type { border-top: 0; }
+  .report-row > span { display: block; color: var(--host-text-soft); margin-top: 3px; }
+  .row-count.none { color: var(--host-text-soft); }
+  .found-line { color: var(--host-text) !important; }
+  .folder-line.refused { color: var(--host-warning, #d9a441) !important; }
+  .row-actions { display: flex !important; gap: 6px; flex-wrap: wrap; margin-top: 6px !important; }
   .scan-report span.load-failed { color: var(--host-danger); }
   .bar { height: 3px; background: var(--host-line-soft); }
   .bar i { display: block; height: 100%; background: var(--host-accent); }
