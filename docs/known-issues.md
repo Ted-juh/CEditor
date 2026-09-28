@@ -210,7 +210,7 @@ longer triggers a filesystem read. Invalid package shapes show a visible error, 
 current panel and do not open an extra tab. Tests also cover nested artwork and missing assets;
 the walkthrough is not evidence for every asset format or a second computer.
 
-## ~~A multi-channel custom component exports every channel with the FIRST channel's device binding~~ — EXPORT FIXED
+## ~~A multi-channel custom component exports every channel with the FIRST channel's device binding~~ — CLOSED
 
 *(Found and fixed 2026-09-28. `exportParameters.js` now picks each channel's wire by the binding
 whose `port` is the channel's name, as the live editor does; a single public channel keeps "any
@@ -220,10 +220,10 @@ The bug: one device wire per control was spread onto every public channel, so tw
 to two synth parameters exported two host lanes that both drove the first parameter, window-closed
 only. No QA sheet had a multi-channel component with bindings, so no existing export changed.
 
-**Still open, display only:** the Parameters editor (`PanelPreviewSurface.svelte` `parameterItem`)
-and `utils/parameterStatus.js` show one item per control from its first binding, so a
-multi-channel component lists one parameter where it now exports several. Nothing is sent wrongly;
-the list is just incomplete.
+**The display half is fixed too** (same day): the Parameter Editor listed one item per control, from
+its first binding. `utils/parameterStatus.js` `parameterEntries` now gives a component one item per
+bound channel; the first keeps the control's id, so the GAIA panel's 277 items are unchanged, and a
+further channel is `controlId::channel`. `parameterStatus.test.js` pins it.
 
 ## Compiler-free plugin export
 

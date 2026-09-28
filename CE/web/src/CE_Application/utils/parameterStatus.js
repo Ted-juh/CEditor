@@ -1,16 +1,61 @@
 import { flatControls } from './containment.js';
 import { customLcdInfo } from './customLcdInfo.js';
 
+/**
+ * The device-parameter bindings a Parameter Editor lists for one control, each with its item id.
+ *
+ * The first binding keeps the control's own id — every existing item, focus and recent list is keyed
+ * by it, so nothing that works today changes. A custom component's FURTHER bindings, each on a channel
+ * of its own, get `controlId::channel`: until these existed a component with `cutoff` and `resonance`
+ * bound to two synth parameters listed only the first, though it drives (and exports) both.
+ */
+export function parameterEntries(control) {
+  const s = control?._children;
+  const id = String(s?.Core?.id ?? '');
+  const bindings = (s?.DeviceBindings?.bindings ?? []).filter((b) => b?.kind === 'deviceParameter');
+  if (!id || !bindings.length) return [];
+  const out = [{ id, binding: bindings[0] }];
+  const channels = s?.ValueChannels?._children;
+  if (!channels) return out;
+  const seen = new Set([String(bindings[0].port ?? '')]);
+  for (const binding of bindings.slice(1)) {
+    const port = String(binding.port ?? '');
+    if (!port || seen.has(port) || !channels[port]) continue;
+    seen.add(port);
+    out.push({ id: `${id}::${port}`, binding });
+  }
+  return out;
+}
+
+/** `ctrl_7::resonance` → { controlId: 'ctrl_7', port: 'resonance' }; a plain id has no port. */
+export function splitParameterItemId(itemId) {
+  const text = String(itemId ?? '');
+  const at = text.indexOf('::');
+  return at < 0 ? { controlId: text, port: '' } : { controlId: text.slice(0, at), port: text.slice(at + 2) };
+}
+
+/** The binding an item id names on this control, or null. */
+export function parameterBindingFor(control, itemId) {
+  return parameterEntries(control).find((entry) => entry.id === String(itemId ?? ''))?.binding ?? null;
+}
+
 export function parameterStatusDesignModel(controls) {
   const items = flatControls(controls ?? []).flatMap(control => {
-    const s = control._children, binding = s.DeviceBindings?.bindings?.find(b => b.kind === 'deviceParameter');
-    const channel = s.ValueChannels?._children?.[binding?.port], info = customLcdInfo(control);
-    if (!binding || !channel || !info) return [];
-    return [{ id: s.Core.id, parameterId: binding.parameterId, title: info.name.replace(/^TONE \d+\s*\/\s*/i, ''),
-      value: channel.currentValue ?? channel.defaultValue, min: channel.min ?? 0, max: channel.max ?? 127, step: 1,
-      displayValue: info.text, displayNumber: info.value, displayMin: info.min, displayMax: info.max,
-      choices: s.Designer?.lcdReadout?.choices ?? [], group: parameterGroup(binding.parameterId), accent: parameterAccent(binding.parameterId),
-      disabled: true, feedback: {text:'DESIGN PREVIEW',colour:'#9cabb9'} }];
+    const s = control._children, info = customLcdInfo(control);
+    return parameterEntries(control).flatMap(({ id, binding }, index) => {
+      const channel = s.ValueChannels?._children?.[binding?.port];
+      if (!channel || !info) return [];
+      const value = channel.currentValue ?? channel.defaultValue;
+      // The component's own readout describes its first parameter; a further channel speaks for itself.
+      const own = index === 0;
+      return [{ id, parameterId: binding.parameterId,
+        title: own ? info.name.replace(/^TONE \d+\s*\/\s*/i, '') : String(channel.label || binding.port),
+        value, min: channel.min ?? 0, max: channel.max ?? 127, step: 1,
+        displayValue: own ? info.text : String(value ?? ''), displayNumber: own ? info.value : Number(value),
+        displayMin: own ? info.min : (channel.min ?? 0), displayMax: own ? info.max : (channel.max ?? 127),
+        choices: own ? (s.Designer?.lcdReadout?.choices ?? []) : [], group: parameterGroup(binding.parameterId), accent: parameterAccent(binding.parameterId),
+        disabled: true, feedback: {text:'DESIGN PREVIEW',colour:'#9cabb9'} }];
+    });
   });
   return { items, activeId: items.find(i=>i.parameterId==='tone1.filter.cutoff')?.id ?? items[0]?.id,
     recent: [], graphs: [], ui: {}, select() {}, write() {}, updateUi() {}, design: true };

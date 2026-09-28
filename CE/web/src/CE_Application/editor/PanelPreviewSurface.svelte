@@ -1,6 +1,6 @@
 <script>
   import { openDialog } from '../stores/scriptUi.js';
-  import { parameterGroup, parameterAccent, parameterFeedback } from '../utils/parameterStatus.js';
+  import { parameterGroup, parameterAccent, parameterFeedback, parameterEntries, parameterBindingFor, splitParameterItemId } from '../utils/parameterStatus.js';
   import { rangeResetValue } from '../utils/rangeReset.js';
   import { keyedStoreView } from '../utils/keyedStoreView.js';
   import { onDestroy, setContext, untrack } from 'svelte';
@@ -1306,12 +1306,17 @@
     if (focus) parameterFocus = id;
     parameterRecent = [id, ...parameterRecent.filter(other => other !== id)].slice(0, 6);
   }
+  // Item ids are control ids, plus `controlId::channel` for a component's further channel bindings
+  // (utils/parameterStatus.js parameterEntries). Every item still acts on its control.
   function parameterItem(id) {
-    const src = controlById(id), s = src?._children;
-    const binding = s?.DeviceBindings?.bindings?.find(b => b.kind === 'deviceParameter');
+    const { controlId, port } = splitParameterItemId(id);
+    const src = controlById(controlId), s = src?._children;
+    const binding = src ? parameterBindingFor(src, id) : null;
     if (!binding || ['trigger', 'text', 'pageIndex'].includes(binding.port) || s.Designer?.arpeggiator?.enabled) return null;
-    const meta = s.Designer?.lcdReadout ?? {}, info = lcdSourceInfo(src);
     const channel = s.ValueChannels?._children?.[binding.port];
+    // The component's readout speaks for its first parameter; a further channel for itself.
+    const meta = port ? { label: channel?.label || port } : (s.Designer?.lcdReadout ?? {});
+    const info = port ? null : lcdSourceInfo(src);
     const behavior = getBehavior(src), session = sessionFor(src);
     let value, min = 0, max = 127, step = 1, choices = [];
     if (channel && channel.type !== 'array') {
@@ -1337,9 +1342,10 @@
       disabled: isDisabled(src) || isReadOnly(src), feedback: parameterFeedback(binding, value, $deviceSyncFeedback) };
   }
   function writeParameter(id, requested, dragging = false) {
-    const item = parameterItem(id), src = controlById(id);
+    const { controlId, port } = splitParameterItemId(id);
+    const item = parameterItem(id), src = controlById(controlId);
     if (!item || item.disabled) return;
-    const s = src._children, binding = s.DeviceBindings.bindings.find(b => b.kind === 'deviceParameter');
+    const s = src._children, binding = parameterBindingFor(src, id);
     let value;
     if (item.choices.length) {
       const choice = item.choices.find(c => String(c.value) === String(requested));
@@ -1351,15 +1357,20 @@
     }
     rememberParameter(id, false);
     if (String(value) === String(item.value) && sessionFor(src)?.dragging !== true) return;
-    if (s.ValueChannels?._children?.[binding.port]) {
-      patchControlSession(id, { customValues: { [binding.port]: value }, valueOverrideEnabled: true, valueOverride: value, dragging });
-    } else if (binding.port === 'state') patchControlSession(id, { checked: !!value, dragging });
-    else patchControlSession(id, { valueOverrideEnabled: true, valueOverride: value, dragging });
+    if (port) {
+      // A further channel writes only itself; the control's own value belongs to its first parameter.
+      patchControlSession(controlId, { customValues: { [binding.port]: value }, dragging });
+    } else if (s.ValueChannels?._children?.[binding.port]) {
+      patchControlSession(controlId, { customValues: { [binding.port]: value }, valueOverrideEnabled: true, valueOverride: value, dragging });
+    } else if (binding.port === 'state') patchControlSession(controlId, { checked: !!value, dragging });
+    else patchControlSession(controlId, { valueOverrideEnabled: true, valueOverride: value, dragging });
   }
   function parameterEditorModel(control) {
     if (!control?._children?.Display?.parameterEditor) return null;
     const scope = control._children.Display.activeScope ?? [];
-    const items = scope.map(parameterItem).filter(Boolean);
+    const items = scope
+      .flatMap((controlId) => { const c = controlById(controlId); return c ? parameterEntries(c).map((entry) => entry.id) : [controlId]; })
+      .map(parameterItem).filter(Boolean);
     const fallback = items.find(i => i.parameterId === 'tone1.filter.cutoff')?.id ?? items[0]?.id;
     const graphs = allControls.filter(c => linkedEnvelopeConfig(c)).map(c => ({ id: getControlId(c),
       sources: Object.values(linkedEnvelopeConfig(c)).map(link => link.controlId), points: envWorkingPoints(c) }));
