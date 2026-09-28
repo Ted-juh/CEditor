@@ -163,6 +163,9 @@ private:
     // hands out when the worker is merely busy — building its editor — rather than throwing,
     // which the rack guard would read as a failure and answer by tearing the worker down.
     juce::MemoryBlock lastKnownState;
+    // Cleared in the destructor, so a delayed check scheduled on the message thread can tell
+    // the proxy it was about to read is gone.
+    std::shared_ptr<std::atomic<bool>> alive = std::make_shared<std::atomic<bool>> (true);
     bool hasLastKnownState = false;
     // What the worker was last told about realtime mode, so the rack guard's per-block
     // setNonRealtime is a no-op here and not a pipe round-trip on the audio thread.
