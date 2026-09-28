@@ -1,13 +1,14 @@
-// svgPanelImportActions.js — File › New Panel from SVG Artwork.
+// svgPanelImportActions.js — File › New Panel from SVG Artwork, and File › Update Panel from SVG Artwork.
 //
-// The same three layers as panel sharing, for the same reasons:
+// The same layers as panel sharing, for the same reasons:
 //
-//   utils/svgPanelImport.js   the convention and the geometry. No bridge, no stores. Tested in node.
-//   here                      the command: choose a file, read it, make the panel, say what happened.
+//   utils/svgPanelImport.js     the convention and the geometry. No bridge, no stores. Tested in node.
+//   utils/svgPanelReimport.js   matching a revised drawing to the panel it made. Pure, tested in node.
+//   here                        the commands: choose a file, read it, change the panels, report.
 //
-// The result is always a NEW panel. Importing into the open one would have to decide what happens to
-// its background and to controls already sitting where placeholders are, and every answer to that
-// loses someone's work; a new panel loses nothing, and its controls can be copied across.
+// "New" always makes a new panel. "Update" changes the open one, and only in the ways
+// svgPanelReimport.js lists — geometry of matched controls, new controls, the size and the background
+// — after showing what it will do.
 
 import {
   browseImage,
@@ -16,17 +17,28 @@ import {
   onImageBrowsed,
   requestFileData,
 } from '../bridge/bridge.js';
-import { addPanel } from './panels.js';
+import { get } from 'svelte/store';
+
+import { activePanel, addPanel, panels } from './panels.js';
 import { createPanel } from './panelModel.js';
+import { updatePanelInList } from './panelDocumentHelpers.js';
 import { cerror, cinfo, cwarn } from './console.js';
 import { notify } from './scriptUi.js';
+import { confirmDestructive } from '../utils/confirmDiscard.js';
 import { buildSvgImportControls, describeSvgImport, planSvgPanelImport } from '../utils/svgPanelImport.js';
+import {
+  artworkRecord,
+  describeSvgReimport,
+  linksForNewImport,
+  planSvgPanelReimport,
+  reimportIsEmpty,
+} from '../utils/svgPanelReimport.js';
 
 const READ_TIMEOUT_MS = 15000;
 const REQUEST_PREFIX = 'svgpanel_';
 
 let requestCounter = 0;
-let pendingBrowse = '';
+let pendingBrowse = null;   // { requestId, handle(text, filePath) }
 const pendingReads = new Map();
 let listenersReady = false;
 
@@ -63,6 +75,8 @@ export function importSvgPanelText(text, fileName = '') {
   panel.bgImageFit = 'fill';
   // Names are per panel, and this one is new — nothing to collide with but its own placeholders.
   panel.controls = buildSvgImportControls(plan);
+  // What "Update Panel from SVG Artwork" matches against next time.
+  panel.artworkImport = artworkRecord(plan, linksForNewImport(plan, panel.controls), baseName(fileName));
   addPanel(panel);
 
   cinfo(`[svg import] ✓ ${lines[0]} → "${panel.name}". Save it to keep it.`);
@@ -75,6 +89,70 @@ export function importSvgPanelText(text, fileName = '') {
     { kind: unplaced ? 'warn' : 'info', duration: unplaced ? 0 : 5000 },
   );
   return panel;
+}
+
+/**
+ * Update the open panel from a revised drawing. Shows what it will do and asks first, because the
+ * background image is outside undo (history.js excludes panel images to keep snapshots small): undo
+ * puts the controls back, but not the old artwork. Returns what was applied, or null.
+ */
+export function updatePanelFromSvgText(text, fileName = '', { confirm = confirmDestructive } = {}) {
+  const panel = get(activePanel);
+  if (!panel) {
+    notify('Open the panel to update first.', { kind: 'warn' });
+    return null;
+  }
+  const plan = planSvgPanelImport(text);
+  if (!plan.ok) {
+    const [line] = describeSvgImport(plan);
+    cerror('[svg update]', line);
+    notify(line, { kind: 'error', duration: 0 });
+    return null;
+  }
+
+  const update = planSvgPanelReimport(panel, plan, { fileName: baseName(fileName) });
+  const lines = describeSvgReimport(update);
+  const skipped = plan.skipped.map((skip) => `Skipped ${skip.source}: ${skip.reason}`);
+  const question = [
+    `Update "${panel.name}" from ${baseName(fileName)}.svg?`,
+    '',
+    ...lines,
+    ...(skipped.length ? ['', ...skipped] : []),
+    '',
+    'Undo restores the controls and the size, but not the previous background image.',
+  ].join('\n');
+  if (!confirm(question)) return null;
+
+  const moves = new Map(update.moves.map((move) => [move.controlId, move.to]));
+  panels.update((list) => updatePanelInList(list, panel.id, (current) => ({
+    ...current,
+    width: plan.width,
+    height: plan.height,
+    bgImageEnabled: true,
+    bgImage: plan.background.dataUrl,
+    artworkImport: update.record,
+    controls: [
+      ...(current.controls ?? []).map((control) => {
+        const to = moves.get(control?._children?.Core?.id);
+        if (!to) return control;
+        return { ...control, _children: { ...control._children, Transform: { ...control._children.Transform, ...to } } };
+      }),
+      ...update.added,
+    ],
+    modified: true,
+  })));
+
+  cinfo(`[svg update] ✓ "${panel.name}" from ${baseName(fileName)}.svg: ${update.moves.length} moved, `
+    + `${update.added.length} added, ${update.unchanged} unchanged.`);
+  for (const line of [...lines.slice(1), ...skipped]) cwarn(`[svg update] ${line}`);
+  notify(
+    reimportIsEmpty(update)
+      ? 'The artwork was replaced; every control was already in place.'
+      : `Updated from the artwork: ${update.moves.length} moved, ${update.added.length} added.`
+        + (update.kept.length ? ` ${update.kept.length} kept without a placeholder — see the Console.` : ''),
+    { kind: update.kept.length || skipped.length ? 'warn' : 'info', duration: update.kept.length ? 0 : 5000 },
+  );
+  return update;
 }
 
 function readSvgText(filePath) {
@@ -96,8 +174,9 @@ function ensureListeners() {
   // The image browser is shared with the panel background and asset pickers; the requestId is how
   // this command knows the answer is its own.
   onImageBrowsed(async (payload) => {
-    if (!pendingBrowse || payload?.requestId !== pendingBrowse) return;
-    pendingBrowse = '';
+    if (!pendingBrowse || payload?.requestId !== pendingBrowse.requestId) return;
+    const { handle } = pendingBrowse;
+    pendingBrowse = null;
     const filePath = String(payload?.filePath ?? '').trim();
     if (!filePath) return;
     if (!/\.svg$/i.test(filePath)) {
@@ -105,7 +184,7 @@ function ensureListeners() {
       return;
     }
     try {
-      importSvgPanelText(await readSvgText(filePath), filePath);
+      handle(await readSvgText(filePath), filePath);
     } catch (error) {
       cerror('[svg import] Could not read', filePath, '—', error.message);
       notify('Could not read the SVG file.', { kind: 'error', duration: 0 });
@@ -123,25 +202,38 @@ function ensureListeners() {
   });
 }
 
-function fallbackPicker() {
+function fallbackPicker(handle) {
   if (typeof window === 'undefined' || !window.document) return;
   const input = window.document.createElement('input');
   input.type = 'file';
   input.accept = '.svg,image/svg+xml';
   input.onchange = async () => {
     const file = input.files?.[0];
-    if (file) importSvgPanelText(await file.text(), file.name);
+    if (file) handle(await file.text(), file.name);
   };
   input.click();
 }
 
-/** The menu command. */
-export function newPanelFromSvgArtwork() {
+function chooseSvg(handle) {
   if (!isJuceAvailable()) {
-    fallbackPicker();
+    fallbackPicker(handle);
     return;
   }
   ensureListeners();
-  pendingBrowse = `${REQUEST_PREFIX}browse_${++requestCounter}`;
-  browseImage(pendingBrowse);
+  pendingBrowse = { requestId: `${REQUEST_PREFIX}browse_${++requestCounter}`, handle };
+  browseImage(pendingBrowse.requestId);
+}
+
+/** File › New Panel from SVG Artwork. */
+export function newPanelFromSvgArtwork() {
+  chooseSvg((text, filePath) => importSvgPanelText(text, filePath));
+}
+
+/** File › Update Panel from SVG Artwork. */
+export function updatePanelFromSvgArtwork() {
+  if (!get(activePanel)) {
+    notify('Open the panel to update first.', { kind: 'warn' });
+    return;
+  }
+  chooseSvg((text, filePath) => updatePanelFromSvgText(text, filePath));
 }

@@ -19,7 +19,8 @@ system, lived in `CE/web/src/CE_Application/docs/` and were deleted with the res
 ## Other documents here
 
 - [Panels from drawn artwork, and components that stay linked](panel-artwork-import.md) — File ›
-  New Panel from SVG Artwork (the placeholder convention, and what is and is not read), and the
+  New Panel from SVG Artwork (the placeholder convention, and what is and is not read), File ›
+  Update Panel from SVG Artwork (a revised drawing, without losing the panel's work), and the
   Source card that diffs, updates, resets and detaches a placed library component.
 - [Panel text style](property-hints.md) — the rules for user-facing strings: property hints,
   tooltips, and the notes in the panel body.

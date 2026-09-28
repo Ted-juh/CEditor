@@ -411,6 +411,10 @@ export function planSvgPanelImport(text) {
           orientation: found.role === 'slider' && box.height > box.width ? 'vertical' : 'horizontal',
           reason: found.reason,
           source: tagDescription(child),
+          // What a later re-import matches this placeholder by: the author's name, else the element
+          // id — even an editor's own `rect12`, which Inkscape keeps across saves. '' when neither
+          // exists (unnamed Illustrator shapes); those are matched by where they were.
+          key: name || String(child.attributes?.id ?? '').trim(),
         });
       } else if (UNMEASURED.has(child.name)) {
         const name = objectName(child);

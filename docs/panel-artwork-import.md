@@ -57,8 +57,44 @@ CSS classes, as Illustrator writes them, count.
 - **Only rectangles, circles and ellipses are measured.** A path, line, polygon, text or `<use>` in
   the placeholder layer is reported and skipped; convert it to a rectangle or circle.
 - **There is no LED control yet**, so LEDs are placed as round red lamps (a Shape). The report says so.
-- The import always makes a **new** panel. Copy controls across if you want them in an existing one.
+- **New Panel** always makes a new panel. To bring a revised drawing into a panel you have already
+  worked on, use **Update Panel** (below).
 - To discard an import, close its tab without saving. It is a new, unsaved panel until you save it.
+
+## Update Panel from SVG Artwork
+
+Artwork gets revised, and by then the panel has bindings, scripts and links. **File › Update Panel
+from SVG Artwork…** brings the open panel up to date with a new version of its drawing, and keeps
+that work. Before changing anything it shows what it will do and asks.
+
+What it changes:
+
+- **The background** is replaced with the new drawing, and the panel is resized if the drawing was.
+- **A control moves only if its placeholder moved in the drawing.** A control you nudged in CEditor
+  keeps your position while the drawing leaves it alone. If both moved, the drawing wins and the
+  summary names the control.
+- **A new placeholder becomes a new control.**
+
+What it never does:
+
+- **Delete a control.** A control whose placeholder is gone is kept, bindings and all, and listed so
+  you can decide.
+- **Re-add a control you deleted** from the panel while its placeholder is still in the drawing.
+- **Change a control's type**, or anything about it except position and size. If a placeholder now
+  says `slider` over a knob, the knob is moved and the mismatch is reported.
+
+How controls are matched to placeholders:
+
+1. **By the placeholder's name**, or its id if it has none. Renaming a control in CEditor does not
+   break the match. Renaming the *placeholder* in the drawing does: it becomes a new placeholder, so
+   the old control is kept and a new one is added.
+2. **Unnamed placeholders** (common in Illustrator) are matched by overlap with where they were.
+3. **A panel that was not made by an import** (built by hand, or imported before this existed)
+   adopts controls whose names are the placeholders' names, and remembers the match from then on.
+
+**Undo** puts the controls and the panel size back, but **not the previous background image**. Panel
+background images are kept out of the undo history everywhere in the editor. The confirmation says
+so before you commit. To go back fully, run Update again with the previous drawing.
 
 ## Linked components
 
