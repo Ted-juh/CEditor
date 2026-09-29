@@ -202,7 +202,7 @@ export async function runCreationPresets(page,out){
   await props.locator('.preset-action-btn').getByText('Apply',{exact:true}).click();await flush();
   assert.deepEqual(await text(),saved);
   await props.getByRole('button',{name:'Undo',exact:true}).click();assert.deepEqual(await text(),edited);
-  await props.getByTitle('Redo',{exact:true}).click();assert.deepEqual(await text(),saved);
+  await props.getByRole('button',{name:'Redo',exact:true}).click();assert.deepEqual(await text(),saved);
   console.log('Recovery load:',await page.evaluate(()=>({openPanels:window.__acceptance.panels().length,expandedBytes:JSON.stringify(window.__acceptance.panels()).length,storedBytes:localStorage.getItem('ce.unsavedPanels')?.length??0})));
   await page.reload();await page.waitForFunction(()=>!!window.__acceptance?.panel());
   await page.locator(`.canvas-control[data-control-id="${id}"]`).click({force:true});
@@ -246,7 +246,7 @@ export async function runOptionalFields(page){
     assert.equal((await read()).Setlist.scenes[0][key],next,`${label}: explicit zero is preserved`);
     await props.getByRole('button',{name:'Undo',exact:true}).click();
     assert.equal(JSON.stringify(await read()),before,`${label}: one undo restores the edit without a phantom zero in the next field`);
-    await props.getByTitle('Redo',{exact:true}).click();
+    await props.getByRole('button',{name:'Redo',exact:true}).click();
     await field.fill('');await field.press('Enter');await flush();
     assert.equal((await read()).Setlist.scenes[0][key],null,`${label}: clearing means do not send`);
   }
