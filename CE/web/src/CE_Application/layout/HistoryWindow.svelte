@@ -25,15 +25,21 @@
     listEl?.querySelector('[data-current="true"]')?.scrollIntoView?.({ block: 'nearest' });
   });
 
-  function onKeydown(event) {
-    if (event.key === 'Escape' && $historyWindowOpen) {
-      event.stopPropagation();
+  // Escape closes the window and nothing else. It listens in the capture phase, ahead of the
+  // editor's own window handlers, which would otherwise take the same Escape to clear a selection
+  // or leave a tool. The window is not modal, so every other key goes on to the editor as usual.
+  $effect(() => {
+    if (!$historyWindowOpen) return undefined;
+    const onKeydownCapture = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
       closeHistoryWindow();
-    }
-  }
+    };
+    window.addEventListener('keydown', onKeydownCapture, true);
+    return () => window.removeEventListener('keydown', onKeydownCapture, true);
+  });
 </script>
-
-<svelte:window onkeydown={onKeydown} />
 
 {#if $historyWindowOpen}
   <aside class="history-window" aria-label="History" data-testid="history-window">

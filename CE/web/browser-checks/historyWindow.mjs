@@ -83,6 +83,34 @@ try {
   const closed = await kit.page.locator('[data-testid="history-window"]').count();
   check('Escape closes the window', () => assert.equal(closed, 0));
 
+  // Escape must close the window and not ALSO do the editor's own Escape. In the Component
+  // Designer that clears the selected part, which is where the window's Escape used to leak.
+  const cc = await kit.make('CustomComponent', { 'Transform.x': 80, 'Transform.y': 260, 'Transform.width': 160, 'Transform.height': 80 });
+  await kit.page.evaluate(async (id) => {
+    const { createCustomComponentPartsDefaults } = await import('/src/CE_Application/utils/customComponentFactory.js');
+    const { applyControlPatch } = await import('/src/CE_Application/stores/controls.js');
+    applyControlPatch(id, { 'Parts._children': createCustomComponentPartsDefaults()._children });
+  }, cc);
+  const box = await kit.box(cc);
+  await kit.page.mouse.click(box.x + box.w / 2, box.y + box.h / 2);
+  await kit.settle(700);
+  await kit.page.locator('[data-testid="component-designer-launch"]').click();
+  await kit.settle(2500);
+  await kit.set(cc, { 'Designer.selectedSurfaceKind': 'layer', 'Designer.selectedLayer': 'label', 'Designer.selectedLayers': ['label'] });
+  await kit.settle(300);
+  await openEdit();
+  await kit.page.locator('#menu-Edit .dropdown-item', { hasText: 'History...' }).click();
+  await kit.page.locator('[data-testid="history-window"]').waitFor({ state: 'visible' });
+  await kit.page.keyboard.press('Escape');
+  await kit.settle(300);
+  const inDesigner = {
+    open: await kit.page.locator('[data-testid="history-window"]').count(),
+    selected: await kit.read(cc, 'Designer.selectedLayer'),
+  };
+  check('in the Component Designer, Escape closes the window and leaves the selected part selected', () => {
+    assert.deepEqual(inDesigner, { open: 0, selected: 'label' });
+  });
+
   check('no page errors', () => assert.deepEqual([...kit.failures], []));
 } finally {
   await kit.close();

@@ -113,6 +113,32 @@ try {
     assert.deepEqual(after, { open: false, state: 'hover' });
   });
 
+  // The sheet is modal: keys pressed while it is open belong to it, not to the designer behind it.
+  // Escape used to close the sheet AND clear the designer's selection, and Delete reached the
+  // designer and removed the selected part, out of sight under the sheet.
+  await kit.set(id, { 'Designer.selectedSurfaceKind': 'layer', 'Designer.selectedLayer': 'badge', 'Designer.selectedLayers': ['badge'] });
+  await kit.settle(400);
+  await kit.page.locator('.contact-sheet-btn').click();
+  await kit.page.locator('[data-testid="contact-sheet"]').waitFor({ state: 'visible', timeout: 10000 });
+  await kit.page.keyboard.press('Delete');
+  await kit.settle(300);
+  await kit.page.keyboard.press('Escape');
+  await kit.settle(400);
+  const keys = await kit.page.evaluate(async (id) => {
+    const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+    const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+    const live = get(panels).find((p) => p.id === get(activePanelId));
+    const control = (live?.controls ?? []).find((c) => c._children?.Core?.id === id);
+    return {
+      open: !!document.querySelector('[data-testid="contact-sheet"]'),
+      badge: !!control?._children?.Parts?._children?.badge,
+      selected: control?._children?.Designer?.selectedLayer ?? '',
+    };
+  }, id);
+  check('Escape closes the sheet and nothing else; Delete does not reach the designer behind it', () => {
+    assert.deepEqual(keys, { open: false, badge: true, selected: 'badge' });
+  });
+
   const errors = [...kit.failures];
   check('no page errors', () => assert.deepEqual(errors, []));
 } finally {

@@ -22,18 +22,36 @@
   let sheet = $derived(buildContactSheet(controlWithVariant(control, variant), stateNames, previewSignals(preview)));
   let scale = $derived(contactSheetScale(sheet.sizes));
 
-  function onKeydown(event) {
-    if (event.key === 'Escape') {
-      event.stopPropagation();
-      onClose();
-    }
-  }
+  // The sheet is modal, so keys pressed while it is open are its own. The designer behind it
+  // listens on the window: with a plain window listener here, Escape closed the sheet AND cleared
+  // the designer's selection, and Delete removed the selected part out of sight under the sheet.
+  // So: listen in the CAPTURE phase, which runs before the designer's handler.
+  //   Escape                 closes the sheet, and goes no further.
+  //   a key on the sheet     reaches its target (the variant picker), then stops at the sheet.
+  //   any other key          goes no further. Only listeners are skipped, not the browser's own
+  //                          default, so Tab still moves focus.
+  let sheetEl = $state(null);
+  $effect(() => {
+    const onKeydownCapture = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        onClose();
+        return;
+      }
+      if (sheetEl?.contains(event.target)) return;
+      event.stopImmediatePropagation();
+    };
+    window.addEventListener('keydown', onKeydownCapture, true);
+    return () => window.removeEventListener('keydown', onKeydownCapture, true);
+  });
+  // Take focus on open, so keys land on the sheet rather than on the button that opened it.
+  $effect(() => { sheetEl?.focus({ preventScroll: true }); });
 </script>
 
-<svelte:window onkeydown={onKeydown} />
-
 <div class="sheet-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-  <div class="sheet" role="dialog" aria-modal="true" aria-label="States at every size" data-testid="contact-sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="States at every size" data-testid="contact-sheet"
+    tabindex="-1" bind:this={sheetEl} onkeydown={(event) => event.stopPropagation()}>
     <header>
       <strong>States × sizes</strong>
       <span class="summary" class:clean={sheet.issueCount === 0}>
@@ -104,6 +122,7 @@
   }
 
   .sheet {
+    outline: none;
     width: max-content;
     max-width: 100%;
     max-height: 100%;
