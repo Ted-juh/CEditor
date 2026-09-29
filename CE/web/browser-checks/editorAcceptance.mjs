@@ -170,7 +170,7 @@ try {
     await page.evaluate(()=>window.__acceptance.flush());
     await x.fill('99');await x.press('Enter');
     await page.evaluate(()=>window.__acceptance.flush());
-    await props.getByTitle('Undo',{exact:true}).click();assert.equal((await read()).x,-42);
+    await props.getByRole('button',{name:'Undo',exact:true}).click();assert.equal((await read()).x,-42);
     await props.getByTitle('Redo',{exact:true}).click();assert.equal((await read()).x,99);
     assert.deepEqual(errors,[]);
     console.log('PASS numeric cancel/commit, typed stepping, Shift stepping, finite values, precision and undo/redo');
@@ -239,7 +239,7 @@ try {
               const after=await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)),id);
               if(after===before){edit.result='unchanged; inspect constraint or non-document field';continue;}
               await page.evaluate(()=>window.__acceptance.flush());
-              await props.getByTitle('Undo',{exact:true}).click();
+              await props.getByRole('button',{name:'Undo',exact:true}).click();
               const restored=await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)),id);
               if(restored!==before){
                 await writeFile(join(out,`${item.type}-${title.replaceAll(' ','_')}-${fieldIndex}-before.json`),before);
@@ -263,7 +263,7 @@ try {
             const after=await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)),id);
             const edit={switchIndex,label:name,result:'unchanged'};tabRecord.edits.push(edit);
             if(after!==before){
-              await page.evaluate(()=>window.__acceptance.flush());await props.getByTitle('Undo',{exact:true}).click();
+              await page.evaluate(()=>window.__acceptance.flush());await props.getByRole('button',{name:'Undo',exact:true}).click();
               assert.equal(await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)),id),before,`${item.type}/${title}/${name}: undo restores boolean edit`);
               assert.deepEqual(await page.evaluate(()=>window.__acceptance.selection()),[id]);
               edit.result='changed and undo restored';
@@ -285,7 +285,7 @@ try {
               const after=await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)),id);
               const edit={fieldIndex,label:descriptor.label,attempt:next,result:after===before?'non-document choice':'changed and undo restored'};tabRecord.edits.push(edit);
               if(after!==before){
-                await page.evaluate(()=>window.__acceptance.flush());await props.getByTitle('Undo',{exact:true}).click();
+                await page.evaluate(()=>window.__acceptance.flush());await props.getByRole('button',{name:'Undo',exact:true}).click();
                 assert.equal(await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)),id),before,`${item.type}/${title}/${descriptor.label}/${next}: undo restores option change`);
               }else await field.selectOption(descriptor.value);
             }

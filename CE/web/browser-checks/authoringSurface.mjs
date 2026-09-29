@@ -164,8 +164,10 @@ try {
   // rather than per-session. One undo should give back the 100 and keep the part; only the second
   // should take the part away. An undo stack that collapsed both into one entry would pass a
   // single-undo assertion and lose an author's drawing every time they corrected a number.
-  const undo = () => kit.page.locator('button[title="Undo (Ctrl+Z)"]').click();
-  const redo = () => kit.page.locator('button[title="Redo (Ctrl+Y)"]').click();
+  // By accessible name: the tooltip names the step ("Undo Resize part rect1 (Ctrl+Z)"), so it is
+  // not a stable handle.
+  const undo = () => kit.page.locator('.component-workspace-actions button[aria-label="Undo"]').click();
+  const redo = () => kit.page.locator('.component-workspace-actions button[aria-label="Redo"]').click();
 
   await undo();
   await kit.settle(900);

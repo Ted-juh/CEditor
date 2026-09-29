@@ -916,6 +916,7 @@
                 class:active={$undoAvailable}
                 disabled={!$undoAvailable}
                 title={`${undoTip} (Ctrl+Z)`}
+                aria-label="Undo"
                 onclick={undo}
               ><Undo2 size={14} strokeWidth={2} /></button>
               <button
@@ -924,6 +925,7 @@
                 class:active={$redoAvailable}
                 disabled={!$redoAvailable}
                 title={`${redoTip} (Ctrl+Y)`}
+                aria-label="Redo"
                 onclick={redo}
               ><Redo2 size={14} strokeWidth={2} /></button>
               {#if $componentDesignerStatus?.kind}
