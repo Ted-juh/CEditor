@@ -6,8 +6,9 @@ not a rewrite, and to check how much of the property model a JSON Schema form li
 (svelte-jsonschema-form) could take before adopting it.
 
 **Built:** `properties/FieldList.svelte` draws ordinary fields from data (`utils/inspectorFields.js`
-describes the kinds, `models/inspectorFieldSets.js` holds the sets). The **Kinetic** section's
-editor now uses it. Anything that is not ordinary stays the editor's own, as a Svelte snippet
+describes the kinds, `models/inspectorFieldSets.js` holds the sets). The kinds are switch,
+slider, number and select. The **Kinetic** editor and three of **Crossfader**'s four sections use
+it. Anything that is not ordinary stays the editor's own, as a Svelte snippet
 placed by a `slot` entry.
 
 **Not adopted:** the JSON Schema form library, for the reasons below.
@@ -71,10 +72,22 @@ Nothing was added to `package.json`.
 
 In order, each a small step that pays for itself:
 
-1. **Number and select kinds** (`NumberCell`/`PropertyScrub`, `<select>`), covering 47% of cells.
-   A select's options should come from `componentTables.js`, which the scripting enums already
-   read. That would retire `componentEnums.test.js`'s parsing of editor source to find options,
-   because the editor and the scripting API would read one table.
+1. **Number and select kinds.** *Done, 2026-09-29, with Crossfader as the section that proves
+   them.* A number field is a `NumberCell` in the three arrangements the editors use: a compact
+   cell, a cell whose label differs from the number's own, or the NumberCell alone. It can clamp
+   on write to its range or only to its minimum. A select lists `[value, label]` options in the
+   order it presents them, and may name the `table` its component reads (`componentTables.js` and
+   the layout modules it imports). A test holds such a select to exactly that set of values. Order
+   is left to the inspector, because Crossfader's Law is presented as Equal power, Linear, Sharp
+   while the table reads linear, equalPower, sharp. Any field can carry `when`, which is how
+   Crossfader's Rest and Time appear only once "On release" asks for them.
+   Crossfader's Handle design, Crossfader and Return to rest sections are data now; Labels &
+   colours stays hand-written (text inputs and the swatch cluster). Its render was identical
+   before and after in four states, including both conditional layouts. The acceptance harness's
+   properties mode edits the same 9 Crossfader fields as before, each with a full undo round trip.
+   `componentEnums.test.js` used to parse the Crossfader editor's source for its orientation
+   options; it now reads the field set. It still parses seven other editors (LCD, Pixel, Chord Pad,
+   Ribbon, Note Ribbon, Meter, Matrix), and each of those ends when its section moves.
 2. **Move sections as they are next edited**, not in a sweep. Each move gets the same before/after
    render comparison the Kinetic move had.
 3. **Derive the scripting verbs' ranges from the field sets**, or the reverse, so the two lists

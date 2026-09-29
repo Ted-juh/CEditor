@@ -20,6 +20,8 @@
 // enum verb exists without an entry, and that the two tables with no util module to import from
 // (the LCD's scroll, the Pixel display's animation mode) match the `<select>` the editor renders.
 
+import { CROSSFADER_FIELDS } from '../src/CE_Application/models/inspectorFieldSets.js';
+import { selectOptions } from '../src/CE_Application/utils/inspectorFields.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -156,7 +158,10 @@ test('the LCD and Pixel tables match the picker the editor renders', () => {
   assert.deepEqual(NOTERIBBON_MOD_AXES, editorOptions('NoteRibbonEditor.svelte', 'modAxis'));
   assert.deepEqual(RIBBON_ORIENTATIONS, editorOptions('RibbonEditor.svelte', 'orientation'));
   assert.deepEqual(RIBBON_STYLES, editorOptions('RibbonEditor.svelte', 'style'));
-  assert.deepEqual(CROSSFADER_ORIENTATIONS, editorOptions('CrossfaderEditor.svelte', 'orientation'));
+  // Crossfader's picker is data now (models/inspectorFieldSets.js), so it is read from there rather
+  // than out of the .svelte source — same values, same order, no parsing.
+  assert.deepEqual(CROSSFADER_ORIENTATIONS,
+    selectOptions(CROSSFADER_FIELDS.find((field) => field.key === 'orientation')).map(([value]) => value));
   assert.deepEqual(METER_ORIENTATIONS, editorOptions('MeterEditor.svelte', 'orientation'));
   assert.deepEqual(MATRIX_CELL_STYLES, editorOptions('MatrixEditor.svelte', 'cellStyle'));
   assert.deepEqual(LCD_SCROLL_MODES, editorOptions('DisplayEditor.svelte', 'scrollMode'));

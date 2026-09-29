@@ -1,10 +1,13 @@
 /**
- * inspectorFields.mjs — the Kinetic inspector, drawn from data, driven in the running editor.
+ * inspectorFields.mjs — inspector sections drawn from data, driven in the running editor.
  *
  * test/inspectorFields.test.js renders the editor on the server, which proves what it draws but not
  * that its sliders and switches write. The acceptance harness's properties mode opens the Kinetic tab
  * but only fills text and number inputs, so it edits none of these fields. This does: the Run switch,
  * a plain slider, a percent slider, and the editor's own Sync snippet in its slot.
+ *
+ * Crossfader is the second section, for the number and select kinds: a select, a clamped number, and
+ * the Rest and Time fields that appear only once "On release" asks for them.
  *
  * Run: node browser-checks/inspectorFields.mjs
  */
@@ -63,6 +66,47 @@ try {
   await kit.settle(200);
   const sync = await kit.read(id, 'Kinetic.syncToTransport');
   check('the Sync snippet in its slot still writes', () => assert.equal(sync, true));
+
+  // --- Crossfader: selects, numbers and fields that come and go ---------------------------------
+  const xf = await kit.make('Crossfader', { 'Transform.x': 60, 'Transform.y': 260 });
+  await kit.page.evaluate(async (id) => {
+    const { selectedComponentIds } = await import('/src/CE_Application/stores/panels.js');
+    selectedComponentIds.set(new Set([id]));
+  }, xf);
+  await kit.settle(400);
+  await props.locator('.tab-icon[title="Crossfader"]').click();
+  await kit.settle(400);
+
+  await cellOf(props, 'Law').locator('select').selectOption('sharp');
+  await kit.settle(200);
+  const law = await kit.read(xf, 'Crossfader.law');
+  check('a select writes the value chosen', () => assert.equal(law, 'sharp'));
+
+  const mix = props.locator('input.nc-value[aria-label="Mix"]');
+  await mix.fill('5');
+  await mix.press('Enter');
+  await kit.settle(200);
+  const mixed = await kit.read(xf, 'Crossfader.mix');
+  check('a number field writes what is typed, clamped to its range', () => assert.equal(mixed, 1));
+
+  const restBefore = await props.locator('input.nc-value[aria-label="Rest"]').count();
+  const timeBefore = await props.locator('input.nc-value[aria-label="Time (ms)"]').count();
+  await cellOf(props, 'On release').locator('select').selectOption('rest');
+  await kit.settle(300);
+  const rest = props.locator('input.nc-value[aria-label="Rest"]');
+  const shownAfter = { rest: await rest.count(), time: await props.locator('input.nc-value[aria-label="Time (ms)"]').count() };
+  await rest.fill('0.8');
+  await rest.press('Enter');
+  const time = props.locator('input.nc-value[aria-label="Time (ms)"]');
+  await time.fill('600');
+  await time.press('Enter');
+  await kit.settle(200);
+  const spring = { mode: await kit.read(xf, 'Crossfader.returnMode'), value: await kit.read(xf, 'Crossfader.returnValue'), time: await kit.read(xf, 'Crossfader.returnTime') };
+  check('choosing "A set value" brings in Rest and Time, and both write', () => {
+    assert.deepEqual([restBefore, timeBefore], [0, 0], 'hidden while the handle latches');
+    assert.deepEqual(shownAfter, { rest: 1, time: 1 });
+    assert.deepEqual(spring, { mode: 'rest', value: 0.8, time: 600 });
+  });
 
   check('no page errors', () => assert.deepEqual([...kit.failures], []));
 } finally {
