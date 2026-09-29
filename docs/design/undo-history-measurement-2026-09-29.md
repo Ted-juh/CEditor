@@ -97,8 +97,32 @@ retention to nothing measurable.
 it writes to. That is what Immer's `produce` is. It belongs **in the edit path**, not as a
 patch-based history: once edits share structure, snapshots already cost a pointer per control.
 It is a bigger change than 1. `mutatePanelControlsInList` has fourteen call sites, each mutator
-writing freely into its draft, and Immer is a new dependency, so it needs its own review. A hand-written
-per-section copy for the hot paths (drag, nudge, align) would get most of the benefit without it.
+writing freely into its draft, and Immer is a new dependency, so it needs its own review. A
+hand-written per-section copy for the hot paths (drag, nudge, align) would get most of the benefit
+without it.
+
+**Fixed the same day, for the hot paths, without Immer.** Drag, group resize, nudge and align
+all write through `applyControlPatchesById`, and inspector edits across a selection through
+`updateSelectedProperty` and `applySelectedPatch`. All of those writes are dotted paths. `setNestedValueShared` in
+`stores/controlTreeUtils.js` copies only the spine of nodes a path walks through, by the same rules
+`setNestedValue` walks by, then runs the real `setNestedValue` on that spine. Everything else stays
+shared. `patchPanelControlsInList` applies it across a panel. `sharedPathWrite.test.js` checks it
+against `deepClone` + `setNestedValue` on every leaf path of every component type (over 5,000
+paths), plus template-materialised sections, array indices, root keys, writes that do not land
+and writes that throw. The bench, re-run with a cleared history per scenario, with the old path
+alongside:
+
+| Panel | Edit | Before: edit / retained per step | After |
+|---|---|---|---|
+| GAIA | select all, nudge | 633 ms / 31 MB (1.5 GB at 50) | 1.1 ms / 3 KB (0.1 MB) |
+| GAIA | move the 6.5 MB container | 117 ms / 7.1 MB (346 MB) | 1.3 ms / 1.6 KB (0.1 MB) |
+| AN1x | select all, nudge | 402 ms / 27 MB (1.3 GB) | 3.7 ms / 298 KB (14.5 MB) |
+| GAIA, AN1x | move one control | ~1 ms / 24–27 KB | ~1.3 ms / 8 KB |
+
+The other `mutatePanelControlsInList` callers still deepClone each control they edit: state-scoped
+inspector writes, adding and removing sections and nodes, and replacing controls. Each touches one
+control, from a menu or a field rather than a gesture, so none of them is on a path that repeats
+per frame or per selection. Immer remains the route if they ever need the same treatment.
 
 **4. Patch-based history is not needed.** It would solve 3 by storing `Transform.x: 12 → 13`
 instead of controls. But once 2 and 3 are fixed the snapshots already retain only what changed,

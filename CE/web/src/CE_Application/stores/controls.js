@@ -25,7 +25,7 @@ import {
 import { instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
 import { isExclusiveSelectBehavior, normalizeExclusiveSelectDefaults } from '../utils/selectGroupUtils.js';
 import { deleteNestedValue, setNestedValue, valueAtPath } from './controlTreeUtils.js';
-import { mutatePanelControlsByIdsInList, mutatePanelControlsInList, updatePanelInList } from './panelDocumentHelpers.js';
+import { mutatePanelControlsByIdsInList, mutatePanelControlsInList, patchPanelControlsInList, updatePanelInList } from './panelDocumentHelpers.js';
 import { mutateComponentDocumentControl } from './componentWorkspace.js';
 import { targetLayerName } from './panelLayerActions.js';
 
@@ -165,10 +165,9 @@ export function updateSelectedProperty(path, value) {
   const preferredControlIds = isBehaviorPath(path) ? [...ids] : [];
 
   panels.update((list) => {
-    let nextList = mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
-      applyResolvedValue(draft, path, value);
-      return true;
-    });
+    // Copies only what the write passes through; see patchPanelControlsInList.
+    let nextList = patchPanelControlsInList(list, panelId,
+      (control) => (ids.has(control?._children?.Core?.id) ? { [path]: value } : null));
 
     if (isBehaviorPath(path)) {
       nextList = normalizeExclusiveSelectionInList(nextList, panelId, preferredControlIds);
@@ -642,21 +641,11 @@ export function applyControlPatchesById(patchesByControlId, targetPanelId = get(
   );
 
   panels.update((list) => {
-    let nextList = mutatePanelControlsInList(
-      list,
-      panelId,
-      (control) => patchesByControlId.has(control?._children?.Core?.id),
-      (draft) => {
-        const patch = patchesByControlId.get(draft?._children?.Core?.id);
-        if (!patch || Object.keys(patch).length === 0) return false;
-
-        for (const [path, value] of Object.entries(patch)) {
-          applyResolvedValue(draft, path, value);
-        }
-
-        return true;
-      }
-    );
+    // Drag, group resize, nudge and align all land here. Copying only what each path passes
+    // through, instead of deepCloning every control touched, is what keeps a select-all nudge from
+    // copying (and undo history from keeping) the whole panel.
+    let nextList = patchPanelControlsInList(list, panelId,
+      (control) => patchesByControlId.get(control?._children?.Core?.id) ?? null);
 
     if (shouldNormalize) {
       nextList = normalizeExclusiveSelectionInList(nextList, panelId, preferredControlIds);
@@ -730,13 +719,9 @@ export function applySelectedPatch(patch) {
   const shouldNormalize = shouldNormalizeExclusiveSelection(Object.keys(patch));
 
   panels.update((list) => {
-    let nextList = mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
-      for (const [path, value] of Object.entries(patch)) {
-        applyResolvedValue(draft, path, value);
-      }
-
-      return true;
-    });
+    // A preset applied to a whole selection: copies only what the paths pass through.
+    let nextList = patchPanelControlsInList(list, panelId,
+      (control) => (ids.has(control?._children?.Core?.id) ? patch : null));
 
     if (shouldNormalize) {
       nextList = normalizeExclusiveSelectionInList(nextList, panelId, preferredControlIds);

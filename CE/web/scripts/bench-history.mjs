@@ -2,7 +2,7 @@
 //
 // Handoff item 7 asked whether history needs a new data model (Immer patches, jsondiffpatch) and
 // said to profile first. This is the profile. It loads the real shipped panels into the real
-// stores and edits them through the same store path a drag uses (mutatePanelControlsByIdsInList),
+// stores and edits them through the same store path a drag uses (applyControlPatchesById),
 // committing each edit with pushSnapshot(), as a gesture boundary does. For each scenario it
 // reports:
 //
@@ -22,8 +22,8 @@ import { get } from 'svelte/store';
 import { deserializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { panels, addPanel, setActivePanel } from '../src/CE_Application/stores/panels.js';
 import { mutatePanelControlsByIdsInList } from '../src/CE_Application/stores/panelDocumentHelpers.js';
-import { mapControlsTree } from '../src/CE_Application/utils/containment.js';
-import { initHistory, pushSnapshot, undo, redo } from '../src/CE_Application/stores/history.js';
+import { applyControlPatchesById } from '../src/CE_Application/stores/controls.js';
+import { clearHistory, initHistory, pushSnapshot, undo, redo } from '../src/CE_Application/stores/history.js';
 
 if (typeof globalThis.gc !== 'function') {
   console.error('run with --expose-gc');
@@ -56,32 +56,25 @@ function walk(controls, depth = 0, out = []) {
   return out;
 }
 
+/** What a drag, nudge or align does: a Transform.x patch per control through applyControlPatchesById. */
 function moveBy(panelId, ids, dx) {
+  const live = get(panels).find((p) => p.id === panelId);
+  const byId = new Map(walk(live.controls).map((entry) => [entry.id, entry.control]));
+  applyControlPatchesById(new Map(ids.map((id) => [id, { 'Transform.x': Number(byId.get(id)?._children?.Transform?.x ?? 0) + dx }])), panelId);
+}
+
+/** The same move as it was before 2026-09-29: every control touched deepCloned, then written. */
+function moveByDeepClone(panelId, ids, dx) {
   panels.update((list) => mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
     draft._children.Transform.x = Number(draft._children.Transform.x ?? 0) + dx;
     return true;
   }));
 }
 
-/**
- * The same move, but copying only what it changes: the control shell, its _children map and its
- * Transform. Every other section stays shared with the previous state. Not what the app does —
- * the comparison that says how much of the cost is the edit path's whole-control deepClone.
- */
-function moveBySharing(panelId, ids, dx) {
-  const wanted = new Set(ids);
-  panels.update((list) => list.map((panel) => {
-    if (panel.id !== panelId) return panel;
-    const controls = mapControlsTree(panel.controls, (control) => {
-      if (!wanted.has(control?._children?.Core?.id)) return control;
-      const transform = control._children.Transform;
-      return { ...control, _children: { ...control._children, Transform: { ...transform, x: Number(transform.x ?? 0) + dx } } };
-    });
-    return { ...panel, controls, modified: true };
-  }));
-}
-
 function scenario(panelId, label, ids, move = moveBy) {
+  // Each scenario starts from an empty history: otherwise its steps evict the previous scenario's,
+  // the heap SHRINKS, and a costly scenario after a costlier one reads as retaining nothing.
+  clearHistory(panelId);
   pushSnapshot();                       // baseline
   const before = heap();
   const edits = [];
@@ -139,8 +132,8 @@ for (const file of files) {
     scenario(live.id, 'move 20 controls', twenty),
     scenario(live.id, `edit the biggest control (${biggest.type})`, [biggest.id]),
     scenario(live.id, 'select all top-level, nudge', topLevel),
-    scenario(live.id, 'same, copying only Transform (comparison)', topLevel, moveBySharing),
-    scenario(live.id, `biggest control, copying only Transform (comparison)`, [biggest.id], moveBySharing),
+    scenario(live.id, 'select all, nudge — deepClone path (before)', topLevel, moveByDeepClone),
+    scenario(live.id, 'biggest control — deepClone path (before)', [biggest.id], moveByDeepClone),
   ]) {
     rows.push({ panel: basename(file, '.cepanel'), ...result });
     console.log(`  ${result.label.padEnd(44)} edit ${ms(result.edit)} (p95 ${ms(result.editP95)})  commit ${ms(result.commit)} (p95 ${ms(result.commitP95)})  `
