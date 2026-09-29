@@ -129,6 +129,22 @@ private:
 };
 }
 
+/** reFX names every Vanguard preset with a two-letter type code ("LD Clav Man", "PD Warm"),
+    and the .fxp carries no category of its own; the code is the category. */
+inline juce::String vanguardCategory (const juce::String& presetName)
+{
+    static const std::pair<const char*, const char*> codes[] {
+        { "LD", "Lead" }, { "AR", "Arp" }, { "SY", "Synth" }, { "PD", "Pad" }, { "BA", "Bass" },
+        { "TG", "Trance gate" }, { "FX", "FX" }, { "PL", "Pluck" }, { "AT", "Atmosphere" },
+        { "SQ", "Sequence" }, { "DR", "Drums" }, { "OR", "Organ" }, { "CH", "Chord" },
+        { "ST", "Strings" }, { "PN", "Piano" }, { "BL", "Bell" }, { "GT", "Guitar" },
+        { "MA", "Mallet" }, { "BR", "Brass" }, { "VO", "Vocal" }, { "KY", "Keys" }, { "KB", "Keys" } };
+    const auto code = presetName.trim().upToFirstOccurrenceOf (" ", false, false);
+    for (const auto& [prefix, category] : codes)
+        if (code == prefix) return category;
+    return {};
+}
+
 inline VendorPreset readVendorPreset (const juce::File& file)
 {
     VendorPreset result;
@@ -213,6 +229,7 @@ inline VendorPreset readVendorPreset (const juce::File& file)
         result.sourceType = "fxp";
         result.instrument = "Vanguard";
         result.manufacturer = "reFX";
+        result.category = vanguardCategory (result.name);
         result.componentState = juce::MemoryBlock (data + 60, size - 60);
     }
     else if (file.hasFileExtension ("h2p"))

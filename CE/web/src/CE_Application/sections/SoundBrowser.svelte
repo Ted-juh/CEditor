@@ -360,10 +360,10 @@
               <button type="button" class="preset-pick" aria-pressed={record.recordId === selected?.recordId}
                       title={record.available ? `${record.name} — ${record.instrument}` : record.reason}
                       onkeydown={walkPresets} onclick={(e) => sounds.select(record.recordId, e)} ondblclick={() => loadInto(record, 'focused')}>
-                <span class="preset-name">{record.name}{#if record.hidden}<span class="badge folded">FOLDED</span>{/if}</span><span>{record.instrument || '—'}</span>
+                <span class="preset-name"><span class="name-text">{record.name}</span>{#if record.hidden}<span class="badge folded">FOLDED</span>{/if}{#if !page && record.rating > 0}<span class="stars inline" data-testid="row-stars">{'★'.repeat(record.rating)}</span>{/if}{#each (record.tags ?? []).slice(0, 3) as tag (tag)}<span class="row-tag" data-testid="row-tag">{tag}</span>{/each}{#if (record.tags ?? []).length > 3}<span class="row-tag more">+{record.tags.length - 3}</span>{/if}</span><span>{record.instrument || '—'}</span>
                 <span class="preset-category">{record.category || '—'}</span>
                 {#if page}
-                  <span class="col-env">{#if record.sonic && !record.sonic.silent}<svg viewBox="0 0 70 16" preserveAspectRatio="none" aria-hidden="true"><path d={`${envelopeLine(record.sonic.envelope, 70, 16)} L70,16 L0,16 Z`} /></svg>{/if}</span>
+                  <span class="col-env">{#if record.sonic && !record.sonic.silent}<svg viewBox="0 0 70 16" preserveAspectRatio="none" aria-hidden="true"><path d={`${envelopeLine(record.sonic.envelope, 70, 16)} L70,16 L0,16 Z`} /></svg>{:else if record.sonic}<span class="not-measured">silent</span>{:else if record.type === 'preset'}<span class="not-measured" title="Not listened to yet: Library › Listen plays each sound once and draws its envelope">not measured</span>{/if}</span>
                   <span class="col-rating">{#if record.rating > 0}<span class="stars">{'★'.repeat(record.rating)}</span>{/if}</span>
                   <span class="col-loaded">{lastLoaded(record.lastLoadedAtMs)}</span>
                 {/if}
@@ -670,6 +670,12 @@
   .col-env svg { width: 70px; height: 16px; display: block; }
   .col-env path { fill: #6fb0c944; stroke: #7fb4e0; stroke-width: 1; vector-effect: non-scaling-stroke; }
   .stars { color: #d9a13c; font-size: 10.5px; letter-spacing: 1px; }
+  .stars.inline { margin-left: 6px; }
+  /* Your tags, on the row: small, quiet, and never pushing the name out of its column. */
+  .row-tag { display: inline-block; margin-left: 5px; padding: 0 6px; border: 1px solid #3a4652; border-radius: 8px;
+             font-size: 10px; line-height: 15px; color: var(--host-text-soft, #9aa5b1); vertical-align: 1px; }
+  .row-tag.more { border-style: dashed; }
+  .not-measured { font-size: 10px; color: var(--host-text-dim, #6c7783); }
   .col-loaded { font: 11px var(--host-font-mono, monospace); color: var(--host-text-dim); }
   .more { padding: 8px 10px; color: var(--host-text-dim); font-size: 11px; }
 

@@ -39,7 +39,7 @@ try {
     return { history: [...sounds.history], at: sounds.historyAt, selection: [...sounds.selection], sort: sounds.query.sort,
              descending: sounds.query.sortDescending, selected: sounds.selected?.name ?? '' };
   });
-  const rowNames = () => page.getByTestId('preset-row').locator('.preset-name').allInnerTexts();
+  const rowNames = () => page.getByTestId('preset-row').locator('.preset-name .name-text').allInnerTexts();
 
   // From the dock to the page, and the page's three columns.
   await page.getByRole('button', { name: 'Rack', exact: true }).first().click();
@@ -47,6 +47,10 @@ try {
   if (await page.getByTestId('host-sound-browser').count() === 0) await page.getByTestId('dock-tab-sounds').click();
   await page.getByTestId('preset-row').first().waitFor();
   await shot('dock');
+  // What you set on a sound shows on its row: stars in the dock (it has no rating column), tags as chips.
+  const warmDock = page.getByTestId('preset-row').filter({ hasText: 'Warm Pad' }).first();
+  assert.equal(await warmDock.getByTestId('row-stars').innerText(), '★★★★★', 'the dock row shows the rating');
+  assert.deepEqual(await warmDock.getByTestId('row-tag').allInnerTexts(), ['warm', 'wide'], 'and the tags');
   await page.getByTestId('sounds-open-page').click();
   const sounds = page.getByTestId('host-primary-sounds');
   await sounds.waitFor();
@@ -54,6 +58,11 @@ try {
   assert.equal(await sounds.getByTestId('browser-inspector').isVisible(), true, 'and so is the inspector');
   assert.equal(await sounds.getByTestId('audition-bar').isVisible(), true);
   assert.equal(await page.getByLabel('Sounds target part').count(), 1, 'the part it loads into is named');
+  const warmPage = sounds.getByTestId('preset-row').filter({ hasText: 'Warm Pad' }).first();
+  assert.deepEqual(await warmPage.getByTestId('row-tag').allInnerTexts(), ['warm', 'wide'], 'tags show on the page rows too');
+  assert.equal(await warmPage.getByTestId('row-stars').count(), 0, 'where the rating has a column of its own');
+  assert.ok((await sounds.locator('.col-env .not-measured').allInnerTexts()).includes('not measured'),
+    'a sound nobody has listened to says so instead of an empty envelope');
 
   // Paging: the page asks for the library a slice at a time and fetches the next slice as the
   // list nears the end of what it holds. Four rows a page makes the demo library take three.
@@ -129,7 +138,7 @@ try {
   assert.ok((await record(dragged)).collections.includes('Tonight'), 'dropping a row files it');
 
   // The inspector: notes, collections, and more like this but brighter.
-  const rowFor = (name) => sounds.getByTestId('preset-row').filter({ has: page.locator('.preset-name', { hasText: new RegExp(`^${name}$`) }) }).first();
+  const rowFor = (name) => sounds.getByTestId('preset-row').filter({ has: page.locator('.preset-name .name-text', { hasText: new RegExp(`^${name}$`) }) }).first();
   const warm = rowFor('Warm Pad');
   await warm.locator('.preset-pick').click();
   const notes = sounds.getByTestId('record-notes');
