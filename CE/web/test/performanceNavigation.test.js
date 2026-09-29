@@ -27,10 +27,10 @@ test('saved navigation survives reload and rejects malformed or cross-group memo
   storePerformanceNavigation(state, storage);
   assert.deepEqual(restorePerformanceNavigation(storage), state);
   saved = '{broken';
-  assert.equal(restorePerformanceNavigation(storage).tab, 'patterns');
+  assert.equal(restorePerformanceNavigation(storage).tab, 'setlist', 'a broken memory opens on the songs');
   assert.equal(normalisePerformanceNavigation({ tab: 'lfos', lastTools: { capture: 'lfos' } }).lastTools.capture, 'looper');
-  assert.equal(normalisePerformanceNavigation(null).tab, 'patterns');
+  assert.equal(normalisePerformanceNavigation(null).tab, 'setlist');
   const blocked = { getItem() { throw Error('blocked'); }, setItem() { throw Error('full'); } };
-  assert.equal(restorePerformanceNavigation(blocked).tab, 'patterns');
+  assert.equal(restorePerformanceNavigation(blocked).tab, 'setlist');
   assert.doesNotThrow(() => storePerformanceNavigation(state, blocked));
 });

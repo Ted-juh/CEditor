@@ -129,7 +129,7 @@ try {
   await shot(randomCard, 'random');
 
   // Pattern steps: rows under the selected lane, drawn with a drag.
-  await tool('playback', 'patterns');
+  await tool('patterns', 'patterns');
   await page.getByTestId('perf-add-pattern').click();
   await page.locator('.pattern-row .pattern-name').last().click();
   await page.getByRole('combobox', { name: 'Add a lane' }).selectOption('drum');
@@ -174,7 +174,7 @@ try {
   // Clips and scenes: follow actions as pictures, the fill in its own panel, one line a clip.
   await page.locator('.pattern-row').last().getByRole('button', { name: '+ Clip' }).click();
   await page.locator('.pattern-row').last().getByRole('button', { name: '+ Clip' }).click();
-  await tool('playback', 'clips');
+  await tool('show', 'clips');
   const clipRow = page.getByTestId('perf-clip').last();
   const clip = async () => (await perf()).clips.at(-1);
   assert.equal(await clipRow.locator('[data-testid=clip-follow] button svg').count(), 5, 'five follow actions, each drawn');

@@ -763,21 +763,21 @@
     {/if}
   </div>
 
-  <div class="performance-navigation">
-    <nav class="perf-groups" aria-label="Performance groups">
-      {#each PERFORMANCE_GROUPS as group (group.id)}
-        <button type="button" class:on={activeGroup.id === group.id}
-          aria-pressed={activeGroup.id === group.id} data-testid={`perf-group-${group.id}`}
-          onclick={() => selectTool(navigation.lastTools[group.id])}>{group.label}</button>
-      {/each}
-    </nav>
-    <nav class="perf-tabs" aria-label="Tools in selected Performance group">
-      {#each activeGroup.tools as tool (tool.id)}
-        <button type="button" class="toggle" class:on={tab === tool.id} aria-pressed={tab === tool.id}
+  <!-- One rail: every tool is one click, under the group it belongs to. A group's heading goes
+       back to the tool last used in it. -->
+  <div class="perf-layout">
+  <nav class="performance-navigation perf-rail" aria-label="Performance tools">
+    {#each PERFORMANCE_GROUPS as group (group.id)}
+      <button type="button" class="rail-group" class:on={activeGroup.id === group.id}
+        aria-pressed={activeGroup.id === group.id} data-testid={`perf-group-${group.id}`}
+        onclick={() => selectTool(navigation.lastTools[group.id])}>{group.label}</button>
+      {#each group.tools as tool (tool.id)}
+        <button type="button" class="rail-tool" class:on={tab === tool.id} aria-pressed={tab === tool.id}
           onclick={() => selectTool(tool.id)} data-testid={`perf-tab-${tool.id}`}>{tool.label}</button>
       {/each}
-    </nav>
-  </div>
+    {/each}
+  </nav>
+  <div class="perf-content">
 
   {#if tab === 'patterns'}
     <div class="perf-body">
@@ -1885,16 +1885,25 @@
       <div class="clip-column">
         <div class="perf-head">
           <strong>Clips</strong>
-          <div class="freeze-cycles" title="How many source cycles become one deterministic clip">
-            Freeze
-            <Segmented options={[1, 2, 4, 8].map((cycles) => ({ value: cycles, label: `${cycles}×`, title: `${cycles} source cycles` }))}
-                       value={freezeCycles} label="MIDI freeze cycles" testid="freeze-cycles"
-                       onchange={(cycles) => (freezeCycles = cycles)} />
-          </div>
-          <button type="button" class="ghost" onclick={() => stopAllClips()}>Stop all</button>
+          <!-- Only what can act: freezing needs a clip, stopping needs one playing. -->
+          {#if performance.clips.length > 0}
+            <div class="freeze-cycles" title="How many source cycles become one deterministic clip">
+              Freeze
+              <Segmented options={[1, 2, 4, 8].map((cycles) => ({ value: cycles, label: `${cycles}×`, title: `${cycles} source cycles` }))}
+                         value={freezeCycles} label="MIDI freeze cycles" testid="freeze-cycles"
+                         onchange={(cycles) => (freezeCycles = cycles)} />
+            </div>
+          {/if}
+          {#if performance.clips.some((clip) => clip.active)}
+            <button type="button" class="ghost" data-testid="perf-stop-all" onclick={() => stopAllClips()}>
+              ■ Stop all · {performance.clips.filter((clip) => clip.active).length} playing</button>
+          {/if}
         </div>
         {#if performance.clips.length === 0}
-          <div class="empty-hint">No clips yet — make one from a pattern.</div>
+          <div class="empty-hint first-step" data-testid="perf-clips-empty">
+            <span>No clips yet. A clip plays a pattern: open a pattern and press <strong>+ Clip</strong>.</span>
+            <button type="button" onclick={() => selectTool('patterns')}>Go to Patterns</button>
+          </div>
         {/if}
 
         <!-- The song form as a map. The rows below stay the editor; a follow action is five
@@ -2049,7 +2058,8 @@
         {/if}
         {#if performance.scenes.length === 0}
           <div class="empty-hint">
-            A scene recalls clips, mixer state and macros together — add one to capture the rig as it stands.
+            No scenes yet. A scene is a sound setup: which parts play, their levels and macros, and which clips start.
+            <strong>+ Scene</strong> takes the rig as it is now.
           </div>
         {/if}
         {#each performance.scenes as scene (scene.sceneId)}
@@ -2147,7 +2157,7 @@
 
       {#if performance.arrangement.items.length === 0}
         <div class="empty-hint">
-          No song blocks yet — use “+ Arrange” beside a scene. Each block simply holds that scene for a number of bars.
+          No blocks yet. Use <strong>+ Arrange</strong> beside a scene in the Launcher; each block holds that scene for a number of bars.
         </div>
       {/if}
 
@@ -2235,7 +2245,7 @@
       {#if performance.setlist.items.length === 0}
         <div class="empty-hint">
           No songs yet. Click <strong>+ Song</strong>. A song has its own name, notes and length, and plays
-          one of your scenes (the sound setups made under Patterns &amp; playback › Clips &amp; scenes).
+          one of your scenes (the sound setups made in the Launcher).
         </div>
       {/if}
       {#each performance.setlist.items as item, index (item.itemId)}
@@ -2316,6 +2326,8 @@
       {/each}
     </div>
   {/if}
+  </div>
+  </div>
   <div class="perf-location" data-testid="perf-location" role="status">Performance / {activeGroup.label} / {activeTool.label}</div>
 </div>
 
@@ -2338,13 +2350,19 @@
 
   .perf-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 2px 8px; }
   .perf-toolbar h2 { margin: 0; font-size: 18px; font-weight: 650; }
-  .performance-navigation { flex: none; border: 1px solid var(--host-line); border-radius: var(--host-radius-panel); overflow: hidden; }
-  .perf-groups { display: flex; flex-wrap: wrap; background: var(--host-bg-deep); border-bottom: 1px solid var(--host-line); padding: 0 8px; }
-  :global(.host-workspace.host-workspace) .perf-panel .perf-groups button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; min-height: 42px; padding: 10px 14px; color: var(--host-text-soft); }
-  :global(.host-workspace.host-workspace) .perf-panel .perf-groups button.on { border-bottom-color: var(--host-accent-strong); background: var(--host-accent-surface); color: var(--host-text); }
-  .perf-tabs { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding: 10px; }
-  :global(.host-workspace.host-workspace) .perf-panel .perf-tabs button { background: transparent; border-color: transparent; }
-  :global(.host-workspace.host-workspace) .perf-panel .perf-tabs button.on { background: var(--host-accent-surface); border-color: var(--host-accent); color: var(--host-text); }
+  .perf-layout { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; align-items: start; min-height: 0; }
+  .perf-content { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .perf-rail { position: sticky; top: 0; display: flex; flex-direction: column; gap: 1px; padding: 8px 6px;
+               border: 1px solid var(--host-line); border-radius: var(--host-radius-panel); background: var(--host-bg-deep); }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-rail button { border: 0; border-radius: 5px; background: transparent;
+               text-align: left; justify-content: flex-start; min-height: 0; }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-rail button.rail-group { margin-top: 8px; padding: 2px 8px;
+               font: 600 10px var(--host-font-mono, monospace); letter-spacing: .12em; text-transform: uppercase; color: var(--host-text-dim); }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-rail button.rail-group:first-child { margin-top: 0; }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-rail button.rail-group.on { color: var(--host-text-soft); background: transparent; box-shadow: none; }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-rail button.rail-tool { padding: 5px 10px; color: var(--host-text-soft); }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-rail button.rail-tool.on { background: var(--host-accent-surface);
+               color: var(--host-text); box-shadow: inset 2px 0 var(--host-accent-strong); }
   .perf-location { flex: none; border-top: 1px solid var(--host-line-soft); margin-top: auto; padding: 10px 2px 0; font-size: 11px; color: var(--host-text-soft); }
   .perf-spacer { flex: 1; }
   .recording { color: #e4b3b3; border-color: #7a4a4a; }
@@ -2374,8 +2392,10 @@
   @media (max-width: 650px) {
     .perf-toolbar > .perf-spacer { display: none; }
     .retrospective { padding-left: 0; border-left: 0; }
-    :global(.host-workspace.host-workspace) .perf-panel .perf-groups button { padding: 9px 10px; }
-    .perf-groups { padding: 0; }
+    /* Narrow: the rail lies down above the page and wraps. */
+    .perf-layout { grid-template-columns: minmax(0, 1fr); }
+    .perf-rail { position: static; flex-direction: row; flex-wrap: wrap; align-items: center; }
+    :global(.host-workspace.host-workspace) .perf-panel .perf-rail button.rail-group { margin: 0 0 0 8px; }
   }
 
   .looper-body { display: flex; flex-direction: column; gap: 12px; }
@@ -2651,6 +2671,8 @@
   .clip-scene-body .clip-row, .clip-scene-body .scene-row { flex-wrap: wrap; }
   .perf-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .empty-hint { color: #7d8894; padding: 8px 2px; font-size: 12px; }
+  .empty-hint strong { color: var(--host-text, #d6dbe0); font-weight: 600; }
+  .empty-hint.first-step { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
   .pattern-list { flex: 0 0 250px; display: flex; flex-direction: column; gap: 6px; }
   .pattern-row { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 12px; }

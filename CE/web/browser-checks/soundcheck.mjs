@@ -21,7 +21,7 @@ try {
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/performanceNavigation.html`);
   await page.evaluate(() => window.setupSoundcheck());
   await page.getByRole('button', { name: 'Performance', exact: true }).click();
-  await page.getByTestId('perf-group-setup').click();
+  await page.getByTestId('perf-group-show').click();
   await page.getByTestId('perf-tab-setlist').click();
   const first = page.getByTestId('soundcheck-song0'), second = page.getByTestId('soundcheck-song1');
   assert.equal(await first.getByTestId('soundcheck-peak').textContent(), '—');

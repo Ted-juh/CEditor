@@ -53,7 +53,7 @@ try {
 
   // Build: adding a scene to the setlist says so on the scene.
   await page.getByRole('button', { name: 'Performance', exact: true }).first().click();
-  await page.getByRole('button', { name: 'Clips & scenes', exact: true }).click();
+  await page.getByTestId('perf-tab-clips').click();
   const verseRow = page.getByTestId('perf-scene').first();
   assert.equal(await verseRow.getByTestId('scene-in-setlist').innerText(), 'in setlist');
   await verseRow.getByTestId('scene-add-song').click();
@@ -61,8 +61,7 @@ try {
   assert.equal((await state()).performance.setlist.items.at(-1).name, 'Song 4', 'a new song has its own name, not its scene');
 
   // Live setup: songs are made and named here, each with the scene it plays chosen beside it.
-  await page.getByRole('button', { name: 'Live setup', exact: true }).click();
-  await page.getByRole('button', { name: 'Setlist', exact: true }).click();
+  await page.getByTestId('perf-tab-setlist').click();
   await page.getByTestId('setlist-add-song').click();
   const added = (await state()).performance.setlist.items.at(-1);
   assert.equal(added.name, 'Song 5');

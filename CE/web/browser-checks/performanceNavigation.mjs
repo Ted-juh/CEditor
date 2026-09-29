@@ -45,7 +45,7 @@ try {
   await goGroup('capture');await page.getByTestId('perf-capture-recent').click();
   assert.equal(await page.evaluate(() => window.performanceCommands.findLast(c => c.cmd === 'captureRecentMidi').seconds), 30);
   await page.evaluate(() => window.finishNavigationCapture());
-  assert.equal(await page.getByTestId('perf-group-playback').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.getByTestId('perf-group-patterns').getAttribute('aria-pressed'), 'true');
   assert.equal(await page.getByTestId('perf-tab-patterns').getAttribute('aria-pressed'), 'true');
   await goGroup('modulation');await goTool('lfos');
   await page.getByRole('button', { name: 'Layers', exact: true }).click();
