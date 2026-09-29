@@ -103,7 +103,7 @@
     });
 
     if (result.changed === 0) { cwarn('[random]', result.reason); return; }
-    const history = beginSnapshotValueHistory(result.values, { panel, parameters });
+    const history = beginSnapshotValueHistory(result.values, { panel, parameters, label: 'Randomise values' });
     const before = captureSnapshot({ name: 'Before randomise' });
     if (!before) {
       cwarn('[random] Could not take an undo snapshot — nothing was changed.');

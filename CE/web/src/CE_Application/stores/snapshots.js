@@ -148,7 +148,7 @@ export function applyValues(values, { panel = null, parameters = null } = {}) {
  * Capture exactly the preview sessions a value-map can write, for one explicit undo transaction.
  * Ordinary preview updates stay out of document history; only Recall and Roll opt in.
  */
-export function beginSnapshotValueHistory(values, { panel = null, parameters = null } = {}) {
+export function beginSnapshotValueHistory(values, { panel = null, parameters = null, label = '' } = {}) {
   const target = panel ?? get(activePanel);
   if (!target) return null;
   const list = parameters ?? snapshotParameters(target);
@@ -165,7 +165,7 @@ export function beginSnapshotValueHistory(values, { panel = null, parameters = n
         : { exists: false }]));
   };
   const restore = (entries) => restorePanelPreviewSessionEntries(deepClone(entries ?? {}));
-  return beginHistoryTransaction({ capture, restore });
+  return beginHistoryTransaction({ capture, restore, label });
 }
 
 export function commitSnapshotValueHistory(transaction) {
@@ -178,7 +178,7 @@ export function recallSnapshot(snapshotId) {
   const snapshot = panelSnapshots(panel).find((s) => s.id === snapshotId);
   if (!snapshot) { cwarn(`[snapshot] No snapshot "${snapshotId}" on this panel.`); return 0; }
 
-  const history = beginSnapshotValueHistory(snapshot.values, { panel });
+  const history = beginSnapshotValueHistory(snapshot.values, { panel, label: `Recall ${snapshot.name || 'snapshot'}` });
   const written = applyValues(snapshot.values, { panel });
   commitSnapshotValueHistory(history);
   lastMorphSent.delete(panel?.id);

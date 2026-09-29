@@ -50,7 +50,7 @@
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
   import { activeComponentControl, closeComponentWorkspace, componentWorkspaceMode, createComponentDocument, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
-  import { undo, redo, undoAvailable, redoAvailable, flushHistory } from '../stores/history.js';
+  import { undo, redo, undoAvailable, redoAvailable, flushHistory, undoLabel, redoLabel, historyVersion } from '../stores/history.js';
 
   // The four keys whose autorepeat is one undo step (see handleEditorKeyUp).
   const ARROW_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
@@ -814,6 +814,10 @@
     if (document?.id) setActiveEditorTab({ type: 'screen', id: document.id });
   }
 
+
+  // Name the step each button would take back or put back. Re-read only when a stack changes.
+  let undoTip = $derived.by(() => { void $historyVersion; const step = $undoAvailable ? undoLabel() : ''; return step ? `Undo ${step}` : 'Undo'; });
+  let redoTip = $derived.by(() => { void $historyVersion; const step = $redoAvailable ? redoLabel() : ''; return step ? `Redo ${step}` : 'Redo'; });
 </script>
 
 <!-- The canvas annotation layer: everything the editor DRAWS OVER the panel
@@ -911,7 +915,7 @@
                 class="icon-btn"
                 class:active={$undoAvailable}
                 disabled={!$undoAvailable}
-                title="Undo (Ctrl+Z)"
+                title={`${undoTip} (Ctrl+Z)`}
                 onclick={undo}
               ><Undo2 size={14} strokeWidth={2} /></button>
               <button
@@ -919,7 +923,7 @@
                 class="icon-btn"
                 class:active={$redoAvailable}
                 disabled={!$redoAvailable}
-                title="Redo (Ctrl+Y)"
+                title={`${redoTip} (Ctrl+Y)`}
                 onclick={redo}
               ><Redo2 size={14} strokeWidth={2} /></button>
               {#if $componentDesignerStatus?.kind}

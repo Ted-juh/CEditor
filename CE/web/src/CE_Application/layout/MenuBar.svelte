@@ -11,7 +11,8 @@
   import { bringForward, bringToFront, sendBackward, sendToBack, tidyGrid, arrangeCircular } from '../stores/alignment.js';
   import { editMenuAvailability } from '../utils/editMenuAvailability.js';
   import { closeApplication } from '../bridge/bridge.js';
-  import { undo, redo } from '../stores/history.js';
+  import { undo, redo, undoLabel, redoLabel } from '../stores/history.js';
+  import { openHistoryWindow } from '../stores/historyWindow.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { requestFitToWindow, requestZoomStep, requestZoomToSelection } from '../stores/editorCommands.js';
   import { createComponentDocument } from '../stores/componentWorkspace.js';
@@ -194,8 +195,11 @@
       { label: 'Close Program', shortcut: 'Alt+F4', action: () => closeApplication() },
     ],
     Edit: [
-      { label: 'Undo', shortcut: 'Ctrl+Z', enabled: () => get(undoAvailable), action: () => undo() },
-      { label: 'Redo', shortcut: 'Ctrl+Y', enabled: () => get(redoAvailable), action: () => redo() },
+      // Getters, so the row names the step it will take back ("Undo Move Cutoff"). The dropdown is
+      // rebuilt each time it opens, which is when these are read; the access key stays U / R.
+      { get label() { const step = undoLabel(); return step ? `Undo ${step}` : 'Undo'; }, shortcut: 'Ctrl+Z', enabled: () => get(undoAvailable), action: () => undo() },
+      { get label() { const step = redoLabel(); return step ? `Redo ${step}` : 'Redo'; }, shortcut: 'Ctrl+Y', enabled: () => get(redoAvailable), action: () => redo() },
+      { label: 'History...', action: () => openHistoryWindow() },
       { type: 'separator' },
       { label: 'Cut',   shortcut: 'Ctrl+X', enabled: hasSelection, action: () => cutSelection() },
       { label: 'Copy',  shortcut: 'Ctrl+C', enabled: hasSelection, action: () => copySelection() },

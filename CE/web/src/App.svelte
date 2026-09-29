@@ -40,6 +40,7 @@
   import ScriptNotifications from './CE_Application/layout/ScriptNotifications.svelte';
   import ScriptDialog from './CE_Application/layout/ScriptDialog.svelte';
   import NewPanelDialog from './CE_Application/layout/NewPanelDialog.svelte';
+  import HistoryWindow from './CE_Application/layout/HistoryWindow.svelte';
   import { openNewPanelDialog } from './CE_Application/stores/newPanelDialog.js';
   import { initPanelRuntime } from './CE_Application/scripting/panelRuntime.js';
   import { initHistory, undo, redo, flushHistory } from './CE_Application/stores/history.js';
@@ -459,6 +460,7 @@
   <ScriptDialog />
 
   <NewPanelDialog />
+  <HistoryWindow />
 
   {#if showShortcuts}
     <ShortcutsOverlay show={showShortcuts} onclose={() => showShortcuts = false} />

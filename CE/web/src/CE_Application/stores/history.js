@@ -1,5 +1,7 @@
 import { get, writable } from 'svelte/store';
 import { deepClone } from '../utils/deepClone.js';
+import { jsonEqual } from '../utils/jsonEqual.js';
+import { cachedHistoryStepLabel } from '../utils/historyLabels.js';
 import { panels, resolvedActivePanelId, activeEditorTab, selectedComponentIds } from './panels.js';
 import {
   componentWorkspaceMode,
@@ -10,6 +12,11 @@ import {
 /** Reactive stores for UI binding */
 export const undoAvailable = writable(false);
 export const redoAvailable = writable(false);
+/**
+ * Bumped whenever a stack changes, so readers of historyTimeline() and the Undo/Redo labels know to
+ * look again. The stacks themselves are plain arrays, deliberately not stores.
+ */
+export const historyVersion = writable(0);
 
 /**
  * Undo/Redo history — per-context state snapshots.
@@ -249,6 +256,7 @@ function getHistory(key) {
 }
 
 function updateAvailability() {
+  historyVersion.update((n) => n + 1);
   if (suppressed) {
     undoAvailable.set(false);
     redoAvailable.set(false);
@@ -341,63 +349,8 @@ function chromeOf(snapshot) {
   return JSON.stringify(rest);
 }
 
-/**
- * Do two values serialize to the same JSON? The answer `JSON.stringify(a) === JSON.stringify(b)`
- * would give, without building either string.
- *
- * WHY NOT JUST STRINGIFY. Measured 2026-09-29 (docs/design/undo-history-measurement-2026-09-29.md):
- * on the GAIA panel every control sits inside one of six top-level containers, one of them 6.5 MB
- * expanded. Moving one knob inside it replaced that container's reference, so the compare below
- * stringified all 6.5 MB twice — 60-85 ms on every commit and again on every undo. Edits never
- * mutate in place, so everything the edit did not touch is still the SAME object on both sides:
- * returning at the first `===` walks only the path down to the change.
- *
- * Kept to JSON's rules on purpose, because the callers used to compare strings and dedupe
- * depends on the same answer: key ORDER counts (a `_children` map's order is document order, so
- * reordering one is a real edit), keys whose value is undefined or a function are skipped as
- * JSON skips them, undefined or a function inside an array reads as null, and a non-finite number
- * reads as null.
- */
-export function jsonEqual(a, b) {
-  if (a === b) return true;
-  const ta = jsonType(a);
-  const tb = jsonType(b);
-  if (ta !== tb) return false;
-  if (ta === 'null') return true;
-  if (ta !== 'array' && ta !== 'object') return a === b;
-  if (typeof a.toJSON === 'function' || typeof b.toJSON === 'function') {
-    return JSON.stringify(a) === JSON.stringify(b);
-  }
-  if (ta === 'array') {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) if (!jsonEqual(a[i], b[i])) return false;
-    return true;
-  }
-  const ka = serializedKeys(a);
-  const kb = serializedKeys(b);
-  if (ka.length !== kb.length) return false;
-  for (let i = 0; i < ka.length; i++) {
-    if (ka[i] !== kb[i]) return false;
-    if (!jsonEqual(a[ka[i]], b[kb[i]])) return false;
-  }
-  return true;
-}
-
-/** The JSON kind of a value, folding what JSON writes as null into 'null'. */
-function jsonType(value) {
-  if (value === null || value === undefined || typeof value === 'function' || typeof value === 'symbol') return 'null';
-  if (typeof value === 'number') return Number.isFinite(value) ? 'number' : 'null';
-  if (Array.isArray(value)) return 'array';
-  return typeof value;
-}
-
-/** The keys JSON.stringify would write, in the order it would write them. */
-function serializedKeys(object) {
-  return Object.keys(object).filter((key) => {
-    const value = object[key];
-    return value !== undefined && typeof value !== 'function' && typeof value !== 'symbol';
-  });
-}
+// Re-exported: the history tests pin its parity with JSON.stringify from here.
+export { jsonEqual };
 
 /**
  * Are two snapshots the same state?
@@ -715,7 +668,7 @@ export function pushSnapshot() {
  * incoming MIDI and scripts can update them every frame. Commands such as snapshot Recall and
  * Roll opt in here and provide a small capture/restore sidecar for only the controls they write.
  */
-export function beginHistoryTransaction({ capture = null, restore = null } = {}) {
+export function beginHistoryTransaction({ capture = null, restore = null, label = '' } = {}) {
   flushPendingSnapshot();
   const context = activeContext();
   if (!context) return null;
@@ -733,6 +686,9 @@ export function beginHistoryTransaction({ capture = null, restore = null } = {})
     auxiliary: typeof capture === 'function' && typeof restore === 'function'
       ? { capture, restore, value: auxiliaryValue }
       : null,
+    // A command that changes values outside the document (a snapshot recall) cannot be named by
+    // comparing document states, so it names itself.
+    label: typeof label === 'string' ? label : '',
   };
 }
 
@@ -770,6 +726,7 @@ export function commitHistoryTransaction(transaction) {
     snapshot: transaction.snapshot,
     selection: transaction.selection,
     auxiliary: transaction.auxiliary,
+    label: transaction.label || undefined,
   });
   if (history.undoStack.length > MAX_HISTORY) history.undoStack.shift();
   history.redoStack.length = 0;
@@ -946,7 +903,8 @@ export function undo() {
     try { value = prev.auxiliary.capture(); } catch { value = null; }
     auxiliary = { ...prev.auxiliary, value };
   }
-  history.redoStack.push({ snapshot: current, selection: selectionOf(context), auxiliary });
+  // The redo entry is the same step seen from the other side, so its name goes with it.
+  history.redoStack.push({ snapshot: current, selection: selectionOf(context), auxiliary, label: prev.label });
 
   // Restore previous state
   restoreSnapshot(context, prev);
@@ -978,11 +936,72 @@ export function redo() {
     try { value = next.auxiliary.capture(); } catch { value = null; }
     auxiliary = { ...next.auxiliary, value };
   }
-  history.undoStack.push({ snapshot: current, selection: selectionOf(context), auxiliary });
+  history.undoStack.push({ snapshot: current, selection: selectionOf(context), auxiliary, label: next.label });
 
   // Restore redo state
   restoreSnapshot(context, next);
   updateAvailability();
+}
+
+/**
+ * The active context's history as steps people can read: every state history holds, oldest first,
+ * with the step between each pair named (utils/historyLabels.js).
+ *
+ *   steps     [{ label, applied }] — `applied` false for steps that were undone and can be redone
+ *   position  how many steps are applied; jumpToHistory(position) goes back to exactly this
+ *
+ * The states are the undo stack's, then the live state, then the redo stack's newest-undone last.
+ * Nothing is recorded for this — labels are worked out on demand by diffing neighbouring states,
+ * and cached per pair.
+ */
+export function historyTimeline() {
+  const context = activeContext();
+  if (!context || suppressed) return { steps: [], position: 0 };
+  const history = getHistory(contextKey(context));
+  // The COMMITTED current state. An edit still waiting on the debounce is not a step yet; reading
+  // the live store here would fold it into the last step's name.
+  const current = baselineKey === contextKey(context) && lastSnapshot != null ? lastSnapshot : snapshotOf(context);
+  const kind = context.kind;
+  const undoEntries = history.undoStack;
+  const redoEntries = [...history.redoStack].reverse();   // next redo first
+  const states = [...undoEntries.map((entry) => entry.snapshot), current, ...redoEntries.map((entry) => entry.snapshot)];
+  // Which entry owns each step's own label, when a command named itself.
+  const owners = [...undoEntries, ...redoEntries];
+  const steps = [];
+  for (let i = 0; i < states.length - 1; i++) {
+    const own = owners[i]?.label;
+    steps.push({
+      label: own || cachedHistoryStepLabel(states[i], states[i + 1], kind),
+      applied: i < undoEntries.length,
+    });
+  }
+  return { steps, position: undoEntries.length };
+}
+
+/** What Undo would take back, in words, or '' when there is nothing to undo. */
+export function undoLabel() {
+  const { steps, position } = historyTimeline();
+  return position > 0 ? steps[position - 1]?.label ?? '' : '';
+}
+
+/** What Redo would put back, in words, or '' when there is nothing to redo. */
+export function redoLabel() {
+  const { steps, position } = historyTimeline();
+  return steps[position]?.label ?? '';
+}
+
+/**
+ * Go to the state after `position` steps: back with undo, forward with redo, one step at a time,
+ * so everything a single undo does (selection, dirty flag, preview-session sidecars) happens for
+ * each. Returns the position reached.
+ */
+export function jumpToHistory(position) {
+  let { steps, position: at } = historyTimeline();
+  const target = Math.max(0, Math.min(steps.length, Math.floor(Number(position) || 0)));
+  let guard = steps.length + 1;
+  while (at > target && guard-- > 0) { undo(); at = historyTimeline().position; }
+  while (at < target && guard-- > 0) { redo(); at = historyTimeline().position; }
+  return at;
 }
 
 /**
