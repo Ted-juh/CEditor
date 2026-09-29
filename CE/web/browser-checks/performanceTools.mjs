@@ -175,7 +175,11 @@ try {
   await page.locator('.pattern-row').last().getByRole('button', { name: '+ Clip' }).click();
   await page.locator('.pattern-row').last().getByRole('button', { name: '+ Clip' }).click();
   await tool('show', 'clips');
+  // The Launcher: clips are columns; picking one shows its settings under the grid.
+  assert.equal(await page.getByTestId('launch-clip').count(), (await perf()).clips.length, 'every clip is a column');
+  await page.getByTestId('launch-clip').last().locator('.lg-name').click();
   const clipRow = page.getByTestId('perf-clip').last();
+  assert.match(await page.locator('.clip-column .perf-head strong').innerText(), new RegExp((await perf()).clips.at(-1).name));
   const clip = async () => (await perf()).clips.at(-1);
   assert.equal(await clipRow.locator('[data-testid=clip-follow] button svg').count(), 5, 'five follow actions, each drawn');
   await clipRow.locator('[data-testid=clip-follow] [data-value=next]').click();
@@ -208,6 +212,20 @@ try {
   await sceneRow.locator('[data-testid=scene-page] button').last().click();
   assert.ok((await scene()).pageId, 'the recalled controller page is a toggle row');
   assert.equal(await sceneRow.locator('select').count(), 0);
+
+  // A lit cell is a clip the scene starts; clicking it says so to the host.
+  const last = await scene();
+  const firstClip = (await perf()).clips[0];
+  assert.equal(await page.getByTestId('launch-scene').count(), (await perf()).scenes.length, 'every scene is a row');
+  const cell = page.getByLabel(`${last.name} starts ${firstClip.name}`, { exact: true });
+  const was = last.clipIds.includes(firstClip.clipId);
+  await cell.click();
+  assert.equal((await scene()).clipIds.includes(firstClip.clipId), !was, 'the cell toggles whether the scene starts the clip');
+  assert.equal(await cell.getAttribute('aria-pressed'), String(!was));
+  await page.getByTestId('launch-clip-play').first().click();
+  assert.equal((await perf()).clips[0].active || (await perf()).clips[0].pending, true, 'a column head launches its clip');
+  await page.getByTestId('perf-stop-all').waitFor();
+  await shot(page.getByTestId('perf-launcher'), 'launcher');
 
   assert.deepEqual(errors, [], 'no uncaught page errors');
   console.log('performanceTools: LFO, envelope, MSEG, random, pattern step rows, clips and scenes draw and drag');

@@ -60,6 +60,43 @@
   let { onShowMixer = () => {} } = $props();
   const stopMeasurement = () => { if ($hostState.soundcheck.activeItemId) finishSoundcheck(); };
   const songCount = (sceneId) => performance.setlist.items.filter((item) => item.sceneId === sceneId).length;
+
+  // The Launcher: scenes are rows and clips columns, so what a scene starts is visible at a
+  // glance. Picking a column or a row shows that clip's or scene's settings under the grid.
+  let pickedClipId = $state('');
+  let pickedSceneId = $state('');
+  let knownSceneCount = 0;
+  const pickedClip = $derived(performance.clips.find((c) => c.clipId === pickedClipId) ?? performance.clips[0] ?? null);
+  const pickedScene = $derived(performance.scenes.find((s) => s.sceneId === pickedSceneId) ?? performance.scenes[0] ?? null);
+  $effect(() => {
+    // A scene just added is the one about to be set up.
+    const count = performance.scenes.length;
+    if (count > knownSceneCount && knownSceneCount > 0) pickedSceneId = performance.scenes[count - 1].sceneId;
+    knownSceneCount = count;
+  });
+  const SCENE_COLOURS = ['#d98b3a', '#4f9fd6', '#9a7ad6', '#52b58a', '#d6698f', '#c9b24a', '#4fc1c9', '#8c9aa8'];
+  const sceneColour = (index) => SCENE_COLOURS[index % SCENE_COLOURS.length];
+  const clipParts = (clip) => {
+    const pattern = performance.patterns.find((p) => p.patternId === clip.patternId);
+    const names = new Set();
+    for (const lane of pattern?.lanes ?? []) {
+      const part = $hostState.rack.parts.find((candidate) => candidate.partId === lane.targetPartId);
+      if (part) names.add(part.name || part.pluginName || 'Part');
+    }
+    return [...names];
+  };
+  const clipFlow = (clip) => {
+    if (clip.followAction === 'none') return clip.loop ? 'loops' : 'plays once';
+    if (clip.followAction === 'stop') return 'then stops';
+    if (clip.followAction === 'next') return 'then the next clip';
+    if (clip.followAction === 'random') return 'then a random clip';
+    const target = performance.clips.find((c) => c.clipId === clip.followClipId);
+    return target ? `then ${target.name}` : 'then a clip';
+  };
+  const sceneUse = (sceneId) => {
+    const songs = performance.setlist.items.filter((item) => item.sceneId === sceneId).length;
+    return songs === 0 ? 'no song' : songs === 1 ? '1 song' : `${songs} songs`;
+  };
   onDestroy(stopMeasurement);
   const heldFillClipIds = new Set();
   const heldEnvelopeIds = new Set();
@@ -1881,10 +1918,74 @@
   {/if}
 
   {#if tab === 'clips'}
-    <div class="perf-body clip-scene-body">
+    <div class="perf-body clip-scene-body" data-testid="perf-launcher">
+      <div class="perf-head launcher-head">
+        <strong>Launcher</strong>
+        <span class="launcher-note">Scenes are rows, clips are columns. A lit cell means the scene starts that clip.</span>
+        <span class="perf-spacer"></span>
+        {#if performance.clips.some((clip) => clip.active)}
+          <button type="button" class="ghost" data-testid="perf-stop-all" onclick={() => stopAllClips()}>
+            ■ Stop all · {performance.clips.filter((clip) => clip.active).length} playing</button>
+        {/if}
+        <button type="button" onclick={() => addScene()} data-testid="perf-add-scene"
+                title="A new scene with the rig as it is now">+ Scene from the rig</button>
+      </div>
+      {#if performance.snapshotMorph.active}
+        <div class="snapshot-morph-status" data-testid="snapshot-morph-status">
+          <span>Morphing to <strong>{performance.snapshotMorph.name}</strong></span>
+          <span>{performance.snapshotMorph.targetCount} controls</span>
+          <span class="snapshot-morph-track" aria-label="Snapshot morph progress">
+            <span style={`width:${performance.snapshotMorph.progress * 100}%`}></span>
+          </span>
+        </div>
+      {/if}
+      {#if performance.scenes.length > 0 || performance.clips.length > 0}
+        <div class="launch-scroll">
+        <div class="launch-grid" role="group" aria-label="Scenes and the clips they start"
+             style={`grid-template-columns: minmax(150px, 190px) repeat(${performance.clips.length}, minmax(104px, 1fr)) minmax(96px, 130px)`}>
+          <span class="lg-corner"></span>
+          {#each performance.clips as clip (clip.clipId)}
+            <div class="lg-clip" class:picked={pickedClip?.clipId === clip.clipId} class:active={clip.active} data-testid="launch-clip">
+              <button type="button" class="lg-play" data-testid="launch-clip-play"
+                      title={clip.active ? 'Stop at the next boundary' : 'Launch at the next boundary'}
+                      onclick={() => (clip.active ? stopClip(clip.clipId) : launchClip(clip.clipId))}>
+                {clip.pending ? '⧗' : clip.active ? '■' : '▶'}</button>
+              <button type="button" class="lg-name" title="Show this clip's settings below"
+                      onclick={() => (pickedClipId = clip.clipId)}>
+                <b>{clip.name}{clip.frozenMidi ? ' ❄' : ''}</b>
+                <small>{clipParts(clip).join(', ') || 'no part yet'} · {clipFlow(clip)}</small></button>
+            </div>
+          {/each}
+          <span class="lg-corner lg-used">Used in</span>
+          {#each performance.scenes as scene, index (scene.sceneId)}
+            <div class="lg-scene" class:picked={pickedScene?.sceneId === scene.sceneId}
+                 class:now={performance.currentSceneId === scene.sceneId}
+                 class:queued={performance.queuedSceneId === scene.sceneId} data-testid="launch-scene">
+              <button type="button" class="lg-play" data-testid="launch-scene-play"
+                      title={scene.morphBeats > 0 ? `Launch, morphing over ${scene.morphBeats} beats` : 'Launch this scene at its boundary'}
+                      onclick={() => launchScene(scene.sceneId)}>▶</button>
+              <span class="lg-swatch" style={`background:${sceneColour(index)}`}></span>
+              <button type="button" class="lg-name" title="Show this scene's settings below"
+                      onclick={() => (pickedSceneId = scene.sceneId)}>
+                <b>{scene.name}</b>{#if scene.variationLabel}<small>variation {scene.variationLabel}</small>{/if}</button>
+            </div>
+            {#each performance.clips as clip (clip.clipId)}
+              {@const on = scene.clipIds.includes(clip.clipId)}
+              <button type="button" class="lg-cell" class:on class:playing={on && clip.active}
+                      style={on ? `--cell:${sceneColour(index)}` : ''} aria-pressed={on} data-testid="launch-cell"
+                      aria-label={`${scene.name} starts ${clip.name}`}
+                      title={on ? `${scene.name} starts ${clip.name}. Click to leave it out.` : `Make ${scene.name} start ${clip.name}`}
+                      onclick={() => setSceneClip(scene.sceneId, clip.clipId, !on)}>{on ? clip.name : ''}</button>
+            {/each}
+            <span class="lg-meta" class:unused={songCount(scene.sceneId) === 0}>{sceneUse(scene.sceneId)}</span>
+          {/each}
+        </div>
+        </div>
+      {/if}
+      <div class="launcher-details">
       <div class="clip-column">
         <div class="perf-head">
-          <strong>Clips</strong>
+          <strong>{pickedClip ? `Clip · ${pickedClip.name}` : 'Clips'}</strong>
           <!-- Only what can act: freezing needs a clip, stopping needs one playing. -->
           {#if performance.clips.length > 0}
             <div class="freeze-cycles" title="How many source cycles become one deterministic clip">
@@ -1893,10 +1994,6 @@
                          value={freezeCycles} label="MIDI freeze cycles" testid="freeze-cycles"
                          onchange={(cycles) => (freezeCycles = cycles)} />
             </div>
-          {/if}
-          {#if performance.clips.some((clip) => clip.active)}
-            <button type="button" class="ghost" data-testid="perf-stop-all" onclick={() => stopAllClips()}>
-              ■ Stop all · {performance.clips.filter((clip) => clip.active).length} playing</button>
           {/if}
         </div>
         {#if performance.clips.length === 0}
@@ -1911,7 +2008,7 @@
              like one that will. -->
         <FollowGraph clips={performance.clips} />
 
-        {#each performance.clips as clip (clip.clipId)}
+        {#each pickedClip ? [pickedClip] : [] as clip (clip.clipId)}
           <div class="clip-row" class:active={clip.active} class:pending={clip.pending}
                data-testid="perf-clip">
             <button type="button" class="clip-launch"
@@ -2044,25 +2141,15 @@
 
       <div class="scene-column">
         <div class="perf-head">
-          <strong>Scenes</strong>
-          <button type="button" onclick={() => addScene()} data-testid="perf-add-scene">+ Scene</button>
+          <strong>{pickedScene ? `Scene · ${pickedScene.name}` : 'Scenes'}</strong>
         </div>
-        {#if performance.snapshotMorph.active}
-          <div class="snapshot-morph-status" data-testid="snapshot-morph-status">
-            <span>Morphing to <strong>{performance.snapshotMorph.name}</strong></span>
-            <span>{performance.snapshotMorph.targetCount} controls</span>
-            <span class="snapshot-morph-track" aria-label="Snapshot morph progress">
-              <span style={`width:${performance.snapshotMorph.progress * 100}%`}></span>
-            </span>
-          </div>
-        {/if}
         {#if performance.scenes.length === 0}
           <div class="empty-hint">
             No scenes yet. A scene is a sound setup: which parts play, their levels and macros, and which clips start.
-            <strong>+ Scene</strong> takes the rig as it is now.
+            <strong>+ Scene from the rig</strong> takes the rig as it is now.
           </div>
         {/if}
-        {#each performance.scenes as scene (scene.sceneId)}
+        {#each pickedScene ? [pickedScene] : [] as scene (scene.sceneId)}
           <div class="scene-row" data-testid="perf-scene">
             <button type="button" class="clip-launch"
                     title={scene.morphBeats > 0
@@ -2121,19 +2208,8 @@
                     onclick={() => addArrangementItem(scene.sceneId)}>+ Arrange</button>
             <HostConfirmButton identity={JSON.stringify([scene.sceneId])} title="Remove scene" aria-label="Remove scene" type="button" class="ghost danger" onclick={() => removeScene(scene.sceneId)}>×</HostConfirmButton>
           </div>
-          {#if performance.clips.length > 0}
-            <div class="scene-clips">
-              {#each performance.clips as clip (clip.clipId)}
-                <button type="button" class="chip" class:on={scene.clipIds.includes(clip.clipId)}
-                        title={`Include ${clip.name} in ${scene.name}`}
-                        onclick={() => setSceneClip(scene.sceneId, clip.clipId,
-                                                    !scene.clipIds.includes(clip.clipId))}>
-                  {clip.name}
-                </button>
-              {/each}
-            </div>
-          {/if}
         {/each}
+      </div>
       </div>
     </div>
   {/if}
@@ -2667,6 +2743,36 @@
 
   .perf-body { display: flex; gap: 16px; align-items: flex-start; }
   .clip-scene-body { flex-direction: column; width: 100%; }
+  .launcher-head { width: 100%; }
+  .launcher-note { font-size: 11px; color: var(--host-text-soft, #9aa5b1); }
+  .launch-scroll { width: 100%; overflow-x: auto; }
+  .launch-grid { display: grid; gap: 4px; align-items: stretch; min-width: min-content; }
+  .lg-corner { font: 600 10px var(--host-font-mono, monospace); letter-spacing: .1em; text-transform: uppercase;
+               color: var(--host-text-dim, #6c7783); align-self: end; padding: 0 4px 6px; }
+  .lg-clip, .lg-scene { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 6px; border-radius: 6px;
+                        border: 1px solid var(--host-line-soft, #2b333d); background: var(--host-bg-deep, #12171b); }
+  .lg-clip { align-items: flex-start; }
+  .lg-clip.picked, .lg-scene.picked { border-color: var(--host-accent, #80d8bc); }
+  .lg-clip.active { box-shadow: inset 0 -2px 0 #58d68d; }
+  .lg-scene.now { box-shadow: inset 0 0 0 1px #ffb347; }
+  .lg-scene.queued { box-shadow: inset 0 0 0 1px #79b9ee; }
+  :global(.host-workspace.host-workspace) .perf-panel button.lg-play { flex: none; width: 24px; height: 24px; min-height: 0; padding: 0;
+               border-radius: 50%; border: 1.5px solid #58d68d; color: #58d68d; background: transparent; font-size: 9px; }
+  :global(.host-workspace.host-workspace) .perf-panel button.lg-name { flex: 1; min-width: 0; min-height: 0; padding: 0; border: 0;
+               background: transparent; text-align: left; justify-content: flex-start; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+  .lg-name b { font-size: 12px; color: var(--host-text, #d6dbe0); font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lg-name small { font-size: 10px; color: var(--host-text-dim, #6c7783); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lg-swatch { flex: none; width: 7px; height: 24px; border-radius: 2px; }
+  :global(.host-workspace.host-workspace) .perf-panel button.lg-cell { min-height: 36px; padding: 0 8px; border-radius: 5px;
+               border: 1px dashed #2a343e; background: transparent; color: #0d1115; font-size: 11px; font-weight: 600;
+               justify-content: flex-start; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  :global(.host-workspace.host-workspace) .perf-panel button.lg-cell:hover { border-color: #4a5866; }
+  :global(.host-workspace.host-workspace) .perf-panel button.lg-cell.on { border: 1px solid transparent; background: var(--cell); }
+  :global(.host-workspace.host-workspace) .perf-panel button.lg-cell.playing { outline: 2px solid #58d68d; outline-offset: -2px; }
+  .lg-meta { align-self: center; font: 10.5px var(--host-font-mono, monospace); color: var(--host-text-soft, #9aa5b1); padding: 0 4px; }
+  .lg-meta.unused { color: var(--host-text-dim, #6c7783); }
+  .lg-used { text-align: left; }
+  .launcher-details { display: flex; flex-direction: column; gap: 12px; width: 100%; }
   .clip-scene-body .clip-column, .clip-scene-body .scene-column { width: 100%; flex: none; }
   .clip-scene-body .clip-row, .clip-scene-body .scene-row { flex-wrap: wrap; }
   .perf-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
