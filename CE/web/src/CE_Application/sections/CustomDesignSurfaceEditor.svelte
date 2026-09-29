@@ -68,6 +68,8 @@
   import CustomArpeggiatorEditor from './CustomArpeggiatorEditor.svelte';
   import CustomStateFilmstrip from './CustomStateFilmstrip.svelte';
   import CustomContactSheet from './CustomContactSheet.svelte';
+  import SurfacePenTool from './SurfacePenTool.svelte';
+  import { isPathPart, pathPartSpec } from '../utils/penPath.js';
   import SurfaceToolStrip from './SurfaceToolStrip.svelte';
   import SurfaceBottomBar from './SurfaceBottomBar.svelte';
   import SurfacePalette from './SurfacePalette.svelte';
@@ -364,6 +366,10 @@
   let inspectorTab = $state('object');
   let filmstripCollapsed = $state(false);
   let contactSheetOpen = $state(false);
+  let penTool = $state(null);
+  // The one selected path part, when the Select tool is out: the Pen shows its points for editing.
+  let penEditPart = $derived(activeTool === 'select' && selectedLayerNames.length === 1 && isPathPart(selectedPart)
+    ? { name: selectedLayer, part: selectedPart } : null);
   // Pane visibility toggles (mirrors the normal editor's bottom-left icons).
   let paletteCollapsed = $state(false);
   let dockHidden = $state(false);
@@ -518,6 +524,8 @@
     { id: 'text', label: 'Text', key: 'T' },
     // Lines & polygons (drawn as SVG vector shapes via shapeGeometry).
     { id: 'line', label: 'Line', key: 'L' },
+    // Any outline, point by point: SurfacePenTool.svelte and utils/penPath.js.
+    { id: 'pen', label: 'Pen', key: 'P' },
     { id: 'triangle', label: 'Triangle', key: '' },
     { id: 'rightTriangle', label: 'Right triangle', key: '' },
     { id: 'parallelogram', label: 'Parallelogram', key: '' },
@@ -538,7 +546,7 @@
   // Shortcut cheatsheet + glossary live in SurfaceHelpOverlay.svelte.
   const POLYGON_TOOL_IDS = ['triangle', 'rightTriangle', 'parallelogram', 'trapezoid', 'diamond', 'pentagon', 'hexagon', 'star', 'chevron', 'arrow', 'plus'];
   // "Lines & Polygons" palette section: line first, then the flat polygons.
-  const VECTOR_SHAPE_TOOL_IDS = ['line', ...POLYGON_TOOL_IDS];
+  const VECTOR_SHAPE_TOOL_IDS = ['pen', 'line', ...POLYGON_TOOL_IDS];
   // SHAPE_TOOL_IDS stays the 6 "Basic" shapes — it drives the bottom tool-strip's
   // Shape flyout. Lines/polygons are drawn directly from the left palette.
   const SHAPE_TOOL_IDS = new Set(['rectangle', 'roundedRectangle', 'ellipse', 'ring', 'arcTrack', 'capsule']);
@@ -1243,6 +1251,29 @@
         }
         : {},
     });
+  }
+
+  /** A finished Pen drawing becomes a part: filled if closed, stroked if open. */
+  function createPenPart(points, closed) {
+    if (!core?.id) return;
+    const spec = pathPartSpec(points, closed);
+    const part = createPartNode(nextPartName('path'), {
+      kind: spec.kind, role: 'path', zIndex: authoredPartNames.length + 1, layout: spec.layout, meta: spec.meta,
+      sections: { Background: createBackground(closed ? 'FF5B9BD5' : '00000000', {
+        borderEnabled: true, borderColour: closed ? '55FFFFFF' : 'FF5B9BD5', borderThickness: closed ? 1 : 3, radius: 0,
+      }) },
+    });
+    localSelectedLayerNames = [part.name];
+    applyControlPatch(core.id, {
+      [`Parts.${part.name}`]: part,
+      'Designer.selectedLayer': part.name,
+      'Designer.selectedLayers': [part.name],
+      'Designer.selectedSurfaceKind': 'layer',
+      'Designer.selectedHitZone': '',
+    });
+    activeTool = 'select';
+    lastDrawCreatedAt = Date.now();
+    pulseSelection(`layer:${part.name}`);
   }
 
   function makeDrawnHitZone(rect, shape = 'rectangle') {
@@ -3045,6 +3076,7 @@
 
   function beginDraw(event) {
     if (activeTool === 'select' || event.button !== 0) return false;
+    if (activeTool === 'pen') { penTool?.pointerDown(event); return true; }
     event.stopPropagation();
     event.preventDefault();
     const start = pointInArtboard(event);
@@ -3061,7 +3093,7 @@
   }
 
   function commitClickDraw(event) {
-    if (activeTool === 'select') return;
+    if (activeTool === 'select' || activeTool === 'pen') return;
     event.stopPropagation();
     event.preventDefault();
     if (Date.now() - lastDrawCreatedAt < 260) return;
@@ -3260,6 +3292,7 @@
 
   function handleSurfaceKeydown(event) {
     if (!surfaceKeyEventAllowed(event)) return;
+    if (penTool?.handleKeydown(event)) return;
     if (event.key === '?' && !(event.ctrlKey || event.metaKey || event.altKey)) {
       event.preventDefault();
       helpOverlayOpen = !helpOverlayOpen;
@@ -3557,6 +3590,23 @@
                 parentHeight={artboardHeight}
               />
             {/each}
+
+            {#if !designerPreviewing}
+              <SurfacePenTool
+                bind:this={penTool}
+                active={activeTool === 'pen'}
+                artboardEl={surfaceArtboardEl}
+                {artboardWidth}
+                {artboardHeight}
+                zoom={surfaceZoom}
+                snapPoint={(point, event) => ({ x: snapValue(point.x, event), y: snapValue(point.y, event) })}
+                editPart={penEditPart}
+                onCreate={createPenPart}
+                onPatchPart={(name, patch) => core?.id && applyControlPatch(core.id,
+                  Object.fromEntries(Object.entries(patch).map(([path, value]) => [`Parts.${name}.${path}`, value])))}
+                onOutlineMouseDown={(event) => penEditPart && beginMove(penEditPart.name, penEditPart.part, event)}
+              />
+            {/if}
 
             {#if !designerPreviewing && arpeggiatorEnabled}
               <CustomArpeggiatorEditor

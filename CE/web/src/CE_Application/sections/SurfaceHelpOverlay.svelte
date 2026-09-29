@@ -8,7 +8,9 @@
   let tab = $state('shortcuts');
 
   const SHORTCUT_CHEATSHEET = [
-    { keys: 'V R U O G A C H I T L', action: 'Draw tools: Select, Rectangle, Rounded, Ellipse, Ring, Arc, Capsule, Hit Zone, Interactive, Text, Line' },
+    { keys: 'V R U O G A C H I T L P', action: 'Draw tools: Select, Rectangle, Rounded, Ellipse, Ring, Arc, Capsule, Hit Zone, Interactive, Text, Line, Pen' },
+    { keys: 'Pen', action: 'Click to add points. Click the first point to close the shape; Enter or double-click to finish it open. Shift: 45°. Backspace: undo a point' },
+    { keys: 'Path points', action: 'Select a pen shape: drag a point to move it, Alt-click to remove it, double-click the outline to add one' },
     { keys: 'Esc', action: 'Cancel draw → back to Select → clear selection (closes this overlay first)' },
     { keys: 'Tab / Shift+Tab', action: 'Cycle layers (Alt+Tab cycles hit zones)' },
     { keys: 'Arrows / Shift+Arrows', action: 'Nudge selection by 1px / 10px' },

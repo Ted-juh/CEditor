@@ -2,6 +2,7 @@
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { polygonPoints, polygonToSvgPoints } from '../utils/shapeGeometry.js';
+  import { pathIsClosed, pathVectorPoints } from '../utils/penPath.js';
   import { numberOr } from '../utils/primitives.js';
   import { plainFillCSS } from '../utils/plainFillCSS.js';
   import { materialActive } from '../utils/materialFilter.js';
@@ -108,8 +109,10 @@
 
   // Flat vector polygons (triangle, star, hexagon, …) render as a single SVG
   // <polygon> using the part's fill + border, instead of the CSS background.
-  let polygonVerts = $derived(polygonPoints(part?.kind));
+  // A `path` part (the designer's Pen) carries its own points; see utils/penPath.js.
+  let polygonVerts = $derived(polygonPoints(part?.kind) ?? pathVectorPoints(part));
   let rendersPolygon = $derived(!!polygonVerts);
+  let rendersOpenPath = $derived(rendersPolygon && String(part?.kind ?? '') === 'path' && !pathIsClosed(part));
   let rendersLine = $derived(simpleBackgroundKind === 'line');
   let rendersVectorShape = $derived(rendersPolygon || rendersLine);
 
@@ -389,6 +392,19 @@
       };
     }
 
+    if (rendersOpenPath) {
+      // An open path has no inside: stroke it like a line, falling back the same way.
+      const openStroke = stroke !== 'none'
+        ? stroke
+        : (fillEnabled ? cssColour(backgroundFill?.colour ?? 'FFFFFFFF', '#FFFFFF') : '#FFFFFF');
+      const openWidth = strokeWidth > 0 ? strokeWidth : 2;
+      return {
+        width, height, fill: 'none', stroke: openStroke, strokeWidth: openWidth, open: true,
+        points: polygonToSvgPoints(polygonVerts, width, height, openWidth / 2),
+        line: null,
+      };
+    }
+
     const inset = strokeWidth / 2;
     return {
       width, height, fill, stroke, strokeWidth,
@@ -524,6 +540,15 @@
             stroke-width={vectorShapeSvg.line.width}
             stroke-linecap="round"
           ></line>
+        {:else if vectorShapeSvg.open}
+          <polyline
+            points={vectorShapeSvg.points}
+            fill="none"
+            stroke={vectorShapeSvg.stroke}
+            stroke-width={vectorShapeSvg.strokeWidth}
+            stroke-linejoin="round"
+            stroke-linecap="round"
+          ></polyline>
         {:else}
           <polygon
             points={vectorShapeSvg.points}

@@ -184,6 +184,7 @@ export function layerKindLabel(part) {
     capsule: 'Capsule',
     ring: 'Ring',
     viewport: 'View',
+    path: 'Path',
   };
   return labels[kind] ?? kind;
 }

@@ -23,6 +23,8 @@ system, lived in `CE/web/src/CE_Application/docs/` and were deleted with the res
   Update Panel from SVG Artwork (a revised drawing, without losing the panel's work), Edit ›
   Create Component from Selection (artwork into a reusable linked component), and the
   Source card that diffs, updates, resets and detaches a placed library component.
+- [The Pen](pen-tool.md) — drawing your own shapes in the Component Designer, point by point, and
+  editing their points afterwards.
 - [Undo history](undo-history.md) — named undo steps in the Edit menu and the toolbar tooltips,
   and Edit › History..., which lists every step and jumps to any of them.
 - [Moving, resizing and checking components at every size](canvas-and-component-sizes.md) —
