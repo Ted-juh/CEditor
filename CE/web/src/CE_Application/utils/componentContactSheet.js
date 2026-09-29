@@ -16,6 +16,8 @@ import { partFrame } from './customDesignSurfaceGeometry.js';
 import { materializedCustomComponentSnapshot } from './customComponentMaterializer.js';
 import { resolveStateScopedControl } from './interactionRuntime.js';
 import { applyCustomInternalScale } from './customComponentScale.js';
+import { activeVariantOf, applyActiveVariant, applyVariantPatches } from './customComponentVariants.js';
+import { deepClone } from './deepClone.js';
 import { numberOr } from './primitives.js';
 
 const EDGE_TOLERANCE = 0.5;
@@ -32,6 +34,28 @@ export function contactSheetSizes(width, height) {
     size('wide', 'Wide', w * 2, h),
     size('tall', 'Tall', w, h * 2),
   ];
+}
+
+/**
+ * The control showing `variantName` ('default' for the base look). Both keys are set, because
+ * activeVariantOf reads Designer.activeVariant first.
+ */
+export function controlWithVariant(control, variantName) {
+  const children = control?._children ?? {};
+  if (!children.Variants) return control;
+  return {
+    ...control,
+    _children: {
+      ...children,
+      Designer: { ...(children.Designer ?? {}), activeVariant: variantName || 'default' },
+      Variants: { ...children.Variants, active: variantName || 'default' },
+    },
+  };
+}
+
+/** The variant the sheet opens on: the one the component is showing. */
+export function initialSheetVariant(control) {
+  return activeVariantOf(control)?.name ?? 'default';
 }
 
 /** The control as if it had been placed at this size. */
@@ -117,9 +141,12 @@ export function layoutIssues(designParts, designSize, parts, size) {
 
 /** One cell: this state, at this size. */
 export function contactSheetCell(control, stateName, size, signals = {}, design = null) {
-  const sized = controlAtSize(control, size.width, size.height);
+  // Variant first, then the state on top, as resolveInteractiveControl orders them.
+  const sized = deepClone(controlAtSize(control, size.width, size.height));
+  const variantPending = applyActiveVariant(sized);
   const scoped = stateName && stateName !== 'base' ? resolveStateScopedControl(sized, stateName) : sized;
   const materialized = materializedCustomComponentSnapshot(scoped, signals);
+  if (variantPending) applyVariantPatches(materialized, variantPending);
   applyCustomInternalScale(materialized);
   const parts = visibleParts(materialized);
   return {

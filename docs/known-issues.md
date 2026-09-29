@@ -225,29 +225,28 @@ its first binding. `utils/parameterStatus.js` `parameterEntries` now gives a com
 bound channel; the first keeps the control's id, so the GAIA panel's 277 items are unchanged, and a
 further channel is `controlId::channel`. `parameterStatus.test.js` pins it.
 
-## A custom component's variants are never applied
+## ~~A custom component's variants are never applied~~ — CLOSED
 
-*(Found 2026-09-28, while building the States × sizes sheet.)*
+*(Found 2026-09-28 while building the States × sizes sheet; fixed 2026-09-29.
+`customComponentVariants.test.js` and `browser-checks/variants.mjs` pin it.)*
 
-The Component Designer's **Publish › Variants** tab lets a component define named variants
-(Compact, Dark, Light, Vertical…), and the instance **Properties** tab lets each placed copy pick
-one (`Variants.active`). Nothing that draws a component reads either. `interactionRuntime.js`
-applies states, bindings and internal scale; the materializer applies generators; neither looks at
-`Variants`, and neither the panel renderer nor the C++ player does. Picking a variant changes the
-document and nothing on screen. The Linked components update does keep the chosen variant, which
-is right, but it is currently keeping a choice that has no effect.
+The Variants tab defined named looks and each placed copy could pick one, but nothing that drew a
+component read either: picking a variant changed the document and nothing on screen. The built-in
+presets were broken too. They wrote `Parts.<name>.Transform.*`, which no part has (a part's scale
+and rotation are in its `Layout`), and `Designer.width`/`height`, which do not size a placed copy.
+They also fell back to guessed part names, and a patch to a path that does not exist was silently
+dropped.
 
-The built-in presets would not work even if they were applied. They write to paths components do
-not have: a part's scale and rotation live at `Parts.<name>.Layout.scale`/`.rotation`, not
-`.Transform.*`, and a patch to a path that does not exist is silently dropped; and
-`Designer.width`/`height` are not what sizes a component.
-
-The fix is not large, but it spans every place a component is drawn: apply the active variant's
-patches in `resolveInteractiveControl` before the states, the same way a state is applied, then
-teach the C++ player and the exporter the same thing. The presets also need to target real paths.
-Until then, variants are left off the States × sizes sheet
-([canvas-and-component-sizes.md](canvas-and-component-sizes.md)), which would otherwise show every
-variant looking the same.
+`resolveInteractiveControl` now applies the copy's variant before bindings and states. It is the
+one path the editor canvas, preview mode and the exported plug-in's player all draw through, so
+there was no C++ side to change. Patches on generator-made parts are retried after the generators
+run. A variant may change only how a component looks: its parts, and the root's Background, Text,
+Effects and Image. It may not change how the component behaves (hit testing reads the component's
+own hit zones, so a moved hit zone would draw in one place and respond in another) or its
+Transform, which belongs to whoever placed the copy. The Variants tab marks any override that is
+refused or that names a path the component does not have. The presets now target real parts only,
+and the Vertical preset is gone: rotating two parts about their own centres does not make a
+vertical layout.
 
 ## Compiler-free plugin export
 

@@ -62,6 +62,24 @@ drawn.
 
 Click any cell to close the sheet and edit that state.
 
-**Variants are not on the sheet.** A component's variants are currently never applied when it is
-drawn; see [known-issues.md](known-issues.md). A sheet showing them would show the same picture
-in every row.
+**Variants.** If the component has variants, the sheet has a **Variant** picker. It opens on the
+variant the component is showing, and redraws every cell in the one you pick, with each state on
+top of it, as a placed copy would draw it.
+
+## Variants
+
+A variant is a named look for a component, such as Compact, Dark or Light. It is defined in the
+Component Designer under **Publish › Variants**, and each placed copy picks one on its
+**Properties** tab (a script or the published `variant` property can pick one too). The variant is
+the copy's base look: bindings and states still act on top of it.
+
+A variant can change the component's **parts** (colours, visibility, size and position within the
+component, text styling) and the root's **Background**, **Text**, **Effects** and **Image**. It
+cannot change how the component **behaves** (hit zones, value channels, bindings, links, states), because
+clicks are tested against the component's own hit zones and a variant that moved one would draw in
+one place and respond in another. It cannot change the copy's **Transform** either, because the
+copy's size and position belong to whoever placed it. The Variants tab marks an override it will
+not apply, and one that names a path the component does not have, and says why.
+
+The artboard always shows the base you are editing, so an edit is never hidden under a variant.
+To see a variant, pick it on a placed copy, or in the States × sizes sheet.

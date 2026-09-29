@@ -26,7 +26,7 @@ system, lived in `CE/web/src/CE_Application/docs/` and were deleted with the res
 - [Moving, resizing and checking components at every size](canvas-and-component-sizes.md) —
   what the panel canvas snaps to while you move, resize and group-resize (rotation included), and
   the Component Designer's States × sizes sheet, which draws every state at five sizes and says
-  where the layout breaks.
+  where the layout breaks, and what a component's variants can and cannot change.
 - [Panel text style](property-hints.md) — the rules for user-facing strings: property hints,
   tooltips, and the notes in the panel body.
 - [The display components, filled and moving](display-gallery.md) — five recordings of the

@@ -3,7 +3,7 @@
   // same part renderer the canvas uses, with the layout breaks at each size listed under its cell.
   // The cells and the checks are utils/componentContactSheet.js; this only lays them out.
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
-  import { buildContactSheet, contactSheetScale } from '../utils/componentContactSheet.js';
+  import { buildContactSheet, contactSheetScale, controlWithVariant, initialSheetVariant } from '../utils/componentContactSheet.js';
   import { previewSignals } from '../utils/customDesignSurfaceHelpers.js';
 
   let {
@@ -14,7 +14,12 @@
   } = $props();
 
   let stateNames = $derived(Object.keys(control?._children?.States?._children ?? {}));
-  let sheet = $derived(buildContactSheet(control, stateNames, previewSignals(preview)));
+  let variantEntries = $derived(Object.entries(control?._children?.Variants?._children ?? {})
+    .filter(([, variant]) => variant?.enabled !== false));
+  // '' until somebody picks one: then the sheet follows the variant the component is showing.
+  let pickedVariant = $state('');
+  let variant = $derived(pickedVariant || initialSheetVariant(control));
+  let sheet = $derived(buildContactSheet(controlWithVariant(control, variant), stateNames, previewSignals(preview)));
   let scale = $derived(contactSheetScale(sheet.sizes));
 
   function onKeydown(event) {
@@ -34,6 +39,15 @@
       <span class="summary" class:clean={sheet.issueCount === 0}>
         {sheet.issueCount === 0 ? 'No layout breaks' : `${sheet.issueCount} layout break${sheet.issueCount === 1 ? '' : 's'}`}
       </span>
+      {#if variantEntries.length > 1}
+        <label class="variant-pick">Variant
+          <select value={variant} onchange={(event) => { pickedVariant = event.currentTarget.value; }} data-testid="contact-sheet-variant">
+            {#each variantEntries as [name, entry] (name)}
+              <option value={name}>{entry?.label ?? name}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
       <em>Drawn as the panel draws them, at the preview's test value. Click a cell to edit that state.</em>
       <button type="button" class="close" onclick={onClose} title="Close (Esc)">×</button>
     </header>
@@ -118,6 +132,22 @@
     flex: 1;
     color: #7F95A3;
     font-style: normal;
+  }
+
+  .variant-pick {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #9FB3C0;
+  }
+
+  .variant-pick select {
+    background: #10181E;
+    border: 1px solid #31404A;
+    border-radius: 3px;
+    color: #D8E6EE;
+    font: inherit;
+    padding: 1px 4px;
   }
 
   .summary {

@@ -30,6 +30,7 @@ import {
 import { sliderValueToAngle } from './sliderGeometry.js';
 import { materializeCustomComponent } from './customComponentMaterializer.js';
 import { applyCustomInternalScale } from './customComponentScale.js';
+import { applyActiveVariant, applyVariantPatches } from './customComponentVariants.js';
 import { constrainCustomValues, customConditionMatches } from './customComponentInteraction.js';
 import { clamp } from './primitives.js';
 import { formatChannelValue } from './valueDisplayScale.js';
@@ -792,7 +793,11 @@ export function resolveInteractiveControl(control, previewSession = {}) {
 
   const resolved = deepClone(control);
   const signals = resolveInteractionContext(control, effectivePreviewSession);
+  // The copy's chosen variant is its base look: applied first, so bindings and states still act
+  // on top of it. Patches on a part a generator makes are retried once the generators have run.
+  const variantPending = isCustomComponent ? applyActiveVariant(resolved) : null;
   materializeCustomComponent(resolved, signals);
+  if (variantPending) applyVariantPatches(resolved, variantPending);
   applyCustomBindings(resolved, signals);
   const resolvedStates = getNodeChild(resolved, 'States');
 

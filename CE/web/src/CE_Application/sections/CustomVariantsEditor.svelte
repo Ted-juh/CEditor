@@ -1,6 +1,8 @@
 <script>
   import { getSection, updateControlProperty, removeControlNode, applyControlPatch } from '../stores/controls.js';
   import { valueAtPath } from '../stores/controlTreeUtils.js';
+  import { describeVariantPatches } from '../utils/customComponentVariants.js';
+  import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -35,21 +37,25 @@
   let showAdvanced = $state(false);
   let newOverridePath = $state('');
   let newOverrideValue = $state('');
-  let overrideSuggestions = $derived([
-    'Designer.width',
-    'Designer.height',
-    ...partNames.flatMap((name) => [
-      `Parts.${name}.visible`,
-      `Parts.${name}.Transform.x`,
-      `Parts.${name}.Transform.y`,
-      `Parts.${name}.Transform.scale`,
-      `Parts.${name}.Background.Fill.colour`,
-    ]),
-  ]);
+  // A part's geometry lives in its Layout child. These used to suggest `Parts.x.Transform.*`, which
+  // no part has, so a variant built from them changed nothing.
+  let overrideSuggestions = $derived(partNames.flatMap((name) => [
+    `Parts.${name}.visible`,
+    `Parts.${name}.opacity`,
+    `Parts.${name}.Layout.x`,
+    `Parts.${name}.Layout.y`,
+    `Parts.${name}.Layout.scale`,
+    `Parts.${name}.Background.Fill.colour`,
+  ]));
+  // Generated parts exist only after the generators run, so paths are checked against that.
+  let materializedForCheck = $derived(selectedPatchEntries.length ? materializedCustomComponentSnapshot(control, { valueNormalized: 0.5, customChannels: {} }) : null);
+  let patchChecks = $derived(new Map(describeVariantPatches(selected?.patches ?? {}, materializedForCheck).map((row) => [row.path, row])));
   let overrideRows = $derived(selectedPatchEntries.map(([path, value]) => {
     const base = valueAtPath(control, path);
-    return { path, value, base, changed: !sameValue(base, value) };
+    const check = patchChecks.get(path);
+    return { path, value, base, changed: !sameValue(base, value), status: check?.status ?? 'ok', reason: check?.reason ?? '' };
   }));
+  let ineffectiveCount = $derived(overrideRows.filter((row) => row.status !== 'ok').length);
 
   $effect(() => {
     if (!names.length) {
@@ -82,10 +88,15 @@
       || fallback;
   }
 
-  function partPath(role, suffix, fallbackName = '') {
+  // A preset patches only parts this component actually has. It used to fall back to a guessed
+  // name, writing patches to parts that did not exist.
+  function partPath(role, suffix) {
     const found = partNames.find((name) => name.toLowerCase().includes(role));
-    const name = found || fallbackName || partNames[0] || role;
-    return `Parts.${name}.${suffix}`;
+    return found ? `Parts.${found}.${suffix}` : '';
+  }
+
+  function patchesOf(entries) {
+    return Object.fromEntries(entries.filter(([path]) => path));
   }
 
   function createVariantPresets() {
@@ -94,44 +105,35 @@
         id: 'compact',
         label: 'Compact',
         description: 'Smaller layout and tighter type for dense panels.',
-        patches: {
-          'Designer.width': 96,
-          'Designer.height': 32,
-          [partPath('label', 'Text.Font.size', 'label')]: 10,
-          [partPath('handle', 'Transform.scale', 'handle')]: 0.85,
-        },
+        patches: patchesOf([
+          [partPath('label', 'Text.Font.size'), 10],
+          [partPath('handle', 'Layout.scale'), 0.85],
+        ]),
       },
       {
         id: 'dark',
         label: 'Dark',
         description: 'Darker shell with a brighter accent part.',
-        patches: {
-          [partPath('background', 'Background.Fill.colour', 'background')]: 'FF15171A',
-          [partPath('handle', 'Background.Fill.colour', 'handle')]: 'FF5B9BD5',
-          [partPath('label', 'Text.Fill.colour', 'label')]: 'FFEFEFEF',
-        },
+        patches: patchesOf([
+          [partPath('background', 'Background.Fill.colour'), 'FF15171A'],
+          [partPath('handle', 'Background.Fill.colour'), 'FF5B9BD5'],
+          [partPath('label', 'Text.Fill.colour'), 'FFEFEFEF'],
+        ]),
       },
       {
         id: 'light',
         label: 'Light',
         description: 'Light panel-friendly colour treatment.',
-        patches: {
-          [partPath('background', 'Background.Fill.colour', 'background')]: 'FFE8ECEF',
-          [partPath('handle', 'Background.Fill.colour', 'handle')]: 'FF2E78B7',
-          [partPath('label', 'Text.Fill.colour', 'label')]: 'FF1D242B',
-        },
+        patches: patchesOf([
+          [partPath('background', 'Background.Fill.colour'), 'FFE8ECEF'],
+          [partPath('handle', 'Background.Fill.colour'), 'FF2E78B7'],
+          [partPath('label', 'Text.Fill.colour'), 'FF1D242B'],
+        ]),
       },
-      {
-        id: 'vertical',
-        label: 'Vertical',
-        description: 'Tall orientation starter patch.',
-        patches: {
-          'Designer.width': 48,
-          'Designer.height': 144,
-          [partPath('label', 'Transform.rotation', 'label')]: -90,
-          [partPath('track', 'Transform.rotation', 'track')]: -90,
-        },
-      },
+      // No 'Vertical' preset. It rotated the label and track parts, each about its own centre,
+      // which does not turn a horizontal layout into a vertical one — and it resized the component
+      // through Designer.width/height, which is not what sizes a placed copy. A vertical look is a
+      // layout of its own; draw it as a separate component.
       {
         id: 'performance',
         label: 'Performance',
@@ -291,7 +293,7 @@
   </PropertySection>
 
   <PropertySection title="Variant Preview" icon={EyeIcon}>
-    <PropertyCell label="Summary" span={2} hint="Variant count and active state.">
+    <PropertyCell label="Summary" span={2} hint="Variant count and active state. The artboard always shows the base you are editing; see a variant on a placed copy, or under Sizes… on the States strip.">
       <div class="variant-summary">
         <strong>{variants.active ?? 'default'}</strong>
         <span>{enabledCount} enabled / {names.length} total</span>
@@ -333,8 +335,8 @@
         <div class="override-list">
           {#if overrideRows.length}
             {#each overrideRows as row (row.path)}
-              <div class="override-row" class:unchanged={!row.changed}>
-                <div class="override-path" title={row.path}>{row.path}</div>
+              <div class="override-row" class:unchanged={!row.changed} class:ineffective={row.status !== 'ok'} data-status={row.status}>
+                <div class="override-path" title={row.reason ? `${row.path} — ${row.reason}` : row.path}>{row.status !== 'ok' ? '⚠ ' : ''}{row.path}</div>
                 <div class="override-base" title={`Base: ${displayValue(row.base)}`}>{displayValue(row.base)}</div>
                 {#if typeof row.value === 'boolean' || typeof row.base === 'boolean'}
                   <div class="override-edit"><PropertyToggle value={row.value === true} onchange={() => setOverride(row.path, !(row.value === true), row.base)} /></div>
@@ -347,6 +349,14 @@
             {/each}
           {:else}
             <div class="empty-note">No overrides — this variant matches the base component.</div>
+          {/if}
+          {#if ineffectiveCount}
+            <div class="ineffective-note" data-testid="variant-ineffective">
+              {ineffectiveCount} override{ineffectiveCount === 1 ? '' : 's'} will not change anything:
+              {#each overrideRows.filter((row) => row.status !== 'ok') as row (row.path)}
+                <span><code>{row.path}</code> — {row.reason}.</span>
+              {/each}
+            </div>
           {/if}
           <div class="override-add">
             <input class="val" type="text" list="variant-override-paths" bind:value={newOverridePath} placeholder="Parts.label.visible" />
@@ -405,6 +415,9 @@
   .override-list { display: flex; flex-direction: column; gap: 4px; width: 100%; min-width: 0; }
   .override-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr) minmax(0, 1fr) auto auto; gap: 4px; align-items: center; }
   .override-row.unchanged .override-edit { opacity: 0.7; }
+  .override-row.ineffective .override-path { color: #E0A15B; }
+  .ineffective-note { display: grid; gap: 2px; padding: 6px 8px; border: 1px solid #5A4020; border-radius: 3px; background: #2A2016; color: #E0B97A; font-size: 10px; line-height: 1.35; }
+  .ineffective-note code { font-family: Consolas, 'Courier New', monospace; }
   .override-path { color: #CFCFCF; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: Consolas, 'Courier New', monospace; }
   .override-base { color: #888; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .override-edit { min-width: 0; }
