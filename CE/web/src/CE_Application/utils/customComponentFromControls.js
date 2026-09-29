@@ -23,10 +23,18 @@
  *                         size, weight, style and case. Anything else — letter spacing, an icon, a
  *                         non-default text layout, effects — is named and refused.
  *
- * Knobs, sliders, buttons and everything else with a value are refused in this step: their look is
- * drawn procedurally from their Behavior and has no part equivalent, and they carry bindings and
- * script references. So are controls a script mentions — the component cannot keep a name a script
- * addresses — and controls inside containers.
+ *   Knob, Slider       →  one part of kind `slidercontrol` carrying the knob itself, drawn by the
+ *                         panel's own SliderFamilyRenderer through the panel's own state machine, and
+ *                         dragged by the panel's own pointer maths (sliderControlPart.js). Its value
+ *                         becomes a channel of the component; its device bindings move to that channel
+ *                         on the placed copy; and the copy keeps the host parameter id the knob
+ *                         exported under, so a DAW session's automation and saved values still find
+ *                         it. What that pipeline does not draw — a background plate, a caption, an
+ *                         icon or lamp, extra parts, a control form — is refused by name, and so is a
+ *                         knob anything addresses: see valueReferences below.
+ *
+ * Buttons and everything else with a value are still refused. So are controls a script mentions — the
+ * component cannot keep a name a script addresses — and controls inside containers.
  *
  * Every label's text is PUBLISHED as an editable property, so each placed copy can carry its own
  * legend: the same plate reads CUTOFF on one copy and RESONANCE on the next, and an update to the
@@ -34,14 +42,19 @@
  */
 import { deepClone } from './deepClone.js';
 import { flattenControl } from './customComponentSourceLink.js';
-import { createPartNode } from './customComponentFactory.js';
+import { createBehaviorModule, createHitZone, createPartNode, createValueChannel } from './customComponentFactory.js';
 import { shapeConfig, shapeNeedsRoundCap, shapePath, shapeStrokeDash, shapeTakesFill } from './shapePrimitives.js';
 import { createControl } from '../models/componentTypes.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { resolveControlForSet } from '../models/controlSetFamilies.js';
 import { getControlLayer, sortControlsForRender } from './controlOrder.js';
+import { SLIDER_CONTROL_KIND, SLIDER_SEMANTIC_PARTS, sliderControlSnapshot } from './sliderControlPart.js';
+import { anatomyForm } from '../models/controlAnatomy.js';
+import { isDisplayOnly } from './displayMode.js';
 
 export const ARTWORK_TYPES = ['Background', 'Image', 'Shape', 'Label'];
+/** Controls with a value that convert: drawn by SliderFamilyRenderer, one value each. */
+export const VALUE_TYPES = ['Knob', 'Slider'];
 
 /** The Text leaves the part renderer draws exactly as a label does. Everything else must be default. */
 const TEXT_KEYS = new Set([
@@ -86,7 +99,10 @@ function defaultsFor(type) {
 
 function sectionLeaves(control, section) {
   const out = new Map();
-  for (const [path, value] of flattenControl(control)) {
+  // Only the one section: flattening the whole control per question was most of the time the plan
+  // took on a panel of knobs, whose semantic parts are hundreds of leaves each.
+  const only = { _children: { [section]: control?._children?.[section] } };
+  for (const [path, value] of flattenControl(only)) {
     if (path === section || path.startsWith(`${section}.`)) out.set(path.slice(section.length + 1), value);
   }
   return out;
@@ -147,6 +163,91 @@ function scriptReference(scripts, control) {
 }
 
 /**
+ * Where anything on the panel addresses each of these knobs, as a readable place, by control id.
+ *
+ * A knob that becomes a channel of a component is no longer a control with that id or that name, so
+ * everything that pointed at it would silently point at nothing. Two kinds of address:
+ *
+ *   by id    routes, meter / LCD / envelope sources, links… — every one of them stores the control's
+ *            Core.id as a string, so the whole panel is searched for it, outside the controls being
+ *            converted: one walk for all the knobs, instead of a list of fields that would go stale.
+ *   by name  the places utils/controlNames.js rewrites when a name changes: a script's target, an LCD
+ *            soft key's `press.set`, the GAIA feedback's `gridName`, a Setlist's capture paths and
+ *            scene values. Script SOURCES are checked by scriptReference, for every control.
+ *
+ * Snapshots and the export list are keyed by host parameter id, which the conversion keeps, so they
+ * are not references to refuse.
+ */
+function valueReferences(panel, valueControls, convertingIds) {
+  const reasons = new Map();
+  if (!valueControls.length) return reasons;
+  const byId = new Map(valueControls.map((control) => [String(control._children.Core.id ?? ''), control]));
+  const byName = new Map(valueControls.map((control) => [nameOf(control), control]));
+  const note = (control, reason) => {
+    const id = String(control._children.Core.id ?? '');
+    if (!reasons.has(id)) reasons.set(id, reason);
+  };
+  const namedBy = (text) => {
+    if (typeof text !== 'string') return null;
+    return byName.get(text) ?? byName.get(text.split('.')[0]) ?? null;
+  };
+
+  // By id: one walk over everything outside the controls being converted.
+  const walk = (node, where, path) => {
+    if (node == null) return;
+    if (typeof node === 'string') {
+      const control = byId.get(node);
+      if (control) note(control, `addressed by ${where}${path ? ` (${path})` : ''}`);
+      return;
+    }
+    if (typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      node.forEach((item, index) => walk(item, where, `${path}[${index}]`));
+      return;
+    }
+    for (const [key, value] of Object.entries(node)) {
+      if (key === '_type') continue;
+      walk(value, where, key === '_children' ? path : (path ? `${path}.${key}` : key));
+    }
+  };
+  const scripts = [...(panel?.scripts ?? [])];
+  const walkControls = (controls) => {
+    for (const other of controls ?? []) {
+      const kids = other?._children ?? {};
+      if (!convertingIds.has(String(kids.Core?.id ?? ''))) {
+        const owner = nameOf(other);
+        const { Children, Core, ...rest } = kids;
+        walk(rest, owner, '');
+        // By name: the places utils/controlNames.js rewrites when a name changes.
+        scripts.push(...(kids.Scripts?.scripts ?? []));
+        for (const layout of kids.Display?.layouts ?? []) {
+          for (const zone of layout?.zones ?? []) {
+            const control = namedBy(zone?.press?.set);
+            if (control) note(control, `set by ${owner}'s soft key`);
+          }
+        }
+        const grid = byName.get(kids.Designer?.deviceSyncFeedback?.gridName);
+        if (grid) note(grid, `${owner}'s device feedback grid`);
+        const setlist = kids.Setlist;
+        for (const path of [...(setlist?.capturePaths ?? []), ...(setlist?.scenes ?? []).flatMap((scene) => Object.keys(scene?.values ?? {}))]) {
+          const control = namedBy(path);
+          if (control) note(control, `captured by ${owner}'s setlist`);
+        }
+      }
+      walkControls(Object.values(kids.Children?._children ?? {}));
+    }
+  };
+  const { controls, exportParameters, snapshots, ...panelRest } = panel ?? {};
+  walk(panelRest, 'the panel', '');
+  walkControls(controls);
+  for (const script of scripts) {
+    const control = byName.get(String(script?.target ?? ''));
+    if (control) note(control, `the target of script "${script.name ?? script.id ?? 'untitled'}"`);
+  }
+  return reasons;
+}
+
+/**
  * Whether a label's text overflows its content box. The panel wraps an overflowing label onto more
  * lines; the part renderer keeps one — so an overflowing label is a label that would change. Needs
  * real font metrics, so the caller passes `measure(text, font) → width in px` (a canvas in the app);
@@ -168,11 +269,51 @@ function overflows(resolved, measure) {
   return measure(content, font) + spacing > available - 1;
 }
 
+/**
+ * Why this knob or slider cannot convert faithfully, or ''. The part draws exactly what CanvasControl
+ * draws for it through SliderFamilyRenderer, so anything CanvasControl draws BESIDES that is refused,
+ * and so is anything that would behave differently as one part of a larger control.
+ */
+function whyNotValueConvertible(control, resolved) {
+  const kids = control._children;
+  const core = kids.Core ?? {};
+  const behavior = kids.Behavior ?? {};
+  if (String(behavior.family ?? '') !== 'range' || String(behavior.role ?? '') !== 'slider') return 'not drawn as a slider';
+  if (String(behavior.valueMode ?? 'single') !== 'single') return 'two handles (a range) — a component channel holds one value';
+  const form = anatomyForm(core.controlType, core.controlForm);
+  if (form) return `drawn in the "${form}" control form, which a part does not draw`;
+  if (isDisplayOnly(behavior)) return 'read-only';
+  if (core.enabled === false) return 'disabled';
+  if (core.visible === false) return 'hidden';
+  if (core.hostAutomation === false) return 'kept out of host automation';
+  if (Number(kids.Transform?.rotation ?? 0)) return 'rotated';
+  if (drawsBackground(resolved?._children?.Background)) return 'a background plate';
+  if (String(resolved?._children?.Text?.content ?? '').trim()) return 'a caption';
+  if (nonDefault(control, 'Icon').length) return 'an icon';
+  if (nonDefault(control, 'ContentLayout').some((key) => key.startsWith('lamp'))) return 'a lamp';
+  const extra = Object.entries(resolved?._children?.Parts?._children ?? {})
+    .filter(([name, part]) => part?.visible !== false && !SLIDER_SEMANTIC_PARTS.has(name))
+    .map(([name]) => name);
+  if (extra.length) return `extra parts drawn over it (${extra.join(', ')})`;
+  if ((kids.Scripts?.scripts ?? []).some((script) => String(script?.source ?? '').trim())) return 'a script of its own';
+  if (kids.DeviceBindings?.enabled === false && (kids.DeviceBindings?.bindings ?? []).length) return 'device bindings switched off';
+  const ports = (kids.DeviceBindings?.bindings ?? []).map((binding) => String(binding?.port ?? 'value')).filter((port) => port !== 'value');
+  if (ports.length) return `a device binding on its ${ports[0]} port`;
+  return '';
+}
+
 /** Why this control cannot convert faithfully, or '' when it can. */
 export function whyNotConvertible(control, resolved, { measure = null } = {}) {
   const type = String(control?._children?.Core?.controlType ?? '');
+  if (VALUE_TYPES.includes(type)) {
+    const transform = control._children.Transform ?? {};
+    if (String(transform.anchor ?? 'topLeft') !== 'topLeft') return 'anchored to a corner other than top-left';
+    if (Number(transform.scale ?? 1) !== 1) return 'scaled';
+    if (nonDefault(control, 'Effects').length) return 'effects (shadow, bevel, glow…)';
+    return whyNotValueConvertible(control, resolved);
+  }
   if (!ARTWORK_TYPES.includes(type)) {
-    return `a ${type || 'control'} — only artwork (shapes, labels, images, backgrounds) can become a component in this step`;
+    return `a ${type || 'control'} — only artwork (shapes, labels, images, backgrounds), knobs and sliders can become a component`;
   }
   const transform = control._children.Transform ?? {};
   if (String(transform.anchor ?? 'topLeft') !== 'topLeft') return 'anchored to a corner other than top-left';
@@ -282,6 +423,17 @@ function partsFor(control, resolved, rect, zIndex, taken) {
     layout: pxLayout(rect, transform),
   };
   const name = nameOf(control);
+  if (VALUE_TYPES.includes(type)) {
+    // The knob itself, drawn by the panel's own renderer (sliderControlPart.js). Its value, hover and
+    // press are written into meta.sliderControl by the bindings and states planComponentFromSelection
+    // adds for it.
+    return [createPartNode(uniquePartName(name, taken), {
+      ...common,
+      role: 'custom',
+      kind: SLIDER_CONTROL_KIND,
+      meta: { sliderControl: { control: sliderControlSnapshot(resolved), hover: false, pressed: false } },
+    })];
+  }
   if (type === 'Label') {
     // Two parts: the label's own plate over the whole box, and its text over the CONTENT box — the box
     // inset by the layout padding, which is what the label renderer centres (or left/right-aligns)
@@ -360,6 +512,12 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
   const scripts = panelScripts(panel);
   const chosen = [];
 
+  const converting = new Set(wanted);
+  const references = valueReferences(
+    panel,
+    wanted.map((id) => topLevel.get(id)?.control).filter((control) => VALUE_TYPES.includes(String(control?._children?.Core?.controlType ?? ''))),
+    converting,
+  );
   for (const id of wanted) {
     const entry = topLevel.get(id);
     if (!entry) {
@@ -368,7 +526,10 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
     }
     const { control } = entry;
     const resolved = resolveControlForSet(control, set);
-    const why = whyNotConvertible(control, resolved, { measure }) || (scriptReference(scripts, control) ? `used by ${scriptReference(scripts, control)}` : '');
+    const why = whyNotConvertible(control, resolved, { measure })
+      || (scriptReference(scripts, control) ? `used by ${scriptReference(scripts, control)}` : '')
+      || references.get(id)
+      || '';
     if (why) refused.push({ id, name: nameOf(control), reason: why });
     else chosen.push({ ...entry, resolved });
   }
@@ -418,10 +579,12 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
   const taken = new Set();
   const parts = {};
   const published = {};
+  const values = [];
   order.forEach(({ control, resolved, rect }, i) => {
     const local = { ...rect, x: rect.x - bounds.x, y: rect.y - bounds.y };
     for (const part of partsFor(control, resolved, local, (i + 1) * 10, taken)) {
       parts[part.name] = part;
+      if (part.kind === SLIDER_CONTROL_KIND) values.push({ control, resolved, part, local, paintIndex: i });
       if (part.role === 'label') {
         published[`${part.name}Text`] = {
           path: `Parts.${part.name}.Text.content`,
@@ -439,11 +602,22 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
   children.Core.name = String(name).trim() || 'Artwork';
   Object.assign(children.Transform, { x: 0, y: 0, width: Math.round(bounds.width), height: Math.round(bounds.height) });
   children.Parts = { _type: 'Parts', _children: parts };
-  // Artwork has no value: none of the starter channels or behaviours a fresh component is given.
-  children.ValueChannels = { ...children.ValueChannels, _children: {} };
-  children.Behaviors = { ...children.Behaviors, _children: {} };
-  children.PublishedProperties = { ...children.PublishedProperties, inputs: {}, outputs: {}, editableProperties: published };
-  children.Designer = { ...children.Designer, selectedLayer: Object.keys(parts)[0] ?? '', selectedValueChannel: '', selectedBehavior: '' };
+  // None of the starter channels or behaviours a fresh component is given: artwork has no value, and
+  // each knob brings exactly its own.
+  const valueSections = knobSections(values, bounds);
+  children.ValueChannels = { ...children.ValueChannels, _children: valueSections.channels };
+  children.Behaviors = { ...children.Behaviors, _children: valueSections.behaviors };
+  children.HitZones = { ...children.HitZones, _children: valueSections.hitZones };
+  children.Bindings = { ...children.Bindings, _children: valueSections.bindings };
+  children.States = { ...children.States, _children: valueSections.states };
+  children.PublishedProperties = {
+    ...children.PublishedProperties,
+    inputs: valueSections.published,
+    outputs: valueSections.published,
+    editableProperties: published,
+  };
+  const firstChannel = Object.keys(valueSections.channels)[0] ?? '';
+  children.Designer = { ...children.Designer, selectedLayer: Object.keys(parts)[0] ?? '', selectedValueChannel: firstChannel, selectedBehavior: firstChannel };
 
   return {
     ok: true,
@@ -455,7 +629,117 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
     zIndex: Number(order[0].control._children.Core.zIndex) || 0,
     insertIndex: Math.min(...order.map(({ index }) => index)),
     component,
+    // What the placed copy carries for each knob (see placeValueControls): its bindings, now on the
+    // knob's channel, and the host parameter it exported as.
+    values: valueSections.carried,
   };
+}
+
+/**
+ * The channel, behaviour, hit zone, binding and two states one knob needs inside the component.
+ *
+ *   channel    the knob's value model: range, step, default, unit.
+ *   behaviour  `slidercontrol`, naming the part: the drag is the panel knob's own (sliderControlPart.js).
+ *   hit zone   the knob's box, in percent of the component, so it follows any zoom.
+ *   binding    channel value → the part's meta.sliderControl.value, which the part renders from.
+ *   states     hover, press and focus of THIS knob's zone → the part's hover / pressed / focused,
+ *              which run the knob's own Hover, Pressed, Dragging and Focused states. A component's own
+ *              hover and focus are the whole component's.
+ */
+function knobSections(values, bounds) {
+  const out = { channels: {}, behaviors: {}, hitZones: {}, bindings: {}, states: {}, published: {}, carried: [] };
+  const width = Math.max(1, bounds.width);
+  const height = Math.max(1, bounds.height);
+  for (const { control, part, local, paintIndex } of values) {
+    const behavior = control._children.Behavior ?? {};
+    const channelName = part.name;
+    const zoneName = `${channelName}Zone`;
+    const min = Number.isFinite(Number(behavior.min)) ? Number(behavior.min) : 0;
+    let max = Number.isFinite(Number(behavior.max)) ? Number(behavior.max) : 1;
+    if (max <= min) max = min + 1;
+    const rawDefault = Number(behavior.defaultCurrentValue ?? behavior.defaultValue);
+    const defaultValue = Math.min(max, Math.max(min, Number.isFinite(rawDefault) ? rawDefault : min));
+    const unit = String(behavior.unit ?? '').trim();
+    out.channels[channelName] = createValueChannel(channelName, {
+      label: nameOf(control),
+      type: behavior.valueType === 'int' ? 'int' : 'float',
+      min,
+      max,
+      step: Number(behavior.step) > 0 ? Number(behavior.step) : 0.01,
+      defaultValue,
+      // The host reads its unit from the suffix first (exportParameters.paramFromChannel).
+      format: { suffix: unit, unit },
+    });
+    out.behaviors[channelName] = {
+      ...createBehaviorModule(channelName, { type: SLIDER_CONTROL_KIND, valueChannel: channelName, role: 'custom' }),
+      part: part.name,
+    };
+    out.hitZones[zoneName] = createHitZone(zoneName, {
+      shape: 'rectangle',
+      targetBehavior: channelName,
+      targetValueChannel: channelName,
+      action: 'dragValue',
+      cursor: String(control._children.Mouse?.cursor ?? 'pointer'),
+      bounds: {
+        x: (local.x / width) * 100,
+        y: (local.y / height) * 100,
+        width: (local.width / width) * 100,
+        height: (local.height / height) * 100,
+        unit: 'percent',
+      },
+    });
+    // The knob painted last is on top, so it takes the pointer where two overlap, as on the panel.
+    out.hitZones[zoneName].priority = paintIndex;
+    out.bindings[`${channelName}Value`] = {
+      _type: 'Binding',
+      name: `${channelName}Value`,
+      enabled: true,
+      source: `channel.${channelName}.raw`,
+      mapMode: 'direct',
+      target: `Parts.${part.name}.meta.sliderControl.value`,
+    };
+    out.states[`${channelName}Hover`] = {
+      _type: 'State', name: `${channelName}Hover`, group: 'interaction', enabled: true,
+      description: `The pointer is over ${nameOf(control)}.`,
+      when: { hoveredCustomHitZone: zoneName },
+      patches: { component: {}, parts: { [part.name]: { 'meta.sliderControl.hover': true } } },
+    };
+    out.states[`${channelName}Pressed`] = {
+      _type: 'State', name: `${channelName}Pressed`, group: 'interaction', enabled: true,
+      description: `${nameOf(control)} is being dragged.`,
+      when: { activeCustomHitZone: zoneName, dragging: true },
+      patches: { component: {}, parts: { [part.name]: { 'meta.sliderControl.pressed': true } } },
+    };
+    out.states[`${channelName}Focused`] = {
+      _type: 'State', name: `${channelName}Focused`, group: 'interaction', enabled: true,
+      description: `${nameOf(control)} has focus (sliderControlPart.js keeps each knob's focus apart).`,
+      when: { focusedCustomHitZones: zoneName },
+      patches: { component: {}, parts: { [part.name]: { 'meta.sliderControl.focused': true } } },
+    };
+    // The knob that stands for the component's DOM focus wears the preview's keyboard focus ring,
+    // where the panel knob wore it (CanvasControl moves the ring off the component onto this part).
+    out.states[`${channelName}DomFocus`] = {
+      _type: 'State', name: `${channelName}DomFocus`, group: 'interaction', enabled: true,
+      description: `${nameOf(control)} holds the keyboard focus.`,
+      when: { domFocusCustomHitZone: zoneName },
+      patches: { component: {}, parts: { [part.name]: { 'meta.sliderControl.domFocus': true } } },
+    };
+    out.published[channelName] = {
+      channel: channelName, label: nameOf(control), type: out.channels[channelName].type, enabled: true, min, max, defaultValue,
+    };
+    const deviceBindings = control._children.DeviceBindings ?? {};
+    out.carried.push({
+      controlId: String(control._children.Core.id ?? ''),
+      name: nameOf(control),
+      channel: channelName,
+      // Exactly what exportParameters.paramFromBehavior gave this knob.
+      hostParameter: { id: `${nameOf(control)}.value`, label: nameOf(control) },
+      bindings: deviceBindings.enabled === false
+        ? []
+        : (deviceBindings.bindings ?? []).map((binding) => ({ ...deepClone(binding), port: channelName })),
+    });
+  }
+  return out;
 }
 
 /** One line per refusal, for the notification and the console. */

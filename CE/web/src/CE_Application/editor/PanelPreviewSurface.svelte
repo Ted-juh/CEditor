@@ -301,6 +301,11 @@
     seedCustomValues,
     snapCustomChannelValue,
   } from '../utils/customComponentInteraction.js';
+  import {
+    firstSliderControlZone, hasSliderControlParts, sliderControlBlurPatch, sliderControlFocusZonePatch,
+    sliderControlForZone, sliderControlKeyValue, sliderControlPressFocusPatch, sliderControlResetValue,
+    sliderControlWheelValue,
+  } from '../utils/sliderControlPart.js';
   import { dispatchInteraction } from '../scripting/panelRuntime.js';
   import { customNumericFields, customNumericPatch, customArpeggiatorKeyPatch } from '../utils/customNumericEditing.js';
   import { numberOr } from '../utils/primitives.js';
@@ -493,6 +498,9 @@
   let pointerSliderHandle = $state('');
   let pointerCustomHitZone = $state(null);
   let pointerCustomStartValues = $state({});
+  // One pointer gesture's drag state for a component's knob part (utils/sliderControlPart.js keeps
+  // the gesture's scrub in it, as the panel keeps `sliderScrub`). Plain, not $state: it is mutated.
+  let pointerCustomDragState = null;
   let keyboardFocusControlId = $state('');
   let lastInputMode = $state('pointer');
   let openComboboxControlId = $state('');
@@ -6539,11 +6547,20 @@
   function emitDeviceBindingsForPatch(control, patch = {}, previous = null) {
     const controlId = getControlId(control);
     const interactionPhase = patch.dragging === true ? 'continuous' : 'commit';
+    // A component's patch carries every channel's value, so a channel that did not change is not
+    // sent — except the one this patch is driving (the zone being dragged, the knob wheeled or keyed),
+    // which sends on every patch as a panel knob does: a press sends the value it is already at, so
+    // touching a knob puts the synth where the screen is.
+    const driven = patch.drivenCustomChannel
+      ?? (patch.activeCustomHitZone ? getCustomHitZones(control)?.[patch.activeCustomHitZone]?.targetValueChannel : '')
+      ?? '';
+    const unchangedChannel = (binding, value) => binding.port !== 'value' && binding.port !== driven
+      && !!control?._children?.ValueChannels?._children?.[binding.port]
+      && value === previous?.customValues?.[binding.port];
     for (const binding of activeDeviceBindings(control)) {
       const value = bindingValueForPatch(binding, patch, control);
       if (value === undefined) continue;
-      if (binding.port !== 'value' && control?._children?.ValueChannels?._children?.[binding.port]
-        && value === previous?.customValues?.[binding.port]) continue;
+      if (unchangedChannel(binding, value)) continue;
       commitDeviceParameter({
         requestId: `panel_preview_${controlId || 'control'}_${interactionPhase}_${Date.now()}`,
         deviceRole: binding.deviceRole || DEFAULT_DEVICE_ROLE,
@@ -6559,6 +6576,8 @@
     for (const binding of activeMidiControlBindings(control)) {
       const value = bindingValueForPatch(binding, patch, control);
       if (value === undefined) continue;
+      // Without this, each move of one knob re-sent every other knob's CC.
+      if (unchangedChannel(binding, value)) continue;
       const message = midiControlMessage(binding, value);
       if (!message) continue;
       triggerRawMidiAction({
@@ -6866,6 +6885,7 @@
       startClientX: pointerDownPoint?.x,
       startClientY: pointerDownPoint?.y,
       startValues: pointerCustomStartValues,
+      dragState: pointerCustomDragState,
       fine: event?.shiftKey === true,
       coarse: event?.ctrlKey === true || event?.metaKey === true,
     });
@@ -6889,6 +6909,7 @@
       startClientX: pointerDownPoint?.x,
       startClientY: pointerDownPoint?.y,
       startValues: pointerCustomStartValues,
+      dragState: pointerCustomDragState,
       fine: event?.shiftKey === true,
       coarse: event?.ctrlKey === true || event?.metaKey === true,
     });
@@ -7427,6 +7448,30 @@
     }
     if (isCustomComponent(control)) {
       if (isDisabled(control)) return;
+      // A component carrying panel knobs (Create Component from Selection) wheels the way those
+      // knobs did on the panel: only the knob under the pointer, only if it took the wheel, one step
+      // a notch. Over its artwork, nothing — the panel's plate never moved a knob.
+      if (hasSliderControlParts(control)) {
+        const rect = event?.currentTarget?.getBoundingClientRect?.();
+        const resolvedPreview = resolvedPreviewFor(control);
+        const hit = resolveCustomHitZoneAtPoint(resolvedPreview?.control ?? control, rect, event.clientX, event.clientY, sessionFor(control)?.customValues ?? {});
+        const knob = hit ? sliderControlForZone(control, hit.zone) : null;
+        const channel = knob ? getCustomValueChannels(control)?.[knob.channelName] : null;
+        if (!knob || !channel) return;
+        const values = customSessionValues(control);
+        const next = sliderControlWheelValue(knob.snapshot, values?.[knob.channelName] ?? channel.defaultValue, event.deltaY < 0 ? 1 : -1);
+        if (next == null) return;
+        event.preventDefault();
+        event.stopPropagation();
+        patchControlSession(getControlId(control), {
+          customValues: { ...values, [knob.channelName]: next },
+          drivenCustomChannel: knob.channelName,
+          ...sliderControlFocusZonePatch(sessionFor(control), hit.name),
+          focused: true,
+          hover: true,
+        });
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       const baseDirection = event.deltaY < 0 ? 1 : -1;
@@ -7544,6 +7589,7 @@
       pointerSliderHandle = '';
       pointerCustomHitZone = null;
       pointerCustomStartValues = {};
+      pointerCustomDragState = null;
       removeWindowListeners();
     }
 
@@ -7784,6 +7830,16 @@
       const rect = event.currentTarget?.getBoundingClientRect?.();
       const hit = resolveCustomHitZoneAtPoint(resolvedPreviewFor(control)?.control ?? control,
         rect, event.clientX, event.clientY, customSessionValues(control));
+      const knob = hit ? sliderControlForZone(control, hit.zone) : null;
+      if (knob) {
+        // A panel knob carried by the component resets as it did on the panel.
+        const value = sliderControlResetValue(knob.snapshot);
+        if (value == null || !getCustomValueChannels(control)?.[knob.channelName]) return false;
+        patchControlSession(id, { customValues: { [knob.channelName]: value }, drivenCustomChannel: knob.channelName, dragging: false, pressed: false });
+        lcdActiveAt[id] = Date.now(); lcdActiveId = id; rememberParameter(id);
+        inspectPreviewControl(id);
+        return true;
+      }
       const behavior = getCustomBehaviors(control)[hit?.zone?.targetBehavior];
       if (!['slider', 'knob', 'dial', 'ring'].includes(String(behavior?.role ?? behavior?.type).toLowerCase())) return false;
       const channelName = hit?.zone?.targetValueChannel ?? behavior.valueChannel;
@@ -7983,6 +8039,7 @@
     sliderScrub = null;
     pointerCustomHitZone = null;
     pointerCustomStartValues = {};
+    pointerCustomDragState = null;
     pointerStartValue = isSliderControl(control)
       ? currentSliderRoleValue(control, currentSliderActiveHandle(control))
       : currentRangeValue(control);
@@ -7996,6 +8053,11 @@
         ?? customHitZoneFromEventTarget(resolvedPreview?.control ?? control, event)
         ?? customHitZoneFromEventTarget(control, event);
       pointerCustomStartValues = { ...(sessionFor(control)?.customValues ?? {}) };
+      pointerCustomDragState = {};
+      // Panel knobs inside: a press moves "DOM focus" to the knob pressed and clears its focus flag.
+      const knobFocus = hasSliderControlParts(control)
+        ? sliderControlPressFocusPatch(sessionFor(control), sliderControlForZone(control, pointerCustomHitZone?.zone) ? pointerCustomHitZone.name : '')
+        : {};
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
       const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || ['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action) || action === '';
       if (isDragAction) {
@@ -8004,8 +8066,11 @@
           pressed: false,
           focused: false,
           dragging: true,
+          ...knobFocus,
         });
-        updateCustomDragFromPointer(control, event);
+        // A panel knob's press is one patch, value included (setSliderRoleValue); the press above
+        // already is that for a knob part, and a second at the same point would send it twice.
+        if (!sliderControlForZone(control, pointerCustomHitZone?.zone)) updateCustomDragFromPointer(control, event);
       } else {
         patchControlSession(pointerActiveControlId, {
           hover: true,
@@ -8014,6 +8079,7 @@
           dragging: false,
           activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
           activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+          ...knobFocus,
         });
       }
       window.addEventListener('pointermove', handleWindowPointerMove);
@@ -8329,6 +8395,7 @@
       pointerSliderHandle = '';
       pointerCustomHitZone = null;
       pointerCustomStartValues = {};
+      pointerCustomDragState = null;
       const abandoned = momentaryButtonPreview.releasePress(activeId, activeBehavior);
       if (abandoned) patchControlSession(activeId, abandoned);
       removeWindowListeners();
@@ -8384,6 +8451,7 @@
     pointerSliderHandle = '';
     pointerCustomHitZone = null;
     pointerCustomStartValues = {};
+    pointerCustomDragState = null;
     if (!cancelled && listboxDrag?.id === activeId) startListboxMomentum(activeControl, listboxDrag);
     listboxDrag = null;
     removeWindowListeners();
@@ -8399,7 +8467,13 @@
     const controlId = getControlId(control);
     keyboardFocusControlId = controlId;
     inspectPreviewControl(controlId);
-    patchControlSession(controlId, { focused: true });
+    // Tab into a component carrying panel knobs focuses a knob, as Tab focused one on the panel.
+    const knobZone = isCustomComponent(control) && hasSliderControlParts(control)
+      ? (sessionFor(control)?.domFocusCustomHitZone || firstSliderControlZone(control))
+      : '';
+    patchControlSession(controlId, knobZone
+      ? { focused: true, activeCustomHitZone: knobZone, domFocusCustomHitZone: knobZone, ...sliderControlFocusZonePatch(sessionFor(control), knobZone) }
+      : { focused: true });
   }
 
   function handleBlur(control, event) {
@@ -8428,6 +8502,7 @@
       dragging: false,
       valueInputActive: false,
       ...(momentaryRelease ?? {}),
+      ...(isCustomComponent(control) && hasSliderControlParts(control) ? sliderControlBlurPatch(sessionFor(control)) : {}),
     });
 
     if (pointerActiveControlId === controlId) {
@@ -8552,6 +8627,30 @@
       if (isTimedButtonBehavior(getBehavior(control))) {
         timedButtonPreview.beginPress(controlId, getBehavior(control));
       }
+      return;
+    }
+
+    // A component carrying panel knobs: keys move the knob last pressed, by the panel knob's own key
+    // rules. It is one focus stop where the panel had one per knob, so "focused" is the last touched.
+    if (isCustomComponent(control) && hasSliderControlParts(control)
+      && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+      const zoneName = sessionFor(control)?.activeCustomHitZone ?? '';
+      const zone = getCustomHitZones(control)?.[zoneName];
+      const knob = zone ? sliderControlForZone(control, zone) : null;
+      const channel = knob ? getCustomValueChannels(control)?.[knob.channelName] : null;
+      if (!knob || !channel) return;
+      const values = customSessionValues(control);
+      const next = sliderControlKeyValue(knob.snapshot, values?.[knob.channelName] ?? channel.defaultValue, event.key);
+      if (next == null) return;
+      event.preventDefault();
+      event.currentTarget?.focus?.();
+      patchControlSession(controlId, {
+        customValues: { ...values, [knob.channelName]: next },
+        drivenCustomChannel: knob.channelName,
+        ...sliderControlFocusZonePatch(sessionFor(control), zoneName),
+        focused: true,
+        hover: true,
+      });
       return;
     }
 

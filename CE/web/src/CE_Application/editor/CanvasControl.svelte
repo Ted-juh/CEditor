@@ -11,6 +11,7 @@
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import { bakeStaticPartEntries } from '../utils/staticPartBaking.js';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
+  import { SLIDER_SEMANTIC_PARTS, hasSliderControlParts } from '../utils/sliderControlPart.js';
   import ControlAnatomy from './ControlAnatomy.svelte';
   import { anatomyForm } from '../models/controlAnatomy.js';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
@@ -430,12 +431,6 @@
       .filter(([, zone]) => zone?.enabled !== false && zone?.visibleInEditor !== false)
       .sort((left, right) => numberOr(left?.[1]?.priority, 0) - numberOr(right?.[1]?.priority, 0))
   );
-  const SLIDER_SEMANTIC_PARTS = new Set([
-    'bodyTrackBase', 'bodyTrackFill', 'bodySelectedRange', 'bodyCenterMarker', 'bodyCap',
-    'pointerStart', 'pointerCurrent', 'pointerEnd',
-    'tickMajor', 'tickMinor', 'tickAccent',
-    'labelMin', 'labelMax', 'labelStart', 'labelCurrent', 'labelEnd', 'labelValue', 'labelTitle', 'labelUnit',
-  ]);
   let renderPartEntries = $derived.by(() =>
     Object.entries(renderParts?._children ?? {})
       .filter(([, part]) => part?.visible !== false)
@@ -515,6 +510,10 @@
   // whatever sits behind it, and it has no hover. See utils/displayMode.js for the trade.
   let mouseBlocksPointer = $derived(mouseAppliesToSurface && !acceptsPointerFor(mouseSection, flowBehavior));
   let mouseChildrenTakePointer = $derived(mouseAppliesToSurface && childrenAcceptPointer(mouseSection));
+  // A component carrying panel knobs (utils/sliderControlPart.js) is one focusable element where the
+  // panel had one per knob, so the preview's keyboard focus ring moves off it onto the knob that holds
+  // its focus — the ring the panel knob itself wore.
+  let carriesKnobs = $derived(isCustomComponent && hasSliderControlParts(control));
   let mouseFocusOutline = $derived(mouseAppliesToSurface && showsFocusOutline(mouseSection));
   let mouseRaisesOnClick = $derived(mouseAppliesToSurface && raisesOnClick(mouseSection));
 
@@ -3458,6 +3457,7 @@
   class:device-drop-incompatible={deviceDropStatus === 'incompatible'}
   class:mouse-transparent={mouseBlocksPointer}
   class:mouse-focus-outline={mouseFocusOutline}
+  class:carries-knobs={carriesKnobs}
   style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; --inv-scale:{1 / (scale || 1)}; {layerTint ? `--layer-tint:${layerTint};` : ''} {canvasTransformCSS} {rootTransitionCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
   onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
   ondblclick={editorInteractionEnabled ? handleDoubleClick : undefined}
@@ -4422,6 +4422,7 @@
     outline-offset: 1px;
   }
 
+
   /* Nested-children layers. Transparent to pointer events so Child Clicks off
      makes the container one hit target; the on-state below re-enables both the
      layer and each nested control. */
@@ -4881,6 +4882,21 @@
   }
 
   .canvas-control.preview-keyboard-focus::after {
+    border: 1px solid rgba(91, 155, 213, 0.6);
+  }
+
+  /* A component carrying panel knobs: the keyboard ring goes round the knob that has the focus, as
+     it went round that knob on the panel, not round the whole component. Same ring, same place. */
+  .canvas-control.preview-keyboard-focus.carries-knobs::after {
+    content: none;
+  }
+
+  .canvas-control.preview-keyboard-focus.carries-knobs :global(.interactive-part[data-focus-ring])::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 12px;
+    pointer-events: none;
     border: 1px solid rgba(91, 155, 213, 0.6);
   }
 

@@ -8,6 +8,7 @@ import { resolvePartPixelRect } from './customComponentLayout.js';
 import { numberOr, clamp } from './primitives.js';
 import { DragScrub, presets } from '../scrub/dragScrub';
 import { appScrubOverrides } from './scrubRuntime.js';
+import { SLIDER_CONTROL_KIND, sliderControlValueFromPoint } from './sliderControlPart.js';
 
 function sectionChildren(control, sectionName) {
   return control?._children?.[sectionName]?._children ?? {};
@@ -937,6 +938,28 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
     const result = applyHitZonePayloadValues(nextValues, channels, hitZone, channelName, action);
     nextValue = result?.value ?? nextValue;
     normalized = result?.normalized ?? normalized;
+  } else if (point?.rect && String(behaviorModule?.type ?? '').trim().toLowerCase() === SLIDER_CONTROL_KIND) {
+    // A panel knob or slider carried as a part (utils/sliderControlPart.js): the panel's own drag, on
+    // the part's box, from the knob's own Behavior and Mouse settings.
+    const snapshot = control?._children?.Parts?._children?.[behaviorModule?.part]?.meta?.sliderControl?.control ?? null;
+    const box = customHitZoneRect(hitZone, point.rect);
+    const partRect = {
+      left: point.rect.left + box.x,
+      top: point.rect.top + box.y,
+      width: box.width,
+      height: box.height,
+      right: point.rect.left + box.x + box.width,
+      bottom: point.rect.top + box.y + box.height,
+    };
+    const value = sliderControlValueFromPoint(snapshot, partRect, point, {
+      clientX: point.startClientX,
+      clientY: point.startClientY,
+      value: point.startValues?.[channelName] ?? currentValue,
+    }, point.dragState ?? null);
+    if (value != null) {
+      nextValue = value;
+      normalized = normalizeCustomChannelValue(channel, value);
+    }
   } else if (point?.rect) {
     const geometry = String(behaviorModule?.geometry ?? '').trim().toLowerCase();
     const type = String(behaviorModule?.type ?? '').trim().toLowerCase();

@@ -300,6 +300,7 @@ function paramFromBehavior(name, behavior, valueSection = null) {
  */
 export function deriveExportParameters(panel) {
   const out = [];
+  const kept = [];
   for (const control of flatControls(panel?.controls ?? [])) {
     const core = control?._children?.Core;
     const name = core?.name ?? core?.id;
@@ -329,7 +330,10 @@ export function deriveExportParameters(panel) {
         // made two lanes bound to two synth parameters both drive the first, window-closed only
         // (exportParametersChannelBindings.test.js). A lone channel keeps "any binding drives it".
         const channelWire = single ? wire : deviceWireFor(control, channelName);
-        out.push({ ...paramFromChannel(name, channelName, channel, single), ...channelWire });
+        const param = { ...paramFromChannel(name, channelName, channel, single), ...channelWire };
+        const keep = core?.hostParameters?.[channelName];
+        if (keep?.id) kept.push({ param, keep });
+        out.push(param);
       }
       continue;
     }
@@ -348,7 +352,39 @@ export function deriveExportParameters(panel) {
       if (param) out.push({ ...param, ...wire });
     }
   }
+  keepHostParameterIds(out, kept);
   return out;
+}
+
+/**
+ * A channel that used to be a panel knob keeps the host parameter id the knob exported under.
+ *
+ * Create Component from Selection turns knob `cutoff` (host id `cutoff.value`) into channel `cutoff`
+ * of component `Filter`, whose own id would be `Filter.cutoff`. The plug-in names its parameters by
+ * id — juce::ParameterID in PanelParameters.h — and a DAW saves automation lanes and the plug-in's
+ * state (the APVTS) against that id. So the placed copy records what the knob was
+ * (`Core.hostParameters[channel] = { id, label }`) and the channel exports under it; `path`, which is
+ * how the player finds the value, is the channel's.
+ *
+ * Never at the cost of a duplicate: two parameters with one id is a broken plug-in. A kept id that
+ * another parameter already has by its own name — a new knob called `cutoff` — or that an earlier copy
+ * already kept — the converted component duplicated — is dropped, and that channel exports under its
+ * own id. First in panel order keeps it.
+ */
+function keepHostParameterIds(params, kept) {
+  if (!kept.length) return;
+  const keptSet = new Set(kept.map(({ param }) => param));
+  const taken = new Set(params.filter((param) => !keptSet.has(param)).map((param) => param.id));
+  for (const { param, keep } of kept) {
+    const id = String(keep.id);
+    if (taken.has(id)) {
+      taken.add(param.id);
+      continue;
+    }
+    param.id = id;
+    if (keep.label) param.label = String(keep.label);
+    taken.add(id);
+  }
 }
 
 /**

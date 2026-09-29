@@ -326,6 +326,8 @@ function evaluateState(state, signals) {
   const when = state.when ?? {};
   return Object.entries(when).every(([key, expected]) => {
     const actual = stateSignalValue(key, signals);
+    // "Is this zone among the focused ones" — the one list-valued signal a state asks about.
+    if (key === 'focusedCustomHitZones') return Array.isArray(actual) && actual.includes(expected);
     if (Array.isArray(expected)) return expected.includes(actual);
     return actual === expected;
   });
@@ -581,6 +583,8 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
     activeCustomHitZone: previewSession?.activeCustomHitZone ?? '',
     hoveredCustomBehavior: previewSession?.hoveredCustomBehavior ?? '',
     hoveredCustomHitZone: previewSession?.hoveredCustomHitZone ?? '',
+    focusedCustomHitZones: Array.isArray(previewSession?.focusedCustomHitZones) ? previewSession.focusedCustomHitZones : [],
+    domFocusCustomHitZone: previewSession?.domFocusCustomHitZone ?? '',
     hover: previewSession?.hover === true,
     pressed: previewSession?.pressed === true,
     focused: previewSession?.focused === true,

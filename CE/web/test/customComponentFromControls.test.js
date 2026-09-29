@@ -3,7 +3,7 @@
 //
 // The pixel proof is browser-checks/fromSelection.mjs: a hand-made panel of every artwork kind, and
 // three real QA sheets, drawn before and after with the editor's own renderer. These tests pin the
-// rules that decide what gets that far.
+// rules that decide what gets that far. Knobs and sliders have their own file, knobsFromSelection.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -95,10 +95,13 @@ test('an artwork component is a complete package, not one "with issues"', () => 
 
 // --- What is refused, and the reason given ---------------------------------------------------------
 
-test('a knob is refused, and so is the whole command — nothing converts partly', () => {
-  const plan = planComponentFromSelection(artworkPanel(), ids('plate', 'cutoff'));
+test('a button is refused, and so is the whole command — nothing converts partly', () => {
+  // Knobs and sliders convert (test/knobsFromSelection.test.js); buttons still do not.
+  const panel = artworkPanel();
+  panel.controls.push(at('Button', 'go', 240, 20, 50, 30));
+  const plan = planComponentFromSelection(panel, ids('plate', 'go'));
   assert.equal(plan.ok, false);
-  assert.match(refusal(plan, 'cutoff'), /a Knob — only artwork/);
+  assert.match(refusal(plan, 'go'), /a Button — only artwork \(shapes, labels, images, backgrounds\), knobs and sliders/);
   assert.equal(plan.component, undefined);
 });
 

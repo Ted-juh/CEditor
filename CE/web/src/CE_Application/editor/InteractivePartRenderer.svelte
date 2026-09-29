@@ -7,6 +7,9 @@
   import { plainFillCSS } from '../utils/plainFillCSS.js';
   import { materialActive } from '../utils/materialFilter.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
+  import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
+  import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
+  import { isSliderControlPart, sliderControlSession } from '../utils/sliderControlPart.js';
 
   let {
     part = null,
@@ -101,6 +104,12 @@
     String(part?.kind ?? '').toLowerCase() === 'waveformicon'
     || String(part?.meta?.renderer ?? '').toLowerCase() === 'waveformicon'
   );
+  // A panel knob or slider carried by a component (utils/sliderControlPart.js): the panel's own
+  // pipeline, fed the session the panel would hold for it, so it draws and animates the same way.
+  let sliderControl = $derived(isSliderControlPart(part) ? part?.meta?.sliderControl ?? null : null);
+  let sliderResolved = $derived(sliderControl?.control
+    ? resolveInteractiveControl(sliderControl.control, sliderControlSession(sliderControl))
+    : null);
   let usesSimpleBackground = $derived(
     background
     && !rendersArcTrack
@@ -518,7 +527,7 @@
 </script>
 
 {#if part?.visible !== false}
-  <div class="interactive-part" class:debug={debug} data-part-name={partName || part?.name || undefined} style={partStyle}>
+  <div class="interactive-part" class:debug={debug} data-part-name={partName || part?.name || undefined} data-focus-ring={sliderControl?.domFocus === true ? '' : undefined} style={partStyle}>
     {#if materialLit}
       <MaterialFilter id={materialId} {material} />
     {/if}
@@ -559,6 +568,17 @@
           ></polygon>
         {/if}
       </svg>
+    {/if}
+
+    {#if sliderResolved}
+      <SliderFamilyRenderer
+        control={sliderResolved.control}
+        runtime={sliderResolved.runtime}
+        width={frame.width}
+        height={frame.height}
+        partTransitions={sliderResolved.runtime?.transitions?.partTransitions ?? null}
+        {debug}
+      />
     {/if}
 
     {#if rendersValueArc}

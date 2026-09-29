@@ -47,6 +47,10 @@ const IGNORED_DESIGNER_KEYS = new Set([
 
 const INSTANCE_CORE_KEYS = new Set([
   'name', 'layer', 'zIndex', 'visible', 'enabled', 'locked', 'alwaysOnTop', 'tooltip', 'screenReaderText',
+  // The host parameter ids this copy's channels keep from the panel knobs they were made from
+  // (customComponentFromControls.js, exportParameters.keepHostParameterIds). A DAW's automation
+  // belongs to this copy, not to the package.
+  'hostParameters',
 ]);
 
 const INSTANCE_TRANSFORM_KEYS = new Set([

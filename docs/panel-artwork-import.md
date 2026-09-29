@@ -139,8 +139,8 @@ same reason.
 
 ## Create Component from Selection
 
-Select some artwork on a panel (a plate, its legends, a scale, a logo) and choose **Edit › Create
-Component from Selection…** or the same item on the canvas right-click menu. You're asked for a name
+Select some artwork on a panel (a plate, its legends, a scale, a logo), with or without the knobs and
+sliders on it, and choose **Edit › Create Component from Selection…** or the same item on the canvas right-click menu. You're asked for a name
 (the first label's text is suggested). The selection is saved to the library as a component, and
 the panel gets a **linked copy** in its place, so the Source card and "Update N copies" above work on
 it from then on.
@@ -159,11 +159,15 @@ the reason. Nothing is converted partly.
 | Background, Image | Its background (fill, gradient, image, border, corners) is carried as-is, and drawn by the same renderer. |
 | Shape | The exact SVG the panel draws for it, as an image. |
 | Label | Its plate, plus its text over the same padded box. Font, size, weight, style, case, colour and spacing are carried. |
+| Knob, Slider | The knob itself, drawn and driven by the panel's own knob code, with its value as a channel of the component. Its device bindings and its host parameter id go with it. See [Knobs and sliders](#knobs-and-sliders). |
 
 | Refused, with the reason given | Why |
 |---|---|
-| Knobs, sliders, buttons and other controls with a value | Their look is drawn from their behaviour settings, which component parts can't reproduce, and converting them would change their host-automation identity. Deliberately not supported; see below. |
+| Buttons, and every other control with a value that is not a knob or slider | Not supported yet. A momentary button in particular has no equivalent: a component's hit zone can toggle or cycle a value, not release one. |
 | A control a script mentions | The component can't keep the name the script uses. The script and line are named. |
+| A knob anything else addresses | A route, a meter, LCD or envelope source, a link (anything that stores its id), a script's target, an LCD soft key, a setlist capture. The place is named. |
+| A knob with two handles, a control form, a background plate, a caption, an icon or lamp, extra parts, rotation, a script of its own, its device bindings switched off, or a binding on a port other than its value | The part draws what the panel's knob renderer draws and nothing else, and holds one value. |
+| A knob that is read-only, disabled, hidden, or kept out of host automation | It would behave differently as one part of a larger control. |
 | Text wider than its box, or on more than one line | The panel wraps it; a component would not. |
 | Underline, strikethrough, text aligned to the top or bottom, an icon, a lamp, effects, scaling | The component would draw them differently. |
 | Controls inside a container, or across layers | Select the container's contents, or one layer at a time. |
@@ -177,23 +181,64 @@ after with the editor's own renderer and compare them pixel by pixel.
 Undo puts the controls back. The saved component stays in the library, where you can remove it from
 the Library tab.
 
-### Why controls with a value are not converted
+### Knobs and sliders
 
-Converting knobs, sliders and buttons was scoped and deliberately paused (2026-09-28), for reasons
-that belong in writing so the idea is not re-attempted blind:
+Converting knobs and sliders was first scoped on 2026-09-28 and paused, for four reasons written
+here at the time. It was built on 2026-09-29, and each of them is answered by what was built rather
+than by a trade-off:
 
-- **It breaks DAW automation for shipped panels.** A host parameter's id comes from the control:
-  knob `cutoff` exports as `cutoff.value`; as channel `cutoff` inside component `Filter` it becomes
-  `Filter.cutoff`, and every saved DAW session automating it loses the lane
-  (`utils/exportParameters.js`, `paramFromBehavior` versus `paramFromChannel`).
-- **Its look can only be rebuilt, not kept.** A panel knob is drawn procedurally from its
-  Behavior (SliderFamilyRenderer); parts can approximate it with arcs and a pointer, not reproduce it.
-- **Momentary buttons have no equivalent.** Component hit zones can toggle or cycle a channel;
-  none resets one on release.
-- **A value control is referenced from many places**, not only scripts: routes, LCD and display
-  sources, envelope stage sources, snapshots, exclusive button groups, the explicit export list.
-- **Multi-channel export had a binding bug**, now fixed (known-issues.md), which several converted
-  controls in one component would have hit.
+- **DAW automation.** A host parameter's id came from the control: knob `cutoff` exported as
+  `cutoff.value`, and a channel `cutoff` of component `Filter` would export as `Filter.cutoff`. The
+  plug-in names its parameters by that id, and a DAW saves automation lanes and the plug-in's state
+  against it, so every saved session would have lost the knob. **Now the placed copy keeps the id**:
+  it records `Core.hostParameters[channel] = { id: 'cutoff.value', label: 'cutoff' }`, and the export
+  publishes the channel under the knob's own id and label, with its range, unit and device wire
+  unchanged. Only the path the player uses to find the value is new. Snapshots are keyed by the same
+  id, so they keep working too. A kept id is dropped rather than duplicated: if the copy is
+  duplicated, or a new knob takes the old name, the later one exports under its own id.
+- **The look.** Parts could only approximate a knob. So a knob is not rebuilt from parts: it becomes
+  one part that carries the knob, drawn by the panel's own knob renderer through the panel's own
+  state machine, fed what the panel would feed it: the value, and whether the knob is hovered,
+  pressed or focused. The same knob code handles the drag, the wheel, the arrow keys and the
+  double-click reset.
+- **Momentary buttons** still have no equivalent, and buttons are still refused.
+- **References.** Anything that addresses a knob by id or by name is found and named, and the
+  command is refused. An explicit export list is pointed at the channel instead (same id), and
+  snapshots need nothing.
 
-Artwork components plus ordinary controls placed beside them (and Duplicate for the whole group)
-already give reusable modules without any of this.
+The knob's device bindings move to the placed copy, onto the knob's channel, and its current value
+comes along, so nothing moves on screen. The copy gets a name no other control has, because the
+channel is addressed through it.
+
+**How it is proved.** `browser-checks/knobsFromSelection.mjs` builds a panel of knobs and sliders,
+and takes a cluster of the Roland GAIA sheet with its legends. It converts a copy of each and does
+the same things to both in preview, the surface the exported plug-in mounts:
+- the picture at rest and hovered;
+- an absolute knob and a relative dial dragged past their ends and back;
+- two sliders;
+- the wheel;
+- a double-click reset;
+- a click, the wheel and arrow keys to move focus.
+
+The pictures are identical to the pixel and the values identical to the last digit. A knob bound
+to a raw CC sends the synth the same messages, one for one. The export publishes the same host
+parameters.
+
+That last comparison found a fault that predates the conversion. Every component's patch carries all
+its channels, and raw CC bindings were sent from every patch. So moving one knob of a multi-knob
+component re-sent every other knob's CC, and pressing one sent its value twice. Now a channel sends
+when it changes, or when it is the one being driven, as a panel knob does. Profile-parameter
+bindings follow the same rule. On the QA sheets, 772 of 774 top-level knobs and sliders pass the
+rules. The two refused have a script of their own, and device bindings switched off.
+
+**Two differences remain, both stated rather than hidden:**
+
+- **The editor canvas, outside preview.** There a panel knob is drawn without a runtime, so its
+  pointer sits at the minimum while its readout shows the default. A converted knob draws its
+  default. Preview and the exported plug-in are identical.
+- **Keyboard.** A component is one Tab stop where the panel had one per knob. Tab reaches the first
+  knob, and the keys move the knob last pressed. The focus ring, and each knob's focus look, are
+  drawn where the panel drew them.
+
+A module that includes a button is still made the old way: an artwork component, with the button
+placed beside it (and Duplicate for the whole group).
