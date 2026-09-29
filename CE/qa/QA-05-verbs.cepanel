@@ -2809,7 +2809,7 @@
           }
         },
         "Text": {
-          "content": "matrix.cell(cell)             matrix.showLabels[on]\nmatrix.clear(cell)            matrix.showValues[on]\nmatrix.bipolar[on]            matrix.read(read)\nmatrix.step(int)              matrix.size(size)\nmatrix.cellStyle(enum)        matrix.fill(fill)\nmatrix.editable[on]",
+          "content": "matrix.cell(cell)             matrix.showLabels[on]\nmatrix.clear(cell)            matrix.showValues[on]\nmatrix.bipolar[on]            matrix.read(read)\nmatrix.step(num)              matrix.size(size)\nmatrix.cellStyle(enum)        matrix.fill(fill)\nmatrix.editable[on]",
           "_children": {
             "Font": {
               "family": "monospace",

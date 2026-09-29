@@ -9,6 +9,10 @@
  * Crossfader is the second section, for the number and select kinds: a select, a clamped number, and
  * the Rest and Time fields that appear only once "On release" asks for them.
  *
+ * Chord Pad, Meter and Mod Matrix bring whole numbers (rounded and clamped, or rounded with only a
+ * floor) and a clamped fraction; one of each is typed here. A NumberCell holds what is typed to its
+ * own min..max before a field sees it, which the Meter's Segments shows.
+ *
  * Run: node browser-checks/inspectorFields.mjs
  */
 import assert from 'node:assert/strict';
@@ -107,6 +111,55 @@ try {
     assert.deepEqual(shownAfter, { rest: 1, time: 1 });
     assert.deepEqual(spring, { mode: 'rest', value: 0.8, time: 600 });
   });
+
+  // --- Chord Pad, Meter, Mod Matrix: whole numbers and a clamped fraction -------------------------
+  const select = async (type, y, tab) => {
+    const made = await kit.make(type, { 'Transform.x': 60, 'Transform.y': y });
+    await kit.page.evaluate(async (id) => {
+      const { selectedComponentIds } = await import('/src/CE_Application/stores/panels.js');
+      selectedComponentIds.set(new Set([id]));
+    }, made);
+    await kit.settle(400);
+    await props.locator(`.tab-icon[title="${tab}"]`).click();
+    await kit.settle(400);
+    return made;
+  };
+  const type = async (label, text) => {
+    const input = props.locator(`input.nc-value[aria-label="${label}"]`).first();
+    await input.fill(text);
+    await input.press('Enter');
+    await kit.settle(200);
+  };
+
+  const pad = await select('ChordPad', 460, 'Chord Pad');
+  await type('Vel', '63.6');
+  const vel = await kit.read(pad, 'ChordPad.velocity');
+  await type('Vel', '400');
+  const velHigh = await kit.read(pad, 'ChordPad.velocity');
+  const invBefore = await props.locator('input.nc-value[aria-label="Inv"]').count();
+  await cellOf(props, 'Mode').locator('select').selectOption('notes');
+  await kit.settle(300);
+  const swapped = { inv: await props.locator('input.nc-value[aria-label="Inv"]').count(), oct: await props.locator('input.nc-value[aria-label="Oct"]').count() };
+  check('a whole-number field writes rounded and clamped, and Mode swaps Inversion for Octaves', () => {
+    assert.deepEqual([vel, velHigh], [64, 127]);
+    assert.equal(invBefore, 1);
+    assert.deepEqual(swapped, { inv: 0, oct: 2 }, 'Octaves (span) and Octave (transpose) both read "Oct"');
+  });
+
+  const meter = await select('Meter', 660, 'Meter');
+  await type('Seg', '7.4');
+  const seg = await kit.read(meter, 'Meter.segments');
+  await type('Seg', '100');
+  const segHigh = await kit.read(meter, 'Meter.segments');
+  // The NumberCell holds a typed value to its min..max before the field sees it, whatever `clamp` says.
+  check('a rounded field writes a whole number, held to the cell\'s range', () => assert.deepEqual([seg, segHigh], [7, 64]));
+
+  const matrix = await select('Matrix', 860, 'Matrix');
+  await type('Snap', '0.25');
+  const snap = await kit.read(matrix, 'Matrix.step');
+  await type('Snap', '3');
+  const snapHigh = await kit.read(matrix, 'Matrix.step');
+  check('Snap keeps a fraction and clamps to 1', () => assert.deepEqual([snap, snapHigh], [0.25, 1]));
 
   check('no page errors', () => assert.deepEqual([...kit.failures], []));
 } finally {

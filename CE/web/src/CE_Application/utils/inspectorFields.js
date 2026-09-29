@@ -17,8 +17,16 @@
 //                                                    own label (numberLabel, else label) shows instead
 //           { ..., numberLabel }                     the NumberCell's label when it differs from the cell's
 //           { ..., bare: true }                      the NumberCell alone, with no PropertyCell round it
-//           { ..., clamp: true | 'min' }             clamp what is written to min..max, or only to min
+//           { ..., clamp: true | 'min' }             clamp what is written to min..max, or only to min.
+//                                                    The NumberCell already holds a typed or dragged
+//                                                    value to its min..max; this is the editor's own
+//                                                    guard on top, kept as each editor spelled it
 //           { ..., reset: false }                    no reset-to-default on the NumberCell
+//           { ..., integer: true }                   a whole number: read as a number (a stored "60"
+//                                                    shows 60, junk shows the default), written
+//                                                    rounded and clamped to min..max
+//           { ..., round: true }                     written rounded, then clamped as `clamp` says
+//                                                    (a whole number with only a floor, say)
 //   select  { key, label, span, hint, default, options }   a <select>. options are [value, label]
 //                                                    pairs, or bare values shown as themselves, in
 //                                                    the order they are offered
@@ -52,14 +60,20 @@ export function selectOptions(field) {
 
 /** The value a number field shows: the stored one, else its default. */
 export function numberValue(field, stored) {
+  if (field.integer) return fieldNumber(stored, field.default);
   return stored ?? field.default;
 }
 
 /** What a number field stores for a value typed or dragged, clamped as the field says. */
 export function numberWrite(field, value) {
-  if (field.clamp === true) return Math.max(field.min, Math.min(field.max, value));
-  if (field.clamp === 'min') return Math.max(field.min, value);
-  return value;
+  if (field.integer) {
+    const n = Math.round(fieldNumber(value, field.default));
+    return n < field.min ? field.min : n > field.max ? field.max : n;
+  }
+  const n = field.round ? Math.round(value) : value;
+  if (field.clamp === true) return Math.max(field.min, Math.min(field.max, n));
+  if (field.clamp === 'min') return Math.max(field.min, n);
+  return n;
 }
 
 /** What a toggle shows for a stored value. */
@@ -87,12 +101,13 @@ export function rangeWrite(field, sliderValue) {
 }
 
 /**
- * The range a field can WRITE, in stored units (a percent slider stores 0..1). A number field only
- * counts where it clamps: an unclamped NumberCell can be typed past its drag range.
+ * The range a field can WRITE, in stored units (a percent slider stores 0..1). A NumberCell clamps
+ * what is typed or dragged to its own min..max before it reports it, so a number field with both
+ * bounds writes within them whatever its `clamp` says; one with a single bound, or none, is open.
  */
 export function writableRange(field) {
   if (field.kind === 'range') return field.percent ? { min: 0, max: 1 } : { min: field.min, max: field.max };
-  if (field.kind === 'number' && field.clamp === true) return { min: field.min, max: field.max };
+  if (field.kind === 'number' && field.min != null && field.max != null) return { min: field.min, max: field.max };
   return null;
 }
 

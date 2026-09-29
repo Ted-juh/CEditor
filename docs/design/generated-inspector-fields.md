@@ -7,9 +7,9 @@ not a rewrite, and to check how much of the property model a JSON Schema form li
 
 **Built:** `properties/FieldList.svelte` draws ordinary fields from data (`utils/inspectorFields.js`
 describes the kinds, `models/inspectorFieldSets.js` holds the sets). The kinds are switch,
-slider, number and select. The **Kinetic** editor and three of **Crossfader**'s four sections use
-it. Anything that is not ordinary stays the editor's own, as a Svelte snippet
-placed by a `slot` entry.
+slider, number and select. Seven editors use it: **Kinetic**, **Crossfader**, **Ribbon**, **Note
+Ribbon**, **Chord Pad**, **Meter** and **Mod Matrix**, each for every section that is mostly ordinary.
+Anything that is not ordinary stays the editor's own, as a Svelte snippet placed by a `slot` entry.
 
 **Not adopted:** the JSON Schema form library, for the reasons below.
 
@@ -89,7 +89,10 @@ In order, each a small step that pays for itself:
    options; it now reads the field set. It still parses seven other editors (LCD, Pixel, Chord Pad,
    Ribbon, Note Ribbon, Meter, Matrix), and each of those ends when its section moves.
 2. **Move sections as they are next edited**, not in a sweep. Each move gets the same before/after
-   render comparison the Kinetic move had.
+   render comparison the Kinetic move had. *Five more moved, 2026-09-29: the small editors whose
+   options `componentEnums.test.js` still parsed.* See [The second round](#the-second-round) below.
+   Only the LCD and Pixel editors are parsed now; at 1,300 lines each they are the ones to move when
+   they are next edited, not before.
 3. **One range for the inspector and the scripting API.** *Done, 2026-09-29.* A ranged field is
    now also where a script verb gets its range: `componentVerbs.js` reads `scriptRangeOf(section,
    key)` from `models/inspectorFieldSets.js` instead of repeating the numbers. A script reaches the
@@ -101,6 +104,50 @@ In order, each a small step that pays for itself:
    serialised metadata of all 445 verbs was identical before and after, so no script sees a
    different range. Changing a field's range moves its verb with it. A verb naming a field that is
    not in a set throws at load, the same rule the enum tables follow.
+
+## The second round
+
+Ribbon, Note Ribbon, Chord Pad, Meter and Mod Matrix, 2026-09-29. Each editor was rendered on the
+server before and after in three or four states: defaults, every field set away from its default,
+junk where a number should be, an emptied section, and every conditional layout (Chord Pad's chords
+and notes modes and its grid columns, the Meter's dB scale, arc section, peak hold and readout, the
+Note Ribbon's glide and CC fields). All were identical. Kept hand-written, as slots or around the
+list: key pickers whose note names follow the scale, the shared panel-key cell, previews, swatches,
+text inputs, the Meter's zones and value source, the Matrix's source, destination and amount lists.
+
+Two field options came out of it:
+
+- **`integer: true`** — what the Note Ribbon and Chord Pad editors did with their own `clampInt()`:
+  a stored `"60"` shows 60, junk shows the default, a write is rounded and held to the range.
+- **`round: true`** — rounded, then clamped as `clamp` says. The Meter's segments, tick count and
+  precision round and floor at 0 or 1 and have no ceiling of their own.
+
+And one correction to what step 3 assumed. A `NumberCell` holds a typed or dragged value to its own
+`min..max` before it reports it, so a number field with both bounds writes within them whatever
+its `clamp` says. `clamp` is the editor's guard on top, kept as each editor spelled it. The range
+check now counts every such field, where it used to count only the ones that said `clamp: true`. It
+still passes.
+
+Linking the verbs of these five sections found five script ranges that disagreed with the field.
+Each was compared against what the component itself reads:
+
+| Verb | Was | Now | Why |
+|---|---|---|---|
+| `noteRibbonOctaves` | 1..6 | 1..5 | the layout clamps to 1..5; a 6 played as 5 |
+| `noteRibbonBendRange` | 0..24 | 1..48 | the ribbon clamps to 1..48; a script could not reach 25..48, and 0 played as 1 |
+| `chordPadOctave` | −4..4 | −3..3 | the layout clamps to −3..3 |
+| `chordPadNoteSpan` | 1..8 | 1..3 | the layout clamps to 1..3 |
+| `matrixStep` | whole number 0..64 | 0..1 | the snap is in amount units (0.25 snaps to quarters). As a whole number a script could set no snap but 0 or 1 |
+
+None of the first four changes a sound: the ends that went were clamped away before they played.
+The last is a fix. The other 440 verbs serialise exactly as before. Two fields keep a script
+reach wider than the inspector, as they had it and the component allows: Chord Pad's grid
+columns (1..12 against 1..8) and strum (to 2,000 ms against 200). Twenty-nine verbs now read their
+range from a field. The regenerated `docs/api-explorer.html` carries the new ranges.
+
+`browser-checks/inspectorFields.mjs` types into one field of each new kind in the running editor:
+a rounded and clamped velocity, the Meter's segments, the Matrix's fractional snap, and Chord
+Pad's Mode swapping Inversion for Octaves.
 
 Not recommended: generating whole sections, or folding the custom 30% into ever more field kinds.
 A field kind that only one section uses is a snippet with extra steps.

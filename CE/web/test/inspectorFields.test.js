@@ -1,10 +1,11 @@
 // inspectorFields.test.js — ordinary inspector fields drawn from data.
 //
 // Kinetic was the first section moved onto properties/FieldList.svelte, and Crossfader (three of
-// its four sections) the second, for the number and select kinds. Each time the server-rendered
-// editor was compared with the hand-written one — Kinetic in three states, Crossfader in four,
-// including both of its conditional layouts — and was identical but for whitespace between grid
-// cells, which a grid does not draw. These keep the pieces that comparison rested on.
+// its four sections) the second, for the number and select kinds; Ribbon, Note Ribbon, Chord Pad,
+// Meter and Mod Matrix followed. Each time the server-rendered editor was compared with the
+// hand-written one in three or four states, including every conditional layout, and was identical
+// but for whitespace between grid cells, which a grid does not draw. These keep the pieces that
+// comparison rested on.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,11 +17,12 @@ import {
 } from '../src/CE_Application/utils/inspectorFields.js';
 import * as FIELD_SETS from '../src/CE_Application/models/inspectorFieldSets.js';
 import CrossfaderEditor from '../src/CE_Application/sections/CrossfaderEditor.svelte';
+import ChordPadEditor from '../src/CE_Application/sections/ChordPadEditor.svelte';
 
 const { KINETIC_FIELDS, CROSSFADER_FIELDS, CROSSFADER_HANDLE_FIELDS, CROSSFADER_RETURN_FIELDS, scriptRangeOf } = FIELD_SETS;
 const CROSSFADER_ALL = [...CROSSFADER_HANDLE_FIELDS, ...CROSSFADER_FIELDS, ...CROSSFADER_RETURN_FIELDS];
-/** Every field set, with the model section it edits. */
-const SETS = [['Kinetic', KINETIC_FIELDS], ['Crossfader', CROSSFADER_ALL]];
+/** Every field set, with the model section it edits — all of them, so a new section is covered. */
+const SETS = Object.entries(FIELD_SETS.FIELD_SETS);
 import { COMPONENT_FAMILIES } from '../src/CE_Application/scripting/componentVerbs.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import KineticEditor from '../src/CE_Application/sections/KineticEditor.svelte';
@@ -49,7 +51,18 @@ test('a number field shows its default, and clamps only where it says', () => {
   assert.equal(numberValue(mix, 0), 0, 'a stored 0 is not replaced by the default');
   assert.deepEqual([numberWrite(mix, 1.4), numberWrite(mix, -2), numberWrite(mix, 0.3)], [1, 0, 0.3]);
   assert.deepEqual([numberWrite({ min: 0, max: 5000, clamp: 'min' }, 9000), numberWrite({ min: 0, clamp: 'min' }, -5)], [9000, 0]);
-  assert.equal(numberWrite({ min: 2, max: 20 }, 99), 99, 'unclamped writes as typed, as the editor always did');
+  assert.equal(numberWrite({ min: 2, max: 20 }, 99), 99, 'without clamp the field writes what the cell reports (the cell holds it to min..max itself)');
+});
+
+test('a whole-number field reads junk as its default and writes rounded; `round` rounds without the ceiling', () => {
+  // Note Ribbon and Chord Pad's numbers: what their editors' clampInt() always did.
+  const velocity = { integer: true, min: 1, max: 127, default: 96 };
+  assert.deepEqual([numberValue(velocity, '60'), numberValue(velocity, 'junk'), numberValue(velocity, undefined)], [60, 96, 96]);
+  assert.deepEqual([numberWrite(velocity, 63.6), numberWrite(velocity, 400), numberWrite(velocity, -3), numberWrite(velocity, 'x')], [64, 127, 1, 96]);
+  // The Meter's segments: rounded and floored. (The NumberCell holds what is typed to 0..64 before
+  // this sees it; the floor is the editor's own guard, kept as it was.)
+  const segments = { round: true, clamp: 'min', min: 0, max: 64, default: 0 };
+  assert.deepEqual([numberWrite(segments, 7.4), numberWrite(segments, -2)], [7, 0]);
 });
 
 test('select options, and fields that show only in some states', () => {
@@ -85,21 +98,25 @@ test('the scripting API reads its ranges from the field sets, so the two cannot 
     for (const field of fields) {
       const range = scriptRange(field);
       if (!range) continue;
-      for (const verb of family.verbs.filter((entry) => entry.f === field.key && entry.k === 'num')) {
+      for (const verb of family.verbs.filter((entry) => entry.f === field.key && (entry.k === 'num' || entry.k === 'int'))) {
         assert.deepEqual({ min: verb.min, max: verb.max }, range, `${section}.${field.key} (${verb.v})`);
         linked += 1;
       }
     }
   }
-  assert.equal(linked, 8, 'gravity, bounce, friction, keepAlive, mix, detent, returnValue, returnTime');
+  // Kinetic gravity, bounce, friction, keepAlive; Crossfader mix, detent, returnValue, returnTime;
+  // Ribbon value, returnValue, returnTime, snap; Note Ribbon baseNote, octaves, bendRange, velocity,
+  // channel, modCc, echoChannel; Chord Pad inversion, noteSpan, gridCols, octave, velocity, channel,
+  // strum, echoChannel; Meter valuePrecision; Mod Matrix step.
+  assert.equal(linked, 29);
   assert.throws(() => scriptRangeOf('Kinetic', 'gravityy'), /no ranged field Kinetic.gravityy/, 'a verb naming a field that is not here fails at load');
 });
 
 test('a script may reach further than the inspector, never less far', () => {
   for (const [section, fields] of SETS) assert.deepEqual(scriptRangesNarrowerThanInspector(fields), [], section);
-  // The three that reach further, on purpose, and nothing else.
+  // The ones that reach further, on purpose, and nothing else.
   const wider = SETS.flatMap(([section, fields]) => fields.filter((field) => field.script).map((field) => `${section}.${field.key}`));
-  assert.deepEqual(wider, ['Kinetic.gravity', 'Kinetic.restitution', 'Crossfader.detent']);
+  assert.deepEqual(wider, ['Kinetic.gravity', 'Kinetic.restitution', 'Crossfader.detent', 'ChordPad.gridCols', 'ChordPad.strumMs']);
   // ...and the check catches a script range that falls short of the inspector's.
   const short = [{ key: 'mix', kind: 'number', min: 0, max: 1, clamp: true, script: { min: 0, max: 0.5 } }];
   assert.deepEqual(scriptRangesNarrowerThanInspector(short), ['mix: the inspector writes 0..1, a script accepts 0..0.5']);
@@ -132,4 +149,15 @@ test('the Crossfader editor draws its selects, numbers and conditional fields fr
   assert.doesNotMatch(latched, /nc-label[^>]*>Rest</);
   assert.doesNotMatch(latched, /Time \(ms\)/, 'nothing about the spring while it latches');
   assert.match(latched, /Label A/, 'the hand-written Labels & colours section is still there');
+});
+
+test('the Chord Pad editor swaps its chord fields for the note span with the mode, and keeps its own cells', () => {
+  const draw = (patch) => render(ChordPadEditor, { props: { control: createControl('ChordPad', { Core: { id: 'c' }, ChordPad: patch }) } }).body;
+  const chords = draw({ mode: 'chords', layout: 'wheel' });
+  assert.match(chords, /nc-label[^>]*>Inv</);
+  assert.doesNotMatch(chords, /nc-label[^>]*>Cols</, 'Columns only while the layout is a grid');
+  const notes = draw({ mode: 'notes', layout: 'grid', key: 3 });
+  assert.doesNotMatch(notes, /nc-label[^>]*>Inv</);
+  assert.match(notes, /nc-label[^>]*>Cols</);
+  assert.match(notes, /<option value="3" selected[^>]*>/, 'the key picker in its slot still shows the stored key');
 });
