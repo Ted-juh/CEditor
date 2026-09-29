@@ -68,6 +68,19 @@ returns early on reference equality at every level, not only the top. Unchanged 
 shared, so it walks only the path to the edit. It is local to `stores/history.js`, small, and
 the existing history tests cover it.
 
+**Fixed the same day.** `jsonEqual` in `stores/history.js` gives the answer the two strings gave,
+key order and JSON's dropped values included, and returns at the first shared reference.
+`historySnapshot.test.js` fuzzes it against `JSON.stringify`, and fails the old code by catching
+a container being serialized during a commit. Re-running the bench on GAIA:
+
+| Edit | Commit before → after | Undo before → after |
+|---|---|---|
+| move one control (nested) | 61–84 ms → 5.3 ms | 69–88 ms → 2.4 ms |
+| move the 6.5 MB container | 74–79 ms → 1.9 ms | 6 ms → 10 ms (noise) |
+
+The component workspace, whose compare stringified the whole component, uses the same function.
+The edit-path costs below are untouched by this.
+
 **2. The edit path deep-clones the whole control it edits, children included.**
 `mutatePanelControlsInList` runs `deepClone(control)` before calling the mutator. Moving a
 container therefore copies every control inside it: 60 ms per move on GAIA's big container, and

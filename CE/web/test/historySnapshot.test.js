@@ -140,3 +140,93 @@ test('a snapshot of a big panel is cheap', () => {
   assert.ok(perSnapshot < 25,
     `${perSnapshot.toFixed(1)} ms per edit+snapshot on a 400-control panel — the snapshot is serializing the whole document again`);
 });
+
+// --- Comparing without stringifying ---------------------------------------------------------------
+//
+// Measured 2026-09-29: a commit compared each changed top-level control by JSON.stringify-ing both
+// versions. On GAIA every control sits in one of six containers, so moving one knob serialized a
+// 6.5 MB container twice — 60-85 ms per commit, and again per undo. The compare now walks and stops
+// at shared references. It must still give exactly the answer the strings gave.
+
+import { jsonEqual } from '../src/CE_Application/stores/history.js';
+
+test('the compare agrees with JSON.stringify, including on key order and what JSON drops', () => {
+  const cases = [
+    [{ a: 1, b: 2 }, { b: 2, a: 1 }],                 // order counts: a _children map's order is document order
+    [{ a: 1, b: undefined }, { a: 1 }],               // undefined keys are not written
+    [{ a: 1, f() {} }, { a: 1 }],                     // nor are functions
+    [[1, undefined], [1, null]],                      // inside an array both are null
+    [{ n: NaN }, { n: null }],                        // a non-finite number is null
+    [{ n: Infinity }, { n: NaN }],
+    [{ a: [1, { b: 2 }] }, { a: [1, { b: 2 }] }],
+    [{ a: [1, { b: 2 }] }, { a: [1, { b: 3 }] }],
+    [{ a: '1' }, { a: 1 }],
+    [{ a: {} }, { a: [] }],
+    [{ a: null }, { a: {} }],
+    [{ a: true }, { a: 1 }],
+    [[], {}],
+  ];
+  for (const [a, b] of cases) {
+    assert.equal(jsonEqual(a, b), JSON.stringify(a) === JSON.stringify(b), `${JSON.stringify(a)} vs ${JSON.stringify(b)}`);
+  }
+
+  // And a fuzz, because the list above is only the cases somebody thought of.
+  let seed = 7;
+  const rand = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const leaves = [0, 1, -1, 0.5, NaN, Infinity, '', 'a', '1', true, false, null, undefined];
+  const make = (depth) => {
+    const r = rand();
+    if (depth > 3 || r < 0.4) return leaves[Math.floor(rand() * leaves.length)];
+    if (r < 0.7) return Array.from({ length: Math.floor(rand() * 3) }, () => make(depth + 1));
+    const out = {};
+    for (const key of ['a', 'b', 'c'].filter(() => rand() < 0.6)) out[key] = make(depth + 1);
+    return out;
+  };
+  let agreedEqual = 0;
+  for (let i = 0; i < 4000; i++) {
+    const a = make(0);
+    const b = rand() < 0.5 ? JSON.parse(JSON.stringify(a ?? null)) : make(0);
+    if (a === undefined) continue;                    // a top-level undefined is not a snapshot
+    const expected = JSON.stringify(a) === JSON.stringify(b);
+    if (expected) agreedEqual += 1;
+    assert.equal(jsonEqual(a, b), expected, `${JSON.stringify(a)} vs ${JSON.stringify(b)}`);
+  }
+  assert.ok(agreedEqual > 1000, 'the fuzz exercised equal pairs, not only unequal ones');
+});
+
+test('committing an edit inside a container does not serialize the container', () => {
+  const kids = Array.from({ length: 40 }, (unused, i) =>
+    createControl('Knob', { Core: { id: `nest_k${i}` }, Transform: { x: i, y: 5 } }));
+  const box = createControl('Container', { Core: { id: 'nest_box' } });
+  box._children.Children = { _type: 'Children', layout: 'none', gap: 0, padding: 0, clip: false,
+    _children: Object.fromEntries(kids.map((kid) => [kid._children.Core.id, kid])) };
+  const panel = createPanel('history-nested');
+  panel.controls = [box];
+  addPanel(panel);
+  const live = get(panels).find((p) => p.name === 'history-nested');
+  setActivePanel(live.id);
+  pushSnapshot();
+
+  moveControl(live.id, 'nest_k7', 700);
+  const containerBefore = controlsOf(live.id)[0];
+  assert.notEqual(containerBefore, box, 'the container was replaced, which is what used to trigger the stringify');
+
+  const original = JSON.stringify;
+  const serialized = [];
+  JSON.stringify = function patched(value, ...rest) {
+    serialized.push(value);
+    return original.call(this, value, ...rest);
+  };
+  try {
+    pushSnapshot();
+  } finally {
+    JSON.stringify = original;
+  }
+  // A count, not the objects: a failing deepEqual over expanded containers spends minutes on the diff.
+  const containers = serialized.filter((value) => value?._children?.Core?.controlType === 'Container').length;
+  assert.equal(containers, 0, 'no container was stringified to find out what changed');
+  assert.ok(canUndo(), 'and the edit is still an undo step');
+  undo();
+  const child = controlsOf(live.id)[0]._children.Children._children.nest_k7;
+  assert.equal(child._children.Transform.x, 7, 'which puts the child back');
+});
