@@ -11,12 +11,13 @@ import assert from 'node:assert/strict';
 import { render } from 'svelte/server';
 
 import {
-  fieldShown, fieldsOutsideVerbs, numberValue, numberWrite, rangeView, rangeWrite, selectOptions, selectsOffTable, toggleOn,
+  fieldShown, numberValue, numberWrite, rangeView, rangeWrite, scriptRange, scriptRangesNarrowerThanInspector,
+  selectOptions, selectsOffTable, toggleOn,
 } from '../src/CE_Application/utils/inspectorFields.js';
 import * as FIELD_SETS from '../src/CE_Application/models/inspectorFieldSets.js';
 import CrossfaderEditor from '../src/CE_Application/sections/CrossfaderEditor.svelte';
 
-const { KINETIC_FIELDS, CROSSFADER_FIELDS, CROSSFADER_HANDLE_FIELDS, CROSSFADER_RETURN_FIELDS } = FIELD_SETS;
+const { KINETIC_FIELDS, CROSSFADER_FIELDS, CROSSFADER_HANDLE_FIELDS, CROSSFADER_RETURN_FIELDS, scriptRangeOf } = FIELD_SETS;
 const CROSSFADER_ALL = [...CROSSFADER_HANDLE_FIELDS, ...CROSSFADER_FIELDS, ...CROSSFADER_RETURN_FIELDS];
 /** Every field set, with the model section it edits. */
 const SETS = [['Kinetic', KINETIC_FIELDS], ['Crossfader', CROSSFADER_ALL]];
@@ -75,15 +76,33 @@ test('a select offers exactly the values its component reads, in whatever order 
   assert.deepEqual(selectsOffTable(wrong), ['law: not offered sharp; offered but not read soft']);
 });
 
-test('the inspector never writes a value a script would be refused', () => {
+test('the scripting API reads its ranges from the field sets, so the two cannot drift', () => {
+  // Every verb that writes a field held here carries exactly that field's script range. A literal
+  // range put back into componentVerbs.js would have to match to pass — and then it is redundant.
+  let linked = 0;
   for (const [section, fields] of SETS) {
     const family = COMPONENT_FAMILIES.find((entry) => entry.section === section);
-    assert.deepEqual(fieldsOutsideVerbs(fields, family?.verbs ?? []), [], section);
+    for (const field of fields) {
+      const range = scriptRange(field);
+      if (!range) continue;
+      for (const verb of family.verbs.filter((entry) => entry.f === field.key && entry.k === 'num')) {
+        assert.deepEqual({ min: verb.min, max: verb.max }, range, `${section}.${field.key} (${verb.v})`);
+        linked += 1;
+      }
+    }
   }
-  const kinetic = COMPONENT_FAMILIES.find((family) => family.section === 'Kinetic');
-  // ...and the check does catch it when it happens.
-  const tooFar = [{ key: 'friction', kind: 'range', min: 0, max: 2 }];
-  assert.match(fieldsOutsideVerbs(tooFar, kinetic.verbs)[0], /friction: the inspector writes 0..2, a script accepts 0..1/);
+  assert.equal(linked, 8, 'gravity, bounce, friction, keepAlive, mix, detent, returnValue, returnTime');
+  assert.throws(() => scriptRangeOf('Kinetic', 'gravityy'), /no ranged field Kinetic.gravityy/, 'a verb naming a field that is not here fails at load');
+});
+
+test('a script may reach further than the inspector, never less far', () => {
+  for (const [section, fields] of SETS) assert.deepEqual(scriptRangesNarrowerThanInspector(fields), [], section);
+  // The three that reach further, on purpose, and nothing else.
+  const wider = SETS.flatMap(([section, fields]) => fields.filter((field) => field.script).map((field) => `${section}.${field.key}`));
+  assert.deepEqual(wider, ['Kinetic.gravity', 'Kinetic.restitution', 'Crossfader.detent']);
+  // ...and the check catches a script range that falls short of the inspector's.
+  const short = [{ key: 'mix', kind: 'number', min: 0, max: 1, clamp: true, script: { min: 0, max: 0.5 } }];
+  assert.deepEqual(scriptRangesNarrowerThanInspector(short), ['mix: the inspector writes 0..1, a script accepts 0..0.5']);
 });
 
 test('the Kinetic editor draws every field, with the value the control holds', () => {

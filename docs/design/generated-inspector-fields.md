@@ -65,8 +65,8 @@ Nothing was added to `package.json`.
 - **One source for ranges.** `test/inspectorFields.test.js` checks each field's writable range
   against the scripting API's range for the same field (`scripting/componentVerbs.js`). The rule:
   the inspector may offer less than a script (gravity is 0..4 by hand and −4..4 from a script),
-  never more. That compares two hand-kept lists. Deriving one from the other is the next step
-  below.
+  never more. That compared two hand-kept lists at first; the verbs now read the field sets
+  (step 3 below).
 
 ## Extending it, if it is wanted
 
@@ -90,8 +90,17 @@ In order, each a small step that pays for itself:
    Ribbon, Note Ribbon, Meter, Matrix), and each of those ends when its section moves.
 2. **Move sections as they are next edited**, not in a sweep. Each move gets the same before/after
    render comparison the Kinetic move had.
-3. **Derive the scripting verbs' ranges from the field sets**, or the reverse, so the two lists
-   cannot drift. Today the test only catches the inspector exceeding a script.
+3. **One range for the inspector and the scripting API.** *Done, 2026-09-29.* A ranged field is
+   now also where a script verb gets its range: `componentVerbs.js` reads `scriptRangeOf(section,
+   key)` from `models/inspectorFieldSets.js` instead of repeating the numbers. A script reaches the
+   field's own range unless the field declares a wider `script` range. Three do, as they always
+   did: Kinetic's gravity (−4..4 against the inspector's 0..4), its bounce (up to 1.5 against
+   100 %), and Crossfader's detent (0..1 against 0..0.5). A test holds that a script range is never
+   narrower than the inspector's. All eight verbs over these fields (Kinetic gravity, bounce,
+   friction, keep alive; Crossfader mix, detent, rest value, return time) read from here. The
+   serialised metadata of all 445 verbs was identical before and after, so no script sees a
+   different range. Changing a field's range moves its verb with it. A verb naming a field that is
+   not in a set throws at load, the same rule the enum tables follow.
 
 Not recommended: generating whole sections, or folding the custom 30% into ever more field kinds.
 A field kind that only one section uses is a snippet with extra steps.

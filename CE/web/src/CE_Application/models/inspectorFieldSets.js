@@ -4,13 +4,16 @@
 // span, hint, range, step, default and display. utils/inspectorFields.js describes the kinds and
 // properties/FieldList.svelte draws them. `slot` entries are the editor's own snippets, kept in place.
 //
-// test/inspectorFields.test.js checks every range here against the scripting API's range for the
-// same field (componentVerbs.js): the inspector may offer less than a script can reach, never more.
-// It also holds every select that names a `table` to exactly the values the component reads.
+// These are also the scripting API's ranges. componentVerbs.js reads each of these fields' min/max
+// through scriptRangeOf() below instead of repeating the numbers, so the inspector and a script
+// cannot disagree about a field. `script: { min, max }` marks the few where a script deliberately
+// reaches further than the inspector; test/inspectorFields.test.js holds that it is never narrower,
+// and holds every select that names a `table` to exactly the values the component reads.
 
 import { CROSSFADER_LAWS } from '../utils/crossfaderLayout.js';
 import { RETURN_CURVES, RETURN_MODES } from '../utils/returnToRest.js';
 import { CROSSFADER_ORIENTATIONS } from '../scripting/componentTables.js';
+import { scriptRange } from '../utils/inspectorFields.js';
 
 export const KINETIC_FIELDS = [
   { key: 'running', kind: 'toggle', label: 'Run', span: 1, defaultOn: true, hint: 'Integrate the physics in preview / player.' },
@@ -19,10 +22,14 @@ export const KINETIC_FIELDS = [
   { slot: 'reset' },
   {
     key: 'gravity', kind: 'range', label: 'Gravity', span: 4, min: 0, max: 4, step: 0.05, default: 0, decimals: 2,
+    // A script can turn gravity round (−4..4); the inspector only offers a downward pull.
+    script: { min: -4, max: 4 },
     hint: 'Downward pull. 0 = zero-g; higher makes the ball fall and settle.',
   },
   {
     key: 'restitution', kind: 'range', label: 'Bounce', span: 4, percent: true, default: 0.92,
+    // A script can make a wall add energy (up to 1.5); the inspector stops at 100 %.
+    script: { min: 0, max: 1.5 },
     hint: 'Wall restitution — energy kept on each bounce. 100% = perpetual motion; lower = the ball loses energy and slows.',
   },
   {
@@ -58,7 +65,11 @@ export const CROSSFADER_FIELDS = [
   { key: 'mix', kind: 'number', label: 'Mix', span: 1, compact: true, min: 0, max: 1, step: 0.01, default: 0.5, clamp: true, hint: 'Position: 0 = full A, 1 = full B.' },
   { key: 'bipolar', kind: 'toggle', label: 'Bipolar', span: 1, defaultOn: false, hint: 'Mix port emits −1..1.' },
   { key: 'editable', kind: 'toggle', label: 'Editable', span: 1, defaultOn: true, hint: 'Drag the handle in preview.' },
-  { key: 'detent', kind: 'number', label: 'Detent', span: 1, compact: true, min: 0, max: 0.5, step: 0.01, default: 0.03, clamp: true, hint: 'Snap-to-centre threshold (0 = off).' },
+  {
+    key: 'detent', kind: 'number', label: 'Detent', span: 1, compact: true, min: 0, max: 0.5, step: 0.01, default: 0.03, clamp: true,
+    hint: 'Snap-to-centre threshold (0 = off).',
+    script: { min: 0, max: 1 },   // the script verb has always taken the whole 0..1
+  },
   { key: 'showGains', kind: 'toggle', label: 'Gain bars', span: 1, defaultOn: false, hint: 'Draw per-side gain indicators.' },
 ];
 
@@ -81,3 +92,21 @@ export const CROSSFADER_RETURN_FIELDS = [
     options: [['linear', 'Linear'], ['exp', 'Spring (exp)'], ['ease', 'Ease']],
   },
 ];
+
+/** Every field set, by the model section it edits. */
+export const FIELD_SETS = {
+  Kinetic: KINETIC_FIELDS,
+  Crossfader: [...CROSSFADER_HANDLE_FIELDS, ...CROSSFADER_FIELDS, ...CROSSFADER_RETURN_FIELDS],
+};
+
+/**
+ * The range a script verb for `section.key` uses — read by componentVerbs.js. Throws for a field
+ * that is not here or has no range, so a verb pointing at the wrong name fails at load rather than
+ * quietly losing its clamp.
+ */
+export function scriptRangeOf(section, key) {
+  const field = (FIELD_SETS[section] ?? []).find((entry) => entry.key === key);
+  const range = field ? scriptRange(field) : null;
+  if (!range) throw new Error(`inspectorFieldSets: no ranged field ${section}.${key} for a script verb to read`);
+  return range;
+}

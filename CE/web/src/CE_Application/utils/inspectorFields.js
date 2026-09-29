@@ -28,6 +28,11 @@
 //   slot    { slot }                                 the editor's own snippet, in this position
 //
 // Any field may carry `when: (values) => boolean`; it is drawn only while that holds.
+//
+// A range or number field is also where the SCRIPTING API reads its range: componentVerbs.js takes
+// a verb's min/max from here (scriptRange), so the two cannot drift. A script reaches exactly the
+// field's own range unless the field says `script: { min, max }` — a deliberate wider reach, such as
+// Kinetic's gravity going negative from a script while the inspector stops at 0.
 
 /** A number, or the fallback when it is not one. */
 export function fieldNumber(value, fallback = 0) {
@@ -92,6 +97,34 @@ export function writableRange(field) {
 }
 
 /**
+ * The range a SCRIPT may write for this field, in stored units: its own `script` range if it has
+ * one, else what the field itself spans (a percent slider spans 0..1). Null for fields with no range.
+ */
+export function scriptRange(field) {
+  if (field?.script) return { min: field.script.min, max: field.script.max };
+  if (field?.kind === 'range') return field.percent ? { min: 0, max: 1 } : { min: field.min, max: field.max };
+  if (field?.kind === 'number' && field.min != null && field.max != null) return { min: field.min, max: field.max };
+  return null;
+}
+
+/**
+ * Fields whose own `script` range is narrower than what the inspector writes. A wider script reach is
+ * a choice; a narrower one means the editor sets values a script is refused, which is a contradiction.
+ */
+export function scriptRangesNarrowerThanInspector(fields) {
+  const problems = [];
+  for (const field of fields) {
+    const inspector = writableRange(field);
+    const script = scriptRange(field);
+    if (!inspector || !script) continue;
+    if (inspector.min < script.min || inspector.max > script.max) {
+      problems.push(`${field.key}: the inspector writes ${inspector.min}..${inspector.max}, a script accepts ${script.min}..${script.max}`);
+    }
+  }
+  return problems;
+}
+
+/**
  * Selects whose options are not exactly the values the component reads. Order is free — it is how
  * the inspector presents them — but a value missing is one the editor cannot set, and a value extra
  * is one the component ignores.
@@ -106,26 +139,6 @@ export function selectsOffTable(fields) {
     const extra = [...offered].filter((value) => !read.has(value));
     if (missing.length || extra.length) {
       problems.push(`${field.key}: ${missing.length ? `not offered ${missing.join(', ')}` : ''}${missing.length && extra.length ? '; ' : ''}${extra.length ? `offered but not read ${extra.join(', ')}` : ''}`);
-    }
-  }
-  return problems;
-}
-
-/**
- * Where the inspector and the scripting API disagree about a field. The inspector may offer LESS than
- * a script can reach (Kinetic's gravity is 0..4 by hand and -4..4 from a script, which is a choice),
- * but never more: a value the editor can set that a script is refused, or clamps, is a contradiction.
- * `verbs` is a COMPONENT_FAMILIES entry's verbs list.
- */
-export function fieldsOutsideVerbs(fields, verbs) {
-  const byField = new Map((verbs ?? []).filter((verb) => verb.min != null || verb.max != null).map((verb) => [verb.f, verb]));
-  const problems = [];
-  for (const field of fields) {
-    const range = writableRange(field);
-    const verb = range && byField.get(field.key);
-    if (!verb) continue;
-    if ((verb.min != null && range.min < verb.min) || (verb.max != null && range.max > verb.max)) {
-      problems.push(`${field.key}: the inspector writes ${range.min}..${range.max}, a script accepts ${verb.min}..${verb.max}`);
     }
   }
   return problems;

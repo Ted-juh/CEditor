@@ -35,6 +35,7 @@
 // 1-based indexing throughout, on purpose: it is what the editor's own lists show, and a script
 // that says "scene 3" should mean the third one whichever language it is written in.
 
+import { scriptRangeOf } from '../models/inspectorFieldSets.js';
 import { VERB_VALUES } from './componentTables.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { SOURCE_KINDS } from '../utils/controlSources.js';
@@ -76,6 +77,10 @@ export const LIST_KINDS = [ITEM, CELL, LINE];
 
 /** A verb: v = name inside the namespace, f = the field it writes, k = kind. */
 const v = (name, field, kind, extra = {}) => ({ v: name, f: field, k: kind, ...extra });
+
+// A verb whose field the inspector draws from data takes its range from that field set instead of
+// repeating it here (models/inspectorFieldSets.js), so a script and the inspector cannot disagree.
+const FIELD = scriptRangeOf;
 
 const RATE = { min: 0.01, max: 200 };
 const UNIT = { min: 0, max: 1 };
@@ -317,10 +322,10 @@ export const COMPONENT_FAMILIES = [
     verbs: [
       v('run', 'running', BOOL, { toggle: true }),
       v('sync', 'syncToTransport', BOOL, { toggle: true }),
-      v('gravity', 'gravity', NUM, { min: -4, max: 4 }),
-      v('bounce', 'restitution', NUM, { min: 0, max: 1.5 }),
-      v('friction', 'friction', NUM, UNIT),
-      v('keepAlive', 'keepAlive', NUM, UNIT),
+      v('gravity', 'gravity', NUM, FIELD('Kinetic', 'gravity')),
+      v('bounce', 'restitution', NUM, FIELD('Kinetic', 'restitution')),
+      v('friction', 'friction', NUM, FIELD('Kinetic', 'friction')),
+      v('keepAlive', 'keepAlive', NUM, FIELD('Kinetic', 'keepAlive')),
       v('launch', 'initial', XY, { fx: 'x', fy: 'y', ...UNIT, args: ['x', 'y'],
         doc: 'Put the ball at (x, y) and let it go from there.' }),
       v('velocity', 'initial', XY, { fx: 'vx', fy: 'vy', min: -4, max: 4, args: ['vx', 'vy'],
@@ -464,16 +469,16 @@ export const COMPONENT_FAMILIES = [
     id: 'crossfader', section: 'Crossfader', prefix: 'crossfader', label: 'Crossfader',
     summary: 'Drive a Crossfader and change its law.',
     verbs: [
-      v('mix', 'mix', NUM, UNIT),
+      v('mix', 'mix', NUM, FIELD('Crossfader', 'mix')),
       v('law', 'law', ENUM),
       v('bipolar', 'bipolar', BOOL, { toggle: true }),
-      v('detent', 'detent', NUM, UNIT),
+      v('detent', 'detent', NUM, FIELD('Crossfader', 'detent')),
       v('returnMode', 'returnMode', ENUM, { doc: 'none | center | min | max | rest.' }),
-      v('returnValue', 'returnValue', NUM, { min: 0, max: 1 }),
+      v('returnValue', 'returnValue', NUM, FIELD('Crossfader', 'returnValue')),
       // The unified spring's fields. `returnRate` was this component's own word for it and is
       // still READ from old panels by normalizeReturnBehavior — but a verb writes, and a verb
       // writing a field nothing reads back is a verb that appears to work.
-      v('returnTime', 'returnTime', NUM, { min: 0, max: 5000, doc: 'Milliseconds for the whole travel. 0 snaps.' }),
+      v('returnTime', 'returnTime', NUM, { ...FIELD('Crossfader', 'returnTime'), doc: 'Milliseconds for the whole travel. 0 snaps.' }),
       v('returnCurve', 'returnCurve', ENUM, { doc: 'linear | exp | ease.' }),
       v('orientation', 'orientation', ENUM),
       v('labelA', 'labelA', STR),
