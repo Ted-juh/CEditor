@@ -306,6 +306,7 @@
     sliderControlForZone, sliderControlKeyValue, sliderControlPressFocusPatch, sliderControlResetValue,
     sliderControlWheelValue,
   } from '../utils/sliderControlPart.js';
+  import { floating } from '../utils/floatingUi.js';
   import { dispatchInteraction } from '../scripting/panelRuntime.js';
   import { customNumericFields, customNumericPatch, customArpeggiatorKeyPatch } from '../utils/customNumericEditing.js';
   import { numberOr } from '../utils/primitives.js';
@@ -6046,21 +6047,25 @@
       ?? '';
   }
 
-  function comboboxMenuStyle(control) {
-    // The dropdown lives at panel level, including for controls inside tabs or
-    // scroll containers. Use the rendered box so padding, anchors, scrolling and
-    // zoom are already accounted for; local Transform.x/y cannot locate a child.
+  // The dropdown lives at panel level, including for controls inside tabs or scroll containers, and
+  // hangs off the control's rendered element, so padding, anchors, scrolling and zoom are already
+  // accounted for (local Transform.x/y cannot locate a child). Placement is utils/floatingUi.js's: below
+  // the control, ABOVE it when the panel's bottom is nearer than the list is long — a combobox in the
+  // bottom row used to open off the panel — and kept inside what is visible. It stays inside the scaled
+  // surface, so it is drawn at the panel's zoom like everything else on it.
+  function comboboxElement(control) {
     const id = getControlId(control);
-    const element = surfaceRef && [...surfaceRef.querySelectorAll('.canvas-control[data-control-id]')]
-      .find(node => node.getAttribute('data-control-id') === id);
+    return surfaceRef && [...surfaceRef.querySelectorAll('.canvas-control[data-control-id]')]
+      .find(node => node.getAttribute('data-control-id') === id) || null;
+  }
+
+  function comboboxMenuWidth(control) {
+    const element = comboboxElement(control);
     const surfaceBox = surfaceRef?.getBoundingClientRect();
-    const box = element?.getBoundingClientRect();
     const zoom = surfaceBox?.width > 0 && surfaceRef.offsetWidth > 0 ? surfaceBox.width / surfaceRef.offsetWidth : scale || 1;
-    const rect = controlPanelRect(panel.controls, id) ?? { x: 0, y: 0, w: 160, h: 34 };
-    const x = box ? (box.left - surfaceBox.left) / zoom - surfaceRef.clientLeft : rect.x;
-    const y = box ? (box.bottom - surfaceBox.top) / zoom - surfaceRef.clientTop : rect.y + rect.h;
-    const width = Math.max(32, box ? box.width / zoom : rect.w);
-    return `left:${x}px; top:${y + 4}px; width:${width}px;`;
+    const box = element?.getBoundingClientRect();
+    const rect = controlPanelRect(panel.controls, getControlId(control)) ?? { w: 160 };
+    return Math.max(32, box ? box.width / zoom : rect.w);
   }
 
   function selectComboboxRow(control, row) {
@@ -8942,7 +8947,8 @@
   {#if openComboboxControlId}
     {@const control = controlById(openComboboxControlId)}
     {#if control && isComboboxControl(control) && getValueRows(control).length}
-      <div class="panel-combobox-menu" data-control-id={getControlId(control)} style={comboboxMenuStyle(control)} role="listbox"
+      <div class="panel-combobox-menu" data-control-id={getControlId(control)} style={`width:${comboboxMenuWidth(control)}px;`} role="listbox"
+        use:floating={{ anchor: comboboxElement(control), placement: 'bottom-start', offset: 4, padding: 4, fallbackPlacements: ['top-start'], fit: false }}
         onfocusout={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) openComboboxControlId = ''; }}>
         {#if String(getBehavior(control)?.subtype) === 'searchable'}
           <input class="combobox-search" aria-label="Search choices" placeholder="Search choices…" value={comboboxQuery}

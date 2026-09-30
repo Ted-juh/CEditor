@@ -12,7 +12,7 @@
   import { styleClipboard, copyControlStyle, applyStyleToSelection } from '../stores/styleClipboard.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { guides, clearGuides } from '../stores/guides.js';
-  import { placeMenu, placeSubmenu } from '../utils/menuPlacement.js';
+  import { floating } from '../utils/floatingUi.js';
 
   // `target` is null when hidden, { screenX, screenY, panelX, panelY } when shown.
   // Parent binds to this so the menu can close itself.
@@ -22,38 +22,11 @@
 
   function close() { target = null; sub = null; }
 
-  // --- Placement (see utils/menuPlacement.js for why) ---
-  // The menu used to be pinned straight to the pointer with no measurement at
-  // all, so near a window edge it simply hung outside it. Measure first, place
-  // second: the size is known only once the items are in the DOM, and it
-  // depends on the selection (Ungroup, Edit, Device Bindings all come and go),
-  // so this cannot be a constant.
-  let menuEl = $state(null);
-  let subEl = $state(null);
-  let placed = $state(null);
-  let subPlaced = $state(null);
-
-  const viewportSize = () => ({
-    width: typeof window === 'undefined' ? 0 : window.innerWidth,
-    height: typeof window === 'undefined' ? 0 : window.innerHeight,
-  });
-
-  $effect(() => {
-    // Re-measure whenever the menu opens somewhere new. Reading the rect is
-    // untracked, so writing `placed` here cannot loop.
-    const at = target;
-    if (!at || !menuEl) { placed = null; return; }
-    const rect = menuEl.getBoundingClientRect();
-    placed = placeMenu(at.screenX, at.screenY, { width: rect.width, height: rect.height }, viewportSize());
-  });
-
-  $effect(() => {
-    const which = sub;
-    if (!which || !subEl) { subPlaced = null; return; }
-    const itemRect = subEl.parentElement?.getBoundingClientRect();
-    const rect = subEl.getBoundingClientRect();
-    subPlaced = placeSubmenu(itemRect, { width: rect.width, height: rect.height }, viewportSize());
-  });
+  // --- Placement (utils/floatingUi.js) ---
+  // Down and right of the pointer; flipped to the other side of it near an edge, never slid under it;
+  // scrolled only when taller than the window. Submenus open to the right of their item and flip left.
+  const MENU_FALLBACKS = ['bottom-end', 'top-start', 'top-end'];
+  const SUB_FALLBACKS = ['left-start'];
 
   function cut()    { cutSelection(); close(); }
   function copy()   { copySelection(); close(); }
@@ -138,8 +111,7 @@
        place reads as a glitch. -->
   <div
     class="ctx-menu"
-    bind:this={menuEl}
-    style="left:{placed ? placed.left : target.screenX}px; top:{placed ? placed.top : target.screenY}px; {placed?.clipped ? `max-height:${placed.maxHeight}px; overflow-y:auto;` : ''} visibility:{placed ? 'visible' : 'hidden'};"
+    use:floating={{ anchor: { x: target.screenX, y: target.screenY }, placement: 'bottom-start', fallbackPlacements: MENU_FALLBACKS }}
   >
     <button class="ctx-item" disabled={$selectedComponentIds.size === 0} onclick={cut}>Cut<span class="ctx-shortcut">Ctrl+X</span></button>
     <button class="ctx-item" disabled={$selectedComponentIds.size === 0} onclick={copy}>Copy<span class="ctx-shortcut">Ctrl+C</span></button>
@@ -156,9 +128,7 @@
           {#if sub === 'edit'}
             <div
               class="ctx-submenu"
-              class:flip-left={subPlaced?.side === 'left'}
-              bind:this={subEl}
-              style="top:{subPlaced ? subPlaced.top : -4}px;"
+              use:floating={{ anchor: 'parent', placement: 'right-start', offset: { crossAxis: -4 }, fallbackPlacements: SUB_FALLBACKS }}
             >
               {#each editFacets as facet}
                 <button class="ctx-item" onclick={() => editFacet(facet.id)}>{facet.label}</button>
@@ -191,9 +161,7 @@
         {#if sub === 'order'}
           <div
             class="ctx-submenu"
-            class:flip-left={subPlaced?.side === 'left'}
-            bind:this={subEl}
-            style="top:{subPlaced ? subPlaced.top : -4}px;"
+            use:floating={{ anchor: 'parent', placement: 'right-start', offset: { crossAxis: -4 }, fallbackPlacements: SUB_FALLBACKS }}
           >
             <button class="ctx-item" onclick={() => order(bringToFront)}>Bring to Front</button>
             <button class="ctx-item" onclick={() => order(bringForward)}>Bring Forward</button>
@@ -299,8 +267,7 @@
   }
 
   .ctx-submenu {
-    position: absolute;
-    left: 100%;
+    position: fixed;
     min-width: 150px;
     background: #2D2D2D;
     border: 1px solid #444;
@@ -313,8 +280,4 @@
   /* Rightward was hardcoded, so a menu opened near the right edge grew a
      submenu that started off-screen — worse than the parent menu's version of
      the same bug, because the parent at least had its first column visible. */
-  .ctx-submenu.flip-left {
-    left: auto;
-    right: 100%;
-  }
 </style>

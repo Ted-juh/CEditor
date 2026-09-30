@@ -2,7 +2,7 @@
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { polygonPoints, polygonToSvgPoints } from '../utils/shapeGeometry.js';
-  import { pathIsClosed, pathVectorPoints } from '../utils/penPath.js';
+  import { hasCompoundPath, pathIsClosed, pathVectorPoints } from '../utils/penPath.js';
   import { numberOr } from '../utils/primitives.js';
   import { plainFillCSS } from '../utils/plainFillCSS.js';
   import { materialActive } from '../utils/materialFilter.js';
@@ -123,7 +123,10 @@
   let rendersPolygon = $derived(!!polygonVerts);
   let rendersOpenPath = $derived(rendersPolygon && String(part?.kind ?? '') === 'path' && !pathIsClosed(part));
   let rendersLine = $derived(simpleBackgroundKind === 'line');
-  let rendersVectorShape = $derived(rendersPolygon || rendersLine);
+  // A combined or smoothed shape (utils/partBooleans.js): SVG path data in 0..1 of the box, with curves,
+  // holes and islands, so it cannot be a point list.
+  let compoundPathData = $derived(hasCompoundPath(part) ? part.meta.pathData : '');
+  let rendersVectorShape = $derived(rendersPolygon || rendersLine || !!compoundPathData);
 
   let frame = $derived.by(() => {
     if (!layout) {
@@ -401,6 +404,25 @@
       };
     }
 
+    if (compoundPathData) {
+      // Scaled into the box the way a polygon's points are, inset by half the stroke so the stroke
+      // stays inside the box; the stroke itself does not scale.
+      const open = part?.meta?.closed === false;
+      const pathStroke = open && stroke === 'none'
+        ? (fillEnabled ? cssColour(backgroundFill?.colour ?? 'FFFFFFFF', '#FFFFFF') : '#FFFFFF')
+        : stroke;
+      const pathStrokeWidth = open && strokeWidth === 0 ? 2 : strokeWidth;
+      const inset = pathStrokeWidth / 2;
+      return {
+        width, height, line: null, points: '',
+        fill: open ? 'none' : fill,
+        stroke: pathStroke,
+        strokeWidth: pathStrokeWidth,
+        d: compoundPathData,
+        transform: `translate(${inset} ${inset}) scale(${Math.max(0.001, width - 2 * inset)} ${Math.max(0.001, height - 2 * inset)})`,
+      };
+    }
+
     if (rendersOpenPath) {
       // An open path has no inside: stroke it like a line, falling back the same way.
       const openStroke = stroke !== 'none'
@@ -549,6 +571,18 @@
             stroke-width={vectorShapeSvg.line.width}
             stroke-linecap="round"
           ></line>
+        {:else if vectorShapeSvg.d}
+          <path
+            d={vectorShapeSvg.d}
+            transform={vectorShapeSvg.transform}
+            fill={vectorShapeSvg.fill}
+            fill-rule="evenodd"
+            stroke={vectorShapeSvg.stroke}
+            stroke-width={vectorShapeSvg.strokeWidth}
+            stroke-linejoin="round"
+            stroke-linecap="round"
+            vector-effect="non-scaling-stroke"
+          ></path>
         {:else if vectorShapeSvg.open}
           <polyline
             points={vectorShapeSvg.points}

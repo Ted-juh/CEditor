@@ -1,11 +1,12 @@
 import { sortControlsForHitTest } from './controlOrder.js';
 import { normalizeLayerName } from './panelLayers.js';
+import { footprintCandidates, spatialIndexFor, worthIndexing } from './controlSpatialIndex.js';
 import {
   buildControlIndex,
   contentOrigin,
   findControlById,
-  getChildControls,
   panelToLocalPoint,
+  stableChildControls,
 } from './containment.js';
 
 /** Rotate a panel-space point into a control's local (unrotated) frame,
@@ -138,7 +139,7 @@ export function findControlsInRect(controls, rect, getSection, scopeId = null) {
 
   if (scopeId != null) {
     const container = findControlById(controls ?? [], scopeId);
-    const kids = getChildControls(container);
+    const kids = stableChildControls(container);
     if (!kids.length) return ids;
     if (Number(container?._children?.Transform?.rotation ?? 0) % 360) return ids;
     const local = panelToLocalPoint(controls, scopeId, rect.x, rect.y);
@@ -146,7 +147,9 @@ export function findControlsInRect(controls, rect, getSection, scopeId = null) {
     scopedRect = { x: local.x, y: local.y, w: rect.w, h: rect.h };
   }
 
-  for (const ctrl of list) {
+  // On a big panel, only what the rect's footprint query returns can intersect it (controlSpatialIndex.js).
+  const pool = worthIndexing(list) ? footprintCandidates(spatialIndexFor(list, getSection), scopedRect) : list;
+  for (const ctrl of pool) {
     const t = getSection(ctrl, 'Transform');
     const c = getSection(ctrl, 'Core');
     if (!t || !c) continue;
@@ -165,6 +168,32 @@ export function findControlsInRect(controls, rect, getSection, scopeId = null) {
  * every level. Descent carries the point through each rotated frame, so
  * children of a rotated container hit-test where they are drawn.
  */
+// Hit-test order (front-most first) for a list, by control: the sort, once per list and layer order,
+// instead of once per call.
+const hitRanks = new WeakMap();
+function hitRank(controls, layerNames) {
+  const key = layerNames.join('\u0000');
+  let byKey = hitRanks.get(controls);
+  if (!byKey) { byKey = new Map(); hitRanks.set(controls, byKey); }
+  let rank = byKey.get(key);
+  if (!rank) {
+    rank = new Map(sortControlsForHitTest(controls, layerNames).map((control, index) => [control, index]));
+    byKey.set(key, rank);
+  }
+  return rank;
+}
+
+/**
+ * The controls to try, front-most first. On a big panel only those whose on-screen footprint holds the
+ * point can hold it (controlSpatialIndex.js), taken in the same front-to-back order the full sort gives.
+ */
+function hitTestPool(controls, layerNames, x, y) {
+  if (!worthIndexing(controls)) return sortControlsForHitTest(controls, layerNames);
+  const rank = hitRank(controls, layerNames);
+  return footprintCandidates(spatialIndexFor(controls), { x, y, w: 0, h: 0 })
+    .sort((a, b) => (rank.get(a) ?? 0) - (rank.get(b) ?? 0));
+}
+
 export function findControlAtPoint(controls, x, y, layers = null) {
   // A locked or hidden layer is not pickable. This is the point of locking scenery: you stop
   // grabbing the section box when you meant the knob drawn on top of it, and the fix has to be
@@ -176,7 +205,8 @@ export function findControlAtPoint(controls, x, y, layers = null) {
   let hit = null;
   let localX = x;
   let localY = y;
-  for (const c of sortControlsForHitTest(controls, (layers ?? []).map((l) => l.name))) {
+  const layerNames = (layers ?? []).map((l) => l.name);
+  for (const c of hitTestPool(controls, layerNames, x, y)) {
     if (blocked.size && blocked.has(normalizeLayerName(c?._children?.Core?.layer))) continue;
     const t = c._children?.Transform;
     if (!t) continue;
@@ -191,7 +221,7 @@ export function findControlAtPoint(controls, x, y, layers = null) {
 
   if (!hit) return null;
 
-  const kids = getChildControls(hit);
+  const kids = stableChildControls(hit);
   if (kids.length) {
     const t = hit._children.Transform;
     const origin = contentOrigin(hit);

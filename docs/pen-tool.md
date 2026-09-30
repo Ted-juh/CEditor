@@ -39,3 +39,37 @@ across and down, the same way the built-in triangle and star are. That is why it
 box, and why a component set to *Scale internals* scales it with everything else. `meta.closed`
 says whether it is filled or stroked. It is drawn by the same part renderer everywhere: the
 designer, the panel, the States × sizes sheet and the exported plug-in.
+
+## Combining shapes
+
+Select two or more shapes in the Designer (click one, then **Add to selection** on the others in
+the layer list) and the alignment toolbar gains four buttons:
+
+- **Unite** merges them into one outline.
+- **Subtract** cuts the front shapes out of the back one — a plate with a hole, a notched pointer.
+- **Intersect** keeps only where they overlap.
+- **Exclude** keeps where they do not overlap.
+
+The result is one part, keeping the name, fill, border and bindings of the part that owns it: the
+back one for Subtract, the front one otherwise. The other parts are removed. The whole thing is one
+undo step.
+
+Rectangles (rounded or not, per-corner radii included), ellipses, rings, capsules, the polygons,
+closed pen shapes and earlier combined shapes can be combined, turned and scaled ones included.
+Anything else is refused with the reason rather than approximated: text, arcs, open lines, bevelled
+or notched corners, a part that is hidden, and the owning part if its fill is a gradient, image or
+texture or its border is not solid. So is removing a part that something still points at — a hit
+zone, a binding, a state, a published property or a variant — since that would leave the reference
+dangling. Shapes that do not overlap give nothing to Intersect, and it says so.
+
+## Smooth
+
+Select a pen shape and the point toolbar offers **Smooth**, which replaces the corners with a curve
+through the same points. Open shapes stay open.
+
+## Combined and smoothed shapes are outlines, not points
+
+Both results are stored as an SVG outline (`meta.pathData`, again from 0 to 1 across the part's
+box) rather than as points, because a hole or a curve is not a list of corners. They scale, fill,
+stroke, animate and bind like any part, and render the same everywhere, but they have **no point
+handles**: to change the outline, undo and edit the originals.

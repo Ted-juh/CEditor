@@ -11,6 +11,7 @@
   import { analyze, getCompletions, getHover, getDefinition, getSignatureHelp, getFoldRegions, wordAt } from '../scripting/languageService.js';
   import { projectFolds, pruneFolds } from './foldModel.js';
   import { columnInsert, columnDelete, offsetOf } from './columnEdit.js';
+  import { floating } from '../utils/floatingUi.js';
 
   let {
     value = '',
@@ -973,14 +974,14 @@
   {/if}
 
   {#if hover}
-    <div class="ce-hover" use:portal style="left:{hover.cx + 6}px; top:{hover.cy + 16}px">
+    <div class="ce-hover" use:portal use:floating={{ anchor: { x: hover.cx, y: hover.cy }, placement: 'bottom-start', offset: { mainAxis: 16, crossAxis: 6 }, fallbackPlacements: ['top-start'], track: false }}>
       <div class="ce-hover-title">{hover.title}</div>
       {#if hover.doc}<div class="ce-hover-doc">{hover.doc}</div>{/if}
     </div>
   {/if}
 
   {#if signature && !acOpen}
-    <div class="ce-sig" use:portal style="left:{sigScreen.x}px; top:{sigScreen.y}px">
+    <div class="ce-sig" use:portal use:floating={{ anchor: { x: sigScreen.x, y: sigScreen.y, width: 0, height: lineHeight }, placement: 'top-start', offset: 5, fallbackPlacements: ['bottom-start'], track: false }}>
       <span class="ce-sig-name">{signature.name}</span>(<!--
         -->{#each signature.params as p, i (i)}<span class={['ce-sig-param', i === signature.activeParam && 'active']}>{p}</span>{#if i < signature.params.length - 1}, {/if}{/each}<!--
       -->)
@@ -988,7 +989,7 @@
   {/if}
 
   {#if acOpen}
-    <div class="ce-ac" use:portal style="left:{acScreen.x}px; top:{acScreen.y}px">
+    <div class="ce-ac" use:portal use:floating={{ anchor: { x: acScreen.x, y: acScreen.y - lineHeight, width: 0, height: lineHeight }, placement: 'bottom-start', offset: -2, fallbackPlacements: ['top-start'], track: false }}>
       {#each acOptions as o, i (o.kind + o.label)}
         <div class={['ce-ac-row', i === acIndex && 'sel']}
           role="option" aria-selected={i === acIndex} tabindex="-1"
@@ -1360,7 +1361,6 @@
   .ce-rename {
     position: fixed;
     z-index: 64;
-    transform: translateY(-2px);
     min-width: 90px;
     background: var(--panel-2);
     border: 1px solid var(--accent);
@@ -1393,7 +1393,6 @@
   .ce-sig {
     position: fixed;
     z-index: 59;
-    transform: translateY(calc(-100% - 5px));
     background: var(--panel-2);
     border: 1px solid var(--line-2);
     border-radius: 6px;

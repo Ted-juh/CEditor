@@ -3,6 +3,11 @@
   import ArrowDown from 'lucide-svelte/icons/arrow-down';
   import ArrowUp from 'lucide-svelte/icons/arrow-up';
   import Copy from 'lucide-svelte/icons/copy';
+  import SquaresUnite from 'lucide-svelte/icons/squares-unite';
+  import SquaresSubtract from 'lucide-svelte/icons/squares-subtract';
+  import SquaresIntersect from 'lucide-svelte/icons/squares-intersect';
+  import SquaresExclude from 'lucide-svelte/icons/squares-exclude';
+  import Spline from 'lucide-svelte/icons/spline';
   import Eye from 'lucide-svelte/icons/eye';
   import EyeOff from 'lucide-svelte/icons/eye-off';
   import Lock from 'lucide-svelte/icons/lock';
@@ -70,6 +75,7 @@
   import CustomContactSheet from './CustomContactSheet.svelte';
   import SurfacePenTool from './SurfacePenTool.svelte';
   import { isPathPart, pathPartSpec } from '../utils/penPath.js';
+  import { BOOLEAN_LABELS, applyPartPatch, partsAfterBoolean, planPartBoolean, planPathSmooth } from '../utils/partBooleans.js';
   import SurfaceToolStrip from './SurfaceToolStrip.svelte';
   import SurfaceBottomBar from './SurfaceBottomBar.svelte';
   import SurfacePalette from './SurfacePalette.svelte';
@@ -695,6 +701,12 @@
     if (interaction?.type === 'zoneResize') return interaction?.handle ? `Zone resize ${interaction.handle.toUpperCase()}` : 'Zone resize';
     return '';
   });
+  // Above the path it edits, or below it when the path is too near the artboard's top: clamped into
+  // the artboard instead, it would sit over the path's top point handles and take their drags.
+  function pathToolbarTop(frame) {
+    return frame.top >= 32 ? frame.top - 30 : frame.top + frame.height + 6;
+  }
+
   let activeSelectionFrame = $derived.by(() => {
     if (activeSelectionKind === 'kit') return selectedKitFrame;
     if (activeSelectionKind === 'hitZone') return activeZoneFrame ?? selectedZoneFrame;
@@ -2437,6 +2449,48 @@
     if (Object.keys(patch).length) applyControlPatch(core.id, patch);
   }
 
+  // Unite / Subtract / Intersect / Exclude the selected shapes into one (utils/partBooleans.js). One
+  // write of the whole Parts section, so one undo brings every operand back.
+  let combining = $state(false);
+  async function combineSelectedLayers(operation) {
+    if (!core?.id || selectedLayerNames.length < 2 || combining) return;
+    combining = true;
+    try {
+      const entries = selectedLayerNames.map((name) => [name, authoredParts?._children?.[name], parts?._children?.[name]]);
+      const plan = await planPartBoolean(control, entries, operation, { artboardWidth, artboardHeight });
+      if (!plan.ok) {
+        const first = plan.refused[0];
+        showDrawNotice(`Can't ${BOOLEAN_LABELS[operation].toLowerCase()}: ${first.name ? `${first.name} — ` : ''}${first.reason}`);
+        return;
+      }
+      localSelectedLayerNames = [plan.keep];
+      applyControlPatch(core.id, {
+        'Parts._children': partsAfterBoolean(authoredParts?._children, plan),
+        'Designer.selectedLayer': plan.keep,
+        'Designer.selectedLayers': [plan.keep],
+        'Designer.selectedSurfaceKind': 'layer',
+      });
+      showDrawNotice(`${BOOLEAN_LABELS[operation]}: ${entries.length} shapes into ${plan.keep}`);
+    } finally {
+      combining = false;
+    }
+  }
+
+  // Smooth a Pen path into a curve through the same points.
+  async function smoothSelectedPath() {
+    if (!core?.id || !penEditPart || combining) return;
+    combining = true;
+    try {
+      const name = penEditPart.name;
+      const plan = await planPathSmooth(parts?._children?.[name], { artboardWidth, artboardHeight });
+      if (!plan.ok) { showDrawNotice(plan.reason); return; }
+      applyControlPatch(core.id, { [`Parts.${name}`]: applyPartPatch(authoredParts._children[name], plan.patch) });
+      showDrawNotice(`Smoothed ${name}`);
+    } finally {
+      combining = false;
+    }
+  }
+
   function copySelectedLayers() {
     const copiedParts = selectedLayerNames
       .map((name) => authoredParts?._children?.[name])
@@ -3714,8 +3768,26 @@
                   <span class="align-divider"></span>
                   <button type="button" onclick={() => distributeSelectedLayers('x')} disabled={selectedLayerNames.length < 3} title="Distribute horizontally (3+ layers)">⇸</button>
                   <button type="button" onclick={() => distributeSelectedLayers('y')} disabled={selectedLayerNames.length < 3} title="Distribute vertically (3+ layers)">⇊</button>
+                  <span class="align-divider"></span>
+                  <button type="button" data-boolean="unite" onclick={() => combineSelectedLayers('unite')} disabled={combining} title="Unite: merge the shapes into one outline" aria-label="Unite"><SquaresUnite size={13} /></button>
+                  <button type="button" data-boolean="subtract" onclick={() => combineSelectedLayers('subtract')} disabled={combining} title="Subtract: cut the front shapes out of the back one" aria-label="Subtract"><SquaresSubtract size={13} /></button>
+                  <button type="button" data-boolean="intersect" onclick={() => combineSelectedLayers('intersect')} disabled={combining} title="Intersect: keep only where the shapes overlap" aria-label="Intersect"><SquaresIntersect size={13} /></button>
+                  <button type="button" data-boolean="exclude" onclick={() => combineSelectedLayers('exclude')} disabled={combining} title="Exclude: keep where they don't overlap" aria-label="Exclude"><SquaresExclude size={13} /></button>
                 </div>
               {/if}
+            {/if}
+
+            {#if !designerPreviewing && penEditPart && !interaction && activeSelectionFrame}
+              <div
+                class="align-toolbar"
+                style={`left:${Math.max(0, activeSelectionFrame.left)}px;top:${pathToolbarTop(activeSelectionFrame)}px;`}
+                role="toolbar"
+                tabindex="-1"
+                aria-label="Path"
+                onmousedown={stopSelectionAction}
+              >
+                <button type="button" data-path-smooth onclick={smoothSelectedPath} disabled={combining} title="Smooth: a curve through the same points" aria-label="Smooth"><Spline size={13} /></button>
+              </div>
             {/if}
 
             {#each partEntries as [name, part] (name)}

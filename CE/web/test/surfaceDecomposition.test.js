@@ -216,9 +216,9 @@ test('the surface has its own context menu, not the panel editor’s', () => {
                        'Show / hide', 'Make interactive', 'Jump to generator', 'Delete']) {
     assert.ok(menu.includes(label), `the menu is missing "${label}"`);
   }
-  // It shares the placement helper with the panel menu — a menu opened near a window edge has to
-  // be measured before it is placed, and that problem is the same on both surfaces.
-  assert.match(menu, /import \{ placeMenu \} from '\.\.\/utils\/menuPlacement\.js'/);
+  // It shares the placement with the panel menu — a menu opened near a window edge has to be
+  // measured before it is placed, and that problem is the same on both surfaces.
+  assert.match(menu, /import \{ floating \} from '\.\.\/utils\/floatingUi\.js'/);
   // But not the panel model: none of this reaches a part inside a component document. Checked
   // against the code with the doc comment stripped, since that comment names them to explain why.
   const code = menu.replace(/\/\*[\s\S]*?\*\//g, '');

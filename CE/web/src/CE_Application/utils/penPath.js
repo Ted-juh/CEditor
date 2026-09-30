@@ -9,6 +9,8 @@
 //                     built-in polygons use, so it scales with the part like they do
 //   meta.closed       true: a filled polygon; false: an open polyline, stroked
 //
+// or, in its compound form, `meta.pathData` instead of points (see hasCompoundPath).
+//
 // The part's box is always the tight bounding box of its points, in px, anchored top-left. Points
 // are placed and edited in artboard coordinates and converted here, so the Pen and the vertex
 // handles never do box arithmetic of their own.
@@ -34,6 +36,15 @@ export function pathVectorPoints(part) {
     .filter((point) => Array.isArray(point) && Number.isFinite(Number(point[0])) && Number.isFinite(Number(point[1])))
     .map(([x, y]) => [Math.max(0, Math.min(1, Number(x))), Math.max(0, Math.min(1, Number(y)))]);
   return points.length >= MIN_OPEN_POINTS ? points : null;
+}
+
+/**
+ * The compound form: `meta.pathData`, SVG path data in 0..1 of the box, with curves, holes and islands
+ * — what a boolean combine or a smooth makes (utils/partBooleans.js). Drawn, moved and styled like any
+ * path part; not edited point by point.
+ */
+export function hasCompoundPath(part) {
+  return String(part?.kind ?? '') === PATH_KIND && typeof part?.meta?.pathData === 'string' && part.meta.pathData.trim() !== '';
 }
 
 export function pathIsClosed(part) {

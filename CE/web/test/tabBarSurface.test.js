@@ -131,9 +131,11 @@ test('the menu greys out what it cannot do, including Reveal outside the desktop
   assert.match(script, /tabContextAvailability\(orderedTabs, tabMenu\.index, tabMenu\.tab\)/);
 });
 
-test('the menu is placed by measuring first, so a right-click on the last tab stays on screen', () => {
-  assert.match(script, /placeMenu\(at\.x, at\.y, \{ width: rect\.width, height: rect\.height \}, viewportSize\(\)\)/);
-  assert.match(markup, /visibility:\{tabMenuPlaced \? 'visible' : 'hidden'\}/);
+test('the menu is placed by the shared floating placement, so a right-click on the last tab stays on screen', () => {
+  // utils/floatingUi.js measures, flips away from the edge and keeps it hidden until placed
+  // (browser-checks/floatingUi.mjs drives it at the window's edges).
+  assert.match(script, /import \{ floating \} from '\.\.\/utils\/floatingUi\.js'/);
+  assert.match(markup, /use:floating=\{\{ anchor: \{ x: tabMenu\.x, y: tabMenu\.y \}, placement: 'bottom-start', fallbackPlacements: TAB_MENU_FALLBACKS \}\}/);
 });
 
 test('closing many tabs goes through the tested helper rather than a second loop', () => {

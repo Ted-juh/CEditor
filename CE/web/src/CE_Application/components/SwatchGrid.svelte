@@ -29,6 +29,7 @@
   import { paletteLibrary, selectPalette, newPalette, renameActivePalette, removePalette, saveActiveColors } from '../stores/palettes.js';
   import { activePalette, PALETTE_SIZE } from '../utils/paletteLibrary.js';
   import { swatchAction, swatchMenuItems, swatchTitle, undoFor, applyUndo } from '../utils/swatchGestures.js';
+  import { floating } from '../utils/floatingUi.js';
 
   let {
     swatches = [],
@@ -126,16 +127,14 @@
 
   // --- Cell menu ---------------------------------------------------------
   let menuIndex = $state(null);
-  let menuX = $state(0);
-  let menuY = $state(0);
+  // The cell the menu hangs off (utils/floatingUi.js): below it, above it at the bottom of the dock,
+  // and following it when the dock scrolls. It used to be offset inside the grid with no edge at all.
+  let menuAnchor = $state(null);
   let gridEl = $state(null);
 
   function openMenu(index, event) {
     event.preventDefault();
-    const host = gridEl?.getBoundingClientRect();
-    const cell = event.currentTarget?.getBoundingClientRect?.();
-    menuX = cell && host ? Math.max(0, cell.left - host.left) : 0;
-    menuY = cell && host ? cell.bottom - host.top + 2 : 0;
+    menuAnchor = event.currentTarget ?? null;
     menuIndex = index;
   }
 
@@ -272,7 +271,7 @@
 
   {#if menuIndex !== null}
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div class="cell-menu" style="left: {menuX}px; top: {menuY}px" role="menu" tabindex="-1" onmouseleave={closeMenu}>
+    <div class="cell-menu" use:floating={{ anchor: menuAnchor, placement: 'bottom-start', offset: 2, fallbackPlacements: ['top-start', 'bottom-end', 'top-end'] }} role="menu" tabindex="-1" onmouseleave={closeMenu}>
       {#each swatchMenuItems(!!swatches[menuIndex]) as item (item.id)}
         <button
           class="cell-menu-item"
@@ -387,8 +386,8 @@
   .swatch.empty:hover { border-color: #5B9BD5; }
 
   .cell-menu {
-    position: absolute;
-    z-index: 20;
+    position: fixed;
+    z-index: 1000;
     min-width: 150px;
     background: #1E1E1E;
     border: 1px solid #444;

@@ -3,28 +3,18 @@
   import Filter from 'lucide-svelte/icons/filter';
   import VolumeX from 'lucide-svelte/icons/volume-x';
   import Headphones from 'lucide-svelte/icons/headphones';
+  import { floating } from '../utils/floatingUi.js';
   let { issues = [], onInspect = () => {} } = $props();
   const icons = { plug: Unplug, filter: Filter, level: VolumeX, solo: Headphones };
   let visible = $derived(issues.filter(issue => !issue.existing));
+  // Below its icon, above it near the bottom, kept in the window and following it on scroll and resize
+  // (utils/floatingUi.js) — it used to clamp only sideways, so a low icon's tip went off the bottom.
   let focusedTip = $state(null);
-  let tipAnchor;
-  let tipIssue;
   function showTip(event, issue) {
-    tipAnchor = event.currentTarget;
-    tipIssue = issue;
-    positionTip();
+    focusedTip = { id: issue.id, anchor: event.currentTarget };
   }
-  function positionTip() {
-    if (!tipAnchor) return;
-    const rect = tipAnchor.getBoundingClientRect();
-    focusedTip = { id: tipIssue.id, left: Math.max(8, Math.min(rect.left, window.innerWidth - 256)),
-      top: rect.bottom + 4 };
-  }
-  function hideTip() { tipAnchor = null; focusedTip = null; }
+  function hideTip() { focusedTip = null; }
 </script>
-
-<svelte:window onresize={positionTip} />
-<svelte:document onscrollcapture={positionTip} />
 
 {#if visible.length}
   <span class="part-issue-icons" aria-label="Part diagnostics">
@@ -40,7 +30,7 @@
         </button>
         {#if focusedTip?.id === issue.id}
           <span class="issue-tip" aria-hidden="true"
-                style={`left:${focusedTip.left}px;top:${focusedTip.top}px`}>{issue.detail}</span>
+                use:floating={{ anchor: focusedTip.anchor, placement: 'bottom-start', offset: 4, padding: 8, fallbackPlacements: ['top-start', 'bottom-end', 'top-end'] }}>{issue.detail}</span>
         {/if}
       </span>
     {/each}

@@ -5,6 +5,7 @@
  */
 
 import { rotatedRectBounds } from './transformMath.js';
+import { distanceCandidates, snapCandidates, spatialIndexFor, worthIndexing } from './controlSpatialIndex.js';
 
 const SNAP_THRESHOLD = 5;
 
@@ -62,8 +63,14 @@ export function findAlignmentSnap(rect, selfId, otherControls, rulerGuides, getS
   let xGuidePos = null;
   let yGuidePos = null;
 
-  if (otherControls) {
-    for (const other of otherControls) {
+  // On a big panel, only the siblings with an edge inside the threshold of one of ours can win; the
+  // spatial index finds them without visiting the rest (controlSpatialIndex.js). Same loop, same order.
+  const snapPool = worthIndexing(otherControls)
+    ? snapCandidates(spatialIndexFor(otherControls, getSection), myXEdges.map((edge) => edge.val), myYEdges.map((edge) => edge.val), threshold)
+    : otherControls;
+
+  if (snapPool) {
+    for (const other of snapPool) {
       const otherCore = getSection(other, 'Core');
       const otherTransform = getSection(other, 'Transform');
       if (!otherTransform || otherCore?.id === selfId) continue;
@@ -256,7 +263,9 @@ export function computeDistances(rect, selfId, selectedIds, otherControls, panel
   let nearestTop = null;
   let nearestBottom = null;
 
-  for (const other of otherControls) {
+  // Only a sibling in the rect's own rows or columns can be a nearest neighbour.
+  const pool = worthIndexing(otherControls) ? distanceCandidates(spatialIndexFor(otherControls, getSection), rect) : otherControls;
+  for (const other of pool) {
     const oc = getSection(other, 'Core');
     const ot = getSection(other, 'Transform');
     if (!ot || oc?.id === selfId) continue;

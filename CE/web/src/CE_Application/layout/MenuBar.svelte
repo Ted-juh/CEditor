@@ -42,6 +42,7 @@
   import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
   import { newPanelFromSvgArtwork, updatePanelFromSvgArtwork } from '../stores/svgPanelImportActions.js';
   import WorkspacePicker from './WorkspacePicker.svelte';
+  import { floating } from '../utils/floatingUi.js';
 
   // Menu state predicates, evaluated when a dropdown opens. A menu item that
   // is always enabled and never shows state cannot tell the user whether
@@ -334,13 +335,13 @@
   /** Index of the item whose submenu is open, and the roving focus inside it. */
   let openSubmenuIndex = $state(-1);
   let subFocusIndex = $state(-1);
-  /**
-   * Where the open submenu sits, in viewport pixels. The submenu is `position: fixed` because its
-   * parent dropdown scrolls: `overflow-y: auto` forces `overflow-x` to auto as well, so a submenu
-   * positioned inside it at `left: 100%` was clipped to nothing — Open Recent opened, and nobody
-   * could see it. Fixed positioning takes it out of that box; the row's rect says where to put it.
+  /*
+   * Placement is utils/floatingUi.js's. The submenu is `position: fixed` because its parent dropdown
+   * scrolls: `overflow-y: auto` forces `overflow-x` to auto as well, so a submenu positioned inside it at
+   * `left: 100%` was clipped to nothing — Open Recent opened, and nobody could see it. It hangs off its
+   * row, flips left at the window's right edge, and follows the row when the dropdown scrolls. The
+   * dropdown hangs off its bar button and moves left when it would run off the right edge.
    */
-  let submenuAnchor = $state(null);
   /** The menu bar is one tab stop: this is which button that stop is on. */
   let barFocusName = $state(menuNames[0]);
 
@@ -372,7 +373,6 @@
 
   function closeSubmenu() {
     openSubmenuIndex = -1;
-    submenuAnchor = null;
     subFocusIndex = -1;
     submenuItems = [];
     subEls = [];
@@ -411,15 +411,8 @@
     subEls = [];
     submenuItems = item.items ? item.items() : [];
     openSubmenuIndex = index;
-    placeSubmenu();
     focusIndex = index;
     subFocusIndex = focusFirst ? firstFocusableIndex(submenuItems) : -1;
-  }
-
-  /** Level with the row that opened it: the dropdown's 4px padding and 1px border sit above it. */
-  function placeSubmenu() {
-    const rect = itemEls[openSubmenuIndex]?.getBoundingClientRect();
-    submenuAnchor = rect ? { left: rect.right - 4, top: rect.top - 5 } : null;
   }
 
   function handleItemClick(item) {
@@ -611,7 +604,7 @@
           aria-label={name}
           tabindex="-1"
           onkeydown={handleDropdownKeydown}
-          onscroll={() => { if (openSubmenuIndex >= 0) placeSubmenu(); }}
+          use:floating={{ anchor: barEls[name], placement: 'bottom-start', fallbackPlacements: ['bottom-end'], fit: false, slide: false }}
         >
           {#each menus[name] as item, index}
             {#if item.type === 'separator'}
@@ -660,9 +653,7 @@
                   role="menu"
                   aria-label={item.label}
                   tabindex="-1"
-                  style:left={submenuAnchor ? `${submenuAnchor.left}px` : undefined}
-                  style:top={submenuAnchor ? `${submenuAnchor.top}px` : undefined}
-                  style:max-height={submenuAnchor ? `calc(100vh - ${submenuAnchor.top}px - 8px)` : undefined}
+                  use:floating={{ anchor: itemEls[index], placement: 'right-start', offset: { mainAxis: -4, crossAxis: -5 }, fallbackPlacements: ['left-start'] }}
                   onkeydown={handleSubmenuKeydown}
                 >
                   {#each submenuItems as subItem, subIndex}
@@ -754,9 +745,7 @@
 
   /* Dropdown */
   .dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
+    position: fixed;
     min-width: 200px;
     max-height: calc(100vh - 60px);
     overflow-y: auto;
@@ -769,7 +758,7 @@
   }
 
   /* A submenu hangs off its parent row, not off the menu bar, level with the row that opened it —
-     which is what makes the pointer travel feel right. Fixed, not absolute: see submenuAnchor. */
+     which is what makes the pointer travel feel right. Fixed, not absolute: see the note by openSubmenuIndex. */
   .dropdown.submenu {
     position: fixed;
     z-index: 210;
