@@ -2340,7 +2340,7 @@ export function emptyPerformance() {
     currentSceneId: '',
     queuedSceneId: '',
     arrangement: {
-      items: [], loop: false, playing: false, currentIndex: -1, queuedIndex: -1,
+      items: [], songId: '', loop: false, playing: false, currentIndex: -1, queuedIndex: -1,
       ending: false, progress: 0, bar: 0,
     },
     capture: {
@@ -3234,6 +3234,15 @@ export function normalizeResponseProfile(profile) {
   };
 }
 
+const normalizeSection = (i) => ({
+  itemId: String(i?.itemId ?? ''),
+  name: String(i?.name ?? ''),
+  sceneId: String(i?.sceneId ?? ''),
+  sceneName: String(i?.sceneName ?? ''),
+  missing: i?.missing === true,
+  bars: Math.max(1, Math.min(128, Number(i?.bars ?? 4))),
+});
+
 export function normalizePerformance(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   const t = p.transport && typeof p.transport === 'object' ? p.transport : {};
@@ -3396,6 +3405,9 @@ export function normalizePerformance(payload) {
         tempo: Number(i?.tempo ?? 0),
         // How long the song should take on stage, in seconds; 0 = not planned.
         plannedSeconds: Math.max(0, Math.min(3600, Math.round(Number(i?.plannedSeconds ?? 0)) || 0)),
+        // The song's own structure: sections, each a scene held for a number of bars.
+        sections: (Array.isArray(i?.sections) ? i.sections : []).map(normalizeSection),
+        sectionsLoop: i?.sectionsLoop === true,
       })),
       currentIndex: Number(setlist.currentIndex ?? -1),
       // The stage's clocks, wall-clock ms: when the set began, and when the song on stage did.
@@ -3414,14 +3426,9 @@ export function normalizePerformance(payload) {
       })),
     },
     arrangement: {
-      items: (Array.isArray(arrangement.items) ? arrangement.items : []).map((i) => ({
-        itemId: String(i?.itemId ?? ''),
-        name: String(i?.name ?? ''),
-        sceneId: String(i?.sceneId ?? ''),
-        sceneName: String(i?.sceneName ?? ''),
-        missing: i?.missing === true,
-        bars: Math.max(1, Math.min(128, Number(i?.bars ?? 4))),
-      })),
+      // What plays: the current song's sections (songId), or the show-wide list ('').
+      items: (Array.isArray(arrangement.items) ? arrangement.items : []).map(normalizeSection),
+      songId: String(arrangement.songId ?? ''),
       loop: arrangement.loop === true,
       playing: arrangement.playing === true,
       currentIndex: Number(arrangement.currentIndex ?? -1),
@@ -5215,6 +5222,30 @@ function applyMockSnapshot(scene, state) {
 
 /** The mock reducer: applies one command to a normalized state, so the browser-only app
  *  behaves instead of stalling. Deliberately mirrors the native semantics the tests pin. */
+/** The mock keeps the host's rule: a song's sections are its own, and what plays is the
+    current song's (or the show-wide list with no song current). Edits name the song. */
+function mockSectionsFor(perf, songId) {
+  if (songId) {
+    const song = perf.setlist.items.find((item) => item.itemId === songId);
+    if (!song) return null;
+    song.sections ??= [];
+    return { items: song.sections, setLoop: (loop) => { song.sectionsLoop = loop; } };
+  }
+  perf.showArrangement ??= { items: [...perf.arrangement.items], loop: perf.arrangement.loop };
+  const show = perf.showArrangement;
+  return { items: show.items, setLoop: (loop) => { show.loop = loop; } };
+}
+function mockIsPlaying(perf, songId) {
+  return (perf.arrangement.songId ?? '') === (songId ?? '');
+}
+function mockShowPlaying(perf) {
+  const song = perf.setlist.items[perf.setlist.currentIndex];
+  const show = perf.showArrangement ?? { items: perf.arrangement.items, loop: perf.arrangement.loop };
+  perf.arrangement.items = (song ? song.sections ?? [] : show.items).map((item) => ({ ...item }));
+  perf.arrangement.loop = song ? song.sectionsLoop === true : show.loop;
+  perf.arrangement.songId = song?.itemId ?? '';
+}
+
 export function applyMockCommand(state, payload) {
   const cmd = payload?.cmd;
   const next = normalizeHostState(state);
@@ -7310,6 +7341,8 @@ export function applyMockCommand(state, payload) {
       notes: '',
       tempo: 0,
       plannedSeconds: 0,
+      sections: [],
+      sectionsLoop: false,
     });
     return next;
   }
@@ -7321,13 +7354,17 @@ export function applyMockCommand(state, payload) {
   if (cmd === 'removeSetlistItem' || cmd === 'setSetlistItem' || cmd === 'moveSetlistItem') {
     const index = perf.setlist.items.findIndex((i) => i.itemId === payload.itemId);
     if (index < 0) return next;
+    // As natively: the current song stays current as others move; removing it leaves none.
+    const currentId = perf.setlist.items[perf.setlist.currentIndex]?.itemId ?? '';
     if (cmd === 'removeSetlistItem') {
       perf.setlist.items.splice(index, 1);
-      perf.setlist.currentIndex = Math.min(perf.setlist.currentIndex, perf.setlist.items.length - 1);
+      perf.setlist.currentIndex = perf.setlist.items.findIndex((i) => i.itemId === currentId);
+      mockShowPlaying(perf);
     } else if (cmd === 'moveSetlistItem') {
       const [item] = perf.setlist.items.splice(index, 1);
       perf.setlist.items.splice(Math.min(perf.setlist.items.length,
                                          Math.max(0, Number(payload.index ?? index))), 0, item);
+      perf.setlist.currentIndex = perf.setlist.items.findIndex((i) => i.itemId === currentId);
     } else {
       const item = perf.setlist.items[index];
       for (const key of ['name', 'notes', 'rackRecordId', 'pageId'])
@@ -7359,15 +7396,21 @@ export function applyMockCommand(state, payload) {
     const now = Date.now();
     if (perf.setlist.currentIndex < 0 || target === 0 || !perf.setlist.startedAtMs) perf.setlist.startedAtMs = now;
     perf.setlist.songStartedAtMs = now;
+    if (perf.arrangement.playing) { perf.arrangement.playing = false; perf.arrangement.currentIndex = -1; }
     perf.setlist.currentIndex = target;
     perf.setlist.loadingIndex = -1;
-    if (item.sceneId) return applyMockCommand(next, { cmd: 'launchScene', sceneId: item.sceneId });
+    mockShowPlaying(perf);
+    const sections = item.sections ?? [];
+    if (sections.length > 0 && perf.transport.playing) return applyMockCommand(next, { cmd: 'startArrangement', index: 0 });
+    const opening = item.sceneId || sections[0]?.sceneId;
+    if (opening) return applyMockCommand(next, { cmd: 'launchScene', sceneId: opening });
     return next;
   }
   if (cmd === 'addArrangementItem') {
     const scene = perf.scenes.find((s) => s.sceneId === payload.sceneId);
-    if (!scene || perf.arrangement.playing) return next;
-    perf.arrangement.items.push({
+    const target = mockSectionsFor(perf, payload.songId);
+    if (!scene || !target || (perf.arrangement.playing && mockIsPlaying(perf, payload.songId))) return next;
+    target.items.push({
       itemId: nextMockId('mock-arrangement'),
       name: String(payload.name || scene.name),
       sceneId: scene.sceneId,
@@ -7375,21 +7418,23 @@ export function applyMockCommand(state, payload) {
       missing: false,
       bars: Math.max(1, Math.min(128, Number(payload.bars ?? 4))),
     });
+    mockShowPlaying(perf);
     return next;
   }
   if (cmd === 'removeArrangementItem' || cmd === 'setArrangementItem'
       || cmd === 'moveArrangementItem') {
-    if (perf.arrangement.playing) return next;
-    const index = perf.arrangement.items.findIndex((i) => i.itemId === payload.itemId);
+    const target = mockSectionsFor(perf, payload.songId);
+    if (!target || (perf.arrangement.playing && mockIsPlaying(perf, payload.songId))) return next;
+    const index = target.items.findIndex((i) => i.itemId === payload.itemId);
     if (index < 0) return next;
     if (cmd === 'removeArrangementItem') {
-      perf.arrangement.items.splice(index, 1);
+      target.items.splice(index, 1);
     } else if (cmd === 'moveArrangementItem') {
-      const [item] = perf.arrangement.items.splice(index, 1);
-      perf.arrangement.items.splice(Math.min(perf.arrangement.items.length,
+      const [item] = target.items.splice(index, 1);
+      target.items.splice(Math.min(target.items.length,
         Math.max(0, Number(payload.index ?? index))), 0, item);
     } else {
-      const item = perf.arrangement.items[index];
+      const item = target.items[index];
       if (payload.name !== undefined) item.name = String(payload.name);
       if (payload.bars !== undefined)
         item.bars = Math.max(1, Math.min(128, Number(payload.bars)));
@@ -7401,10 +7446,13 @@ export function applyMockCommand(state, payload) {
         item.missing = false;
       }
     }
+    mockShowPlaying(perf);
     return next;
   }
   if (cmd === 'setArrangementOptions') {
-    if (payload.loop !== undefined) perf.arrangement.loop = payload.loop === true;
+    const target = mockSectionsFor(perf, payload.songId);
+    if (target && payload.loop !== undefined) target.setLoop(payload.loop === true);
+    mockShowPlaying(perf);
     return next;
   }
   if (cmd === 'startArrangement') {
@@ -9453,15 +9501,16 @@ export const setlistGo = (index) => send({ cmd: 'setlistGo', index });
 export const resetSetlistClock = () => send({ cmd: 'resetSetlistClock' });
 export const setlistNext = () => send({ cmd: 'setlistNext' });
 export const setlistPrev = () => send({ cmd: 'setlistPrev' });
-export const addArrangementItem = (sceneId, name) =>
-  send(name ? { cmd: 'addArrangementItem', sceneId, name }
-            : { cmd: 'addArrangementItem', sceneId });
-export const removeArrangementItem = (itemId) => send({ cmd: 'removeArrangementItem', itemId });
-export const setArrangementItem = (itemId, fields) =>
-  send({ cmd: 'setArrangementItem', itemId, ...fields });
-export const moveArrangementItem = (itemId, index) =>
-  send({ cmd: 'moveArrangementItem', itemId, index });
-export const setArrangementOptions = (fields) => send({ cmd: 'setArrangementOptions', ...fields });
+// Sections belong to a song: `songId` names it (a setlist item id); left out, the show-wide list.
+const withSong = (payload, songId) => (songId ? { ...payload, songId } : payload);
+export const addArrangementItem = (sceneId, name, songId, bars) =>
+  send(withSong({ cmd: 'addArrangementItem', sceneId, ...(name ? { name } : {}), ...(bars ? { bars } : {}) }, songId));
+export const removeArrangementItem = (itemId, songId) => send(withSong({ cmd: 'removeArrangementItem', itemId }, songId));
+export const setArrangementItem = (itemId, fields, songId) =>
+  send(withSong({ cmd: 'setArrangementItem', itemId, ...fields }, songId));
+export const moveArrangementItem = (itemId, index, songId) =>
+  send(withSong({ cmd: 'moveArrangementItem', itemId, index }, songId));
+export const setArrangementOptions = (fields, songId) => send(withSong({ cmd: 'setArrangementOptions', ...fields }, songId));
 export const startArrangement = (index = 0) => send({ cmd: 'startArrangement', index });
 export const stopArrangement = () => send({ cmd: 'stopArrangement' });
 export const setPartArp = (partId, fields) => send({ cmd: 'setPartArp', partId, ...fields });

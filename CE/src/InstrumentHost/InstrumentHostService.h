@@ -1198,6 +1198,10 @@ private:
     int queueSceneLaunch (const juce::String& sceneId, perf::Quantize quantize);
     bool startArrangementPlayback (int index);
     void stopArrangementPlayback (bool stopClips);
+    // What plays: the current song's sections, or the show-wide arrangement when no song is
+    // current. `arrangementFor` finds a song's sections by its setlist item id ("" = show-wide).
+    const perf::Arrangement& playingArrangement() const;
+    perf::Arrangement* arrangementFor (const juce::String& songId);
     void tickArrangement();
     /** Queues one held-fill edge after resolving the clip's configured alternate pattern. */
     bool setClipFillState (const juce::String& clipId, bool active, bool reportError = true);

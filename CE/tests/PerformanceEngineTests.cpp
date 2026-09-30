@@ -2753,6 +2753,15 @@ void testScalesAndSerialization()
              && restoredSetlist.preloadAhead == 2,
            "and a setlist keeps full-rack/page recall, preload policy, notes, planned length and its place");
 
+    setlist.items.getReference (0).sections.items.add ({ "x1", "Intro", "s1", 8 });
+    setlist.items.getReference (0).sections.loop = true;
+    Setlist withSections;
+    check (setlistFromVar (setlistToVar (setlist), withSections)
+             && withSections.items[0].sections.items.size() == 1
+             && withSections.items[0].sections.items[0].bars == 8
+             && withSections.items[0].sections.loop,
+           "a song keeps its own sections and whether they loop");
+
     Arrangement arrangement;
     arrangement.items.add ({ "a1", "Intro", "s1", 2 });
     arrangement.items.add ({ "a2", "Verse", "s1", 8 });

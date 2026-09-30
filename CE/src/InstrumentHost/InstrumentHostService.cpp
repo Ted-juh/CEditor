@@ -5520,7 +5520,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         if (cmd == "removeScene")
         {
             bool sceneIsArranged = false;
-            for (const auto& item : performance.arrangement.items)
+            for (const auto& item : playingArrangement().items)
                 sceneIsArranged = sceneIsArranged || item.sceneId == sceneId;
             if (sceneIsArranged && arrangementPlaying)
                 stopArrangementPlayback (true);
@@ -5532,9 +5532,15 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 if (performance.setlist.items.getReference (i).sceneId == sceneId)
                     performance.setlist.items.remove (i);
 
-            for (int i = performance.arrangement.items.size(); --i >= 0;)
-                if (performance.arrangement.items.getReference (i).sceneId == sceneId)
-                    performance.arrangement.items.remove (i);
+            const auto dropScene = [&sceneId] (perf::Arrangement& arrangement)
+            {
+                for (int i = arrangement.items.size(); --i >= 0;)
+                    if (arrangement.items.getReference (i).sceneId == sceneId)
+                        arrangement.items.remove (i);
+            };
+            dropScene (performance.arrangement);
+            for (auto& song : performance.setlist.items)
+                dropScene (song.sections);
 
             for (int i = 0; i < performance.scenes.size(); ++i)
                 if (performance.scenes.getReference (i).sceneId == sceneId)
@@ -5651,15 +5657,28 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
+        // The current song stays the current song when others move around it; removing it
+        // leaves no song current, and its sections stop with it.
+        const auto currentId = juce::isPositiveAndBelow (setlist.currentIndex, setlist.items.size())
+                                 ? setlist.items.getReference (setlist.currentIndex).itemId : juce::String();
+        const auto followCurrent = [&setlist, &currentId]
+        {
+            setlist.currentIndex = -1;
+            for (int i = 0; i < setlist.items.size(); ++i)
+                if (setlist.items.getReference (i).itemId == currentId) setlist.currentIndex = i;
+        };
         if (cmd == "removeSetlistItem")
         {
+            if (arrangementPlaying && setlist.items.getReference (index).itemId == currentId)
+                stopArrangementPlayback (false);
             setlist.items.remove (index);
-            setlist.currentIndex = juce::jlimit (-1, setlist.items.size() - 1, setlist.currentIndex);
+            followCurrent();
         }
         else if (cmd == "moveSetlistItem")
         {
             setlist.items.move (index, juce::jlimit (0, setlist.items.size() - 1,
                                                      (int) payload.getProperty ("index", index)));
+            followCurrent();
         }
         else if (const auto* fields = payload.getDynamicObject())
         {
@@ -5713,9 +5732,16 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         if (! requireFeature (licensing::Feature::scenesAndSetlists))
             return;
-        if (arrangementPlaying)
+        // "songId" names the song whose sections these are; without it, the show-wide one.
+        auto* target = arrangementFor (payload.getProperty ("songId", {}).toString());
+        if (target == nullptr)
         {
-            emitError ("Stop the arrangement before editing its order.");
+            emitError ("Unknown song.");
+            return;
+        }
+        if (arrangementPlaying && target == &playingArrangement())
+        {
+            emitError ("Stop the song's sections before editing them.");
             return;
         }
 
@@ -5735,7 +5761,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         if (item.name.isEmpty())
             item.name = scene->name;
         item.bars = juce::jlimit (1, 128, (int) payload.getProperty ("bars", 4));
-        performance.arrangement.items.add (std::move (item));
+        target->items.add (std::move (item));
         savePerformance();
         emitState();
         return;
@@ -5744,14 +5770,20 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (cmd == "removeArrangementItem" || cmd == "setArrangementItem"
         || cmd == "moveArrangementItem")
     {
-        if (arrangementPlaying)
+        auto* target = arrangementFor (payload.getProperty ("songId", {}).toString());
+        if (target == nullptr)
         {
-            emitError ("Stop the arrangement before editing its order.");
+            emitError ("Unknown song.");
+            return;
+        }
+        if (arrangementPlaying && target == &playingArrangement())
+        {
+            emitError ("Stop the song's sections before editing them.");
             return;
         }
 
         auto& performance = const_cast<Performance&> (rack.getPerformance());
-        auto& arrangement = performance.arrangement;
+        auto& arrangement = *target;
         const auto itemId = payload.getProperty ("itemId", {}).toString();
         int index = -1;
         for (int i = 0; i < arrangement.items.size(); ++i)
@@ -5799,7 +5831,13 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "setArrangementOptions")
     {
-        auto& arrangement = const_cast<Performance&> (rack.getPerformance()).arrangement;
+        auto* target = arrangementFor (payload.getProperty ("songId", {}).toString());
+        if (target == nullptr)
+        {
+            emitError ("Unknown song.");
+            return;
+        }
+        auto& arrangement = *target;
         if (const auto* fields = payload.getDynamicObject();
             fields != nullptr && fields->hasProperty ("loop"))
             arrangement.loop = (bool) payload["loop"];
@@ -15784,9 +15822,28 @@ bool InstrumentHostService::launchScene (const juce::String& sceneId)
     return scene != nullptr && queueSceneLaunch (sceneId, scene->launchQuantize) != 0;
 }
 
+const perf::Arrangement& InstrumentHostService::playingArrangement() const
+{
+    const auto& performance = rack.getPerformance();
+    if (juce::isPositiveAndBelow (performance.setlist.currentIndex, performance.setlist.items.size()))
+        return performance.setlist.items.getReference (performance.setlist.currentIndex).sections;
+    return performance.arrangement;
+}
+
+perf::Arrangement* InstrumentHostService::arrangementFor (const juce::String& songId)
+{
+    auto& performance = const_cast<Performance&> (rack.getPerformance());
+    if (songId.isEmpty())
+        return &performance.arrangement;
+    for (auto& song : performance.setlist.items)
+        if (song.itemId == songId)
+            return &song.sections;
+    return nullptr;
+}
+
 bool InstrumentHostService::startArrangementPlayback (int index)
 {
-    const auto& arrangement = rack.getPerformance().arrangement;
+    const auto& arrangement = playingArrangement();
     if (! juce::isPositiveAndBelow (index, arrangement.items.size()))
         return false;
 
@@ -15879,7 +15936,7 @@ void InstrumentHostService::tickArrangement()
     if (arrangementQueuedIndex >= 0 || arrangementCurrentIndex < 0)
         return;
 
-    const auto& arrangement = rack.getPerformance().arrangement;
+    const auto& arrangement = playingArrangement();
     if (! juce::isPositiveAndBelow (arrangementCurrentIndex, arrangement.items.size()))
     {
         stopArrangementPlayback (true);
@@ -15932,6 +15989,10 @@ bool InstrumentHostService::goToSetlistItem (int index)
     const auto item = currentSetlist.items.getReference (index);
     const auto previous = currentSetlist.currentIndex;
     pendingSetlistRecall = {};
+    // The sections that were playing belong to the song being left. Its clips are not cut:
+    // the new song's scene takes over on its own boundary.
+    if (arrangementPlaying)
+        stopArrangementPlayback (false);
 
     if (item.rackRecordId.isNotEmpty())
     {
@@ -16025,6 +16086,16 @@ bool InstrumentHostService::goToSetlistItem (int index)
     setlistSongStartedAtMs = nowMs;
     if (previous < 0 || index == 0 || setlistStartedAtMs == 0)
         setlistStartedAtMs = nowMs;
+
+    // A song with sections plays them from the top while the transport runs; stopped, it
+    // waits on its first section's scene until Play.
+    if (! item.sections.items.isEmpty())
+    {
+        if (rack.getEngine().getTransport().isPlaying())
+            startArrangementPlayback (0);
+        else if (item.sceneId.isEmpty())
+            launchScene (item.sections.items.getFirst().sceneId);
+    }
 
     auto* payload = new juce::DynamicObject();
     payload->setProperty ("index", index);
@@ -20069,6 +20140,21 @@ juce::var InstrumentHostService::performancePayload() const
         i->setProperty ("notes",     item.notes);
         i->setProperty ("tempo",     item.tempo);
         i->setProperty ("plannedSeconds", item.plannedSeconds);
+        juce::Array<juce::var> sections;
+        for (const auto& section : item.sections.items)
+        {
+            const auto* sectionScene = performance.findScene (section.sceneId);
+            auto* sv = new juce::DynamicObject();
+            sv->setProperty ("itemId",    section.itemId);
+            sv->setProperty ("name",      section.name);
+            sv->setProperty ("sceneId",   section.sceneId);
+            sv->setProperty ("sceneName", sectionScene != nullptr ? sectionScene->name : juce::String());
+            sv->setProperty ("missing",   sectionScene == nullptr);
+            sv->setProperty ("bars",      section.bars);
+            sections.add (juce::var (sv));
+        }
+        i->setProperty ("sections",     sections);
+        i->setProperty ("sectionsLoop", item.sections.loop);
         setlistItems.add (juce::var (i));
     }
 
@@ -20097,8 +20183,9 @@ juce::var InstrumentHostService::performancePayload() const
     }
     setlistObj->setProperty ("preloads", preloads);
 
+    const auto& playing = playingArrangement();
     juce::Array<juce::var> arrangementItems;
-    for (const auto& item : performance.arrangement.items)
+    for (const auto& item : playing.items)
     {
         const auto* scene = performance.findScene (item.sceneId);
         auto* i = new juce::DynamicObject();
@@ -20113,7 +20200,12 @@ juce::var InstrumentHostService::performancePayload() const
 
     auto* arrangementObj = new juce::DynamicObject();
     arrangementObj->setProperty ("items",        arrangementItems);
-    arrangementObj->setProperty ("loop",         performance.arrangement.loop);
+    arrangementObj->setProperty ("loop",         playing.loop);
+    // Whose sections these are: the current song's id, or "" for the show-wide arrangement.
+    arrangementObj->setProperty ("songId",       juce::isPositiveAndBelow (performance.setlist.currentIndex,
+                                                                           performance.setlist.items.size())
+                                                    ? performance.setlist.items.getReference (performance.setlist.currentIndex).itemId
+                                                    : juce::String());
     arrangementObj->setProperty ("playing",      arrangementPlaying);
     arrangementObj->setProperty ("currentIndex", arrangementCurrentIndex);
     arrangementObj->setProperty ("queuedIndex",  arrangementQueuedIndex);
@@ -20122,15 +20214,15 @@ juce::var InstrumentHostService::performancePayload() const
     auto arrangementBar = 0;
     if (arrangementPlaying
         && juce::isPositiveAndBelow (arrangementCurrentIndex,
-                                     performance.arrangement.items.size()))
+                                     playing.items.size()))
     {
-        const auto length = (double) performance.arrangement.items
+        const auto length = (double) playing.items
                               .getReference (arrangementCurrentIndex).bars
                             * transport.barLengthPpq();
         const auto elapsed = juce::jmax (0.0, transport.getPositionPpq()
                                                - arrangementItemStartPpq);
         arrangementProgress = length > 0.0 ? juce::jlimit (0.0, 1.0, elapsed / length) : 0.0;
-        arrangementBar = juce::jlimit (1, performance.arrangement.items
+        arrangementBar = juce::jlimit (1, playing.items
                                             .getReference (arrangementCurrentIndex).bars,
                                        1 + (int) std::floor (elapsed / transport.barLengthPpq()));
     }

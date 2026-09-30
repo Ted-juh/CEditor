@@ -5280,6 +5280,31 @@ void testCtrl49Broker()
     }
 }
 
+void testSectionsMigration()
+{
+    std::cout << "\nsongs own their sections" << std::endl;
+    using ceditor::host::Performance;
+    Performance before;
+    before.performanceId = "p1";
+    before.setlist.items.add ({ "song-1", "Opener", "s1" });
+    before.setlist.items.add ({ "song-2", "Closer", "s1" });
+    before.arrangement.items.add ({ "a1", "Intro", "s1", 8 });
+    before.arrangement.loop = true;
+    Performance after;
+    check (Performance::fromVar (before.toVar(), after)
+             && after.setlist.items[0].sections.items.size() == 1
+             && after.setlist.items[0].sections.loop
+             && after.setlist.items[1].sections.items.isEmpty()
+             && after.arrangement.items.isEmpty(),
+           "a show-wide arrangement from before songs had sections becomes the first song's");
+    Performance alone;
+    alone.performanceId = "p2";
+    alone.arrangement.items.add ({ "a1", "Intro", "s1", 8 });
+    Performance kept;
+    check (Performance::fromVar (alone.toVar(), kept) && kept.arrangement.items.size() == 1,
+           "with no songs it stays show-wide");
+}
+
 void testStateFolders()
 {
     std::cout << "\npreset folders a plug-in reads as its own state" << std::endl;
@@ -10568,17 +10593,28 @@ void testPerformanceSystem()
                    .getProperty ("setlist", {}).getProperty ("currentIndex", -1) == 0,
                "and leaves the rig on the last item that worked");
 
-        // -- the song/scene arranger: ordered scene blocks, not a second timeline ------------
-        h.cmd ("addArrangementItem", { { "sceneId", sceneId }, { "name", "Intro" },
+        // -- a song's sections: ordered scene blocks, not a second timeline -----------------
+        const auto songId = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {})
+                              .getProperty ("items", {})[0].getProperty ("itemId", {}).toString();
+        h.cmd ("addArrangementItem", { { "songId", songId }, { "sceneId", sceneId }, { "name", "Intro" },
                                          { "bars", 2 } });
-        h.cmd ("addArrangementItem", { { "sceneId", sceneId }, { "name", "Verse" } });
+        h.cmd ("addArrangementItem", { { "songId", songId }, { "sceneId", sceneId }, { "name", "Verse" } });
         auto arrangement = h.emits.lastState()->getProperty ("performance", {})
                                .getProperty ("arrangement", {});
+        check (arrangement.getProperty ("songId", {}).toString() == songId
+                 && arrangement.getProperty ("items", {}).size() == 2,
+               "what plays is the current song's sections");
+        check (h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {})
+                   .getProperty ("items", {})[0].getProperty ("sections", {}).size() == 2,
+               "and the song carries them");
         const auto secondArrangementId = arrangement.getProperty ("items", {})[1]
                                            .getProperty ("itemId", {}).toString();
-        h.cmd ("setArrangementItem", { { "itemId", secondArrangementId }, { "bars", 8 } });
-        h.cmd ("moveArrangementItem", { { "itemId", secondArrangementId }, { "index", 0 } });
-        h.cmd ("setArrangementOptions", { { "loop", true } });
+        h.cmd ("setArrangementItem", { { "songId", songId }, { "itemId", secondArrangementId }, { "bars", 8 } });
+        h.cmd ("moveArrangementItem", { { "songId", songId }, { "itemId", secondArrangementId }, { "index", 0 } });
+        h.cmd ("setArrangementOptions", { { "songId", songId }, { "loop", true } });
+        h.emits.clear();
+        h.cmd ("addArrangementItem", { { "songId", "no-such-song" }, { "sceneId", sceneId } });
+        check (h.emits.lastError().contains ("Unknown song"), "a song that is not in the set is refused");
         // This assertion exercises the parked-start path. The looper deliberately started
         // the shared transport earlier, so park it and let the audio edge consume the stop.
         h.cmd ("transportStop");
@@ -10590,6 +10626,28 @@ void testPerformanceSystem()
                  && (int) arrangement.getProperty ("currentIndex", -1) == 0,
                "the arranger recalls its first block while parked and arms the shared transport");
         h.cmd ("stopArrangement");
+
+        // Going to a song while the transport runs plays its sections from the top.
+        h.cmd ("transportPlay");
+        buffer.clear(); h.service->getGraph().processBlock (buffer, midi);
+        h.cmd ("setlistGo", { { "index", 0 } });
+        arrangement = h.emits.lastState()->getProperty ("performance", {}).getProperty ("arrangement", {});
+        check ((bool) arrangement.getProperty ("playing", false) && arrangement.getProperty ("songId", {}).toString() == songId,
+               "a song with sections starts them when it begins while the transport runs");
+        h.cmd ("stopArrangement");
+        h.cmd ("transportStop");
+        buffer.clear(); h.service->getGraph().processBlock (buffer, midi);
+
+        // Moving songs around the current one keeps it current.
+        h.cmd ("addSetlistItem", { { "sceneId", sceneId }, { "name", "Closer" } });
+        const auto closerId = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {})
+                                .getProperty ("items", {})[2].getProperty ("itemId", {}).toString();
+        h.cmd ("moveSetlistItem", { { "itemId", closerId }, { "index", 0 } });
+        const auto moved = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {});
+        check ((int) moved.getProperty ("currentIndex", -1) == 1
+                 && moved.getProperty ("items", {})[1].getProperty ("itemId", {}).toString() == songId,
+               "moving another song in front keeps the current song current");
+        h.cmd ("removeSetlistItem", { { "itemId", closerId } });
 
         // -- MIDI Freeze/Bounce -------------------------------------------------------------
         h.cmd ("setPartMidiFx", { { "partId", partA }, { "transpose", 12 } });
@@ -10630,6 +10688,7 @@ void testPerformanceSystem()
              && performance.getProperty ("clips", {}).size() == 6
              && performance.getProperty ("scenes", {}).size() == 1
              && performance.getProperty ("setlist", {}).getProperty ("items", {}).size() == 2
+             && performance.getProperty ("setlist", {}).getProperty ("items", {})[0].getProperty ("sections", {}).size() == 2
              && performance.getProperty ("arrangement", {}).getProperty ("items", {}).size() == 2
              && (bool) performance.getProperty ("arrangement", {}).getProperty ("loop", false),
            "patterns, clips, scenes, setlist and arrangement all come back");
@@ -13800,6 +13859,7 @@ int main (int argc, char* argv[])
     testEditionsInTheService();
     testEditorPolicy();
     testStateFolders();
+    testSectionsMigration();
     testScan (stubWorker);
     testWrapperContext();
     testParameterModel();

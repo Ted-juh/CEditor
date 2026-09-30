@@ -1597,6 +1597,7 @@ juce::var setlistToVar (const Setlist& setlist)
         i->setProperty ("notes",   item.notes);
         i->setProperty ("tempo",   item.tempo);
         i->setProperty ("plannedSeconds", item.plannedSeconds);
+        i->setProperty ("sections", arrangementToVar (item.sections));
         itemVars.add (juce::var (i));
     }
 
@@ -1630,6 +1631,8 @@ bool setlistFromVar (const juce::var& stored, Setlist& out)
             item.notes   = i.getProperty ("notes", {}).toString();
             item.tempo   = juce::jlimit (0.0, 300.0, (double) i.getProperty ("tempo", 0.0));
             item.plannedSeconds = juce::jlimit (0, 3600, (int) i.getProperty ("plannedSeconds", 0));
+            if (! arrangementFromVar (i.getProperty ("sections", {}), item.sections))
+                return false;
             out.items.add (std::move (item));
         }
 

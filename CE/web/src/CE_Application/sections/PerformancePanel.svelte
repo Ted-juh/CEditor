@@ -2205,7 +2205,7 @@
                 {songCount(scene.sceneId) === 1 ? 'in setlist' : `in setlist ×${songCount(scene.sceneId)}`}</span>
             {/if}
             <button type="button" class="ghost" title="Add a four-bar block to the song arranger"
-                    onclick={() => addArrangementItem(scene.sceneId)}>+ Arrange</button>
+                    onclick={() => addArrangementItem(scene.sceneId, undefined, performance.arrangement.songId)}>+ Arrange</button>
             <HostConfirmButton identity={JSON.stringify([scene.sceneId])} title="Remove scene" aria-label="Remove scene" type="button" class="ghost danger" onclick={() => removeScene(scene.sceneId)}>×</HostConfirmButton>
           </div>
         {/each}
@@ -2227,7 +2227,7 @@
         {/if}
         <PropertyToggle compact label="Loop song" value={performance.arrangement.loop}
                         disabled={performance.arrangement.playing}
-                        onchange={(value) => setArrangementOptions({ loop: value })} />
+                        onchange={(value) => setArrangementOptions({ loop: value }, performance.arrangement.songId)} />
         <span class="arranger-explainer">Scenes change on bar boundaries; clips remain editable in their own patterns.</span>
       </div>
 
@@ -2249,19 +2249,19 @@
             <div class="arranger-order">
               <button type="button" class="ghost" disabled={performance.arrangement.playing || index === 0}
                       aria-label={`Move ${item.name} earlier`}
-                      onclick={() => moveArrangementItem(item.itemId, index - 1)}>↑</button>
+                      onclick={() => moveArrangementItem(item.itemId, index - 1, performance.arrangement.songId)}>↑</button>
               <button type="button" class="ghost"
                       disabled={performance.arrangement.playing || index === performance.arrangement.items.length - 1}
                       aria-label={`Move ${item.name} later`}
-                      onclick={() => moveArrangementItem(item.itemId, index + 1)}>↓</button>
+                      onclick={() => moveArrangementItem(item.itemId, index + 1, performance.arrangement.songId)}>↓</button>
             </div>
             <input type="text" class="arranger-name" value={item.name}
                    disabled={performance.arrangement.playing}
                    aria-label={`Arrangement block ${index + 1} name`}
-                   onchange={(e) => setArrangementItem(item.itemId, { name: e.currentTarget.value })} />
+                   onchange={(e) => setArrangementItem(item.itemId, { name: e.currentTarget.value }, performance.arrangement.songId)} />
             <select class="arranger-scene" value={item.sceneId} disabled={performance.arrangement.playing}
                     aria-label={`${item.name} scene`}
-                    onchange={(e) => setArrangementItem(item.itemId, { sceneId: e.currentTarget.value })}>
+                    onchange={(e) => setArrangementItem(item.itemId, { sceneId: e.currentTarget.value }, performance.arrangement.songId)}>
               {#if item.missing}<option value={item.sceneId}>Missing scene</option>{/if}
               {#each performance.scenes as scene (scene.sceneId)}
                 <option value={scene.sceneId}>{scene.name}</option>
@@ -2272,7 +2272,7 @@
                      disabled={performance.arrangement.playing}
                      aria-label={`${item.name} duration in bars`}
                      onchange={(e) => setArrangementItem(item.itemId,
-                                           { bars: Number(e.currentTarget.value) })} />
+                                           { bars: Number(e.currentTarget.value) }, performance.arrangement.songId)} />
             </label>
             <div class="arranger-status">
               {#if performance.arrangement.currentIndex === index}
@@ -2286,7 +2286,7 @@
             </div>
             <HostConfirmButton identity={JSON.stringify([item.itemId])} title="Remove arrangement item" type="button" class="ghost danger" disabled={performance.arrangement.playing}
                     aria-label={`Remove ${item.name} from arrangement`}
-                    onclick={() => removeArrangementItem(item.itemId)}>×</HostConfirmButton>
+                    onclick={() => removeArrangementItem(item.itemId, performance.arrangement.songId)}>×</HostConfirmButton>
           </div>
         {/each}
       </div>

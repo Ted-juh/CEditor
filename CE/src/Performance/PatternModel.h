@@ -359,25 +359,6 @@ void makeSceneVariation (const Scene& source, char label, float amount,
                          Scene& out,
                          const SceneParameterIsContinuous& isContinuous = {});
 
-struct SetlistItem
-{
-    juce::String itemId;
-    juce::String name;               // song / performance name shown on stage
-    juce::String sceneId;            // the scene this item recalls
-    juce::String rackRecordId;       // optional full-rack Library capture for another song
-    juce::String pageId;             // CTRL49 control page recalled with the song
-    juce::String notes;              // what the player needs to read on stage
-    double tempo = 0.0;              // 0 = the scene's or the current tempo
-    int plannedSeconds = 0;          // how long the song should take on stage; 0 = not planned
-};
-
-struct Setlist
-{
-    juce::Array<SetlistItem> items;
-    int currentIndex = -1;          // -1 = nothing recalled yet
-    int preloadAhead = 1;            // 0=off, 1=next song, 2=next two songs
-};
-
 /** One block in the deliberately small song arranger. It sequences existing scenes for an
     integer number of bars; it does not duplicate clips or introduce a DAW-style timeline. */
 struct ArrangementItem
@@ -392,6 +373,28 @@ struct Arrangement
 {
     juce::Array<ArrangementItem> items;
     bool loop = false;
+};
+
+struct SetlistItem
+{
+    juce::String itemId;
+    juce::String name;               // song / performance name shown on stage
+    juce::String sceneId;            // the scene this item recalls
+    juce::String rackRecordId;       // optional full-rack Library capture for another song
+    juce::String pageId;             // CTRL49 control page recalled with the song
+    juce::String notes;              // what the player needs to read on stage
+    double tempo = 0.0;              // 0 = the scene's or the current tempo
+    int plannedSeconds = 0;          // how long the song should take on stage; 0 = not planned
+    // The song's own structure: its sections, each a scene held for a number of bars. Played
+    // on bar boundaries while this song is the current one; empty = the song stays on sceneId.
+    Arrangement sections;
+};
+
+struct Setlist
+{
+    juce::Array<SetlistItem> items;
+    int currentIndex = -1;          // -1 = nothing recalled yet
+    int preloadAhead = 1;            // 0=off, 1=next song, 2=next two songs
 };
 
 /** Per-part arpeggiator settings (§18.8.5). The arp is a mode over the shared engine, not a

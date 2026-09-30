@@ -1835,6 +1835,20 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
     if (! perf::arrangementFromVar (stored.getProperty ("arrangement", {}), parsed.arrangement))
         return false;
 
+    // Songs own their sections now. A show-wide arrangement from before that belongs to the
+    // first song, if no song has sections of its own yet; with no songs it stays show-wide.
+    if (! parsed.arrangement.items.isEmpty() && ! parsed.setlist.items.isEmpty())
+    {
+        bool anySections = false;
+        for (const auto& song : parsed.setlist.items)
+            anySections = anySections || ! song.sections.items.isEmpty();
+        if (! anySections)
+        {
+            parsed.setlist.items.getReference (0).sections = parsed.arrangement;
+            parsed.arrangement = {};
+        }
+    }
+
     if (const auto* takeArray = stored.getProperty ("performanceTakes", {}).getArray())
     {
         juce::StringArray seenTakeIds;
