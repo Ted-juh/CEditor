@@ -117,3 +117,39 @@ test('the PNG encoder is deterministic and decodes back to its pixels', () => {
   assert.deepEqual(back.at(2, 1), [...rgba.subarray(20, 24)]);
   assert.throws(() => encodePng(2, 2, new Uint8Array(3)), /needs 16 bytes/);
 });
+
+// --- Update Panel from Photoshop Artwork ----------------------------------------------------------
+
+test('a revised Photoshop file moves the controls whose layers moved and adds the new ones; bindings survive', async () => {
+  const { get } = await import('svelte/store');
+  const { panels, activePanelId } = await import('../src/CE_Application/stores/panels.js');
+  const { importPsdPanelBytes, updatePanelFromPsdBytes } = await import('../src/CE_Application/stores/psdPanelImportActions.js');
+  const layers = (knobX, extra = []) => [
+    solid('Background', 0, 0, 200, 100, [20, 30, 40, 255]),
+    { name: 'components', hidden: true, children: [
+      solid('knob-cutoff', knobX, 10, 40, 40, [128, 128, 128, 255]),
+      solid('button-play', 120, 60, 30, 20, [128, 128, 128, 255]),
+      ...extra,
+    ] },
+  ];
+  panels.set([]);
+  const panel = await importPsdPanelBytes(psdFile(layers(10)), 'Voice.psd');
+  assert.equal(panel.artworkImport.links.length, 2, 'the import records which layer made which control');
+  activePanelId.set(panel.id);
+  const cutoff = () => get(panels)[0].controls.find((c) => c._children.Core.name === 'cutoff');
+  panels.update((list) => list.map((p) => ({ ...p, controls: p.controls.map((c) => (c._children.Core.name === 'cutoff'
+    ? { ...c, _children: { ...c._children, DeviceBindings: { _type: 'DeviceBindings', bindings: [{ kind: 'deviceParameter', parameterId: 'vcf.cutoff' }] } } }
+    : c)) })));
+
+  let asked = '';
+  const update = await updatePanelFromPsdBytes(psdFile(layers(60, [solid('slider-drive', 170, 5, 10, 90, [128, 128, 128, 255])])), 'Voice v2.psd', {
+    confirm: (text) => { asked = text; return true; },
+  });
+  assert.match(asked, /Update "Voice" from Voice v2\.psd\?/);
+  assert.deepEqual(update.moves.map((m) => m.name), ['cutoff']);
+  assert.deepEqual(update.added.map((c) => c._children.Core.name), ['drive']);
+  assert.equal(cutoff()._children.Transform.x, 60);
+  assert.equal(cutoff()._children.DeviceBindings.bindings[0].parameterId, 'vcf.cutoff', 'its binding survives');
+  assert.equal(get(panels)[0].controls.length, 3);
+  panels.set([]);
+});

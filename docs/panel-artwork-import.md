@@ -84,8 +84,11 @@ CSS classes, as Illustrator writes them, count.
 
 The flattening is simpler than Photoshop's. Blend modes other than Normal, clipping masks, layer
 masks and layer styles (effects) are not drawn. Each affected layer is named in the Console, and
-the fix is to merge or rasterize it in Photoshop before importing. There is no **Update Panel** for
-Photoshop files yet.
+the fix is to merge or rasterize it in Photoshop before importing.
+
+**File › Update Panel from Photoshop Artwork...** brings a revised file into the panel you already
+worked on, by the same rules as the SVG update below. Controls are matched to their layers by
+**layer name**, so keep the names stable between revisions.
 
 ## Update Panel from SVG Artwork
 

@@ -123,8 +123,7 @@ export function importSvgPanelText(text, fileName = '') {
  * puts the controls back, but not the old artwork. Returns what was applied, or null.
  */
 export function updatePanelFromSvgText(text, fileName = '', { confirm = confirmDestructive } = {}) {
-  const panel = get(activePanel);
-  if (!panel) {
+  if (!get(activePanel)) {
     notify('Open the panel to update first.', { kind: 'warn' });
     return null;
   }
@@ -135,12 +134,28 @@ export function updatePanelFromSvgText(text, fileName = '', { confirm = confirmD
     notify(line, { kind: 'error', duration: 0 });
     return null;
   }
+  const update = updatePanelFromArtworkPlan(plan, `${baseName(fileName)}.svg`, { confirm, tag: 'svg update' });
+  if (update) embedArtworkFonts(get(activePanel)?.id, plan.background.svg);
+  return update;
+}
 
-  const update = planSvgPanelReimport(panel, plan, { fileName: baseName(fileName) });
+/**
+ * The update itself, for any artwork format whose importer produces a plan of this shape (the SVG
+ * and Photoshop importers both do): match, ask, apply, report. `fileLabel` is the file as the
+ * question and the report name it. Returns what was applied, or null.
+ */
+export function updatePanelFromArtworkPlan(plan, fileLabel, { confirm = confirmDestructive, tag = 'artwork update' } = {}) {
+  const panel = get(activePanel);
+  if (!panel) {
+    notify('Open the panel to update first.', { kind: 'warn' });
+    return null;
+  }
+  const update = planSvgPanelReimport(panel, plan, { fileName: fileLabel.replace(/\.[a-z]+$/i, '') });
   const lines = describeSvgReimport(update);
   const skipped = plan.skipped.map((skip) => `Skipped ${skip.source}: ${skip.reason}`);
+  const warnings = plan.warnings ?? [];
   const question = [
-    `Update "${panel.name}" from ${baseName(fileName)}.svg?`,
+    `Update "${panel.name}" from ${fileLabel}?`,
     '',
     ...lines,
     ...(skipped.length ? ['', ...skipped] : []),
@@ -154,8 +169,7 @@ export function updatePanelFromSvgText(text, fileName = '', { confirm = confirmD
     ...current,
     width: plan.width,
     height: plan.height,
-    bgImageEnabled: true,
-    bgImage: plan.background.dataUrl,
+    ...(plan.background?.dataUrl ? { bgImageEnabled: true, bgImage: plan.background.dataUrl } : {}),
     artworkImport: update.record,
     controls: [
       ...(current.controls ?? []).map((control) => {
@@ -168,10 +182,9 @@ export function updatePanelFromSvgText(text, fileName = '', { confirm = confirmD
     modified: true,
   })));
 
-  embedArtworkFonts(panel.id, plan.background.svg);
-  cinfo(`[svg update] ✓ "${panel.name}" from ${baseName(fileName)}.svg: ${update.moves.length} moved, `
+  cinfo(`[${tag}] ✓ "${panel.name}" from ${fileLabel}: ${update.moves.length} moved, `
     + `${update.added.length} added, ${update.unchanged} unchanged.`);
-  for (const line of [...lines.slice(1), ...skipped]) cwarn(`[svg update] ${line}`);
+  for (const line of [...lines.slice(1), ...skipped, ...warnings]) cwarn(`[${tag}] ${line}`);
   notify(
     reimportIsEmpty(update)
       ? 'The artwork was replaced; every control was already in place.'

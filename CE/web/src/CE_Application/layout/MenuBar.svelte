@@ -41,7 +41,7 @@
   import { requestPropertiesTab } from '../stores/propertiesTab.js';
   import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
   import { newPanelFromSvgArtwork, updatePanelFromSvgArtwork } from '../stores/svgPanelImportActions.js';
-  import { newPanelFromPsdArtwork } from '../stores/psdPanelImportActions.js';
+  import { newPanelFromPsdArtwork, updatePanelFromPsdArtwork } from '../stores/psdPanelImportActions.js';
   import WorkspacePicker from './WorkspacePicker.svelte';
   import { floating } from '../utils/floatingUi.js';
 
@@ -165,6 +165,7 @@
       { label: 'Update Panel from SVG Artwork...', enabled: hasPanel, action: () => updatePanelFromSvgArtwork() },
       // The same convention from a Photoshop file: a "components" layer group (utils/psdPanelImport.js).
       { label: 'New Panel from Photoshop Artwork...', action: () => newPanelFromPsdArtwork() },
+      { label: 'Update Panel from Photoshop Artwork...', enabled: hasPanel, action: () => updatePanelFromPsdArtwork() },
       { type: 'submenu', label: 'Open Recent', enabled: () => recentGroups.length > 0, items: recentSubmenuItems },
       { type: 'separator' },
       { label: 'New Custom Component', action: () => newCustomComponent() },
