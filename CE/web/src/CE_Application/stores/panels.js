@@ -44,8 +44,7 @@ import {
 import {
   clearUnsavedSessionSnapshot,
   persistUnsavedSessionSnapshot as persistSessionSnapshot,
-  readUnsavedActiveEditorTab,
-  readUnsavedSessionSnapshot,
+  readUnsavedSession,
 } from './panelSessionPersistence.js';
 import {
   activeComponentDocumentId,
@@ -237,28 +236,42 @@ function restorePanelDeviceSession(panel, label) {
 }
 
 let recoveryWarningShown = false;
-function persistUnsavedSessionSnapshot() {
-  const stored = persistSessionSnapshot({
+function persistUnsavedSessionSnapshot({ unloading = false } = {}) {
+  // The snapshot is taken NOW (the panel list as it is at this call); only the storing is
+  // asynchronous. See stores/panelSessionPersistence.js for where it goes and why.
+  return persistSessionSnapshot({
     panelList: get(panels),
     activeEditorTab: get(activeEditorTab),
     autosaveEnabled: get(autosaveEnabled),
     restoreUnsavedWork: get(restoreUnsavedWork),
+    unloading,
+  }).then((stored) => {
+    if (!stored && !recoveryWarningShown) {
+      recoveryWarningShown = true;
+      notify('Automatic recovery could not save your latest changes. Save your open panels to files before closing CEditor.', { kind: 'error', duration: 0 });
+    } else if (stored) {
+      recoveryWarningShown = false;
+    }
+    return stored;
+  }).catch((error) => {
+    console.error('[panels] recovery snapshot could not be stored', error);
+    return false;
   });
-  if (!stored && !recoveryWarningShown) {
-    recoveryWarningShown = true;
-    notify('Automatic recovery could not save your latest changes. Save your open panels to files before closing CEditor.', { kind: 'error', duration: 0 });
-  } else if (stored) {
-    recoveryWarningShown = false;
-  }
 }
 
-export function flushUnsavedSessionSnapshot() {
+/**
+ * Take the recovery snapshot now, rather than at the next autosave tick. The snapshot is built
+ * before this returns; storing it finishes asynchronously, in order with every other write.
+ * `unloading` (the window closing) also writes a synchronous copy where it fits, because a closing
+ * WebView does not promise to finish an IndexedDB write.
+ */
+export function flushUnsavedSessionSnapshot({ unloading = false } = {}) {
   if (autosaveTimer != null) {
     clearTimeout(autosaveTimer);
     autosaveTimer = null;
   }
 
-  persistUnsavedSessionSnapshot();
+  return persistUnsavedSessionSnapshot({ unloading });
 }
 
 // Autosave is suspended for the length of a preview run. A preview mutates the document — scripts
@@ -301,19 +314,19 @@ function scheduleUnsavedSessionAutosave() {
     // a drag with no visible cause. requestIdleCallback waits for a gap instead, and its `timeout`
     // guarantees the snapshot still happens on a busy editor rather than being starved.
     //
-    // flushUnsavedSessionSnapshot stays synchronous: it runs before destructive actions and on the
-    // way out, where the point is that the write has finished.
-    runWhenIdle(persistUnsavedSessionSnapshot, 2000);
+    // flushUnsavedSessionSnapshot takes its snapshot synchronously: it runs before destructive
+    // actions and on the way out, where the point is that the state captured is the current one.
+    runWhenIdle(() => { persistUnsavedSessionSnapshot(); }, 2000);
   }, Math.max(5, get(autosaveIntervalSeconds)) * 1000);
 }
 
-function restoreUnsavedSessionFromSnapshot() {
+async function restoreUnsavedSessionFromSnapshot() {
   if (!get(restoreUnsavedWork)) {
-    clearUnsavedSessionSnapshot();
+    await clearUnsavedSessionSnapshot();
     return;
   }
 
-  const snapshot = readUnsavedSessionSnapshot();
+  const { panels: snapshot, activeEditorTab: savedActiveTab } = await readUnsavedSession();
   if (!Array.isArray(snapshot) || snapshot.length === 0) return;
 
   const idMap = new Map();
@@ -343,7 +356,6 @@ function restoreUnsavedSessionFromSnapshot() {
     ),
   ]);
 
-  const savedActiveTab = readUnsavedActiveEditorTab();
   const restoredActiveId = idMap.get(savedActiveTab?.id) ?? restoredPanels[restoredPanels.length - 1]?.id ?? null;
 
   if (restoredActiveId != null) {
@@ -1451,13 +1463,20 @@ export function restoreSessionFromPreferences() {
   sessionRestoreInitialized = true;
 
   const unsavedRestoreTimer = createPerfDebugTimer('restore unsaved session snapshot');
-  restoreUnsavedSessionFromSnapshot();
-  unsavedRestoreTimer(`panels=${get(panels).length}`);
-
-  if (get(reopenLastSession)) {
-    logPerfDebug('restore saved panel paths requested');
-    bridgeLoadOpenPanels();
-  } else {
-    scheduleUnsavedSessionAutosave();
-  }
+  // The recovery snapshot is read (asynchronously, from IndexedDB) BEFORE the last session's files
+  // are asked for, and that order is the whole point: a file that reopens finds its recovered,
+  // modified copy already open and reuses it (see the file-data handler's existingAfterLoad). The
+  // other way round, the clean copy from disk would open first and the unsaved edits would be
+  // dropped as a duplicate.
+  return restoreUnsavedSessionFromSnapshot()
+    .catch((error) => { console.error('[panels] recovery snapshot could not be restored', error); })
+    .then(() => {
+      unsavedRestoreTimer(`panels=${get(panels).length}`);
+      if (get(reopenLastSession)) {
+        logPerfDebug('restore saved panel paths requested');
+        bridgeLoadOpenPanels();
+      } else {
+        scheduleUnsavedSessionAutosave();
+      }
+    });
 }

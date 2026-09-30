@@ -336,7 +336,7 @@
   });
 
   function handleBeforeUnload() {
-    flushUnsavedSessionSnapshot();
+    flushUnsavedSessionSnapshot({ unloading: true });
   }
 
   function maybeLoadCustomComponentStressTest() {
