@@ -591,7 +591,9 @@ test('persisted rack and performance lists expose their native edit operations',
   const readRepo = (...parts) => readFileSync(path.join(repoRoot, ...parts), 'utf8');
   const host = readRepo('CE', 'web', 'src', 'CE_Application', 'sections', 'InstrumentHostView.svelte');
   const mixer = readRepo('CE', 'web', 'src', 'CE_Application', 'sections', 'HostMixerPanel.svelte');
-  const performance = readRepo('CE', 'web', 'src', 'CE_Application', 'sections', 'PerformancePanel.svelte');
+  // The songs are their own component inside Performance; their controls count as its.
+  const performance = readRepo('CE', 'web', 'src', 'CE_Application', 'sections', 'PerformancePanel.svelte')
+    + readRepo('CE', 'web', 'src', 'CE_Application', 'sections', 'performance', 'SongsPage.svelte');
 
   for (const operation of [
     'moveRackPart', 'renameControlPage', 'renameMacro', 'renameReturn',
@@ -615,7 +617,7 @@ test('every command-sending store export is reachable from Svelte or deliberatel
     'Ctrl49ScreenCard.svelte',
     // The Performance modulators each own their card, and the commands it sends.
     'performance/LfoCard.svelte', 'performance/EnvelopeCard.svelte', 'performance/MsegCard.svelte',
-    'performance/RandomCard.svelte',
+    'performance/RandomCard.svelte', 'performance/SongsPage.svelte',
     // The sound browser's parts, and the state they share.
     'sounds/SoundsRail.svelte', 'sounds/SoundsInspector.svelte', 'sounds/SoundsMap.svelte',
     'sounds/SoundsAuditionBar.svelte', 'sounds/SoundsBulkBar.svelte', 'sounds/SoundsShootout.svelte',

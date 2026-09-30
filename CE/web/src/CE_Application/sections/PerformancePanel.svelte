@@ -6,8 +6,8 @@
    * PerformancePanel.svelte — Hostage's performance system.
    *
    * Several views over ONE engine, which is the whole point of the stage: the pattern editor
-   * writes lanes and steps, the clip and scene grid launches them, the arranger chains them,
-   * and the setlist walks whole rigs. None keeps its own playback state — every control sends a command and the
+   * writes lanes and steps, the Launcher's scene and clip grid launches them, and Songs builds
+   * each song from sections of those scenes and walks the set. None keeps its own playback state — every control sends a command and the
    * next `instrumentHostState` push is what gets drawn, so a launch that the engine is still
    * holding for its quantization boundary renders as "pending" rather than as a lie.
    *
@@ -38,11 +38,7 @@
     setPartMicrotuning, sendMicrotuning,
     addScene, removeScene, renameScene, captureScene, setSceneOptions, setSceneClip, launchScene,
     createSceneVariations,
-    addSetlistItem, removeSetlistItem, moveSetlistItem, setSetlistItem, setSetlistOptions,
-    setlistGo, setlistNext, setlistPrev,
-    checkSetlistSoundcheck, startSoundcheck, finishSoundcheck,
-    addArrangementItem, removeArrangementItem, setArrangementItem, moveArrangementItem,
-    setArrangementOptions, startArrangement, stopArrangement,
+    addSetlistItem, finishSoundcheck,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import { PERFORMANCE_GROUPS, performanceGroupFor, restorePerformanceNavigation,
@@ -2204,91 +2200,10 @@
                     title="Songs in the setlist (Live setup › Setlist) that recall this scene">
                 {songCount(scene.sceneId) === 1 ? 'in setlist' : `in setlist ×${songCount(scene.sceneId)}`}</span>
             {/if}
-            <button type="button" class="ghost" title="Add a four-bar block to the song arranger"
-                    onclick={() => addArrangementItem(scene.sceneId, undefined, performance.arrangement.songId)}>+ Arrange</button>
             <HostConfirmButton identity={JSON.stringify([scene.sceneId])} title="Remove scene" aria-label="Remove scene" type="button" class="ghost danger" onclick={() => removeScene(scene.sceneId)}>×</HostConfirmButton>
           </div>
         {/each}
       </div>
-      </div>
-    </div>
-  {/if}
-
-  {#if tab === 'arranger'}
-    <div class="perf-body arranger-body" data-testid="perf-arranger">
-      <div class="perf-head arranger-head">
-        <strong>Song / Scene Arranger</strong>
-        {#if performance.arrangement.playing}
-          <button type="button" class="arranger-stop" onclick={() => stopArrangement()}
-                  data-testid="perf-arrangement-stop">■ Stop</button>
-        {:else}
-          <button type="button" disabled={performance.arrangement.items.length === 0}
-                  onclick={() => startArrangement(0)} data-testid="perf-arrangement-play">▶ Play</button>
-        {/if}
-        <PropertyToggle compact label="Loop song" value={performance.arrangement.loop}
-                        disabled={performance.arrangement.playing}
-                        onchange={(value) => setArrangementOptions({ loop: value }, performance.arrangement.songId)} />
-        <span class="arranger-explainer">Scenes change on bar boundaries; clips remain editable in their own patterns.</span>
-      </div>
-
-      {#if performance.arrangement.items.length === 0}
-        <div class="empty-hint">
-          No blocks yet. Use <strong>+ Arrange</strong> beside a scene in the Launcher; each block holds that scene for a number of bars.
-        </div>
-      {/if}
-
-      <div class="arranger-list">
-        {#each performance.arrangement.items as item, index (item.itemId)}
-          <div class="arranger-item" class:current={performance.arrangement.currentIndex === index}
-               class:queued={performance.arrangement.queuedIndex === index} class:missing={item.missing}
-               data-testid="perf-arrangement-item">
-            <button type="button" class="arranger-play-here"
-                    disabled={performance.arrangement.playing || item.missing}
-                    title={`Play the arrangement from ${item.name}`}
-                    onclick={() => startArrangement(index)}>▶ {index + 1}</button>
-            <div class="arranger-order">
-              <button type="button" class="ghost" disabled={performance.arrangement.playing || index === 0}
-                      aria-label={`Move ${item.name} earlier`}
-                      onclick={() => moveArrangementItem(item.itemId, index - 1, performance.arrangement.songId)}>↑</button>
-              <button type="button" class="ghost"
-                      disabled={performance.arrangement.playing || index === performance.arrangement.items.length - 1}
-                      aria-label={`Move ${item.name} later`}
-                      onclick={() => moveArrangementItem(item.itemId, index + 1, performance.arrangement.songId)}>↓</button>
-            </div>
-            <input type="text" class="arranger-name" value={item.name}
-                   disabled={performance.arrangement.playing}
-                   aria-label={`Arrangement block ${index + 1} name`}
-                   onchange={(e) => setArrangementItem(item.itemId, { name: e.currentTarget.value }, performance.arrangement.songId)} />
-            <select class="arranger-scene" value={item.sceneId} disabled={performance.arrangement.playing}
-                    aria-label={`${item.name} scene`}
-                    onchange={(e) => setArrangementItem(item.itemId, { sceneId: e.currentTarget.value }, performance.arrangement.songId)}>
-              {#if item.missing}<option value={item.sceneId}>Missing scene</option>{/if}
-              {#each performance.scenes as scene (scene.sceneId)}
-                <option value={scene.sceneId}>{scene.name}</option>
-              {/each}
-            </select>
-            <label class="arranger-bars">Bars
-              <input type="number" min="1" max="128" value={item.bars}
-                     disabled={performance.arrangement.playing}
-                     aria-label={`${item.name} duration in bars`}
-                     onchange={(e) => setArrangementItem(item.itemId,
-                                           { bars: Number(e.currentTarget.value) }, performance.arrangement.songId)} />
-            </label>
-            <div class="arranger-status">
-              {#if performance.arrangement.currentIndex === index}
-                <span>{performance.arrangement.ending ? 'Ending' : `Bar ${performance.arrangement.bar} / ${item.bars}`}</span>
-                <span class="arranger-progress"><span style={`width:${performance.arrangement.progress * 100}%`}></span></span>
-              {:else if performance.arrangement.queuedIndex === index}
-                <span>Queued for next bar</span>
-              {:else}
-                <span>{item.bars} {item.bars === 1 ? 'bar' : 'bars'}</span>
-              {/if}
-            </div>
-            <HostConfirmButton identity={JSON.stringify([item.itemId])} title="Remove arrangement item" type="button" class="ghost danger" disabled={performance.arrangement.playing}
-                    aria-label={`Remove ${item.name} from arrangement`}
-                    onclick={() => removeArrangementItem(item.itemId, performance.arrangement.songId)}>×</HostConfirmButton>
-          </div>
-        {/each}
       </div>
     </div>
   {/if}
@@ -2908,33 +2823,5 @@
   .preload-state.ready { color: #82bd8d; }
   .preload-state.degraded { color: #df9a76; }
 
-  .arranger-body { flex-direction: column; }
-  .arranger-head { flex-wrap: wrap; }
-  .arranger-explainer { color: #87939e; font-size: 11px; }
-  .arranger-stop { color: #e8b0a6; border-color: #765049; }
-  .arranger-list { display: flex; flex-direction: column; gap: 5px; }
-  .arranger-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 38px;
-    padding: 3px 5px;
-    border: 1px solid #2d3741;
-    background: #171d23;
-    font-size: 12px;
-  }
-  .arranger-item.current { border-color: #b56e32; background: #282119; }
-  .arranger-item.queued { border-color: #6d6742; }
-  .arranger-item.missing { border-color: #744c4c; }
-  .arranger-play-here { flex: 0 0 46px; }
-  .arranger-order { display: flex; flex-direction: column; gap: 1px; }
-  .arranger-order button { min-width: 24px; padding: 0 5px; line-height: 14px; }
-  .arranger-name { flex: 0 1 150px; min-width: 90px; }
-  .arranger-scene { flex: 0 1 155px; min-width: 100px; }
-  .arranger-bars { display: inline-flex; align-items: center; gap: 4px; color: #98a4ae; }
-  .arranger-bars input { width: 48px; }
-  .arranger-status { display: flex; align-items: center; gap: 8px; flex: 1; color: #98a4ae; min-width: 125px; }
-  .arranger-progress { display: block; width: 90px; height: 4px; background: #101419; overflow: hidden; }
-  .arranger-progress > span { display: block; height: 100%; background: #d3833d; }
 
 </style>

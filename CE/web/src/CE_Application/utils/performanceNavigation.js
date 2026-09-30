@@ -2,7 +2,7 @@
 // what the songs are made of. Tool ids are stable; only labels and grouping are the page's.
 export const PERFORMANCE_GROUPS = [
   { id: 'show', label: 'Show', tools: [
-    { id: 'setlist', label: 'Songs' }, { id: 'clips', label: 'Launcher' }, { id: 'arranger', label: 'Arrange' },
+    { id: 'setlist', label: 'Songs' }, { id: 'clips', label: 'Launcher' },
   ] },
   { id: 'patterns', label: 'Patterns', tools: [
     { id: 'patterns', label: 'Patterns' },

@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { PERFORMANCE_GROUPS, performanceGroupFor, normalisePerformanceNavigation,
   selectPerformanceTool, restorePerformanceNavigation, storePerformanceNavigation } from '../src/CE_Application/utils/performanceNavigation.js';
 
-test('all thirteen existing Performance tools occur once in a group', () => {
+test('all twelve Performance tools occur once in a group', () => {
   const ids = PERFORMANCE_GROUPS.flatMap(g => g.tools.map(t => t.id));
-  assert.equal(new Set(ids).size, 13);
+  assert.equal(new Set(ids).size, 12);
   assert.deepEqual([...ids].sort(), ['patterns','looper','gestures','recorder','modulation','lfos',
-    'envelopes','msegs','random','tuning','clips','arranger','setlist'].sort());
+    'envelopes','msegs','random','tuning','clips','setlist'].sort());
 });
 test('switching tools remembers each group independently, including direct navigation', () => {
   let state = selectPerformanceTool(null, 'lfos');

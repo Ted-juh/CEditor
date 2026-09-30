@@ -63,5 +63,5 @@ try {
   await page.setViewportSize({ width: 1280, height: 940 });
   if (process.env.PERFORMANCE_SCREENSHOT) await page.screenshot({ path: process.env.PERFORMANCE_SCREENSHOT });
   assert.deepEqual(errors, []);
-  console.log('Performance navigation browser checks passed: 13 tools, group memory, remount/reload, LFO add/edit/routing, capture jump, responsive navigation.');
+  console.log('Performance navigation browser checks passed: 12 tools, group memory, remount/reload, LFO add/edit/routing, capture jump, responsive navigation.');
 } finally { await browser.close(); await server.close(); }
