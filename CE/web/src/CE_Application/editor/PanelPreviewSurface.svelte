@@ -7857,6 +7857,11 @@
         valueOverrideEnabled: true, valueOverride: value, dragging: false, pressed: false });
     } else if (isRangeControl(control) && !isTwoValueSpinner(control)) {
       const behavior = getBehavior(control);
+      // A control that springs back on release has nowhere to be reset TO: release already takes
+      // it to rest. So a quick second press is what it looks like — the hand grabbing it again,
+      // mid-glide — and falls through to an ordinary grab, which stops the spring (startValueReturn).
+      // Resetting here instead left the spring running, which overwrote the reset and slid on.
+      if (restValueFor(behavior) !== null) return false;
       const role = isSliderControl(control) ? currentSliderActiveHandle(control) : 'current';
       const defaultValue = role === 'start' ? behavior.defaultStartValue
         : role === 'end' ? behavior.defaultEndValue : behavior.defaultCurrentValue ?? behavior.defaultValue;
@@ -7887,6 +7892,8 @@
         event.preventDefault(); event.stopPropagation();
         event.currentTarget?.focus?.({ preventScroll: true });
         lastPointerDownId = ''; lastPointerDownAt = 0;
+        // A reset is the hand's decision; no spring still gliding from an earlier release may undo it.
+        cancelReturn(downId);
         // Do not start another drag: its release would overwrite the reset.
         return;
       }

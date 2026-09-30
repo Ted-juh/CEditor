@@ -428,7 +428,7 @@ try {
   await check('Listbox type-ahead respects Enter confirmation and sends one confirmed choice',async()=>{
     const rows=['Alpha','Beta','Gamma'].map((displayText,i)=>({id:String(i),internalValue:displayText,displayText,enabled:true,selectedByDefault:i===0}));
     const id=await fixture('Listbox',{Value:{rows},Listbox:{confirmMode:'enter',typeAhead:'prefix'},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'selectedChoice',deviceRole:'mainSynth',parameterId:'patchName',dryRun:true}]}});
-    const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await node(id).focus();await page.keyboard.type('b');await settle();
+    const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();/* Focus lives on the option-owning listbox itself (ListboxRenderer), not the control's wrapper. */await node(id).locator('[role="listbox"]').focus();await page.keyboard.type('b');await settle();
       const sent=()=>page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter'));
       assert.equal((await sent()).length,0,'typing to find a row must not bypass Enter confirmation');
       assert.equal(await node(id).locator('.listbox-row.pending .lb-label').textContent(),'Beta');
