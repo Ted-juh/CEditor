@@ -57,7 +57,9 @@ and controller assignment. Seeing an outgoing message proves that CEditor produc
 that the instrument actually responds too.
 
 Turn Preview off to continue arranging and styling the panel. The Text, Effects and Screen
-tools act on the selection; the editor canvas shows the result.
+tools act on the selection; the editor canvas shows the result. To use two tools at once — Text
+beside Effects, say — Alt+click or right-click a tab in the bottom dock, or use the split button
+at the end of its tab strip. Colors, Gradient, Notepad, Viewer and Preview stay in the main pane.
 
 ## Save, share and export
 

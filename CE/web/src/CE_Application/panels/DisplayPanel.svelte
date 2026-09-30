@@ -29,6 +29,9 @@
   import PlugZap from 'lucide-svelte/icons/plug-zap';
   import Camera from 'lucide-svelte/icons/camera';
   import LayersIcon from 'lucide-svelte/icons/layers';
+  import Columns2 from 'lucide-svelte/icons/columns-2';
+  import DisplayBesidePane from './DisplayBesidePane.svelte';
+  import { dragScrub } from '../scrub/dragScrubAction';
   import ColorChooser from '../components/ColorChooser.svelte';
   import ColorSettings from '../components/ColorSettings.svelte';
   import GradientMiniPreview from '../components/GradientMiniPreview.svelte';
@@ -110,6 +113,68 @@
   }
 
   let activeTab = $state(sanitizeStoredDisplayTab(readStoredJson(DISPLAY_TAB_STORAGE_KEY, DEFAULT_DISPLAY_TAB)));
+
+  // --- A second tool beside the first (DisplayBesidePane) --------------------------------------
+  // Two tools in use together without switching tabs: the Text dock beside Effects, the MIDI monitor
+  // beside Ports. Only tools that stand on their own may go beside: Colors, Gradient, Notepad and
+  // Viewer share this dock's one colour pick, and Preview mounts a live surface. A tool is never in
+  // both panes; choosing the one beside in the rail swaps the two.
+  const BESIDE_TAB_IDS = new Set(['effects', 'type', 'assets', 'screen', 'api', 'library', 'animation', 'designer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'console']);
+  const BESIDE_TAB_STORAGE_KEY = 'ce.displayPanel.besideTab';
+  const BESIDE_WIDTH_STORAGE_KEY = 'ce.displayPanel.besideWidth';
+  const BESIDE_MIN_WIDTH = 240;
+  const sanitizeBesideTab = (value, primary) => (BESIDE_TAB_IDS.has(String(value)) && value !== primary ? String(value) : '');
+  let besideTab = $state(sanitizeBesideTab(readStoredJson(BESIDE_TAB_STORAGE_KEY, ''), untrack(() => activeTab)));
+  let besideWidth = $state(readStoredNumber(BESIDE_WIDTH_STORAGE_KEY, 420));
+  let lastBesideTab = untrack(() => besideTab) || 'type';
+  let contentWidth = $state(0);
+  $effect(() => { writeStoredJson(BESIDE_TAB_STORAGE_KEY, besideTab); });
+  $effect(() => { writeStoredJson(BESIDE_WIDTH_STORAGE_KEY, besideWidth); });
+  let besideMax = $derived(Math.max(BESIDE_MIN_WIDTH, contentWidth - BESIDE_MIN_WIDTH));
+  let besideShownWidth = $derived(Math.max(BESIDE_MIN_WIDTH, Math.min(besideMax, besideWidth)));
+  let besideResizeScrub = $derived({
+    axis: 'x', tracking: 'relative', sensitivity: 1, deadZone: 0, invertX: true,
+    min: BESIDE_MIN_WIDTH, max: besideMax, value: besideShownWidth, manageCursor: false, keyStep: 16,
+    onChange: (value) => { besideWidth = Math.round(value); },
+  });
+
+  function openBeside(tabId) {
+    if (!BESIDE_TAB_IDS.has(tabId)) return;
+    if (tabId === activeTab) {
+      // The tool moves beside; the main pane goes back to the one that was beside before, or Colors.
+      const back = besideTab && besideTab !== tabId ? besideTab : 'colors';
+      besideTab = tabId;
+      handleTabClick(back);
+    } else {
+      besideTab = tabId;
+    }
+    lastBesideTab = tabId;
+  }
+
+  function closeBeside() {
+    if (besideTab) lastBesideTab = besideTab;
+    besideTab = '';
+  }
+
+  function toggleBeside() {
+    if (besideTab) { closeBeside(); return; }
+    const pick = [lastBesideTab, 'type', 'effects', 'midi'].find((id) => BESIDE_TAB_IDS.has(id) && id !== activeTab);
+    openBeside(pick);
+  }
+
+  function handleRailClick(event, tabId) {
+    // Alt+click opens a tool beside, as Alt+click opens a file to the side in a code editor.
+    if (event.altKey && BESIDE_TAB_IDS.has(tabId)) { openBeside(tabId); return; }
+    handleTabClick(tabId);
+  }
+
+  function handleRailContextMenu(event, tabId) {
+    if (!BESIDE_TAB_IDS.has(tabId)) return;
+    event.preventDefault();
+    openBeside(tabId);
+  }
+
+  let besideChoices = $derived(tabs.filter((tab) => BESIDE_TAB_IDS.has(tab.id) && tab.id !== activeTab));
   let activeTabComponent = $state(null);
   let activeTabComponentId = $state(null);
   let activeTabError = $state('');
@@ -207,7 +272,9 @@
       // Consume visibility and tab together: clearing the request here can run
       // before App's effect has observed it and leave the requested tab hidden.
       showDisplayPanel.set(true);
-      handleTabClick(impliedDockTab({ tabRequest: req, lastTab: activeTab }));
+      const wanted = impliedDockTab({ tabRequest: req, lastTab: activeTab });
+      // A tool already open beside is already showing: it stays where the user put it.
+      if (wanted !== besideTab) handleTabClick(wanted);
       displayTabRequest.set(null);
     }
   });
@@ -839,6 +906,8 @@
       clearGradientTarget();
       resetGradientFromPanel();
     }
+    // The tool beside, chosen for the main pane: the two swap, when the one leaving may go beside.
+    if (tabId === besideTab) besideTab = BESIDE_TAB_IDS.has(activeTab) && activeTab !== tabId ? activeTab : '';
     activeTab = tabId;
     if (onTabChange) onTabChange(tabId);
   }
@@ -906,20 +975,34 @@
       <button
         class="studio-tab"
         class:active={activeTab === tab.id}
+        class:beside={besideTab === tab.id}
         role="tab"
         aria-selected={activeTab === tab.id}
         tabindex={activeTab === tab.id ? 0 : -1}
         aria-label={tab.label}
-        title={tab.label}
-        onclick={() => handleTabClick(tab.id)}
+        title={BESIDE_TAB_IDS.has(tab.id) ? `${tab.label}${besideTab === tab.id ? ' (open beside)' : ''} — Alt+click or right-click to open beside` : tab.label}
+        onclick={(event) => handleRailClick(event, tab.id)}
+        oncontextmenu={(event) => handleRailContextMenu(event, tab.id)}
         onkeydown={(event) => handleStudioTabKeydown(event, tab.id)}
       >
         <tab.icon size={15} strokeWidth={1.6} />
         <span>{tab.label}</span>
       </button>
     {/each}
+    <button
+      type="button"
+      class="studio-tab split-toggle"
+      class:active={!!besideTab}
+      aria-pressed={!!besideTab}
+      aria-label="Split: a second tool beside this one"
+      title={besideTab ? 'Close the pane beside' : 'Split: a second tool beside this one (or Alt+click a tab)'}
+      onclick={toggleBeside}
+    >
+      <Columns2 size={15} strokeWidth={1.6} />
+    </button>
   </div>
 
+  <div class="studio-body" bind:clientWidth={contentWidth}>
   <div class="studio-content">
     {#if activeTab === 'colors'}
       <div class="tab-pane">
@@ -1133,6 +1216,24 @@
       </div>
     {/if}
   </div>
+  {#if besideTab}
+    <!-- A focusable separator with a value is a widget (ARIA window splitter); the linter reads it as static. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="beside-resize" role="separator" aria-orientation="vertical" aria-label="Resize the pane beside" tabindex="0"
+      aria-valuenow={besideShownWidth} aria-valuemin={BESIDE_MIN_WIDTH} aria-valuemax={besideMax}
+      use:dragScrub={besideResizeScrub}></div>
+    <div class="beside-area" style="flex: 0 0 {besideShownWidth}px;">
+      <DisplayBesidePane
+        tabId={besideTab}
+        choices={besideChoices}
+        load={ensureLazyTabComponent}
+        onchange={openBeside}
+        onclose={closeBeside}
+        onopentab={handleTabClick}
+      />
+    </div>
+  {/if}
+  </div>
 </div>
 
 <style>
@@ -1200,12 +1301,48 @@
     border-color: #5B9BD5;
   }
 
+  .studio-body {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+  }
+
   .studio-content {
     flex: 1;
     min-width: 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
+  }
+
+  .beside-resize {
+    flex: 0 0 5px;
+    cursor: col-resize;
+    background: #2A2A2A;
+  }
+
+  .beside-resize:hover,
+  .beside-resize:focus-visible {
+    background: #5B9BD5;
+  }
+
+  .beside-area {
+    min-width: 0;
+    min-height: 0;
+    border-left: 1px solid #333;
+  }
+
+  .studio-tab.beside {
+    color: #CFE3F5;
+    border-color: #3D6A91;
+    border-style: dashed;
+  }
+
+  .studio-tab.split-toggle {
+    margin-left: auto;
+    flex-shrink: 0;
   }
 
   .tab-pane {
