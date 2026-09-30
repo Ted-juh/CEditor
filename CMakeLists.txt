@@ -1270,6 +1270,17 @@ target_link_libraries(CEditorLibraryPersistenceTests PRIVATE juce::juce_core)
 add_test(NAME LibraryPersistence COMMAND CEditorLibraryPersistenceTests)
 ce_configure_test(CEditorLibraryPersistenceTests)
 
+# What the library's one-file JSON index costs at the size it is designed for (12,000 presets):
+# load, save, a favourite click, an audition, searches. A measurement, not a test — no add_test,
+# and EXCLUDE_FROM_ALL so neither CI nor a plain build pays for it. See the header of the source.
+add_executable(CEditorLibraryBench EXCLUDE_FROM_ALL
+    "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+    "${CE_ROOT}/tests/LibraryBench.cpp"
+)
+target_include_directories(CEditorLibraryBench PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorLibraryBench PRIVATE juce::juce_core)
+ce_configure_test(CEditorLibraryBench)
+
 # The licence document, its signature and the edition table (§19 "Trust", §20, §26.2, §27).
 # juce_cryptography is the only module beyond juce_core: RSAKey and SHA256, the two primitives
 # an offline signature check needs. No network, and nothing to link that could introduce one.
