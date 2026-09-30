@@ -397,8 +397,16 @@ export function serializePanel(panel, options = {}) {
   // The format version goes first, where a person opening the file sees it. A document from a
   // newer CEditor keeps its number: writing ours would tell that newer version to run its
   // migrations again over a document that already had them (utils/panelFormat.js).
-  const { formatVersion, ...rest } = data;
-  return JSON.stringify({ formatVersion: Math.max(PANEL_FORMAT_VERSION, panelFormatVersion({ formatVersion })), ...rest }, null, 2);
+  // A complete document says so. The exporters read a document either way (the app hands them this
+  // one; a person may pass a saved .cepanel), and a saved one has to be completed first —
+  // tools/scripts/lib/exportDocument.mjs. The mark is how they tell, where no structural test can:
+  // a default item the author deleted is simply absent from both forms.
+  const { formatVersion, documentForm, ...rest } = data;
+  return JSON.stringify({
+    formatVersion: Math.max(PANEL_FORMAT_VERSION, panelFormatVersion({ formatVersion })),
+    ...(elide ? {} : { documentForm: 'complete' }),
+    ...rest,
+  }, null, 2);
 }
 
 // What the last deserializePanel call had to say, for the caller to show: why a document was

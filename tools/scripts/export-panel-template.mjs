@@ -121,7 +121,14 @@ export function findTemplate(templatesDir, format) {
 }
 
 export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir, formats, log = console.log }) {
-  const panelDoc = JSON.parse(readFileSync(panelFile, 'utf8'));
+  let panelDoc = JSON.parse(readFileSync(panelFile, 'utf8'));
+  // A saved .cepanel passed by hand from a source checkout is completed as the app would complete it
+  // (lib/exportDocument.mjs). An installation has no editor source to do that with, and needs none:
+  // the app always hands this script the complete document it prepared.
+  if (existsSync(path.join(REPO, 'CE/web/src/CE_Application/stores/documentShape.js'))) {
+    const { completeExportDocument } = await import(pathToFileURL(path.join(HERE, 'lib/exportDocument.mjs')).href);
+    panelDoc = await completeExportDocument(panelDoc, path.resolve(panelFile));
+  }
   const explicitFormats = formats !== undefined;
   formats ??= TEMPLATE_FORMATS.filter((format) =>
     format.id === 'vst3' || (format.id === 'clap'

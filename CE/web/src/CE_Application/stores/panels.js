@@ -213,7 +213,7 @@ function serializePanelDocument(panel) {
  * the .cepanel in C++ and reads Core, Behavior and Scripts directly off controls[]. A field that
  * was elided is simply absent to it. So the build payload is written in full.
  */
-function serializePanelForExport(panel) {
+export function serializePanelForExport(panel) {
   return serializePanel(panelWithBoundScripts(panel), {
     deviceSession: getProjectDeviceSessionSnapshot(),
     // An in-progress capture is saved in the .cepanel and has no business in a plugin binary: the

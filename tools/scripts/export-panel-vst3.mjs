@@ -41,7 +41,11 @@ const outDir = path.join(repo, 'export-out');
 
 // Read the panel + its Export settings (Panel Properties → Export). These drive the plugin identity;
 // the CLI productName arg and built-in defaults are fallbacks (keeps the CLI and in-app paths aligned).
-const panelDoc = JSON.parse(readFileSync(panel, 'utf8'));
+// A saved .cepanel stores controls as differences from their defaults, which the plug-in cannot read
+// and from which the host parameter list comes out wrong (lib/exportDocument.mjs). The app hands this
+// script a complete document; a saved file passed by hand is completed here the same way.
+const panelDoc = await (await import('./lib/exportDocument.mjs'))
+  .completeExportDocument(JSON.parse(readFileSync(panel, 'utf8')), path.resolve(panel));
 const es = panelDoc.exportSettings ?? {};
 validateRuntimeFormats(panelDoc);
 // The fallback chain lives in panelIdentityInputs.js rather than here, because the template

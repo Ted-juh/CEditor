@@ -294,10 +294,18 @@ at a panel and run the hosts' conformance suites over the result
 ([docs/plugin-validation.md](docs/plugin-validation.md) says where to get them):
 
 ```bash
-cmake build/app -DCE_VST_PANEL_PATH="$PWD/CE/panels/Roland GAIA SH-01.cepanel" "-DCE_VST_PRODUCT_NAME=GAIA Validate"
+node tools/scripts/prepare-export-panel.mjs "CE/panels/Roland GAIA SH-01.cepanel" /tmp/gaia-export.cepanel
+cmake build/app -DCE_VST_PANEL_PATH=/tmp/gaia-export.cepanel "-DCE_VST_PRODUCT_NAME=GAIA Validate"
 cmake --build build/app --target CEditorPlayerVST_VST3 CEditorPlayerVST_CLAP CEditorPlayerVST_LV2
 node tools/scripts/validate-plugins.mjs build/app/CEditorPlayerVST_artefacts/Release/{VST3,CLAP,LV2}/GAIA\ Validate.*
 ```
+
+**Never point `CE_VST_PANEL_PATH` at a saved `.cepanel`.** A saved file stores each control as a
+difference from its type's defaults. The plug-in cannot rebuild the defaults, so every
+default-valued property is missing from it. The first validation runs did exactly that, and the
+player log filled with 14,000 refused script writes that were an artefact of the setup, not of the
+panel. `prepare-export-panel.mjs` writes the complete form the app would export. The exporters do
+this themselves.
 
 Do this when you touch `CE/src/Player/`, the CLAP wrapper or the plug-in's CMake. Its first run
 found five defects that no other test here could see. Linux is also where the host-thread
