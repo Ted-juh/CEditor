@@ -31,6 +31,14 @@ jobs:
   windows:
     runs-on: windows-latest
     timeout-minutes: 90
+    # sccache keeps compiled objects in the GitHub Actions cache between runs, so a run recompiles
+    # only the translation units whose inputs changed — JUCE's modules, Lua and QuickJS are the bulk
+    # of a cold build and almost never change. It works with MSVC because Release objects carry
+    # their debug info inline (/Z7, see ce_enable_private_release_symbols in CMakeLists.txt); /Zi
+    # would write a shared PDB that sccache cannot cache. `sccache --show-stats` at the end says how
+    # many hits a run got.
+    env:
+      SCCACHE_GHA_ENABLED: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -58,11 +66,18 @@ jobs:
         with:
           arch: x64
 
+      - name: Compiler cache (sccache)
+        uses: mozilla-actions/sccache-action@v0.0.9
+
       - name: Configure (scripting ON, dev-mode OFF)
-        run: cmake --preset native -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF
+        run: cmake --preset native -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
       - name: Build (Release, all targets)
         run: cmake --build --preset native-release
 
       - name: C++ tests (CTest)
         run: ctest --test-dir build/native -C Release --output-on-failure
+
+      - name: Compiler cache statistics
+        if: always()
+        run: sccache --show-stats
