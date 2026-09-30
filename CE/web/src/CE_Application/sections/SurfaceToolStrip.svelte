@@ -378,7 +378,11 @@
     pointer-events: auto;
   }
 
-  .tool-strip button {
+  /* The strip's own buttons only: a bare `.tool-strip button` also reached the flyout menus' items
+     (they are nested in the strip) and, coming later, squeezed each to 38px — the label collapsed
+     behind its shortcut key. */
+  .tool-strip > button,
+  .tool-flyout-host > button {
     width: 38px;
     height: 38px;
     border-color: #32414B;
@@ -386,8 +390,10 @@
     color: #D8E6EE;
   }
 
-  .tool-strip button:hover,
-  .tool-strip button.active {
+  .tool-strip > button:hover,
+  .tool-strip > button.active,
+  .tool-flyout-host > button:hover,
+  .tool-flyout-host > button.active {
     border-color: var(--surface-accent, #14B8A6);
     background: rgba(20, 184, 166, 0.18);
     box-shadow:
