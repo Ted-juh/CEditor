@@ -1152,10 +1152,18 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
 
                 auto requestId = payloadObj->getProperty ("requestId").toString();
 
+                // A caller may narrow the picker to the files it can use — the Photoshop importer asks
+                // for *.psd, which is not an image any other picker could show. Only a plain pattern
+                // list is taken; anything else falls back to the image types.
+                auto patterns = payloadObj->getProperty ("patterns").toString().trim();
+                if (patterns.isEmpty() || ! patterns.containsOnly ("*.;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"))
+                    patterns = "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.svg;*.webp";
+                auto title = payloadObj->getProperty ("title").toString().trim();
+
                 fileChooser = std::make_unique<juce::FileChooser> (
-                    "Select Image",
+                    title.isNotEmpty() ? title : juce::String ("Select Image"),
                     juce::File::getSpecialLocation (juce::File::userPicturesDirectory),
-                    "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.svg;*.webp");
+                    patterns);
 
                 fileChooser->launchAsync (
                     juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,

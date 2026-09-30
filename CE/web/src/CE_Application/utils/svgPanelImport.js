@@ -64,6 +64,9 @@ const CONTROL_TYPE = {
   menu: 'Combobox',
 };
 
+// The Photoshop importer places controls by the same convention (utils/psdPanelImport.js).
+export { CONTROL_TYPE as ROLE_CONTROL_TYPES };
+
 const MEASURED = new Set(['rect', 'circle', 'ellipse']);
 const UNMEASURED = new Set(['path', 'line', 'polyline', 'polygon', 'text', 'use', 'image']);
 

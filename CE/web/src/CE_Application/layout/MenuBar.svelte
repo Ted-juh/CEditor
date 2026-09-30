@@ -41,6 +41,7 @@
   import { requestPropertiesTab } from '../stores/propertiesTab.js';
   import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
   import { newPanelFromSvgArtwork, updatePanelFromSvgArtwork } from '../stores/svgPanelImportActions.js';
+  import { newPanelFromPsdArtwork } from '../stores/psdPanelImportActions.js';
   import WorkspacePicker from './WorkspacePicker.svelte';
   import { floating } from '../utils/floatingUi.js';
 
@@ -162,6 +163,8 @@
       // where every control goes. utils/svgPanelImport.js has the convention.
       { label: 'New Panel from SVG Artwork...', action: () => newPanelFromSvgArtwork() },
       { label: 'Update Panel from SVG Artwork...', enabled: hasPanel, action: () => updatePanelFromSvgArtwork() },
+      // The same convention from a Photoshop file: a "components" layer group (utils/psdPanelImport.js).
+      { label: 'New Panel from Photoshop Artwork...', action: () => newPanelFromPsdArtwork() },
       { type: 'submenu', label: 'Open Recent', enabled: () => recentGroups.length > 0, items: recentSubmenuItems },
       { type: 'separator' },
       { label: 'New Custom Component', action: () => newCustomComponent() },

@@ -43,8 +43,10 @@
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",
     "acorn": "^8.17.0",
+    "ag-psd": "^30.2.0",
     "comlink": "^4.4.2",
     "dexie": "^4.4.6",
+    "fflate": "^0.8.3",
     "fontkit": "^2.0.4",
     "gifuct-js": "^2.1.2",
     "harfbuzzjs": "^1.6.2",

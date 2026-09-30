@@ -69,6 +69,24 @@ CSS classes, as Illustrator writes them, count.
   worked on, use **Update Panel** (below).
 - To discard an import, close its tab without saving. It is a new, unsaved panel until you save it.
 
+## New Panel from Photoshop Artwork
+
+**File › New Panel from Photoshop Artwork...** does the same from a `.psd`:
+
+- A **layer group** named `components` (or `controls`, `placeholders`, `ceditor`) holds the
+  placeholders, one layer per control, at any depth. The group may be hidden.
+- Each layer is placed on its bounds, the box Photoshop keeps around the layer's pixels. Its
+  **name** says what it is, exactly as for SVG (`knob-cutoff`, `slider volume`). With no keyword, its
+  **colour** decides: red is a control (a long layer a slider, otherwise a knob), green a button,
+  blue a label, magenta an LED, yellow a display.
+- Every other visible layer is flattened into the background, with each layer's opacity and its
+  group's.
+
+The flattening is simpler than Photoshop's. Blend modes other than Normal, clipping masks, layer
+masks and layer styles (effects) are not drawn. Each affected layer is named in the Console, and
+the fix is to merge or rasterize it in Photoshop before importing. There is no **Update Panel** for
+Photoshop files yet.
+
 ## Update Panel from SVG Artwork
 
 Artwork gets revised, and by then the panel has bindings, scripts and links. **File › Update Panel
