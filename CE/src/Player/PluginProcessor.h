@@ -1619,6 +1619,17 @@ private:
                                "not lead anywhere on this panel. A state patch key like "
                                "\"Background.Fill.colour\" is ONE map key rather than three path steps.");
         };
+        // Only a control bound to a host parameter sends anything window-closed (setValue above), so
+        // only a write to one spends the flood budget.
+        cb.transmitsTo = [this] (const juce::String& path)
+        {
+           #if CEDITOR_VALUE_LAYER
+            return scriptBoundParamByPath.find (path) != scriptBoundParamByPath.end();
+           #else
+            juce::ignoreUnused (path);
+            return false;
+           #endif
+        };
        #if CEDITOR_VALUE_LAYER
         // Raw CC/NRPN/Sysex mirror the byte construction in panelRuntime.js so a script transmits
         // identically whether it runs window-open (JS) or window-closed (here). Role = "mainSynth".

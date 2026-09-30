@@ -29,6 +29,10 @@ public:
         // "normalizedValue". The app maps it, because only the app knows the control's range.
         std::function<void (const juce::String& path, const juce::var& value, bool transmit,
                             const juce::String& form)> setValue;
+        // Whether a transmitting write to `path` would reach the synth at all — the path is bound to
+        // a device parameter. Only those writes spend the MIDI flood budget. Unset: every
+        // transmitting write counts, which is how every set() was counted before this existed.
+        std::function<bool (const juce::String& path)> transmitsTo;
         // Device / MIDI.
         std::function<void (int ch, int cc, const juce::var& value)> sendCC;
         std::function<void (int ch, int msb, int lsb, const juce::var& value)> sendNRPN;
@@ -162,8 +166,12 @@ public:
         bool transmit = runtime ? runtime->defaultTransmit() : true;
         if (auto* o = options.getDynamicObject())
             if (o->hasProperty ("transmit")) transmit = (bool) o->getProperty ("transmit");
-        // Under a MIDI flood the value still applies locally — only the synth send is dropped.
-        if (transmit && ! midiSendAllowed())
+        // Under a MIDI flood the value still applies locally — only the synth send is dropped. A write
+        // that could never send (a label's text, a colour, a tooltip) spends nothing: the GAIA's
+        // preset list paints ~1,500 of those on load, which counted as 1,500 MIDI sends, tripped the
+        // guard, and silently dropped the MIDI of any BOUND control set in the rest of that second.
+        const bool wouldSend = ! callbacks.transmitsTo || callbacks.transmitsTo (addressed.first);
+        if (transmit && wouldSend && ! midiSendAllowed())
             transmit = false;
         if (callbacks.setValue) callbacks.setValue (addressed.first, value, transmit, addressed.second);
     }
