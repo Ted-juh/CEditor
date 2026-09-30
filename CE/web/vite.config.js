@@ -73,6 +73,10 @@ export default defineConfig(({ command }) => ({
   },
   // Production uses a file:// entry point, so built assets must be relative.
   base: command === 'build' ? './' : '/',
+  // The font worker (workers/fontWorker.js) loads fontkit, HarfBuzz and the WOFF2 codec on demand, and
+  // a worker bundle can only be split like that as an ES module. The client falls back to the page
+  // wherever a module worker cannot start (utils/fontWorkerClient.js).
+  worker: { format: 'es' },
   server: {
     port: 5173,
     strictPort: true,

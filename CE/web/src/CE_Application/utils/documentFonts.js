@@ -102,12 +102,15 @@ export async function embedPanelFonts(panel, storedFonts, readData = async () =>
     if (!carried) missing.push(name);
   }
   if (subset && fonts.length) {
-    // Each face cut to the characters the panel can show (utils/fontSubset.js — loaded only here).
-    const { panelCharacters, subsetFontDataUrl } = await import('./fontSubset.js');
+    // Each face cut to the characters the panel can show (utils/fontSubset.js), in the font worker
+    // where there is one (utils/fontWorkerClient.js): HarfBuzz and a WOFF2 encode per face is
+    // seconds of work on a CJK font, and the page stays usable while it runs.
+    const { panelCharacters } = await import('./fontSubset.js');
+    const { subsetFontInWorker } = await import('./fontWorkerClient.js');
     const characters = panelCharacters(panel);
     const done = new Map();
     for (const face of fonts) {
-      if (!done.has(face.data)) done.set(face.data, await subsetFontDataUrl(face.data, characters));
+      if (!done.has(face.data)) done.set(face.data, await subsetFontInWorker(face.data, characters));
       face.data = done.get(face.data);
     }
   }

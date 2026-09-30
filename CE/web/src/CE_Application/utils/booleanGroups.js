@@ -38,7 +38,7 @@ import { writable } from 'svelte/store';
 import { partFrame } from './customDesignSurfaceGeometry.js';
 import { BOOLEAN_KIND, isBooleanGroup, loadGeometry, partOutline, paintsBox, whyNoOutline } from './partOutlines.js';
 import { textLayoutSpec } from './textOutline.js';
-import { glyphAtlas, needsAtlas, registerGlyphAtlas, resolveFont } from './fontSources.js';
+import { glyphAtlasAsync, needsAtlas, registerGlyphAtlas, resolveFont } from './fontSources.js';
 import { scalePathData } from './svgPathScale.js';
 import { withPivotKept } from './bezierPath.js';
 import { numberOr } from './primitives.js';
@@ -440,7 +440,7 @@ async function atlasesFor(resolvedGroup) {
     try {
       const resolved = await resolveFont(spec.family, { weight: spec.weight, style: spec.style });
       if (!needsAtlas(resolved)) continue;
-      out.set(id, glyphAtlas(resolved, spec, [...spec.content].map((char) => char.codePointAt(0))));
+      out.set(id, await glyphAtlasAsync(resolved, spec, [...spec.content].map((char) => char.codePointAt(0))));
     } catch { /* the outline itself reports an unreadable face */ }
   }
   return [...out.values()];

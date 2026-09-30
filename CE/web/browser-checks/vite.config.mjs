@@ -11,6 +11,8 @@ export default defineConfig({
   // The app's entry reads a build stamp the main config injects. These harnesses do not care what
   // it says, only that the identifier resolves.
   define: { __APP_BUILD__: JSON.stringify({ sha: 'check', branch: 'check', time: '', version: '0.0.0' }) },
+  // As in the main config: the font worker splits its bundle, which only an ES module worker can do.
+  worker: { format: 'es' },
   build: {
     outDir: '../dist-scenery',
     emptyOutDir: true,

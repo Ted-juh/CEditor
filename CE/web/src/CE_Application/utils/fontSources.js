@@ -24,6 +24,7 @@
  * panel faces are variable. Everything here is loaded on first use, never at start-up.
  */
 import { PANEL_FONT_FACES } from '../models/panelFontFaces.js';
+import { ATLAS_CHARACTERS, atlasFromFont, unitsPath } from './glyphAtlasBuild.js';
 
 export class FontUnavailableError extends Error {
   constructor(family, detail = '') {
@@ -155,6 +156,7 @@ function bytesFor(buffer) {
 }
 
 const fontCache = new Map();
+const sfntCache = new Map();
 
 /** Parse (and cache) a font file into a fontkit font. */
 async function fontFromLoader(key, load) {
@@ -162,6 +164,9 @@ async function fontFromLoader(key, load) {
     fontCache.set(key, (async () => {
       const fontkit = await loadFontkit();
       const sfnt = await toSfnt(await load());
+      // Kept for the font worker (glyphAtlasAsync), which parses its own copy: fontkit's objects do
+      // not cross a thread. The bytes are held anyway, inside the parsed font.
+      sfntCache.set(key, sfnt);
       return fontkit.create(bytesFor(sfnt));
     })());
   }
@@ -361,6 +366,7 @@ export function fontAtWeight(resolved, weight) {
 /** For the tests: forget parsed fonts (and registered glyph atlases). */
 export function clearFontCache() {
   fontCache.clear();
+  sfntCache.clear();
   instanceCache.clear();
   atlases.clear();
   atlasMemo.clear();
@@ -375,20 +381,10 @@ export function clearFontCache() {
 // cache. It shapes plainly: kerning, no ligatures or contextual forms, which is what a font with
 // letter-spacing gets anyway, and within a hair of the real layout otherwise.
 
-export const ATLAS_CHARACTERS = [
-  ...Array.from({ length: 0x7F - 0x20 }, (_, i) => 0x20 + i),
-  ...Array.from({ length: 0x100 - 0xC0 }, (_, i) => 0xC0 + i),
-];
-const KERNED = ATLAS_CHARACTERS.filter((cp) => cp < 0x7F);
+export { ATLAS_CHARACTERS };
 
 const atlases = new Map();
 const atlasId = (family, weight, style) => `${String(family).toLowerCase()}|${weight}|${style}`;
-
-function unitsPath(commands) {
-  const n = (v) => String(Math.round(v * 10) / 10);
-  const letters = { moveTo: 'M', lineTo: 'L', quadraticCurveTo: 'Q', bezierCurveTo: 'C', closePath: 'Z' };
-  return commands.map(({ command, args }) => letters[command] + args.map(n).join(' ')).join('');
-}
 
 function commandsFrom(path) {
   const names = { M: 'moveTo', L: 'lineTo', Q: 'quadraticCurveTo', C: 'bezierCurveTo', Z: 'closePath' };
@@ -420,32 +416,35 @@ export function glyphAtlas(resolved, { family, weight = 400, style = 'normal' },
   return { ...base, glyphs };
 }
 
-function buildAtlas(resolved, { family, weight, style }) {
-  const font = fontAtWeight(resolved, weight);
-  const glyphs = {};
-  for (const cp of ATLAS_CHARACTERS) {
-    if (!font.hasGlyphForCodePoint?.(cp) && cp !== 0x20) continue;
-    const glyph = font.glyphForCodePoint(cp);
-    glyphs[cp] = [Math.round(glyph.advanceWidth * 10) / 10, unitsPath(glyph.path.commands)];
-  }
-  const kern = {};
-  for (const a of KERNED) {
-    if (!glyphs[a]) continue;
-    const advance = glyphs[a][0];
-    for (const b of KERNED) {
-      if (!glyphs[b]) continue;
-      const run = font.layout(String.fromCodePoint(a, b), { liga: false, clig: false, dlig: false, calt: false });
-      if (run.glyphs.length !== 2) continue;
-      const dx = Math.round((run.positions[0].xAdvance - advance) * 10) / 10;
-      if (dx) kern[`${a},${b}`] = dx;
-    }
-  }
+function atlasMeta(resolved, { family, weight, style }) {
   return {
-    family: primaryFamily(family), weight: Number(weight) || 400, style: style === 'italic' ? 'italic' : 'normal',
-    unitsPerEm: font.unitsPerEm, ascent: font.ascent, descent: font.descent,
+    family: primaryFamily(family), weight: Number(weight) || 400, style,
     synthesizedItalic: !!resolved.synthesizedItalic, synthesizedBold: !!resolved.synthesizedBold,
-    glyphs, kern,
   };
+}
+
+function buildAtlas(resolved, spec) {
+  return atlasFromFont(fontAtWeight(resolved, spec.weight), atlasMeta(resolved, spec));
+}
+
+/**
+ * glyphAtlas, with the expensive part — laying out every ASCII pair to read its kerning, about half a
+ * second for one face — done in the font worker (utils/fontWorkerClient.js) instead of on the page.
+ * The result is the same object glyphAtlas returns, and is remembered the same way, so a later
+ * synchronous glyphAtlas call for the face is free. Falls back to building here where there is no
+ * worker (the tests, the player) or the worker cannot start.
+ */
+export async function glyphAtlasAsync(resolved, spec, extra = []) {
+  const { weight = 400, style = 'normal' } = spec;
+  const memoKey = `${resolved.key}@${weight}`;
+  const sfnt = sfntCache.get(resolved.key);
+  if (!atlasMemo.has(memoKey) && sfnt) {
+    const { buildAtlasInWorker } = await import('./fontWorkerClient.js');
+    const meta = atlasMeta(resolved, { ...spec, weight, style });
+    const built = await buildAtlasInWorker(sfnt, meta, resolved.variable ? weight : null);
+    if (built && !atlasMemo.has(memoKey)) atlasMemo.set(memoKey, built);
+  }
+  return glyphAtlas(resolved, spec, extra);
 }
 
 /** A font-like object over an atlas: the part of fontkit's interface textOutline uses. */

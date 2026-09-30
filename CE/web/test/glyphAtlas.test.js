@@ -97,3 +97,21 @@ test('a border gradient that follows the outline starts top-left and runs clockw
   assert.equal(outlineBorderPaints(border).flow, 'follow');
   assert.equal(outlineBorderPaints({ ...border, gradientFlow: 'across' }).flow, 'across');
 });
+
+// --- The font worker builds the same atlas as the page ------------------------------------------
+//
+// There is no Worker in node, so glyphAtlasAsync takes its fallback — which is the worker's own
+// function (fontWorkerApi.buildAtlas) run on the page, fed the face's bytes rather than the parsed
+// font. Equality here is what lets an atlas from either side be stored in a document.
+
+test('the worker\'s atlas is identical to the page\'s, for a static and a variable face', async () => {
+  const { glyphAtlasAsync, glyphAtlas, clearFontCache, resolveFont } = await import('../src/CE_Application/utils/fontSources.js');
+  for (const [family, weight] of [['Arial', 400], ['Rubik', 650]]) {
+    clearFontCache();
+    const page = glyphAtlas(await resolveFont(family, { weight }), { family, weight, style: 'normal' });
+    clearFontCache();
+    const viaWorkerCode = await glyphAtlasAsync(await resolveFont(family, { weight }), { family, weight, style: 'normal' });
+    assert.ok(Object.keys(page.kern).length > 0, `${family}: the comparison should include kerning`);
+    assert.deepEqual(viaWorkerCode, page, `${family} ${weight}`);
+  }
+});
