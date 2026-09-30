@@ -264,21 +264,21 @@ export pipeline). It cannot bundle C++/C#/Java handlers or CPython. The compilin
 bundles these extra runtimes only for VST3. A requested unsupported combination fails explicitly
 before replacing an export. A failed required handler build also fails the export.
 
-## The GAIA panel's scripts, run window-closed in the plug-in
+## ~~The GAIA panel's scripts, run window-closed in the plug-in~~ — CLOSED
 
-Seen in the player log while pluginval exercised the GAIA panel built as a plug-in
-([plugin validation](plugin-validation.md)). With the editor window closed, the scripts run in the
-plug-in's own runtime, and two things happen there that do not happen in the editor:
+*(Logged 2026-09-30 as panel-script behaviour; both turned out to be defects in CEditor, fixed the
+same day. `exportDocument.test.js` and `PlayerScriptIntegrationTests` pin them.)*
 
-- **Writes to paths that exist only in the editor's model.** The preset-name scripts set
-  `recall_*.text.fill.colour` and `recall_*.core.tooltip`. The window-closed value model has no such
-  paths, so each write is refused with "nothing was written — that path does not lead anywhere on
-  this panel": about 14,000 lines per validation run. Nothing is lost, since there is no window to
-  colour. But the log fills, and a real error in that script would be hard to find among them. The
-  scripts should skip visual writes when `ce.runtime` is `player` and no window is open, or the
-  runtime should accept and drop writes to visual paths silently. The runtime is the better place.
-- **A MIDI flood at load.** `gaia_preset_names` sends more than 1,000 messages a second as it loads,
-  and the flood guard drops the rest of that second. The guard did its job. Whether the script
-  should send that much with no synth listening is the question.
+Seen in the player log while pluginval ran the GAIA panel as a plug-in:
 
-Neither affected the validators' verdict; both are panel-script behaviour, not plug-in defects.
+- **14,000 refused writes** to `recall_*.text.fill.colour` and `recall_*.core.tooltip`. Not the
+  scripts: the plug-in had been built from the saved `.cepanel`, which stores each control as a
+  difference from its defaults, and those two properties were at their defaults, so the plug-in
+  had no such paths. The command-line exporter had the same flaw, and worse: it derived the host
+  parameter list from the sparse controls, 5 parameters instead of 60 on QA-08. A saved document is
+  now completed first, with the editor's own export serialisation (`tools/scripts/lib/exportDocument.mjs`).
+  The refused writes went from 14,395 to none.
+- **The MIDI flood guard tripping at load.** Not the script either: the guard counted every
+  `set()` as a MIDI send, including a label's text and colours, which never send anything. Painting
+  the preset list spent the whole budget, and a bound control set in the rest of that second lost
+  its MIDI. Now only writes to bound paths count.

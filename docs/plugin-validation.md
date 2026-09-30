@@ -49,6 +49,13 @@ quirk of the validator.
 | clap-validator `features-categories` | No main CLAP category, which CLAP requires. | `CMakeLists.txt` (`audio-effect`, matching the VST3's `Fx`) |
 | pluginval, LV2 | A crash, and after a first fix a hang. Script engines were created and destroyed on the host's thread and used on the plug-in's message thread, so every JavaScript call failed with "stack overflow" (1.1 million lines in the player log), and teardown raced a timer. | `PluginProcessor.h` `onMessageThread` |
 
+Two more came from reading the player log those runs left, not from a validator's verdict:
+
+| Seen in | Defect | Fixed in |
+| --- | --- | --- |
+| 14,000 refused script writes | A plug-in built from a *saved* `.cepanel` lacked every default-valued property, and the command-line exporter derived its host parameters from the sparse controls: 5 instead of 60 on QA-08. | `tools/scripts/lib/exportDocument.mjs`: a saved document is completed first. Build by hand with `prepare-export-panel.mjs`. |
+| the MIDI flood guard, at every load | Every `set()` counted as a MIDI send, a label's text included, so painting a long list silently dropped the MIDI of the next bound control. | `BridgeScriptHost.h`: only writes to bound paths count. |
+
 Two clap-validator **warnings** remain and are understood:
 
 - `process-audio-denormals` — processing takes several times longer on denormal input. The plug-in
