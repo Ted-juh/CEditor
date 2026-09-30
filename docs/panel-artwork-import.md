@@ -51,6 +51,12 @@ CSS classes, as Illustrator writes them, count.
   Buttons get no legend of their own, because the artwork prints it.
 - A report in the Console. It lists every placeholder whose type came from its colour or shape
   rather than its name, and every one that could not be placed, with the reason.
+- **Text in the artwork keeps its font.** A browser draws an SVG background without the page's
+  fonts, so the fonts the artwork's text names are carried inside it: the panel fonts and any font
+  you imported under Settings → Fonts, each cut down to the characters the artwork uses. The
+  background is replaced with that copy a moment after the panel opens. Text in a font CEditor
+  cannot supply draws in a fallback font and is reported. Import the font and import again, or
+  convert the text to outlines in the drawing program.
 
 ### Limits
 

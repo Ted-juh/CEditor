@@ -25,7 +25,8 @@ import { updatePanelInList } from './panelDocumentHelpers.js';
 import { cerror, cinfo, cwarn } from './console.js';
 import { notify } from './scriptUi.js';
 import { confirmDestructive } from '../utils/confirmDiscard.js';
-import { buildSvgImportControls, describeSvgImport, planSvgPanelImport } from '../utils/svgPanelImport.js';
+import { buildSvgImportControls, describeSvgImport, planSvgPanelImport, svgDataUrl } from '../utils/svgPanelImport.js';
+import { embedSvgFonts } from '../utils/svgArtworkFonts.js';
 import {
   artworkRecord,
   describeSvgReimport,
@@ -55,6 +56,30 @@ function baseName(path) {
 }
 
 /**
+ * Carry the fonts the artwork's text names inside it (utils/svgArtworkFonts.js), then swap the
+ * panel's background for that copy. Afterwards, not before: the panel opens at once, and the fonts
+ * are found, subset and embedded in the font worker while the author looks at it. A font nothing
+ * can supply is reported, with what to do about it. Returns the promise, for the tests.
+ */
+export function embedArtworkFonts(panelId, svgText) {
+  return embedSvgFonts(svgText).then(({ svg, embedded, missing }) => {
+    if (embedded.length) {
+      panels.update((list) => updatePanelInList(list, panelId, (current) => ({ ...current, bgImage: svgDataUrl(svg) })));
+      cinfo(`[svg import] carried in the artwork: ${embedded.join(', ')}`);
+    }
+    if (missing.length) {
+      cwarn(`[svg import] The artwork's text uses ${missing.join(', ')}, which CEditor cannot supply, so it draws in a fallback font. `
+        + 'Import the font (Settings → Fonts) and re-import, or convert the text to outlines in the drawing program.');
+      notify(`Text in the artwork uses ${missing.join(', ')}, which is not available — it will draw in a fallback font. See the Console.`, { kind: 'warn', duration: 0 });
+    }
+    return { embedded, missing };
+  }).catch((error) => {
+    cwarn('[svg import] the artwork\'s fonts could not be embedded', error);
+    return { embedded: [], missing: [] };
+  });
+}
+
+/**
  * Build and open a panel from SVG text. Split from the file picking so the part that matters is
  * reachable without a backend. Returns the new panel, or null with the reason already reported.
  */
@@ -78,6 +103,7 @@ export function importSvgPanelText(text, fileName = '') {
   // What "Update Panel from SVG Artwork" matches against next time.
   panel.artworkImport = artworkRecord(plan, linksForNewImport(plan, panel.controls), baseName(fileName));
   addPanel(panel);
+  embedArtworkFonts(panel.id, plan.background.svg);
 
   cinfo(`[svg import] ✓ ${lines[0]} → "${panel.name}". Save it to keep it.`);
   for (const line of lines.slice(1)) cwarn(`[svg import] ${line}`);
@@ -142,6 +168,7 @@ export function updatePanelFromSvgText(text, fileName = '', { confirm = confirmD
     modified: true,
   })));
 
+  embedArtworkFonts(panel.id, plan.background.svg);
   cinfo(`[svg update] ✓ "${panel.name}" from ${baseName(fileName)}.svg: ${update.moves.length} moved, `
     + `${update.added.length} added, ${update.unchanged} unchanged.`);
   for (const line of [...lines.slice(1), ...skipped]) cwarn(`[svg update] ${line}`);

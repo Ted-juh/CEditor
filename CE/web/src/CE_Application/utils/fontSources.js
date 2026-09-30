@@ -363,6 +363,14 @@ export function fontAtWeight(resolved, weight) {
   return instanceCache.get(key);
 }
 
+/**
+ * The file behind a resolved font, as TrueType/OpenType bytes, or null for one that has no file here
+ * (a glyph atlas). For code that has to hand the face on — utils/svgArtworkFonts.js embeds it.
+ */
+export function fontFileBytes(resolved) {
+  return sfntCache.get(resolved?.key) ?? null;
+}
+
 /** For the tests: forget parsed fonts (and registered glyph atlases). */
 export function clearFontCache() {
   fontCache.clear();
