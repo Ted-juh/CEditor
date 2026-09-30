@@ -110,7 +110,9 @@ try {
   await popup.waitFor();
   const box = await dbeamControl.boundingBox(), popupBox = await popup.boundingBox();
   assert.ok(Math.abs(box.x - popupBox.x) < 1);
-  assert.ok(Math.abs(popupBox.y - box.y - box.height - 3) < 1);
+  const dbeamAbove = (await popup.getAttribute('data-placement'))?.startsWith('top');
+  const dbeamGap = dbeamAbove ? box.y - popupBox.y - popupBox.height : popupBox.y - box.y - box.height;
+  assert.ok(Math.abs(dbeamGap - 3) < 1, `D Beam popup ${dbeamAbove ? 'above' : 'below'}, 4 panel units (3px at 75%) from its control: ${JSON.stringify({ box, popupBox })}`);
   await popup.getByRole('option').last().click();
   assert.deepEqual(errors, []);
   assert.equal(checked, menus.length);
