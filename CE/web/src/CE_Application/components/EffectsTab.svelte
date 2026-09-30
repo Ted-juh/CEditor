@@ -1,4 +1,6 @@
 <script>
+  import { drawnForInspector } from '../models/controlSetFamilies.js';
+  import { activeControlSet } from '../stores/controlSets.js';
   import { setContext } from 'svelte';
   import { writable } from 'svelte/store';
   import Pin from 'lucide-svelte/icons/pin';
@@ -21,7 +23,8 @@
   let panelControls = $derived(flatControls($activePanel?.controls ?? []));
   let rawControl = $derived($effectsDockState.followSelection ? $selectedControl
     : panelControls.find((entry) => entry._children?.Core?.id === $effectsDockState.pinnedId) ?? null);
-  let control = $derived(resolveStateScopedControl(rawControl, $stateEditScope.mode === 'state' ? $stateEditScope.stateName : ''));
+  // What is drawn: the set's value where it decides one (models/controlSetFamilies.js drawnForInspector).
+  let control = $derived(drawnForInspector(resolveStateScopedControl(rawControl, $stateEditScope.mode === 'state' ? $stateEditScope.stateName : ''), $activeControlSet));
   let stateNames = $derived(Object.keys(rawControl?._children?.States?._children ?? {}));
   let domainsHere = $derived(availableDomains(control));
   let domain = $derived(domainsHere.includes($effectsDockState.domain) ? $effectsDockState.domain : (domainsHere[0] ?? 'text'));

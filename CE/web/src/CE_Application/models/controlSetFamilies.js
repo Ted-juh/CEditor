@@ -32,7 +32,7 @@
 
 import { COMPONENT_TYPES, createControl } from './componentTypes.js';
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
-import { BUILT_IN_CONTROL_SETS, resolveControlTokens, getControlSet } from './controlSets.js';
+import { BUILT_IN_CONTROL_SETS, isTokenReference, resolveColourValue, resolveControlTokens, getControlSet } from './controlSets.js';
 import { typeFamilies } from './controlSetRecipes.js';
 import { deepClone } from '../utils/deepClone.js';
 
@@ -223,6 +223,31 @@ export function resolveControlForSet(control, set) {
 /** A built-in design pinned to an individual control survives copying into another panel. */
 export function controlSetForControl(control, panelSet) {
   return getControlSet(control?._children?.Core?.controlSetId) ?? panelSet;
+}
+
+/**
+ * The control as the inspector should show it: what is DRAWN. The family patch applied under the
+ * rule, so a field reads the set's value wherever the set decides it (a slider's ticks, a label's
+ * tracking) rather than the factory value it overrides; and where the family wrote a colour token
+ * reference, the colour it resolves to, so a colour field shows the swatch that is painted. Colour
+ * references the control itself holds are left as they are — the colour fields already show those
+ * with the token's name. Copy-on-write: a control the set says nothing about comes back as itself.
+ */
+export function drawnForInspector(control, set) {
+  const drawn = resolveControlFamily(control, set);
+  if (drawn === control) return control;
+  const family = familyPatchFor(controlSetForControl(control, set), control?._children?.Core?.controlType);
+  const paths = [
+    ...Object.keys(family?.component ?? {}),
+    ...Object.entries(family?.parts ?? {}).flatMap(([part, patch]) => Object.keys(patch ?? {}).map((path) => `Parts.${part}.${path}`)),
+  ];
+  let out = drawn;
+  for (const path of paths) {
+    const value = readControlPath(out, path);
+    if (typeof value !== 'string' || !isTokenReference(value) || readControlPath(control, path) === value) continue;
+    out = writeControlPath(out, path, resolveColourValue(value, controlSetForControl(control, set)));
+  }
+  return out;
 }
 
 /**

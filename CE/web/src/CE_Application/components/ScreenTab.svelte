@@ -1,4 +1,6 @@
 <script>
+  import { drawnForInspector } from '../models/controlSetFamilies.js';
+  import { activeControlSet } from '../stores/controlSets.js';
   import { setContext } from 'svelte';
   import { writable } from 'svelte/store';
   import Pin from 'lucide-svelte/icons/pin';
@@ -27,7 +29,8 @@
       ? $stateEditScope.stateName
       : ''
   );
-  let control = $derived(resolveStateScopedControl(rawControl, stateName));
+  // What is drawn: the set's value where it decides one (models/controlSetFamilies.js drawnForInspector).
+  let control = $derived(drawnForInspector(resolveStateScopedControl(rawControl, stateName), $activeControlSet));
   let core = $derived(getSection(control, 'Core'));
   let screenKind = $derived(getSection(control, 'Display') ? 'lcd' : getSection(control, 'Pixel') ? 'pixel' : '');
   let group = $derived($screenDockState.group);

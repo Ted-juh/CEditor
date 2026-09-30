@@ -736,3 +736,36 @@ test('every inspector write pins what the rule cannot see, and only that', async
   assert.deepEqual(stored()._children.Core.setOverrides, ['Text.Font.family'], 'a programmatic write (a preset, a reset) does not pin');
   selectedComponentIds.set(new Set());
 });
+
+test('the inspector is shown what is drawn: the set\'s value where it decides one, colours as painted', async () => {
+  const { drawnForInspector, resolveControlFamily, setPatchablePaths, readControlPath } = await import('../src/CE_Application/models/controlSetFamilies.js');
+  const { collectTokenReferences, isTokenReference } = await import('../src/CE_Application/models/controlSets.js');
+  const graphite = getControlSet('graphite');
+
+  const slider = createControl('Slider');
+  assert.equal(slider._children.Behavior.showTicks, true, 'stored: the factory value');
+  assert.equal(drawnForInspector(slider, graphite)._children.Behavior.showTicks, false, 'shown: the ticks the set hides');
+  const label = createControl('Label');
+  const shownFont = drawnForInspector(label, graphite)._children.Text._children.Font;
+  const drawnFont = resolveControlFamily(label, graphite)._children.Text._children.Font;
+  assert.equal(shownFont.family, drawnFont.family);
+  assert.equal(shownFont.letterSpacing, drawnFont.letterSpacing);
+  assert.equal(drawnForInspector(slider, null), slider, 'no set: the control itself');
+
+  // Every built-in set, every family path: a colour field is never handed a reference the family
+  // wrote (it would show a fallback swatch), while the control's own references are left for the
+  // colour fields, which name the token.
+  for (const set of BUILT_IN_CONTROL_SETS) {
+    for (const type of ['Knob', 'Slider', 'Button', 'Label']) {
+      const control = createControl(type);
+      const own = collectTokenReferences(control);
+      const shown = drawnForInspector(control, set);
+      for (const path of setPatchablePaths(type)) {
+        const value = readControlPath(shown, path);
+        if (typeof value !== 'string' || !isTokenReference(value)) continue;
+        assert.equal(readControlPath(control, path), value, `${set.id} ${type} ${path}: ${value} was the family's, and should be a colour`);
+      }
+      assert.ok([...collectTokenReferences(shown)].every((token) => own.has(token)), `${set.id} ${type}: only the control's own references remain`);
+    }
+  }
+});

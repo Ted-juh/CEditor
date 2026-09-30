@@ -325,9 +325,19 @@ path a built-in set can patch back to its factory value pins it, and writing any
 unpins it, since the rule already keeps that. Paths no set patches are never pinned, and a
 state-scoped edit belongs to the state. Programmatic writes — presets, resets, gestures, through
 `applyControlPatch` — do not pin unless they ask to (`{ pin: true }`, which the slider editors'
-multi-field writes do). The slider inspector's Show flags also display what is drawn rather than
-what is stored; other fields still show the stored value, so choosing the factory value where a set
-has drawn another means typing something else first — the pin then lands on the way back.
+multi-field writes do).
+
+**The inspector shows what is drawn** (`drawnForInspector`). Every appearance tab of the Properties
+panel (`panels/SectionRenderer.svelte`) and the Text, Effects and Screen docks are handed the control
+with its set's family patch applied, under the same rule the canvas draws by. So a field reads the
+set's value wherever the set decides it: the slider's Ticks flag is off under a set that hides
+ticks, and a label's Letter field reads the set's tracking. Colour token references that the family
+writes are resolved to the colour they paint, so a colour field shows the painted swatch rather than
+a fallback. References the control itself stores are left alone, because the colour fields already
+show those with the token's name. Tabs that edit structure (Core, States, Bindings, Reactions,
+Device, Animations) see the control as stored. Choosing the factory value where a set drew another
+is therefore an ordinary edit: the field shows the set's value, the author types the factory one,
+and the store pins it.
 `pinnedWrite(control, path, value)` pins unconditionally, for code that means it.
 
 **What the knob gained** to have something to patch: a `bodyCap` semantic part — a disc under the
