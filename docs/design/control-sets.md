@@ -313,6 +313,17 @@ control and keeps every deliberate edit; nothing is written into the document. I
 diff-against-defaults idea applied at draw time, copy-on-write like the token resolver, and it runs
 before the token pass because a family patch may write references. The build bakes both.
 
+**Pins: the author who chose the factory value.** The rule cannot tell an untouched property from one
+the author set back to its default on purpose. That was a dead end in practice: the default set
+draws sliders without ticks, `showTicks: true` is the factory value, so an author who turned ticks
+back on wrote exactly the value the set overrides, and the Ticks flag read "on" over a slider with
+none. `Core.setOverrides` lists the paths an author set on purpose (as the patch names them, with
+`Parts.<name>.` in front for a part), and the set leaves those alone whatever they hold.
+`pinnedWrite(control, path, value)` is the write that records one; the slider inspector's Show flags
+use it, and display what is drawn rather than what is stored. Other inspector fields do not pin yet:
+typing a different value already wins under the rule, and only re-choosing the factory value needs
+the pin.
+
 **What the knob gained** to have something to patch: a `bodyCap` semantic part — a disc under the
 pointer, invisible by default so every existing knob keeps drawing its arc-and-dot — sized as a
 percentage of the track's diameter so one set fits every knob size; and a `kind` on `pointerCurrent`
