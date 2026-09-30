@@ -7,7 +7,6 @@
   import SquaresSubtract from 'lucide-svelte/icons/squares-subtract';
   import SquaresIntersect from 'lucide-svelte/icons/squares-intersect';
   import SquaresExclude from 'lucide-svelte/icons/squares-exclude';
-  import Spline from 'lucide-svelte/icons/spline';
   import Eye from 'lucide-svelte/icons/eye';
   import EyeOff from 'lucide-svelte/icons/eye-off';
   import Lock from 'lucide-svelte/icons/lock';
@@ -75,7 +74,12 @@
   import CustomContactSheet from './CustomContactSheet.svelte';
   import SurfacePenTool from './SurfacePenTool.svelte';
   import { isPathPart, pathPartSpec } from '../utils/penPath.js';
-  import { BOOLEAN_LABELS, applyPartPatch, partsAfterBoolean, planPartBoolean, planPathSmooth } from '../utils/partBooleans.js';
+  import {
+    attachBooleanInputs, booleanShapeFor, booleanShapeRevision, booleanSpec, drawnPartEntries,
+    isBooleanGroup, isBooleanOperand, membershipRenamePatch, operandEntries, partsAfterOperandMove, partsAfterRemoval, withGroupMembers,
+  } from '../utils/booleanGroups.js';
+  import SurfaceShapeTools from './SurfaceShapeTools.svelte';
+  import { frameMapper, groupForRender, groupFramePatch, withLayoutFrame } from '../utils/surfaceGroupFrames.js';
   import SurfaceToolStrip from './SurfaceToolStrip.svelte';
   import SurfaceBottomBar from './SurfaceBottomBar.svelte';
   import SurfacePalette from './SurfacePalette.svelte';
@@ -174,7 +178,13 @@
   let generators = $derived(getSection(control, 'Generators'));
   let states = $derived(getSection(control, 'States'));
   let renderControl = $derived.by(() => materializedCustomComponentSnapshot(control, previewSignals(preview)));
-  let parts = $derived(getSection(renderControl, 'Parts'));
+  // Combined shapes (utils/booleanGroups.js) are handed their operands as drawn. The snapshot is a
+  // fresh copy per derivation, so attaching writes into nothing shared.
+  let parts = $derived.by(() => {
+    const section = getSection(renderControl, 'Parts');
+    attachBooleanInputs(section?._children);
+    return section;
+  });
   let authoredParts = $derived(getSection(control, 'Parts'));
   let hitZones = $derived(getSection(renderControl, 'HitZones'));
   let authoredHitZones = $derived(getSection(control, 'HitZones'));
@@ -182,7 +192,12 @@
     Object.entries(parts?._children ?? {})
       .sort((left, right) => Number(left?.[1]?.zIndex ?? 0) - Number(right?.[1]?.zIndex ?? 0))
   );
-  let partEntries = $derived(allPartEntries.filter(([, part]) => part?.visible !== false));
+  // What the artboard draws: a combined shape stands in for its operands.
+  let partEntries = $derived(allPartEntries.filter(([, part]) => part?.visible !== false && !isBooleanOperand(part)));
+  let shapeTools = $state(null);
+  let shapeBusy = $state(false);
+  // Operands being edited are shown faintly where they are, so a hole can be seen while it is moved.
+  let selectedOperandEntries = $derived(allPartEntries.filter(([name, part]) => isBooleanOperand(part) && part?.visible !== false && selectedLayerSet.has(name)));
   let hitZoneEntries = $derived(
     Object.entries(hitZones?._children ?? {})
       .filter(([, zone]) => zone?.enabled !== false && zone?.visibleInEditor !== false)
@@ -296,13 +311,15 @@
   let generatedSourceEntries = $derived.by(() => buildGeneratedSourceEntries());
   let topLevelPartEntries = $derived(topDownPartEntries.filter(([, part]) => {
     const source = generatedSourceForNode(part);
-    return !kitIdFor(part) && (!source || !isGeneratedSourceCollapsed(source));
+    return !isBooleanOperand(part) && !kitIdFor(part) && (!source || !isGeneratedSourceCollapsed(source));
   }));
   let dockHitZoneEntries = $derived(hitZoneEntries.filter(([, zone]) => {
     const source = generatedSourceForNode(zone);
     return !source || !isGeneratedSourceCollapsed(source);
   }));
-  let overlayPartEntries = $derived(partEntries.filter(([name, part]) => !kitIdFor(part) || selectedLayerSet.has(name)));
+  let overlayPartEntries = $derived(allPartEntries.filter(([name, part]) => part?.visible !== false && (isBooleanOperand(part)
+    ? selectedLayerSet.has(name)
+    : (!kitIdFor(part) || selectedLayerSet.has(name)))));
   let selectedKitEntry = $derived(kitEntries.find((entry) => entry.id === selectedKit) ?? null);
   let selectedKitFrame = $derived.by(() => kitFrame(selectedKitEntry));
   let selectedPart = $derived(parts?._children?.[selectedLayer] ?? null);
@@ -327,7 +344,11 @@
   });
   let selectedPartEditable = $derived(isEditablePart(selectedAuthoredPart));
   let selectedZoneEditable = $derived(isEditableZone(selectedAuthoredZone));
-  let selectedBackground = $derived(selectedAuthoredPart?._children?.Background ?? null);
+  // For a combined shape, the style shown and edited is its paint source's (see paintTargetFor).
+  let selectedStylePart = $derived(isBooleanGroup(selectedAuthoredPart)
+    ? (authoredParts?._children?.[booleanSpec(selectedAuthoredPart).paintFrom] ?? selectedAuthoredPart)
+    : selectedAuthoredPart);
+  let selectedBackground = $derived(selectedStylePart?._children?.Background ?? null);
   let selectedText = $derived(selectedAuthoredPart?._children?.Text ?? null);
   let selectedFill = $derived(selectedBackground?._children?.Fill ?? null);
   let selectedBorder = $derived(selectedBackground?._children?.Border ?? null);
@@ -872,6 +893,15 @@
   }
 
   function partFrame(part) {
+    // A combined shape is where its outline is; its Layout box only records that, and lags an edit
+    // by as long as the outline takes to compute.
+    if (isBooleanGroup(part) && part?.meta?.booleanInputs) {
+      $booleanShapeRevision;
+      const bounds = booleanShapeFor(part, artboardWidth, artboardHeight).shape?.bounds;
+      if (bounds && bounds.width > 0 && bounds.height > 0) {
+        return { left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height };
+      }
+    }
     return partFrameBase(part, artboardWidth, artboardHeight);
   }
 
@@ -1001,31 +1031,17 @@
   }
 
   function renderPartForFrame(name, part) {
-    const frame = activeLayerFrames?.[name] ?? (activeSelectionKind === 'layer' && name === selectedLayer ? activeFrame : null);
-    if (!frame) return part;
-    const layout = part?._children?.Layout ?? {};
-    return {
-      ...part,
-      _children: {
-        ...(part?._children ?? {}),
-        Layout: {
-          ...layout,
-          mode: 'absolute',
-          x: frame.left,
-          y: frame.top,
-          width: frame.width,
-          height: frame.height,
-          xUnit: 'px',
-          yUnit: 'px',
-          widthUnit: 'px',
-          heightUnit: 'px',
-          anchorX: 'left',
-          anchorY: 'top',
-          offsetX: 0,
-          offsetY: 0,
-        },
-      },
-    };
+    const frame = inFlightFrame(name);
+    if (isBooleanGroup(part)) {
+      // Moving or sizing a shape carries its operands; dragging one operand moves just that one.
+      return groupForRender(part, frame ? frameMapper(partFrame(part), frame) : null,
+        { renderPart: renderPartForFrame, frameOf: inFlightFrame, partFrame });
+    }
+    return frame ? withLayoutFrame(part, frame) : part;
+  }
+
+  function inFlightFrame(name) {
+    return activeLayerFrames?.[name] ?? (activeSelectionKind === 'layer' && name === selectedLayer ? activeFrame : null);
   }
 
   function nearestArcPivotTarget() {
@@ -1057,7 +1073,8 @@
     const previewTransform = getSection(materialized, 'Transform') ?? transform ?? {};
     const previewWidth = Math.max(1, numberOr(previewTransform?.width, artboardWidth));
     const previewHeight = Math.max(1, numberOr(previewTransform?.height, artboardHeight));
-    const previewParts = Object.entries(getSection(materialized, 'Parts')?._children ?? {})
+    attachBooleanInputs(getSection(materialized, 'Parts')?._children);
+    const previewParts = drawnPartEntries(Object.entries(getSection(materialized, 'Parts')?._children ?? {}))
       .filter(([, part]) => part?.visible !== false)
       .sort((left, right) => Number(left?.[1]?.zIndex ?? 0) - Number(right?.[1]?.zIndex ?? 0));
     return {
@@ -1965,6 +1982,13 @@
   }
 
   function patchFromFrameForLayer(name, part, frame) {
+    if (isBooleanGroup(part) || isBooleanGroup(parts?._children?.[name])) {
+      // A combined shape's box is derived: moving or sizing it moves and sizes its operands.
+      return groupFramePatch(name, frame, {
+        authoredParts: authoredParts?._children, parts: parts?._children, partFrame, isEditable: isEditablePart,
+        patchFor: (leaf, authored, leafFrame) => patchFromFrameForLayerBase(leaf, authored, leafFrame, artboardWidth, artboardHeight),
+      });
+    }
     return patchFromFrameForLayerBase(name, part, frame, artboardWidth, artboardHeight);
   }
 
@@ -1998,12 +2022,21 @@
       for (const name of selectedLayerNames) setLayerPropertyFor(name, relativePath, value);
       return;
     }
-    updateControlProperty(core.id, `Parts.${selectedLayer}.${relativePath}`, value);
+    updateControlProperty(core.id, `Parts.${paintTargetFor(selectedLayer, relativePath)}.${relativePath}`, value);
   }
 
   function setLayerPropertyFor(name, relativePath, value) {
     if (!core?.id || !name || !relativePath || !isEditablePart(authoredParts?._children?.[name])) return;
-    updateControlProperty(core.id, `Parts.${name}.${relativePath}`, value);
+    updateControlProperty(core.id, `Parts.${paintTargetFor(name, relativePath)}.${relativePath}`, value);
+  }
+
+  // A combined shape paints with its paint source's fill, border and effects (booleanGroups.js), so
+  // restyling the shape restyles that operand — which is also what states and bindings on it change.
+  const PAINT_ROOTS = new Set(['Background', 'Effects', 'opacity']);
+  function paintTargetFor(name, relativePath) {
+    const part = authoredParts?._children?.[name];
+    if (!isBooleanGroup(part) || !PAINT_ROOTS.has(String(relativePath).split('.')[0])) return name;
+    return booleanSpec(part).paintFrom || name;
   }
 
   function setLayerLayoutProperty(relativePath, value) {
@@ -2078,6 +2111,8 @@
     localSelectedLayerNames = nextSelection;
     applyControlPatch(core.id, {
       [`Parts.${nextName}`]: renamed,
+      // Combined shapes name their operands; the names follow.
+      ...membershipRenamePatch(authoredParts?._children, currentName, nextName),
       'Designer.selectedLayer': nextName,
       'Designer.selectedLayers': nextSelection,
       'Designer.selectedSurfaceKind': 'layer',
@@ -2094,6 +2129,25 @@
 
   function duplicateSelectedLayer() {
     if (!core?.id || !selectedAuthoredPart) return;
+    if (selectedLayerNames.some((name) => isBooleanGroup(authoredParts?._children?.[name]))) {
+      // Through the paste path, which carries a shape's operands and re-points them at the copies.
+      const result = buildPastePatch(
+        { parts: withGroupMembers(authoredParts?._children, selectedLayerNames).map((name) => authoredParts._children[name]), hitZones: [] },
+        Object.keys(authoredParts?._children ?? {}),
+        Object.keys(authoredHitZones?._children ?? {}),
+        maxLayerZIndex(),
+        8,
+      );
+      if (!result?.partNames?.length) return;
+      localSelectedLayerNames = result.partNames;
+      applyControlPatch(core.id, {
+        ...result.patch,
+        'Designer.selectedLayer': result.partNames[0],
+        'Designer.selectedLayers': result.partNames,
+        'Designer.selectedSurfaceKind': 'layer',
+      });
+      return;
+    }
     if (multiSelectionActive) {
       const patch = {};
       const nextSelection = [];
@@ -2205,6 +2259,19 @@
 
   function removeSelectedLayer() {
     if (!core?.id || !selectedLayer || !selectedAuthoredPart) return;
+    if (selectedLayerNames.some((name) => isBooleanGroup(authoredParts?._children?.[name]) || isBooleanOperand(authoredParts?._children?.[name]))) {
+      // A deleted shape takes its operands; a deleted operand leaves its shape. One write, one undo.
+      const nextParts = partsAfterRemoval(authoredParts?._children, selectedLayerNames);
+      const next = topDownPartEntries.find(([name, part]) => nextParts[name] && !isBooleanOperand(nextParts[name]) && part)?.[0] ?? '';
+      localSelectedLayerNames = next ? [next] : [];
+      applyControlPatch(core.id, {
+        'Parts._children': nextParts,
+        'Designer.selectedLayer': next,
+        'Designer.selectedLayers': next ? [next] : [],
+        'Designer.selectedSurfaceKind': 'layer',
+      });
+      return;
+    }
     if (multiSelectionActive) {
       const selected = new Set(selectedLayerNames);
       const next = topDownPartEntries.find(([name]) => !selected.has(name))?.[0] ?? '';
@@ -2260,6 +2327,16 @@
 
   function moveLayer(name, direction) {
     if (!core?.id || !name || !authoredParts?._children?.[name]) return;
+    if (isBooleanOperand(authoredParts._children[name])) {
+      // Inside a combined shape, order is the operands' order (which one is cut from, which paints).
+      applyControlPatch(core.id, {
+        'Parts._children': partsAfterOperandMove(authoredParts._children, name, direction),
+        'Designer.selectedLayer': name,
+        'Designer.selectedLayers': [name],
+        'Designer.selectedSurfaceKind': 'layer',
+      });
+      return;
+    }
     const stack = Object.entries(authoredParts?._children ?? {})
       .sort((left, right) => numberOr(left?.[1]?.zIndex, 0) - numberOr(right?.[1]?.zIndex, 0));
     const index = stack.findIndex(([entryName]) => entryName === name);
@@ -2449,50 +2526,9 @@
     if (Object.keys(patch).length) applyControlPatch(core.id, patch);
   }
 
-  // Unite / Subtract / Intersect / Exclude the selected shapes into one (utils/partBooleans.js). One
-  // write of the whole Parts section, so one undo brings every operand back.
-  let combining = $state(false);
-  async function combineSelectedLayers(operation) {
-    if (!core?.id || selectedLayerNames.length < 2 || combining) return;
-    combining = true;
-    try {
-      const entries = selectedLayerNames.map((name) => [name, authoredParts?._children?.[name], parts?._children?.[name]]);
-      const plan = await planPartBoolean(control, entries, operation, { artboardWidth, artboardHeight });
-      if (!plan.ok) {
-        const first = plan.refused[0];
-        showDrawNotice(`Can't ${BOOLEAN_LABELS[operation].toLowerCase()}: ${first.name ? `${first.name} — ` : ''}${first.reason}`);
-        return;
-      }
-      localSelectedLayerNames = [plan.keep];
-      applyControlPatch(core.id, {
-        'Parts._children': partsAfterBoolean(authoredParts?._children, plan),
-        'Designer.selectedLayer': plan.keep,
-        'Designer.selectedLayers': [plan.keep],
-        'Designer.selectedSurfaceKind': 'layer',
-      });
-      showDrawNotice(`${BOOLEAN_LABELS[operation]}: ${entries.length} shapes into ${plan.keep}`);
-    } finally {
-      combining = false;
-    }
-  }
-
-  // Smooth a Pen path into a curve through the same points.
-  async function smoothSelectedPath() {
-    if (!core?.id || !penEditPart || combining) return;
-    combining = true;
-    try {
-      const name = penEditPart.name;
-      const plan = await planPathSmooth(parts?._children?.[name], { artboardWidth, artboardHeight });
-      if (!plan.ok) { showDrawNotice(plan.reason); return; }
-      applyControlPatch(core.id, { [`Parts.${name}`]: applyPartPatch(authoredParts._children[name], plan.patch) });
-      showDrawNotice(`Smoothed ${name}`);
-    } finally {
-      combining = false;
-    }
-  }
-
   function copySelectedLayers() {
-    const copiedParts = selectedLayerNames
+    // A combined shape is copied with the operands it is made of.
+    const copiedParts = withGroupMembers(authoredParts?._children, selectedLayerNames)
       .map((name) => authoredParts?._children?.[name])
       .filter(Boolean);
     if (!copiedParts.length) return;
@@ -3646,6 +3682,18 @@
             {/each}
 
             {#if !designerPreviewing}
+              {#each selectedOperandEntries as [name, part] (name)}
+                <div class="boolean-operand-ghost" aria-hidden="true">
+                  <InteractivePartRenderer
+                    part={renderPartForFrame(name, part)}
+                    parentWidth={artboardWidth}
+                    parentHeight={artboardHeight}
+                  />
+                </div>
+              {/each}
+            {/if}
+
+            {#if !designerPreviewing}
               <SurfacePenTool
                 bind:this={penTool}
                 active={activeTool === 'pen'}
@@ -3769,26 +3817,36 @@
                   <button type="button" onclick={() => distributeSelectedLayers('x')} disabled={selectedLayerNames.length < 3} title="Distribute horizontally (3+ layers)">⇸</button>
                   <button type="button" onclick={() => distributeSelectedLayers('y')} disabled={selectedLayerNames.length < 3} title="Distribute vertically (3+ layers)">⇊</button>
                   <span class="align-divider"></span>
-                  <button type="button" data-boolean="unite" onclick={() => combineSelectedLayers('unite')} disabled={combining} title="Unite: merge the shapes into one outline" aria-label="Unite"><SquaresUnite size={13} /></button>
-                  <button type="button" data-boolean="subtract" onclick={() => combineSelectedLayers('subtract')} disabled={combining} title="Subtract: cut the front shapes out of the back one" aria-label="Subtract"><SquaresSubtract size={13} /></button>
-                  <button type="button" data-boolean="intersect" onclick={() => combineSelectedLayers('intersect')} disabled={combining} title="Intersect: keep only where the shapes overlap" aria-label="Intersect"><SquaresIntersect size={13} /></button>
-                  <button type="button" data-boolean="exclude" onclick={() => combineSelectedLayers('exclude')} disabled={combining} title="Exclude: keep where they don't overlap" aria-label="Exclude"><SquaresExclude size={13} /></button>
+                  <button type="button" data-boolean="unite" onclick={() => shapeTools?.combine('unite')} disabled={shapeBusy} title="Unite: merge the shapes into one outline" aria-label="Unite"><SquaresUnite size={13} /></button>
+                  <button type="button" data-boolean="subtract" onclick={() => shapeTools?.combine('subtract')} disabled={shapeBusy} title="Subtract: cut the front shapes out of the back one" aria-label="Subtract"><SquaresSubtract size={13} /></button>
+                  <button type="button" data-boolean="intersect" onclick={() => shapeTools?.combine('intersect')} disabled={shapeBusy} title="Intersect: keep only where the shapes overlap" aria-label="Intersect"><SquaresIntersect size={13} /></button>
+                  <button type="button" data-boolean="exclude" onclick={() => shapeTools?.combine('exclude')} disabled={shapeBusy} title="Exclude: keep where they don't overlap" aria-label="Exclude"><SquaresExclude size={13} /></button>
                 </div>
               {/if}
             {/if}
 
-            {#if !designerPreviewing && penEditPart && !interaction && activeSelectionFrame}
-              <div
-                class="align-toolbar"
-                style={`left:${Math.max(0, activeSelectionFrame.left)}px;top:${pathToolbarTop(activeSelectionFrame)}px;`}
-                role="toolbar"
-                tabindex="-1"
-                aria-label="Path"
-                onmousedown={stopSelectionAction}
-              >
-                <button type="button" data-path-smooth onclick={smoothSelectedPath} disabled={combining} title="Smooth: a curve through the same points" aria-label="Smooth"><Spline size={13} /></button>
-              </div>
-            {/if}
+            <SurfaceShapeTools
+              bind:this={shapeTools}
+              bind:busy={shapeBusy}
+              controlId={core?.id ?? ''}
+              {control}
+              authoredParts={authoredParts?._children ?? {}}
+              parts={parts?._children ?? {}}
+              {selectedLayerNames}
+              {selectedLayer}
+              {selectedAuthoredPart}
+              {activeSelectionKind}
+              {penEditPart}
+              {activeSelectionFrame}
+              {interaction}
+              {designerPreviewing}
+              {artboardWidth}
+              {artboardHeight}
+              toolbarTop={pathToolbarTop}
+              {stopSelectionAction}
+              onSelection={(names) => { localSelectedLayerNames = names; }}
+              onNotice={showDrawNotice}
+            />
 
             {#each partEntries as [name, part] (name)}
               {#if !designerPreviewing && inlineTextEditLayer === name && authoredParts?._children?.[name]?._children?.Text && isEditablePart(authoredParts?._children?.[name])}
@@ -3962,6 +4020,7 @@
             {moveLayer} {beginLayerDrag} {dropLayerOn}
             {addLayerAtCenter} {addHitZoneAtCenter} {editKitParts} {editGeneratedSource} {editGeneratorForLayer} {removeKitEntry}
             {renameLayer}
+            operandEntriesFor={(name) => operandEntries(parts?._children, name)}
           />
           {:else if dockTab === 'generators'}
             <div class="dock-generator-editor">
@@ -5379,6 +5438,14 @@
     color: rgba(250, 224, 120, 0.98);
     font-size: 10px;
     white-space: nowrap;
+  }
+
+  .boolean-operand-ghost {
+    position: absolute;
+    inset: 0;
+    opacity: 0.35;
+    pointer-events: none;
+    outline: none;
   }
 
   .align-toolbar {

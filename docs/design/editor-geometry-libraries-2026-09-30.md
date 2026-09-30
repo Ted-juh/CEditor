@@ -10,7 +10,11 @@ deliberately left alone.
 |---|---|---|---|
 | `@floating-ui/dom` ^1.8 | MIT | `utils/floatingUi.js` | Yes, about 15 kB — the preview combobox uses it |
 | `rbush` ^4.0 | MIT | `utils/controlSpatialIndex.js` | No |
-| `paper` ^0.12.18 | MIT | `utils/partBooleans.js`, loaded lazily | No — dynamic import, editor only |
+| `paper` ^0.12.18 | MIT | `utils/partOutlines.js`, `booleanGroups.js` | On demand only — a lazy chunk (212 kB) the player fetches the first time a combined shape needs computing |
+| `paperjs-offset` ^2.2 | MIT | stroke expansion and inward offsets | On demand only (20 kB) |
+| `fontkit` ^2.0 | MIT | `utils/textOutline.js` — glyphs, shaping, variable fonts | On demand only, for text taking part in a shape |
+| `woff2-encoder` ^2.0 | MIT | WOFF2 → TrueType (Google's decoder, WebAssembly) | On demand only, as fontkit |
+| Liberation Sans / Serif / Mono 2.1 | OFL 1.1 | `assets/fonts/liberation-*.woff2`, unmodified | Fetched one file at a time, only to outline Arial / Times / Courier text |
 
 ## Floating UI: one rule for every popup
 
@@ -69,34 +73,87 @@ container — `getChildControls` returns a fresh one each call, which would have
 Not indexed, and why: drop-target search (containers are few), scenery hover, and the
 multi-selection bounds (its cost is recomputation, which is a caching problem, not a spatial one).
 
-## Paper.js: booleans and smoothing in the Component Designer
+## Paper.js: live combined shapes in the Component Designer
 
-**The problem.** The designer's parts are primitives plus pen paths. A plate with a hole, a notched
-pointer or a crescent could only be faked with overlapping parts and a background-coloured fill,
-which breaks as soon as the panel colour changes.
+**The problem.** The designer's parts are primitives, Pen paths and text. A plate with a hole, a
+notched pointer, a legend knocked out of a badge could only be faked with overlapping parts and a
+background-coloured fill, which breaks as soon as the panel colour changes.
 
-**What changed.** Unite, Subtract, Intersect and Exclude on a multi-selection, and Smooth on a pen
-path (user docs: [The Pen](../pen-tool.md#combining-shapes)). Paper.js runs headless, loaded by a
-dynamic `import()` on first use, so neither the editor's first load nor the player pays for it.
-`partOutline` turns each part into its real outline — per-corner radii, the capsule's stadium,
-polygon points, layout scale and rotation about the pivot — so what is combined is what is drawn.
+**The first version, and why it was replaced.** Combining replaced the operands with one path. That
+deleted parts — and a component names its parts everywhere (hit zones follow them, bindings move them,
+states and variants restyle them, scripts address them) — so it had to refuse any operand anything
+referred to, and anything it could not outline exactly: text, arcs, lines, open paths, three of the four
+corner styles, gradient and image fills, non-solid borders, hidden and generated parts. Six classes of
+refusal, each a place the tool said no.
 
-The result is a new part form: `kind: 'path'` with `meta.pathData` (an SVG path in the part's 0..1
-box) and no `vectorPoints`. `InteractivePartRenderer` draws it as one `<path>` with
-`fill-rule="evenodd"` and a non-scaling stroke inset by half its width, everywhere parts render. It
-imports only `hasCompoundPath` from `penPath.js`, never `partBooleans.js`, which is what keeps
-Paper.js out of the player.
+**What it is now** (user docs: [The Pen](../pen-tool.md#combining-shapes)):
 
-Refused rather than approximated: see the user docs. The ones worth knowing as a developer are the
-reference checks — a removed operand referenced by a hit zone (`part:name`), a binding
-(`Parts.name.`), a state's `patches.parts`, a published property or a variant stops the operation,
-because removing it would leave that reference dangling. The applied change is one
-`applyControlPatch` of `Parts._children`, so it is one undo step.
+- **Live groups** (`utils/booleanGroups.js`). A combined shape is a part of kind `boolean` —
+  `meta.boolean { operation, operands, paintFrom }` — and each operand is kept, marked
+  `meta.booleanGroup`. Nothing is deleted, so nothing that names a part breaks, and there is nothing
+  left to refuse on that account. `attachBooleanInputs` runs at the end of `resolveInteractiveControl`
+  (and on the designer's snapshot, the state filmstrip and the contact sheet): each shape is handed its
+  operands as they are after variants, generators, bindings, states and internal scaling. So a binding
+  that moves the hole moves the cut, at run time, in the plug-in — `browser-checks/booleanRuntime.mjs`
+  turns a value on the panel and reads the cut moving off the screen.
+- **Computed on demand, cached.** The renderer asks `booleanShapeFor` synchronously; it answers from a
+  memo keyed by the operands' geometry, or from `meta.cache` (the outline the designer last computed,
+  written without an undo step of its own once an edit settles), or — while Paper.js computes the new
+  outline — with the last good one, and `booleanShapeRevision` redraws when it arrives. Paper.js is a
+  lazy chunk; the player fetches it only when a cache does not match.
+- **Exact operands** (`utils/partOutlines.js`). Every kind is outlined by the renderer's own rules:
+  corners through the fill clip builder the renderer uses (`cornerPaths.js`), with CSS's
+  radius-scaling rule for rounded ones; stadiums; polygons and Pen paths as the inset polygon plus its
+  stroke band; open paths and lines as their stroke band (paperjs-offset), round caps as drawn; arcs as
+  the ring sector the dashed circle paints, centred as `viewBox`+meet centres it; the value arc as its
+  conic sector under its radial mask (including CSS's farthest-corner sizing); text as glyphs.
+- **Text** (`utils/textOutline.js`, `utils/fontSources.js`). The glyphs come from the font file, parsed
+  by fontkit, shaped with the font's kerning and ligatures, variable fonts instanced at their weight,
+  laid out by a model of the renderer's text box (padding, flex centring, letter- and word-spacing,
+  case, wrapping, clipping, synthesised bold and italic). The panel faces are resolved from
+  `models/panelFontFaces.js` — `panelFonts.css` as data, unicode-range subsets included, held to the
+  stylesheet by a test. `browser-checks/partBooleans.mjs` compares outlined text to the browser's own
+  glyphs pixel for pixel: 87% ink overlap, every edge within a pixel (the rest is antialiasing).
+  WOFF2 is decompressed with woff2-encoder first, because fontkit's WOFF2 path cannot instance a
+  variable font. System fonts: Arial / Helvetica, Times and Courier resolve to the Liberation fonts,
+  metric-compatible (same advance widths), shipped unmodified — a subset would be a Modified Version
+  under the OFL and could not keep the reserved name; on Windows the app reads system fonts from the
+  Fonts folder through its file bridge; a browser may grant the Local Font Access API. Anything else is
+  refused by name.
+- **Full paint on the outline** (`BackgroundRenderer`'s `outline` mode, `utils/outlineBorder.js`,
+  `utils/outlineShadows.js`). Fill layers are clipped with `clip-path: path(evenodd, …)`; the border is
+  drawn as bands inward from the outline — a stroke of twice the depth clipped to the inside, which is
+  exactly the set of points within that depth of the edge — so dashed, groove, ridge and double carry
+  over by the box border's own arithmetic; dotted borders sit on the outline pulled in by the dot radius
+  (a Paper.js offset, computed with the shape); inset and outset shade by which way an edge faces.
+  Part shadows are drawn from the outline instead of a box-shadow. Closed flattened and smoothed paths
+  paint through the same pipeline.
+- **The designer** treats a shape as one layer: dragging or resizing it maps its operands' frames
+  (`utils/surfaceGroupFrames.js`) and the outline follows the pointer; the layer list nests operands
+  under their shape; delete, rename, reorder, copy, paste and duplicate keep membership consistent
+  (`partsAfterRemoval`, `membershipRenamePatch`, `remapCopiedGroups`); a generated operand is detached
+  first, and the materializer no longer stamps a detached part back to generated (a bug the per-layer
+  Detach already had). The shape tools live in `sections/SurfaceShapeTools.svelte`.
 
-**Known limit.** A compound path is not vertex-editable: it has no point handles. Converting it
-back to editable points (per subpath, with curve handles) is the natural next step if it is asked
-for.
+**Still refused, by name:** a knob or slider carried as a part, an envelope display, a waveform icon —
+each drawn live by its own renderer with no fixed outline — and text whose font file cannot be read.
+Flatten, the one destructive step, is refused while anything names an operand.
 
-Checked by `test/partBooleans.test.js` (areas per operation, ownership, turned and scaled outlines,
-refusals, references, smoothing, the SSR renderer) and `browser-checks/partBooleans.mjs` (subtract
-through the real toolbar, undo and redo, a pixel check that the hole is really empty, smooth).
+**Known limits.**
+
+- A flattened or smoothed path has no point handles. Keep a shape live to keep editing it.
+- A shape's cache is keyed to the designer's artboard size; an instance drawn at another size
+  computes its outline on first paint (one frame of the previous outline, then the right one).
+- Text using a font imported in Settings is outlined in the editor, but the player does not load
+  imported fonts, so a *run-time* change to such text (a binding on its content) cannot be re-outlined
+  there; the shape keeps the outline it had.
+- A border's gradient on an outline runs across the shape's box at the gradient's angle; the box
+  border's per-side "follow" flow and corner gradient modes have no sides to follow.
+
+Checked by `test/booleanGroups.test.js`, `test/partOutlines.test.js` and `test/textOutline.test.js`
+(areas of every kind against the renderer's rules, live resolution through the real pipeline with a
+state and a binding, the renderer's outline mode, membership through every layer operation, flatten
+and its refusals, the font table against the stylesheet, font matching, layout) and by
+`browser-checks/partBooleans.mjs` (combine, undo, the cut following the hole, hiding, switching the
+operation, gradient and dashed border on the outline, dragging the shape, flatten refused and done,
+release, smooth, text against the browser's glyphs) and `browser-checks/booleanRuntime.mjs`.

@@ -9,6 +9,7 @@
   import { plainFillCSS } from '../utils/plainFillCSS.js';
   import { observeElementMetrics } from '../utils/batchedElementMetrics.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
+  import { drawnPartEntries } from '../utils/booleanGroups.js';
   import { bakeStaticPartEntries } from '../utils/staticPartBaking.js';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
   import { SLIDER_SEMANTIC_PARTS, hasSliderControlParts } from '../utils/sliderControlPart.js';
@@ -431,8 +432,9 @@
       .filter(([, zone]) => zone?.enabled !== false && zone?.visibleInEditor !== false)
       .sort((left, right) => numberOr(left?.[1]?.priority, 0) - numberOr(right?.[1]?.priority, 0))
   );
+  // A combined shape's operands are drawn by the shape (utils/booleanGroups.js), not as themselves.
   let renderPartEntries = $derived.by(() =>
-    Object.entries(renderParts?._children ?? {})
+    drawnPartEntries(Object.entries(renderParts?._children ?? {}))
       .filter(([, part]) => part?.visible !== false)
       .sort((left, right) => numberOr(left?.[1]?.zIndex, 0) - numberOr(right?.[1]?.zIndex, 0))
   );
@@ -3729,7 +3731,9 @@
           {partName}
           parentWidth={displayW}
           parentHeight={displayH}
-          transitionBucket={interactionRuntime?.transitions?.partTransitions?.get?.(partName) ?? null}
+          transitionBucket={interactionRuntime?.transitions?.partTransitions?.get?.(partName)
+            ?? interactionRuntime?.transitions?.partTransitions?.get?.(part?.meta?.booleanInputs?.paintFrom)
+            ?? null}
           debug={interactionDebugEnabled}
           editableInput={editableInputForPart(part)}
           oneditableinput={editableHandlerForPart(part, 'input')}

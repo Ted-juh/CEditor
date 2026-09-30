@@ -30,6 +30,7 @@ import {
 import { sliderValueToAngle } from './sliderGeometry.js';
 import { materializeCustomComponent } from './customComponentMaterializer.js';
 import { applyCustomInternalScale } from './customComponentScale.js';
+import { attachBooleanInputs } from './booleanGroups.js';
 import { applyActiveVariant, applyVariantPatches } from './customComponentVariants.js';
 import { constrainCustomValues, customConditionMatches } from './customComponentInteraction.js';
 import { clamp } from './primitives.js';
@@ -833,6 +834,10 @@ export function resolveInteractiveControl(control, previewSession = {}) {
   // the stamped design size. Applied last so materialization, bindings, and
   // state patches all keep authoring in design space.
   if (isCustomComponent) applyCustomInternalScale (resolved);
+
+  // Combined shapes (utils/booleanGroups.js) take their operands as they are NOW — after variants,
+  // generators, bindings, states and scaling — so a binding that moves a hole moves it in the shape.
+  if (isCustomComponent) attachBooleanInputs(getNodeChild(resolved, 'Parts')?._children);
 
   const transitions = buildTransitionCatalog(resolved, effectivePreviewSession);
 

@@ -19,6 +19,7 @@ import { applyCustomInternalScale } from './customComponentScale.js';
 import { activeVariantOf, applyActiveVariant, applyVariantPatches } from './customComponentVariants.js';
 import { deepClone } from './deepClone.js';
 import { numberOr } from './primitives.js';
+import { attachBooleanInputs, drawnPartEntries, isBooleanGroup } from './booleanGroups.js';
 
 const EDGE_TOLERANCE = 0.5;
 
@@ -72,6 +73,18 @@ function visibleParts(materialized) {
   return Object.entries(materialized?._children?.Parts?._children ?? {})
     .filter(([, part]) => part?.visible !== false)
     .sort((left, right) => numberOr(left?.[1]?.zIndex, 0) - numberOr(right?.[1]?.zIndex, 0));
+}
+
+// What a cell draws: a combined shape (booleanGroups.js) in place of its operands.
+function drawnParts(materialized) {
+  attachBooleanInputs(materialized?._children?.Parts?._children);
+  return drawnPartEntries(visibleParts(materialized));
+}
+
+// What a cell is judged by: every real layout box — the operands, not the box a combined shape
+// derives from them.
+function measuredParts(materialized) {
+  return visibleParts(materialized).filter(([, part]) => !isBooleanGroup(part));
 }
 
 /**
@@ -148,13 +161,15 @@ export function contactSheetCell(control, stateName, size, signals = {}, design 
   const materialized = materializedCustomComponentSnapshot(scoped, signals);
   if (variantPending) applyVariantPatches(materialized, variantPending);
   applyCustomInternalScale(materialized);
-  const parts = visibleParts(materialized);
+  const measured = measuredParts(materialized);
+  const parts = drawnParts(materialized);
   return {
     key: `${stateName || 'base'}:${size.key}`,
     state: stateName || 'base',
     size,
     parts,
-    issues: design ? layoutIssues(design.parts, design.size, parts, size) : [],
+    measured,
+    issues: design ? layoutIssues(design.measured ?? design.parts, design.size, measured, size) : [],
   };
 }
 

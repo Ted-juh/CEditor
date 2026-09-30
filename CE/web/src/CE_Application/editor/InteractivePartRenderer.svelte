@@ -10,6 +10,9 @@
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import { isSliderControlPart, sliderControlSession } from '../utils/sliderControlPart.js';
+  import { booleanShapeFor, booleanShapeRevision, compoundShapeFor, isBooleanGroup } from '../utils/booleanGroups.js';
+  import { outlineInsetDepths } from '../utils/outlineBorder.js';
+  import { outlineShadows } from '../utils/outlineShadows.js';
 
   let {
     part = null,
@@ -24,6 +27,8 @@
     oneditablefocus = null,
     oneditableblur = null,
   } = $props();
+
+  const partUid = $props.id();
 
   function clampNumber(value, min, max) {
     return Math.max(min, Math.min(max, numberOr(value, min)));
@@ -126,9 +131,23 @@
   // A combined or smoothed shape (utils/partBooleans.js): SVG path data in 0..1 of the box, with curves,
   // holes and islands, so it cannot be a point list.
   let compoundPathData = $derived(hasCompoundPath(part) ? part.meta.pathData : '');
-  let rendersVectorShape = $derived(rendersPolygon || rendersLine || !!compoundPathData);
+  // A combined shape (utils/booleanGroups.js) and a closed compound path paint through the outline
+  // pipeline — every fill layer, border style and effect, on their true shape. An OPEN compound path
+  // (a smoothed open Pen path) has no inside and is still a stroke, drawn by the vector branch.
+  let rendersBooleanGroup = $derived(isBooleanGroup(part));
+  let rendersOutline = $derived(rendersBooleanGroup || (!!compoundPathData && part?.meta?.closed !== false));
+  let rendersVectorShape = $derived(rendersPolygon || rendersLine || (!!compoundPathData && !rendersOutline));
 
-  let frame = $derived.by(() => {
+  let outlineDepths = $derived(rendersOutline ? outlineInsetDepths(background) : []);
+  // The group's outline: computed from its operands as they are now, synchronously when that is
+  // already known, otherwise the previous outline until Paper.js has the new one.
+  let groupShape = $derived.by(() => {
+    if (!rendersBooleanGroup) return null;
+    $booleanShapeRevision;
+    return booleanShapeFor(part, parentWidth, parentHeight, { insetDepths: outlineDepths, identity: partUid });
+  });
+
+  let layoutFrame = $derived.by(() => {
     if (!layout) {
       return {
         left: 0,
@@ -162,13 +181,35 @@
     };
   });
 
+  // A group sits where its outline is; its Layout box only records that for the designer.
+  let frame = $derived.by(() => {
+    const bounds = groupShape?.shape?.bounds;
+    if (rendersBooleanGroup && bounds) return { left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height };
+    return layoutFrame;
+  });
+
+  let outlineState = $derived.by(() => {
+    if (!rendersOutline) return null;
+    if (rendersBooleanGroup) return groupShape;
+    $booleanShapeRevision;
+    return compoundShapeFor(part, frame.width, frame.height, { insetDepths: outlineDepths, identity: partUid });
+  });
+
+  let outline = $derived.by(() => {
+    const shape = outlineState?.shape;
+    if (!shape || shape.empty || !shape.pathData) return null;
+    return { d: shape.pathData, fillRule: 'evenodd', insets: shape.insets ?? {} };
+  });
+
+  let shadowLayers = $derived(rendersOutline ? outlineShadows(effects) : null);
+
   let partScale = $derived(Math.max(0.01, numberOr(layout?.scale, 1)));
   let partRotation = $derived(numberOr(layout?.rotation, 0));
-  let shadowCSS = $derived(buildShadowCSS(effects));
+  // On an outline the shadows are drawn from the outline (utils/outlineShadows.js), not the box.
+  let shadowCSS = $derived(rendersOutline ? '' : buildShadowCSS(effects));
   let blendCSS = $derived(buildBlendCSS(effects));
   // A lit material (utils/materialFilter.js) is an SVG filter this part owns; it goes first in the
   // filter list so the CSS blur / brightness that follow act on the lit surface.
-  const partUid = $props.id();
   let material = $derived(effects?._children?.Material ?? null);
   let materialLit = $derived(materialActive(material));
   let materialId = $derived(`part-material-${partUid}`);
@@ -207,7 +248,7 @@
   // 2,821 of the GAIA panel's parts are static art already folded into one image per component,
   // and the 474 that are left over still wanted a div each just to hold a colour.
   let absorbedFillCSS = $derived(
-    background && !usesSimpleBackground && !rendersVectorShape
+    background && !usesSimpleBackground && !rendersVectorShape && !rendersOutline
       ? plainFillCSS(background, frame.width, frame.height)
       : null,
   );
@@ -553,7 +594,61 @@
     {#if materialLit}
       <MaterialFilter id={materialId} {material} />
     {/if}
-    {#if background && usesSimpleBackground && !rendersVectorShape}
+    {#if rendersOutline}
+      {#if outline}
+        {#if shadowLayers?.outer.length}
+          <svg class="interactive-outline-shadow" viewBox={`0 0 ${Math.max(1, frame.width)} ${Math.max(1, frame.height)}`} aria-hidden="true">
+            <defs>
+              <mask id={`${partUid}-outside`} maskUnits="userSpaceOnUse" x={-shadowLayers.reach} y={-shadowLayers.reach} width={frame.width + 2 * shadowLayers.reach} height={frame.height + 2 * shadowLayers.reach}>
+                <rect x={-shadowLayers.reach} y={-shadowLayers.reach} width={frame.width + 2 * shadowLayers.reach} height={frame.height + 2 * shadowLayers.reach} fill="white" />
+                <path d={outline.d} fill="black" fill-rule="evenodd" />
+              </mask>
+              {#each shadowLayers.outer as shadow, i (i)}
+                <filter id={`${partUid}-shadow-${i}`} filterUnits="userSpaceOnUse" x={-shadowLayers.reach} y={-shadowLayers.reach} width={frame.width + 2 * shadowLayers.reach} height={frame.height + 2 * shadowLayers.reach}>
+                  {#if shadow.spread > 0}<feMorphology operator="dilate" radius={shadow.spread} />{:else if shadow.spread < 0}<feMorphology operator="erode" radius={-shadow.spread} />{/if}
+                  {#if shadow.blur > 0}<feGaussianBlur stdDeviation={shadow.blur / 2} />{/if}
+                </filter>
+              {/each}
+            </defs>
+            <g mask={`url(#${partUid}-outside)`}>
+              {#each shadowLayers.outer as shadow, i (i)}
+                <path d={outline.d} fill={shadow.colour} fill-rule="evenodd" transform={`translate(${shadow.x} ${shadow.y})`} filter={`url(#${partUid}-shadow-${i})`} />
+              {/each}
+            </g>
+          </svg>
+        {/if}
+        {#if background}
+          <BackgroundRenderer {background} width={frame.width} height={frame.height} {outline} />
+        {/if}
+        {#if shadowLayers?.inner.length}
+          <svg class="interactive-outline-shadow" viewBox={`0 0 ${Math.max(1, frame.width)} ${Math.max(1, frame.height)}`} aria-hidden="true">
+            <defs>
+              <clipPath id={`${partUid}-inside`}><path d={outline.d} clip-rule="evenodd" /></clipPath>
+              {#each shadowLayers.inner as shadow, i (i)}
+                <filter id={`${partUid}-inner-${i}`} filterUnits="userSpaceOnUse" x={-shadowLayers.reach} y={-shadowLayers.reach} width={frame.width + 2 * shadowLayers.reach} height={frame.height + 2 * shadowLayers.reach}>
+                  {#if shadow.blur > 0}<feGaussianBlur stdDeviation={shadow.blur / 2} />{/if}
+                </filter>
+              {/each}
+            </defs>
+            <g clip-path={`url(#${partUid}-inside)`}>
+              {#each shadowLayers.inner as shadow, i (i)}
+                {@const reach = shadowLayers.reach}
+                <!-- Everything outside the shape, moved by the offset and shrunk by the spread, blurred
+                     back in over the edge: an inset box-shadow, on the outline. -->
+                <g filter={`url(#${partUid}-inner-${i})`}>
+                  <path fill={shadow.colour} fill-rule="evenodd"
+                    d={`M ${-reach} ${-reach} H ${frame.width + reach} V ${frame.height + reach} H ${-reach} Z ${outline.d}`}
+                    transform={`translate(${shadow.x} ${shadow.y})`} />
+                  {#if shadow.spread > 0}
+                    <path d={outline.d} fill="none" stroke={shadow.colour} stroke-width={shadow.spread * 2} transform={`translate(${shadow.x} ${shadow.y})`} />
+                  {/if}
+                </g>
+              {/each}
+            </g>
+          </svg>
+        {/if}
+      {/if}
+    {:else if background && usesSimpleBackground && !rendersVectorShape}
       <div class="interactive-simple-background" style={simpleBackgroundStyle}></div>
     {:else if background && !rendersVectorShape}
       <BackgroundRenderer {background} width={frame.width} height={frame.height} absorbFill={!!absorbedFillCSS} />
@@ -721,6 +816,15 @@
   }
 
   .interactive-arc-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .interactive-outline-shadow {
     position: absolute;
     inset: 0;
     width: 100%;

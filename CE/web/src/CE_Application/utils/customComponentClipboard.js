@@ -7,6 +7,8 @@
 // hit-zone sources to the pasted names, offsets layout so the paste is
 // visible, and stacks the clones above the destination's layers.
 
+import { booleanGroupOf, remapCopiedGroups } from './booleanGroups.js';
+
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -84,6 +86,12 @@ export function buildPastePatch(payload, existingPartNames, existingZoneNames, b
     partNames.push(nextName);
   }
 
+  // Combined shapes (booleanGroups.js) come with their operands; membership follows the new names,
+  // and what is selected after the paste is what was selected before it — the shapes, not their insides.
+  const clones = Object.fromEntries(partNames.map((name) => [name, patch[`Parts.${name}`]]));
+  remapCopiedGroups(clones, renames);
+  const selectable = partNames.filter((name) => !booleanGroupOf(clones[name]));
+
   for (const source of (Array.isArray(payload?.hitZones) ? payload.hitZones : [])) {
     const clone = cloneValue(source);
     const nextName = uniqueName(`${clone.name ?? 'zone'}_copy`, takenZones, 'zone');
@@ -97,5 +105,5 @@ export function buildPastePatch(payload, existingPartNames, existingZoneNames, b
     zoneNames.push(nextName);
   }
 
-  return { patch, partNames, zoneNames };
+  return { patch, partNames: selectable.length ? selectable : partNames, zoneNames };
 }

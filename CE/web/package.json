@@ -39,11 +39,14 @@
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",
     "acorn": "^8.17.0",
+    "fontkit": "^2.0.4",
     "gifuct-js": "^2.1.2",
     "luaparse": "^0.3.1",
     "lucide-svelte": "^1.0.1",
     "paper": "^0.12.18",
+    "paperjs-offset": "^2.2.1",
     "rbush": "^4.0.1",
-    "wasmoon": "^1.16.0"
+    "wasmoon": "^1.16.0",
+    "woff2-encoder": "^2.0.0"
   }
 }

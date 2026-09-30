@@ -63,6 +63,14 @@ export default defineConfig(({ command }) => ({
   define: {
     __APP_BUILD__: JSON.stringify(buildStamp()),
   },
+  // Paper.js: one instance, the core build. `paper`'s main entry is paper-full (PaperScript and its
+  // parser, dead weight for headless geometry), and paperjs-offset imports the bare specifier and
+  // tests `instanceof paper.Path` — so utils/partBooleans.js must load the very same module it does.
+  // Both say `paper`; here that means the core build. Node (the tests) resolves paper-full for both,
+  // which is again one instance.
+  resolve: {
+    alias: [{ find: /^paper$/, replacement: 'paper/dist/paper-core.js' }],
+  },
   // Production uses a file:// entry point, so built assets must be relative.
   base: command === 'build' ? './' : '/',
   server: {

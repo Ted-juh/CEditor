@@ -173,6 +173,11 @@ export function layerKind(part) {
 
 export function layerKindLabel(part) {
   const kind = layerKind(part);
+  // A combined shape (utils/booleanGroups.js) is named for what it does.
+  if (kind === 'boolean') {
+    const operation = String(part?.meta?.boolean?.operation ?? 'unite');
+    return operation[0].toUpperCase() + operation.slice(1);
+  }
   const labels = {
     roundedRectangle: 'Rounded',
     rectangle: 'Rect',
