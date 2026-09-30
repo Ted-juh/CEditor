@@ -319,10 +319,16 @@ draws sliders without ticks, `showTicks: true` is the factory value, so an autho
 back on wrote exactly the value the set overrides, and the Ticks flag read "on" over a slider with
 none. `Core.setOverrides` lists the paths an author set on purpose (as the patch names them, with
 `Parts.<name>.` in front for a part), and the set leaves those alone whatever they hold.
-`pinnedWrite(control, path, value)` is the write that records one; the slider inspector's Show flags
-use it, and display what is drawn rather than what is stored. Other inspector fields do not pin yet:
-typing a different value already wins under the rule, and only re-choosing the factory value needs
-the pin.
+Every inspector write keeps the pins in step (`withSetPins`, applied in `stores/controls.js` by
+`updateControlProperty`, `updateSelectedProperty` and the state-aware inspector writers): writing a
+path a built-in set can patch back to its factory value pins it, and writing any other value there
+unpins it, since the rule already keeps that. Paths no set patches are never pinned, and a
+state-scoped edit belongs to the state. Programmatic writes — presets, resets, gestures, through
+`applyControlPatch` — do not pin unless they ask to (`{ pin: true }`, which the slider editors'
+multi-field writes do). The slider inspector's Show flags also display what is drawn rather than
+what is stored; other fields still show the stored value, so choosing the factory value where a set
+has drawn another means typing something else first — the pin then lands on the way back.
+`pinnedWrite(control, path, value)` pins unconditionally, for code that means it.
 
 **What the knob gained** to have something to patch: a `bodyCap` semantic part — a disc under the
 pointer, invisible by default so every existing knob keeps drawing its arc-and-dot — sized as a

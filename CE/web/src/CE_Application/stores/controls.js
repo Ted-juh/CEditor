@@ -28,6 +28,7 @@ import { deleteNestedValue, setNestedValue, valueAtPath } from './controlTreeUti
 import { mutatePanelControlsByIdsInList, mutatePanelControlsInList, patchPanelControlsInList, updatePanelInList } from './panelDocumentHelpers.js';
 import { mutateComponentDocumentControl } from './componentWorkspace.js';
 import { targetLayerName } from './panelLayerActions.js';
+import { withSetPins } from '../models/controlSetFamilies.js';
 
 // Re-export for convenience
 export { getSection, hasSection };
@@ -134,8 +135,21 @@ export function applyResolvedValue(control, path, value) {
  */
 export function applyInspectorResolvedValue(control, path, value, stateName = inspectorStateNameForPath(path)) {
   if (stateName) return applyStateScopedValue(control, stateName, path, value);
-  return applyResolvedValue(control, path, value);
+  const changed = applyResolvedValue(control, path, value);
+  pinDraftForSets(control, { [path]: value });
+  return changed;
 }
+
+// An author's edit is pinned against the control set where the rule could not otherwise see it
+// (models/controlSetFamilies.js, PINS): every inspector write goes through here or through
+// `pinForSets` below. A state-scoped edit is the state's, and presets, resets and gestures write
+// through applyControlPatch, which does not pin.
+function pinDraftForSets(draft, patch) {
+  const pinned = withSetPins(draft, patch);
+  if (pinned !== patch) applyResolvedValue(draft, 'Core.setOverrides', pinned['Core.setOverrides']);
+}
+
+const pinForSets = (control, patch) => (patch ? withSetPins(control, patch) : patch);
 
 function isBehaviorPath(path) {
   return String(path ?? '').startsWith('Behavior.');
@@ -167,7 +181,7 @@ export function updateSelectedProperty(path, value) {
   panels.update((list) => {
     // Copies only what the write passes through; see patchPanelControlsInList.
     let nextList = patchPanelControlsInList(list, panelId,
-      (control) => (ids.has(control?._children?.Core?.id) ? { [path]: value } : null));
+      (control) => (ids.has(control?._children?.Core?.id) ? pinForSets(control, { [path]: value }) : null));
 
     if (isBehaviorPath(path)) {
       nextList = normalizeExclusiveSelectionInList(nextList, panelId, preferredControlIds);
@@ -591,7 +605,7 @@ export function renameControl(controlId, requestedName) {
  * @param {*} value - The new value
  */
 export function updateControlProperty(controlId, path, value) {
-  applyControlPatchesById(new Map([[controlId, { [path]: value }]]));
+  applyControlPatchesById(new Map([[controlId, { [path]: value }]]), undefined, { pin: true });
 }
 
 export function updateInspectorControlProperty(
@@ -618,7 +632,7 @@ export function updateInspectorControlProperty(
   ));
 }
 
-export function applyControlPatchesById(patchesByControlId, targetPanelId = get(resolvedActivePanelId)) {
+export function applyControlPatchesById(patchesByControlId, targetPanelId = get(resolvedActivePanelId), { pin = false } = {}) {
   const panelId = targetPanelId;
   if (!patchesByControlId || patchesByControlId.size === 0) return;
 
@@ -629,6 +643,7 @@ export function applyControlPatchesById(patchesByControlId, targetPanelId = get(
         for (const [path, value] of Object.entries(patch)) {
           applyResolvedValue(draft, path, value);
         }
+        if (pin) pinDraftForSets(draft, patch);
         return true;
       });
     }
@@ -644,8 +659,10 @@ export function applyControlPatchesById(patchesByControlId, targetPanelId = get(
     // Drag, group resize, nudge and align all land here. Copying only what each path passes
     // through, instead of deepCloning every control touched, is what keeps a select-all nudge from
     // copying (and undo history from keeping) the whole panel.
-    let nextList = patchPanelControlsInList(list, panelId,
-      (control) => patchesByControlId.get(control?._children?.Core?.id) ?? null);
+    let nextList = patchPanelControlsInList(list, panelId, (control) => {
+      const patch = patchesByControlId.get(control?._children?.Core?.id) ?? null;
+      return pin ? pinForSets(control, patch) : patch;
+    });
 
     if (shouldNormalize) {
       nextList = normalizeExclusiveSelectionInList(nextList, panelId, preferredControlIds);
@@ -655,9 +672,9 @@ export function applyControlPatchesById(patchesByControlId, targetPanelId = get(
   });
 }
 
-export function applyControlPatch(controlId, patch) {
+export function applyControlPatch(controlId, patch, { pin = false } = {}) {
   if (!patch || Object.keys(patch).length === 0) return;
-  applyControlPatchesById(new Map([[controlId, patch]]));
+  applyControlPatchesById(new Map([[controlId, patch]]), undefined, { pin });
 }
 
 /**
@@ -710,7 +727,7 @@ export function applyInspectorControlPatch(controlId, patch) {
   ));
 }
 
-export function applySelectedPatch(patch) {
+export function applySelectedPatch(patch, { pin = false } = {}) {
   const panelId = get(resolvedActivePanelId);
   const ids = get(selectedComponentIds);
   if (panelId == null || ids.size === 0 || !patch || Object.keys(patch).length === 0) return;
@@ -721,7 +738,7 @@ export function applySelectedPatch(patch) {
   panels.update((list) => {
     // A preset applied to a whole selection: copies only what the paths pass through.
     let nextList = patchPanelControlsInList(list, panelId,
-      (control) => (ids.has(control?._children?.Core?.id) ? patch : null));
+      (control) => (ids.has(control?._children?.Core?.id) ? (pin ? pinForSets(control, patch) : patch) : null));
 
     if (shouldNormalize) {
       nextList = normalizeExclusiveSelectionInList(nextList, panelId, preferredControlIds);

@@ -1,7 +1,7 @@
 <script>
-  import { getSection, updateControlProperty, updateSelectedProperty, applyControlPatch, applySelectedPatch, applyControlPatchesById, selectedControls } from '../stores/controls.js';
+  import { getSection, updateControlProperty, updateSelectedProperty, applyControlPatch, applySelectedPatch } from '../stores/controls.js';
   import { activeControlSet } from '../stores/controlSets.js';
-  import { pinnedWrite, resolveControlFamily } from '../models/controlSetFamilies.js';
+  import { resolveControlFamily } from '../models/controlSetFamilies.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -69,26 +69,13 @@
     }
   }
 
-  // The Show flags are ones a control set decides too (the default set draws sliders without ticks
-  // or min/max labels). They show what is drawn, and what they write is pinned against the set —
-  // turning ticks back on writes their factory value, which the set would otherwise still override.
-  function setPinned(path, value) {
-    const controlId = getSection(control, 'Core')?.id;
-    if (!controlId) return;
-    if ($selectedComponentIds.size > 1) {
-      applyControlPatchesById(new Map($selectedControls.map((each) => [each._children.Core.id, pinnedWrite(each, path, value)])));
-    } else {
-      applyControlPatch(controlId, pinnedWrite(control, path, value));
-    }
-  }
-
   function setPatch(patch = {}) {
     const controlId = getSection(control, 'Core')?.id;
     if (!controlId) return;
     if ($selectedComponentIds.size > 1) {
-      applySelectedPatch(patch);
+      applySelectedPatch(patch, { pin: true });
     } else {
-      applyControlPatch(controlId, patch);
+      applyControlPatch(controlId, patch, { pin: true });
     }
   }
 
@@ -187,6 +174,9 @@
   }
 
   let behavior = $derived(getSection(control, 'Behavior'));
+  // The Show flags are ones a control set decides too (the default set draws sliders without ticks
+  // or min/max labels), so they show what is drawn; the write is pinned against the set by the
+  // store, as every inspector write is (models/controlSetFamilies.js, PINS).
   let drawnBehavior = $derived(getSection(resolveControlFamily(control, $activeControlSet), 'Behavior') ?? behavior);
   // Absent, not zero: the readout range is off until someone sets it, and `null` is how the model
   // says so — the same tri-state the section padding uses, for the same reason.
@@ -360,11 +350,11 @@
           { key: 'centerMarker', title: 'Centre marker at the authored centre value', on: drawnBehavior.showCenterMarker === true, icon: AlignCenterVertical },
         ]}
         ontoggle={(key) => {
-          if (key === 'ticks') setPinned('Behavior.showTicks', !(drawnBehavior.showTicks !== false));
-          else if (key === 'minMax') setPinned('Behavior.showMinMaxLabels', !(drawnBehavior.showMinMaxLabels !== false));
-          else if (key === 'handleLabels') setPinned('Behavior.showHandleLabels', !(drawnBehavior.showHandleLabels === true));
-          else if (key === 'readout') setPinned('Behavior.showValueReadout', !(drawnBehavior.showValueReadout !== false));
-          else if (key === 'centerMarker') setPinned('Behavior.showCenterMarker', !(drawnBehavior.showCenterMarker === true));
+          if (key === 'ticks') set('Behavior.showTicks', !(drawnBehavior.showTicks !== false));
+          else if (key === 'minMax') set('Behavior.showMinMaxLabels', !(drawnBehavior.showMinMaxLabels !== false));
+          else if (key === 'handleLabels') set('Behavior.showHandleLabels', !(drawnBehavior.showHandleLabels === true));
+          else if (key === 'readout') set('Behavior.showValueReadout', !(drawnBehavior.showValueReadout !== false));
+          else if (key === 'centerMarker') set('Behavior.showCenterMarker', !(drawnBehavior.showCenterMarker === true));
         }}
         oncontextmenu={(key, event) => {
           if (key === 'minMax' || key === 'readout') showLabelPositionEditor(key, event);

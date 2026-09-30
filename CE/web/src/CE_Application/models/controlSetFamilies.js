@@ -32,7 +32,7 @@
 
 import { COMPONENT_TYPES, createControl } from './componentTypes.js';
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
-import { resolveControlTokens, getControlSet } from './controlSets.js';
+import { BUILT_IN_CONTROL_SETS, resolveControlTokens, getControlSet } from './controlSets.js';
 import { typeFamilies } from './controlSetRecipes.js';
 import { deepClone } from '../utils/deepClone.js';
 
@@ -223,6 +223,56 @@ export function resolveControlForSet(control, set) {
 /** A built-in design pinned to an individual control survives copying into another panel. */
 export function controlSetForControl(control, panelSet) {
   return getControlSet(control?._children?.Core?.controlSetId) ?? panelSet;
+}
+
+/**
+ * Every path any built-in set's family patch can write for a control type, in the form the pins use
+ * (`Parts.<name>.` in front for a part). A path outside it is one no set touches, so pinning it would
+ * mean nothing.
+ */
+const patchableCache = new Map();
+export function setPatchablePaths(controlType, extraSets = []) {
+  const type = String(controlType ?? '');
+  const collect = (sets, into) => {
+    for (const set of sets) {
+      const family = familyPatchFor(set, type);
+      if (!family) continue;
+      for (const path of Object.keys(family.component ?? {})) into.add(path);
+      for (const [part, paths] of Object.entries(family.parts ?? {})) {
+        for (const path of Object.keys(paths ?? {})) into.add(`Parts.${part}.${path}`);
+      }
+    }
+    return into;
+  };
+  if (!patchableCache.has(type)) patchableCache.set(type, collect(BUILT_IN_CONTROL_SETS, new Set()));
+  const base = patchableCache.get(type);
+  return extraSets.length ? collect(extraSets, new Set(base)) : base;
+}
+
+/**
+ * An author's edit, with the control's pins kept in step (see PINS above): writing a path a set can
+ * patch back to its factory value pins it, since that is the one value the rule cannot tell from
+ * "untouched"; writing anything else there unpins it, since the rule already keeps it. Returns the
+ * patch itself when the pins do not change. Every inspector write goes through this
+ * (stores/controls.js); programmatic writes — presets, resets, gestures — do not.
+ */
+export function withSetPins(control, patch, extraSets = []) {
+  if (!patch || Object.hasOwn(patch, 'Core.setOverrides')) return patch;
+  const type = control?._children?.Core?.controlType;
+  const pristine = pristineControlFor(type);
+  if (!pristine) return patch;
+  const patchable = setPatchablePaths(type, extraSets);
+  if (!patchable.size) return patch;
+  const current = Array.isArray(control._children.Core.setOverrides) ? control._children.Core.setOverrides : [];
+  const next = new Set(current);
+  for (const [rawPath, value] of Object.entries(patch)) {
+    const path = String(rawPath).replace(/\._children\./g, '.');
+    if (!patchable.has(path)) continue;
+    if (sameValue(value, readControlPath(pristine, path))) next.add(path);
+    else next.delete(path);
+  }
+  if (next.size === current.length && current.every((path) => next.has(path))) return patch;
+  return { ...patch, 'Core.setOverrides': [...next] };
 }
 
 /**

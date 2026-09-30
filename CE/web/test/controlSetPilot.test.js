@@ -693,3 +693,46 @@ test('a pinned path is the author\'s even at its factory value: turning a set\'s
   assert.equal(drawn._children.Behavior.showMinMaxLabels, false, 'and only that path: the rest still follows the set');
   assert.deepEqual(pinnedWrite(slider, 'Behavior.showTicks', false), { 'Behavior.showTicks': false }, 'a path already pinned is not listed twice');
 });
+
+test('every inspector write pins what the rule cannot see, and only that', async () => {
+  const { withSetPins, setPatchablePaths, resolveControlFamily } = await import('../src/CE_Application/models/controlSetFamilies.js');
+  const { updateControlProperty, updateSelectedProperty, updateInspectorControlProperty, applyControlPatch } = await import('../src/CE_Application/stores/controls.js');
+  const { selectedComponentIds } = await import('../src/CE_Application/stores/panels.js');
+
+  const label = createControl('Label');
+  assert.ok(setPatchablePaths('Label').has('Text.Font.letterSpacing'), 'a set can patch a label\'s tracking');
+  assert.ok(!setPatchablePaths('Label').has('Transform.x'), 'and no set patches where it sits');
+  assert.deepEqual(withSetPins(label, { 'Text.Font.letterSpacing': 0 })['Core.setOverrides'], ['Text.Font.letterSpacing'],
+    'the factory value, written on purpose, is pinned');
+  const patch = { 'Text.Font.letterSpacing': 2 };
+  assert.equal(withSetPins(label, patch), patch, 'any other value already wins, so nothing is pinned');
+  label._children.Core.setOverrides = ['Text.Font.letterSpacing'];
+  assert.deepEqual(withSetPins(label, patch)['Core.setOverrides'], [], 'and writing one unpins a pinned path');
+  const moved = { 'Transform.x': 40 };
+  assert.equal(withSetPins(createControl('Label'), moved), moved, 'a path no set patches is left alone');
+
+  // Through the store, as the inspector writes: a label in the default set, tracking typed back to 0.
+  const panel = openPanel();
+  const control = createControl('Label');
+  panels.update((list) => list.map((p) => (p.id === panel.id ? { ...p, controls: [control] } : p)));
+  const id = control._children.Core.id;
+  const stored = () => currentPanel().controls[0];
+  const drawnSpacing = () => resolveControlFamily(stored(), get(activeControlSet))._children.Text._children.Font.letterSpacing;
+  assert.notEqual(drawnSpacing(), 0, 'the default set gives a label its own tracking');
+  updateControlProperty(id, 'Text.Font.letterSpacing', 3);
+  assert.equal(stored()._children.Core.setOverrides, undefined, 'a non-default value needs no pin');
+  updateControlProperty(id, 'Text.Font.letterSpacing', 0);
+  assert.deepEqual(stored()._children.Core.setOverrides, ['Text.Font.letterSpacing']);
+  assert.equal(drawnSpacing(), 0, 'and the label is drawn with the tracking the author chose');
+
+  updateInspectorControlProperty(id, 'Text.Font.family', createControl('Label')._children.Text._children.Font.family);
+  assert.deepEqual(stored()._children.Core.setOverrides, ['Text.Font.letterSpacing', 'Text.Font.family'], 'the inspector path pins too');
+
+  selectedComponentIds.set(new Set([id]));
+  updateSelectedProperty('Text.Font.letterSpacing', 1);
+  assert.deepEqual(stored()._children.Core.setOverrides, ['Text.Font.family'], 'a multi-selection write keeps the pins in step');
+
+  applyControlPatch(id, { 'Text.Font.letterSpacing': 0 });
+  assert.deepEqual(stored()._children.Core.setOverrides, ['Text.Font.family'], 'a programmatic write (a preset, a reset) does not pin');
+  selectedComponentIds.set(new Set());
+});
