@@ -76,7 +76,7 @@
   import { hasCompoundPath, isPathPart, pathPartSpec } from '../utils/penPath.js';
   import {
     attachBooleanInputs, booleanShapeFor, booleanShapeRevision, booleanSpec, drawnPartEntries,
-    isBooleanGroup, isBooleanOperand, membershipRenamePatch, operandEntries, partsAfterOperandMove, partsAfterRemoval, withGroupMembers,
+    isBooleanGroup, isBooleanOperand, membershipRenamePatch, operandEntries, partsAfterOperandMove, partsAfterRemoval, planOperandMove, withGroupMembers,
   } from '../utils/booleanGroups.js';
   import SurfaceShapeTools from './SurfaceShapeTools.svelte';
   import { frameMapper, groupForRender, groupFramePatch, withLayoutFrame } from '../utils/surfaceGroupFrames.js';
@@ -2389,6 +2389,7 @@
 
   function moveLayerTo(name, targetName) {
     if (!core?.id || !name || !targetName || name === targetName) return;
+    const operandMove = planOperandMove(authoredParts?._children, name, targetName); if (operandMove) return operandMove.parts ? applyControlPatch(core.id, { 'Parts._children': operandMove.parts }) : showDrawNotice(`Can't move ${name}: ${operandMove.reason}`);
     const stack = Object.entries(authoredParts?._children ?? {})
       .sort((left, right) => numberOr(left?.[1]?.zIndex, 0) - numberOr(right?.[1]?.zIndex, 0));
     const from = stack.findIndex(([entryName]) => entryName === name);

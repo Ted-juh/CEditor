@@ -285,6 +285,16 @@ export async function resolveFont(fontFamily, { weight = 400, style = 'normal', 
     return { font, key, variable: !!font.variationAxes?.wght, synthesizedItalic: italic === 'italic' && stored.style !== 'italic', synthesizedBold: false };
   }
 
+  // Where no file can be read — the player has no imported fonts — a combined shape may carry the
+  // glyphs of its text's face with it (see glyphAtlas below).
+  const atlas = atlasFor(family, w, italic);
+  if (atlas) {
+    if (!atlas.font.covers(codePoint)) {
+      throw new FontUnavailableError(family, `the character ${String.fromCodePoint(codePoint)} is not among the glyphs this shape carries`);
+    }
+    return { font: atlas.font, key: atlas.key, variable: false, synthesizedItalic: atlas.synthesizedItalic, synthesizedBold: atlas.synthesizedBold };
+  }
+
   const windowsFile = externalSources.readFile ? windowsFontFile(family, w, italic) : null;
   if (windowsFile) {
     try {
@@ -329,8 +339,145 @@ export function fontAtWeight(resolved, weight) {
   return instanceCache.get(key);
 }
 
-/** For the tests: forget parsed fonts. */
+/** For the tests: forget parsed fonts (and registered glyph atlases). */
 export function clearFontCache() {
   fontCache.clear();
   instanceCache.clear();
+  atlases.clear();
+  atlasMemo.clear();
+}
+
+// --- Glyph atlases: a face's outlines carried in the document -------------------------------------
+//
+// The player loads the panel faces and nothing else, so text in a font the user imported cannot be
+// outlined there: a combined shape whose text a binding changes at run time kept the outline it
+// was saved with. An atlas is the part of a face such text can need — the outlines and advances of
+// printable Latin, and the kerning between the ASCII ones — small enough to travel in the shape's
+// cache. It shapes plainly: kerning, no ligatures or contextual forms, which is what a font with
+// letter-spacing gets anyway, and within a hair of the real layout otherwise.
+
+export const ATLAS_CHARACTERS = [
+  ...Array.from({ length: 0x7F - 0x20 }, (_, i) => 0x20 + i),
+  ...Array.from({ length: 0x100 - 0xC0 }, (_, i) => 0xC0 + i),
+];
+const KERNED = ATLAS_CHARACTERS.filter((cp) => cp < 0x7F);
+
+const atlases = new Map();
+const atlasId = (family, weight, style) => `${String(family).toLowerCase()}|${weight}|${style}`;
+
+function unitsPath(commands) {
+  const n = (v) => String(Math.round(v * 10) / 10);
+  const letters = { moveTo: 'M', lineTo: 'L', quadraticCurveTo: 'Q', bezierCurveTo: 'C', closePath: 'Z' };
+  return commands.map(({ command, args }) => letters[command] + args.map(n).join(' ')).join('');
+}
+
+function commandsFrom(path) {
+  const names = { M: 'moveTo', L: 'lineTo', Q: 'quadraticCurveTo', C: 'bezierCurveTo', Z: 'closePath' };
+  const out = [];
+  for (const [, letter, body] of String(path).matchAll(/([MLQCZ])([^MLQCZ]*)/g)) {
+    out.push({ command: names[letter], args: body.trim() ? body.trim().split(/\s+/).map(Number) : [] });
+  }
+  return out;
+}
+
+/**
+ * The atlas of a resolved face at a weight: `{ family, weight, style, unitsPerEm, ascent, descent,
+ * synthesizedItalic, synthesizedBold, glyphs: { codePoint: [advance, path] }, kern: { 'a,b': dx } }`,
+ * in font units. `extra` adds characters beyond printable Latin (the text as it is now).
+ */
+const atlasMemo = new Map();
+export function glyphAtlas(resolved, { family, weight = 400, style = 'normal' }, extra = []) {
+  const memoKey = `${resolved.key}@${weight}`;
+  if (!atlasMemo.has(memoKey)) atlasMemo.set(memoKey, buildAtlas(resolved, { family, weight, style }));
+  const base = atlasMemo.get(memoKey);
+  const font = fontAtWeight(resolved, weight);
+  const missing = extra.filter((cp) => !base.glyphs[cp] && font.hasGlyphForCodePoint?.(cp));
+  if (!missing.length) return base;
+  const glyphs = { ...base.glyphs };
+  for (const cp of missing) {
+    const glyph = font.glyphForCodePoint(cp);
+    glyphs[cp] = [Math.round(glyph.advanceWidth * 10) / 10, unitsPath(glyph.path.commands)];
+  }
+  return { ...base, glyphs };
+}
+
+function buildAtlas(resolved, { family, weight, style }) {
+  const font = fontAtWeight(resolved, weight);
+  const glyphs = {};
+  for (const cp of ATLAS_CHARACTERS) {
+    if (!font.hasGlyphForCodePoint?.(cp) && cp !== 0x20) continue;
+    const glyph = font.glyphForCodePoint(cp);
+    glyphs[cp] = [Math.round(glyph.advanceWidth * 10) / 10, unitsPath(glyph.path.commands)];
+  }
+  const kern = {};
+  for (const a of KERNED) {
+    if (!glyphs[a]) continue;
+    const advance = glyphs[a][0];
+    for (const b of KERNED) {
+      if (!glyphs[b]) continue;
+      const run = font.layout(String.fromCodePoint(a, b), { liga: false, clig: false, dlig: false, calt: false });
+      if (run.glyphs.length !== 2) continue;
+      const dx = Math.round((run.positions[0].xAdvance - advance) * 10) / 10;
+      if (dx) kern[`${a},${b}`] = dx;
+    }
+  }
+  return {
+    family: primaryFamily(family), weight: Number(weight) || 400, style: style === 'italic' ? 'italic' : 'normal',
+    unitsPerEm: font.unitsPerEm, ascent: font.ascent, descent: font.descent,
+    synthesizedItalic: !!resolved.synthesizedItalic, synthesizedBold: !!resolved.synthesizedBold,
+    glyphs, kern,
+  };
+}
+
+/** A font-like object over an atlas: the part of fontkit's interface textOutline uses. */
+function atlasFont(atlas) {
+  const parsed = new Map();
+  const glyph = (cp) => {
+    if (!parsed.has(cp)) {
+      const entry = atlas.glyphs[cp];
+      parsed.set(cp, entry ? { advanceWidth: entry[0], path: { commands: commandsFrom(entry[1]) }, codePoints: [cp] } : null);
+    }
+    return parsed.get(cp);
+  };
+  return {
+    unitsPerEm: atlas.unitsPerEm,
+    ascent: atlas.ascent,
+    descent: atlas.descent,
+    covers: (cp) => !!atlas.glyphs[cp],
+    layout(text) {
+      const cps = [...String(text)].map((char) => char.codePointAt(0)).filter((cp) => atlas.glyphs[cp]);
+      const glyphs = cps.map(glyph);
+      const positions = cps.map((cp, i) => ({
+        xAdvance: glyphs[i].advanceWidth + (i + 1 < cps.length ? (atlas.kern[`${cp},${cps[i + 1]}`] ?? 0) : 0),
+        xOffset: 0,
+        yOffset: 0,
+      }));
+      return { glyphs, positions };
+    },
+  };
+}
+
+/** Make an atlas available to resolveFont (the player does this for every shape that carries one). */
+export function registerGlyphAtlas(atlas) {
+  if (!atlas?.glyphs || !atlas.unitsPerEm) return;
+  const id = atlasId(atlas.family, atlas.weight, atlas.style);
+  if (atlases.has(id)) return;
+  atlases.set(id, {
+    ...atlas,
+    key: `atlas:${id}`,
+    font: atlasFont(atlas),
+  });
+}
+
+function atlasFor(family, weight, style) {
+  const exact = atlases.get(atlasId(family, weight, style));
+  if (exact) return exact;
+  const key = String(family).toLowerCase();
+  const same = [...atlases.values()].filter((a) => a.family.toLowerCase() === key && a.style === style);
+  return same.sort((a, b) => Math.abs(a.weight - weight) - Math.abs(b.weight - weight))[0] ?? null;
+}
+
+/** True for a face the player cannot read for itself (anything but the bundled panel faces and twins). */
+export function needsAtlas(resolved) {
+  return !/^(panel|twin|atlas):/.test(String(resolved?.key ?? ''));
 }

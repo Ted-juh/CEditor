@@ -9,7 +9,8 @@
  *             the artboard shows through the hole, and one undo takes it all back
  *   live      the hole moved by a patch moves the cut; the hole hidden fills it; the shape's toolbar
  *             switches the operation
- *   paint     a gradient fill and a dashed border drawn on the outline, not a solid-colour stand-in
+ *   paint     a gradient fill and a dashed border drawn on the outline, not a solid-colour stand-in; a
+ *             border gradient set to follow runs along the outline
  *   gesture   the shape dragged on the artboard carries its operands
  *   text      outlined text lands on the browser's own glyphs (ink compared pixel for pixel)
  *   release / flatten / smooth
@@ -260,6 +261,29 @@ try {
     const right = at(shot, 0.88, 0.12);
     assert.ok(left[0] > left[1] + 60, `red at the left: ${left}`);
     assert.ok(right[1] > right[0] + 60, `green at the right: ${right}`);
+  });
+
+  // --- A border gradient that follows the outline ----------------------------------------------------
+  await patch(id, {
+    'Parts.plate.Background.Border': {
+      _type: 'Border', enabled: true, linked: true, thickness: 8, style: 'solid', fillSolid: false, fillGradient: true, gradientFlow: 'follow',
+      gradient: { type: 'linear', angle: 0, stops: [{ color: 'FF0000', position: 0 }, { color: '0000FF', position: 100 }] },
+    },
+  });
+  await kit.settle(900);
+  const flow = await page.evaluate((name) => {
+    const pieces = [...document.querySelectorAll(`.artboard [data-part-name="${name}"] [data-outline-flow] line`)];
+    return { count: pieces.length, first: pieces[0]?.getAttribute('stroke'), last: pieces.at(-1)?.getAttribute('stroke') };
+  }, groupName);
+  await page.keyboard.press('Escape');
+  await kit.settle(300);
+  shot = await pixels(await partRect(groupName));
+  check('a border gradient set to follow runs along the outline, clockwise from the top-left', () => {
+    assert.ok(flow.count > 40, `drawn as pieces along the outline: ${JSON.stringify(flow)}`);
+    const top = at(shot, 0.5, 0.015);    // a quarter of the way round: mostly red
+    const left = at(shot, 0.015, 0.5);   // seven eighths of the way round: mostly blue
+    assert.ok(top[0] > top[2] + 60, `red along the top: ${top}`);
+    assert.ok(left[2] > left[0] + 60, `blue down the left, where it comes back round: ${left}`);
   });
 
   // --- Gesture: drag the shape, the operands follow -------------------------------------------------

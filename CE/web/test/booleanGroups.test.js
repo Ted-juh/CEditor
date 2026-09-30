@@ -10,7 +10,7 @@ import { createPartNode } from '../src/CE_Application/utils/customComponentFacto
 import {
   attachBooleanInputs, booleanShapeFor, clearBooleanShapeMemo, computeBooleanShape, drawnPartEntries,
   groupMemberNames, membershipRenamePatch, operandEntries, partsAfterOperandMove, partsAfterRemoval,
-  planBooleanGroup, refreshedGroup, releasedParts, remapCopiedGroups, settleBooleanShapes, withGroupMembers,
+  planBooleanGroup, planOperandMove, refreshedGroup, releasedParts, remapCopiedGroups, settleBooleanShapes, withGroupMembers,
   withOperation,
 } from '../src/CE_Application/utils/booleanGroups.js';
 import { loadGeometry } from '../src/CE_Application/utils/partOutlines.js';
@@ -229,6 +229,16 @@ test('rename, delete, reorder and paste keep membership straight', async () => {
   assert.deepEqual(swapped[g].meta.boolean.operands, ['hole', 'plate']);
   assert.equal(swapped[g].meta.boolean.paintFrom, 'hole', 'the conventional paint source follows the order');
   assert.deepEqual(operandEntries(plan.parts, g).map(([name]) => name), ['hole', 'plate'], 'front first, as a layer list is');
+
+  // Dragged in the layer list: onto another operand of the same shape reorders the shape; into or out
+  // of it is refused by name; two ordinary layers are the stack's business.
+  const dragged = planOperandMove(plan.parts, 'hole', 'plate');
+  assert.deepEqual(dragged.parts[g].meta.boolean.operands, ['hole', 'plate']);
+  assert.equal(dragged.parts[g].meta.boolean.paintFrom, 'hole');
+  assert.equal(dragged.parts[g].meta.cache, undefined, 'and its outline is recomputed');
+  assert.match(planOperandMove({ ...plan.parts, badge: plate }, 'badge', 'hole').reason, /Combine and Release/);
+  assert.match(planOperandMove(plan.parts, 'hole', g).reason, /Combine and Release/);
+  assert.equal(planOperandMove({ a: plate, b: hole }, 'a', 'b'), null);
 
   const copied = withGroupMembers(plan.parts, [g]);
   assert.deepEqual(copied, [g, 'plate', 'hole']);

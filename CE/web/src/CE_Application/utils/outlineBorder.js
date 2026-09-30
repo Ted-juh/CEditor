@@ -102,10 +102,12 @@ export function outlineBorderDepth(border) {
 /** Border paint flags, as the box border reads them from its settings. */
 export function outlineBorderPaints(border) {
   const settings = outlineBorderSettings(border);
-  if (!settings) return { solid: false, gradient: null, image: null, overlay: null };
+  if (!settings) return { solid: false, gradient: null, flow: 'across', image: null, overlay: null };
   return {
     solid: settings.fillSolid !== false,
     gradient: settings.fillGradient && settings.gradient ? settings.gradient : null,
+    // 'across' — straight across the shape at the gradient's angle; 'follow' — along the outline.
+    flow: settings.gradientFlow === 'follow' ? 'follow' : 'across',
     image: settings.fillImage && settings.imageSrc ? settings.imageSrc : null,
     overlay: settings.fillOverlay && settings.overlaySrc ? settings.overlaySrc : null,
   };
@@ -125,4 +127,75 @@ export function outlineInsetDepths(background) {
     depths.add(round3(inner));
   }
   return [...depths].sort((a, b) => a - b);
+}
+
+// --- A gradient that follows the outline -----------------------------------------------------------
+//
+// A box border's gradient can flow ALONG the border ("follow": top, right, bottom, left, clockwise
+// from the top-left corner). An outline has no sides, but it has contours, and the same rule reads
+// on them: each contour starts at its top-left-most point and runs clockwise, and the gradient
+// runs from 0 at the start to 1 back at it. The renderer samples the outline's path (the browser's
+// own path geometry) and draws short stroked pieces coloured by where they fall.
+
+/**
+ * Split sampled points into contours (a jump longer than `gap` starts a new one), orient each as the
+ * box border runs, and return pieces `{ x1, y1, x2, y2, t }` with `t` in 0..1 along the contour.
+ */
+export function outlineFlowPieces(points, gap) {
+  const contours = [];
+  let current = [];
+  for (const point of points) {
+    const last = current[current.length - 1];
+    if (last && Math.hypot(point.x - last.x, point.y - last.y) > gap) {
+      contours.push(current);
+      current = [];
+    }
+    current.push(point);
+  }
+  if (current.length) contours.push(current);
+
+  const pieces = [];
+  for (let ring of contours) {
+    if (ring.length < 3) continue;
+    // Clockwise on screen (y down) is a positive shoelace sum.
+    let area = 0;
+    for (let i = 0; i < ring.length; i += 1) {
+      const a = ring[i];
+      const b = ring[(i + 1) % ring.length];
+      area += a.x * b.y - b.x * a.y;
+    }
+    if (area < 0) ring = [...ring].reverse();
+    let start = 0;
+    for (let i = 1; i < ring.length; i += 1) {
+      if (ring[i].x + ring[i].y < ring[start].x + ring[start].y - 1e-9) start = i;
+    }
+    ring = [...ring.slice(start), ...ring.slice(0, start)];
+    const lengths = [0];
+    for (let i = 1; i <= ring.length; i += 1) {
+      const a = ring[i - 1];
+      const b = ring[i % ring.length];
+      lengths.push(lengths[i - 1] + Math.hypot(b.x - a.x, b.y - a.y));
+    }
+    const total = lengths[ring.length] || 1;
+    for (let i = 0; i < ring.length; i += 1) {
+      const a = ring[i];
+      const b = ring[(i + 1) % ring.length];
+      pieces.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, t: (lengths[i] + lengths[i + 1]) / 2 / total });
+    }
+  }
+  return pieces;
+}
+
+/** The colour of sorted stops `[{ position: 0..100, color: 'RRGGBB' }]` at `t` in 0..1, as `#RRGGBB`. */
+export function stopsColourAt(stops, t) {
+  if (!stops.length) return '#000000';
+  const at = Math.max(0, Math.min(100, t * 100));
+  let i = stops.findIndex((stop) => stop.position >= at);
+  if (i <= 0) return `#${stops[i < 0 ? stops.length - 1 : 0].color}`;
+  const a = stops[i - 1];
+  const b = stops[i];
+  const f = (at - a.position) / Math.max(1e-9, b.position - a.position);
+  const channel = (hex, k) => parseInt(hex.slice(k, k + 2), 16);
+  const mix = (k) => Math.round(channel(a.color, k) + (channel(b.color, k) - channel(a.color, k)) * f).toString(16).padStart(2, '0');
+  return `#${mix(0)}${mix(2)}${mix(4)}`.toUpperCase();
 }

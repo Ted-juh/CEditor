@@ -38,6 +38,7 @@ import { writable } from 'svelte/store';
 import { partFrame } from './customDesignSurfaceGeometry.js';
 import { BOOLEAN_KIND, isBooleanGroup, loadGeometry, partOutline, paintsBox, whyNoOutline } from './partOutlines.js';
 import { textLayoutSpec } from './textOutline.js';
+import { glyphAtlas, needsAtlas, registerGlyphAtlas, resolveFont } from './fontSources.js';
 import { scalePathData } from './svgPathScale.js';
 import { withPivotKept } from './bezierPath.js';
 import { numberOr } from './primitives.js';
@@ -242,7 +243,7 @@ function remember(key, value) {
   if (memo.size > MEMO_LIMIT) memo.delete(memo.keys().next().value);
 }
 
-function shapeFromMemo(key, compute, { cacheShape = null, cacheKey = '', identity = null } = {}) {
+function shapeFromMemo(key, compute, { cacheShape = null, cacheKey = '', staleShape = cacheShape, identity = null } = {}) {
   const hit = memo.get(key);
   if (hit) {
     if (identity && hit.shape) rememberGood(identity, hit.shape);
@@ -262,7 +263,7 @@ function shapeFromMemo(key, compute, { cacheShape = null, cacheKey = '', identit
       });
     pending.set(key, job);
   }
-  const stale = (identity && lastGood.get(identity)) ?? cacheShape ?? null;
+  const stale = (identity && lastGood.get(identity)) ?? staleShape ?? null;
   return { shape: stale, key, pending: true, error: '' };
 }
 
@@ -275,11 +276,32 @@ export function booleanShapeFor(groupPart, parentWidth, parentHeight, { insetDep
   const key = booleanShapeKey(groupPart, parentWidth, parentHeight, insetDepths);
   if (!key) return { shape: null, key, pending: false, error: '' };
   const cache = groupPart?.meta?.cache;
+  for (const atlas of cache?.glyphs ?? []) registerGlyphAtlas(atlas);
   return shapeFromMemo(key, () => computeBooleanShape(groupPart, parentWidth, parentHeight, insetDepths), {
     cacheShape: cache?.shape ?? null,
     cacheKey: cache?.key ?? '',
+    staleShape: cacheScaledTo(cache, parentWidth, parentHeight),
     identity,
   });
+}
+
+/**
+ * The cached outline scaled from the size it was computed at to `width` × `height`: exact for
+ * operands laid out in percentages, and close for the rest — shown for the moment an instance of
+ * another size takes to compute its own, where the unscaled outline would sit visibly wrong.
+ */
+export function cacheScaledTo(cache, width, height) {
+  const shape = cache?.shape;
+  if (!shape || shape.empty) return shape ?? null;
+  const w0 = Number(cache.width);
+  const h0 = Number(cache.height);
+  if (!(w0 > 0 && h0 > 0) || (Math.abs(w0 - width) < 1e-6 && Math.abs(h0 - height) < 1e-6)) return shape;
+  const sx = width / w0;
+  const sy = height / h0;
+  const b = shape.bounds;
+  const bounds = { x: round3(b.x * sx), y: round3(b.y * sy), width: round3(b.width * sx), height: round3(b.height * sy) };
+  // The path is in the result's own box, so it scales about its origin.
+  return { pathData: scalePathData(shape.pathData, sx, sy), bounds, insets: {}, empty: false };
 }
 
 /**
@@ -395,10 +417,40 @@ export async function planBooleanGroup(partsChildren, entries, operation, { artb
   return { ok: true, groupName, parts: next, empty: cache.shape.empty };
 }
 
+/** Every text operand of a group, nested groups' included. */
+function textOperands(groupPart, out = []) {
+  for (const [, part] of groupPart?.meta?.booleanInputs?.operands ?? []) {
+    if (isBooleanGroup(part)) textOperands(part, out);
+    else if (part?._children?.Text) out.push(part);
+  }
+  return out;
+}
+
+/**
+ * The glyph atlases a group's text needs where only the document travels (utils/fontSources.js): one
+ * per face the player cannot read for itself, none for the bundled panel faces.
+ */
+async function atlasesFor(resolvedGroup) {
+  const out = new Map();
+  for (const part of textOperands(resolvedGroup)) {
+    const spec = textLayoutSpec(part, 1, 1);
+    if (!spec?.content.trim()) continue;
+    const id = `${spec.family}|${spec.weight}|${spec.style}`;
+    if (out.has(id)) continue;
+    try {
+      const resolved = await resolveFont(spec.family, { weight: spec.weight, style: spec.style });
+      if (!needsAtlas(resolved)) continue;
+      out.set(id, glyphAtlas(resolved, spec, [...spec.content].map((char) => char.codePointAt(0))));
+    } catch { /* the outline itself reports an unreadable face */ }
+  }
+  return [...out.values()];
+}
+
 async function cacheFor(resolvedGroup, width, height) {
   try {
     const shape = await computeBooleanShape(resolvedGroup, width, height, []);
-    return { key: booleanShapeKey(resolvedGroup, width, height, []), shape, artboardWidth: width, artboardHeight: height };
+    const glyphs = await atlasesFor(resolvedGroup);
+    return { key: booleanShapeKey(resolvedGroup, width, height, []), shape, glyphs, artboardWidth: width, artboardHeight: height };
   } catch (error) {
     return { error: error?.message ?? String(error) };
   }
@@ -416,7 +468,18 @@ function withCache(group, cache) {
   const pivot = kept['Layout.pivotX'] === undefined ? {} : { pivotX: kept['Layout.pivotX'], pivotY: kept['Layout.pivotY'] };
   return {
     ...group,
-    meta: { ...group.meta, cache: { key: cache.key, shape: cache.shape } },
+    meta: {
+      ...group.meta,
+      cache: {
+        key: cache.key,
+        shape: cache.shape,
+        // The size it was computed at, so an instance drawn at another size can show it scaled
+        // while its own outline is computed; and the glyphs its text needs in the player.
+        width: cache.artboardWidth,
+        height: cache.artboardHeight,
+        ...(cache.glyphs?.length ? { glyphs: cache.glyphs } : {}),
+      },
+    },
     _children: {
       ...group._children,
       Layout: {
@@ -449,6 +512,30 @@ export async function refreshedGroup(authored, resolvedGroup, width, height) {
 }
 
 /** Parts after changing a group's operation (subtract ↔ unite …), paint source following the convention. */
+/**
+ * A layer dropped on another in the layer list, when either is a combined shape's operand. Operands
+ * are not drawn as themselves, so their z-order means nothing; their order in the shape does (for
+ * Subtract, the back-most is what is cut). Resolves to
+ *   null                        neither is an operand: an ordinary move in the stack
+ *   { parts }                   both are operands of one shape: that shape's operands reordered
+ *   { reason }                  a move into or out of a shape, which the list does not do
+ */
+export function planOperandMove(partsChildren, name, targetName) {
+  const groupOf = (partName) => booleanGroupOf(partsChildren?.[partName]);
+  const from = groupOf(name);
+  const to = groupOf(targetName);
+  if (!from && !to) return null;
+  if (from !== to || !isBooleanGroup(partsChildren?.[from])) {
+    return { reason: 'a layer moves into or out of a combined shape with Combine and Release, not by dragging' };
+  }
+  const operands = [...booleanSpec(partsChildren[from]).operands];
+  const source = operands.indexOf(name);
+  const target = operands.indexOf(targetName);
+  if (source < 0 || target < 0 || source === target) return { parts: partsChildren };
+  operands.splice(target, 0, ...operands.splice(source, 1));
+  return { parts: withOperandOrder(partsChildren, from, operands) };
+}
+
 export function withOperation(partsChildren, groupName, operation) {
   const group = partsChildren?.[groupName];
   if (!isBooleanGroup(group) || !BOOLEAN_OPERATIONS.includes(operation)) return partsChildren;
@@ -605,6 +692,12 @@ export function partsAfterOperandMove(partsChildren, name, direction) {
   const target = index + direction;
   if (index < 0 || target < 0 || target >= operands.length) return partsChildren;
   [operands[index], operands[target]] = [operands[target], operands[index]];
+  return withOperandOrder(partsChildren, groupName, operands);
+}
+
+/** The group with its operands in a new order (its cache dropped, to be recomputed). */
+function withOperandOrder(partsChildren, groupName, operands) {
+  const group = partsChildren[groupName];
   const spec = booleanSpec(group);
   // The paint follows the convention (back-most for subtract, front-most otherwise) only if it did.
   const conventional = spec.operation === 'subtract' ? spec.operands[0] : spec.operands[spec.operands.length - 1];

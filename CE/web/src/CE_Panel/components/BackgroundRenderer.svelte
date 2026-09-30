@@ -9,7 +9,7 @@
   import { fileCache, loadFile } from '../../CE_Application/stores/fileCache.js';
   import { resolveStroke } from '../../CE_Application/utils/strokeResolver.js';
   import { fillShapeCSS, imageLayerStyle } from '../../CE_Application/utils/plainFillCSS.js';
-  import { outlineBorderBands, outlineBorderDepth, outlineBorderPaints } from '../../CE_Application/utils/outlineBorder.js';
+  import { outlineBorderBands, outlineBorderDepth, outlineBorderPaints, outlineFlowPieces, stopsColourAt } from '../../CE_Application/utils/outlineBorder.js';
 
   // `absorbFill` — the caller has already painted this fill as `background` on an element it was
   // going to render anyway (utils/plainFillCSS.js), so drawing it here as well would double it.
@@ -577,10 +577,30 @@
   let outlinePaints = $derived(outlineBands.length ? outlineBorderPaints(border) : null);
   let outlineGradientCoords = $derived(outlinePaints?.gradient ? gradientCoords(outlinePaints.gradient.angle, width, height) : null);
   // Paints for a band, in the box border's order: its own (shaded) colour, then gradient, image, overlay.
+  // A gradient that follows the outline: the path sampled by the browser's own geometry, cut into
+  // short pieces each stroked in the colour of where it falls (utils/outlineBorder.js).
+  let outlineFlow = $derived.by(() => {
+    if (!outlinePaints?.gradient || outlinePaints.flow !== 'follow' || typeof document === 'undefined') return null;
+    const stops = gradStops(outlinePaints.gradient);
+    if (stops.length < 2) return null;
+    const probe = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    probe.setAttribute('d', outline.d);
+    let total = 0;
+    try { total = probe.getTotalLength(); } catch { return null; }
+    if (!(total > 0)) return null;
+    const step = Math.max(1.5, total / 900);
+    const points = [];
+    for (let at = 0; at < total; at += step) {
+      const p = probe.getPointAtLength(at);
+      points.push({ x: p.x, y: p.y });
+    }
+    return outlineFlowPieces(points, step * 1.5).map((piece) => ({ ...piece, colour: stopsColourAt(stops, piece.t) }));
+  });
+
   function outlineBandPaints(band) {
     const out = [];
     if (outlinePaints?.solid) out.push(band.colour);
-    if (outlinePaints?.gradient) out.push(`url(#${svgDefId('ol-grad')})`);
+    if (outlinePaints?.gradient) out.push(outlineFlow ? 'flow' : `url(#${svgDefId('ol-grad')})`);
     if (outlinePaints?.image) out.push(`url(#${svgDefId('ol-img')})`);
     if (outlinePaints?.overlay) out.push(`url(#${svgDefId('ol-ovr')})`);
     return out;
@@ -820,8 +840,15 @@
     {#each outlineBands as band, i (i)}
       {#each outlineBandPaints(band) as paint}
         {#if band.dots}
-          <path d={outline.insets?.[outlineKey(band.dots.depth)] ?? ''} fill="none" stroke={paint} stroke-width={band.dots.radius * 2}
+          <!-- Dots take the gradient across the shape: a dot is too small to show where along it falls. -->
+          <path d={outline.insets?.[outlineKey(band.dots.depth)] ?? ''} fill="none" stroke={paint === 'flow' ? `url(#${svgDefId('ol-grad')})` : paint} stroke-width={band.dots.radius * 2}
             stroke-dasharray={band.dasharray} stroke-linecap="round" />
+        {:else if paint === 'flow'}
+          <g mask="url(#{svgDefId(`ol-band-${i}`)})" data-outline-flow>
+            {#each outlineFlow as piece, k (k)}
+              <line x1={piece.x1} y1={piece.y1} x2={piece.x2} y2={piece.y2} stroke={piece.colour} stroke-width={band.to * 2 + 2} stroke-linecap="square" />
+            {/each}
+          </g>
         {:else}
           <rect x={-pad} y={-pad} width={width + 2 * pad} height={height + 2 * pad} fill={paint} mask="url(#{svgDefId(`ol-band-${i}`)})" />
         {/if}
