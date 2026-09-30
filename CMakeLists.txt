@@ -168,6 +168,30 @@ if(NOT CEDITOR_JUCE_HELPER_DIR STREQUAL JUCE_VENDORED_BIN)
     message(STATUS "CEditor: JUCE helpers from ${CEDITOR_JUCE_HELPER_DIR}")
 endif()
 
+# --- SQLite: Hostage's sound library ------------------------------------------------------------
+# Vendored, public domain; CE/thirdparty/sqlite/VENDORED.md says where it came from. Built here,
+# above the app block, because the service tests use it as well as the app and the host targets.
+# The options are sqlite.org's recommended set, plus SQLITE_OMIT_LOAD_EXTENSION: nothing loads
+# extensions, and leaving it in would need libdl on Linux. Warnings are off because it is upstream
+# code nobody here edits. It is position-independent because the host plug-in (CEHostVST3) links it
+# into a shared object.
+find_package(Threads REQUIRED)
+add_library(ce_sqlite STATIC "${CE_ROOT}/thirdparty/sqlite/sqlite3.c")
+target_include_directories(ce_sqlite SYSTEM PUBLIC "${CE_ROOT}/thirdparty/sqlite")
+target_compile_definitions(ce_sqlite PRIVATE
+    SQLITE_DQS=0
+    SQLITE_DEFAULT_MEMSTATUS=0
+    SQLITE_DEFAULT_WAL_SYNCHRONOUS=1
+    SQLITE_LIKE_DOESNT_MATCH_BLOBS
+    SQLITE_MAX_EXPR_DEPTH=0
+    SQLITE_OMIT_DEPRECATED
+    SQLITE_OMIT_LOAD_EXTENSION
+    SQLITE_OMIT_SHARED_CACHE
+    SQLITE_USE_ALLOCA)
+target_compile_options(ce_sqlite PRIVATE $<IF:$<C_COMPILER_ID:MSVC>,/w,-w>)
+set_target_properties(ce_sqlite PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(ce_sqlite PUBLIC Threads::Threads)
+
 # ------------------------------------------------------------------ the app, the player, the VST
 # Everything from here to the tests needs WebView2 and a native juceaide. See CEDITOR_BUILD_APP.
 
