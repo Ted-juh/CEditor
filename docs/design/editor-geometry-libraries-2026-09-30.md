@@ -162,14 +162,18 @@ what replaced each:
   the meantime (`cacheScaledTo`) — exact for operands laid out in percentages, close for the rest,
   and replaced by the exact outline as soon as Paper.js has it.
 - *The player does not load imported fonts*, so a run-time change to text in one (a binding on its
-  content) could not be re-outlined there. The cache now carries a **glyph atlas** for each face the
-  player cannot read for itself (`fontSources.glyphAtlas`): the outlines and advances of printable
-  Latin plus any character the text holds now, and the kerning between the ASCII ones — 48 KB for
-  Liberation Sans, 66 KB for DM Sans, about half a second to build once per face per session. The
-  player registers it and outlines from it; `test/glyphAtlas.test.js` shows the atlas lands every
-  point of a kerned string within 0.01 px of the font file. It shapes plainly — kerning, no
-  ligatures — so a changed string with an "fi" in it draws the two letters; a character outside the
-  atlas is refused as an unreadable face was, and the shape keeps its outline.
+  content) could not be re-outlined there. Two things answer it now. First and fully: a panel leaving
+  the editor — shared, or prepared for export — **carries the imported faces it names**
+  (`utils/documentFonts.js`, `panel.fonts`), and the player registers them, for CSS and for outlines,
+  so the text is re-outlined from the real font with ligatures and every glyph. That also mended the
+  editor itself: the wiring that hands imported fonts to the outline code
+  (`stores/fontOutlineSources.js`) was described in `fontSources.js` but had never been written, so
+  text in an imported font was refused as "not available to outline" even in the editor. Second, as
+  a fallback, the cache carries a **glyph atlas** for each face the player cannot read for itself
+  (`fontSources.glyphAtlas`): printable Latin outlines and advances, any character the text holds
+  now, and ASCII kerning — 48 KB for Liberation Sans, 66 KB for DM Sans. `test/glyphAtlas.test.js`
+  shows it lands every point of a kerned string within 0.01 px of the font file; it shapes without
+  ligatures, and a character outside it is refused, the shape keeping its outline.
 - *A border's gradient ran across the shape's box* however its flow was set. A gradient set to
   **follow** now runs along the outline as a box border's runs round its sides: each contour from its
   top-left-most point, clockwise, 0 to 1 and back (`outlineFlowPieces`), drawn as short pieces of the

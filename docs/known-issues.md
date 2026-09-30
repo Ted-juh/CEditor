@@ -198,7 +198,10 @@ a folder the next person also needs. The only native support the format required
 dialogs (`savePanelPackageAs`, `openPanelPackage`).
 
 The collector includes `panel.bgImage`, `panel.bgTexture`, nested control/part image, overlay and
-texture sources, and `Text.path` font references. Arbitrary files read by scripts are not collected.
+texture sources, and `Text.path` font references. Fonts imported in Settings that the panel's text
+names travel as `panel.fonts` (`utils/documentFonts.js`): the player and a recipient without those
+fonts register them on opening, and a font whose file cannot be read is reported missing like an
+image. Arbitrary files read by scripts are not collected.
 
 Two things are stripped on the way out, and both are the kind of leak nobody notices until it is
 in somebody else's hands: `filePath`, which is the author's name and folder layout, and

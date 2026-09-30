@@ -23,6 +23,9 @@ import { get } from 'svelte/store';
 
 import { isJuceAvailable } from '../bridge/bridge.js';
 import { fileCache, loadFile } from './fileCache.js';
+import { appSettings } from './appSettings.js';
+import { readFontData } from './fontFileData.js';
+import { withEmbeddedFonts } from '../utils/documentFonts.js';
 import {
   createPanelPackage,
   openPanelPackage,
@@ -98,18 +101,25 @@ export async function packagePanelForSharing(panel, metadata = {}) {
     if (!usableAsset(path)) loadFile(path);
   }
 
-  const envelope = await createPanelPackage(panel, {
+  // The imported fonts the panel names travel with it (utils/documentFonts.js): whoever opens it —
+  // another author, or the exported plug-in's player — has no Settings holding them. A font whose
+  // file cannot be read is missing in the same sense an image is.
+  const carried = await withEmbeddedFonts(panel, get(appSettings)?.fonts ?? [], readFontData);
+
+  const envelope = await createPanelPackage(carried.panel, {
     readAsset: readAssetViaCache,
     metadata,
   });
 
   const validation = validatePanelPackage(envelope);
+  const missing = [...(envelope.missing ?? []), ...carried.missing.map((family) => `font ${family}`)];
   return {
     ok: validation.ok,
     envelope,
     issues: validation.issues,
     warnings: validation.warnings,
-    missing: envelope.missing,
+    missing,
+    fontCount: carried.panel.fonts?.length ?? 0,
     assetCount: Object.keys(envelope.assets).length,
   };
 }

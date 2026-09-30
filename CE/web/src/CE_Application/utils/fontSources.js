@@ -8,7 +8,8 @@
  *
  *   1. the faces shipped for panels (models/panelFontFaces.js — assets/fonts/panelFonts.css as data),
  *      choosing the unicode-range subset that holds the character, as the browser does;
- *   2. the fonts the user imported (Settings → Fonts: a local file or a cached Google face);
+ *   2. the fonts the user imported (Settings → Fonts: a local file or a cached Google face), and after
+ *      them the faces the open panel carries (utils/documentFonts.js — all the player has);
  *   3. the system font of that name — on Windows read from the Fonts folder through the app's file
  *      bridge, in a browser through the Local Font Access API where it is granted;
  *   4. for Arial / Helvetica, Times New Roman and Courier New only: Liberation Sans, Serif and Mono,
@@ -186,6 +187,13 @@ export function setFontSources(sources) {
   externalSources = { ...externalSources, ...sources };
 }
 
+// The faces the open documents carry (utils/documentFonts.js): the only imported fonts the player
+// has, and in the editor the fonts of a shared panel whose author imported them and this user did not.
+let documentFaces = [];
+export function setDocumentFonts(faces) {
+  documentFaces = Array.isArray(faces) ? faces : [];
+}
+
 function dataUrlBuffer(dataUrl) {
   const text = String(dataUrl ?? '');
   const comma = text.indexOf(',');
@@ -201,7 +209,7 @@ function parseWeight(value, fallback = 400) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function storedFace(family, weight, style) {
+function storedFace(family, weight, style, codePoint = 0x41) {
   const key = family.toLowerCase();
   const fonts = (externalSources.storedFonts?.() ?? []).filter((font) => font?.enabled !== false
     && (String(font.family ?? '').toLowerCase() === key || String(font.cssFamily ?? '').toLowerCase() === key));
@@ -209,17 +217,28 @@ function storedFace(family, weight, style) {
   for (const font of fonts) {
     if (Array.isArray(font.cachedFaces) && font.cachedFaces.length) {
       for (const face of font.cachedFaces) {
-        faces.push({ id: `${font.id}:${face.weight}:${face.style}:${face.unicodeRange ?? ''}`, weight: parseWeight(face.weight), style: face.style || 'normal', dataUrl: face.dataUrl });
+        faces.push({ id: `${font.id}:${face.weight}:${face.style}:${face.unicodeRange ?? ''}`, weight: parseWeight(face.weight), style: face.style || 'normal', unicodeRange: face.unicodeRange, dataUrl: face.dataUrl });
       }
     } else if (font.localDataUrl || font.filePath) {
       faces.push({ id: font.id, weight: parseWeight(font.staticWeight), style: font.fontStyle || 'normal', dataUrl: font.localDataUrl, filePath: font.filePath });
+    }
+  }
+  // The user's own import wins; the faces an open panel carries answer where the user has none.
+  if (!faces.length) {
+    for (const face of documentFaces) {
+      if (String(face.family).toLowerCase() !== key) continue;
+      faces.push({ id: `doc:${face.family}:${face.weight}:${face.style}:${face.unicodeRange ?? ''}:${face.data.length}`, weight: parseWeight(face.weight), style: face.style || 'normal', unicodeRange: face.unicodeRange, dataUrl: face.data });
     }
   }
   if (!faces.length) return null;
   const wantItalic = style === 'italic';
   const styled = faces.filter((face) => (face.style === 'italic') === wantItalic);
   const pool = styled.length ? styled : faces;
-  return [...pool].sort((a, b) => Math.abs(a.weight - weight) - Math.abs(b.weight - weight))[0];
+  // A face split by unicode-range (a cached Google font) holds only its subset.
+  const covering = pool.filter((face) => !face.unicodeRange
+    || parseUnicodeRange(face.unicodeRange).some(([start, end]) => codePoint >= start && codePoint <= end));
+  const candidates = covering.length ? covering : pool;
+  return [...candidates].sort((a, b) => Math.abs(a.weight - weight) - Math.abs(b.weight - weight))[0];
 }
 
 async function queryLocalFont(family, weight, style) {
@@ -273,7 +292,7 @@ export async function resolveFont(fontFamily, { weight = 400, style = 'normal', 
     };
   }
 
-  const stored = storedFace(family, w, italic);
+  const stored = storedFace(family, w, italic, codePoint);
   if (stored) {
     const key = `stored:${stored.id}`;
     const font = await fontFromLoader(key, async () => {

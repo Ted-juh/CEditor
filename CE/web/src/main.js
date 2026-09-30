@@ -6,6 +6,10 @@ import './assets/fonts/webFonts.css';
 // The faces a panel may use (a control set's `type` block); the player loads the same sheet.
 import './assets/fonts/panelFonts.css';
 import App from './App.svelte';
+import { wireFontOutlineSources } from './CE_Application/stores/fontOutlineSources.js';
+
+// Imported fonts for text turned into outlines, and the fonts open panels carry.
+wireFontOutlineSources();
 
 const app = mount(App, {
   target: document.getElementById('app'),
