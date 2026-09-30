@@ -30,6 +30,7 @@
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "ControlSurface/Ctrl49Protocol.h"
 #include "StubSynthProcessor.h"
+#include <sqlite3.h>
 #include <algorithm>
 #include <cstring>
 #include <atomic>
@@ -93,6 +94,40 @@ juce::File freshDataDir (const juce::String& name)
     dir.deleteRecursively();
     dir.createDirectory();
     return dir;
+}
+
+/** The sound library as the service left it on disk — read the way the next start reads it. */
+ceditor::host::Library storedLibrary (const juce::File& dataDir)
+{
+    ceditor::host::Library library;
+    ceditor::host::LibraryStore store;
+    store.open (dataDir.getChildFile ("library.db"), {}, library);
+    return library;
+}
+
+/** SQL on the stored library, from outside, the way a hand edit or another machine would change
+    it. Returns false if it did not run. */
+bool editStoredLibrary (const juce::File& dataDir, const juce::String& sql)
+{
+    sqlite3* handle = nullptr;
+    const auto opened = sqlite3_open_v2 (dataDir.getChildFile ("library.db").getFullPathName().toRawUTF8(),
+                                         &handle, SQLITE_OPEN_READWRITE, nullptr) == SQLITE_OK;
+    const auto ok = opened && sqlite3_exec (handle, sql.toRawUTF8(), nullptr, nullptr, nullptr) == SQLITE_OK;
+    sqlite3_close_v2 (handle);
+    return ok;
+}
+
+/** Puts `replacement` in the stored library's place, ids and all, while other harnesses may still
+    have it open. Seeding through library.json only works before the first start: after that the
+    database exists and the file is never read again. `replacement` must be unsaved (built with
+    addCapturedRecord / mergeVendorScan), so its journal names every record as new. */
+void replaceStoredLibrary (const juce::File& dataDir, ceditor::host::Library replacement)
+{
+    editStoredLibrary (dataDir, "PRAGMA foreign_keys = ON; DELETE FROM records; DELETE FROM smart_collections;");
+    ceditor::host::Library emptied;
+    ceditor::host::LibraryStore store;
+    store.open (dataDir.getChildFile ("library.db"), {}, emptied);
+    store.write (replacement);
 }
 
 /** Writes a catalogue file holding one healthy synth class and one quarantined module. */
@@ -2215,7 +2250,7 @@ void testSubstitutes()
         check (dir.getChildFile ("substitutions.json").existsAsFile(),
                "kept in its own file, NOT in the library — a Sound Pack you hand somebody must "
                "not carry your answers about plug-ins on your machine");
-        check (! dir.getChildFile ("library.json").loadFileAsString().contains ("substitutions"),
+        check (! juce::JSON::toString (storedLibrary (dir).toVar()).contains ("substitution"),
                "and the library really does not carry it");
     }
 
@@ -2815,8 +2850,7 @@ void testZebra3ProgramNames()
     {
         Harness h (dir);
         h.cmd ("getState"); h.cmd ("scanLibrary");
-        Library updated;
-        updated.loadFrom (dir.getChildFile ("library.json"));
+        const auto updated = storedLibrary (dir);
         check (updated.find (oldId) == nullptr && updated.find (capturedId) != nullptr
                && updated.find (otherId) != nullptr,
                "update removes old Zebra3 slots even without its worker, while preserving captures and other synths");
@@ -3554,7 +3588,7 @@ void testMovedLibraryRelinks()
         library.mergeVendorScan ("vstpreset", { preset ("/old/a.vstpreset", "fp-a"),
                                                 preset ("/old/b.vstpreset", "fp-b") });
         const auto keptId = library.allRecords().getReference (0).recordId;
-        library.find (keptId)->user.rating = 5;
+        library.edit (keptId)->user.rating = 5;
 
         library.mergeVendorScan ("vstpreset", { preset ("/new/a.vstpreset", "fp-a"),
                                                 preset ("/new/b.vstpreset", "fp-b") });
@@ -3576,7 +3610,7 @@ void testMovedLibraryRelinks()
         Library library;
         library.mergeVendorScan ("vstpreset", { preset ("/old/c.vstpreset", "fp-c") });
         const auto cId = library.allRecords().getReference (0).recordId;
-        library.find (cId)->user.rating = 4;
+        library.edit (cId)->user.rating = 4;
 
         library.mergeVendorScan ("vstpreset", {});
         check (library.find (cId) != nullptr && library.find (cId)->missing,
@@ -3633,14 +3667,14 @@ void testDuplicateFold()
     const auto bId = library.allRecords().getReference (1).recordId;
 
     {
-        auto* a = library.find (aId);
+        auto* a = library.edit (aId);
         a->user.favourite = true;
         a->user.rating = 5;
         a->user.notes = "Best pad I have";
         a->user.tags = { "pad" };
         a->user.collections = { "Live set" };
 
-        auto* b = library.find (bId);
+        auto* b = library.edit (bId);
         b->user.rating = 3;
         b->user.notes = "Came off the old drive";
         b->user.tags = { "warm", "pad" };
@@ -3745,8 +3779,8 @@ void testDuplicateFoldCommands()
                                   vendorPreset ("/presets/lead.vstpreset", "Bright Lead", "fp-lead") });
         keyId = seeded.allRecords().getReference (0).recordId;
         foldedId = seeded.allRecords().getReference (1).recordId;
-        seeded.find (keyId)->user.rating = 4;
-        seeded.find (foldedId)->user.tags = { "warm" };
+        seeded.edit (keyId)->user.rating = 4;
+        seeded.edit (foldedId)->user.tags = { "warm" };
         seeded.saveTo (dir.getChildFile ("library.json"));
     }
 
@@ -3821,7 +3855,7 @@ void testDuplicateFoldCommands()
                                                vendorPreset ("/b.vstpreset", "Init", "fp-b") });
         for (int i = 0; i < 2; ++i)
         {
-            auto* record = nearby.find (nearby.allRecords().getReference (i).recordId);
+            auto* record = nearby.edit (nearby.allRecords().getReference (i).recordId);
             record->sonic.measured = true;
             record->sonic.brightness = 0.5f;
         }
@@ -3829,7 +3863,7 @@ void testDuplicateFoldCommands()
         check (near.size() == 1 && ! near.getReference (0).identical,
                "two presets of one plug-in that measure alike are a set, but not an identical one");
         nearId = near.getReference (0).keyRecordId;
-        nearby.saveTo (dir.getChildFile ("library.json"));
+        replaceStoredLibrary (dir, nearby);
     }
 
     Harness h2 (dir);
@@ -4110,8 +4144,8 @@ void testRecordFamily()
         one.name = "One"; two.name = "Two";
         const auto oneId = looped.addCapturedRecord (one);
         const auto twoId = looped.addCapturedRecord (two);
-        looped.find (oneId)->branchedFromRecordId = twoId;
-        looped.find (twoId)->branchedFromRecordId = oneId;   // only a hand-edited file says this
+        looped.edit (oneId)->branchedFromRecordId = twoId;
+        looped.edit (twoId)->branchedFromRecordId = oneId;   // only a hand-edited file says this
 
         const auto family = recordFamily (looped, oneId);
         check (family.truncated, "a cycle is reported as truncated rather than followed");
@@ -4384,7 +4418,7 @@ void testLibraryBrowsing()
         keeps.mergeVendorScan ("vstpreset", first);
 
         const auto id = keeps.allRecords().getFirst().recordId;
-        auto* record = keeps.find (id);
+        auto* record = keeps.edit (id);
         record->sonic.measured = true;
         record->sonic.brightness = 0.42f;
         record->sonicFingerprint = record->fingerprint;
@@ -6394,9 +6428,9 @@ void testChainPresets()
         // Degraded, not silent: an effect this machine no longer has is named, and the rest of
         // the voice still plays. Surgery on the record's own manifest is the honest way to get
         // here — it is exactly what moving the library to another machine does.
-        const auto libraryFile = dir.getChildFile ("library.json");
-        libraryFile.replaceWithText (libraryFile.loadFileAsString()
-                                         .replace ("VST3-nice-reverb", "VST3-gone-reverb"));
+        check (editStoredLibrary (dir, "UPDATE records SET rack_manifest ="
+                                       " replace(rack_manifest, 'VST3-nice-reverb', 'VST3-gone-reverb')"),
+               "the stored chain now names a reverb this machine does not have");
 
         Harness h (dir);
         h.cmd ("getState");
@@ -6415,8 +6449,10 @@ void testChainPresets()
                "and the instrument and the rest of the voice still load");
 
         // The instrument itself missing is a different answer: refuse, and change nothing.
-        libraryFile.replaceWithText (libraryFile.loadFileAsString()
-                                         .replace ("VST3-good-synth", "VST3-gone-synth"));
+        check (editStoredLibrary (dir, "UPDATE records SET"
+                                       " rack_manifest = replace(rack_manifest, 'VST3-good-synth', 'VST3-gone-synth'),"
+                                       " target_ce_id = replace(target_ce_id, 'VST3-good-synth', 'VST3-gone-synth')"),
+               "and an instrument it does not have");
         Harness h2 (dir);
         h2.cmd ("getState");
         h2.cmd ("addPart");
@@ -10707,13 +10743,11 @@ void testUnreadableLibraryIsNotOverwritten()
     check (parked.size() == 1 && parked[0].loadFileAsString() == truncated,
            "the unreadable index is kept whole, beside the data directory");
 
-    // And the host keeps working: the new index is written where the old one was, with the old
-    // one's bytes safe under another name rather than gone.
+    // And the host keeps working: a new library is started, with the old one's bytes safe under
+    // another name rather than gone — and not imported, since there was nothing readable to import.
     h.cmd ("saveSmartCollection", { { "name", "Pads" } });
-    ceditor::host::Library persisted;
-    check (persisted.loadFrom (file) == ceditor::host::Library::LoadResult::loaded
-             && persisted.allSmartCollections().size() == 1,
-           "a fresh index is written in its place");
+    check (storedLibrary (dir).allSmartCollections().size() == 1, "a fresh library is written");
+    check (! file.existsAsFile(), "and the unreadable file is not left where it would be imported again");
     check (parked[0].loadFileAsString() == truncated, "and the quarantined copy is untouched");
 }
 
@@ -10721,12 +10755,12 @@ void testLibrarySaveFeedback()
 {
     const auto dir = freshDataDir ("library-save-feedback");
     seedCatalog (dir);
-    Harness h (dir);
+    Harness h (dir, {}, [] (InstrumentHostService::Options& options) { options.libraryBusyTimeoutMs = 50; });
     h.cmd ("getState");
     h.cmd ("addPart");
     const auto partId = h.firstPartId();
     h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
-    const auto file = dir.getChildFile ("library.json");
+    const auto file = dir.getChildFile ("library.db");
     for (const auto* command : { "saveUserPreset", "saveChainToLibrary", "saveRackToLibrary" })
     {
         h.emits.clear();
@@ -10734,17 +10768,21 @@ void testLibrarySaveFeedback()
         const auto* saved = h.emits.last ("instrumentHostLibrarySaved");
         check (saved != nullptr && saved->getProperty ("name", {}).toString() == command,
                juce::String (command) + " confirms the saved name");
-        ceditor::host::Library persisted;
-        persisted.loadFrom (file);
         bool found = false;
-        for (const auto& record : persisted.allRecords())
+        const auto stored = storedLibrary (dir);
+        for (const auto& record : stored.allRecords())
             found = found || record.name == command;
         check (found, "success corresponds to a record persisted on disk");
     }
     h.cmd ("getLibrary");
     const auto before = h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).size();
-    // A directory at the library file path deterministically refuses replacement on all platforms.
-    check (file.deleteFile() && file.createDirectory().wasOk(), "fixture blocks library writes");
+
+    // Another process in the middle of a write, holding the lock for longer than the service
+    // will wait: the realistic way a library write fails now, and deterministic everywhere.
+    sqlite3* other = nullptr;
+    sqlite3_open_v2 (file.getFullPathName().toRawUTF8(), &other, SQLITE_OPEN_READWRITE, nullptr);
+    check (sqlite3_exec (other, "BEGIN IMMEDIATE", nullptr, nullptr, nullptr) == SQLITE_OK,
+           "fixture blocks library writes");
     for (const auto* command : { "saveUserPreset", "saveChainToLibrary", "saveRackToLibrary" })
     {
         h.emits.clear();
@@ -10757,6 +10795,75 @@ void testLibrarySaveFeedback()
         check (h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).size() == before,
                "a failed save leaves no phantom record in memory");
     }
+    sqlite3_exec (other, "ROLLBACK", nullptr, nullptr, nullptr);
+    sqlite3_close_v2 (other);
+
+    // A favourite is different from a capture: it is kept while the library is busy and written
+    // when it is free, rather than refused.
+    const auto recordId = h.emits.last ("instrumentHostLibrary")->getProperty ("records", {})[0]
+                              .getProperty ("recordId", {}).toString();
+    sqlite3_open_v2 (file.getFullPathName().toRawUTF8(), &other, SQLITE_OPEN_READWRITE, nullptr);
+    sqlite3_exec (other, "BEGIN IMMEDIATE", nullptr, nullptr, nullptr);
+    h.emits.clear();
+    h.cmd ("setLibraryUserMetadata", { { "recordId", recordId }, { "favourite", true } });
+    check (h.emits.lastError().contains ("busy") && h.emits.lastError().contains ("kept"),
+           "a favourite made while the library is busy is kept, and the message says so");
+    sqlite3_exec (other, "ROLLBACK", nullptr, nullptr, nullptr);
+    sqlite3_close_v2 (other);
+    h.cmd ("getLibrary");   // the next change or the next tick writes it; a command is enough
+    h.cmd ("setLibraryUserMetadata", { { "recordId", recordId }, { "rating", 2 } });
+    const auto storedNow = storedLibrary (dir);
+    const auto* stored = storedNow.find (recordId);
+    check (stored != nullptr && stored->user.favourite && stored->user.rating == 2,
+           "and once it is free, the kept favourite is written with the next change");
+}
+
+void testLibraryAcrossInstances()
+{
+    std::cout << "\nthe library shared by two running instances" << std::endl;
+
+    // The standalone and the plug-in in a DAW, on one library. With the JSON index, once one of
+    // them saved, every later save from the other was refused for the rest of its session and
+    // left a complete copy of the library beside it.
+    const auto dir = freshDataDir ("library-two-instances");
+    seedCatalog (dir);
+    juce::String id;
+    {
+        ceditor::host::Library seed;
+        ceditor::host::LibraryRecord record;
+        record.type = "preset";
+        record.name = "Shared Pad";
+        record.targetCeId = "VST3-good-synth";
+        id = seed.addCapturedRecord (record);
+        seed.saveTo (dir.getChildFile ("library.json"));
+    }
+
+    Harness standalone (dir);
+    Harness plugin (dir);
+    standalone.cmd ("getLibrary");
+    plugin.cmd ("getLibrary");
+
+    standalone.cmd ("setLibraryUserMetadata", { { "recordId", id }, { "favourite", true } });
+    plugin.emits.clear();
+    plugin.cmd ("setLibraryUserMetadata", { { "recordId", id }, { "rating", 4 } });
+    check (plugin.emits.lastError().isEmpty(), "the second instance's save is not refused");
+
+    // Nobody asks: the pump notices the other instance wrote, reads it, and tells the browser.
+    plugin.emits.clear();
+    plugin.service->drainParameterEvents();
+    const auto* view = plugin.emits.last ("instrumentHostLibrary");
+    check (view != nullptr, "the other instance's change reaches the browser on the next tick");
+    const auto row = view != nullptr ? view->getProperty ("records", {})[0] : juce::var();
+    check ((bool) row.getProperty ("favourite", false) && (int) row.getProperty ("rating", 0) == 4,
+           "showing the favourite from one instance and the rating from the other");
+
+    const auto stored = storedLibrary (dir);
+    check (stored.find (id) != nullptr && stored.find (id)->user.favourite && stored.find (id)->user.rating == 4,
+           "and both are in the library on disk");
+
+    juce::Array<juce::File> conflicts;
+    dir.findChildFiles (conflicts, juce::File::findFiles, false, "*conflict*");
+    check (conflicts.isEmpty(), "with no conflict copy written");
 }
 
 void testLibraryConsumers()
@@ -12927,6 +13034,7 @@ int main (int argc, char* argv[])
     testVendorPresetLoadRoutes();
     testSavedLibraryAndLoadResults();
     testLibrarySaveFeedback();
+    testLibraryAcrossInstances();
     testUnreadableLibraryIsNotOverwritten();
     testBuildEditHistory();
     testLibraryConsumers();

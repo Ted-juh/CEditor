@@ -18,6 +18,7 @@
 #include "SetlistSoundcheck.h"
 #include "ParameterModel.h"
 #include "Library.h"
+#include "LibraryStore.h"
 #include "SnapshotStore.h"
 #include "RecentPlay.h"
 #include "PlatformMatrix.h"
@@ -341,6 +342,10 @@ public:
         // instead of the editor. A test with no worker, or one measuring a processor that lives
         // in the test's own process, sets this false.
         bool auditionOutOfProcess = true;
+        // How long a library write waits for another CEditor's write to finish before the change
+        // is kept for later instead (LibraryStore). Writes take milliseconds; a test that holds
+        // the lock on purpose sets this short.
+        int libraryBusyTimeoutMs = 1000;
         std::function<void (const juce::String& eventName, const juce::var& payload)> emit;
         std::function<void (const juce::String& descriptionXml, double sampleRate, int blockSize,
                             InstantiateCallback)> instantiate;
@@ -885,10 +890,24 @@ private:
     void ensureHostProject();
     void ensureLibrary();
 
-    /** Writes the library index and SAYS when that failed. Every call site used to drop the
-        result, so a read-only folder, a full disk or an index still blocked after an
-        unreadable load all looked exactly like a save. Returns false on any of those. */
-    bool saveLibrary();
+    /** Writes the library's pending changes and SAYS when that failed. Every call site used to
+        drop the result, so a read-only folder, a full disk or a library that could not be opened
+        all looked exactly like a save. Returns false on any of those.
+
+        A row update now, not a rewrite of the whole index: milliseconds, where the JSON index cost
+        a second per click at 12,000 presets. A failure no longer loses the change either: it stays
+        in the library's journal, and the next sync (any save, or tickLibrarySync) writes it. */
+    bool saveLibrary()                  { return syncLibrary (false).ok(); }
+    /** `readOthers` also reads what other processes wrote, which can move records in memory:
+        only tickLibrarySync passes true, because a command may be holding a record pointer. */
+    LibraryStore::SyncReport syncLibrary (bool readOthers);
+
+    /** Another CEditor on the same library (the standalone and the plug-in in a DAW, say) writes
+        to it too. Once a second, on the controlling-thread pump: write anything still pending
+        from a busy moment, and read what the other process wrote, so the browser shows it. The
+        check is one counter read when nothing has changed. */
+    void tickLibrarySync();
+    juce::uint32 lastLibrarySyncCheckMs = 0;
     /** Merges and saves the shared plug-in catalogue, reporting a failure once per streak. */
     bool saveCatalog();
 
@@ -1087,7 +1106,10 @@ private:
     std::map<juce::String, juce::StringArray> parameterFavourites;
     bool parameterFavouritesLoaded = false;
 
-    juce::File libraryFile() const      { return options.dataDirectory.getChildFile ("library.json"); }
+    juce::File libraryFile() const      { return options.dataDirectory.getChildFile ("library.db"); }
+    /** Where the library lived before it was a database. Imported once when there is no database
+        yet, then left alone as the backup (LibraryStore.h). */
+    juce::File legacyLibraryFile() const { return options.dataDirectory.getChildFile ("library.json"); }
 
     /** The substitutes you accepted, kept DELIBERATELY OUTSIDE library.json (Stage E).
         A library is portable — a Sound Pack is a bundle you hand somebody — and "when this
@@ -1384,6 +1406,7 @@ private:
     juce::var hostProject;          // the Host Project manifest; loaded/minted on first ask
     bool hostProjectLoaded = false;
     Library library;                // the Stage 4 unified index; loaded on first ask
+    LibraryStore libraryStore { options.libraryBusyTimeoutMs };   // where it is kept
     // The rendered previews that make browsing instant, and the ring that remembers what you
     // played so a preset can be auditioned with your own line rather than a middle C.
     std::unique_ptr<SnapshotStore> snapshots;

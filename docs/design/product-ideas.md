@@ -2071,7 +2071,8 @@ twice rather than differently.
 >
 > - There is **no export or import of a library record at all**. No command, nothing under
 >   `tools/`, nothing in the bridge. Grepping for one finds the support bundle and nothing else.
-> - The **support bundle is an allowlist** and `library.json` is not on it — `SupportBundle.cpp`
+> - The **support bundle is an allowlist** and `library.json` is not on it (nor, since, is the
+>   `library.db` that replaced it) — `SupportBundle.cpp`
 >   names every file that travels, and says so in the manifest it writes.
 > - A **built product ships `session-performance.json` as `factory-performance.json`** — the rack
 >   manifest, not the library.

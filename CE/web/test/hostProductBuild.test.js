@@ -195,7 +195,8 @@ test('a factory performance stages beside the exe and into the bundle resources'
 });
 
 // CURATION AND WHAT TRAVELS. Nothing about a library record can leave this machine at all —
-// there is no export command, the support bundle is an allowlist that does not name library.json,
+// there is no export command, the support bundle is an allowlist that does not name the library
+// (library.db, or the library.json an older install is imported from),
 // and a built product ships the rack manifest rather than the library. The one thing that does
 // travel is the authored rack, and it carries the single piece of personal prose in a
 // Performance: a setlist item's notes, "what the player needs to read on stage".

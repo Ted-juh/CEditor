@@ -299,6 +299,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+        "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/FloatingEditorWindows.cpp"
         "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
@@ -331,7 +332,7 @@ if(CEDITOR_BUILD_APP)
         "${CMAKE_BINARY_DIR}/BinaryData"
     )
 
-    target_link_libraries(CEditor PRIVATE
+    target_link_libraries(CEditor PRIVATE ce_sqlite
         $<$<PLATFORM_ID:Windows>:winmm>   # CTRL49 WinMM transport, see the test target's note
         juce::juce_core
         juce::juce_cryptography
@@ -627,6 +628,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+        "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/FloatingEditorWindows.cpp"
         "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
@@ -659,7 +661,7 @@ if(CEDITOR_BUILD_APP)
         "${CMAKE_BINARY_DIR}/PlayerWebData"
     )
 
-    target_link_libraries(CEHostStandalone PRIVATE
+    target_link_libraries(CEHostStandalone PRIVATE ce_sqlite
         $<$<PLATFORM_ID:Windows>:winmm>   # CTRL49 WinMM transport, see the test target's note
         juce::juce_core
         # The licence check (Licensing/*.cpp in the shared host sources above) uses RSAKey and
@@ -716,7 +718,7 @@ if(CEDITOR_BUILD_APP)
         "${CMAKE_BINARY_DIR}/PlayerWebData"
     )
 
-    target_link_libraries(CEHostVST3 PRIVATE
+    target_link_libraries(CEHostVST3 PRIVATE ce_sqlite
         $<$<PLATFORM_ID:Windows>:winmm>   # CTRL49 WinMM transport, see the test target's note
         juce::juce_core
         # The licence check (Licensing/*.cpp in the shared host sources above) uses RSAKey and
@@ -1123,6 +1125,7 @@ if(WIN32)
         "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+        "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
     )
     target_compile_features(Ctrl49RackDemo PRIVATE cxx_std_23)
     target_compile_definitions(Ctrl49RackDemo PRIVATE
@@ -1133,7 +1136,7 @@ if(WIN32)
         JUCE_STANDALONE_APPLICATION=1
     )
     target_include_directories(Ctrl49RackDemo PRIVATE "${CE_ROOT}/src")
-    target_link_libraries(Ctrl49RackDemo PRIVATE juce::juce_cryptography winmm juce::juce_audio_utils
+    target_link_libraries(Ctrl49RackDemo PRIVATE ce_sqlite juce::juce_cryptography winmm juce::juce_audio_utils
                                             juce::juce_dsp)
 
     add_executable(Ctrl49BridgeDemo
@@ -1280,29 +1283,32 @@ target_link_libraries(CEditorVendorPresetTests PRIVATE juce::juce_core juce::juc
 add_test(NAME VendorPresets COMMAND CEditorVendorPresetTests)
 ce_configure_test(CEditorVendorPresetTests)
 
-# The library index's read/write contract (§18.6.5). Separate from the vendor tests above
-# because it proves a rule about FAILURE rather than about any format: an index that could not
-# be read is never written over by the empty library that failing to read it produced. juce_core
-# only — files and JSON are the whole surface.
+# The library's read/write contract (§18.6.5). Separate from the vendor tests above because it
+# proves rules about FAILURE rather than about any format: a library that could not be read is
+# never written over by the empty library that failing to read it produced, and a change is never
+# lost to another CEditor process. Covers the JSON form and LibraryStore (SQLite): juce_core and
+# ce_sqlite are the whole surface.
 add_executable(CEditorLibraryPersistenceTests
     "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+    "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
     "${CE_ROOT}/tests/LibraryPersistenceTests.cpp"
 )
 target_compile_features(CEditorLibraryPersistenceTests PRIVATE cxx_std_23)
 target_include_directories(CEditorLibraryPersistenceTests PRIVATE "${CE_ROOT}/src")
-target_link_libraries(CEditorLibraryPersistenceTests PRIVATE juce::juce_core)
+target_link_libraries(CEditorLibraryPersistenceTests PRIVATE ce_sqlite juce::juce_core)
 add_test(NAME LibraryPersistence COMMAND CEditorLibraryPersistenceTests)
 ce_configure_test(CEditorLibraryPersistenceTests)
 
-# What the library's one-file JSON index costs at the size it is designed for (12,000 presets):
-# load, save, a favourite click, an audition, searches. A measurement, not a test — no add_test,
-# and EXCLUDE_FROM_ALL so neither CI nor a plain build pays for it. See the header of the source.
+# What the library costs to keep at the size it is designed for (12,000 presets): import, open, a
+# favourite click, an audition, a capture, searches, two instances. A measurement, not a test — no
+# add_test, and EXCLUDE_FROM_ALL so neither CI nor a plain build pays for it. See the source's header.
 add_executable(CEditorLibraryBench EXCLUDE_FROM_ALL
     "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+    "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
     "${CE_ROOT}/tests/LibraryBench.cpp"
 )
 target_include_directories(CEditorLibraryBench PRIVATE "${CE_ROOT}/src")
-target_link_libraries(CEditorLibraryBench PRIVATE juce::juce_core)
+target_link_libraries(CEditorLibraryBench PRIVATE ce_sqlite juce::juce_core)
 ce_configure_test(CEditorLibraryBench)
 
 # The licence document, its signature and the edition table (§19 "Trust", §20, §26.2, §27).
@@ -1533,6 +1539,7 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
     "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+    "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
     "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
     "${CE_ROOT}/src/InstrumentHost/SonicAnalysisJob.cpp"
     "${CE_ROOT}/src/InstrumentHost/SonicAnalysisWorker.cpp"
@@ -1543,7 +1550,7 @@ add_executable(CEditorInstrumentHostServiceTests
 target_compile_definitions(CEditorInstrumentHostServiceTests PRIVATE JUCE_MODAL_LOOPS_PERMITTED=1)
 target_compile_features(CEditorInstrumentHostServiceTests PRIVATE cxx_std_23)
 target_include_directories(CEditorInstrumentHostServiceTests PRIVATE "${CE_ROOT}/src")
-target_link_libraries(CEditorInstrumentHostServiceTests PRIVATE
+target_link_libraries(CEditorInstrumentHostServiceTests PRIVATE ce_sqlite
     juce::juce_core
     juce::juce_cryptography
     juce::juce_audio_utils   # AudioProcessorPlayer for the service's preview audio engine
@@ -1623,6 +1630,7 @@ if (CEDITOR_REAL_PLUGIN_CHECK)
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+        "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
         "${CE_ROOT}/tests/RealPluginCheck.cpp"
     )
     target_compile_features(CEditorRealPluginCheck PRIVATE cxx_std_23)
@@ -1636,7 +1644,7 @@ if (CEDITOR_REAL_PLUGIN_CHECK)
         JUCE_MODAL_LOOPS_PERMITTED=1
     )
     target_include_directories(CEditorRealPluginCheck PRIVATE "${CE_ROOT}/src")
-    target_link_libraries(CEditorRealPluginCheck PRIVATE
+    target_link_libraries(CEditorRealPluginCheck PRIVATE ce_sqlite
         juce::juce_core
         juce::juce_cryptography
         juce::juce_audio_utils

@@ -6406,7 +6406,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         if (requestedId.isEmpty())
             requestedId = part->lastPresetRecordId;
 
-        auto* target = library.find (requestedId);
+        const auto* target = library.find (requestedId);
         if (target == nullptr)
         {
             emitError ("Load a sound from the library first, or save this as a new one.");
@@ -6454,12 +6454,13 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         version.label = label;
         version.savedAtMs = juce::Time::currentTimeMillis();
         version.stateBlobBase64 = blob;
-        target->versions.add (std::move (version));
-        target->versions = pruneLibraryVersions (std::move (target->versions),
+        auto* saving = library.edit (target->recordId, LibraryChanges::state);
+        saving->versions.add (std::move (version));
+        saving->versions = pruneLibraryVersions (std::move (saving->versions),
                                                  juce::Time::currentTimeMillis());
         // The record's own state is the newest version — one current state, so nothing that
         // already reads a record has to learn about versions.
-        target->stateBlobBase64 = target->versions.getLast().stateBlobBase64;
+        saving->stateBlobBase64 = saving->versions.getLast().stateBlobBase64;
 
         saveLibrary();
         emitLibrary (libraryView);
@@ -10065,26 +10066,43 @@ void InstrumentHostService::ensureLibrary()
 
     options.dataDirectory.createDirectory();
 
-    // An index we could not read is NOT an empty index. Left alone, the first favourite or
-    // captured preset after a failed read would write that emptiness over the real file, so
-    // the original is moved aside first and only then is this fresh library allowed to save.
-    // If it cannot even be moved, saves stay blocked: refusing to save is recoverable, and
-    // overwriting somebody's entire curation is not.
-    if (library.loadFrom (libraryFile()) == Library::LoadResult::unreadable)
+    // A library we could not read is NOT an empty library. Left alone, the first favourite or
+    // captured preset after a failed read would write that emptiness over the real one, so the
+    // store moves the original aside first and only then starts a new one. If it cannot even be
+    // moved, nothing is opened and nothing is written: refusing to save is recoverable, and
+    // overwriting somebody's entire curation is not. (LibraryStore.h has the rest of the rules,
+    // and the one-time import of an older library.json.)
+    const auto opened = libraryStore.open (libraryFile(), legacyLibraryFile(), library);
+    switch (opened.result)
     {
-        if (const auto parked = quarantineUnreadableLibrary (libraryFile()); parked != juce::File())
-        {
-            library.allowSaves();
-            emitError ("The sound library index could not be read. It has been set aside as \""
-                       + parked.getFileName() + "\" and a new one started, so nothing in it was "
-                       "overwritten.");
-        }
-        else
-        {
-            emitError ("The sound library index could not be read, and could not be set aside "
-                       "either. Library changes will not be saved until \""
-                       + libraryFile().getFullPathName() + "\" is repaired or moved.");
-        }
+        case LibraryStore::OpenResult::opened:
+        case LibraryStore::OpenResult::created:
+        case LibraryStore::OpenResult::imported:
+            break;
+
+        case LibraryStore::OpenResult::unreadable:
+            if (opened.quarantined != juce::File())
+                emitError ("The sound library could not be read. It has been set aside as \""
+                           + opened.quarantined.getFileName() + "\" and a new one started, so "
+                           "nothing in it was overwritten.");
+            else
+                emitError ("The sound library could not be read, and could not be set aside "
+                           "either. Library changes will not be saved until \""
+                           + (libraryFile().existsAsFile() ? libraryFile() : legacyLibraryFile()).getFullPathName()
+                           + "\" is repaired or moved.");
+            break;
+
+        case LibraryStore::OpenResult::newerFormat:
+            emitError ("The sound library at \"" + libraryFile().getFullPathName() + "\" was written "
+                       "by a newer version of CEditor. It has been left exactly as it is, and changes "
+                       "made here will not be saved to it.");
+            break;
+
+        case LibraryStore::OpenResult::failed:
+            emitError ("The sound library at \"" + libraryFile().getFullPathName() + "\" could not "
+                       "be opened (" + opened.error + "). It has been left as it is, and changes made "
+                       "here will not be saved until CEditor is started again.");
+            break;
     }
 
     snapshots = std::make_unique<SnapshotStore> (snapshotDirectory());
@@ -10554,7 +10572,7 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
             if (finding.problem.isEmpty())
                 ++measured;
 
-            if (auto* record = library.find (finding.recordId))
+            if (auto* record = library.edit (finding.recordId, LibraryChanges::sonic))
             {
                 record->sonic = finding.profile;
                 // The bytes that were ATTEMPTED, whether or not they yielded anything. A preset
@@ -11042,34 +11060,56 @@ LibraryAvailability InstrumentHostService::libraryAvailability() const
     return [this] (const LibraryRecord& record) { return recordUnavailableReason (record).isEmpty(); };
 }
 
-bool InstrumentHostService::saveLibrary()
+LibraryStore::SyncReport InstrumentHostService::syncLibrary (bool readOthers)
 {
-    if (library.saveTo (libraryFile()))
+    const auto report = readOthers ? libraryStore.sync (library) : libraryStore.write (library);
+    if (report.ok())
     {
         libraryWriteErrorReported = false;
-        return true;
+        return report;
     }
 
     // Said once, not once per favourite: see libraryWriteErrorReported.
     if (libraryWriteErrorReported)
-        return false;
+        return report;
 
     libraryWriteErrorReported = true;
-    const auto failure = library.lastSaveFailure();
-    emitError (failure == Library::SaveFailure::unreadableSource
-                 ? juce::String ("Library changes are not being saved: the index at \"")
-                       + libraryFile().getFullPathName()
-                       + "\" could not be read at startup and has been left untouched."
-               : failure == Library::SaveFailure::changedExternally
-                 ? juce::String ("The sound library changed in another CEditor instance. "
-                                 "This instance did not overwrite those newer changes.")
-                       + (library.lastConflictCopy() != juce::File()
-                            ? " Its unsaved version was preserved at \""
-                                + library.lastConflictCopy().getFullPathName() + "\"."
-                            : juce::String())
-                 : juce::String ("Could not save the sound library index to \"")
-                       + libraryFile().getFullPathName() + "\".");
-    return false;
+    switch (report.result)
+    {
+        case LibraryStore::SyncResult::busy:
+            emitError ("The sound library is busy in another CEditor. Changes made here are kept, "
+                       "and will be saved as soon as it is free.");
+            break;
+        case LibraryStore::SyncResult::closed:
+            emitError ("Library changes are not being saved: the library at \""
+                       + libraryFile().getFullPathName() + "\" could not be opened when CEditor "
+                       "started, and has been left untouched.");
+            break;
+        case LibraryStore::SyncResult::failed:
+        case LibraryStore::SyncResult::synced:
+            emitError ("Could not save to the sound library at \"" + libraryFile().getFullPathName()
+                       + "\" (" + report.error + "). Changes made here are kept, and saving them "
+                       "will be tried again.");
+            break;
+    }
+    return report;
+}
+
+void InstrumentHostService::tickLibrarySync()
+{
+    if (! libraryLoaded || ! libraryStore.isOpen())
+        return;
+
+    const auto now = juce::Time::getMillisecondCounter();
+    if (now - lastLibrarySyncCheckMs < 1000)
+        return;
+    lastLibrarySyncCheckMs = now;
+
+    if (! library.hasPendingChanges() && ! libraryStore.othersHaveWritten())
+        return;
+
+    if (const auto report = syncLibrary (true); report.ok() && report.changedByOthers > 0)
+        emitLibrary (libraryView);
 }
 
 bool InstrumentHostService::saveCatalog()
@@ -11103,19 +11143,19 @@ juce::String InstrumentHostService::saveCapturedLibraryRecord (LibraryRecord rec
 {
     const auto name = record.name;
     const auto recordId = library.addCapturedRecord (std::move (record));
-    if (! library.saveTo (libraryFile()))
+    if (const auto report = libraryStore.write (library); ! report.ok())
     {
-        // A failed capture must not remain in memory and appear saved on a later refresh.
+        // A capture is confirmed only once it is on disk. It is not left pending like a
+        // favourite: "saved" would then be a claim that a crash before the next sync makes
+        // false. Taken back instead (the journal forgets it too), and said so.
         library.removeRecord (recordId);
-        emitError (library.lastSaveFailure() == Library::SaveFailure::changedExternally
-                     ? "Could not save \"" + name + "\" because the sound library changed "
-                       "in another CEditor instance. The newer index was left untouched."
-                       + (library.lastConflictCopy() != juce::File()
-                            ? " The unsaved version was preserved at \""
-                                + library.lastConflictCopy().getFullPathName() + "\"."
-                            : juce::String())
-                     : "Could not save \"" + name + "\" to the library. Could not write: "
-                         + libraryFile().getFullPathName());
+        emitError ("Could not save \"" + name + "\" to the sound library at \""
+                   + libraryFile().getFullPathName() + "\": "
+                   + (report.result == LibraryStore::SyncResult::busy
+                        ? juce::String ("it is busy in another CEditor. Try again in a moment.")
+                        : report.result == LibraryStore::SyncResult::closed
+                            ? juce::String ("it could not be opened when CEditor started.")
+                            : report.error + "."));
         return {};
     }
     if (options.emit != nullptr)
@@ -16205,6 +16245,7 @@ void InstrumentHostService::drainParameterEvents()
     tickMsegs();
     tickRandomModulators();
     tickMidiHealth();
+    tickLibrarySync();
 
     // A dedicated small packet, not a document/state push. Draining even when the browser
     // is hidden prevents old audio from flashing on reopening. The graph only accumulates

@@ -1,24 +1,26 @@
-// LibraryBench.cpp — what the sound library's JSON index costs at the size it is designed for.
+// LibraryBench.cpp — what the sound library costs to keep, at the size it is designed for.
 //
 //   cmake --build build/native --config Release --target CEditorLibraryBench
 //   build/native/Release/CEditorLibraryBench [vendorRecords=12000] [capturedRecords=300]
 //
-// A measurement, not a test: it is not registered with CTest and is not built by default. It exists
-// to answer one question with numbers — does the one-file JSON index (Library::saveTo, loadFrom)
-// hold at twelve thousand presets, or does it need a database? — and to be re-run when the answer
-// might have changed. docs/design/library-storage-measurement-2026-09-30.md has the numbers it gave.
+// A measurement, not a test: it is not registered with CTest and is not built by default. It was
+// written to answer one question with numbers — does the one-file JSON index hold at twelve
+// thousand presets, or does it need a database? — and it answered it: a second per favourite
+// click, nearly five with a few hundred captured sounds, and two CEditor processes that could not
+// share a library at all (docs/design/library-storage-measurement-2026-09-30.md). The library is
+// now kept in SQLite (LibraryStore), and this measures that the same way, so the two sets of
+// numbers can be read side by side.
 //
 // What it builds is what a real library holds after a vendor scan and an analysis pass: every
 // vendor record measured (a SonicProfile with its 48-point envelope), a few tags and favourites,
-// and — the part that makes a file big — captured sounds, each carrying its processor state and
-// a few earlier versions of it, base64 in the JSON.
+// and captured sounds, each carrying its processor state and a few earlier versions of it.
 //
-// Every operation is timed through the real code path. The two that matter most are the ones the
-// service runs on a click: setUserMetadata + saveTo (favourite, rating, tag) and noteRecordUsed +
-// saveTo (every load and every audition). A save re-reads the file on disk first, to refuse a stale
-// write over another process's changes, so a click costs a full read AND a full write.
+// Every operation goes through the real code path. The ones that matter most are what the service
+// does on a click: setUserMetadata + write (favourite, rating, tag) and noteRecordUsed + write
+// (every load and every audition).
 
 #include <InstrumentHost/Library.h>
+#include <InstrumentHost/LibraryStore.h>
 
 #include <algorithm>
 #include <chrono>
@@ -86,7 +88,15 @@ juce::String stateBlob (int bytes, juce::Random& random)
 {
     juce::MemoryBlock block ((size_t) bytes);
     for (size_t b = 0; b < block.getSize(); ++b) block[b] = (char) random.nextInt (256);
-    return block.toBase64Encoding();
+    return juce::Base64::toBase64 (block.getData(), block.getSize());   // what the service writes
+}
+
+juce::int64 sizeOnDisk (const juce::File& database)
+{
+    juce::int64 total = 0;
+    for (const auto* suffix : { "", "-wal", "-shm" })
+        total += database.getSiblingFile (database.getFileName() + suffix).getSize();
+    return total;
 }
 } // namespace
 
@@ -138,91 +148,123 @@ int main (int argc, char** argv)
     const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("ceditor-library-bench");
     dir.deleteRecursively();
     dir.createDirectory();
-    const auto file = dir.getChildFile ("library.json");
-
-    const auto firstSaveMs = millis ([&] { library.saveTo (file); });
-    const auto sizeMb = (double) file.getSize() / (1024.0 * 1024.0);
-
+    const auto json = dir.getChildFile ("library.json");
+    const auto database = dir.getChildFile ("library.db");
     constexpr int runs = 7;
-    const auto saveMs = median (runs, [&] { library.saveTo (file); });
-    const auto loadMs = median (runs, [&] { Library fresh; fresh.loadFrom (file); });
 
-    const auto someId = library.allRecords()[library.allRecords().size() / 2].recordId;
+    // The JSON form, now only an export and the import source: how big, and what the one-time
+    // import into a database costs.
+    const auto exportMs = millis ([&] { library.saveTo (json); });
+    const auto jsonMb = (double) json.getSize() / (1024.0 * 1024.0);
+
+    Library imported;
+    LibraryStore importer;
+    const auto importMs = millis ([&] { importer.open (database, json, imported); });
+    importer.close();
+    const auto databaseMb = (double) sizeOnDisk (database) / (1024.0 * 1024.0);
+
+    const auto openMs = median (runs, [&] { Library fresh; LibraryStore store; store.open (database, {}, fresh); });
+
+    Library live;
+    LibraryStore store;
+    store.open (database, {}, live);
+
+    const auto someId = live.allRecords()[live.allRecords().size() / 2].recordId;
     bool toggle = false;
     const auto favouriteMs = median (runs, [&]
     {
-        auto user = library.find (someId)->user;
+        auto user = live.find (someId)->user;
         user.favourite = (toggle = ! toggle);
-        library.setUserMetadata (someId, user);
-        library.saveTo (file);
+        live.setUserMetadata (someId, user);
+        store.write (live);
     });
     const auto favouriteInMemoryMs = median (runs, [&]
     {
-        auto user = library.find (someId)->user;
+        auto user = live.find (someId)->user;
         user.favourite = (toggle = ! toggle);
-        library.setUserMetadata (someId, user);
+        live.setUserMetadata (someId, user);
     });
+    store.write (live);
     const auto auditionMs = median (runs, [&]
     {
-        library.noteRecordUsed (someId, true, juce::Time::currentTimeMillis());
-        library.saveTo (file);
+        live.noteRecordUsed (someId, true, juce::Time::currentTimeMillis());
+        store.write (live);
     });
+    const auto captureMs = median (runs, [&]
+    {
+        auto r = vendorRecord (vendorCount + capturedCount + 1, random);
+        r.sourceType = "userState";
+        r.factory = false;
+        r.stateBlobBase64 = stateBlob (stateBytes, random);
+        live.addCapturedRecord (r);
+        store.write (live);
+    });
+    const auto idleCheckMs = median (runs, [&] { (void) store.sync (live); });
 
-    const auto textSearchMs = median (runs, [&] { (void) searchLibrary (library, juce::String ("pad"), {}); });
+    const auto textSearchMs = median (runs, [&] { (void) searchLibrary (live, juce::String ("pad"), {}); });
     LibraryQuery faceted;
     faceted.categories.include.add ("Pad");
     faceted.brightness.active = true; faceted.brightness.min = 0.2f; faceted.brightness.max = 0.6f;
     faceted.tail.active = true; faceted.tail.min = 0.5f; faceted.tail.max = 1.0f;
-    const auto facetSearchMs = median (runs, [&] { (void) searchLibrary (library, faceted); });
-    const auto facetCountsMs = median (runs, [&] { (void) libraryFacets (library, faceted); });
+    const auto facetSearchMs = median (runs, [&] { (void) searchLibrary (live, faceted); });
+    const auto facetCountsMs = median (runs, [&] { (void) libraryFacets (live, faceted); });
 
-    // Two instances of the host — the standalone and the plug-in in a DAW — on one library file.
-    // A saves first; B then records three clicks of its own.
-    int conflictFiles = 0;
-    juce::int64 conflictBytes = 0;
-    bool bSaved = true;
+    // Two instances of the host — the standalone and the plug-in in a DAW — on one library.
+    // A rates a sound; B, which has not seen that, favourites three others and the same one.
+    int bLanded = 0;
+    bool bothOnOne = false;
+    double pullMs = 0;
     {
         Library a, b;
-        a.loadFrom (file);
-        b.loadFrom (file);
-        const auto idA = a.allRecords()[1].recordId;
-        auto userA = a.find (idA)->user; userA.rating = 5;
-        a.setUserMetadata (idA, userA);
-        a.saveTo (file);
+        LibraryStore storeA, storeB;
+        storeA.open (database, {}, a);
+        storeB.open (database, {}, b);
+        const auto shared = a.allRecords()[1].recordId;
+        auto userA = a.find (shared)->user; userA.rating = 5;
+        a.setUserMetadata (shared, userA);
+        storeA.write (a);
+
+        juce::StringArray clicked { shared };
         for (int click = 0; click < 3; ++click)
+            clicked.add (b.allRecords()[10 + click].recordId);
+        for (const auto& id : clicked)
         {
-            const auto idB = b.allRecords()[10 + click].recordId;
-            auto userB = b.find (idB)->user; userB.favourite = true;
-            b.setUserMetadata (idB, userB);
-            bSaved = b.saveTo (file) && bSaved;
+            auto userB = b.find (id)->user; userB.favourite = true;
+            b.setUserMetadata (id, userB);
+            storeB.write (b);
         }
-        for (const auto& f : dir.findChildFiles (juce::File::findFiles, false, "*.conflict-*"))
-        {
-            ++conflictFiles;
-            conflictBytes += f.getSize();
-        }
+        pullMs = millis ([&] { (void) storeA.sync (a); });
+
+        Library check;
+        LibraryStore reader;
+        reader.open (database, {}, check);
+        for (const auto& id : clicked)
+            bLanded += check.find (id)->user.favourite ? 1 : 0;
+        bothOnOne = check.find (shared)->user.favourite && check.find (shared)->user.rating == 5;
     }
 
     std::printf ("library: %d vendor + %d captured records (%d KB state, %d versions each)\n",
                  vendorCount, capturedCount, stateBytes / 1024, versionsPerCapture);
-    std::printf ("  built in memory              %8.0f ms\n", buildMs);
-    std::printf ("  file size                    %8.1f MB\n", sizeMb);
-    std::printf ("  first save                   %8.1f ms\n", firstSaveMs);
-    std::printf ("  save (median of %d)           %8.1f ms\n", runs, saveMs);
-    std::printf ("  load                         %8.1f ms\n", loadMs);
-    std::printf ("  favourite click, with save   %8.1f ms\n", favouriteMs);
-    std::printf ("  favourite click, memory only %8.3f ms\n", favouriteInMemoryMs);
-    std::printf ("  audition/load count + save   %8.1f ms\n", auditionMs);
-    std::printf ("  text search \"pad\"            %8.2f ms\n", textSearchMs);
-    std::printf ("  faceted search               %8.2f ms\n", facetSearchMs);
-    std::printf ("  facet counts                 %8.2f ms\n", facetCountsMs);
-    std::printf ("  two instances: B's 3 clicks  %s, %d conflict file(s), %.1f MB\n",
-                 bSaved ? "saved" : "REFUSED", conflictFiles, (double) conflictBytes / (1024.0 * 1024.0));
+    std::printf ("  built in memory               %8.0f ms\n", buildMs);
+    std::printf ("  JSON export                   %8.1f MB, %.0f ms\n", jsonMb, exportMs);
+    std::printf ("  import into a database        %8.0f ms (once)\n", importMs);
+    std::printf ("  database on disk              %8.1f MB\n", databaseMb);
+    std::printf ("  open and read all             %8.1f ms\n", openMs);
+    std::printf ("  favourite click, written      %8.2f ms\n", favouriteMs);
+    std::printf ("  favourite click, memory only  %8.3f ms\n", favouriteInMemoryMs);
+    std::printf ("  audition count, written       %8.2f ms\n", auditionMs);
+    std::printf ("  capture a %d KB sound         %8.2f ms\n", stateBytes / 1024, captureMs);
+    std::printf ("  sync with nothing to do       %8.3f ms\n", idleCheckMs);
+    std::printf ("  text search \"pad\"             %8.2f ms\n", textSearchMs);
+    std::printf ("  faceted search                %8.2f ms\n", facetSearchMs);
+    std::printf ("  facet counts                  %8.2f ms\n", facetCountsMs);
+    std::printf ("  two instances: B's 4 clicks   %d of 4 landed; A's rating and B's favourite on one record: %s; A reads them in %.1f ms\n",
+                 bLanded, bothOnOne ? "both kept" : "LOST", pullMs);
 
-    // CE_BENCH_KEEP=1 leaves the file behind, to look at what a record costs on disk.
+    // CE_BENCH_KEEP=1 leaves the files behind, to look at what a record costs on disk.
     if (juce::SystemStats::getEnvironmentVariable ("CE_BENCH_KEEP", {}).isEmpty())
         dir.deleteRecursively();
     else
-        std::printf ("  kept                         %s\n", file.getFullPathName().toRawUTF8());
+        std::printf ("  kept                          %s\n", dir.getFullPathName().toRawUTF8());
     return 0;
 }

@@ -103,9 +103,9 @@ void testParsersAndDiscovery()
     Library library;
     for (const auto& record : records) library.mergeVendorScan (record.sourceType, { record });
     const auto id = library.allRecords()[0].recordId;
-    library.find (id)->user.favourite = true;
-    library.find (id)->user.notes = "Keep this";
-    library.find (id)->user.tags.add ("Live set");
+    library.edit (id)->user.favourite = true;
+    library.edit (id)->user.notes = "Keep this";
+    library.edit (id)->user.tags.add ("Live set");
     const auto renamed = nks.getSiblingFile ("Renamed.nksf"); nks.moveFileTo (renamed);
     const auto updated = discoverVendorPresets (catalog, { root });
     for (const auto& source : { "nksf", "fxp", "spire" })
@@ -194,7 +194,7 @@ void testZebra3Presets()
     Library library;
     library.mergeVendorScan ("h2p", records);
     const auto id = library.allRecords()[0].recordId;
-    library.find (id)->user.favourite = true;
+    library.edit (id)->user.favourite = true;
     const auto renamed = preset.getSiblingFile ("Renamed Glass.h2p");
     preset.moveFileTo (renamed);
     library.mergeVendorScan ("h2p", discoverVendorPresets (catalog, { root }));

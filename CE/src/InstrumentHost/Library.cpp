@@ -7,23 +7,94 @@
 #include <deque>
 #include <limits>
 #include <map>
-#include <mutex>
 #include <utility>
 
 namespace ceditor::host
 {
 
-LibraryRecord* Library::find (const juce::String& recordId)
+bool LibraryChanges::isEmpty() const
 {
-    for (auto& record : records)
+    return records.empty() && usage.empty() && removedRecords.empty()
+             && smartCollections.empty() && removedSmartCollections.empty();
+}
+
+void LibraryChanges::absorb (LibraryChanges later)
+{
+    for (const auto& id : later.removedRecords)
+    {
+        records.erase (id);
+        usage.erase (id);
+        removedRecords.insert (id);
+    }
+    for (const auto& [id, fields] : later.records)
+    {
+        records[id] |= fields;
+        removedRecords.erase (id);
+    }
+    for (const auto& [id, delta] : later.usage)
+    {
+        auto& into = usage[id];
+        into.loads += delta.loads;
+        into.auditions += delta.auditions;
+        into.lastLoadedAtMs = std::max (into.lastLoadedAtMs, delta.lastLoadedAtMs);
+    }
+    for (const auto& id : later.removedSmartCollections)
+    {
+        smartCollections.erase (id);
+        removedSmartCollections.insert (id);
+    }
+    for (const auto& id : later.smartCollections)
+    {
+        smartCollections.insert (id);
+        removedSmartCollections.erase (id);
+    }
+}
+
+const LibraryRecord* Library::find (const juce::String& recordId) const
+{
+    for (const auto& record : records)
         if (record.recordId == recordId)
             return &record;
     return nullptr;
 }
 
-const LibraryRecord* Library::find (const juce::String& recordId) const
+LibraryRecord* Library::edit (const juce::String& recordId, juce::uint32 fields)
 {
-    return const_cast<Library*> (this)->find (recordId);
+    for (auto& record : records)
+        if (record.recordId == recordId)
+        {
+            noteChanged (recordId, fields);
+            return &record;
+        }
+    return nullptr;
+}
+
+void Library::noteChanged (const juce::String& recordId, juce::uint32 fields)
+{
+    if (fields != 0)
+        changes.records[recordId] |= fields;
+}
+
+LibraryChanges Library::takePendingChanges()
+{
+    return std::exchange (changes, {});
+}
+
+void Library::restorePendingChanges (LibraryChanges unwritten)
+{
+    unwritten.absorb (std::exchange (changes, {}));
+    changes = std::move (unwritten);
+
+    // A record removed in the meantime was dropped from the journal by removeRecord, but the
+    // put-back journal still names it. Writing it would bring back a record that is gone from
+    // memory, so anything no longer here is forgotten — unless it is a removal, which must land.
+    std::set<juce::String> present;
+    for (const auto& record : records)
+        present.insert (record.recordId);
+    for (auto it = changes.records.begin(); it != changes.records.end();)
+        it = present.count (it->first) == 0 ? changes.records.erase (it) : std::next (it);
+    for (auto it = changes.usage.begin(); it != changes.usage.end();)
+        it = present.count (it->first) == 0 ? changes.usage.erase (it) : std::next (it);
 }
 
 juce::String Library::addCapturedRecord (LibraryRecord record)
@@ -35,15 +106,30 @@ juce::String Library::addCapturedRecord (LibraryRecord record)
         record.addedAtMs = juce::Time::currentTimeMillis();
     const auto id = record.recordId;
     records.add (std::move (record));
+    changes.records[id] = LibraryChanges::created;
     return id;
 }
 
-bool Library::removeRecord (const juce::String& recordId)
+bool Library::removeRecord (const juce::String& recordIdToRemove)
 {
+    // Copied, because callers pass `record->recordId` — a reference into the element this is
+    // about to destroy — and the journal needs the id after it is gone.
+    const auto recordId = recordIdToRemove;
     for (int i = 0; i < records.size(); ++i)
         if (records.getReference (i).recordId == recordId)
         {
             records.remove (i);
+
+            // A record that was never written needs no tombstone: forgetting it is the whole
+            // removal. That is the failed-capture path, where a record added a moment ago is
+            // taken back because the store could not write it.
+            const auto pending = changes.records.find (recordId);
+            const bool neverWritten = pending != changes.records.end()
+                                        && (pending->second & LibraryChanges::created) != 0;
+            changes.records.erase (recordId);
+            changes.usage.erase (recordId);
+            if (! neverWritten)
+                changes.removedRecords.insert (recordId);
             return true;
         }
     return false;
@@ -54,25 +140,30 @@ juce::String Library::putSmartCollection (SmartCollection collection)
     if (collection.collectionId.isEmpty())
         collection.collectionId = juce::Uuid().toDashedString();
 
+    const auto id = collection.collectionId;
+    changes.smartCollections.insert (id);
+    changes.removedSmartCollections.erase (id);
+
     for (auto& existing : smartCollections)
-        if (existing.collectionId == collection.collectionId)
+        if (existing.collectionId == id)
         {
-            const auto id = collection.collectionId;
             existing = std::move (collection);
             return id;
         }
 
-    const auto id = collection.collectionId;
     smartCollections.add (std::move (collection));
     return id;
 }
 
-bool Library::removeSmartCollection (const juce::String& collectionId)
+bool Library::removeSmartCollection (const juce::String& collectionIdToRemove)
 {
+    const auto collectionId = collectionIdToRemove;   // see removeRecord
     for (int i = 0; i < smartCollections.size(); ++i)
         if (smartCollections.getReference (i).collectionId == collectionId)
         {
             smartCollections.remove (i);
+            changes.smartCollections.erase (collectionId);
+            changes.removedSmartCollections.insert (collectionId);
             return true;
         }
     return false;
@@ -122,6 +213,7 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             // somebody's history, and the captured parts are what a substitution is computed
             // from; all three used to go silently when a plug-in was simply loaded again.
             auto& record = *existing[i];
+            const auto before = record;
             const auto keepId = record.recordId;
             // When it first arrived is a fact about this record, not about the vendor's file —
             // and a rescan that restamped it would make the whole library look new every time
@@ -160,6 +252,24 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             record.parts = keepParts;
             record.missing = false;
             matched.set (i, true);
+
+            // Journal only what the rescan actually moved. A scan of an unchanged folder finds
+            // twelve thousand records exactly as they were, and writing them all back would be
+            // twelve thousand row updates that every other open CEditor then reads again.
+            juce::uint32 moved = 0;
+            if (record.type != before.type || record.sourceType != before.sourceType
+                || record.sourceLocator != before.sourceLocator || record.name != before.name
+                || record.manufacturer != before.manufacturer || record.instrument != before.instrument
+                || record.targetCeId != before.targetCeId || record.category != before.category
+                || record.rackManifestJson != before.rackManifestJson
+                || record.classIdHex != before.classIdHex || record.fingerprint != before.fingerprint
+                || record.factory != before.factory)
+                moved |= LibraryChanges::identity;
+            if (record.stateBlobBase64 != before.stateBlobBase64)
+                moved |= LibraryChanges::state;
+            if (before.missing)
+                moved |= LibraryChanges::missing;
+            noteChanged (keepId, moved);
             return true;
         }
         return false;
@@ -196,8 +306,11 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
     // Unclaimed vendor records lost their source: marked, kept, repairable — favourites and
     // notes are the user's, not the rescan's (baseline §18.6.5).
     for (int i = 0; i < existing.size(); ++i)
-        if (! matched[i])
+        if (! matched[i] && ! existing[i]->missing)
+        {
             existing[i]->missing = true;
+            noteChanged (existing[i]->recordId, LibraryChanges::missing);
+        }
 
     // `fresh` is what survived all three identity passes unclaimed, which the comment at the
     // top of this function calls genuinely new — so this is the one moment a scanned preset
@@ -206,15 +319,25 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
     for (auto& record : fresh)
     {
         record.addedAtMs = arrivedAtMs;
+        changes.records[record.recordId] = LibraryChanges::created;
         records.add (std::move (record));
     }
 }
 
 bool Library::setUserMetadata (const juce::String& recordId, const LibraryRecord::UserMetadata& user)
 {
-    if (auto* record = find (recordId))
+    // Field by field, because the caller hands over the whole block even when one star moved,
+    // and the store must write the star alone: another process may be editing the notes.
+    if (auto* record = edit (recordId, 0))
     {
+        juce::uint32 moved = 0;
+        if (record->user.favourite != user.favourite)     moved |= LibraryChanges::favourite;
+        if (record->user.rating != user.rating)           moved |= LibraryChanges::rating;
+        if (record->user.notes != user.notes)             moved |= LibraryChanges::notes;
+        if (record->user.tags != user.tags)               moved |= LibraryChanges::tags;
+        if (record->user.collections != user.collections) moved |= LibraryChanges::collections;
         record->user = user;
+        noteChanged (recordId, moved);
         return true;
     }
     return false;
@@ -222,29 +345,87 @@ bool Library::setUserMetadata (const juce::String& recordId, const LibraryRecord
 
 bool Library::noteRecordUsed (const juce::String& recordId, bool audition, juce::int64 nowMs)
 {
-    auto* record = find (recordId);
+    auto* record = edit (recordId, 0);
     if (record == nullptr)
         return false;
 
+    auto& delta = changes.usage[recordId];
     if (audition)
     {
         ++record->auditionCount;
+        ++delta.auditions;
         return true;
     }
 
     ++record->loadCount;
     record->lastLoadedAtMs = nowMs;
+    ++delta.loads;
+    delta.lastLoadedAtMs = std::max (delta.lastLoadedAtMs, nowMs);
     return true;
 }
 
 bool Library::setRecordHidden (const juce::String& recordId, bool hidden)
 {
-    if (auto* record = find (recordId))
+    if (auto* record = edit (recordId, 0))
     {
+        if (record->hidden != hidden)
+            noteChanged (recordId, LibraryChanges::hidden);
         record->hidden = hidden;
         return true;
     }
     return false;
+}
+
+juce::var capturedPartsToVar (const juce::Array<CapturedPart>& parts)
+{
+    juce::Array<juce::var> partVars;
+    for (const auto& part : parts)
+    {
+        auto* pv = new juce::DynamicObject();
+        pv->setProperty ("partId",     part.partId);
+        pv->setProperty ("pluginCeId", part.pluginCeId);
+        pv->setProperty ("pluginName", part.pluginName);
+        pv->setProperty ("presetName", part.presetName);
+        if (part.sonic.measured)
+        {
+            auto* m = new juce::DynamicObject();
+            m->setProperty ("brightness", part.sonic.brightness);
+            m->setProperty ("attack",     part.sonic.attack);
+            m->setProperty ("tail",       part.sonic.tail);
+            m->setProperty ("width",      part.sonic.width);
+            m->setProperty ("noisiness",  part.sonic.noisiness);
+            m->setProperty ("dynamics",   part.sonic.dynamics);
+            pv->setProperty ("sonic", juce::var (m));
+        }
+        partVars.add (juce::var (pv));
+    }
+    return partVars;
+}
+
+juce::Array<CapturedPart> capturedPartsFromVar (const juce::var& stored)
+{
+    juce::Array<CapturedPart> parts;
+    if (const auto* storedParts = stored.getArray())
+        for (const auto& pv : *storedParts)
+        {
+            CapturedPart part;
+            part.partId     = pv.getProperty ("partId", {}).toString();
+            part.pluginCeId = pv.getProperty ("pluginCeId", {}).toString();
+            part.pluginName = pv.getProperty ("pluginName", {}).toString();
+            part.presetName = pv.getProperty ("presetName", {}).toString();
+            if (const auto m = pv.getProperty ("sonic", {}); m.isObject())
+            {
+                part.sonic.measured   = true;
+                part.sonic.brightness = (float) (double) m.getProperty ("brightness", 0.0);
+                part.sonic.attack     = (float) (double) m.getProperty ("attack", 0.0);
+                part.sonic.tail       = (float) (double) m.getProperty ("tail", 0.0);
+                part.sonic.width      = (float) (double) m.getProperty ("width", 0.0);
+                part.sonic.noisiness  = (float) (double) m.getProperty ("noisiness", 0.0);
+                part.sonic.dynamics   = (float) (double) m.getProperty ("dynamics", 0.0);
+            }
+            parts.add (std::move (part));
+        }
+    return parts;
 }
 
 juce::var Library::toVar() const
@@ -343,30 +524,7 @@ juce::var Library::toVar() const
             r->setProperty ("branchedFrom", record.branchedFromRecordId);
 
         if (! record.parts.isEmpty())
-        {
-            juce::Array<juce::var> partVars;
-            for (const auto& part : record.parts)
-            {
-                auto* pv = new juce::DynamicObject();
-                pv->setProperty ("partId",     part.partId);
-                pv->setProperty ("pluginCeId", part.pluginCeId);
-                pv->setProperty ("pluginName", part.pluginName);
-                pv->setProperty ("presetName", part.presetName);
-                if (part.sonic.measured)
-                {
-                    auto* m = new juce::DynamicObject();
-                    m->setProperty ("brightness", part.sonic.brightness);
-                    m->setProperty ("attack",     part.sonic.attack);
-                    m->setProperty ("tail",       part.sonic.tail);
-                    m->setProperty ("width",      part.sonic.width);
-                    m->setProperty ("noisiness",  part.sonic.noisiness);
-                    m->setProperty ("dynamics",   part.sonic.dynamics);
-                    pv->setProperty ("sonic", juce::var (m));
-                }
-                partVars.add (juce::var (pv));
-            }
-            r->setProperty ("parts", partVars);
-        }
+            r->setProperty ("parts", capturedPartsToVar (record.parts));
         recordVars.add (juce::var (r));
     }
 
@@ -474,26 +632,7 @@ Library Library::fromVar (const juce::var& stored)
             }
         record.branchedFromRecordId = r.getProperty ("branchedFrom", {}).toString();
 
-        if (const auto* storedParts = r.getProperty ("parts", {}).getArray())
-            for (const auto& pv : *storedParts)
-            {
-                CapturedPart part;
-                part.partId     = pv.getProperty ("partId", {}).toString();
-                part.pluginCeId = pv.getProperty ("pluginCeId", {}).toString();
-                part.pluginName = pv.getProperty ("pluginName", {}).toString();
-                part.presetName = pv.getProperty ("presetName", {}).toString();
-                if (const auto m = pv.getProperty ("sonic", {}); m.isObject())
-                {
-                    part.sonic.measured   = true;
-                    part.sonic.brightness = (float) (double) m.getProperty ("brightness", 0.0);
-                    part.sonic.attack     = (float) (double) m.getProperty ("attack", 0.0);
-                    part.sonic.tail       = (float) (double) m.getProperty ("tail", 0.0);
-                    part.sonic.width      = (float) (double) m.getProperty ("width", 0.0);
-                    part.sonic.noisiness  = (float) (double) m.getProperty ("noisiness", 0.0);
-                    part.sonic.dynamics   = (float) (double) m.getProperty ("dynamics", 0.0);
-                }
-                record.parts.add (std::move (part));
-            }
+        record.parts = capturedPartsFromVar (r.getProperty ("parts", {}));
 
         const auto u = r.getProperty ("user", {});
         record.user.favourite = (bool) u.getProperty ("favourite", false);
@@ -516,18 +655,15 @@ Library::LoadResult Library::loadFrom (const juce::File& file)
 {
     *this = Library();
 
-    baselinePath = file.getFullPathName();
-    hasFileBaseline = true;
-    baselineFileExisted = file.existsAsFile();
-
-    if (! baselineFileExisted)
+    if (! file.existsAsFile())
         return LoadResult::absent;
 
     // Everything below this line is the same question asked three ways: did we actually READ
     // the library? An empty string is what a locked or unreadable file gives back (JUCE reports
     // no error for it), a parse failure is a truncated or corrupted document, and a document
     // that is not an object is not this format at all. None of them is an empty library, and
-    // the difference matters because `saveTo` is about to be asked to write over the original.
+    // the difference matters because whoever called this is about to act on the answer: the
+    // import into the database would otherwise start an empty library in its place.
     const auto text = file.loadFileAsString();
     juce::var parsed;
 
@@ -540,16 +676,11 @@ Library::LoadResult Library::loadFrom (const juce::File& file)
     }
 
     *this = fromVar (parsed);
-    baselinePath = file.getFullPathName();
-    hasFileBaseline = true;
-    baselineFileExisted = true;
-    baselineText = text;
     return LoadResult::loaded;
 }
 
 bool Library::saveTo (const juce::File& file) const
 {
-    conflictCopy = juce::File();
     // The refusal is the point. After a failed read this object is empty because the read
     // failed, not because the library is empty, and writing it out is how a disk hiccup turns
     // into deleted curation.
@@ -557,68 +688,20 @@ bool Library::saveTo (const juce::File& file) const
     {
         saveFailure = SaveFailure::unreadableSource;
         return false;
-
     }
 
-    // Atomic replacement prevents a torn file, but it cannot prevent a complete stale file:
-    // two processes can both load revision A, then save B and C in sequence. Without a lock
-    // AND a comparison under that lock, C quietly erases everything B added. Refuse the stale
-    // save instead. The caller reports the conflict and the other process's bytes remain safe.
-    // JUCE's InterProcessLock does not exclude two instances inside one process (fcntl locks
-    // are process-scoped on POSIX, and a Windows named mutex is recursive on one thread).
-    // Library saves are infrequent control-thread work, so one process-wide mutex is simpler
-    // and safer than a lifetime-sensitive map of per-path mutexes.
-    static std::mutex inProcessSaveMutex;
-    const std::scoped_lock inProcessLock (inProcessSaveMutex);
-
-    auto lockPath = file.getFullPathName();
-   #if JUCE_WINDOWS
-    lockPath = lockPath.toLowerCase();
-   #endif
-    juce::InterProcessLock processLock (
-        "CEditorLibrary-" + juce::String::toHexString (lockPath.hashCode64()));
-    if (! processLock.enter (1000))
-    {
-        saveFailure = SaveFailure::lockUnavailable;
-        return false;
-    }
-
-    struct Unlock
-    {
-        explicit Unlock (juce::InterProcessLock& lockToUse) : lock (lockToUse) {}
-        ~Unlock() { lock.exit(); }
-        juce::InterProcessLock& lock;
-    } unlock (processLock);
-
-    const auto fullPath = file.getFullPathName();
-    if (hasFileBaseline && baselinePath == fullPath)
-    {
-        const bool existsNow = file.existsAsFile();
-        const auto textNow = existsNow ? file.loadFileAsString() : juce::String();
-        if (existsNow != baselineFileExisted || (existsNow && textNow != baselineText))
-        {
-            const auto stamp = juce::Time::getCurrentTime().formatted ("%Y%m%d-%H%M%S");
-            const auto recovery = file.getSiblingFile (
-                file.getFileName() + ".conflict-" + stamp + "-"
-                + juce::Uuid().toDashedString() + ".json");
-            if (writeTextAtomically (recovery, juce::JSON::toString (toVar())))
-                conflictCopy = recovery;
-            saveFailure = SaveFailure::changedExternally;
-            return false;
-        }
-    }
-
-    const auto text = juce::JSON::toString (toVar());
+    // Compact, with floats to seven places: a float carries no more than that, and the old
+    // pretty-printed form spent a third of the file on indentation and half of every measured
+    // record on the fifteen-digit tails of 48 envelope points.
+    const auto text = juce::JSON::toString (toVar(), juce::JSON::FormatOptions{}
+                                                         .withSpacing (juce::JSON::Spacing::none)
+                                                         .withMaxDecimalPlaces (7));
     if (! writeTextAtomically (file, text))
     {
         saveFailure = SaveFailure::writeFailed;
         return false;
     }
 
-    baselinePath = fullPath;
-    hasFileBaseline = true;
-    baselineFileExisted = true;
-    baselineText = text;
     saveFailure = SaveFailure::none;
     return true;
 }
