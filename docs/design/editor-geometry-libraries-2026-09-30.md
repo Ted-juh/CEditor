@@ -165,7 +165,11 @@ what replaced each:
   content) could not be re-outlined there. Two things answer it now. First and fully: a panel leaving
   the editor — shared, or prepared for export — **carries the imported faces it names**
   (`utils/documentFonts.js`, `panel.fonts`), and the player registers them, for CSS and for outlines,
-  so the text is re-outlined from the real font with ligatures and every glyph. That also mended the
+  so the text is re-outlined from the real font with ligatures and every glyph. Each carried face
+  is cut to the characters the panel can show (`utils/fontSubset.js`: HarfBuzz's hb-subset in
+  WebAssembly, loaded only when packaging) and compressed to WOFF2 — Liberation Sans goes from
+  144 KB (as WOFF2; 411 KB as TrueType) to 25 KB, and a kerned string measures identically before and after, variable axes
+  included; fontkit's own subsetter was passed over because it drops kerning, ligatures and axes. That also mended the
   editor itself: the wiring that hands imported fonts to the outline code
   (`stores/fontOutlineSources.js`) was described in `fontSources.js` but had never been written, so
   text in an imported font was refused as "not available to outline" even in the editor. Second, as

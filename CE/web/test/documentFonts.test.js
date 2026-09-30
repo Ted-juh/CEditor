@@ -37,7 +37,7 @@ test('the names a panel asks for: text, parts, state patches, CSS stacks', () =>
 test('only imported faces are carried, under the name the document uses', async () => {
   const panel = panelWith(label('Imported Sans'), label('Web Face'), label('cefont-c'), label('Unreadable'), label('Rubik'), label('Arial'));
   const reads = [];
-  const { fonts, missing } = await embedPanelFonts(panel, stored, async (path) => { reads.push(path); return path.includes('ondisk') ? dataUrl : null; });
+  const { fonts, missing } = await embedPanelFonts(panel, stored, async (path) => { reads.push(path); return path.includes('ondisk') ? dataUrl : null; }, { subset: false });
   assert.deepEqual(fonts.map((face) => [face.family, face.weight, face.style, face.unicodeRange ?? '']), [
     ['Imported Sans', '400', 'normal', ''],
     ['Web Face', '400', 'normal', 'U+0000-00FF'],
@@ -48,14 +48,17 @@ test('only imported faces are carried, under the name the document uses', async 
   assert.deepEqual(reads.sort(), ['C:/fonts/gone.ttf', 'C:/fonts/ondisk.ttf']);
   assert.deepEqual(missing, ['Unreadable'], 'an imported font whose file cannot be read is reported, like an image');
 
-  const unused = await embedPanelFonts(panelWith(label('Rubik')), stored);
+  const unused = await embedPanelFonts(panelWith(label('Rubik')), stored, undefined, { subset: false });
   assert.deepEqual(unused.fonts, [], 'a panel that uses no imported font carries none');
 });
 
 test('a panel that arrived carrying a font passes it on to the next person', async () => {
   const carried = { family: 'Imported Sans', weight: '400', style: 'normal', data: dataUrl };
-  const { panel } = await withEmbeddedFonts({ ...panelWith(label('Imported Sans')), fonts: [carried] }, [], async () => null);
+  const original = { ...panelWith(label('Imported Sans')), fonts: [carried] };
+  const { panel } = await withEmbeddedFonts(original, [], async () => null, { subset: false });
   assert.deepEqual(panel.fonts, [carried]);
+  await withEmbeddedFonts(original, [], async () => null);
+  assert.equal(original.fonts[0].data, dataUrl, 'the panel handed in is not changed');
   const { panel: none } = await withEmbeddedFonts({ ...panelWith(label('Rubik')), fonts: [carried] }, [], async () => null);
   assert.equal(none.fonts, undefined, 'a font the panel no longer names is dropped');
 });
@@ -67,6 +70,7 @@ test('where there are no Settings — the player — text outlines in the face t
   await assert.rejects(resolveFont('Imported Sans'), FontUnavailableError, 'without it, the face is unknown');
 
   const { fonts } = await embedPanelFonts(panelWith(label('Imported Sans')), stored);
+  assert.ok(fonts[0].data.length < dataUrl.length / 3, `carried subset: ${fonts[0].data.length} of ${dataUrl.length}`);
   await registerDocumentFonts(fonts);   // no document here: registers for outlines only
   const resolved = await resolveFont('Imported Sans', { weight: 400 });
   assert.match(resolved.key, /^stored:doc:/);
@@ -94,6 +98,6 @@ test('packaging a panel carries its fonts, and opening the package keeps them', 
   const opened = await openSharedPanel(packed.envelope);
   assert.equal(opened.ok, true);
   assert.equal(opened.panel.fonts[0].family, 'Imported Sans');
-  assert.equal(opened.panel.fonts[0].data, dataUrl);
+  assert.match(opened.panel.fonts[0].data, /^data:font\/woff2;base64,/, 'subset and compressed');
   appSettings.update((current) => ({ ...current, fonts: [] }));
 });

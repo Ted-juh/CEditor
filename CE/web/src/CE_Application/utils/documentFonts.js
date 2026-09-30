@@ -15,7 +15,8 @@
  * `family` is the name exactly as the document writes it: a control may name the font by the family
  * the user sees or by the CSS name the editor registered it under, and the player has no settings to
  * map one to the other, so each face is registered under the name the document asks for. `weight`
- * is a CSS descriptor ('400', or '100 900' for a variable face); `data` is the font file as a data URL.
+ * is a CSS descriptor ('400', or '100 900' for a variable face); `data` is the font file as a data URL,
+ * cut to the characters the panel can show (utils/fontSubset.js).
  *
  * Wherever a panel is opened, `registerDocumentFonts` adds those faces to the page (CSS text) and
  * hands them to utils/fontSources.js (text turned into outlines). Only faces the author imported are
@@ -66,7 +67,7 @@ function weightDescriptor(font) {
  * the author's to carry and is skipped — unless the panel already carries it, from whoever shared it;
  * an imported font whose file cannot be read is `missing`.
  */
-export async function embedPanelFonts(panel, storedFonts, readData = async () => null) {
+export async function embedPanelFonts(panel, storedFonts, readData = async () => null, { subset = true } = {}) {
   const fonts = [];
   const missing = [];
   const alreadyCarried = (Array.isArray(panel?.fonts) ? panel.fonts : []).filter(validFace);
@@ -74,7 +75,7 @@ export async function embedPanelFonts(panel, storedFonts, readData = async () =>
     const matches = importedFontFor(name, storedFonts);
     if (!matches.length) {
       // A panel that arrived carrying a font this user never imported passes it on unchanged.
-      fonts.push(...alreadyCarried.filter((face) => face.family.toLowerCase() === name.toLowerCase()));
+      fonts.push(...alreadyCarried.filter((face) => face.family.toLowerCase() === name.toLowerCase()).map((face) => ({ ...face })));
       continue;
     }
     let carried = 0;
@@ -100,12 +101,22 @@ export async function embedPanelFonts(panel, storedFonts, readData = async () =>
     }
     if (!carried) missing.push(name);
   }
+  if (subset && fonts.length) {
+    // Each face cut to the characters the panel can show (utils/fontSubset.js — loaded only here).
+    const { panelCharacters, subsetFontDataUrl } = await import('./fontSubset.js');
+    const characters = panelCharacters(panel);
+    const done = new Map();
+    for (const face of fonts) {
+      if (!done.has(face.data)) done.set(face.data, await subsetFontDataUrl(face.data, characters));
+      face.data = done.get(face.data);
+    }
+  }
   return { fonts, missing };
 }
 
 /** A panel with the faces it names carried in it (a copy; `fonts` replaced). */
-export async function withEmbeddedFonts(panel, storedFonts, readData) {
-  const { fonts, missing } = await embedPanelFonts(panel, storedFonts, readData);
+export async function withEmbeddedFonts(panel, storedFonts, readData, options) {
+  const { fonts, missing } = await embedPanelFonts(panel, storedFonts, readData, options);
   const next = { ...panel };
   if (fonts.length) next.fonts = fonts;
   else delete next.fonts;

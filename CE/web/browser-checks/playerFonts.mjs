@@ -6,7 +6,7 @@
  * (window.__CE_LOAD_PANEL__), carrying a monospace face (Liberation Mono) under a made-up family name
  * nothing else could supply, and measures the label: in the carried face "iiii" and "WWWW" are the
  * same width; in any fallback they are not. And the same panel without the face, to show the
- * measurement would catch it.
+ * measurement would catch it; and with the face subset in the page as packaging subsets it.
  *
  * Run: CE_BEHAVIOUR_URL=http://127.0.0.1:5199/ node browser-checks/playerFonts.mjs
  */
@@ -39,7 +39,16 @@ async function widths(carry) {
       Object.assign(label._children.Text._children.Font, { family: 'Carried Mono', size: 40, letterSpacing: 0 });
       label._children.Core.setOverrides = ['Text.Font.family', 'Text.Font.letterSpacing'];
       panel.controls = [label];
-      if (carry) panel.fonts = [{ family: 'Carried Mono', weight: '400', style: 'normal', data: mono }];
+      if (carry) {
+        let data = mono;
+        if (carry === 'subset') {
+          // As packaging does it (utils/fontSubset.js): HarfBuzz in WebAssembly, in the page.
+          const { panelCharacters, subsetFontDataUrl } = await import('/src/CE_Application/utils/fontSubset.js');
+          data = await subsetFontDataUrl(mono, panelCharacters(panel));
+          window.__subsetSizes = [mono.length, data.length];
+        }
+        panel.fonts = [{ family: 'Carried Mono', weight: '400', style: 'normal', data }];
+      }
       window.__CE_LOAD_PANEL__(panel);
     }, { content, carry, mono });
     await page.waitForTimeout(1200);
@@ -54,13 +63,15 @@ async function widths(carry) {
   const narrow = await run('iiii');
   const wide = await run('WWWW');
   const loaded = await page.evaluate(() => document.fonts.check('40px "Carried Mono"') && [...document.fonts].some((f) => f.family.replace(/"/g, '') === 'Carried Mono' && f.status === 'loaded'));
+  const sizes = await page.evaluate(() => window.__subsetSizes ?? null);
   await page.close();
-  return { narrow, wide, loaded, errors };
+  return { narrow, wide, loaded, sizes, errors };
 }
 
 try {
   const carried = await widths(true);
   const bare = await widths(false);
+  const subset = await widths('subset');
   check('a label in a carried face draws in it: a monospace face measures iiii and WWWW alike', () => {
     assert.ok(carried.narrow > 0 && carried.wide > 0, JSON.stringify(carried));
     assert.equal(carried.loaded, true, 'the face is registered and loaded');
@@ -69,7 +80,13 @@ try {
   check('without the face the same label falls back, which the measurement catches', () => {
     assert.ok(Math.abs(bare.narrow - bare.wide) > 10, JSON.stringify(bare));
   });
-  check('no page errors', () => assert.deepEqual([...carried.errors, ...bare.errors], []));
+  check('a face subset for carrying, as packaging cuts it, still draws the label, at a fraction of the size', () => {
+    assert.equal(subset.loaded, true);
+    assert.ok(Math.abs(subset.narrow - subset.wide) < 1, JSON.stringify(subset));
+    assert.ok(Math.abs(subset.narrow - carried.narrow) < 0.5, 'and measures as the whole font does');
+    assert.ok(subset.sizes[1] < subset.sizes[0] / 3, `carried ${subset.sizes[1]} of ${subset.sizes[0]} characters of data URL`);
+  });
+  check('no page errors', () => assert.deepEqual([...carried.errors, ...bare.errors, ...subset.errors], []));
 } finally {
   await browser.close();
 }
