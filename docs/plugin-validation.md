@@ -71,9 +71,9 @@ re-read.
 
 ## What it does not cover
 
-- **Windows- and macOS-only paths.** The run above was on Linux. The threading fix matters most
-  there, because a Windows host builds and destroys a plug-in on its UI thread. Run the script on a
-  Windows export as well. There is no CI job for it yet: adding one is a change to CI, and
-  `CLAUDE.md` leaves that to the owner.
+- **macOS.** The first runs were on Linux, and CI now runs the same check on Windows on every
+  run: the Windows job builds the player with the GAIA panel in it and validates the VST3 and the
+  CLAP with `--require` (`.github/workflows/ci.yml`; the report is uploaded as the
+  `plugin-validation` artifact). The LV2 is validated on Linux only. There is no macOS build.
 - **The panel's own scripts.** The validators drive the plug-in with no hardware attached. A panel
   script that misbehaves only when a synth answers will not show up here.

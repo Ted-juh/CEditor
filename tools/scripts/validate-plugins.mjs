@@ -263,6 +263,7 @@ async function main() {
   const results = validatePlugins(paths, { ...options, skipGui, logDir });
   for (const result of results) console.log(describe(result));
   if (options.report) {
+    mkdirSync(path.dirname(path.resolve(options.report)), { recursive: true });
     writeFileSync(options.report, JSON.stringify({ strictness: options.strictness, skipGui, results }, null, 2));
     console.log(`Report: ${options.report}`);
   }

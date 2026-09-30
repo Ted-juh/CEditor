@@ -23,8 +23,8 @@ all three formats pass.
 
 No other test in the tree could have found any of them. The state bug passed pluginval at
 strictness 10, because pluginval restores into the same instance, and only clap-validator reloads
-into a fresh one. That is the argument for running both. No CI job was added: that is a CI change,
-and `CLAUDE.md` leaves it to the owner.
+into a fresh one. That is the argument for running both. At the owner's request, CI's Windows job
+now runs both on every run, against the GAIA panel's VST3 and CLAP.
 
 ### Ajv: a format version, a migration chain, and a schema
 
