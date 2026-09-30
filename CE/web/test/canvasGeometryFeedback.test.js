@@ -159,7 +159,7 @@ test('overlapping boxes are not "equally spaced"', () => {
 test('the canvas draws the indicators for the control being moved', () => {
   assert.match(editorCanvas, /detectEqualSpacing\(target,/);
   assert.match(editorCanvas, /class="eq-bar"/);
-  assert.match(editorCanvas, /controlPanelOffset\(canvasPanel\.controls, gesture\.id\)/,
+  assert.match(editorCanvas, /controlPanelOffset\(canvasPanel\.controls, gesture(?:\.id|Id)\)/,
     'drawn in panel space although detected in the control\'s own frame');
 });
 
