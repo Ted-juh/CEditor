@@ -30,7 +30,8 @@ Select a pen shape with the Select tool (**V**) and each point gets a handle.
 - **Double-click the outline** to add a point exactly there.
 - **Drag the outline or the inside** to move the whole shape, as with any part.
 
-Every edit is one undo step.
+Every edit is one undo step. A turned or scaled shape is edited where it is drawn: the handles sit
+on its corners, and moving one point leaves the others where they are.
 
 ## How it is stored
 

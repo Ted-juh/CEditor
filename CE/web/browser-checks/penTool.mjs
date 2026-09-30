@@ -159,6 +159,45 @@ try {
     assert.equal(polylines, 1);
   });
 
+  // --- A turned path: handles on the drawn corners, and a drag moves only the point dragged ------------
+  await kit.page.evaluate(async ({ id, name }) => {
+    const { applyControlPatch } = await import('/src/CE_Application/stores/controls.js');
+    applyControlPatch(id, { [`Parts.${name}._children.Layout.rotation`]: 35, [`Parts.${name}._children.Layout.scale`]: 1.2 });
+  }, { id, name });
+  await kit.settle(400);
+  await kit.page.locator('.list-row button.row-main', { has: kit.page.locator('strong', { hasText: new RegExp(`^${name}$`) }) }).first().click();
+  await kit.settle(500);
+  const handleCentres = () => kit.page.evaluate(() => [...document.querySelectorAll('[data-testid="pen-overlay"] .pen-handle')]
+    .map((el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }));
+  const cornersOf = () => kit.page.evaluate((name) => {
+    const polygon = document.querySelector(`.surface-shell .artboard [data-part-name="${name}"] polygon`);
+    const matrix = polygon.getScreenCTM();
+    return [...polygon.points].map((p) => { const q = new DOMPoint(p.x, p.y).matrixTransform(matrix); return { x: q.x, y: q.y }; });
+  }, name);
+  const drawnCorners = await cornersOf();
+  const turned = await handleCentres();
+  // The drawn polygon is inset by half its stroke; a handle is within that of its corner.
+  const within = (a, b, tolerance) => Math.hypot(a.x - b.x, a.y - b.y) <= tolerance;
+  check('on a turned path, each handle sits on its drawn corner', () => {
+    assert.equal(turned.length, drawnCorners.length);
+    turned.forEach((handle, i) => assert.ok(within(handle, drawnCorners[i], 4 * zoom), `handle ${i} ${JSON.stringify(handle)} vs corner ${JSON.stringify(drawnCorners[i])}`));
+  });
+  const target = { x: turned[0].x - 14 * zoom, y: turned[0].y + 9 * zoom };
+  await kit.page.mouse.move(turned[0].x, turned[0].y);
+  await kit.page.mouse.down();
+  await kit.page.mouse.move(target.x, target.y, { steps: 6 });
+  await kit.page.mouse.up();
+  await kit.settle(500);
+  const moved = await handleCentres();
+  const drawnAfter = await cornersOf();
+  check('dragging one point of a turned path moves it under the pointer and leaves the others as drawn', () => {
+    // Grid snapping puts it on the nearest grid point, at most half a 10-unit cell from the pointer.
+    assert.ok(within(moved[0], target, 5 * Math.SQRT2 * zoom + 1), `dragged point ${JSON.stringify(moved[0])} vs pointer ${JSON.stringify(target)}`);
+    for (let i = 1; i < drawnAfter.length; i += 1) {
+      assert.ok(within(drawnAfter[i], drawnCorners[i], 1.5), `corner ${i} swung: ${JSON.stringify(drawnCorners[i])} → ${JSON.stringify(drawnAfter[i])}`);
+    }
+  });
+
   check('no page errors', () => assert.deepEqual([...kit.failures], []));
 } finally {
   await kit.close();

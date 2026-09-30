@@ -515,12 +515,26 @@ export function patchFromModel(part, model, artboardWidth, artboardHeight) {
     'Layout.offsetX': 0,
     'Layout.offsetY': 0,
   };
+  return withPivotKept(part, patch, artboardWidth, artboardHeight);
+}
+
+/**
+ * A part patch that re-fits the box (`Layout.x / y / width / height`, px) with, for a turned or scaled
+ * part, the pivot moved to stay on the same spot of the artboard. The pivot is a percentage of the box,
+ * so a new box would otherwise move it, and the turn about the moved pivot would swing everything the
+ * edit did not touch. Shared by the curve editor and the Pen's point editor.
+ */
+export function withPivotKept(part, patch, artboardWidth, artboardHeight) {
   const { pivot, turned } = partTransform(part, artboardWidth, artboardHeight);
-  if (turned) {
-    patch['Layout.pivotX'] = Math.round(((pivot.x - round2(left)) / round2(width)) * 100 * 1000) / 1000;
-    patch['Layout.pivotY'] = Math.round(((pivot.y - round2(top)) / round2(height)) * 100 * 1000) / 1000;
-  }
-  return patch;
+  if (!turned || !patch) return patch;
+  const width = Number(patch['Layout.width']);
+  const height = Number(patch['Layout.height']);
+  if (!(width > 0) || !(height > 0)) return patch;
+  return {
+    ...patch,
+    'Layout.pivotX': Math.round(((pivot.x - Number(patch['Layout.x'])) / width) * 100 * 1000) / 1000,
+    'Layout.pivotY': Math.round(((pivot.y - Number(patch['Layout.y'])) / height) * 100 * 1000) / 1000,
+  };
 }
 
 /** Every anchor and handle of the model, flattened for hit-testing and drawing. */

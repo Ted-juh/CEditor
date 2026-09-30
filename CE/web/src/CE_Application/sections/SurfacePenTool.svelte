@@ -18,6 +18,7 @@
     nearestPathSegment, pathIsClosed, pathPointsInArtboard, penClickAction, removePathPoint,
   } from '../utils/penPath.js';
   import SurfaceCurveEditor from './SurfaceCurveEditor.svelte';
+  import { partTransform, withPivotKept } from '../utils/bezierPath.js';
 
   let {
     active = false,                  // the Pen is the current tool
@@ -116,8 +117,20 @@
 
   // --- Editing a selected path ------------------------------------------------------------------
 
-  let editPoints = $derived(editPart && !active ? pathPointsInArtboard(editPart.part, artboardWidth, artboardHeight) : []);
+  // The points live in the part's own (unturned) box; the part is drawn turned and scaled about its
+  // pivot. So handles are drawn through that transform, the pointer is mapped back through it, and a
+  // re-fitted box keeps its pivot where it was (bezierPath.js) — otherwise a turned path's handles sit
+  // off the shape, and moving one point swings the others round.
+  let editTransform = $derived(editPart ? partTransform(editPart.part, artboardWidth, artboardHeight) : null);
+  let editLocalPoints = $derived(editPart && !active ? pathPointsInArtboard(editPart.part, artboardWidth, artboardHeight) : []);
+  let editPoints = $derived(editLocalPoints.map(([x, y]) => {
+    const p = editTransform.toScreen({ x, y });
+    return [p.x, p.y];
+  }));
   let editClosed = $derived(editPart ? pathIsClosed(editPart.part) : true);
+
+  const localPoint = (point) => (editTransform ? editTransform.fromScreen(point) : point);
+  const keepPivot = (part, patch) => withPivotKept(part, patch, artboardWidth, artboardHeight);
 
   function beginHandleDrag(index, event) {
     if (event.button !== 0 || !editPart) return;
@@ -125,7 +138,7 @@
     event.stopPropagation();
     if (event.altKey) {
       const patch = removePathPoint(editPart.part, index, artboardWidth, artboardHeight);
-      if (patch) onPatchPart(editPart.name, patch);
+      if (patch) onPatchPart(editPart.name, keepPivot(editPart.part, patch));
       return;
     }
     dragging = { index };
@@ -133,9 +146,9 @@
     const move = (moveEvent) => {
       const part = editPart?.name === name ? editPart.part : null;
       if (!part) return;
-      const point = snapPoint(pointFromEvent(moveEvent), moveEvent);
+      const point = localPoint(snapPoint(pointFromEvent(moveEvent), moveEvent));
       const patch = movePathPoint(part, index, point, artboardWidth, artboardHeight);
-      if (patch) onPatchPart(name, patch);
+      if (patch) onPatchPart(name, keepPivot(part, patch));
     };
     const up = () => {
       dragging = null;
@@ -150,11 +163,13 @@
     if (!editPart) return;
     event.preventDefault();
     event.stopPropagation();
-    const point = pointFromEvent(event);
+    const point = localPoint(pointFromEvent(event));
     const nearest = nearestPathSegment(editPart.part, point, artboardWidth, artboardHeight);
-    if (!nearest || nearest.distance > radius() * 2) return;
+    // The hit radius is in screen units; a scaled part's own units are that much larger or smaller.
+    const scale = Math.max(0.01, Number(editPart.part?._children?.Layout?.scale ?? 1) || 1);
+    if (!nearest || nearest.distance * scale > radius() * 2) return;
     const patch = insertPathPoint(editPart.part, nearest.index, { x: nearest.x, y: nearest.y }, artboardWidth, artboardHeight);
-    if (patch) onPatchPart(editPart.name, patch);
+    if (patch) onPatchPart(editPart.name, keepPivot(editPart.part, patch));
   }
 
   const svgPoints = (points) => points.map(([x, y]) => `${x},${y}`).join(' ');

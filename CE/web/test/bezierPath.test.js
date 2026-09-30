@@ -125,3 +125,23 @@ test('a turned part keeps its pivot on the same spot, so nothing else swings', (
   const round = fromScreen(toScreen({ x: 33, y: 44 }));
   near(round.x, 33, 1e-9, 'fromScreen undoes toScreen');
 });
+
+test('the Pen\'s point form, turned: moving one point leaves the others where they are drawn', async () => {
+  const { movePathPoint, pathPointsInArtboard } = await import('../src/CE_Application/utils/penPath.js');
+  const { withPivotKept } = await import('../src/CE_Application/utils/bezierPath.js');
+  const pen = {
+    kind: 'path',
+    meta: { vectorPoints: [[0, 1], [0.5, 0], [1, 1]], closed: true },
+    _children: { Layout: { x: 20, y: 20, width: 60, height: 40, xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top', rotation: 40, scale: 1.25 } },
+  };
+  const onScreen = (part) => pathPointsInArtboard(part, 400, 400).map(([x, y]) => partTransform(part, 400, 400).toScreen({ x, y }));
+  const before = onScreen(pen);
+  const patch = withPivotKept(pen, movePathPoint(pen, 1, { x: 50, y: 5 }, 400, 400), 400, 400);
+  assert.ok(patch['Layout.pivotX'] !== undefined, 'the pivot is moved with the box');
+  const after = onScreen(applyPartPatch(pen, patch));
+  for (const index of [0, 2]) {
+    near(after[index].x, before[index].x, 0.05, `point ${index} x`);
+    near(after[index].y, before[index].y, 0.05, `point ${index} y`);
+  }
+  assert.equal(withPivotKept({ ...pen, _children: { Layout: { ...pen._children.Layout, rotation: 0, scale: 1 } } }, { 'Layout.x': 1, 'Layout.y': 1, 'Layout.width': 5, 'Layout.height': 5 }, 400, 400)['Layout.pivotX'], undefined, 'an unturned part is left alone');
+});
