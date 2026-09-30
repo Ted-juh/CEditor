@@ -1,6 +1,6 @@
 <script>
   import { onDestroy, onMount } from 'svelte';
-  import SetlistSoundcheckRow from './SetlistSoundcheckRow.svelte';
+  import SongsPage from './performance/SongsPage.svelte';
   import HostConfirmButton from './HostConfirmButton.svelte';
   /**
    * PerformancePanel.svelte — Hostage's performance system.
@@ -2294,113 +2294,7 @@
   {/if}
 
   {#if tab === 'setlist'}
-    <div class="perf-body setlist-body" data-testid="perf-setlist">
-      <div class="perf-head">
-        <strong>Setlist</strong>
-        <!-- Songs are made here. Each plays one scene; a new one takes the last song's scene. -->
-        <button type="button" data-testid="setlist-add-song"
-                title="Add a song to the end of the setlist"
-                onclick={() => addSetlistItem(performance.setlist.items.at(-1)?.sceneId ?? performance.scenes[0]?.sceneId ?? '',
-                                              `Song ${performance.setlist.items.length + 1}`)}>+ Song</button>
-        <span class="soundcheck-label" title="Session soundcheck · Main output 1/2 · dBFS">Soundcheck</span>
-        <button type="button" class="ghost" disabled={!performance.setlist.items.length}
-          title="Check saved rig references without loading plug-ins or sending MIDI"
-          onclick={() => checkSetlistSoundcheck()}>Check setlist</button>
-        <button type="button" class="ghost" onclick={showMixer}>Mixer</button>
-        <label class="mini-field" title="Warm upcoming full-rack captures before they are needed">Preload
-          <select value={String(performance.setlist.preloadAhead)}
-                  onchange={(e) => setSetlistOptions({ preloadAhead: Number(e.currentTarget.value) })}>
-            <option value="0">Off</option>
-            <option value="1">Next song</option>
-            <option value="2">Next 2 songs</option>
-          </select>
-        </label>
-        <button type="button" class="ghost" onclick={() => setlistPrev()}>← Prev</button>
-        <button type="button" class="ghost" onclick={() => setlistNext()} data-testid="perf-setlist-next">Next →</button>
-      </div>
-      {#if performance.setlist.items.length === 0}
-        <div class="empty-hint">
-          No songs yet. Click <strong>+ Song</strong>. A song has its own name, notes and length, and plays
-          one of your scenes (the sound setups made in the Launcher).
-        </div>
-      {/if}
-      {#each performance.setlist.items as item, index (item.itemId)}
-        {@const preload = preloadFor(item)}
-        <div class="setlist-entry">
-        <div class="setlist-item" class:current={performance.setlist.currentIndex === index}
-             class:missing={item.missing} class:loading={performance.setlist.loadingIndex === index}>
-          <button type="button" class="ghost setlist-go" onclick={() => setlistGo(index)}>{index + 1}</button>
-          <span class="setlist-order" aria-label={`Move ${item.name}`}>
-            <button type="button" class="ghost" disabled={index === 0}
-                    title="Move earlier" aria-label={`Move ${item.name} earlier`}
-                    onclick={() => moveSetlistItem(item.itemId, index - 1)}>↑</button>
-            <button type="button" class="ghost" disabled={index === performance.setlist.items.length - 1}
-                    title="Move later" aria-label={`Move ${item.name} later`}
-                    onclick={() => moveSetlistItem(item.itemId, index + 1)}>↓</button>
-          </span>
-          <label class="mini-field song-field">Song
-            <input type="text" class="setlist-name" value={item.name}
-                   aria-label={`Song name ${index + 1}`} data-testid="setlist-song-name"
-                   onchange={(e) => setSetlistItem(item.itemId, { name: e.currentTarget.value })} />
-          </label>
-          <label class="mini-field" title="The sound setup this song plays">Plays scene
-            <select class="setlist-scene" value={item.sceneId} data-testid="setlist-scene"
-                    onchange={(e) => setSetlistItem(item.itemId, { sceneId: e.currentTarget.value })}>
-              <option value="">No scene (keep the sound)</option>
-              {#if item.missing}<option value={item.sceneId}>scene is gone</option>{/if}
-              {#each performance.scenes as scene (scene.sceneId)}
-                <option value={scene.sceneId}>{scene.name}</option>
-              {/each}
-            </select>
-          </label>
-          {#if performance.setlist.loadingIndex === index}<span class="setlist-loading">loading rig…</span>{/if}
-          {#if preload}
-            <span class={`preload-state ${preload.state}`} title={preload.error}>
-              {preload.state === 'ready' ? 'ready'
-                : preload.state === 'degraded' ? `degraded ${preload.ready}/${preload.total}`
-                : `warming ${preload.ready}/${preload.total}`}
-            </span>
-          {/if}
-          <!-- Lyrics, cues, a chord chart: the stage shows all of it, and capitals stand out. -->
-          <textarea class="setlist-notes" rows="2" placeholder="notes for the stage: lyrics, cues (CHORUS: scene 2)…"
-                    value={item.notes} aria-label={`Stage notes for ${item.name}`}
-                    onchange={(e) => setSetlistItem(item.itemId, { notes: e.currentTarget.value })}></textarea>
-          <label class="mini-field" title="Optional full-rack Library capture for this song">Rig
-            <select value={item.rackRecordId}
-                    onchange={(e) => setSetlistItem(item.itemId, { rackRecordId: e.currentTarget.value })}>
-              <option value="">Current rig</option>
-              {#each rackCaptures as record (record.recordId)}
-                <option value={record.recordId} disabled={!record.available}>{record.name}</option>
-              {/each}
-            </select>
-          </label>
-          <label class="mini-field" title="CTRL49 controls shown when this song is recalled">Controls
-            <select value={item.pageId}
-                    onchange={(e) => setSetlistItem(item.itemId, { pageId: e.currentTarget.value })}>
-              <option value="">Keep page</option>
-              {#each $hostState.rack.pages.slice(0, 3) as page (page.pageId)}
-                <option value={page.pageId}>{page.name}</option>
-              {/each}
-            </select>
-          </label>
-          <div class="mini-field" title="Keep the current tempo, or set the song's">Tempo
-            <ScrubValue value={item.tempo} min={0} max={300} step={1} fineStep={0.1} label={`Tempo for ${item.name}`}
-                        testid="setlist-tempo" format={(v) => (v > 0 ? `${Math.round(v * 10) / 10}` : 'keep')}
-                        onchange={(tempo) => setSetlistItem(item.itemId, { tempo })} />
-          </div>
-          <div class="mini-field" title="How long the song should take on stage. The stage's timers count toward it.">Length
-            <ScrubValue value={item.plannedSeconds} min={0} max={3600} step={15} fineStep={1}
-                        label={`Planned length for ${item.name}`} testid="setlist-length"
-                        format={(s) => (s > 0 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'none')}
-                        parse={parseLength}
-                        onchange={(plannedSeconds) => setSetlistItem(item.itemId, { plannedSeconds })} />
-          </div>
-          <HostConfirmButton identity={JSON.stringify([item.itemId])} title="Remove setlist item" aria-label="Remove setlist item" type="button" class="ghost danger" onclick={() => removeSetlistItem(item.itemId)}>×</HostConfirmButton>
-        </div>
-        <SetlistSoundcheckRow {item} soundcheck={$hostState.soundcheck} onMeasure={startSoundcheck} onStop={finishSoundcheck}/>
-        </div>
-      {/each}
-    </div>
+    <SongsPage {performance} {rackCaptures} {preloadFor} onShowMixer={showMixer} />
   {/if}
   </div>
   </div>
