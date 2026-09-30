@@ -693,7 +693,8 @@
       title="Open Component"
       entries={componentLibraryEntries}
       emptyText="No saved component packages yet."
-      anchorStyle="left: 8px; top: calc(100% + 2px);"
+      placement="bottom-start"
+      offset={{ mainAxis: 2, crossAxis: 8 }}
       onPick={handlePickerPick}
       onClose={() => { picker = ''; }}
     />

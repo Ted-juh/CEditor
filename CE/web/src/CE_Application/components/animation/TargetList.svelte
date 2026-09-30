@@ -10,6 +10,7 @@
    * offers — Fill colour and Text colour — are not on the runtime's list, so they animate nothing,
    * and a target on a part that does not exist is built and then never drawn.
    */
+  import { tick } from 'svelte';
   import GripVertical from 'lucide-svelte/icons/grip-vertical';
   import X from 'lucide-svelte/icons/x';
   import TriangleAlert from 'lucide-svelte/icons/triangle-alert';
@@ -45,17 +46,27 @@
     dropIndex = Math.max(0, Math.min(rows.length - 1, next));
   }
 
+  // Move a row, keeping the selection on the row it was on.
+  function reorder(from, to) {
+    let nextSelection = selectedIndex;
+    if (selectedIndex === from) nextSelection = to;
+    else if (from < to && selectedIndex > from && selectedIndex <= to) nextSelection -= 1;
+    else if (to < from && selectedIndex >= to && selectedIndex < from) nextSelection += 1;
+    onreorder(from, to);
+    if (nextSelection !== selectedIndex) onselect(nextSelection);
+  }
+
+  // Alt+Up / Alt+Down on a focused row: the keyboard's way to drag it, as moving a line is in an editor.
+  async function keyMove(index, step) {
+    const to = index + step;
+    if (to < 0 || to >= rows.length) return;
+    reorder(index, to);
+    await tick();
+    rowEls[to]?.focus();
+  }
+
   function endDrag() {
-    if (dragIndex >= 0 && dropIndex >= 0 && dragIndex !== dropIndex) {
-      const from = dragIndex;
-      const to = dropIndex;
-      let nextSelection = selectedIndex;
-      if (selectedIndex === from) nextSelection = to;
-      else if (from < to && selectedIndex > from && selectedIndex <= to) nextSelection -= 1;
-      else if (to < from && selectedIndex >= to && selectedIndex < from) nextSelection += 1;
-      onreorder(from, to);
-      if (nextSelection !== selectedIndex) onselect(nextSelection);
-    }
+    if (dragIndex >= 0 && dropIndex >= 0 && dragIndex !== dropIndex) reorder(dragIndex, dropIndex);
     dragIndex = -1;
     dropIndex = -1;
   }
@@ -89,13 +100,14 @@
       onkeydown={(event) => {
         if (event.target !== event.currentTarget) return;
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onselect(row.index); }
+        else if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) { event.preventDefault(); keyMove(row.index, event.key === 'ArrowUp' ? -1 : 1); }
       }}
     >
       {#if dragIndex >= 0 && dropIndex === row.index && dragIndex !== row.index}
         <span class="dropline" aria-hidden="true"></span>
       {/if}
 
-      <span class="grip" role="presentation" title="Drag to reorder"
+      <span class="grip" role="presentation" title="Drag to reorder (Alt+Up / Alt+Down on a row)"
             onpointerdown={(event) => beginDrag(row.index, event)}>
         <GripVertical size={10} aria-hidden="true" />
       </span>

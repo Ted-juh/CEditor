@@ -3,6 +3,7 @@
   // one editor over *clusters* — the unit Make Interactive creates. Membership
   // is the wiring; the target dropdowns leave the common path (they remain in
   // the Advanced flat lists below, which embed the original three editors).
+  import { floating } from '../utils/floatingUi.js';
   import { getSection, updateControlProperty, applyControlPatch } from '../stores/controls.js';
   import { creatorMode } from '../stores/creatorMode.js';
   import { deriveInteractClusters } from '../utils/customComponentClusters.js';
@@ -160,7 +161,8 @@
         + Make interactive ▾
       </button>
       {#if addMenuOpen}
-        <div class="add-menu" role="menu" aria-label="Interactive archetypes">
+        <div class="add-menu" role="menu" aria-label="Interactive archetypes"
+          use:floating={{ anchor: 'parent', placement: 'bottom-end', offset: 4, fallbackPlacements: ['top-end'] }}>
           {#each ARCHETYPES as archetype (archetype.id)}
             <button type="button" role="menuitem" onclick={() => addInteractive(archetype.id)}>{archetype.label}</button>
           {/each}
@@ -338,10 +340,7 @@
   }
 
   .add-menu {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 4px);
-    z-index: 20;
+    z-index: 1600;
     min-width: 130px;
     display: flex;
     flex-direction: column;

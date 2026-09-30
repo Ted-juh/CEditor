@@ -37,14 +37,18 @@ and autocomplete, and the **preview combobox list** — which previously opened 
 panel for a combobox in its last row, and since that surface is the player's, the fix ships in the
 plug-in too.
 
-Left CSS-anchored, because they sit inside a fixed layout and do not reach an edge: the effect
-colour popover, the device-insight picker, the custom-interact add menu, the tab tray and workspace
-picker, the insert flyout and the surface tool strip's flyouts. Convert them the same way if one
-ever clips.
+Converted second, having first been left CSS-anchored on the theory that they sat inside a fixed
+layout and never reached an edge: the effect colour popover, the device-insight Bind picker, the
+custom-interact add menu, the tab strip's New / Open trays, the workspace picker (whose `anchorStyle`
+prop gave way to a `placement`), and the Component Designer's tool-strip flyouts. The theory was
+wrong often enough — a narrow window, a scrolled inspector — and, being `position: absolute`, each
+was also clipped by any scrolling ancestor. The insert flyout stays as it is: it is not a popup but a
+panel docked to the icon rail, the full height of the workspace.
 
 Checked by `browser-checks/floatingUi.mjs`: a menu at the window corner flips up and left and
 follows a resize, a submenu at the right edge flips left, the menu bar survives a 520 px window, the
-tree menu opens upward from its lowest row, and a bottom-row combobox opens above itself.
+tree menu opens upward from its lowest row, a bottom-row combobox opens above itself, the tab tray
+hangs under its button and a designer tool flyout opens above its.
 
 ## RBush: the canvas asks what is near, not what exists
 
@@ -149,15 +153,29 @@ round. `browser-checks/curveEditing.mjs` drives each gesture with a real pointer
 each drawn live by its own renderer with no fixed outline — and text whose font file cannot be read.
 Flatten, the one destructive step, is refused while anything names an operand.
 
-**Known limits.**
+**Limits, and how they were lifted.** The first version shipped with three, recorded here with
+what replaced each:
 
-- A shape's cache is keyed to the designer's artboard size; an instance drawn at another size
-  computes its outline on first paint (one frame of the previous outline, then the right one).
-- Text using a font imported in Settings is outlined in the editor, but the player does not load
-  imported fonts, so a *run-time* change to such text (a binding on its content) cannot be re-outlined
-  there; the shape keeps the outline it had.
-- A border's gradient on an outline runs across the shape's box at the gradient's angle; the box
-  border's per-side "follow" flow and corner gradient modes have no sides to follow.
+- *A shape's cache is keyed to the designer's artboard size*, so an instance drawn at another size
+  showed the previous outline, unscaled, until its own was computed. The cache now records the size
+  it was computed at, and an instance of another size shows the cached outline scaled to its box in
+  the meantime (`cacheScaledTo`) — exact for operands laid out in percentages, close for the rest,
+  and replaced by the exact outline as soon as Paper.js has it.
+- *The player does not load imported fonts*, so a run-time change to text in one (a binding on its
+  content) could not be re-outlined there. The cache now carries a **glyph atlas** for each face the
+  player cannot read for itself (`fontSources.glyphAtlas`): the outlines and advances of printable
+  Latin plus any character the text holds now, and the kerning between the ASCII ones — 48 KB for
+  Liberation Sans, 66 KB for DM Sans, about half a second to build once per face per session. The
+  player registers it and outlines from it; `test/glyphAtlas.test.js` shows the atlas lands every
+  point of a kerned string within 0.01 px of the font file. It shapes plainly — kerning, no
+  ligatures — so a changed string with an "fi" in it draws the two letters; a character outside the
+  atlas is refused as an unreadable face was, and the shape keeps its outline.
+- *A border's gradient ran across the shape's box* however its flow was set. A gradient set to
+  **follow** now runs along the outline as a box border's runs round its sides: each contour from its
+  top-left-most point, clockwise, 0 to 1 and back (`outlineFlowPieces`), drawn as short pieces of the
+  band in the colour of where they fall. Dotted bands keep the gradient across the shape — a dot is
+  too small to show where along the line it sits — and the corner gradient modes still have no
+  corners to act on.
 
 Checked by `test/booleanGroups.test.js`, `test/partOutlines.test.js` and `test/textOutline.test.js`
 (areas of every kind against the renderer's rules, live resolution through the real pipeline with a
@@ -166,3 +184,35 @@ and its refusals, the font table against the stylesheet, font matching, layout) 
 `browser-checks/partBooleans.mjs` (combine, undo, the cut following the hole, hiding, switching the
 operation, gradient and dashed border on the outline, dragging the shape, flatten refused and done,
 release, smooth, text against the browser's glyphs) and `browser-checks/booleanRuntime.mjs`.
+
+## Two libraries looked at and not taken: PaneForge and svelte-dnd-action
+
+Both were on the list with the three above, and both were read — source, not README — before
+deciding. Neither went in; what each would have brought was built into what is here instead.
+
+**PaneForge (docking).** It sizes panes in percentages of their group, and only in percentages. The
+workspace's side panels are pixel-sized on purpose — the properties panel's 600 px floor, the
+tree's 120–400 px — and keep their width when the window changes, as an IDE's do. Under PaneForge
+they would stretch with the window, and the floor would become a percentage recomputed on every
+resize, fighting the library. What it would have added is keyboard resizing and a window-splitter's
+ARIA; the three splitters already run on `dragScrub`, which has keyboard handling of its own, so
+they became focusable separators with `aria-valuenow` / `-min` / `-max`: Tab to one, the arrows
+move it 16 px (Ctrl coarser, Shift finer, as every scrub), Home / End to its limits. Dockview —
+panels torn off and docked anywhere — is a different workspace, not a better splitter, and the
+shape of the workspace is the owner's call; it is not started here.
+
+**svelte-dnd-action (drag-and-drop lists).** The reorderable lists already drag with the
+browser's own drag-and-drop, carefully (the MIDI chain's drop arithmetic is shared and tested), and
+the editor tabs also drag *out* of their strip, which a list library's model does not cover. What
+it would have added is keyboard reordering, so that is what was added where it was missing: the
+editor tabs move with Ctrl+Shift+PageUp / PageDown, as a browser's do, keeping focus on the tab
+moved; animation targets with Alt+Up / Alt+Down, as a line moves in an editor. The MIDI and effect
+chains already had their Earlier / Later buttons. And one list was wrong rather than inaccessible:
+dragging a combined shape's operand in the designer's layer list moved it in the stacking order,
+where an operand is not drawn and its position means nothing, instead of in the shape, where for
+Subtract it decides what is cut. It now reorders the shape (`planOperandMove`, sharing the arrow
+buttons' rule for which operand paints), and dragging a layer into or out of a shape is refused by
+name — that is what Combine and Release are for.
+
+Checked by `browser-checks/reorderAndResize.mjs` (a splitter from the keyboard, tabs moved and
+moved back, an operand dragged, a layer refused) and `browser-checks/animationTab.mjs`.

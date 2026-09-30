@@ -16,6 +16,7 @@
    * palette draws the same icons — so it lives once in the parent as `.surface-shell :global(...)`
    * rather than being copied into every component that draws a tool button.
    */
+  import { floating } from '../utils/floatingUi.js';
   import { CUSTOM_COMPONENT_STARTERS, CUSTOM_ASSISTANT_RECIPES } from '../utils/customComponentFactory.js';
 
   let {
@@ -66,7 +67,7 @@
         <strong>Shape: {activeShapeTool.label}</strong>
       </button>
       {#if shapeFlyoutOpen}
-        <div class="tool-flyout" role="menu" aria-label="Shape tools">
+        <div class="tool-flyout" use:floating={{ anchor: 'parent', placement: 'top-start', fallbackPlacements: ['bottom-start'] }} role="menu" aria-label="Shape tools">
           {#each shapeTools as tool (tool.id)}
             <button
               type="button"
@@ -117,7 +118,7 @@
         <strong>Interactive: {activeInteractiveMeta.label}</strong>
       </button>
       {#if interactiveFlyoutOpen}
-        <div class="tool-flyout" role="menu" aria-label="Interactive archetypes">
+        <div class="tool-flyout" use:floating={{ anchor: 'parent', placement: 'top-start', fallbackPlacements: ['bottom-start'] }} role="menu" aria-label="Interactive archetypes">
           {#each interactiveArchetypes as archetype (archetype.id)}
             <button
               type="button"
@@ -146,7 +147,7 @@
         <strong>Starters</strong>
       </button>
       {#if starterFlyoutOpen}
-        <div class="tool-flyout rich" role="menu" aria-label="Starter components">
+        <div class="tool-flyout rich" use:floating={{ anchor: 'parent', placement: 'top-start', fallbackPlacements: ['bottom-start'] }} role="menu" aria-label="Starter components">
           {#each CUSTOM_COMPONENT_STARTERS as starter (starter.id)}
             <button type="button" role="menuitem" title={starter.summary} onclick={(event) => applyStarterFromFlyout(event, starter)}>
               <span class="rich-copy">
@@ -171,7 +172,7 @@
         <strong>Assistant</strong>
       </button>
       {#if assistantFlyoutOpen}
-        <div class="tool-flyout rich" role="menu" aria-label="Assistant recipes">
+        <div class="tool-flyout rich" use:floating={{ anchor: 'parent', placement: 'top-start', fallbackPlacements: ['bottom-start'] }} role="menu" aria-label="Assistant recipes">
           {#each CUSTOM_ASSISTANT_RECIPES as recipe (recipe.id)}
             <button type="button" role="menuitem" title={recipe.summary} onclick={(event) => applyRecipeFromFlyout(event, recipe)}>
               <span class="rich-copy">
@@ -274,11 +275,7 @@
   }
 
   .tool-flyout {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    top: auto;
-    z-index: 30;
+    z-index: 1600;
     width: 154px;
     padding: 6px;
     border: 1px solid #3B4652;

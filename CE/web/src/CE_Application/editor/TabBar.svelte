@@ -1,4 +1,5 @@
 <script>
+  import { tick } from 'svelte';
   import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, closePanel, panels, setActiveEditorTab, closeSettingsTab, closeInstrumentHostTab, closeDeviceProfileTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
   import { closeComponentDocument, createComponentDocument } from '../stores/componentWorkspace.js';
   import { closeScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile, scriptDocuments } from '../stores/scriptWorkspace.js';
@@ -264,6 +265,19 @@
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       setActiveEditorTab(tab);
+      return;
+    }
+    // Ctrl+Shift+PageUp / PageDown moves the focused tab, as it does in a browser: the keyboard's
+    // way to do what dragging a tab does.
+    if (e.ctrlKey && e.shiftKey && (e.key === 'PageUp' || e.key === 'PageDown')) {
+      e.preventDefault();
+      const seeded = seedTabOrder(orderedTabs, tabOrder);
+      const key = tabKey(tab);
+      const neighbour = seeded[seeded.indexOf(key) + (e.key === 'PageUp' ? -1 : 1)];
+      if (!neighbour) return;
+      tabOrder = moveTabKey(seeded, key, neighbour);
+      // Moving the element drops its focus; keep it on the tab, so the next press moves it again.
+      tick().then(() => tabEls[key]?.focus());
     }
   }
 
@@ -397,7 +411,6 @@
             tab,
           }))}
           emptyText="No open tabs."
-          anchorStyle="right: 0; top: calc(100% + 6px);"
           onPick={(row) => { picker = ''; setActiveEditorTab(row.tab); }}
           onClose={() => { picker = ''; }}
         />
@@ -428,14 +441,14 @@
     </button>
 
     {#if tray === 'new'}
-      <div class="tray-menu" role="menu" aria-label="New document">
+      <div class="tray-menu" use:floating={{ anchor: 'parent', placement: 'bottom-end', offset: 6, fallbackPlacements: ['top-end'] }} role="menu" aria-label="New document">
         <button role="menuitem" onclick={() => runNew(openNewPanelDialog)}>Panel&hellip;</button>
         <button role="menuitem" onclick={() => runNew(createComponentTab)}>Custom Component</button>
         <button role="menuitem" onclick={() => runNew(createDeviceProfileTab)}>Device Profile Designer</button>
         <button role="menuitem" onclick={() => runNew(createScriptTab)}>Script Workspace</button>
       </div>
     {:else if tray === 'open'}
-      <div class="tray-menu" role="menu" aria-label="Open document">
+      <div class="tray-menu" use:floating={{ anchor: 'parent', placement: 'bottom-end', offset: 6, fallbackPlacements: ['top-end'] }} role="menu" aria-label="Open document">
         <button role="menuitem" onclick={() => runNew(openPanelFromFile)}>Panel&hellip;</button>
         <button role="menuitem" onclick={openSavedComponent}>Saved Custom Component&hellip;</button>
         <button role="menuitem" onclick={openSavedDeviceProfile}>Device Profile&hellip;</button>
@@ -731,10 +744,7 @@
   }
 
   .tray-menu {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    z-index: 30;
+    z-index: 1600;
     display: flex;
     flex-direction: column;
     min-width: 220px;

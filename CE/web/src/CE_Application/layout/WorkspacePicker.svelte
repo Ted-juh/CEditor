@@ -9,15 +9,18 @@
    * copy TabBar's picker into MenuBar and have two to keep in step, the picker moved here and
    * both call sites mount it.
    *
-   * Positioning is the caller's business (`anchorStyle`): the tab strip hangs it under the tab
-   * group at the right, the menu bar hangs it under the File menu at the left.
+   * It hangs off the element it is mounted in (`use:floating`, utils/floatingUi.js), flipping and
+   * following it like every other popup; the caller says which way: the tab strip hangs it under the
+   * tab group at the right (the default), the menu bar under the File menu at the left.
    */
+  import { floating } from '../utils/floatingUi.js';
   let {
     title = 'Open',
     entries = [],
     emptyText = 'Nothing saved yet.',
     footerLabel = '',
-    anchorStyle = 'right: 0; top: calc(100% + 6px);',
+    placement = 'bottom-end',
+    offset = 6,
     onPick = () => {},
     onClose = () => {},
     onFooter = () => {},
@@ -42,7 +45,7 @@
   class="workspace-picker"
   role="dialog"
   aria-label={title}
-  style={anchorStyle}
+  use:floating={{ anchor: 'parent', placement, offset, fallbackPlacements: [placement.replace('bottom', 'top')] }}
   tabindex="-1"
   bind:this={root}
   onkeydown={handleKeydown}
@@ -69,8 +72,7 @@
 
 <style>
   .workspace-picker {
-    position: absolute;
-    z-index: 300;
+    z-index: 1600;
     width: 260px;
     max-width: calc(100vw - 24px);
     padding: 8px;

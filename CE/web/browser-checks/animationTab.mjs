@@ -220,6 +220,25 @@ await settle();
 check('and deleting takes them back off', async () => {});
 assert.deepEqual(await ev(() => window.__anim.storedNames()), ['pressMotion', 'hoverGlow']);
 
+// --- Reordering from the keyboard -------------------------------------------------------------
+
+const rowOrder = () => ev(() => [...document.querySelectorAll('.trow')].map((row) => row.textContent.replace(/\s+/g, ' ').trim()));
+const beforeKeys = await rowOrder();
+await page.locator('.trow').first().focus();
+await page.keyboard.press('Alt+ArrowDown');
+await settle();
+const afterKeys = await rowOrder();
+const focusedRow = await ev(() => [...document.querySelectorAll('.trow')].indexOf(document.activeElement));
+check('Alt+Down moves the focused target one place down, and focus goes with it', () => {
+  assert.ok(beforeKeys.length >= 2, `rows: ${beforeKeys.join(' | ')}`);
+  assert.deepEqual(afterKeys.slice(0, 2), [beforeKeys[1], beforeKeys[0]], afterKeys.join(' | '));
+  assert.equal(focusedRow, 1);
+});
+await page.keyboard.press('Alt+ArrowUp');
+await settle();
+check('and Alt+Up puts it back', async () => {});
+assert.deepEqual(await rowOrder(), beforeKeys);
+
 // --- The rules --------------------------------------------------------------------------------
 
 check('there is not one slider in the tab', async () => {});

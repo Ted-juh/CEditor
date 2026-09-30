@@ -11,7 +11,8 @@
  *   - a menu-bar submenu on a narrow window;
  *   - the layer tree's menu opened on its lowest row (it used to clamp against a guessed 200×330);
  *   - a combobox in the bottom row of a panel in preview — the one popup that also ships in the plug-in —
- *     which used to open off the panel's bottom.
+ *     which used to open off the panel's bottom;
+ *   - the tab strip's tray menu and a Component Designer tool flyout, which hung by CSS alone.
  *
  * Run: CE_BEHAVIOUR_URL=http://127.0.0.1:5199/ node browser-checks/floatingUi.mjs
  */
@@ -155,6 +156,39 @@ try {
     assert.ok(list, 'the list opened');
     assert.ok(inside(list, 0), JSON.stringify(list));
     assert.ok(list.bottom <= control.y + 1, `above the control: ${JSON.stringify(list)} vs ${JSON.stringify(control)}`);
+  });
+
+  // --- The popups that used to hang by CSS alone ----------------------------------------------------
+  await kit.preview(false);
+  await kit.fresh();
+  const trayButton = page.locator('.tray-btn').first();
+  const trayAt = await trayButton.boundingBox();
+  await trayButton.click();
+  await waitPlaced();
+  const tray = await boxOf('.tray-menu');
+  check('the tab strip\'s tray menu hangs under its button, on screen', () => {
+    assert.ok(tray, 'the tray opened');
+    assert.ok(inside(tray, 0), JSON.stringify(tray));
+    assert.ok(tray.top >= trayAt.y + trayAt.height - 1, `under the button: ${JSON.stringify(tray)} vs ${JSON.stringify(trayAt)}`);
+  });
+  await trayButton.click();
+  await kit.settle(200);
+
+  const custom = await kit.make('CustomComponent', { 'Transform.x': 80, 'Transform.y': 80, 'Transform.width': 200, 'Transform.height': 140 });
+  const customBox = await kit.box(custom);
+  await page.mouse.click(customBox.x + 4, customBox.y + 4);
+  await kit.settle(500);
+  await page.locator('[data-testid="component-designer-launch"]').click();
+  await kit.settle(2000);
+  const shapeButton = page.locator('.tool-flyout-host > button[aria-haspopup="menu"]').first();
+  const shapeAt = await shapeButton.boundingBox();
+  await shapeButton.click();
+  await waitPlaced();
+  const flyout = await boxOf('.tool-flyout');
+  check('a designer tool flyout opens above its button in the bottom strip, on screen', () => {
+    assert.ok(flyout, 'the flyout opened');
+    assert.ok(inside(flyout, 0), JSON.stringify(flyout));
+    assert.ok(flyout.bottom <= shapeAt.y + 1, `above the button: ${JSON.stringify(flyout)} vs ${JSON.stringify(shapeAt)}`);
   });
 
   check('no page errors', () => assert.deepEqual([...kit.failures], []));
