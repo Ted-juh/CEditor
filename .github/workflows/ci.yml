@@ -119,6 +119,8 @@ jobs:
           path: build/validation/
           if-no-files-found: ignore
 
+      # always(), to show the hit rate of a build that failed — but only once sccache exists: a run
+      # that fails before the cache step would otherwise add a second, misleading error here.
       - name: Compiler cache statistics
         if: always()
-        run: sccache --show-stats
+        run: if (Get-Command sccache -ErrorAction SilentlyContinue) { sccache --show-stats } else { "sccache was not set up in this run." }
