@@ -263,3 +263,22 @@ The installed template includes Lua/JavaScript support (TypeScript is prepared b
 export pipeline). It cannot bundle C++/C#/Java handlers or CPython. The compiling exporter currently
 bundles these extra runtimes only for VST3. A requested unsupported combination fails explicitly
 before replacing an export. A failed required handler build also fails the export.
+
+## The GAIA panel's scripts, run window-closed in the plug-in
+
+Seen in the player log while pluginval exercised the GAIA panel built as a plug-in
+([plugin validation](plugin-validation.md)). With the editor window closed, the scripts run in the
+plug-in's own runtime, and two things happen there that do not happen in the editor:
+
+- **Writes to paths that exist only in the editor's model.** The preset-name scripts set
+  `recall_*.text.fill.colour` and `recall_*.core.tooltip`. The window-closed value model has no such
+  paths, so each write is refused with "nothing was written — that path does not lead anywhere on
+  this panel": about 14,000 lines per validation run. Nothing is lost, since there is no window to
+  colour. But the log fills, and a real error in that script would be hard to find among them. The
+  scripts should skip visual writes when `ce.runtime` is `player` and no window is open, or the
+  runtime should accept and drop writes to visual paths silently. The runtime is the better place.
+- **A MIDI flood at load.** `gaia_preset_names` sends more than 1,000 messages a second as it loads,
+  and the flood guard drops the rest of that second. The guard did its job. Whether the script
+  should send that much with no synth listening is the question.
+
+Neither affected the validators' verdict; both are panel-script behaviour, not plug-in defects.
