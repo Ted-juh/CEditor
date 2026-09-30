@@ -22,6 +22,11 @@
 //               has no part of that name (a jewel lamp, a guard). Not used by the pilot sets.
 // A value may be a colour token reference ('{control.cap}'); the token resolver runs after this.
 //
+// PINS. The rule cannot see an author who chose the factory value itself: a set that hides a
+// slider's ticks overrode an author who turned them back on, because "on" is the default and so
+// looked untouched. `Core.setOverrides` lists the paths (as the patch names them, `Parts.<name>.`
+// prefixed for a part) an author set on purpose; the set leaves those alone whatever they hold.
+//
 // Copy-on-write, like the token resolver: a control the set has nothing to say about comes back
 // as the same object, and one it changes is copied only along the paths that changed.
 
@@ -122,8 +127,9 @@ export function writeControlPath(root, path, value) {
   return walk(root, 0, []);
 }
 
-function applyPatchWhereDefault(target, pristine, patch, prefix, out) {
+function applyPatchWhereDefault(target, pristine, patch, prefix, out, pinned) {
   for (const [path, value] of Object.entries(patch ?? {})) {
+    if (pinned.has(prefix ? `${prefix}.${path}` : path)) continue;
     const current = readControlPath(target, path);
     const factory = readControlPath(pristine, path);
     // The author changed this one: it is theirs. (A property neither has counts as unchanged.)
@@ -182,7 +188,9 @@ export function resolveControlFamily(control, set) {
   const pristine = pristineControlFor(type);
   if (!pristine) return control;
 
-  let out = applyPatchWhereDefault(control, pristine, family.component, '', control);
+  const overrides = control._children?.Core?.setOverrides;
+  const pinned = new Set(Array.isArray(overrides) ? overrides : []);
+  let out = applyPatchWhereDefault(control, pristine, family.component, '', control, pinned);
 
   const parts = control._children?.Parts?._children ?? {};
   const pristineParts = pristine._children?.Parts?._children ?? {};
@@ -190,7 +198,7 @@ export function resolveControlFamily(control, set) {
     const part = parts[partName];
     const factory = pristineParts[partName];
     if (!part || !factory) continue;
-    out = applyPatchWhereDefault(part, factory, patch, `Parts.${partName}`, out);
+    out = applyPatchWhereDefault(part, factory, patch, `Parts.${partName}`, out, pinned);
   }
 
   if (family.addParts && control._children?.Parts) {
@@ -215,4 +223,16 @@ export function resolveControlForSet(control, set) {
 /** A built-in design pinned to an individual control survives copying into another panel. */
 export function controlSetForControl(control, panelSet) {
   return getControlSet(control?._children?.Core?.controlSetId) ?? panelSet;
+}
+
+/**
+ * The patch that writes `value` at `path` as the author's own choice: the value, and the path
+ * pinned against the control's set (see PINS above) so it stays even if it is the factory value.
+ */
+export function pinnedWrite(control, path, value) {
+  const current = control?._children?.Core?.setOverrides;
+  const list = Array.isArray(current) ? current : [];
+  return list.includes(path)
+    ? { [path]: value }
+    : { [path]: value, 'Core.setOverrides': [...list, path] };
 }

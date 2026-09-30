@@ -1,5 +1,7 @@
 <script>
-  import { getSection, updateControlProperty, updateSelectedProperty, applyControlPatch, applySelectedPatch } from '../stores/controls.js';
+  import { getSection, updateControlProperty, updateSelectedProperty, applyControlPatch, applySelectedPatch, applyControlPatchesById, selectedControls } from '../stores/controls.js';
+  import { activeControlSet } from '../stores/controlSets.js';
+  import { pinnedWrite, resolveControlFamily } from '../models/controlSetFamilies.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -64,6 +66,19 @@
       updateSelectedProperty(path, value);
     } else {
       updateControlProperty(controlId, path, value);
+    }
+  }
+
+  // The Show flags are ones a control set decides too (the default set draws sliders without ticks
+  // or min/max labels). They show what is drawn, and what they write is pinned against the set —
+  // turning ticks back on writes their factory value, which the set would otherwise still override.
+  function setPinned(path, value) {
+    const controlId = getSection(control, 'Core')?.id;
+    if (!controlId) return;
+    if ($selectedComponentIds.size > 1) {
+      applyControlPatchesById(new Map($selectedControls.map((each) => [each._children.Core.id, pinnedWrite(each, path, value)])));
+    } else {
+      applyControlPatch(controlId, pinnedWrite(control, path, value));
     }
   }
 
@@ -172,6 +187,7 @@
   }
 
   let behavior = $derived(getSection(control, 'Behavior'));
+  let drawnBehavior = $derived(getSection(resolveControlFamily(control, $activeControlSet), 'Behavior') ?? behavior);
   // Absent, not zero: the readout range is off until someone sets it, and `null` is how the model
   // says so — the same tri-state the section padding uses, for the same reason.
   let displayScaleOff = $derived(behavior?.displayMin == null && behavior?.displayMax == null);
@@ -337,18 +353,18 @@
     <PropertyCell label="Show" span={4} hint="Ticks, min/max labels, handle labels, readout, centre marker. Right-click min/max or readout to place them.">
       <FlagStrip
         flags={[
-          { key: 'ticks', title: 'Ticks — generated major/minor ticks', on: behavior.showTicks !== false, icon: Ruler },
-          { key: 'minMax', title: 'Min / max labels (right-click to position)', on: behavior.showMinMaxLabels !== false, active: labelPositionTarget === 'minMax', icon: MoveHorizontal },
-          { key: 'handleLabels', title: 'Handle labels beside the active handles', on: behavior.showHandleLabels === true, icon: Tags },
-          { key: 'readout', title: 'Primary value readout (right-click to position)', on: behavior.showValueReadout !== false, active: labelPositionTarget === 'readout', icon: Type },
-          { key: 'centerMarker', title: 'Centre marker at the authored centre value', on: behavior.showCenterMarker === true, icon: AlignCenterVertical },
+          { key: 'ticks', title: 'Ticks — generated major/minor ticks', on: drawnBehavior.showTicks !== false, icon: Ruler },
+          { key: 'minMax', title: 'Min / max labels (right-click to position)', on: drawnBehavior.showMinMaxLabels !== false, active: labelPositionTarget === 'minMax', icon: MoveHorizontal },
+          { key: 'handleLabels', title: 'Handle labels beside the active handles', on: drawnBehavior.showHandleLabels === true, icon: Tags },
+          { key: 'readout', title: 'Primary value readout (right-click to position)', on: drawnBehavior.showValueReadout !== false, active: labelPositionTarget === 'readout', icon: Type },
+          { key: 'centerMarker', title: 'Centre marker at the authored centre value', on: drawnBehavior.showCenterMarker === true, icon: AlignCenterVertical },
         ]}
         ontoggle={(key) => {
-          if (key === 'ticks') set('Behavior.showTicks', !(behavior.showTicks !== false));
-          else if (key === 'minMax') set('Behavior.showMinMaxLabels', !(behavior.showMinMaxLabels !== false));
-          else if (key === 'handleLabels') set('Behavior.showHandleLabels', !(behavior.showHandleLabels === true));
-          else if (key === 'readout') set('Behavior.showValueReadout', !(behavior.showValueReadout !== false));
-          else if (key === 'centerMarker') set('Behavior.showCenterMarker', !(behavior.showCenterMarker === true));
+          if (key === 'ticks') setPinned('Behavior.showTicks', !(drawnBehavior.showTicks !== false));
+          else if (key === 'minMax') setPinned('Behavior.showMinMaxLabels', !(drawnBehavior.showMinMaxLabels !== false));
+          else if (key === 'handleLabels') setPinned('Behavior.showHandleLabels', !(drawnBehavior.showHandleLabels === true));
+          else if (key === 'readout') setPinned('Behavior.showValueReadout', !(drawnBehavior.showValueReadout !== false));
+          else if (key === 'centerMarker') setPinned('Behavior.showCenterMarker', !(drawnBehavior.showCenterMarker === true));
         }}
         oncontextmenu={(key, event) => {
           if (key === 'minMax' || key === 'readout') showLabelPositionEditor(key, event);

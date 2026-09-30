@@ -5764,6 +5764,14 @@
     return String(getBehavior(control)?.buttonType ?? '').trim().toLowerCase() === 'listbox';
   }
 
+  // A listbox's keyboard focus lives on the option-owning list, not the control's wrapper, which
+  // has no tabindex by design (85864af) — so focusing the wrapper on a press did nothing, and the
+  // keys pressed after clicking a row went to whatever had focus before.
+  function pointerFocus(control, wrapper) {
+    const target = isListboxControl(control) ? (wrapper?.querySelector?.('[role="listbox"]') ?? wrapper) : wrapper;
+    target?.focus?.({ preventScroll: true });
+  }
+
   // --- TextInput: an editable text field committing to Behavior.defaultValue ---
   function isTextInputControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'TextInput';
@@ -7932,7 +7940,7 @@
     // Only the POINTER path takes this. The keyboard handlers below focus deliberately, and
     // scrolling a control into view is the right thing when you arrived by Tab rather than by
     // pointing at something already on screen.
-    event.currentTarget?.focus?.({ preventScroll: true });
+    pointerFocus(control, event.currentTarget);
     lastInputMode = 'pointer';
     keyboardFocusControlId = '';
     pointerActiveControlId = getControlId(control);

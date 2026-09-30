@@ -677,3 +677,19 @@ test('the panel follows the set\'s colour only while it wears the default one', 
   assert.match(buildSolidStyle(authored), /#0000FF/);
   assert.match(buildSolidStyle({ ...createPanel(), controlSet: { id: 'graphite' } }), /#333333/, 'a colour-only set leaves the panel alone');
 });
+
+test('a pinned path is the author\'s even at its factory value: turning a set\'s hidden ticks back on sticks', async () => {
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { resolveControlFamily, pinnedWrite } = await import('../src/CE_Application/models/controlSetFamilies.js');
+  const set = getControlSet('graphite');
+  const slider = createControl('Slider');
+  assert.equal(resolveControlFamily(slider, set)._children.Behavior.showTicks, false, 'the default set draws sliders without ticks');
+
+  const patch = pinnedWrite(slider, 'Behavior.showTicks', true);
+  assert.deepEqual(patch, { 'Behavior.showTicks': true, 'Core.setOverrides': ['Behavior.showTicks'] });
+  slider._children.Core.setOverrides = patch['Core.setOverrides'];
+  const drawn = resolveControlFamily(slider, set);
+  assert.equal(drawn._children.Behavior.showTicks, true, 'the pin keeps the factory value the author chose');
+  assert.equal(drawn._children.Behavior.showMinMaxLabels, false, 'and only that path: the rest still follows the set');
+  assert.deepEqual(pinnedWrite(slider, 'Behavior.showTicks', false), { 'Behavior.showTicks': false }, 'a path already pinned is not listed twice');
+});
