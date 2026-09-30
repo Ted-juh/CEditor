@@ -644,19 +644,34 @@ function followModeZoneRect(zone, rect, parts) {
   if (source === 'independent') return null;
 
   let base = null;
+  let turn = null;
   if (source === 'face') {
     base = { x: 0, y: 0, width: rect.width, height: rect.height };
   } else if (source.startsWith('part:')) {
     const partName = source.slice('part:'.length);
     const layout = parts?.[partName]?._children?.Layout ?? null;
     base = layout ? resolvePartPixelRect(layout, rect.width, rect.height) : null;
+    // The part is drawn turned and scaled about its pivot; the zone that follows it is too, or it
+    // would cover the part's layout box and not the part (a turned knob's corners were dead).
+    const rotation = numberOr(layout?.rotation, 0);
+    const scale = Math.max(0.01, numberOr(layout?.scale, 1));
+    if (base && (Math.abs(rotation) > 1e-6 || Math.abs(scale - 1) > 1e-6)) {
+      turn = {
+        rotation,
+        scale,
+        originX: base.x + base.width * numberOr(layout.pivotX, 50) / 100,
+        originY: base.y + base.height * numberOr(layout.pivotY, 50) / 100,
+      };
+    }
   }
   if (!base) return null;
 
+  // Inflation and the minimum touch size are screen pixels, so on a scaled part they are divided out.
+  const unscale = turn ? 1 / turn.scale : 1;
   const inflate = zone?.inflate ?? {};
   const percentUnit = String(inflate.unit ?? 'px') === 'percent';
-  const inflateX = percentUnit ? (numberOr(inflate.x, 0) / 100) * rect.width : numberOr(inflate.x, 0);
-  const inflateY = percentUnit ? (numberOr(inflate.y, 0) / 100) * rect.height : numberOr(inflate.y, 0);
+  const inflateX = (percentUnit ? (numberOr(inflate.x, 0) / 100) * rect.width : numberOr(inflate.x, 0)) * unscale;
+  const inflateY = (percentUnit ? (numberOr(inflate.y, 0) / 100) * rect.height : numberOr(inflate.y, 0)) * unscale;
   let resolved = {
     x: base.x - inflateX,
     y: base.y - inflateY,
@@ -664,7 +679,7 @@ function followModeZoneRect(zone, rect, parts) {
     height: base.height + inflateY * 2,
   };
 
-  const minTouch = numberOr(zone?.minTouch, 0);
+  const minTouch = numberOr(zone?.minTouch, 0) * unscale;
   if (minTouch > 0) {
     if (resolved.width < minTouch) {
       resolved.x -= (minTouch - resolved.width) / 2;
@@ -675,7 +690,20 @@ function followModeZoneRect(zone, rect, parts) {
       resolved.height = minTouch;
     }
   }
-  return resolved;
+  return turn ? { ...resolved, turn } : resolved;
+}
+
+/** A point in the control's coordinates, taken into a turned zone's own (unturned) frame. */
+function intoZone(zoneRect, x, y) {
+  const turn = zoneRect?.turn;
+  if (!turn) return { x, y };
+  const angle = (-turn.rotation * Math.PI) / 180;
+  const dx = x - turn.originX;
+  const dy = y - turn.originY;
+  return {
+    x: turn.originX + (dx * Math.cos(angle) - dy * Math.sin(angle)) / turn.scale,
+    y: turn.originY + (dx * Math.sin(angle) + dy * Math.cos(angle)) / turn.scale,
+  };
 }
 
 export function customHitZoneRect(zone, rect, parts = null) {
@@ -701,8 +729,9 @@ export function customHitZoneRect(zone, rect, parts = null) {
   };
 }
 
-function isPointInZone(zone, rect, localX, localY, parts = null) {
+function isPointInZone(zone, rect, pointX, pointY, parts = null) {
   const zoneRect = customHitZoneRect(zone, rect, parts);
+  const { x: localX, y: localY } = intoZone(zoneRect, pointX, pointY);
   const insideBox = localX >= zoneRect.x
     && localX <= zoneRect.x + zoneRect.width
     && localY >= zoneRect.y

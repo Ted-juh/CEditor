@@ -80,6 +80,8 @@
   } from '../utils/booleanGroups.js';
   import SurfaceShapeTools from './SurfaceShapeTools.svelte';
   import { frameMapper, groupForRender, groupFramePatch, withLayoutFrame } from '../utils/surfaceGroupFrames.js';
+  import { arcHandleStyle, arcPointerAngle, drawnCentre, followDrawn, moveSnapped, pivotPlacement, screenBounds } from '../utils/surfaceTransforms.js';
+  import { partTransform } from '../utils/bezierPath.js';
   import SurfaceToolStrip from './SurfaceToolStrip.svelte';
   import SurfaceBottomBar from './SurfaceBottomBar.svelte';
   import SurfacePalette from './SurfacePalette.svelte';
@@ -338,7 +340,7 @@
     if (!measureEnabled || designerPreviewing) return [];
     if (activeSelectionKind !== 'layer' || selectedLayerNames.length !== 2) return [];
     const [frameA, frameB] = selectedLayerNames.map((name) => (
-      parts?._children?.[name] ? partFrame(parts._children[name]) : null
+      parts?._children?.[name] ? visualFrame(parts._children[name]) : null
     ));
     return measurementLinesBetween(frameA, frameB);
   });
@@ -905,6 +907,9 @@
     return partFrameBase(part, artboardWidth, artboardHeight);
   }
 
+  // What is drawn: a turned or scaled part's axis-aligned bounds (utils/surfaceTransforms.js).
+  const visualFrame = (part, frame = partFrame(part)) => screenBounds(part, frame, artboardWidth, artboardHeight);
+
   function canManagePartName(name) {
     return !!authoredParts?._children?.[name];
   }
@@ -984,7 +989,7 @@
     if (!kit?.layerNames?.length) return null;
     return boundsForFrames(
       kit.layerNames
-        .map((name) => parts?._children?.[name] ? partFrame(parts._children[name]) : null)
+        .map((name) => parts?._children?.[name] ? visualFrame(parts._children[name]) : null)
         .filter(Boolean)
     );
   }
@@ -1046,12 +1051,12 @@
 
   function nearestArcPivotTarget() {
     if (activeSelectionKind !== 'layer' || !selectedPart || !selectedFrame) return null;
-    const selectedCenter = frameCenter(selectedFrame);
+    const selectedCenter = drawnCentre(selectedPart, selectedFrame, artboardWidth, artboardHeight);
     const candidates = Object.entries(parts?._children ?? {})
       .filter(([name, part]) => name !== selectedLayer && part?.visible !== false && isArcCenterPart(part))
       .map(([name, part]) => {
         const frame = partFrame(part);
-        const center = frameCenter(frame);
+        const center = drawnCentre(part, frame, artboardWidth, artboardHeight);
         return {
           name,
           frame,
@@ -1167,7 +1172,7 @@
     if (!selectedLayerNames.length) return null;
     return boundsForFrames(
       selectedLayerNames
-        .map((name) => activeLayerFrames?.[name] ?? (parts?._children?.[name] ? partFrame(parts._children[name]) : null))
+        .map((name) => (parts?._children?.[name] ? visualFrame(parts._children[name], activeLayerFrames?.[name]) : activeLayerFrames?.[name]))
         .filter(Boolean)
     );
   }
@@ -1814,7 +1819,7 @@
   function displayZoneFrame(zone) {
     if (!isFollowZone(zone)) return zoneFrame(zone);
     const resolved = customHitZoneRect(zone, { width: artboardWidth, height: artboardHeight }, parts?._children ?? null);
-    return { left: resolved.x, top: resolved.y, width: resolved.width, height: resolved.height };
+    return { left: resolved.x, top: resolved.y, width: resolved.width, height: resolved.height, turn: resolved.turn };
   }
 
   function hitZoneStyle(name, zone) {
@@ -2041,19 +2046,24 @@
 
   function setLayerLayoutProperty(relativePath, value) {
     if (!selectedPartEditable || !relativePath) return;
+    if (['pivotX', 'pivotY'].includes(relativePath) && selectedFrame) {
+      const pct = { pivotX: numberOr(selectedAuthoredPart?._children?.Layout?.pivotX, 50), pivotY: numberOr(selectedAuthoredPart?._children?.Layout?.pivotY, 50), [relativePath]: numberOr(value, 50) };
+      return placePivot(partTransform(selectedPart, artboardWidth, artboardHeight).toScreen({ x: selectedFrame.left + selectedFrame.width * pct.pivotX / 100, y: selectedFrame.top + selectedFrame.height * pct.pivotY / 100 }));
+    }
     updateControlProperty(core.id, `Parts.${selectedLayer}.Layout.${relativePath}`, value);
   }
 
   function setSelectedPivotToArcCenter() {
     if (!selectedPartEditable || !selectedLayer || !selectedFrame || !selectedArcPivotTarget) return;
-    const width = Math.max(1, numberOr(selectedFrame.width, 1));
-    const height = Math.max(1, numberOr(selectedFrame.height, 1));
-    const pivotX = ((selectedArcPivotTarget.center.x - selectedFrame.left) / width) * 100;
-    const pivotY = ((selectedArcPivotTarget.center.y - selectedFrame.top) / height) * 100;
-    applyLayerPatch({
-      [`Parts.${selectedLayer}.Layout.pivotX`]: roundLayoutValue(pivotX),
-      [`Parts.${selectedLayer}.Layout.pivotY`]: roundLayoutValue(pivotY),
-    });
+    placePivot(selectedArcPivotTarget.center);
+  }
+
+  // Move the pivot to a drawn point without moving the part (a pivot is a % of the box that the turn
+  // and scale act about, so the box shifts to compensate — utils/surfaceTransforms.js).
+  function placePivot(screenPoint) {
+    const placed = pivotPlacement(selectedPart, selectedFrame, screenPoint, artboardWidth, artboardHeight);
+    applyLayerPatch({ ...patchFromFrame(selectedAuthoredPart, placed.frame),
+      [`Parts.${selectedLayer}.Layout.pivotX`]: roundLayoutValue(placed.pivotX), [`Parts.${selectedLayer}.Layout.pivotY`]: roundLayoutValue(placed.pivotY) });
   }
 
   function setArtboardSize(path, value) {
@@ -2462,14 +2472,15 @@
     }
 
     if (!selectedPartEditable || !selectedFrame || !selectedAuthoredPart) return;
-    const frame = { ...selectedFrame };
+    const drawn = visualFrame(selectedPart);
+    const frame = { ...drawn };
     if (mode === 'left') frame.left = 0;
     if (mode === 'centerX') frame.left = (artboardWidth - frame.width) / 2;
     if (mode === 'right') frame.left = artboardWidth - frame.width;
     if (mode === 'top') frame.top = 0;
     if (mode === 'centerY') frame.top = (artboardHeight - frame.height) / 2;
     if (mode === 'bottom') frame.top = artboardHeight - frame.height;
-    applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
+    applyLayerPatch(patchFromFrame(selectedAuthoredPart, followDrawn(selectedFrame, drawn, frame)));
   }
 
   function moveSelectedLayersBy(dx, dy) {
@@ -2490,7 +2501,7 @@
     const excluded = new Set(excludedNames);
     const frames = partEntries
       .filter(([name]) => !excluded.has(name))
-      .map(([, part]) => partFrame(part));
+      .map(([, part]) => visualFrame(part));
     return smartSnapTargets(frames, artboardWidth, artboardHeight);
   }
 
@@ -2500,12 +2511,12 @@
     if (!core?.id || selectedLayerNames.length < 2) return;
     const entries = selectedEditableLayerEntries();
     const aligned = alignFramesWithinSelection(
-      entries.map(([name, , renderedPart]) => [name, partFrame(renderedPart)]),
+      entries.map(([name, , renderedPart]) => [name, visualFrame(renderedPart)]),
       mode
     );
     const patch = {};
-    for (const [name, authoredPart] of entries) {
-      const frame = aligned.get(name);
+    for (const [name, authoredPart, renderedPart] of entries) {
+      const frame = aligned.get(name) && followDrawn(partFrame(renderedPart), visualFrame(renderedPart), aligned.get(name));
       if (frame) Object.assign(patch, patchFromFrameForLayer(name, authoredPart, frame));
     }
     if (Object.keys(patch).length) applyControlPatch(core.id, patch);
@@ -2515,12 +2526,12 @@
     if (!core?.id || selectedLayerNames.length < 3) return;
     const entries = selectedEditableLayerEntries();
     const distributed = distributeFramesWithinSelection(
-      entries.map(([name, , renderedPart]) => [name, partFrame(renderedPart)]),
+      entries.map(([name, , renderedPart]) => [name, visualFrame(renderedPart)]),
       axis
     );
     const patch = {};
-    for (const [name, authoredPart] of entries) {
-      const frame = distributed.get(name);
+    for (const [name, authoredPart, renderedPart] of entries) {
+      const frame = distributed.get(name) && followDrawn(partFrame(renderedPart), visualFrame(renderedPart), distributed.get(name));
       if (frame) Object.assign(patch, patchFromFrameForLayer(name, authoredPart, frame));
     }
     if (Object.keys(patch).length) applyControlPatch(core.id, patch);
@@ -2706,8 +2717,9 @@
       handle,
       startMouse: { x: event.clientX, y: event.clientY },
       startFrame: selectedFrame,
-      // Rotation + pivot captured so resize can stay aligned to a rotated shape.
+      // Rotation, scale + pivot captured so resize can stay aligned to a turned or scaled shape.
       startRotation: numberOr(layout.rotation, 0),
+      startScale: Math.max(0.01, numberOr(layout.scale, 1)),
       pivotX: numberOr(layout.pivotX, 50) / 100,
       pivotY: numberOr(layout.pivotY, 50) / 100,
     };
@@ -2721,10 +2733,7 @@
     if (event.button !== 0 || !selectedPartEditable || !selectedFrame) return;
     event.stopPropagation();
     event.preventDefault();
-    const center = {
-      x: selectedFrame.left + selectedFrame.width / 2,
-      y: selectedFrame.top + selectedFrame.height / 2,
-    };
+    const center = partTransform(selectedPart, artboardWidth, artboardHeight).pivot;   // CSS turns about the pivot
     const artboardRect = event.currentTarget?.closest?.('.artboard')?.getBoundingClientRect?.();
     const pointer = artboardRect
       ? { x: (event.clientX - artboardRect.left) / surfaceZoom, y: (event.clientY - artboardRect.top) / surfaceZoom }
@@ -2750,7 +2759,7 @@
       name: selectedLayer,
       startAngle: numberOr(selectedArcMeta?.startAngle, -135),
       startSweep: numberOr(selectedArcMeta?.sweepAngle, 270),
-      frame: selectedFrame,
+      frame: selectedFrame, part: selectedPart, ccw: String(selectedArcMeta?.direction ?? 'cw').toLowerCase() === 'ccw',
     };
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
@@ -2767,15 +2776,11 @@
         left: interaction.startFrame.left + dx,
         top: interaction.startFrame.top + dy,
       };
-      const gridded = snapFrame(raw, event);
-      if (smartSnapEnabled && !event.altKey) {
-        const snapped = applySmartSnap(raw, gridded, interaction.smartTargets);
-        activeFrame = snapped.frame;
-        activeSmartGuides = snapped.guides;
-      } else {
-        activeFrame = gridded;
-        activeSmartGuides = [];
-      }
+      // Snapped by what is drawn: a turned part's visible edges, not its layout box.
+      const snapped = moveSnapped(parts?._children?.[interaction.name], raw, artboardWidth, artboardHeight, (drawn) => (smartSnapEnabled && !event.altKey
+        ? applySmartSnap(drawn, snapFrame(drawn, event), interaction.smartTargets) : { frame: snapFrame(drawn, event), guides: [] }));
+      activeFrame = snapped.frame;
+      activeSmartGuides = snapped.guides;
       return;
     }
 
@@ -2827,16 +2832,17 @@
 
     if (interaction.type === 'resize') {
       const rotationDeg = interaction.startRotation || 0;
+      const scale = interaction.startScale || 1;
       const theta = (rotationDeg * Math.PI) / 180;
       const cos = Math.cos(theta);
       const sin = Math.sin(theta);
 
-      // Convert the screen-space drag into the shape's local (un-rotated) axes,
-      // so a handle resizes along the shape's own edges instead of the screen's.
+      // Convert the screen-space drag into the shape's local (un-rotated, un-scaled) axes, so a
+      // handle resizes along the shape's own edges and by the distance the pointer went on screen.
       const sdx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const sdy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
-      const dx = sdx * cos + sdy * sin;
-      const dy = -sdx * sin + sdy * cos;
+      const dx = (sdx * cos + sdy * sin) / scale;
+      const dy = (-sdx * sin + sdy * cos) / scale;
 
       const start = {
         x: interaction.startFrame.left,
@@ -2853,18 +2859,18 @@
         maxH: 0,
       });
 
-      if (Math.abs(rotationDeg) < 0.001) {
+      if (Math.abs(rotationDeg) < 0.001 && Math.abs(scale - 1) < 0.001) {
         activeFrame = snapFrame({ left: rect.x, top: rect.y, width: rect.w, height: rect.h }, event);
         return;
       }
 
-      // Rotation-aware placement: keep the anchored edge/corner fixed in world
-      // space while the size changes, so the shape doesn't swing off the cursor.
-      // The CSS rotation pivots about (pivotX%, pivotY%) of the box.
+      // Transform-aware placement: keep the anchored edge/corner fixed in world space while the size
+      // changes, so the shape doesn't swing off the cursor. The CSS `rotate() scale()` acts about
+      // (pivotX%, pivotY%) of the box, so a box point sits at pivot + scale·R(point − pivot).
       const handle = interaction.handle;
       const px = interaction.pivotX;
       const py = interaction.pivotY;
-      const rot = (vx, vy) => ({ x: vx * cos - vy * sin, y: vx * sin + vy * cos });
+      const rot = (vx, vy) => ({ x: scale * (vx * cos - vy * sin), y: scale * (vx * sin + vy * cos) });
       // Local position (from top-left) of the anchored edge/corner that stays put.
       const anchorLocal = (w, h) => ({
         x: handle.includes('r') ? 0 : handle.includes('l') ? w : w / 2,
@@ -2943,16 +2949,13 @@
       const artboardRect = artboard?.getBoundingClientRect?.();
       if (!artboardRect) return;
       const pointer = { x: (event.clientX - artboardRect.left) / surfaceZoom, y: (event.clientY - artboardRect.top) / surfaceZoom };
-      const center = {
-        x: interaction.frame.left + interaction.frame.width / 2,
-        y: interaction.frame.top + interaction.frame.height / 2,
-      };
-      let angle = Math.atan2(pointer.y - center.y, pointer.x - center.x) * (180 / Math.PI);
+      // In the arc's own compass angles (0° up, clockwise), through the part's turn.
+      let angle = arcPointerAngle(interaction.part, interaction.frame, pointer, artboardWidth, artboardHeight);
       if (event.shiftKey) angle = Math.round(angle / 15) * 15;
       if (interaction.handle === 'start') {
         updateControlProperty(core.id, `Parts.${interaction.name}.meta.arcTrack.startAngle`, normalizeRotation(angle));
       } else {
-        const sweep = normalizeRotation(angle - interaction.startAngle);
+        const sweep = normalizeRotation(interaction.ccw ? interaction.startAngle - angle : angle - interaction.startAngle);
         updateControlProperty(core.id, `Parts.${interaction.name}.meta.arcTrack.sweepAngle`, Math.max(1, Math.min(360, sweep || 360)));
       }
       return;
@@ -3134,7 +3137,7 @@
       if (!band.additive) clearSurfaceSelection();
       return;
     }
-    const hits = partsInMarquee(topLevelPartEntries, rect, partFrame);
+    const hits = partsInMarquee(topLevelPartEntries, rect, (part) => visualFrame(part));
     const names = mergeMarqueeSelection(band.additive ? selectedLayerNames : [], hits, band.additive);
     if (names.length) commitLayerSelection(names, names[names.length - 1]);
     else if (!band.additive) clearSurfaceSelection();
@@ -3754,20 +3757,20 @@
                       <span
                         class="arc-handle arc-start"
                         title="Drag arc start"
-                        style={arcPointStyle(selectedFrame, selectedArcMeta?.startAngle)}
+                        style={arcHandleStyle(selectedFrame, selectedArcMeta, selectedBorder, 'start')}
                         onmousedown={(event) => beginArcHandleDrag('start', event)}
                       ></span>
                       <span
                         class="arc-handle arc-end"
                         title="Drag arc end"
-                        style={arcPointStyle(selectedFrame, numberOr(selectedArcMeta?.startAngle, -135) + numberOr(selectedArcMeta?.sweepAngle, 270))}
+                        style={arcHandleStyle(selectedFrame, selectedArcMeta, selectedBorder, 'end')}
                         onmousedown={(event) => beginArcHandleDrag('end', event)}
                       ></span>
                     {/if}
                     {#each RESIZE_HANDLES as handle (handle.id)}
                       {#if !isTinyPart(name, part) || ['tl', 'tr', 'br', 'bl'].includes(handle.id)}
                         <span
-                          class="resize-handle"
+                          class="resize-handle" data-resize={handle.id}
                           style={`${handleStyle(handle.id)} cursor:${handle.cursor};`}
                           onmousedown={(event) => beginResize(handle.id, event)}
                         ></span>
@@ -3837,7 +3840,7 @@
               {selectedAuthoredPart}
               {activeSelectionKind}
               {penEditPart}
-              {activeSelectionFrame}
+              activeSelectionFrame={selectedPart && !multiSelectionActive ? visualFrame(selectedPart) : activeSelectionFrame}
               {interaction}
               {designerPreviewing}
               {artboardWidth}

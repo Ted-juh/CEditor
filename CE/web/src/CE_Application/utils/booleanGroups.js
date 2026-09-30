@@ -39,6 +39,7 @@ import { partFrame } from './customDesignSurfaceGeometry.js';
 import { BOOLEAN_KIND, isBooleanGroup, loadGeometry, partOutline, paintsBox, whyNoOutline } from './partOutlines.js';
 import { textLayoutSpec } from './textOutline.js';
 import { scalePathData } from './svgPathScale.js';
+import { withPivotKept } from './bezierPath.js';
 import { numberOr } from './primitives.js';
 
 export { BOOLEAN_KIND, isBooleanGroup };
@@ -397,7 +398,7 @@ export async function planBooleanGroup(partsChildren, entries, operation, { artb
 async function cacheFor(resolvedGroup, width, height) {
   try {
     const shape = await computeBooleanShape(resolvedGroup, width, height, []);
-    return { key: booleanShapeKey(resolvedGroup, width, height, []), shape };
+    return { key: booleanShapeKey(resolvedGroup, width, height, []), shape, artboardWidth: width, artboardHeight: height };
   } catch (error) {
     return { error: error?.message ?? String(error) };
   }
@@ -406,6 +407,13 @@ async function cacheFor(resolvedGroup, width, height) {
 function withCache(group, cache) {
   const { bounds } = cache.shape;
   const round2 = (value) => Math.round(value * 100) / 100;
+  // A turned or scaled shape keeps its pivot on the same spot when its box follows the operands, or
+  // the whole shape would swing each time an operand is edited (bezierPath.js withPivotKept).
+  const kept = withPivotKept(group, {
+    'Layout.x': round2(bounds.x), 'Layout.y': round2(bounds.y),
+    'Layout.width': round2(Math.max(1, bounds.width)), 'Layout.height': round2(Math.max(1, bounds.height)),
+  }, cache.artboardWidth ?? 0, cache.artboardHeight ?? 0);
+  const pivot = kept['Layout.pivotX'] === undefined ? {} : { pivotX: kept['Layout.pivotX'], pivotY: kept['Layout.pivotY'] };
   return {
     ...group,
     meta: { ...group.meta, cache: { key: cache.key, shape: cache.shape } },
@@ -420,8 +428,9 @@ function withCache(group, cache) {
         height: round2(Math.max(1, bounds.height)),
         xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px',
         anchorX: 'left', anchorY: 'top', offsetX: 0, offsetY: 0,
-        // A group's own turn / scale / pivot are the author's (the renderer applies them to the whole
-        // outline); only the box follows the operands.
+        // A group's own turn / scale are the author's (the renderer applies them to the whole
+        // outline); only the box follows the operands, and the pivot stays where it was drawn.
+        ...pivot,
       },
     },
   };
