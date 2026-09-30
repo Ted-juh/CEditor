@@ -135,13 +135,22 @@ refusal, each a place the tool said no.
   first, and the materializer no longer stamps a detached part back to generated (a bug the per-layer
   Detach already had). The shape tools live in `sections/SurfaceShapeTools.svelte`.
 
+**Editing a flattened path.** A flattened or smoothed path is edited anchor by anchor with Bézier
+handles (`utils/bezierPath.js`, `sections/SurfaceCurveEditor.svelte`, handed the part by the Pen's
+editor). The model parses any SVG path — relative and shorthand commands, quadratics raised to cubics
+exactly, arcs as cubics — and every edit is a pure function of it: move an anchor, bend a handle
+(mirrored on a smooth anchor, independent with Alt), insert an anchor by de Casteljau so the outline
+does not change, toggle corner / smooth, remove an anchor or a whole hole. Writing it back fits the
+box to the curves' exact bounds (derivative roots, not the handles) and, on a turned or scaled part,
+moves the pivot to stay on the same spot, so re-fitting the box never swings the rest of the outline
+round. `browser-checks/curveEditing.mjs` drives each gesture with a real pointer.
+
 **Still refused, by name:** a knob or slider carried as a part, an envelope display, a waveform icon —
 each drawn live by its own renderer with no fixed outline — and text whose font file cannot be read.
 Flatten, the one destructive step, is refused while anything names an operand.
 
 **Known limits.**
 
-- A flattened or smoothed path has no point handles. Keep a shape live to keep editing it.
 - A shape's cache is keyed to the designer's artboard size; an instance drawn at another size
   computes its outline on first paint (one frame of the previous outline, then the right one).
 - Text using a font imported in Settings is outlined in the editor, but the player does not load

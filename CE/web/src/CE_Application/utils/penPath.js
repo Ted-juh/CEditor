@@ -41,7 +41,7 @@ export function pathVectorPoints(part) {
 /**
  * The compound form: `meta.pathData`, SVG path data in 0..1 of the box, with curves, holes and islands
  * — what a boolean combine or a smooth makes (utils/partBooleans.js). Drawn, moved and styled like any
- * path part; not edited point by point.
+ * path part, and edited anchor by anchor with curve handles (bezierPath.js, SurfaceCurveEditor).
  */
 export function hasCompoundPath(part) {
   return String(part?.kind ?? '') === PATH_KIND && typeof part?.meta?.pathData === 'string' && part.meta.pathData.trim() !== '';

@@ -7,15 +7,17 @@
   // Escape abandons the drawing. Points snap to the grid when snapping is on.
   //
   // EDITING. With one path part selected, its points get handles: drag one to move it, Alt-click
-  // one to remove it, double-click the outline to add a point there.
+  // one to remove it, double-click the outline to add a point there. A flattened or smoothed path
+  // (curves, holes) is edited anchor by anchor, with Bézier handles, by SurfaceCurveEditor.
   //
   // It lives in its own file because the surface editor has a line budget (surfaceDecomposition
   // test) and because none of this needs the editor's state beyond what is passed in. The geometry
   // is utils/penPath.js; this file is gestures and drawing.
   import {
-    POINT_HIT_RADIUS, clampToArtboard, constrainTo45, insertPathPoint, movePathPoint,
+    POINT_HIT_RADIUS, clampToArtboard, constrainTo45, hasCompoundPath, insertPathPoint, movePathPoint,
     nearestPathSegment, pathIsClosed, pathPointsInArtboard, penClickAction, removePathPoint,
   } from '../utils/penPath.js';
+  import SurfaceCurveEditor from './SurfaceCurveEditor.svelte';
 
   let {
     active = false,                  // the Pen is the current tool
@@ -157,6 +159,20 @@
 
   const svgPoints = (points) => points.map(([x, y]) => `${x},${y}`).join(' ');
 </script>
+
+{#if editPart && !active && !draft.length && hasCompoundPath(editPart.part)}
+  <SurfaceCurveEditor
+    name={editPart.name}
+    part={editPart.part}
+    {artboardEl}
+    {artboardWidth}
+    {artboardHeight}
+    {zoom}
+    {snapPoint}
+    {onPatchPart}
+    {onOutlineMouseDown}
+  />
+{/if}
 
 {#if draft.length || editPoints.length}
   <svg

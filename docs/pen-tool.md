@@ -99,10 +99,23 @@ variant still does — the refusal names them. Keeping the shape live is always 
 Select a pen shape and the point toolbar offers **Smooth**, which replaces the corners with a curve
 through the same points. Open shapes stay open.
 
-## Flattened and smoothed shapes are outlines, not points
+## Editing flattened and smoothed shapes
 
 Both results are stored as an SVG outline (`meta.pathData`, again from 0 to 1 across the part's
 box) rather than as points, because a hole or a curve is not a list of corners. They scale, fill,
-stroke, animate and bind like any part, paint with every fill and border feature, and render the same
-everywhere, but they have **no point handles**: to change the outline, undo and edit the originals —
-or, better, keep the shape combined and live.
+stroke, animate and bind like any part, and paint with every fill and border feature.
+
+Select one with the Select tool (**V**) and it is edited anchor by anchor, with curve handles, as in
+any vector tool:
+
+- **Drag an anchor** to move it; its handles come with it. The part's box follows the outline.
+- **Click an anchor** to show its handles (and its neighbours' handles facing it). **Drag a handle**
+  to bend the curve. On a smooth anchor the opposite handle turns with it, so the curve stays smooth;
+  hold **Alt** to move one handle alone and make a corner.
+- **Double-click an anchor** to switch it between a sharp corner and a smooth curve.
+- **Double-click the outline** to add an anchor exactly there. The curve is split, so the shape does
+  not change until you move it.
+- **Alt-click an anchor** to remove it. Removing the last anchors of a hole removes the hole.
+
+Square anchors are corners, round ones are smooth. Every drag is one undo step. A turned or scaled
+part is edited where it is drawn, and editing it leaves the rest of the outline where it was.

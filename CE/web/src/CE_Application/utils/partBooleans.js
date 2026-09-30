@@ -13,7 +13,7 @@
  *   meta.closed     true (Smooth keeps an open path open)
  *
  * A closed compound path paints through the same outline pipeline as a live group, so every fill and
- * border feature applies to it. It is not vertex-editable: it moves, scales and styles like any part.
+ * border feature applies to it, and it is edited anchor by anchor with Bézier handles (bezierPath.js).
  *
  * Because Flatten removes parts, an operand anything still refers to — a hit zone, a binding, a state,
  * a published property, a variant — is refused by name: those references would point at nothing.
@@ -125,7 +125,7 @@ export async function planFlatten(control, partsChildren, resolvedParts, groupNa
 /**
  * Smooth a Pen path: a curve through the same points (Catmull-Rom), so a polygon drawn with a few
  * clicks becomes the rounded shape it was sketching. The result is the compound form: it scales and
- * styles like before, and is no longer edited point by point.
+ * styles like before, and is edited anchor by anchor with curve handles (bezierPath.js).
  */
 export async function planPathSmooth(rendered, { artboardWidth, artboardHeight }) {
   const points = pathVectorPoints(rendered);

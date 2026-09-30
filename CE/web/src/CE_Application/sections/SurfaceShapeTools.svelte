@@ -17,6 +17,7 @@
   import { applyControlPatch } from '../stores/controls.js';
   import { flushHistory, setHistoryRecordingSuppressed } from '../stores/history.js';
   import { applyPartPatch, planFlatten, planPathSmooth } from '../utils/partBooleans.js';
+  import { pathVectorPoints } from '../utils/penPath.js';
   import {
     BOOLEAN_LABELS, BOOLEAN_OPERATIONS, booleanSpec, isBooleanGroup, planBooleanGroup, refreshedGroup,
     releasedParts, withOperation,
@@ -168,7 +169,7 @@
   });
 </script>
 
-{#if !designerPreviewing && penEditPart && !interaction && activeSelectionFrame}
+{#if !designerPreviewing && penEditPart && pathVectorPoints(penEditPart.part) && !interaction && activeSelectionFrame}
   <div
     class="align-toolbar shape-toolbar"
     style={`left:${Math.max(0, activeSelectionFrame.left)}px;top:${toolbarTop(activeSelectionFrame)}px;`}

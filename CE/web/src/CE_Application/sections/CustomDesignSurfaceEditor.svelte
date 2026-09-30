@@ -73,7 +73,7 @@
   import CustomStateFilmstrip from './CustomStateFilmstrip.svelte';
   import CustomContactSheet from './CustomContactSheet.svelte';
   import SurfacePenTool from './SurfacePenTool.svelte';
-  import { isPathPart, pathPartSpec } from '../utils/penPath.js';
+  import { hasCompoundPath, isPathPart, pathPartSpec } from '../utils/penPath.js';
   import {
     attachBooleanInputs, booleanShapeFor, booleanShapeRevision, booleanSpec, drawnPartEntries,
     isBooleanGroup, isBooleanOperand, membershipRenamePatch, operandEntries, partsAfterOperandMove, partsAfterRemoval, withGroupMembers,
@@ -395,7 +395,7 @@
   let contactSheetOpen = $state(false);
   let penTool = $state(null);
   // The one selected path part, when the Select tool is out: the Pen shows its points for editing.
-  let penEditPart = $derived(activeTool === 'select' && selectedLayerNames.length === 1 && isPathPart(selectedPart)
+  let penEditPart = $derived(activeTool === 'select' && selectedLayerNames.length === 1 && (isPathPart(selectedPart) || hasCompoundPath(selectedPart))
     ? { name: selectedLayer, part: selectedPart } : null);
   // Pane visibility toggles (mirrors the normal editor's bottom-left icons).
   let paletteCollapsed = $state(false);
