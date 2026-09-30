@@ -101,24 +101,71 @@ public:
         startTimerHz (30);
 #endif
 #if CEDITOR_SCRIPTING
-        setupScripting();   // window-closed: load the panel's scripts + fire onPanelLoad
+        // window-closed: load the panel's scripts + fire onPanelLoad — ON the message thread,
+        // whichever thread the host is building us on (see onMessageThread).
+        onMessageThread ([this] { setupScripting(); });
 #endif
+    }
+
+    /**
+     * Run `fn` on JUCE's message thread, now, and return when it is done.
+     *
+     * The scripts belong to the message thread. Their timers, this processor's 30 Hz timer and the
+     * device callbacks all run there and call straight into the Lua, JavaScript and Python engines,
+     * and the engines themselves are tied to the thread that creates them: QuickJS measures its
+     * stack limit from the creating thread's stack, and CPython's thread state is per thread. A
+     * host may build and destroy the plug-in on a thread of its own, though. On Linux an LV2 (and a
+     * VST3 in some hosts) runs a message thread INSIDE the plug-in, and the host constructs and
+     * frees instances from wherever it likes — pluginval does both from its test thread.
+     *
+     * What pluginval found on the LV2 build, in order: a crash in JavascriptEngine::evaluate on the
+     * message thread while ~JavascriptEngine ran on the host's, with a Lua "invalid key to 'next'"
+     * before it (the destroy handlers racing a timer in one Lua state); and under a lock instead,
+     * every JavaScript call failing with "stack overflow" — 1.1 million of them in the player log —
+     * because each engine had been created on the host's thread and was being run on this one.
+     *
+     * So script setup and teardown are handed to the message thread and the caller waits. On the
+     * message thread already — Windows, macOS and most hosts — `fn` just runs.
+     */
+    template <typename Fn>
+    static void onMessageThread (Fn&& fn)
+    {
+        auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+        if (mm == nullptr || mm->isThisTheMessageThread() || mm->currentThreadHasLockedMessageManager())
+        {
+            fn();
+            return;
+        }
+        std::function<void()> call (std::forward<Fn> (fn));
+        mm->callFunctionOnMessageThread ([] (void* context) -> void*
+        {
+            (*static_cast<std::function<void()>*> (context))();
+            return nullptr;
+        }, &call);
     }
 
 #if CEDITOR_VALUE_LAYER
     ~PlayerAudioProcessor() override
     {
-       #if CEDITOR_SCRIPTING
-        // FIRST, while everything a teardown handler needs still works: its timers, its state, the
-        // device service, set() and sendCC(). This is the plugin being unloaded — the real end of
-        // the scripts, as distinct from the window closing (onPanelClose), which they survive.
-        if (scriptRuntime != nullptr) scriptRuntime->onPanelDestroy();
-       #endif
-        stopTimer();
-       #if CEDITOR_SCRIPTING
-        deviceService.setEventCallback (nullptr);  // stop device events reaching the about-to-die runtime
-        scriptTimers.stopAll();                    // stop script timers before the runtime is destroyed
-       #endif
+        // The WHOLE teardown on the message thread — the destroy handlers, the timer stops AND the
+        // runtime itself — so no callback is mid-flight and every engine dies on the thread that
+        // made it (onMessageThread).
+        onMessageThread ([this]
+        {
+           #if CEDITOR_SCRIPTING
+            // FIRST, while everything a teardown handler needs still works: its timers, its state,
+            // the device service, set() and sendCC(). This is the plugin being unloaded — the real
+            // end of the scripts, as distinct from the window closing (onPanelClose), which they
+            // survive.
+            if (scriptRuntime != nullptr) scriptRuntime->onPanelDestroy();
+           #endif
+            stopTimer();
+           #if CEDITOR_SCRIPTING
+            deviceService.setEventCallback (nullptr);  // stop device events reaching the about-to-die runtime
+            scriptTimers.stopAll();                    // stop script timers before the runtime is destroyed
+            scriptRuntime.reset();                     // here, not later as a member
+           #endif
+        });
     }
 #endif
 
@@ -432,6 +479,18 @@ public:
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
             markSessionRestored();
         }
+        else
+        {
+            return;
+        }
+
+        // Every parameter may have just moved, and the host has to be told to read them again. A
+        // DAW reopening a project builds a FRESH instance and loads the state into it, so what it
+        // read at creation was the defaults; without this it keeps showing them. JUCE's VST3
+        // wrapper re-reads after setState on its own, but the CLAP wrapper only rescans on a
+        // "program changed" notice — clap-validator's state-reproducibility tests failed on every
+        // export until this was sent. Synchronous, and on the calling (main) thread.
+        updateHostDisplay (ChangeDetails().withProgramChanged (true));
 #else
         juce::ignoreUnused (data, sizeInBytes);
 #endif

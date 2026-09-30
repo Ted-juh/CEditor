@@ -14,6 +14,9 @@
 /tmp/
 # Per-panel export output (generated VST3s).
 /export-out/
+# pluginval / clap-validator binaries for tools/scripts/validate-plugins.mjs. Not vendored: pluginval
+# is GPLv3 and both are tens of MB of per-platform release binaries. docs/plugin-validation.md.
+/tools/validators/
 
 # Prebuilt player templates. Build outputs (cmake -DCEDITOR_TEMPLATE_PLAYER=ON), staged here for
 # the compiler-free export path and by the installer. Tens of MB per format, and reproducible.

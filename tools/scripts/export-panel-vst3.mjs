@@ -497,11 +497,29 @@ try {
       throw new Error(`LV2 artifact not found: ${builtLv2}`);
     }
   }
+  const exported = [];
   for (const staged of outputs) {
     const destination = path.join(outDir, path.basename(staged));
     rmSync(destination, { recursive: true, force: true });
     cpSync(staged, destination, { recursive: true });
     console.log(`EXPORTED: ${destination} (${mb(dirSize(destination))} MB)`);
+    exported.push(destination);
+  }
+
+  // Optional: run the hosts' conformance suites over what was just built (validate-plugins.mjs,
+  // docs/plugin-validation.md). Opt-in — pluginval takes minutes — via Export settings
+  // `validatePlugins: true` or CE_VALIDATE_EXPORT=1. A failure is reported loudly and does NOT undo
+  // the export: the files are good enough to load and look at, and the report says what to fix.
+  if (es.validatePlugins === true || process.env.CE_VALIDATE_EXPORT === '1') {
+    const { validatePlugins } = await import(pathToFileURL(path.join(repo, 'tools/scripts/validate-plugins.mjs')).href);
+    console.log('Validating the export (pluginval / clap-validator)...');
+    const results = validatePlugins(exported);
+    for (const result of results) {
+      const name = path.basename(result.plugin);
+      if (result.outcome === 'passed') console.log(`  ✓ ${name}: ${result.validator} passed`);
+      else if (result.outcome === 'not-run') console.log(`  - ${name}: not validated (${result.reason})`);
+      else console.warn(`  ✗ ${name}: ${result.validator} FAILED — run node tools/scripts/validate-plugins.mjs "${result.plugin}" for the details`);
+    }
   }
 } finally {
   try {

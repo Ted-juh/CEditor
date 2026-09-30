@@ -536,7 +536,11 @@ if(CEDITOR_BUILD_APP)
             CLAP_ID "${CE_CLAP_ID}"
             # A MIDI controller surface, not an audio processor: "utility" is the honest category
             # and "external" marks it as controlling outboard gear (both from the CLAP taxonomy).
-            CLAP_FEATURES utility external)
+            # CLAP also REQUIRES one main category, and "utility" is not one — clap-validator's
+            # features-categories test failed on every export without it. "audio-effect" is the
+            # one that matches what the plug-in is to a host: it passes audio through untouched,
+            # and the VST3 build already declares itself Fx (VST3_CATEGORIES above).
+            CLAP_FEATURES audio-effect utility external)
         message(STATUS "CEditor: CLAP format ENABLED (target CEditorPlayerVST_CLAP, id ${CE_CLAP_ID}).")
     endif()
 
@@ -1775,6 +1779,12 @@ if (CEDITOR_SCRIPTING)
         sol2::sol2
         lua_static                 # from walterschell/Lua; rename if your Lua provider differs
     )
+    # Both static libraries end up inside the player PLUG-IN, which is a shared module. On Linux that
+    # needs position-independent code, and neither target asks for it: the link failed with
+    # "relocation R_X86_64_TPOFF32 ... recompile with -fPIC" (sol2's thread_local Lua state), and no
+    # Linux .vst3, .clap or .lv2 could be built at all. Windows DLLs and macOS need nothing here and
+    # CMake emits nothing for them. Found by building a plug-in to run pluginval against.
+    set_target_properties(ceditor_scripting lua_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
     # --- Optional: native embedded CPython (third language, full stdlib) ---
     if (CEDITOR_PYTHON)

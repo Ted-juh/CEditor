@@ -307,7 +307,7 @@ the top of it.
 6. **regl-scatterplot plus umap-js under Constellation and Timbre Space.**
 7. **Real Ctrlr panels for the importer's first run** — with the authors asked before anything ships.
 8. **Surge tuning-library and MTS-ESP.**
-9. **pluginval in the export pipeline.**
+9. **pluginval in the export pipeline.** Done 2026-09-30, with clap-validator beside it: `tools/scripts/validate-plugins.mjs`, [docs/plugin-validation.md](../plugin-validation.md). Its first run found five real defects.
 10. **Strudel's mini-notation in the phrase sequencer.**
 
 ---

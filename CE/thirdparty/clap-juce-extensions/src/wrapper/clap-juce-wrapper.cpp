@@ -1450,8 +1450,10 @@ class ClapJuceWrapper : public clap::helpers::Plugin<
 
         if (!usingLegacyParameterAPI)
         {
+            // CEditor patch (VENDORED.md): copyToUTF8 NUL-terminates and never splits a multi-byte
+            // character at the buffer's end; strncpy did neither.
             auto res = pbi.processorParam->getText((float)value, (int)size);
-            strncpy(display, res.toStdString().c_str(), size);
+            res.copyToUTF8(display, size);
         }
         else
         {
@@ -1460,7 +1462,7 @@ class ClapJuceWrapper : public clap::helpers::Plugin<
              * event that the JUCE parameter mode is more or less like a VST2
              */
             auto res = pbi.processorParam->getCurrentValueAsText();
-            strncpy(display, res.toStdString().c_str(), size);
+            res.copyToUTF8(display, size);
         }
 
         return true;
@@ -1470,7 +1472,10 @@ class ClapJuceWrapper : public clap::helpers::Plugin<
     {
         auto pbi = paramPtrByClapID[paramId];
         *value = (double)getUnNormalisedParameterValue(
-            pbi, pbi.processorParam->getValueForText(display));
+            // CEditor patch (VENDORED.md): the host's text is UTF-8. juce::String(const char*) reads
+            // it as ASCII, so a label like "Up · keep low+high" matched nothing and came back as
+            // the first choice.
+            pbi, pbi.processorParam->getValueForText(juce::String::fromUTF8(display)));
         return true;
     }
 
