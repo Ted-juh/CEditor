@@ -9,7 +9,7 @@ import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
 import { DEFAULT_CONTROL_SET_ID, normalizeControlSet, normalizeControlSetList, serializeControlSet } from '../models/controlSets.js';
 import { resolveControlForSet } from '../models/controlSetFamilies.js';
 import { dedupeSnapshotIds } from '../utils/snapshotModel.js';
-import { migrateDottedControlNames } from '../utils/controlNames.js';
+import { PANEL_FORMAT_VERSION, panelFormatVersion, readPanelDocument } from '../utils/panelFormat.js';
 
 let nextId = 1;
 
@@ -394,27 +394,36 @@ export function serializePanel(panel, options = {}) {
     data.exportParameters = collectExportParameters(panel);
   }
 
-  return JSON.stringify(data, null, 2);
+  // The format version goes first, where a person opening the file sees it. A document from a
+  // newer CEditor keeps its number: writing ours would tell that newer version to run its
+  // migrations again over a document that already had them (utils/panelFormat.js).
+  const { formatVersion, ...rest } = data;
+  return JSON.stringify({ formatVersion: Math.max(PANEL_FORMAT_VERSION, panelFormatVersion({ formatVersion })), ...rest }, null, 2);
 }
 
-/** Returns the panel object, or null if the document is corrupted / not a valid panel. */
+// What the last deserializePanel call had to say, for the caller to show: why a document was
+// refused (`error`), or what a person should know about one that opened (`warnings`, such as a
+// panel from a newer CEditor). A side channel rather than a return value because three callers
+// take the panel-or-null contract and only the editor's open path reports anything.
+let lastOpenReport = { error: null, warnings: [] };
+export function panelOpenReport() {
+  return lastOpenReport;
+}
+
+/**
+ * Returns the panel object, or null if the document is corrupted / not a valid panel; then
+ * panelOpenReport().error says why. The document is checked against utils/panelDocumentSchema.js
+ * and upgraded to the current format version on the way in (utils/panelFormat.js).
+ */
 export function deserializePanel(json, filePath, name) {
-  let data;
-  try {
-    data = JSON.parse(json);
-  } catch (error) {
-    console.error(`[panels] Cannot open panel${filePath ? ` "${filePath}"` : ''} — file is not valid JSON: ${error.message}`);
+  const read = readPanelDocument(json);
+  lastOpenReport = { error: read.error, warnings: read.migration?.warnings ?? [] };
+  if (!read.doc) {
+    console.error(`[panels] Cannot open panel${filePath ? ` "${filePath}"` : ''} — ${read.error}`);
     return null;
   }
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    console.error(`[panels] Cannot open panel${filePath ? ` "${filePath}"` : ''} — file does not contain a panel document`);
-    return null;
-  }
-  if (data.controls != null && (!Array.isArray(data.controls)
-    || data.controls.some((control) => !control || typeof control !== 'object' || Array.isArray(control)))) {
-    console.error('[panels] Cannot open panel — controls must be an array of component objects');
-    return null;
-  }
+  for (const warning of lastOpenReport.warnings) console.warn(`[panels] ${warning}`);
+  const data = read.doc;
   const id = nextId++;
   if (data.deviceSession) {
     data.deviceSession = normalizeProjectDeviceSession(data.deviceSession);
@@ -450,16 +459,17 @@ export function deserializePanel(json, filePath, name) {
     // built from first-appearance order, which is exactly what rendering used to infer, so it
     // looks identical on the first load and stops restacking on every load after it.
     layers: normalizePanelLayers(data.layers, controls),
+    formatVersion: read.migration.toVersion,
     id,
     filePath,
     name: name || data.name || `Untitled ${id}`,
     modified: false,
   };
-  // A document from before control names lost their dots is converted on the way in, names and
-  // the references that address controls by name together (utils/controlNames.js). Marked
-  // modified, because what is open is no longer what is on disk and saving it should be offered.
-  const migrated = migrateDottedControlNames(panel);
-  if (migrated === panel) return panel;
-  console.info(`[panels] ${panel.name}: control names with dots were converted to underscores`);
-  return { ...migrated, modified: true };
+  // A document an older format was converted from is marked modified: what is open is no longer
+  // what is on disk, and saving it should be offered.
+  if (read.migration.changed) {
+    console.info(`[panels] ${panel.name}: converted from format ${read.migration.fromVersion} to ${read.migration.toVersion}`);
+    return { ...panel, modified: true };
+  }
+  return panel;
 }

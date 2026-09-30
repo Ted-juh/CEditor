@@ -36,7 +36,7 @@ import { rememberRecentFile } from './recentFiles.js';
 import { equalityWritable } from '../utils/equalityStore.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
 import { controlSetForPanel } from '../models/controlSets.js';
-import { createPanel, deserializePanel, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
+import { createPanel, deserializePanel, panelOpenReport, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
 import {
   getProjectDeviceSessionSnapshot,
   requestProjectDeviceSessionRestore,
@@ -1401,10 +1401,13 @@ export function initPanelBridge() {
     if (!panel) {
       if (filePath) pendingOpenPanelFiles.delete(filePath);
       deserializeTimer('failed');
-      console.error(`[panels] "${label}" could not be opened — the file is corrupted or is not a .cepanel document.`);
-      notify(`Cannot open "${label}": the file is corrupted or is not a valid .cepanel document.`, { kind: 'error', duration: 0 });
+      // The loader says which field is wrong (utils/panelFormat.js): a hand-edited or generated file
+      // is fixable in a minute when the message names the path, and not at all when it does not.
+      const reason = panelOpenReport().error ?? 'the file is corrupted or is not a valid .cepanel document';
+      notify(`Cannot open "${label}": ${reason}.`, { kind: 'error', duration: 0 });
       return;
     }
+    for (const warning of panelOpenReport().warnings) notify(`"${label}": ${warning}`, { kind: 'warn', duration: 0 });
     restorePanelDeviceSession(panel, label);
     const controlCount = Array.isArray(panel?.controls) ? panel.controls.length : 0;
     deserializeTimer(

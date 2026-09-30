@@ -22,7 +22,7 @@ import {
 } from '../bridge/bridge.js';
 import { addPanel, activePanel } from './panels.js';
 import { cerror, cinfo, cwarn } from './console.js';
-import { deserializePanel, serializePanel } from './panelModel.js';
+import { deserializePanel, panelOpenReport, serializePanel } from './panelModel.js';
 import { openSharedPanel, packagePanelForSharing, panelPackageFile } from './panelSharing.js';
 import { notify } from './scriptUi.js';
 
@@ -159,7 +159,11 @@ export async function openPackageText(text, fallbackName = '') {
 
   const name = String(envelope?.metadata?.name ?? '').trim() || fallbackName || 'Shared Panel';
   const panel = deserializePanel(JSON.stringify(opened.panel), null, name);
-  if (!panel) return null;
+  if (!panel) {
+    notify(`Cannot open "${name}": ${panelOpenReport().error ?? 'the package does not hold a valid panel'}.`, { kind: 'error', duration: 0 });
+    return null;
+  }
+  for (const warning of panelOpenReport().warnings) notify(`"${name}": ${warning}`, { kind: 'warn', duration: 0 });
 
   addPanel(panel);
   cinfo(`[share] Opened "${name}" from a package. Save it to keep it.`);
