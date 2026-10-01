@@ -84,8 +84,12 @@ too. A real synth's factory list has such names (`µcomputer`, `Café`, `™`); 
 event of the session carried them, and from the page's side the library simply never came. Found
 running the app on Linux with a 3,600-preset Surge XT library (2026-09-08, commit `08a2c85`).
 
-**If you upgrade JUCE:** check whether upstream fixed it (look for `getNumBytesAsUTF8` in
-`sendCommand`); if not, re-apply both halves. The guard test names this document when it fails.
+**Upstream status (checked 2026-10-01).** Half of it is fixed: JUCE 9.0.0 counts bytes
+(`f9f79a18f`, "Linux: WebBrowserComponent: Fix emitting non-ASCII event data", 2026-06-21). The
+other half is not: 9.0.3's `writeToChannel` has a resume-after-short-write block that is unreachable,
+because any result other than -1 leaves the loop first. A fix against `develop` is prepared for a
+pull request; until it lands, re-apply the write loop on an upgrade. The guard test names this
+document when it fails.
 
 ### 4. Runtime LV2 plugin identity
 
