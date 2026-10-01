@@ -286,6 +286,50 @@ assert.match(await ev(() => window.__as.bakeEstimate()), /\d+×\d+/);
 await ev(() => window.__as.openBake());
 await page.waitForTimeout(150);
 
+// --- Rename and replace -----------------------------------------------------------------------
+
+await ev(() => window.__as.select('cleanStrip'));
+await page.waitForTimeout(200);
+await ev(() => window.__as.rename('dialStrip'));
+await page.waitForTimeout(300);
+check('a rename moves the asset and rewrites the generator and the path that named it, in one step', async () => {});
+assert.deepEqual((await ev(() => window.__as.names())).filmstrips, ['driftStrip', 'dialStrip']);
+assert.equal(await ev(() => window.__as.generatorAsset('frames')), 'dialStrip');
+assert.equal(await ev(() => window.__as.publishedPath()), 'Assets.filmstrips.dialStrip.source');
+assert.equal(await ev(() => window.__as.selected()), 'dialStrip', 'the selection follows the new name');
+assert.match(await ev(() => window.__as.status()), /Rename cleanStrip → dialStrip — 2 references updated/);
+assert.equal(await ev(() => window.__as.undo()), 'Rename cleanStrip → dialStrip');
+await page.waitForTimeout(300);
+check('  and one undo puts the name, the generator and the path back', async () => {});
+assert.deepEqual((await ev(() => window.__as.names())).filmstrips, ['driftStrip', 'cleanStrip']);
+assert.equal(await ev(() => window.__as.generatorAsset('frames')), 'cleanStrip');
+assert.equal(await ev(() => window.__as.publishedPath()), 'Assets.filmstrips.cleanStrip.source');
+
+await ev(() => window.__as.rename('drift.strip'));
+await page.waitForTimeout(200);
+check('a name a path cannot carry is refused and nothing moves', async () => {});
+assert.match(await ev(() => window.__as.status()), /path segment/);
+assert.deepEqual((await ev(() => window.__as.names())).filmstrips, ['driftStrip', 'cleanStrip']);
+
+await ev(() => window.__as.select('knobFace'));
+await page.waitForTimeout(200);
+const oldFace = await ev(() => window.__as.assetSource('image', 'knobFace'));
+assert.equal(await ev(() => window.__as.neighbourImageSrc()), oldFace, 'fixture: the neighbour copied the face');
+const bytes = Buffer.from(await ev(() => window.__as.pngBytes(40, 24)), 'base64');
+await page.setInputFiles('.settings input[type=file]', { name: 'new-face.png', mimeType: 'image/png', buffer: bytes });
+await page.waitForTimeout(600);
+const newFace = await ev(() => window.__as.assetSource('image', 'knobFace'));
+check('a replace writes the new picture into the asset and into the copy on the other control', async () => {});
+assert.notEqual(newFace, oldFace);
+assert.equal(await ev(() => window.__as.neighbourImageSrc()), newFace);
+assert.deepEqual(await ev(() => window.__as.assetSize('knobFace')), [40, 24, 'new-face.png'], 'measured and recorded');
+assert.match(await ev(() => window.__as.status()), /Replaced knobFace with new-face.png — 1 copy updated/);
+assert.equal(await ev(() => window.__as.undo()), 'Replace knobFace');
+await page.waitForTimeout(300);
+check('  and one undo puts both back', async () => {});
+assert.equal(await ev(() => window.__as.assetSource('image', 'knobFace')), oldFace);
+assert.equal(await ev(() => window.__as.neighbourImageSrc()), oldFace);
+
 // --- What uses an asset -----------------------------------------------------------------------
 
 check('the library marks an asset nothing uses, and not one something does', async () => {});
@@ -295,8 +339,8 @@ assert.equal(await ev(() => window.__as.tileNote('cleanStrip')), '32 frames');
 await ev(() => window.__as.select('cleanStrip'));
 await page.waitForTimeout(200);
 check('the settings column lists what uses the selected asset', async () => {});
-assert.equal(await ev(() => window.__as.usedBy()), 'Used by 1');
-assert.deepEqual(await ev(() => window.__as.uses()), ['generator frames']);
+assert.equal(await ev(() => window.__as.usedBy()), 'Used by 2');
+assert.deepEqual(await ev(() => window.__as.uses()), ['generator frames', 'path — PublishedProperties › editableProperties › strip › path']);
 
 // The knob face is copied on the OTHER control only, so inside its component nothing uses it — and
 // removing it must still say where the copy is.

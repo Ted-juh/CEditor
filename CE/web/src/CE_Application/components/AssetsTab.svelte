@@ -26,7 +26,10 @@
   import AssetSettings from './assets/AssetSettings.svelte';
   import AssetBake from './assets/AssetBake.svelte';
   import { activePanel, selectedComponentIds } from '../stores/panels.js';
-  import { applyControlPatch, updateControlProperty, removeControlNode, getSection } from '../stores/controls.js';
+  import { applyControlPatch, applyControlPatchesById, updateControlProperty, removeControlNode, getSection } from '../stores/controls.js';
+  import { updatePanel } from '../stores/panels.js';
+  import { beginHistoryTransaction, commitHistoryTransaction } from '../stores/history.js';
+  import { planAssetRename, planAssetReplace } from '../utils/assetEdits.js';
   import { flatControls } from '../utils/containment.js';
   import {
     editorTarget,
@@ -224,6 +227,81 @@ onMount(() => {
     status = `${selected.name} applied to ${layerName}`;
   }
 
+  // --- Rename and replace -----------------------------------------------------
+  //
+  // Both are planned over the reference index (assetEdits.js) and applied as ONE store update
+  // inside a labelled history transaction, so a rename that rewrites a generator, two paths and
+  // the map is one undo step. The panel's own background is the exception: history keeps it out
+  // of snapshots on purpose, so a copy there is written and the status line says it is not undone.
+
+  function renameSelected(newName) {
+    if (!controlId || !selected) return;
+    const plan = planAssetRename(control, selected.kind, selected.name, newName, { panel: $activePanel });
+    if (!plan.ok) { status = plan.error; return; }
+    const history = beginHistoryTransaction({ label: plan.label });
+    applyControlPatchesById(plan.patchesByControlId);
+    commitHistoryTransaction(history);
+    wantedKey = plan.key;
+    const n = plan.rewritten.length;
+    status = n ? `${plan.label} — ${n} reference${n === 1 ? '' : 's'} updated` : plan.label;
+  }
+
+  async function replaceSelected(file) {
+    if (!controlId || !selected || !file) return;
+    const targetId = controlId;
+    const { kind, name } = selected;
+    try {
+      const source = await readFile(file);
+      if (controlId !== targetId) return;
+      if (!source.startsWith('data:image/')) { status = 'That is not an image file.'; return; }
+      const size = await measure(source);
+      if (controlId !== targetId) return;
+      measured.set(source, size);
+      const plan = planAssetReplace(control, kind, name,
+        { source, width: size.width, height: size.height, fileName: file.name }, { panel: $activePanel });
+      if (!plan.ok) { status = plan.error; return; }
+
+      const history = beginHistoryTransaction({ label: plan.label });
+      applyControlPatchesById(plan.patchesByControlId);
+      if (plan.outsideUndo.length && $activePanel) updatePanel($activePanel.id, plan.panelUpdates);
+      commitHistoryTransaction(history);
+
+      const parts = [`Replaced ${name} with ${file.name}`];
+      if (plan.copies.length) parts.push(`${plan.copies.length} cop${plan.copies.length === 1 ? 'y' : 'ies'} updated`);
+      if (plan.outsideUndo.length) parts.push(`panel ${plan.outsideUndo.join(' and ')} too (undo does not cover the panel background)`);
+      if (plan.duplicates.length) parts.push(`${plan.duplicates.length} duplicate${plan.duplicates.length === 1 ? '' : 's'} left as ${plan.duplicates.length === 1 ? 'it is' : 'they are'}`);
+      status = parts.join(' — ');
+      if (plan.staleBakes.length) await rebakeStale(targetId, plan.staleBakes);
+    } catch (error) {
+      if (controlId === targetId) status = error?.message ?? 'Replace failed';
+    }
+  }
+
+  // A baked strip is a picture of the component, and the component has just changed. Baking takes
+  // longer than the history debounce, so this is its own undo step, and the question says so.
+  async function rebakeStale(targetId, stale) {
+    const names = stale.map((entry) => entry.name).join(', ');
+    const plural = stale.length !== 1;
+    const asked = typeof window !== 'undefined' && typeof window.confirm === 'function'
+      && window.confirm(`${plural ? `${stale.length} baked filmstrips draw` : 'A baked filmstrip draws'} this component: ${names}.\n\n`
+        + `Bake ${plural ? 'them' : 'it'} again from the new picture? (A separate undo step.)`);
+    if (!asked) { status += ` — ${names} still ${plural ? 'show' : 'shows'} the old picture`; return; }
+    bakeBusy = true;
+    try {
+      for (const entry of stale) {
+        if (controlId !== targetId) return;
+        const asset = await bakeCustomComponentFilmstrip(control, entry.options);
+        if (controlId !== targetId) return;
+        applyControlPatch(targetId, { [assetPath('filmstrip', asset.name)]: asset });
+      }
+      status = `Re-baked ${names}`;
+    } catch (error) {
+      status = `Re-bake failed: ${error?.message ?? error}`;
+    } finally {
+      bakeBusy = false;
+    }
+  }
+
   // --- Import and bake --------------------------------------------------------
 
   function readFile(file) {
@@ -418,6 +496,8 @@ onMount(() => {
             ondownload={download}
             onremove={removeSelected}
             onapply={applyToLayer}
+            onrename={renameSelected}
+            onreplace={replaceSelected}
           />
         {/if}
       </div>

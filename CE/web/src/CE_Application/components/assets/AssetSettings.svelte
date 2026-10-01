@@ -7,15 +7,16 @@
    * two-way choices are `Segmented`. Nothing here has more than four options, so no select is
    * needed at all.
    *
-   * The name is shown but not editable. The map key IS the name — `Generators.*.assetName` and
-   * every part that copied the source refer to it — so a rename is a move with references to
-   * follow, not a field. That is a separate job and pretending otherwise here would break links
-   * silently. What those references are is listed under "Used by" (`assetReferences.js`), which is
-   * the index a rename will follow.
+   * The name is editable, and it is not a field: the map key IS the name, and `Generators.*.assetName`
+   * and every path refer to it, so a rename is a move with references to follow. `onrename` hands
+   * the new name to the tab, which plans the move over the reference index (`assetEdits.js`) and
+   * applies it as one undo step; what the index found is listed under "Used by". Replace goes the
+   * same way: a new picture for the asset, and for every part that copied the old one.
    */
   import Download from 'lucide-svelte/icons/download';
   import Trash2 from 'lucide-svelte/icons/trash-2';
   import Layers from 'lucide-svelte/icons/layers';
+  import RefreshCw from 'lucide-svelte/icons/refresh-cw';
   import NumberCell from '../../properties/NumberCell.svelte';
   import Segmented from '../../properties/Segmented.svelte';
   import {
@@ -37,7 +38,16 @@
     ondownload = () => {},
     onremove = () => {},
     onapply = () => {},
+    onrename = () => {},
+    onreplace = () => {},
   } = $props();
+
+  let replaceInput = $state(null);
+  function pickReplacement(event) {
+    const file = event?.target?.files?.[0];
+    if (file) onreplace(file);
+    if (event?.target) event.target.value = '';
+  }
 
   let groups = $derived(entry ? assetFieldGroups(entry.kind) : []);
   const titleCase = (value) => String(value).replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -47,7 +57,18 @@
   {#if entry}
     <div class="box">
       <div class="grp">Asset</div>
-      <div class="r"><label for="asset-name">Name</label><div class="fixed" id="asset-name">{entry.name}</div></div>
+      <div class="r">
+        <label for="asset-name">Name</label>
+        <input
+          class="txt name"
+          id="asset-name"
+          type="text"
+          value={entry.name}
+          title="Rename: every generator and path that names this asset follows, as one undo step"
+          onchange={(event) => { if (event.currentTarget.value !== entry.name) onrename(event.currentTarget.value); }}
+          onkeydown={(event) => { if (event.key === 'Escape') { event.currentTarget.value = entry.name; event.currentTarget.blur(); } }}
+        />
+      </div>
       <div class="r"><label for="asset-src">Source</label><div class="fixed" id="asset-src" title={sourceLabel(entry)}>{sourceLabel(entry)}</div></div>
       <div class="r"><label for="asset-bytes">Size</label><div class="fixed" id="asset-bytes">{entry.hasSource ? formatBytes(entry.bytes) : 'empty'}</div></div>
 
@@ -120,6 +141,11 @@
             <Layers size={11} /> Overlay
           </button>
         {/if}
+        <button type="button" onclick={() => replaceInput?.click()}
+                title="Replace the picture: every part that copied this one takes the new one, as one undo step">
+          <RefreshCw size={11} /> Replace
+        </button>
+        <input bind:this={replaceInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onchange={pickReplacement} />
         <button type="button" disabled={!entry.hasSource} onclick={ondownload} title="Save this asset to disk">
           <Download size={11} /> Save
         </button>
@@ -212,6 +238,7 @@
     outline: none;
   }
   .txt:focus { border-color: #5B9BD5; }
+  .txt.name { font: 500 10px/1 'IBM Plex Mono', ui-monospace, monospace; color: #D7DEE4; }
 
   .grp s { text-decoration: none; color: #7C8891; margin-left: 4px; }
   .uses { list-style: none; margin: 5px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }

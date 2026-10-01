@@ -203,8 +203,27 @@ under **Used by**, marks unused assets in the library, and asks before removing 
 naming each use. The live count covers the component; the panel-wide search runs once, on
 removal, because walking every string of a large panel on every edit is not free.
 
-Still to build on it, in order: rename and replace as one undoable step following the index, then
-rebuilding the filmstrips that depend on a replaced asset.
+**Rename and replace are built on it** (`utils/assetEdits.js`, the same day). Both are planned
+as patches over the index and applied in one store update inside a labelled history transaction,
+so a rename that rewrites the map, a generator and two paths is one undo step, and so is a replace
+that writes the new picture into the asset and into every part that copied it, on this control or
+another. The browser check undoes each once and reads the document back. Three things the plan is
+honest about rather than quiet:
+
+- The panel's own `bgImage`/`bgTexture` are kept out of history snapshots on purpose, so a copy
+  there is rewritten and the status line says undo does not cover it.
+- A name has to be a path segment — letters, digits, `-` and `_` — because it is one.
+  `safeAssetFileName` allows dots, so an import named `knob.v2` already produces a path nobody
+  can match; the rename refuses to make another, and the import rule is a separate fix.
+- A baked filmstrip is a picture of the component, and the component just changed. The plan lists
+  every other baked strip on the control as stale when the replaced asset was used by the
+  component at all, each with the options to bake it again from its own record. Baking takes
+  longer than the history debounce, so the tab asks and makes it a second undo step, saying so.
+  Replacing a baked strip itself with a file makes it an imported one: `generated` and the bake
+  record go with the old bytes.
+
+Not followed: duplicates (another asset with the same bytes) are their own assets and stay as they
+are, named in the status line.
 
 ### Corrected after review
 
