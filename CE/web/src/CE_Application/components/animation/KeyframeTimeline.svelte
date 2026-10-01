@@ -25,6 +25,11 @@
   let host = $state(null);
   let timeline = null;
   let settingModel = false;
+  // While a keyframe is being dragged the library's model is the truth; replacing it mid-drag
+  // leaves the drag holding a keyframe that no longer exists and drops it at the wrong time. The
+  // document's model is applied when the drag ends instead.
+  let dragging = false;
+  let modelStale = false;
   const where = new WeakMap(); // library keyframe object → { track, index }
 
   function buildModel() {
@@ -64,26 +69,35 @@
       if (settingModel || event.source === 'setTimeMethod') return;
       ontime(Math.max(0, Math.round(event.val)));
     });
+    timeline.onDragStarted(() => { dragging = true; });
     timeline.onDragFinished((event) => {
+      dragging = false;
       const moves = [];
       for (const element of event.elements ?? []) {
         const at = element?.keyframe ? where.get(element.keyframe) : null;
         if (at) moves.push({ ...at, time: Math.max(0, Math.round(element.keyframe.val)) });
       }
       if (moves.length) onmove(moves);
+      if (modelStale) applyModel();
     });
+    // A press on the ruler or the playhead moves time; it is not a request to drop the selection,
+    // so the empty "selected" the library sends after it is ignored. A press on empty track space
+    // still deselects.
+    let lastPress = '';
+    timeline.onMouseDown((event) => { lastPress = String(event.target?.type ?? ''); });
     timeline.onSelected((event) => {
       if (settingModel) return;
       const first = event.selected?.[0];
+      if (!first && lastPress === 'timeline') return;
       onselect(first ? where.get(first) ?? null : null);
     });
   });
 
   // The library keeps its own copy of the model; every change the tab makes rebuilds it, so what
   // is drawn is always the document and never a stale drag.
-  $effect(() => {
-    void tracks; void selected; void duration;
+  function applyModel() {
     if (!timeline) return;
+    modelStale = false;
     settingModel = true;
     try {
       timeline.setModel(buildModel());
@@ -91,6 +105,13 @@
     } finally {
       settingModel = false;
     }
+  }
+
+  $effect(() => {
+    void tracks; void selected; void duration; void time;
+    if (!timeline) return;
+    if (dragging) { modelStale = true; return; }
+    applyModel();
   });
 
   onDestroy(() => {

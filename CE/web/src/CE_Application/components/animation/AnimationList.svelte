@@ -50,7 +50,7 @@
       <span class="nm">{row.name}</span>
 
       <span class="meta">
-        {row.duration}ms{#if row.kind === 'spring'} spring{:else if row.kind === 'keyframes'} keyframes{/if}
+        {row.duration}ms{#if row.kind === 'spring'}&nbsp;spring{:else if row.kind === 'keyframes'}&nbsp;keyframes{/if}
         {#if dead}
           <i class="bad" title={`${dead} of this animation's targets do nothing`}>
             <TriangleAlert size={9} aria-hidden="true" /> {dead}

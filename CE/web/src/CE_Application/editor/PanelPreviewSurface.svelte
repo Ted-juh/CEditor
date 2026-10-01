@@ -51,6 +51,7 @@
     commitPanelPreviewSelectAction,
     setPreviewInspectedControlId,
   } from '../stores/interactionPreview.js';
+  import { keyframeOverlays } from '../stores/keyframeOverlays.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { sceneryHoldSet } from '../utils/sceneryModel.js';
   import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
@@ -639,6 +640,10 @@
   // Cross-control displays still track every source they actually read.
   const previewSessionView = keyedStoreView(panelPreviewSessions);
   onDestroy(previewSessionView.destroy);
+  // A running keyframe animation's pose (stores/keyframeOverlays.js), per control, so a frame of
+  // one animation re-resolves one control and not the panel.
+  const keyframeOverlayView = keyedStoreView(keyframeOverlays);
+  onDestroy(keyframeOverlayView.destroy);
 
   function sessionFor(control) {
     const controlId = getControlId(control);
@@ -647,7 +652,11 @@
 
   function resolvedPreviewFor(rawControl) {
     const session = sessionFor(rawControl);
-    const previewOverrides = session?.enabled === false ? {} : session;
+    const baseOverrides = session?.enabled === false ? {} : session;
+    // The keyframe pose rides in with the session: this surface resolves the control itself and
+    // hands CanvasControl the result, so the overlay has to be applied here, not there.
+    const keyframeOverlay = keyframeOverlayView.values.get(getControlId(rawControl)) ?? null;
+    const previewOverrides = keyframeOverlay ? { ...(baseOverrides ?? {}), keyframeOverlay } : baseOverrides;
     // Host automation of a field on the component's OWN section (an Arp's rate, a joystick's x)
     // lands here first, so every apply*ValueSource below and the renderer itself read the section
     // as they always do. It has to happen before the chain rather than inside it: several of those
