@@ -40,6 +40,8 @@ the way it does the VST3:
   panel bakes, so a session saved against either finds the plugin.
 - A `.clap` is one file in a folder every CLAP shares, so each export is a folder of its own:
   `<Name>/<Name>.clap`, `panel.cepanel` and `CE/profiles/`. Hosts search CLAP folders recursively.
+- The vendor is one place the two templates differ: the CLAP's comes from the panel, the VST3's
+  is baked in (`CE_VST_COMPANY_NAME`, default `Tedjuh`, the same fallback the exporters use).
 - A template with no panel beside it reports **zero** plugins, never the template's own identity —
   otherwise every stray copy would be the same plugin to a host.
 - On Windows the wrapper had no `DllMain`, so JUCE took the host's executable for the module and

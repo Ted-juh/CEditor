@@ -259,6 +259,11 @@ would collide with every other copy. LV2 remains available through the source-ch
 exporter. New panels select VST3 only, and existing saved format choices are retained; a panel with
 LV2 selected still exports its other formats, and the build log explains the skipped one.
 
+A template VST3's vendor string is fixed when the template is built (`Tedjuh`): JUCE bakes it in,
+and the sidecar hook changes only the plug-in codes. A panel that sets its own vendor in Export
+settings shows it in a compiled export and in a template CLAP, whose descriptor is filled from the
+panel at load, but a template VST3 keeps the template's. The identity a host keys on is unaffected.
+
 A CLAP is exported as a folder — `<Name>/<Name>.clap` beside its `panel.cepanel` and device profiles
 — because the CLAP folder is shared by every CLAP a user has and the panel must sit beside the
 module. Install the whole folder into the CLAP folder; hosts search it recursively. A `.clap` copied

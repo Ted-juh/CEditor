@@ -410,7 +410,12 @@ if(CEDITOR_BUILD_APP)
     # stamp out unique-per-panel binaries (the Ctrlr fix: distinct PLUGIN_CODE/name -> distinct FUID).
     set(CE_VST_PRODUCT_NAME "CEditor Player VST" CACHE STRING "Per-panel plugin product name")
     set(CE_VST_PLUGIN_CODE  "Cep1"               CACHE STRING "Per-panel 4-char plugin code")
-    set(CE_VST_COMPANY_NAME "Tedjuh-inc"         CACHE STRING "Plugin vendor / company name")
+    # "Tedjuh", not "Tedjuh-inc": this default is what a template player bakes in as its VST3 vendor
+    # string, and it must agree with the fallback the exporters use when a panel names no vendor
+    # (panelIdentityInputs.js, PanelIdentitySidecar.h), or the same panel's compiled VST3, template
+    # VST3 and CLAP report three different vendors. The app's and host's own COMPANY_NAME are
+    # separate products and stay as they are.
+    set(CE_VST_COMPANY_NAME "Tedjuh"             CACHE STRING "Plugin vendor / company name")
     set(CE_VST_MFR_CODE     "Tdjh"               CACHE STRING "4-char plugin manufacturer code")
     set(CE_VST_VERSION      "1.0.0"              CACHE STRING "Plugin version string")
     # Empty by default: the export pipeline always passes the real panel via -DCE_VST_PANEL_PATH.
