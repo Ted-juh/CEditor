@@ -63,8 +63,12 @@ first run fills the cache, and the job's last step prints the hit statistics.
 **Comlink**, through a font worker (`workers/fontWorker.js`). The need, measured: building a glyph
 atlas is one 200–310 ms task on the page per face, and subsetting a carried font is seconds on a CJK
 face. Through the worker the page has no long task (Long Tasks API, `browser-checks/fontWorker.mjs`).
-Every call falls back to the page wherever a module worker cannot start. That matters because the
-app is served from a custom scheme on WebKitGTK.
+Every call falls back to the page wherever a module worker cannot start. That mattered because the
+app is served from a custom scheme on WebKitGTK, which was the open question: checked since, on
+WebKitGTK 2.52 (`browser-checks/webkitgtk/fontWorker.py`, which serves the build over a `juce://`
+scheme set up as JUCE's Linux webview sets it). The worker starts from that scheme, its atlas and
+subset are identical to the page's, and the page's longest stall while an atlas builds falls from
+256–615 ms to 14–17 ms. The fallback is there for a WebView that refuses, and Linux is not one.
 
 **fast-check** rather than RapidCheck. The logic worth generating cases for is JavaScript.
 `test/properties.test.js` covers the save/load round trip over random edits of every control
