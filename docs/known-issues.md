@@ -279,6 +279,33 @@ export pipeline). It cannot bundle C++/C#/Java handlers or CPython. The compilin
 bundles these extra runtimes only for VST3. A requested unsupported combination fails explicitly
 before replacing an export. A failed required handler build also fails the export.
 
+## Keyboard shortcuts in a DAW while the exported editor has focus — scoped, not built
+
+*(Scoped 2026-10-01 from a review of webview-in-plug-in projects; nobody has reported it yet.)*
+
+While the plug-in's editor window has keyboard focus on Windows, every key goes to the page and
+none to the DAW: Space does not start the transport, and the host's own shortcuts are dead until the
+user clicks outside the editor. JUCE's WebView2 host (`juce_WebBrowserComponent_windows.cpp`)
+registers only `MoveFocusRequested`, for Tab traversal, and no `AcceleratorKeyPressed` handler, and
+the player (`PlayerHost.cpp`, `PluginProcessor.h`) adds no key handling of its own. A keyboard-first
+panel (a text field, the scripting console) does need the keys, so this is not simply "never take
+focus".
+
+What fixing it would take, when someone reports it:
+
+1. A vendored JUCE patch (the fifth) registering `add_AcceleratorKeyPressed` on the WebView2
+   controller. For a key the page has not claimed, mark it handled and post it to the plug-in
+   window's parent, which is the host's; a key the page has claimed passes through.
+2. "Claimed" comes from the page: a bridge message when an editable element gains or loses focus,
+   which the Svelte player can send from one `focusin`/`focusout` listener. Without it, pass
+   through the transport keys (Space, Enter, the arrows when nothing editable is focused) and keep
+   the rest.
+3. Linux (WebKitGTK) and macOS differ: X11 hosts generally receive keys the embedded view does not
+   consume, and WKWebView has its own first-responder chain. Scope each when there is a report.
+
+The wxp project (Rust, wry) carries parent-attachment and focus patches for exactly this situation
+and is the reference to diff against upstream wry when the work starts.
+
 ## ~~The GAIA panel's scripts, run window-closed in the plug-in~~ — CLOSED
 
 *(Logged 2026-09-30 as panel-script behaviour; both turned out to be defects in CEditor, fixed the
