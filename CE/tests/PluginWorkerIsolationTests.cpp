@@ -282,8 +282,23 @@ void testUnhandledWorkerCreatesMinidump (const juce::File& stub)
     auto metadataFiles =
         ceditor::host::plugin_worker::PluginWorkerCrashDumps::supportMetadataFiles (
             testDataDirectory());
-    const auto deadline = juce::Time::getMillisecondCounter() + 2000;
-    while ((dumps.size() <= before.size() || metadataFiles.size() <= metadataBefore.size())
+    // Done means the SIDECAR has its bytes, not that a file exists. The reporter writes the dump,
+    // closes it, and only then creates the sidecar (PluginWorkerCrashReporter.cpp), so a sidecar
+    // with content proves the dump is finished. Waiting for the files to appear raced the writer:
+    // CI run 296 read a dump still being written — no MDMP header, no sidecar yet — after the old
+    // two-second limit ran out on a loaded runner. The limit is generous because the wait ends as
+    // soon as the writer does; a dump that never arrives still fails below.
+    const auto sidecarWritten = [&]
+    {
+        if (metadataFiles.size() <= metadataBefore.size())
+            return false;
+        for (const auto& metadata : metadataFiles)
+            if (! metadataBefore.contains (metadata) && metadata.getSize() > 0)
+                return true;
+        return false;
+    };
+    const auto deadline = juce::Time::getMillisecondCounter() + 15000;
+    while ((dumps.size() <= before.size() || ! sidecarWritten())
            && juce::Time::getMillisecondCounter() < deadline)
     {
         juce::Thread::sleep (10);
