@@ -116,6 +116,60 @@ of its own, and a spring in a script and a spring on a control are held to one p
    document shape is decided. This is the only step that costs the player bytes, and it is the one
    the tab's record deferred for the right reason.
 
+## As built: keyframes (2026-10-01, the same day)
+
+Item 3 followed the same afternoon, so this section is the record of what shipped rather than
+the plan above.
+
+**The document.** A `keyframes` animation keeps its tracks on its targets: each target carries
+`keyframes: [{ time, value, easing }]`, sorted by time, with `duration` the length of the axis
+(never shorter than the last keyframe), `loop`, and `hold` (keep the last frame while the state
+that fired it stays). Values are numbers, or AARRGGBB strings on a colour target. Switching an
+animation to `keyframes` seeds every live track with one keyframe at 0 holding the value the control
+has as authored, so the switch changes nothing on screen until a second keyframe is added; switching
+away leaves the tracks in place.
+
+**The runtime.** `utils/keyframeModel.js` turns an animation into one anime.js timeline over a
+plain object (one key per track, segments between keyframes with the arriving keyframe's easing,
+the same bezier the CSS transition gets) and reads it back as a patch map in document shape.
+`utils/keyframePlayer.js` owns one player per mounted control: a `stateChange` trigger that fires
+restarts the timeline, the last frame holds while the state stays and clears when it leaves, a
+trigger on `*` plays through and clears, `loop` keeps going, and a `valueChange` trigger does not
+play at all: the position follows the value, a sequence scrubbed by a knob. Every frame the
+overlays of the control's running animations merge into `stores/keyframeOverlays.js`, and
+`resolveInteractiveControl` applies that map after the state patches and before scaling, exactly
+where a state's own patch lands. A keyframes animation builds no CSS transition, so nothing eases
+what is already eased. anime.js is a dynamic import: the player chunk every export carries did not
+grow, and a panel with no keyframes never loads it.
+
+**The tab.** `animation-timeline-js` sits under the Changes list, one row per target, with the
+labels in a column of the tab's own. Drag a keyframe and the drop is one store write for every
+keyframe moved (and one undo step); click one and a box edits its time, value (a number cell, or
+the hex of a colour) and the easing it arrives with; *Keyframe at N ms* adds one to the selected
+track holding the pose there, which the same timeline samples; Delete removes it. The playhead
+poses the control on the canvas in any view, through the same overlay store the player writes, and
+Play runs the sequence there with the playhead following. Loop and After (hold or return) sit in
+the Timing group; the properties panel offers the kind, Loop, Hold and a button to the tab.
+
+**Measured.** The timeline is seeked in Node by the tests (anime.js's clock falls back to a timer
+there), including a real play through the player: a state entering fills the overlay store, the
+last frame holds, the state leaving empties it, a value trigger follows the value, a non-holding
+sequence clears itself. The browser check switches a transition to keyframes, finds the seeded
+tracks and the drawn axis, adds and deletes a keyframe, reads the pose off the overlay store, and
+plays. Built: anime.js's timeline is its own chunk of 42 KB minified, fetched only by a panel
+that has a keyframe animation (`utils/animeTimeline.js` re-exports the one function, so the rest
+of the library is dropped); the player chunk every export carries grew by 18 KB (0.7%), which is
+the keyframe runtime itself and the tab's model it shares; the timeline control is in the editor
+chunk only.
+
+**Limits, stated.** Tracks animate what the transition catalog can smooth: a part's transform,
+opacity and colour, and the root's transform, opacity and colour. Value channels and filmstrip
+frames, which the plan named as the reason for a value-driven engine, are not yet targets; the
+engine and the overlay can carry them, the target list does not offer them yet. Keyframes cannot
+be copied between tracks, there is no curve display between keyframes beyond the easing name, and
+the axis has no markers or labels. The timeline control draws on a canvas and is not reachable
+from the keyboard; the keyframe box beside it is.
+
 ## Looked at and dropped
 
 | Project | Why not |

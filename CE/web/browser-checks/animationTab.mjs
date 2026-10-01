@@ -142,6 +142,59 @@ await page.waitForTimeout(350);
 assert.equal(await ev(() => window.__anim.storedKind('pressMotion')), 'transition');
 assert.equal((await ev(() => window.__anim.storedSpring('pressMotion'))).damping, 6, 'the numbers stay for next time');
 
+// --- The keyframes kind ---------------------------------------------------------------------------
+
+await ev(() => window.__anim.pickKind('keyframes'));
+await page.waitForTimeout(500);
+const seeded = await ev(() => window.__anim.storedKeyframes('pressMotion'));
+const loopHold = await ev(() => window.__anim.storedLoopHold('pressMotion'));
+const canvases = await ev(() => window.__anim.timelineCanvases());
+const labels = await ev(() => window.__anim.trackLabels());
+check('switching to keyframes seeds each live track with its authored value and draws the axis', () => {
+  assert.equal(seeded.length, 3, `tracks: ${JSON.stringify(seeded)}`);
+  assert.deepEqual(seeded[0].map(([t]) => t), [0], 'scale: one keyframe at 0');
+  assert.deepEqual(seeded[2], [], 'the missing part has nothing to start from');
+  assert.deepEqual(loopHold, { loop: false, hold: true, duration: 600 }, 'the spring settle time was long enough to keep');
+  assert.equal(canvases, 1, 'the timeline control is mounted');
+  assert.equal(labels.length, 3, labels.join(' | '));
+  assert.match(labels[0], /Scale/);
+});
+assert.equal(await ev(() => window.__anim.storedKind('pressMotion')), 'keyframes');
+
+await ev(() => window.__anim.selectTrack(1));
+await page.waitForTimeout(200);
+await ev(() => window.__anim.addKeyframe());
+await page.waitForTimeout(400);
+const afterAdd = await ev(() => window.__anim.storedKeyframes('pressMotion'));
+const box = await ev(() => window.__anim.keyframeBox());
+check('a keyframe at the playhead lands on the selected track, holding the pose there, and is selected', () => {
+  assert.equal(afterAdd[1].length, 1, `opacity track: ${JSON.stringify(afterAdd[1])}`);
+  assert.deepEqual(afterAdd[1][0], [0, 1], 'at 0 ms, with the opacity the part has');
+  assert.equal(box, true, 'its editor is open');
+});
+const posed = await ev(() => window.__anim.overlay());
+check('the playhead poses the control on the canvas through the overlay store', () => {
+  assert.ok(posed, 'an overlay exists while the playhead is on a keyframes animation');
+  assert.equal(posed[Object.keys(posed).find((k) => /opacity$/.test(k))], 1, JSON.stringify(posed));
+});
+await ev(() => window.__anim.deleteKeyframe());
+await page.waitForTimeout(400);
+assert.equal((await ev(() => window.__anim.storedKeyframes('pressMotion')))[1].length, 0, 'deleted');
+await ev(() => window.__anim.play());
+await page.waitForTimeout(250);
+const playingText = await ev(() => window.__anim.playheadText());
+check('play runs the playhead along the axis', () => {
+  assert.ok(/^\d+ ms/.test(playingText), playingText);
+  assert.ok(parseInt(playingText, 10) > 0, `playhead moved: ${playingText}`);
+});
+await ev(() => window.__anim.stop());
+await page.waitForTimeout(100);
+await ev(() => window.__anim.pickKind('transition'));
+await page.waitForTimeout(350);
+check('and switching back leaves the tracks for next time', async () => {});
+assert.equal((await ev(() => window.__anim.storedKeyframes('pressMotion')))[0].length, 1);
+assert.equal(await ev(() => window.__anim.overlay()), null, 'no pose once the animation is no longer keyframes');
+
 await ev(() => window.__anim.chooseChange('Width'));
 await page.waitForTimeout(300);
 const noWarning = await ev(() => window.__anim.addWarning());

@@ -163,7 +163,7 @@ const COLOUR_PATHS = new Set(['Background.Fill.colour', 'Text.Fill.colour', 'Bac
 const COLOUR_HINTS = new Set(['colour', 'background-color', 'color']);
 const namesColour = (tail, propertySet) => COLOUR_PATHS.has(tail) || [...COLOUR_HINTS].some((hint) => propertySet.has(hint));
 
-function treeValueAtPath(node, path) {
+export function treeValueAtPath(node, path) {
   if (!node || !path) return undefined;
   const parts = String(path).split('.');
   let current = node;
@@ -420,6 +420,9 @@ function buildTransitionCatalog(control, previewSession) {
 
   for (const animation of Object.values(animations?._children ?? {})) {
     if (!animation || animation.enabled === false) continue;
+    // A keyframes animation drives its values itself (utils/keyframePlayer.js); a CSS transition
+    // on top would ease what is already eased.
+    if (String(animation.kind ?? 'transition') === 'keyframes') continue;
     const spring = String(animation.kind ?? 'transition') === 'spring';
     const transition = `${numberOr(animation.duration, spring ? SPRING_DEFAULTS.duration : 120)}ms ${timingToCss(animation)} ${numberOr(animation.delay, 0)}ms`;
     for (const target of animation.targets ?? []) {
@@ -879,6 +882,13 @@ export function resolveInteractiveControl(control, previewSession = {}) {
 
   for (const [, state] of activeStates) {
     applyStatePatches(resolved, state);
+  }
+
+  // A running keyframe animation, or the Animation tab's playhead: a path → value map written by
+  // utils/keyframePlayer.js into stores/keyframeOverlays.js and handed in with the session. It
+  // lands after the states, where a state's own patch would, and before scaling, like one.
+  if (effectivePreviewSession?.keyframeOverlay) {
+    applyPatchMap(resolved, effectivePreviewSession.keyframeOverlay);
   }
 
   // Resize policy: with Transform.contentScaleMode === 'scaleInternals',

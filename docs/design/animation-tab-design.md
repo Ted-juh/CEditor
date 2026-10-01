@@ -1,8 +1,9 @@
 # The Animation tab
 
 Status: **built**, 2026-09-10. The properties panel is untouched — see [What was built](#what-was-built).
-**2026-10-01:** finding 1 is closed (the runtime has a colour bucket) and open item 4 is closed (a
-second kind, `spring`); see the notes under each.
+**2026-10-01:** finding 1 is closed (the runtime has a colour bucket), open item 4 is closed (a
+second kind, `spring`) and open item 3 is closed (a third kind, `keyframes`, with the timeline);
+see the notes under each.
 
 Candidate 8 from [`display-panel-candidates.md`](display-panel-candidates.md). Drawn in
 [`animation-tab-mockups.html`](animation-tab-mockups.html).
@@ -199,6 +200,17 @@ the panel's rows do come out.
 3. **No timeline.** The candidate list wanted one. With one duration, one delay and one easing per
    animation there is nothing to lay out along a time axis that the three numbers do not already
    say. If animations ever get keyframes, that changes.
+
+   > **Closed 2026-10-01.** Animations got keyframes, and the tab got the axis. The third kind,
+   > `keyframes`, keeps its tracks on the targets (`targets[].keyframes[] = { time, value,
+   > easing }`) with `duration` as the axis length, `loop` and `hold`. `utils/keyframeModel.js`
+   > builds an anime.js timeline from them and `utils/keyframePlayer.js` plays it, in the editor's
+   > preview and the exported player alike, into `stores/keyframeOverlays.js`, which the resolver
+   > applies after the state patches. The tab shows `animation-timeline-js` under the Changes list
+   > (`components/animation/KeyframeTimeline.svelte`): one row per target, drag to move, click to
+   > edit time, value and the easing it arrives with; the playhead poses the control on the canvas
+   > in any view, and Play runs it there. `animation-libraries-2026-10-01.md` has the as-built notes
+   > and the limits.
 4. **`kind` is not edited here at all.** Transition is the only one that works, so the tab writes it
    and does not offer the box. If a second kind ever ships, this needs a real choice.
 

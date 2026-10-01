@@ -273,9 +273,51 @@ test('the panel offers four easings and the runtime knows five', () => {
 
 // --- Odds and ends ----------------------------------------------------------
 
-test('two animation kinds do something', () => {
-  assert.deepEqual(ANIMATION_KINDS, ['transition', 'spring']);
+test('three animation kinds do something', () => {
+  assert.deepEqual(ANIMATION_KINDS, ['transition', 'spring', 'keyframes']);
   assert.deepEqual(TRIGGER_TYPES, ['stateChange', 'valueChange']);
+});
+
+test('switching to keyframes seeds every track with the value the control has, and a length', () => {
+  const base = createControl('CustomComponent');
+  base._children.Parts = createCustomComponentPartsDefaults();
+  const part = partsOf(base)[0];
+  base._children.Parts._children[part]._children.Layout.rotation = 12;
+  const animation = {
+    kind: 'transition', duration: 90, targets: [
+      { path: `Parts.${part}.Layout.rotation`, properties: ['transform'] },
+      { path: `Parts.${part}.Background.Fill.colour`, properties: ['background-color'] },
+      { path: 'Parts.nosuchpart.opacity', properties: ['opacity'] },
+    ],
+  };
+  const next = animationWithKind(animation, 'keyframes', base);
+  assert.equal(next.kind, 'keyframes');
+  assert.equal(next.duration, 1000, 'a 90 ms transition becomes a 1 s axis');
+  assert.equal(next.hold, true);
+  assert.equal(next.loop, false);
+  assert.deepEqual(next.targets[0].keyframes, [{ time: 0, value: 12, easing: 'outQuad' }]);
+  assert.equal(next.targets[1].keyframes[0].value, base._children.Parts._children[part]._children.Background._children.Fill.colour);
+  assert.deepEqual(next.targets[2].keyframes, [], 'a track on a part that is not there has nothing to start from');
+  // Back and forth keeps the tracks.
+  const back = animationWithKind(next, 'transition', base);
+  assert.equal(back.kind, 'transition');
+  assert.deepEqual(animationWithKind(back, 'keyframes', base).targets[0].keyframes, next.targets[0].keyframes);
+  // A keyframes animation builds no CSS transition: it drives its values itself.
+  const control = withAnimation([{ path: `Parts.${part}.Layout.rotation`, properties: ['transform'], keyframes: [{ time: 0, value: 0 }] }]);
+  control._children.Animations._children.test.kind = 'keyframes';
+  const { runtime } = resolveInteractiveControl(control, {});
+  assert.equal(runtime.transitions.partTransitions.get(part), undefined);
+});
+
+test('an overlay in the session poses the control after its states, where a state patch would', () => {
+  const base = createControl('CustomComponent');
+  base._children.Parts = createCustomComponentPartsDefaults();
+  const part = partsOf(base)[0];
+  const { control } = resolveInteractiveControl(base, { keyframeOverlay: { [`Parts.${part}.Layout.rotation`]: 33, [`Parts.${part}.opacity`]: 0.25, 'Transform.rotation': 5 } });
+  assert.equal(control._children.Parts._children[part]._children.Layout.rotation, 33);
+  assert.equal(control._children.Parts._children[part].opacity, 0.25);
+  assert.equal(control._children.Transform.rotation, 5);
+  assert.equal(base._children.Parts._children[part]._children.Layout.rotation, 0, 'the document is untouched');
 });
 
 // --- The spring kind ----------------------------------------------------------------------------

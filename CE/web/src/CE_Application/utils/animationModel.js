@@ -19,16 +19,17 @@
  * `targetStatus()` below is the same rule the runtime uses, written out so the editor can show it.
  * If the runtime ever accepts more paths, `animationModel.test.js` fails, because it runs both.
  */
-import { EASING_BEZIERS, EASING_NAMES, SPRING_DEFAULTS, springEase } from './interactionRuntime.js';
+import { EASING_BEZIERS, EASING_NAMES, SPRING_DEFAULTS, springEase, treeValueAtPath } from './interactionRuntime.js';
 
 export { EASING_BEZIERS, EASING_NAMES, SPRING_DEFAULTS, springEase };
 
 /**
- * The two animation kinds the runtime does something with. `transition` eases between states on a
- * named curve; `spring` overshoots and settles on the same damped oscillation `ce.anim.spring`
- * draws, declared on the control instead of written in a script (2026-10-01).
+ * The three animation kinds the runtime does something with. `transition` eases between states on
+ * a named curve; `spring` overshoots and settles on the same damped oscillation `ce.anim.spring`
+ * draws, declared on the control instead of written in a script; `keyframes` is a sequence along a
+ * time axis, one track per target, played by anime.js (`utils/keyframeModel.js`). All 2026-10-01.
  */
-export const ANIMATION_KINDS = ['transition', 'spring'];
+export const ANIMATION_KINDS = ['transition', 'spring', 'keyframes'];
 
 export const TRIGGER_TYPES = ['stateChange', 'valueChange'];
 
@@ -172,6 +173,8 @@ export function describeAnimation(name, animation) {
     easing: String(animation?.easing ?? 'outQuad'),
     damping: Number.isFinite(Number(animation?.damping)) ? Number(animation.damping) : SPRING_DEFAULTS.damping,
     frequency: Number.isFinite(Number(animation?.frequency)) ? Number(animation.frequency) : SPRING_DEFAULTS.frequency,
+    loop: animation?.loop === true,
+    hold: animation?.hold !== false,
     triggerType: String(animation?.trigger?.type ?? 'stateChange'),
     from: Array.isArray(animation?.trigger?.from) ? animation.trigger.from.map(String) : [],
     to: Array.isArray(animation?.trigger?.to) ? animation.trigger.to.map(String) : [],
@@ -271,7 +274,7 @@ export function easingPoints(name, steps = 24) {
  * parameter that gives that x first. Twenty rounds of bisection is far more than a 90px picture
  * needs and costs nothing.
  */
-function cubicBezierY([x1, y1, x2, y2], x) {
+export function cubicBezierY([x1, y1, x2, y2], x) {
   const curveX = (t) => 3 * (1 - t) * (1 - t) * t * x1 + 3 * (1 - t) * t * t * x2 + t * t * t;
   const curveY = (t) => 3 * (1 - t) * (1 - t) * t * y1 + 3 * (1 - t) * t * t * y2 + t * t * t;
   let low = 0;
@@ -349,7 +352,7 @@ export function renameBlockedBecause(existingNames, from, to) {
  * leave the panel, the search has to be fed from here instead.
  */
 export function allAnimationFieldLabels() {
-  return ['Kind', 'Duration', 'Delay', 'Easing', 'Damping', 'Frequency', 'Trigger', 'From', 'To', 'Source', 'Targets', 'Animation'];
+  return ['Kind', 'Duration', 'Delay', 'Easing', 'Damping', 'Frequency', 'Loop', 'Hold', 'Trigger', 'From', 'To', 'Source', 'Targets', 'Animation'];
 }
 
 /**
@@ -366,17 +369,37 @@ export function springPoints(damping = SPRING_DEFAULTS.damping, frequency = SPRI
   return out;
 }
 
+/** The value a path has on the control as authored — where a seeded keyframe track starts. */
+export function baseValueAt(control, path) {
+  const value = treeValueAtPath(control, String(path ?? ''));
+  return value === undefined || value === null || typeof value === 'object' ? undefined : value;
+}
+
 /**
- * What switching an animation to `spring` writes, in one store write: the kind, the spring's two
- * numbers if it has none yet, and a settle time long enough to see the overshoot. Switching back
- * leaves the numbers in place, so a second switch finds them again.
+ * What switching an animation's kind writes, in one store write.
+ *
+ * To `spring`: the spring's two numbers if it has none yet, and a settle time long enough to see
+ * the overshoot. To `keyframes`: a length for the axis, `hold` on, and for every target that has
+ * no track yet, one keyframe at 0 holding the value the control has as authored, so switching
+ * kind changes nothing on screen until a second keyframe is added. Switching away leaves all of
+ * it in place, so a switch back finds the tracks again.
  */
-export function animationWithKind(animation, kind) {
+export function animationWithKind(animation, kind, control = null) {
   const next = { ...(animation ?? {}), kind: ANIMATION_KINDS.includes(kind) ? kind : 'transition' };
   if (next.kind === 'spring') {
     if (!Number.isFinite(Number(next.damping))) next.damping = SPRING_DEFAULTS.damping;
     if (!Number.isFinite(Number(next.frequency))) next.frequency = SPRING_DEFAULTS.frequency;
     if (!Number.isFinite(Number(next.duration)) || Number(next.duration) < 200) next.duration = SPRING_DEFAULTS.duration;
+  }
+  if (next.kind === 'keyframes') {
+    if (!Number.isFinite(Number(next.duration)) || Number(next.duration) < 100) next.duration = 1000;
+    if (typeof next.hold !== 'boolean') next.hold = true;
+    if (typeof next.loop !== 'boolean') next.loop = false;
+    next.targets = (Array.isArray(next.targets) ? next.targets : []).map((target) => {
+      if (Array.isArray(target?.keyframes) && target.keyframes.length) return target;
+      const base = control ? baseValueAt(control, target?.path) : undefined;
+      return { ...target, keyframes: base === undefined ? [] : [{ time: 0, value: base, easing: 'outQuad' }] };
+    });
   }
   return next;
 }

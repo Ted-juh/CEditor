@@ -56,7 +56,7 @@
   /** One write for the kind and, for a spring, the numbers it needs (`animationWithKind`). */
   function setAnimationKind(kind) {
     if (!core?.id || !selectedAnimationName || !selectedAnimation) return;
-    updateControlProperty(core.id, `Animations.${selectedAnimationName}`, animationWithKind(selectedAnimation, kind));
+    updateControlProperty(core.id, `Animations.${selectedAnimationName}`, animationWithKind(selectedAnimation, kind, control));
   }
 
   function setAnimationProp(prop, value) {
@@ -278,20 +278,30 @@
                     onchange={() => setAnimationProp('enabled', !(selectedAnimation.enabled !== false))} />
       {/snippet}
       {#if selectedAnimation.enabled !== false}
-      <PropertyCell label="Kind" span={2} hint="Transition eases between states on a named curve. Spring overshoots and settles, the same curve as ce.anim.spring, with its damping and frequency below.">
-        <select class="val" value={selectedAnimation.kind === 'spring' ? 'spring' : 'transition'} onchange={(e) => setAnimationKind(e.target.value)}>
+      <PropertyCell label="Kind" span={2} hint="Transition eases between states on a named curve. Spring overshoots and settles, the same curve as ce.anim.spring, with its damping and frequency below. Keyframes is a sequence along a time axis, one track per target, edited in the Animation tab.">
+        <select class="val" value={ANIMATION_KINDS.includes(selectedAnimation.kind) ? selectedAnimation.kind : 'transition'} onchange={(e) => setAnimationKind(e.target.value)}>
           {#each ANIMATION_KINDS as option}
             <option value={option}>{option}</option>
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label={selectedAnimation.kind === 'spring' ? 'Settle' : 'Duration'} span={1} compact hint="How long the change takes, in milliseconds. For a spring, the time it takes to settle.">
+      <PropertyCell label={selectedAnimation.kind === 'spring' ? 'Settle' : selectedAnimation.kind === 'keyframes' ? 'Length' : 'Duration'} span={1} compact hint="How long the change takes, in milliseconds. For a spring, the time it takes to settle; for keyframes, the length of the time axis.">
         <NumberCell label="Dur" value={selectedAnimation.duration ?? 120} step={1} min={0} defaultValue={120} onchange={(value) => setAnimationProp('duration', value)} />
       </PropertyCell>
       <PropertyCell label="Delay" span={1} compact hint="Transition delay in milliseconds.">
         <NumberCell label="Delay" value={selectedAnimation.delay ?? 0} step={1} min={0} defaultValue={0} onchange={(value) => setAnimationProp('delay', value)} />
       </PropertyCell>
-      {#if selectedAnimation.kind === 'spring'}
+      {#if selectedAnimation.kind === 'keyframes'}
+        <PropertyCell label="Loop" span={1} compact hint="Play the sequence again from the start when it ends.">
+          <HeaderPill value={selectedAnimation.loop === true} title="Loop" onchange={() => setAnimationProp('loop', !(selectedAnimation.loop === true))} />
+        </PropertyCell>
+        <PropertyCell label="Hold" span={1} compact hint="Keep the last frame while the state that started it is still active; off, the control returns to its static look when the sequence ends.">
+          <HeaderPill value={selectedAnimation.hold !== false} title="Hold" onchange={() => setAnimationProp('hold', !(selectedAnimation.hold !== false))} />
+        </PropertyCell>
+        <PropertyCell label="Keyframes" span={2} hint="The tracks and their keyframes are drawn and edited on the Animation tab's timeline.">
+          <OpenInDock tab="animation" controlId={core?.id ?? ''} what="this animation's keyframes" />
+        </PropertyCell>
+      {:else if selectedAnimation.kind === 'spring'}
         <PropertyCell label="Damping" span={1} compact hint="How fast the bounce dies away. Less is bouncier.">
           <NumberCell label="Damp" value={selectedAnimation.damping ?? SPRING_DEFAULTS.damping} step={0.5} min={0.5} defaultValue={SPRING_DEFAULTS.damping} onchange={(value) => setAnimationProp('damping', value)} />
         </PropertyCell>

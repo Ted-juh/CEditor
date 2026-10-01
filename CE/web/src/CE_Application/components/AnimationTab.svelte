@@ -21,11 +21,18 @@
    * sprite sheet on a dot-matrix screen — and have nothing to do with this one. The candidate list
    * grouped them by name.
    */
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import Plus from 'lucide-svelte/icons/plus';
+  import Play from 'lucide-svelte/icons/play';
+  import Square from 'lucide-svelte/icons/square';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
+  import * as anime from '../utils/animeTimeline.js';
   import AnimationList from './animation/AnimationList.svelte';
   import TargetList from './animation/TargetList.svelte';
   import EasingCurve from './animation/EasingCurve.svelte';
+  import KeyframeTimeline from './animation/KeyframeTimeline.svelte';
+  import { addKeyframe, removeKeyframe, updateKeyframe, normalizeKeyframes, keyframesDuration, sampleKeyframes, isColourTarget } from '../utils/keyframeModel.js';
+  import { scrubKeyframes, clearKeyframeScrub, playKeyframesPreview } from '../utils/keyframePlayer.js';
   import NumberCell from '../properties/NumberCell.svelte';
   import Segmented from '../properties/Segmented.svelte';
   import PropertySelect from '../properties/PropertySelect.svelte';
@@ -54,6 +61,7 @@
     ANIMATION_KINDS,
     springPoints,
     animationWithKind,
+    baseValueAt,
     targetStatus,
     newAnimationShape,
     cleanAnimationName,
@@ -115,16 +123,142 @@ onMount(() => {
     updateControlProperty(controlId, `Animations.${selectedName}.${prop}`, value);
   }
 
-  /** One store write, so switching kind is one undo step even when it fills in the spring's numbers. */
+  /** One store write, so switching kind is one undo step even when it fills in what the kind needs. */
   function setKind(kind) {
     if (!controlId || !selectedName || !selected) return;
-    updateControlProperty(controlId, `Animations.${selectedName}`, animationWithKind(selected.animation, kind));
+    updateControlProperty(controlId, `Animations.${selectedName}`, animationWithKind(selected.animation, kind, control));
   }
 
   function writeTargets(next) {
     if (!controlId || !selectedName) return;
     updateControlProperty(controlId, `Animations.${selectedName}.targets`, next);
   }
+
+  // --- Keyframes: the time axis, the playhead on the canvas, and one keyframe at a time ---------
+
+  const KIND_LABELS = { transition: 'Transition', spring: 'Spring', keyframes: 'Keyframes' };
+  let isKeyframes = $derived(selected?.kind === 'keyframes');
+  let axisLength = $derived(isKeyframes ? keyframesDuration(selected.animation) : 0);
+  let tracks = $derived(isKeyframes
+    ? targets.map((row) => ({ label: trackLabel(row), path: row.path, keyframes: normalizeKeyframes(row.target) }))
+    : []);
+  let playhead = $state(0);
+  let selectedKeyframe = $state(null); // { track, index }
+  let keyframeAt = $derived.by(() => {
+    if (!isKeyframes || !selectedKeyframe) return null;
+    const target = selected.targets[selectedKeyframe.track];
+    const frames = target ? normalizeKeyframes(target) : [];
+    const keyframe = frames[selectedKeyframe.index];
+    return keyframe ? { ...selectedKeyframe, target, keyframe, colour: isColourTarget(target) } : null;
+  });
+  let playing = $state(false);
+  let stopPreview = null;
+
+  function trackLabel(row) {
+    const [, partName, ...rest] = row.path.startsWith('Parts.') ? row.path.split('.') : ['', '', row.path];
+    const offered = OFFERED_PROPERTIES.find((entry) => entry.path === rest.join('.')) ?? OFFERED_PROPERTIES.find((entry) => entry.path === row.path);
+    const what = offered?.label ?? rest.join('.') ?? row.path;
+    return partName ? `${partName} · ${what}` : what;
+  }
+
+  /** The canvas shows the pose at the playhead, in any view. */
+  function scrubTo(ms) {
+    playhead = Math.max(0, Math.round(ms));
+    if (controlId && selected && isKeyframes) scrubKeyframes(controlId, selectedName, selected.animation, playhead);
+  }
+
+  function stopPlaying() {
+    stopPreview?.();
+    stopPreview = null;
+    playing = false;
+  }
+
+  function togglePlay() {
+    if (!controlId || !selected || !isKeyframes) return;
+    if (playing) {
+      stopPlaying();
+      scrubTo(playhead);
+      return;
+    }
+    playing = true;
+    stopPreview = playKeyframesPreview(controlId, selectedName, selected.animation, {
+      ontime: (ms) => { playhead = Math.round(ms); },
+      ondone: () => { playing = false; stopPreview = null; },
+    });
+  }
+
+  function writeTrack(trackIndex, nextTarget) {
+    writeTargets(selected.targets.map((target, index) => (index === trackIndex ? nextTarget : target)));
+  }
+
+  /** A keyframe on the selected track at the playhead, holding whatever the pose there is. */
+  function addKeyframeAtPlayhead() {
+    if (!selected || !isKeyframes) return;
+    const trackIndex = targetIndex >= 0 ? targetIndex : 0;
+    const target = selected.targets[trackIndex];
+    if (!target) return;
+    const pose = sampleKeyframes(anime, selected.animation, playhead);
+    const value = pose[target.path] ?? baseValueAt(control, target.path) ?? 0;
+    const next = addKeyframe(target, { time: playhead, value });
+    writeTrack(trackIndex, next);
+    selectedKeyframe = { track: trackIndex, index: normalizeKeyframes(next).findIndex((k) => k.time === playhead) };
+    rawTargetIndex = trackIndex;
+  }
+
+  function deleteSelectedKeyframe() {
+    if (!keyframeAt) return;
+    writeTrack(keyframeAt.track, removeKeyframe(keyframeAt.target, keyframeAt.index));
+    selectedKeyframe = null;
+  }
+
+  function patchSelectedKeyframe(patch) {
+    if (!keyframeAt) return;
+    const result = updateKeyframe(keyframeAt.target, keyframeAt.index, patch);
+    writeTrack(keyframeAt.track, result.target);
+    selectedKeyframe = result.index >= 0 ? { track: keyframeAt.track, index: result.index } : null;
+    if (patch.time != null) scrubTo(patch.time);
+  }
+
+  /** The timeline dragged some keyframes; each lands where it was dropped, as one store write. */
+  function moveKeyframes(moves) {
+    if (!selected) return;
+    const next = [...selected.targets];
+    let follow = null;
+    for (const move of moves) {
+      const target = next[move.track];
+      if (!target) continue;
+      const result = updateKeyframe(target, move.index, { time: move.time });
+      next[move.track] = result.target;
+      if (selectedKeyframe?.track === move.track && selectedKeyframe?.index === move.index) follow = { track: move.track, index: result.index };
+    }
+    writeTargets(next);
+    if (follow) selectedKeyframe = follow;
+  }
+
+  // While a keyframes animation is open, the canvas shows its pose at the playhead — on arrival,
+  // after every edit (the scrub rebuilds when the definition changes), and as the playhead moves.
+  // Anything else open on the control takes the pose off again. While playing, the preview owns
+  // the overlay and this stays out of its way.
+  $effect(() => {
+    if (!controlId) return;
+    if (playing) return;
+    if (!isKeyframes || !selected) {
+      clearKeyframeScrub(controlId);
+      return;
+    }
+    scrubKeyframes(controlId, selectedName, selected.animation, playhead);
+  });
+
+  // Another control, or the tab closing, takes the pose off the one before. This depends on the
+  // id alone, so it does not run (and clear what the effect above just posed) on every edit.
+  $effect(() => {
+    const id = controlId;
+    return () => {
+      stopPlaying();
+      if (id) clearKeyframeScrub(id);
+    };
+  });
+  onDestroy(() => { stopPlaying(); if (controlId) clearKeyframeScrub(controlId); });
 
   function add() {
     if (!selected) return;
@@ -289,20 +423,35 @@ onMount(() => {
             <div class="grp">Timing</div>
             <div class="r">
               <label for="anim-kind">Kind</label>
-              <Segmented options={ANIMATION_KINDS.map((value) => ({ value, label: value === 'spring' ? 'Spring' : 'Transition' }))}
-                         value={selected.kind === 'spring' ? 'spring' : 'transition'} ariaLabel="Kind"
+              <Segmented options={ANIMATION_KINDS.map((value) => ({ value, label: KIND_LABELS[value] }))}
+                         value={ANIMATION_KINDS.includes(selected.kind) ? selected.kind : 'transition'} ariaLabel="Kind"
                          onchange={(value) => setKind(value)} />
             </div>
             <div class="r">
-              <label for="anim-dur">{selected.kind === 'spring' ? 'Settle' : 'Duration'}</label>
-              <div class="cell"><NumberCell label="ms" value={selected.duration} min={0} step={10}
-                onchange={(value) => setProp('duration', Math.max(0, Math.round(value)))} /></div>
+              <label for="anim-dur">{selected.kind === 'spring' ? 'Settle' : isKeyframes ? 'Length' : 'Duration'}</label>
+              <div class="cell"><NumberCell label="ms" value={isKeyframes ? axisLength : selected.duration} min={isKeyframes ? 100 : 0} step={10}
+                onchange={(value) => setProp('duration', Math.max(isKeyframes ? 100 : 0, Math.round(value)))} /></div>
             </div>
-            <div class="r">
-              <label for="anim-delay">Delay</label>
-              <div class="cell"><NumberCell label="ms" value={selected.delay} min={0} step={10}
-                onchange={(value) => setProp('delay', Math.max(0, Math.round(value)))} /></div>
-            </div>
+            {#if isKeyframes}
+              <div class="r">
+                <label for="anim-loop">Loop</label>
+                <Segmented options={[{ value: 'off', label: 'Once' }, { value: 'on', label: 'Loop' }]}
+                           value={selected.loop ? 'on' : 'off'} ariaLabel="Loop"
+                           onchange={(value) => setProp('loop', value === 'on')} />
+              </div>
+              <div class="r">
+                <label for="anim-hold">After</label>
+                <Segmented options={[{ value: 'hold', label: 'Hold last' }, { value: 'return', label: 'Return' }]}
+                           value={selected.hold ? 'hold' : 'return'} ariaLabel="After"
+                           onchange={(value) => setProp('hold', value === 'hold')} />
+              </div>
+            {:else}
+              <div class="r">
+                <label for="anim-delay">Delay</label>
+                <div class="cell"><NumberCell label="ms" value={selected.delay} min={0} step={10}
+                  onchange={(value) => setProp('delay', Math.max(0, Math.round(value)))} /></div>
+              </div>
+            {/if}
 
             <div class="grp">Runs when</div>
             <div class="r">
@@ -332,7 +481,10 @@ onMount(() => {
               </div>
             {/if}
 
-            {#if selected.kind === 'spring'}
+            {#if isKeyframes}
+              <div class="grp">Sequence</div>
+              <p class="note">A keyframe per diamond. Drag one along the axis; click it to set its time, value and the easing it arrives with. Only transform, opacity and colour tracks animate (the same ones a transition can smooth).</p>
+            {:else if selected.kind === 'spring'}
               <div class="grp">Spring</div>
               <div class="r">
                 <label for="anim-damping">Damping</label>
@@ -376,6 +528,57 @@ onMount(() => {
             onremove={drop}
             onreorder={reorder}
           />
+
+          {#if isKeyframes}
+            <div class="seq">
+              <div class="transport">
+                <button type="button" class="mk" class:on={playing} onclick={togglePlay} title={playing ? 'Stop' : 'Play on the canvas'} aria-label={playing ? 'Stop' : 'Play'}>
+                  {#if playing}<Square size={10} />{:else}<Play size={10} />{/if}
+                </button>
+                <span class="time" aria-live="off">{playhead} ms <s>of {axisLength}</s></span>
+                <button type="button" class="mk" disabled={!targets.length} onclick={addKeyframeAtPlayhead} title="Add a keyframe to the selected track at the playhead">
+                  <Plus size={10} /> Keyframe at {playhead} ms
+                </button>
+              </div>
+              <KeyframeTimeline
+                {tracks}
+                duration={axisLength}
+                time={playhead}
+                selected={selectedKeyframe}
+                ontime={scrubTo}
+                onmove={moveKeyframes}
+                onselect={(at) => { selectedKeyframe = at; if (at) rawTargetIndex = at.track; if (at) scrubTo(tracks[at.track]?.keyframes[at.index]?.time ?? playhead); }}
+              />
+              {#if keyframeAt}
+                <div class="kfbox">
+                  <div class="r">
+                    <label for="kf-time">Time</label>
+                    <div class="cell"><NumberCell label="ms" value={keyframeAt.keyframe.time} min={0} step={10}
+                      onchange={(value) => patchSelectedKeyframe({ time: Math.max(0, Math.round(value)) })} /></div>
+                  </div>
+                  <div class="r">
+                    <label for="kf-value">Value</label>
+                    {#if keyframeAt.colour}
+                      <input class="txt" id="kf-value" type="text" value={keyframeAt.keyframe.value} aria-label="Colour, AARRGGBB"
+                             onchange={(event) => patchSelectedKeyframe({ value: event.currentTarget.value })} />
+                    {:else}
+                      <div class="cell"><NumberCell label="" value={keyframeAt.keyframe.value} step={1}
+                        onchange={(value) => patchSelectedKeyframe({ value })} /></div>
+                    {/if}
+                  </div>
+                  <div class="r">
+                    <label for="kf-easing">Arrives</label>
+                    <PropertySelect options={EASING_NAMES.map((name) => ({ value: name, label: name }))}
+                                    value={keyframeAt.keyframe.easing} ariaLabel="Easing into this keyframe"
+                                    onchange={(value) => patchSelectedKeyframe({ easing: value })} />
+                  </div>
+                  <button type="button" class="mk danger" onclick={deleteSelectedKeyframe}><Trash2 size={10} /> Delete keyframe</button>
+                </div>
+              {:else if targets.length}
+                <p class="note">Click a keyframe to edit it. The first keyframe on a track is where it starts; a track with one keyframe holds that value.</p>
+              {/if}
+            </div>
+          {/if}
 
           <div class="addbox">
             <div class="r">
@@ -565,8 +768,15 @@ onMount(() => {
 
   .easings { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
   .spring { margin-top: 7px; }
-  .spring .note { margin: 6px 0 0; font-size: 10.5px; line-height: 1.4; color: #8E99A4; }
-  .spring .note code { color: #B9C4CE; }
+  .note { margin: 6px 0 0; font-size: 10.5px; line-height: 1.4; color: #8E99A4; }
+  .note code { color: #B9C4CE; }
+  .seq { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .transport { display: flex; align-items: center; gap: 8px; }
+  .transport .time { font-size: 11px; color: #EAF5FF; font-variant-numeric: tabular-nums; }
+  .transport .time s { text-decoration: none; color: #6E7A86; margin-left: 4px; }
+  .mk.on { border-color: #F5B83D; color: #F5B83D; }
+  .mk.danger { align-self: flex-start; color: #E5A029; }
+  .kfbox { border: 1px solid #2A3038; border-radius: 4px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; background: #15181B; }
   .easing {
     display: flex;
     flex-direction: column;

@@ -28,7 +28,10 @@ New panels select VST3 only; saved format choices are retained.
 Animations: a fill, text or border colour transitions between states (the two colour choices
 that silently did nothing now work), and an animation can be a **spring** instead of a transition:
 it overshoots and settles, with damping and frequency, the same curve a script gets from
-`ce.anim.spring`.
+`ce.anim.spring`. Or **keyframes**: a sequence along a time axis, one track per change, with a
+timeline in the Animation tab to drag and edit them on, a playhead that poses the control on the
+canvas, and Play. A sequence can loop, hold its last frame while the state that started it stays,
+or follow the control's value like a scrubbed film.
 
 ## What you get
 

@@ -73,6 +73,8 @@
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
   import { get } from 'svelte/store';
   import { onDestroy } from 'svelte';
+  import { keyframeOverlays } from '../stores/keyframeOverlays.js';
+  import { syncKeyframePlayer, disposeKeyframePlayer } from '../utils/keyframePlayer.js';
   import { showDistances } from '../stores/editorView.js';
   import { guides, selectedGuide } from '../stores/guides.js';
   import { fileCache, loadFile } from '../stores/fileCache.js';
@@ -362,7 +364,13 @@
     ? applyPanelDependentChoices(flatControls(allControls), {})?.[control?._children?.Core?.id] ?? null
     : null);
   let previewSession = $derived(previewSessionOverride ?? designChoiceSession);
-  let appliedPreviewSession = $derived(previewSession?.enabled === false ? {} : previewSession);
+  // A running keyframe animation, or the Animation tab's playhead, rides in with the session so
+  // the resolver can pose the control (stores/keyframeOverlays.js). Null when nothing is running.
+  let keyframeOverlay = $derived($keyframeOverlays[core?.id] ?? null);
+  let appliedPreviewSession = $derived.by(() => {
+    const base = previewSession?.enabled === false ? {} : previewSession;
+    return keyframeOverlay ? { ...(base ?? {}), keyframeOverlay } : base;
+  });
   let interactiveRenderingEnabled = $derived(isCustomComponent || previewSessionOverride !== null || editorInteractionEnabled === false);
   let shouldResolveInteractive = $derived(interactiveRenderingEnabled && resolvedControlOverride == null && interactionRuntimeOverride == null);
   let resolvedInteractive = $derived(shouldResolveInteractive ? resolveInteractiveControl(control, appliedPreviewSession) : null);
@@ -374,6 +382,21 @@
     interactionRuntimeOverride
       ?? (interactiveRenderingEnabled ? (resolvedInteractive?.runtime ?? null) : null)
   );
+  // The keyframe player (utils/keyframePlayer.js) wants to know when the states or the value
+  // change — not every frame the overlay changes — so it is fed strings that only change then.
+  let keyframeStatesKey = $derived((interactionRuntime?.activeStates ?? []).join('|'));
+  let keyframeValueKey = $derived(interactionRuntime?.signals?.valueNormalized ?? null);
+  let keyframesEnabled = $derived(previewSession?.animationsEnabled !== false && getSection(control, 'Animations')?.enabled !== false);
+  $effect(() => {
+    const id = core?.id;
+    if (!id || !interactiveRenderingEnabled) return;
+    syncKeyframePlayer(id, control, {
+      activeStates: keyframeStatesKey ? keyframeStatesKey.split('|') : [],
+      valueNormalized: keyframeValueKey,
+      enabled: keyframesEnabled,
+    });
+  });
+  onDestroy(() => { if (core?.id) disposeKeyframePlayer(core.id); });
   let svgIdSeed = $derived.by(() => {
     const baseId = safeSvgId(core?.id);
     const namespace = safeSvgId(renderIdNamespace);

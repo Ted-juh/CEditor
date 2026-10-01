@@ -12,6 +12,7 @@ import AnimationTab from '../src/CE_Application/components/AnimationTab.svelte';
 import { panels, activePanelId, selectedComponentIds } from '../src/CE_Application/stores/panels.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { createCustomComponentPartsDefaults } from '../src/CE_Application/utils/customComponentFactory.js';
+import { keyframeOverlays } from '../src/CE_Application/stores/keyframeOverlays.js';
 
 const CONTROL_ID = 'ctrl_anim';
 
@@ -105,7 +106,19 @@ window.__anim = {
     const button = [...document.querySelectorAll('.easing')].find((b) => textOf(b.querySelector('span')) === name);
     return [...(button?.querySelectorAll('svg path') ?? [])].map((p) => p.getAttribute('d'));
   },
-  pickKind: (kind) => { [...document.querySelectorAll('[aria-label="Kind"] button')].find((b) => new RegExp(kind, 'i').test(b.textContent))?.click(); },
+  pickKind: (kind) => { [...document.querySelectorAll('[aria-label="Kind"] button')].find((b) => new RegExp(`^${kind}$`, 'i').test(b.textContent.trim()))?.click(); },
+  storedKeyframes: (name) => animation(name).targets.map((t) => (t.keyframes ?? []).map((k) => [k.time, k.value])),
+  storedLoopHold: (name) => ({ loop: animation(name).loop, hold: animation(name).hold, duration: animation(name).duration }),
+  timelineCanvases: () => document.querySelectorAll('.kft canvas').length,
+  trackLabels: () => [...document.querySelectorAll('.kft .lbl')].map(textOf),
+  playheadText: () => textOf(document.querySelector('.transport .time')),
+  addKeyframe: () => { [...document.querySelectorAll('.transport .mk')].find((b) => /Keyframe at/.test(b.textContent))?.click(); },
+  selectTrack: (index) => { document.querySelectorAll('.trow')[index]?.click(); },
+  keyframeBox: () => !!document.querySelector('.kfbox'),
+  deleteKeyframe: () => { document.querySelector('.kfbox .danger')?.click(); },
+  overlay: () => get(keyframeOverlays)[CONTROL_ID] ?? null,
+  play: () => { document.querySelector('.transport .mk[aria-label="Play"]')?.click(); },
+  stop: () => { document.querySelector('.transport .mk[aria-label="Stop"]')?.click(); },
   storedKind: (name) => animation(name).kind,
   storedSpring: (name) => ({ damping: animation(name).damping, frequency: animation(name).frequency, duration: animation(name).duration }),
   springPath: () => document.querySelector('.spring svg path.trace')?.getAttribute('d') ?? '',
