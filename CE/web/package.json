@@ -9,6 +9,7 @@
     "check": "svelte-check --config ./svelte.config.js --tsconfig ./jsconfig.json",
     "preview": "vite preview",
     "test": "node --import ./test/support/register-svelte.mjs --test",
+    "lint": "eslint src",
     "test:script-exports": "node scripts/validate-script-exports.mjs",
     "test:text-dock": "node browser-checks/textDock.mjs",
     "test:effects-dock": "node browser-checks/effectsTab.mjs",
@@ -30,10 +31,14 @@
     "gen:panel-validator": "node scripts/generate-panel-validator.mjs"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "ajv": "^8.20.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-svelte": "^3.23.0",
     "fake-indexeddb": "^6.2.5",
     "fast-check": "^4.10.2",
+    "globals": "^17.13.0",
     "playwright-core": "^1.62.1",
     "svelte": "^5.0.0",
     "svelte-check": "^4.7.6",

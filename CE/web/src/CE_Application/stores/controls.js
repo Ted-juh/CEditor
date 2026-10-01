@@ -1,6 +1,7 @@
 import { derived, get } from 'svelte/store';
 import { panels, resolvedActivePanelId, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, keyObjectId } from './panels.js';
 import { createControl as createControlFromType, getSection, hasSection } from '../models/componentTypes.js';
+import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { sanitizeControlName } from '../utils/controlNames.js';
 import { insertOffset, duplicateOffset } from './runtimePreferences.js';
 import { viewportPanelCenter } from './editorView.js';

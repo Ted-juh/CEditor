@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { panels, activePanel, selectedComponentIds, keyObjectId } from './panels.js';
-import { applyControlPatchesById, getSection } from './controls.js';
+import { applyControlPatchesById, getSection, updateControlProperty } from './controls.js';
 import { updatePanel } from './panels.js';
 import { guides } from './guides.js';
 import { getControlId, getControlLayer, sortControlsForRender } from '../utils/controlOrder.js';

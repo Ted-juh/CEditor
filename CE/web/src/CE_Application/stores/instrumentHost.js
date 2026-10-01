@@ -553,6 +553,7 @@ export function normalizeSurfaceLayout(payload) {
     // Which drawing this is, and which others exist: the described one stands in for the
     // authored ones by default, and the picker in the panel is how you get the CTRL49's own
     // picture back without forgetting what you described.
+    // eslint-disable-next-line no-dupe-keys -- the first `profileId` keeps the key in first place
     profileId: String(p?.profileId ?? ''),
     own: p?.own === true,
     profiles: (Array.isArray(p?.profiles) ? p.profiles : []).map((r) => ({

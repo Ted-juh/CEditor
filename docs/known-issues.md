@@ -30,10 +30,13 @@ and because each one will look like an oversight to the next person who finds it
 - **No `CONTRIBUTING` or `SECURITY`.** `LICENSE` — the one the review called out as mattering most,
   because without it nobody can legally use or contribute — is AGPLv3, decided deliberately and
   recorded in [license-decision.md](license-decision.md). The other two are unwritten.
-- **No `.prettierrc`, and no Prettier.** `.clang-format` and `.editorconfig` exist. Prettier is not
-  a dependency of this project and nothing runs it, so a config file would configure a tool that is
-  not there. If Prettier is ever adopted it needs one; until then this is closed by absence, not by
-  work.
+- **A `.prettierrc.json`, and no Prettier.** `.clang-format` and `.editorconfig` exist, and
+  `CE/web/.prettierrc.json` has since 2026-09-22. Prettier itself is not a dependency of this project
+  and nothing runs it, so the file configures a tool that is not there. What does run, since
+  2026-10-01, is `npm run lint`: ESLint with correctness rules only (an undefined name, a duplicate
+  key, unreachable code), not style. Its first run found three `ReferenceError`s behind buttons;
+  [lint-and-accessibility-2026-10-01.md](design/lint-and-accessibility-2026-10-01.md) has the
+  counts and the rules left off, each with its size.
 
 ---
 
