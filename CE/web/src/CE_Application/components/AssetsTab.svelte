@@ -36,6 +36,7 @@
     targetOfKind,
   } from '../stores/editorTarget.js';
   import { bakeCustomComponentFilmstrip } from '../utils/customComponentFilmstripBaker.js';
+  import { componentAssetReferences, dependentReferences, describeReference } from '../utils/assetReferences.js';
   import {
     listAssets,
     findAsset,
@@ -66,6 +67,11 @@
   let channelNames = $derived(Object.keys(getSection(control, 'ValueChannels')?._children ?? {}));
 
   let library = $derived(listAssets(assets));
+  // Who uses each asset, within this component. The whole panel is searched only when it is needed
+  // (removing an asset, below): it is a walk over every string of every control, and on a large panel
+  // that is too much to repeat on every edit.
+  let references = $derived(control ? componentAssetReferences(control).byAsset : new Map());
+  let useCounts = $derived(new Map([...references].map(([key, list]) => [key, dependentReferences(list).length])));
 
   // The wanted key is what the user last clicked; the selected key is what still exists. Deriving
   // the second from the first means an asset deleted, renamed or arrived-at from another control
@@ -176,6 +182,19 @@ onMount(() => {
 
   function removeSelected() {
     if (!controlId || !selected) return;
+    // Anything that would be left pointing at nothing, or showing a picture that is no longer an
+    // asset, is named before it happens. Copies are searched across the panel here, once.
+    const uses = dependentReferences(
+      componentAssetReferences(control, { panel: $activePanel }).byAsset.get(selected.key) ?? [],
+    );
+    if (uses.length && typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      const lines = uses.slice(0, 8).map((use) => `• ${describeReference(use)}`);
+      if (uses.length > 8) lines.push(`• and ${uses.length - 8} more`);
+      const ok = window.confirm(`${selected.name} is used ${uses.length}×:\n\n${lines.join('\n')}\n\n`
+        + 'Generators that name it will draw the first remaining filmstrip, paths will point at nothing, '
+        + 'and copies keep the old picture. Remove it anyway?');
+      if (!ok) return;
+    }
     removeControlNode(controlId, assetPath(selected.kind, selected.name));
     status = `Removed ${selected.name}`;
     wantedKey = '';
@@ -342,6 +361,7 @@ onMount(() => {
         <div class="colh">Library <s>{library.length}</s></div>
         <AssetLibrary
           assets={library}
+          uses={useCounts}
           {selectedKey}
           {baking}
           onselect={selectAsset}
@@ -391,6 +411,7 @@ onMount(() => {
           <AssetSettings
             entry={selected}
             policy={assets?.packagePolicy}
+            references={selected ? references.get(selected.key) ?? [] : []}
             {layerName}
             onset={setField}
             onpolicy={setPolicy}

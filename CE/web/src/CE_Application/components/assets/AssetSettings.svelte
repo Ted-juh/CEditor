@@ -10,7 +10,8 @@
    * The name is shown but not editable. The map key IS the name — `Generators.*.assetName` and
    * every part that copied the source refer to it — so a rename is a move with references to
    * follow, not a field. That is a separate job and pretending otherwise here would break links
-   * silently.
+   * silently. What those references are is listed under "Used by" (`assetReferences.js`), which is
+   * the index a rename will follow.
    */
   import Download from 'lucide-svelte/icons/download';
   import Trash2 from 'lucide-svelte/icons/trash-2';
@@ -23,10 +24,13 @@
     formatBytes,
     sourceLabel,
   } from '../../utils/assetsModel.js';
+  import { describeReference } from '../../utils/assetReferences.js';
 
   let {
     entry = null,
     policy = null,
+    // This asset's references within the component, from componentAssetReferences.
+    references = [],
     layerName = '',
     onset = () => {},
     onpolicy = () => {},
@@ -46,6 +50,20 @@
       <div class="r"><label for="asset-name">Name</label><div class="fixed" id="asset-name">{entry.name}</div></div>
       <div class="r"><label for="asset-src">Source</label><div class="fixed" id="asset-src" title={sourceLabel(entry)}>{sourceLabel(entry)}</div></div>
       <div class="r"><label for="asset-bytes">Size</label><div class="fixed" id="asset-bytes">{entry.hasSource ? formatBytes(entry.bytes) : 'empty'}</div></div>
+
+      <div class="grp">Used by <s>{references.length}</s></div>
+      {#if references.length}
+        <ul class="uses">
+          {#each references as reference (`${reference.via}|${reference.location.join('.')}`)}
+            <li class:fallback={reference.via === 'fallback'} class:off={reference.enabled === false}
+                title={reference.via === 'fallback'
+                  ? 'This generator names no filmstrip, or one that is gone, so it draws the first filmstrip — this one'
+                  : describeReference(reference)}>{describeReference(reference)}</li>
+          {/each}
+        </ul>
+      {:else}
+        <div class="nouse">Nothing in this component uses it. Copies on other controls are checked when you remove it.</div>
+      {/if}
 
       {#each groups as group (group.title)}
         <div class="grp">{group.title}</div>
@@ -194,6 +212,19 @@
     outline: none;
   }
   .txt:focus { border-color: #5B9BD5; }
+
+  .grp s { text-decoration: none; color: #7C8891; margin-left: 4px; }
+  .uses { list-style: none; margin: 5px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+  .uses li {
+    font: 400 9.5px/1.3 'IBM Plex Mono', ui-monospace, monospace;
+    color: #9AA6AE;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .uses li.fallback { color: #C9A85C; }
+  .uses li.off { opacity: 0.55; }
+  .nouse { font: 400 9.5px/1.35 'IBM Plex Sans', system-ui, sans-serif; color: #616C75; margin-top: 5px; }
 
   .acts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
   .acts button {

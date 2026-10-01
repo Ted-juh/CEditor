@@ -20,6 +20,8 @@
     assets = [],
     selectedKey = '',
     baking = false,
+    // asset key → how many things use it (assetReferences.js), or null when not known.
+    uses = null,
     onselect = () => {},
     onimport = () => {},
     onbake = () => {},
@@ -72,6 +74,9 @@
     return entry.hasSource ? formatBytes(entry.bytes) : 'empty';
   }
 
+  const useCount = (entry) => uses?.get?.(entry.key) ?? null;
+  const useNote = (count) => (count == null ? '' : count === 0 ? 'unused' : `used ${count}×`);
+
   function pick(input, event) {
     const file = event?.target?.files?.[0];
     if (file) onimport(input, file);
@@ -92,7 +97,7 @@
           role="option"
           tabindex="0"
           aria-selected={entry.key === selectedKey}
-          title={`${entry.name} — ${sizeNote(entry)}`}
+          title={`${entry.name} — ${sizeNote(entry)}${useCount(entry) == null ? '' : ` — ${useNote(useCount(entry))} in this component`}`}
           onclick={() => onselect(entry.key)}
           onkeydown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onselect(entry.key); }
@@ -109,7 +114,7 @@
             {/if}
           </span>
           <span class="name">{entry.name}</span>
-          <span class="note">{sizeNote(entry)}</span>
+          <span class="note" class:unused={useCount(entry) === 0}>{useCount(entry) === 0 ? 'unused' : sizeNote(entry)}</span>
         </div>
       {/each}
     </div>
@@ -209,6 +214,7 @@
   }
   .tile.sel .name { color: #EAF5FF; }
 
+  .note.unused { color: #8A7A55; font-style: italic; }
   .note {
     font: 400 8px/1 'IBM Plex Mono', ui-monospace, monospace;
     color: #616C75;

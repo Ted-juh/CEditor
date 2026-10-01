@@ -286,6 +286,41 @@ assert.match(await ev(() => window.__as.bakeEstimate()), /\d+×\d+/);
 await ev(() => window.__as.openBake());
 await page.waitForTimeout(150);
 
+// --- What uses an asset -----------------------------------------------------------------------
+
+check('the library marks an asset nothing uses, and not one something does', async () => {});
+assert.equal(await ev(() => window.__as.tileNote('driftStrip')), 'unused');
+assert.equal(await ev(() => window.__as.tileNote('cleanStrip')), '32 frames');
+
+await ev(() => window.__as.select('cleanStrip'));
+await page.waitForTimeout(200);
+check('the settings column lists what uses the selected asset', async () => {});
+assert.equal(await ev(() => window.__as.usedBy()), 'Used by 1');
+assert.deepEqual(await ev(() => window.__as.uses()), ['generator frames']);
+
+// The knob face is copied on the OTHER control only, so inside its component nothing uses it — and
+// removing it must still say where the copy is.
+await ev(() => window.__as.select('knobFace'));
+await page.waitForTimeout(200);
+check('an asset used only elsewhere reads as unused here, and says the panel is checked on removal', async () => {});
+assert.equal(await ev(() => window.__as.usedBy()), 'Used by 0');
+assert.match(await ev(() => window.__as.noUse()), /checked when you remove it/);
+
+let dialog = '';
+page.once('dialog', (d) => { dialog = d.message(); d.dismiss(); });
+await ev(() => window.__as.removeSelected());
+await page.waitForTimeout(250);
+check('removing an asset used on another control asks first, naming that control', async () => {});
+assert.match(dialog, /knobFace is used 1×/);
+assert.match(dialog, /Small Knob: Parts › face › Background › Fill › imageSrc/);
+assert.deepEqual((await ev(() => window.__as.names())).images, ['knobFace'], 'declined: still there');
+
+page.once('dialog', (d) => d.accept());
+await ev(() => window.__as.removeSelected());
+await page.waitForTimeout(250);
+check('  and accepting removes it', async () => {});
+assert.deepEqual((await ev(() => window.__as.names())).images, []);
+
 // --- Removal ----------------------------------------------------------------------------------
 
 await ev(() => window.__as.select('driftStrip'));
@@ -294,7 +329,7 @@ await ev(() => window.__as.removeSelected());
 await page.waitForTimeout(250);
 const remaining = await ev(() => window.__as.names());
 const healed = await ev(() => window.__as.selected());
-check('removing an asset takes it out of the component and the library heals', () => {
+check('removing an unused asset asks nothing, takes it out and the library heals', () => {
   assert.deepEqual(remaining.filmstrips, ['cleanStrip']);
   assert.equal(healed, 'cleanStrip');
 });

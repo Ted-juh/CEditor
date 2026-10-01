@@ -106,7 +106,17 @@ control._children.Assets.images.knobFace = {
   package: true,
 };
 
-panels.set([{ id: 'p1', name: 'Check', width: 640, height: 360, bgColour: 'FF1E1E1E', controls: [control] }]);
+// Uses, for the "Used by" list: a generator that names the clean strip, and — on ANOTHER control —
+// a copy of the knob face's source, the kind of use only a search of the whole panel finds.
+control._children.Generators._children.frames = {
+  _type: 'Generator', name: 'frames', type: 'filmstrip-frames', enabled: true, assetName: 'cleanStrip',
+};
+const neighbour = createControl('CustomComponent');
+neighbour._children.Core.id = 'ctrl_as_2';
+neighbour._children.Core.name = 'Small Knob';
+neighbour._children.Parts._children.face = { _type: 'Part', Background: { Fill: { imageSrc: control._children.Assets.images.knobFace.source } } };
+
+panels.set([{ id: 'p1', name: 'Check', width: 640, height: 360, bgColour: 'FF1E1E1E', controls: [control, neighbour] }]);
 activePanelId.set('p1');
 selectedComponentIds.set(new Set([CONTROL_ID]));
 activateEditorTarget('assets', CONTROL_ID);
@@ -170,6 +180,14 @@ window.__as = {
   },
   policy: () => ({ ...assets().packagePolicy }),
   names: () => ({ images: Object.keys(assets().images), filmstrips: Object.keys(assets().filmstrips) }),
+
+  tileNote: (name) => {
+    const tile = [...document.querySelectorAll('.tile')].find((t) => textOf(t.querySelector('.name')) === name);
+    return textOf(tile?.querySelector('.note'));
+  },
+  usedBy: () => textOf([...document.querySelectorAll('.settings .grp')].find((g) => textOf(g).startsWith('Used by'))),
+  uses: () => [...document.querySelectorAll('.settings .uses li')].map(textOf),
+  noUse: () => textOf(document.querySelector('.settings .nouse')),
 
   removeSelected: () => {
     [...document.querySelectorAll('.acts button')].find((b) => textOf(b) === 'Remove')?.click();

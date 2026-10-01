@@ -185,6 +185,27 @@ still draws all five of its sections and still edits every field. Nothing is rel
 parts that copied the source. A rename is a move with references to follow. The name is shown and
 not editable rather than pretending otherwise and breaking links quietly.
 
+**The references now have an index** (`utils/assetReferences.js`, 2026-10-01), the first of the
+steps a rename and a "replace everywhere" need. For each asset it lists what uses it, found from
+the code that reads assets rather than from a list of fields:
+
+- a filmstrip generator's `assetName`, counted even when the generator is disabled;
+- the same generator with no name, or a name that is gone, which the materializer quietly points
+  at the *first* filmstrip — the use nobody would guess, and the one that changes picture when
+  that filmstrip is removed;
+- any `Assets.images.<name>…` / `Assets.filmstrips.<name>…` path, wherever it sits (bindings,
+  animation targets, published properties all write them);
+- a copy of the asset's source in a part, here or on another control, or the panel background;
+- the same bytes in another asset, reported as a duplicate rather than a use.
+
+Script source is not read: a path built at run time is not in the document. The tab shows the list
+under **Used by**, marks unused assets in the library, and asks before removing one that is used,
+naming each use. The live count covers the component; the panel-wide search runs once, on
+removal, because walking every string of a large panel on every edit is not free.
+
+Still to build on it, in order: rename and replace as one undoable step following the index, then
+rebuilding the filmstrips that depend on a replaced asset.
+
 ### Corrected after review
 
 The tab shipped and then two things about it turned out to be wrong. Both are recorded here rather
