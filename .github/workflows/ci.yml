@@ -56,9 +56,15 @@ jobs:
         working-directory: CE/web
         run: npm ci
 
+      # The spec reporter, not the TAP one a non-terminal gets by default: it ends with a list of the
+      # failing tests and their errors. With TAP a failure sits wherever it ran, among some 34,000
+      # lines of "ok", and the log's tail says only "fail 1" (run 291).
       - name: Web tests (node --test + script-export validation)
         working-directory: CE/web
-        run: npm run test:all
+        run: |
+          npm test -- --test-reporter=spec
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }   # a native failure does not stop a pwsh script
+          npm run test:script-exports
 
       - name: Build web bundle (required by CMake PlayerWebData glob)
         working-directory: CE/web
