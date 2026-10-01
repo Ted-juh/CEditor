@@ -67,6 +67,9 @@ test('template validation protects a previous export, then a supported panel exp
 
     const result = await exportFromTemplate(options);
     assert.equal(result.written.length, 1);
+    // Named after the panel, not after the file it was saved in. Checked on every platform: the
+    // Windows-only binary check below was the only thing that noticed when this broke.
+    assert.equal(path.basename(result.written[0]), 'Validation.vst3');
     assert.equal(JSON.parse(readFileSync(path.join(result.written[0], 'Contents/CE/profiles/test/generic-cc-dpd.ceditor-device.json'), 'utf8')).id, 'generic-cc-dpd');
     const resources = path.join(result.written[0], 'Contents', 'Resources');
     if (process.platform === 'win32') {

@@ -43,6 +43,10 @@ export async function completeExportDocument(doc, filePath = null) {
   if (!panel) throw new Error(`Cannot export: ${panelOpenReport().error}`);
   const complete = JSON.parse(serializePanelForExport(panel));
   // Carried as they were: the editor's export keeps the panel's identity and its baked settings.
+  // The name too: the editor's loader names a panel after its FILE, as it does when you open one,
+  // and the product name falls back to the panel's name — so "Validation" saved as panel.cepanel
+  // exported as panel.vst3.
   if (doc.panelGuid) complete.panelGuid = doc.panelGuid;
+  if (doc.name) complete.name = doc.name;
   return complete;
 }

@@ -35,6 +35,7 @@ test('the completed document keeps the panel identity and every control', async 
   const saved = read('QA-01-components.cepanel');
   const complete = await completeExportDocument(saved, 'QA-01-components.cepanel');
   assert.equal(complete.panelGuid, saved.panelGuid);
+  assert.equal(complete.name, saved.name, 'the panel\'s own name, not its file\'s');
   assert.equal(complete.controls.length, saved.controls.length);
   assert.ok(complete.controls.every((control) => control._children?.Transform), 'every section written out');
 });
