@@ -153,8 +153,13 @@ export function findLv2Helper() {
  */
 function writeLv2Manifests(bundle, lv2Helper, log) {
   const binary = readdirSync(bundle).find((name) => /\.(so|dll)$/i.test(name));
+  // The shipped helper is an executable. A .cmd or .bat stand-in (the test suite's, on Windows) can
+  // only be run through the shell: Node refuses to spawn a batch file directly (EINVAL), and with a
+  // shell nothing is quoted for us.
+  const batch = /\.(cmd|bat)$/i.test(lv2Helper);
+  const quote = (p) => (batch ? `"${p}"` : p);
   try {
-    execFileSync(lv2Helper, [path.join(bundle, binary)], { stdio: 'pipe', env: process.env });
+    execFileSync(quote(lv2Helper), [quote(path.join(bundle, binary))], { stdio: 'pipe', env: process.env, shell: batch });
   } catch (error) {
     const detail = String(error.stderr ?? error.message).trim().split('\n').filter(Boolean).pop() ?? '';
     for (const stale of readdirSync(bundle).filter((f) => f.toLowerCase().endsWith('.ttl'))) rmSync(path.join(bundle, stale));

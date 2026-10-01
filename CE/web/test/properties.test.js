@@ -51,7 +51,9 @@ function setAt(root, path, value) {
 /** A new value of the same kind as `value`, or null when there is nothing sensible to generate. */
 const replacementFor = (value) => {
   if (typeof value === 'boolean') return fc.boolean();
-  if (typeof value === 'number') return fc.oneof(fc.integer({ min: -500, max: 5000 }), fc.double({ min: -1e4, max: 1e4, noNaN: true }));
+  // Not -0: JSON has no negative zero, so a saved -0 loads as 0 and the round-trip below would
+  // fail on a value no editor control ever produces (seen once in CI, seed 1952628918).
+  if (typeof value === 'number') return fc.oneof(fc.integer({ min: -500, max: 5000 }), fc.double({ min: -1e4, max: 1e4, noNaN: true }).map((v) => (v === 0 ? 0 : v)));
   if (typeof value === 'string') return fc.string({ maxLength: 12 });
   return null;
 };
