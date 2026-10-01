@@ -10,6 +10,7 @@
    */
   import { onDestroy, onMount } from 'svelte';
   import { Timeline } from 'animation-timeline-js';
+  import { formatAxisLabel } from '../../utils/keyframeModel.js';
 
   let {
     tracks = [],          // [{ label, keyframes: [{ time }] }]
@@ -63,7 +64,10 @@
       selectionColor: '#8FEDE3',
       timelineStyle: { strokeColor: '#F5B83D', fillColor: '#F5B83D', width: 2, capStyle: { width: 10, height: 8, fillColor: '#F5B83D' } },
     }, buildModel());
+    // The library labels the ruler in seconds with no unit. Ours say what they are.
+    timeline._formatUnitsText = formatAxisLabel;
     timeline.setTime(time);
+    timeline.redraw();
 
     timeline.onTimeChanged((event) => {
       if (settingModel || event.source === 'setTimeMethod') return;

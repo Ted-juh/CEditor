@@ -24,6 +24,7 @@ import {
   easingFunction,
   buildKeyframeTimeline,
   sampleKeyframes,
+  formatAxisLabel,
 } from '../src/CE_Application/utils/keyframeModel.js';
 import { syncKeyframePlayer, disposeKeyframePlayer, scrubKeyframes, clearKeyframeScrub, useAnime, keyframePlayerFor } from '../src/CE_Application/utils/keyframePlayer.js';
 import { keyframeOverlays } from '../src/CE_Application/stores/keyframeOverlays.js';
@@ -227,4 +228,14 @@ test('a sequence that follows the value leaves a mainValue track out; other chan
   assert.equal(pose['Parts.strip.Image.frameIndex'], 3.5, 'the renderer rounds the frame');
   const played = sampleKeyframes(anime, { ...animation, trigger: { type: 'stateChange', to: ['hover'] } }, 500);
   assert.equal(played['ValueChannels.mainValue'], 0.5, 'a state-triggered sequence may drive the value');
+});
+
+test('the ruler says its unit: milliseconds under a second, seconds from there', () => {
+  assert.equal(formatAxisLabel(0), '0 ms');
+  assert.equal(formatAxisLabel(250), '250 ms');
+  assert.equal(formatAxisLabel(999.6), '1000 ms');
+  assert.equal(formatAxisLabel(1000), '1 s');
+  assert.equal(formatAxisLabel(1500), '1.5 s');
+  assert.equal(formatAxisLabel(2250), '2.25 s');
+  assert.equal(formatAxisLabel('x'), '0 ms');
 });

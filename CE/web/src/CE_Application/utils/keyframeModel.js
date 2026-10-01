@@ -85,6 +85,13 @@ export function coerceKeyframeValue(target, value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** A ruler label: milliseconds below a second, seconds from there on, each with its unit. */
+export function formatAxisLabel(ms) {
+  const n = Number(ms) || 0;
+  if (Math.abs(n) < 1000) return `${Math.round(n)} ms`;
+  return `${Number((n / 1000).toFixed(2))} s`;
+}
+
 // --- Tracks -------------------------------------------------------------------------------------
 
 const clampTime = (time) => Math.max(0, Math.round(Number(time) || 0));

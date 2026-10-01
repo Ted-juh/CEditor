@@ -176,8 +176,9 @@ chase itself; the tab marks such a track and the timeline leaves it out. The doc
 never written: a channel keyframe is a pose, like a rotation, and the host and the device see the
 value the user set.
 
-**Limits, stated.** Keyframes cannot be copied between tracks, there is no curve display between
-keyframes beyond the easing name, and the axis labels read seconds without a unit. The timeline
+**Limits, stated.** Keyframes cannot be copied between tracks, and there is no curve display
+between keyframes beyond the easing name. The ruler labels carry their unit (milliseconds under a
+second, seconds from there), through the control's own formatter hook. The timeline
 control draws on a canvas and is not reachable from the keyboard; the keyframe box beside it is.
 Enum, text, note and array channels are not offered, since a keyframe holds a number.
 
