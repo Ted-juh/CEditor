@@ -78,6 +78,16 @@ jobs:
       - name: Compiler cache (sccache)
         uses: mozilla-actions/sccache-action@v0.0.9
 
+      # DIAGNOSTIC, temporary: runs 289 and 293 each wrote ~1,000 entries and the next found none.
+      # sccache's debug log for this build, read back by the statistics step. The server is stopped
+      # first so the one that starts at the first compile picks the settings up.
+      - name: Compiler cache diagnostics on
+        run: |
+          sccache --stop-server 2>$null
+          "SCCACHE_LOG=debug" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SCCACHE_ERROR_LOG=$env:RUNNER_TEMP\sccache.log" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $global:LASTEXITCODE = 0
+
       # The plug-in is built with a real panel in it, so the validation below exercises the scripts
       # too: the script-threading defects in docs/plugin-validation.md only showed with scripts
       # loaded, and GAIA is the heaviest panel in the tree (230 scripts). It goes in through the
@@ -127,6 +137,42 @@ jobs:
 
       # always(), to show the hit rate of a build that failed — but only once sccache exists: a run
       # that fails before the cache step would otherwise add a second, misleading error here.
+      # DIAGNOSTIC, temporary: rebuild one small target from clean. Hits here mean keys are stable
+      # within a run and the cache can be read back, so a miss on the next run comes from between runs.
+      - name: Compiler cache same-run rebuild check
+        if: success()
+        run: |
+          $before = sccache --show-stats --stats-format=json | ConvertFrom-Json
+          ninja -C build/native -f build-Release.ninja -t clean CEditorLibraryPersistenceTests | Out-Null
+          cmake --build --preset native-release --target CEditorLibraryPersistenceTests | Out-Null
+          $after = sccache --show-stats --stats-format=json | ConvertFrom-Json
+          $hits = [int]$after.stats.cache_hits.counts.'C/C++' - [int]$before.stats.cache_hits.counts.'C/C++'
+          $misses = [int]$after.stats.cache_misses.counts.'C/C++' - [int]$before.stats.cache_misses.counts.'C/C++'
+          "DIAG same-run rebuild: $hits hits, $misses misses"
+
       - name: Compiler cache statistics
         if: always()
-        run: if (Get-Command sccache -ErrorAction SilentlyContinue) { sccache --show-stats } else { "sccache was not set up in this run." }
+        run: |
+          if (-not (Get-Command sccache -ErrorAction SilentlyContinue)) { "sccache was not set up in this run."; exit 0 }
+          sccache --show-stats
+          # DIAGNOSTIC, temporary: what the cache key depends on, compared run to run.
+          "DIAG image: $env:ImageOS $env:ImageVersion"
+          $cl = (Get-Command cl.exe -ErrorAction SilentlyContinue).Source
+          if ($cl) { "DIAG cl: $cl $((Get-FileHash $cl).Hash.Substring(0, 16))" }
+          $objs = Get-ChildItem build/native -Recurse -Filter *.obj -ErrorAction SilentlyContinue | Measure-Object Length -Sum
+          "DIAG objects: $($objs.Count) files, $([math]::Round($objs.Sum / 1MB)) MB"
+          $log = "$env:RUNNER_TEMP\sccache.log"
+          if (Test-Path $log) {
+            "DIAG log: $((Get-Item $log).Length) bytes"
+            foreach ($name in 'juce_core.cpp.obj', 'sqlite3.c.obj', 'LibraryStore.cpp.obj', 'PluginCatalog.cpp.obj') {
+              $keys = Select-String -Path $log -Pattern 'Hash key: (\w+)' | Where-Object { $_.Line -like "*$name*" } |
+                ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object -Unique
+              $digest = if ($keys) { [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes(($keys -join ',')))).Replace('-', '').Substring(0, 16) } else { '-' }
+              "DIAG keys ${name}: $(@($keys).Count) distinct, set digest $digest, first $(@($keys)[0])"
+            }
+            "DIAG write errors, by message:"
+            Select-String -Path $log -Pattern 'rror' | ForEach-Object { $_.Line -replace '^\S+\s+\S+\s+', '' -replace '\[[^\]]*\]', '[..]' -replace '[0-9a-f]{16,}', 'H' -replace '\d+', 'N' } |
+              Group-Object | Sort-Object Count -Descending | Select-Object -First 8 | ForEach-Object { "DIAG   $($_.Count) x $($_.Name)" }
+            "DIAG sample log lines:"
+            Get-Content $log -TotalCount 15 | ForEach-Object { "DIAG   $_" }
+          }
