@@ -56,6 +56,8 @@
     moveTarget,
     buildTarget,
     OFFERED_PROPERTIES,
+    offeredTargetsFor,
+    resolvedPartsOf,
     TRIGGER_TYPES,
     EASING_NAMES,
     ANIMATION_KINDS,
@@ -82,6 +84,11 @@
   let controlName = $derived(control?._children?.Core?.name || control?._children?.Core?.controlType || '');
   let section = $derived(getSection(control, 'Animations'));
   let partNames = $derived(Object.keys(getSection(control, 'Parts')?._children ?? {}));
+  // For "does this part exist", generator-made parts count: a filmstrip's frame lives on one.
+  let knownPartNames = $derived([...new Set([...partNames, ...Object.keys(resolvedPartsOf(control))])]);
+  // What the Change dropdown offers for this control: the part properties, its value channels,
+  // and a frame track per filmstrip part.
+  let offered = $derived(offeredTargetsFor(control));
 
   let rows = $derived(control ? readAnimations(control) : []);
   let allOn = $derived(control ? animationsEnabled(control) : true);
@@ -90,7 +97,7 @@
   let selectedName = $derived(rows.some((row) => row.name === wantedName) ? wantedName : (rows[0]?.name ?? ''));
   let selected = $derived(rows.find((row) => row.name === selectedName) ?? null);
 
-  let targets = $derived(selected ? describeTargets(selected, partNames) : []);
+  let targets = $derived(selected ? describeTargets(selected, knownPartNames) : []);
   let deadCount = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames), 0));
 
   let rawTargetIndex = $state(-1);
@@ -100,9 +107,9 @@
   let newPart = $state('');
   let newProperty = $state(OFFERED_PROPERTIES[0].path);
   let partForAdd = $derived(newPart || partNames[0] || '');
-  let offeredForAdd = $derived(OFFERED_PROPERTIES.find((entry) => entry.path === newProperty) ?? OFFERED_PROPERTIES[0]);
+  let offeredForAdd = $derived(offered.find((entry) => entry.path === newProperty) ?? offered[0]);
   // Tell the user before they add it, not after.
-  let addStatus = $derived(targetStatus(buildTarget(partForAdd, offeredForAdd), partNames));
+  let addStatus = $derived(targetStatus(buildTarget(partForAdd, offeredForAdd), knownPartNames, { kind: selected?.kind ?? 'transition', triggerType: selected?.triggerType ?? 'stateChange' }));
 
     // Arm from the selection only when NOTHING is armed — not merely when nothing of this kind is.
   // A target of another kind means another tab is being opened right now, and stealing it is how
@@ -156,8 +163,10 @@ onMount(() => {
 
   function trackLabel(row) {
     const [, partName, ...rest] = row.path.startsWith('Parts.') ? row.path.split('.') : ['', '', row.path];
-    const offered = OFFERED_PROPERTIES.find((entry) => entry.path === rest.join('.')) ?? OFFERED_PROPERTIES.find((entry) => entry.path === row.path);
-    const what = offered?.label ?? rest.join('.') ?? row.path;
+    const whole = offered.find((entry) => entry.scope === 'control' && entry.path === row.path);
+    if (whole) return whole.label;
+    const entry = OFFERED_PROPERTIES.find((e) => e.path === rest.join('.')) ?? OFFERED_PROPERTIES.find((e) => e.path === row.path);
+    const what = entry?.label ?? rest.join('.') ?? row.path;
     return partName ? `${partName} · ${what}` : what;
   }
 
@@ -264,6 +273,12 @@ onMount(() => {
     if (!selected) return;
     const target = buildTarget(partForAdd, offeredForAdd);
     if (!target) return;
+    // On a keyframes animation a new track starts with one keyframe holding the authored value,
+    // as the kind switch seeds, so adding it changes nothing on screen until a second one.
+    if (isKeyframes) {
+      const base = baseValueAt(control, target.path);
+      target.keyframes = base === undefined ? [] : [{ time: 0, value: base, easing: 'outQuad' }];
+    }
     writeTargets(addTarget(selected.targets, target));
     rawTargetIndex = selected.targets.length;
   }
@@ -584,12 +599,12 @@ onMount(() => {
             <div class="r">
               <label for="anim-part">Part</label>
               <PropertySelect options={partNames.map((name) => ({ value: name, label: name }))}
-                              value={partForAdd} ariaLabel="Part"
+                              value={partForAdd} ariaLabel="Part" disabled={offeredForAdd?.scope === 'control'}
                               onchange={(value) => { newPart = value; }} />
             </div>
             <div class="r">
               <label for="anim-what">Change</label>
-              <PropertySelect options={OFFERED_PROPERTIES.map((entry) => ({ value: entry.path, label: entry.label }))}
+              <PropertySelect options={offered.map((entry) => ({ value: entry.path, label: entry.label }))}
                               value={newProperty} ariaLabel="What to change"
                               onchange={(value) => { newProperty = value; }} />
             </div>

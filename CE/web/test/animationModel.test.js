@@ -20,6 +20,9 @@ import {
   TRIGGER_TYPES,
   PART_PATHS,
   ROOT_PATHS,
+  KEYFRAMES_ONLY_BUCKETS,
+  offeredTargetsFor,
+  resolvedPartsOf,
   OFFERED_PROPERTIES,
   EASING_NAMES,
   EASING_BEZIERS,
@@ -44,7 +47,8 @@ import {
 import { resolveInteractiveControl, springCssTiming } from '../src/CE_Application/utils/interactionRuntime.js';
 import { animationSpring } from '../src/CE_Application/scripting/panelRuntime.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
-import { createCustomComponentPartsDefaults } from '../src/CE_Application/utils/customComponentFactory.js';
+import { createCustomComponentPartsDefaults, createCustomComponentStarterPatch } from '../src/CE_Application/utils/customComponentFactory.js';
+import { applyPatchObject } from '../src/CE_Application/stores/controlTreeUtils.js';
 
 /** A control with real parts and one animation carrying the given targets. */
 function withAnimation(targets) {
@@ -175,6 +179,7 @@ test('every path in the tables maps to a bucket the runtime fills', () => {
   base._children.Parts = createCustomComponentPartsDefaults();
   const part = partsOf(base)[0];
   for (const [path, bucket] of Object.entries(PART_PATHS)) {
+    if (KEYFRAMES_ONLY_BUCKETS.includes(bucket)) continue; // no CSS for a frame: keyframes drive it
     const control = withAnimation([{ path: `Parts.${part}.${path}` }]);
     assert.ok(runtimeAnimates(control, part).includes(bucket), `${path} should animate ${bucket}`);
   }
@@ -446,4 +451,63 @@ test('the properties panel really is the way this tab says it is', () => {
   assert.match(kindCell, /ANIMATION_KINDS/);
   assert.match(source, /label="Damping"/);
   assert.match(source, /label="Frequency"/);
+});
+
+// --- Value channel and frame tracks (keyframes only) --------------------------------------------
+
+function filmstripStarter() {
+  const control = createControl('CustomComponent');
+  applyPatchObject(control, createCustomComponentStarterPatch('starter.filmstripKnob'));
+  return control;
+}
+
+test('the Change dropdown offers a channel per value channel and a frame per filmstrip part, whole paths', () => {
+  const control = filmstripStarter();
+  const extras = offeredTargetsFor(control).filter((entry) => entry.scope === 'control');
+  assert.deepEqual(extras.map((e) => e.path), ['ValueChannels.mainValue', 'Parts.filmstrip_knobFrames.Image.frameIndex']);
+  assert.match(extras[0].label, /^Channel: /);
+  assert.match(extras[1].label, /^Frame: filmstrip_knobFrames/);
+  assert.equal(buildTarget('background', extras[0]).path, 'ValueChannels.mainValue', 'a whole path ignores the part picker');
+  assert.ok(Object.keys(resolvedPartsOf(control)).includes('filmstrip_knobFrames'), 'the generated part is known');
+  // A bare custom component has its default channel and no filmstrip: channels only, no frames.
+  const bare = offeredTargetsFor(createControl('CustomComponent')).filter((e) => e.scope === 'control');
+  assert.ok(bare.every((e) => e.properties[0] === 'channel'), JSON.stringify(bare));
+});
+
+test('a channel or frame track works for keyframes only, and never the value a sequence follows', () => {
+  const channel = { path: 'ValueChannels.mainValue', properties: ['channel'] };
+  const frame = { path: 'Parts.filmstrip_knobFrames.Image.frameIndex', properties: ['frame'] };
+  assert.equal(targetStatus(channel, []).reason, 'keyframes only');
+  assert.equal(targetStatus(channel, [], { kind: 'spring' }).reason, 'keyframes only');
+  assert.deepEqual(targetStatus(channel, [], { kind: 'keyframes' }), { works: true, animates: 'channel', part: '', channel: 'mainValue' });
+  assert.equal(targetStatus(channel, [], { kind: 'keyframes', triggerType: 'valueChange' }).reason, 'feedback');
+  assert.equal(targetStatus({ path: 'ValueChannels.other', properties: [] }, [], { kind: 'keyframes', triggerType: 'valueChange' }).works, true);
+  assert.equal(targetStatus(frame, ['filmstrip_knobFrames']).reason, 'keyframes only');
+  assert.equal(targetStatus(frame, ['filmstrip_knobFrames'], { kind: 'keyframes' }).animates, 'frame');
+  assert.equal(targetStatus(frame, ['background'], { kind: 'keyframes' }).reason, 'missing part');
+  // describeTargets carries the row's kind and trigger, so the tab's verdicts follow them.
+  const row = describeAnimation('a', { kind: 'keyframes', trigger: { type: 'valueChange' }, targets: [channel, frame] });
+  assert.deepEqual(describeTargets(row, ['filmstrip_knobFrames']).map((t) => t.status.works), [false, true]);
+});
+
+test('a channel keyframe drives the value, so the filmstrip frame follows; a frame keyframe wins over it', () => {
+  const control = filmstripStarter();
+  const at = (overlay) => resolveInteractiveControl(control, { keyframeOverlay: overlay });
+  const frameOf = (r) => r.control._children.Parts._children.filmstrip_knobFrames._children.Image.frameIndex;
+  assert.equal(frameOf(at({ 'ValueChannels.mainValue': 1 })), 7, 'eight frames, full value');
+  assert.equal(at({ 'ValueChannels.mainValue': 1 }).runtime.signals.valueNormalized, 1);
+  assert.equal(frameOf(at({ 'ValueChannels.mainValue': 0 })), 0);
+  assert.equal(frameOf(at({ 'ValueChannels.mainValue': 1, 'Parts.filmstrip_knobFrames.Image.frameIndex': 2 })), 2);
+  assert.equal(typeof at({ 'ValueChannels.mainValue': 1 }).control._children.ValueChannels._children.mainValue, 'object', 'the channel node is not overwritten');
+  assert.equal(control._children.ValueChannels._children.mainValue.currentValue, 0.5, 'the document value is untouched');
+});
+
+test('switching to keyframes seeds a channel track from its value and a frame track from the resolved frame', () => {
+  const control = filmstripStarter();
+  const next = animationWithKind({ kind: 'transition', targets: [
+    { path: 'ValueChannels.mainValue', properties: ['channel'] },
+    { path: 'Parts.filmstrip_knobFrames.Image.frameIndex', properties: ['frame'] },
+  ] }, 'keyframes', control);
+  assert.deepEqual(next.targets[0].keyframes, [{ time: 0, value: 0.5, easing: 'outQuad' }]);
+  assert.deepEqual(next.targets[1].keyframes, [{ time: 0, value: 4, easing: 'outQuad' }], 'frame 4 of 8 at value 0.5');
 });

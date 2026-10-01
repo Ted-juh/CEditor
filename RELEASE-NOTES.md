@@ -31,7 +31,9 @@ it overshoots and settles, with damping and frequency, the same curve a script g
 `ce.anim.spring`. Or **keyframes**: a sequence along a time axis, one track per change, with a
 timeline in the Animation tab to drag and edit them on, a playhead that poses the control on the
 canvas, and Play. A sequence can loop, hold its last frame while the state that started it stays,
-or follow the control's value like a scrubbed film.
+or follow the control's value like a scrubbed film. A track can be a part's transform, opacity or
+colour, one of the control's value channels, or a filmstrip part's frame, so a filmstrip knob
+turns on the sequence too.
 
 ## What you get
 

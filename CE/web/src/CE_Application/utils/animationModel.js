@@ -19,7 +19,7 @@
  * `targetStatus()` below is the same rule the runtime uses, written out so the editor can show it.
  * If the runtime ever accepts more paths, `animationModel.test.js` fails, because it runs both.
  */
-import { EASING_BEZIERS, EASING_NAMES, SPRING_DEFAULTS, springEase, treeValueAtPath } from './interactionRuntime.js';
+import { EASING_BEZIERS, EASING_NAMES, SPRING_DEFAULTS, springEase, treeValueAtPath, resolveInteractiveControl } from './interactionRuntime.js';
 
 export { EASING_BEZIERS, EASING_NAMES, SPRING_DEFAULTS, springEase };
 
@@ -52,7 +52,14 @@ export const PART_PATHS = {
   'Background.Fill.colour': 'colour',
   'Text.Fill.colour': 'colour',
   'Background.Border.colour': 'colour',
+  // A filmstrip part's frame. Keyframes only: there is no CSS for it, and the generator that
+  // made the part writes it from the value on every resolve, which the overlay then overrides.
+  'Image.frameIndex': 'frame',
 };
+
+/** The buckets only a keyframes animation can drive. The transition catalog has nothing for them. */
+export const KEYFRAMES_ONLY_BUCKETS = ['channel', 'frame'];
+const CHANNEL_PATH = /^ValueChannels\.([^.]+)$/;
 
 /** The same for a target on the control itself rather than one of its parts. */
 export const ROOT_PATHS = {
@@ -76,6 +83,8 @@ export const HINT_BUCKETS = {
   colour: 'colour',
   'background-color': 'colour',
   color: 'colour',
+  channel: 'channel',
+  frame: 'frame',
 };
 export const PROPERTY_HINTS = Object.keys(HINT_BUCKETS);
 
@@ -113,12 +122,24 @@ export const OFFERED_PROPERTIES = [
  * an error to the runtime — it happily builds a transition for a part nobody will ever draw — so
  * that is reported separately from a path the runtime does not accept.
  */
-export function targetStatus(target, partNames = []) {
+export function targetStatus(target, partNames = [], { kind = 'transition', triggerType = 'stateChange' } = {}) {
   const path = String(target?.path ?? '').trim();
   if (!path) {
     return { works: false, reason: 'no path', detail: 'This target has no path, so the runtime skips it.' };
   }
   const hints = Array.isArray(target?.properties) ? target.properties : [];
+
+  // A value channel: a keyframe track on the value itself, which bindings and generators follow.
+  const channel = CHANNEL_PATH.exec(path);
+  if (channel) {
+    if (kind !== 'keyframes') {
+      return { works: false, reason: 'keyframes only', animates: 'channel', detail: `A value channel is driven by keyframes, not by a ${kind}: there is no CSS for a value.` };
+    }
+    if (triggerType === 'valueChange' && channel[1] === 'mainValue') {
+      return { works: false, reason: 'feedback', animates: 'channel', detail: 'A sequence that follows the value cannot also drive it; it would chase itself.' };
+    }
+    return { works: true, animates: 'channel', part: '', channel: channel[1] };
+  }
 
   if (path.startsWith('Parts.')) {
     const [, partName, ...rest] = path.split('.');
@@ -134,6 +155,9 @@ export function targetStatus(target, partNames = []) {
         reason: 'dead path',
         detail: `The runtime does not animate "${tail}". It only animates ${Object.keys(PART_PATHS).join(', ')}.`,
       };
+    }
+    if (KEYFRAMES_ONLY_BUCKETS.includes(byPath ?? byHint) && kind !== 'keyframes') {
+      return { works: false, reason: 'keyframes only', animates: byPath ?? byHint, part: partName, detail: `A filmstrip frame is driven by keyframes, not by a ${kind}: there is no CSS for a frame.` };
     }
     if (partNames.length && !partNames.includes(partName)) {
       return {
@@ -198,13 +222,47 @@ export function animationsEnabled(control) {
 
 /** Each target with its status attached, ready to list. */
 export function describeTargets(row, partNames = []) {
+  const context = { kind: String(row?.kind ?? 'transition'), triggerType: String(row?.triggerType ?? row?.trigger?.type ?? 'stateChange') };
   return (row?.targets ?? []).map((target, index) => ({
     index,
     target,
     path: String(target?.path ?? ''),
     properties: Array.isArray(target?.properties) ? target.properties : [],
-    status: targetStatus(target, partNames),
+    status: targetStatus(target, partNames, context),
   }));
+}
+
+/**
+ * Everything the "Change" dropdown can offer for THIS control: the fixed part properties, one
+ * entry per value channel, and one per filmstrip part. The channels come from the document; the
+ * filmstrip parts come from resolving the control, because a generator makes them and the
+ * document never holds them. Each extra entry carries its whole path (`scope: 'control'`), so the
+ * Part picker does not apply to it.
+ */
+export function offeredTargetsFor(control) {
+  const out = OFFERED_PROPERTIES.map((entry) => ({ ...entry, scope: 'part' }));
+  const channels = control?._children?.ValueChannels?._children ?? {};
+  for (const [name, channel] of Object.entries(channels)) {
+    const type = String(channel?.type ?? 'float').toLowerCase();
+    if (['enum', 'text', 'note', 'array'].includes(type)) continue;
+    out.push({ path: `ValueChannels.${name}`, properties: ['channel'], label: `Channel: ${channel?.label || name}`, scope: 'control', channel: name });
+  }
+  for (const [name, part] of Object.entries(resolvedPartsOf(control))) {
+    if (String(part?._children?.Image?.mode ?? '') === 'filmstrip') {
+      out.push({ path: `Parts.${name}.Image.frameIndex`, properties: ['frame'], label: `Frame: ${name}`, scope: 'control', part: name });
+    }
+  }
+  return out;
+}
+
+/** The parts a resolved control has, generator-made ones included. Empty when it cannot resolve. */
+export function resolvedPartsOf(control) {
+  if (!control?._children?.Parts) return {};
+  try {
+    return resolveInteractiveControl(control, {})?.control?._children?.Parts?._children ?? {};
+  } catch {
+    return control._children.Parts._children ?? {};
+  }
 }
 
 /** How many of an animation's targets do nothing. */
@@ -242,7 +300,7 @@ export function moveTarget(targets, from, to) {
 export function buildTarget(partName, offered) {
   if (!offered) return null;
   return {
-    path: partName ? `Parts.${partName}.${offered.path}` : offered.path,
+    path: partName && offered.scope !== 'control' ? `Parts.${partName}.${offered.path}` : offered.path,
     properties: [...offered.properties],
   };
 }
@@ -371,7 +429,19 @@ export function springPoints(damping = SPRING_DEFAULTS.damping, frequency = SPRI
 
 /** The value a path has on the control as authored — where a seeded keyframe track starts. */
 export function baseValueAt(control, path) {
-  const value = treeValueAtPath(control, String(path ?? ''));
+  const text = String(path ?? '');
+  const channel = CHANNEL_PATH.exec(text);
+  if (channel) {
+    const node = control?._children?.ValueChannels?._children?.[channel[1]];
+    const value = Number(node?.currentValue ?? node?.defaultValue ?? node?.min ?? 0);
+    return Number.isFinite(value) ? value : 0;
+  }
+  let value = treeValueAtPath(control, text);
+  if (value === undefined && text.startsWith('Parts.')) {
+    // A generator-made part (a filmstrip's frame) exists only once the control is resolved.
+    const [, partName, ...rest] = text.split('.');
+    value = treeValueAtPath(resolvedPartsOf(control)?.[partName], rest.join('.'));
+  }
   return value === undefined || value === null || typeof value === 'object' ? undefined : value;
 }
 

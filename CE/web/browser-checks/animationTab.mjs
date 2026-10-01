@@ -189,6 +189,30 @@ check('play runs the playhead along the axis', () => {
 });
 await ev(() => window.__anim.stop());
 await page.waitForTimeout(100);
+
+// --- A value channel as a track -------------------------------------------------------------------
+
+const options = await ev(() => window.__anim.changeOptions());
+check('the Change list offers the control\'s value channel after the part properties', () => {
+  assert.ok(options.some((o) => /^Channel: Knob Value/.test(o)), options.join(' | '));
+});
+await ev(() => window.__anim.chooseChange('Channel: Knob Value'));
+await page.waitForTimeout(300);
+const channelWarning = await ev(() => window.__anim.addWarning());
+const pickerOff = await ev(() => window.__anim.partPickerDisabled());
+check('a channel is a whole path: the part picker steps aside and nothing warns under keyframes', () => {
+  assert.equal(channelWarning, '', channelWarning);
+  assert.equal(pickerOff, true);
+});
+await ev(() => window.__anim.add());
+await page.waitForTimeout(400);
+const pathsNow = await ev(() => window.__anim.storedTargetPaths('pressMotion'));
+check('adding it writes the channel path and seeds its track from the channel value', async () => {});
+assert.ok(pathsNow.includes('ValueChannels.mainValue'), pathsNow.join(', '));
+assert.deepEqual((await ev(() => window.__anim.storedKeyframes('pressMotion'))).at(-1), [[0, 0.5]]);
+await ev(() => window.__anim.removeTarget(3));
+await page.waitForTimeout(350);
+
 await ev(() => window.__anim.pickKind('transition'));
 await page.waitForTimeout(350);
 check('and switching back leaves the tracks for next time', async () => {});

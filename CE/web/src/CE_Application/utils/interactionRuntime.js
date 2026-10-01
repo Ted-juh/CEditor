@@ -465,6 +465,20 @@ function buildTransitionCatalog(control, previewSession) {
   return { enabled: true, rootTransitions, partTransitions };
 }
 
+/** The channel entries of a keyframe overlay, apart from the ones that patch the look. */
+const CHANNEL_OVERLAY = /^ValueChannels\.([^.]+)$/;
+function splitKeyframeOverlay(overlay) {
+  if (!overlay) return { channelOverrides: null, lookOverlay: null };
+  let channelOverrides = null;
+  let lookOverlay = null;
+  for (const [path, value] of Object.entries(overlay)) {
+    const match = CHANNEL_OVERLAY.exec(path);
+    if (match) (channelOverrides ??= {})[match[1]] = value;
+    else (lookOverlay ??= {})[path] = value;
+  }
+  return { channelOverrides, lookOverlay };
+}
+
 function createEmptyRuntime(signals = {}) {
   return {
     signals,
@@ -852,7 +866,14 @@ export function resolveInteractiveControl(control, previewSession = {}) {
   }
 
   const resolved = deepClone(control);
-  const signals = resolveInteractionContext(control, effectivePreviewSession);
+  // A keyframe track on a value channel (`ValueChannels.<name>`, utils/keyframeModel.js) is a
+  // value, not a look: it goes into the session's custom values so the signals, and everything
+  // bindings and generators draw from them (a filmstrip's frame, a meter's bar), follow it.
+  const { channelOverrides, lookOverlay } = splitKeyframeOverlay(effectivePreviewSession?.keyframeOverlay);
+  const signalSession = channelOverrides
+    ? { ...(effectivePreviewSession ?? {}), customValues: { ...(effectivePreviewSession?.customValues ?? {}), ...channelOverrides } }
+    : effectivePreviewSession;
+  const signals = resolveInteractionContext(control, signalSession);
   // The copy's chosen variant is its base look: applied first, so bindings and states still act
   // on top of it. Patches on a part a generator makes are retried once the generators have run.
   const variantPending = isCustomComponent ? applyActiveVariant(resolved) : null;
@@ -887,8 +908,8 @@ export function resolveInteractiveControl(control, previewSession = {}) {
   // A running keyframe animation, or the Animation tab's playhead: a path → value map written by
   // utils/keyframePlayer.js into stores/keyframeOverlays.js and handed in with the session. It
   // lands after the states, where a state's own patch would, and before scaling, like one.
-  if (effectivePreviewSession?.keyframeOverlay) {
-    applyPatchMap(resolved, effectivePreviewSession.keyframeOverlay);
+  if (lookOverlay) {
+    applyPatchMap(resolved, lookOverlay);
   }
 
   // Resize policy: with Transform.contentScaleMode === 'scaleInternals',

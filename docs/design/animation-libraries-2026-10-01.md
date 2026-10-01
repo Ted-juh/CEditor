@@ -162,13 +162,24 @@ of the library is dropped); the player chunk every export carries grew by 18 KB 
 the keyframe runtime itself and the tab's model it shares; the timeline control is in the editor
 chunk only.
 
-**Limits, stated.** Tracks animate what the transition catalog can smooth: a part's transform,
-opacity and colour, and the root's transform, opacity and colour. Value channels and filmstrip
-frames, which the plan named as the reason for a value-driven engine, are not yet targets; the
-engine and the overlay can carry them, the target list does not offer them yet. Keyframes cannot
-be copied between tracks, there is no curve display between keyframes beyond the easing name, and
-the axis has no markers or labels. The timeline control draws on a canvas and is not reachable
-from the keyboard; the keyframe box beside it is.
+**Value channels and filmstrip frames** (later the same day). The Change list offers, after the
+part properties, one entry per value channel (`ValueChannels.<name>`, the raw value in the
+channel's own range) and one per filmstrip part (`Parts.<part>.Image.frameIndex`, found by
+resolving the control, since a generator makes the part and the document never holds it). Both
+are whole paths, so the Part picker steps aside. A channel track goes into the session's custom
+values before the signals are computed, so everything that reads the value follows it: bindings,
+and the generator that turns a value into a filmstrip frame. That is what makes a baked filmstrip
+knob animate after all. A frame track is applied after the generator and wins over it. Both are
+keyframes only, since there is no CSS for a value, and the tab says so under a transition or a
+spring. A sequence that follows the value (`valueChange`) may not drive `mainValue`, which would
+chase itself; the tab marks such a track and the timeline leaves it out. The document value is
+never written: a channel keyframe is a pose, like a rotation, and the host and the device see the
+value the user set.
+
+**Limits, stated.** Keyframes cannot be copied between tracks, there is no curve display between
+keyframes beyond the easing name, and the axis labels read seconds without a unit. The timeline
+control draws on a canvas and is not reachable from the keyboard; the keyframe box beside it is.
+Enum, text, note and array channels are not offered, since a keyframe holds a number.
 
 ## Looked at and dropped
 

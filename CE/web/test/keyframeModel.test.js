@@ -211,3 +211,20 @@ test('the scrub poses a control with no player at all, and is cleared on its own
   clearKeyframeScrub('s');
   assert.equal(get(keyframeOverlays).s, undefined);
 });
+
+test('a sequence that follows the value leaves a mainValue track out; other channels and frames play', () => {
+  const animation = sequence({
+    trigger: { type: 'valueChange', source: 'value.normalized' },
+    targets: [
+      { path: 'ValueChannels.mainValue', properties: ['channel'], keyframes: [{ time: 0, value: 0 }, { time: 1000, value: 1, easing: 'linear' }] },
+      { path: 'ValueChannels.glow', properties: ['channel'], keyframes: [{ time: 0, value: 0 }, { time: 1000, value: 10, easing: 'linear' }] },
+      { path: 'Parts.strip.Image.frameIndex', properties: ['frame'], keyframes: [{ time: 0, value: 0 }, { time: 1000, value: 7, easing: 'linear' }] },
+    ],
+  });
+  const pose = sampleKeyframes(anime, animation, 500);
+  assert.deepEqual(Object.keys(pose), ['ValueChannels.glow', 'Parts.strip.Image.frameIndex']);
+  assert.equal(pose['ValueChannels.glow'], 5);
+  assert.equal(pose['Parts.strip.Image.frameIndex'], 3.5, 'the renderer rounds the frame');
+  const played = sampleKeyframes(anime, { ...animation, trigger: { type: 'stateChange', to: ['hover'] } }, 500);
+  assert.equal(played['ValueChannels.mainValue'], 0.5, 'a state-triggered sequence may drive the value');
+});

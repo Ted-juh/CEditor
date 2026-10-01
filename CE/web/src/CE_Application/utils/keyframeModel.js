@@ -213,10 +213,13 @@ export function buildKeyframeTimeline(anime, animation, { onUpdate = null, onCom
   // keyframe sits early. `_t` is also the current time, for anyone reading the object.
   timeline.add(values, { _t: duration, duration, ease: 'linear' }, 0);
 
+  const follows = String(animation?.trigger?.type ?? 'stateChange') === 'valueChange';
   (animation?.targets ?? []).forEach((target, index) => {
     const path = String(target?.path ?? '').trim();
     const frames = normalizeKeyframes(target);
     if (!path || !frames.length) return;
+    // A sequence that follows the value cannot drive it too: the track would chase itself.
+    if (follows && path === 'ValueChannels.mainValue') return;
     const colour = isColourTarget(target);
     const key = `k${index}`;
     const first = frames[0];

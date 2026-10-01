@@ -20,6 +20,9 @@ const control = createControl('CustomComponent');
 control._children.Core.id = CONTROL_ID;
 control._children.Core.name = 'Big Knob';
 control._children.Parts = createCustomComponentPartsDefaults();
+control._children.ValueChannels = { _type: 'ValueChannels', _children: {
+  mainValue: { _type: 'ValueChannel', name: 'mainValue', label: 'Knob Value', type: 'float', min: 0, max: 1, step: 0.01, defaultValue: 0.5, currentValue: 0.5 },
+} };
 
 const partNames = Object.keys(control._children.Parts._children);
 const first = partNames[0];
@@ -107,6 +110,9 @@ window.__anim = {
     return [...(button?.querySelectorAll('svg path') ?? [])].map((p) => p.getAttribute('d'));
   },
   pickKind: (kind) => { [...document.querySelectorAll('[aria-label="Kind"] button')].find((b) => new RegExp(`^${kind}$`, 'i').test(b.textContent.trim()))?.click(); },
+  changeOptions: () => [...document.querySelectorAll('[aria-label="What to change"] option')].map((o) => o.textContent.trim()),
+  partPickerDisabled: () => !!document.querySelector('[aria-label="Part"]')?.disabled,
+  storedTargetPaths: (name) => animation(name).targets.map((t) => t.path),
   storedKeyframes: (name) => animation(name).targets.map((t) => (t.keyframes ?? []).map((k) => [k.time, k.value])),
   storedLoopHold: (name) => ({ loop: animation(name).loop, hold: animation(name).hold, duration: animation(name).duration }),
   timelineCanvases: () => document.querySelectorAll('.kft canvas').length,
