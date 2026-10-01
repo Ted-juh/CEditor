@@ -20,6 +20,9 @@ Visual Studio or a source checkout, into Documents → CEditor → Exports. A CL
 folder holding the `.clap` and its panel; install the whole folder. LV2 and extra native script
 runtimes require the compiling exporter; a panel with LV2 selected still exports its other formats,
 with the skipped one explained in the build log. Unsupported runtimes are refused with an explanation.
+The build log now says what the panel's bytes are made of: the document against its compact form,
+controls by type, the heaviest section inside parts, embedded media with repeats, and carried
+fonts. The panel inside a plug-in is written compact; the plug-in parses it, nobody reads it.
 New panels select VST3 only; saved format choices are retained.
 
 ## What you get

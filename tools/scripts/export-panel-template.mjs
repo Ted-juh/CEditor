@@ -134,6 +134,12 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
     const { completeExportDocument } = await import(pathToFileURL(path.join(HERE, 'lib/exportDocument.mjs')).href);
     panelDoc = await completeExportDocument(panelDoc, path.resolve(panelFile));
   }
+  // What the bytes are, before anything is written: the one number an export used to give was the
+  // bundle's, and on GAIA it was taken to be artwork when there was none (lib/exportSizeReport.mjs).
+  {
+    const { exportSizeReport, formatExportSizeReport } = await import(pathToFileURL(path.join(HERE, 'lib/exportSizeReport.mjs')).href);
+    for (const line of formatExportSizeReport(exportSizeReport(panelDoc))) log(line);
+  }
   const explicitFormats = formats !== undefined;
   formats ??= TEMPLATE_FORMATS.filter((format) =>
     format.id === 'vst3' || (format.id === 'clap'
@@ -228,7 +234,9 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
     for (const stale of readdirSync(panelDir).filter((f) => f.toLowerCase().endsWith('.cepanel'))) {
       rmSync(path.join(panelDir, stale));
     }
-    writeFileSync(path.join(panelDir, 'panel.cepanel'), JSON.stringify(panelDoc, null, 2));
+    // Compact: the plug-in parses it in full at load and nobody reads it. GAIA's indented panel was
+    // 94 MB where the compact one is 28 MB, and the load parses it three times.
+    writeFileSync(path.join(panelDir, 'panel.cepanel'), JSON.stringify(panelDoc));
 
     // The native MIDI service needs its codecs on a machine without CEditor's checkout. It looks
     // in the module's directory and the one above (DeviceProfileServiceInternal.h, sourceRoot):

@@ -325,9 +325,15 @@ mkdirSync(outDir, { recursive: true });
 const ep = await import(pathToFileURL(path.join(repo, 'CE/web/src/CE_Application/utils/exportParameters.js')).href);
 panelDoc.exportParameters = ep.deriveExportParameters(panelDoc);
 const bakedPanel = path.join(outDir, `${productName}.cepanel`);
-writeFileSync(bakedPanel, JSON.stringify(panelDoc, null, 2));
+// Compact: the plug-in parses this file in full at load (three times, as it happens) and nobody
+// reads it. Indented, GAIA's was 94 MB; compact it is 28 MB. The report below says where those go.
+writeFileSync(bakedPanel, JSON.stringify(panelDoc));
 const panelAbs = bakedPanel.replace(/\\/g, '/');
 console.log(`Baked ${panelDoc.exportParameters.length} parameters into ${bakedPanel}`);
+{
+  const { exportSizeReport, formatExportSizeReport } = await import('./lib/exportSizeReport.mjs');
+  for (const line of formatExportSizeReport(exportSizeReport(panelDoc))) console.log(line);
+}
 
 // 2. Build the web bundle (the self-contained UI embedded into the plugin). The bundle is
 //    PANEL-INDEPENDENT (the .cepanel is loaded at runtime, not baked into the JS), so we only rebuild

@@ -8,6 +8,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { completeExportDocument } from './lib/exportDocument.mjs';
+import { exportSizeReport, formatExportSizeReport } from './lib/exportSizeReport.mjs';
 
 const [input, output] = process.argv.slice(2);
 if (!input || !output) {
@@ -15,5 +16,6 @@ if (!input || !output) {
   process.exit(2);
 }
 const doc = await completeExportDocument(JSON.parse(readFileSync(input, 'utf8')), path.resolve(input));
-writeFileSync(output, JSON.stringify(doc, null, 2));
+writeFileSync(output, JSON.stringify(doc));   // compact, as the exporters write it
 console.log(`wrote ${output}: ${doc.controls?.length ?? 0} controls, ${doc.exportParameters?.length ?? 0} export parameters`);
+for (const line of formatExportSizeReport(exportSizeReport(doc))) console.log(line);
