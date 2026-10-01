@@ -17948,6 +17948,20 @@ bool InstrumentHostService::ownsHardwareSurface() const
                  < hardwareSendFenceMs;
 }
 
+/** Whether a claim stamped `stamp` is someone's, judged at `now`.
+
+    Stale after the claim timeout: an instance that crashed must not hold the surface forever.
+    A stamp AHEAD of `now` is still live, up to a whole timeout ahead: a racing claimer can read
+    the clock a moment before the winner does, and a wall clock stepped back a little by NTP looks
+    the same. Treating any future stamp as garbage let a second instance take a live claim
+    (InstrumentHostServiceTests). Further ahead than that is a corrupt or forged file, and is
+    nobody's. */
+static bool hardwareClaimIsLive (juce::int64 stamp, juce::int64 now, juce::int64 timeoutMs)
+{
+    const auto age = now - stamp;
+    return age <= timeoutMs && age >= -timeoutMs;
+}
+
 juce::String InstrumentHostService::hardwareSurfaceOwner() const
 {
     if (ownsHardwareSurface())
@@ -17958,10 +17972,9 @@ juce::String InstrumentHostService::hardwareSurfaceOwner() const
     if (owner.isEmpty())
         return "nobody";
 
-    // A stale claim is nobody's: an instance that crashed must not hold the surface forever.
     const auto stamp = (juce::int64) stored.getProperty ("heartbeat", 0);
-    const auto age = juce::Time::currentTimeMillis() - stamp;
-    return age < 0 || age > hardwareClaimTimeoutMs ? "nobody" : "another instance";
+    return hardwareClaimIsLive (stamp, juce::Time::currentTimeMillis(), hardwareClaimTimeoutMs)
+               ? "another instance" : "nobody";
 }
 
 bool InstrumentHostService::claimHardwareSurface()
@@ -17970,15 +17983,18 @@ bool InstrumentHostService::claimHardwareSurface()
         return true;
 
     bool acquired = false;
-    const auto now = juce::Time::currentTimeMillis();
+    juce::int64 now = 0;
     options.dataDirectory.createDirectory();
     if (! withHardwareClaimLock (hardwareOwnerFile(), [&]
         {
+            // The clock is read under the lock, so claims are ordered: one read before waiting
+            // would be older than a heartbeat the winner wrote meanwhile.
+            now = juce::Time::currentTimeMillis();
             const auto stored = juce::JSON::parse (hardwareOwnerFile().loadFileAsString());
             const auto owner = stored.getProperty ("instanceId", {}).toString();
             const auto stamp = (juce::int64) stored.getProperty ("heartbeat", 0);
             if (owner.isNotEmpty() && owner != instanceId
-                 && now - stamp <= hardwareClaimTimeoutMs && stamp <= now)
+                 && hardwareClaimIsLive (stamp, now, hardwareClaimTimeoutMs))
                 return;
 
             auto* claim = new juce::DynamicObject();

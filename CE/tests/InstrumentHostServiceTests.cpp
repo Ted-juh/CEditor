@@ -10242,6 +10242,39 @@ void testGeneratedProduct()
         second.service->releaseHardwareSurface();
     }
 
+    // A live claim whose heartbeat reads a little AHEAD of our clock is still live. This is what
+    // the race below produced: the loser read the clock before it got the lock, the winner read
+    // it after and wrote a later stamp, and the loser took a heartbeat newer than its own "now"
+    // for a forged or clock-skewed one and took the surface over — two owners. A wall clock
+    // stepped back by NTP looks the same. Only a stamp further ahead than a whole claim timeout
+    // is treated as garbage, so a corrupt file still cannot hold the surface forever.
+    {
+        const auto ownerFile = dir.getChildFile ("hardware-owner.json");
+        const auto writeClaim = [&] (juce::int64 heartbeat)
+        {
+            auto* claim = new juce::DynamicObject();
+            claim->setProperty ("instanceId", "someone-else");
+            claim->setProperty ("heartbeat", heartbeat);
+            ownerFile.replaceWithText (juce::JSON::toString (juce::var (claim)));
+        };
+
+        Harness h (dir);
+        h.cmd ("getState");
+        writeClaim (juce::Time::currentTimeMillis() + 1000);
+        check (h.service->hardwareSurfaceOwner() == "another instance",
+               "a claim stamped a second ahead of our clock is someone's");
+        check (! h.service->claimHardwareSurface(),
+               "  and is not taken over");
+
+        writeClaim (juce::Time::currentTimeMillis() + 10LL * 60 * 1000);
+        check (h.service->hardwareSurfaceOwner() == "nobody",
+               "a claim stamped ten minutes ahead is garbage");
+        check (h.service->claimHardwareSurface(),
+               "  and can be taken over");
+        h.service->releaseHardwareSurface();
+        ownerFile.deleteFile();
+    }
+
     // The decision and write are one transaction. InterProcessLock alone does not serialize
     // two plugin instances in one DAW process, so race both callers repeatedly on worker threads.
     {
