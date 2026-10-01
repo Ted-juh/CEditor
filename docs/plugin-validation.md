@@ -35,6 +35,13 @@ The script looks for each one in this order: `$PLUGINVAL` / `$CLAP_VALIDATOR`, t
 macOS they are skipped automatically when there is no display; `--with-gui` or `--skip-gui` overrides
 that.
 
+Passing them off Windows says less than it seems. Until 2026-10-01 the player asked for WebView2 by
+name on every platform, so on Linux its editor was a "WebView2 Runtime Unavailable" message, and the
+GUI tests passed against that. The app had been fixed for the same thing (`docs/wine-compile.md`);
+the player had not. A run now starts WebKitGTK's processes when the editor opens, but pluginval
+closes each editor within seconds, long before a software-rendered page paints. A passing GUI test
+on Linux therefore shows that the editor opens and closes cleanly, not that the panel draws.
+
 ## What it found the first time it ran
 
 The first run was against the Roland GAIA panel exported as VST3, CLAP and LV2 on Linux. It
