@@ -165,9 +165,13 @@ Two defects in this migration were caught before commit, and both have tests.
 (AddressSanitizer). And new records were given their place in the library in UUID order,
 because the journal is sorted by id.
 
-### Not done
+### Earlier versions stay on disk
 
-The state blobs are still held in memory as base64 for every captured sound and version, as
-before. Loading them on demand would cut resident memory by roughly the size of the captures
-(about 60 MB at 300). It is the natural next step, and it would change every reader of
-`stateBlobBase64`.
+A captured sound carries its current state and every earlier version, and the versions are three
+of every four state blobs. They are read only when a version is applied or compared. So the store
+now leaves them on disk (`LibraryVersion::stateLoaded`, `LibraryStore::versionState`), and the
+current state, which every load and audition uses, stays in memory. Saving a new version reads
+the ones it never loaded before it rewrites the record's versions, so none is written back empty.
+A JSON export refuses until `LibraryStore::loadVersionStates` has read them. At 12,000 presets
+with 300 captured sounds, the state held in memory went from 75 MB to 18.8 MB (56.2 MB stays on
+disk until asked for), and opening the library from 187 ms to 116 ms.

@@ -2410,6 +2410,41 @@ void testVersionsInTheService()
     h.cmd ("diffVersions", { { "recordId", factoryId } });
     check (h.emits.lastError().isNotEmpty(),
            "and a record with nothing to compare against says so rather than emitting an empty diff");
+
+    // After a restart, earlier versions' states are on disk rather than in memory, and are read
+    // when one is used (LibraryVersion::stateLoaded): the old sound still comes back, the diff still
+    // finds the change, and the rail still says how big each save is.
+    {
+        Harness again (dir);
+        again.cmd ("getState");
+        again.cmd ("addPart");
+        const auto parts = again.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        const auto freshPart = again.partIdAt (parts.size() - 1);
+        again.cmd ("loadInstrument", { { "partId", freshPart }, { "ceId", "VST3-good-synth" } });
+        auto* restarted = again.lastStub;
+        restarted->cutoff->setValueNotifyingHost (0.6f);
+
+        again.emits.clear();
+        again.cmd ("applyVersion", { { "recordId", mineId }, { "versionId", firstVersionId }, { "partId", freshPart } });
+        check (again.emits.lastError().isEmpty() && juce::approximatelyEqual (restarted->cutoff->get(), 0.25f),
+               "after a restart, an earlier version is read from disk and applied");
+
+        again.emits.clear();
+        again.cmd ("diffVersions", { { "recordId", mineId }, { "versionIdA", firstVersionId }, { "partId", freshPart } });
+        const auto* again_diff = again.emits.last ("instrumentHostVersionDiff");
+        check (again_diff != nullptr && (int) again_diff->getProperty ("differing", 0) == 1,
+               "and the diff between two versions on disk still finds the one change");
+
+        again.emits.clear();
+        again.cmd ("getLibrary");
+        juce::var restartedMine;
+        for (const auto& r : *again.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).getArray())
+            if (r.getProperty ("recordId", {}).toString() == mineId)
+                restartedMine = r;
+        check ((int) restartedMine.getProperty ("versions", {})[0].getProperty ("bytes", 0)
+                 == (int) mine.getProperty ("versions", {})[0].getProperty ("bytes", -1),
+               "and the rail gives the same size for a save it has not read");
+    }
 }
 
 // One distance function, three faces: "sounds like", the nearest dot on the map, and the

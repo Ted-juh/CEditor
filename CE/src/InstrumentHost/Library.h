@@ -132,8 +132,16 @@ struct LibraryVersion
     juce::String versionId;         // minted once
     juce::String label;             // what you called it; empty for an unnamed save
     juce::int64 savedAtMs = 0;      // juce::Time::currentTimeMillis()
-    juce::String stateBlobBase64;   // the state itself
+    juce::String stateBlobBase64;   // the state itself, when `stateLoaded`
     bool origin = false;            // the state this record was branched from
+
+    // A library read from LibraryStore leaves earlier versions' states on disk: they are three of
+    // every four state blobs a captured sound carries, and they are read only when a version is
+    // applied or compared. Then `stateLoaded` is false, `stateBlobBase64` is empty, and the state
+    // comes from LibraryStore::versionState. `stateLength` is the length `stateBlobBase64` has when
+    // loaded, so a listing can say how big a save is without reading it.
+    bool stateLoaded = true;
+    int stateLength = 0;
 
     bool operator== (const LibraryVersion&) const = default;
 };
@@ -461,8 +469,10 @@ public:
      *  action anywhere said to delete them. */
     enum class LoadResult { loaded, absent, unreadable };
 
-    /** Why the most recent JSON save failed. */
-    enum class SaveFailure { none, unreadableSource, writeFailed };
+    /** Why the most recent JSON save failed. `statesNotLoaded`: a version's state is still on disk
+        (see LibraryVersion::stateLoaded), and writing the JSON would write it as empty.
+        LibraryStore::loadVersionStates first. */
+    enum class SaveFailure { none, unreadableSource, statesNotLoaded, writeFailed };
 
     // -- the JSON form ---------------------------------------------------------------------------
     //

@@ -781,7 +781,12 @@ public:
         if (! fresh.empty())
         {
             auto& statement = db.cached (
-                "SELECT v.record_id, v.version_id, v.label, v.saved_at_ms, v.origin, v.state"
+                // Without the states: they stay on disk until a version is applied or compared
+                // (LibraryVersion::stateLoaded). The length is the base64 length the state has
+                // when loaded, worked out from the bytes when it is stored as bytes.
+                "SELECT v.record_id, v.version_id, v.label, v.saved_at_ms, v.origin,"
+                " CASE typeof(v.state) WHEN 'blob' THEN (length(v.state) + 2) / 3 * 4"
+                " WHEN 'text' THEN length(v.state) ELSE 0 END"
                 " FROM versions v JOIN records r ON r.record_id = v.record_id"
                 " WHERE r.rev > ?1 ORDER BY v.record_id, v.position");
             statement.bind (1, sinceRev);
@@ -795,7 +800,8 @@ public:
                 version.label = statement.text (2);
                 version.savedAtMs = statement.int64 (3);
                 version.origin = statement.integer (4) != 0;
-                version.stateBlobBase64 = readState (statement, 5);
+                version.stateLoaded = false;
+                version.stateLength = statement.integer (5);
                 fresh[it->second].versions.add (std::move (version));
             }
         }
@@ -885,6 +891,17 @@ public:
         return changed;
     }
 
+    /** One version's state, read from disk, or empty when there is none. */
+    juce::String versionState (const juce::String& recordId, const juce::String& versionId)
+    {
+        auto& statement = db.cached ("SELECT state FROM versions WHERE record_id = ?1 AND version_id = ?2");
+        statement.bind (1, recordId);
+        statement.bind (2, versionId);
+        const auto state = statement.step() ? readState (statement, 0) : juce::String();
+        statement.reset();
+        return state;
+    }
+
     static constexpr juce::uint32 wholeRow = 0xffffffffu;
 
 private:
@@ -966,6 +983,13 @@ private:
 
     void writeVersions (const LibraryRecord& record)
     {
+        // A version whose state was never read keeps the one on disk: fetched before the rows go,
+        // so rewriting a record's versions can never write one back empty.
+        std::map<juce::String, juce::String> kept;
+        for (const auto& version : record.versions)
+            if (! version.stateLoaded)
+                kept[version.versionId] = versionState (record.recordId, version.versionId);
+
         auto& clear = db.cached ("DELETE FROM versions WHERE record_id = ?1");
         clear.bind (1, record.recordId);
         clear.run();
@@ -981,7 +1005,7 @@ private:
             insert.bindOptional (4, version.label);
             insert.bind (5, version.savedAtMs);
             insert.bind (6, version.origin);
-            bindState (insert, 7, version.stateBlobBase64);
+            bindState (insert, 7, version.stateLoaded ? version.stateBlobBase64 : kept[version.versionId]);
             insert.run();
         }
     }
@@ -1288,6 +1312,43 @@ LibraryStore::OpenReport LibraryStore::open (const juce::File& databaseFile, con
         report.result = OpenResult::failed;
         report.error = e.what();
         return report;
+    }
+}
+
+juce::String LibraryStore::versionState (const LibraryRecord& record, const LibraryVersion& version)
+{
+    if (version.stateLoaded)
+        return version.stateBlobBase64;
+    if (! isOpen())
+        return {};
+    try
+    {
+        return impl->database->versionState (record.recordId, version.versionId);
+    }
+    catch (const SqliteError&)
+    {
+        return {};
+    }
+}
+
+bool LibraryStore::loadVersionStates (Library& library)
+{
+    if (! isOpen())
+        return false;
+    try
+    {
+        for (auto& record : library.records)
+            for (auto& version : record.versions)
+                if (! version.stateLoaded)
+                {
+                    version.stateBlobBase64 = impl->database->versionState (record.recordId, version.versionId);
+                    version.stateLoaded = true;
+                }
+        return true;
+    }
+    catch (const SqliteError&)
+    {
+        return false;
     }
 }
 

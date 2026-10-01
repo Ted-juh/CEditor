@@ -127,6 +127,14 @@ public:
         nothing to do: with an empty journal and no writes from elsewhere it starts no transaction. */
     SyncReport sync (Library& library);
 
+    /** A version's state: the one in memory when it is loaded, otherwise read from disk (see
+        LibraryVersion::stateLoaded). Empty when there is none, or the store is not open. */
+    juce::String versionState (const LibraryRecord& record, const LibraryVersion& version);
+
+    /** Reads every version state still on disk into `library`, for something that needs them all:
+        a JSON export (Library::saveTo refuses without them). False if the store could not. */
+    bool loadVersionStates (Library& library);
+
     /** Whether another process has written since this one last read — one counter, no I/O worth
         the name. What a periodic check calls before deciding a sync is worth running. */
     bool othersHaveWritten();

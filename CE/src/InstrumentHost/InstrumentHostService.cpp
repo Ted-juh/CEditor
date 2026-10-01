@@ -6489,10 +6489,18 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
+        // Earlier versions' states stay on disk until one is used (LibraryVersion::stateLoaded).
+        const auto versionState = libraryStore.versionState (*record, *version);
+        if (versionState.isEmpty())
+        {
+            emitError ("That version's saved state could not be read from the library.");
+            return;
+        }
+
         const auto partId = versionTargetPart (payload);
         if (const auto* part = rack.getPerformance().findPart (partId); part != nullptr && part->hardware)
         {
-            rack.setHardwarePatch (partId, version->stateBlobBase64, record->name);
+            rack.setHardwarePatch (partId, versionState, record->name);
             queueHardwarePatchSend (partId);
             savePerformance();
             emitState();
@@ -6506,7 +6514,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
-        if (const auto refusal = applyStateBlob (*instrument, version->stateBlobBase64);
+        if (const auto refusal = applyStateBlob (*instrument, versionState);
             refusal.isNotEmpty())
         {
             emitError (refusal);
@@ -6547,7 +6555,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         if (const auto* v = findVersion (idA); v != nullptr)
         {
-            blobA = v->stateBlobBase64;
+            blobA = libraryStore.versionState (*record, *v);
             nameA = v->label.isNotEmpty() ? v->label : "an earlier save";
         }
         else if (const auto* origin = library.find (record->branchedFromRecordId); origin != nullptr)
@@ -6558,12 +6566,12 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         if (const auto* v = findVersion (idB); v != nullptr)
         {
-            blobB = v->stateBlobBase64;
+            blobB = libraryStore.versionState (*record, *v);
             nameB = v->label.isNotEmpty() ? v->label : "a later save";
         }
         else if (! record->versions.isEmpty())
         {
-            blobB = record->versions.getLast().stateBlobBase64;
+            blobB = libraryStore.versionState (*record, record->versions.getLast());
             nameB = "now";
         }
         else
@@ -11226,7 +11234,8 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::
                 v->setProperty ("label",     version.label);
                 v->setProperty ("savedAtMs", (double) version.savedAtMs);
                 v->setProperty ("origin",    version.origin);
-                v->setProperty ("bytes",     (int) version.stateBlobBase64.length());
+                v->setProperty ("bytes",     version.stateLoaded ? (int) version.stateBlobBase64.length()
+                                                                 : version.stateLength);
                 versionVars.add (juce::var (v));
             }
             r->setProperty ("versions", versionVars);

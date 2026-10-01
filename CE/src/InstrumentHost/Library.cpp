@@ -690,6 +690,15 @@ bool Library::saveTo (const juce::File& file) const
         return false;
     }
 
+    // An export that wrote a version left on disk would write it empty, and nothing would say so.
+    for (const auto& record : records)
+        for (const auto& version : record.versions)
+            if (! version.stateLoaded)
+            {
+                saveFailure = SaveFailure::statesNotLoaded;
+                return false;
+            }
+
     // Compact, with floats to seven places: a float carries no more than that, and the old
     // pretty-printed form spent a third of the file on indentation and half of every measured
     // record on the fifteen-digit tails of 48 envelope points.

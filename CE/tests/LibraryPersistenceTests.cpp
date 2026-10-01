@@ -364,6 +364,7 @@ void testStoreRoundTripsEveryField()
     collection.query.brightness.active = true;
     collection.query.brightness.min = 0.5f;
     library.putSmartCollection (collection);
+    const auto expected = asJson (library);   // before the sync reads the rows back
 
     const auto synced = store.sync (library);
     check (synced.ok() && synced.written == 6, "one sync writes the records and the collection");
@@ -373,7 +374,25 @@ void testStoreRoundTripsEveryField()
     LibraryStore second;
     check (second.open (database, {}, reread).result == LibraryStore::OpenResult::opened,
            "a second store opens what the first wrote");
-    check (asJson (reread) == asJson (library), "every field of every record comes back as it went in");
+
+    // Earlier versions' states stay on disk until asked for: three in four of a capture's blobs.
+    const auto* stored = reread.find (id);
+    check (stored != nullptr && stored->versions.size() == 2 && ! stored->versions[0].stateLoaded
+             && stored->versions[0].stateBlobBase64.isEmpty(),
+           "versions come back without their states");
+    check (stored != nullptr && stored->versions[0].stateLength == everyField().versions[0].stateBlobBase64.length()
+             && stored->versions[1].stateLength == everyField().versions[1].stateBlobBase64.length(),
+           "but say how long each one is, in both encodings");
+    check (stored != nullptr && second.versionState (*stored, stored->versions[1]) == everyField().versions[1].stateBlobBase64,
+           "and each one is read when asked for");
+    check (stored != nullptr && stored->stateBlobBase64 == everyField().stateBlobBase64,
+           "the current state stays in memory: every load and audition uses it");
+
+    check (! reread.saveTo (dir.getChildFile ("export.json"))
+             && reread.lastSaveFailure() == Library::SaveFailure::statesNotLoaded,
+           "an export refuses rather than write states it never read as empty");
+    check (second.loadVersionStates (reread) && asJson (reread) == expected,
+           "with the states loaded, every field of every record is what went in");
     check (! reread.hasPendingChanges(), "and what was read is not a change");
 
     check (querySql (database, ("SELECT typeof(state) FROM records WHERE record_id = '" + id + "'").toRawUTF8())
@@ -407,7 +426,9 @@ void testStoreImportsTheJsonLibraryOnce()
     const auto report = store.open (database, json, library);
     check (report.result == LibraryStore::OpenResult::imported && report.importedRecords == 2,
            "it is imported, and the report says how much");
-    check (asJson (library) == asJson (asJsonRead), "and the database holds exactly what the file did");
+    Library everything = library;
+    store.loadVersionStates (everything);
+    check (asJson (everything) == asJson (asJsonRead), "and the database holds exactly what the file did");
     check (bytesOf (json) == jsonBefore, "the file itself is untouched: it is the backup");
 
     auto user = library.allRecords()[0].user;
@@ -426,6 +447,49 @@ void testStoreImportsTheJsonLibraryOnce()
     juce::Array<juce::File> left;
     dir.findChildFiles (left, juce::File::findFiles, false, "*.creating-*");
     check (left.isEmpty(), "building the database left nothing half-made behind");
+
+    dir.deleteRecursively();
+}
+
+void testANewVersionKeepsTheOnesNeverRead()
+{
+    std::cout << "\nsaving a version keeps the earlier ones it never read" << std::endl;
+
+    const auto dir = makeTempDir ("store-versions");
+    const auto database = dir.getChildFile ("library.db");
+    juce::String id;
+    {
+        Library library;
+        LibraryStore store;
+        store.open (database, {}, library);
+        id = library.addCapturedRecord (everyField());
+        store.sync (library);
+    }
+
+    Library library;
+    LibraryStore store;
+    store.open (database, {}, library);
+    // A new save, the way the service makes one: the record's versions are rewritten, and the two
+    // already there were never read into memory.
+    LibraryVersion third;
+    third.versionId = "v3";
+    third.savedAtMs = 3;
+    third.stateBlobBase64 = juce::Base64::toBase64 ("newer", 5);
+    auto* record = library.edit (id, LibraryChanges::state);
+    record->versions.add (third);
+    record->stateBlobBase64 = third.stateBlobBase64;
+    check (store.sync (library).ok(), "the new version is saved");
+
+    Library reread;
+    LibraryStore second;
+    second.open (database, {}, reread);
+    second.loadVersionStates (reread);
+    const auto* stored = reread.find (id);
+    check (stored != nullptr && stored->versions.size() == 3, "three versions now");
+    check (stored != nullptr && stored->versions[0].stateBlobBase64 == everyField().versions[0].stateBlobBase64
+             && stored->versions[1].stateBlobBase64 == everyField().versions[1].stateBlobBase64,
+           "and the two that were never read still have their states");
+    check (stored != nullptr && stored->versions[2].stateBlobBase64 == third.stateBlobBase64, "as does the new one");
 
     dir.deleteRecursively();
 }
@@ -776,6 +840,7 @@ int main()
     testWriteFailureLeavesTheGoodFileAlone();
     testStoreRoundTripsEveryField();
     testStoreImportsTheJsonLibraryOnce();
+    testANewVersionKeepsTheOnesNeverRead();
     testStoreSetsAsideAnUnreadableJsonImport();
     testStoreSetsAsideAnUnreadableDatabase();
     testStoreLeavesANewerDatabaseAlone();

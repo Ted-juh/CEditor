@@ -169,6 +169,20 @@ int main (int argc, char** argv)
     LibraryStore store;
     store.open (database, {}, live);
 
+    // Processor state an open library holds in memory, against what it leaves on disk until asked
+    // for (earlier versions: LibraryVersion::stateLoaded). Base64 characters, which is how the
+    // in-memory strings hold it.
+    double residentMb = 0, onDiskMb = 0;
+    for (const auto& record : live.allRecords())
+    {
+        residentMb += record.stateBlobBase64.length();
+        for (const auto& version : record.versions)
+            (version.stateLoaded ? residentMb : onDiskMb) += version.stateLoaded ? version.stateBlobBase64.length()
+                                                                               : version.stateLength;
+    }
+    residentMb /= 1024.0 * 1024.0;
+    onDiskMb /= 1024.0 * 1024.0;
+
     const auto someId = live.allRecords()[live.allRecords().size() / 2].recordId;
     bool toggle = false;
     const auto favouriteMs = median (runs, [&]
@@ -250,6 +264,7 @@ int main (int argc, char** argv)
     std::printf ("  import into a database        %8.0f ms (once)\n", importMs);
     std::printf ("  database on disk              %8.1f MB\n", databaseMb);
     std::printf ("  open and read all             %8.1f ms\n", openMs);
+    std::printf ("  state held in memory          %8.1f MB (%.1f MB of earlier versions left on disk)\n", residentMb, onDiskMb);
     std::printf ("  favourite click, written      %8.2f ms\n", favouriteMs);
     std::printf ("  favourite click, memory only  %8.3f ms\n", favouriteInMemoryMs);
     std::printf ("  audition count, written       %8.2f ms\n", auditionMs);
