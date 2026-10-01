@@ -51,6 +51,9 @@
     OFFERED_PROPERTIES,
     TRIGGER_TYPES,
     EASING_NAMES,
+    ANIMATION_KINDS,
+    springPoints,
+    animationWithKind,
     targetStatus,
     newAnimationShape,
     cleanAnimationName,
@@ -110,6 +113,12 @@ onMount(() => {
   function setProp(prop, value) {
     if (!controlId || !selectedName) return;
     updateControlProperty(controlId, `Animations.${selectedName}.${prop}`, value);
+  }
+
+  /** One store write, so switching kind is one undo step even when it fills in the spring's numbers. */
+  function setKind(kind) {
+    if (!controlId || !selectedName || !selected) return;
+    updateControlProperty(controlId, `Animations.${selectedName}`, animationWithKind(selected.animation, kind));
   }
 
   function writeTargets(next) {
@@ -279,7 +288,13 @@ onMount(() => {
           <div class="setbox">
             <div class="grp">Timing</div>
             <div class="r">
-              <label for="anim-dur">Duration</label>
+              <label for="anim-kind">Kind</label>
+              <Segmented options={ANIMATION_KINDS.map((value) => ({ value, label: value === 'spring' ? 'Spring' : 'Transition' }))}
+                         value={selected.kind === 'spring' ? 'spring' : 'transition'} ariaLabel="Kind"
+                         onchange={(value) => setKind(value)} />
+            </div>
+            <div class="r">
+              <label for="anim-dur">{selected.kind === 'spring' ? 'Settle' : 'Duration'}</label>
               <div class="cell"><NumberCell label="ms" value={selected.duration} min={0} step={10}
                 onchange={(value) => setProp('duration', Math.max(0, Math.round(value)))} /></div>
             </div>
@@ -317,16 +332,35 @@ onMount(() => {
               </div>
             {/if}
 
-            <div class="grp">Easing</div>
-            <div class="easings">
-              {#each EASING_NAMES as name (name)}
-                <button type="button" class="easing" class:on={selected.easing === name}
-                        title={`Use ${name}`} onclick={() => setProp('easing', name)}>
-                  <EasingCurve {name} active={selected.easing === name} width={64} height={44} />
-                  <span>{name}</span>
-                </button>
-              {/each}
-            </div>
+            {#if selected.kind === 'spring'}
+              <div class="grp">Spring</div>
+              <div class="r">
+                <label for="anim-damping">Damping</label>
+                <div class="cell"><NumberCell label="damp" value={selected.damping} min={0.5} step={0.5}
+                  onchange={(value) => setProp('damping', Math.max(0.5, value))} /></div>
+              </div>
+              <div class="r">
+                <label for="anim-frequency">Frequency</label>
+                <div class="cell"><NumberCell label="freq" value={selected.frequency} min={1} step={1}
+                  onchange={(value) => setProp('frequency', Math.max(1, value))} /></div>
+              </div>
+              <div class="spring">
+                <EasingCurve points={springPoints(selected.damping, selected.frequency)} active width={204} height={64}
+                             label={`spring, damping ${selected.damping}, frequency ${selected.frequency}`} />
+                <p class="note">Overshoots and settles over the settle time. The same curve as <code>ce.anim.spring</code>; less damping or more frequency means more bounce.</p>
+              </div>
+            {:else}
+              <div class="grp">Easing</div>
+              <div class="easings">
+                {#each EASING_NAMES as name (name)}
+                  <button type="button" class="easing" class:on={selected.easing === name}
+                          title={`Use ${name}`} onclick={() => setProp('easing', name)}>
+                    <EasingCurve {name} active={selected.easing === name} width={64} height={44} />
+                    <span>{name}</span>
+                  </button>
+                {/each}
+              </div>
+            {/if}
           </div>
         </div>
 
@@ -530,6 +564,9 @@ onMount(() => {
   .txt:focus { border-color: #5B9BD5; }
 
   .easings { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+  .spring { margin-top: 7px; }
+  .spring .note { margin: 6px 0 0; font-size: 10.5px; line-height: 1.4; color: #8E99A4; }
+  .spring .note code { color: #B9C4CE; }
   .easing {
     display: flex;
     flex-direction: column;

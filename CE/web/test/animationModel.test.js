@@ -1,9 +1,11 @@
 // animationModel.test.js — the Animation tab's working parts.
 //
 // The headline test runs the REAL animation runtime over every property the editor's dropdown
-// offers, and checks that this file's answer matches. That is the whole point of the tab: two of
-// the seven do nothing, and the editor does not say so. If the runtime ever starts accepting more
-// paths, this test fails rather than the tab quietly keeping an out-of-date warning.
+// offers, and checks that this file's answer matches. That was the whole point of the tab: two of
+// the seven did nothing, and the editor did not say so. The runtime grew a colour bucket on
+// 2026-10-01 and the two are alive; the test is what noticed, and what keeps the tab's answer and
+// the runtime's the same from here on. A second kind, `spring`, arrived the same day: the script
+// API's damped oscillation, declared on the control, as a CSS `linear()` timing function.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,8 +36,13 @@ import {
   easingPoints,
   unofferedEasings,
   allAnimationFieldLabels,
+  springPoints,
+  animationWithKind,
+  SPRING_DEFAULTS,
+  springEase,
 } from '../src/CE_Application/utils/animationModel.js';
-import { resolveInteractiveControl } from '../src/CE_Application/utils/interactionRuntime.js';
+import { resolveInteractiveControl, springCssTiming } from '../src/CE_Application/utils/interactionRuntime.js';
+import { animationSpring } from '../src/CE_Application/scripting/panelRuntime.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { createCustomComponentPartsDefaults } from '../src/CE_Application/utils/customComponentFactory.js';
 
@@ -91,15 +98,30 @@ test('this file agrees with the runtime about every property the editor offers',
   }
 });
 
-test('and the two dead ones are the two the properties panel offers', () => {
+test('nothing the panel offers is dead any more: the two colours fill the colour bucket', () => {
   const dead = OFFERED_PROPERTIES
     .filter((offered) => !targetStatus(buildTarget('label', offered), ['label']).works)
     .map((offered) => offered.label);
-  assert.deepEqual(dead, ['Fill colour', 'Text colour']);
+  assert.deepEqual(dead, []);
+  // The panel's own hints — CSS property names — are what a saved control carries, and they work.
+  assert.equal(targetStatus({ path: 'Parts.label.Background.Fill.colour', properties: ['background-color'] }, ['label']).animates, 'colour');
+  assert.equal(targetStatus({ path: 'Parts.label.Text.Fill.colour', properties: ['color'] }, ['label']).animates, 'colour');
+  assert.equal(targetStatus({ path: 'Background.Fill.colour', properties: [] }, []).animates, 'colour');
+});
+
+test('a colour target really transitions: the runtime writes the colour bucket', () => {
+  const base = createControl('CustomComponent');
+  base._children.Parts = createCustomComponentPartsDefaults();
+  const part = partsOf(base)[0];
+  const control = withAnimation([{ path: `Parts.${part}.Background.Fill.colour`, properties: ['background-color'] }]);
+  const { runtime } = resolveInteractiveControl(control, {});
+  const bucket = runtime.transitions.partTransitions.get(part);
+  assert.match(bucket.colour, /^200ms cubic-bezier\(.*\) 0ms$/);
+  assert.equal(bucket.transform, null, 'a colour target touches only the colour bucket');
 });
 
 test('a dead target says what the runtime does accept', () => {
-  const status = targetStatus({ path: 'Parts.label.Background.Fill.colour', properties: ['background-color'] }, ['label']);
+  const status = targetStatus({ path: 'Parts.label.Background.Fill.gradientOpacity', properties: [] }, ['label']);
   assert.equal(status.works, false);
   assert.equal(status.reason, 'dead path');
   assert.match(status.detail, /Layout\.scale/);
@@ -141,10 +163,11 @@ test('a target on the control itself works for the three paths that exist', () =
 });
 
 test('a properties hint works even when the path is not in the table', () => {
-  // This is the runtime's own escape hatch, and it is why a colour target could be made to work
-  // one day without changing the editor — the runtime would need a colour bucket first.
+  // This is the runtime's own escape hatch. It is how the panel's colour targets, saved with a
+  // CSS property name as their hint, came alive the day the runtime grew a colour bucket.
   assert.equal(targetStatus({ path: 'Parts.label.Anything', properties: ['transform'] }, ['label']).works, true);
-  assert.equal(targetStatus({ path: 'Parts.label.Anything', properties: ['colour'] }, ['label']).works, false);
+  assert.equal(targetStatus({ path: 'Parts.label.Anything', properties: ['colour'] }, ['label']).animates, 'colour');
+  assert.equal(targetStatus({ path: 'Parts.label.Anything', properties: ['filter'] }, ['label']).works, false);
 });
 
 test('every path in the tables maps to a bucket the runtime fills', () => {
@@ -188,7 +211,7 @@ test('the section switch turns everything off', () => {
 test('describeTargets attaches a status to each one and counts the dead', () => {
   const control = withAnimation([
     { path: 'Parts.label.Layout.scale', properties: ['transform'] },
-    { path: 'Parts.label.Background.Fill.colour', properties: ['background-color'] },
+    { path: 'Parts.label.Effects.Filters.blur', properties: [] },
     { path: '' },
   ]);
   const row = readAnimations(control)[0];
@@ -250,9 +273,52 @@ test('the panel offers four easings and the runtime knows five', () => {
 
 // --- Odds and ends ----------------------------------------------------------
 
-test('only one animation kind does anything', () => {
-  assert.deepEqual(ANIMATION_KINDS, ['transition']);
+test('two animation kinds do something', () => {
+  assert.deepEqual(ANIMATION_KINDS, ['transition', 'spring']);
   assert.deepEqual(TRIGGER_TYPES, ['stateChange', 'valueChange']);
+});
+
+// --- The spring kind ----------------------------------------------------------------------------
+
+test('a declared spring and ce.anim.spring trace one path', () => {
+  for (let i = 0; i <= 50; i += 1) {
+    const t = i / 50;
+    assert.equal(springEase(t, 6, 12), animationSpring(t, 6, 12));
+    assert.equal(springEase(t, 3, 20), animationSpring(t, 3, 20));
+  }
+  assert.equal(springEase(1, 6, 12), 1, 'a spring always lands');
+  assert.ok(springPoints(6, 12).some((p) => p.y > 1.1), 'and it overshoots on the way');
+});
+
+test('a spring becomes a linear() timing function the runtime hands to CSS', () => {
+  const base = createControl('CustomComponent');
+  base._children.Parts = createCustomComponentPartsDefaults();
+  const part = partsOf(base)[0];
+  const control = withAnimation([{ path: `Parts.${part}.Layout.rotation`, properties: ['transform'] }]);
+  const animation = control._children.Animations._children.test;
+  animation.kind = 'spring';
+  delete animation.duration;
+  const { runtime } = resolveInteractiveControl(control, {});
+  const transform = runtime.transitions.partTransitions.get(part).transform;
+  assert.match(transform, /^600ms linear\(0\.0000, .*, 1\.0000\) 0ms$/, transform);
+  // The stops are the formula, sampled: the second-to-last is already within a hair of 1.
+  const stops = transform.match(/linear\(([^)]*)\)/)[1].split(', ').map(Number);
+  assert.equal(stops.length, 33);
+  assert.ok(Math.max(...stops) > 1, 'the overshoot is in the stops');
+  assert.equal(springCssTiming(6, 12).split(', ').length, 33);
+});
+
+test('switching kind is one write that fills in what a spring needs, and keeps it on the way back', () => {
+  const spring = animationWithKind({ kind: 'transition', duration: 120, easing: 'outQuad' }, 'spring');
+  assert.deepEqual(spring, { kind: 'spring', duration: 600, easing: 'outQuad', damping: 6, frequency: 12 });
+  const tuned = animationWithKind({ ...spring, damping: 3, duration: 900 }, 'spring');
+  assert.equal(tuned.damping, 3, 'numbers already set are left alone');
+  assert.equal(tuned.duration, 900);
+  const back = animationWithKind(tuned, 'transition');
+  assert.equal(back.kind, 'transition');
+  assert.equal(back.damping, 3, 'the spring numbers survive a switch back');
+  assert.equal(animationWithKind({}, 'nonsense').kind, 'transition');
+  assert.equal(describeAnimation('a', {}).damping, SPRING_DEFAULTS.damping);
 });
 
 test('field labels are collected for when the panel rows come out', () => {
@@ -330,9 +396,12 @@ test('the properties panel really is the way this tab says it is', () => {
   // 3. Four easings, no picture of any of them.
   assert.match(source, /const EASING_OPTIONS = \['linear', 'outQuad', 'inOutQuad', 'outCubic'\]/);
 
-  // 4. Kind is a free text box you can type any word into. The panel's own hint says transition is
-  //    the only kind that does anything, so this one is a small tidy-up rather than a trap.
-  const kindCell = source.slice(source.indexOf('label="Kind"'), source.indexOf('label="Kind"') + 400);
-  assert.match(kindCell, /<input class="val" type="text"/);
-  assert.match(kindCell, /only runtime kind/, 'the panel does warn about this one');
+  // 4. Kind was a free text box you could type any word into. Now it is a choice of the two kinds
+  //    the runtime has, and a spring shows its damping and frequency where a transition shows its
+  //    easing.
+  const kindCell = source.slice(source.indexOf('label="Kind"'), source.indexOf('label="Kind"') + 600);
+  assert.match(kindCell, /<select class="val"/);
+  assert.match(kindCell, /ANIMATION_KINDS/);
+  assert.match(source, /label="Damping"/);
+  assert.match(source, /label="Frequency"/);
 });

@@ -98,6 +98,12 @@ change that. Candidates for the axis itself:
 
 ## What this adds up to
 
+Items 1 and 2 were **built the same day**; `animation-tab-design.md` carries the as-built notes
+under its finding 1 and open item 4. One thing came out differently from the plan: the spring is
+not run through the script animator's loop but handed to CSS as a `linear()` timing function
+sampled from the same formula, so it reaches every bucket (colour included) with no frame loop
+of its own, and a spring in a script and a spring on a control are held to one path by test.
+
 1. **Fix gap C now.** A `colour` bucket in `buildTransitionCatalog`, and `animationModel.test.js`
    changes from pinning two dead properties to pinning none. No library.
 2. **Gap B next, no library.** The Animations section gets a third kind beside `transition`:

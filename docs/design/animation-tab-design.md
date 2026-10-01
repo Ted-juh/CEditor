@@ -1,6 +1,8 @@
 # The Animation tab
 
 Status: **built**, 2026-09-10. The properties panel is untouched — see [What was built](#what-was-built).
+**2026-10-01:** finding 1 is closed (the runtime has a colour bucket) and open item 4 is closed (a
+second kind, `spring`); see the notes under each.
 
 Candidate 8 from [`display-panel-candidates.md`](display-panel-candidates.md). Drawn in
 [`animation-tab-mockups.html`](animation-tab-mockups.html).
@@ -40,6 +42,14 @@ first one is the reason.
 ## Four findings
 
 ### 1. Two of the seven properties on offer animate nothing
+
+> **Closed 2026-10-01.** `buildTransitionCatalog` has a `colour` bucket: `Background.Fill.colour`,
+> `Text.Fill.colour` and `Background.Border.colour` on a part, the first two on the root, and the
+> hints `colour`, `background-color` and `color`. The renderers write `background-color`, `color`
+> and `border-color` transitions for it. The panel's own hints are the CSS names it always wrote, so
+> a control saved before this animates now without being touched. A gradient fill still jumps:
+> there is no colour in it to tween. `animationModel.test.js` now pins the dead count at zero and
+> runs the colour target through the real runtime.
 
 The editor's "Property" dropdown has seven choices:
 
@@ -191,6 +201,16 @@ the panel's rows do come out.
    say. If animations ever get keyframes, that changes.
 4. **`kind` is not edited here at all.** Transition is the only one that works, so the tab writes it
    and does not offer the box. If a second kind ever ships, this needs a real choice.
+
+   > **Closed 2026-10-01.** The second kind is `spring`: the damped oscillation `ce.anim.spring`
+   > draws, declared on the control. The runtime samples it into a CSS `linear()` timing function
+   > (33 stops; WebView2 and WebKitGTK take it, and a browser without it drops the declaration and
+   > the change jumps as it did before). `springEase` lives in `interactionRuntime.js` and the
+   > script runtime's `animationSpring` calls it, so the two trace one path, which the test holds.
+   > The tab has a Kind choice; a spring shows damping, frequency and its curve where a transition
+   > shows the easing row, and the properties panel's free text box is a select with the same two
+   > fields. Switching kind is one store write (`animationWithKind`): it fills in the spring's
+   > numbers and a 600 ms settle time, and leaves them in place on the way back.
 
 ## Notes
 

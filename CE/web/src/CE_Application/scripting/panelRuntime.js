@@ -17,6 +17,7 @@
 // and a fifteenth was spelled differently, and forty-seven panel verbs existed here and nowhere
 // else. Bind nothing panelApi.js doesn't declare, and declare nothing you don't bind.
 
+import { springEase } from '../utils/interactionRuntime.js';
 import { get } from 'svelte/store';
 import { panels, scriptRuntimePanelId, updatePanel } from '../stores/panels.js';
 import { sanitizeControlName } from '../utils/controlNames.js';
@@ -3362,11 +3363,13 @@ export function animationEase(progress, curve) {
   return undefined;
 }
 
-/** A damped oscillation, pinned to exactly 1 at the end so a spring always lands on its target. */
+/**
+ * A damped oscillation, pinned to exactly 1 at the end so a spring always lands on its target.
+ * The formula lives in `utils/interactionRuntime.js` (`springEase`), because the Animations section
+ * can now declare the same spring on a control, and the two must trace one path.
+ */
 export function animationSpring(progress, damping, frequency) {
-  const x = Math.min(1, Math.max(0, Number(progress) || 0));
-  if (x >= 1) return 1;
-  return 1 - Math.exp(-damping * x) * Math.cos(frequency * x);
+  return springEase(progress, damping, frequency);
 }
 
 const animations = new Map();   // path -> descriptor

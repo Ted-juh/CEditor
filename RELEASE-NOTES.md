@@ -25,6 +25,11 @@ controls by type, the heaviest section inside parts, embedded media with repeats
 fonts. The panel inside a plug-in is written compact; the plug-in parses it, nobody reads it.
 New panels select VST3 only; saved format choices are retained.
 
+Animations: a fill, text or border colour transitions between states (the two colour choices
+that silently did nothing now work), and an animation can be a **spring** instead of a transition:
+it overshoots and settles, with damping and frequency, the same curve a script gets from
+`ce.anim.spring`.
+
 ## What you get
 
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,

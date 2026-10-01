@@ -1638,9 +1638,11 @@
     const rules = [];
     const transformTransition = interactionRuntime?.transitions?.rootTransitions?.get?.('transform');
     const opacityTransition = interactionRuntime?.transitions?.rootTransitions?.get?.('opacity');
+    const colourTransition = interactionRuntime?.transitions?.rootTransitions?.get?.('colour');
 
     if (transformTransition) rules.push(`transform ${transformTransition}`);
     if (opacityTransition) rules.push(`opacity ${opacityTransition}`);
+    if (colourTransition) rules.push(`background-color ${colourTransition}`, `color ${colourTransition}`, `border-color ${colourTransition}`);
 
     return rules.length ? `transition:${rules.join(', ')};` : '';
   });

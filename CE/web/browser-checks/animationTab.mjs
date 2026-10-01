@@ -53,23 +53,23 @@ const verdicts = await ev(() => window.__anim.targetVerdicts());
 const dead = await ev(() => window.__anim.deadRows());
 check('a target that animates nothing says so on the row', () => {
   assert.equal(verdicts.length, 4, `rows: ${verdicts.join(' | ')}`);
-  assert.equal(dead.length, 2, `marked dead: ${dead.join(' | ')}`);
-  assert.equal(verdicts.filter((v) => /does nothing/.test(v)).length, 2, verdicts.join(' | '));
+  assert.equal(dead.length, 1, `marked dead: ${dead.join(' | ')}`);
+  assert.equal(verdicts.filter((v) => /does nothing/.test(v)).length, 1, verdicts.join(' | '));
 });
 
-check('and the two dead ones are the colour target and the missing part', () => {
-  assert.ok(dead.some((row) => /Background\.Fill\.colour/.test(row)), dead.join(' | '));
+check('and the dead one is the missing part — the colour target is alive now', () => {
   assert.ok(dead.some((row) => /nosuchpart/.test(row)), dead.join(' | '));
+  assert.ok(!dead.some((row) => /Background\.Fill\.colour/.test(row)), dead.join(' | '));
 });
 
 const working = verdicts.filter((v) => !/does nothing/.test(v));
 check('and a target that works names what it animates', () => {
-  assert.deepEqual(working.sort(), ['opacity', 'transform']);
+  assert.deepEqual(working.sort(), ['colour', 'opacity', 'transform']);
 });
 
 const alarm = await ev(() => window.__anim.alarm());
 check('the header counts the dead targets across every animation', () => {
-  assert.match(alarm, /2 targets do nothing/);
+  assert.match(alarm, /1 target does nothing/);
 });
 
 // --- Editing the target list, which is a JSON box in the panel --------------------------------
@@ -87,7 +87,7 @@ check('removing a target writes the control — no JSON editing', () => {
 });
 
 const alarmAfter = await ev(() => window.__anim.alarm());
-check('and the dead count follows it down', () => {
+check('and the dead count is unmoved, because the removed target was a live one', () => {
   assert.match(alarmAfter, /1 target does nothing/);
 });
 
@@ -119,10 +119,28 @@ assert.equal(await ev(() => window.__anim.activeEasing()), 'inQuad');
 await ev(() => window.__anim.chooseChange('Fill colour'));
 await page.waitForTimeout(300);
 const warning = await ev(() => window.__anim.addWarning());
-check('the tab warns about a dead property before you add it, not after', () => {
-  assert.match(warning, /Fill colour does nothing/i, `warning: ${warning}`);
-  assert.match(warning, /does not animate/i, `warning: ${warning}`);
+check('Fill colour no longer draws the warning it used to', () => {
+  assert.equal(warning, '', `warning: ${warning}`);
 });
+
+// --- The spring kind ----------------------------------------------------------------------------
+
+await ev(() => window.__anim.pickKind('spring'));
+await page.waitForTimeout(350);
+const sprung = await ev(() => window.__anim.storedSpring('pressMotion'));
+const springPath = await ev(() => window.__anim.springPath());
+check('switching to spring writes the kind with its numbers, and draws the curve', () => {
+  assert.equal(sprung.damping, 6);
+  assert.equal(sprung.frequency, 12);
+  assert.equal(sprung.duration, 600, 'the 90 ms transition becomes a settle time long enough to see');
+  assert.ok(springPath.startsWith('M'), `curve: ${springPath.slice(0, 40)}`);
+  assert.ok(springPath.split('L').length > 40, 'the picture is the sampled spring, not a bezier');
+});
+assert.equal(await ev(() => window.__anim.storedKind('pressMotion')), 'spring');
+await ev(() => window.__anim.pickKind('transition'));
+await page.waitForTimeout(350);
+assert.equal(await ev(() => window.__anim.storedKind('pressMotion')), 'transition');
+assert.equal((await ev(() => window.__anim.storedSpring('pressMotion'))).damping, 6, 'the numbers stay for next time');
 
 await ev(() => window.__anim.chooseChange('Width'));
 await page.waitForTimeout(300);
@@ -149,7 +167,9 @@ check('both animations are listed, not one at a time in a dropdown', () => {
 
 const meta = await ev(() => window.__anim.animationMeta());
 check('and each row says how long it runs', () => {
-  assert.match(meta[0], /^90ms/);
+  // pressMotion was 90 ms until the spring check above switched it over and back: the switch to
+  // spring sets a settle time, and the switch back leaves the numbers for next time, by design.
+  assert.match(meta[0], /^600ms/);
   assert.match(meta[1], /^140ms/);
 });
 

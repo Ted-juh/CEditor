@@ -40,7 +40,7 @@ control._children.Animations = {
       targets: [
         // Works.
         { path: `Parts.${first}.Layout.scale`, properties: ['transform'] },
-        // Dead: the runtime has no colour bucket, and the panel's dropdown offers this.
+        // Was dead until the runtime grew a colour bucket; the panel's own hint, as saved.
         { path: `Parts.${first}.Background.Fill.colour`, properties: ['background-color'] },
         // Works.
         { path: `Parts.${first}.opacity`, properties: ['opacity'] },
@@ -105,6 +105,10 @@ window.__anim = {
     const button = [...document.querySelectorAll('.easing')].find((b) => textOf(b.querySelector('span')) === name);
     return [...(button?.querySelectorAll('svg path') ?? [])].map((p) => p.getAttribute('d'));
   },
+  pickKind: (kind) => { [...document.querySelectorAll('[aria-label="Kind"] button')].find((b) => new RegExp(kind, 'i').test(b.textContent))?.click(); },
+  storedKind: (name) => animation(name).kind,
+  storedSpring: (name) => ({ damping: animation(name).damping, frequency: animation(name).frequency, duration: animation(name).duration }),
+  springPath: () => document.querySelector('.spring svg path.trace')?.getAttribute('d') ?? '',
   pickEasing: (name) => {
     const button = [...document.querySelectorAll('.easing')].find((b) => textOf(b.querySelector('span')) === name);
     button?.click();

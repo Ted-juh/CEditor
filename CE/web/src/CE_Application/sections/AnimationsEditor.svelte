@@ -5,6 +5,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import { ANIMATION_KINDS, SPRING_DEFAULTS, animationWithKind } from '../utils/animationModel.js';
   import HeaderPill from '../properties/HeaderPill.svelte';
   import OpenInDock from '../properties/OpenInDock.svelte';
   import Play from 'lucide-svelte/icons/play';
@@ -51,6 +52,12 @@
     targetsDraft = JSON.stringify(selectedAnimation?.targets ?? [], null, 2);
     parseError = '';
   });
+
+  /** One write for the kind and, for a spring, the numbers it needs (`animationWithKind`). */
+  function setAnimationKind(kind) {
+    if (!core?.id || !selectedAnimationName || !selectedAnimation) return;
+    updateControlProperty(core.id, `Animations.${selectedAnimationName}`, animationWithKind(selectedAnimation, kind));
+  }
 
   function setAnimationProp(prop, value) {
     if (!core?.id || !selectedAnimationName) return;
@@ -271,22 +278,35 @@
                     onchange={() => setAnimationProp('enabled', !(selectedAnimation.enabled !== false))} />
       {/snippet}
       {#if selectedAnimation.enabled !== false}
-      <PropertyCell label="Kind" span={2} hint="Animation family. Transition is the only runtime kind in this slice.">
-        <input class="val" type="text" value={selectedAnimation.kind ?? 'transition'} onchange={(e) => setAnimationProp('kind', e.target.value)} />
+      <PropertyCell label="Kind" span={2} hint="Transition eases between states on a named curve. Spring overshoots and settles, the same curve as ce.anim.spring, with its damping and frequency below.">
+        <select class="val" value={selectedAnimation.kind === 'spring' ? 'spring' : 'transition'} onchange={(e) => setAnimationKind(e.target.value)}>
+          {#each ANIMATION_KINDS as option}
+            <option value={option}>{option}</option>
+          {/each}
+        </select>
       </PropertyCell>
-      <PropertyCell label="Duration" span={1} compact hint="Transition duration in milliseconds.">
+      <PropertyCell label={selectedAnimation.kind === 'spring' ? 'Settle' : 'Duration'} span={1} compact hint="How long the change takes, in milliseconds. For a spring, the time it takes to settle.">
         <NumberCell label="Dur" value={selectedAnimation.duration ?? 120} step={1} min={0} defaultValue={120} onchange={(value) => setAnimationProp('duration', value)} />
       </PropertyCell>
       <PropertyCell label="Delay" span={1} compact hint="Transition delay in milliseconds.">
         <NumberCell label="Delay" value={selectedAnimation.delay ?? 0} step={1} min={0} defaultValue={0} onchange={(value) => setAnimationProp('delay', value)} />
       </PropertyCell>
-      <PropertyCell label="Easing" span={2} hint="Named easing curve, mapped to a CSS timing function.">
-        <select class="val" value={selectedAnimation.easing ?? 'outQuad'} onchange={(e) => setAnimationProp('easing', e.target.value)}>
-          {#each EASING_OPTIONS as option}
-            <option value={option}>{option}</option>
-          {/each}
-        </select>
-      </PropertyCell>
+      {#if selectedAnimation.kind === 'spring'}
+        <PropertyCell label="Damping" span={1} compact hint="How fast the bounce dies away. Less is bouncier.">
+          <NumberCell label="Damp" value={selectedAnimation.damping ?? SPRING_DEFAULTS.damping} step={0.5} min={0.5} defaultValue={SPRING_DEFAULTS.damping} onchange={(value) => setAnimationProp('damping', value)} />
+        </PropertyCell>
+        <PropertyCell label="Frequency" span={1} compact hint="How many times it swings on the way. More is busier.">
+          <NumberCell label="Freq" value={selectedAnimation.frequency ?? SPRING_DEFAULTS.frequency} step={1} min={1} defaultValue={SPRING_DEFAULTS.frequency} onchange={(value) => setAnimationProp('frequency', value)} />
+        </PropertyCell>
+      {:else}
+        <PropertyCell label="Easing" span={2} hint="Named easing curve, mapped to a CSS timing function.">
+          <select class="val" value={selectedAnimation.easing ?? 'outQuad'} onchange={(e) => setAnimationProp('easing', e.target.value)}>
+            {#each EASING_OPTIONS as option}
+              <option value={option}>{option}</option>
+            {/each}
+          </select>
+        </PropertyCell>
+      {/if}
       <PropertyCell label="Trigger" span={2} hint="Trigger family that causes this transition to run.">
         <select class="val" value={selectedAnimation.trigger?.type ?? 'stateChange'} onchange={(e) => setAnimationProp('trigger.type', e.target.value)}>
           {#each TRIGGER_TYPES as option}

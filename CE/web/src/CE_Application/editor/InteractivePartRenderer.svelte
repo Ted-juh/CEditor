@@ -75,6 +75,11 @@
       rules.push(`width ${bucket.size}`);
       rules.push(`height ${bucket.size}`);
     }
+    if (bucket?.colour) {
+      rules.push(`background-color ${bucket.colour}`);
+      rules.push(`color ${bucket.colour}`);
+      rules.push(`border-color ${bucket.colour}`);
+    }
     return rules.length ? `transition:${rules.join(', ')};` : '';
   }
 

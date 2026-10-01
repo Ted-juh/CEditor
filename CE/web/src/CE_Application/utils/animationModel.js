@@ -19,12 +19,16 @@
  * `targetStatus()` below is the same rule the runtime uses, written out so the editor can show it.
  * If the runtime ever accepts more paths, `animationModel.test.js` fails, because it runs both.
  */
-import { EASING_BEZIERS, EASING_NAMES } from './interactionRuntime.js';
+import { EASING_BEZIERS, EASING_NAMES, SPRING_DEFAULTS, springEase } from './interactionRuntime.js';
 
-export { EASING_BEZIERS, EASING_NAMES };
+export { EASING_BEZIERS, EASING_NAMES, SPRING_DEFAULTS, springEase };
 
-/** The only animation kind the runtime does anything with. The editor lets you type any word. */
-export const ANIMATION_KINDS = ['transition'];
+/**
+ * The two animation kinds the runtime does something with. `transition` eases between states on a
+ * named curve; `spring` overshoots and settles on the same damped oscillation `ce.anim.spring`
+ * draws, declared on the control instead of written in a script (2026-10-01).
+ */
+export const ANIMATION_KINDS = ['transition', 'spring'];
 
 export const TRIGGER_TYPES = ['stateChange', 'valueChange'];
 
@@ -43,6 +47,10 @@ export const PART_PATHS = {
   opacity: 'opacity',
   'Layout.width': 'size',
   'Layout.height': 'size',
+  // The colour bucket (2026-10-01): a part's flat fill, its text and its border colour.
+  'Background.Fill.colour': 'colour',
+  'Text.Fill.colour': 'colour',
+  'Background.Border.colour': 'colour',
 };
 
 /** The same for a target on the control itself rather than one of its parts. */
@@ -50,25 +58,36 @@ export const ROOT_PATHS = {
   'Transform.scale': 'transform',
   'Transform.rotation': 'transform',
   'Transform.opacity': 'opacity',
+  'Background.Fill.colour': 'colour',
+  'Text.Fill.colour': 'colour',
 };
 
 /**
- * The "properties" hint on a target. A target with one of these works even if its path is not in
- * the tables above — which is how a colour target could be made to work, if the runtime grew a
- * colour bucket. It has not.
+ * The "properties" hint on a target, and the bucket each one fills. A target with one of these
+ * works even if its path is not in the tables above. The colour hints are the CSS property names
+ * the properties panel has always written, so a control saved from it before the colour bucket
+ * existed animates now without being touched.
  */
-export const PROPERTY_HINTS = ['transform', 'opacity', 'size'];
+export const HINT_BUCKETS = {
+  transform: 'transform',
+  opacity: 'opacity',
+  size: 'size',
+  colour: 'colour',
+  'background-color': 'colour',
+  color: 'colour',
+};
+export const PROPERTY_HINTS = Object.keys(HINT_BUCKETS);
 
 /** Root targets have no size bucket, so a size hint at the root does nothing. */
-export const ROOT_PROPERTY_HINTS = ['transform', 'opacity'];
+export const ROOT_PROPERTY_HINTS = PROPERTY_HINTS.filter((hint) => hint !== 'size');
 
 /**
  * What this tab offers in its "Change" dropdown, and whether each one works.
  *
  * The first seven are the properties panel's own list, copied from `AnimationsEditor.svelte`. Two
- * of those seven are dead. They are kept here rather than quietly dropped, because the panel still
- * offers them and a control saved from the panel can already carry one — the tab has to be able to
- * name the problem, not pretend it cannot happen.
+ * of those seven — the colours — were dead until the runtime grew a colour bucket (2026-10-01);
+ * their hints are the panel's CSS property names and are kept as written, so what the panel saved
+ * and what this tab saves stay one shape.
  *
  * Width and Height are added. The runtime animates both and the panel has never offered them.
  * `animationModel.test.js` pins the panel's list at seven, so if it grows this comment fails with
@@ -107,7 +126,7 @@ export function targetStatus(target, partNames = []) {
       return { works: false, reason: 'no part', detail: 'The path says Parts. but does not name one.' };
     }
     const byPath = PART_PATHS[tail];
-    const byHint = hints.find((hint) => PROPERTY_HINTS.includes(hint));
+    const byHint = HINT_BUCKETS[hints.find((hint) => PROPERTY_HINTS.includes(hint))];
     if (!byPath && !byHint) {
       return {
         works: false,
@@ -128,7 +147,7 @@ export function targetStatus(target, partNames = []) {
   }
 
   const byPath = ROOT_PATHS[path];
-  const byHint = hints.find((hint) => ROOT_PROPERTY_HINTS.includes(hint));
+  const byHint = HINT_BUCKETS[hints.find((hint) => ROOT_PROPERTY_HINTS.includes(hint))];
   if (!byPath && !byHint) {
     const sizeHint = hints.includes('size');
     return {
@@ -151,6 +170,8 @@ export function describeAnimation(name, animation) {
     duration: Number.isFinite(Number(animation?.duration)) ? Number(animation.duration) : 120,
     delay: Number.isFinite(Number(animation?.delay)) ? Number(animation.delay) : 0,
     easing: String(animation?.easing ?? 'outQuad'),
+    damping: Number.isFinite(Number(animation?.damping)) ? Number(animation.damping) : SPRING_DEFAULTS.damping,
+    frequency: Number.isFinite(Number(animation?.frequency)) ? Number(animation.frequency) : SPRING_DEFAULTS.frequency,
     triggerType: String(animation?.trigger?.type ?? 'stateChange'),
     from: Array.isArray(animation?.trigger?.from) ? animation.trigger.from.map(String) : [],
     to: Array.isArray(animation?.trigger?.to) ? animation.trigger.to.map(String) : [],
@@ -328,5 +349,34 @@ export function renameBlockedBecause(existingNames, from, to) {
  * leave the panel, the search has to be fed from here instead.
  */
 export function allAnimationFieldLabels() {
-  return ['Kind', 'Duration', 'Delay', 'Easing', 'Trigger', 'From', 'To', 'Source', 'Targets', 'Animation'];
+  return ['Kind', 'Duration', 'Delay', 'Easing', 'Damping', 'Frequency', 'Trigger', 'From', 'To', 'Source', 'Targets', 'Animation'];
+}
+
+/**
+ * Points along the spring, for drawing it. Unlike an easing these go above 1 — the overshoot is
+ * the point — so the picture scales to hold them. Same formula as the runtime and the script API.
+ */
+export function springPoints(damping = SPRING_DEFAULTS.damping, frequency = SPRING_DEFAULTS.frequency, steps = 48) {
+  const count = Math.max(2, Math.round(steps));
+  const out = [];
+  for (let i = 0; i <= count; i += 1) {
+    const t = i / count;
+    out.push({ x: t, y: springEase(t, damping, frequency) });
+  }
+  return out;
+}
+
+/**
+ * What switching an animation to `spring` writes, in one store write: the kind, the spring's two
+ * numbers if it has none yet, and a settle time long enough to see the overshoot. Switching back
+ * leaves the numbers in place, so a second switch finds them again.
+ */
+export function animationWithKind(animation, kind) {
+  const next = { ...(animation ?? {}), kind: ANIMATION_KINDS.includes(kind) ? kind : 'transition' };
+  if (next.kind === 'spring') {
+    if (!Number.isFinite(Number(next.damping))) next.damping = SPRING_DEFAULTS.damping;
+    if (!Number.isFinite(Number(next.frequency))) next.frequency = SPRING_DEFAULTS.frequency;
+    if (!Number.isFinite(Number(next.duration)) || Number(next.duration) < 200) next.duration = SPRING_DEFAULTS.duration;
+  }
+  return next;
 }

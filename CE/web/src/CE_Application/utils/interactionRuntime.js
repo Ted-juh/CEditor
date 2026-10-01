@@ -120,6 +120,49 @@ function easingToCss(name) {
   return b ? `cubic-bezier(${b[0]}, ${b[1]}, ${b[2]}, ${b[3]})` : 'ease';
 }
 
+/** What a `spring` animation gets when it says nothing: the same numbers `ce.anim.spring` uses. */
+export const SPRING_DEFAULTS = Object.freeze({ duration: 600, damping: 6, frequency: 12 });
+
+/**
+ * A damped oscillation, pinned to exactly 1 at the end so a spring always lands on its target.
+ *
+ * One formula, three readers: `ce.anim.spring` in the script runtime (`animationSpring` there is
+ * this function), the declared `spring` kind below, and the picture the Animation tab draws. A
+ * spring written in a script and one declared on the control must trace the same path, or the two
+ * are two features wearing one name — `animationModel.test.js` holds them equal.
+ */
+export function springEase(progress, damping = SPRING_DEFAULTS.damping, frequency = SPRING_DEFAULTS.frequency) {
+  const x = Math.min(1, Math.max(0, Number(progress) || 0));
+  if (x >= 1) return 1;
+  return 1 - Math.exp(-damping * x) * Math.cos(frequency * x);
+}
+
+/**
+ * The spring as a CSS timing function: `linear()` with the curve sampled along it, which is how
+ * CSS carries a shape no cubic-bezier can (a bezier cannot cross 1 and come back). WebView2 and
+ * WebKitGTK both take it. A browser without `linear()` drops the whole transition declaration, so
+ * the change jumps — which is exactly what the property did before it was animated.
+ */
+export function springCssTiming(damping, frequency, steps = 32) {
+  const count = Math.max(4, Math.round(steps));
+  const stops = [];
+  for (let i = 0; i <= count; i += 1) stops.push(springEase(i / count, damping, frequency).toFixed(4));
+  return `linear(${stops.join(', ')})`;
+}
+
+/** The timing function for one animation, by its kind. */
+function timingToCss(animation) {
+  if (String(animation?.kind ?? 'transition') === 'spring') {
+    return springCssTiming(numberOr(animation?.damping, SPRING_DEFAULTS.damping), numberOr(animation?.frequency, SPRING_DEFAULTS.frequency));
+  }
+  return easingToCss(animation?.easing);
+}
+
+/** A colour target on a part or the root: these paths, or a hint that names a colour property. */
+const COLOUR_PATHS = new Set(['Background.Fill.colour', 'Text.Fill.colour', 'Background.Border.colour']);
+const COLOUR_HINTS = new Set(['colour', 'background-color', 'color']);
+const namesColour = (tail, propertySet) => COLOUR_PATHS.has(tail) || [...COLOUR_HINTS].some((hint) => propertySet.has(hint));
+
 function treeValueAtPath(node, path) {
   if (!node || !path) return undefined;
   const parts = String(path).split('.');
@@ -377,7 +420,8 @@ function buildTransitionCatalog(control, previewSession) {
 
   for (const animation of Object.values(animations?._children ?? {})) {
     if (!animation || animation.enabled === false) continue;
-    const transition = `${numberOr(animation.duration, 120)}ms ${easingToCss(animation.easing)} ${numberOr(animation.delay, 0)}ms`;
+    const spring = String(animation.kind ?? 'transition') === 'spring';
+    const transition = `${numberOr(animation.duration, spring ? SPRING_DEFAULTS.duration : 120)}ms ${timingToCss(animation)} ${numberOr(animation.delay, 0)}ms`;
     for (const target of animation.targets ?? []) {
       const path = String(target?.path ?? '');
       if (!path) continue;
@@ -385,7 +429,7 @@ function buildTransitionCatalog(control, previewSession) {
       if (path.startsWith('Parts.')) {
         const [, partName, ...rest] = path.split('.');
         if (!partName) continue;
-        const bucket = partTransitions.get(partName) ?? { transform: null, opacity: null, size: null };
+        const bucket = partTransitions.get(partName) ?? { transform: null, opacity: null, size: null, colour: null };
         if (rest.join('.') === 'Layout.x' || rest.join('.') === 'Layout.y' || rest.join('.') === 'Layout.offsetX' || rest.join('.') === 'Layout.offsetY' || rest.join('.') === 'Layout.rotation' || rest.join('.') === 'Layout.scale' || propertySet.has('transform')) {
           bucket.transform = transition;
         }
@@ -395,6 +439,11 @@ function buildTransitionCatalog(control, previewSession) {
         if (rest.join('.') === 'Layout.width' || rest.join('.') === 'Layout.height' || propertySet.has('size')) {
           bucket.size = transition;
         }
+        // The colour bucket. A part paints its flat fill as `background` and its text as `color`,
+        // so both longhands transition; a gradient fill has no colour to tween and stays a jump.
+        if (namesColour(rest.join('.'), propertySet)) {
+          bucket.colour = transition;
+        }
         partTransitions.set(partName, bucket);
       } else {
         if (path === 'Transform.scale' || path === 'Transform.rotation' || propertySet.has('transform')) {
@@ -402,6 +451,9 @@ function buildTransitionCatalog(control, previewSession) {
         }
         if (path === 'Transform.opacity' || propertySet.has('opacity')) {
           rootTransitions.set('opacity', transition);
+        }
+        if (namesColour(path, propertySet)) {
+          rootTransitions.set('colour', transition);
         }
       }
     }
