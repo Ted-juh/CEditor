@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -51,6 +51,9 @@ test('template validation protects a previous export, then a supported panel exp
     const templateBin = path.join(templatesDir, 'Player.vst3', 'Contents', 'x86_64-win');
     mkdirSync(templateBin, { recursive: true });
     writeFileSync(path.join(templateBin, 'Player.vst3'), 'test DLL placeholder');
+    const templateLinuxBin = path.join(templatesDir, 'Player.vst3', 'Contents', 'x86_64-linux');
+    mkdirSync(templateLinuxBin, { recursive: true });
+    writeFileSync(path.join(templateLinuxBin, 'Player.so'), 'test shared object placeholder');
     writeFileSync(path.join(template, 'moduleinfo.json'), '{"stale":true}');
     mkdirSync(outDir);
     const previous = path.join(outDir, 'keep.txt');
@@ -62,7 +65,7 @@ test('template validation protects a previous export, then a supported panel exp
     assert.equal(existsSync(path.join(outDir, 'Validation.vst3')), false);
 
     writeFileSync(panelFile, JSON.stringify(scripted('javascript')));
-    await assert.rejects(exportFromTemplate({ ...options, formats: TEMPLATE_FORMATS }), /Compiler-free export currently supports VST3 only/);
+    await assert.rejects(exportFromTemplate({ ...options, formats: TEMPLATE_FORMATS }), /supports VST3 and CLAP\. Use the compiling exporter for LV2/);
     assert.equal(existsSync(path.join(outDir, 'Validation.vst3')), false);
 
     const result = await exportFromTemplate(options);
@@ -72,10 +75,12 @@ test('template validation protects a previous export, then a supported panel exp
     assert.equal(path.basename(result.written[0]), 'Validation.vst3');
     assert.equal(JSON.parse(readFileSync(path.join(result.written[0], 'Contents/CE/profiles/test/generic-cc-dpd.ceditor-device.json'), 'utf8')).id, 'generic-cc-dpd');
     const resources = path.join(result.written[0], 'Contents', 'Resources');
-    if (process.platform === 'win32') {
-      assert.equal(readFileSync(path.join(result.written[0], 'Contents/x86_64-win/Validation.vst3'), 'utf8'), 'test DLL placeholder');
-      assert.equal(existsSync(path.join(result.written[0], 'Contents/x86_64-win/Player.vst3')), false);
-    }
+    // The module inside is renamed to match the bundle, on every architecture the bundle carries:
+    // a VST3 host looks for Contents/<arch>/<bundle name>.vst3 (Windows) or .so (Linux).
+    assert.equal(readFileSync(path.join(result.written[0], 'Contents/x86_64-win/Validation.vst3'), 'utf8'), 'test DLL placeholder');
+    assert.equal(existsSync(path.join(result.written[0], 'Contents/x86_64-win/Player.vst3')), false);
+    assert.equal(readFileSync(path.join(result.written[0], 'Contents/x86_64-linux/Validation.so'), 'utf8'), 'test shared object placeholder');
+    assert.equal(existsSync(path.join(result.written[0], 'Contents/x86_64-linux/Player.so')), false);
     assert.equal(JSON.parse(readFileSync(path.join(resources, 'panel.cepanel'), 'utf8')).panelGuid, 'validation-guid');
     assert.equal(existsSync(path.join(resources, 'moduleinfo.json')), false);
   } finally {
@@ -94,6 +99,43 @@ test('formats without runtime bundling cannot silently omit required script supp
   assert.doesNotThrow(() => validateRuntimeFormats(scripted('cpp', {
     exportSettings: { compileNativeHandlers: 'off' },
   })));
+});
+
+test('a CLAP is exported into a folder of its own, with its panel and device profiles beside it', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'ceditor-export-clap-'));
+  try {
+    const templatesDir = path.join(root, 'templates');
+    mkdirSync(path.join(templatesDir, 'Player.vst3', 'Contents', 'Resources'), { recursive: true });
+    writeFileSync(path.join(templatesDir, 'Player.vst3', 'Contents', 'Resources', 'moduleinfo.json'), '{}');
+    writeFileSync(path.join(templatesDir, 'Player.clap'), 'CLAP placeholder');
+    const outDir = path.join(root, 'output');
+    const panelFile = path.join(root, 'panel.cepanel');
+    writeFileSync(panelFile, JSON.stringify(scripted('lua', { exportSettings: { exportClap: true, exportLv2: false } })));
+    const lines = [];
+
+    const result = await exportFromTemplate({ panelFile, templatesDir, outDir, log: (line) => lines.push(line) });
+    const folder = path.join(outDir, 'Validation');
+    assert.ok(result.written.includes(folder), 'the folder is what was written');
+    assert.equal(readFileSync(path.join(folder, 'Validation.clap'), 'utf8'), 'CLAP placeholder', 'the template, renamed');
+    assert.equal(JSON.parse(readFileSync(path.join(folder, 'panel.cepanel'), 'utf8')).panelGuid, 'validation-guid',
+      'the one panel the plug-in reads its identity from, beside it');
+    assert.ok(existsSync(path.join(folder, 'CE/profiles/test/generic-cc-dpd.ceditor-device.json')),
+      'the device profiles where the plug-in looks for them');
+    assert.ok(result.written.some((p) => p.endsWith('Validation.vst3')), 'and the VST3 as before');
+    assert.ok(lines.some((line) => /install the whole "Validation" folder/.test(line)), 'the log says to keep the folder together');
+
+    // Exporting again replaces the folder rather than leaving a second panel in it.
+    writeFileSync(path.join(folder, 'stale.cepanel'), '{}');
+    await exportFromTemplate({ panelFile, templatesDir, outDir, log: () => {} });
+    assert.deepEqual(readdirSync(folder).filter((f) => f.endsWith('.cepanel')), ['panel.cepanel']);
+
+    // A CLAP asked for by name, with no CLAP template installed, is refused rather than skipped.
+    rmSync(path.join(templatesDir, 'Player.clap'));
+    await assert.rejects(exportFromTemplate({ panelFile, templatesDir, outDir, formats: [TEMPLATE_FORMATS[1]], log: () => {} }),
+      /Missing player templates for clap/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('the staged Windows exporter works away from the checkout with bundled Node', { skip: process.platform !== 'win32' }, () => {
@@ -136,12 +178,16 @@ test('the staged Windows exporter works away from the checkout with bundled Node
       exportSettings: { exportClap: true, exportLv2: true },
     }));
     writeFileSync(panelFile, legacyPanel);
-    assert.match(run().toString(), /CLAP and LV2 skipped.*Exporting VST3/);
+    // LV2 is not made by the installed exporter; CLAP is, but this install has no CLAP template.
+    const log = run().toString();
+    assert.match(log, /LV2 skipped: the installed exporter makes VST3 and CLAP/);
+    assert.match(log, /CLAP skipped: no player template for it is installed/);
     assert.equal(readFileSync(panelFile, 'utf8'), legacyPanel);
     assert.deepEqual(JSON.parse(readFileSync(exportedPanel)).exportSettings, {
       exportClap: true, exportLv2: true,
     });
     assert.equal(existsSync(path.join(root, 'exports/Validation.clap')), false);
+    assert.equal(existsSync(path.join(root, 'exports/Validation')), false);
     assert.equal(existsSync(path.join(root, 'exports/Validation.lv2')), false);
   } finally {
     rmSync(root, { recursive: true, force: true });

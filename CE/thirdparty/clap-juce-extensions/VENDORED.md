@@ -28,3 +28,12 @@ without them.
 - `src/wrapper/clap-juce-wrapper.cpp`, `paramsValueToText`: written with `copyToUTF8`, which
   NUL-terminates and stops at a whole character. `strncpy` did neither for text that fills the
   host's buffer.
+- `src/wrapper/clap-juce-wrapper.cpp`, `clap_init` on Windows: sets JUCE's module instance handle to
+  the CLAP's own module, as JUCE's VST3, VST2 and AAX wrappers do in their `DllMain`. This wrapper
+  has no `DllMain`, so inside a CLAP `File::currentExecutableFile` was the host's executable, and
+  anything the plug-in looked up beside itself was looked up beside the DAW. Upstream-worthy.
+- `src/wrapper/clap-juce-wrapper.cpp`, `clap_init` and `clap_get_plugin_count`, under
+  `CEDITOR_SIDECAR_IDENTITY` (the template player only): the descriptor's id, name, vendor and
+  version come from the panel beside the module (`CE/src/Export/ClapSidecarIdentity.h`), and a
+  template with no panel reports no plugins. This is what lets the installed exporter copy one
+  prebuilt CLAP per panel. CEditor-specific; not for upstream.

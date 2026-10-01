@@ -201,8 +201,9 @@ function Build-And-Stage-Templates([string]$RepoRoot, [string]$StageDir, [string
     # payoff is that an install without Visual Studio can export at all, which it previously could
     # not by design.
     #
-    # One VST3 binary serves every panel. CLAP/LV2 still require per-panel compilation because
-    # their wrappers do not yet adopt a sidecar identity.
+    # One VST3 binary and one CLAP binary serve every panel (CE/src/Export/Vst3SidecarIdentity.h
+    # and ClapSidecarIdentity.h). LV2 still requires per-panel compilation: its manifest .ttl files
+    # carry the identity on disk, and the wrapper does not yet rewrite them.
     $vcvars = Find-VcVars64
     $buildDir = Join-Path $RepoRoot "build\package\template"
     $templatesDir = Join-Path $StageDir "templates"
@@ -212,7 +213,7 @@ function Build-And-Stage-Templates([string]$RepoRoot, [string]$StageDir, [string
 
     Push-Location $RepoRoot
     try {
-        $cmd = "`"$vcvars`" && cmake -S . -B `"$buildDir`" -G `"Ninja Multi-Config`" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON -DCEDITOR_TEMPLATE_PLAYER=ON -DCE_VST_GENERIC_PLAYER=ON && cmake --build `"$buildDir`" --config $Configuration --target CEditorPlayerVST_VST3"
+        $cmd = "`"$vcvars`" && cmake -S . -B `"$buildDir`" -G `"Ninja Multi-Config`" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON -DCEDITOR_TEMPLATE_PLAYER=ON -DCE_VST_GENERIC_PLAYER=ON && cmake --build `"$buildDir`" --config $Configuration --target CEditorPlayerVST_VST3 CEditorPlayerVST_CLAP"
         cmd /c $cmd
 
         if ($LASTEXITCODE -ne 0) {
@@ -226,8 +227,8 @@ function Build-And-Stage-Templates([string]$RepoRoot, [string]$StageDir, [string
     # Copy the artefacts out by extension rather than by name: JUCE names them from
     # CE_VST_PRODUCT_NAME, and the exporter finds a template by extension anyway.
     $artefacts = Join-Path $buildDir "CEditorPlayerVST_artefacts\$Configuration"
-    # Only VST3 has the runtime identity hook required for copying a template safely.
-    foreach ($ext in @("vst3")) {
+    # Only these have the runtime identity hook required for copying a template safely.
+    foreach ($ext in @("vst3", "clap")) {
         $formatDir = Join-Path $artefacts $ext.ToUpperInvariant()
         $bundles = @(Get-ChildItem -LiteralPath $formatDir -Filter "*.$ext")
         if ($bundles.Count -ne 1) {

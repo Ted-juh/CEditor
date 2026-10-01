@@ -20,9 +20,11 @@
 // string into the hash, so a different pluginCode, so a different FUID, silently. Each is pinned.
 
 #include "Export/PanelIdentitySidecar.h"
+#include "Export/ClapSidecarIdentity.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include <cstring>
 #include <iostream>
 
 namespace
@@ -303,6 +305,80 @@ int main()
                "the CLAP id is derived from the same GUID: " + id.identity.clapId);
         check (id.identity.auSubtype.isNotEmpty() && id.identity.auSubtype != id.identity.pluginCode,
                "the AU subtype is derived too, and is independent of the plugin code");
+    }
+
+    // ---------------------------------------------------------------- the CLAP template
+    //
+    // A prebuilt .clap fills its descriptor from the panel beside it (ClapSidecarIdentity.h). The
+    // id must be the one a per-panel build of the same panel bakes (the compiling exporter passes
+    // identity.clapId as CE_CLAP_ID), or a session saved against one export stops finding the other.
+    {
+        TempPanel panel { kPanel };
+        const auto sidecar = panel.read();
+        const auto descriptor = ceditor::clapDescriptorFrom (sidecar);
+        const auto compiled = ceditor::exporter::deriveIdentity ("7f3a1c22-90ab-4d0e-9c11-5e6b2f88a301",
+                                                                "GAIA Filter", "Tedjuh", "Tdjh", "1.0.0");
+        check (descriptor.valid && descriptor.id == compiled.clapId.toStdString(),
+               "the CLAP descriptor's id is the one a per-panel build bakes: " + juce::String (descriptor.id));
+        check (descriptor.name == "GAIA Filter" && descriptor.vendor == "Tedjuh" && descriptor.version == "1.0.0",
+               "  with the panel's product name, vendor and version");
+
+        TempPanel noGuid { R"JSON({ "name": "Nameless", "controls": [] })JSON" };
+        check (! ceditor::clapDescriptorFrom (noGuid.read()).valid,
+               "a panel with no GUID gives no descriptor, so the template reports no plugin");
+    }
+
+    // ---------------------------------------------------------------- reading only the top level
+    //
+    // Identity is read while a host scans, so the reader skips everything but the three members it
+    // needs instead of building the panel (topLevelMembers). Skipping must never change the answer.
+    {
+        const auto members = [] (const char* json)
+        {
+            return ceditor::exporter::topLevelMembers (json, json + std::strlen (json), { "panelGuid", "name", "exportSettings" });
+        };
+
+        const auto fast = members (kPanel);
+        const auto full = juce::JSON::parse (kPanel);
+        check (fast.isObject() && fast["panelGuid"] == full["panelGuid"] && fast["name"] == full["name"]
+                   && juce::JSON::toString (fast["exportSettings"]) == juce::JSON::toString (full["exportSettings"]),
+               "the top-level reader gives the members a full parse gives");
+        check (! fast.hasProperty ("controls"), "  and builds none of the rest");
+
+        // Brackets and quotes inside strings, a nested member of the same name, a member after them,
+        // and escapes: the places a bracket counter goes wrong.
+        const auto tricky = members (R"JSON({
+          "controls": [ { "name": "not me", "text": "} ] { [ "quoted" \\" }, 1.5e3, true, null ],
+          "name": "Tr\u00e4cky \"one\"",
+          "panelGuid": "g-1"
+        })JSON");
+        check (tricky["name"].toString() == juce::String::fromUTF8 ("Tr\xc3\xa4" "cky \"one\"") && tricky["panelGuid"] == "g-1",
+               "  past strings full of brackets and quotes, and not fooled by a nested 'name'");
+
+        check (members ("{ \"panelGuid\": \"g\", \"name\": \"a\", \"exportSettings\": {}, \"controls\": [ unparsed }").isObject(),
+               "  it stops once it has every member, and reads nothing after them");
+        check (! members ("{ \"panelGuid\": \"g\", \"name\": \"a\", \"controls\": [").isObject(),
+               "  cut off before it has them all is refused, for the caller to read more");
+        check (members ("\xEF\xBB\xBF{ \"panelGuid\": \"bom\" }")["panelGuid"] == "bom", "  a UTF-8 byte order mark is skipped");
+        check (! members ("{ \"name\": \"a\" ").isObject() && ! members ("[1]").isObject() && ! members ("{ \"a\" 1 }").isObject(),
+               "  anything it cannot follow is refused, for the full parse to decide");
+
+        // A document the fast reader refuses still reads, through the full parse: JUCE's parser takes
+        // a single-quoted value, which this reader does not follow past a comma inside it.
+        const char* singleQuotedJson = "{ \"panelGuid\": 'single, quoted', \"name\": \"Single\", \"controls\": [] }";
+        check (! members (singleQuotedJson).isObject() && juce::JSON::parse (singleQuotedJson).isObject(),
+               "  (a single-quoted value with a comma: refused here, read by JUCE)");
+        TempPanel singleQuoted { singleQuotedJson };
+        check (singleQuoted.read().valid, "a panel only the full parser can read still gives an identity");
+
+        // Members past the 64 KB head the reader takes first: found by reading the rest.
+        juce::String late { "{ \"controls\": [ \"" };
+        late << juce::String::repeatedString ("x", 100 * 1024)
+             << "\" ], \"name\": \"Late\", \"panelGuid\": \"late-guid\", \"exportSettings\": { \"vendor\": \"Far\" } }";
+        TempPanel farDown { late };
+        const auto farIdentity = farDown.read();
+        check (farIdentity.valid && farIdentity.identity.productName == "Late" && farIdentity.identity.vendorName == "Far",
+               "members past the head of a large panel are still found");
     }
 
     if (failures == 0)

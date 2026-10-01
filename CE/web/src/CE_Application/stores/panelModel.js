@@ -52,7 +52,8 @@ export function createPanel(name = null) {
       // present on the export machine (clang for C++, .NET SDK for C#, GraalVM native-image for Java),
       // failing if a required handler cannot build; 'on' = force; 'off' = omit native handlers.
       compileNativeHandlers: 'auto',
-      // New panels select VST3 only, which the installed compiler-free exporter supports.
+      // New panels select VST3 only. The installed compiler-free exporter also makes CLAP when it
+      // is selected (not LV2).
       // Existing explicit format selections remain part of their documents.
       // AAX needs Avid's SDK + PACE signing, VST2 licensing closed in 2018, and AU/AUv3 need a
       // macOS build, so none of those are settings here.

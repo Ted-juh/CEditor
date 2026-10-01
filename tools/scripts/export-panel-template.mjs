@@ -42,14 +42,19 @@ export const TEMPLATE_FORMATS = [
   },
   {
     id: 'clap',
-    // Retained as a known format for explicit refusal. Its wrapper still uses a build-time ID,
-    // and a shared sidecar directory cannot safely hold independent panel exports.
+    // A Windows/Linux CLAP is one file, and the CLAP folder is shared by every CLAP installed, so a
+    // panel loose beside it would be ambiguous. Each export gets a folder of its own —
+    // <Name>/<Name>.clap beside panel.cepanel and the device profiles — which hosts find because
+    // the CLAP spec has them search CLAP folders recursively. CE/src/Export/ClapSidecarIdentity.h
+    // is the other end.
     ext: '.clap',
     bundle: false,
+    folder: true,
     panelDir: (root) => path.dirname(root),
   },
   {
     id: 'lv2',
+    // Not yet: JUCE's LV2 client compiles its URI into the binary and the bundle's .ttl files.
     ext: '.lv2',
     bundle: true,
     panelDir: (root) => root,
@@ -134,15 +139,16 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
     format.id === 'vst3' || (format.id === 'clap'
       ? panelDoc.exportSettings?.exportClap !== false
       : panelDoc.exportSettings?.exportLv2 !== false));
-  const unsupported = formats.filter((format) => format.id !== 'vst3');
+  const supported = (format) => format.id === 'vst3' || format.id === 'clap';
+  const unsupported = formats.filter((format) => !supported(format));
   if (unsupported.length) {
-    if (explicitFormats || !formats.some((format) => format.id === 'vst3')) {
-      throw new Error('Compiler-free export currently supports VST3 only. Use the compiling exporter for CLAP and LV2.');
+    if (explicitFormats || !formats.some(supported)) {
+      throw new Error('Compiler-free export supports VST3 and CLAP. Use the compiling exporter for LV2.');
     }
-    // Older documents contain true for both formats because those were factory defaults.
-    // Keep their settings intact while allowing the installed editor to export a usable VST3.
-    log(`Warning: ${unsupported.map((format) => format.id.toUpperCase()).join(' and ')} skipped: the installed exporter supports VST3 only. Use the compiling exporter for those formats. Exporting VST3; saved format settings are unchanged.`);
-    formats = formats.filter((format) => format.id === 'vst3');
+    // Older documents contain true for every format because those were factory defaults.
+    // Keep their settings intact while allowing the installed editor to export what it can.
+    log(`Warning: LV2 skipped: the installed exporter makes VST3 and CLAP. Use the compiling exporter for LV2. Saved format settings are unchanged.`);
+    formats = formats.filter(supported);
   }
   validateTemplateScripting(panelDoc);
   if (panelDoc.controls?.length && !Array.isArray(panelDoc.exportParameters)) {
@@ -163,8 +169,15 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
   log(`  identity: pluginCode=${identity.pluginCode} auSubtype=${identity.auSubtype}`);
   log(`  clapId:   ${identity.clapId}`);
 
-  // Refuse an incomplete format set before replacing any previous export.
-  const missingFormats = formats.filter((format) => !findTemplate(templatesDir, format));
+  // Refuse an incomplete format set before replacing any previous export. A format the panel's
+  // settings ask for, with no template installed for it (an install from before CLAP templates
+  // shipped), is skipped and said; one the caller asked for by name is not.
+  let missingFormats = formats.filter((format) => !findTemplate(templatesDir, format));
+  if (missingFormats.length && !explicitFormats && missingFormats.length < formats.length) {
+    log(`Warning: ${missingFormats.map((format) => format.id.toUpperCase()).join(' and ')} skipped: no player template for it is installed in ${templatesDir}.`);
+    formats = formats.filter((format) => !missingFormats.includes(format));
+    missingFormats = [];
+  }
   if (missingFormats.length) {
     throw new Error(`Missing player templates for ${missingFormats.map((format) => format.id).join(', ')} in ${templatesDir}. Install those templates or disable those export formats.`);
   }
@@ -181,19 +194,27 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
       continue;
     }
 
-    const dest = path.join(outDir, safeName + format.ext);
-    rmSync(dest, { recursive: true, force: true });
+    // What the export is: the bundle itself, or for CLAP the folder that holds the plugin.
+    const root = format.folder ? path.join(outDir, safeName) : path.join(outDir, safeName + format.ext);
+    const dest = format.folder ? path.join(root, safeName + format.ext) : root;
+    rmSync(root, { recursive: true, force: true });
+    mkdirSync(path.dirname(dest), { recursive: true });
     cpSync(template, dest, { recursive: format.bundle });
 
-    // The Windows VST3 loader derives the DLL name from its enclosing bundle name.
-    // Renaming only the outer directory makes an otherwise valid template unloadable.
-    if (format.id === 'vst3' && process.platform === 'win32') {
+    // A VST3 loader derives the module's name from its enclosing bundle's: Contents/<arch>-win/<Name>.vst3
+    // on Windows, Contents/<arch>-linux/<Name>.so on Linux. Renaming only the outer directory makes an
+    // otherwise valid template unloadable. Keyed on the architecture folders, not on the platform this
+    // runs on, so a Linux template exported anywhere loads too.
+    if (format.id === 'vst3') {
       const contents = path.join(dest, 'Contents');
-      for (const architecture of readdirSync(contents).filter((name) => name.endsWith('-win'))) {
+      const moduleExt = { '-win': '.vst3', '-linux': '.so' };
+      for (const architecture of readdirSync(contents)) {
+        const suffix = Object.keys(moduleExt).find((s) => architecture.endsWith(s));
+        if (!suffix) continue;
         const binDir = path.join(contents, architecture);
-        const binaries = readdirSync(binDir).filter((name) => name.toLowerCase().endsWith('.vst3'));
+        const binaries = readdirSync(binDir).filter((name) => name.toLowerCase().endsWith(moduleExt[suffix]));
         if (binaries.length !== 1) throw new Error(`Expected one VST3 binary in ${binDir}. Reinstall the player template.`);
-        const target = path.join(binDir, `${safeName}.vst3`);
+        const target = path.join(binDir, safeName + moduleExt[suffix]);
         if (path.join(binDir, binaries[0]) !== target) renameSync(path.join(binDir, binaries[0]), target);
       }
     }
@@ -209,18 +230,21 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
     }
     writeFileSync(path.join(panelDir, 'panel.cepanel'), JSON.stringify(panelDoc, null, 2));
 
-    // The native MIDI service needs its codecs on a machine without CEditor's checkout.
-    // Contents is the parent of the VST3 module directory on Windows/Linux.
+    // The native MIDI service needs its codecs on a machine without CEditor's checkout. It looks
+    // in the module's directory and the one above (DeviceProfileServiceInternal.h, sourceRoot):
+    // Contents for a VST3, whose module sits in Contents/<arch>; the export's folder for a CLAP.
     const profiles = path.join(REPO, 'CE/profiles/test');
-    if (format.id === 'vst3' && existsSync(profiles)) {
-      cpSync(profiles, path.join(dest, 'Contents/CE/profiles/test'), { recursive: true });
+    if (existsSync(profiles)) {
+      if (format.id === 'vst3') cpSync(profiles, path.join(dest, 'Contents/CE/profiles/test'), { recursive: true });
+      if (format.id === 'clap') cpSync(profiles, path.join(root, 'CE/profiles/test'), { recursive: true });
     }
 
     if (format.id === 'vst3') fixVst3Manifest(dest, helperExe, log);
 
-    const size = format.bundle ? dirSize(dest) : statSync(dest).size;
-    log(`  ${format.id}: ${path.relative(REPO, dest)} (${(size / 1048576).toFixed(1)} MB)`);
-    written.push(dest);
+    const size = format.bundle || format.folder ? dirSize(root) : statSync(root).size;
+    log(`  ${format.id}: ${path.relative(REPO, root)} (${(size / 1048576).toFixed(1)} MB)`);
+    if (format.folder) log(`  ${format.id}: install the whole "${safeName}" folder into your CLAP folder; the plugin needs the panel beside it.`);
+    written.push(root);
   }
 
   if (written.length === 0) {

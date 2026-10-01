@@ -1,5 +1,8 @@
 #pragma once
 
+#include <initializer_list>
+#include <string_view>
+
 #include <juce_core/juce_core.h>
 
 #include "Export/PanelExportIdentity.h"
@@ -213,6 +216,103 @@ inline juce::File findPanelBesideModule (const juce::File& moduleFile)
     return {};
 }
 
+/**
+ * The named members of a JSON object's top level, every other value skipped unbuilt.
+ *
+ * Identity needs three members of the panel and a host asks for it while it scans, before any
+ * instance exists. Building the whole document for that is the cost of the whole panel: 1.2 s for
+ * the 94 MB GAIA panel, which clap-validator reports as a slow scan and a host pays for every
+ * template-exported plugin on every rescan. Skipping a value only has to match brackets and
+ * strings, and both of the app's writers put these members first, so the reader stops as soon as
+ * it has all of them — a read of a few hundred bytes (readIdentityBesideModule reads a head of the
+ * file first).
+ *
+ * Stopping early means a member repeated further on is not seen: the first copy wins where a full
+ * parse would take the last. Neither JSON writer the app uses can repeat a member, so only a
+ * hand-made file can tell the difference.
+ *
+ * Returns a void var for anything it cannot follow — malformed, or cut off before it found every
+ * member; the caller then reads more or parses the whole document, so a panel this reader cannot
+ * follow is slower and never wrong.
+ */
+inline juce::var topLevelMembers (const char* p, const char* const end, std::initializer_list<const char*> wanted)
+{
+    const auto skipSpace = [&] { while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) ++p; };
+    const auto skipString = [&]   // p at the opening quote; leaves p past the closing one
+    {
+        for (++p; p < end; ++p)
+        {
+            if (*p == '\\') { ++p; continue; }
+            if (*p == '"') { ++p; return true; }
+        }
+        return false;
+    };
+    const auto skipValue = [&]
+    {
+        if (p >= end) return false;
+        if (*p == '"') return skipString();
+        if (*p != '{' && *p != '[')
+        {
+            while (p < end && *p != ',' && *p != '}' && *p != ']' && *p != ' ' && *p != '\t' && *p != '\n' && *p != '\r') ++p;
+            return true;
+        }
+        int depth = 0;
+        while (p < end)
+        {
+            if (*p == '"') { if (! skipString()) return false; continue; }
+            if (*p == '{' || *p == '[') ++depth;
+            else if ((*p == '}' || *p == ']') && --depth == 0) { ++p; return true; }
+            ++p;
+        }
+        return false;
+    };
+
+    // A UTF-8 byte order mark is legal at the head of a file JUCE wrote or a user edited.
+    if (end - p >= 3 && (unsigned char) p[0] == 0xEF && (unsigned char) p[1] == 0xBB && (unsigned char) p[2] == 0xBF) p += 3;
+
+    skipSpace();
+    if (p >= end || *p != '{') return {};
+    ++p;
+
+    auto* members = new juce::DynamicObject();
+    juce::var result (members);
+    for (;;)
+    {
+        skipSpace();
+        if (p < end && *p == '}') return result;
+        if (p >= end || *p != '"') return {};
+        const auto* const keyStart = p + 1;
+        if (! skipString()) return {};
+        const std::string_view key (keyStart, (size_t) (p - 1 - keyStart));
+
+        skipSpace();
+        if (p >= end || *p != ':') return {};
+        ++p;
+        skipSpace();
+        const auto* const valueStart = p;
+        if (! skipValue()) return {};
+
+        for (const auto* name : wanted)
+        {
+            if (key != name) continue;
+            // Wrapped, because JUCE's parser takes only an object or an array at the top.
+            juce::var value;
+            const auto text = "[" + juce::String::fromUTF8 (valueStart, (int) (p - valueStart)) + "]";
+            if (juce::JSON::parse (text, value).failed() || value.size() != 1)
+                return {};
+            members->setProperty (name, value[0]);
+        }
+
+        if (members->getProperties().size() == (int) wanted.size())
+            return result;
+
+        skipSpace();
+        if (p < end && *p == ',') { ++p; continue; }
+        if (p < end && *p == '}') return result;
+        return {};
+    }
+}
+
 /** Read and derive in one step. Invalid (rather than throwing) for every failure a copy can cause. */
 inline SidecarIdentity readIdentityBesideModule (const juce::File& moduleFile)
 {
@@ -220,7 +320,32 @@ inline SidecarIdentity readIdentityBesideModule (const juce::File& moduleFile)
     if (! panel.existsAsFile())
         return {};
 
-    const auto parsed = juce::JSON::parse (panel.loadFileAsString());
+    const auto members = { "panelGuid", "name", "exportSettings" };
+    const auto scan = [&members] (const juce::MemoryBlock& bytes)
+    {
+        const auto* const begin = static_cast<const char*> (bytes.getData());
+        return topLevelMembers (begin, begin + bytes.getSize(), members);
+    };
+
+    // The head first: the members are at the top of every panel the app writes. Then all of it, for
+    // a panel that has them further down, and the full parse last for one this reader cannot follow.
+    juce::var parsed;
+    {
+        juce::MemoryBlock head;
+        if (juce::FileInputStream in (panel); in.openedOk())
+            in.readIntoMemoryBlock (head, 64 * 1024);
+        parsed = scan (head);
+    }
+
+    if (! parsed.isObject())
+    {
+        juce::MemoryBlock bytes;
+        if (! panel.loadFileAsData (bytes))
+            return {};
+        parsed = scan (bytes);
+        if (! parsed.isObject())
+            parsed = juce::JSON::parse (bytes.toString());
+    }
     if (! parsed.isObject())
         return {};
 
