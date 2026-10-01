@@ -13,9 +13,9 @@
  *     green a button, blue a label, magenta an LED, yellow a display.
  *   - Every other visible layer is the artwork, flattened into the panel's background image.
  *
- * Flattening is this file's own, and deliberately modest: layers are painted bottom to top with their
- * opacity and their group's, in normal blending. Blend modes other than normal, clipping masks,
- * layer masks and layer effects are not drawn — each one is reported by layer name, because a
+ * Flattening is utils/psdComposite.js: Photoshop's blend modes, opacity and fill, layer masks,
+ * clipping masks and isolated groups, drawn as Photoshop draws them. What it cannot draw — layer
+ * effects, vector masks, adjustment layers, Dissolve's noise — is reported by layer name, because a
  * background that looks slightly wrong with no explanation is worse than one that says why. The fix
  * the report suggests is Photoshop's own: rasterize or merge that layer before importing.
  *
@@ -29,8 +29,7 @@
 import { initializeCanvas, readPsd } from 'ag-psd';
 import { PLACEHOLDER_LAYER_NAMES, ROLE_CONTROL_TYPES, colourRole, roleFromName } from './svgPanelImport.js';
 import { pngDataUrl } from './pngEncode.js';
-
-const PASSTHROUGH = new Set(['normal', 'pass through']);
+import { compositePsd } from './psdComposite.js';
 
 // ag-psd makes its pixel arrays through a canvas unless told otherwise — a canvas it borrows from the
 // page in a browser, and has none of in node. A plain array is all `useImageData` needs, is the same
@@ -86,35 +85,6 @@ function roleFor(layer, box) {
     return { role: byColour, rest: named.rest, reason: { button: 'green', label: 'blue', led: 'magenta', display: 'yellow' }[byColour] };
   }
   return { role: '', rest: named.rest, reason: '' };
-}
-
-/**
- * Paint `layer`'s pixels over `canvas` (width × height RGBA, not premultiplied) at `alpha`, in normal
- * blending. Pixels outside the document are clipped.
- */
-function paint(canvas, width, height, layer, alpha) {
-  const src = layer.imageData;
-  if (!src?.data?.length || alpha <= 0) return;
-  const left = Math.round(layer.left ?? 0);
-  const top = Math.round(layer.top ?? 0);
-  for (let sy = 0; sy < src.height; sy += 1) {
-    const y = top + sy;
-    if (y < 0 || y >= height) continue;
-    for (let sx = 0; sx < src.width; sx += 1) {
-      const x = left + sx;
-      if (x < 0 || x >= width) continue;
-      const s = (sy * src.width + sx) * 4;
-      const sa = (src.data[s + 3] / 255) * alpha;
-      if (sa <= 0) continue;
-      const d = (y * width + x) * 4;
-      const da = canvas[d + 3] / 255;
-      const oa = sa + da * (1 - sa);
-      for (let c = 0; c < 3; c += 1) {
-        canvas[d + c] = Math.round((src.data[s + c] * sa + canvas[d + c] * da * (1 - sa)) / oa);
-      }
-      canvas[d + 3] = Math.round(oa * 255);
-    }
-  }
 }
 
 /**
@@ -188,39 +158,20 @@ export function planPsdPanelImport(bytes) {
   };
   collect(group.children);
 
-  // The artwork: every other visible layer, bottom to top (ag-psd lists children bottom first).
-  const canvas = new Uint8Array(width * height * 4);
-  const notDrawn = { blend: [], clipping: [], mask: [], effects: [] };
-  let painted = 0;
-  const flatten = (layers, inherited) => {
-    for (const layer of layers ?? []) {
-      if (layer === group || layer.hidden) continue;
-      const alpha = inherited * (layer.opacity ?? 1);
-      const name = layer.name || 'unnamed';
-      const blend = String(layer.blendMode ?? 'normal');
-      if (!PASSTHROUGH.has(blend)) notDrawn.blend.push(`${name} (${blend})`);
-      if (layer.mask) notDrawn.mask.push(name);
-      if (layer.effects && Object.values(layer.effects).some((effect) => effect && (Array.isArray(effect) ? effect.some((e) => e?.enabled !== false) : effect.enabled !== false))) {
-        notDrawn.effects.push(name);
-      }
-      if (isGroup(layer)) { flatten(layer.children, alpha); continue; }
-      if (layer.clipping) { notDrawn.clipping.push(name); continue; }
-      paint(canvas, width, height, layer, alpha * (layer.fillOpacity ?? 1));
-      if (layer.imageData?.data?.length) painted += 1;
-    }
-  };
-  flatten(psd.children, 1);
+  // The artwork: every other visible layer, flattened as Photoshop would (ag-psd lists children
+  // bottom first, which is the order they are drawn in).
+  const { pixels, painted, notDrawn } = compositePsd(psd.children, width, height, { skip: (layer) => layer === group });
 
   const warnings = [];
   if (!placeholders.length) warnings.push(`The "${group.name}" group has no layers to place.`);
   const outside = placeholders.filter((p) => p.x + p.width <= 0 || p.y + p.height <= 0 || p.x >= width || p.y >= height);
   if (outside.length) warnings.push(`${outside.length} placeholder(s) sit outside the canvas and will be off the panel.`);
-  if (notDrawn.blend.length) warnings.push(`Drawn in normal blending instead of their own mode: ${notDrawn.blend.join(', ')}. Merge or rasterize them in Photoshop for an exact background.`);
-  if (notDrawn.clipping.length) warnings.push(`Clipped layers left out: ${notDrawn.clipping.join(', ')}. Merge each into the layer it clips to.`);
-  if (notDrawn.mask.length) warnings.push(`Layer masks not applied: ${notDrawn.mask.join(', ')}. Apply the mask in Photoshop first.`);
   if (notDrawn.effects.length) warnings.push(`Layer effects not drawn: ${notDrawn.effects.join(', ')}. Rasterize the layer style in Photoshop first.`);
+  if (notDrawn.vectorMask.length) warnings.push(`Vector masks not applied: ${notDrawn.vectorMask.join(', ')}. Rasterize the vector mask (or the layer) in Photoshop first.`);
+  if (notDrawn.adjustment.length) warnings.push(`Adjustment layers not applied: ${notDrawn.adjustment.join(', ')}. Merge each into the layers below it in Photoshop first.`);
+  if (notDrawn.dissolve.length) warnings.push(`Dissolve drawn as Normal: ${notDrawn.dissolve.join(', ')}. Its noise is random, so merge the layer in Photoshop for its exact pixels.`);
 
-  const dataUrl = painted ? pngDataUrl(width, height, canvas) : '';
+  const dataUrl = painted ? pngDataUrl(width, height, pixels) : '';
   return {
     ok: true,
     width,

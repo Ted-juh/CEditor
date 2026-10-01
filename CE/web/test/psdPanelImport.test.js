@@ -72,22 +72,32 @@ test('placeholders become controls by name and by colour; the rest becomes the b
   assert.match(describeSvgImport(plan)[0], /3 control\(s\) from the "components" layer on a 200×100 panel/);
 });
 
-test('opacity and group opacity are applied; blend modes, masks and clipping are reported, not guessed', () => {
+test('blend modes, clipping and masks are drawn from the file as Photoshop draws them', () => {
+  const maskPixels = new Uint8ClampedArray(50 * 50 * 4);
+  for (let i = 0; i < 50 * 50; i += 1) maskPixels.set(i % 50 < 25 ? [255, 255, 255, 255] : [0, 0, 0, 255], i * 4);
   const file = psdFile([
     solid('Base', 0, 0, 200, 100, [0, 0, 0, 255]),
     { name: 'Group', opacity: 0.5, children: [solid('White', 0, 0, 100, 100, [255, 255, 255, 255])] },
     solid('Screen', 100, 0, 50, 50, [255, 0, 0, 255], { blendMode: 'screen' }),
-    solid('Clipped', 150, 0, 50, 50, [0, 255, 0, 255], { clipping: true }),
+    // Clipped to Screen: drawn only over it, and multiplied with it rather than with the black below.
+    solid('Clipped', 100, 0, 100, 50, [255, 255, 0, 255], { clipping: true, blendMode: 'multiply' }),
+    solid('Masked', 150, 50, 50, 50, [0, 0, 255, 255], {
+      mask: { left: 150, top: 50, right: 200, bottom: 100, defaultColor: 0, imageData: { width: 50, height: 50, data: maskPixels } },
+    }),
+    solid('Shadowed', 0, 0, 10, 10, [0, 0, 0, 255], { effects: { dropShadow: [{ enabled: true }] } }),
     { name: 'controls', children: [solid('led-power', 5, 5, 8, 8, [0, 0, 0, 255])] },
   ]);
   const plan = planPsdPanelImport(file);
   assert.equal(plan.ok, true, plan.error);
   const bg = pixelsOf(plan.background.dataUrl);
   assert.deepEqual(bg.at(50, 50), [128, 128, 128, 255], 'white at half the group opacity over black');
-  assert.deepEqual(bg.at(170, 10), [0, 0, 0, 255], 'the clipped layer is left out');
+  assert.deepEqual(bg.at(120, 10), [255, 0, 0, 255], 'red screened over black, times yellow: red');
+  assert.deepEqual(bg.at(170, 10), [0, 0, 0, 255], 'the clipped layer stays inside the layer it clips to');
+  assert.deepEqual(bg.at(160, 70), [0, 0, 255, 255], 'the masked layer shows where its mask is white');
+  assert.deepEqual(bg.at(190, 70), [0, 0, 0, 255], 'and not where it is black');
   const warnings = plan.warnings.join('\n');
-  assert.match(warnings, /normal blending instead of their own mode: Screen \(screen\)/);
-  assert.match(warnings, /Clipped layers left out: Clipped/);
+  assert.doesNotMatch(warnings, /blending|Clipped layers|masks not applied/, 'nothing drawn is reported as not drawn');
+  assert.match(warnings, /Layer effects not drawn: Shadowed/);
   assert.equal(plan.placeholders[0].role, 'led');
 });
 

@@ -82,9 +82,20 @@ CSS classes, as Illustrator writes them, count.
 - Every other visible layer is flattened into the background, with each layer's opacity and its
   group's.
 
-The flattening is simpler than Photoshop's. Blend modes other than Normal, clipping masks, layer
-masks and layer styles (effects) are not drawn. Each affected layer is named in the Console, and
-the fix is to merge or rasterize it in Photoshop before importing.
+The flattening follows Photoshop's own rules. It draws every blend mode, Opacity and Fill,
+layer masks, clipping masks, and groups the way Photoshop does: a Pass Through group paints its
+layers straight onto what is below, and a group in any other mode is put together first and then
+blended in as one layer.
+
+It cannot draw four things:
+
+- layer styles (effects), such as shadows, glows and strokes;
+- vector masks;
+- adjustment layers;
+- Dissolve's noise. A Dissolve layer is drawn as Normal.
+
+Each affected layer is named in the Console. The fix is to merge or rasterize that layer in
+Photoshop before importing.
 
 **File › Update Panel from Photoshop Artwork...** brings a revised file into the panel you already
 worked on, by the same rules as the SVG update below. Controls are matched to their layers by

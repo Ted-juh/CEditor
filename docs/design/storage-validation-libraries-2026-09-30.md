@@ -78,9 +78,12 @@ re-save), and the deliberate "under 0.001° counts as unturned" tolerance.
 
 **ag-psd**: File › New Panel from Photoshop Artwork (`utils/psdPanelImport.js`), on the SVG
 importer's convention. A `components` layer group holds the placeholders, named or coloured by
-role, and everything else is flattened into the background. The flattening applies layer and group
-opacity in normal blending. Blend modes, clipping, masks and layer effects are reported by name
-rather than approximated.
+role, and everything else is flattened into the background. The flattening first applied opacity
+in normal blending only and reported the rest. It is now Photoshop's own model
+(`utils/psdComposite.js`): every blend mode except Dissolve's noise, layer masks, clipping groups,
+and isolated versus Pass Through groups, each checked against values worked out from Photoshop's
+formulas. Layer effects, vector masks and adjustment layers have no pixels in the file, so they are
+still reported by name. The old flattening skipped adjustment layers without a word.
 
 **fflate**, not for packages but for the PNG the PSD importer writes (`utils/pngEncode.js`). A
 canvas would premultiply alpha and does not exist in node, where the importer is tested.
