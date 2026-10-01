@@ -304,7 +304,10 @@ What fixing it would take, when someone reports it:
    consume, and WKWebView has its own first-responder chain. Scope each when there is a report.
 
 The wxp project (Rust, wry) carries parent-attachment and focus patches for exactly this situation
-and is the reference to diff against upstream wry when the work starts.
+and is the reference to diff against upstream wry when the work starts. iPlug2 does step 2 and
+nothing else: its Windows webview (`IPlug/Extras/WebView/IPlugWebView_win.cpp`) puts a `keydown`
+and a `keyup` listener on the page that forward the key to C++ through the bridge whenever the
+active element is not a text input (`docs/design/libraries-weighed-2026-10-01.md`).
 
 ## ~~The GAIA panel's scripts, run window-closed in the plug-in~~ — CLOSED
 
