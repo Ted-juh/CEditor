@@ -124,11 +124,25 @@ test('the same panel packages to the same asset ids twice', async () => {
   assert.equal(JSON.stringify(a.panel), JSON.stringify(b.panel));
 });
 
-test('asset ids keep the extension, because a reader has to know what the bytes are', () => {
-  assert.match(assetIdFor('x', 'thing.png'), /\.png$/);
-  assert.match(assetIdFor('x', 'C:/a/b/FONT.TTF'), /\.ttf$/);
-  assert.ok(!assetIdFor('x', 'no-extension').includes('.'));
-  assert.notEqual(assetIdFor('one', 'a.png'), assetIdFor('two', 'a.png'), 'different bytes, different id');
+test('asset ids keep the extension, because a reader has to know what the bytes are', async () => {
+  assert.match(await assetIdFor('x', 'thing.png'), /^a[0-9a-f]{16}\.png$/);
+  assert.match(await assetIdFor('x', 'C:/a/b/FONT.TTF'), /\.ttf$/);
+  assert.ok(!(await assetIdFor('x', 'no-extension')).includes('.'));
+  assert.notEqual(await assetIdFor('one', 'a.png'), await assetIdFor('two', 'a.png'), 'different bytes, different id');
+  // Pinned: an id is the first 64 bits of SHA-256 over the base64 text, so a package written here
+  // and one written elsewhere agree, and a change to the rule shows up as a change to this line.
+  assert.equal(await assetIdFor('x', 'thing.png'), 'a2d711642b726b044.png');
+});
+
+test('a package written with the old 32-bit ids still opens: the opener never recomputes an id', async () => {
+  const envelope = {
+    format: PANEL_PACKAGE_FORMAT, formatVersion: PANEL_PACKAGE_VERSION,
+    panel: { name: 'old', bgImage: 'asset:a1b2c3d4.png', controls: [] },
+    assets: { 'a1b2c3d4.png': { id: 'a1b2c3d4.png', data: 'AAAA', originalPath: 'C:/x/bg.png', bytes: 4 } },
+  };
+  const opened = await openPanelPackage(envelope, { writeAsset: async (id) => `/tmp/${id}` });
+  assert.equal(opened.ok, true, opened.issues?.join('; '));
+  assert.equal(opened.panel.bgImage, '/tmp/a1b2c3d4.png');
 });
 
 test('the source panel is not mutated by packaging it', async () => {
