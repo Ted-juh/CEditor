@@ -71,11 +71,11 @@ Choose **Build → Export Plugin**. The Export properties show the action, ident
 build result. When copying an existing panel, choose whether this is an update of the same plugin
 or a new plugin with its own identity. A DAW uses this identity when reopening projects.
 
-The installed Windows exporter produces VST3 and CLAP under **Documents/CEditor/Exports**,
+The installed Windows exporter produces VST3, CLAP and LV2 under **Documents/CEditor/Exports**,
 including Lua/JavaScript support and prepared TypeScript. A CLAP arrives as a folder holding the
-`.clap` and its panel: copy the whole folder into your CLAP folder. Panels with LV2 selected still
-produce their other formats; the build log explains the skipped one. LV2 and additional
-native/Python runtimes need the compiling exporter, subject to its supported combinations.
+`.clap` and its panel, and an LV2 as its `.lv2` bundle with the panel inside: copy the whole folder
+into your CLAP folder or LV2 path. Additional native/Python runtimes need the compiling exporter,
+subject to its supported combinations.
 
 Add the exported VST3 to your DAW's plugin search path, rescan, load it and save/reopen a test
 project. Route MIDI in and out in the DAW. Incoming host MIDI reaches the panel's main device

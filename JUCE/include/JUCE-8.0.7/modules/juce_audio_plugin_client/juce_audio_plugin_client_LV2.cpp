@@ -65,6 +65,20 @@
  #error "You need to define the JucePlugin_LV2URI value! If you're using the Projucer/CMake, the definition will be written into JuceLV2Defines.h automatically."
 #endif
 
+#if CEDITOR_SIDECAR_IDENTITY
+ // CEDITOR PATCH -- the runtime identity; see CE/src/Export/Lv2SidecarIdentity.h.
+ #include "Export/Lv2SidecarIdentity.h"
+ #if JUCE_WINDOWS
+  #ifndef NOMINMAX
+   #define NOMINMAX
+  #endif
+  #ifndef WIN32_LEAN_AND_MEAN
+   #define WIN32_LEAN_AND_MEAN
+  #endif
+  #include <windows.h>
+ #endif
+#endif
+
 namespace juce::lv2_client
 {
 
@@ -86,10 +100,26 @@ constexpr bool startsWithValidScheme (const std::string_view str)
 static_assert (startsWithValidScheme (JucePlugin_LV2URI),
                "Your configured LV2 URI must include a leading scheme specifier.");
 
+#if CEDITOR_SIDECAR_IDENTITY
+ // CEDITOR PATCH -- see CE/src/Export/Lv2SidecarIdentity.h for the whole rationale. A template
+ // binary takes its URI, name, vendor and version from the panel beside it; each falls back to the
+ // compiled value when there is none. The Turtle writers below read the same four, so the files
+ // juce_lv2_helper generates over a copied template carry the panel's identity.
+ #define JUCE_LV2_URI     (ceditor::lv2PluginUri (JucePlugin_LV2URI))
+ #define JUCE_LV2_NAME    (ceditor::lv2PluginName (JucePlugin_Name))
+ #define JUCE_LV2_VENDOR  (ceditor::lv2PluginVendor (JucePlugin_Manufacturer))
+ #define JUCE_LV2_VERSION (ceditor::lv2PluginVersion (JucePlugin_VersionString))
+#else
+ #define JUCE_LV2_URI     JucePlugin_LV2URI
+ #define JUCE_LV2_NAME    JucePlugin_Name
+ #define JUCE_LV2_VENDOR  JucePlugin_Manufacturer
+ #define JUCE_LV2_VERSION JucePlugin_VersionString
+#endif
+
 constexpr auto uriSeparator = ":";
-const auto JucePluginLV2UriUi      = String (JucePlugin_LV2URI) + uriSeparator + "UI";
-const auto JucePluginLV2UriState   = String (JucePlugin_LV2URI) + uriSeparator + "StateString";
-const auto JucePluginLV2UriProgram = String (JucePlugin_LV2URI) + uriSeparator + "Program";
+static const String& JucePluginLV2UriUi()      { static const String s = String (JUCE_LV2_URI) + uriSeparator + "UI";          return s; }
+static const String& JucePluginLV2UriState()   { static const String s = String (JUCE_LV2_URI) + uriSeparator + "StateString"; return s; }
+static const String& JucePluginLV2UriProgram() { static const String s = String (JUCE_LV2_URI) + uriSeparator + "Program";     return s; }
 
 static const LV2_Feature* findMatchingFeature (const LV2_Feature* const* features, const char* uri)
 {
@@ -245,7 +275,7 @@ private:
         {
             jassert ((size_t) param->getParameterIndex() == result.size());
 
-            const auto uri  = JucePlugin_LV2URI + String (uriSeparator) + getIri (*param);
+            const auto uri  = JUCE_LV2_URI + String (uriSeparator) + getIri (*param);
             const auto urid = mapFeature.map (mapFeature.handle, uri.toRawUTF8());
             result.push_back (urid);
         }
@@ -810,15 +840,15 @@ private:
     Ports ports { mapFeature,
                   processor->getTotalNumInputChannels(),
                   processor->getTotalNumOutputChannels() };
-    lv2_shared::PatchSetHelper patchSetHelper { mapFeature, JucePlugin_LV2URI };
+    lv2_shared::PatchSetHelper patchSetHelper { mapFeature, JUCE_LV2_URI };
     PlayHead playHead;
     MidiBuffer midi;
     AudioBuffer<float> audio;
     std::atomic<bool> shouldSendStateChange { false };
 
    #define X(str) const LV2_URID m##str = map (str);
-    X (JucePluginLV2UriProgram)
-    X (JucePluginLV2UriState)
+    const LV2_URID mJucePluginLV2UriProgram = map (JucePluginLV2UriProgram());
+    const LV2_URID mJucePluginLV2UriState   = map (JucePluginLV2UriState());
     X (LV2_ATOM__Int)
     X (LV2_ATOM__String)
     X (LV2_BUF_SIZE__maxBlockLength)
@@ -862,7 +892,7 @@ struct RecallFeature
 private:
     static String getPresetUri (int index)
     {
-        return JucePlugin_LV2URI + String (uriSeparator) + "preset" + String (index + 1);
+        return JUCE_LV2_URI + String (uriSeparator) + "preset" + String (index + 1);
     }
 
     static FileOutputStream openStream (const File& libraryPath, StringRef name)
@@ -894,7 +924,7 @@ private:
               "@prefix ui:    <http://lv2plug.in/ns/extensions/ui#> .\n"
               "@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .\n"
               "\n"
-              "<" JucePlugin_LV2URI ">\n"
+              "<" << JUCE_LV2_URI << ">\n"
               "\ta lv2:Plugin ;\n"
               "\tlv2:binary <" << URL::addEscapeChars (libraryPath.getFileName(), false) << "> ;\n"
               "\trdfs:seeAlso <dsp.ttl> .\n";
@@ -912,7 +942,7 @@ private:
            #endif
 
             os << "\n"
-                  "<" << JucePluginLV2UriUi << ">\n"
+                  "<" << JucePluginLV2UriUi() << ">\n"
                   "\ta ui:" JUCE_LV2_UI_KIND " ;\n"
                   "\tlv2:binary <" << URL::addEscapeChars (libraryPath.getFileName(), false) << "> ;\n"
                   "\trdfs:seeAlso <ui.ttl> .\n"
@@ -923,9 +953,9 @@ private:
         {
             os << "<" << getPresetUri (i) << ">\n"
                   "\ta pset:Preset ;\n"
-                  "\tlv2:appliesTo <" JucePlugin_LV2URI "> ;\n"
+                  "\tlv2:appliesTo <" << JUCE_LV2_URI << "> ;\n"
                   "\trdfs:label \"" << proc.getProgramName (i) << "\" ;\n"
-                  "\tstate:state [ <" << JucePluginLV2UriProgram << "> \"" << i << "\"^^xsd:int ; ] .\n"
+                  "\tstate:state [ <" << JucePluginLV2UriProgram() << "> \"" << i << "\"^^xsd:int ; ] .\n"
                   "\n";
         }
 
@@ -1031,7 +1061,7 @@ private:
               "@prefix param: <http://lv2plug.in/ns/ext/parameters#> .\n"
               "@prefix patch: <http://lv2plug.in/ns/ext/patch#> .\n"
               "@prefix pg:    <http://lv2plug.in/ns/ext/port-groups#> .\n"
-              "@prefix plug:  <" JucePlugin_LV2URI << uriSeparator << "> .\n"
+              "@prefix plug:  <" << JUCE_LV2_URI << uriSeparator << "> .\n"
               "@prefix pprop: <http://lv2plug.in/ns/ext/port-props#> .\n"
               "@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .\n"
               "@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n"
@@ -1148,12 +1178,12 @@ private:
             }
         }
 
-        os << "<" JucePlugin_LV2URI ">\n";
+        os << "<" << JUCE_LV2_URI << ">\n";
 
         if (proc.hasEditor())
-            os << "\tui:ui <" << JucePluginLV2UriUi << "> ;\n";
+            os << "\tui:ui <" << JucePluginLV2UriUi() << "> ;\n";
 
-        const auto versionParts = StringArray::fromTokens (JucePlugin_VersionString, ".", "");
+        const auto versionParts = StringArray::fromTokens (JUCE_LV2_VERSION, ".", "");
 
         const auto getVersionOrZero = [&] (int indexFromBack)
         {
@@ -1171,19 +1201,19 @@ private:
               "lv2:Plugin"
              #endif
               " ;\n"
-              "\tdoap:name \"" JucePlugin_Name "\" ;\n"
+              "\tdoap:name \"" << JUCE_LV2_NAME << "\" ;\n"
               "\tdoap:description \"" JucePlugin_Desc "\" ;\n"
               "\tlv2:minorVersion " << minorVersion << " ;\n"
               "\tlv2:microVersion " << microVersion << " ;\n"
               "\tdoap:maintainer [\n"
               "\t\ta foaf:Person ;\n"
-              "\t\tfoaf:name \"" JucePlugin_Manufacturer "\" ;\n"
+              "\t\tfoaf:name \"" << JUCE_LV2_VENDOR << "\" ;\n"
               "\t\tfoaf:homepage <" JucePlugin_ManufacturerWebsite "> ;\n"
               "\t\tfoaf:mbox <" JucePlugin_ManufacturerEmail "> ;\n"
               "\t] ;\n"
               "\tdoap:release [\n"
               "\t\ta doap:Version ;\n"
-              "\t\tdoap:revision \"" JucePlugin_VersionString "\" ;\n"
+              "\t\tdoap:revision \"" << JUCE_LV2_VERSION << "\" ;\n"
               "\t] ;\n"
               "\tlv2:optionalFeature\n"
               "\t\tlv2:hardRTCapable ;\n"
@@ -1370,7 +1400,7 @@ private:
               "@prefix ui:   <http://lv2plug.in/ns/extensions/ui#> .\n"
               "@prefix urid: <http://lv2plug.in/ns/ext/urid#> .\n"
               "\n"
-              "<" << JucePluginLV2UriUi << ">\n"
+              "<" << JucePluginLV2UriUi() << ">\n"
               "\tlv2:extensionData\n"
              #if JUCE_LINUX || JUCE_BSD
               "\t\tui:idleInterface ,\n"
@@ -1402,14 +1432,36 @@ private:
 };
 
 //==============================================================================
+#if CEDITOR_SIDECAR_IDENTITY && JUCE_WINDOWS
+// CEDITOR PATCH -- the LV2 client has no DllMain, so JUCE would take the host's executable for this
+// module and look for the panel beside the DAW. Told once, from the address of a function in this
+// module, before anything asks where the panel is.
+static void ceditorNoteThisModule()
+{
+    static const bool noted = []
+    {
+        HMODULE module = nullptr;
+        if (GetModuleHandleExW (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                                reinterpret_cast<LPCWSTR> (&ceditorNoteThisModule), &module) && module != nullptr)
+            Process::setCurrentModuleInstanceHandle (module);
+        return true;
+    }();
+    ignoreUnused (noted);
+}
+#endif
+
 LV2_SYMBOL_EXPORT const LV2_Descriptor* lv2_descriptor (uint32_t index)
 {
     if (index != 0)
         return nullptr;
 
+   #if CEDITOR_SIDECAR_IDENTITY && JUCE_WINDOWS
+    ceditorNoteThisModule();
+   #endif
+
     static const LV2_Descriptor descriptor
     {
-        JucePlugin_LV2URI, // TODO some constexpr check that this is a valid URI in terms of RFC 3986
+        JUCE_LV2_URI, // TODO some constexpr check that this is a valid URI in terms of RFC 3986
         [] (const LV2_Descriptor*,
             double sampleRate,
             const char* pathToBundle,
@@ -1722,9 +1774,13 @@ LV2_SYMBOL_EXPORT const LV2UI_Descriptor* lv2ui_descriptor (uint32_t index)
     if (index != 0)
         return nullptr;
 
+   #if CEDITOR_SIDECAR_IDENTITY && JUCE_WINDOWS
+    ceditorNoteThisModule();
+   #endif
+
     static const LV2UI_Descriptor descriptor
     {
-        JucePluginLV2UriUi.toRawUTF8(), // TODO some constexpr check that this is a valid URI in terms of RFC 3986
+        JucePluginLV2UriUi().toRawUTF8(), // TODO some constexpr check that this is a valid URI in terms of RFC 3986
         [] (const LV2UI_Descriptor*,
             const char* pluginUri,
             const char* bundlePath,

@@ -253,16 +253,21 @@ vertical layout.
 
 ## Compiler-free plugin export
 
-The installed exporter supports VST3 and CLAP. LV2 is skipped: its identity lives in the bundle's
-`.ttl` files rather than in the binary, and the template does not yet rewrite them, so a copied LV2
-would collide with every other copy. LV2 remains available through the source-checkout compiling
-exporter. New panels select VST3 only, and existing saved format choices are retained; a panel with
-LV2 selected still exports its other formats, and the build log explains the skipped one.
+The installed exporter supports VST3, CLAP and LV2. New panels select VST3 only; CLAP is on unless
+turned off and LV2 off unless turned on, as the compiling exporter reads them, and saved format
+choices are retained. An LV2's identity lives in its bundle's `.ttl` files as well as in the binary,
+so the exporter does not copy the template's: it puts the panel beside the copied binary and runs
+`juce_lv2_helper`, which has the plug-in write them again with the panel's URI and parameters. A
+template `.lv2` copied without its panel reports the template's own URI (`urn:ceditor:default`), not
+nothing as a CLAP does, because the template build generates its own manifests from the bare binary.
 
-A template VST3's vendor string is fixed when the template is built (`Tedjuh`): JUCE bakes it in,
-and the sidecar hook changes only the plug-in codes. A panel that sets its own vendor in Export
-settings shows it in a compiled export and in a template CLAP, whose descriptor is filled from the
-panel at load, but a template VST3 keeps the template's. The identity a host keys on is unaffected.
+A template VST3 carries two vendor strings. The class entry's (name, vendor, version) is filled
+from the panel at load by the sidecar hook, like the CLAP's descriptor. The factory's is baked in
+when the template is built (`Tedjuh`), and a JUCE-based host shows that one — CEditor's own scanner
+read `Tedjuh-inc` off a template until the build default was aligned. A panel that sets its own
+vendor in Export settings therefore shows it in a compiled export, in a template CLAP, and in the
+class entry of a template VST3, but a host that reads the factory vendor shows the template's. The
+identity a host keys on is unaffected.
 
 A CLAP is exported as a folder — `<Name>/<Name>.clap` beside its `panel.cepanel` and device profiles
 — because the CLAP folder is shared by every CLAP a user has and the panel must sit beside the

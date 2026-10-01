@@ -112,3 +112,36 @@ test('JUCE/VENDORED.md records the Linux bridge patch too', () => {
   assert.ok(text.includes('juce_WebBrowserComponent_linux.cpp') && text.includes('getNumBytesAsUTF8'),
     'VENDORED.md must name the Linux bridge file and the byte-count fix');
 });
+
+// Patch 4: the LV2 client's URI, name, vendor and version are read from the panel beside the
+// binary, so one prebuilt .lv2 serves every panel the way the VST3 and CLAP templates do. The
+// Turtle writers use the same four, so juce_lv2_helper regenerates a copied template's manifests
+// with the panel's identity and parameters.
+const LV2_WRAPPER = join(repoRoot,
+  'JUCE/include/JUCE-8.0.7/modules/juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp');
+
+test('the vendored JUCE LV2 wrapper still carries the sidecar-identity patch', () => {
+  assert.ok(existsSync(LV2_WRAPPER), `the vendored JUCE LV2 wrapper is missing: ${LV2_WRAPPER}`);
+  const source = readFileSync(LV2_WRAPPER, 'utf8');
+  assert.ok(source.includes('Export/Lv2SidecarIdentity.h'), `the patch's include is gone from the JUCE LV2 wrapper. ${REAPPLY}`);
+  for (const name of ['lv2PluginUri', 'lv2PluginName', 'lv2PluginVendor', 'lv2PluginVersion']) {
+    assert.ok(source.includes(`ceditor::${name} (`), `the LV2 wrapper no longer consults ${name}. ${REAPPLY}`);
+  }
+  // Every use of the compiled URI goes through the macro; a raw use that crept back would be the
+  // one place a template still reported the template's URI.
+  const raw = source.split('JucePlugin_LV2URI').length - 1;
+  assert.equal(raw, 5, `expected the compiled URI only in its #error, static_assert and the two macro definitions; found ${raw} uses. ${REAPPLY}`);
+  // The derived URIs are functions: a namespace-scope static would read the sidecar at DLL load,
+  // before lv2_descriptor can tell JUCE which module it is on Windows.
+  assert.ok(source.includes('static const String& JucePluginLV2UriUi()'), `the derived UI URI is a load-time static again. ${REAPPLY}`);
+  assert.ok(source.includes('ceditorNoteThisModule'), `the Windows module-handle note is gone from lv2_descriptor. ${REAPPLY}`);
+});
+
+test('the LV2 patch stays behind its guard, with the compiled values as the fallback', () => {
+  const source = readFileSync(LV2_WRAPPER, 'utf8');
+  assert.ok(source.includes('#define JUCE_LV2_URI     JucePlugin_LV2URI'), `the stock-JUCE branch of the macro is gone. ${REAPPLY}`);
+  const guarded = source.split('#if CEDITOR_SIDECAR_IDENTITY').length - 1;
+  assert.ok(guarded >= 4, `expected the include, the macros and the two descriptor notes behind the guard; found ${guarded}`);
+  assert.ok(readFileSync(join(repoRoot, 'JUCE/VENDORED.md'), 'utf8').includes('juce_audio_plugin_client_LV2.cpp'),
+    'VENDORED.md must name the patched LV2 file');
+});

@@ -11,7 +11,7 @@ corruption. `.gitignore` now has an explicit exception and
 
 ## Local modifications
 
-Upstream JUCE is otherwise untouched. There are exactly three patches, and they are listed here because a
+Upstream JUCE is otherwise untouched. There are exactly four patches, and they are listed here because a
 patch inside a vendored tree is invisible in a diff against upstream and dies silently the day
 somebody drops in a new JUCE.
 
@@ -86,3 +86,34 @@ running the app on Linux with a 3,600-preset Surge XT library (2026-09-08, commi
 
 **If you upgrade JUCE:** check whether upstream fixed it (look for `getNumBytesAsUTF8` in
 `sendCommand`); if not, re-apply both halves. The guard test names this document when it fails.
+
+### 4. Runtime LV2 plugin identity
+
+**File:** `include/JUCE-8.0.7/modules/juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp`
+
+**Guard:** `#if CEDITOR_SIDECAR_IDENTITY`, as for patch 1. A stock build keeps the compiled
+`JucePlugin_LV2URI`, name, vendor and version through four macros that are the only thing it sees.
+
+**Pinned by:** `CE/web/test/vendoredJucePatches.test.js`.
+
+**What it does.** The LV2 client's URI was a compile-time literal, used in the descriptor, every
+derived URI (the UI, the state keys, the parameters' IRIs, the presets) and the Turtle writers. Each
+use now goes through `JUCE_LV2_URI`, which with the guard on asks `CE/src/Export/Lv2SidecarIdentity.h`
+for the panel beside the binary and answers `urn:ceditor:<clapId>` — the string the compiling
+exporter passes as `CE_LV2_URI`, so the two builds of one panel are the same plugin to a host. Name,
+vendor and version go the same way. The three derived-URI constants became functions, because a
+namespace-scope static would read the sidecar at DLL load, before `lv2_descriptor` has told JUCE
+which module it is on Windows — the LV2 client, unlike the VST3 one, has no `DllMain`, so
+`lv2_descriptor` and `lv2ui_descriptor` note the module from their own address first.
+
+**Why the Turtle files need no rewriting.** JUCE writes manifest.ttl, dsp.ttl and ui.ttl by loading
+the built binary (`juce_lv2_helper`) and calling the plug-in's own writers, which read the live
+processor. The template exporter copies the binary, puts the panel beside it and runs that helper:
+the files come out with the panel's URI and the panel's parameters. Without a panel the compiled
+identity stands, so the template build's own helper run still succeeds; that is also why a template
+`.lv2` copied without its panel reports the template's URI rather than refusing, as the CLAP does.
+
+**If you upgrade JUCE:** re-apply the include, the macro block after the `static_assert`, the three
+functions, the `map()` of the two state URIs, the fourteen use sites and the two descriptor notes;
+the pin test counts the raw uses of `JucePlugin_LV2URI` and names the file.
+

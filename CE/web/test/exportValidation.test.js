@@ -64,8 +64,16 @@ test('template validation protects a previous export, then a supported panel exp
     assert.equal(readFileSync(previous, 'utf8'), 'previous export');
     assert.equal(existsSync(path.join(outDir, 'Validation.vst3')), false);
 
+    // Every format asked for by name, with no CLAP template and no LV2 helper in this fixture:
+    // refused before anything is written, naming the missing piece.
     writeFileSync(panelFile, JSON.stringify(scripted('javascript')));
-    await assert.rejects(exportFromTemplate({ ...options, formats: TEMPLATE_FORMATS }), /supports VST3 and CLAP\. Use the compiling exporter for LV2/);
+    const noHelper = process.env.CEDITOR_LV2_HELPER;
+    process.env.CEDITOR_LV2_HELPER = path.join(root, 'no-such-helper');
+    try {
+      await assert.rejects(exportFromTemplate({ ...options, formats: TEMPLATE_FORMATS }), /LV2 cannot be exported: juce_lv2_helper was not found|Missing player templates for clap/);
+    } finally {
+      if (noHelper === undefined) delete process.env.CEDITOR_LV2_HELPER; else process.env.CEDITOR_LV2_HELPER = noHelper;
+    }
     assert.equal(existsSync(path.join(outDir, 'Validation.vst3')), false);
 
     const result = await exportFromTemplate(options);
@@ -84,6 +92,48 @@ test('template validation protects a previous export, then a supported panel exp
     assert.equal(JSON.parse(readFileSync(path.join(resources, 'panel.cepanel'), 'utf8')).panelGuid, 'validation-guid');
     assert.equal(existsSync(path.join(resources, 'moduleinfo.json')), false);
   } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('an LV2 is exported as its own bundle, binary renamed, panel beside it, manifests written by the helper', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'ceditor-export-lv2-'));
+  const helperWas = process.env.CEDITOR_LV2_HELPER;
+  try {
+    const templatesDir = path.join(root, 'templates');
+    const template = path.join(templatesDir, 'Player.lv2');
+    mkdirSync(template, { recursive: true });
+    writeFileSync(path.join(template, 'libPlayer.so'), 'test shared object placeholder');
+    writeFileSync(path.join(template, 'manifest.ttl'), '<urn:ceditor:default> a lv2:Plugin .');
+    writeFileSync(path.join(template, 'dsp.ttl'), 'template dsp');
+
+    // A stand-in for juce_lv2_helper: it writes the three files beside the binary it is given, and
+    // records what it was given, so the test can see the renamed binary and the panel beside it.
+    const helper = path.join(root, process.platform === 'win32' ? 'helper.cmd' : 'helper.sh');
+    const record = path.join(root, 'helper-args.txt');
+    if (process.platform === 'win32') {
+      writeFileSync(helper, `@echo off\r\necho %1> "${record}"\r\nfor %%f in (manifest dsp ui) do echo written > "%~dp1%%f.ttl"\r\n`);
+    } else {
+      writeFileSync(helper, `#!/bin/sh\nprintf '%s' "$1" > "${record}"\nd=$(dirname "$1"); for f in manifest dsp ui; do echo written > "$d/$f.ttl"; done\n`, { mode: 0o755 });
+    }
+    process.env.CEDITOR_LV2_HELPER = helper;
+
+    const panelFile = path.join(root, 'panel.cepanel');
+    writeFileSync(panelFile, JSON.stringify(scripted('lua', { exportSettings: { exportClap: false, exportLv2: true } })));
+    const outDir = path.join(root, 'output');
+    const lines = [];
+    const result = await exportFromTemplate({ panelFile, templatesDir, outDir, formats: [TEMPLATE_FORMATS.find((f) => f.id === 'lv2')], log: (line) => lines.push(line) });
+
+    const bundle = path.join(outDir, 'Validation.lv2');
+    assert.deepEqual(result.written, [bundle]);
+    assert.equal(readFileSync(record, 'utf8').trim().replace(/^"|"$/g, ''), path.join(bundle, 'libValidation.so'), 'the helper ran over the renamed binary');
+    assert.deepEqual(readdirSync(bundle).filter((f) => !f.startsWith('CE')).sort(), ['dsp.ttl', 'libValidation.so', 'manifest.ttl', 'panel.cepanel', 'ui.ttl']);
+    assert.equal(readFileSync(path.join(bundle, 'manifest.ttl'), 'utf8').trim(), 'written', 'the template\'s own manifest did not survive');
+    assert.equal(JSON.parse(readFileSync(path.join(bundle, 'panel.cepanel'), 'utf8')).panelGuid, 'validation-guid');
+    assert.ok(existsSync(path.join(bundle, 'CE/profiles/test')), 'device profiles beside the binary');
+    assert.ok(lines.some((line) => /lv2: dsp.ttl, manifest.ttl, ui.ttl written from the placed panel/.test(line)), lines.join('\n'));
+  } finally {
+    if (helperWas === undefined) delete process.env.CEDITOR_LV2_HELPER; else process.env.CEDITOR_LV2_HELPER = helperWas;
     rmSync(root, { recursive: true, force: true });
   }
 });
@@ -178,10 +228,9 @@ test('the staged Windows exporter works away from the checkout with bundled Node
       exportSettings: { exportClap: true, exportLv2: true },
     }));
     writeFileSync(panelFile, legacyPanel);
-    // LV2 is not made by the installed exporter; CLAP is, but this install has no CLAP template.
+    // This install has no CLAP template and no LV2 template: both are skipped and said, VST3 exports.
     const log = run().toString();
-    assert.match(log, /LV2 skipped: the installed exporter makes VST3 and CLAP/);
-    assert.match(log, /CLAP skipped: no player template for it is installed/);
+    assert.match(log, /CLAP and LV2 skipped: no player template for it is installed|LV2 skipped: juce_lv2_helper was not found/);
     assert.equal(readFileSync(panelFile, 'utf8'), legacyPanel);
     assert.deepEqual(JSON.parse(readFileSync(exportedPanel)).exportSettings, {
       exportClap: true, exportLv2: true,

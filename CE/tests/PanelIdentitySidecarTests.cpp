@@ -21,6 +21,7 @@
 
 #include "Export/PanelIdentitySidecar.h"
 #include "Export/ClapSidecarIdentity.h"
+#include "Export/Lv2SidecarIdentity.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -326,6 +327,27 @@ int main()
         TempPanel noGuid { R"JSON({ "name": "Nameless", "controls": [] })JSON" };
         check (! ceditor::clapDescriptorFrom (noGuid.read()).valid,
                "a panel with no GUID gives no descriptor, so the template reports no plugin");
+    }
+
+    // ---------------------------------------------------------------- the LV2 template
+    //
+    // A prebuilt .lv2 reports the URI of the panel beside it (Lv2SidecarIdentity.h). It must be the
+    // one the compiling exporter passes as CE_LV2_URI, urn:ceditor:<clapId>, or a session saved
+    // against one build stops finding the other. Unlike the CLAP, a template with no panel keeps
+    // its compiled identity: the template build generates its own Turtle files from the bare binary.
+    {
+        TempPanel panel { kPanel };
+        const auto sidecar = panel.read();
+        const auto lv2 = ceditor::lv2IdentityFrom (sidecar);
+        check (lv2.valid && lv2.uri == "urn:ceditor:" + sidecar.identity.clapId.toStdString(),
+               "the LV2 URI is urn:ceditor: and the CLAP id, as the compiling exporter passes it: " + juce::String (lv2.uri));
+        check (lv2.uri == "urn:ceditor:com.tedjuh.gaia-filter.983f0fe7", "  pinned, so a change to the rule shows here");
+        check (lv2.name == "GAIA Filter" && lv2.vendor == "Tedjuh" && lv2.version == "1.0.0",
+               "  with the panel's product name, vendor and version");
+
+        TempPanel noGuid { R"JSON({ "name": "Nameless", "controls": [] })JSON" };
+        check (! ceditor::lv2IdentityFrom (noGuid.read()).valid,
+               "a panel with no GUID gives no LV2 identity, so the compiled one stands");
     }
 
     // ---------------------------------------------------------------- reading only the top level

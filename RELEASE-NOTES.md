@@ -14,12 +14,12 @@ installer, and about every plugin you export. It is not a sign anything is wrong
 nothing has been signed. Choose *More info → Run anyway*. A certificate is planned before 1.0;
 the app tells you the same thing in **About** and on the **Export** tab.
 
-**VST3 and CLAP export without a compiler.** The installer includes player templates, Node and
-the export scripts. It exports VST3 and CLAP panels using Lua, JavaScript and TypeScript without
-Visual Studio or a source checkout, into Documents → CEditor → Exports. A CLAP is exported as a
-folder holding the `.clap` and its panel; install the whole folder. LV2 and extra native script
-runtimes require the compiling exporter; a panel with LV2 selected still exports its other formats,
-with the skipped one explained in the build log. Unsupported runtimes are refused with an explanation.
+**VST3, CLAP and LV2 export without a compiler.** The installer includes player templates, Node
+and the export scripts. It exports VST3, CLAP and LV2 panels using Lua, JavaScript and TypeScript
+without Visual Studio or a source checkout, into Documents → CEditor → Exports. A CLAP is exported
+as a folder holding the `.clap` and its panel, and an LV2 as its bundle with the panel inside;
+install the whole folder either way. Extra native script runtimes require the compiling exporter.
+Unsupported runtimes are refused with an explanation.
 The build log now says what the panel's bytes are made of: the document against its compact form,
 controls by type, the heaviest section inside parts, embedded media with repeats, and carried
 fonts. The panel inside a plug-in is written compact; the plug-in parses it, nobody reads it.
@@ -41,7 +41,7 @@ New panels select VST3 only; saved format choices are retained.
 - **A whole editor from a device profile** — File → New Panel from Device Profile builds one bound
   control per parameter, grouped, with the real range, choices and label read off the profile. The
   GAIA profile's 793 parameters become 1624 controls in a second.
-- **Plugin export** to VST3 and CLAP; the source-checkout exporter also builds LV2. A standalone
+- **Plugin export** to VST3, CLAP and LV2, with or without a compiler. A standalone
   player is a development build target, not a packaged per-panel export option.
 - **Total Recall** — a reopened project puts the whole saved patch back on the synth, not just on
   the screen: the session stores a full device dump beside the automation values, and a restore
