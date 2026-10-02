@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "0bf1f322",
+  "fingerprint": "060fc138",
   "set": {
     "id": "atlas",
     "name": "Atlas",
@@ -795,6 +795,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF060A12",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF2B3545",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF1A2537",

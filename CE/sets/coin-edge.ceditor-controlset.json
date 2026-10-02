@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "85ccae77",
+  "fingerprint": "8db9ec31",
   "set": {
     "id": "coin-edge",
     "name": "Coin Edge",
@@ -1989,6 +1989,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF080A07",
           "Background.Corners.radius": 5,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF30352E",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF20251E",

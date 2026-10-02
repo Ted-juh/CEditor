@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "59673473",
+  "fingerprint": "8ed29499",
   "set": {
     "id": "satellite",
     "name": "Satellite",
@@ -1020,6 +1020,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF110E23",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF443D6C",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF362E60",

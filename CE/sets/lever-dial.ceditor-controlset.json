@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "3931fce3",
+  "fingerprint": "f2a0c9af",
   "set": {
     "id": "lever-dial",
     "name": "Lever Dial",
@@ -1905,6 +1905,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF080202",
           "Background.Corners.radius": 5,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF302323",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF201212",

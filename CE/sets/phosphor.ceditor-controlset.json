@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "5b1bd737",
+  "fingerprint": "fd53b193",
   "set": {
     "id": "phosphor",
     "name": "Phosphor",
@@ -732,6 +732,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF020302",
           "Background.Corners.radius": 6,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF232523",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF121312",

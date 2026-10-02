@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "9d5a0402",
+  "fingerprint": "e8e34746",
   "set": {
     "id": "recessed",
     "name": "Recessed",
@@ -1008,6 +1008,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF02160B",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF244F37",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF124127",

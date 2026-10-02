@@ -198,7 +198,9 @@ export function instrumentFamilies(set) {
     'Background.Corners.radius': Math.max(2, Math.min(Number.isFinite(radius) ? radius : 8, 14)),
   };
   const own = {
-    Macro: { knobColour: raise(0.12), arcColour: '{series.one}', trackColour: raise(0.05), labelColour: '{instrument.ink}' },
+    // The set's own knob, not a recoloured disc; knobColour and arcColour dress the Macro's own knob
+    // for an author who switches back to it.
+    Macro: { knobDesign: 'set', knobColour: raise(0.12), arcColour: '{series.one}', trackColour: raise(0.05), labelColour: '{instrument.ink}' },
     Orbit: { fieldColour: '{instrument.face}', ringColour: veil(s(3), '33'), centreColour: raise(0.18), labelColour: '{instrument.ink}' },
     Looper: { laneColour: raise(0.03), gridColour: veil(ink, '22'), playheadColour: '{series.two}', labelColour: '{instrument.ink}' },
     Router: { curveColour: '{series.one}', inputColour: '{series.two}', fieldColour: '{instrument.face}', gridColour: veil(ink, '18'), labelColour: '{instrument.ink}' },

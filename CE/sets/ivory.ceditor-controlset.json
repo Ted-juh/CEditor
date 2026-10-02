@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "51de58be",
+  "fingerprint": "fd5b2faa",
   "set": {
     "id": "ivory",
     "name": "Ivory",
@@ -671,6 +671,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF0C110E",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF38443D",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF28352D",

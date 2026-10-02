@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c3335698",
+  "fingerprint": "6208d522",
   "set": {
     "id": "backlit",
     "name": "Backlit",
@@ -1596,6 +1596,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF020203",
           "Background.Corners.radius": 9,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF232426",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF121214",

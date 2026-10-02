@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "4fee8ea1",
+  "fingerprint": "3956f163",
   "set": {
     "id": "turret-stack",
     "name": "Turret Stack",
@@ -1902,6 +1902,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF040506",
           "Background.Corners.radius": 5,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF27292B",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF16181A",

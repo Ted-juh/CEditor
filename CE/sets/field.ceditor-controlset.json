@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b75f109c",
+  "fingerprint": "009049a0",
   "set": {
     "id": "field",
     "name": "Field",
@@ -1660,6 +1660,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF080202",
           "Background.Corners.radius": 8,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF302323",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF201212",

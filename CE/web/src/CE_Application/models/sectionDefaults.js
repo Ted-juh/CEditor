@@ -1079,6 +1079,10 @@ export const SECTION_DEFAULTS = {
       { id: 'm2', label: 'Osc Detune', depth: -0.4, curve: 'linear', min: 0, max: 1, enabled: true, colour: 'FFF2C94C' },
       { id: 'm3', label: 'Drive', depth: 1.0, curve: 'exp', min: 0, max: 1, enabled: true, colour: 'FFF2994A' },
     ],
+    // '' follows the set: every set but Graphite says 'set'. 'set' draws the control set's knob, as a
+    // Knob on the same panel would be (utils/macroKnob.js); 'own' draws the Macro's dark knob in the
+    // colours below.
+    knobDesign: '',
     // Colours.
     knobColour: 'FF23232A',
     arcColour: 'FF5B9BD5',

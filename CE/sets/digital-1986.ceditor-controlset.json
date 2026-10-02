@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "985e297e",
+  "fingerprint": "798fe828",
   "set": {
     "id": "switchboard",
     "name": "Digital 1986",
@@ -1057,6 +1057,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF020302",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF232523",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF121312",

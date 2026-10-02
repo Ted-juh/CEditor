@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "4a772525",
+  "fingerprint": "d47dbc77",
   "set": {
     "id": "rackmount",
     "name": "Rackmount",
@@ -1728,6 +1728,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF101112",
           "Background.Corners.radius": 2,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF424446",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF333538",

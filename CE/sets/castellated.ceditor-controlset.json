@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b2924fc2",
+  "fingerprint": "be5323de",
   "set": {
     "id": "castellated",
     "name": "Castellated",
@@ -1953,6 +1953,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF040404",
           "Background.Corners.radius": 6,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF272728",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF161617",

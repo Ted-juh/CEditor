@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "41c739a3",
+  "fingerprint": "b26e6f77",
   "set": {
     "id": "deep-flute",
     "name": "Deep Flute",
@@ -1953,6 +1953,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF040404",
           "Background.Corners.radius": 6,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF272728",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF161617",

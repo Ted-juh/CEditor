@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "fcdca06b",
+  "fingerprint": "e71681ff",
   "set": {
     "id": "gimbal-ring",
     "name": "Gimbal Ring",
@@ -1991,6 +1991,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF010204",
           "Background.Corners.radius": 5,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF212227",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF101116",

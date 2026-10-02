@@ -142,11 +142,13 @@
     resizeHandleStyle,
   } from '../utils/transformMath.js';
   import { sortControlsForHitTest } from '../utils/controlOrder.js';
-  import { getContext, setContext } from 'svelte';
+  import { getContext, setContext, untrack } from 'svelte';
   import { activeControlSet, CONTROL_SET_CONTEXT_KEY } from '../stores/controlSets.js';
   import { CONTROL_SET_LAMP_CONTEXT_KEY, resolveToken } from '../models/controlSets.js';
   import { SERIES_ROLES, chromeTone } from '../models/instrumentDesigns.js';
-  import { resolveControlForSet, controlSetForControl } from '../models/controlSetFamilies.js';
+  import { macroGeometry, macroValue } from '../utils/macroLayout.js';
+  import { macroKnobBaseRuntime, macroKnobBox, macroKnobControl, macroKnobRuntime, macroUsesSetKnob } from '../utils/macroKnob.js';
+  import { resolveControlForSet, controlSetForControl, familyPatchFor } from '../models/controlSetFamilies.js';
 
   let {
     control: documentControl,
@@ -158,6 +160,9 @@
     interactionRuntimeOverride = null,
     renderIdNamespace = '',
     editorInteractionEnabled = true,
+    // Drawn as part of another control (a Macro's set knob): no control id in the DOM, so nothing that
+    // finds controls by `data-control-id` finds it, and no pointer events.
+    embedded = false,
     snapToGrid = false,
     gridSize = 10,
     gridOriginX = 0,
@@ -380,6 +385,24 @@
     interactionRuntimeOverride
       ?? (interactiveRenderingEnabled ? (resolvedInteractive?.runtime ?? null) : null)
   );
+  // A Macro whose knob follows the set hosts the set's Knob, drawn by this same component
+  // (utils/macroKnob.js). The knob is rebuilt only when its box or what it takes from the set
+  // changes, never as the Macro turns: the key is a string, so an unchanged key notifies nothing,
+  // and the value goes in as a runtime. The set is keyed by content, not identity, since a document
+  // set can arrive as a new object on any change to the panel.
+  let macroKnobKey = $derived(isMacro && macroUsesSetKnob(renderControl)
+    ? JSON.stringify([core?.id ?? '', core?.controlSetId ?? '', macroKnobBox(macroGeometry(displayW, displayH, renderControl), renderControl),
+      controlSet?.id ?? '', resolveToken('instrument.face', controlSet) ?? '', familyPatchFor(controlSet, 'Knob')])
+    : '');
+  let macroKnob = $derived.by(() => {
+    if (!macroKnobKey) return null;
+    return untrack(() => macroKnobControl(renderControl, macroKnobBox(macroGeometry(displayW, displayH, renderControl), renderControl), controlSet));
+  });
+  let macroKnobList = $derived(macroKnob ? [macroKnob] : []);
+  let macroKnobBase = $derived(macroKnobBaseRuntime(macroKnob));
+  let macroKnobState = $derived(macroKnob
+    ? macroKnobRuntime(macroKnobBase, renderControl?._children?.Macro?.__value ?? macroValue(renderControl), previewSession?.dragging === true)
+    : null);
   let svgIdSeed = $derived.by(() => {
     const baseId = safeSvgId(core?.id);
     const namespace = safeSvgId(renderIdNamespace);
@@ -3443,7 +3466,8 @@
 <div
   bind:this={rootElement}
   class="canvas-control"
-  data-control-id={core?.id}
+  class:embedded
+  data-control-id={embedded ? undefined : core?.id}
   class:selected={editorInteractionEnabled && isSelected && !panelLocked}
   class:key-object={editorInteractionEnabled && isKeyObject && !panelLocked}
   class:hidden-component={!isVisible}
@@ -3571,7 +3595,20 @@
     {/if}
 
     {#if isMacro}
-      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} series={seriesPalette} tone={instrumentTone} />
+      {#if macroKnob}
+        <CanvasControlNested
+          control={macroKnob}
+          {scale}
+          embedded
+          editorInteractionEnabled={false}
+          interactionRuntimeOverride={macroKnobState}
+          allControls={macroKnobList}
+          panelWidth={displayW}
+          panelHeight={displayH}
+          renderIdNamespace={`${svgIdSeed}-knob`}
+        />
+      {/if}
+      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} series={seriesPalette} tone={instrumentTone} ownKnob={!macroKnob} />
     {/if}
 
     {#if isOrbit}
@@ -4382,6 +4419,7 @@
     box-sizing: border-box;
     cursor: default;
   }
+  .canvas-control.embedded { pointer-events: none; }
 
   /* THE DRAG AFFORDANCE. The canvas had exactly two cursors — the resize handles' arrows and this
      `default` — so nothing on the surface ever said a control could be dragged; you found out by

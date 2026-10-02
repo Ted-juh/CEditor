@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "72631313",
+  "fingerprint": "97bf87a7",
   "set": {
     "id": "flightdeck",
     "name": "Modular Metal",
@@ -1889,6 +1889,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF040506",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF27292B",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF16181A",

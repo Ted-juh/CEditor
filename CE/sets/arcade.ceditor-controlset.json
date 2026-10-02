@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "25cca12f",
+  "fingerprint": "95a37b59",
   "set": {
     "id": "arcade",
     "name": "Arcade",
@@ -981,6 +981,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF0B0B0B",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF363636",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF262626",

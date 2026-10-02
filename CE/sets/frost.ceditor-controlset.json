@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "7afeb8aa",
+  "fingerprint": "07b1c316",
   "set": {
     "id": "frost",
     "name": "Frost",
@@ -959,6 +959,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF110E23",
           "Background.Corners.radius": 14,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF443D6C",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF362E60",

@@ -66,7 +66,14 @@
   </PropertySection>
 
   <PropertySection title="Appearance" icon={Palette}>
-    <PropertyCell label="Colours" span={4} hint="Knob body, value arc, arc track, labels. An assignment's own colour is set on the assignment. Click a swatch to edit it in the Colors tab.">
+    <PropertyCell label="Knob" span={4} hint="Follow the panel's set, draw the set's knob as a Knob on this panel would be, or draw the Macro's own knob in the colours below. Graphite follows with the Macro's own.">
+      <select class="val" value={m.knobDesign ?? ''} onchange={(e) => set('knobDesign', e.target.value)}>
+        <option value="">Follow set</option>
+        <option value="set">The set's knob</option>
+        <option value="own">Macro's own</option>
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Colours" span={4} hint="Knob body, value arc and arc track (the Macro's own knob), and labels. An assignment's own colour is set on the assignment. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'knobColour', label: 'Knob', value: m.knobColour ?? 'FF23232A', target: { type: 'control', controlId: core?.id, path: 'Macro.knobColour' } },
         { key: 'arcColour', label: 'Arc', value: m.arcColour ?? 'FF5B9BD5', target: { type: 'control', controlId: core?.id, path: 'Macro.arcColour' } },

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "a9177f3a",
+  "fingerprint": "7e117168",
   "set": {
     "id": "spool",
     "name": "Spool",
@@ -1632,6 +1632,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF0A0703",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF352E26",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF251E14",

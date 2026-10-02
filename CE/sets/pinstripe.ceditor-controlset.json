@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "4713d2ca",
+  "fingerprint": "d5e5ae6c",
   "set": {
     "id": "pinstripe",
     "name": "Pinstripe",
@@ -1911,6 +1911,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF080A07",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF30352E",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF20251E",

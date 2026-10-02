@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e8b8234f",
+  "fingerprint": "699d65a3",
   "set": {
     "id": "reel",
     "name": "Reel",
@@ -1712,6 +1712,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF0B0C0C",
           "Background.Corners.radius": 5,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF363939",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF262929",

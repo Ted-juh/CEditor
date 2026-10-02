@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e3c8c098",
+  "fingerprint": "2d9f6102",
   "set": {
     "id": "balance",
     "name": "Balance",
@@ -745,6 +745,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF0C110E",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF38443D",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF28352D",

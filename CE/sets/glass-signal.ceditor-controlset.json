@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d66a2840",
+  "fingerprint": "066d9f8e",
   "set": {
     "id": "gemstone",
     "name": "Glass Signal",
@@ -1297,6 +1297,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF110E23",
           "Background.Corners.radius": 6,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF443D6C",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF362E60",

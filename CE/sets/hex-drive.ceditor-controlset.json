@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "5898e032",
+  "fingerprint": "2e7e3f46",
   "set": {
     "id": "hex-drive",
     "name": "Hex Drive",
@@ -1902,6 +1902,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF040506",
           "Background.Corners.radius": 5,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF27292B",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF16181A",

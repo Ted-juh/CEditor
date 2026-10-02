@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "395bc268",
+  "fingerprint": "142defbc",
   "set": {
     "id": "walnut",
     "name": "Walnut",
@@ -1673,6 +1673,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF090604",
           "Background.Corners.radius": 10,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF322D27",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF221C15",

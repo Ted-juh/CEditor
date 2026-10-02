@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c9e5dc4b",
+  "fingerprint": "82f77857",
   "set": {
     "id": "leatherbound",
     "name": "Future Lab",
@@ -2025,6 +2025,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF010204",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF212227",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF101116",

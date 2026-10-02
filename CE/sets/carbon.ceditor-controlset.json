@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "87087afd",
+  "fingerprint": "2960e769",
   "set": {
     "id": "carbon",
     "name": "Carbon",
@@ -1763,6 +1763,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF040404",
           "Background.Corners.radius": 9,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF272728",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF161617",

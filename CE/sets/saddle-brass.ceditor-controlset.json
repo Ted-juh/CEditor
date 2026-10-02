@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "bf3cae81",
+  "fingerprint": "36f8cdaf",
   "set": {
     "id": "saddle",
     "name": "Saddle & Brass",
@@ -653,6 +653,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF0A0703",
           "Background.Corners.radius": 14,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF352E26",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF251E14",

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c67e291d",
+  "fingerprint": "1d3689c9",
   "set": {
     "id": "atelier",
     "name": "Atelier",
@@ -672,6 +672,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF0B0B0A",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF373735",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF272725",

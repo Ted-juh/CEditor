@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6284e0c1",
+  "fingerprint": "c8e52a05",
   "set": {
     "id": "receiver",
     "name": "Receiver",
@@ -1743,6 +1743,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF04060D",
           "Background.Corners.radius": 5,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF272D3B",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF161C2B",

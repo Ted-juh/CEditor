@@ -79,7 +79,7 @@
     {:else if form==='vernier'}
       {@render ticks(71)}<circle cx="80" cy="76" r="55" fill={face} stroke={ink} stroke-width="3"/><circle cx="80" cy="76" r="48" fill={`url(#${uid}-metal)`}/>
       {#each Array.from({length:24}) as _,i}{@const q=point(i*15,47)}<circle cx={q.x} cy={q.y} r="2" fill={ink}/>{/each}
-      <g transform={`rotate(${angle} 80 76)`}><circle cx="80" cy="76" r="32" fill={housing} stroke={ink} stroke-opacity=".35"/><rect x="76" y="45" width="8" height="30" fill={accent}/></g><path d="M111 35L139 18" stroke={ink}/><rect x="110" y="12" width="39" height="19" rx="2" fill={ink}/><text x="130" y="26" text-anchor="middle" fill={face} font-size="11">{core.formShowValue!==false ? readout : ""}</text>
+      <g transform={`rotate(${angle} 80 76)`}><circle cx="80" cy="76" r="32" fill={housing} stroke={ink} stroke-opacity=".35"/><rect x="76" y="45" width="8" height="30" fill={accent}/></g>{#if core.formShowValue!==false}<path d="M111 35L139 18" stroke={ink}/><rect x="110" y="12" width="39" height="19" rx="2" fill={ink}/><text x="130" y="26" text-anchor="middle" fill={face} font-size="11">{readout}</text>{/if}
     {:else if form==='tuning'}
       <path d="M10 100V59A70 48 0 0 1 150 59V100Z" fill={housing} stroke={ink} stroke-opacity=".35"/><path d="M18 91V60A62 40 0 0 1 142 60V91Z" fill={face}/>
       {#each Array.from({length:detail+1}) as _,i}<line x1={23+i*114/detail} y1="47" x2={23+i*114/detail} y2={i%3?53:60} stroke={ink}/>{/each}<text x="28" y="76" fill={ink} font-size="9">{control?._children?.Behavior?.min ?? 0}</text><text x="121" y="76" fill={ink} font-size="9">{control?._children?.Behavior?.max ?? 1}</text><line x1={24+p*112} y1="31" x2={24+p*112} y2="89" stroke={accent} stroke-width="3"/>

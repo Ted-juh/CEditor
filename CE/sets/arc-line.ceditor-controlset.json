@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6bbac6e1",
+  "fingerprint": "ad5e457b",
   "set": {
     "id": "arc-line",
     "name": "Arc Line",
@@ -998,6 +998,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF02160B",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF244F37",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF124127",

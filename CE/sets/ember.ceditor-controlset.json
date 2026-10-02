@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "8ed25294",
+  "fingerprint": "a3e4603e",
   "set": {
     "id": "ember",
     "name": "Ember",
@@ -1653,6 +1653,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF0A0703",
           "Background.Corners.radius": 9,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF352E26",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF251E14",

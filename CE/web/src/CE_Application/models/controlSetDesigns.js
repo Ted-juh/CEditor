@@ -447,7 +447,7 @@ export const EDITOR_PATHS = [
   /^Envelope\.(fillUnder|lineWidth|nodeRadius|lineColour|fillColour|nodeColour|gridColour|sustainColour|playheadColour)$/,
   /^Joystick\.(puckRadius|showGrid|gridDiv|padColour|gridColour|crosshairColour|puckColour|cornerColour|labelColour)$/,
   // The instruments' colour swatches, each on its own editor's Appearance section.
-  /^Macro\.(knobColour|arcColour|trackColour|labelColour)$/,
+  /^Macro\.(knobDesign|knobColour|arcColour|trackColour|labelColour)$/,
   /^Orbit\.(fieldColour|ringColour|centreColour|labelColour)$/,
   /^Looper\.(laneColour|gridColour|playheadColour|labelColour)$/,
   /^Router\.(curveColour|inputColour|fieldColour|gridColour|labelColour)$/,

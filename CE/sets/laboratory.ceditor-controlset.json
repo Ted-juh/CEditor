@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "feee9e9f",
+  "fingerprint": "db5b2003",
   "set": {
     "id": "laboratory",
     "name": "Laboratory",
@@ -1806,6 +1806,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF0A0703",
           "Background.Corners.radius": 3,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF352E26",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF251E14",

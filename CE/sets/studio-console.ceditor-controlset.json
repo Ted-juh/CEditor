@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "477ac17f",
+  "fingerprint": "b425ea63",
   "set": {
     "id": "hi-fi",
     "name": "Studio Console",
@@ -1966,6 +1966,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF080A07",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF30352E",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF20251E",

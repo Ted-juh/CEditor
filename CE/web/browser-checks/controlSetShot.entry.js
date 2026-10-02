@@ -67,6 +67,20 @@ window.__controlSetShot = {
     mounted = mount(ControlSetShotHarness, { target: document.getElementById('host'), props: { panel } });
     return { width: panel.width, height: panel.height, controls: panel.controls.length, set: panel.controlSet.id };
   },
+  /**
+   * A Macro beside a plain Knob under one set (macroSetKnob.mjs): the Macro's knob should be the
+   * Knob's design. `knobDesign` is written into the Macro when given ('own', 'set').
+   */
+  showMacro(setId, { value = 0.62, knobDesign } = {}) {
+    if (mounted) unmount(mounted);
+    const macro = createControl('Macro', { Transform: { x: 20, y: 20, width: 300, height: 130 } });
+    macro._children.Macro.value = value;
+    if (knobDesign !== undefined) macro._children.Macro.knobDesign = knobDesign;
+    const knob = createControl('Knob', { Transform: { x: 340, y: 20, width: 120, height: 120 }, Behavior: { defaultCurrentValue: value } });
+    const panel = { ...createPanel(), id: 1, width: 480, height: 170, controls: [macro, knob], controlSet: normalizeControlSet(setId) };
+    mounted = mount(ControlSetShotHarness, { target: document.getElementById('host'), props: { panel } });
+    return { controls: panel.controls.length, macroId: macro._children.Core.id, knobId: knob._children.Core.id };
+  },
   /** The same specimen under a set given as an object — a set file's contents, or a probe. */
   showSet(set) {
     if (mounted) unmount(mounted);

@@ -47,6 +47,7 @@ const EXEMPT = {
   'drumpads.padForm': 'authoring: outline and matching hit area, editable in Pad design and by set()',
   'drumpads.padLayout': 'authoring: spatial arrangement, editable in Pad design and by set()',
   'crossfader.handleStyle': 'authoring: the cap shape, editable in Handle design and by set()',
+  'macro.knobDesign': 'authoring: which knob the Macro draws (its own, or its set\'s), editable in Appearance and by set()',
   // Authoring surfaces: what the inspector is FOR. A script that rewrote a display's page layout
   // mid-song is not a performance, it is a different panel.
   'lcd.fields': 'a display layout is an authoring surface, not a performance one',

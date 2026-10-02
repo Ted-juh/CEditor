@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "097a8464",
+  "fingerprint": "1807c838",
   "set": {
     "id": "stompbox",
     "name": "Performance",
@@ -1937,6 +1937,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF040404",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF272728",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF161617",

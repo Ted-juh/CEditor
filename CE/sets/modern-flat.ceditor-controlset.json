@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "1934a14e",
+  "fingerprint": "3c064cb0",
   "set": {
     "id": "diesel",
     "name": "Modern Flat",
@@ -998,6 +998,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF02160B",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF244F37",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF124127",

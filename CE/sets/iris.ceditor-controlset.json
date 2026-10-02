@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "aef7a9a5",
+  "fingerprint": "5e42a59f",
   "set": {
     "id": "iris",
     "name": "Iris",
@@ -1839,6 +1839,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF010204",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF212227",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF101116",

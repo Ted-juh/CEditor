@@ -707,3 +707,27 @@ keeps the text, the renderer falls back to its own colour, and the set looks dre
 voices are Graphite's. `instrumentDesigns.test.js` checks that every role in
 `CONTROL_SET_TOKEN_ROLES` can be written as a reference, and that no instrument property is left
 holding one unresolved.
+
+### The Macro's knob is the set's knob
+
+A set's knob is not a colour. It is a form (a tuning dial on Tolex, a lens on Neon, a vernier on
+Machined, a chicken-head on Chicken Head), with a cap, a pointer, a scale and a material, and the
+Macro drew its own dark disc beside it. `Macro.knobDesign` now follows the set: every set but Graphite
+writes `'set'`, and the Macro hosts a real Knob in its knob's place (`utils/macroKnob.js`). It is the
+factory Knob, resolved through the set's family like any Knob on the panel and drawn by the same
+`CanvasControl`, so whatever a set does to its knobs it does to the Macro's.
+
+The hosted knob only draws. The Macro keeps the value, the drag, its caption and its readout. The
+knob's labels are removed and its value goes in as a runtime, so the knob control is rebuilt only
+when its box or its set changes, not every frame as the Macro turns. It is rendered `embedded`, with
+no `data-control-id` and no pointer events, so hit-testing, selection and the scenery never find a
+control that is not in the document. Its box is fitted between the Macro's caption and readout,
+because a set's knob draws to the edge of its box and the Macro's own arc did not.
+
+It sits on the Macro's face, not on the panel its markings were chosen for. Where they would vanish
+there, two things are re-inked, and only those: the scale printed around the knob (its legend) takes
+`instrument.ink`, and the needle of a bodiless form (`pointer`: Ivory, Atelier, Blueprint) takes
+`instrument.text`. Markings drawn on a knob's own body keep the set's ink. The editor's Appearance
+section offers Follow set, The set's knob, and Macro's own, and an author's choice wins either way.
+`macroKnob.test.js` checks the model, and `browser-checks/macroSetKnob.mjs` checks the drawn knob
+across eight forms: the form a Knob on the same panel has, at the Macro's value, with no control id.

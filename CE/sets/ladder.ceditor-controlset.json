@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6e85d836",
+  "fingerprint": "7e928484",
   "set": {
     "id": "ladder",
     "name": "Ladder",
@@ -1658,6 +1658,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF060607",
           "Background.Corners.radius": 8,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF2C2D2E",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF1B1C1E",

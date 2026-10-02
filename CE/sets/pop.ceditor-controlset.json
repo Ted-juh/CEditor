@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "00633b99",
+  "fingerprint": "4454947b",
   "set": {
     "id": "pop",
     "name": "Pop",
@@ -907,6 +907,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF0B0B0B",
           "Background.Corners.radius": 14,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF363636",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF262626",

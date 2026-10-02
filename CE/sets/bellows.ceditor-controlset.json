@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "5e307f10",
+  "fingerprint": "75d8c936",
   "set": {
     "id": "bellows",
     "name": "Bellows",
@@ -1821,6 +1821,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF040404",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF272728",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF161617",

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "673ee49a",
+  "fingerprint": "63d77e74",
   "set": {
     "id": "compact-rack",
     "name": "Compact Rack",
@@ -1823,6 +1823,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF040506",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF27292B",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF16181A",

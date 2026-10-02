@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "5e34e33b",
+  "fingerprint": "f297e845",
   "set": {
     "id": "broadcast",
     "name": "Broadcast",
@@ -1969,6 +1969,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF080A07",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF30352E",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF20251E",

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "97daa0ed",
+  "fingerprint": "f919b3b3",
   "set": {
     "id": "valve",
     "name": "Valve",
@@ -1680,6 +1680,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF070402",
           "Background.Corners.radius": 10,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF2E2824",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF1E1712",

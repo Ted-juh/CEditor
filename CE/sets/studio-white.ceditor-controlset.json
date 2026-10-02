@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "fdb03ac7",
+  "fingerprint": "9dd81fa5",
   "set": {
     "id": "studio-white",
     "name": "Studio White",
@@ -1445,6 +1445,7 @@
           "Background.Fill.colour": "{instrument.face}",
           "Background.Border.colour": "FF0F1114",
           "Background.Corners.radius": 4,
+          "Macro.knobDesign": "set",
           "Macro.knobColour": "FF40444B",
           "Macro.arcColour": "{series.one}",
           "Macro.trackColour": "FF31353D",

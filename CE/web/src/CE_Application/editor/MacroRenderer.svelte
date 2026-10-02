@@ -10,7 +10,9 @@
   // Reuse the SAME major/minor tick generator the sliders use for value divisions.
   import { buildSliderTickStops } from '../utils/sliderGeometry.js';
 
-  let { control = null, width = 0, height = 0, dragging = false, idPrefix = '', series = null, tone = (colour) => colour } = $props();
+  // ownKnob false: the canvas draws the set's knob under this (utils/macroKnob.js), and this draws
+  // only the caption, the readout and the lanes.
+  let { control = null, width = 0, height = 0, dragging = false, idPrefix = '', series = null, tone = (colour) => colour, ownKnob = true } = $props();
   let svgId = $derived(`macro-${idPrefix || String(control?._children?.Core?.id ?? 'x')}`);
 
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -93,14 +95,16 @@
   </defs>
 
   <!-- Knob -->
-  <circle cx={geom.knobCX} cy={geom.knobCY} r={arcR + 4} fill="rgba(0,0,0,0.35)" />
-  <path d={arcPath(arcR, 135, 405)} fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="5" stroke-linecap="round" />
-  {#if value > 0}
-    <path d={arcPath(arcR, 135, angle)} fill="none" stroke={arcCss} stroke-width="5" stroke-linecap="round" />
+  {#if ownKnob}
+    <circle cx={geom.knobCX} cy={geom.knobCY} r={arcR + 4} fill="rgba(0,0,0,0.35)" />
+    <path d={arcPath(arcR, 135, 405)} fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="5" stroke-linecap="round" />
+    {#if value > 0}
+      <path d={arcPath(arcR, 135, angle)} fill="none" stroke={arcCss} stroke-width="5" stroke-linecap="round" />
+    {/if}
+    <circle cx={geom.knobCX} cy={geom.knobCY} r={geom.knobR} fill={knobCss} stroke="rgba(0,0,0,0.6)" stroke-width="1" />
+    <circle cx={geom.knobCX} cy={geom.knobCY} r={geom.knobR} fill={`url(#${svgId}-face)`} />
+    <line x1={geom.knobCX} y1={geom.knobCY} x2={pointer[0]} y2={pointer[1]} stroke={dragging ? 'rgba(255,255,255,1)' : tone('rgba(240,240,245,0.92)')} stroke-width="3" stroke-linecap="round" />
   {/if}
-  <circle cx={geom.knobCX} cy={geom.knobCY} r={geom.knobR} fill={knobCss} stroke="rgba(0,0,0,0.6)" stroke-width="1" />
-  <circle cx={geom.knobCX} cy={geom.knobCY} r={geom.knobR} fill={`url(#${svgId}-face)`} />
-  <line x1={geom.knobCX} y1={geom.knobCY} x2={pointer[0]} y2={pointer[1]} stroke={dragging ? 'rgba(255,255,255,1)' : tone('rgba(240,240,245,0.92)')} stroke-width="3" stroke-linecap="round" />
 
   <!-- Knob readout / label -->
   {#if cfg.showValues !== false}
