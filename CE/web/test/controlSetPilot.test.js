@@ -18,8 +18,10 @@ import { get } from 'svelte/store';
 import {
   BUILT_IN_CONTROL_SETS,
   CONTROL_SET_TOKEN_NAMES,
+  DEFAULT_CONTROL_SET_ID,
   controlSetForPanel,
   getControlSet,
+  newPanelControlSet,
   normalizeControlSetDefinition,
   normalizeControlSetList,
   resolveToken,
@@ -49,6 +51,7 @@ import { createSliderSemanticParts, resolveSliderSemanticParts } from '../src/CE
 import { buildSolidStyle } from '../src/CE_Application/utils/backgroundCSS.js';
 import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import { createPanel, deserializePanel, serializePanel } from '../src/CE_Application/stores/panelModel.js';
+import { createControlSetStarter } from '../src/CE_Application/models/controlSetStarter.js';
 import { activeControlSet, setActivePanelControlSet, setPanelControlSet } from '../src/CE_Application/stores/controlSets.js';
 import { defaultControlSetId } from '../src/CE_Application/stores/runtimePreferences.js';
 import {
@@ -255,7 +258,60 @@ test('Settings can import without mutating a document and can edit only a person
 test('the application control-set default is applied to new panels', () => {
   defaultControlSetId.set('machined');
   assert.equal(createPanel().controlSet.id, 'machined');
+  assert.deepEqual(createPanel().controlSets, [], 'a built-in default is named, not carried');
   defaultControlSetId.set('graphite');
+});
+
+test('one of your own sets can be the default, and a new panel carries it so it survives the trip', () => {
+  const vellum = { ...ivory, id: 'vellum', name: 'Vellum', tokens: { ...ivory.tokens, accent: 'FF7A3E9A' } };
+  controlSetLibrary.set([vellum]);
+  defaultControlSetId.set('vellum');
+  try {
+    const panel = createPanel();
+    assert.equal(panel.controlSet.id, 'vellum');
+    assert.deepEqual(panel.controlSets.map((set) => set.id), ['vellum']);
+    assert.notEqual(panel.controlSets[0], vellum, 'the document gets its own copy, not the library object');
+    assert.notEqual(panel.controlSets[0].tokens, vellum.tokens);
+
+    // The file names it and carries it, so a reader with an empty library (the Player, the build,
+    // somebody else's machine) still renders Vellum rather than falling back to Graphite.
+    const saved = JSON.parse(serializePanel(panel));
+    assert.equal(saved.controlSet.id, 'vellum');
+    assert.equal(saved.controlSets[0].name, 'Vellum');
+    controlSetLibrary.set([]);
+    const reopened = deserializePanel(JSON.stringify(saved), '/tmp/v.cepanel', 'v');
+    assert.equal(resolveToken('accent', controlSetForPanel(reopened)), 'FF7A3E9A');
+
+    // A default nobody has any more starts the panel on the base set instead of a missing name.
+    assert.equal(createPanel().controlSet.id, DEFAULT_CONTROL_SET_ID);
+    assert.deepEqual(createPanel().controlSets, []);
+  } finally {
+    controlSetLibrary.set([]);
+    defaultControlSetId.set('graphite');
+  }
+});
+
+test('a library set that shares a built-in id is the one a new panel carries', () => {
+  const myIvory = { ...ivory, name: 'My Ivory', tokens: { ...ivory.tokens, accent: 'FF123456' } };
+  assert.deepEqual(newPanelControlSet('ivory', []), { controlSet: { id: 'ivory' }, controlSets: [] });
+  const fromLibrary = newPanelControlSet('ivory', [myIvory]);
+  assert.equal(fromLibrary.controlSet.id, 'ivory');
+  assert.equal(fromLibrary.controlSets[0].name, 'My Ivory',
+    'the editor resolves the library copy first, so the file has to carry that copy');
+  assert.deepEqual(newPanelControlSet('', []), { controlSet: { id: DEFAULT_CONTROL_SET_ID }, controlSets: [] });
+});
+
+test('a set starter shows its built-in and does not carry the library default with it', () => {
+  controlSetLibrary.set([{ ...ivory, id: 'vellum', name: 'Vellum' }]);
+  defaultControlSetId.set('vellum');
+  try {
+    const starter = createControlSetStarter('tolex');
+    assert.equal(starter.controlSet.id, 'tolex');
+    assert.deepEqual(starter.controlSets, []);
+  } finally {
+    controlSetLibrary.set([]);
+    defaultControlSetId.set('graphite');
+  }
 });
 
 test('choosing a library set copies it into the document; a built-in is not copied; the copy survives a save', () => {

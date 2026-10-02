@@ -27,6 +27,7 @@ import { PILOT_CONTROL_SETS } from './pilotControlSets.js';
 import { CATALOG_CONTROL_SETS, CATALOG_SET_EXTRAS } from './catalogControlSets.js';
 import { makeAdditionalControlSets } from './additionalControlSets.js';
 import { extendControlSet } from './controlSetCoverage.js';
+import { deepClone } from '../utils/deepClone.js';
 
 const TOKEN_REFERENCE_PATTERN = /^\{([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)\}$/i;
 const COLOUR_LITERAL_PATTERN = /^[0-9A-F]{6}(?:[0-9A-F]{2})?$/i;
@@ -545,4 +546,23 @@ export function serializeControlSet(value) {
  */
 export function controlSetForPanel(panel, library = []) {
   return getControlSet(panel?.controlSet?.id, { document: panel?.controlSets, library }) ?? BASE_CONTROL_SET;
+}
+
+/**
+ * What a new panel starts on, given the user's default (Settings → Control Sets) and their
+ * library. The default may be one of the user's own sets, and a panel pointed at a library set
+ * has to carry a copy of it — the Player and the build have no library, so a set the document
+ * only names renders as the base set there. So a library default comes back as `controlSets` too,
+ * the same copy choosing it from the panel's picker would have put there. The library is looked
+ * at first, so an imported set that shares a built-in's id is the one carried, as it is the one
+ * the editor shows. A default nobody has (a library set deleted since) starts on the base set
+ * rather than on a name the new panel would only render as Graphite anyway.
+ */
+export function newPanelControlSet(defaultId, library = []) {
+  const id = normalizeControlSet(defaultId).id;
+  const librarySet = (Array.isArray(library) ? library : []).find((set) => set?.id === id);
+  const carried = librarySet ? normalizeControlSetDefinition(deepClone(librarySet)) : null;
+  if (carried) return { controlSet: { id }, controlSets: [carried] };
+  if (SETS_BY_ID.has(id)) return { controlSet: { id }, controlSets: [] };
+  return { controlSet: { id: DEFAULT_CONTROL_SET_ID }, controlSets: [] };
 }

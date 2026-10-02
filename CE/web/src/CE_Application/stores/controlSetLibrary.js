@@ -15,40 +15,16 @@
 // Import and export are plain JSON files (models/controlSetPackage.js): a browser `<input
 // type="file">` in, a download out, exactly the way custom-component packages move.
 
-import { derived, get, writable } from 'svelte/store';
+import { derived, get } from 'svelte/store';
 import { activePanel, panels, updatePanel } from './panels.js';
+import { controlSetLibrary } from './controlSetLibraryStore.js';
 import { BUILT_IN_CONTROL_SETS, normalizeControlSetDefinition, normalizeControlSetList } from '../models/controlSets.js';
 import { createControlSetEnvelope, normalizeControlSetEnvelope } from '../models/controlSetPackage.js';
 import { deepClone } from '../utils/deepClone.js';
 
-const STORAGE_KEY = 'ce.controlSetLibrary.v1';
-
-function canUseLocalStorage() {
-  return typeof localStorage !== 'undefined';
-}
-
-function readStoredSets() {
-  if (!canUseLocalStorage()) return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return normalizeControlSetList(raw ? JSON.parse(raw) : []);
-  } catch {
-    return [];
-  }
-}
-
-function writeStoredSets(value) {
-  if (!canUseLocalStorage()) return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
-  } catch {
-    // Persistence is a convenience; the in-memory library still works.
-  }
-}
-
-/** The user's own sets. Persisted; survives every document. */
-export const controlSetLibrary = writable(readStoredSets());
-controlSetLibrary.subscribe(writeStoredSets);
+// The store and its persistence live in controlSetLibraryStore.js, so that createPanel can read
+// the library without importing this module (and, through it, panels.js).
+export { controlSetLibrary };
 
 /** The sets the open document carries. Read-through from the panel store — never persisted here. */
 export const documentControlSets = derived(activePanel, ($panel) => normalizeControlSetList($panel?.controlSets));

@@ -49,6 +49,11 @@
     ...BUILT_IN_CONTROL_SETS.filter((set) => !$controlSetLibrary.some((custom) => custom.id === set.id))
       .map((set) => ({ ...set, origin: 'built-in' })),
   ]);
+  // The default for new panels can be one of your own sets: createPanel carries it into the new
+  // document (models/controlSets.js newPanelControlSet), so the panel keeps it wherever it opens.
+  let defaultSetId = $derived($generalSettings.defaultControlSetId || 'graphite');
+  let mySets = $derived(allSets.filter((set) => set.origin === 'library'));
+  let builtInSets = $derived(allSets.filter((set) => set.origin === 'built-in'));
   let selectedSet = $derived(allSets.find((set) => set.id === selectedId) ?? allSets[0]);
   let isCustom = $derived(selectedSet?.origin === 'library');
 
@@ -168,8 +173,14 @@
     <div class="card-head"><h2>Control Sets</h2><p>Choose the starting design for new panels and manage reusable visual systems.</p></div>
     <div class="default-row">
       <label><span>Default for new panels</span>
-        <select value={$generalSettings.defaultControlSetId} onchange={(event) => updateGeneralSettings({ defaultControlSetId: event.target.value })}>
-          {#each BUILT_IN_CONTROL_SETS as set}<option value={set.id}>{set.name}</option>{/each}
+        <select value={defaultSetId} onchange={(event) => updateGeneralSettings({ defaultControlSetId: event.target.value })}>
+          {#if mySets.length}
+            <optgroup label="My sets">{#each mySets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
+          {/if}
+          <optgroup label="Built in">{#each builtInSets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
+          {#if !allSets.some((set) => set.id === defaultSetId)}
+            <option value={defaultSetId}>{defaultSetId} (not installed; new panels use Graphite)</option>
+          {/if}
         </select>
       </label>
       <button class="primary" onclick={() => galleryOpen = true}><Images size={15} /> Browse 36 templates</button>
