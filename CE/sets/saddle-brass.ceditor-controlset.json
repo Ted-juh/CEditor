@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "7352bc6e",
+  "fingerprint": "2815975d",
   "set": {
     "id": "saddle",
     "name": "Saddle & Brass",
@@ -61,7 +61,8 @@
       "display.unlit": "24F2D07A",
       "display.screen": "FF1A1208",
       "display.backlight": "FF352E26",
-      "panel.surface": "FFB3873A"
+      "panel.surface": "FFB3873A",
+      "section.surface": "FFCEB17F"
     },
     "lamp": {
       "azimuth": 225,
@@ -531,6 +532,111 @@
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
           "Text.Effects.shadowColour": "99E6D6B5"
+        }
+      },
+      "Group": {
+        "component": {
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 2,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 14,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 3,
+              "spread": 0,
+              "colour": "99000000"
+            }
+          ]
+        }
+      },
+      "Container": {
+        "component": {
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 2,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 14,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 3,
+              "spread": 0,
+              "colour": "99000000"
+            }
+          ]
+        }
+      },
+      "TabContainer": {
+        "component": {
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 2,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 14,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 3,
+              "spread": 0,
+              "colour": "99000000"
+            }
+          ],
+          "TabContainer.stripColour": "{section.surface}",
+          "TabContainer.tabColour": "{section.surface}",
+          "TabContainer.labelColour": "{text.primary}",
+          "TabContainer.activeLabelColour": "FFF6F7F9"
+        }
+      },
+      "ScrollArea": {
+        "component": {
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 2,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 14,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 3,
+              "spread": 0,
+              "colour": "99000000"
+            }
+          ]
+        }
+      },
+      "Background": {
+        "component": {
+          "Background.Border.enabled": false
         }
       }
     },

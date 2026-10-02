@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b1896cc2",
+  "fingerprint": "38e90312",
   "set": {
     "id": "field",
     "name": "Field",
@@ -61,7 +61,8 @@
       "display.unlit": "24FF3B30",
       "display.screen": "FF140505",
       "display.backlight": "FF302323",
-      "panel.surface": "FF4F5A3C"
+      "panel.surface": "FF4F5A3C",
+      "section.surface": "FF3E462F"
     },
     "lamp": {
       "azimuth": 225,
@@ -877,204 +878,128 @@
       },
       "Group": {
         "component": {
-          "Background.Corners.radius": 8,
-          "Background.Border.thickness": 1,
-          "Background.Effects.Material.enabled": true,
-          "Background.Effects.Material.kind": "hammer",
-          "Background.Effects.Material.strength": 50,
-          "Background.Effects.Material.shine": 30,
-          "Background.Effects.Material.grain": 100,
-          "Background.Corners.style": "chamfer",
-          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "Allerta Stencil",
           "Background.Fill.gradientEnabled": false,
-          "Background.Fill.gradient": {
-            "type": "linear",
-            "angle": 180,
-            "edge": 0,
-            "stops": [
-              {
-                "color": "656C5E",
-                "position": 0
-              },
-              {
-                "color": "3A4230",
-                "position": 55
-              },
-              {
-                "color": "2A3023",
-                "position": 100
-              }
-            ]
-          },
-          "Background.Fill.gradientOpacity": 100,
-          "Background.Border.colour": "FF1D2118",
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "leather",
+          "Background.Effects.Material.strength": 90,
+          "Background.Effects.Material.shine": 20,
+          "Background.Effects.Material.grain": 150,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99697156",
+          "Background.Corners.radius": 8,
           "Effects.Shadows.items": [
             {
               "enabled": true,
-              "type": "drop",
+              "type": "inner",
               "offsetX": 0,
               "offsetY": 2,
-              "blur": 3,
+              "blur": 6,
               "spread": 0,
-              "colour": "99000000"
+              "colour": "73000000"
             }
-          ],
-          "Text.Fill.colour": "{text.primary}",
-          "Text.Font.family": "Allerta Stencil"
+          ]
         }
       },
       "Container": {
         "component": {
-          "Background.Corners.radius": 8,
-          "Background.Border.thickness": 1,
-          "Background.Effects.Material.enabled": true,
-          "Background.Effects.Material.kind": "hammer",
-          "Background.Effects.Material.strength": 50,
-          "Background.Effects.Material.shine": 30,
-          "Background.Effects.Material.grain": 100,
-          "Background.Corners.style": "chamfer",
-          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "Allerta Stencil",
           "Background.Fill.gradientEnabled": false,
-          "Background.Fill.gradient": {
-            "type": "linear",
-            "angle": 180,
-            "edge": 0,
-            "stops": [
-              {
-                "color": "656C5E",
-                "position": 0
-              },
-              {
-                "color": "3A4230",
-                "position": 55
-              },
-              {
-                "color": "2A3023",
-                "position": 100
-              }
-            ]
-          },
-          "Background.Fill.gradientOpacity": 100,
-          "Background.Border.colour": "FF1D2118",
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "leather",
+          "Background.Effects.Material.strength": 90,
+          "Background.Effects.Material.shine": 20,
+          "Background.Effects.Material.grain": 150,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99697156",
+          "Background.Corners.radius": 8,
           "Effects.Shadows.items": [
             {
               "enabled": true,
-              "type": "drop",
+              "type": "inner",
               "offsetX": 0,
               "offsetY": 2,
-              "blur": 3,
+              "blur": 6,
               "spread": 0,
-              "colour": "99000000"
+              "colour": "73000000"
             }
-          ],
-          "Text.Fill.colour": "{text.primary}",
-          "Text.Font.family": "Allerta Stencil"
+          ]
         }
       },
       "TabContainer": {
         "component": {
-          "Background.Corners.radius": 8,
-          "Background.Border.thickness": 1,
-          "Background.Effects.Material.enabled": true,
-          "Background.Effects.Material.kind": "hammer",
-          "Background.Effects.Material.strength": 50,
-          "Background.Effects.Material.shine": 30,
-          "Background.Effects.Material.grain": 100,
-          "Background.Corners.style": "chamfer",
-          "Background.Fill.colour": "{control.field}",
-          "Background.Fill.gradientEnabled": false,
-          "Background.Fill.gradient": {
-            "type": "linear",
-            "angle": 180,
-            "edge": 0,
-            "stops": [
-              {
-                "color": "656C5E",
-                "position": 0
-              },
-              {
-                "color": "3A4230",
-                "position": 55
-              },
-              {
-                "color": "2A3023",
-                "position": 100
-              }
-            ]
-          },
-          "Background.Fill.gradientOpacity": 100,
-          "Background.Border.colour": "FF1D2118",
-          "Effects.Shadows.items": [
-            {
-              "enabled": true,
-              "type": "drop",
-              "offsetX": 0,
-              "offsetY": 2,
-              "blur": 3,
-              "spread": 0,
-              "colour": "99000000"
-            }
-          ],
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "Allerta Stencil",
           "TabContainer.appearance": "hardware",
           "TabContainer.accentColour": "{accent}",
-          "TabContainer.stripColour": "{control.field}",
-          "TabContainer.tabColour": "{surface}",
+          "TabContainer.stripColour": "{section.surface}",
+          "TabContainer.tabColour": "{section.surface}",
           "TabContainer.activeTabColour": "{surface.checked}",
           "TabContainer.labelColour": "{text.primary}",
-          "TabContainer.activeLabelColour": "{text.inverse}"
+          "TabContainer.activeLabelColour": "FF15171A",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "leather",
+          "Background.Effects.Material.strength": 90,
+          "Background.Effects.Material.shine": 20,
+          "Background.Effects.Material.grain": 150,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99697156",
+          "Background.Corners.radius": 8,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ]
         }
       },
       "ScrollArea": {
         "component": {
-          "Background.Corners.radius": 8,
-          "Background.Border.thickness": 1,
-          "Background.Effects.Material.enabled": true,
-          "Background.Effects.Material.kind": "hammer",
-          "Background.Effects.Material.strength": 50,
-          "Background.Effects.Material.shine": 30,
-          "Background.Effects.Material.grain": 100,
-          "Background.Corners.style": "chamfer",
-          "Background.Fill.colour": "{control.field}",
-          "Background.Fill.gradientEnabled": false,
-          "Background.Fill.gradient": {
-            "type": "linear",
-            "angle": 180,
-            "edge": 0,
-            "stops": [
-              {
-                "color": "656C5E",
-                "position": 0
-              },
-              {
-                "color": "3A4230",
-                "position": 55
-              },
-              {
-                "color": "2A3023",
-                "position": 100
-              }
-            ]
-          },
-          "Background.Fill.gradientOpacity": 100,
-          "Background.Border.colour": "FF1D2118",
-          "Effects.Shadows.items": [
-            {
-              "enabled": true,
-              "type": "drop",
-              "offsetX": 0,
-              "offsetY": 2,
-              "blur": 3,
-              "spread": 0,
-              "colour": "99000000"
-            }
-          ],
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "Allerta Stencil",
           "ScrollArea.scrollbarSize": 10,
           "ScrollArea.trackColour": "{control.track}",
-          "ScrollArea.thumbColour": "{control.cap}"
+          "ScrollArea.thumbColour": "{control.cap}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "leather",
+          "Background.Effects.Material.strength": 90,
+          "Background.Effects.Material.shine": 20,
+          "Background.Effects.Material.grain": 150,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99697156",
+          "Background.Corners.radius": 8,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ]
         }
       },
       "Meter": {
@@ -1713,6 +1638,11 @@
       "Label": {
         "component": {
           "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false
+        }
+      },
+      "Background": {
+        "component": {
           "Background.Border.enabled": false
         }
       }

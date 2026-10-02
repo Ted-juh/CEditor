@@ -28,6 +28,7 @@ import { CATALOG_CONTROL_SETS, CATALOG_SET_EXTRAS } from './catalogControlSets.j
 import { makeAdditionalControlSets } from './additionalControlSets.js';
 import { extendControlSet } from './controlSetCoverage.js';
 import { withLabelDesign } from './labelDesigns.js';
+import { withSectionDesign, withSectionSurface } from './sectionDesigns.js';
 import { deepClone } from '../utils/deepClone.js';
 
 const TOKEN_REFERENCE_PATTERN = /^\{([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)\}$/i;
@@ -45,6 +46,7 @@ export const CONTROL_SET_TOKEN_ROLES = [
   // buttons are cream on a black panel, `surface` is the cream and the text is cream too, and a
   // Label filled with `surface` had cream lettering on a cream plate.
   { name: 'panel.surface', group: 'panel', description: 'The panel\'s face: the fill of a Label and of a Background block. Text roles read on it.' },
+  { name: 'section.surface', group: 'panel', description: 'The face of a section (Group, Container, tab page, scroll area): the panel a step further from the lettering, so text roles read on it too.' },
 
   // Surfaces: the body of a button-like control and its interaction states.
   { name: 'surface', group: 'surface', description: 'Body of a ready-made control at rest (Button, Toggle, containers).' },
@@ -314,7 +316,10 @@ export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditiona
   .map(extendControlSet)
   .map((set) => withPanelSurface(set, { fallback: '{surface}' }))
   // After panel.surface, which the label designs read to light their lettering.
-  .map(withLabelDesign);
+  .map(withLabelDesign)
+  // Then the sections, whose surface is the panel's moved a step from the lettering.
+  .map((set) => withSectionSurface(set, { fallback: '{surface}' }))
+  .map(withSectionDesign);
 
 export const DEFAULT_CONTROL_SET_ID = 'graphite';
 
@@ -375,7 +380,8 @@ export function normalizeControlSetDefinition(value) {
   const type = normalizeControlSetType(value.type);
   if (type) out.type = type;
   // A set written before `panel.surface` existed still names its panel colour; that is the role.
-  return withPanelSurface(out);
+  // Its section surface follows from that panel, the same way the built-ins' does.
+  return withSectionSurface(withPanelSurface(out));
 }
 
 /**

@@ -634,3 +634,32 @@ the layout's line box, as `textUnrotatedOrigin` already did after the same trap 
 "CATEG". `browser-checks/templateLabels.mjs` measures the SVG copy across the box as well as the
 DOM text, and on the old code reports 832 captions cut off. And a backlit glow wider than a
 caption's line is cut square at the label's box, so the glow is tight and bright: 3px at 70%.
+
+## Sections are part of the panel
+
+The label designs above shipped a regression. A silkscreen label carries no plate, so it reads on
+whatever is behind it, and the contrast test measured it against the panel only. But every set drew
+a Group, a Container, a tab page and a scroll area as an enlarged button: `controlSetCoverage`
+copied the button's face onto them and filled them with `control.field`, the colour of a value
+window. On seven sets that window is pale. Tolex, Machined, Frost, Rackmount, Anodised, Eurorack
+and Receiver had cream or silver section slabs, and a label inside one read at about 1:1.
+
+`models/sectionDesigns.js` makes a section part of the panel. `section.surface` is the panel moved a
+step further from its lettering (darker under light lettering, lighter under dark), so its contrast
+only ever grows, and anything that reads on the panel reads in a section. The frame is the set's
+decision. The button copy is removed, not merged, because a section is not a button. Five frames:
+
+| Frame | What it is | Sets |
+| --- | --- | --- |
+| well | section surface, a hairline edge, an inset shadow | the rest (47) |
+| milled | a harder inset with a lit lower lip, tight corners, the panel's own finish | the engraved (metal) sets (20) |
+| glow | a glass face and a hairline lit in the accent | the backlit sets (7) |
+| piping | no face, a cream piping line | Tolex, Saddle |
+| hairline | no face, one ink line | Blueprint |
+
+The full-panel Background block also loses the factory's white 2px border, since it is the panel's
+face. Tab strips take the section surface with readable idle tabs, and the chosen tab takes whichever
+ink reads best on the set's checked surface: it had been `text.inverse` regardless, under 3:1 on
+twelve sets and as low as 1.1:1. Graphite's sections are untouched. `sectionDesigns.test.js` measures
+a label inside every section type in every set; on the previous code it fails at Tolex's
+Group, 1.07:1.

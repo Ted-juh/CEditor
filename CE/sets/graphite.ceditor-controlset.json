@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b3dd7302",
+  "fingerprint": "1903216b",
   "set": {
     "id": "graphite",
     "name": "Graphite",
@@ -61,7 +61,8 @@
       "border": "664C4C4C",
       "border.surface": "66FFFFFF",
       "border.field": "665B5B5B",
-      "border.mixed": "FFFFD166"
+      "border.mixed": "FFFFD166",
+      "section.surface": "{surface}"
     },
     "lamp": {
       "azimuth": 225,

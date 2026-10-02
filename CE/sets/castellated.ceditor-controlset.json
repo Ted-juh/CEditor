@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "357d0ad1",
+  "fingerprint": "b840ac83",
   "set": {
     "id": "castellated",
     "name": "Castellated",
@@ -61,7 +61,8 @@
       "display.unlit": "24FF7A1A",
       "display.screen": "FF0A0A0B",
       "display.backlight": "FF272728",
-      "panel.surface": "FF24292B"
+      "panel.surface": "FF24292B",
+      "section.surface": "FF1C2022"
     },
     "lamp": {
       "azimuth": 225,
@@ -1078,236 +1079,112 @@
       },
       "Group": {
         "component": {
-          "Background.Corners.radius": 6,
-          "Background.Border.thickness": 1,
-          "Background.Effects.Material.enabled": true,
-          "Background.Effects.Material.kind": "blast",
-          "Background.Effects.Material.strength": 50,
-          "Background.Effects.Material.shine": 40,
-          "Background.Effects.Material.grain": 100,
-          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "Barlow",
           "Background.Fill.gradientEnabled": false,
-          "Background.Fill.gradient": {
-            "type": "linear",
-            "angle": 180,
-            "edge": 0,
-            "stops": [
-              {
-                "color": "505357",
-                "position": 0
-              },
-              {
-                "color": "2A2D32",
-                "position": 55
-              },
-              {
-                "color": "1D1F23",
-                "position": 100
-              }
-            ]
-          },
-          "Background.Fill.gradientOpacity": 100,
-          "Background.Border.colour": "FF151719",
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "9946494A",
+          "Background.Corners.radius": 6,
           "Effects.Shadows.items": [
             {
               "enabled": true,
               "type": "inner",
               "offsetX": 0,
-              "offsetY": 1,
-              "blur": 2,
-              "spread": 0,
-              "colour": "40FFFFFF"
-            },
-            {
-              "enabled": true,
-              "type": "drop",
-              "offsetX": 0,
               "offsetY": 2,
-              "blur": 3,
+              "blur": 6,
               "spread": 0,
-              "colour": "99000000"
+              "colour": "73000000"
             }
-          ],
-          "Text.Fill.colour": "{text.primary}",
-          "Text.Font.family": "Barlow"
+          ]
         }
       },
       "Container": {
         "component": {
-          "Background.Corners.radius": 6,
-          "Background.Border.thickness": 1,
-          "Background.Effects.Material.enabled": true,
-          "Background.Effects.Material.kind": "blast",
-          "Background.Effects.Material.strength": 50,
-          "Background.Effects.Material.shine": 40,
-          "Background.Effects.Material.grain": 100,
-          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "Barlow",
           "Background.Fill.gradientEnabled": false,
-          "Background.Fill.gradient": {
-            "type": "linear",
-            "angle": 180,
-            "edge": 0,
-            "stops": [
-              {
-                "color": "505357",
-                "position": 0
-              },
-              {
-                "color": "2A2D32",
-                "position": 55
-              },
-              {
-                "color": "1D1F23",
-                "position": 100
-              }
-            ]
-          },
-          "Background.Fill.gradientOpacity": 100,
-          "Background.Border.colour": "FF151719",
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "9946494A",
+          "Background.Corners.radius": 6,
           "Effects.Shadows.items": [
             {
               "enabled": true,
               "type": "inner",
               "offsetX": 0,
-              "offsetY": 1,
-              "blur": 2,
-              "spread": 0,
-              "colour": "40FFFFFF"
-            },
-            {
-              "enabled": true,
-              "type": "drop",
-              "offsetX": 0,
               "offsetY": 2,
-              "blur": 3,
+              "blur": 6,
               "spread": 0,
-              "colour": "99000000"
+              "colour": "73000000"
             }
-          ],
-          "Text.Fill.colour": "{text.primary}",
-          "Text.Font.family": "Barlow"
+          ]
         }
       },
       "TabContainer": {
         "component": {
-          "Background.Corners.radius": 6,
-          "Background.Border.thickness": 1,
-          "Background.Effects.Material.enabled": true,
-          "Background.Effects.Material.kind": "blast",
-          "Background.Effects.Material.strength": 50,
-          "Background.Effects.Material.shine": 40,
-          "Background.Effects.Material.grain": 100,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Fill.gradientEnabled": false,
-          "Background.Fill.gradient": {
-            "type": "linear",
-            "angle": 180,
-            "edge": 0,
-            "stops": [
-              {
-                "color": "505357",
-                "position": 0
-              },
-              {
-                "color": "2A2D32",
-                "position": 55
-              },
-              {
-                "color": "1D1F23",
-                "position": 100
-              }
-            ]
-          },
-          "Background.Fill.gradientOpacity": 100,
-          "Background.Border.colour": "FF151719",
-          "Effects.Shadows.items": [
-            {
-              "enabled": true,
-              "type": "inner",
-              "offsetX": 0,
-              "offsetY": 1,
-              "blur": 2,
-              "spread": 0,
-              "colour": "40FFFFFF"
-            },
-            {
-              "enabled": true,
-              "type": "drop",
-              "offsetX": 0,
-              "offsetY": 2,
-              "blur": 3,
-              "spread": 0,
-              "colour": "99000000"
-            }
-          ],
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "Barlow",
           "TabContainer.appearance": "hardware",
           "TabContainer.accentColour": "{accent}",
-          "TabContainer.stripColour": "{control.field}",
-          "TabContainer.tabColour": "{surface}",
+          "TabContainer.stripColour": "{section.surface}",
+          "TabContainer.tabColour": "{section.surface}",
           "TabContainer.activeTabColour": "{surface.checked}",
           "TabContainer.labelColour": "{text.primary}",
-          "TabContainer.activeLabelColour": "{text.inverse}"
-        }
-      },
-      "ScrollArea": {
-        "component": {
-          "Background.Corners.radius": 6,
-          "Background.Border.thickness": 1,
-          "Background.Effects.Material.enabled": true,
-          "Background.Effects.Material.kind": "blast",
-          "Background.Effects.Material.strength": 50,
-          "Background.Effects.Material.shine": 40,
-          "Background.Effects.Material.grain": 100,
-          "Background.Fill.colour": "{control.field}",
+          "TabContainer.activeLabelColour": "FFF6F7F9",
           "Background.Fill.gradientEnabled": false,
-          "Background.Fill.gradient": {
-            "type": "linear",
-            "angle": 180,
-            "edge": 0,
-            "stops": [
-              {
-                "color": "505357",
-                "position": 0
-              },
-              {
-                "color": "2A2D32",
-                "position": 55
-              },
-              {
-                "color": "1D1F23",
-                "position": 100
-              }
-            ]
-          },
-          "Background.Fill.gradientOpacity": 100,
-          "Background.Border.colour": "FF151719",
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "9946494A",
+          "Background.Corners.radius": 6,
           "Effects.Shadows.items": [
             {
               "enabled": true,
               "type": "inner",
               "offsetX": 0,
-              "offsetY": 1,
-              "blur": 2,
-              "spread": 0,
-              "colour": "40FFFFFF"
-            },
-            {
-              "enabled": true,
-              "type": "drop",
-              "offsetX": 0,
               "offsetY": 2,
-              "blur": 3,
+              "blur": 6,
               "spread": 0,
-              "colour": "99000000"
+              "colour": "73000000"
             }
-          ],
+          ]
+        }
+      },
+      "ScrollArea": {
+        "component": {
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "Barlow",
           "ScrollArea.scrollbarSize": 10,
           "ScrollArea.trackColour": "{control.track}",
-          "ScrollArea.thumbColour": "{control.cap}"
+          "ScrollArea.thumbColour": "{control.cap}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "9946494A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ]
         }
       },
       "Ribbon": {
@@ -2055,6 +1932,11 @@
           "StepSequencer.labelColour": "{text.primary}",
           "StepSequencer.gridColour": "{border}",
           "StepSequencer.playheadColour": "{accent}"
+        }
+      },
+      "Background": {
+        "component": {
+          "Background.Border.enabled": false
         }
       }
     },

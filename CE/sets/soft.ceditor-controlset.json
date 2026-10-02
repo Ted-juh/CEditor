@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "82e59b11",
+  "fingerprint": "e4405975",
   "set": {
     "id": "soft",
     "name": "Soft",
@@ -61,7 +61,8 @@
       "display.unlit": "24A9A9F0",
       "display.screen": "FF262A33",
       "display.backlight": "FF40444B",
-      "panel.surface": "FFE8EAEE"
+      "panel.surface": "FFE8EAEE",
+      "section.surface": "FFF0F1F4"
     },
     "lamp": {
       "azimuth": 225,
@@ -603,132 +604,112 @@
       },
       "Group": {
         "component": {
-          "Background.Corners.radius": 16,
-          "Background.Border.thickness": 0,
-          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "Nunito Sans",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99C9CBD0",
+          "Background.Corners.radius": 14,
           "Effects.Shadows.items": [
             {
               "enabled": true,
-              "type": "drop",
-              "offsetX": -3,
-              "offsetY": -3,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
               "blur": 6,
               "spread": 0,
-              "colour": "E6FFFFFF"
-            },
-            {
-              "enabled": true,
-              "type": "drop",
-              "offsetX": 4,
-              "offsetY": 4,
-              "blur": 8,
-              "spread": 0,
-              "colour": "33000000"
+              "colour": "73000000"
             }
-          ],
-          "Text.Fill.colour": "{text.primary}",
-          "Text.Font.family": "Nunito Sans",
-          "Background.Fill.gradientEnabled": false
+          ]
         }
       },
       "Container": {
         "component": {
-          "Background.Corners.radius": 16,
-          "Background.Border.thickness": 0,
-          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "Nunito Sans",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99C9CBD0",
+          "Background.Corners.radius": 14,
           "Effects.Shadows.items": [
             {
               "enabled": true,
-              "type": "drop",
-              "offsetX": -3,
-              "offsetY": -3,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
               "blur": 6,
               "spread": 0,
-              "colour": "E6FFFFFF"
-            },
-            {
-              "enabled": true,
-              "type": "drop",
-              "offsetX": 4,
-              "offsetY": 4,
-              "blur": 8,
-              "spread": 0,
-              "colour": "33000000"
+              "colour": "73000000"
             }
-          ],
-          "Text.Fill.colour": "{text.primary}",
-          "Text.Font.family": "Nunito Sans",
-          "Background.Fill.gradientEnabled": false
+          ]
         }
       },
       "TabContainer": {
         "component": {
-          "Background.Corners.radius": 16,
-          "Background.Border.thickness": 0,
-          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "Nunito Sans",
+          "TabContainer.appearance": "hardware",
+          "TabContainer.accentColour": "{accent}",
+          "TabContainer.stripColour": "{section.surface}",
+          "TabContainer.tabColour": "{section.surface}",
+          "TabContainer.activeTabColour": "{surface.checked}",
+          "TabContainer.labelColour": "{text.primary}",
+          "TabContainer.activeLabelColour": "{text.inverse}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99C9CBD0",
+          "Background.Corners.radius": 14,
           "Effects.Shadows.items": [
             {
               "enabled": true,
-              "type": "drop",
-              "offsetX": -3,
-              "offsetY": -3,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
               "blur": 6,
               "spread": 0,
-              "colour": "E6FFFFFF"
-            },
-            {
-              "enabled": true,
-              "type": "drop",
-              "offsetX": 4,
-              "offsetY": 4,
-              "blur": 8,
-              "spread": 0,
-              "colour": "33000000"
+              "colour": "73000000"
             }
-          ],
-          "Text.Fill.colour": "{text.primary}",
-          "Text.Font.family": "Nunito Sans",
-          "Background.Fill.gradientEnabled": false,
-          "TabContainer.appearance": "hardware",
-          "TabContainer.accentColour": "{accent}",
-          "TabContainer.stripColour": "{control.field}",
-          "TabContainer.tabColour": "{surface}",
-          "TabContainer.activeTabColour": "{surface.checked}",
-          "TabContainer.labelColour": "{text.primary}",
-          "TabContainer.activeLabelColour": "{text.inverse}"
+          ]
         }
       },
       "ScrollArea": {
         "component": {
-          "Background.Corners.radius": 16,
-          "Background.Border.thickness": 0,
-          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "Nunito Sans",
+          "ScrollArea.scrollbarSize": 10,
+          "ScrollArea.trackColour": "{control.track}",
+          "ScrollArea.thumbColour": "{control.cap}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99C9CBD0",
+          "Background.Corners.radius": 14,
           "Effects.Shadows.items": [
             {
               "enabled": true,
-              "type": "drop",
-              "offsetX": -3,
-              "offsetY": -3,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
               "blur": 6,
               "spread": 0,
-              "colour": "E6FFFFFF"
-            },
-            {
-              "enabled": true,
-              "type": "drop",
-              "offsetX": 4,
-              "offsetY": 4,
-              "blur": 8,
-              "spread": 0,
-              "colour": "33000000"
+              "colour": "73000000"
             }
-          ],
-          "Text.Fill.colour": "{text.primary}",
-          "Text.Font.family": "Nunito Sans",
-          "Background.Fill.gradientEnabled": false,
-          "ScrollArea.scrollbarSize": 10,
-          "ScrollArea.trackColour": "{control.track}",
-          "ScrollArea.thumbColour": "{control.cap}"
+          ]
         }
       },
       "Meter": {
@@ -1168,6 +1149,11 @@
       "Label": {
         "component": {
           "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false
+        }
+      },
+      "Background": {
+        "component": {
           "Background.Border.enabled": false
         }
       }

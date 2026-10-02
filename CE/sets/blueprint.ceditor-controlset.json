@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e1ca4087",
+  "fingerprint": "2c400b32",
   "set": {
     "id": "blueprint",
     "name": "Blueprint",
@@ -61,7 +61,8 @@
       "display.unlit": "24DCE8F5",
       "display.screen": "FF0E1A2C",
       "display.backlight": "FF2B3545",
-      "panel.surface": "FF14243A"
+      "panel.surface": "FF14243A",
+      "section.surface": "FF101C2D"
     },
     "lamp": {
       "azimuth": 225,
@@ -362,56 +363,72 @@
       },
       "Group": {
         "component": {
-          "Background.Corners.radius": 0,
-          "Background.Border.thickness": 1,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Border.colour": "FFDCE8F5",
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "JetBrains Mono",
-          "Background.Fill.gradientEnabled": false
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": []
         }
       },
       "Container": {
         "component": {
-          "Background.Corners.radius": 0,
-          "Background.Border.thickness": 1,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Border.colour": "FFDCE8F5",
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "JetBrains Mono",
-          "Background.Fill.gradientEnabled": false
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": []
         }
       },
       "TabContainer": {
         "component": {
-          "Background.Corners.radius": 0,
-          "Background.Border.thickness": 1,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Border.colour": "FFDCE8F5",
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "JetBrains Mono",
-          "Background.Fill.gradientEnabled": false,
           "TabContainer.appearance": "flat",
           "TabContainer.accentColour": "{accent}",
-          "TabContainer.stripColour": "{control.field}",
-          "TabContainer.tabColour": "{surface}",
+          "TabContainer.stripColour": "{section.surface}",
+          "TabContainer.tabColour": "{section.surface}",
           "TabContainer.activeTabColour": "{surface.checked}",
           "TabContainer.labelColour": "{text.primary}",
-          "TabContainer.activeLabelColour": "{text.inverse}"
+          "TabContainer.activeLabelColour": "FF15171A",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": []
         }
       },
       "ScrollArea": {
         "component": {
-          "Background.Corners.radius": 0,
-          "Background.Border.thickness": 1,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Border.colour": "FFDCE8F5",
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "JetBrains Mono",
-          "Background.Fill.gradientEnabled": false,
           "ScrollArea.scrollbarSize": 5,
           "ScrollArea.trackColour": "{control.track}",
-          "ScrollArea.thumbColour": "{control.cap}"
+          "ScrollArea.thumbColour": "{control.cap}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": []
         }
       },
       "Meter": {
@@ -645,6 +662,11 @@
           "Background.Border.enabled": true,
           "Background.Border.colour": "{text.primary}",
           "Background.Border.thickness": 1
+        }
+      },
+      "Background": {
+        "component": {
+          "Background.Border.enabled": false
         }
       }
     },

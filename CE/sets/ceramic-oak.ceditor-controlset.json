@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d8e7c7b9",
+  "fingerprint": "d628ff33",
   "set": {
     "id": "ceramic",
     "name": "Ceramic & Oak",
@@ -61,7 +61,8 @@
       "display.unlit": "242B2A26",
       "display.screen": "FFE9E6DC",
       "display.backlight": "FFECE9E0",
-      "panel.surface": "FFF2EFE7"
+      "panel.surface": "FFF2EFE7",
+      "section.surface": "FFF7F5EF"
     },
     "lamp": {
       "azimuth": 225,
@@ -472,6 +473,127 @@
       "Label": {
         "component": {
           "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false
+        }
+      },
+      "Group": {
+        "component": {
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 30,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99D2CFC8",
+          "Background.Corners.radius": 8,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ]
+        }
+      },
+      "Container": {
+        "component": {
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 30,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99D2CFC8",
+          "Background.Corners.radius": 8,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ]
+        }
+      },
+      "TabContainer": {
+        "component": {
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 30,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99D2CFC8",
+          "Background.Corners.radius": 8,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "TabContainer.stripColour": "{section.surface}",
+          "TabContainer.tabColour": "{section.surface}",
+          "TabContainer.labelColour": "{text.primary}",
+          "TabContainer.activeLabelColour": "FFF6F7F9"
+        }
+      },
+      "ScrollArea": {
+        "component": {
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 30,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99D2CFC8",
+          "Background.Corners.radius": 8,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ]
+        }
+      },
+      "Background": {
+        "component": {
           "Background.Border.enabled": false
         }
       }

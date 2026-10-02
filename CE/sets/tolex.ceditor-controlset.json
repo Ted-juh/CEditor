@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "82eddd2e",
+  "fingerprint": "a267fafd",
   "set": {
     "id": "tolex",
     "name": "Tolex",
@@ -61,7 +61,8 @@
       "border.surface": "AA1C1A17",
       "border.field": "CCB8892E",
       "border.mixed": "FFC98A2A",
-      "panel.surface": "FF1C1A17"
+      "panel.surface": "FF1C1A17",
+      "section.surface": "FF161412"
     },
     "lamp": {
       "azimuth": 225,
@@ -837,192 +838,112 @@
       },
       "Group": {
         "component": {
-          "Background.Corners.radius": 10,
-          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "Libre Franklin",
           "Background.Fill.gradientEnabled": false,
-          "Background.Fill.gradient": {
-            "type": "radial",
-            "centerX": 38,
-            "centerY": 30,
-            "radiusX": 70,
-            "radiusY": 70,
-            "edge": 0,
-            "stops": [
-              {
-                "color": "F6EFE0",
-                "position": 0
-              },
-              {
-                "color": "F1E6CF",
-                "position": 55
-              },
-              {
-                "color": "A9A191",
-                "position": 100
-              }
-            ]
-          },
-          "Background.Fill.gradientOpacity": 100,
-          "Background.Border.colour": "FF3A2E1E",
-          "Background.Border.thickness": 1.5,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 2,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 14,
           "Effects.Shadows.items": [
             {
               "enabled": true,
               "type": "drop",
               "offsetX": 0,
               "offsetY": 2,
-              "blur": 2,
+              "blur": 3,
               "spread": 0,
-              "colour": "88000000"
+              "colour": "99000000"
             }
-          ],
-          "Text.Fill.colour": "{text.primary}",
-          "Text.Font.family": "Libre Franklin"
+          ]
         }
       },
       "Container": {
         "component": {
-          "Background.Corners.radius": 10,
-          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "Libre Franklin",
           "Background.Fill.gradientEnabled": false,
-          "Background.Fill.gradient": {
-            "type": "radial",
-            "centerX": 38,
-            "centerY": 30,
-            "radiusX": 70,
-            "radiusY": 70,
-            "edge": 0,
-            "stops": [
-              {
-                "color": "F6EFE0",
-                "position": 0
-              },
-              {
-                "color": "F1E6CF",
-                "position": 55
-              },
-              {
-                "color": "A9A191",
-                "position": 100
-              }
-            ]
-          },
-          "Background.Fill.gradientOpacity": 100,
-          "Background.Border.colour": "FF3A2E1E",
-          "Background.Border.thickness": 1.5,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 2,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 14,
           "Effects.Shadows.items": [
             {
               "enabled": true,
               "type": "drop",
               "offsetX": 0,
               "offsetY": 2,
-              "blur": 2,
+              "blur": 3,
               "spread": 0,
-              "colour": "88000000"
+              "colour": "99000000"
             }
-          ],
-          "Text.Fill.colour": "{text.primary}",
-          "Text.Font.family": "Libre Franklin"
+          ]
         }
       },
       "TabContainer": {
         "component": {
-          "Background.Corners.radius": 10,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Fill.gradientEnabled": false,
-          "Background.Fill.gradient": {
-            "type": "radial",
-            "centerX": 38,
-            "centerY": 30,
-            "radiusX": 70,
-            "radiusY": 70,
-            "edge": 0,
-            "stops": [
-              {
-                "color": "F6EFE0",
-                "position": 0
-              },
-              {
-                "color": "F1E6CF",
-                "position": 55
-              },
-              {
-                "color": "A9A191",
-                "position": 100
-              }
-            ]
-          },
-          "Background.Fill.gradientOpacity": 100,
-          "Background.Border.colour": "FF3A2E1E",
-          "Background.Border.thickness": 1.5,
-          "Effects.Shadows.items": [
-            {
-              "enabled": true,
-              "type": "drop",
-              "offsetX": 0,
-              "offsetY": 2,
-              "blur": 2,
-              "spread": 0,
-              "colour": "88000000"
-            }
-          ],
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "Libre Franklin",
           "TabContainer.appearance": "hardware",
           "TabContainer.accentColour": "{accent}",
-          "TabContainer.stripColour": "{control.field}",
-          "TabContainer.tabColour": "{surface}",
+          "TabContainer.stripColour": "{section.surface}",
+          "TabContainer.tabColour": "{section.surface}",
           "TabContainer.activeTabColour": "{surface.checked}",
           "TabContainer.labelColour": "{text.primary}",
-          "TabContainer.activeLabelColour": "{text.inverse}"
-        }
-      },
-      "ScrollArea": {
-        "component": {
-          "Background.Corners.radius": 10,
-          "Background.Fill.colour": "{control.field}",
+          "TabContainer.activeLabelColour": "FFF6F7F9",
           "Background.Fill.gradientEnabled": false,
-          "Background.Fill.gradient": {
-            "type": "radial",
-            "centerX": 38,
-            "centerY": 30,
-            "radiusX": 70,
-            "radiusY": 70,
-            "edge": 0,
-            "stops": [
-              {
-                "color": "F6EFE0",
-                "position": 0
-              },
-              {
-                "color": "F1E6CF",
-                "position": 55
-              },
-              {
-                "color": "A9A191",
-                "position": 100
-              }
-            ]
-          },
-          "Background.Fill.gradientOpacity": 100,
-          "Background.Border.colour": "FF3A2E1E",
-          "Background.Border.thickness": 1.5,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 2,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 14,
           "Effects.Shadows.items": [
             {
               "enabled": true,
               "type": "drop",
               "offsetX": 0,
               "offsetY": 2,
-              "blur": 2,
+              "blur": 3,
               "spread": 0,
-              "colour": "88000000"
+              "colour": "99000000"
             }
-          ],
+          ]
+        }
+      },
+      "ScrollArea": {
+        "component": {
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "Libre Franklin",
           "ScrollArea.scrollbarSize": 10,
           "ScrollArea.trackColour": "{control.track}",
-          "ScrollArea.thumbColour": "{control.cap}"
+          "ScrollArea.thumbColour": "{control.cap}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 2,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 14,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 3,
+              "spread": 0,
+              "colour": "99000000"
+            }
+          ]
         }
       },
       "Meter": {
@@ -1628,6 +1549,11 @@
       "Label": {
         "component": {
           "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false
+        }
+      },
+      "Background": {
+        "component": {
           "Background.Border.enabled": false
         }
       }
