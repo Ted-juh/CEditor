@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d9dc72fc",
+  "fingerprint": "28f92888",
   "set": {
     "id": "leatherbound",
     "name": "Future Lab",
@@ -60,7 +60,8 @@
       "display.lit": "FF5FE3FF",
       "display.unlit": "245FE3FF",
       "display.screen": "FF03040A",
-      "display.backlight": "FF212227"
+      "display.backlight": "FF212227",
+      "panel.surface": "FF171D24"
     },
     "lamp": {
       "azimuth": 225,

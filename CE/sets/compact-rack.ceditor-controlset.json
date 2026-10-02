@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c1a773b0",
+  "fingerprint": "4b72a3f1",
   "set": {
     "id": "compact-rack",
     "name": "Compact Rack",
@@ -60,7 +60,8 @@
       "border": "66303338",
       "border.surface": "AA3A3E43",
       "border.field": "66303338",
-      "border.mixed": "FFC9A227"
+      "border.mixed": "FFC9A227",
+      "panel.surface": "FFBEC1BA"
     },
     "lamp": {
       "azimuth": 225,

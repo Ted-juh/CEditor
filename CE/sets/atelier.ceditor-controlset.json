@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "9a0a7615",
+  "fingerprint": "450b86d8",
   "set": {
     "id": "atelier",
     "name": "Atelier",
@@ -60,7 +60,8 @@
       "display.lit": "FFE8590C",
       "display.unlit": "24E8590C",
       "display.screen": "FF1C1C1A",
-      "display.backlight": "FF373735"
+      "display.backlight": "FF373735",
+      "panel.surface": "FFD9D9D4"
     },
     "lamp": {
       "azimuth": 225,

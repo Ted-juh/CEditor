@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c7670f64",
+  "fingerprint": "781d974d",
   "set": {
     "id": "bellows",
     "name": "Bellows",
@@ -60,7 +60,8 @@
       "display.lit": "FFFF7A1A",
       "display.unlit": "24FF7A1A",
       "display.screen": "FF0A0A0B",
-      "display.backlight": "FF272728"
+      "display.backlight": "FF272728",
+      "panel.surface": "FF27252B"
     },
     "lamp": {
       "azimuth": 225,

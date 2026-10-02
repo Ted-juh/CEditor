@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "3c754c9a",
+  "fingerprint": "9df053b8",
   "set": {
     "id": "castellated",
     "name": "Castellated",
@@ -60,7 +60,8 @@
       "display.lit": "FFFF7A1A",
       "display.unlit": "24FF7A1A",
       "display.screen": "FF0A0A0B",
-      "display.backlight": "FF272728"
+      "display.backlight": "FF272728",
+      "panel.surface": "FF24292B"
     },
     "lamp": {
       "azimuth": 225,

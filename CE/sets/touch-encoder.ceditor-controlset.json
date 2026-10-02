@@ -11,12 +11,13 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "db70ed5a",
+  "fingerprint": "f6de3d01",
   "set": {
     "id": "touch-encoder",
     "name": "Touch Encoder",
     "description": "Wide flat encoder caps with central readouts, perimeter position dots and thin fader markers.",
     "tokens": {
+      "panel.surface": "FF222930",
       "surface": "FF4F616D",
       "surface.hover": "FF4F616D",
       "surface.pressed": "FF4F616D",

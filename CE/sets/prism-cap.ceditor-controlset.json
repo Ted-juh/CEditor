@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e7ace891",
+  "fingerprint": "09747d2d",
   "set": {
     "id": "prism-cap",
     "name": "Prism Cap",
@@ -60,7 +60,8 @@
       "display.lit": "FFFFE27A",
       "display.unlit": "24FFE27A",
       "display.screen": "FF2B2358",
-      "display.backlight": "FF443D6C"
+      "display.backlight": "FF443D6C",
+      "panel.surface": "FF202A33"
     },
     "lamp": {
       "azimuth": 225,

@@ -11,12 +11,13 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "15ea7949",
+  "fingerprint": "3f6ae9ab",
   "set": {
     "id": "arc-line",
     "name": "Arc Line",
     "description": "Open value arcs, long fine pointers, straight minimal faders and low rectangular touch keys.",
     "tokens": {
+      "panel.surface": "FF1B252A",
       "surface": "FF475C64",
       "surface.hover": "FF475C64",
       "surface.pressed": "FF475C64",

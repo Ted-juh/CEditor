@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b4dd04ef",
+  "fingerprint": "188acabd",
   "set": {
     "id": "dual-scale",
     "name": "Dual Scale",
@@ -60,7 +60,8 @@
       "border": "66303338",
       "border.surface": "AA3A3E43",
       "border.field": "66303338",
-      "border.mixed": "FFC9A227"
+      "border.mixed": "FFC9A227",
+      "panel.surface": "FF30373A"
     },
     "lamp": {
       "azimuth": 225,

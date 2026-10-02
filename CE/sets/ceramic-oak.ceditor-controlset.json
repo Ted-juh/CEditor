@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "9d6cf2bf",
+  "fingerprint": "1b0aad59",
   "set": {
     "id": "ceramic",
     "name": "Ceramic & Oak",
@@ -60,7 +60,8 @@
       "display.lit": "FF2B2A26",
       "display.unlit": "242B2A26",
       "display.screen": "FFE9E6DC",
-      "display.backlight": "FFECE9E0"
+      "display.backlight": "FFECE9E0",
+      "panel.surface": "FFF2EFE7"
     },
     "lamp": {
       "azimuth": 225,

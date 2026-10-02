@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "96414a66",
+  "fingerprint": "bb0b199e",
   "set": {
     "id": "balance",
     "name": "Balance",
@@ -60,7 +60,8 @@
       "border": "66807A6E",
       "border.surface": "66403A30",
       "border.field": "66807A6E",
-      "border.mixed": "FFB98A00"
+      "border.mixed": "FFB98A00",
+      "panel.surface": "FFEEECE4"
     },
     "lamp": {
       "azimuth": 225,

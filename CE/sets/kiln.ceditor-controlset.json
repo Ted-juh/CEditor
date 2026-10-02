@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "cad65f0c",
+  "fingerprint": "b1662ba8",
   "set": {
     "id": "kiln",
     "name": "Kiln",
@@ -60,7 +60,8 @@
       "display.lit": "FFA9A9F0",
       "display.unlit": "24A9A9F0",
       "display.screen": "FF262A33",
-      "display.backlight": "FF40444B"
+      "display.backlight": "FF40444B",
+      "panel.surface": "FFEEE7DC"
     },
     "lamp": {
       "azimuth": 225,

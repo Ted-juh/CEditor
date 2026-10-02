@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "7465935c",
+  "fingerprint": "10afd946",
   "set": {
     "id": "studio-white",
     "name": "Studio White",
@@ -60,7 +60,8 @@
       "display.lit": "FFA9A9F0",
       "display.unlit": "24A9A9F0",
       "display.screen": "FF262A33",
-      "display.backlight": "FF40444B"
+      "display.backlight": "FF40444B",
+      "panel.surface": "FFE1E3DE"
     },
     "lamp": {
       "azimuth": 225,

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "7fb25215",
+  "fingerprint": "5ec9133f",
   "set": {
     "id": "bakelite",
     "name": "Classic Poly",
@@ -60,7 +60,8 @@
       "display.lit": "FF9BE870",
       "display.unlit": "249BE870",
       "display.screen": "FF141A12",
-      "display.backlight": "FF30352E"
+      "display.backlight": "FF30352E",
+      "panel.surface": "FF24262A"
     },
     "lamp": {
       "azimuth": 225,

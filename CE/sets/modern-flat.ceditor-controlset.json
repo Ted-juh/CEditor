@@ -11,12 +11,13 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "3da1decd",
+  "fingerprint": "cdc6f5b1",
   "set": {
     "id": "diesel",
     "name": "Modern Flat",
     "description": "Matte circular knobs, single value arcs, slim rectangular sliders and clear state indicators.",
     "tokens": {
+      "panel.surface": "FF1C242A",
       "surface": "FF43515B",
       "surface.hover": "FF43515B",
       "surface.pressed": "FF43515B",

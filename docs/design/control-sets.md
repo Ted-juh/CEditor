@@ -568,3 +568,24 @@ enough to read.
 **How to look at a set before it is one.** `CONTROL_SET_SHOT_FILE=my.ceditor-controlset.json`
 renders the specimen under a set file instead of the built-ins — the harness gained a
 `showSet(set)` for it — so a design can be seen in the real renderer in one command.
+
+## Labels sit on the panel
+
+A Label and a Background block used to fill with `surface`, the body of a button. Every set picks
+its text roles to read on its *panel*: the additional sets compute `text.*` as the ink for their
+panel colour, and the hand-written ones agree, at 4.7:1 or better against `panel.colour` in all
+of them. So wherever a set's buttons are the same tone as its lettering, a Label was lettering on
+a button-coloured plate. Tolex is the clearest case, with cream text on cream pushbuttons at 1.0:1.
+Thirty-one of the seventy-eight built-ins had labels under 4.5:1. The same fill on a full-panel
+Background block, which the New Panel templates lay down first, covered the set's own panel with
+the button colour, and took every knob's and slider's caption down with it.
+
+`panel.surface` is the role for the panel's face. Both types now default to it. A set that names a
+panel colour gets that colour, derived when the set is built or read (`withPanelSurface`), so a
+library set or a document's copy written before the role existed picks it up too. Graphite names
+no panel colour and aliases it to `{surface}`, so it is unchanged, as rule 1 requires. A user's
+set without a panel colour reaches that alias through the base set and reads as it always did.
+Every built-in's Label now reads at 4.7:1 or better (`controlSets.test.js` holds them to 4.5:1),
+and Knob, Slider and Button resolve exactly as before in every set. The Settings editor's
+"Panel surface" swatch, which had been editing `surface`, now edits this role and the panel colour
+behind it. `surface` keeps its own swatch as "Button surface".

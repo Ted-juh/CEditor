@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "03b9d52b",
+  "fingerprint": "ea40a1ae",
   "set": {
     "id": "eurorack",
     "name": "Eurorack",
@@ -60,7 +60,8 @@
       "display.lit": "FF39FF7A",
       "display.unlit": "2439FF7A",
       "display.screen": "FF101214",
-      "display.backlight": "FF2D2E30"
+      "display.backlight": "FF2D2E30",
+      "panel.surface": "FFC4C8CC"
     },
     "lamp": {
       "azimuth": 225,

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c7899849",
+  "fingerprint": "558b6a5b",
   "set": {
     "id": "stompbox",
     "name": "Performance",
@@ -60,7 +60,8 @@
       "display.lit": "FFFF7A1A",
       "display.unlit": "24FF7A1A",
       "display.screen": "FF0A0A0B",
-      "display.backlight": "FF272728"
+      "display.backlight": "FF272728",
+      "panel.surface": "FF242A2B"
     },
     "lamp": {
       "azimuth": 225,

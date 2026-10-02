@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "919b5000",
+  "fingerprint": "c3a0730c",
   "set": {
     "id": "receiver",
     "name": "Receiver",
@@ -60,7 +60,8 @@
       "display.lit": "FF8FD3FF",
       "display.unlit": "248FD3FF",
       "display.screen": "FF0A1020",
-      "display.backlight": "FF272D3B"
+      "display.backlight": "FF272D3B",
+      "panel.surface": "FFC9CED3"
     },
     "lamp": {
       "azimuth": 225,

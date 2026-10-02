@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "bcba25c7",
+  "fingerprint": "d03c7f05",
   "set": {
     "id": "soft",
     "name": "Soft",
@@ -60,7 +60,8 @@
       "display.lit": "FFA9A9F0",
       "display.unlit": "24A9A9F0",
       "display.screen": "FF262A33",
-      "display.backlight": "FF40444B"
+      "display.backlight": "FF40444B",
+      "panel.surface": "FFE8EAEE"
     },
     "lamp": {
       "azimuth": 225,

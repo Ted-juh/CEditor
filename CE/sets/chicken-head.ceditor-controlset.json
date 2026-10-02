@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e5ca16c1",
+  "fingerprint": "13c3dc06",
   "set": {
     "id": "chicken-head",
     "name": "Chicken Head",
@@ -60,7 +60,8 @@
       "border": "88F1E6CC",
       "border.surface": "AA1C1A17",
       "border.field": "CCB8892E",
-      "border.mixed": "FFC98A2A"
+      "border.mixed": "FFC98A2A",
+      "panel.surface": "FF312C27"
     },
     "lamp": {
       "azimuth": 225,

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "841b06a5",
+  "fingerprint": "9dc56fe5",
   "set": {
     "id": "carbon",
     "name": "Carbon",
@@ -60,7 +60,8 @@
       "display.lit": "FFFF7A1A",
       "display.unlit": "24FF7A1A",
       "display.screen": "FF0A0A0B",
-      "display.backlight": "FF272728"
+      "display.backlight": "FF272728",
+      "panel.surface": "FF1C1E21"
     },
     "lamp": {
       "azimuth": 225,

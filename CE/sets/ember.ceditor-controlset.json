@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "83d3f4fc",
+  "fingerprint": "cc89b845",
   "set": {
     "id": "ember",
     "name": "Ember",
@@ -60,7 +60,8 @@
       "border": "665A4A40",
       "border.surface": "66FFF1DD",
       "border.field": "666A5A4C",
-      "border.mixed": "FFE6C15A"
+      "border.mixed": "FFE6C15A",
+      "panel.surface": "FF2A2320"
     },
     "lamp": {
       "azimuth": 225,

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "57b0c27f",
+  "fingerprint": "1d7fa273",
   "set": {
     "id": "chronograph",
     "name": "Precision",
@@ -60,7 +60,8 @@
       "border": "66303338",
       "border.surface": "AA3A3E43",
       "border.field": "66303338",
-      "border.mixed": "FFC9A227"
+      "border.mixed": "FFC9A227",
+      "panel.surface": "FF292D31"
     },
     "lamp": {
       "azimuth": 225,

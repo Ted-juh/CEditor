@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "7a36ae42",
+  "fingerprint": "c5617cb3",
   "set": {
     "id": "saddle",
     "name": "Saddle & Brass",
@@ -60,7 +60,8 @@
       "display.lit": "FFF2D07A",
       "display.unlit": "24F2D07A",
       "display.screen": "FF1A1208",
-      "display.backlight": "FF352E26"
+      "display.backlight": "FF352E26",
+      "panel.surface": "FFB3873A"
     },
     "lamp": {
       "azimuth": 225,

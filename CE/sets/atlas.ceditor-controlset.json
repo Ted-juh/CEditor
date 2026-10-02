@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e9ffe943",
+  "fingerprint": "83c15301",
   "set": {
     "id": "atlas",
     "name": "Atlas",
@@ -60,7 +60,8 @@
       "display.lit": "FFDCE8F5",
       "display.unlit": "24DCE8F5",
       "display.screen": "FF0E1A2C",
-      "display.backlight": "FF2B3545"
+      "display.backlight": "FF2B3545",
+      "panel.surface": "FF172D3B"
     },
     "lamp": {
       "azimuth": 225,

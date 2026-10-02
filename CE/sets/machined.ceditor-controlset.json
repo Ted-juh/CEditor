@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "9929c44a",
+  "fingerprint": "c8fe9a67",
   "set": {
     "id": "machined",
     "name": "Machined",
@@ -60,7 +60,8 @@
       "border": "66303338",
       "border.surface": "AA3A3E43",
       "border.field": "66303338",
-      "border.mixed": "FFC9A227"
+      "border.mixed": "FFC9A227",
+      "panel.surface": "FF9A9FA6"
     },
     "lamp": {
       "azimuth": 225,

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b9aef1ec",
+  "fingerprint": "b2c59aa0",
   "set": {
     "id": "porcelain",
     "name": "Compact Analog",
@@ -60,7 +60,8 @@
       "display.lit": "FFA9A9F0",
       "display.unlit": "24A9A9F0",
       "display.screen": "FF262A33",
-      "display.backlight": "FF40444B"
+      "display.backlight": "FF40444B",
+      "panel.surface": "FFD8D9D4"
     },
     "lamp": {
       "azimuth": 225,

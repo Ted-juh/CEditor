@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d78f86f4",
+  "fingerprint": "3d2db056",
   "set": {
     "id": "pinstripe",
     "name": "Pinstripe",
@@ -60,7 +60,8 @@
       "display.lit": "FF9BE870",
       "display.unlit": "249BE870",
       "display.screen": "FF141A12",
-      "display.backlight": "FF30352E"
+      "display.backlight": "FF30352E",
+      "panel.surface": "FF25272A"
     },
     "lamp": {
       "azimuth": 225,

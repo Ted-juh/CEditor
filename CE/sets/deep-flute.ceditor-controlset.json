@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "ead48ce4",
+  "fingerprint": "1597935a",
   "set": {
     "id": "deep-flute",
     "name": "Deep Flute",
@@ -60,7 +60,8 @@
       "display.lit": "FFFF7A1A",
       "display.unlit": "24FF7A1A",
       "display.screen": "FF0A0A0B",
-      "display.backlight": "FF272728"
+      "display.backlight": "FF272728",
+      "panel.surface": "FF202629"
     },
     "lamp": {
       "azimuth": 225,

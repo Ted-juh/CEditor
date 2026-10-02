@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "4309ce0f",
+  "fingerprint": "79d9a26a",
   "set": {
     "id": "field",
     "name": "Field",
@@ -60,7 +60,8 @@
       "display.lit": "FFFF3B30",
       "display.unlit": "24FF3B30",
       "display.screen": "FF140505",
-      "display.backlight": "FF302323"
+      "display.backlight": "FF302323",
+      "panel.surface": "FF4F5A3C"
     },
     "lamp": {
       "azimuth": 225,

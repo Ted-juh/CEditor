@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "2f9163ec",
+  "fingerprint": "6037dc30",
   "set": {
     "id": "carbon-pro",
     "name": "Carbon Pro",
@@ -60,7 +60,8 @@
       "display.lit": "FFFF7A1A",
       "display.unlit": "24FF7A1A",
       "display.screen": "FF0A0A0B",
-      "display.backlight": "FF272728"
+      "display.backlight": "FF272728",
+      "panel.surface": "FF282D2E"
     },
     "lamp": {
       "azimuth": 225,

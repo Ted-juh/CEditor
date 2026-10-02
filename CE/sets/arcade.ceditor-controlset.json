@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "be6df937",
+  "fingerprint": "b43d158c",
   "set": {
     "id": "arcade",
     "name": "Arcade",
@@ -60,7 +60,8 @@
       "display.lit": "FFF6D96B",
       "display.unlit": "24F6D96B",
       "display.screen": "FF1B1B1B",
-      "display.backlight": "FF363636"
+      "display.backlight": "FF363636",
+      "panel.surface": "FF202039"
     },
     "lamp": {
       "azimuth": 225,

@@ -11,12 +11,13 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "cdcbd5e4",
+  "fingerprint": "b3dd7302",
   "set": {
     "id": "graphite",
     "name": "Graphite",
     "description": "The original look: neutral dark greys with a cool blue accent.",
     "tokens": {
+      "panel.surface": "{surface}",
       "surface": "FF3A3A3A",
       "surface.hover": "FF4A4A4A",
       "surface.pressed": "FF2C2C2C",

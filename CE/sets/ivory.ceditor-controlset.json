@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6cd8ecce",
+  "fingerprint": "1b9a69dd",
   "set": {
     "id": "ivory",
     "name": "Ivory",
@@ -60,7 +60,8 @@
       "border": "66807A6E",
       "border.surface": "66403A30",
       "border.field": "66807A6E",
-      "border.mixed": "FFB98A00"
+      "border.mixed": "FFB98A00",
+      "panel.surface": "FFEFEAE0"
     },
     "lamp": {
       "azimuth": 225,

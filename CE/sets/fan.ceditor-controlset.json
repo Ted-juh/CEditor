@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "eb0ea8ee",
+  "fingerprint": "33c499f3",
   "set": {
     "id": "fan",
     "name": "Fan",
@@ -60,7 +60,8 @@
       "display.lit": "FFF6D96B",
       "display.unlit": "24F6D96B",
       "display.screen": "FF1B1B1B",
-      "display.backlight": "FF363636"
+      "display.backlight": "FF363636",
+      "panel.surface": "FFF1E6D8"
     },
     "lamp": {
       "azimuth": 225,

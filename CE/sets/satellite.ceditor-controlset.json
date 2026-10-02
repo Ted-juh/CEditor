@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "7b6c3744",
+  "fingerprint": "88611fd8",
   "set": {
     "id": "satellite",
     "name": "Satellite",
@@ -60,7 +60,8 @@
       "display.lit": "FFFFE27A",
       "display.unlit": "24FFE27A",
       "display.screen": "FF2B2358",
-      "display.backlight": "FF443D6C"
+      "display.backlight": "FF443D6C",
+      "panel.surface": "FF162B35"
     },
     "lamp": {
       "azimuth": 225,

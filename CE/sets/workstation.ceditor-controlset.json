@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "bb56fd7a",
+  "fingerprint": "70aa3c79",
   "set": {
     "id": "cassette-deck",
     "name": "Workstation",
@@ -60,7 +60,8 @@
       "display.lit": "FF9BE870",
       "display.unlit": "249BE870",
       "display.screen": "FF141A12",
-      "display.backlight": "FF30352E"
+      "display.backlight": "FF30352E",
+      "panel.surface": "FF34383E"
     },
     "lamp": {
       "azimuth": 225,

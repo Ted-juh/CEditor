@@ -10,7 +10,7 @@
   import ControlSetGallery from '../panels/ControlSetGallery.svelte';
   import { buildSolidStyle } from '../utils/backgroundCSS.js';
   import { createControlSetStarter } from '../models/controlSetStarter.js';
-  import { BUILT_IN_CONTROL_SETS, getControlSet } from '../models/controlSets.js';
+  import { BUILT_IN_CONTROL_SETS, getControlSet, resolveToken } from '../models/controlSets.js';
   import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
   import { MATERIAL_KINDS } from '../utils/materialFilter.js';
   import { controlSetFileName } from '../models/controlSetPackage.js';
@@ -24,7 +24,7 @@
   import { deepClone } from '../utils/deepClone.js';
 
   const COLOUR_ROLES = [
-    ['surface', 'Panel surface'], ['control.body', 'Control body'], ['control.cap', 'Knob / fader cap'],
+    ['panel.surface', 'Panel surface'], ['surface', 'Button surface'], ['control.body', 'Control body'], ['control.cap', 'Knob / fader cap'],
     ['control.fill', 'Value fill'], ['accent', 'Accent'], ['text.primary', 'Primary text'],
     ['display.screen', 'Display glass'], ['display.lit', 'Display light'],
   ];
@@ -110,11 +110,16 @@
   function setToken(key, event) {
     const old = String(draft?.tokens?.[key] ?? 'FFFFFFFF').replace('#', '');
     const alpha = old.length === 8 ? old.slice(0, 2) : 'FF';
-    draft = { ...draft, tokens: { ...draft.tokens, [key]: `${alpha}${event.target.value.slice(1).toUpperCase()}` } };
+    const value = `${alpha}${event.target.value.slice(1).toUpperCase()}`;
+    draft = { ...draft, tokens: { ...draft.tokens, [key]: value } };
+    // The panel's own fill reads `panel.colour` (utils/backgroundCSS.js), so the panel behind the
+    // labels follows the swatch too.
+    if (key === 'panel.surface') draft = { ...draft, panel: { ...(draft.panel ?? {}), colour: value } };
   }
 
   function colourValue(key) {
-    const raw = String(draft?.tokens?.[key] ?? 'FFFFFFFF').replace('#', '');
+    // A role may be an alias ('{surface}', '{accent}'): show the colour it gives, not its name.
+    const raw = String(resolveToken(key, draft) ?? 'FFFFFFFF').replace('#', '');
     return `#${(raw.length === 8 ? raw.slice(2) : raw).padStart(6, '0').slice(-6)}`;
   }
 

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "82d9a6eb",
+  "fingerprint": "2eab766e",
   "set": {
     "id": "crown",
     "name": "Crown",
@@ -60,7 +60,8 @@
       "border": "66303338",
       "border.surface": "AA3A3E43",
       "border.field": "66303338",
-      "border.mixed": "FFC9A227"
+      "border.mixed": "FFC9A227",
+      "panel.surface": "FF292728"
     },
     "lamp": {
       "azimuth": 225,

@@ -11,12 +11,13 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "4d36f760",
+  "fingerprint": "5f7c4ab7",
   "set": {
     "id": "recessed",
     "name": "Recessed",
     "description": "Flush dial wells, raised index tabs, recessed fader slots and shallow rocker switches.",
     "tokens": {
+      "panel.surface": "FF293138",
       "surface": "FF687A85",
       "surface.hover": "FF687A85",
       "surface.pressed": "FF687A85",

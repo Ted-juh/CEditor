@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "a0ea1884",
+  "fingerprint": "6793f7cf",
   "set": {
     "id": "obsidian",
     "name": "Obsidian",
@@ -60,7 +60,8 @@
       "display.lit": "FF5FE3FF",
       "display.unlit": "245FE3FF",
       "display.screen": "FF03040A",
-      "display.backlight": "FF212227"
+      "display.backlight": "FF212227",
+      "panel.surface": "FF0B0D11"
     },
     "lamp": {
       "azimuth": 225,

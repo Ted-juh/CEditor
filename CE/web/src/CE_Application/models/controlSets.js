@@ -40,6 +40,11 @@ const MAX_ALIAS_DEPTH = 8;
  * says what the role is for, not what colour it is.
  */
 export const CONTROL_SET_TOKEN_ROLES = [
+  // The panel itself. Every text role is chosen to read on this, not on `surface`: in a set whose
+  // buttons are cream on a black panel, `surface` is the cream and the text is cream too, and a
+  // Label filled with `surface` had cream lettering on a cream plate.
+  { name: 'panel.surface', group: 'panel', description: 'The panel\'s face: the fill of a Label and of a Background block. Text roles read on it.' },
+
   // Surfaces: the body of a button-like control and its interaction states.
   { name: 'surface', group: 'surface', description: 'Body of a ready-made control at rest (Button, Toggle, containers).' },
   { name: 'surface.hover', group: 'surface', description: 'Body while the pointer is over it.' },
@@ -116,6 +121,8 @@ const BASE_BUILT_IN_SETS = [
     name: 'Graphite',
     description: 'The original look: neutral dark greys with a cool blue accent.',
     tokens: {
+      // Graphite names no panel colour, and its labels have always sat on the control surface.
+      'panel.surface': '{surface}',
       'surface': 'FF3A3A3A',
       'surface.hover': 'FF4A4A4A',
       'surface.pressed': 'FF2C2C2C',
@@ -266,6 +273,28 @@ const BASE_BUILT_IN_SETS = [
   },
 ];
 
+/**
+ * A set's `panel.surface`: the panel colour it names (`panel.colour`), unless the set says
+ * otherwise. A set that names no panel colour gets `fallback` — the built-ins pass `'{surface}'`
+ * because every built-in must define every role; a user's set is left without one and reaches
+ * Graphite's `'{surface}'` alias through the base-set fallback, which resolves against its own
+ * surface. Either way that is what its labels sat on before this role existed.
+ *
+ * An inherited `'{surface}'` alias is replaced when there is a panel colour to replace it with:
+ * the additional sets copy their base's tokens wholesale, Graphite's alias among them, and with a
+ * panel colour present that alias is exactly the cream-on-cream this role exists to prevent.
+ */
+export function withPanelSurface(set, { fallback = null } = {}) {
+  const current = set?.tokens?.['panel.surface'];
+  const panelColour = String(set?.panel?.colour ?? '').trim().toUpperCase();
+  const hasPanelColour = COLOUR_LITERAL_PATTERN.test(panelColour);
+  let next = current;
+  if (hasPanelColour && (current === undefined || tokenNameOf(current) === 'surface')) next = panelColour;
+  else if (current === undefined && fallback) next = fallback;
+  if (next === current) return set;
+  return { ...set, tokens: { ...set.tokens, 'panel.surface': next } };
+}
+
 // Ember and Ivory began as colour-only sets; their mockup boards showed a chicken-head and a
 // black-bodied knob, and models/catalogControlSets.js carries those as extras. Graphite stays
 // exactly what it was: it is the look every existing document has.
@@ -280,7 +309,9 @@ const ORIGINAL_CONTROL_SETS = [
   // And the rest of the boards.
   ...CATALOG_CONTROL_SETS,
 ];
-export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditionalControlSets(ORIGINAL_CONTROL_SETS)].map(extendControlSet);
+export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditionalControlSets(ORIGINAL_CONTROL_SETS)]
+  .map(extendControlSet)
+  .map((set) => withPanelSurface(set, { fallback: '{surface}' }));
 
 export const DEFAULT_CONTROL_SET_ID = 'graphite';
 
@@ -340,7 +371,8 @@ export function normalizeControlSetDefinition(value) {
   if (value.panel && typeof value.panel === 'object' && !Array.isArray(value.panel)) out.panel = value.panel;
   const type = normalizeControlSetType(value.type);
   if (type) out.type = type;
-  return out;
+  // A set written before `panel.surface` existed still names its panel colour; that is the role.
+  return withPanelSurface(out);
 }
 
 /**

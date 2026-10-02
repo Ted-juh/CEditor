@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "960ad108",
+  "fingerprint": "ddf081b1",
   "set": {
     "id": "phosphor",
     "name": "Phosphor",
@@ -60,7 +60,8 @@
       "display.lit": "FF39FF7A",
       "display.unlit": "2439FF7A",
       "display.screen": "FF050705",
-      "display.backlight": "FF232523"
+      "display.backlight": "FF232523",
+      "panel.surface": "FF0B0D0B"
     },
     "lamp": {
       "azimuth": 225,

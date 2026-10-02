@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "3e115a84",
+  "fingerprint": "cbc09eba",
   "set": {
     "id": "reel",
     "name": "Reel",
@@ -60,7 +60,8 @@
       "display.lit": "FF1E1B18",
       "display.unlit": "241E1B18",
       "display.screen": "FFF3E9C8",
-      "display.backlight": "FFF4ECCF"
+      "display.backlight": "FFF4ECCF",
+      "panel.surface": "FF5E6A5E"
     },
     "lamp": {
       "azimuth": 225,

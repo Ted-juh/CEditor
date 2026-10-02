@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "528e7606",
+  "fingerprint": "2dfeaebd",
   "set": {
     "id": "walnut",
     "name": "Walnut",
@@ -60,7 +60,8 @@
       "display.lit": "FFF2D07A",
       "display.unlit": "24F2D07A",
       "display.screen": "FF161009",
-      "display.backlight": "FF322D27"
+      "display.backlight": "FF322D27",
+      "panel.surface": "FF4A3226"
     },
     "lamp": {
       "azimuth": 225,

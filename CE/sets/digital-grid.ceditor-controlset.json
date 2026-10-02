@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "28630463",
+  "fingerprint": "93d455f1",
   "set": {
     "id": "digital-grid",
     "name": "Digital Grid",
@@ -60,7 +60,8 @@
       "display.lit": "FF39FF7A",
       "display.unlit": "2439FF7A",
       "display.screen": "FF050705",
-      "display.backlight": "FF232523"
+      "display.backlight": "FF232523",
+      "panel.surface": "FF242B36"
     },
     "lamp": {
       "azimuth": 225,

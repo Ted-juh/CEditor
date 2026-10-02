@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "5d8de7b8",
+  "fingerprint": "ce7591f6",
   "set": {
     "id": "rackmount",
     "name": "Rackmount",
@@ -60,7 +60,8 @@
       "display.lit": "FF1B1B1D",
       "display.unlit": "241B1B1D",
       "display.screen": "FFF3E9C8",
-      "display.backlight": "FFF4ECCF"
+      "display.backlight": "FFF4ECCF",
+      "panel.surface": "FFA9ADB2"
     },
     "lamp": {
       "azimuth": 225,

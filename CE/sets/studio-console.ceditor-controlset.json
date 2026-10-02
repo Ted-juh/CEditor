@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "cb6b0a7e",
+  "fingerprint": "879ef61a",
   "set": {
     "id": "hi-fi",
     "name": "Studio Console",
@@ -60,7 +60,8 @@
       "display.lit": "FF9BE870",
       "display.unlit": "249BE870",
       "display.screen": "FF141A12",
-      "display.backlight": "FF30352E"
+      "display.backlight": "FF30352E",
+      "panel.surface": "FF32383B"
     },
     "lamp": {
       "azimuth": 225,

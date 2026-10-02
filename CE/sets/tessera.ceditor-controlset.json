@@ -11,12 +11,13 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "7275b0c2",
+  "fingerprint": "e8e6b3c5",
   "set": {
     "id": "tessera",
     "name": "Tessera",
     "description": "Rotating square frame, mosaic keys, hexagonal pads and a stepped number stack.",
     "tokens": {
+      "panel.surface": "FFE8E3D7",
       "surface": "FF365E63",
       "surface.hover": "FF365E63",
       "surface.pressed": "FF365E63",

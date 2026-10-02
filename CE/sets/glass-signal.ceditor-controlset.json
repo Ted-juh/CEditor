@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "8d63b394",
+  "fingerprint": "20fe9a14",
   "set": {
     "id": "gemstone",
     "name": "Glass Signal",
@@ -60,7 +60,8 @@
       "display.lit": "FFFFE27A",
       "display.unlit": "24FFE27A",
       "display.screen": "FF2B2358",
-      "display.backlight": "FF443D6C"
+      "display.backlight": "FF443D6C",
+      "panel.surface": "FF1E2A35"
     },
     "lamp": {
       "azimuth": 225,

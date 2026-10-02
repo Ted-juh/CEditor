@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "0ffdd522",
+  "fingerprint": "66cf0156",
   "set": {
     "id": "laboratory",
     "name": "Laboratory",
@@ -60,7 +60,8 @@
       "display.lit": "FFF2D07A",
       "display.unlit": "24F2D07A",
       "display.screen": "FF1A1208",
-      "display.backlight": "FF352E26"
+      "display.backlight": "FF352E26",
+      "panel.surface": "FF5F6B5E"
     },
     "lamp": {
       "azimuth": 225,

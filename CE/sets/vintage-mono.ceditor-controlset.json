@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "5d6a7be7",
+  "fingerprint": "db7b1100",
   "set": {
     "id": "brassworks",
     "name": "Vintage Mono",
@@ -60,7 +60,8 @@
       "border": "88F1E6CC",
       "border.surface": "AA1C1A17",
       "border.field": "CCB8892E",
-      "border.mixed": "FFC98A2A"
+      "border.mixed": "FFC98A2A",
+      "panel.surface": "FF242321"
     },
     "lamp": {
       "azimuth": 225,

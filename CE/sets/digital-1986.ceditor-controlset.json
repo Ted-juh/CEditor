@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "85773e27",
+  "fingerprint": "a4cb8a79",
   "set": {
     "id": "switchboard",
     "name": "Digital 1986",
@@ -60,7 +60,8 @@
       "display.lit": "FF39FF7A",
       "display.unlit": "2439FF7A",
       "display.screen": "FF050705",
-      "display.backlight": "FF232523"
+      "display.backlight": "FF232523",
+      "panel.surface": "FF232932"
     },
     "lamp": {
       "azimuth": 225,

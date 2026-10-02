@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "1da63471",
+  "fingerprint": "5282eff0",
   "set": {
     "id": "frost",
     "name": "Frost",
@@ -60,7 +60,8 @@
       "display.lit": "FFFFE27A",
       "display.unlit": "24FFE27A",
       "display.screen": "FF2B2358",
-      "display.backlight": "FF443D6C"
+      "display.backlight": "FF443D6C",
+      "panel.surface": "FF6A5BD6"
     },
     "lamp": {
       "azimuth": 225,
