@@ -30,6 +30,7 @@ import { extendControlSet } from './controlSetCoverage.js';
 import { withLabelDesign } from './labelDesigns.js';
 import { withSectionDesign, withSectionSurface } from './sectionDesigns.js';
 import { withInstrumentDesign, withInstrumentTokens } from './instrumentDesigns.js';
+import { withDisplayDesign } from './displayDesigns.js';
 import { withPersonalDesigns } from './personalSetDesigns.js';
 import { deepClone } from '../utils/deepClone.js';
 
@@ -336,7 +337,9 @@ export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditiona
   .map(withSectionDesign)
   // And the instruments, in the set's display window and its series of voices.
   .map(withInstrumentTokens)
-  .map(withInstrumentDesign);
+  .map(withInstrumentDesign)
+  // And the displays and shapes, in the set's readout and its section language.
+  .map(withDisplayDesign);
 
 export const DEFAULT_CONTROL_SET_ID = 'graphite';
 

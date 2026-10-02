@@ -34,6 +34,7 @@
 import { withLabelDesign, labelFamily } from './labelDesigns.js';
 import { withSectionDesign, withSectionSurface } from './sectionDesigns.js';
 import { SERIES_ROLES, withInstrumentDesign, withInstrumentTokens } from './instrumentDesigns.js';
+import { withDisplayDesign } from './displayDesigns.js';
 
 export const DERIVED_ROLES = ['section.surface', 'instrument.face', 'instrument.ink', 'instrument.text', ...SERIES_ROLES];
 
@@ -90,6 +91,7 @@ export function withPersonalDesigns(set, { builtInId = () => null, isBuiltIn = (
   next = withInstrumentTokens(next);
   // Nobody authors an instrument family, so the design's keys are the design's, every read.
   next = withInstrumentDesign(next, { replace: true });
+  next = withDisplayDesign(next, { replace: true });
   if (lineage === 'graphite' && typeof set.chosenFamilies?.Knob !== 'string') {
     const macro = next.families?.Macro;
     const { 'Macro.knobDesign': _, ...component } = macro?.component ?? {};

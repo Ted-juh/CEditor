@@ -784,11 +784,9 @@ node scripts/control-set-reach.mjs   # from CE/web
 exactly, so a gap that is fixed has to be crossed off and a new one has to be named:
 
 - **Reach.** Every set changes every control, or the control is named with a reason. Image and
-  Custom Component are the author's own; Pixel Display is a gap (its screen colours are its own
-  properties and no set writes them).
+  Custom Component are the author's own.
 - **Form.** Every control takes at least three forms across the sets, or is named. Background is
-  frameless everywhere by design; LCD, Shape and Range are gaps: every set draws them the same, in
-  its own paint.
+  frameless everywhere by design; Range is a gap: every set draws it the same, in its own paint.
 - **Debt.** The sets that only recolour a control are counted per control. A new recolour fails, and
   a paid one fails until its count is lowered, so the table only goes down. Today: Ceramic and Saddle
   recolour twenty-odd controls each, Walnut, Valve, Ladder and Field ten, the step sequencer keeps its
@@ -798,3 +796,36 @@ Reach is the weakest of the three, and the history says so: before the instrumen
 did change the twenty instruments, but only their text colour, so they passed reach and fail form
 (one form each) and debt (77 sets recolouring each). Form is generous too: the instruments pass it on
 their corner radius alone, which is a thinner kind of form than a knob's cap or a fader's handle.
+
+## Displays and shapes
+
+The table's first gaps were the three controls that draw a picture rather than a value. The LCD
+took the set's four display colours and nothing else, the same green-station panel with the same
+round cells in every set. The Pixel Display did not take the colours either: it was a white OLED
+everywhere. A Shape's own fill and stroke were factory grey in every set, because the sets wrote
+only its Background, which a Shape keeps switched off. Pixel Display was unreached; LCD and Shape
+were one form each.
+
+`models/displayDesigns.js` reads what kind of readout a set's display window is from the colours
+it already chose for it, glass and ink together:
+
+| Readout | From | Sets |
+| --- | --- | --- |
+| reflective | pale glass: dark segments, no backlight, a brighter glass sheen | Ceramic, Rackmount, Reel, Ladder |
+| glow | dark glass and a saturated ink: a VFD, LED or nixie, round cells, the cell mesh showing, a halo on the Pixel Display | 33, Tolex's amber and Valve's nixie among them |
+| scan | a black screen with a green trace: a phosphor tube, scanlines | Phosphor, Switchboard, Digital Grid |
+| oled | a black screen otherwise: square cells, no glass, no ghosts | 8, Obsidian's family |
+| drafting | the line-work set: a grid, no glass | Blueprint |
+| backlit | everything else: a lit LCD, as the factory one is, with square cells | 28 |
+
+The Pixel Display now shows `display.*` like the LCD, and both sit in the set's bezel: the section
+surface, with the set's corners. A Shape is drawn in the set's section language: the section
+surface, the frame's corners and weight (Tolex pipes its shapes at 2 px, Machined mills them at
+1.5 with tight corners), and a line that is mostly lettering, because a line is often a divider on
+the bare panel and has to read there. At the frame's old weight (30% lettering) it was 1.65:1 on
+Flightdeck and all but vanished on Ivory; at 70% it reads at 3:1 on every set, against its fill and
+against the panel. The line-work set draws construction lines, dashed.
+
+Graphite's displays and shapes are untouched, and personal sets get these from their own colours on
+every read like the other designs. `displayDesigns.test.js` pins the treatments, the colours, the 3:1
+lines and Graphite. The reach table crossed all three off.

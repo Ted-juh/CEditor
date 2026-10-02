@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "7e928484",
+  "fingerprint": "7db35459",
   "set": {
     "id": "ladder",
     "name": "Ladder",
@@ -1887,6 +1887,47 @@
           "Panic.borderColour": "{series.alert}",
           "Panic.labelColour": "{instrument.text}",
           "Panic.flashColour": "{series.alert}"
+        }
+      },
+      "LcdDisplay": {
+        "component": {
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.colour": "FF0F0F10",
+          "Background.Corners.radius": 8,
+          "Display.backlightOn": false,
+          "Display.showGhost": true,
+          "Display.showGlass": true,
+          "Display.glassTint": "33FFFFFF",
+          "Display.showScanlines": false,
+          "Display.showGrid": false,
+          "Display.dotShape": "square"
+        }
+      },
+      "PixelDisplay": {
+        "component": {
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.colour": "FF0F0F10",
+          "Background.Corners.radius": 8,
+          "Pixel.litColour": "{display.lit}",
+          "Pixel.unlitColour": "{display.unlit}",
+          "Pixel.screenColour": "{display.screen}",
+          "Pixel.backlightColour": "{display.backlight}",
+          "Pixel.backlightOn": false,
+          "Pixel.showGhost": true,
+          "Pixel.showGlass": true,
+          "Pixel.glassTint": "33FFFFFF",
+          "Pixel.showScanlines": false,
+          "Pixel.dotShape": "square",
+          "Pixel.glow": 0
+        }
+      },
+      "Shape": {
+        "component": {
+          "Shape.fillColour": "{section.surface}",
+          "Shape.strokeColour": "FFB1A99A",
+          "Shape.strokeWidth": 1,
+          "Shape.cornerRadius": 8,
+          "Shape.strokeStyle": "solid"
         }
       }
     },

@@ -446,6 +446,10 @@ export const EDITOR_PATHS = [
   /^Matrix\.(cellStyle|cellBg|rowHeaderW|gridColour|posColour|negColour|labelColour|activeColour)$/,
   /^Envelope\.(fillUnder|lineWidth|nodeRadius|lineColour|fillColour|nodeColour|gridColour|sustainColour|playheadColour)$/,
   /^Joystick\.(puckRadius|showGrid|gridDiv|padColour|gridColour|crosshairColour|puckColour|cornerColour|labelColour)$/,
+  // The displays' appearance fields and the Shape's fill and stroke (models/displayDesigns.js).
+  /^Display\.(backlightOn|showGhost|showGlass|glassTint|showScanlines|showGrid|dotShape)$/,
+  /^Pixel\.(litColour|unlitColour|screenColour|backlightColour|backlightOn|showGhost|showGlass|glassTint|showScanlines|dotShape|glow)$/,
+  /^Shape\.(fillColour|strokeColour|strokeWidth|cornerRadius|strokeStyle)$/,
   // The instruments' colour swatches, each on its own editor's Appearance section.
   /^Macro\.(knobDesign|knobColour|arcColour|trackColour|labelColour)$/,
   /^Orbit\.(fieldColour|ringColour|centreColour|labelColour)$/,

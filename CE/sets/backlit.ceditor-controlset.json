@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6208d522",
+  "fingerprint": "c8f8a473",
   "set": {
     "id": "backlit",
     "name": "Backlit",
@@ -1825,6 +1825,47 @@
           "Panic.borderColour": "{series.alert}",
           "Panic.labelColour": "{instrument.text}",
           "Panic.flashColour": "{series.alert}"
+        }
+      },
+      "LcdDisplay": {
+        "component": {
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.colour": "FF0A0A0C",
+          "Background.Corners.radius": 9,
+          "Display.backlightOn": false,
+          "Display.showGhost": false,
+          "Display.showGlass": false,
+          "Display.glassTint": "00FFFFFF",
+          "Display.showScanlines": false,
+          "Display.showGrid": false,
+          "Display.dotShape": "square"
+        }
+      },
+      "PixelDisplay": {
+        "component": {
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.colour": "FF0A0A0C",
+          "Background.Corners.radius": 9,
+          "Pixel.litColour": "{display.lit}",
+          "Pixel.unlitColour": "{display.unlit}",
+          "Pixel.screenColour": "{display.screen}",
+          "Pixel.backlightColour": "{display.backlight}",
+          "Pixel.backlightOn": false,
+          "Pixel.showGhost": false,
+          "Pixel.showGlass": false,
+          "Pixel.glassTint": "00FFFFFF",
+          "Pixel.showScanlines": false,
+          "Pixel.dotShape": "square",
+          "Pixel.glow": 0
+        }
+      },
+      "Shape": {
+        "component": {
+          "Shape.fillColour": "{section.surface}",
+          "Shape.strokeColour": "B34DD9FF",
+          "Shape.strokeWidth": 1,
+          "Shape.cornerRadius": 9,
+          "Shape.strokeStyle": "solid"
         }
       }
     },

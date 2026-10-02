@@ -29,7 +29,6 @@ const row = (type) => ROWS.find((entry) => entry.type === type);
 const NOT_REACHED = {
   Image: 'the author\'s picture: a set has nothing to say about its pixels',
   CustomComponent: 'the author\'s own component, designed part by part by them',
-  PixelDisplay: 'GAP: its screen colours (lit, unlit, glass, backlight) are its own properties, and no set writes them; the LCD\'s follow display.*',
 };
 
 const MIN_FORMS = 3;
@@ -37,8 +36,6 @@ const MIN_FORMS = 3;
 /** Controls every set draws in the same form. */
 const ONE_FORM = {
   Background: 'by design: the panel\'s own face, frameless in every set, in the panel\'s colour and material',
-  LcdDisplay: 'GAP: its glass follows display.* in every set, but no set changes its bezel, segments or cell pitch',
-  Shape: 'GAP: a set fills it with its colours and nothing else',
   Range: 'GAP: every set gives its two fields the same font, and otherwise only recolours its track, handles and fields',
 };
 

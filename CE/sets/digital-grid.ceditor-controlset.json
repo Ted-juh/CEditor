@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "617e1494",
+  "fingerprint": "31964ad0",
   "set": {
     "id": "digital-grid",
     "name": "Digital Grid",
@@ -1286,6 +1286,47 @@
           "Panic.borderColour": "{series.alert}",
           "Panic.labelColour": "{instrument.text}",
           "Panic.flashColour": "{series.alert}"
+        }
+      },
+      "LcdDisplay": {
+        "component": {
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.colour": "FF14181E",
+          "Background.Corners.radius": 4,
+          "Display.backlightOn": true,
+          "Display.showGhost": false,
+          "Display.showGlass": true,
+          "Display.glassTint": "1AFFFFFF",
+          "Display.showScanlines": true,
+          "Display.showGrid": false,
+          "Display.dotShape": "round"
+        }
+      },
+      "PixelDisplay": {
+        "component": {
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.colour": "FF14181E",
+          "Background.Corners.radius": 4,
+          "Pixel.litColour": "{display.lit}",
+          "Pixel.unlitColour": "{display.unlit}",
+          "Pixel.screenColour": "{display.screen}",
+          "Pixel.backlightColour": "{display.backlight}",
+          "Pixel.backlightOn": true,
+          "Pixel.showGhost": false,
+          "Pixel.showGlass": true,
+          "Pixel.glassTint": "1AFFFFFF",
+          "Pixel.showScanlines": true,
+          "Pixel.dotShape": "round",
+          "Pixel.glow": 0.45
+        }
+      },
+      "Shape": {
+        "component": {
+          "Shape.fillColour": "{section.surface}",
+          "Shape.strokeColour": "FFB8B8B5",
+          "Shape.strokeWidth": 1,
+          "Shape.cornerRadius": 4,
+          "Shape.strokeStyle": "solid"
         }
       }
     },
