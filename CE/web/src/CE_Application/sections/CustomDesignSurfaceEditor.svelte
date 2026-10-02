@@ -3063,7 +3063,7 @@
     event.stopPropagation();
     // Right-clicking a part that is not selected selects it first — otherwise the menu acts on
     // whatever happened to be selected before, which is the classic way to delete the wrong thing.
-    if (name && !isLayerSelected(name)) selectLayer(name, part, event);
+    if (name && !isLayerSelected(name)) selectLayer(name, event);
     contextMenuTarget = { screenX: event.clientX, screenY: event.clientY };
   }
 

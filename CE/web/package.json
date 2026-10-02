@@ -9,6 +9,7 @@
     "check": "svelte-check --config ./svelte.config.js --tsconfig ./jsconfig.json",
     "preview": "vite preview",
     "test": "node --import ./test/support/register-svelte.mjs --test",
+    "test:coverage": "node --import ./test/support/register-svelte.mjs --test --experimental-test-coverage --test-coverage-include=\"src/**\" --test-coverage-exclude=\"src/CE_Application/generated/**\"",
     "lint": "eslint src",
     "test:script-exports": "node scripts/validate-script-exports.mjs",
     "test:text-dock": "node browser-checks/textDock.mjs",
