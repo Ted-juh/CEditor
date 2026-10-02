@@ -12,7 +12,7 @@
     PHRASE_DIRECTION_LABELS,
   } from '../utils/phraseLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 8;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -104,10 +104,10 @@
 
 <svg class="phrase" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <rect x={PAD - 4} y={PAD - 4} width={Math.max(8, width - PAD * 2 + 8)} height={Math.max(8, height - PAD * 2 + 8)}
-        rx="6" fill={faceCss} stroke="rgba(42,42,54,1)" />
+        rx="6" fill={faceCss} stroke={tone('rgba(42,42,54,1)')} />
 
   {#if showHeader}
-    <circle cx={PAD + 3} cy={PAD + 5} r="3.5" fill={running ? noteCss : 'rgba(90,90,100,1)'} />
+    <circle cx={PAD + 3} cy={PAD + 5} r="3.5" fill={running ? noteCss : tone('rgba(90,90,100,1)')} />
     <text x={PAD + 12} y={PAD + 9} font-size="9.5" fill={labelCss} opacity="0.85">
       {keyLabel} · {steps} steps{dirLabel}
     </text>
@@ -142,7 +142,7 @@
       {#each Array.from({ length: c.ratchet }, (_, k) => k) as k (k)}
         <rect x={c.rect.x + 1 + k * ((c.rect.w - 2) / c.ratchet)} y={c.rect.y + c.rect.h - 2.5}
               width={Math.max(1, (c.rect.w - 2) / c.ratchet - 1)} height="1.8"
-              fill="rgba(10,10,16,0.75)" />
+              fill={tone('rgba(10,10,16,0.75)')} />
       {/each}
     {/if}
     {#if c.on && c.chance < 1}

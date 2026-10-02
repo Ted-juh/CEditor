@@ -11,7 +11,7 @@
   } from '../utils/splitZoneLayout.js';
   import { midiNoteLabel } from '../utils/arpLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 8;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -99,7 +99,7 @@
 
 <svg class="split" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <rect x={PAD - 4} y={PAD - 4} width={Math.max(8, width - PAD * 2 + 8)} height={Math.max(8, height - PAD * 2 + 8)}
-        rx="6" fill={faceCss} stroke="rgba(42,42,54,1)" />
+        rx="6" fill={faceCss} stroke={tone('rgba(42,42,54,1)')} />
 
   {#if showHeader}
     <text x={PAD} y={PAD + 9} font-size="9.5" fill={labelCss} opacity="0.85">{summary || 'No zones'}</text>
@@ -112,7 +112,7 @@
           fill={b.fill} opacity={b.zone.enabled ? 0.85 : 0.25} />
     {#if cfg.showLabels !== false && b.rect.w > 34}
       <text x={b.rect.x + 4} y={b.rect.y + b.rect.h - 2} font-size={Math.min(9, b.rect.h - 1)}
-            fill="rgba(11,11,16,0.95)" style="font-weight:600">{b.zone.label}</text>
+            fill={tone('rgba(11,11,16,0.95)')} style="font-weight:600">{b.zone.label}</text>
     {/if}
   {/each}
 

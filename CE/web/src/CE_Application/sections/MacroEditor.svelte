@@ -9,6 +9,8 @@
   import { componentListWithElement } from '../utils/componentElements.js';
   import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
   import ListTree from 'lucide-svelte/icons/list-tree';
+  import Palette from 'lucide-svelte/icons/palette';
+  import SwatchCluster from '../properties/SwatchCluster.svelte';
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
@@ -61,6 +63,17 @@
         <NumberCell label="Minor" value={m.minorTickCount ?? 0} min={0} max={8} step={1} defaultValue={0} onchange={(v) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(v, 0)))))} />
       </PropertyCell>
     {/if}
+  </PropertySection>
+
+  <PropertySection title="Appearance" icon={Palette}>
+    <PropertyCell label="Colours" span={4} hint="Knob body, value arc, arc track, labels. An assignment's own colour is set on the assignment. Click a swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'knobColour', label: 'Knob', value: m.knobColour ?? 'FF23232A', target: { type: 'control', controlId: core?.id, path: 'Macro.knobColour' } },
+        { key: 'arcColour', label: 'Arc', value: m.arcColour ?? 'FF5B9BD5', target: { type: 'control', controlId: core?.id, path: 'Macro.arcColour' } },
+        { key: 'trackColour', label: 'Track', value: m.trackColour ?? 'FF0E0E12', target: { type: 'control', controlId: core?.id, path: 'Macro.trackColour' } },
+        { key: 'labelColour', label: 'Labels', value: m.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'Macro.labelColour' } },
+      ]} />
+    </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Assignments" icon={ListTree}>

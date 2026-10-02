@@ -8,7 +8,7 @@
     TRANSPORT_SOURCE_LABELS, loopRegion, formatLoopRange, formatCountIn,
   } from '../utils/transportLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 8;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -67,18 +67,18 @@
 </script>
 
 <svg class="transport" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
-  <rect x={geom.x} y={geom.y} width={geom.w} height={geom.h} rx="6" fill={faceCss} stroke="rgba(42,42,54,1)" />
+  <rect x={geom.x} y={geom.y} width={geom.w} height={geom.h} rx="6" fill={faceCss} stroke={tone('rgba(42,42,54,1)')} />
 
   <!-- play / stop -->
   <rect x={btn.x} y={btn.y} width={btn.w} height={btn.h} rx="6"
-        fill={running ? accentCss : 'rgba(28,28,38,1)'} opacity={running ? 0.9 : 1}
-        stroke={countingIn ? beatCss : running ? accentCss : 'rgba(58,58,72,1)'} />
+        fill={running ? accentCss : tone('rgba(28,28,38,1)')} opacity={running ? 0.9 : 1}
+        stroke={countingIn ? beatCss : running ? accentCss : tone('rgba(58,58,72,1)')} />
   {#if countingIn}
     <!-- armed, not yet playing: a pulsing ring rather than the play or stop face -->
     <circle cx={btn.x + btn.w / 2} cy={btn.y + btn.h / 2} r="7" fill="none" stroke={beatCss} stroke-width="2" />
   {:else if running}
-    <rect x={btn.x + btn.w / 2 - 6} y={btn.y + btn.h / 2 - 6} width="4.5" height="12" rx="1" fill="#0b0b10" />
-    <rect x={btn.x + btn.w / 2 + 1.5} y={btn.y + btn.h / 2 - 6} width="4.5" height="12" rx="1" fill="#0b0b10" />
+    <rect x={btn.x + btn.w / 2 - 6} y={btn.y + btn.h / 2 - 6} width="4.5" height="12" rx="1" fill={tone('#0b0b10')} />
+    <rect x={btn.x + btn.w / 2 + 1.5} y={btn.y + btn.h / 2 - 6} width="4.5" height="12" rx="1" fill={tone('#0b0b10')} />
   {:else}
     <path d={`M ${btn.x + btn.w / 2 - 4} ${btn.y + btn.h / 2 - 7} L ${btn.x + btn.w / 2 + 7} ${btn.y + btn.h / 2} L ${btn.x + btn.w / 2 - 4} ${btn.y + btn.h / 2 + 7} Z`}
           fill={accentCss} />
@@ -86,7 +86,7 @@
 
   <!-- tempo -->
   <text x={btn.x + btn.w + 12} y={geom.y + geom.h * 0.52} font-size={bpmSize}
-        fill="rgba(232,232,238,1)" style="font-weight:700">{bpm.toFixed(1)}</text>
+        fill={tone('rgba(232,232,238,1)')} style="font-weight:700">{bpm.toFixed(1)}</text>
   <text x={btn.x + btn.w + 12} y={geom.y + geom.h - 8} font-size="8.5" fill={labelCss} opacity="0.75">
     BPM · {sig.beats}/{sig.unit}{external ? ` · ${locked ? (host ? 'HOST' : 'EXT') : (host ? 'HOST · no DAW' : 'EXT · no clock')}` : ''}{loopActive ? ` · ⟲ ${formatLoopRange(region)}` : ''}
   </text>
@@ -98,7 +98,7 @@
       {countingIn ? `−${formatCountIn(countLeft, sig.beats)}` : formatBarBeat(beats, sig)}
     </text>
     <circle cx={geom.x + geom.w - 14} cy={geom.y + geom.h - 12} r={onBeat ? (downbeat ? 5 : 3.5) : 2.5}
-            fill={onBeat ? beatCss : 'rgba(80,80,92,1)'} />
+            fill={onBeat ? beatCss : tone('rgba(80,80,92,1)')} />
   {/if}
 
   <!-- external, unlocked: say so rather than showing a frozen readout -->

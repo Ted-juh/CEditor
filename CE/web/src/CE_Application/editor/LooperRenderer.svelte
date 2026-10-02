@@ -12,7 +12,7 @@
   // Reuse the SAME major/minor tick generator the sliders use for value divisions.
   import { buildSliderTickStops } from '../utils/sliderGeometry.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 8;
   const SAMPLES = 48; // curve resolution per lane
@@ -101,13 +101,13 @@
       <path d={row.fill} fill={row.colour} opacity="0.16" />
       <path d={row.d} fill="none" stroke={row.colour} stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity={row.l.enabled ? 1 : 0.4} />
     {:else}
-      <text x={row.rect.x + row.rect.w / 2} y={row.rect.y + row.rect.h / 2 + 3} font-size={labelSize} fill="rgba(140,140,150,0.7)" text-anchor="middle">
+      <text x={row.rect.x + row.rect.w / 2} y={row.rect.y + row.rect.h / 2 + 3} font-size={labelSize} fill={tone('rgba(140,140,150,0.7)')} text-anchor="middle">
         {row.recording ? 'recording…' : 'press & move to record'}
       </text>
     {/if}
 
     <!-- lane label + REC dot -->
-    <text x={row.rect.x + 6} y={row.rect.y + 12} font-size={labelSize} fill={row.l.enabled ? labelCss : 'rgba(150,150,160,0.5)'} style="letter-spacing:.02em">{row.l.label}</text>
+    <text x={row.rect.x + 6} y={row.rect.y + 12} font-size={labelSize} fill={row.l.enabled ? labelCss : tone('rgba(150,150,160,0.5)')} style="letter-spacing:.02em">{row.l.label}</text>
     {#if row.recording}
       <circle cx={row.rect.x + row.rect.w - 10} cy={row.rect.y + 10} r="4" fill="rgba(235,87,87,1)" />
     {/if}

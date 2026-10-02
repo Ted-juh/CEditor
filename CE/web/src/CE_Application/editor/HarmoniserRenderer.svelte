@@ -13,7 +13,7 @@
   } from '../utils/harmoniserLayout.js';
   import { NOTE_SHARP, NOTE_FLAT, SCALE_LABELS, noteName } from '../utils/chordPadLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 8;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -74,10 +74,10 @@
 
 <svg class="harmoniser" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <rect x={PAD - 4} y={PAD - 4} width={Math.max(8, width - PAD * 2 + 8)} height={Math.max(8, height - PAD * 2 + 8)}
-        rx="6" fill={faceCss} stroke="rgba(42,42,54,1)" />
+        rx="6" fill={faceCss} stroke={tone('rgba(42,42,54,1)')} />
 
   {#if showHeader}
-    <circle cx={PAD + 3} cy={PAD + 5} r="3.5" fill={voiceCount ? addedCss : 'rgba(90,90,100,1)'} />
+    <circle cx={PAD + 3} cy={PAD + 5} r="3.5" fill={voiceCount ? addedCss : tone('rgba(90,90,100,1)')} />
     <text x={PAD + 12} y={PAD + 9} font-size="10" fill={labelCss} opacity="0.95">{chordName}</text>
     <text x={width - PAD} y={PAD + 9} font-size="8.5" fill={labelCss} text-anchor="end" opacity="0.65">
       {modeLabel} · {voicingLabel}

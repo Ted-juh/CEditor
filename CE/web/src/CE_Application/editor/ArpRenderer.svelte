@@ -11,7 +11,7 @@
     arpGeometry, arpCell, ARP_PATTERN_LABELS, arpSynced, arpDivisionLabel,
   } from '../utils/arpLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 8;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -73,9 +73,9 @@
 
 <svg class="arp" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   {#if showHeader}
-    <rect x={PAD} y={PAD - 4} width={Math.max(10, width - PAD * 2)} height={headerH - 4} rx="6" fill="rgba(20,20,32,1)" stroke="rgba(42,42,54,1)" />
-    <circle cx={PAD + 11} cy={PAD + 5} r="3.5" fill={running ? headCss : 'rgba(90,90,100,1)'} />
-    <text x={PAD + 20} y={PAD + 9} font-size="10" fill="rgba(232,232,238,1)" style="font-weight:600">
+    <rect x={PAD} y={PAD - 4} width={Math.max(10, width - PAD * 2)} height={headerH - 4} rx="6" fill={tone('rgba(20,20,32,1)')} stroke={tone('rgba(42,42,54,1)')} />
+    <circle cx={PAD + 11} cy={PAD + 5} r="3.5" fill={running ? headCss : tone('rgba(90,90,100,1)')} />
+    <text x={PAD + 20} y={PAD + 9} font-size="10" fill={tone('rgba(232,232,238,1)')} style="font-weight:600">
       {ARP_PATTERN_LABELS[arpPattern(control)] ?? arpPattern(control)}
     </text>
     <text x={width / 2} y={PAD + 9} font-size="9" fill={labelCss} text-anchor="middle" opacity="0.8">{sourceLabel}</text>
@@ -111,7 +111,7 @@
     {/if}
     {#if cfg.showNotes !== false && s.c.w >= 22 && s.c.h >= 26}
       <text x={s.c.x + s.c.w / 2} y={s.c.y + s.c.h - 4} font-size={Math.min(9, Math.max(7, s.c.w * 0.32))}
-            fill={s.fires ? (s.isHead ? headCss : labelCss) : 'rgba(110,110,120,1)'} text-anchor="middle">{s.label}</text>
+            fill={s.fires ? (s.isHead ? headCss : labelCss) : tone('rgba(110,110,120,1)')} text-anchor="middle">{s.label}</text>
     {/if}
     <!-- A hand-mute gets a strike; a Euclidean rest just stays dark, so the two
          kinds of silence read differently. -->

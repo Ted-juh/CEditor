@@ -663,3 +663,47 @@ ink reads best on the set's checked surface: it had been `text.inverse` regardle
 twelve sets and as low as 1.1:1. Graphite's sections are untouched. `sectionDesigns.test.js` measures
 a label inside every section type in every set; on the previous code it fails at Tolex's
 Group, 1.07:1.
+
+## Instruments wear the set's display
+
+Twenty controls ignored the set entirely: the Macro, Orbit, Looper, Router, Timbre, Turing, Kinetic,
+Constellation, Constraint, Keyboard, ChordPad, Arp, NoteRibbon, Phrase, Recorder, Harmoniser,
+SplitZone, Setlist, Transport and Panic. Each drew one design in one palette (a near-black slab,
+green and yellow voices, a blue accent) on Tolex exactly as on Graphite. Most of their colours were
+already properties with editor fields. No set wrote them.
+
+`models/instrumentDesigns.js` treats them as what they are, screens, and dresses them in the set's
+own display:
+
+- **The face.** `instrument.face` is the set's `display.screen` when that is dark, otherwise the
+  panel taken nearly to black. Its lettering is `instrument.ink` (captions, 4.5:1) and
+  `instrument.text` (readouts, 7:1).
+- **The voices.** `series.one` to `series.five` and `series.alert` are six colours drawn from the
+  set's own colours: its lit display ink, its range handles and band, its hot accent, its fill and
+  its light lettering. Each is nudged until it reads at 3:1 on the face, and one too close to a
+  voice already taken is passed over. When a set's own colours run out, hue siblings of its display
+  ink fill in. No voice is a grey. Graphite's series *is* the old palette.
+- **Each instrument's properties.** A family per instrument writes the properties it already had:
+  `Turing.barColour` is `{series.one}`, `Arp.headColour` is `{series.two}`, the keys of a Keyboard
+  are ivory tinted by the panel, and so on. Every one is a path the editor exposes. The Macro gained
+  an Appearance section for its knob, arc, track and label, and the ChordPad gained swatches for its
+  field and echo.
+
+Two things the instruments drew were never properties, and they follow the set too:
+
+- **Lanes, slots, scenes and tracks** carry a colour each as data, and the factory gives them the
+  palette's. One that still wears one of the six palette colours speaks that voice and takes the
+  set's colour for it (`withSetVoices` in `controlSetFamilies.js`, at draw time, like a family
+  patch). A colour the author chose is theirs. The step sequencer's tracks are included. The
+  Meter's zones are not, because green, amber and red there mean levels, not voices.
+- **The chrome** around a readout (a header plate, its edge, an idle lamp, a piano strip) was a run
+  of fixed greys picked between Graphite's face and lettering. `chromeTone` keeps each grey's place
+  on that run and draws it between the set's face and lettering instead, so Tolex's Arp header is
+  brown with cream lettering rather than navy. Under Graphite it is the identity function.
+
+A role's name must start every dotted part with a letter, which is why the voices are named and not
+numbered: `{series.1}` is not a token reference. Nothing fails when one is written. The resolver
+keeps the text, the renderer falls back to its own colour, and the set looks dressed while its
+voices are Graphite's. `instrumentDesigns.test.js` checks that every role in
+`CONTROL_SET_TOKEN_ROLES` can be written as a reference, and that no instrument property is left
+holding one unresolved.

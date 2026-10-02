@@ -8,7 +8,7 @@
     visibleRange, rowRect, currentScene, setlistWraps,
   } from '../utils/setlistLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 8;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -70,10 +70,10 @@
 
 <svg class="setlist" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <rect x={PAD - 4} y={PAD - 4} width={Math.max(8, width - PAD * 2 + 8)} height={Math.max(8, height - PAD * 2 + 8)}
-        rx="6" fill={faceCss} stroke="rgba(42,42,54,1)" />
+        rx="6" fill={faceCss} stroke={tone('rgba(42,42,54,1)')} />
 
   {#if showHeader}
-    <circle cx={PAD + 3} cy={PAD + 5} r="3.5" fill={count ? currentCss : 'rgba(90,90,100,1)'} />
+    <circle cx={PAD + 3} cy={PAD + 5} r="3.5" fill={count ? currentCss : tone('rgba(90,90,100,1)')} />
     <text x={PAD + 12} y={PAD + 9} font-size="9.5" fill={labelCss} opacity="0.9">
       {posLabel}{cur ? ` · ${cur.name}` : ''}{setlistWraps(control) ? ' · loop' : ''}
     </text>
@@ -94,17 +94,17 @@
           opacity={r.scene.enabled === false ? 0.3 : r.current ? 0.9 : 0.75} />
     <!-- the running number: on stage you count songs, not names -->
     <text x={r.rect.x + 6} y={r.rect.y + r.rect.h * 0.5 + 3.2} font-size="8.5"
-          fill={r.current ? 'rgba(10,10,16,0.75)' : labelCss} opacity="0.85">{r.i + 1}</text>
+          fill={r.current ? tone('rgba(10,10,16,0.75)') : labelCss} opacity="0.85">{r.i + 1}</text>
     <text x={r.rect.x + 22} y={r.rect.y + r.rect.h * 0.5 + 3.2} font-size="9.5"
-          fill={r.current ? 'rgba(10,10,16,1)' : textCss}
+          fill={r.current ? tone('rgba(10,10,16,1)') : textCss}
           text-decoration={r.scene.enabled === false ? 'line-through' : 'none'}>{r.scene.name}</text>
     {#if r.tempo}
       <text x={r.rect.x + r.rect.w - 46} y={r.rect.y + r.rect.h * 0.5 + 3.2} font-size="8"
-            fill={r.current ? 'rgba(10,10,16,0.75)' : labelCss} text-anchor="end" opacity="0.8">{r.tempo}</text>
+            fill={r.current ? tone('rgba(10,10,16,0.75)') : labelCss} text-anchor="end" opacity="0.8">{r.tempo}</text>
     {/if}
     {#if r.badge}
       <text x={r.rect.x + r.rect.w - 6} y={r.rect.y + r.rect.h * 0.5 + 3.2} font-size="8"
-            fill={r.current ? 'rgba(10,10,16,0.75)' : labelCss} text-anchor="end" opacity="0.8">{r.badge}</text>
+            fill={r.current ? tone('rgba(10,10,16,0.75)') : labelCss} text-anchor="end" opacity="0.8">{r.badge}</text>
     {/if}
   {/each}
 

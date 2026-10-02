@@ -29,6 +29,7 @@ import { makeAdditionalControlSets } from './additionalControlSets.js';
 import { extendControlSet } from './controlSetCoverage.js';
 import { withLabelDesign } from './labelDesigns.js';
 import { withSectionDesign, withSectionSurface } from './sectionDesigns.js';
+import { withInstrumentDesign, withInstrumentTokens } from './instrumentDesigns.js';
 import { deepClone } from '../utils/deepClone.js';
 
 const TOKEN_REFERENCE_PATTERN = /^\{([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)\}$/i;
@@ -47,6 +48,18 @@ export const CONTROL_SET_TOKEN_ROLES = [
   // Label filled with `surface` had cream lettering on a cream plate.
   { name: 'panel.surface', group: 'panel', description: 'The panel\'s face: the fill of a Label and of a Background block. Text roles read on it.' },
   { name: 'section.surface', group: 'panel', description: 'The face of a section (Group, Container, tab page, scroll area): the panel a step further from the lettering, so text roles read on it too.' },
+  // Instruments: the controls that draw a live display (Macro, Turing, Arp, Transport, Keyboard...).
+  // Their face is the set's display window; the series are their voices. Graphite's are today's
+  // palette, so a panel that never chose a set draws them as it always did.
+  { name: 'instrument.face', group: 'instrument', description: 'The face of an instrument control: the set\'s display window.' },
+  { name: 'instrument.ink', group: 'instrument', description: 'Secondary lettering on an instrument face: captions, scales, units.' },
+  { name: 'instrument.text', group: 'instrument', description: 'Primary lettering on an instrument face: names, the current item.' },
+  { name: 'series.one', group: 'series', description: 'First voice: bars, notes, curves, the main value.' },
+  { name: 'series.two', group: 'series', description: 'The moving or current thing: a playhead, a head step, a puck, a tonic.' },
+  { name: 'series.three', group: 'series', description: 'Second voice: steps, in-key notes, rings.' },
+  { name: 'series.four', group: 'series', description: 'Third voice: minor chords, added notes.' },
+  { name: 'series.five', group: 'series', description: 'Fourth voice: the next lane in a multi-lane display.' },
+  { name: 'series.alert', group: 'series', description: 'Alert: record, panic.' },
 
   // Surfaces: the body of a button-like control and its interaction states.
   { name: 'surface', group: 'surface', description: 'Body of a ready-made control at rest (Button, Toggle, containers).' },
@@ -319,7 +332,10 @@ export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditiona
   .map(withLabelDesign)
   // Then the sections, whose surface is the panel's moved a step from the lettering.
   .map((set) => withSectionSurface(set, { fallback: '{surface}' }))
-  .map(withSectionDesign);
+  .map(withSectionDesign)
+  // And the instruments, in the set's display window and its series of voices.
+  .map(withInstrumentTokens)
+  .map(withInstrumentDesign);
 
 export const DEFAULT_CONTROL_SET_ID = 'graphite';
 

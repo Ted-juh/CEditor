@@ -11,12 +11,21 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "cf28fbca",
+  "fingerprint": "9c0aa4cd",
   "set": {
     "id": "anodised",
     "name": "Anodised",
     "description": "Photographed, not drawn. Machined aluminium knobs with real knurling and a domed cap, engraved legends, slot faders with a 3D cap, buttons that sit proud of the panel.",
     "tokens": {
+      "instrument.face": "FF101214",
+      "instrument.ink": "FFA7A8AD",
+      "instrument.text": "FFE8E8EE",
+      "series.one": "FFFF7A1A",
+      "series.two": "FF5CC492",
+      "series.three": "FF8A5A3A",
+      "series.four": "FF7CFF6B",
+      "series.five": "FFEDEE2B",
+      "series.alert": "FFE5534B",
       "surface": "FFB8BDC3",
       "surface.hover": "FFCDD2D7",
       "surface.pressed": "FF8E949B",
@@ -1819,6 +1828,241 @@
       "Background": {
         "component": {
           "Background.Border.enabled": false
+        }
+      },
+      "Macro": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Macro.knobColour": "FF2D2E30",
+          "Macro.arcColour": "{series.one}",
+          "Macro.trackColour": "FF1C1E20",
+          "Macro.labelColour": "{instrument.ink}"
+        }
+      },
+      "Orbit": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Orbit.fieldColour": "{instrument.face}",
+          "Orbit.ringColour": "338A5A3A",
+          "Orbit.centreColour": "FF3B3D3E",
+          "Orbit.labelColour": "{instrument.ink}"
+        }
+      },
+      "Looper": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Looper.laneColour": "FF17191B",
+          "Looper.gridColour": "22A7A8AD",
+          "Looper.playheadColour": "{series.two}",
+          "Looper.labelColour": "{instrument.ink}"
+        }
+      },
+      "Router": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Router.curveColour": "{series.one}",
+          "Router.inputColour": "{series.two}",
+          "Router.fieldColour": "{instrument.face}",
+          "Router.gridColour": "18A7A8AD",
+          "Router.labelColour": "{instrument.ink}"
+        }
+      },
+      "Timbre": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Timbre.fieldColour": "{instrument.face}",
+          "Timbre.puckColour": "{series.two}",
+          "Timbre.labelColour": "{instrument.ink}"
+        }
+      },
+      "Turing": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Turing.barColour": "{series.one}",
+          "Turing.headColour": "{series.two}",
+          "Turing.fieldColour": "{instrument.face}",
+          "Turing.labelColour": "{instrument.ink}"
+        }
+      },
+      "Kinetic": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Kinetic.fieldColour": "{instrument.face}",
+          "Kinetic.ballColour": "{series.one}",
+          "Kinetic.wallColour": "338A5A3A",
+          "Kinetic.labelColour": "{instrument.ink}"
+        }
+      },
+      "Constellation": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Constellation.fieldColour": "{instrument.face}",
+          "Constellation.probeColour": "{series.two}",
+          "Constellation.linkColour": "338A5A3A",
+          "Constellation.labelColour": "{instrument.ink}"
+        }
+      },
+      "Constraint": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Constraint.fieldColour": "{instrument.face}",
+          "Constraint.trackColour": "18A7A8AD",
+          "Constraint.linkColour": "555CC492",
+          "Constraint.labelColour": "{instrument.ink}"
+        }
+      },
+      "Keyboard": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Keyboard.whiteColour": "FFECEBE7",
+          "Keyboard.blackColour": "FF36383A",
+          "Keyboard.heldColour": "FF8A5A3A",
+          "Keyboard.outOfKeyColour": "FF9A9A99",
+          "Keyboard.labelColour": "FF5A5958"
+        }
+      },
+      "ChordPad": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "ChordPad.echoColour": "{series.one}",
+          "ChordPad.fieldColour": "{instrument.face}",
+          "ChordPad.padColour": "FF1E2022",
+          "ChordPad.inKeyColour": "{series.three}",
+          "ChordPad.tonicColour": "{series.two}",
+          "ChordPad.minorColour": "{series.four}",
+          "ChordPad.labelColour": "{instrument.ink}"
+        }
+      },
+      "Arp": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Arp.fieldColour": "{instrument.face}",
+          "Arp.stepColour": "{series.three}",
+          "Arp.headColour": "{series.two}",
+          "Arp.restColour": "FF282A2C",
+          "Arp.labelColour": "{instrument.ink}"
+        }
+      },
+      "NoteRibbon": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "NoteRibbon.echoColour": "{series.one}",
+          "NoteRibbon.fieldColour": "{instrument.face}",
+          "NoteRibbon.zoneColour": "FF1E2022",
+          "NoteRibbon.inKeyColour": "{series.three}",
+          "NoteRibbon.rootColour": "{series.two}",
+          "NoteRibbon.touchColour": "{series.two}",
+          "NoteRibbon.labelColour": "{instrument.ink}"
+        }
+      },
+      "Phrase": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Phrase.faceColour": "{instrument.face}",
+          "Phrase.cellColour": "FF232527",
+          "Phrase.noteColour": "{series.one}",
+          "Phrase.playColour": "{series.two}",
+          "Phrase.labelColour": "{instrument.ink}"
+        }
+      },
+      "Recorder": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Recorder.faceColour": "{instrument.face}",
+          "Recorder.noteColour": "{series.three}",
+          "Recorder.recordColour": "{series.alert}",
+          "Recorder.playheadColour": "{series.two}",
+          "Recorder.labelColour": "{instrument.ink}"
+        }
+      },
+      "Harmoniser": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Harmoniser.faceColour": "{instrument.face}",
+          "Harmoniser.whiteColour": "FFECEBE7",
+          "Harmoniser.blackColour": "FF36383A",
+          "Harmoniser.playedColour": "{series.two}",
+          "Harmoniser.addedColour": "{series.four}",
+          "Harmoniser.labelColour": "{instrument.ink}"
+        }
+      },
+      "SplitZone": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "SplitZone.faceColour": "{instrument.face}",
+          "SplitZone.whiteColour": "FFECEBE7",
+          "SplitZone.blackColour": "FF36383A",
+          "SplitZone.litColour": "{series.two}",
+          "SplitZone.gapColour": "FF3B3D3E",
+          "SplitZone.labelColour": "{instrument.ink}"
+        }
+      },
+      "Setlist": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Setlist.faceColour": "{instrument.face}",
+          "Setlist.rowColour": "FF232527",
+          "Setlist.currentColour": "{series.three}",
+          "Setlist.textColour": "{instrument.text}",
+          "Setlist.labelColour": "{instrument.ink}"
+        }
+      },
+      "Transport": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Transport.faceColour": "{instrument.face}",
+          "Transport.accentColour": "{series.one}",
+          "Transport.beatColour": "{series.two}",
+          "Transport.labelColour": "{instrument.ink}"
+        }
+      },
+      "Panic": {
+        "component": {
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.colour": "FF060708",
+          "Background.Corners.radius": 3,
+          "Panic.faceColour": "FF3B1F1F",
+          "Panic.borderColour": "{series.alert}",
+          "Panic.labelColour": "{instrument.text}",
+          "Panic.flashColour": "{series.alert}"
         }
       }
     },

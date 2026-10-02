@@ -11,7 +11,7 @@
   } from '../utils/timbreLayout.js';
   import { safeSvgId } from '../utils/primitives.js';
 
-  let { control = null, width = 0, height = 0, idSeed = '' } = $props();
+  let { control = null, width = 0, height = 0, idSeed = '', series = null, tone = (colour) => colour } = $props();
 
   /**
    * The heat gradients need ids that are unique in the DOCUMENT, not in this component.
@@ -40,6 +40,11 @@
   }
   function n(v, f = 0) { const x = Number(v); return Number.isFinite(x) ? x : f; }
   const ANCHOR_PALETTE = ['rgba(91,155,213,1)', 'rgba(242,153,74,1)', 'rgba(57,217,138,1)', 'rgba(155,138,255,1)', 'rgba(242,201,76,1)', 'rgba(235,87,87,1)'];
+  // The set's series of voices (series.one to series.alert, models/instrumentDesigns.js), in
+  // this control's own order. Graphite's series is the palette above, so a panel that never
+  // chose a set is unchanged.
+  const SERIES_ORDER = [3, 5, 1, 4, 2, 6];
+  let palette = $derived(Array.isArray(series) && series.length >= 6 ? SERIES_ORDER.map((n, i) => css(series[n - 1], ANCHOR_PALETTE[i])) : ANCHOR_PALETTE);
 
   let cfg = $derived(timbreConfig(control));
   let geom = $derived(timbreGeometry(width, height, PAD));
@@ -62,7 +67,7 @@
   let anchorPx = $derived(anchors.map((a, i) => ({
     a, i,
     q: timbreToPx(a, geom),
-    colour: a.colour ? css(a.colour) : ANCHOR_PALETTE[i % ANCHOR_PALETTE.length],
+    colour: a.colour ? css(a.colour) : palette[i % palette.length],
   })));
   let puckPx = $derived(timbreToPx(puck, geom));
   let weights = $derived(anchorWeights(anchors, puck.x, puck.y, n(cfg.power, 2)));
@@ -86,7 +91,7 @@
     {/each}
   </defs>
 
-  <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx="8" fill={fieldCss} stroke="rgba(36,36,48,1)" />
+  <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx="8" fill={fieldCss} stroke={tone('rgba(36,36,48,1)')} />
   {#if cfg.showField !== false}
     {#each anchorPx as ap (ap.i)}
       <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx="8" fill={`url(#tsHeat-${gradientSeed}-${ap.i})`} />
@@ -114,7 +119,7 @@
 
   <!-- honesty readout -->
   {#if cfg.showReadout !== false && readout.total > 0}
-    <text x={geom.x0 + geom.w - 6} y={geom.y0 + 14} font-size={Math.max(8, labelSize - 2)} fill={readout.addressable < readout.total ? 'rgba(242,153,74,0.9)' : 'rgba(140,140,150,0.8)'} text-anchor="end">
+    <text x={geom.x0 + geom.w - 6} y={geom.y0 + 14} font-size={Math.max(8, labelSize - 2)} fill={readout.addressable < readout.total ? 'rgba(242,153,74,0.9)' : tone('rgba(140,140,150,0.8)')} text-anchor="end">
       {readout.addressable}/{readout.total} MIDI
     </text>
   {/if}

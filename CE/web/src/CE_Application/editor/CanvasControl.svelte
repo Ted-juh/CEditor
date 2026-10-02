@@ -144,7 +144,8 @@
   import { sortControlsForHitTest } from '../utils/controlOrder.js';
   import { getContext, setContext } from 'svelte';
   import { activeControlSet, CONTROL_SET_CONTEXT_KEY } from '../stores/controlSets.js';
-  import { CONTROL_SET_LAMP_CONTEXT_KEY } from '../models/controlSets.js';
+  import { CONTROL_SET_LAMP_CONTEXT_KEY, resolveToken } from '../models/controlSets.js';
+  import { SERIES_ROLES, chromeTone } from '../models/instrumentDesigns.js';
   import { resolveControlForSet, controlSetForControl } from '../models/controlSetFamilies.js';
 
   let {
@@ -233,6 +234,13 @@
   // the same object it always was.
   const contextControlSet = getContext(CONTROL_SET_CONTEXT_KEY) ?? null;
   let controlSet = $derived(controlSetForControl(documentControl, typeof contextControlSet === 'function' ? contextControlSet() : $activeControlSet));
+  // The set's series of voices, for the instruments that colour lanes and nodes from a palette
+  // rather than from one property each (Macro, Orbit, Timbre, Constraint). Graphite's series is
+  // their old built-in palette, and a set that names none falls back to it.
+  let seriesPalette = $derived(SERIES_ROLES.map((role) => resolveToken(role, controlSet) ?? null));
+  // The fixed greys an instrument draws around its readout (header plates, edges, idle lamps),
+  // moved onto the set's own face and lettering. Under Graphite each is itself.
+  let instrumentTone = $derived(chromeTone(resolveToken('instrument.face', controlSet), resolveToken('instrument.text', controlSet)));
   // The set's family patch first (a knob gets its cap, a button its finish), then the tokens —
   // models/controlSetFamilies.js. The set's lamp goes into context for every material filter
   // drawn under this control, so all of them are lit from the panel's one light.
@@ -3563,23 +3571,23 @@
     {/if}
 
     {#if isMacro}
-      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} />
+      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} series={seriesPalette} tone={instrumentTone} />
     {/if}
 
     {#if isOrbit}
-      <OrbitRenderer control={renderControl} width={displayW} height={displayH} />
+      <OrbitRenderer control={renderControl} width={displayW} height={displayH} series={seriesPalette} />
     {/if}
 
     {#if isLooper}
-      <LooperRenderer control={renderControl} width={displayW} height={displayH} />
+      <LooperRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isRouter}
-      <RouterRenderer control={renderControl} width={displayW} height={displayH} />
+      <RouterRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isTimbre}
-      <TimbreRenderer control={renderControl} width={displayW} height={displayH} idSeed={svgIdSeed} />
+      <TimbreRenderer control={renderControl} width={displayW} height={displayH} idSeed={svgIdSeed} series={seriesPalette} tone={instrumentTone} />
     {/if}
 
     {#if isTuring}
@@ -3587,27 +3595,27 @@
     {/if}
 
     {#if isKinetic}
-      <KineticRenderer control={renderControl} width={displayW} height={displayH} />
+      <KineticRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isConstellation}
-      <ConstellationRenderer control={renderControl} width={displayW} height={displayH} />
+      <ConstellationRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isConstraint}
-      <ConstraintRenderer control={renderControl} width={displayW} height={displayH} />
+      <ConstraintRenderer control={renderControl} width={displayW} height={displayH} series={seriesPalette} tone={instrumentTone} />
     {/if}
 
     {#if isChordPad}
-      <ChordPadRenderer control={renderControl} width={displayW} height={displayH} />
+      <ChordPadRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isArp}
-      <ArpRenderer control={renderControl} width={displayW} height={displayH} />
+      <ArpRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isNoteRibbon}
-      <NoteRibbonRenderer control={renderControl} width={displayW} height={displayH} />
+      <NoteRibbonRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isDrumPads}
@@ -3619,24 +3627,24 @@
     {/if}
 
     {#if isSplitZone}
-      <SplitZoneRenderer control={renderControl} width={displayW} height={displayH} />
+      <SplitZoneRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isPhrase}
-      <PhraseRenderer control={renderControl} width={displayW} height={displayH} />
+      <PhraseRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
     {#if isRecorder}
-      <RecorderRenderer control={renderControl} width={displayW} height={displayH} />
+      <RecorderRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
     {#if isHarmoniser}
-      <HarmoniserRenderer control={renderControl} width={displayW} height={displayH} />
+      <HarmoniserRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
     {#if isSetlist}
-      <SetlistRenderer control={renderControl} width={displayW} height={displayH} />
+      <SetlistRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isTransport}
-      <TransportRenderer control={renderControl} width={displayW} height={displayH} />
+      <TransportRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     <!-- ce.draw: whatever a script has drawn on THIS control, painted over its normal content.

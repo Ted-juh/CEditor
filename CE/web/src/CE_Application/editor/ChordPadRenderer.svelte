@@ -11,7 +11,7 @@
     noteName, useFlats, SCALE_LABELS, padNotes,
   } from '../utils/chordPadLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 10;
   const HEADER = 30;
@@ -121,8 +121,8 @@
 
 <svg class="chordpad" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <!-- header: key + scale, mode -->
-  <rect x={PAD} y={PAD - 4} width={Math.max(10, width - PAD * 2)} height={HEADER - 6} rx="8" fill="rgba(20,20,32,1)" stroke="rgba(42,42,54,1)" />
-  <text x={PAD + 10} y={PAD + 13} font-size="12" fill="rgba(232,232,238,1)" style="font-weight:600">{keyLabel}</text>
+  <rect x={PAD} y={PAD - 4} width={Math.max(10, width - PAD * 2)} height={HEADER - 6} rx="8" fill={tone('rgba(20,20,32,1)')} stroke={tone('rgba(42,42,54,1)')} />
+  <text x={PAD + 10} y={PAD + 13} font-size="12" fill={tone('rgba(232,232,238,1)')} style="font-weight:600">{keyLabel}</text>
   <text x={width - PAD - 10} y={PAD + 13} font-size="10" fill={heldLabel ? tonicCss : (echoOn ? echoCss : tonicCss)} text-anchor="end" style="font-weight:600">
     {heldLabel || (echoOn ? `IN · ${echoNotes.length}` : (String(cfg.mode ?? 'chords') === 'notes' ? 'Notes' : 'Chords'))}
   </text>
@@ -141,13 +141,13 @@
         <circle cx={nd.x} cy={nd.y} r={nd.r + 4} fill="none" stroke={echoCss} stroke-width="2" opacity="0.9" />
       {/if}
       <circle cx={nd.x} cy={nd.y} r={nd.r}
-              fill={isHeld ? 'rgba(42,42,52,1)' : padCss}
-              stroke={isHeld ? accent : (nd.ch.inKey ? accent : 'rgba(42,42,52,1)')}
+              fill={isHeld ? tone('rgba(42,42,52,1)') : padCss}
+              stroke={isHeld ? accent : (nd.ch.inKey ? accent : tone('rgba(42,42,52,1)'))}
               stroke-width={isHeld ? 2.5 : (nd.ch.inKey ? 1.5 : 1)}
               opacity={nd.ch.inKey ? 1 : 0.45} />
       <text x={nd.x} y={nd.y + (nd.ring === 'minor' ? 3.5 : 4.5)}
             font-size={nd.ring === 'minor' ? Math.max(7, nd.r * 0.62) : Math.max(8, nd.r * 0.66)}
-            fill={isHeld ? '#fff' : (nd.ch.inKey ? 'rgba(232,232,238,1)' : 'rgba(120,120,132,1)')}
+            fill={isHeld ? '#fff' : (nd.ch.inKey ? tone('rgba(232,232,238,1)') : tone('rgba(120,120,132,1)'))}
             text-anchor="middle" style="font-weight:700">{nd.ch.name}</text>
       <!-- Romans sit OUTSIDE their ring: above the outer majors, below the inner
            minors — otherwise the two rings' labels collide in the middle. -->
@@ -158,8 +158,8 @@
     {/each}
 
     <!-- hub: key + IV/V hints -->
-    <circle cx={wGeom.cx} cy={wGeom.cy} r={wGeom.hubR} fill="rgba(12,12,18,1)" stroke="rgba(42,42,54,1)" />
-    <text x={wGeom.cx} y={wGeom.cy - 1} font-size={Math.max(9, wGeom.hubR * 0.36)} fill="rgba(232,232,238,1)" text-anchor="middle" style="font-weight:700">{noteName(keyPc, flats)}</text>
+    <circle cx={wGeom.cx} cy={wGeom.cy} r={wGeom.hubR} fill={tone('rgba(12,12,18,1)')} stroke={tone('rgba(42,42,54,1)')} />
+    <text x={wGeom.cx} y={wGeom.cy - 1} font-size={Math.max(9, wGeom.hubR * 0.36)} fill={tone('rgba(232,232,238,1)')} text-anchor="middle" style="font-weight:700">{noteName(keyPc, flats)}</text>
     <text x={wGeom.cx} y={wGeom.cy + wGeom.hubR * 0.42} font-size={Math.max(7, wGeom.hubR * 0.24)} fill={labelCss} text-anchor="middle" opacity="0.7">{SCALE_LABELS[scaleName] ?? scaleName}</text>
     <text x={wGeom.cx - wGeom.hubR - 4} y={wGeom.cy - wGeom.hubR * 0.5} font-size="8" fill={inKeyCss} text-anchor="end" opacity="0.75">IV</text>
     <text x={wGeom.cx + wGeom.hubR + 4} y={wGeom.cy - wGeom.hubR * 0.5} font-size="8" fill={inKeyCss} text-anchor="start" opacity="0.75">V</text>
@@ -175,32 +175,32 @@
         <rect x={g.c.x - 2} y={g.c.y - 2} width={g.c.w + 4} height={g.c.h + 4} rx="10" fill="none" stroke={echoCss} stroke-width="2" opacity="0.9" />
       {/if}
       <rect x={g.c.x} y={g.c.y} width={g.c.w} height={g.c.h} rx="8"
-            fill={isHeld ? 'rgba(32,32,42,1)' : padCss}
-            stroke={isHeld ? accent : 'rgba(44,44,56,1)'} stroke-width={isHeld ? 2 : 1} />
+            fill={isHeld ? tone('rgba(32,32,42,1)') : padCss}
+            stroke={isHeld ? accent : tone('rgba(44,44,56,1)')} stroke-width={isHeld ? 2 : 1} />
       <rect x={g.c.x + 7} y={g.c.y + 7} width={Math.max(2, g.c.w - 14)} height="3" rx="1.5" fill={accent} opacity={isHeld ? 1 : 0.65} />
       <text x={g.c.x + g.c.w / 2} y={g.c.y + g.c.h / 2 + 5}
             font-size={Math.max(11, Math.min(20, g.c.h * 0.34))}
-            fill={isHeld ? '#fff' : 'rgba(232,232,238,1)'} text-anchor="middle" style="font-weight:700">{g.p.name}</text>
+            fill={isHeld ? '#fff' : tone('rgba(232,232,238,1)')} text-anchor="middle" style="font-weight:700">{g.p.name}</text>
       <!-- Roman sits under the colour strip; the chord tones own the bottom row,
            so a wide numeral (♭VII) can't run into a wide note list. -->
       {#if cfg.showRomans !== false && g.p.roman}
         <text x={g.c.x + 8} y={g.c.y + 22} font-size="9" fill={labelCss} opacity="0.8">{g.p.roman}</text>
       {/if}
       {#if g.p.noteNames && g.p.noteNames.length > 1 && g.c.h > 46}
-        <text x={g.c.x + g.c.w / 2} y={g.c.y + g.c.h - 7} font-size="8.5" fill={isHeld ? accent : 'rgba(122,122,132,1)'} text-anchor="middle">{g.p.noteNames.join('·')}</text>
+        <text x={g.c.x + g.c.w / 2} y={g.c.y + g.c.h - 7} font-size="8.5" fill={isHeld ? accent : tone('rgba(122,122,132,1)')} text-anchor="middle">{g.p.noteNames.join('·')}</text>
       {/if}
     {/each}
   {/if}
 
   <!-- piano strip: what's sounding -->
   {#if cfg.showPiano !== false}
-    <rect x={PAD - 1} y={pianoY - 1} width={pianoW + 2} height={pianoH - 2} rx="4" fill="rgba(8,8,12,1)" stroke="rgba(32,32,42,1)" />
+    <rect x={PAD - 1} y={pianoY - 1} width={pianoW + 2} height={pianoH - 2} rx="4" fill={tone('rgba(8,8,12,1)')} stroke={tone('rgba(32,32,42,1)')} />
     {#each Array(14) as _, i (i)}
       {@const pc = WHITE[i % 7]}
       {@const lit = litPcs.has(pc)}
       {@const ech = echoPcs.has(pc)}
       <rect x={PAD + i * whiteW + 0.5} y={pianoY} width={Math.max(1, whiteW - 1)} height={pianoH - 4} rx="2"
-            fill={lit ? tonicCss : (ech ? echoCss : 'rgba(233,233,238,0.92)')}
+            fill={lit ? tonicCss : (ech ? echoCss : tone('rgba(233,233,238,0.92)'))}
             fill-opacity={!lit && ech ? echoPcAlpha[pc] : 1} />
     {/each}
     {#each [0, 1] as oct (oct)}
@@ -208,7 +208,7 @@
         {@const lit = litPcs.has(BLACK_PC[j])}
         {@const ech = echoPcs.has(BLACK_PC[j])}
         <rect x={PAD + (oct * 7 + wi + 1) * whiteW - whiteW * 0.32} y={pianoY} width={whiteW * 0.64} height={(pianoH - 4) * 0.62} rx="1.5"
-              fill={lit ? tonicCss : (ech ? echoCss : 'rgba(21,21,27,1)')}
+              fill={lit ? tonicCss : (ech ? echoCss : tone('rgba(21,21,27,1)'))}
               fill-opacity={!lit && ech ? echoPcAlpha[BLACK_PC[j]] : 1}
               stroke="rgba(0,0,0,0.8)" stroke-width="0.5" />
       {/each}
