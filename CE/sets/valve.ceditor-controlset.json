@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "23f204b7",
+  "fingerprint": "9869c379",
   "set": {
     "id": "valve",
     "name": "Valve",
@@ -1779,9 +1779,25 @@
       },
       "Macro": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Macro.knobDesign": "set",
           "Macro.knobColour": "FF2E2824",
           "Macro.arcColour": "{series.one}",
@@ -1791,9 +1807,25 @@
       },
       "Orbit": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Orbit.fieldColour": "{instrument.face}",
           "Orbit.ringColour": "33B08D3C",
           "Orbit.centreColour": "FF3D3733",
@@ -1802,9 +1834,25 @@
       },
       "Looper": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Looper.laneColour": "FF19120D",
           "Looper.gridColour": "22B2A58E",
           "Looper.playheadColour": "{series.two}",
@@ -1813,9 +1861,25 @@
       },
       "Router": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Router.curveColour": "{series.one}",
           "Router.inputColour": "{series.two}",
           "Router.fieldColour": "{instrument.face}",
@@ -1825,9 +1889,25 @@
       },
       "Timbre": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Timbre.fieldColour": "{instrument.face}",
           "Timbre.puckColour": "{series.two}",
           "Timbre.labelColour": "{instrument.ink}"
@@ -1835,9 +1915,25 @@
       },
       "Turing": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Turing.barColour": "{series.one}",
           "Turing.headColour": "{series.two}",
           "Turing.fieldColour": "{instrument.face}",
@@ -1846,9 +1942,25 @@
       },
       "Kinetic": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Kinetic.fieldColour": "{instrument.face}",
           "Kinetic.ballColour": "{series.one}",
           "Kinetic.wallColour": "33B08D3C",
@@ -1857,9 +1969,25 @@
       },
       "Constellation": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Constellation.fieldColour": "{instrument.face}",
           "Constellation.probeColour": "{series.two}",
           "Constellation.linkColour": "33B08D3C",
@@ -1868,9 +1996,25 @@
       },
       "Constraint": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Constraint.fieldColour": "{instrument.face}",
           "Constraint.trackColour": "18B2A58E",
           "Constraint.linkColour": "558FB07A",
@@ -1879,9 +2023,25 @@
       },
       "Keyboard": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Keyboard.whiteColour": "FFE8E4DD",
           "Keyboard.blackColour": "FF2A221B",
           "Keyboard.heldColour": "FFB08D3C",
@@ -1891,9 +2051,25 @@
       },
       "ChordPad": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "ChordPad.echoColour": "{series.one}",
           "ChordPad.fieldColour": "{instrument.face}",
           "ChordPad.padColour": "FF201A15",
@@ -1905,9 +2081,25 @@
       },
       "Arp": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Arp.fieldColour": "{instrument.face}",
           "Arp.stepColour": "{series.three}",
           "Arp.headColour": "{series.two}",
@@ -1917,9 +2109,25 @@
       },
       "NoteRibbon": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "NoteRibbon.echoColour": "{series.one}",
           "NoteRibbon.fieldColour": "{instrument.face}",
           "NoteRibbon.zoneColour": "FF201A15",
@@ -1931,9 +2139,25 @@
       },
       "Phrase": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Phrase.faceColour": "{instrument.face}",
           "Phrase.cellColour": "FF251F1A",
           "Phrase.noteColour": "{series.one}",
@@ -1943,9 +2167,25 @@
       },
       "Recorder": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Recorder.faceColour": "{instrument.face}",
           "Recorder.noteColour": "{series.three}",
           "Recorder.recordColour": "{series.alert}",
@@ -1955,9 +2195,25 @@
       },
       "Harmoniser": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Harmoniser.faceColour": "{instrument.face}",
           "Harmoniser.whiteColour": "FFE8E4DD",
           "Harmoniser.blackColour": "FF2A221B",
@@ -1968,9 +2224,25 @@
       },
       "SplitZone": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "SplitZone.faceColour": "{instrument.face}",
           "SplitZone.whiteColour": "FFE8E4DD",
           "SplitZone.blackColour": "FF2A221B",
@@ -1981,9 +2253,25 @@
       },
       "Setlist": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Setlist.faceColour": "{instrument.face}",
           "Setlist.rowColour": "FF251F1A",
           "Setlist.currentColour": "{series.three}",
@@ -1993,9 +2281,25 @@
       },
       "Transport": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Transport.faceColour": "{instrument.face}",
           "Transport.accentColour": "{series.one}",
           "Transport.beatColour": "{series.two}",
@@ -2004,9 +2308,25 @@
       },
       "Panic": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{instrument.face}",
-          "Background.Border.colour": "FF070402",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
+          "Text.Font.family": "Libre Franklin",
           "Panic.faceColour": "FF3C1914",
           "Panic.borderColour": "{series.alert}",
           "Panic.labelColour": "{instrument.text}",
@@ -2015,9 +2335,24 @@
       },
       "LcdDisplay": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{section.surface}",
-          "Background.Border.colour": "FF3B2919",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
           "Display.backlightOn": true,
           "Display.showGhost": true,
           "Display.showGlass": true,
@@ -2029,9 +2364,24 @@
       },
       "PixelDisplay": {
         "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
           "Background.Fill.colour": "{section.surface}",
-          "Background.Border.colour": "FF3B2919",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "99816347",
           "Background.Corners.radius": 10,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "inner",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 6,
+              "spread": 0,
+              "colour": "73000000"
+            }
+          ],
           "Pixel.litColour": "{display.lit}",
           "Pixel.unlitColour": "{display.unlit}",
           "Pixel.screenColour": "{display.screen}",

@@ -22,6 +22,7 @@
 // they always were.
 
 import { argb, darken, lighten, mix } from './controlSetDesigns.js';
+import { frameFor, grammarFor } from './designGrammar.js';
 
 export const INSTRUMENT_TYPES = ['Macro', 'Orbit', 'Looper', 'Router', 'Timbre', 'Turing', 'Kinetic', 'Constellation', 'Constraint',
   'Keyboard', 'ChordPad', 'Arp', 'NoteRibbon', 'Phrase', 'Recorder', 'Harmoniser', 'SplitZone', 'Setlist', 'Transport', 'Panic'];
@@ -192,10 +193,17 @@ export function instrumentFamilies(set) {
     .reduce((best, c) => (contrast(c, white) > contrast(best, white) ? c : best));
   const keys = { whiteColour: white, blackColour: black };
   const radius = Number(set.families?.Group?.component?.['Background.Corners.radius'] ?? 8);
+  // The case is the set's frame round its display window (models/designGrammar.js): Tolex pipes it
+  // in cream, Neon lights its edge, Machined mills it, Blueprint draws it in one line. The lettering
+  // is the set's legend face, not Arial.
+  const grammar = grammarFor(set);
   const shell = {
-    'Background.Fill.colour': '{instrument.face}',
-    'Background.Border.colour': argb(darken(face.slice(-6), 0.6)),
-    'Background.Corners.radius': Math.max(2, Math.min(Number.isFinite(radius) ? radius : 8, 14)),
+    ...(frameFor(set, { fill: '{instrument.face}', maxRadius: 14 }) ?? {
+      'Background.Fill.colour': '{instrument.face}',
+      'Background.Border.colour': argb(darken(face.slice(-6), 0.6)),
+      'Background.Corners.radius': Math.max(2, Math.min(Number.isFinite(radius) ? radius : 8, 14)),
+    }),
+    ...(grammar?.lettering.legend ? { 'Text.Font.family': grammar.lettering.legend } : {}),
   };
   const own = {
     // The set's own knob, not a recoloured disc; knobColour and arcColour dress the Macro's own knob

@@ -39,15 +39,12 @@ const ONE_FORM = {
 };
 
 /**
- * Per control, how many sets change only its colours. What is left: the keyboard keeps its case in
- * 37 sets, and Walnut, Valve, Ladder and Field give seven instruments each nothing but colour. The
- * controls in ONE_FORM are not counted here, since every set recolours them.
+ * Per control, how many sets change only its colours. Paid in full: the last were the keyboard's
+ * case in 37 sets and seven instruments each on Walnut, Valve, Ladder and Field, which the design
+ * grammar's frame and lettering gave a form (models/designGrammar.js). It stays, empty, so that the
+ * next recolour fails here rather than going unnoticed.
  */
-const COLOUR_ONLY = {
-  Keyboard: 37,
-  Looper: 2, Router: 2, Turing: 2, Kinetic: 2, Constraint: 2, Arp: 2, NoteRibbon: 2,
-  Phrase: 2, Recorder: 2, Harmoniser: 2, SplitZone: 2, Setlist: 2, Transport: 2, Panic: 2,
-};
+const COLOUR_ONLY = {};
 
 test('the measure: a recolour is a recolour, and a radius or a form is form', () => {
   const recolour = { id: 'probe', tokens: {}, families: { Knob: { component: { 'Core.formFaceColour': 'FF123456' } } } };

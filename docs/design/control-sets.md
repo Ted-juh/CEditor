@@ -835,3 +835,39 @@ against the panel. The line-work set draws construction lines, dashed.
 Graphite's displays and shapes are untouched, and personal sets get these from their own colours on
 every read like the other designs. `displayDesigns.test.js` pins the treatments, the colours, the 3:1
 lines and Graphite. The reach table crossed all three off.
+
+## A grammar, and the frame as a signature
+
+What made the instruments look generic after they took the sets' colours was everything the sets
+did not say about them. Their lettering was Arial in every set, beside panels set in Barlow, Libre
+Franklin, Space Grotesk or JetBrains Mono. Their cases differed by a corner radius at most: their
+border was the factory's and their drop shadow was switched off. And each set's frame (its piping,
+its glow, its milling) stopped at its sections.
+
+`models/designGrammar.js` names the few decisions every framed control reads:
+
+- **frame**: well, milled, glow, piping or hairline, the section treatment, decided first for the
+  sections and read from there;
+- **corners**: the set's radius, as its frame clamps it;
+- **line**: a hairline 1, a milled edge 1.5, piping 2;
+- **lettering**: its legend, field and label faces.
+
+`frameFor(set, { fill })` is the section frame round a control whose face is its own, without the
+panel's material, which belongs to things cut into the panel rather than to a screen. Instrument
+cases and display bezels are drawn in it, so the frame is the set's signature, repeated wherever it
+holds something: Tolex pipes its sections, shapes, LCD bezels and instrument cases in cream; Neon
+lights all their edges; Machined mills them; Blueprint draws each in one square line. The instruments
+letter in the set's legend face, and shapes take the grammar's line. This paid the rest of the reach
+table's debt: the keyboard's case in 37 sets and seven instruments each on Walnut, Valve, Ladder and
+Field had only changed colour, and the Turing now takes 48 forms across the sets rather than 10.
+The debt list in `controlSetReach.test.js` is empty and stays, so the next recolour fails.
+
+### Dark knobs on the Macro's face
+
+A Macro hosting its set's knob draws it on the set's display window, and a mid-grey cap on a
+near-black screen reads at about 2:1 (Flightdeck, Stompbox, Bakelite). A lighter plate behind it would
+sit too close to the grey; light behind a dark silhouette does not, so such a knob sits on an
+underlit ring in the set's display light (`macroKnobHalo` in `utils/macroKnob.js`), as knobs do on a
+backlit synth. Only round caps get one, since a ring round a tuning dial, a roller, a tile or a balance
+beam reads as a mistake; only where that light reads on the face at 3:1, since a reflective set's
+ink is dark; and never a knob that lights itself (a lens, an LED ring, line-work). Sixteen sets.

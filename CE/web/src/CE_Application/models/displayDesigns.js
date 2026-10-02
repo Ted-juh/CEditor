@@ -28,6 +28,7 @@
 import { argb, darken, mix } from './controlSetDesigns.js';
 import { labelTreatmentFor } from './labelDesigns.js';
 import { sectionTreatmentFor } from './sectionDesigns.js';
+import { frameFor, grammarFor } from './designGrammar.js';
 
 export const DISPLAY_TREATMENTS = ['reflective', 'glow', 'scan', 'oled', 'drafting', 'backlit'];
 export const DISPLAY_TYPES = ['LcdDisplay', 'PixelDisplay', 'Shape'];
@@ -94,7 +95,8 @@ export function displayFamilies(set) {
   const panel = literal(set, 'panel.surface') ?? 'FF202020';
   const ink = literal(set, 'text.primary') ?? 'FFFFFFFF';
   const accent = literal(set, 'accent') ?? ink;
-  const bezel = {
+  // The bezel is the set's frame round the glass (models/designGrammar.js).
+  const bezel = frameFor(set, { fill: '{section.surface}', maxRadius: 12 }) ?? {
     'Background.Fill.colour': '{section.surface}',
     'Background.Border.colour': argb(darken(panel.slice(-6), 0.45)),
     'Background.Corners.radius': Math.min(corner, 12),
@@ -132,7 +134,7 @@ export function displayFamilies(set) {
   const shape = {
     'Shape.fillColour': '{section.surface}',
     'Shape.strokeColour': line,
-    'Shape.strokeWidth': frame === 'piping' ? 2 : frame === 'milled' ? 1.5 : 1,
+    'Shape.strokeWidth': grammarFor(set)?.line ?? 1,
     'Shape.cornerRadius': corner,
     'Shape.strokeStyle': frame === 'hairline' ? 'dashed' : 'solid',
   };
