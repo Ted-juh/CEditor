@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "addd793e",
+  "fingerprint": "a63bfd32",
   "set": {
     "id": "anodised",
     "name": "Anodised",
@@ -421,15 +421,85 @@
       "Range": {
         "parts": {
           "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 3,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
             "Text.Fill.colour": "FFFFFFFF"
           },
           "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 3,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
             "Text.Fill.colour": "FFFFFFFF"
           },
           "decrement": {
+            "Background.Corners.radius": 3,
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "blast",
+            "Background.Effects.Material.strength": 80,
+            "Background.Effects.Material.shine": 60,
+            "Background.Effects.Material.grain": 100,
+            "Background.Fill.colour": "FFB8BDC3",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "D1D4D8",
+                  "position": 0
+                },
+                {
+                  "color": "B8BDC3",
+                  "position": 55
+                },
+                {
+                  "color": "909398",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF3A3F45",
             "Text.Fill.colour": "FFFFFFFF"
           },
           "increment": {
+            "Background.Corners.radius": 3,
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "blast",
+            "Background.Effects.Material.strength": 80,
+            "Background.Effects.Material.shine": 60,
+            "Background.Effects.Material.grain": 100,
+            "Background.Fill.colour": "FFB8BDC3",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "D1D4D8",
+                  "position": 0
+                },
+                {
+                  "color": "B8BDC3",
+                  "position": 55
+                },
+                {
+                  "color": "909398",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF3A3F45",
             "Text.Fill.colour": "FFFFFFFF"
           }
         }
@@ -1811,6 +1881,16 @@
           "Joystick.puckColour": "{control.cap}",
           "Joystick.cornerColour": "{text.muted}",
           "Joystick.labelColour": "FFF2F2F2"
+        }
+      },
+      "StepSequencer": {
+        "component": {
+          "StepSequencer.cellForm": "hex",
+          "StepSequencer.cellColour": "{surface}",
+          "StepSequencer.cellOnColour": "{accent}",
+          "StepSequencer.labelColour": "{text.primary}",
+          "StepSequencer.gridColour": "{border}",
+          "StepSequencer.playheadColour": "{accent}"
         }
       },
       "Label": {

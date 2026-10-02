@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "37bf5157",
+  "fingerprint": "c26e27bd",
   "set": {
     "id": "gemstone",
     "name": "Glass Signal",
@@ -425,15 +425,33 @@
       "Range": {
         "parts": {
           "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 4,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
             "Text.Fill.colour": "{text.inverse}"
           },
           "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 4,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
             "Text.Fill.colour": "{text.inverse}"
           },
           "decrement": {
+            "Background.Corners.radius": 14,
+            "Background.Border.thickness": 1,
+            "Background.Fill.colour": "38FFFFFF",
+            "Background.Border.colour": "AAFFFFFF",
             "Text.Fill.colour": "{text.inverse}"
           },
           "increment": {
+            "Background.Corners.radius": 14,
+            "Background.Border.thickness": 1,
+            "Background.Fill.colour": "38FFFFFF",
+            "Background.Border.colour": "AAFFFFFF",
             "Text.Fill.colour": "{text.inverse}"
           }
         }

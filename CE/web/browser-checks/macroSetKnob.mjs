@@ -21,8 +21,8 @@ import assert from 'node:assert/strict';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '../dist-scenery');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.woff2': 'font/woff2' };
-// Slider-drawn (Saddle), and anatomy forms with a body, a dial, line-work and a new-style form.
-const SETS = ['saddle', 'tolex', 'neon', 'machined', 'ivory', 'blueprint', 'chicken-head', 'atlas'];
+// Slider-drawn (Ceramic), and anatomy forms with a body, a dial, line-work and a new-style form.
+const SETS = ['ceramic', 'tolex', 'neon', 'machined', 'ivory', 'blueprint', 'chicken-head', 'atlas'];
 
 const server = createServer(async (req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);

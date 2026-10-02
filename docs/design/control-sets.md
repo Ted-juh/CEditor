@@ -786,11 +786,17 @@ exactly, so a gap that is fixed has to be crossed off and a new one has to be na
 - **Reach.** Every set changes every control, or the control is named with a reason. Image and
   Custom Component are the author's own.
 - **Form.** Every control takes at least three forms across the sets, or is named. Background is
-  frameless everywhere by design; Range is a gap: every set draws it the same, in its own paint.
+  frameless everywhere by design, and is the only one.
 - **Debt.** The sets that only recolour a control are counted per control. A new recolour fails, and
-  a paid one fails until its count is lowered, so the table only goes down. Today: Ceramic and Saddle
-  recolour twenty-odd controls each, Walnut, Valve, Ladder and Field ten, the step sequencer keeps its
-  cells in 29 sets and the keyboard its case in 37.
+  a paid one fails until its count is lowered, so the table only goes down.
+
+The first debts it showed are paid. Ceramic and Saddle recoloured twenty-odd controls each because
+`controlSetCoverage.js` keyed them by their file names ('saddle-brass', 'ceramic-oak') and so found
+no design direction; keyed by id they take Tolex's and Soft's families for every control they had
+none for, and keep the knobs and buttons they were drawn with. The step sequencer kept the factory
+rectangle in the 29 sets whose direction names no pad form: the twelve starting directions now name a
+cell (Blueprint's diamond, Soft's pod, Field's shield). Range was two number fields and two steppers
+drawn the same everywhere: its fields are now the set's value windows and its steppers its buttons.
 
 Reach is the weakest of the three, and the history says so: before the instrument designs every set
 did change the twenty instruments, but only their text colour, so they passed reach and fail form

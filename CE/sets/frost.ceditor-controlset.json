@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "7421a624",
+  "fingerprint": "d942e2ce",
   "set": {
     "id": "frost",
     "name": "Frost",
@@ -253,15 +253,33 @@
       "Range": {
         "parts": {
           "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 14,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
             "Text.Fill.colour": "{text.inverse}"
           },
           "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 14,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
             "Text.Fill.colour": "{text.inverse}"
           },
           "decrement": {
+            "Background.Corners.radius": 14,
+            "Background.Border.thickness": 1,
+            "Background.Fill.colour": "38FFFFFF",
+            "Background.Border.colour": "AAFFFFFF",
             "Text.Fill.colour": "{text.inverse}"
           },
           "increment": {
+            "Background.Corners.radius": 14,
+            "Background.Border.thickness": 1,
+            "Background.Fill.colour": "38FFFFFF",
+            "Background.Border.colour": "AAFFFFFF",
             "Text.Fill.colour": "{text.inverse}"
           }
         }
@@ -941,6 +959,16 @@
           "Joystick.puckColour": "{control.cap}",
           "Joystick.cornerColour": "{text.muted}",
           "Joystick.labelColour": "FFF2F2F2"
+        }
+      },
+      "StepSequencer": {
+        "component": {
+          "StepSequencer.cellForm": "porthole",
+          "StepSequencer.cellColour": "{surface}",
+          "StepSequencer.cellOnColour": "{accent}",
+          "StepSequencer.labelColour": "{text.primary}",
+          "StepSequencer.gridColour": "{border}",
+          "StepSequencer.playheadColour": "{accent}"
         }
       },
       "Label": {

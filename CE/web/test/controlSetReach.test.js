@@ -36,23 +36,17 @@ const MIN_FORMS = 3;
 /** Controls every set draws in the same form. */
 const ONE_FORM = {
   Background: 'by design: the panel\'s own face, frameless in every set, in the panel\'s colour and material',
-  Range: 'GAP: every set gives its two fields the same font, and otherwise only recolours its track, handles and fields',
 };
 
 /**
- * Per control, how many sets change only its colours. The debt is concentrated: Ceramic and Saddle
- * recolour twenty-odd controls each; Walnut, Valve, Ladder and Field ten; the step sequencer's cells
- * keep their form in 29 sets and the keyboard's case in 37. The controls in ONE_FORM are not
- * counted here, since every set recolours them.
+ * Per control, how many sets change only its colours. What is left: the keyboard keeps its case in
+ * 37 sets, and Walnut, Valve, Ladder and Field give seven instruments each nothing but colour. The
+ * controls in ONE_FORM are not counted here, since every set recolours them.
  */
 const COLOUR_ONLY = {
-  TextInput: 2, Meter: 2, ProgressBar: 2,
-  RadioButtonGroup: 2, CyclicButton: 2, TimedButton: 2, OneShotButton: 2,
-  Listbox: 2, Crossfader: 2, Numpad: 2, Ribbon: 2, PitchWheel: 2, ModWheel: 2, VectorJoystick: 2,
-  Envelope: 2, Matrix: 2, DrumPads: 2,
-  StepSequencer: 29, Keyboard: 37,
+  Keyboard: 37,
   Looper: 2, Router: 2, Turing: 2, Kinetic: 2, Constraint: 2, Arp: 2, NoteRibbon: 2,
-  Phrase: 3, Recorder: 3, Harmoniser: 3, SplitZone: 3, Setlist: 3, Transport: 3, Panic: 3,
+  Phrase: 2, Recorder: 2, Harmoniser: 2, SplitZone: 2, Setlist: 2, Transport: 2, Panic: 2,
 };
 
 test('the measure: a recolour is a recolour, and a radius or a form is form', () => {

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "14b26528",
+  "fingerprint": "a844a72f",
   "set": {
     "id": "castellated",
     "name": "Castellated",
@@ -1941,6 +1941,92 @@
           "StepSequencer.labelColour": "{text.primary}",
           "StepSequencer.gridColour": "{border}",
           "StepSequencer.playheadColour": "{accent}"
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 6,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 6,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "decrement": {
+            "Background.Corners.radius": 6,
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "blast",
+            "Background.Effects.Material.strength": 50,
+            "Background.Effects.Material.shine": 40,
+            "Background.Effects.Material.grain": 100,
+            "Background.Fill.colour": "FF2A2D32",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "505357",
+                  "position": 0
+                },
+                {
+                  "color": "2A2D32",
+                  "position": 55
+                },
+                {
+                  "color": "1D1F23",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF151719",
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "increment": {
+            "Background.Corners.radius": 6,
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "blast",
+            "Background.Effects.Material.strength": 50,
+            "Background.Effects.Material.shine": 40,
+            "Background.Effects.Material.grain": 100,
+            "Background.Fill.colour": "FF2A2D32",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "505357",
+                  "position": 0
+                },
+                {
+                  "color": "2A2D32",
+                  "position": 55
+                },
+                {
+                  "color": "1D1F23",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF151719",
+            "Text.Fill.colour": "FFF2F2F2"
+          }
         }
       },
       "Background": {

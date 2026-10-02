@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "65aba21b",
+  "fingerprint": "7f648ae8",
   "set": {
     "id": "field",
     "name": "Field",
@@ -1642,6 +1642,104 @@
           "Joystick.puckColour": "{control.cap}",
           "Joystick.cornerColour": "{text.muted}",
           "Joystick.labelColour": "FFF2F2F2"
+        }
+      },
+      "StepSequencer": {
+        "component": {
+          "StepSequencer.cellForm": "shield",
+          "StepSequencer.cellColour": "{surface}",
+          "StepSequencer.cellOnColour": "{accent}",
+          "StepSequencer.labelColour": "{text.primary}",
+          "StepSequencer.gridColour": "{border}",
+          "StepSequencer.playheadColour": "{accent}"
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 8,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 8,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "decrement": {
+            "Background.Corners.radius": 6,
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "hammer",
+            "Background.Effects.Material.strength": 50,
+            "Background.Effects.Material.shine": 30,
+            "Background.Effects.Material.grain": 100,
+            "Background.Corners.style": "chamfer",
+            "Background.Fill.colour": "FF3A4230",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "656C5E",
+                  "position": 0
+                },
+                {
+                  "color": "3A4230",
+                  "position": 55
+                },
+                {
+                  "color": "2A3023",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF1D2118",
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "increment": {
+            "Background.Corners.radius": 6,
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "hammer",
+            "Background.Effects.Material.strength": 50,
+            "Background.Effects.Material.shine": 30,
+            "Background.Effects.Material.grain": 100,
+            "Background.Corners.style": "chamfer",
+            "Background.Fill.colour": "FF3A4230",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "656C5E",
+                  "position": 0
+                },
+                {
+                  "color": "3A4230",
+                  "position": 55
+                },
+                {
+                  "color": "2A3023",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF1D2118",
+            "Text.Fill.colour": "FFF2F2F2"
+          }
         }
       },
       "Label": {

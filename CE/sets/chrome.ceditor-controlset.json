@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e28d8468",
+  "fingerprint": "80d690a2",
   "set": {
     "id": "chrome",
     "name": "Chrome",
@@ -1815,6 +1815,110 @@
           "Joystick.puckColour": "{control.cap}",
           "Joystick.cornerColour": "{text.muted}",
           "Joystick.labelColour": "FFF2F2F2"
+        }
+      },
+      "StepSequencer": {
+        "component": {
+          "StepSequencer.cellForm": "ribbed",
+          "StepSequencer.cellColour": "{surface}",
+          "StepSequencer.cellOnColour": "{accent}",
+          "StepSequencer.labelColour": "{text.primary}",
+          "StepSequencer.gridColour": "{border}",
+          "StepSequencer.playheadColour": "{accent}"
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 2,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 2,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "decrement": {
+            "Background.Corners.radius": 7,
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 40,
+            "Background.Effects.Material.shine": 120,
+            "Background.Effects.Material.grain": 100,
+            "Background.Fill.colour": "FF2A3544",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 100,
+              "stops": [
+                {
+                  "color": "FFFFFF",
+                  "position": 0
+                },
+                {
+                  "color": "FFFFFF",
+                  "position": 48
+                },
+                {
+                  "color": "2A3544",
+                  "position": 48
+                },
+                {
+                  "color": "2A3544",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 22,
+            "Background.Border.colour": "AA959AA2",
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "increment": {
+            "Background.Corners.radius": 7,
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 40,
+            "Background.Effects.Material.shine": 120,
+            "Background.Effects.Material.grain": 100,
+            "Background.Fill.colour": "FF2A3544",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 100,
+              "stops": [
+                {
+                  "color": "FFFFFF",
+                  "position": 0
+                },
+                {
+                  "color": "FFFFFF",
+                  "position": 48
+                },
+                {
+                  "color": "2A3544",
+                  "position": 48
+                },
+                {
+                  "color": "2A3544",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 22,
+            "Background.Border.colour": "AA959AA2",
+            "Text.Fill.colour": "FFF2F2F2"
+          }
         }
       },
       "Label": {

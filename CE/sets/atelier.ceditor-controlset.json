@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "89e82460",
+  "fingerprint": "3f1460d6",
   "set": {
     "id": "atelier",
     "name": "Atelier",
@@ -654,6 +654,46 @@
           "Joystick.puckColour": "{control.cap}",
           "Joystick.cornerColour": "{text.muted}",
           "Joystick.labelColour": "FF202020"
+        }
+      },
+      "StepSequencer": {
+        "component": {
+          "StepSequencer.cellForm": "diamond",
+          "StepSequencer.cellColour": "{surface}",
+          "StepSequencer.cellOnColour": "{accent}",
+          "StepSequencer.labelColour": "{text.primary}",
+          "StepSequencer.gridColour": "{border}",
+          "StepSequencer.playheadColour": "{accent}"
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 0,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1,
+            "Text.Fill.colour": "FF202020"
+          },
+          "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 0,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1,
+            "Text.Fill.colour": "FF202020"
+          },
+          "decrement": {
+            "Background.Corners.radius": 4,
+            "Background.Border.thickness": 1,
+            "Text.Fill.colour": "FF202020"
+          },
+          "increment": {
+            "Background.Corners.radius": 4,
+            "Background.Border.thickness": 1,
+            "Text.Fill.colour": "FF202020"
+          }
         }
       },
       "Label": {

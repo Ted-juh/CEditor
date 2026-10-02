@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "bddd5b24",
+  "fingerprint": "05bc87d5",
   "set": {
     "id": "arcade",
     "name": "Arcade",
@@ -969,6 +969,40 @@
           "StepSequencer.labelColour": "{text.primary}",
           "StepSequencer.gridColour": "{border}",
           "StepSequencer.playheadColour": "{accent}"
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 4,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 4,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "decrement": {
+            "Background.Corners.radius": 999,
+            "Background.Border.thickness": 3,
+            "Background.Fill.colour": "FFFFFFFF",
+            "Background.Border.colour": "FF1B1B1B",
+            "Text.Fill.colour": "FF202020"
+          },
+          "increment": {
+            "Background.Corners.radius": 999,
+            "Background.Border.thickness": 3,
+            "Background.Fill.colour": "FFFFFFFF",
+            "Background.Border.colour": "FF1B1B1B",
+            "Text.Fill.colour": "FF202020"
+          }
         }
       },
       "Background": {

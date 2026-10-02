@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "71e22a10",
+  "fingerprint": "708e1b22",
   "set": {
     "id": "satellite",
     "name": "Satellite",
@@ -301,15 +301,33 @@
       "Range": {
         "parts": {
           "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 4,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
             "Text.Fill.colour": "{text.inverse}"
           },
           "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 4,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
             "Text.Fill.colour": "{text.inverse}"
           },
           "decrement": {
+            "Background.Corners.radius": 14,
+            "Background.Border.thickness": 1,
+            "Background.Fill.colour": "38FFFFFF",
+            "Background.Border.colour": "AAFFFFFF",
             "Text.Fill.colour": "{text.inverse}"
           },
           "increment": {
+            "Background.Corners.radius": 14,
+            "Background.Border.thickness": 1,
+            "Background.Fill.colour": "38FFFFFF",
+            "Background.Border.colour": "AAFFFFFF",
             "Text.Fill.colour": "{text.inverse}"
           }
         }

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "61b6a3d4",
+  "fingerprint": "5b03f4e6",
   "set": {
     "id": "crown",
     "name": "Crown",
@@ -581,10 +581,76 @@
       "Range": {
         "parts": {
           "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 4,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
             "Text.Fill.colour": "{text.inverse}"
           },
           "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 4,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
             "Text.Fill.colour": "{text.inverse}"
+          },
+          "decrement": {
+            "Background.Corners.radius": 3,
+            "Background.Fill.colour": "FFB4B9BF",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "CED2D5",
+                  "position": 0
+                },
+                {
+                  "color": "B4B9BF",
+                  "position": 55
+                },
+                {
+                  "color": "8C9095",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF4A4F55",
+            "Background.Border.thickness": 1,
+            "Text.Fill.colour": "FF202020"
+          },
+          "increment": {
+            "Background.Corners.radius": 3,
+            "Background.Fill.colour": "FFB4B9BF",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "CED2D5",
+                  "position": 0
+                },
+                {
+                  "color": "B4B9BF",
+                  "position": 55
+                },
+                {
+                  "color": "8C9095",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF4A4F55",
+            "Background.Border.thickness": 1,
+            "Text.Fill.colour": "FF202020"
           }
         }
       },

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "f5a5071c",
+  "fingerprint": "dcb607fe",
   "set": {
     "id": "prism-cap",
     "name": "Prism Cap",
@@ -429,15 +429,33 @@
       "Range": {
         "parts": {
           "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 6,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
             "Text.Fill.colour": "{text.inverse}"
           },
           "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 6,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1.5,
             "Text.Fill.colour": "{text.inverse}"
           },
           "decrement": {
+            "Background.Corners.radius": 14,
+            "Background.Border.thickness": 1,
+            "Background.Fill.colour": "38FFFFFF",
+            "Background.Border.colour": "AAFFFFFF",
             "Text.Fill.colour": "{text.inverse}"
           },
           "increment": {
+            "Background.Corners.radius": 14,
+            "Background.Border.thickness": 1,
+            "Background.Fill.colour": "38FFFFFF",
+            "Background.Border.colour": "AAFFFFFF",
             "Text.Fill.colour": "{text.inverse}"
           }
         }
