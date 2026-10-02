@@ -282,6 +282,23 @@ export pipeline). It cannot bundle C++/C#/Java handlers or CPython. The compilin
 bundles these extra runtimes only for VST3. A requested unsupported combination fails explicitly
 before replacing an export. A failed required handler build also fails the export.
 
+## The player's script MIDI takes a lock on the audio thread — measured, not fixed
+
+*(Found 2026-10-02 by RealtimeSanitizer; nobody has reported a dropout.)*
+
+The exported plug-in sends what a panel script queues (`sendCC`, NRPN, SysEx) through JUCE's
+`MidiMessageCollector`. Its `CriticalSection` is taken by the audio thread on every block and by the
+message thread while it appends, and appending can allocate, so the audio thread can wait behind an
+allocation. A burst of SysEx also grows the host's MIDI buffer inside the callback. The input
+direction already avoids both (`HostMidiInputQueue`); the output direction does not.
+
+`tools/rtsan/run.sh` reproduces it on Linux with clang 20: a lock and an unlock on 2,000 of 2,000
+blocks, and six reallocations under SysEx bursts. The fix proposed in
+[checkers-run-2026-10-02.md](design/checkers-run-2026-10-02.md) is choc's `VariableSizeFIFO` (ISC,
+header-only) with a per-block byte budget; as a drop-in in the same harness it reported nothing and
+cut the 99th-percentile callback time from about 16 µs to 6 µs. It changes where in the block
+script MIDI lands, which is why it is a change of its own and not a line in a review.
+
 ## Keyboard shortcuts in a DAW while the exported editor has focus — scoped, not built
 
 *(Scoped 2026-10-01 from a review of webview-in-plug-in projects; nobody has reported it yet.)*
@@ -296,7 +313,7 @@ focus".
 
 What fixing it would take, when someone reports it:
 
-1. A vendored JUCE patch (the fifth) registering `add_AcceleratorKeyPressed` on the WebView2
+1. A vendored JUCE patch (the sixth) registering `add_AcceleratorKeyPressed` on the WebView2
    controller. For a key the page has not claimed, mark it handled and post it to the plug-in
    window's parent, which is the host's; a key the page has claimed passes through.
 2. "Claimed" comes from the page: a bridge message when an editable element gains or loses focus,

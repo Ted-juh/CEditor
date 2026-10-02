@@ -11,7 +11,7 @@ corruption. `.gitignore` now has an explicit exception and
 
 ## Local modifications
 
-Upstream JUCE is otherwise untouched. There are exactly four patches, and they are listed here because a
+Upstream JUCE is otherwise untouched. There are exactly five patches, and they are listed here because a
 patch inside a vendored tree is invisible in a diff against upstream and dies silently the day
 somebody drops in a new JUCE.
 
@@ -120,4 +120,40 @@ identity stands, so the template build's own helper run still succeeds; that is 
 **If you upgrade JUCE:** re-apply the include, the macro block after the `static_assert`, the three
 functions, the `map()` of the two state URIs, the fourteen use sites and the two descriptor notes;
 the pin test counts the raw uses of `JucePlugin_LV2URI` and names the file.
+
+### 5. MIDI-CI: callbacks that outlived the visitor they captured
+
+**File:** `include/JUCE-8.0.7/modules/juce_midi_ci/ci/juce_CIDevice.cpp`
+
+**Guard:** none. It is a fix, not a feature: a stock build with the patch behaves as JUCE intends.
+
+**Pinned by:** `CE/web/test/vendoredJucePatches.test.js`.
+
+**What was wrong.** `Device::Impl::LastListener::tryRespond` handles each incoming MIDI-CI message
+with a `Visitor` built on its own stack (`Visitor { device, &output, &result }`) and gone when it
+returns. Four of the visitor's lambdas are stored for later rather than run there: the reply to a
+property-exchange capabilities inquiry asks the device for its ResourceList, then its DeviceInfo and
+ChannelList, and the callbacks for those replies (`onResourceListReceived`, and inside it
+`allDone` and `getChannelList`) captured `this`, the visitor. So did the subscription callback,
+which runs when the last chunk of a subscription arrives, possibly in a later call. Each of them
+then read `device` through a pointer to a dead stack frame.
+
+It worked by luck: the slot usually still held the same pointer when the reply arrived.
+AddressSanitizer reported it as a stack-use-after-return on the first run of
+`CEditorDeviceProfileTests` under it (`docs/design/checkers-run-2026-10-02.md`), from CEditor's own
+MIDI-CI session (`MidiCiSession::handleIncomingSysex`). In a release build the same read is
+whatever the stack holds by then, through which the callback calls `sendPropertyGetInquiry` and
+the device's listeners.
+
+**What the patch does.** The four lambdas capture the `Impl*` the visitor points at
+(`[device = device, ...]` in the two outer ones, `[device, ...]` in the two nested ones), which is
+the device itself and outlives every callback the device owns. Nothing else in them read the
+visitor.
+
+**Upstream status (checked 2026-10-02).** Unfixed on JUCE's `develop` at `39b4da4f2`: the same four
+captures, at the same lines. It is the third candidate for an upstream pull request beside the two
+in the other patches' notes.
+
+**If you upgrade JUCE:** look for `[this,` in the property-exchange handlers of
+`LastListener::Visitor` in `juce_CIDevice.cpp`; the pin test fails while any of the four is back.
 

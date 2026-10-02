@@ -145,3 +145,31 @@ test('the LV2 patch stays behind its guard, with the compiled values as the fall
   assert.ok(readFileSync(join(repoRoot, 'JUCE/VENDORED.md'), 'utf8').includes('juce_audio_plugin_client_LV2.cpp'),
     'VENDORED.md must name the patched LV2 file');
 });
+
+// Patch 5: four MIDI-CI property-exchange callbacks captured the temporary Visitor (`this`) and ran
+// after it was gone. AddressSanitizer found it; JUCE's develop still has it. They capture the device.
+const CI_DEVICE = join(repoRoot, 'JUCE/include/JUCE-8.0.7/modules/juce_midi_ci/ci/juce_CIDevice.cpp');
+
+test('the vendored JUCE MIDI-CI callbacks capture the device, not the temporary visitor', () => {
+  assert.ok(existsSync(CI_DEVICE), `the vendored MIDI-CI device is missing: ${CI_DEVICE}`);
+  const source = readFileSync(CI_DEVICE, 'utf8');
+  for (const [name, capture] of [
+    ['onResourceListReceived', 'const auto onResourceListReceived = [device = device,'],
+    ['allDone', 'const auto allDone = [device, source]'],
+    ['getChannelList', 'const auto getChannelList = [device,'],
+    ['the subscription callback', 'const auto callback = [device = device, request, source, subscribeId]'],
+  ]) {
+    assert.ok(source.includes(capture), `${name} no longer captures the device. ${REAPPLY}`);
+  }
+  for (const stale of ['onResourceListReceived = [this', 'allDone = [this', 'getChannelList = [this',
+    'callback = [this, request, source, subscribeId]']) {
+    assert.ok(!source.includes(stale), `"${stale}" is back: a callback captures the dead visitor. ${REAPPLY}`);
+  }
+});
+
+test('JUCE/VENDORED.md records the MIDI-CI patch', () => {
+  const text = readFileSync(join(repoRoot, 'JUCE/VENDORED.md'), 'utf8');
+  assert.ok(text.includes('juce_CIDevice.cpp') && text.includes('stack-use-after-return'),
+    'VENDORED.md must name the MIDI-CI file and the defect');
+});
+
