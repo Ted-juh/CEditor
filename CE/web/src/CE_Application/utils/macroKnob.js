@@ -24,6 +24,11 @@ import { macroConfig } from './macroLayout.js';
 
 // Forms drawn as line-work straight onto what is behind them, with no cap or body under the needle.
 const BODILESS_FORMS = new Set(['pointer']);
+// Forms that read by their own light: a lens, an LED ring, line-work. They need nothing behind them.
+const SELF_LIT_FORMS = new Set(['pointer', 'lens', 'encoder']);
+// Forms that are not a round cap: a ring of light round a tuning dial, a roller, a tile or a balance
+// beam reads as a mistake rather than as a lit ring.
+const NOT_ROUND_FORMS = new Set(['tuning', 'roller', 'new-tessera', 'new-balance']);
 const LABEL_PARTS = ['labelMin', 'labelMax', 'labelStart', 'labelCurrent', 'labelEnd', 'labelValue', 'labelTitle', 'labelUnit'];
 
 export function macroUsesSetKnob(control) {
@@ -77,6 +82,26 @@ function reinkForFace(knob, set) {
   const reads = (colour) => /^[0-9A-F]{8}$/i.test(String(colour)) && contrast(colour, face) >= 3;
   if (!reads(drawn.formLabelColour)) knob._children.Core.formLabelColour = '{instrument.ink}';
   if (BODILESS_FORMS.has(drawn.controlForm) && !reads(drawn.formInkColour)) knob._children.Core.formInkColour = '{instrument.text}';
+}
+
+/**
+ * The ring of light a knob sits on when its body would be lost on the Macro's face: a mid-grey cap
+ * on a near-black screen reads at about 2:1 (Flightdeck, Stompbox, Bakelite). A lighter plate would
+ * not help, sitting too close to the grey; light behind a dark silhouette does, so the knob sits on
+ * an underlit ring in the set's own display light. Returns that colour, or null for a knob that
+ * reads already or lights itself.
+ */
+export function macroKnobHalo(knob, set) {
+  if (!knob || !set) return null;
+  const core = resolveControlForSet(knob, set)._children.Core;
+  if (SELF_LIT_FORMS.has(core.controlForm) || NOT_ROUND_FORMS.has(core.controlForm)) return null;
+  const face = resolveToken('instrument.face', set);
+  const body = core.controlForm ? core.formFaceColour
+    : resolveControlForSet(knob, set)._children.Parts?._children?.bodyCap?._children?.Background?._children?.Fill?.colour;
+  if (!face || !/^[0-9A-F]{8}$/i.test(String(body)) || contrast(body, face) >= 2.5) return null;
+  // The light must read on the face, or there is no ring to see: a reflective set's ink is dark.
+  const lit = resolveToken('display.lit', set);
+  return /^[0-9A-F]{8}$/i.test(String(lit)) && contrast(lit, face) >= 3 ? lit : null;
 }
 
 /** The knob's runtime at rest, computed once per knob. */

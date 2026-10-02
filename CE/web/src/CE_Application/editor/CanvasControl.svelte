@@ -147,7 +147,7 @@
   import { CONTROL_SET_LAMP_CONTEXT_KEY, resolveToken } from '../models/controlSets.js';
   import { SERIES_ROLES, chromeTone } from '../models/instrumentDesigns.js';
   import { macroGeometry, macroValue } from '../utils/macroLayout.js';
-  import { macroKnobBaseRuntime, macroKnobBox, macroKnobControl, macroKnobRuntime, macroUsesSetKnob } from '../utils/macroKnob.js';
+  import { macroKnobBaseRuntime, macroKnobBox, macroKnobControl, macroKnobHalo, macroKnobRuntime, macroUsesSetKnob } from '../utils/macroKnob.js';
   import { resolveControlForSet, controlSetForControl, familyPatchFor } from '../models/controlSetFamilies.js';
 
   let {
@@ -399,6 +399,15 @@
     return untrack(() => macroKnobControl(renderControl, macroKnobBox(macroGeometry(displayW, displayH, renderControl), renderControl), controlSet));
   });
   let macroKnobList = $derived(macroKnob ? [macroKnob] : []);
+  // A dark knob on the Macro's dark face sits on a ring of the set's display light.
+  let macroKnobRing = $derived.by(() => {
+    if (!macroKnob) return '';
+    const lit = untrack(() => macroKnobHalo(macroKnob, controlSet));
+    if (!lit) return '';
+    const [r, g, b] = [2, 4, 6].map((i) => parseInt(lit.slice(i, i + 2), 16));
+    const t = macroKnob._children.Transform;
+    return `left:${t.x}px; top:${t.y}px; width:${t.width}px; height:${t.height}px; background:radial-gradient(circle closest-side, rgba(${r},${g},${b},0) 62%, rgba(${r},${g},${b},0.5) 74%, rgba(${r},${g},${b},0.16) 88%, rgba(${r},${g},${b},0) 100%);`;
+  });
   let macroKnobBase = $derived(macroKnobBaseRuntime(macroKnob));
   let macroKnobState = $derived(macroKnob
     ? macroKnobRuntime(macroKnobBase, renderControl?._children?.Macro?.__value ?? macroValue(renderControl), previewSession?.dragging === true)
@@ -3595,6 +3604,9 @@
     {/if}
 
     {#if isMacro}
+      {#if macroKnobRing}
+        <div class="macro-knob-ring" style={macroKnobRing} aria-hidden="true"></div>
+      {/if}
       {#if macroKnob}
         <CanvasControlNested
           control={macroKnob}
@@ -4420,6 +4432,7 @@
     cursor: default;
   }
   .canvas-control.embedded { pointer-events: none; }
+  .macro-knob-ring { position: absolute; border-radius: 50%; pointer-events: none; }
 
   /* THE DRAG AFFORDANCE. The canvas had exactly two cursors — the resize handles' arrows and this
      `default` — so nothing on the surface ever said a control could be dragged; you found out by

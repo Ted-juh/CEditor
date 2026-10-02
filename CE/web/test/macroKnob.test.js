@@ -14,7 +14,7 @@ import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { contrast } from '../src/CE_Application/models/instrumentDesigns.js';
 import { macroGeometry } from '../src/CE_Application/utils/macroLayout.js';
 import {
-  macroKnobBaseRuntime, macroKnobBox, macroKnobControl, macroKnobRuntime, macroUsesSetKnob,
+  macroKnobBaseRuntime, macroKnobBox, macroKnobControl, macroKnobHalo, macroKnobRuntime, macroUsesSetKnob,
 } from '../src/CE_Application/utils/macroKnob.js';
 
 const others = BUILT_IN_CONTROL_SETS.filter((s) => s.id !== 'graphite');
@@ -110,4 +110,19 @@ test('the value goes in as a runtime: the knob control stays the same while the 
   assert.equal(macroKnobRuntime(base, 7).signals.currentValueNormalized, 1);
   assert.equal(macroKnobRuntime(base, -1).signals.currentValueNormalized, 0);
   assert.equal(macroKnobRuntime(null, 0.5), null);
+});
+
+test('a dark round knob on the dark face sits on a ring of the set\'s display light; others need none', () => {
+  const source = macro();
+  const ring = (id) => macroKnobHalo(macroKnobControl(source, boxFor(source)), getControlSet(id));
+  for (const id of ['flightdeck', 'stompbox', 'bakelite']) {
+    const set = getControlSet(id);
+    assert.equal(ring(id), resolveToken('display.lit', set), `${id} gets its display light`);
+    assert.ok(contrast(ring(id), resolveToken('instrument.face', set)) >= 3, `${id}: the ring reads`);
+  }
+  assert.equal(ring('tolex'), null, 'a cream dial reads already');
+  assert.equal(ring('neon'), null, 'a lens lights itself');
+  assert.equal(ring('walnut'), null, 'a tuning dial is not a round cap');
+  assert.equal(ring('ladder'), null, 'a reflective set\'s ink is dark: no ring to see');
+  assert.equal(macroKnobHalo(null, getControlSet('tolex')), null);
 });

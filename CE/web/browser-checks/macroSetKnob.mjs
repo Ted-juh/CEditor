@@ -9,7 +9,8 @@
  *   - the Macro draws the same knob form the Knob does, and Graphite's Macro draws its own;
  *   - that knob sits at the Macro's value, not at a Knob's default;
  *   - it adds no `data-control-id` and takes no pointer events;
- *   - an author's 'own' keeps the Macro's knob under any set.
+ *   - an author's 'own' keeps the Macro's knob under any set;
+ *   - a dark round knob on the dark face sits on a ring of light, and one that reads has none.
  */
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
@@ -60,6 +61,7 @@ async function look(shown) {
       ids: document.querySelectorAll('[data-control-id]').length,
       hosted: hosted ? { ...form(hosted), pointerEvents: getComputedStyle(hosted).pointerEvents, id: hosted.getAttribute('data-control-id') } : null,
       knob: form(element(knobId)),
+      ring: !!macro?.querySelector('.macro-knob-ring'),
     };
   }, shown);
 }
@@ -82,6 +84,12 @@ try {
     assert.equal(seen.hosted.pointerEvents, 'none', `${id}: the Macro, not its knob, takes the drag`);
     console.log(`  ok  ${id}: the Macro's knob is the set's ${seen.hosted.form}`);
   }
+
+  for (const [id, ringed] of [['flightdeck', true], ['stompbox', true], ['tolex', false], ['neon', false]]) {
+    const seen = await look(await page.evaluate((set) => window.__controlSetShot.showMacro(set), id));
+    assert.equal(seen.ring, ringed, `${id}: ${ringed ? 'a dark cap on a dark face sits on a ring' : 'a knob that reads needs no ring'}`);
+  }
+  console.log('  ok  dark knobs sit on a ring of the set\'s light; knobs that read have none');
 
   const own = await look(await page.evaluate(() => window.__controlSetShot.showMacro('tolex', { knobDesign: 'own' })));
   assert.equal(own.hosted, null, 'an author\'s own knob stays under a set');
