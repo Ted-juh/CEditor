@@ -24,6 +24,8 @@ const DIRECTIONS = new Map(STARTER_CONTROL_SETS.map((entry) => [entry.id, entry]
 // own: a shape that says what their keys are (Blueprint's crosshair keys, Soft's cushions, Field's
 // guarded keys). The additional directions carry `padForm` and keep it.
 const STEP_CELLS = {
+  // Graphite's flat discs, for the designed Graphite (Graphite itself takes no direction).
+  graphite: 'porthole',
   blueprint: 'diamond', pop: 'petal', soft: 'pod', frost: 'porthole', obsidian: 'shutter', console: 'ribbed',
   carbon: 'concertina', machined: 'hex', tolex: 'reel', field: 'shield', phosphor: 'hex',
 };
@@ -39,11 +41,18 @@ const RELATED = {
   // 'ceramic-oak'), found no direction, and stayed recolours of twenty-odd controls.
   walnut: 'tolex', valve: 'tolex', reel: 'tolex', saddle: 'tolex',
   ceramic: 'soft', receiver: 'tolex',
+  // The designed Graphite draws in Graphite's own direction, which Graphite itself does not take.
+  'graphite-studio': 'graphite',
 };
 // Those two were drawn with knobs and buttons of their own (Saddle's cream caps on brass skirts,
 // Ceramic's white caps with a blue arc), which the typo happened to protect. They keep them: the
-// direction fills the controls they had no design for, not the ones they had.
-const OWN_MECHANISMS = new Set(['saddle', 'ceramic']);
+// direction fills the controls they had no design for, not the ones they had. The designed
+// Graphite keeps Graphite's flat buttons and switch: the direction's tiles and sliding tabs are
+// drawn in a fixed frame, and at a button's usual 120 by 40 they shrink to a sliver with a caption
+// too small to read, which the set every new panel starts on cannot have.
+const BUTTON_TYPES = ['Button', 'MomentaryButton', 'ToggleButton', 'TimedButton', 'OneShotButton'];
+const OWN_MECHANISMS = { saddle: 'all', ceramic: 'all', 'graphite-studio': BUTTON_TYPES };
+const keepsOwn = (id, type) => OWN_MECHANISMS[id] === 'all' || (OWN_MECHANISMS[id] ?? []).includes(type);
 
 export function extendControlSet(set) {
   // Graphite remains the compatibility baseline for existing documents.
@@ -111,7 +120,7 @@ export function extendControlSet(set) {
     families[type] = { ...families[type], component: { ...families[type]?.component, 'Text.Fill.colour': surfaceInk } };
   }
   for (const type of ['Knob', 'Button', 'MomentaryButton', 'ToggleButton', 'TimedButton', 'OneShotButton', 'Meter', 'ProgressBar']) {
-    if (OWN_MECHANISMS.has(set.id)) continue;
+    if (keepsOwn(set.id, type)) continue;
     families[type] = { ...families[type], component: { ...families[type]?.component,
       'Core.controlForm': setAnatomy(type, d.id),
       'Core.formFaceColour': '{surface}', 'Core.formInkColour': inkOn(set.tokens.surface), 'Core.formLabelColour': '{text.primary}', 'Core.formAccentColour': '{accent}',

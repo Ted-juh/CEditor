@@ -358,8 +358,9 @@ test('controlSetForPanel: the named set, or the base set for none or an unknown 
 });
 
 test('a panel on the default set writes no controlSet key; any other set writes {id}', () => {
-  const panel = createPanel('Sets');
-  assert.deepEqual(panel.controlSet, { id: DEFAULT_CONTROL_SET_ID });
+  // On the base set, as every document from before sets is. A new panel starts on the designed
+  // Graphite and names it (designedGraphite.test.js).
+  const panel = { ...createPanel('Sets'), controlSet: { id: DEFAULT_CONTROL_SET_ID } };
   const plain = JSON.parse(serializePanel(panel));
   assert.equal('controlSet' in plain, false);
 
@@ -404,7 +405,7 @@ test('a saved document keeps its references; a build payload is baked to literal
 // --- the store --------------------------------------------------------------------------------------
 
 test('activeControlSet follows the active panel, and setActivePanelControlSet writes through', () => {
-  const panel = openPanel();
+  const panel = openPanel({ controlSet: { id: DEFAULT_CONTROL_SET_ID } });
   assert.equal(get(activeControlSet), BASE_CONTROL_SET);
 
   setActivePanelControlSet('ivory');

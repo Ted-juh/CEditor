@@ -71,7 +71,9 @@ test('every voice reads on its face, the captions read, and no voice is a grey o
     }
     for (const role of SERIES_ROLES.slice(0, 5)) {
       const c = resolveToken(role, set);
-      assert.ok(!GRAPHITE_SERIES.includes(c), `${set.id} ${role} fell back to Graphite's ${c}`);
+      // The designed Graphite's accent is Graphite's blue, so that voice is its own, not a leftover.
+      const own = [set.tokens.accent, set.tokens['display.lit']].includes(c);
+      assert.ok(own || !GRAPHITE_SERIES.includes(c), `${set.id} ${role} fell back to Graphite's ${c}`);
       const [r, g, b] = luminance(c);
       const chroma = Math.max(r, g, b) - Math.min(r, g, b);
       const lettering = resolveToken('text.primary', set);

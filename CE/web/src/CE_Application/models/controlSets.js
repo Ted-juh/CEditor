@@ -27,6 +27,7 @@ import { PILOT_CONTROL_SETS } from './pilotControlSets.js';
 import { CATALOG_CONTROL_SETS, CATALOG_SET_EXTRAS } from './catalogControlSets.js';
 import { makeAdditionalControlSets } from './additionalControlSets.js';
 import { extendControlSet } from './controlSetCoverage.js';
+import { typeFamilies } from './controlSetRecipes.js';
 import { withLabelDesign } from './labelDesigns.js';
 import { withSectionDesign, withSectionSurface } from './sectionDesigns.js';
 import { withInstrumentDesign, withInstrumentTokens } from './instrumentDesigns.js';
@@ -136,7 +137,9 @@ export const CONTROL_SET_TOKEN_NAMES = CONTROL_SET_TOKEN_ROLES.map((role) => rol
 const BASE_BUILT_IN_SETS = [
   {
     id: 'graphite',
-    name: 'Graphite',
+    // Classic: every document that names no set is on it, so it stays exactly what it was. New
+    // panels start on the designed Graphite below instead.
+    name: 'Graphite Classic',
     description: 'The original look: neutral dark greys with a cool blue accent.',
     tokens: {
       // Graphite names no panel colour, and its labels have always sat on the control surface.
@@ -313,6 +316,39 @@ export function withPanelSurface(set, { fallback = null } = {}) {
   return { ...set, tokens: { ...set.tokens, 'panel.surface': next } };
 }
 
+// Graphite, designed: what NEW panels start on (stores/runtimePreferences.js). Graphite itself is
+// the base set, the one every document that names no set is drawn in, and it has no designs so
+// that those documents keep their look; it is listed as Graphite Classic. This is a set like the
+// others: a panel on it names it, so a file made today keeps its look whatever the base set does.
+// It is Graphite (its greys and blue, its lettering, its lamp, its buttons and slider) with the
+// knob and meter Graphite's starter already drew with (the flat disc and the continuous bar: the
+// 'graphite' direction in models/controlSetCoverage.js), a panel a step darker than its controls
+// so they sit on it, a display in its own blue rather than the factory's green, and every design
+// the pipeline below derives.
+function designedGraphite(classic) {
+  // Every button letters in Graphite's face. The type block reaches the Button, the Momentary and
+  // the Toggle; the timed, one-shot, cycle and radio buttons stayed in the factory's, which Classic
+  // keeps as they were.
+  const legend = typeFamilies(classic.type).Button?.component ?? {};
+  const lettered = Object.fromEntries(['TimedButton', 'OneShotButton', 'CyclicButton', 'RadioButtonGroup']
+    .map((type) => [type, { ...classic.families[type], component: { ...legend, ...classic.families[type]?.component } }]));
+  return {
+    ...classic,
+    families: { ...classic.families, ...lettered },
+    id: 'graphite-studio',
+    name: 'Graphite',
+    description: 'The original greys and blue, designed: flat disc knobs, continuous bars, and its panel, sections, displays and instruments drawn in one hand.',
+    tokens: {
+      ...classic.tokens,
+      'display.lit': 'FF89C2FF',
+      'display.unlit': '1F89C2FF',
+      'display.screen': 'FF060709',
+      'display.backlight': 'FF0C1622',
+    },
+    panel: { colour: 'FF27292D' },
+  };
+}
+
 // Ember and Ivory began as colour-only sets; their mockup boards showed a chicken-head and a
 // black-bodied knob, and models/catalogControlSets.js carries those as extras. Graphite stays
 // exactly what it was: it is the look every existing document has.
@@ -320,7 +356,7 @@ const ORIGINAL_CONTROL_SETS = [
   ...BASE_BUILT_IN_SETS.map((set) => {
     const extras = CATALOG_SET_EXTRAS[set.id];
     return extras ? { ...set, ...extras, tokens: { ...set.tokens, ...(extras.tokens ?? {}) } } : set;
-  }),
+  }).flatMap((set) => (set.id === 'graphite' ? [set, designedGraphite(set)] : [set])),
   // Tolex and Machined: the pilot sets that reach beyond colour — a family patch each, a lamp, a
   // panel material. Defined in their own module because they are mostly data.
   ...PILOT_CONTROL_SETS,
@@ -342,6 +378,10 @@ export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditiona
   .map(withDisplayDesign);
 
 export const DEFAULT_CONTROL_SET_ID = 'graphite';
+// What a new panel starts on unless the user chose otherwise (Settings → Control Sets). Not the
+// base set: a document that names no set is a document from before this, and stays on Classic.
+// stores/runtimePreferences.js holds the same id as its default, without importing the sets.
+export const NEW_PANEL_CONTROL_SET_ID = 'graphite-studio';
 
 // Svelte context key under which a surface that renders a panel of its own (the preview, the
 // Player) hands its controls the set to resolve against. A getter, so it follows the panel.

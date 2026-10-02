@@ -28,8 +28,10 @@ export const DEFAULT_GENERAL_SETTINGS = {
   keyboardNudgeSmall: 1,
   keyboardNudgeLarge: 10,
   // Visual language assigned to newly created panels. Kept as an id so a built-in can be
-  // selected without copying its full definition into the application settings file.
-  defaultControlSetId: 'graphite',
+  // selected without copying its full definition into the application settings file. The designed
+  // Graphite (models/controlSets.js NEW_PANEL_CONTROL_SET_ID; written out so this module stays free
+  // of the sets). A settings file that already names a default keeps it, Graphite Classic included.
+  defaultControlSetId: 'graphite-studio',
   // OFF, and this one is a default rather than a preference in the usual sense. Checking for
   // updates sends this machine's IP address to GitHub — unremarkable, and still not something a
   // program should do on its own the first time somebody starts it. Help → Check for Updates works
@@ -107,7 +109,7 @@ export function applyGeneralSettingsToRuntime(settings) {
   duplicateOffset.set(settings.duplicateOffset);
   keyboardNudgeSmall.set(settings.keyboardNudgeSmall);
   keyboardNudgeLarge.set(settings.keyboardNudgeLarge);
-  defaultControlSetId.set(settings.defaultControlSetId ?? 'graphite');
+  defaultControlSetId.set(settings.defaultControlSetId ?? DEFAULT_GENERAL_SETTINGS.defaultControlSetId);
   exportVendor.set(settings.exportVendor ?? '');
   exportManufacturerCode.set(normalizeManufacturerCode(settings.exportManufacturerCode));
   exportOutputDir.set(settings.exportOutputDir ?? '');

@@ -871,3 +871,37 @@ underlit ring in the set's display light (`macroKnobHalo` in `utils/macroKnob.js
 backlit synth. Only round caps get one, since a ring round a tuning dial, a roller, a tile or a balance
 beam reads as a mistake; only where that light reads on the face at 3:1, since a reflective set's
 ink is dark; and never a knob that lights itself (a lens, an LED ring, line-work). Sixteen sets.
+
+## New panels start on a designed Graphite
+
+Graphite was the least designed set on purpose. It is the base set: every document from before sets,
+and every one that never chose a set, is drawn in it and stores no set at all, so it takes none of
+the designs above. That also made it the look of every new panel, so the one set everybody saw first
+was the one set nobody was allowed to design.
+
+The two are now apart. The base set keeps its id, `graphite`, and its look exactly, and is listed as
+**Graphite Classic**: a file that names no set opens on it as it always did, and a panel on it still
+writes no key. New panels start on **Graphite** (`graphite-studio`, `NEW_PANEL_CONTROL_SET_ID`),
+which is a set like the others, so a panel on it names it in its file and keeps its look whatever the
+base set does. It is Graphite: its greys and blue, its DM Sans, its lamp, its flat buttons and its pill
+slider. To that it adds the knob and meter Graphite's starter template already drew with (the flat
+disc and the continuous bar, the `graphite` direction), a panel a step darker than its controls so
+they sit on it, a display in its own blue on black rather than the factory's green STN, and every
+design the others derive: silkscreened labels, recessed sections, the grammar's frame, instruments
+on its display, the Macro's knob on a ring of that blue.
+
+It keeps Graphite's buttons rather than the direction's tiles and sliding tabs. An anatomy form is
+drawn in a fixed frame, and at a button's usual 120 by 40 a tile shrinks to a sliver with a caption
+too small to read, which the set every new panel starts on cannot have. (Every set that draws its
+buttons as anatomy forms has that at those sizes; it is the next thing on that list.)
+
+The default is a setting (Settings → Control Sets, "Default for new panels"). A settings file that
+already names one keeps it, Graphite Classic included: an installation that has saved its settings
+since the default existed has `graphite` written there, and that may have been a choice. Choosing
+Graphite there, or on a panel, is one click. `designedGraphite.test.js` pins the base set as it was,
+the new panel naming the designed one, the designed one as Graphite with the starter's knob and
+meter and its buttons kept, and every design reaching it.
+
+`browser-checks/controlSetShot.mjs` photographs a second row now, for what the sets reach since the
+specimen was drawn: a Group with its title and captions on the section's face, a Macro hosting the
+set's knob, a Shape and a Pixel Display.

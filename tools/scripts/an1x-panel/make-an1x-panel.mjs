@@ -21,6 +21,7 @@ import { createControl } from '../../../CE/web/src/CE_Application/models/compone
 import { SECTION_DEFAULTS } from '../../../CE/web/src/CE_Application/models/sectionDefaults.js';
 import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
+import { DEFAULT_CONTROL_SET_ID } from '../../../CE/web/src/CE_Application/models/controlSets.js';
 import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds, stepCell } from '../gaia-panel/components.mjs';
 import { createScript } from '../../../CE/web/src/CE_Application/scripting/scriptModel.js';
 import { FEG_POINTS, FEG_TRACKS, fegBridgeScript } from './feg-bridge.mjs';
@@ -691,6 +692,10 @@ export function buildAn1xPanel({ slim = true } = {}) {
   seq = 0;
 
   const panel = createPanel('Yamaha AN1x');
+  // createPanel starts a new panel on the user's default set,
+  // which is the designed Graphite; this is a curated document, drawn on the base set, Graphite
+  // Classic, since before sets existed, and its file stays that way (no controlSet key).
+  panel.controlSet = { id: DEFAULT_CONTROL_SET_ID };
   const controls = [];
   const missing = [];
   const overflow = [];

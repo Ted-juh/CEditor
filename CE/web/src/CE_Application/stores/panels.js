@@ -35,7 +35,7 @@ import { runWhenIdle } from '../utils/runWhenIdle.js';
 import { rememberRecentFile } from './recentFiles.js';
 import { equalityWritable } from '../utils/equalityStore.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
-import { controlSetForPanel } from '../models/controlSets.js';
+import { controlSetForPanel, normalizeControlSet } from '../models/controlSets.js';
 import { createPanel, deserializePanel, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
 import {
   getProjectDeviceSessionSnapshot,
@@ -324,6 +324,10 @@ function restoreUnsavedSessionFromSnapshot() {
       const restored = {
         ...fresh,
         ...panelData,
+        // The panel's own set, never the new-panel default: a snapshot from before sets is a
+        // document on the base set, as a .cepanel without the key is (panelModel deserializePanel).
+        controlSet: normalizeControlSet(panelData.controlSet),
+        controlSets: Array.isArray(panelData.controlSets) ? panelData.controlSets : [],
         // Session IDs key tabs and must come from this run's allocator. Keeping a saved ID can
         // collide with the next opened panel; panelGuid remains the persistent document identity.
         id: fresh.id,

@@ -24,6 +24,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
+import { DEFAULT_CONTROL_SET_ID } from '../../../CE/web/src/CE_Application/models/controlSets.js';
 import { createScript } from '../../../CE/web/src/CE_Application/scripting/scriptModel.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -78,6 +79,9 @@ const SELFTEST_GUID = '5e1f7e57-c0de-4000-8000-000000000001';
 
 const panel = createPanel('CEditor Self-Test');
 panel.panelGuid = SELFTEST_GUID;
+// The base set, as the committed self-test has always been: createPanel starts a new panel on the
+// user's default set, which is the designed Graphite. A fixture's look is not the user's choice.
+panel.controlSet = { id: DEFAULT_CONTROL_SET_ID };
 panel.scripts = Object.entries(LANGS).map(([lang, [, source]]) =>
   createScript({ id: `st_${lang}`, name: `selftest ${lang}`, language: lang, source, event: 'onPanelReady', scope: 'panel', target: '*' }));
 // Make the export exercise every engine.

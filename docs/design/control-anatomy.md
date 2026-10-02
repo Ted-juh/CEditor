@@ -46,9 +46,11 @@ Scale divisions are visual and do not quantize values. Set Behavior → step for
 values. The protective rails are visible housing, not safety interlocks. Rubber shapes do
 not imply pressure-sensing hardware. The existing control behavior determines those functions.
 
-Graphite remains the default compatibility appearance for existing documents. Its new flat
-forms are explicitly selected in its starter. Other sets supply form defaults which can be
-overridden with an individual form or Original parts.
+Graphite remains the default compatibility appearance for existing documents (listed as Graphite
+Classic). Its new flat forms are explicitly selected in its starter. New panels start on the
+designed Graphite, which takes the flat disc and the continuous bar as its defaults and keeps
+Graphite's flat buttons (control-sets.md, "New panels start on a designed Graphite"). Other sets
+supply form defaults which can be overridden with an individual form or Original parts.
 
 ## Verification
 
