@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "4d92b494",
+  "fingerprint": "df50f7a4",
   "set": {
     "id": "concave-studio",
     "name": "Concave Studio",
@@ -534,7 +534,15 @@
       },
       "Label": {
         "component": {
-          "Text.Fill.colour": "{text.primary}"
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false,
+          "Text.Effects.shadowEnabled": true,
+          "Text.Effects.shadowStyle": "soft",
+          "Text.Effects.shadowOffsetX": 0,
+          "Text.Effects.shadowOffsetY": -1,
+          "Text.Effects.shadowBlur": 0,
+          "Text.Effects.shadowColour": "A6000000"
         }
       },
       "TextInput": {

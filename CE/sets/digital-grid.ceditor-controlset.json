@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "93d455f1",
+  "fingerprint": "e25e6ac0",
   "set": {
     "id": "digital-grid",
     "name": "Digital Grid",
@@ -358,7 +358,9 @@
       },
       "Label": {
         "component": {
-          "Text.Fill.colour": "{text.primary}"
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false
         }
       },
       "TextInput": {

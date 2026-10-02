@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c631f528",
+  "fingerprint": "c20f3056",
   "set": {
     "id": "edge-light",
     "name": "Edge Light",
@@ -545,7 +545,13 @@
       },
       "Label": {
         "component": {
-          "Text.Fill.colour": "{text.primary}"
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false,
+          "Text.Effects.glowEnabled": true,
+          "Text.Effects.glowSize": 3,
+          "Text.Effects.glowIntensity": 1,
+          "Text.Effects.glowColour": "B3F7F4EC"
         }
       },
       "TextInput": {

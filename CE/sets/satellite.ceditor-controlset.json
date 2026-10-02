@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "88611fd8",
+  "fingerprint": "74b6d9cb",
   "set": {
     "id": "satellite",
     "name": "Satellite",
@@ -352,7 +352,9 @@
       },
       "Label": {
         "component": {
-          "Text.Fill.colour": "{text.primary}"
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false
         }
       },
       "CyclicButton": {

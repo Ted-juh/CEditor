@@ -57,10 +57,16 @@ function measureLabels(ids) {
     const range = document.createRange();
     range.selectNodeContents(glyphs);
     const rects = [...range.getClientRects()].filter((r) => r.width > 0);
-    const reach = rects.length ? Math.max(
+    let reach = rects.length ? Math.max(
       box.left - Math.min(...rects.map((r) => r.left)), Math.max(...rects.map((r) => r.right)) - box.right,
       box.top - Math.min(...rects.map((r) => r.top)), Math.max(...rects.map((r) => r.bottom)) - box.bottom,
     ) : 0;
+    // A caption with a text shadow or glow is DRAWN as SVG (the DOM glyphs above are then hidden),
+    // and the two are placed by different code: the SVG copy is what the eye sees, so its
+    // placement across the box is measured too. Only across: an SVG text's box is the font's whole
+    // em box, a pixel or two taller than the line, so its height says nothing about the ink.
+    const svg = [...control.querySelectorAll('svg.text-visual-svg text')].map((t) => t.getBoundingClientRect()).filter((r) => r.width > 0);
+    if (svg.length) reach = Math.max(reach, box.left - Math.min(...svg.map((r) => r.left)), Math.max(...svg.map((r) => r.right)) - box.right);
     return {
       id, text,
       lines: glyphs.querySelectorAll('.text-line').length || 1,

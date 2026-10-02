@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "1d7fa273",
+  "fingerprint": "a04e01e3",
   "set": {
     "id": "chronograph",
     "name": "Precision",
@@ -678,7 +678,15 @@
       },
       "Label": {
         "component": {
-          "Text.Fill.colour": "{text.primary}"
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false,
+          "Text.Effects.shadowEnabled": true,
+          "Text.Effects.shadowStyle": "soft",
+          "Text.Effects.shadowOffsetX": 0,
+          "Text.Effects.shadowOffsetY": -1,
+          "Text.Effects.shadowBlur": 0,
+          "Text.Effects.shadowColour": "A6000000"
         }
       },
       "TextInput": {

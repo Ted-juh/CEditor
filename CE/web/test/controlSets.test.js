@@ -222,26 +222,28 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-test('a Label reads in every built-in set: its lettering against its plate is at least 4.5:1', () => {
+test('a Label reads in every built-in set: its lettering against what is behind it is at least 4.5:1', () => {
   // The sets choose their text colours to read on the PANEL. A Label used to fill with `surface`,
   // the button face, and on a third of the catalogue that is the text colour's own tone: Tolex
-  // drew cream lettering on a cream plate at 1.0:1.
+  // drew cream lettering on a cream plate at 1.0:1. Most sets now draw no plate at all
+  // (models/labelDesigns.js), and then what is behind the lettering is the panel.
   for (const set of BUILT_IN_CONTROL_SETS) {
     const label = resolveControlForSet(createControl('Label'), set)._children;
-    const plate = label.Background._children.Fill.colour;
+    const fill = label.Background._children.Fill.colour;
+    const behind = fill.startsWith('00') ? resolveToken('panel.surface', set) : fill;
     const ink = label.Text._children.Fill.colour;
-    assert.ok(isColourLiteral(plate) && isColourLiteral(ink), `${set.id}: ${plate} / ${ink}`);
-    assert.ok(contrast(plate, ink) >= 4.5, `${set.id}: ${ink} on ${plate} is ${contrast(plate, ink).toFixed(2)}:1`);
+    assert.ok(isColourLiteral(behind) && isColourLiteral(ink), `${set.id}: ${behind} / ${ink}`);
+    assert.ok(contrast(behind, ink) >= 4.5, `${set.id}: ${ink} on ${behind} is ${contrast(behind, ink).toFixed(2)}:1`);
   }
 });
 
-test('a Label and a Background block take the panel colour a set names, and Graphite keeps its own', () => {
+test('a Background block takes the panel colour a set names, a factory Label too, and Graphite keeps its own', () => {
   for (const set of BUILT_IN_CONTROL_SETS) {
     const expected = set.panel?.colour ? String(set.panel.colour).toUpperCase() : resolveToken('surface', set);
     assert.equal(resolveToken('panel.surface', set), expected, set.id);
-    for (const type of ['Label', 'Background']) {
-      assert.equal(resolveControlForSet(createControl(type), set)._children.Background._children.Fill.colour, expected, `${set.id} ${type}`);
-    }
+    assert.equal(resolveControlForSet(createControl('Background'), set)._children.Background._children.Fill.colour, expected, `${set.id} Background`);
+    // The Label's own default, before a set's label design: what a set without one draws.
+    assert.equal(resolveControlTokens(createControl('Label'), set)._children.Background._children.Fill.colour, expected, `${set.id} Label`);
   }
   // Rule 1 above: a document that never chose a set looks exactly as it did.
   for (const type of ['Label', 'Background']) {

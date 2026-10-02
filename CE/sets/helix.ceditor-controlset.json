@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "9f07bbba",
+  "fingerprint": "378ecee9",
   "set": {
     "id": "helix",
     "name": "Helix",
@@ -580,7 +580,9 @@
       },
       "Label": {
         "component": {
-          "Text.Fill.colour": "{text.primary}"
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false
         }
       },
       "CyclicButton": {

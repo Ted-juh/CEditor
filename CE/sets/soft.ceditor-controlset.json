@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d03c7f05",
+  "fingerprint": "82e59b11",
   "set": {
     "id": "soft",
     "name": "Soft",
@@ -1163,6 +1163,12 @@
           "Joystick.puckColour": "{control.cap}",
           "Joystick.cornerColour": "{text.muted}",
           "Joystick.labelColour": "FF202020"
+        }
+      },
+      "Label": {
+        "component": {
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false
         }
       }
     },

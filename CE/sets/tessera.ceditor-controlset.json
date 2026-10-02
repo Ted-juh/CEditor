@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e8e6b3c5",
+  "fingerprint": "00c6c994",
   "set": {
     "id": "tessera",
     "name": "Tessera",
@@ -165,7 +165,9 @@
       },
       "Label": {
         "component": {
-          "Text.Fill.colour": "{text.primary}"
+          "Text.Fill.colour": "{text.primary}",
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false
         }
       },
       "CyclicButton": {

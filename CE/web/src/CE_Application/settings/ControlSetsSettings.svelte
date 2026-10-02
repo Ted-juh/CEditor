@@ -30,7 +30,7 @@
   ];
   const FAMILY_ROLES = [
     ['Knob', 'Knobs'], ['Slider', 'Sliders'], ['Button', 'Buttons'],
-    ['ToggleButton', 'Switches'], ['DrumPads', 'Drum pads'], ['StepSequencer', 'Steppers'],
+    ['ToggleButton', 'Switches'], ['DrumPads', 'Drum pads'], ['StepSequencer', 'Steppers'], ['Label', 'Labels'],
   ];
   const DESIGN_SOURCES = PHYSICAL_DIRECTIONS.map((entry) => getControlSet(entry.id)).filter(Boolean);
 

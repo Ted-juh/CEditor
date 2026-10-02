@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "9dc56fe5",
+  "fingerprint": "63ba75c5",
   "set": {
     "id": "carbon",
     "name": "Carbon",
@@ -1843,6 +1843,12 @@
           "Joystick.puckColour": "{control.cap}",
           "Joystick.cornerColour": "{text.muted}",
           "Joystick.labelColour": "FFF2F2F2"
+        }
+      },
+      "Label": {
+        "component": {
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false
         }
       }
     },

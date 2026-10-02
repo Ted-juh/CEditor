@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "3d150454",
+  "fingerprint": "e1ca4087",
   "set": {
     "id": "blueprint",
     "name": "Blueprint",
@@ -637,6 +637,14 @@
           "Joystick.puckColour": "{control.cap}",
           "Joystick.cornerColour": "{text.muted}",
           "Joystick.labelColour": "FFF2F2F2"
+        }
+      },
+      "Label": {
+        "component": {
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Border.thickness": 1
         }
       }
     },

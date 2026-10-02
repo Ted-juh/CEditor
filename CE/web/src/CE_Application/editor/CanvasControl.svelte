@@ -2782,7 +2782,12 @@
   });
   let svgTextBaseX = $derived.by(() => {
     const left = textUnrotatedOrigin.left;
-    const width = Math.max(0, textGlyphSize.width);
+    // The origin's width, which falls back to the layout's line box, not the raw DOM measurement.
+    // Folded scenery is baked in a detached element (utils/sceneryMarkupCache.js), where nothing is
+    // ever measured: with the raw width of 0 a centred line was anchored at the line box's LEFT
+    // edge, so a label with a text shadow or glow (drawn here, as SVG) lost its left half —
+    // "Cutoff" read "toff". The same trap textUnrotatedOrigin documents for the DOM text.
+    const width = Math.max(0, textUnrotatedOrigin.width);
 
     if (svgTextAnchor === 'start') return left;
     if (svgTextAnchor === 'end') return left + width;
@@ -2928,7 +2933,7 @@
     if (blockLineFillWidthApplied(index)) return textUnrotatedOrigin.left;
     const align = blockLineEffectiveAlign(index);
     if (align === 'left') return textUnrotatedOrigin.left;
-    if (align === 'right') return textUnrotatedOrigin.left + Math.max(0, textGlyphSize.width);
+    if (align === 'right') return textUnrotatedOrigin.left + Math.max(0, textUnrotatedOrigin.width);
     return svgTextBaseX;
   }
 

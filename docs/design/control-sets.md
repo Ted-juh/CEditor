@@ -602,3 +602,35 @@ the text's width, and so Fit → Shrink compared the box with itself and never s
 being too *wide*. It fits against `contentWidth` now. `browser-checks/templateLabels.mjs` renders
 every template under every set, at its own size and at the preset that shrinks it most, and holds
 every caption to one line inside its box: 2,028 of them, none needing to shrink at full size.
+
+## Labels, designed
+
+A set changed five things on a Label (face, two weights, letter-spacing, ink) against a median of
+49 on a knob and 74 on a slider. Every set therefore drew the same white 2px box, which is the
+default border every control inherits. It is a literal, not a token, and no hardware looks like it:
+a panel's legends are printed on the panel. "The boards' type" above called the boards' engraved
+and backlit labels a further step; `models/labelDesigns.js` takes it.
+
+Five treatments, written as family-patch properties the editor exposes, under the family rule (only
+where a Label still holds its factory value, so an author's colours and borders survive):
+
+| Treatment | What it is | Sets |
+| --- | --- | --- |
+| silkscreen | no plate, no box: the lettering on the panel | every set not below (44) |
+| engraved | silkscreen with a one-pixel lip: light under dark lettering, dark over light | panel material blast, brushed or hammertone (20) |
+| backlit | silkscreen, glowing in its own ink | Neon, Backlit, Obsidian, Phosphor, Edge Light, Floating Halo, Gemstone |
+| plate | a brass plate with a darker rim and dark engraved lettering | Walnut, Valve, Saddle, Valve Console, Brassworks |
+| frame | a hairline in the ink colour | Blueprint |
+
+Graphite has none, as rule 1 requires. Every Label still reads at 4.7:1 or better against what is
+behind it: the panel, or the brass plate at 6.7:1. The Settings editor's Control families gained
+Labels, so a personal set can take any template's label design the way it takes a knob's.
+
+Two things the designs found. A caption with a text shadow or glow is drawn as SVG. Folded scenery
+is baked in a detached element where nothing is measured, so its SVG copy was anchored on the line
+box's left edge with half its width cut off: "Cutoff" read "toff". That had been true of any
+folded label with a text effect. `svgTextBaseX` now takes the origin's width, which falls back to
+the layout's line box, as `textUnrotatedOrigin` already did after the same trap cut "CATEGORY" to
+"CATEG". `browser-checks/templateLabels.mjs` measures the SVG copy across the box as well as the
+DOM text, and on the old code reports 832 captions cut off. And a backlit glow wider than a
+caption's line is cut square at the label's box, so the glow is tight and bright: 3px at 70%.

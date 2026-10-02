@@ -27,6 +27,7 @@ import { PILOT_CONTROL_SETS } from './pilotControlSets.js';
 import { CATALOG_CONTROL_SETS, CATALOG_SET_EXTRAS } from './catalogControlSets.js';
 import { makeAdditionalControlSets } from './additionalControlSets.js';
 import { extendControlSet } from './controlSetCoverage.js';
+import { withLabelDesign } from './labelDesigns.js';
 import { deepClone } from '../utils/deepClone.js';
 
 const TOKEN_REFERENCE_PATTERN = /^\{([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)\}$/i;
@@ -311,7 +312,9 @@ const ORIGINAL_CONTROL_SETS = [
 ];
 export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditionalControlSets(ORIGINAL_CONTROL_SETS)]
   .map(extendControlSet)
-  .map((set) => withPanelSurface(set, { fallback: '{surface}' }));
+  .map((set) => withPanelSurface(set, { fallback: '{surface}' }))
+  // After panel.surface, which the label designs read to light their lettering.
+  .map(withLabelDesign);
 
 export const DEFAULT_CONTROL_SET_ID = 'graphite';
 

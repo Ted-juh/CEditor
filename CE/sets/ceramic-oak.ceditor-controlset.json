@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "1b0aad59",
+  "fingerprint": "d8e7c7b9",
   "set": {
     "id": "ceramic",
     "name": "Ceramic & Oak",
@@ -467,6 +467,12 @@
             "glow": false,
             "Background.Fill.colour": "FF2F6F9A"
           }
+        }
+      },
+      "Label": {
+        "component": {
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false
         }
       }
     },
