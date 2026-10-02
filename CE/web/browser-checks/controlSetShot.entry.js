@@ -2,7 +2,8 @@ import { mount, unmount } from 'svelte';
 import ControlSetShotHarness from './ControlSetShotHarness.svelte';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { createPanel } from '../src/CE_Application/stores/panelModel.js';
-import { normalizeControlSet } from '../src/CE_Application/models/controlSets.js';
+import { BUILT_IN_CONTROL_SETS, normalizeControlSet } from '../src/CE_Application/models/controlSets.js';
+import { PANEL_SIZE_PRESETS, PANEL_TEMPLATES, buildPanelFromTemplate } from '../src/CE_Application/models/panelTemplates.js';
 // The panel faces: a set's type block names them, and a picture in the fallback face proves nothing.
 import '../src/assets/fonts/panelFonts.css';
 import { createControlSetStarter } from '../src/CE_Application/models/controlSetStarter.js';
@@ -74,6 +75,23 @@ window.__controlSetShot = {
     panel.controlSets = [set];
     mounted = mount(ControlSetShotHarness, { target: document.getElementById('host'), props: { panel } });
     return { width: panel.width, height: panel.height, controls: panel.controls.length, set: panel.controlSet.id };
+  },
+  templateIds: PANEL_TEMPLATES.map((t) => t.id),
+  templateSizes: Object.fromEntries(PANEL_TEMPLATES.map((t) => [t.id, { width: t.width, height: t.height }])),
+  sizePresets: PANEL_SIZE_PRESETS.map(({ id, width, height }) => ({ id, width, height })),
+  builtInSetIds: BUILT_IN_CONTROL_SETS.map((s) => s.id),
+  /**
+   * A New Panel template, built the way the dialog builds it (so a smaller size scales it), under
+   * one set. `firstLabelText` replaces the first Label's text: the check's proof that it can see a
+   * caption that does not fit. Returns the Label ids, which is what the check measures.
+   */
+  showTemplate(templateId, setId, { width, height, firstLabelText = null } = {}) {
+    if (mounted) unmount(mounted);
+    const panel = { ...buildPanelFromTemplate({ templateId, width, height }), id: 1, controlSet: normalizeControlSet(setId) };
+    const labels = panel.controls.filter((c) => c._children.Core.controlType === 'Label');
+    if (firstLabelText != null && labels[0]) labels[0]._children.Text.content = firstLabelText;
+    mounted = mount(ControlSetShotHarness, { target: document.getElementById('host'), props: { panel } });
+    return { width: panel.width, height: panel.height, labels: labels.map((c) => ({ id: c._children.Core.id, text: c._children.Text.content })) };
   },
   /** Resolves once every face the page asked for has loaded (or failed), so a shot is in the real font. */
   fontsReady() {

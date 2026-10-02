@@ -589,3 +589,16 @@ Every built-in's Label now reads at 4.7:1 or better (`controlSets.test.js` holds
 and Knob, Slider and Button resolve exactly as before in every set. The Settings editor's
 "Panel surface" swatch, which had been editing `surface`, now edits this role and the panel colour
 behind it. `surface` keeps its own swatch as "Button surface".
+
+The templates' captions failed for the other half of the same reason: their boxes were sized for
+Graphite's 12px Arial, and a set's `type.label` is often bolder, wider or letter-spaced. Measured in
+the browser, 181 template labels were cut off at the templates' own sizes, across all 78 sets with
+Graphite among them, since a 40px box less 8px of padding a side left "VOL" 24px. Scaled down to
+the Control bar preset, where the padding does not scale, it was 928. The captions are now one line
+(`wrapMode: 'none'`) that shrinks to fit, the box is the line (no vertical padding, 2px a side), and
+they use the width their layout already had. That needed a fix in `buildBlockTextLayoutState`:
+the canvas lays captions in a line box forced to the full width, the layout reported that box as
+the text's width, and so Fit → Shrink compared the box with itself and never shrank anything for
+being too *wide*. It fits against `contentWidth` now. `browser-checks/templateLabels.mjs` renders
+every template under every set, at its own size and at the preset that shrinks it most, and holds
+every caption to one line inside its box: 2,028 of them, none needing to shrink at full size.
