@@ -30,6 +30,7 @@ import { extendControlSet } from './controlSetCoverage.js';
 import { withLabelDesign } from './labelDesigns.js';
 import { withSectionDesign, withSectionSurface } from './sectionDesigns.js';
 import { withInstrumentDesign, withInstrumentTokens } from './instrumentDesigns.js';
+import { withPersonalDesigns } from './personalSetDesigns.js';
 import { deepClone } from '../utils/deepClone.js';
 
 const TOKEN_REFERENCE_PATTERN = /^\{([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)\}$/i;
@@ -348,6 +349,15 @@ export const CONTROL_SET_LAMP_CONTEXT_KEY = 'ce.controlSetLamp';
 export const BASE_CONTROL_SET = BUILT_IN_CONTROL_SETS.find((set) => set.id === DEFAULT_CONTROL_SET_ID);
 
 const SETS_BY_ID = new Map(BUILT_IN_CONTROL_SETS.map((set) => [set.id, set]));
+// A built-in by its id, or by its name as duplication turns a name into an id ('Vintage Mono' is
+// brassworks; its copies are 'vintage-mono-copy').
+const slugOf = (text) => String(text ?? '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const BUILT_IN_BY_SLUG = new Map(BUILT_IN_CONTROL_SETS.map((set) => [slugOf(set.name), set.id]));
+export function builtInControlSetId(text) {
+  const key = String(text ?? '').trim();
+  if (SETS_BY_ID.has(key)) return key;
+  return BUILT_IN_BY_SLUG.get(slugOf(key)) ?? null;
+}
 
 /**
  * The set an id names. Three places can hold one, and the order is a rule, not an accident:
@@ -395,9 +405,20 @@ export function normalizeControlSetDefinition(value) {
   if (value.panel && typeof value.panel === 'object' && !Array.isArray(value.panel)) out.panel = value.panel;
   const type = normalizeControlSetType(value.type);
   if (type) out.type = type;
+  // A personal set's lineage and its author's choices (models/personalSetDesigns.js).
+  if (typeof value.basedOn === 'string' && value.basedOn.trim()) out.basedOn = value.basedOn.trim();
+  const plainStrings = (entry) => (entry && typeof entry === 'object' && !Array.isArray(entry)
+    ? Object.fromEntries(Object.entries(entry).filter(([, v]) => typeof v === 'string')) : null);
+  const chosen = plainStrings(value.chosenFamilies);
+  if (chosen && Object.keys(chosen).length) out.chosenFamilies = chosen;
+  if (value.designed && typeof value.designed === 'object' && !Array.isArray(value.designed)) {
+    const designed = Object.fromEntries(Object.entries(value.designed)
+      .filter(([, keys]) => Array.isArray(keys)).map(([family, keys]) => [family, keys.filter((key) => typeof key === 'string')]));
+    if (Object.keys(designed).length) out.designed = designed;
+  }
   // A set written before `panel.surface` existed still names its panel colour; that is the role.
-  // Its section surface follows from that panel, the same way the built-ins' does.
-  return withSectionSurface(withPanelSurface(out));
+  // Then its designs, derived again from its own colours, the same way the built-ins' are.
+  return withPersonalDesigns(withPanelSurface(out), { builtInId: builtInControlSetId, isBuiltIn: (key) => SETS_BY_ID.has(key) });
 }
 
 /**

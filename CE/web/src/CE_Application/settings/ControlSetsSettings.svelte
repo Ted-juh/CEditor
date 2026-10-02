@@ -10,7 +10,7 @@
   import ControlSetGallery from '../panels/ControlSetGallery.svelte';
   import { buildSolidStyle } from '../utils/backgroundCSS.js';
   import { createControlSetStarter } from '../models/controlSetStarter.js';
-  import { BUILT_IN_CONTROL_SETS, getControlSet, resolveToken } from '../models/controlSets.js';
+  import { BUILT_IN_CONTROL_SETS, getControlSet, normalizeControlSetDefinition, resolveToken } from '../models/controlSets.js';
   import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
   import { MATERIAL_KINDS } from '../utils/materialFilter.js';
   import { controlSetFileName } from '../models/controlSetPackage.js';
@@ -63,7 +63,7 @@
     if (!set || loadedId === id) return;
     draft = deepClone(set);
     delete draft.origin;
-    familySources = {};
+    familySources = { ...(draft.chosenFamilies ?? {}) };
     loadedId = id;
     status = '';
   });
@@ -72,7 +72,9 @@
     if (!draft) return null;
     const sourceId = BUILT_IN_CONTROL_SETS.some((set) => set.id === draft.id) ? draft.id : 'graphite';
     const sample = createControlSetStarter(sourceId);
-    return { ...sample, name: `${draft.name} preview`, controlSet: { id: draft.id }, controlSets: [draft] };
+    // Normalised, so what the set derives from its colours (its sections, its instruments' face and
+    // voices) follows the swatches while they are edited, not only after a save.
+    return { ...sample, name: `${draft.name} preview`, controlSet: { id: draft.id }, controlSets: [normalizeControlSetDefinition(draft) ?? draft] };
   });
 
   function choose(id) {
@@ -131,7 +133,15 @@
   function setFamilySource(family, sourceId) {
     const source = getControlSet(sourceId);
     if (!source?.families?.[family]) return;
-    draft = { ...draft, families: { ...(draft.families ?? {}), [family]: deepClone(source.families[family]) } };
+    // Recorded as the author's choice, so the set's own derived designs never overwrite it
+    // (models/personalSetDesigns.js), and the record of what they last wrote no longer applies.
+    const { [family]: _, ...designed } = draft.designed ?? {};
+    draft = {
+      ...draft,
+      families: { ...(draft.families ?? {}), [family]: deepClone(source.families[family]) },
+      chosenFamilies: { ...(draft.chosenFamilies ?? {}), [family]: sourceId },
+      designed,
+    };
     familySources = { ...familySources, [family]: sourceId };
   }
 

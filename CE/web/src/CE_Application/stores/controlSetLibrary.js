@@ -18,7 +18,7 @@
 import { derived, get } from 'svelte/store';
 import { activePanel, panels, updatePanel } from './panels.js';
 import { controlSetLibrary } from './controlSetLibraryStore.js';
-import { BUILT_IN_CONTROL_SETS, normalizeControlSetDefinition, normalizeControlSetList } from '../models/controlSets.js';
+import { BUILT_IN_CONTROL_SETS, builtInControlSetId, normalizeControlSetDefinition, normalizeControlSetList } from '../models/controlSets.js';
 import { createControlSetEnvelope, normalizeControlSetEnvelope } from '../models/controlSetPackage.js';
 import { deepClone } from '../utils/deepClone.js';
 
@@ -114,12 +114,17 @@ function customSetId(name, existing = get(controlSetLibrary)) {
   return id;
 }
 
-/** Make a protected built-in or an existing library set editable under a new, stable id. */
+/**
+ * Make a protected built-in or an existing library set editable under a new, stable id. The copy
+ * remembers the built-in it descends from, whose label, section and instrument treatments it keeps
+ * (models/personalSetDesigns.js); a copy of a copy has the same lineage as its source.
+ */
 export function duplicateControlSet(value, name = '') {
   const source = normalizeControlSetDefinition(value);
   if (!source) return null;
   const copyName = String(name || `${source.name} Copy`).trim();
-  return addControlSetToLibrary({ ...deepClone(source), id: customSetId(copyName), name: copyName });
+  const basedOn = builtInControlSetId(source.id) ?? source.basedOn;
+  return addControlSetToLibrary({ ...deepClone(source), id: customSetId(copyName), name: copyName, ...(basedOn ? { basedOn } : {}) });
 }
 
 /** Replace a personal set. Its id stays stable so panels that use it keep their reference. */

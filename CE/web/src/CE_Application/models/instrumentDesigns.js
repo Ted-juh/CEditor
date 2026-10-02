@@ -231,12 +231,15 @@ export function instrumentFamilies(set) {
 }
 
 /** The set with its instruments dressed. Merged under any family the set already gives them. */
-export function withInstrumentDesign(set) {
+export function withInstrumentDesign(set, { replace = false } = {}) {
   const designed = instrumentFamilies(set);
   if (!designed) return set;
   const families = { ...set.families };
   for (const [type, family] of Object.entries(designed)) {
-    families[type] = { ...family, ...families[type], component: { ...family.component, ...(families[type]?.component ?? {}) } };
+    // A built-in that names an instrument family of its own keeps it. A personal set's instrument
+    // families are only ever an earlier read of this design, so `replace` lets the design win.
+    const own = families[type]?.component ?? {};
+    families[type] = { ...family, ...families[type], component: replace ? { ...own, ...family.component } : { ...family.component, ...own } };
   }
   return { ...set, families };
 }

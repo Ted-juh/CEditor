@@ -731,3 +731,39 @@ there, two things are re-inked, and only those: the scale printed around the kno
 section offers Follow set, The set's knob, and Macro's own, and an author's choice wins either way.
 `macroKnob.test.js` checks the model, and `browser-checks/macroSetKnob.mjs` checks the drawn knob
 across eight forms: the form a Knob on the same panel has, at the Macro's value, with no control id.
+
+## Personal sets get the designs too
+
+The label, section and instrument designs above are made once, when the program builds its
+built-ins. A personal set is a copy of one, and a copy kept the designs as they stood the day it was
+made:
+
+- one saved before they existed had none, so its Groups were still the pale button copy and its
+  instruments Graphite's;
+- one saved after kept the original's display face and voices as fixed colours, so recolouring it
+  left its instruments in the original's colours;
+- "New Control Set" is a copy of Graphite, which has no designs, so a set made that way never got any.
+
+`models/personalSetDesigns.js` derives them again on every read, from the set's own colours and its
+lineage, in `normalizeControlSetDefinition`, so a set read from the library, from a document or from
+a file all get it. What the author chose is kept:
+
+- `basedOn` is the built-in a set was duplicated from. Its treatments are that built-in's: Tolex's
+  piping, Walnut's plates, Neon's glow. Duplicate writes it, and a copy of a copy inherits it. A set
+  saved before it existed is matched by its id, which duplication made from the original's name
+  (`tolex-copy`, `vintage-mono-copy-2`; fourteen built-ins have a name that is not their id), or by
+  `new-control-set`, Settings' name for a copy of Graphite.
+- A set descended from Graphite takes the general treatments (Graphite has none only so that existing
+  documents keep their look), and its Macro keeps the Macro's own knob, as Graphite's does: Graphite's
+  knob, at that size, is a dot.
+- `chosenFamilies` records the families picked in Settings' Control families. A chosen Labels design
+  is not redesigned, and a chosen Knobs design gives a Graphite descendant's Macro the set's knob.
+- `designed` records what the label design wrote, so the next read takes it out first: turning a
+  set's metal finish off then leaves no engraved lip under the new silkscreen.
+
+The derived roles (`section.surface`, the instrument face and inks, the series) are never kept from
+a previous read; they follow the set's colours, and Settings' preview reads the draft the same way,
+so they follow the swatches while they are edited. A set with a built-in's id is left exactly as it
+is, so the shipped set files do not move. `personalSetDesigns.test.js` reads the Tolex file as it
+shipped before any of these designs, which is what a copy saved then holds; on the previous code its
+light lettering reads at 1.07:1 on its cream Groups and its voices are Graphite's green.

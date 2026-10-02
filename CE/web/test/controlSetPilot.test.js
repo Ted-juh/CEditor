@@ -44,6 +44,7 @@ import {
 import { DEFAULT_LAMP, MATERIAL_KINDS, materialActive, materialPrimitives, resolveMaterialLamp } from '../src/CE_Application/utils/materialFilter.js';
 import { buttonFamily, knobFamily, lampFamily, mergeFamilies, sliderFamily, typeFamilies } from '../src/CE_Application/models/controlSetRecipes.js';
 import { hasSurfaceEffects } from '../src/CE_Application/utils/surfaceEffects.js';
+import { DERIVED_ROLES } from '../src/CE_Application/models/personalSetDesigns.js';
 import { COMPONENT_GROUPS } from '../src/CE_Application/utils/effectStack.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
@@ -141,10 +142,16 @@ test('normalizeControlSetDefinition keeps a set, drops what is not one, and norm
   assert.equal(normalizeControlSetDefinition({ name: 'no id', tokens: {} }), null);
   assert.equal(normalizeControlSetDefinition({ id: 'x' }), null, 'no tokens is not a set');
   const set = normalizeControlSetDefinition({ id: ' x ', tokens: { accent: ' ff112233 ' }, lamp: { azimuth: '10', elevation: 'nope' }, families: 'bad' });
-  assert.deepEqual(set, { id: 'x', name: 'x', description: '', tokens: { accent: 'ff112233' } });
+  // What it adds beyond what it was given is only what a set derives from its own colours
+  // (models/personalSetDesigns.js): the derived roles and the families its designs write.
+  const { tokens, families, designed, ...rest } = set;
+  assert.deepEqual(rest, { id: 'x', name: 'x', description: '' }, 'no lamp from a half-valid one');
+  assert.equal(tokens.accent, 'ff112233');
+  assert.deepEqual(Object.keys(tokens).filter((name) => name !== 'accent' && !DERIVED_ROLES.includes(name)), []);
+  assert.equal(families.Knob, undefined, 'the malformed families are not kept');
   const withLamp = normalizeControlSetDefinition({ id: 'y', name: 'Y', tokens: {}, lamp: { azimuth: 10, elevation: 20 }, families: { Knob: {} }, panel: { colour: 'FF000000' } });
   assert.deepEqual(withLamp.lamp, { azimuth: 10, elevation: 20 });
-  assert.deepEqual(withLamp.families, { Knob: {} });
+  assert.deepEqual(withLamp.families.Knob, {}, 'a family it was given is kept as given');
   assert.deepEqual(withLamp.panel, { colour: 'FF000000' });
   assert.deepEqual(normalizeControlSetList([withLamp, withLamp, null, { id: 'z', tokens: {} }]).map((s) => s.id), ['y', 'z']);
 });
@@ -246,6 +253,9 @@ test('Settings can import without mutating a document and can edit only a person
 
   const copy = duplicateControlSet(ivory, 'Ivory Workshop');
   assert.ok(copy.id.startsWith('ivory-workshop'));
+  // A copy remembers where it came from, and so does a copy of the copy: its designs are Ivory's.
+  assert.equal(copy.basedOn, 'ivory');
+  assert.equal(duplicateControlSet(copy).basedOn, 'ivory');
   assert.equal(updateControlSetInLibrary(copy.id, { ...copy, name: 'Ivory Workshop II' }).name, 'Ivory Workshop II');
   assert.equal(updateControlSetInLibrary('ivory', { ...ivory, name: 'Changed built-in' }), null,
     'built-in ids stay protected');
