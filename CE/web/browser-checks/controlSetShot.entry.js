@@ -16,6 +16,8 @@ window.__JUCE__ = undefined;
 
 // The specimen every mockup board carried: knobs, a slider, buttons, a toggle, a combobox, a
 // number, an LCD — enough that a set's family patch and material have something of every kind to land on.
+// And a second row for what the sets reach since: a section with labels in it, a Macro (an
+// instrument, hosting the set's knob), a Shape and a Pixel Display.
 function specimenPanel(setId) {
   const place = (type, x, y, w, h, extra = {}) => createControl(type, { Transform: { x, y, width: w, height: h }, ...extra });
   // A slider's title is its labelTitle part's text, not a Text section.
@@ -23,6 +25,12 @@ function specimenPanel(setId) {
     control._children.Parts._children.labelTitle._children.Text.content = title;
     return control;
   };
+  // A caption as the New Panel templates set one (models/panelTemplates.js): one line, shrunk
+  // rather than wrapped when a set's lettering is wider than the box.
+  const caption = (content, x, y, w) => place('Label', x, y, w, 22, {
+    Text: { content, _children: { Multiline: { wrapMode: 'none', fitMode: 'shrink' } } },
+    ContentLayout: { paddingLeft: 2, paddingRight: 2, paddingTop: 0, paddingBottom: 0 },
+  });
   const controls = [
     place('Knob', 30, 30, 120, 120, { Behavior: { defaultCurrentValue: 0.62 } }),
     place('Knob', 170, 30, 120, 120, { Behavior: { defaultCurrentValue: 0.35 } }),
@@ -37,8 +45,20 @@ function specimenPanel(setId) {
     place('Number', 420, 160, 160, 36),
     // The glass follows the set (display.* tokens): a two-line LCD under the knobs.
     place('LcdDisplay', 30, 164, 360, 44),
+    // A section in the set's frame, with its title and captions on its face rather than on the
+    // panel: where a label has to read on the section surface. (A Group's own title is centred,
+    // so the title is a Label too.)
+    place('Group', 30, 226, 360, 186, { Text: { content: '' } }),
+    caption('FILTER', 46, 236, 120),
+    place('Knob', 60, 262, 100, 100, { Behavior: { defaultCurrentValue: 0.45 } }),
+    place('Knob', 200, 262, 100, 100, { Behavior: { defaultCurrentValue: 0.2 } }),
+    caption('CUTOFF', 50, 372, 120),
+    caption('RESONANCE', 190, 372, 120),
+    place('Macro', 420, 226, 276, 124),
+    place('Shape', 420, 362, 276, 50),
+    place('PixelDisplay', 716, 226, 174, 186),
   ];
-  const panel = { ...createPanel(), id: 1, width: 920, height: 220, controls, controlSet: normalizeControlSet(setId) };
+  const panel = { ...createPanel(), id: 1, width: 920, height: 430, controls, controlSet: normalizeControlSet(setId) };
   return panel;
 }
 
