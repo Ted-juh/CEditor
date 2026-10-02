@@ -1,6 +1,9 @@
 <script>
   import { colorTarget, activateInspectorColorTarget } from '../stores/colorTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
+  import { selectedControls } from '../stores/controls.js';
+  import { activeControlSet } from '../stores/controlSets.js';
+  import { effectiveSwatchColour } from '../utils/setSwatchValue.js';
 
   // A control's colours as one row of captioned mini-swatches — the panel's
   // W5 widget. Clicking a swatch makes it the live target of the display
@@ -14,9 +17,19 @@
   //             or { type: 'panel', prop }
   let { swatches = [] } = $props();
 
+  // A control's swatch shows the colour the canvas draws, which is the control set's wherever the
+  // control still holds its factory value (utils/setSwatchValue.js), and says so.
+  let shown = $derived(swatches.map((s) => {
+    if (s.target?.type !== 'control') return { ...s, fromSet: false };
+    const control = $selectedControls.find((c) => c?._children?.Core?.id === s.target.controlId);
+    const effective = effectiveSwatchColour(control, $activeControlSet, s.target.path, s.value);
+    return effective ? { ...s, value: effective.value, fromSet: effective.fromSet } : { ...s, fromSet: false };
+  }));
+
   function pick(s) {
     // The swatch key rides along so callback targets (dynamic collections
-    // with no stable path) can still be matched for the live ring.
+    // with no stable path) can still be matched for the live ring. The dock
+    // starts from the colour shown, so a set's colour can be nudged from.
     activateInspectorColorTarget({ ...s.target, _swatchKey: s.key }, s.value);
     displayTabRequest.set({ tab: 'colors' });
   }
@@ -42,13 +55,16 @@
 </script>
 
 <div class="swatchcluster" role="group">
-  {#each swatches as s (s.key)}
+  {#each shown as s (s.key)}
     <span class="swx">
       <button type="button"
               class:live={isLive(s, $colorTarget)}
+              class:from-set={s.fromSet}
               style="background:#{rgb(s.value)}"
-              title="{s.label} — click to edit in the Colors tab"
-              aria-label="{s.label} colour"
+              title={s.fromSet
+                ? `${s.label} — from the control set. Click to edit in the Colors tab; a colour you pick is this control's own.`
+                : `${s.label} — click to edit in the Colors tab`}
+              aria-label={s.fromSet ? `${s.label} colour, from the control set` : `${s.label} colour`}
               onclick={() => pick(s)}></button>
       <i>{s.label}</i>
     </span>
@@ -83,6 +99,24 @@
 
   .swx button:hover {
     border-color: #5B9BD5;
+  }
+
+  /* From the set: a small corner notch, so a set's colour reads as the set's, not the author's. */
+  .swx button.from-set {
+    position: relative;
+  }
+  .swx button.from-set::after {
+    content: '';
+    position: absolute;
+    right: 1px;
+    bottom: 1px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 0 6px 6px;
+    border-color: transparent transparent #E8E8EE transparent;
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.8));
+    pointer-events: none;
   }
 
   .swx button.live {

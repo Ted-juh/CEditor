@@ -6,7 +6,8 @@
   import Layers from 'lucide-svelte/icons/layers';
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
-  import { getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
+  import { getSection, selectedControls, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
+  import { effectiveSwatchColour } from '../utils/setSwatchValue.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { activateInspectorColorTarget } from '../stores/colorTarget.js';
   import { activeControlSet } from '../stores/controlSets.js';
@@ -365,7 +366,11 @@
   // with the token named under the field. Typing a colour writes a literal — the link breaks for
   // this property and nothing else (docs/design/control-sets.md, "override").
   let fillToken = $derived(tokenNameOf(fill?.colour));
-  let displayColour = $derived(resolveColourLiteral(fill?.colour, $activeControlSet, 'FF3A3A3A').slice(-6));
+  // And where the set's family patch draws this fill instead (a section's surface, a display's
+  // bezel), show that, as the canvas does: utils/setSwatchValue.js.
+  let documentControl = $derived($selectedControls.find((c) => c?._children?.Core?.id === core?.id) ?? null);
+  let setFill = $derived(effectiveSwatchColour(documentControl, $activeControlSet, `${pathPrefix}.Fill.colour`, fill?.colour));
+  let displayColour = $derived(setFill?.fromSet ? setFill.value.slice(-6) : resolveColourLiteral(fill?.colour, $activeControlSet, 'FF3A3A3A').slice(-6));
   let gradientPreview = $derived(gradientToCSS(fill?.gradient ?? DEFAULT_FILL_GRADIENT));
 </script>
 
@@ -438,7 +443,7 @@
           {#snippet tools()}{@render layerTools('solid')}{/snippet}
           <PropertyCell label="Colour" span={2} hint="The layer colour. The swatch opens it in the display panel; the field takes AARRGGBB or RRGGBB.">
             <div class="color-input">
-              <button class="mini-swatch" title="Pick colour" style="background:#{displayColour}" onclick={handleSwatchClick}></button>
+              <button class="mini-swatch" title={setFill?.fromSet ? 'From the control set. Pick a colour to make it this control\'s own' : 'Pick colour'} style="background:#{displayColour}" onclick={handleSwatchClick}></button>
               <input class="val" type="text" value={displayColour} onfocus={selectAll} onchange={setColour} />
             </div>
             {#if fillToken}
