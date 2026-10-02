@@ -767,3 +767,34 @@ so they follow the swatches while they are edited. A set with a built-in's id is
 is, so the shipped set files do not move. `personalSetDesigns.test.js` reads the Tolex file as it
 shipped before any of these designs, which is what a copy saved then holds; on the previous code its
 light lettering reads at 1.07:1 on its cream Groups and its voices are Graphite's green.
+
+## Measuring the reach
+
+The instruments were invisible to the sets for a long time because a control a set does not touch has
+no symptom: every test passes and the set just looks generic. `scripts/control-set-reach.mjs`
+measures it for every control on the Insert menu and every set but Graphite: what the set changes,
+whether any of it is form or only colour (every value that differs is a colour, a colour token, or
+sits under a colour-named property), and how many different forms the sets give the control.
+
+```bash
+node scripts/control-set-reach.mjs   # from CE/web
+```
+
+`test/controlSetReach.test.js` holds the table to three rules, each with a list that is asserted
+exactly, so a gap that is fixed has to be crossed off and a new one has to be named:
+
+- **Reach.** Every set changes every control, or the control is named with a reason. Image and
+  Custom Component are the author's own; Pixel Display is a gap (its screen colours are its own
+  properties and no set writes them).
+- **Form.** Every control takes at least three forms across the sets, or is named. Background is
+  frameless everywhere by design; LCD, Shape and Range are gaps: every set draws them the same, in
+  its own paint.
+- **Debt.** The sets that only recolour a control are counted per control. A new recolour fails, and
+  a paid one fails until its count is lowered, so the table only goes down. Today: Ceramic and Saddle
+  recolour twenty-odd controls each, Walnut, Valve, Ladder and Field ten, the step sequencer keeps its
+  cells in 29 sets and the keyboard its case in 37.
+
+Reach is the weakest of the three, and the history says so: before the instrument designs every set
+did change the twenty instruments, but only their text colour, so they passed reach and fail form
+(one form each) and debt (77 sets recolouring each). Form is generous too: the instruments pass it on
+their corner radius alone, which is a thinner kind of form than a knob's cap or a fader's handle.
