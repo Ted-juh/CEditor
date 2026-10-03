@@ -538,3 +538,11 @@ test('every shipped control and starter names only states it has, and has no cla
     assert.deepEqual(findClashes(rows, parts), [], label);
   }
 });
+
+test('a working colour target says that only a solid colour fades', () => {
+  // Phase 2 of the overhaul: colour animates, and the one thing it cannot do is said on the row.
+  const colour = targetStatus({ path: 'Parts.label.Background.Fill.colour' }, ['label']);
+  assert.equal(colour.works, true);
+  assert.match(colour.note, /gradient, an image or a material switches/);
+  assert.equal(targetStatus({ path: 'Transform.scale' }, []).note, undefined, 'scale has nothing to warn about');
+});

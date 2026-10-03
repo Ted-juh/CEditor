@@ -88,6 +88,20 @@ export const OFFERED_ROOT_PROPERTIES = [
 ];
 
 /**
+ * What a working colour target cannot do. CSS fades one solid colour into another and nothing
+ * else: a gradient, an image or a material swaps at the end of the duration instead. True of every
+ * browser, so it is said on the row rather than discovered.
+ */
+export const COLOUR_NOTE = 'A solid colour fades. A gradient, an image or a material switches at the end instead — CSS cannot blend between them.';
+
+/** The status of a target that works, with what it should know about the bucket it fills. */
+function working(buckets, part) {
+  const status = { works: true, animates: buckets[0], buckets, part };
+  if (buckets.includes('colour')) status.note = COLOUR_NOTE;
+  return status;
+}
+
+/**
  * Does this target animate anything, and if not, why not?
  *
  * `partNames` is the list of parts the control has. A target on a part that does not exist is not
@@ -122,7 +136,7 @@ export function targetStatus(target, partNames = []) {
         detail: `This control has no part called "${partName}", so the animation is built for something that is not there.`,
       };
     }
-    return { works: true, animates: landing.buckets[0], buckets: landing.buckets, part: partName };
+    return working(landing.buckets, partName);
   }
 
   if (!landing?.buckets.length) {
@@ -135,7 +149,7 @@ export function targetStatus(target, partNames = []) {
         : `The runtime does not animate "${path}" on the control itself. It only animates ${Object.keys(ROOT_PATHS).join(', ')}.`,
     };
   }
-  return { works: true, animates: landing.buckets[0], buckets: landing.buckets, part: '' };
+  return working(landing.buckets, '');
 }
 
 /**

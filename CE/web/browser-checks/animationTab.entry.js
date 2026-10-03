@@ -117,7 +117,9 @@ window.__anim = {
   storedEnabled: (name) => animation(name).enabled,
 
   targetPaths: () => [...document.querySelectorAll('.trow .what')].map(textOf),
-  targetVerdicts: () => [...document.querySelectorAll('.trow .does')].map(textOf),
+  // The verdict without the "solid only" note a colour target carries beside it.
+  targetVerdicts: () => [...document.querySelectorAll('.trow .does')].map((d) => textOf(d).replace(/\s*solid only$/, '')),
+  targetNotes: () => [...document.querySelectorAll('.trow .does .note')].map((n) => n.getAttribute('title')),
   deadRows: () => [...document.querySelectorAll('.trow.bad .what')].map(textOf),
   targetCount: () => document.querySelectorAll('.trow').length,
   removeTarget: (index) => { document.querySelectorAll('.trow')[index]?.querySelector('.drop')?.click(); },
@@ -215,6 +217,22 @@ window.__anim = {
     return !!button;
   },
   undo: () => undo(),
+
+  // --- the stage ----------------------------------------------------------------------
+  stageControls: () => document.querySelectorAll('.stage-box .canvas-control').length,
+  playTitle: () => document.querySelector('.stage-box .play')?.getAttribute('title') ?? '',
+  playDisabled: () => document.querySelector('.stage-box .play')?.disabled === true,
+  clickPlay: () => { document.querySelector('.stage-box .play')?.click(); },
+  toggleSlow: () => { document.querySelector('.stage-box .slow')?.click(); },
+  stepLabel: () => textOf(document.querySelector('.stage-box .steplabel')),
+  stageWhy: () => textOf(document.querySelector('.stage-box .why')),
+  stageTransition: () => {
+    const el = document.querySelector('.stage-box .canvas-control');
+    if (!el) return null;
+    const style = getComputedStyle(el);
+    return { property: style.transitionProperty, duration: style.transitionDuration };
+  },
+  lamps: () => [...document.querySelectorAll('.arow')].filter((r) => r.querySelector('.lamp')).map((r) => textOf(r.querySelector('.nm'))),
 
   sliderCount: () => document.querySelectorAll('input[type=range], .slider, [role=slider]').length,
   jsonBoxes: () => document.querySelectorAll('textarea').length,

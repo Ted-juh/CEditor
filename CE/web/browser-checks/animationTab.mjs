@@ -71,6 +71,12 @@ check('and a target that works names what it animates — colour among them now'
   assert.deepEqual(working.sort(), ['colour', 'opacity', 'transform']);
 });
 
+const notes = await ev(() => window.__anim.targetNotes());
+check('and a colour target says what a fade cannot do', () => {
+  assert.equal(notes.length, 1, notes.join(' | '));
+  assert.match(notes[0], /gradient, an image or a material switches/);
+});
+
 const alarm = await ev(() => window.__anim.alarm());
 check('the header counts the dead targets across every animation', () => {
   assert.match(alarm, /2 targets do nothing/);
@@ -197,6 +203,42 @@ check('selecting the other animation shows its own targets', () => {
   assert.deepEqual(rootTargets, ['opacity'], `rows: ${rootTargets.join(' | ')}`);
 });
 
+// --- The stage: the control, live, with Play ----------------------------------------------------
+
+check('the stage draws the armed control with the real renderer', async () => {});
+assert.equal(await ev(() => window.__anim.stageControls()), 1);
+check('and Play says what it will do', async () => {});
+assert.match(await ev(() => window.__anim.playTitle()), /Play hoverGlow: default → hover → default again/);
+
+await ev(() => window.__anim.clickPlay());
+await page.waitForTimeout(450);
+const playingLabel = await ev(() => window.__anim.stepLabel());
+const playingTransition = await ev(() => window.__anim.stageTransition());
+check('Play performs the trigger: the stage hovers, and hoverGlow\'s 140ms is on the control', () => {
+  assert.equal(playingLabel, 'hover');
+  assert.match(playingTransition.property, /opacity/);
+  assert.ok(playingTransition.duration.split(', ').every((d) => d === '0.14s'), playingTransition.duration);
+});
+const lit = await ev(() => window.__anim.lamps());
+check('and the lamp beside it lights as it fires', () => {
+  assert.deepEqual(lit, ['hoverGlow']);
+});
+await page.waitForTimeout(1300);
+check('and when it is done the stage is back where it started', async () => {});
+assert.equal(await ev(() => window.__anim.stepLabel()), '');
+
+await ev(() => window.__anim.toggleSlow());
+await settle();
+await ev(() => window.__anim.clickPlay());
+await page.waitForTimeout(450);
+const slowTransition = await ev(() => window.__anim.stageTransition());
+check('Slow plays it at a quarter speed on the stage', () => {
+  assert.ok(slowTransition.duration.split(', ').every((d) => d === '0.56s'), slowTransition.duration);
+});
+await ev(() => window.__anim.clickPlay());
+await ev(() => window.__anim.toggleSlow());
+await settle();
+
 await ev(() => window.__anim.selectAnimation('pressEcho'));
 await settle();
 const echoTo = await ev(() => window.__anim.chips('To'));
@@ -239,6 +281,9 @@ await settle();
 check('a value trigger offers Origin, and Outside writes external', async () => {});
 assert.equal((await ev(() => window.__anim.storedTrigger('pressEcho'))).type, 'valueChange');
 assert.equal((await ev(() => window.__anim.storedTrigger('pressEcho'))).origin, 'external');
+check('and Play says plainly when it cannot sweep a value', async () => {});
+assert.equal(await ev(() => window.__anim.playDisabled()), true);
+assert.match(await ev(() => window.__anim.stageWhy()), /cannot set this control's value/);
 
 // --- Making and unmaking an animation ----------------------------------------------------------
 

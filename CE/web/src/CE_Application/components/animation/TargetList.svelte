@@ -84,7 +84,7 @@
       aria-selected={row.index === selectedIndex}
       bind:this={rowEls[row.index]}
       title={row.status.works
-        ? `Animates ${row.status.animates}`
+        ? `Animates ${row.status.animates}${row.status.note ? `. ${row.status.note}` : ''}`
         : row.status.detail}
       onclick={() => onselect(row.index)}
       onkeydown={(event) => {
@@ -109,6 +109,7 @@
       <span class="does">
         {#if row.status.works}
           {row.status.animates}
+          {#if row.status.note}<i class="note" title={row.status.note}>solid only</i>{/if}
         {:else}
           <TriangleAlert size={10} aria-hidden="true" /> does nothing
         {/if}
@@ -183,6 +184,7 @@
     white-space: nowrap;
   }
   .trow.bad .does { color: #E5A029; }
+  .does .note { font-style: normal; color: #4B545C; border: 1px solid #2A3038; border-radius: 2px; padding: 1px 3px; }
 
   .drop {
     width: 18px;

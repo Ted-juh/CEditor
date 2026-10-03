@@ -165,14 +165,24 @@ never plays on them (and never visibly did). Either drop the animation or give t
 both change a shipped starter's package fingerprint and regenerate QA-07/QA-09, so it was left.
 `animationModel.test.js` lists them as known exceptions so the list cannot grow.
 
-### Phase 2
+### Phase 2 — done
 
-- B is mostly done (runtime + renderers). Remaining: tab copy that no longer calls colour "dead";
-  note in `targetStatus` that gradients/images do not interpolate.
-- D: in the tab, a **Play** button that drives the selected control's preview session
-  (`stores/interactionPreview.js`) through the trigger's from → to (and back if reverse),
-  a **0.25×** toggle that sets `previewSession.animationTimeScale` (already honoured by the
-  catalog), and lights from `stores/animationActivity.js` beside animations as they fire.
+- **B, colour:** the runtime and renderers already animated it after phase 1. A working colour
+  target now carries `note` (`COLOUR_NOTE` in `animationModel.js`): only a solid colour fades; a
+  gradient, image or material switches at the end. TargetList shows it as "solid only".
+- **D, live preview:** a **stage** in the tab (`components/animation/AnimationStage.svelte`) draws the
+  armed control with the real renderers (`InteractiveTestSurface`, compact) on a preview session of
+  its own — you can hover, press and drag it in place, and nothing reaches the panel's sessions.
+  **Play** runs `utils/animationPlayback.js`'s plan: the state the trigger starts from (a press
+  starts from hover, as a real one does, so a hover animation beside it does not tie), the change,
+  and the way back when `reverse` is on; a value trigger sweeps the value low → high → low with the
+  pointer on or off the control by Origin. What Play cannot do it says (no such state, a channel
+  source, a control without a settable value). **0.25×** sets `animationTimeScale: 4` on the stage
+  session only. **Lamps** on the list rows light from `stores/animationActivity.js` as animations
+  fire, on the stage or in Preview.
+- Tests: `test/animationPlayback.test.js` (plans, then run through the real runtime + tracker to
+  check the right animation fires); `animationTab.mjs` plays hoverGlow on the stage and checks the
+  stage control's computed transition (0.14s, then 0.56s slowed) and the lamp.
 
 ### Phase 3
 

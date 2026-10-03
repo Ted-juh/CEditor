@@ -7,6 +7,10 @@
    * opening it: targets that do nothing, a trigger naming a state the control does not have, and a
    * clash it loses — another animation later in the list that answers the same change on the same
    * property, so this one never plays there.
+   *
+   * And which animation just fired: a lamp beside the name lights each time one catches a change,
+   * on the stage or in Preview (stores/animationActivity.js), so hovering and pressing the control
+   * shows which trigger caught what — the question nothing could answer while triggers were ignored.
    */
   import TriangleAlert from 'lucide-svelte/icons/triangle-alert';
   import Swords from 'lucide-svelte/icons/swords';
@@ -20,6 +24,7 @@
     partNames = [],
     stateNames = [],
     clashes = [],
+    fired = null,
     selectedName = '',
     onselect = () => {},
     ontoggle = () => {},
@@ -55,7 +60,12 @@
         onclick={(event) => { event.stopPropagation(); ontoggle(row); }}
       ></button>
 
-      <span class="nm">{row.name}</span>
+      <span class="nm">
+        {#if fired?.names?.includes(row.name)}
+          {#key fired.seq}<i class="lamp" title="Just fired" aria-hidden="true"></i>{/key}
+        {/if}
+        {row.name}
+      </span>
 
       <span class="meta">
         {row.duration}ms
@@ -140,6 +150,22 @@
     text-overflow: ellipsis;
   }
   .arow.sel .nm { color: #EAF5FF; }
+  .lamp {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 4px;
+    border-radius: 50%;
+    vertical-align: 1px;
+    background: #F5C451;
+    box-shadow: 0 0 6px #F5C451;
+    animation: lamp-fade 1.2s ease-out forwards;
+  }
+  @keyframes lamp-fade {
+    0% { opacity: 1; }
+    60% { opacity: 0.8; }
+    100% { opacity: 0.15; box-shadow: none; }
+  }
 
   .meta {
     display: flex;

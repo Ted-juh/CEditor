@@ -28,6 +28,8 @@
   import TargetList from './animation/TargetList.svelte';
   import EasingCurve from './animation/EasingCurve.svelte';
   import StateChips from './animation/StateChips.svelte';
+  import AnimationStage from './animation/AnimationStage.svelte';
+  import { animationActivity } from '../stores/animationActivity.js';
   import NumberCell from '../properties/NumberCell.svelte';
   import Segmented from '../properties/Segmented.svelte';
   import PropertySelect from '../properties/PropertySelect.svelte';
@@ -289,6 +291,7 @@ onMount(() => {
           {partNames}
           {stateNames}
           {clashes}
+          fired={$animationActivity[controlId] ?? null}
           {selectedName}
           onselect={(name) => { wantedName = name; rawTargetIndex = -1; }}
           onrename={beginRename}
@@ -395,6 +398,9 @@ onMount(() => {
         </div>
 
         <div class="targetcol">
+          <div class="colh">Stage <s>hover, press, drag — or Play</s></div>
+          <AnimationStage {control} row={selected} />
+
           <div class="colh">
             Changes
             <s>{targets.length} {targets.length === 1 ? 'target' : 'targets'}</s>
