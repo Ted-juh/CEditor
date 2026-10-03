@@ -25,6 +25,16 @@ function rid() {
   return `${os}-${process.arch === 'arm64' ? 'arm64' : 'x64'}`;
 }
 function ext() { return process.platform === 'win32' ? '.dll' : process.platform === 'darwin' ? '.dylib' : '.so'; }
+// The generator's default (net10.0) when that SDK is here, otherwise the newest SDK that is, so the
+// check runs on the machine in front of it rather than skipping for want of one particular version.
+function targetFramework() {
+  try {
+    const majors = execSync('dotnet --list-sdks', { encoding: 'utf8' }).split('\n')
+      .map((l) => parseInt(l, 10)).filter((n) => Number.isFinite(n));
+    if (!majors.length || majors.includes(10)) return 'net10.0';
+    return `net${Math.max(...majors)}.0`;
+  } catch { return 'net10.0'; }
+}
 
 const work = path.join(tmpdir(), `ce-nh-cs-${process.pid}`);
 rmSync(work, { recursive: true, force: true });
@@ -37,9 +47,12 @@ try {
   if (which('dotnet') && cc) {
     // Exercise sendCC (numeric overload) + setValue + log — the same API surface the selftest panel
     // uses — so an API/signature mismatch fails the build here, not on the user's machine.
+    // knob2: the calls whose value goes through the slots appended after ABI 1, in C#'s own spelling
+    // and with a PascalCase handler, so the shim and the generator's binding are both exercised.
     const gen = generateCsharpModule({ scripts: [
       { id: 'knob1', name: 'Cutoff', event: 'onValueChanged', source: 'void onValueChanged(CeContext ctx, CeEvent e){ ctx.sendCC(1, 25, 127); ctx.setValue("out", e.value*2+1); ctx.log("ran"); }' },
-    ], outDir: work, abiInfo: { dir: ABI_DIR } });
+      { id: 'knob2', name: 'Values', event: 'onValueChanged', source: 'void OnValueChanged(CeContext ctx, CeEvent e){ ctx.Log("v", 1.5); ctx.SendSysex(new[] { 0xF0, 0x7F, 0xF7 }); ctx.SendSysex("F0 7E F7"); ctx.SendNRPN(1, 2, 3, 400); }' },
+    ], outDir: work, abiInfo: { dir: ABI_DIR, targetFramework: targetFramework() } });
 
     // 1) Roslyn → self-contained CoreCLR + ce_managed.dll
     execSync(gen.publishCommand(rid()), { cwd: work, stdio: 'inherit', env: { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_NOLOGO: '1' } });

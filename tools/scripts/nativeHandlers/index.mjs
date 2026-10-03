@@ -73,7 +73,10 @@ async function buildLanguage(lang, scripts, { workRoot, binDir }) {
       const tc = cppCompiler();
       if (!tc) return { ok: false, lang, error: 'no C++ compiler — run: node tools/toolchains/provision.mjs llvm-mingw' };
       const out = path.join(outDir, `${moduleName}${ext}`);
-      execSync(`"${tc.cxx}" -std=c++20 -shared -static -O2 -fvisibility=hidden -I "${ABI_DIR}" -I "${path.join(HERE, 'cpp')}" "${path.join(outDir, 'glue.cpp')}" -o "${out}"`, { stdio: 'inherit' });
+      // -ffp-contract=off: ce_runtime.h's helpers match the preview to the bit, and a fused
+      // multiply-add (lerp's a + (b - a) * t) rounds once where JS rounds twice. Clang contracts
+      // within an expression by default and does so wherever the target has FMA (every ARM64).
+      execSync(`"${tc.cxx}" -std=c++20 -shared -static -O2 -ffp-contract=off -fvisibility=hidden -I "${ABI_DIR}" -I "${path.join(HERE, 'cpp')}" "${path.join(outDir, 'glue.cpp')}" -o "${out}"`, { stdio: 'inherit' });
       if (!existsSync(out)) return { ok: false, lang, error: 'C++ module build produced no output' };
       cpSync(out, dest);
     } else if (lang === 'csharp') {

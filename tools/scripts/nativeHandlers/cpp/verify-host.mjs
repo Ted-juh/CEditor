@@ -16,6 +16,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../../..');
 const ABI_DIR = path.join(REPO, 'CE/src/Scripting');
 const SRC = path.join(REPO, 'CE/src/Scripting/NativeHandlerEngine.cpp');
+// The engine runs every dispatch through this guard (a C file: MSVC's __try lives there), so it has
+// to be linked in. This check predates it, and failed to link until it was.
+const GUARD = path.join(REPO, 'CE/src/Scripting/NativeHandlerCrashGuard.c');
 
 function which(c) { try { execSync(`command -v ${c}`, { stdio: 'ignore' }); return true; } catch { return false; } }
 const cxx = ['clang++', 'g++', 'c++'].find(which);
@@ -52,7 +55,10 @@ try {
   // 2) generate + compile a C++ handler module into the work dir (where the e2e binary will live).
   generateCppModule({
     scripts: [{ id: 'knob1', name: 'Cutoff', event: 'onValueChanged',
-      source: 'void onValueChanged(CeContext& ctx, const CeEvent& event){ ctx.setValue("out", event.value*2+1); ctx.log("ran"); }' }],
+      source: 'void onValueChanged(CeContext& ctx, const CeEvent& event){ ctx.setValue("out", event.value*2+1); ctx.log("ran"); }' },
+    // The values that travel through the slots appended after ABI 1, into the real host trampolines.
+    { id: 'knob2', name: 'Values', event: 'onValueChanged',
+      source: 'void onValueChanged(CeContext& ctx, const CeEvent& event){ ctx.log("v", 1.5); ctx.sendSysex({0xF0, 0x7F, 0xF7}); ctx.sendSysex("F0 7E F7"); }' }],
     outDir: work, abiHeaderDir: ABI_DIR, runtimeHeaderDir: HERE,
   });
   run(`${cxx} -std=c++20 -fPIC -shared -fvisibility=hidden -I ${q(ABI_DIR)} -I ${q(HERE)} ${q(path.join(work, 'glue.cpp'))} -o ${q(path.join(work, 'ce_handlers_cpp.so'))}`);
@@ -67,19 +73,19 @@ namespace juce { extern const char* const juce_compilationDate; extern const cha
 #include <map>
 using namespace ceditor::scripting;
 struct TestHost : ScriptHostApi {
-  std::map<juce::String,double> vals; int cc=-1; juce::String log_;
+  std::map<juce::String,double> vals; int cc=-1; juce::String log_; juce::var logValue; juce::Array<juce::var> sysex;
   juce::var getValue(const juce::String&, const juce::String&) override { return {}; }
   void setValue(const juce::String& p, const juce::var& v, const juce::var&) override { vals[p]=(double)v; }
   void sendCC(int,int c,const juce::var&) override { cc=c; }
   void sendNRPN(int,int,int,const juce::var&) override {}
-  void sendSysex(const juce::var&) override {}
+  void sendSysex(const juce::var& b) override { sysex.add(b); }
   void requestDump(const juce::String&) override {}
   void applyDump(const juce::var&) override {}
   void sendDump(const juce::String&) override {}
   juce::var buildDump(const juce::String&) override { return {}; }
   juce::var runAction(const juce::String&, const juce::var&) override { return {}; }
   void emitEvent(const juce::String&, const juce::var&) override {}
-  void log(const juce::String& m, const juce::var&) override { log_=m; }
+  void log(const juce::String& m, const juce::var& v) override { log_=m; logValue=v; }
 };
 int main(){
   TestHost host; auto eng = createNativeHandlerEngine(); eng->installApi(host);
@@ -90,16 +96,28 @@ int main(){
   eng->dispatch("knob1","onValueChanged", juce::var(10.0), onErr);
   bool ok = loaded && has && host.vals["out"]==21.0 && host.log_=="ran";
   std::printf("loaded=%d has=%d out=%.1f log='%s' -> %s\\n", loaded, has, host.vals["out"], host.log_.toRawUTF8(), ok?"PASS":"FAIL");
+
+  ScriptDefinition d2 = d; d2.id="knob2"; d2.name="Values";
+  eng->loadScript(d2, onErr);
+  eng->dispatch("knob2","onValueChanged", juce::var(10.0), onErr);
+  const bool list = host.sysex.size() == 2 && host.sysex[0].isArray() && host.sysex[0].size() == 3
+                 && (int) host.sysex[0][0] == 0xF0 && (int) host.sysex[0][1] == 0x7F && (int) host.sysex[0][2] == 0xF7;
+  const bool hex = host.sysex.size() == 2 && host.sysex[1].isString() && host.sysex[1].toString() == "F0 7E F7";
+  const bool values = host.log_ == "v" && host.logValue.isDouble() && (double) host.logValue == 1.5 && list && hex;
+  std::printf("knob2: log('%s', %s) sysex=%s then %s -> %s\\n", host.log_.toRawUTF8(), host.logValue.toString().toRawUTF8(),
+              list ? "[F0,7F,F7]" : "WRONG", hex ? "\\"F0 7E F7\\"" : "WRONG", values ? "PASS" : "FAIL");
+  ok = ok && values;
   return ok?0:1;
 }
 `);
 
   run(`${cxx} -c -std=c++20 ${DEFS.join(' ')} -I ${q(ABI_DIR)} -I ${q(JM)} ${q(SRC)} -o ${q(path.join(work, 'engine.o'))}`);
   run(`${cxx} -c -std=c++20 ${DEFS.join(' ')} -I ${q(ABI_DIR)} -I ${q(JM)} ${q(path.join(work, 'e2e.cpp'))} -o ${q(path.join(work, 'e2e.o'))}`);
-  run(`${cxx} ${q(path.join(work, 'e2e.o'))} ${q(path.join(work, 'engine.o'))} ${q(juceObj)} -o ${q(path.join(work, 'e2e'))} -ldl -lpthread`);
+  run(`${cxx.replace(/\+\+$/, '').replace(/^g$/, 'gcc').replace(/^c$/, 'cc')} -c -I ${q(ABI_DIR)} ${q(GUARD)} -o ${q(path.join(work, 'guard.o'))}`);
+  run(`${cxx} ${q(path.join(work, 'e2e.o'))} ${q(path.join(work, 'engine.o'))} ${q(path.join(work, 'guard.o'))} ${q(juceObj)} -o ${q(path.join(work, 'e2e'))} -ldl -lpthread`);
   const out = execSync(q(path.join(work, 'e2e')), { cwd: work, encoding: 'utf8' });
   process.stdout.write(out);
-  if (!/PASS/.test(out)) { console.error('verify-host: FAIL'); process.exit(1); }
+  if (!/PASS/.test(out) || /FAIL/.test(out)) { console.error('verify-host: FAIL'); process.exit(1); }
   console.log('verify-host: NativeHandlerEngine loads + dispatches a compiled C++ module against real JUCE ✓');
 } finally {
   rmSync(work, { recursive: true, force: true });

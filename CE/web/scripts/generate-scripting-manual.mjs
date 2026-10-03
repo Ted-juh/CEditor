@@ -219,6 +219,26 @@ and all numbers are doubles (integer division is not truncated). The definitive 
 the top of \`CE/web/src/CE_Application/scripting/cppPreview.js\` (C# and Java mirror it); the
 export-side design is \`CE/src/Scripting/native-handlers-design.md\`.
 
+**What the exported plugin compiles.** At export a handler is compiled against a smaller context
+than the preview's: the core of the API, under every spelling the preview accepts for it.
+That is \`set\`/\`get\` and \`setValue\`/\`getValue\`, \`log\` with or without a value, \`sendCC\`,
+\`sendNRPN\`, \`sendSysex\` (a list of bytes or a hex string), and \`clamp\`, \`scale\`, \`round\`,
+\`snap\`, \`lerp\` and \`curve\`, which return what the preview returns to the last bit. C# has
+each of these in its PascalCase form as well (\`SetValue\`, \`Log\`, \`SendCC\`, \`Scale\`, …),
+reads the event as \`e.Value\` and \`e.FirstTime\`, and may name the handler \`OnValueChanged\`.
+Everything else the preview's \`ctx\` offers previews and does **not** compile at export, so keep
+a handler you mean to ship to this core, or write it in Lua or JavaScript. Three more things
+differ:
+
+- Pass \`1\` and \`0\`, not \`true\` and \`false\`, as a value. The preview reads \`true\` as
+  the number 1; the exported C++ sends 1 too, but Java sends a bool and C# does not accept one.
+- A Java \`get\` returns an \`Object\`: read a number as \`(double) ctx.get("cutoff.value")\`.
+- Only the handler for the script's own event is compiled, and \`setup\` is not called, so
+  \`on(...)\` listeners registered there run in the preview only.
+
+\`npm run test:script-exports\` builds a handler making every one of these calls through the real
+export generators and compares each call with the preview's.
+
 ## Conventions
 
 The numbers the API expects, everywhere:

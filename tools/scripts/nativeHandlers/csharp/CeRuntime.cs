@@ -147,6 +147,31 @@ namespace Ce
         public delegate* unmanaged[Cdecl]<IntPtr, nuint, IntPtr> alloc;
         // void dealloc(void* host_ctx, void* p, size_t n);
         public delegate* unmanaged[Cdecl]<IntPtr, IntPtr, nuint, void> dealloc;
+
+        // --- appended after ABI 1, in the header's order. This struct used to stop at dealloc, which
+        // was harmless while nothing here read past it; log_value and send_sysex_value sit after the
+        // sixteen slots below, so every one of them has to be declared for the offsets to line up.
+        // Read any of them only after CeContext.HasField says the host's struct reaches it.
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, void> request_dump;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeBytes*, void> apply_dump;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, void> send_dump;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, CeValue*, int> build_dump;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, CeValue*, CeValue*, int> run_action;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, int, void> start_timer;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, void> stop_timer;
+        public delegate* unmanaged[Cdecl]<IntPtr, int, void> begin_transmit;
+        public delegate* unmanaged[Cdecl]<IntPtr, void> end_transmit;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeBytes*, void> send_midi;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, CeValue*, void> save_setting;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, CeValue*, int> load_setting;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, CeValue*, CeValue*, int> device_query;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeValue*, int> transport_state;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, CeValue*, CeStr*, int> device_write;
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, CeStr*, CeValue*, int> device_define;
+        // void log_value(void* host_ctx, int32_t level, const CeStr* msg, const CeValue* value);
+        public delegate* unmanaged[Cdecl]<IntPtr, int, CeStr*, CeValue*, void> log_value;
+        // void send_sysex_value(void* host_ctx, const CeValue* bytes);
+        public delegate* unmanaged[Cdecl]<IntPtr, CeValue*, void> send_sysex_value;
     }
 
     // ----------------------------------------------------------------- UTF-8 marshalling helpers
@@ -275,6 +300,15 @@ namespace Ce
         }
 
         public override string ToString() => AsString();
+
+        // So a handler can pass a string wherever a Var is taken and read a Var back as a number, as it
+        // can in the preview (ce::Var reads back as a double in C++ too). Numbers are not converted
+        // INTO a Var implicitly: with conversions both ways, an int argument matches a Var overload
+        // and a double one equally and the call is ambiguous, so every method that takes a number has
+        // a double overload instead. Nor a bool: the preview reads a C# `true` as the number 1 and
+        // this would send a bool, so a bool keeps needing `new Var(b)`.
+        public static implicit operator Var(string s) => new Var(s);
+        public static implicit operator double(Var v) => v.AsDouble();
     }
 
     // ----------------------------------------------------------------- CeContext (mirror of ce::Context)
@@ -387,6 +421,173 @@ namespace Ce
             finally { Utf8.Free(nm); }
         }
 
+        // ------------------------------------------------------------- the preview's spellings
+        // The editor's C# preview hands a handler `ctx` with set/get as well as setValue/getValue, and
+        // the core of the API under C#'s own names too (SetValue, Log, SendCC, Scale, …). A handler that
+        // ran in the preview has to compile here, so every spelling the preview accepts for this core
+        // is accepted here — and none it does not, or a script would compile and not preview.
+        public void set(string path, Var v) => setValue(path, v);
+        public void set(string path, double d) => setValue(path, new Var(d));
+        public Var get(string path, string form = "value") => getValue(path, form);
+
+        public void SetValue(string path, Var v) => setValue(path, v);
+        public void SetValue(string path, double d) => setValue(path, new Var(d));
+        public Var GetValue(string path, string form = "value") => getValue(path, form);
+        public void Log(string msg) => log(msg);
+        public void Log(string msg, Var value) => log(msg, value);
+        public void Log(string msg, double value) => log(msg, new Var(value));
+        public void SendCC(int channel, int cc, Var v) => sendCC(channel, cc, v);
+        public void SendCC(int channel, int cc, double v) => sendCC(channel, cc, new Var(v));
+        public void SendNRPN(int channel, int msb, int lsb, Var v) => sendNRPN(channel, msb, lsb, v);
+        public void SendNRPN(int channel, int msb, int lsb, double v) => sendNRPN(channel, msb, lsb, new Var(v));
+        public void SendSysex(IEnumerable<int> bytes) => sendSysex(bytes);
+        public void SendSysex(IEnumerable<byte> bytes) => sendSysex(bytes);
+        public void SendSysex(string hex) => sendSysex(hex);
+        public double Clamp(double v, double lo, double hi) => clamp(v, lo, hi);
+        public double Scale(double v, double inLo, double inHi, double outLo, double outHi) => scale(v, inLo, inHi, outLo, outHi);
+        public double Round(double v) => round(v);
+        public double Snap(double v, double step) => snap(v, step);
+        public double Lerp(double a, double b, double t) => lerp(a, b, t);
+        public double Curve(double v, string? shape = "linear") => curve(v, shape);
+
+        /// <summary>log(message, value) — the value goes to the host as it is, and the host formats it,
+        /// as it does for a Lua or JS log. A host older than the slot gets the message alone.</summary>
+        public void log(string msg, Var value)
+        {
+            CeStr m = Utf8.Alloc(msg);
+            try
+            {
+                if (!HasField(&_h->log_value)) { _h->log(_h->host_ctx, 0, &m); return; }
+                CeValue pv = Pin(value, out CeStr owned);
+                try { _h->log_value(_h->host_ctx, 0, &m, &pv); }
+                finally { Utf8.Free(owned); }
+            }
+            finally { Utf8.Free(m); }
+        }
+
+        public void log(string msg, double value) => log(msg, new Var(value));
+
+        public void sendNRPN(int channel, int msb, int lsb, Var v)
+        {
+            CeValue pv = Pin(v, out CeStr owned);
+            try { _h->send_nrpn(_h->host_ctx, channel, msb, lsb, &pv); }
+            finally { Utf8.Free(owned); }
+        }
+        public void sendNRPN(int channel, int msb, int lsb, double v) => sendNRPN(channel, msb, lsb, new Var(v));
+
+        /// <summary>sendSysex(bytes) or sendSysex("F0 41 10 …"). The list or the string goes to the host
+        /// as it is — the host clamps each byte and adds F0/F7 exactly as it does for Lua and JS.</summary>
+        public void sendSysex(IEnumerable<int> bytes)
+        {
+            var list = new List<int>(bytes ?? Array.Empty<int>());
+            if (HasField(&_h->send_sysex_value))
+            {
+                var items = new CeValue[list.Count];
+                for (int i = 0; i < items.Length; i++) items[i] = new CeValue { tag = (int)CeTag.Int64, i = list[i] };
+                fixed (CeValue* ip = items)
+                {
+                    CeValue v = new CeValue { tag = (int)CeTag.List, list = new CeList { items = (IntPtr)ip, len = items.Length } };
+                    _h->send_sysex_value(_h->host_ctx, &v);
+                }
+                return;
+            }
+            // A host older than the slot takes packed bytes: clamp them first, as the host would.
+            var packed = new byte[list.Count];
+            for (int i = 0; i < packed.Length; i++) packed[i] = (byte)(list[i] < 0 ? 0 : list[i] > 255 ? 255 : list[i]);
+            fixed (byte* bp = packed)
+            {
+                CeBytes b = new CeBytes { ptr = (IntPtr)bp, len = packed.Length };
+                _h->send_sysex(_h->host_ctx, &b);
+            }
+        }
+        public void sendSysex(IEnumerable<byte> bytes)
+        {
+            var ints = new List<int>();
+            foreach (byte b in bytes ?? Array.Empty<byte>()) ints.Add(b);
+            sendSysex(ints);
+        }
+        public void sendSysex(string hex)
+        {
+            if (!HasField(&_h->send_sysex_value)) { log("sendSysex(\"\u2026\"): this host takes a list of bytes, not a hex string."); return; }
+            CeValue pv = Pin(new Var(hex ?? string.Empty), out CeStr owned);
+            try { _h->send_sysex_value(_h->host_ctx, &pv); }
+            finally { Utf8.Free(owned); }
+        }
+
+        // ------------------------------------------------------------- the arithmetic helpers
+        // Written from the WebView runtime's definitions, which every prelude agrees with, to the bit.
+        // C#'s Math.Round rounds half to even, and JS Math.round rounds half towards +infinity and
+        // returns -0 for [-0.5, 0), so round is written out rather than borrowed.
+        internal static double JsRound(double v)
+        {
+            if (double.IsNaN(v) || double.IsInfinity(v) || v == Math.Floor(v)) return v;
+            if (v < 0 && v >= -0.5) return -0.0;
+            double r = Math.Floor(v);
+            return (v - r >= 0.5) ? r + 1.0 : r;
+        }
+        public double clamp(double v, double lo, double hi) => v < lo ? lo : (v > hi ? hi : v);
+        public double round(double v) => JsRound(v);
+        public double scale(double v, double inLo, double inHi, double outLo, double outHi)
+            => inHi == inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo);
+        public double snap(double v, double step) => step == 0 ? v : JsRound(v / step) * step;
+        public double lerp(double a, double b, double t) => a + (b - a) * t;
+        public double curve(double v, string? shape = "linear")
+        {
+            if (shape == "exp") return v * v;
+            if (shape == "log") return Math.Sqrt(double.IsNaN(v) ? v : (v > 0 ? v : 0.0));
+            if (shape == "s") return v * v * (3 - 2 * v);
+            if (!string.IsNullOrEmpty(shape) && shape != "linear")
+                log("curve(v, " + JsonQuote(shape) + "): unknown shape \u2014 using linear. The names are \"linear\", "
+                    + "\"exp\", \"log\" and \"s\"; for any other shape use map(v, points).");
+            return v;
+        }
+
+        // JSON.stringify of a string, which is how the WebView quotes the shape in that message.
+        internal static string JsonQuote(string s)
+        {
+            var sb = new StringBuilder("\"");
+            foreach (char c in s)
+            {
+                switch (c)
+                {
+                    case '"': sb.Append("\\\""); break;
+                    case '\\': sb.Append("\\\\"); break;
+                    case '\b': sb.Append("\\b"); break;
+                    case '\f': sb.Append("\\f"); break;
+                    case '\n': sb.Append("\\n"); break;
+                    case '\r': sb.Append("\\r"); break;
+                    case '\t': sb.Append("\\t"); break;
+                    default:
+                        if (c < 0x20) sb.Append("\\u").Append(((int)c).ToString("x4"));
+                        else sb.Append(c);
+                        break;
+                }
+            }
+            return sb.Append('"').ToString();
+        }
+
+        // Does the vtable the host handed us reach this field, and fill it? CE_HAS_FIELD, in C#, plus
+        // the null check: a host whose struct reaches a slot it left empty must get the fallback.
+        private bool HasField(void* field)
+            => _h->struct_size >= (uint)((byte*)field - (byte*)_h) + (uint)sizeof(IntPtr) && *(IntPtr*)field != IntPtr.Zero;
+
+        // v's ABI form, in memory that stays put for the call: an owned string is copied to unmanaged
+        // memory (the caller frees `owned` afterwards), and a view is copied shallowly — the pointers in
+        // it are still the host's, valid for the call as they were.
+        private static CeValue Pin(Var v, out CeStr owned)
+        {
+            owned = default;
+            CeValue scratch;
+            if (v.IsOwnedString)
+            {
+                owned = Utf8.Alloc(v.AsString());
+                scratch = v.OwnedBacking;
+                scratch.s = owned;
+                return scratch;
+            }
+            return *v.Abi(&scratch);
+        }
+
         // Copy a (just-returned, still host-owned) CeValue into an owned Var before free_value reclaims it.
         // Strings are decoded into managed memory so they survive the free. List/map copy-out is a TODO
         // (mirrors ce_runtime.h: scalars + strings only).
@@ -414,6 +615,9 @@ namespace Ce
 
         public double value { get; }
         public bool firstTime { get; }
+        // The preview's event has both spellings, and a C# author writes e.Value.
+        public double Value => value;
+        public bool FirstTime => firstTime;
 
         internal CeEvent(CeValue* payload)
         {

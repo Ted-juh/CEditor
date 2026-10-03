@@ -88,9 +88,20 @@ host refuses a version mismatch outright, so bumping it would disown every modul
 whereas an append is compatible by construction. Read a newly-added slot only behind
 `CE_HAS_FIELD(vt, member)`, which checks it against the `struct_size` the host filled in.
 
-The pure helpers (`scale`, `clamp`, `to7bit`, `checksum`, `panic`, …) are **not** in the vtable.
-They are maths with no host state, so each language's generated glue defines them locally rather
-than paying a cross-boundary call per `clamp()`.
+The last two appended, `log_value` and `send_sysex_value`, carry a value the earlier slots could not:
+`log(message, value)` and `sendSysex(list | "F0 41 …")`. `log` carries no value and `send_sysex`
+carries bytes already packed to `uint8`, so a compiled handler either dropped the value or repeated
+the host's clamping and hex parsing. These pass it through untouched, and the host does exactly what
+it does for Lua and JS. Against a host without them the runtimes fall back to `log` and to clamped
+`send_sysex` bytes; a hex string then cannot be sent and the handler logs why.
+
+The pure helpers are **not** in the vtable. They are maths with no host state, so each language's
+runtime defines them locally (`ce_runtime.h`, `CeRuntime.cs`, `CeRuntime.java`) rather than paying a
+cross-boundary call per `clamp()`. Today that is `clamp`, `scale`, `round`, `snap`, `lerp` and
+`curve`, written from the WebView runtime's definitions to the bit — JS `Math.round`'s half-up and
+its `-0`, `Math.max(0, NaN)` — and the C++ export compiles with `-ffp-contract=off`, since a fused
+multiply-add in `lerp` rounds once where JS rounds twice. The rest of the helper surface (`to7bit`,
+`checksum`, `panic`, …) is not there yet.
 
 ### Host side — `NativeHandlerEngine` (a new `ScriptEngine`)
 
@@ -244,6 +255,24 @@ the Lua/JS/Python preludes). Mitigations:
 - A conformance test suite: a set of handler snippets run through (a) the subset interpreter and (b) a
   compiled module, asserting identical observable effects (set/sendCC/emit calls). Run in CI per
   language.
+
+  **Built:** `CE/web/scripts/validate-script-exports.mjs` (`npm run test:script-exports`, part of
+  `test:all` and so of CI). For each of C++, C# and Java it generates a module from the canonical
+  example and from `CORE_SOURCES` — a handler making every call of the core in every spelling the
+  preview accepts, plus 39 helper calls at their edges — with the real generator, compiles it against
+  the real runtime, dispatches it through the real entry points into a recording host, and compares
+  every call, to the bit, with the same source in the preview (`previewContextFor`/`previewEventFor`,
+  exported from `panelRuntime.js` so the comparison uses the preview's own `ctx`). The only stand-in
+  is the far side: the C++ glue is linked into the harness, the C# exports are called through
+  function pointers, and Java's `CeRuntime.HOST` is swapped for a recorder. The shims in that gap
+  (`CeHost.c`, `ce_java_shim.c`) and the host trampolines are run by `verify-all.mjs`, whose samples
+  now include the two appended slots.
+
+  What it does not cover is the rest of the preview's `ctx`: the preview hands a compiled-language
+  handler the whole panel API, and the export only the core. A member past the core previews and
+  fails to compile at export (the scripting manual says so). Closing that is a design decision, not
+  a missing wrapper: a member that returns a structure is read as `info.playing` in the preview, which
+  C++ and Java cannot say of a dynamic value.
 
 ## 7. Error surfacing
 

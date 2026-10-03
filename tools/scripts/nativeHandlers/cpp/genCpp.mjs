@@ -90,10 +90,12 @@ if (APPLE)
   set_target_properties(ce_handlers_cpp PROPERTIES SUFFIX ".dylib")
 endif()
 # Harden (does NOT sandbox — see design §5): catch some corruption earlier and louder.
+# No floating-point contraction: ce_runtime.h's helpers match the preview to the bit, and a fused
+# multiply-add rounds once where JS rounds twice (MSVC's /fp:precise does not contract).
 if (MSVC)
-  target_compile_options(ce_handlers_cpp PRIVATE /GS /guard:cf /EHsc)
+  target_compile_options(ce_handlers_cpp PRIVATE /GS /guard:cf /EHsc /fp:precise)
 else()
-  target_compile_options(ce_handlers_cpp PRIVATE -fstack-protector-strong)
+  target_compile_options(ce_handlers_cpp PRIVATE -fstack-protector-strong -ffp-contract=off)
 endif()
 `;
 

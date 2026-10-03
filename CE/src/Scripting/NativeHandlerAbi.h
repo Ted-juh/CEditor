@@ -156,6 +156,16 @@ typedef struct CeHostVtable {
      * declare a parameter and not send one would build a panel that looks wired and is not. */
     int  (CE_CALL *device_define) (void* host_ctx, const CeStr* what, const CeStr* id,
                                    const CeValue* spec /*nullable*/);
+    /* --- appended: the two calls whose VALUE the slots above could not carry ------------------
+     * log(message, value) and sendSysex(list | "F0 41 …") are in every language's preview `ctx`,
+     * and the scripted engines hand the host the value itself — the host formats a logged value
+     * and clamps or parses SysEx bytes. `log` above carries no value, and `send_sysex` carries
+     * bytes already packed to uint8, so a compiled handler either lost the value or had to repeat
+     * the host's clamping and hex parsing: a second copy of each, waiting to drift. These pass the
+     * value through untouched and the host does exactly what it does for Lua and JS. */
+    void (CE_CALL *log_value)       (void* host_ctx, int32_t level, const CeStr* msg,
+                                     const CeValue* value /*nullable*/);
+    void (CE_CALL *send_sysex_value)(void* host_ctx, const CeValue* bytes /*list of numbers, or a hex string*/);
     /* NOTE on module opt-in (design doc §5): a panel declares the modules its scripts may use, and
      * the scripted engines enforce it by swapping the prelude's members for explaining stubs. A
      * native handler has no prelude — it calls these function pointers directly — so there is

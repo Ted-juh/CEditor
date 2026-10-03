@@ -247,6 +247,18 @@ int CE_CALL host_transport_state (void* ctx, CeValue* out)
     return 0;
 }
 
+// The value goes to the host as it came, the way the scripted engines pass it: the host formats a
+// logged value and clamps or parses SysEx itself (NativeHandlerAbi.h, log_value / send_sysex_value).
+void CE_CALL host_log_value (void* ctx, int32_t /*level*/, const CeStr* msg, const CeValue* value)
+{
+    static_cast<HostCtx*> (ctx)->host->log (msg ? fromCeStr (*msg) : juce::String(),
+                                            value ? ceToVar (value) : juce::var());
+}
+void CE_CALL host_send_sysex_value (void* ctx, const CeValue* bytes)
+{
+    static_cast<HostCtx*> (ctx)->host->sendSysex (bytes ? ceToVar (bytes) : juce::var());
+}
+
 void CE_CALL host_free_value (void* /*ctx*/, CeValue* v) { freeCeValueDeep (v); }
 void* CE_CALL host_alloc   (void* /*ctx*/, size_t n) { return std::malloc (n); }
 void  CE_CALL host_dealloc (void* /*ctx*/, void* p, size_t /*n*/) { std::free (p); }
@@ -484,6 +496,8 @@ private:
         m.vtable.device_write = host_device_write;
         m.vtable.device_define = host_device_define;
         m.vtable.transport_state = host_transport_state;
+        m.vtable.log_value = host_log_value;
+        m.vtable.send_sysex_value = host_send_sysex_value;
 
         if (ini (&m.vtable, &m.state) != 0 || m.state == nullptr)
         {

@@ -12,23 +12,36 @@
 // Two extra passes beyond "does it compile":
 //   • TypeScript is additionally transpiled with the SAME tsService the editor uses, and the
 //     emitted JS is executed — that JS is what ships in `compiledJs` and what QuickJS runs.
-//   • C++/C#/Java also run through the CeScript interpreters (cppPreview/csharpPreview/
-//     javaPreview) that drive the live editor preview, and must agree with the real compiler.
-//     That cross-check needs no toolchain, so it always runs.
+//   • C++/C#/Java are not run as written but as exported: through genCpp/genCsharp/genJava,
+//     compiled against the shipped runtimes and dispatched through the flat ABI, then compared
+//     call for call with the same source in the editor's preview (see the section below).
+//     The canonical source also runs through the preview interpreters on their own, which
+//     needs no toolchain, so it always runs.
 
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { register } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { get as readStore } from 'svelte/store';
 
 import { compileCpp, invokeCpp } from '../src/CE_Application/scripting/cppPreview.js';
 import { compileCsharp, invokeCsharp } from '../src/CE_Application/scripting/csharpPreview.js';
 import { compileJava, invokeJava } from '../src/CE_Application/scripting/javaPreview.js';
 import { RUNNABLE_LANGUAGES } from '../src/CE_Application/scripting/panelApi.js';
 import { ensureTs, transpileTs } from '../src/CE_Application/scripting/tsService.js';
-import { EXPECTED, SOURCES, checkEffects, createRecordingApi } from './script-export-corpus.mjs';
+import { CORE_GET, CORE_SOURCES, EXPECTED, SOURCES, checkEffects, createRecordingApi } from './script-export-corpus.mjs';
+
+// The compiled handlers are compared with the preview's own ctx and event, so this needs
+// panelRuntime, which imports its wasm through Vite's `?url` suffix. Plain Node cannot resolve that;
+// the test suite's loader stubs it. Registered here so `node scripts/validate-script-exports.mjs`
+// works as well as `npm run test:script-exports`.
+register('../test/support/svelte-hooks.mjs', import.meta.url);
+const { previewContextFor, previewEventFor, scriptApiForTesting } =
+  await import('../src/CE_Application/scripting/panelRuntime.js');
+const { scriptTrace } = await import('../src/CE_Application/stores/scriptConsole.js');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(here, '..');
@@ -215,123 +228,6 @@ assert midi[0]["channel"] == ${EXP_CC.channel} and midi[0]["cc"] == ${EXP_CC.cc}
 `.trimStart();
 }
 
-function cppHarness() {
-  return `
-#include <cmath>
-#include <cstdio>
-#include <stdexcept>
-#include <string>
-#include <utility>
-#include <vector>
-
-struct CeEvent { double value = 0.0; };
-
-struct CeContext {
-  std::vector<std::pair<std::string, double>> patches;
-  int ccCount = 0, ccChannel = -1, ccNumber = -1;
-  long ccValue = -1;
-  void set(const char* path, double value) { patches.emplace_back(path, value); }
-  double get(const char*) const { return 0.0; }
-  void sendCC(int channel, int cc, long value) { ++ccCount; ccChannel = channel; ccNumber = cc; ccValue = value; }
-  double scale(double v, double inLo, double inHi, double outLo, double outHi) const {
-    return inHi == inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo);
-  }
-  double clamp(double v, double lo, double hi) const { return v < lo ? lo : v > hi ? hi : v; }
-  double round(double v) const { return std::floor(v + 0.5); }
-};
-
-${SOURCES.cpp}
-int main() {
-  CeContext ctx;
-  CeEvent event; event.value = ${EV};
-  onValueChanged(ctx, event);
-
-  if (ctx.patches.size() != ${EXP_PATCHES.length}) throw std::runtime_error("expected ${EXP_PATCHES.length} set() calls");
-${EXP_PATCHES.map((p, i) => `  if (ctx.patches[${i}].first != ${JSON.stringify(p.path)}) throw std::runtime_error("set()[${i}] wrong path");
-  if (std::fabs(ctx.patches[${i}].second - ${p.value}) > 1e-9) throw std::runtime_error("set()[${i}] wrong value");`).join('\n')}
-  if (ctx.ccCount != 1) throw std::runtime_error("expected one CC");
-  if (ctx.ccChannel != ${EXP_CC.channel} || ctx.ccNumber != ${EXP_CC.cc} || ctx.ccValue != ${EXP_CC.value}) throw std::runtime_error("wrong CC");
-  return 0;
-}
-`.trimStart();
-}
-
-function csharpHarness() {
-  return `
-using System;
-using System.Collections.Generic;
-
-public sealed class CeEvent { public double Value { get; set; } }
-
-public sealed class CeContext {
-  public List<KeyValuePair<string, double>> Patches = new List<KeyValuePair<string, double>>();
-  public int CcCount = 0, CcChannel = -1, CcNumber = -1, CcValue = -1;
-  public void SetValue(string path, double value) { Patches.Add(new KeyValuePair<string, double>(path, value)); }
-  public double GetValue(string path) { return 0; }
-  public void SendCC(int channel, int cc, int value) { CcCount++; CcChannel = channel; CcNumber = cc; CcValue = value; }
-  public double Scale(double v, double inLo, double inHi, double outLo, double outHi) {
-    return inHi == inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo);
-  }
-  public double Clamp(double v, double lo, double hi) { return Math.Min(hi, Math.Max(lo, v)); }
-  public double Round(double v) { return Math.Floor(v + 0.5); }
-}
-
-public sealed class ScriptHarness {
-${SOURCES.csharp.split('\n').map((line) => (line ? `  ${line}` : line)).join('\n')}
-  public static void Main() {
-    var ctx = new CeContext();
-    new ScriptHarness().OnValueChanged(ctx, new CeEvent { Value = ${EV} });
-
-    if (ctx.Patches.Count != ${EXP_PATCHES.length}) throw new Exception("expected ${EXP_PATCHES.length} set() calls");
-${EXP_PATCHES.map((p, i) => `    if (ctx.Patches[${i}].Key != ${JSON.stringify(p.path)}) throw new Exception("set()[${i}] wrong path");
-    if (Math.Abs(ctx.Patches[${i}].Value - ${p.value}) > 1e-9) throw new Exception("set()[${i}] wrong value");`).join('\n')}
-    if (ctx.CcCount != 1) throw new Exception("expected one CC");
-    if (ctx.CcChannel != ${EXP_CC.channel} || ctx.CcNumber != ${EXP_CC.cc} || ctx.CcValue != ${EXP_CC.value}) throw new Exception("wrong CC");
-  }
-}
-`.trimStart();
-}
-
-function javaHarness() {
-  return `
-import java.util.ArrayList;
-import java.util.List;
-
-public class MacroRouting {
-  static class CeEvent {
-    double value;
-    CeEvent(double v) { value = v; }
-  }
-
-  static class CeContext {
-    List<String> paths = new ArrayList<String>();
-    List<Double> values = new ArrayList<Double>();
-    int ccCount = 0, ccChannel = -1, ccNumber = -1, ccValue = -1;
-    void set(String path, double value) { paths.add(path); values.add(value); }
-    double get(String path) { return 0; }
-    void sendCC(int channel, int cc, int value) { ccCount++; ccChannel = channel; ccNumber = cc; ccValue = value; }
-    double scale(double v, double inLo, double inHi, double outLo, double outHi) {
-      return inHi == inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo);
-    }
-    double clamp(double v, double lo, double hi) { return Math.min(hi, Math.max(lo, v)); }
-    double round(double v) { return Math.floor(v + 0.5); }
-  }
-
-${SOURCES.java.split('\n').map((line) => (line ? `  ${line}` : line)).join('\n')}
-  public static void main(String[] args) {
-    CeContext ctx = new CeContext();
-    new MacroRouting().onValueChanged(ctx, new CeEvent(${EV}));
-
-    if (ctx.paths.size() != ${EXP_PATCHES.length}) throw new RuntimeException("expected ${EXP_PATCHES.length} set() calls");
-${EXP_PATCHES.map((p, i) => `    if (!ctx.paths.get(${i}).equals(${JSON.stringify(p.path)})) throw new RuntimeException("set()[${i}] wrong path");
-    if (Math.abs(ctx.values.get(${i}) - ${p.value}) > 1e-9) throw new RuntimeException("set()[${i}] wrong value");`).join('\n')}
-    if (ctx.ccCount != 1) throw new RuntimeException("expected one CC");
-    if (ctx.ccChannel != ${EXP_CC.channel} || ctx.ccNumber != ${EXP_CC.cc} || ctx.ccValue != ${EXP_CC.value}) throw new RuntimeException("wrong CC");
-  }
-}
-`.trimStart();
-}
-
 /* ----------------------------------------------------------------- validators */
 
 async function validateJavascript() {
@@ -402,20 +298,343 @@ async function validatePython() {
     : result('python', 'fail', combineOutput(exec), { tool: python });
 }
 
+/* ------------------------------------------------- C++ / C# / Java: the real export */
+// These three are not run as written. At export a handler is wrapped by a generator (genCpp,
+// genCsharp, genJava), compiled against that language's runtime (ce_runtime.h, CeRuntime.cs,
+// CeRuntime.java) and dispatched through the flat ABI. So that is what runs here: the canonical
+// source and CORE_SOURCES go through the real generator, are compiled against the real runtime, and
+// are dispatched through the real entry points into a host that records every call. Each run is then
+// compared, call for call and to the bit, with the same source run through the editor's preview.
+//
+// This used to compile each source against a CeContext written inside this file, which proved the
+// source was valid C++ against a context the export never uses. The canonical C# example declared
+// OnValueChanged and called ctx.Scale, neither of which the shipped runtime had, and passed.
+//
+// The far side is the only stand-in. C++ links the generated glue straight into the harness; C# calls
+// the [UnmanagedCallersOnly] exports through function pointers; Java swaps CeRuntime.HOST for a
+// recorder. The native shims that sit in that last gap (CeHost.c, ce_java_shim.c) are what
+// tools/scripts/nativeHandlers/verify-all.mjs builds and runs, where a JDK and a C compiler exist.
+
+const repoRoot = path.resolve(webRoot, '../..');
+const nativeDir = path.join(repoRoot, 'tools', 'scripts', 'nativeHandlers');
+const abiDir = path.join(repoRoot, 'CE', 'src', 'Scripting');
+const NATIVE_SCRIPTS = (language) => [
+  { id: 'canonical', name: 'canonical', event: 'onValueChanged', source: SOURCES[language] },
+  { id: 'core', name: 'core', event: 'onValueChanged', source: CORE_SOURCES[language] },
+];
+
+async function generator(relative, name) {
+  return (await import(pathToFileURL(path.join(nativeDir, relative)).href))[name];
+}
+
+// Every harness prints a call as `R <json>`, its arguments encoded so nothing is lost on the way:
+// a double as its 64 bits in hex, an int64 as a decimal string, text with everything past ASCII
+// escaped (a Windows console would otherwise re-encode it).
+function decodeArg(v) {
+  if (Array.isArray(v)) return v.map(decodeArg);
+  if (v && typeof v === 'object' && 'f' in v) {
+    const view = new DataView(new ArrayBuffer(8));
+    view.setBigUint64(0, BigInt(`0x${v.f}`));
+    return view.getFloat64(0);
+  }
+  if (v && typeof v === 'object' && 'i' in v) return Number(BigInt(v.i));
+  return v;
+}
+
+function parseRecords(stdout) {
+  const runs = {};
+  let current = null;
+  for (const line of stdout.split(/\r?\n/)) {
+    if (line.startsWith('S ')) runs[(current = line.slice(2).trim())] = [];
+    else if (line.startsWith('R ') && current) runs[current].push(JSON.parse(line.slice(2)).map(decodeArg));
+  }
+  return runs;
+}
+
+/** The same source through the preview, with the preview's own ctx and event over a recording API. */
+function previewRecords(language, source) {
+  const base = scriptApiForTesting('', `export-${language}`);
+  const records = [];
+  const lastTraceId = () => readStore(scriptTrace).at(-1)?.id ?? 0;
+  const api = {
+    ...base,
+    set: (p, v) => { records.push(['set', p, v]); },
+    get: (p) => (p === CORE_GET.path ? CORE_GET.value : null),
+    log: (...args) => { records.push(['log', ...args]); },
+    sendCC: (ch, cc, v) => { records.push(['cc', ch, cc, v]); },
+    sendNRPN: (ch, msb, lsb, v) => { records.push(['nrpn', ch, msb, lsb, v]); },
+    sendSysex: (bytes) => { records.push(['sysex', bytes]); },
+    // The WebView's curve reports an unknown shape to the script console rather than through log();
+    // the compiled one has only log(). Read it back so the two can be compared.
+    curve: (...args) => {
+      const since = lastTraceId();
+      const r = base.curve(...args);
+      for (const t of readStore(scriptTrace)) if (t.id > since && t.kind === 'log') records.push(['log', t.message]);
+      return r;
+    },
+  };
+  const spec = INTERPRETERS.find((i) => i.language === language);
+  const { handlers, diagnostics } = spec.compile(source);
+  if (diagnostics.length) throw new Error(`preview: ${diagnostics.join('; ')}`);
+  // The preview's rule for which declaration answers onValueChanged, which genCsharp follows too.
+  const fn = handlers.get('onValueChanged') ?? (language === 'csharp' ? handlers.get('OnValueChanged') : undefined);
+  if (!fn) throw new Error('preview: no onValueChanged handler');
+  spec.invoke(fn, [previewContextFor(language, api), previewEventFor(language, EV)]);
+  return records;
+}
+
+const sameValue = (a, b) => (Array.isArray(a) || Array.isArray(b)
+  ? Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => sameValue(x, b[i]))
+  : Object.is(a, b));
+const show = (r) => JSON.stringify(r, (_, v) => (Object.is(v, -0) ? '-0' : typeof v === 'number' && !Number.isFinite(v) ? String(v) : v));
+
+/** Compare a compiled run with the preview's, and the canonical run with EXPECTED. '' when they agree. */
+function compareRuns(language, runs) {
+  for (const id of ['canonical', 'core']) {
+    const compiled = runs[id];
+    if (!compiled) return `${id}: the compiled module did not run it`;
+    const preview = previewRecords(language, id === 'canonical' ? SOURCES[language] : CORE_SOURCES[language]);
+    const n = Math.max(compiled.length, preview.length);
+    for (let i = 0; i < n; i++) {
+      if (!compiled[i] || !preview[i] || !sameValue(compiled[i], preview[i])) {
+        return `${id}: call ${i + 1} differs — compiled ${show(compiled[i] ?? 'nothing')}, preview ${show(preview[i] ?? 'nothing')}`;
+      }
+    }
+  }
+  const patches = runs.canonical.filter((r) => r[0] === 'set').map(([, p, value]) => ({ path: p, value }));
+  const midi = runs.canonical.filter((r) => r[0] === 'cc').map(([, channel, cc, value]) => ({ channel, cc, value }));
+  return checkEffects(patches, midi);
+}
+
+function cppRecordingHost() {
+  return `// The recording host for validate-script-exports.mjs. Linked with the generated glue.cpp, so the
+// entry points are called directly: no dlopen, and so no difference between platforms.
+#include "NativeHandlerAbi.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+
+static const char* kHex = "0123456789abcdef";
+static std::string text(const char* p, int64_t n) {
+  std::string s = "\\"";
+  for (int64_t i = 0; i < n; ) {
+    unsigned char c = (unsigned char) p[i];
+    unsigned cp = c; int len = 1;
+    if (c >= 0xF0) { cp = c & 0x07; len = 4; } else if (c >= 0xE0) { cp = c & 0x0F; len = 3; } else if (c >= 0xC0) { cp = c & 0x1F; len = 2; }
+    for (int k = 1; k < len && i + k < n; ++k) cp = (cp << 6) | ((unsigned char) p[i + k] & 0x3F);
+    i += len;
+    auto u = [&](unsigned v) { s += "\\\\u"; for (int sh = 12; sh >= 0; sh -= 4) s += kHex[(v >> sh) & 15]; };
+    if (cp == '"' || cp == '\\\\') { s += '\\\\'; s += (char) cp; }
+    else if (cp < 0x20 || cp > 0x7E) {
+      if (cp > 0xFFFF) { cp -= 0x10000; u(0xD800 + (cp >> 10)); u(0xDC00 + (cp & 0x3FF)); } else u(cp);
+    } else s += (char) cp;
+  }
+  return s + "\\"";
+}
+static std::string str(const CeStr* s) { return s ? text(s->ptr, s->len) : "null"; }
+static std::string enc(const CeValue* v) {
+  if (!v) return "null";
+  switch (v->tag) {
+    case CE_DOUBLE: {
+      unsigned long long u; std::memcpy(&u, &v->u.d, 8);
+      std::string h; for (int sh = 60; sh >= 0; sh -= 4) h += kHex[(u >> sh) & 15];
+      return "{\\"f\\":\\"" + h + "\\"}";
+    }
+    case CE_INT64:  return "{\\"i\\":\\"" + std::to_string((long long) v->u.i) + "\\"}";
+    case CE_BOOL:   return v->u.b ? "true" : "false";
+    case CE_STRING: return text(v->u.s.ptr, v->u.s.len);
+    case CE_LIST: {
+      std::string s = "[";
+      for (int64_t i = 0; i < v->u.list.len; ++i) { if (i) s += ","; s += enc(&v->u.list.items[i]); }
+      return s + "]";
+    }
+    default: return "null";
+  }
+}
+static void out(const std::string& call) { std::fputs(("R " + call + "\\n").c_str(), stdout); }
+
+static int  CE_CALL h_set(void*, const CeStr* k, const CeValue* v, const CeValue*) { out("[\\"set\\"," + str(k) + "," + enc(v) + "]"); return 0; }
+static int  CE_CALL h_get(void*, const CeStr* k, const CeStr*, CeValue* o) {
+  o->tag = CE_NULL;
+  if (k && std::string(k->ptr, (size_t) k->len) == ${JSON.stringify(CORE_GET.path)}) { o->tag = CE_DOUBLE; o->u.d = ${CORE_GET.value}; }
+  return 0;
+}
+static void CE_CALL h_cc(void*, int32_t ch, int32_t cc, const CeValue* v) { out("[\\"cc\\"," + std::to_string(ch) + "," + std::to_string(cc) + "," + enc(v) + "]"); }
+static void CE_CALL h_nrpn(void*, int32_t ch, int32_t msb, int32_t lsb, const CeValue* v) {
+  out("[\\"nrpn\\"," + std::to_string(ch) + "," + std::to_string(msb) + "," + std::to_string(lsb) + "," + enc(v) + "]");
+}
+static void CE_CALL h_sysex(void*, const CeBytes* b) {
+  std::string s = "[\\"sysex-packed\\",[";
+  for (int64_t i = 0; b && i < b->len; ++i) { if (i) s += ","; s += std::to_string((int) b->ptr[i]); }
+  out(s + "]]");
+}
+static void CE_CALL h_log(void*, int32_t, const CeStr* m) { out("[\\"log\\"," + str(m) + "]"); }
+static void CE_CALL h_log_value(void*, int32_t, const CeStr* m, const CeValue* v) { out("[\\"log\\"," + str(m) + "," + enc(v) + "]"); }
+static void CE_CALL h_sysex_value(void*, const CeValue* v) { out("[\\"sysex\\"," + enc(v) + "]"); }
+static void CE_CALL h_emit(void*, const CeStr* n, const CeValue* v) { out("[\\"emit\\"," + str(n) + "," + enc(v) + "]"); }
+static void CE_CALL h_free(void*, CeValue*) {}
+static void* CE_CALL h_alloc(void*, size_t n) { return std::malloc(n); }
+static void CE_CALL h_dealloc(void*, void* p, size_t) { std::free(p); }
+
+int main() {
+  CeHostVtable vt; std::memset(&vt, 0, sizeof vt);
+  vt.abi_version = CE_ABI_VERSION; vt.struct_size = (uint32_t) sizeof vt;
+  vt.set = h_set; vt.get = h_get; vt.send_cc = h_cc; vt.send_nrpn = h_nrpn; vt.send_sysex = h_sysex;
+  vt.log = h_log; vt.emit = h_emit; vt.free_value = h_free; vt.alloc = h_alloc; vt.dealloc = h_dealloc;
+  vt.log_value = h_log_value; vt.send_sysex_value = h_sysex_value;
+  void* state = nullptr;
+  if (ce_handler_init(&vt, &state) != 0) { std::puts("ce_handler_init failed"); return 1; }
+  CeValue payload; std::memset(&payload, 0, sizeof payload); payload.tag = CE_DOUBLE; payload.u.d = ${EV};
+  const CeStr ev { "onValueChanged", 14 };
+  for (const char* id : { "canonical", "core" }) {
+    const CeStr sid { id, (int64_t) std::strlen(id) };
+    std::printf("S %s\\n", id);
+    if (!ce_handler_has(state, sid, ev)) { std::printf("no handler for %s\\n", id); return 1; }
+    const int rc = ce_handler_dispatch(state, sid, ev, &payload, nullptr);
+    if (rc != 0) { std::printf("dispatch %s returned %d\\n", id, rc); return 1; }
+  }
+  ce_handler_shutdown(state);
+  return 0;
+}
+`;
+}
+
 async function validateCpp() {
   const compiler = resolveCommand(['g++', 'clang++', 'cl']);
   if (!compiler) return result('cpp', 'skip', 'C++ compiler not found.');
-  const { directory, filePath } = await writeTargetFile('cpp', 'macroRouting.cpp', cppHarness());
-  const outPath = path.join(directory, process.platform === 'win32' ? 'macroRouting.exe' : 'macroRouting');
+  const directory = path.join(workspaceRoot, 'cpp');
+  const generateCppModule = await generator('cpp/genCpp.mjs', 'generateCppModule');
+  const runtimeDir = path.join(nativeDir, 'cpp');
+  generateCppModule({ scripts: NATIVE_SCRIPTS('cpp'), outDir: directory, abiHeaderDir: abiDir, runtimeHeaderDir: runtimeDir });
+  await writeFile(path.join(directory, 'host.cpp'), cppRecordingHost(), 'utf8');
+  const outPath = path.join(directory, process.platform === 'win32' ? 'exported.exe' : 'exported');
   const isMsvc = /(^|[\\/])cl(\.exe)?$/i.test(compiler);
+  // -ffp-contract=off as the export builds it: a fused multiply-add rounds once where JS rounds twice.
   const compile = isMsvc
-    ? runExecutable(compiler, ['/nologo', '/EHsc', '/std:c++20', filePath, `/Fe:${outPath}`], directory)
-    : runExecutable(compiler, ['-std=c++20', filePath, '-o', outPath], directory);
-  if (compile.status !== 0) return result('cpp', 'fail', combineOutput(compile), { tool: compiler });
+    ? runExecutable(compiler, ['/nologo', '/EHsc', '/std:c++20', '/O2', '/fp:precise', `/I${abiDir}`, `/I${runtimeDir}`,
+      path.join(directory, 'glue.cpp'), path.join(directory, 'host.cpp'), `/Fe:${outPath}`], directory)
+    : runExecutable(compiler, ['-std=c++20', '-O2', '-ffp-contract=off', '-I', abiDir, '-I', runtimeDir,
+      path.join(directory, 'glue.cpp'), path.join(directory, 'host.cpp'), '-o', outPath], directory);
+  if (compile.status !== 0) return result('cpp', 'fail', `genCpp's module did not compile:\n${combineOutput(compile)}`, { tool: compiler });
   const exec = runExecutable(outPath, [], directory);
-  return exec.status === 0
-    ? result('cpp', 'pass', 'compiled and panel-API harness passed.', { tool: compiler })
-    : result('cpp', 'fail', combineOutput(exec), { tool: compiler });
+  if (exec.status !== 0) return result('cpp', 'fail', combineOutput(exec), { tool: compiler });
+  const mismatch = compareRuns('cpp', parseRecords(exec.stdout));
+  return mismatch
+    ? result('cpp', 'fail', mismatch, { tool: compiler })
+    : result('cpp', 'pass', 'genCpp module compiled and dispatched; every call matches the preview.', { tool: compiler });
+}
+
+function csharpRecordingHost() {
+  return `// The recording host for validate-script-exports.mjs: the generated module's own exports, called
+// through function pointers exactly as the native shim calls them.
+using System;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text;
+
+namespace Ce
+{
+    internal static unsafe class ExportHarness
+    {
+        static string Text(CeStr s)
+        {
+            string v = Utf8.Decode(s);
+            var sb = new StringBuilder("\\"");
+            foreach (char c in v)
+            {
+                if (c == '"' || c == '\\\\') sb.Append('\\\\').Append(c);
+                else if (c < 0x20 || c > 0x7E) sb.Append("\\\\u").Append(((int)c).ToString("x4"));
+                else sb.Append(c);
+            }
+            return sb.Append('"').ToString();
+        }
+        static string Enc(CeValue* v)
+        {
+            if (v == null) return "null";
+            switch ((CeTag)v->tag)
+            {
+                case CeTag.Double: return "{\\"f\\":\\"" + BitConverter.DoubleToInt64Bits(v->d).ToString("x16") + "\\"}";
+                case CeTag.Int64: return "{\\"i\\":\\"" + v->i.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\\"}";
+                case CeTag.Bool: return v->b != 0 ? "true" : "false";
+                case CeTag.String: return Text(v->s);
+                case CeTag.List:
+                {
+                    var items = (CeValue*)v->list.items;
+                    var sb = new StringBuilder("[");
+                    for (long i = 0; i < v->list.len; i++) { if (i > 0) sb.Append(','); sb.Append(Enc(&items[i])); }
+                    return sb.Append(']').ToString();
+                }
+                default: return "null";
+            }
+        }
+        static readonly System.IO.Stream Stdout = Console.OpenStandardOutput();
+        static void Out(string call) { var b = Encoding.ASCII.GetBytes("R " + call + "\\n"); Stdout.Write(b, 0, b.Length); Stdout.Flush(); }
+        static void Line(string s) { var b = Encoding.ASCII.GetBytes(s + "\\n"); Stdout.Write(b, 0, b.Length); Stdout.Flush(); }
+
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        static int Set(IntPtr c, CeStr* k, CeValue* v, CeValue* o) { Out("[\\"set\\"," + Text(*k) + "," + Enc(v) + "]"); return 0; }
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        static int Get(IntPtr c, CeStr* k, CeStr* f, CeValue* o)
+        {
+            o->tag = (int)CeTag.Null;
+            if (Utf8.Decode(*k) == ${JSON.stringify(CORE_GET.path)}) { o->tag = (int)CeTag.Double; o->d = ${CORE_GET.value}; }
+            return 0;
+        }
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        static void Cc(IntPtr c, int ch, int cc, CeValue* v) { Out("[\\"cc\\"," + ch + "," + cc + "," + Enc(v) + "]"); }
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        static void Nrpn(IntPtr c, int ch, int msb, int lsb, CeValue* v) { Out("[\\"nrpn\\"," + ch + "," + msb + "," + lsb + "," + Enc(v) + "]"); }
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        static void Sysex(IntPtr c, CeBytes* b)
+        {
+            var sb = new StringBuilder("[\\"sysex-packed\\",[");
+            for (long i = 0; i < b->len; i++) { if (i > 0) sb.Append(','); sb.Append(((byte*)b->ptr)[i]); }
+            Out(sb.Append("]]").ToString());
+        }
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        static void Log(IntPtr c, int level, CeStr* m) { Out("[\\"log\\"," + Text(*m) + "]"); }
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        static void LogValue(IntPtr c, int level, CeStr* m, CeValue* v) { Out("[\\"log\\"," + Text(*m) + "," + Enc(v) + "]"); }
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        static void SysexValue(IntPtr c, CeValue* v) { Out("[\\"sysex\\"," + Enc(v) + "]"); }
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        static void Emit(IntPtr c, CeStr* n, CeValue* v) { Out("[\\"emit\\"," + Text(*n) + "," + Enc(v) + "]"); }
+        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        static void Free(IntPtr c, CeValue* v) { }
+
+        static CeStr Ascii(string s, byte* buf) { for (int i = 0; i < s.Length; i++) buf[i] = (byte)s[i]; return new CeStr { ptr = (IntPtr)buf, len = s.Length }; }
+
+        static int Main()
+        {
+            var vt = (CeHostVtable*)NativeMemory.AllocZeroed((nuint)sizeof(CeHostVtable));
+            vt->abi_version = Abi.Version;
+            vt->struct_size = (uint)sizeof(CeHostVtable);
+            vt->set = &Set; vt->get = &Get; vt->send_cc = &Cc; vt->send_nrpn = &Nrpn; vt->send_sysex = &Sysex;
+            vt->log = &Log; vt->emit = &Emit; vt->free_value = &Free;
+            vt->log_value = &LogValue; vt->send_sysex_value = &SysexValue;
+
+            delegate* unmanaged[Cdecl]<CeHostVtable*, void**, int> init = &Exports.Init;
+            delegate* unmanaged[Cdecl]<void*, CeStr, CeStr, int> has = &Exports.Has;
+            delegate* unmanaged[Cdecl]<void*, CeStr, CeStr, CeValue*, CeValue*, int> dispatch = &Exports.Dispatch;
+            void* state = null;
+            if (init(vt, &state) != 0) { Line("ce_handler_init failed"); return 1; }
+            var payload = new CeValue { tag = (int)CeTag.Double, d = ${EV} };
+            byte* evBuf = stackalloc byte[64]; byte* idBuf = stackalloc byte[64];
+            CeStr ev = Ascii("onValueChanged", evBuf);
+            foreach (var id in new[] { "canonical", "core" })
+            {
+                CeStr sid = Ascii(id, idBuf);
+                Line("S " + id);
+                if (has(state, sid, ev) != 1) { Line("no handler for " + id); return 1; }
+                int rc = dispatch(state, sid, ev, &payload, null);
+                if (rc != 0) { Line("dispatch " + id + " returned " + rc); return 1; }
+            }
+            return 0;
+        }
+    }
+}
+`;
 }
 
 async function validateCsharp() {
@@ -426,59 +645,134 @@ async function validateCsharp() {
     return result('csharp', 'skip', 'dotnet runtime found, but no .NET SDK is installed for build validation.', { tool: dotnet });
   }
   const directory = path.join(workspaceRoot, 'csharp');
-  await mkdir(directory, { recursive: true });
-  await writeFile(path.join(directory, 'ScriptHarness.csproj'), [
+  const genDir = path.join(directory, 'module');
+  const runDir = path.join(directory, 'run');
+  await mkdir(runDir, { recursive: true });
+  const generateCsharpModule = await generator('csharp/genCsharp.mjs', 'generateCsharpModule');
+  generateCsharpModule({ scripts: NATIVE_SCRIPTS('csharp'), outDir: genDir, abiInfo: { dir: abiDir } });
+  await writeFile(path.join(runDir, 'ExportHarness.cs'), csharpRecordingHost(), 'utf8');
+  // The module's own sources, less its no-op Program.cs (the harness has the entry point), built as
+  // an ordinary framework-dependent program — no self-contained publish, no native shim.
+  const moduleSources = ['CeRuntime.cs', 'HandlerRegistry.Registration.cs', 'Handlers.canonical.cs', 'Handlers.core.cs'];
+  await writeFile(path.join(runDir, 'ExportHarness.csproj'), [
     '<Project Sdk="Microsoft.NET.Sdk">',
     '  <PropertyGroup>',
     '    <OutputType>Exe</OutputType>',
     '    <TargetFramework>net8.0</TargetFramework>',
+    '    <Nullable>enable</Nullable>',
     '    <ImplicitUsings>disable</ImplicitUsings>',
-    '    <Nullable>disable</Nullable>',
+    '    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>',
+    '    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>',
     '  </PropertyGroup>',
+    '  <ItemGroup>',
+    '    <Compile Include="ExportHarness.cs" />',
+    ...moduleSources.map((f) => `    <Compile Include="../module/${f}" />`),
+    '  </ItemGroup>',
     '</Project>',
     '',
   ].join('\n'), 'utf8');
-  await writeFile(path.join(directory, 'Program.cs'), csharpHarness(), 'utf8');
-  const exec = runExecutable(dotnet, ['run', '--nologo', '--project', path.join(directory, 'ScriptHarness.csproj')], directory);
-  return exec.status === 0
-    ? result('csharp', 'pass', 'dotnet run panel-API harness passed.', { tool: dotnet })
-    : result('csharp', 'fail', combineOutput(exec), { tool: dotnet });
+  const exec = runExecutable(dotnet, ['run', '--nologo', '-c', 'Release', '--project', path.join(runDir, 'ExportHarness.csproj')], runDir);
+  if (exec.status !== 0) return result('csharp', 'fail', `genCsharp's module did not build or run:\n${combineOutput(exec)}`, { tool: dotnet });
+  const mismatch = compareRuns('csharp', parseRecords(exec.stdout));
+  return mismatch
+    ? result('csharp', 'fail', mismatch, { tool: dotnet })
+    : result('csharp', 'pass', 'genCsharp module built and dispatched; every call matches the preview.', { tool: dotnet });
+}
+
+function javaRecordingHost() {
+  return `// The recording host for validate-script-exports.mjs. CeRuntime.HOST is the one seam: everything
+// else — the registry, the dispatch entry point, CeContext, CeEvent — is the generated module's own.
+public final class ExportHarness implements CeHostCalls {
+    static String text(String v) {
+        StringBuilder sb = new StringBuilder("\\"");
+        for (int i = 0; i < v.length(); i++) {
+            char c = v.charAt(i);
+            if (c == '"' || c == '\\\\') sb.append('\\\\').append(c);
+            else if (c < 0x20 || c > 0x7E) sb.append(String.format("\\\\u%04x", (int) c));
+            else sb.append(c);
+        }
+        return sb.append('"').toString();
+    }
+    static String dbl(double d) { return "{\\"f\\":\\"" + String.format("%016x", Double.doubleToRawLongBits(d)) + "\\"}"; }
+    static String kind(int kind, double d, String s) {
+        return kind == CeRuntime.CE_DOUBLE ? dbl(d) : kind == CeRuntime.CE_STRING ? text(s) : "null";
+    }
+    static void out(String call) { System.out.print("R " + call + "\\n"); }
+
+    public void   setD(long h, String key, double v)        { out("[\\"set\\"," + text(key) + "," + dbl(v) + "]"); }
+    public void   setS(long h, String key, String v)        { out("[\\"set\\"," + text(key) + "," + text(v) + "]"); }
+    public void   setB(long h, String key, boolean v)       { out("[\\"set\\"," + text(key) + "," + v + "]"); }
+    public int    getKind(long h, String key, String form)  { return ${JSON.stringify(CORE_GET.path)}.equals(key) ? CeRuntime.CE_DOUBLE : CeRuntime.CE_NULL; }
+    public double getD(long h, String key, String form)     { return ${JSON.stringify(CORE_GET.path)}.equals(key) ? ${CORE_GET.value} : 0; }
+    public String getS(long h, String key, String form)     { return ""; }
+    public void   ccD(long h, int ch, int cc, double v)     { out("[\\"cc\\"," + ch + "," + cc + "," + dbl(v) + "]"); }
+    public void   ccS(long h, int ch, int cc, String v)     { out("[\\"cc\\"," + ch + "," + cc + "," + text(v) + "]"); }
+    public void   nrpnV(long h, int ch, int msb, int lsb, int k, double d, String s) { out("[\\"nrpn\\"," + ch + "," + msb + "," + lsb + "," + kind(k, d, s) + "]"); }
+    public void   sysexList(long h, int[] bytes) {
+        StringBuilder sb = new StringBuilder("[\\"sysex\\",[");
+        for (int i = 0; i < bytes.length; i++) { if (i > 0) sb.append(','); sb.append("{\\"i\\":\\"").append(bytes[i]).append("\\"}"); }
+        out(sb.append("]]").toString());
+    }
+    public void   sysexHex(long h, String hex)              { out("[\\"sysex\\"," + text(hex) + "]"); }
+    public void   log(long h, int level, String msg)        { out("[\\"log\\"," + text(msg) + "]"); }
+    public void   logV(long h, int level, String msg, int k, double d, String s) { out("[\\"log\\"," + text(msg) + "," + kind(k, d, s) + "]"); }
+    public void   emitD(long h, String name, double v)      { out("[\\"emit\\"," + text(name) + "," + dbl(v) + "]"); }
+    public void   emitS(long h, String name, String v)      { out("[\\"emit\\"," + text(name) + "," + text(v) + "]"); }
+    public int    pKind(long p, String key)                 { return "value".equals(key) ? CeRuntime.CE_DOUBLE : -1; }
+    public double pD(long p, String key)                    { return "value".equals(key) ? ${EV} : 0; }
+    public String pS(long p, String key)                    { return ""; }
+
+    public static void main(String[] args) {
+        CeRuntime.HOST = new ExportHarness();
+        if (CeRuntime.init() != 0) { System.out.println("init failed"); System.exit(1); }
+        for (String id : new String[] { "canonical", "core" }) {
+            System.out.print("S " + id + "\\n");
+            if (CeRuntime.has(id, "onValueChanged") != 1) { System.out.println("no handler for " + id); System.exit(1); }
+            int rc = CeRuntime.dispatch(id, "onValueChanged", 1L, 1L);
+            if (rc != 0) { System.out.println("dispatch " + id + " returned " + rc); System.exit(1); }
+        }
+        System.out.flush();
+    }
+}
+`;
 }
 
 async function validateJava() {
   const javac = resolveCommand(['javac']);
   const java = resolveCommand(['java']);
   if (!javac) return result('java', 'skip', 'javac not found.');
-  const { directory, filePath } = await writeTargetFile('java', 'MacroRouting.java', javaHarness());
-  const compile = runExecutable(javac, [filePath], directory);
-  if (compile.status !== 0) return result('java', 'fail', combineOutput(compile), { tool: javac });
-  if (!java) return result('java', 'pass', 'javac compiled the harness; java not found for the runtime pass.', { tool: javac });
-  const exec = runExecutable(java, ['-cp', directory, 'MacroRouting'], directory);
-  return exec.status === 0
-    ? result('java', 'pass', 'javac and panel-API harness passed.', { tool: javac })
-    : result('java', 'fail', combineOutput(exec), { tool: javac });
+  const directory = path.join(workspaceRoot, 'java');
+  const classes = path.join(directory, 'classes');
+  await mkdir(classes, { recursive: true });
+  const generateJavaModule = await generator('java/genJava.mjs', 'generateJavaModule');
+  const gen = generateJavaModule({ scripts: NATIVE_SCRIPTS('java'), outDir: directory, abiInfo: { dir: abiDir } });
+  await writeFile(path.join(directory, 'ExportHarness.java'), javaRecordingHost(), 'utf8');
+  const sources = [...gen.javaSources, 'ExportHarness.java'].map((f) => path.join(directory, f));
+  const compile = runExecutable(javac, ['-encoding', 'UTF-8', '-d', classes, ...sources], directory);
+  if (compile.status !== 0) return result('java', 'fail', `genJava's module did not compile:\n${combineOutput(compile)}`, { tool: javac });
+  if (!java) return result('java', 'pass', 'genJava module compiled; java not found for the run.', { tool: javac });
+  const exec = runExecutable(java, ['-cp', classes, 'ExportHarness'], directory);
+  if (exec.status !== 0) return result('java', 'fail', combineOutput(exec), { tool: javac });
+  const mismatch = compareRuns('java', parseRecords(exec.stdout));
+  return mismatch
+    ? result('java', 'fail', mismatch, { tool: javac })
+    : result('java', 'pass', 'genJava module compiled and dispatched; every call matches the preview.', { tool: javac });
 }
 
 // The interpreted-subset languages ship TWO executors: the real compiler at export, and the
 // CeScript interpreter that moves controls live in the editor. They must agree, or a script
 // behaves one way while designing and another way once exported. Pure JS — always runs.
 const INTERPRETERS = [
-  { language: 'cpp', handler: 'onValueChanged', compile: compileCpp, invoke: invokeCpp, event: () => ({ value: EV }) },
-  { language: 'csharp', handler: 'OnValueChanged', compile: compileCsharp, invoke: invokeCsharp, event: () => ({ value: EV, Value: EV }) },
-  { language: 'java', handler: 'onValueChanged', compile: compileJava, invoke: invokeJava, event: () => ({ value: EV }) },
+  { language: 'cpp', handler: 'onValueChanged', compile: compileCpp, invoke: invokeCpp },
+  { language: 'csharp', handler: 'OnValueChanged', compile: compileCsharp, invoke: invokeCsharp },
+  { language: 'java', handler: 'onValueChanged', compile: compileJava, invoke: invokeJava },
 ];
 
 async function validateInterpreters() {
   const failures = [];
   for (const spec of INTERPRETERS) {
     const { patches, midi, api } = createRecordingApi();
-    const ctx = {
-      ...api,
-      setValue: api.set, getValue: api.get,
-      SetValue: api.set, GetValue: api.get, Log: api.log,
-      SendCC: api.sendCC, SendNRPN: api.sendNRPN, SendSysex: api.sendSysex,
-      Clamp: api.clamp, Scale: api.scale, Round: api.round,
-    };
+    const ctx = previewContextFor(spec.language, api);
     const { handlers, diagnostics } = spec.compile(SOURCES[spec.language]);
     if (diagnostics.length) {
       failures.push(`${spec.language}: ${diagnostics.join('; ')}`);
@@ -490,7 +784,7 @@ async function validateInterpreters() {
       continue;
     }
     try {
-      spec.invoke(fn, [ctx, spec.event()]);
+      spec.invoke(fn, [ctx, previewEventFor(spec.language, EV)]);
     } catch (e) {
       failures.push(`${spec.language}: ${e?.message ?? e}`);
       continue;

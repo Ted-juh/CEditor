@@ -7498,9 +7498,35 @@ function runSetupEntryPoint(script, handlers, ctx, invoke, print, label) {
   return null;
 }
 
+/**
+ * The `ctx` a C++, C# or Java handler is handed in the preview, over a given panel API, and the event
+ * it is handed with a payload. One definition, exported, because the export validator has to put the
+ * compiled handler against exactly this: the compiled C++/C#/Java context accepts every spelling of
+ * the core API that this one does (validate-script-exports.mjs runs the same source through both and
+ * compares every call), and a second copy of these lists would be free to drift from the first.
+ */
+export function previewContextFor(language, api) {
+  const ctx = { ...api, setValue: api.set, getValue: api.get };
+  if (language !== 'csharp') return ctx;
+  // C# in both spellings: the API's own lower-case names and C#'s PascalCase ones.
+  return {
+    ...ctx,
+    SetValue: api.set, GetValue: api.get, Log: api.log,
+    SendCC: api.sendCC, SendNRPN: api.sendNRPN, SendSysex: api.sendSysex,
+    Clamp: api.clamp, Scale: api.scale, Round: api.round, Snap: api.snap, Lerp: api.lerp, Curve: api.curve,
+  };
+}
+
+export function previewEventFor(language, payload) {
+  if (language !== 'csharp') return payload && typeof payload === 'object' ? payload : { value: payload };
+  return payload && typeof payload === 'object'
+    ? { ...payload, Value: payload.value, FirstTime: payload.firstTime }
+    : { value: payload, Value: payload };
+}
+
 function loadHandlersCpp(script) {
   const api = buildApi(ownerOf(script), script.id);
-  const ctx = { ...api, setValue: api.set, getValue: api.get };
+  const ctx = previewContextFor('cpp', api);
   const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
   const { handlers: parsed, diagnostics } = compileCpp(script.source);
   for (const d of diagnostics) addScriptTrace('error', script.id, `C++ preview: ${d}`);
@@ -7509,7 +7535,7 @@ function loadHandlersCpp(script) {
   for (const [name, fnNode] of parsed) {
     if (name === entry) continue;
     out[name] = (payload) => {
-      const event = payload && typeof payload === 'object' ? payload : { value: payload };
+      const event = previewEventFor('cpp', payload);
       try { return invokeCpp(fnNode, [ctx, event], { print }); }
       catch (e) { addScriptTrace('error', script.id, `C++ preview runtime error: ${e?.message ?? e}`); }
     };
@@ -7523,12 +7549,7 @@ function loadHandlersCpp(script) {
 // (the skeleton) or PascalCase (idiomatic C#).
 function loadHandlersCsharp(script) {
   const api = buildApi(ownerOf(script), script.id);
-  const ctx = {
-    ...api, setValue: api.set, getValue: api.get,
-    SetValue: api.set, GetValue: api.get, Log: api.log,
-    SendCC: api.sendCC, SendNRPN: api.sendNRPN, SendSysex: api.sendSysex,
-    Clamp: api.clamp, Scale: api.scale, Round: api.round, Snap: api.snap, Lerp: api.lerp, Curve: api.curve,
-  };
+  const ctx = previewContextFor('csharp', api);
   const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
   const { handlers: parsed, diagnostics } = compileCsharp(script.source);
   for (const d of diagnostics) addScriptTrace('error', script.id, `C# preview: ${d}`);
@@ -7537,9 +7558,7 @@ function loadHandlersCsharp(script) {
   for (const [name, fnNode] of parsed) {
     if (name === entry) continue;
     const fire = (payload) => {
-      const event = payload && typeof payload === 'object'
-        ? { ...payload, Value: payload.value, FirstTime: payload.firstTime }
-        : { value: payload, Value: payload };
+      const event = previewEventFor('csharp', payload);
       try { return invokeCsharp(fnNode, [ctx, event], { print }); }
       catch (e) { addScriptTrace('error', script.id, `C# preview runtime error: ${e?.message ?? e}`); }
     };
@@ -7554,7 +7573,7 @@ function loadHandlersCsharp(script) {
 // Interpreted preview of the Java behavior-handler subset (javaPreview.js).
 function loadHandlersJava(script) {
   const api = buildApi(ownerOf(script), script.id);
-  const ctx = { ...api, setValue: api.set, getValue: api.get };
+  const ctx = previewContextFor('java', api);
   const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
   const { handlers: parsed, diagnostics } = compileJava(script.source);
   for (const d of diagnostics) addScriptTrace('error', script.id, `Java preview: ${d}`);
@@ -7563,7 +7582,7 @@ function loadHandlersJava(script) {
   for (const [name, fnNode] of parsed) {
     if (name === entry) continue;
     out[name] = (payload) => {
-      const event = payload && typeof payload === 'object' ? payload : { value: payload };
+      const event = previewEventFor('java', payload);
       try { return invokeJava(fnNode, [ctx, event], { print }); }
       catch (e) { addScriptTrace('error', script.id, `Java preview runtime error: ${e?.message ?? e}`); }
     };

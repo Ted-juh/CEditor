@@ -184,6 +184,73 @@ static void JNICALL n_emitS(JNIEnv* e, jclass c, jlong host, jstring name, jstri
     (*e)->ReleaseStringUTFChars(e, s, sv);
     (*e)->ReleaseStringUTFChars(e, name, nm);
 }
+/* A value of the kind Java picked: CE_NULL, CE_DOUBLE (d) or CE_STRING (s). The string's UTF-8 is
+ * borrowed from `s` and must be released by the caller (ce_release_kind) after the host call. */
+static CeValue ce_kind_value(JNIEnv* e, jint kind, jdouble d, jstring s, const char** utf) {
+    CeValue v; memset(&v, 0, sizeof v); *utf = NULL;
+    if (kind == CE_DOUBLE) { v.tag = CE_DOUBLE; v.u.d = d; }
+    else if (kind == CE_STRING && s) { *utf = (*e)->GetStringUTFChars(e, s, NULL); v.tag = CE_STRING; v.u.s = ce_str(*utf); }
+    else v.tag = CE_NULL;
+    return v;
+}
+static void ce_release_kind(JNIEnv* e, jstring s, const char* utf) { if (utf) (*e)->ReleaseStringUTFChars(e, s, utf); }
+
+/* log(message, value): the value goes to the host as it is, through log_value. A host older than that
+ * slot gets the message alone, which is what a compiled handler always got before. */
+static void JNICALL n_logV(JNIEnv* e, jclass c, jlong host, jint level, jstring msg, jint kind, jdouble d, jstring s) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt) return;
+    const char* m = (*e)->GetStringUTFChars(e, msg, NULL);
+    CeStr ms = ce_str(m);
+    if (CE_HAS_FIELD(vt, log_value) && vt->log_value) {
+        const char* utf; CeValue v = ce_kind_value(e, kind, d, s, &utf);
+        vt->log_value(vt->host_ctx, level, &ms, &v);
+        ce_release_kind(e, s, utf);
+    } else if (vt->log) {
+        vt->log(vt->host_ctx, level, &ms);
+    }
+    (*e)->ReleaseStringUTFChars(e, msg, m);
+}
+static void JNICALL n_nrpnV(JNIEnv* e, jclass c, jlong host, jint ch, jint msb, jint lsb, jint kind, jdouble d, jstring s) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->send_nrpn) return;
+    const char* utf; CeValue v = ce_kind_value(e, kind, d, s, &utf);
+    vt->send_nrpn(vt->host_ctx, ch, msb, lsb, &v);
+    ce_release_kind(e, s, utf);
+}
+/* sendSysex(int[]): a list of numbers to send_sysex_value, so the host clamps and frames it exactly as
+ * it does for Lua and JS. A host older than that slot takes packed bytes, clamped here as it would. */
+static void JNICALL n_sysexList(JNIEnv* e, jclass c, jlong host, jintArray arr) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !arr) return;
+    jsize n = (*e)->GetArrayLength(e, arr);
+    jint* xs = (*e)->GetIntArrayElements(e, arr, NULL);
+    if (CE_HAS_FIELD(vt, send_sysex_value) && vt->send_sysex_value) {
+        CeValue* items = (CeValue*)calloc(n > 0 ? (size_t)n : 1, sizeof(CeValue));
+        for (jsize i = 0; i < n; i++) { items[i].tag = CE_INT64; items[i].u.i = xs[i]; }
+        CeValue list; memset(&list, 0, sizeof list); list.tag = CE_LIST; list.u.list.items = items; list.u.list.len = n;
+        vt->send_sysex_value(vt->host_ctx, &list);
+        free(items);
+    } else if (vt->send_sysex) {
+        uint8_t* packed = (uint8_t*)malloc(n > 0 ? (size_t)n : 1);
+        for (jsize i = 0; i < n; i++) packed[i] = (uint8_t)(xs[i] < 0 ? 0 : xs[i] > 255 ? 255 : xs[i]);
+        CeBytes b; b.ptr = packed; b.len = n;
+        vt->send_sysex(vt->host_ctx, &b);
+        free(packed);
+    }
+    (*e)->ReleaseIntArrayElements(e, arr, xs, JNI_ABORT);
+}
+/* sendSysex("F0 41 …"): the string to send_sysex_value, which parses it as the host does for every
+ * other language. A host older than that slot cannot take a string at all, and says so. */
+static void JNICALL n_sysexHex(JNIEnv* e, jclass c, jlong host, jstring hex) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt) return;
+    if (!(CE_HAS_FIELD(vt, send_sysex_value) && vt->send_sysex_value)) {
+        if (vt->log) { CeStr m = ce_str("sendSysex(\"\xE2\x80\xA6\"): this host takes a list of bytes, not a hex string."); vt->log(vt->host_ctx, 0, &m); }
+        return;
+    }
+    const char* h = (*e)->GetStringUTFChars(e, hex, NULL);
+    CeValue v; memset(&v, 0, sizeof v); v.tag = CE_STRING; v.u.s = ce_str(h);
+    vt->send_sysex_value(vt->host_ctx, &v);
+    (*e)->ReleaseStringUTFChars(e, hex, h);
+}
+
 /* payload accessors: p = (CeValue*) address (no host needed) */
 static jint JNICALL n_pKind(JNIEnv* e, jclass c, jlong p, jstring key) {
     (void)c;
@@ -224,6 +291,10 @@ static const JNINativeMethod kNatives[] = {
     { "nLog",    "(JILjava/lang/String;)V",                      (void*)n_log    },
     { "nEmitD",  "(JLjava/lang/String;D)V",                      (void*)n_emitD  },
     { "nEmitS",  "(JLjava/lang/String;Ljava/lang/String;)V",     (void*)n_emitS  },
+    { "nLogV",   "(JILjava/lang/String;IDLjava/lang/String;)V",  (void*)n_logV   },
+    { "nNrpnV",  "(JIIIIDLjava/lang/String;)V",                  (void*)n_nrpnV  },
+    { "nSysexList", "(J[I)V",                                    (void*)n_sysexList },
+    { "nSysexHex",  "(JLjava/lang/String;)V",                    (void*)n_sysexHex  },
     { "nPKind",  "(JLjava/lang/String;)I",                       (void*)n_pKind  },
     { "nPD",     "(JLjava/lang/String;)D",                       (void*)n_pD     },
     { "nPS",     "(JLjava/lang/String;)Ljava/lang/String;",      (void*)n_pS     },
