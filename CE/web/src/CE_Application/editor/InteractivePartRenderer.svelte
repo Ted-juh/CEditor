@@ -6,6 +6,7 @@
   import { plainFillCSS } from '../utils/plainFillCSS.js';
   import { materialActive } from '../utils/materialFilter.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
+  import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
 
   let {
     part = null,
@@ -58,15 +59,10 @@
     }
   }
 
+  // The part's own transition, plus the colour timing its painting children read (see
+  // utils/transitionCss.js). Always set, so a part never borrows its control's colour timing.
   function buildTransitionStyle(bucket) {
-    const rules = [];
-    if (bucket?.transform) rules.push(`transform ${bucket.transform}`);
-    if (bucket?.opacity) rules.push(`opacity ${bucket.opacity}`);
-    if (bucket?.size) {
-      rules.push(`width ${bucket.size}`);
-      rules.push(`height ${bucket.size}`);
-    }
-    return rules.length ? `transition:${rules.join(', ')};` : '';
+    return `${transitionDeclaration(bucket, { target: 'part' })} ${colourTransitionVar(bucket?.colour ?? null)}`.trim();
   }
 
   let layout = $derived(part?._children?.Layout ?? null);
@@ -501,13 +497,13 @@
       <MaterialFilter id={materialId} {material} />
     {/if}
     {#if background && usesSimpleBackground && !rendersVectorShape}
-      <div class="interactive-simple-background" style={simpleBackgroundStyle}></div>
+      <div class="interactive-simple-background ce-colour-anim" style={simpleBackgroundStyle}></div>
     {:else if background && !rendersVectorShape}
       <BackgroundRenderer {background} width={frame.width} height={frame.height} absorbFill={!!absorbedFillCSS} />
     {/if}
 
     {#if rendersVectorShape && vectorShapeSvg}
-      <svg class="interactive-vector-shape" viewBox={`0 0 ${vectorShapeSvg.width} ${vectorShapeSvg.height}`} preserveAspectRatio="none" aria-hidden="true">
+      <svg class="interactive-vector-shape ce-colour-anim" viewBox={`0 0 ${vectorShapeSvg.width} ${vectorShapeSvg.height}`} preserveAspectRatio="none" aria-hidden="true">
         {#if vectorShapeSvg.line}
           <line
             x1={vectorShapeSvg.line.x1}
@@ -573,7 +569,7 @@
     {/if}
 
     {#if text && !editableInput}
-      <div class="interactive-part-text" style={textStyle}>
+      <div class="interactive-part-text ce-colour-anim" style={textStyle}>
         {text?.content ?? ''}
       </div>
     {:else if editableInput}
@@ -611,6 +607,13 @@
     position: absolute;
     box-sizing: border-box;
     pointer-events: none;
+  }
+
+  /* The elements inside a part that paint a colour glide with the part's colour timing. */
+  .ce-colour-anim,
+  .interactive-vector-shape :global(line),
+  .interactive-vector-shape :global(polygon) {
+    transition: var(--ce-colour-transition, none);
   }
 
   /* Editable value field — make editing visually obvious (caret + focus highlight). */

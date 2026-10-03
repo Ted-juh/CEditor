@@ -1,78 +1,67 @@
 /**
  * animationModel.js — the working parts of the Animation tab, with no Svelte in them.
  *
- * This file answers one question the editor has never asked: will this animation target actually
- * do anything?
+ * This file answers the questions the editor never asked:
  *
- * The runtime (`buildTransitionCatalog` in `utils/interactionRuntime.js`) only accepts a short,
- * fixed list of property paths. The Animations editor offers a "Property" dropdown with seven
- * choices, and two of them — Fill Colour and Text Colour — are not on that list. Pick one, click
- * Append target, and you get an animation that never runs. Nothing tells you.
+ *   - Will this target actually do anything? (`targetStatus`)
+ *   - Do two animations fight over the same property for the same change? (`findClashes`)
+ *   - Are the trigger's states ones this control has? (`unknownTriggerStates`)
+ *   - What does animating this cost the browser? (`targetCost`)
  *
- * Measured, by running the real runtime over each of the seven:
- *
- *   Scale, Rotation, X Position, Y Position  →  animates
- *   Opacity                                  →  animates
- *   Fill Colour                              →  nothing
- *   Text Colour                              →  nothing
- *
- * `targetStatus()` below is the same rule the runtime uses, written out so the editor can show it.
- * If the runtime ever accepts more paths, `animationModel.test.js` fails, because it runs both.
+ * The rule for the first is the runtime's own table (`PART_PATH_BUCKETS` and friends in
+ * utils/interactionRuntime.js), read rather than copied. It used to be a copy, and the copy said
+ * Fill colour and Text colour animate nothing, which was true: the runtime had no colour bucket.
+ * It has one now, and the two choices the properties panel has always offered work.
+ * `animationModel.test.js` still runs the real runtime over every offered property and checks the
+ * answer, so the tab cannot drift from what plays.
  */
-import { EASING_BEZIERS, EASING_NAMES } from './interactionRuntime.js';
+import {
+  EASING_BEZIERS,
+  EASING_NAMES,
+  PART_PATH_BUCKETS,
+  ROOT_PATH_BUCKETS,
+  BUCKET_HINTS,
+  ROOT_BUCKETS,
+  targetBuckets,
+  readTrigger,
+} from './interactionRuntime.js';
+import { OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT, readEasing, easeAt } from './easing.js';
 
-export { EASING_BEZIERS, EASING_NAMES };
+export { EASING_BEZIERS, EASING_NAMES, OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT };
 
-/** The only animation kind the runtime does anything with. The editor lets you type any word. */
-export const ANIMATION_KINDS = ['transition'];
+/**
+ * The animation kinds the runtime plays. A transition moves a property when something changes; a
+ * keyframe animation runs a shape of its own — a pulse, a blink — while its trigger holds, or once
+ * each time it fires.
+ */
+export const ANIMATION_KINDS = ['transition', 'keyframes'];
 
 export const TRIGGER_TYPES = ['stateChange', 'valueChange'];
 
-/**
- * The paths the runtime accepts on a part, and what each one animates.
- *
- * Copied from `buildTransitionCatalog`. Nothing else works.
- */
-export const PART_PATHS = {
-  'Layout.x': 'transform',
-  'Layout.y': 'transform',
-  'Layout.offsetX': 'transform',
-  'Layout.offsetY': 'transform',
-  'Layout.rotation': 'transform',
-  'Layout.scale': 'transform',
-  opacity: 'opacity',
-  'Layout.width': 'size',
-  'Layout.height': 'size',
-};
+/** What can start a keyframe animation. A transition only ever answers a state or value change. */
+export const KEYFRAME_TRIGGER_TYPES = ['always', 'stateChange', 'valueChange', 'beat', 'script'];
+
+/** Which value changes a value trigger answers: any, only the person's own, or only from outside. */
+export const VALUE_ORIGINS = ['any', 'user', 'external'];
+
+/** The paths the runtime animates on a part, and the bucket each fills. The runtime's own table. */
+export const PART_PATHS = PART_PATH_BUCKETS;
 
 /** The same for a target on the control itself rather than one of its parts. */
-export const ROOT_PATHS = {
-  'Transform.scale': 'transform',
-  'Transform.rotation': 'transform',
-  'Transform.opacity': 'opacity',
-};
+export const ROOT_PATHS = ROOT_PATH_BUCKETS;
 
-/**
- * The "properties" hint on a target. A target with one of these works even if its path is not in
- * the tables above — which is how a colour target could be made to work, if the runtime grew a
- * colour bucket. It has not.
- */
-export const PROPERTY_HINTS = ['transform', 'opacity', 'size'];
+/** The `properties` hints a target can carry, by the bucket they name. */
+export const PROPERTY_HINTS = Object.keys(BUCKET_HINTS);
 
 /** Root targets have no size bucket, so a size hint at the root does nothing. */
-export const ROOT_PROPERTY_HINTS = ['transform', 'opacity'];
+export const ROOT_PROPERTY_HINTS = Object.keys(BUCKET_HINTS).filter((hint) => ROOT_BUCKETS.includes(BUCKET_HINTS[hint]));
 
 /**
- * What this tab offers in its "Change" dropdown, and whether each one works.
+ * What this tab offers in its "Change" dropdown.
  *
- * The first seven are the properties panel's own list, copied from `AnimationsEditor.svelte`. Two
- * of those seven are dead. They are kept here rather than quietly dropped, because the panel still
- * offers them and a control saved from the panel can already carry one — the tab has to be able to
- * name the problem, not pretend it cannot happen.
- *
- * Width and Height are added. The runtime animates both and the panel has never offered them.
- * `animationModel.test.js` pins the panel's list at seven, so if it grows this comment fails with
- * it.
+ * The first seven are the properties panel's own list, as it has written them since before the
+ * runtime had a colour bucket — Fill colour and Text colour carry the CSS names `background-color`
+ * and `color`, which now name it. Width, Height and Border colour are this tab's additions.
  */
 export const OFFERED_PROPERTIES = [
   { path: 'Layout.scale', properties: ['transform'], label: 'Scale' },
@@ -84,6 +73,17 @@ export const OFFERED_PROPERTIES = [
   { path: 'opacity', properties: ['opacity'], label: 'Opacity' },
   { path: 'Background.Fill.colour', properties: ['background-color'], label: 'Fill colour' },
   { path: 'Text.Fill.colour', properties: ['color'], label: 'Text colour' },
+  { path: 'Background.Border.colour', properties: ['colour'], label: 'Border colour' },
+];
+
+/** The same for a target on the control itself — no position or size, which the panel owns. */
+export const OFFERED_ROOT_PROPERTIES = [
+  { path: 'Transform.scale', properties: ['transform'], label: 'Scale' },
+  { path: 'Transform.rotation', properties: ['transform'], label: 'Rotation' },
+  { path: 'Transform.opacity', properties: ['opacity'], label: 'Opacity' },
+  { path: 'Background.Fill.colour', properties: ['colour'], label: 'Fill colour' },
+  { path: 'Text.Fill.colour', properties: ['colour'], label: 'Text colour' },
+  { path: 'Background.Border.colour', properties: ['colour'], label: 'Border colour' },
 ];
 
 /**
@@ -98,17 +98,14 @@ export function targetStatus(target, partNames = []) {
   if (!path) {
     return { works: false, reason: 'no path', detail: 'This target has no path, so the runtime skips it.' };
   }
-  const hints = Array.isArray(target?.properties) ? target.properties : [];
-
+  const landing = targetBuckets(target);
   if (path.startsWith('Parts.')) {
     const [, partName, ...rest] = path.split('.');
     const tail = rest.join('.');
-    if (!partName) {
+    if (!partName || !landing) {
       return { works: false, reason: 'no part', detail: 'The path says Parts. but does not name one.' };
     }
-    const byPath = PART_PATHS[tail];
-    const byHint = hints.find((hint) => PROPERTY_HINTS.includes(hint));
-    if (!byPath && !byHint) {
+    if (!landing.buckets.length) {
       return {
         works: false,
         reason: 'dead path',
@@ -119,18 +116,16 @@ export function targetStatus(target, partNames = []) {
       return {
         works: false,
         reason: 'missing part',
-        animates: byPath ?? byHint,
+        animates: landing.buckets[0],
         part: partName,
         detail: `This control has no part called "${partName}", so the animation is built for something that is not there.`,
       };
     }
-    return { works: true, animates: byPath ?? byHint, part: partName };
+    return { works: true, animates: landing.buckets[0], buckets: landing.buckets, part: partName };
   }
 
-  const byPath = ROOT_PATHS[path];
-  const byHint = hints.find((hint) => ROOT_PROPERTY_HINTS.includes(hint));
-  if (!byPath && !byHint) {
-    const sizeHint = hints.includes('size');
+  if (!landing?.buckets.length) {
+    const sizeHint = (target?.properties ?? []).includes('size');
     return {
       works: false,
       reason: sizeHint ? 'no size at root' : 'dead path',
@@ -139,7 +134,29 @@ export function targetStatus(target, partNames = []) {
         : `The runtime does not animate "${path}" on the control itself. It only animates ${Object.keys(ROOT_PATHS).join(', ')}.`,
     };
   }
-  return { works: true, animates: byPath ?? byHint, part: '' };
+  return { works: true, animates: landing.buckets[0], buckets: landing.buckets, part: '' };
+}
+
+/**
+ * What animating a target costs, cheapest first.
+ *
+ * Transform and opacity are composited: the browser moves pixels it already painted. Colour has
+ * to repaint the element every frame. Width and height re-run layout for the element and
+ * everything that depends on it, every frame — on a panel of two hundred controls that is the
+ * difference between smooth and not.
+ */
+export function targetCost(target) {
+  const buckets = targetBuckets(target)?.buckets ?? [];
+  if (buckets.includes('size')) {
+    return { level: 'layout', label: 'layout', detail: 'Width and height re-run layout every frame. Scale looks similar and costs far less.' };
+  }
+  if (buckets.includes('colour')) {
+    return { level: 'paint', label: 'paint', detail: 'A colour change repaints the element every frame. Cheap for one control, noticeable for many at once.' };
+  }
+  if (buckets.length) {
+    return { level: 'composite', label: 'cheap', detail: 'Moved by the compositor without repainting.' };
+  }
+  return { level: 'none', label: '', detail: '' };
 }
 
 /** One animation, read into the shape the tab draws. */

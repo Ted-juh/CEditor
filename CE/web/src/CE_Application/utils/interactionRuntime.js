@@ -34,6 +34,7 @@ import { constrainCustomValues, customConditionMatches } from './customComponent
 import { clamp } from './primitives.js';
 import { formatChannelValue } from './valueDisplayScale.js';
 import { visibleChoiceRows, dependsOnId } from './dependentChoices.js';
+import { easingToCss } from './easing.js';
 
 function getNodeChild(node, key) {
   return node?._children?.[key];
@@ -99,24 +100,10 @@ function normalizeRange(value, min, max) {
   return (value - min) / span;
 }
 
-// The named easings, as their cubic-bezier control points [x1, y1, x2, y2]. A table rather than a
-// switch of strings because ce.anim evaluates these NUMERICALLY: a script animating with
-// curve = "outCubic" has to trace the same path the panel's CSS transition does, and a lookalike
-// (1 - (1-t)^2 for outQuad, say) is a second curve wearing the same name. One table, two consumers.
-export const EASING_BEZIERS = {
-  inQuad:    [0.55,  0.085, 0.68,  0.53],
-  outQuad:   [0.25,  0.46,  0.45,  0.94],
-  inOutQuad: [0.455, 0.03,  0.515, 0.955],
-  outCubic:  [0.215, 0.61,  0.355, 1],
-};
-export const EASING_NAMES = ['linear', ...Object.keys(EASING_BEZIERS)];
-
-function easingToCss(name) {
-  const key = String(name ?? 'outQuad');
-  if (key === 'linear') return 'linear';
-  const b = EASING_BEZIERS[key];
-  return b ? `cubic-bezier(${b[0]}, ${b[1]}, ${b[2]}, ${b[3]})` : 'ease';
-}
+// The named easings live in utils/easing.js now, with the solver and the CSS writer beside them.
+// Re-exported from here because ce.anim's tests pin the identity of THIS module's table: the panel
+// and a script asking for "outCubic" have to read one object, not two that agree today.
+export { EASING_BEZIERS, EASING_NAMES } from './easing.js';
 
 function treeValueAtPath(node, path) {
   if (!node || !path) return undefined;
@@ -165,6 +152,15 @@ function setTreeValueAtPath(node, path, value) {
   } else {
     current[finalKey] = value;
   }
+}
+
+/**
+ * The value a signal source names ("value.normalized", "channel.cutoff.raw", …), read from
+ * `signals`. The same reader bindings use, so an animation triggered by a source and a binding
+ * driven by it agree about what that source is.
+ */
+export function readSignalSource(source, signals) {
+  return evaluateBindingSource({ source }, signals ?? {});
 }
 
 function evaluateBindingSource(binding, signals) {
@@ -362,48 +358,166 @@ export function resolveStateScopedControl(control, stateName = '') {
   return resolved;
 }
 
+// --- Animations -------------------------------------------------------------------------------
+// What each target path animates. A target is either on a part ("Parts.<name>.<path>") or on the
+// control itself, and each path fills one BUCKET — a group of CSS properties the renderers give
+// one shared transition. utils/animationModel.js reads these same tables to tell the editor which
+// targets do something, so there is one list and not a copy of it.
+
+export const PART_PATH_BUCKETS = {
+  'Layout.x': 'transform',
+  'Layout.y': 'transform',
+  'Layout.offsetX': 'transform',
+  'Layout.offsetY': 'transform',
+  'Layout.rotation': 'transform',
+  'Layout.scale': 'transform',
+  opacity: 'opacity',
+  'Layout.width': 'size',
+  'Layout.height': 'size',
+  'Background.Fill.colour': 'colour',
+  'Background.Border.colour': 'colour',
+  'Text.Fill.colour': 'colour',
+};
+
+export const ROOT_PATH_BUCKETS = {
+  'Transform.scale': 'transform',
+  'Transform.rotation': 'transform',
+  'Transform.opacity': 'opacity',
+  'Background.Fill.colour': 'colour',
+  'Background.Border.colour': 'colour',
+  'Text.Fill.colour': 'colour',
+};
+
+/**
+ * A target's `properties` list names buckets directly, which is how a target on a path missing from
+ * the tables can still animate. The three CSS names are what the properties panel has always written
+ * for its two colour choices; for years they named a bucket that did not exist, and now they name
+ * the one that does, so a control saved with "Fill colour" starts working without being edited.
+ */
+export const BUCKET_HINTS = {
+  transform: 'transform',
+  opacity: 'opacity',
+  size: 'size',
+  colour: 'colour',
+  color: 'colour',
+  'background-color': 'colour',
+  'border-color': 'colour',
+};
+
+/** The buckets a target on the control itself can fill. The root has no size bucket. */
+export const ROOT_BUCKETS = ['transform', 'opacity', 'colour'];
+
+export const ANIMATION_BUCKETS = ['transform', 'opacity', 'size', 'colour'];
+
+/**
+ * Where a target lands: `{ part, buckets }`, with part '' for the control itself. Null when the
+ * path is empty or names "Parts." without a part; an empty bucket list when nothing it says is
+ * animatable.
+ */
+export function targetBuckets(target) {
+  const path = String(target?.path ?? '').trim();
+  if (!path) return null;
+  const hinted = (Array.isArray(target?.properties) ? target.properties : [])
+    .map((hint) => BUCKET_HINTS[String(hint)])
+    .filter(Boolean);
+  if (path.startsWith('Parts.')) {
+    const [, partName, ...rest] = path.split('.');
+    if (!partName) return null;
+    const byPath = PART_PATH_BUCKETS[rest.join('.')];
+    return { part: partName, buckets: [...new Set([byPath, ...hinted].filter(Boolean))] };
+  }
+  const byPath = ROOT_PATH_BUCKETS[path];
+  return {
+    part: '',
+    buckets: [...new Set([byPath, ...hinted].filter((bucket) => bucket && ROOT_BUCKETS.includes(bucket)))],
+  };
+}
+
+const normalizeStateList = (list) => (Array.isArray(list) ? list : [])
+  .map((value) => normalizeKey(value))
+  .filter(Boolean);
+
+/** One animation's trigger, read once. Every field has the default the editor shows. */
+export function readTrigger(animation) {
+  const trigger = animation?.trigger ?? {};
+  const type = String(trigger.type ?? 'stateChange');
+  return {
+    type,
+    from: normalizeStateList(trigger.from),
+    to: normalizeStateList(trigger.to),
+    // Leaving the `to` state plays the animation too, unless switched off. That is how a hover lift
+    // settles back when the pointer leaves, which every control did before triggers were read.
+    reverse: trigger.reverse !== false,
+    source: String(trigger.source ?? 'value.normalized'),
+    origin: ['user', 'external'].includes(trigger.origin) ? trigger.origin : 'any',
+    every: Math.max(1, Math.round(Number(trigger.every) || 1)),
+    event: String(trigger.event ?? ''),
+  };
+}
+
+/**
+ * The animation timing as a CSS transition value: "<duration>ms <easing> <delay>ms".
+ * `timeScale` stretches both times — the editor's slow-motion preview, never the panel itself.
+ */
+export function animationTiming(animation, timeScale = 1) {
+  const scale = Number.isFinite(Number(timeScale)) && Number(timeScale) > 0 ? Number(timeScale) : 1;
+  const duration = Math.max(0, numberOr(animation?.duration, 120)) * scale;
+  const delay = Math.max(0, numberOr(animation?.delay, 0)) * scale;
+  return `${Math.round(duration)}ms ${easingToCss(animation)} ${Math.round(delay)}ms`;
+}
+
 function buildTransitionCatalog(control, previewSession) {
   const animations = getNodeChild(control, 'Animations');
   const enabled = animations?.enabled !== false && previewSession?.animationsEnabled !== false;
   const rootTransitions = new Map();
   const partTransitions = new Map();
+  const entries = [];
+  const reducedMotion = previewSession?.reducedMotion === true;
   if (!enabled) {
-    return { enabled: false, rootTransitions, partTransitions };
+    return { enabled: false, reducedMotion, rootTransitions, partTransitions, entries };
   }
 
-  for (const animation of Object.values(animations?._children ?? {})) {
-    if (!animation || animation.enabled === false) continue;
-    const transition = `${numberOr(animation.duration, 120)}ms ${easingToCss(animation.easing)} ${numberOr(animation.delay, 0)}ms`;
+  const timeScale = previewSession?.animationTimeScale;
+  let order = 0;
+  for (const [key, animation] of Object.entries(animations?._children ?? {})) {
+    if (!animation || typeof animation !== 'object' || animation.enabled === false) continue;
+    // Keyframe animations are played by the renderers as CSS animations, not transitions; see
+    // utils/keyframeAnimation.js. Every other kind — including a word typed into the old free
+    // text box — is a transition, exactly as before.
+    if (String(animation.kind ?? '') === 'keyframes') continue;
+    const transition = animationTiming(animation, timeScale);
+    const scale = Number(timeScale) > 0 ? Number(timeScale) : 1;
+    const entry = {
+      name: String(animation.name ?? key),
+      order: order++,
+      css: transition,
+      // How long a transition this entry starts can still be running — the tracker keeps it in
+      // place that long rather than cutting it off on the next unrelated change.
+      span: (Math.max(0, numberOr(animation.duration, 120)) + Math.max(0, numberOr(animation.delay, 0))) * scale,
+      trigger: readTrigger(animation),
+      root: new Set(),
+      parts: new Map(),
+    };
     for (const target of animation.targets ?? []) {
-      const path = String(target?.path ?? '');
-      if (!path) continue;
-      const propertySet = new Set(target?.properties ?? []);
-      if (path.startsWith('Parts.')) {
-        const [, partName, ...rest] = path.split('.');
-        if (!partName) continue;
-        const bucket = partTransitions.get(partName) ?? { transform: null, opacity: null, size: null };
-        if (rest.join('.') === 'Layout.x' || rest.join('.') === 'Layout.y' || rest.join('.') === 'Layout.offsetX' || rest.join('.') === 'Layout.offsetY' || rest.join('.') === 'Layout.rotation' || rest.join('.') === 'Layout.scale' || propertySet.has('transform')) {
-          bucket.transform = transition;
-        }
-        if (rest.join('.') === 'opacity' || propertySet.has('opacity')) {
-          bucket.opacity = transition;
-        }
-        if (rest.join('.') === 'Layout.width' || rest.join('.') === 'Layout.height' || propertySet.has('size')) {
-          bucket.size = transition;
-        }
-        partTransitions.set(partName, bucket);
+      const landing = targetBuckets(target);
+      if (!landing || !landing.buckets.length) continue;
+      if (landing.part) {
+        const bucket = partTransitions.get(landing.part) ?? { transform: null, opacity: null, size: null, colour: null };
+        const set = entry.parts.get(landing.part) ?? new Set();
+        for (const name of landing.buckets) { bucket[name] = transition; set.add(name); }
+        partTransitions.set(landing.part, bucket);
+        entry.parts.set(landing.part, set);
       } else {
-        if (path === 'Transform.scale' || path === 'Transform.rotation' || propertySet.has('transform')) {
-          rootTransitions.set('transform', transition);
-        }
-        if (path === 'Transform.opacity' || propertySet.has('opacity')) {
-          rootTransitions.set('opacity', transition);
-        }
+        for (const name of landing.buckets) { rootTransitions.set(name, transition); entry.root.add(name); }
       }
     }
+    if (entry.root.size || entry.parts.size) entries.push(entry);
   }
 
-  return { enabled: true, rootTransitions, partTransitions };
+  // rootTransitions / partTransitions are every animation at once, the last one winning a shared
+  // bucket — what the runtime COULD animate. Which one actually plays depends on what changed, and
+  // that needs the previous frame: utils/transitionSelection.js picks from `entries`.
+  return { enabled: true, reducedMotion, rootTransitions, partTransitions, entries };
 }
 
 function createEmptyRuntime(signals = {}) {
@@ -414,6 +528,7 @@ function createEmptyRuntime(signals = {}) {
       enabled: false,
       rootTransitions: new Map(),
       partTransitions: new Map(),
+      entries: [],
     },
   };
 }

@@ -737,6 +737,15 @@
 </EffectSurface>
 
 <style>
+  /* A colour animation on the control or part this background belongs to reaches the layers that
+     actually paint through an inherited custom property; see utils/transitionCss.js. */
+  .bg-fill-layer,
+  .bg-border-css,
+  .bg-border :global(path),
+  .bg-border :global(rect) {
+    transition: var(--ce-colour-transition, none);
+  }
+
   .bg-fill-layer {
     position: absolute;
     inset: 0;

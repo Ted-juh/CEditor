@@ -1,5 +1,8 @@
 <script>
+  import { untrack } from 'svelte';
   import SliderShapeFill from './SliderShapeFill.svelte';
+  import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
+  import { parseTiming } from '../utils/easing.js';
   import { resolveSliderSemanticParts } from '../utils/sliderEntityFactory.js';
   import { numberOr, clamp } from '../utils/primitives.js';
   import {
@@ -95,11 +98,13 @@
     return argbToCss(part?._children?.Background?._children?.Border?.colour, fallback);
   }
 
+  // One declaration for every renderer (utils/transitionCss.js). This used to be
+  // `transition: all <one timing>`, which gave every property on a slider part — colour included —
+  // whichever of transform, size or opacity was set first. Reduced motion and dragging are decided
+  // upstream now, by the tracker in CanvasControl, for every control and not only sliders.
   function buildTransitionStyle(bucket) {
-    if (runtime?.signals?.reducedMotion === true) return '';
-    if (runtime?.signals?.dragging === true) return '';
-    const transition = bucket?.transform ?? bucket?.size ?? bucket?.opacity ?? '';
-    return transition ? `transition: all ${transition};` : '';
+    if (!bucket) return '';
+    return `${transitionDeclaration(bucket, { target: 'svg' })} ${colourTransitionVar(bucket.colour ?? null, { svg: true })}`.trim();
   }
 
   function textTransformForCase(caseMode) {
@@ -205,11 +210,63 @@
   let geometry = $derived(getSliderGeometry(behavior));
   let orientation = $derived(getSliderOrientation(behavior));
   let valueMode = $derived(getSliderValueMode(behavior));
-  let normalizedValues = $derived({
+  let targetValues = $derived({
     start: numberOr(signals?.startValueNormalized, 0),
     current: numberOr(signals?.currentValueNormalized, numberOr(signals?.valueNormalized, 0)),
     end: numberOr(signals?.endValueNormalized, 1),
   });
+
+  // --- The value glide -------------------------------------------------------------------------
+  // A pointer is drawn with SVG attributes (cx, x1, an arc's d), and CSS cannot transition an
+  // attribute, so a "when the value changes" animation on pointerCurrent/Start/End — the default
+  // Knob and Slider both ship one — did nothing on the controls it was written for. The glide moves
+  // the DRAWN value along the same curve in JS instead. The tracker in CanvasControl only hands a
+  // pointer a timing for a value change that is not a drag, so a drag still tracks the mouse 1:1.
+  let glideTiming = $derived(parseTiming(
+    partTransitions?.get?.('pointerCurrent')?.transform
+      ?? partTransitions?.get?.('pointerStart')?.transform
+      ?? partTransitions?.get?.('pointerEnd')?.transform
+      ?? null
+  ));
+  let glide = $state(null);
+  let glideFrame = 0;
+  let glideFrom = null;
+
+  const lerpValues = (a, b, t) => ({
+    start: a.start + (b.start - a.start) * t,
+    current: a.current + (b.current - a.current) * t,
+    end: a.end + (b.end - a.end) * t,
+  });
+  const sameValues = (a, b) => !!a && !!b
+    && Math.abs(a.start - b.start) < 1e-6 && Math.abs(a.current - b.current) < 1e-6 && Math.abs(a.end - b.end) < 1e-6;
+
+  // Before the DOM updates, so the first frame of a glide draws where it starts, not where it ends.
+  $effect.pre(() => {
+    const next = targetValues;
+    const timing = glideTiming;
+    untrack(() => {
+      const from = glide ?? glideFrom;
+      glideFrom = next;
+      if (glideFrame) { cancelAnimationFrame(glideFrame); glideFrame = 0; }
+      if (!timing || timing.duration + timing.delay <= 0 || !from || sameValues(from, next)
+          || typeof requestAnimationFrame !== 'function') {
+        glide = null;
+        return;
+      }
+      const startedAt = performance.now();
+      glide = from;
+      const step = (now) => {
+        const progress = Math.min(1, Math.max(0, (now - startedAt - timing.delay) / Math.max(1, timing.duration)));
+        if (progress >= 1) { glide = null; glideFrame = 0; return; }
+        glide = lerpValues(from, next, timing.ease(progress));
+        glideFrame = requestAnimationFrame(step);
+      };
+      glideFrame = requestAnimationFrame(step);
+    });
+  });
+  $effect(() => () => { if (glideFrame) cancelAnimationFrame(glideFrame); glideFrame = 0; });
+
+  let normalizedValues = $derived(glide ?? targetValues);
   let rawValues = $derived({
     start: numberOr(signals?.startValueRaw, 0),
     current: numberOr(signals?.currentValueRaw, numberOr(signals?.valueRaw, 0)),
@@ -615,18 +672,17 @@
     };
   }
 
-  function pointerStyleFor(partName) {
-    if ([
-      'bodyTrackFill',
-      'bodySelectedRange',
-      'pointerStart',
-      'pointerCurrent',
-      'pointerEnd',
-    ].includes(String(partName))) {
-      return '';
-    }
+  // The track fill, selected range and pointers are redrawn from the value every frame of a drag or
+  // a glide; a CSS transform transition on them would fight that. Their colour and opacity still
+  // follow the part's timing — a pointer that lights up on press should glide into its colour.
+  const VALUE_DRAWN_PARTS = ['bodyTrackFill', 'bodySelectedRange', 'pointerStart', 'pointerCurrent', 'pointerEnd'];
 
-    return buildTransitionStyle(partTransitions?.get?.(partName) ?? null);
+  function pointerStyleFor(partName) {
+    const bucket = partTransitions?.get?.(partName) ?? null;
+    if (VALUE_DRAWN_PARTS.includes(String(partName))) {
+      return buildTransitionStyle(bucket ? { transform: null, size: null, opacity: bucket.opacity, colour: bucket.colour } : null);
+    }
+    return buildTransitionStyle(bucket);
   }
 
   function oppositeDirection(direction) {

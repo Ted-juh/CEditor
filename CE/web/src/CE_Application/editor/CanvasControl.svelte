@@ -82,6 +82,10 @@
   import EffectSurface from '../../CE_Panel/components/EffectSurface.svelte';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { resolveInteractiveControl, resolveInteractionContext } from '../utils/interactionRuntime.js';
+  import { createTransitionTracker } from '../utils/transitionSelection.js';
+  import { rootTransitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
+  import { systemReducedMotion } from '../stores/reducedMotion.js';
+  import { noteAnimationsFired } from '../stores/animationActivity.js';
   import {
     getMouseSection,
     resolveCursorCss,
@@ -1625,15 +1629,22 @@
 
   // Current rotation for display (transient during rotate drag, otherwise from the resolved transform)
   let displayRotation = $derived(transientRotation ?? renderTransform?.rotation ?? transform?.rotation ?? 0);
+  // Which animation plays depends on what just changed — "from hover to pressed" is a different
+  // animation from "when the value changes" — and only something that remembers the frame before
+  // can tell. The tracker is that memory, one per control on screen. utils/transitionSelection.js
+  // has the rules; this is also where reduced motion (the preview switch or the OS setting) and
+  // dragging are honoured, once, for every renderer below.
+  const transitionTracker = createTransitionTracker();
+  let activeTransitions = $derived(interactionRuntime
+    ? transitionTracker.next(interactionRuntime, { reducedMotion: $systemReducedMotion })
+    : null);
+  $effect(() => {
+    const fired = activeTransitions?.fired;
+    if (fired?.length) noteAnimationsFired(core?.id, fired);
+  });
   let rootTransitionCSS = $derived.by(() => {
-    const rules = [];
-    const transformTransition = interactionRuntime?.transitions?.rootTransitions?.get?.('transform');
-    const opacityTransition = interactionRuntime?.transitions?.rootTransitions?.get?.('opacity');
-
-    if (transformTransition) rules.push(`transform ${transformTransition}`);
-    if (opacityTransition) rules.push(`opacity ${opacityTransition}`);
-
-    return rules.length ? `transition:${rules.join(', ')};` : '';
+    const root = activeTransitions?.rootTransitions ?? null;
+    return `${rootTransitionDeclaration(root)} ${colourTransitionVar(root?.get?.('colour') ?? null)}`.trim();
   });
   let canvasTransformCSS = $derived.by(() => {
     const transforms = [];
@@ -3709,7 +3720,7 @@
         runtime={interactionRuntime}
         width={displayW}
         height={displayH}
-        partTransitions={interactionRuntime?.transitions?.partTransitions ?? null}
+        partTransitions={activeTransitions?.partTransitions ?? null}
         debug={interactionDebugEnabled}
       />
     {/if}
@@ -3721,7 +3732,7 @@
           {partName}
           parentWidth={displayW}
           parentHeight={displayH}
-          transitionBucket={interactionRuntime?.transitions?.partTransitions?.get?.(partName) ?? null}
+          transitionBucket={activeTransitions?.partTransitions?.get?.(partName) ?? null}
           debug={interactionDebugEnabled}
           editableInput={editableInputForPart(part)}
           oneditableinput={editableHandlerForPart(part, 'input')}
@@ -4081,7 +4092,7 @@
           styles are alignment and spacing, and on a single line they say the same thing one level
           up — 225 labels on the GAIA panel is 225 elements saved.
         -->
-        <span class="text-span" style="{textAnchorStyle}; {textSpanStyle}">
+        <span class="text-span ce-colour-anim" style="{textAnchorStyle}; {textSpanStyle}">
           <span
             bind:this={textGlyphElement}
             class="text-glyphs"
@@ -4533,6 +4544,13 @@
     inset: 0;
     overflow: hidden;
     pointer-events: none;
+  }
+
+  /* A plain fill paints on .control-content and text on .text-span; both glide with the control's
+     colour timing, which arrives as an inherited custom property (utils/transitionCss.js). */
+  .control-content,
+  .ce-colour-anim {
+    transition: var(--ce-colour-transition, none);
   }
   .control-background { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 
