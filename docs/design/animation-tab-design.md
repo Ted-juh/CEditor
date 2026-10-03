@@ -152,6 +152,13 @@ Same rule as the other six. Duration and delay are number cells with steppers; t
 segmented control; easing is a row of pictures you click. There is no slider and no JSON box in the
 tab, and the browser check asserts both.
 
+The timeline under the columns is not a slider either: it is a drawing of every animation's delay
+and duration on one axis, from the moment its trigger fires, and its bars are buttons you can nudge
+— drag a bar to move its start, its right edge to resize a cycle, or use the arrows. The numbers are
+still edited in the number cells; a drag writes once, on release, as one undo step. The JSON the
+properties panel's "Debug animation" button used to show is the setting column's Debug button now:
+it sends the node, as stored, to the Console tab's debug pane and opens that tab.
+
 ## What was built
 
 | Piece | File |

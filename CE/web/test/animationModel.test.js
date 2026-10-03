@@ -11,6 +11,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
+  triggerSummary,
+  timelineOf,
+  retime,
+  animationDebugPayload,
   ANIMATION_KINDS,
   KEYFRAME_TRIGGER_TYPES,
   KEYFRAME_TRIGGER_LABELS,
@@ -671,4 +675,58 @@ test('the status lamp fades into its colour and the tab group cross-fades its pa
   const fade = readAnimations(tabs).find((row) => row.name === 'pageFade');
   assert.deepEqual(describeTargets(fade, partsOf(tabs)).map((t) => t.status.animates), ['visibility', 'visibility', 'visibility']);
   assert.deepEqual(fade.trigger.to, ['tabtwo', 'tabthree']);
+});
+
+// --- The timeline ----------------------------------------------------------------------------------
+
+test('the timeline lays every animation on one axis, from the moment its trigger fires', () => {
+  const button = createControl('Button');
+  button._children.Animations._children.glow = {
+    _type: 'Animation', name: 'glow', enabled: false, kind: 'keyframes', trigger: { type: 'beat', every: 1 },
+    targets: [{ path: 'Transform' }], frames: [{ at: 0, scale: 1 }], duration: 200, delay: 150, iterations: 3,
+  };
+  button._children.Animations._children.blink = {
+    _type: 'Animation', name: 'blink', enabled: true, kind: 'keyframes', trigger: { type: 'always' },
+    targets: [{ path: 'Transform' }], frames: [{ at: 0, opacity: 1 }], duration: 300, delay: 0,
+  };
+  const rows = readAnimations(button);
+  const timeline = timelineOf(rows);
+  assert.deepEqual(timeline.items.map((item) => item.name), rows.map((row) => row.name), 'in document order');
+  const glow = timeline.items.find((item) => item.name === 'glow');
+  assert.deepEqual({ delay: glow.delay, iterations: glow.iterations, end: glow.end, enabled: glow.enabled }, { delay: 150, iterations: 3, end: 750, enabled: false });
+  assert.equal(glow.when, 'on the beat');
+  assert.equal(timeline.items.find((item) => item.name === 'blink').iterations, Infinity, 'a loop');
+  // The axis reaches past the longest finite animation, on a round number, in four steps.
+  assert.ok(timeline.span >= 750 * 1.1, String(timeline.span));
+  assert.match(String(timeline.span), /^[125]0*$/);
+  assert.deepEqual(timeline.ticks, [0, 1, 2, 3, 4].map((i) => (i * timeline.span) / 4));
+  assert.equal(timelineOf([]).span, 200, 'an empty control still has an axis');
+});
+
+test('a drag on the timeline moves the start or resizes a cycle, snapped to the boxes\' step', () => {
+  const item = { delay: 100, duration: 200 };
+  assert.deepEqual(retime(item, 'move', 37), { delay: 140, duration: 200 });
+  assert.deepEqual(retime(item, 'move', -500), { delay: 0, duration: 200 }, 'never before the trigger');
+  assert.deepEqual(retime(item, 'resize', -12), { delay: 100, duration: 190 });
+  assert.deepEqual(retime(item, 'resize', -900), { delay: 100, duration: 10 }, 'a cycle is at least one step');
+  assert.deepEqual(retime(item, 'other', 50), item);
+});
+
+test('the trigger in a few words, the same in the panel summary and the timeline', () => {
+  const say = (animation) => triggerSummary(describeAnimation('a', { _type: 'Animation', ...animation }));
+  assert.equal(say({ trigger: { type: 'stateChange', from: ['*'], to: ['pressed'] } }), 'entering pressed');
+  assert.equal(say({ trigger: { type: 'stateChange', to: ['*'] } }), 'entering any state');
+  assert.equal(say({ kind: 'keyframes', trigger: { type: 'stateChange', to: ['checked'] } }), 'while checked');
+  assert.equal(say({ trigger: { type: 'valueChange', source: 'value.normalized' } }), 'when value.normalized changes');
+  assert.equal(say({ kind: 'keyframes', trigger: { type: 'beat', every: 4 } }), 'every 4 beats');
+  assert.equal(say({ kind: 'keyframes', trigger: { type: 'script' } }), 'from a script');
+});
+
+test('Debug sends the animation as it is stored, under the control and name it lives at', () => {
+  const knob = createControl('Knob');
+  const row = readAnimations(knob)[0];
+  const payload = animationDebugPayload('knob1', row);
+  assert.equal(payload.title, 'Animation Debug');
+  assert.equal(payload.source, `knob1:${row.name}`);
+  assert.deepEqual(JSON.parse(payload.text), knob._children.Animations._children[row.name]);
 });

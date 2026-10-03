@@ -26,6 +26,7 @@
     findClashes,
     controlStateNames,
     unknownTriggerStates,
+    triggerSummary,
   } from '../utils/animationModel.js';
 
   let { control = null } = $props();
@@ -41,19 +42,6 @@
   let dead = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames), 0));
   let unknown = $derived(rows.reduce((sum, row) => sum + unknownTriggerStates(row, stateNames).length, 0));
   let clashes = $derived(findClashes(rows, partNames).length);
-
-  /** "when entering pressed", "on the beat" — the trigger in a few words. */
-  function when(row) {
-    const t = row.trigger;
-    if (row.kind === 'keyframes') {
-      if (t.type === 'always') return 'all the time';
-      if (t.type === 'beat') return t.every === 1 ? 'on the beat' : `every ${t.every} beats`;
-      if (t.type === 'script') return 'from a script';
-    }
-    if (t.type === 'valueChange') return `when ${t.source} changes`;
-    const to = !t.to.length || t.to.includes('*') ? 'any state' : t.to.join(', ');
-    return row.kind === 'keyframes' && row.iterations === 'infinite' ? `while ${to}` : `entering ${to}`;
-  }
 </script>
 
 {#if multiEdit}
@@ -74,7 +62,7 @@
         <div class="row" class:off={!row.enabled || !allOn}>
           <span class="nm">{row.name}</span>
           <span class="ms">{row.duration}ms</span>
-          <span class="what">{row.kind === 'keyframes' ? 'keyframes' : 'transition'} · {when(row)}</span>
+          <span class="what">{row.kind === 'keyframes' ? 'keyframes' : 'transition'} · {triggerSummary(row)}</span>
         </div>
       {/each}
       {#if !rows.length}<p class="none">No animations yet.</p>{/if}

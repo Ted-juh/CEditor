@@ -534,6 +534,85 @@ export function buildTarget(partName, offered) {
   };
 }
 
+// --- The timeline -----------------------------------------------------------
+// Every animation of one control on one axis of milliseconds, measured from the moment its trigger
+// fires. Animations that answer the same change start together, so the bars say what the separate
+// Delay and Duration boxes could not: what runs after what, and what overlaps.
+
+/** "entering pressed", "on the beat" — an animation's trigger in a few words. */
+export function triggerSummary(row) {
+  const t = row?.trigger ?? {};
+  if (row?.kind === 'keyframes') {
+    if (t.type === 'always') return 'all the time';
+    if (t.type === 'beat') return t.every === 1 ? 'on the beat' : `every ${t.every} beats`;
+    if (t.type === 'script') return 'from a script';
+  }
+  if (t.type === 'valueChange') return `when ${t.source} changes`;
+  const to = !t.to?.length || t.to.includes('*') ? 'any state' : t.to.join(', ');
+  return row?.kind === 'keyframes' && row?.iterations === 'infinite' ? `while ${to}` : `entering ${to}`;
+}
+
+/** The smallest of 1, 2 or 5 times a power of ten that is at least `ms`. */
+function niceSpan(ms) {
+  const power = 10 ** Math.floor(Math.log10(Math.max(1, ms)));
+  for (const step of [1, 2, 5, 10]) if (step * power >= ms) return step * power;
+  return 10 * power;
+}
+
+/**
+ * The timeline: one item per animation, in document order, and the axis they share. A keyframe
+ * animation that repeats carries its cycle count, and a loop is drawn to the end of the axis. The
+ * axis reaches past the longest finite animation, and shows a loop's first two cycles.
+ */
+export function timelineOf(rows) {
+  const items = (rows ?? []).map((row) => {
+    const iterations = row.kind === 'keyframes'
+      ? (row.iterations === 'infinite' ? Infinity : Math.max(1, Number(row.iterations) || 1))
+      : 1;
+    return {
+      name: row.name,
+      enabled: row.enabled,
+      kind: row.kind,
+      delay: row.delay,
+      duration: row.duration,
+      iterations,
+      end: row.delay + row.duration * (Number.isFinite(iterations) ? iterations : 1),
+      when: triggerSummary(row),
+    };
+  });
+  const reach = Math.max(100, ...items.map((item) => (Number.isFinite(item.iterations) ? item.end : item.delay + item.duration * 2)));
+  const span = niceSpan(reach * 1.1);
+  const step = span / 4;
+  return { items, span, ticks: [0, 1, 2, 3, 4].map((i) => i * step) };
+}
+
+const TIMELINE_STEP = 10;
+const snap = (ms) => Math.round(ms / TIMELINE_STEP) * TIMELINE_STEP;
+
+/**
+ * Where a drag on the timeline leaves an animation. Dragging the bar moves its start (the delay);
+ * dragging its right edge changes how long one cycle runs (the duration). Both snap to 10ms, the
+ * step the Delay and Duration boxes use; a delay cannot go below zero and a cycle below one step.
+ */
+export function retime(item, mode, deltaMs) {
+  const delta = Number(deltaMs) || 0;
+  if (mode === 'move') return { delay: Math.max(0, snap(item.delay + delta)), duration: item.duration };
+  if (mode === 'resize') return { delay: item.delay, duration: Math.max(TIMELINE_STEP, snap(item.duration + delta)) };
+  return { delay: item.delay, duration: item.duration };
+}
+
+/**
+ * What the Debug button sends to the Console tab's debug pane: the animation node as it is stored,
+ * under the control and name it lives at — what the properties panel's "Debug animation" sent.
+ */
+export function animationDebugPayload(controlId, row) {
+  return {
+    title: 'Animation Debug',
+    source: `${controlId ?? ''}:${row?.name ?? ''}`,
+    text: JSON.stringify(row?.animation ?? null, null, 2),
+  };
+}
+
 // --- Drawing the easing curve -----------------------------------------------
 
 /**

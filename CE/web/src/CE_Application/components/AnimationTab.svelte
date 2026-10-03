@@ -31,6 +31,9 @@
   import AnimationStage from './animation/AnimationStage.svelte';
   import BezierEditor from './animation/BezierEditor.svelte';
   import FramesEditor from './animation/FramesEditor.svelte';
+  import Timeline from './animation/Timeline.svelte';
+  import { setDebugDock } from '../stores/debugDock.js';
+  import { displayTabRequest } from '../stores/displayTab.js';
   import { animationActivity } from '../stores/animationActivity.js';
   import NumberCell from '../properties/NumberCell.svelte';
   import Segmented from '../properties/Segmented.svelte';
@@ -80,6 +83,7 @@
     findClashes,
     clashesFor,
     VALUE_ORIGINS,
+    animationDebugPayload,
   } from '../utils/animationModel.js';
 
   let mine = $derived(targetOfKind($editorTarget, 'animation'));
@@ -162,6 +166,20 @@ onMount(() => {
   function setProps(patch) {
     if (!controlId || !selectedName || !selected) return;
     updateControlProperty(controlId, `Animations.${selectedName}`, { ...selected.animation, ...patch });
+  }
+
+  /** A drag or an arrow key on the timeline: one write, so one undo step. */
+  function retimeAnimation(name, { delay, duration }) {
+    const row = rows.find((entry) => entry.name === name);
+    if (!controlId || !row) return;
+    updateControlProperty(controlId, `Animations.${name}`, { ...row.animation, delay, duration });
+  }
+
+  /** The animation as it is stored, in the Console tab's debug pane — and the tab, so it is seen. */
+  function debugSelected() {
+    if (!selected) return;
+    setDebugDock(animationDebugPayload(controlId, selected));
+    displayTabRequest.set({ tab: 'console' });
   }
 
   const EASING_TITLES = {
@@ -402,7 +420,11 @@ onMount(() => {
 
       {#if selected}
         <div class="setcol">
-          <div class="colh">{selected.name}</div>
+          <div class="colh">
+            {selected.name}
+            <button type="button" class="dbg" onclick={debugSelected}
+                    title="Show this animation as it is stored, in the Console tab's debug pane">Debug</button>
+          </div>
           <div class="setbox">
             <div class="grp">Timing</div>
             <div class="r">
@@ -642,6 +664,13 @@ onMount(() => {
         </div>
       {/if}
     </div>
+
+    <div class="timelinebox">
+      <div class="colh">Timeline <s>from the moment each trigger fires — drag a bar to move it, its edge to resize</s></div>
+      <Timeline {rows} {selectedName} fired={$animationActivity[controlId] ?? null}
+                onselect={(name) => { wantedName = name; rawTargetIndex = -1; }}
+                onretime={retimeAnimation} />
+    </div>
   {/if}
 </div>
 
@@ -735,6 +764,14 @@ onMount(() => {
   .mk:disabled { opacity: 0.35; cursor: default; }
   .renerr { margin: 5px 0 0; font: 400 9px/1.4 'IBM Plex Sans', system-ui, sans-serif; color: #E5A029; }
   .setcol { flex: 0 0 300px; min-width: 0; }
+  .timelinebox { padding: 0 10px 12px; }
+  .dbg {
+    margin-left: auto;
+    border: 1px solid #333; background: #1A1D20; color: #8A949C;
+    font: 600 8.5px/1 'IBM Plex Sans', system-ui, sans-serif; letter-spacing: 0.04em;
+    padding: 3px 6px; border-radius: 3px; cursor: pointer; text-transform: none;
+  }
+  .dbg:hover { border-color: #5B9BD5; color: #D7ECFF; }
   .targetcol { flex: 1 1 0; min-width: 280px; }
 
   .colh {

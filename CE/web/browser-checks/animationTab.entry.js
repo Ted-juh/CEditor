@@ -13,6 +13,8 @@ import { panels, activePanelId, selectedComponentIds } from '../src/CE_Applicati
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { createCustomComponentPartsDefaults } from '../src/CE_Application/utils/customComponentFactory.js';
 import { undo } from '../src/CE_Application/stores/history.js';
+import { debugDockState } from '../src/CE_Application/stores/debugDock.js';
+import { displayTabRequest } from '../src/CE_Application/stores/displayTab.js';
 
 const CONTROL_ID = 'ctrl_anim';
 
@@ -281,6 +283,26 @@ window.__anim = {
   presetReport: () => textOf(document.querySelector('.presets .report')),
   storedState: (key) => JSON.parse(JSON.stringify(live()._children.States._children[key] ?? null)),
 
+  /** The timeline: its rows, and where one bar sits on screen. */
+  timelineNames: () => [...document.querySelectorAll('.tl-row:not(.tl-axis) .tl-nm')].map(textOf),
+  timelineTicks: () => [...document.querySelectorAll('.tl-axis .tl-tick')].map(textOf),
+  timelineBar: (name) => {
+    const row = [...document.querySelectorAll('.tl-row:not(.tl-axis)')].find((r) => textOf(r.querySelector('.tl-nm')) === name);
+    const bar = row?.querySelector('.tl-bar');
+    if (!bar) return null;
+    bar.scrollIntoView({ block: 'center' });
+    const rect = bar.getBoundingClientRect();
+    const track = row.querySelector('.tl-track').getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, trackWidth: track.width, label: textOf(bar.querySelector('.tl-len')) };
+  },
+  nudge: (name, key, shiftKey = false) => {
+    const row = [...document.querySelectorAll('.tl-row:not(.tl-axis)')].find((r) => textOf(r.querySelector('.tl-nm')) === name);
+    row?.querySelector('.tl-bar')?.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true }));
+  },
+  clickDebug: () => document.querySelector('.dbg')?.click(),
+  debugDock: () => get(debugDockState),
+  tabRequest: () => get(displayTabRequest),
+  undo: () => undo(),
   sliderCount: () => document.querySelectorAll('input[type=range], .slider, [role=slider]').length,
   jsonBoxes: () => document.querySelectorAll('textarea').length,
 };

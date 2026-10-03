@@ -465,6 +465,55 @@ assert.equal(await ev(() => window.__anim.selectedAnimation()), 'hoverLift', 'an
 await ev(() => window.__anim.removeAnimation('hoverLift'));
 await settle();
 
+// --- The timeline and Debug ------------------------------------------------------------------
+
+check('the timeline lays every animation on one axis, in the list\'s order', async () => {});
+assert.deepEqual(await ev(() => window.__anim.timelineNames()), await ev(() => window.__anim.storedNames()));
+assert.equal((await ev(() => window.__anim.timelineTicks()))[0], '0ms');
+
+const delayBefore = (await ev(() => window.__anim.storedAnimation('pressMotion'))).delay;
+await ev(() => window.__anim.nudge('pressMotion', 'ArrowRight', true));
+await settle();
+check('an arrow key on a bar moves its start, and writes the control', async () => {});
+assert.equal((await ev(() => window.__anim.storedAnimation('pressMotion'))).delay, delayBefore + 100);
+await ev(() => window.__anim.undo());
+await settle();
+assert.equal((await ev(() => window.__anim.storedAnimation('pressMotion'))).delay, delayBefore, 'one undo step');
+
+const bar = await ev(() => window.__anim.timelineBar('pressMotion'));
+const durationBefore = (await ev(() => window.__anim.storedAnimation('pressMotion'))).duration;
+// Drag the right edge a fifth of the track to the right.
+await page.mouse.move(bar.x + bar.width - 2, bar.y + bar.height / 2);
+await page.mouse.down();
+await page.mouse.move(bar.x + bar.width - 2 + bar.trackWidth / 10, bar.y + bar.height / 2, { steps: 4 });
+await page.mouse.move(bar.x + bar.width - 2 + bar.trackWidth / 5, bar.y + bar.height / 2, { steps: 4 });
+const storedMidDrag = (await ev(() => window.__anim.storedAnimation('pressMotion'))).duration;
+await page.mouse.up();
+await settle();
+const resized = await ev(() => window.__anim.storedAnimation('pressMotion'));
+check('dragging a bar\'s edge resizes it — written once, when it is let go', () => {
+  assert.equal(storedMidDrag, durationBefore, 'nothing is written while the pointer is still down');
+  assert.ok(resized.duration > durationBefore, `${durationBefore}ms became ${resized.duration}ms`);
+  assert.equal(resized.duration % 10, 0, 'snapped to the Duration box\'s step');
+  assert.equal(resized.delay, delayBefore, 'and the start stayed put');
+});
+await ev(() => window.__anim.undo());
+await settle();
+
+await ev(() => window.__anim.selectAnimation('pressEcho'));
+await settle();
+await ev(() => window.__anim.clickDebug());
+await settle();
+const dock = await ev(() => window.__anim.debugDock());
+const echoStored = await ev(() => window.__anim.storedAnimation('pressEcho'));
+const request = await ev(() => window.__anim.tabRequest());
+check('Debug shows the animation as it is stored, in the Console tab', () => {
+  assert.equal(dock.title, 'Animation Debug');
+  assert.equal(dock.source, 'ctrl_anim:pressEcho');
+  assert.deepEqual(JSON.parse(dock.text), echoStored);
+  assert.deepEqual(request, { tab: 'console' });
+});
+
 // --- The rules --------------------------------------------------------------------------------
 
 check('there is not one slider in the tab', async () => {});
