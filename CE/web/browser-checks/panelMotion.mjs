@@ -160,6 +160,41 @@ check('a script\'s ce.anim.play starts a keyframe animation on the control', () 
   assert.match(winking.name, /ce-kf-[0-9a-z]+-a/, winking.name);
 });
 
+// --- Colour frames --------------------------------------------------------------------------------
+
+const glowA = await ev(() => window.__motion.colours('glow'));
+await wait(450);
+const glowB = await ev(() => window.__motion.colours('glow'));
+check('a colour frame repaints the control\'s fill and its label, not just the element that moves', () => {
+  // The fill is painted by .control-content and the label by its own span, each with an inline
+  // colour; a keyframe on the control could not reach either.
+  assert.match(glowA.fillAnimation, /^ce-kf-paint-[0-9a-z]+-a$/, JSON.stringify(glowA));
+  assert.match(glowA.textAnimation, /^ce-kf-text-[0-9a-z]+-a$/, JSON.stringify(glowA));
+  assert.notEqual(glowA.fill, glowB.fill, `the fill moves: ${glowA.fill} then ${glowB.fill}`);
+  assert.notEqual(glowA.text, glowB.text, `and the label: ${glowA.text} then ${glowB.text}`);
+});
+
+const lampPart = await ev(() => window.__motion.partPaint('lamp', 'lamp'));
+await wait(450);
+const lampLater = await ev(() => window.__motion.partPaint('lamp', 'lamp'));
+const caption = await ev(() => window.__motion.partPaint('lamp', 'caption'));
+check('on a part, it paints that part and leaves the control\'s other parts alone', () => {
+  assert.ok(lampPart?.layers.some((layer) => /ce-kf-paint-/.test(layer.animation)), JSON.stringify(lampPart));
+  const paintOf = (part) => part.layers.find((layer) => /ce-kf-paint-/.test(layer.animation)).background;
+  assert.notEqual(paintOf(lampPart), paintOf(lampLater), `the lamp moves: ${paintOf(lampPart)} then ${paintOf(lampLater)}`);
+  assert.equal(caption.channel, 'none', 'the caption is told there is nothing to paint');
+  assert.deepEqual(caption.layers.filter((layer) => /ce-kf-/.test(layer.animation)), []);
+});
+
+const pointerA = await ev(() => window.__motion.shapePaint('tinted'));
+await wait(450);
+const pointerB = await ev(() => window.__motion.shapePaint('tinted'));
+check('a knob\'s drawn pointer takes the colour in the property it paints with', () => {
+  assert.ok(pointerA.length > 0, 'no pointer shape is playing a colour channel');
+  const paint = (shapes) => shapes.map((shape) => (/stroke/.test(shape.animation) ? shape.stroke : shape.fill)).join(' ');
+  assert.notEqual(paint(pointerA), paint(pointerB), `it moves: ${paint(pointerA)} then ${paint(pointerB)}`);
+});
+
 // --- A state that swaps which part is visible (phase-5 item K) ----------------------------------
 
 const pageTwoAtRest = await ev(() => window.__motion.part('tabs', 'pageTwo'));

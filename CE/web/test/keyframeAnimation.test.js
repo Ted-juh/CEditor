@@ -20,6 +20,12 @@ import {
   animationDeclaration,
   framesHash,
   createKeyframePlayer,
+  cleanFrameColour,
+  channelFrames,
+  colourKeyframesRule,
+  colourAnimationValue,
+  colourVariables,
+  COLOUR_CHANNELS,
 } from '../src/CE_Application/utils/keyframeAnimation.js';
 import { readTrigger } from '../src/CE_Application/utils/interactionRuntime.js';
 
@@ -199,4 +205,81 @@ test('two animations on one part play together, in document order', () => {
 test('readTrigger keeps the beat interval it is given', () => {
   assert.equal(readTrigger({ trigger: { type: 'beat', every: 4 } }).every, 4);
   assert.equal(readTrigger({ trigger: { type: 'beat', every: 0 } }).every, 1);
+});
+
+// --- Colour ---------------------------------------------------------------------------------------
+// A control's colour is painted by layers inside the element that moves, so colour frames are
+// separate @keyframes, one per channel, handed to those layers as custom properties.
+
+test('a frame colour is the document\'s AARRGGBB, and nothing else gets in', () => {
+  assert.equal(cleanFrameColour('ff3a3a3a'), 'FF3A3A3A');
+  assert.equal(cleanFrameColour('#80FF0000'), '80FF0000');
+  assert.equal(cleanFrameColour('#14b8a6'), 'FF14B8A6', 'six digits are opaque');
+  // The colour is written into a <style> element: anything but hex digits is refused, not escaped.
+  for (const bad of ['red', 'rgb(1,2,3)', '#FFF', '', null, 'FF0000}body{display:none', '{surface}']) {
+    assert.equal(cleanFrameColour(bad), null, String(bad));
+  }
+});
+
+test('frames keep a fill and a text colour, and drop one that is not a colour', () => {
+  assert.deepEqual(cleanFrames([{ at: 0.5, fill: '#ff0000', text: 'nope', scale: 1.1 }, { at: 0, text: 'FFFFFFFF' }]), [
+    { at: 0, text: 'FFFFFFFF' },
+    { at: 0.5, scale: 1.1, fill: 'FFFF0000' },
+  ]);
+});
+
+const flash = (extra = {}) => node({ type: 'always' }, {
+  name: 'flash',
+  frames: [{ at: 0, fill: 'FF202020' }, { at: 0.5, fill: 'FFFF8800', text: 'FF000000' }, { at: 1, fill: 'FF202020' }],
+  ...extra,
+});
+
+test('each channel is its own @keyframes, painting with the one property that element uses', () => {
+  const entry = readKeyframes(flash());
+  assert.equal(entry.moves, false, 'colour only: no motion keyframes at all');
+  assert.deepEqual(Object.fromEntries(Object.entries(COLOUR_CHANNELS).map(([k, v]) => [k, v.property])),
+    { paint: 'background-color', shape: 'fill', stroke: 'stroke', text: 'color' });
+  assert.match(colourKeyframesRule(entry, 'paint', 'a'),
+    /^@keyframes ce-kf-paint-[0-9a-z]+-a\{0%\{background-color:#202020FF\}50%\{background-color:#FF8800FF\}100%\{background-color:#202020FF\}\}$/);
+  assert.match(colourKeyframesRule(entry, 'stroke', 'a'), /^@keyframes ce-kf-stroke-\w+-a\{0%\{stroke:#202020FF\}/);
+  // A frame that leaves a colour out is not in that channel's rule: it eases through.
+  assert.deepEqual(channelFrames(entry, 'text'), [{ at: 0.5, colour: 'FF000000' }]);
+  assert.match(colourKeyframesRule(entry, 'text', 'b'), /^@keyframes ce-kf-text-\w+-b\{50%\{color:#000000FF\}\}$/);
+  assert.match(colourAnimationValue(entry, 'text', 'b'), /^ce-kf-text-\w+-b 400ms linear 0ms infinite normal none$/,
+    'on the same clock as the motion would be');
+});
+
+test('the player hands colour out per part and channel, beside the motion', () => {
+  const both = flash({ name: 'both', frames: [{ at: 0, scale: 1, fill: 'FF202020' }, { at: 1, scale: 1.1 }] });
+  const { step } = rig(flash(), both);
+  const out = step();
+  assert.equal(out.parts.get('lamp').length, 1, 'only the animation that moves writes motion');
+  const lamp = out.colours.get('lamp');
+  assert.equal(lamp.paint.length, 2);
+  assert.equal(lamp.text.length, 1, 'only flash sets a text colour');
+  assert.match(out.rules, /@keyframes ce-kf-paint-/);
+  assert.match(out.rules, /@keyframes ce-kf-shape-/);
+  assert.equal(step().colours, out.colours, 'nothing changed, so the same objects come back');
+});
+
+test('a restart flips the colour channels with the motion, so they stay in step', () => {
+  const blinkColour = flash({ trigger: { type: 'beat', every: 1 }, frames: [{ at: 0, scale: 1, fill: 'FF000000' }, { at: 1, scale: 1.2 }] });
+  const { step } = rig(blinkColour);
+  step([], {}, { beats: 0.5 });
+  const first = step([], {}, { beats: 1.5 });
+  const second = step([], {}, { beats: 2.5 });
+  const phase = (out) => [/-(a|b) /.exec(out.parts.get('lamp')[0])[1], /-(a|b) /.exec(out.colours.get('lamp').paint[0])[1]];
+  assert.deepEqual(phase(first), ['a', 'a']);
+  assert.deepEqual(phase(second), ['b', 'b']);
+});
+
+test('colour variables are all four, always, so a part never paints with its control\'s pulse', () => {
+  assert.equal(colourVariables(null), '--ce-kf-paint:none;--ce-kf-shape:none;--ce-kf-stroke:none;--ce-kf-text:none;');
+  assert.equal(colourVariables({ paint: ['p 1ms'], text: ['t 1ms', 'u 1ms'] }),
+    '--ce-kf-paint:p 1ms;--ce-kf-shape:none;--ce-kf-stroke:none;--ce-kf-text:t 1ms, u 1ms;');
+  // A part whose fill is absorbed onto it plays paint itself, and must not hand it to its layers too.
+  assert.match(colourVariables({ paint: ['p 1ms'] }, { skip: ['paint'] }), /^--ce-kf-paint:none;/);
+  assert.equal(animationDeclaration(['m 1ms'], { extra: ['p 1ms'] }), 'animation:m 1ms, p 1ms;');
+  assert.equal(animationDeclaration(null, { extra: ['p 1ms'], svg: true }), 'animation:p 1ms;',
+    'a colour alone needs no transform origin');
 });

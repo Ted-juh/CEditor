@@ -651,6 +651,15 @@ test('frame values are set, cleared and re-sorted', () => {
   assert.deepEqual(removeFrame(frames, 9).length, 3);
 });
 
+test('a frame colour is set as the document writes colours, and text that is not one leaves none', () => {
+  const frames = [{ at: 0, scale: 1 }, { at: 1, scale: 1 }];
+  assert.deepEqual(setFrameValue(frames, 1, 'fill', '#ff8800')[1], { at: 1, scale: 1, fill: 'FFFF8800' });
+  assert.deepEqual(setFrameValue(frames, 0, 'text', '80FFFFFF')[0], { at: 0, scale: 1, text: '80FFFFFF' });
+  assert.deepEqual(setFrameValue(frames, 0, 'text', 'white')[0], { at: 0, scale: 1 }, 'not black, not broken: left out');
+  const coloured = setFrameValue(frames, 1, 'fill', 'FFFF8800');
+  assert.deepEqual(setFrameValue(coloured, 1, 'fill', '')[1], { at: 1, scale: 1 }, 'and empty clears it');
+});
+
 test('the status lamp fades into its colour and the tab group cross-fades its pages', async () => {
   const { buildStarterControl } = await import('../../../tools/scripts/qa/sheets/packages.mjs');
   const { CUSTOM_COMPONENT_STARTERS } = await import('../src/CE_Application/utils/customComponentFactory.js');

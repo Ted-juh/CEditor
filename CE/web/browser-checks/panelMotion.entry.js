@@ -92,17 +92,52 @@ Object.assign(tabs._children.Core, { id: 'tabs', name: 'tabs' });
 Object.assign(tabs._children.Transform, { x: 20, y: 200, width: 260, height: 160 });
 tabs._children.Animations._children.pageFade.duration = 800;   // slow enough to sample mid-fade
 
+// Colour frames: a button whose fill and label colour pulse, and a status lamp whose lamp part
+// pulses while its caption — another part of the same control — must not.
+const glow = place(createControl('Button'), 'glow', 290, 205, 100, 40);
+glow._children.Animations._children = {
+  glowing: keyframes('glowing', { type: 'always' }, [
+    { at: 0, fill: 'FF102030', text: 'FFFFFFFF' },
+    { at: 0.5, fill: 'FFFF8800', text: 'FF000000' },
+    { at: 1, fill: 'FF102030', text: 'FFFFFFFF' },
+  ], 2000),
+};
+const lamp = place(createControl('CustomComponent'), 'lamp', 290, 260, 100, 60);
+for (const [dotPath, value] of Object.entries(createCustomComponentStarterPatch('starter.statusLamp'))) {
+  const parts = dotPath.split('.');
+  if (parts.length === 1) { lamp._children[parts[0]] = value; continue; }
+  const field = parts.pop();
+  let node = lamp._children;
+  for (const key of parts) node = node?.[key]?._children ?? node?.[key];
+  if (node && typeof node === 'object') node[field] = value;
+}
+Object.assign(lamp._children.Core, { id: 'lamp', name: 'lamp' });
+Object.assign(lamp._children.Transform, { x: 290, y: 260, width: 100, height: 60 });
+lamp._children.Animations._children.throb = {
+  ...keyframes('throb', { type: 'always' }, [{ at: 0, fill: 'FF003300' }, { at: 0.5, fill: 'FF00FF66' }, { at: 1, fill: 'FF003300' }], 2000),
+  targets: [{ path: 'Parts.lamp' }],
+};
+
+// …and a knob whose pointer — drawn as SVG, not as a box — pulses its colour.
+const tinted = place(createControl('Knob'), 'tinted', 345, 20, 50, 50);
+tinted._children.Animations._children = {
+  tint: {
+    ...keyframes('tint', { type: 'always' }, [{ at: 0, fill: 'FFFFFFFF' }, { at: 0.5, fill: 'FFFF2200' }, { at: 1, fill: 'FFFFFFFF' }], 2000),
+    targets: [{ path: 'Parts.pointerCurrent' }],
+  },
+};
+
 // ce.anim is declared because this panel has no script of its own for the runtime to derive it from;
 // a panel whose script calls ce.anim.play gets the module from that script.
 const panel = {
   id: 'motion', name: 'Motion', width: 400, height: 380, bgColour: 'FF1E1E1E',
-  controls: [button, knob, springy, drawn, pulser, beater, tabs],
+  controls: [button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted],
   scripting: { modules: ['ce.core', 'ce.anim'] },
 };
 panels.set([]);
 addPanel(panel);
 setActivePanel(panel.id);
-panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn, pulser, beater, tabs].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
+panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn, pulser, beater, tabs, glow, lamp, tinted].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
 mount(GaiaPagesHarness, { target: document.getElementById('host'), props: { panelId: panel.id } });
 setPreviewModeEnabled(true);
 
@@ -134,6 +169,26 @@ window.__motion = {
     const style = getComputedStyle(root(id));
     return { name: style.animationName, scale: style.scale, transform: style.transform };
   },
+  /** A control's own colour layers: the absorbed fill, the label, and what they are animating. */
+  colours: (id) => {
+    const content = getComputedStyle(root(id).querySelector('.control-content'));
+    const text = root(id).querySelector('.text-span');
+    const textStyle = text ? getComputedStyle(text) : null;
+    return { fill: content.backgroundColor, fillAnimation: content.animationName, text: textStyle?.color ?? null, textAnimation: textStyle?.animationName ?? null };
+  },
+  /** Every element of one part that paints a background, its colour, and the paint channel it inherits. */
+  partPaint: (id, name) => {
+    const el = root(id)?.querySelector(`.interactive-part[data-part-name="${name}"]`);
+    if (!el) return null;
+    const layers = [el, ...el.querySelectorAll('*')].map((node) => getComputedStyle(node))
+      .filter((style) => style.animationName !== 'none')
+      .map((style) => ({ animation: style.animationName, background: style.backgroundColor, fill: style.fill, stroke: style.stroke }));
+    return { channel: getComputedStyle(el).getPropertyValue('--ce-kf-paint').trim(), layers };
+  },
+  /** The SVG shapes inside a control that are playing a colour channel, and their paint now. */
+  shapePaint: (id) => [...root(id).querySelectorAll('svg *')].map((node) => getComputedStyle(node))
+    .filter((style) => /ce-kf-(shape|stroke)-/.test(style.animationName))
+    .map((style) => ({ animation: style.animationName, fill: style.fill, stroke: style.stroke })),
   startTransport: (bpm) => { setTransportBpm(bpm); startTransport(0); },
   /** A part of a control as the browser has it: there at all, visible, and how opaque. */
   part: (id, name) => {

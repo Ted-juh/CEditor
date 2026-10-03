@@ -591,7 +591,7 @@
 <EffectSurface effects={background?._children?.Effects} {width} {height} target="background">
 {#each visibleFillLayers as layerId (layerId)}
   <EffectSurface effects={fill?._children?.[`${layerId[0].toUpperCase()}${layerId.slice(1)}Effects`]} {width} {height} target={layerId}>
-    <div class="bg-fill-layer" style={fillLayerStyles[layerId]}></div>
+    <div class="bg-fill-layer" class:solid={layerId === 'solid'} style={fillLayerStyles[layerId]}></div>
   </EffectSurface>
 {/each}
 
@@ -752,6 +752,11 @@
     pointer-events: none;
     box-sizing: border-box;
   }
+
+  /* A keyframe animation's fill colour, handed down by the control or part it belongs to
+     (CE_Application/utils/keyframeAnimation.js). Unset — the player window, any control without
+     colour frames — it is none. */
+  .bg-fill-layer.solid { animation: var(--ce-kf-paint, none); }
 
   .bg-border {
     position: absolute;

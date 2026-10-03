@@ -29,6 +29,7 @@ import { OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CU
 import {
   KEYFRAME_TRIGGER_TYPES,
   FRAME_PROPERTIES,
+  FRAME_COLOURS,
   FRAME_DEFAULTS,
   PULSE_FRAMES,
   cleanFrames,
@@ -37,7 +38,7 @@ import {
 } from './keyframeAnimation.js';
 
 export { EASING_BEZIERS, EASING_NAMES, OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT };
-export { KEYFRAME_TRIGGER_TYPES, FRAME_PROPERTIES, FRAME_DEFAULTS };
+export { KEYFRAME_TRIGGER_TYPES, FRAME_PROPERTIES, FRAME_COLOURS, FRAME_DEFAULTS };
 
 /** The four easings the properties panel's dropdown offers. AnimationsEditor.svelte is pinned to it. */
 export const PANEL_EASING_OPTIONS = ['linear', 'outQuad', 'inOutQuad', 'outCubic'];
@@ -483,6 +484,8 @@ export function removeFrame(frames, index) {
 /**
  * One value in one frame. `at` is a percentage in the tab and a fraction here; an empty value
  * removes the property from the frame, which lets it ease through from the frames either side.
+ * A colour (`fill`, `text`) is kept as written and checked by cleanFrames, so text that is not a
+ * colour leaves the frame without one rather than with a broken one.
  */
 export function setFrameValue(frames, index, key, value) {
   const list = cleanFrames(frames);
@@ -490,6 +493,7 @@ export function setFrameValue(frames, index, key, value) {
   const next = { ...list[index] };
   if (key === 'at') next.at = Number(value) / 100;
   else if (value === '' || value === null || value === undefined) delete next[key];
+  else if (FRAME_COLOURS.includes(key)) next[key] = String(value);
   else next[key] = Number(value);
   list[index] = next;
   return cleanFrames(list);

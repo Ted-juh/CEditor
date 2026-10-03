@@ -86,7 +86,7 @@
   import { rootTransitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { noteAnimationsFired, animationPlays } from '../stores/animationActivity.js';
-  import { createKeyframePlayer, animationDeclaration } from '../utils/keyframeAnimation.js';
+  import { createKeyframePlayer, animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
   import { transport } from '../stores/transport.js';
   import {
     getMouseSection,
@@ -1687,6 +1687,10 @@
     if (fired?.length) noteAnimationsFired(core?.id, fired);
   });
   let rootKeyframeCSS = $derived(animationDeclaration(activeKeyframes?.parts?.get('') ?? null));
+  // Colour frames reach the layers that paint as inherited custom properties. Only a control that
+  // has any sets them; then it and every part set all four, so a pulse stays where it was put.
+  let keyframeColours = $derived(activeKeyframes?.colours?.size ? activeKeyframes.colours : null);
+  let rootColourCSS = $derived(keyframeColours ? colourVariables(keyframeColours.get('') ?? null) : '');
   let canvasTransformCSS = $derived.by(() => {
     const transforms = [];
     if (Math.abs(displayRotation) > 0.001) transforms.push(`rotate(${displayRotation}deg)`);
@@ -3502,7 +3506,7 @@
   class:device-drop-incompatible={deviceDropStatus === 'incompatible'}
   class:mouse-transparent={mouseBlocksPointer}
   class:mouse-focus-outline={mouseFocusOutline}
-  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; --inv-scale:{1 / (scale || 1)}; {layerTint ? `--layer-tint:${layerTint};` : ''} {canvasTransformCSS} {rootTransitionCSS} {rootKeyframeCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
+  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; --inv-scale:{1 / (scale || 1)}; {layerTint ? `--layer-tint:${layerTint};` : ''} {canvasTransformCSS} {rootTransitionCSS} {rootKeyframeCSS} {rootColourCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
   onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
   ondblclick={editorInteractionEnabled ? handleDoubleClick : undefined}
   ondragover={editorInteractionEnabled ? handleDeviceParameterDragOver : undefined}
@@ -3541,7 +3545,7 @@
       <BackgroundRenderer {background} width={displayW} height={displayH} />
     </div>
   {/if}
-  <div bind:this={controlContentElement} class="control-content" style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
+  <div bind:this={controlContentElement} class="control-content" class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
     {#if hasAnatomy}
       <ControlAnatomy control={renderControl} runtime={interactionRuntime} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} />
     {/if}
@@ -3768,6 +3772,7 @@
         height={displayH}
         partTransitions={activeTransitions?.partTransitions ?? null}
         partAnimations={activeKeyframes?.parts ?? null}
+        partColours={keyframeColours}
         debug={interactionDebugEnabled}
       />
     {/if}
@@ -3781,6 +3786,7 @@
           parentHeight={displayH}
           transitionBucket={activeTransitions?.partTransitions?.get?.(partName) ?? null}
           animationList={activeKeyframes?.parts?.get?.(partName) ?? null}
+          colourChannels={keyframeColours ? (keyframeColours.get(partName) ?? {}) : null}
           fadeHidden={fadeableParts.has(partName)}
           debug={interactionDebugEnabled}
           editableInput={editableInputForPart(part)}
@@ -4601,6 +4607,10 @@
   .ce-colour-anim {
     transition: var(--ce-colour-transition, none);
   }
+  /* Keyframe colour frames (utils/keyframeAnimation.js, HOW COLOUR DRAWS): the fill where it is
+     absorbed onto this element, and the control's text. */
+  .control-content.absorbs-fill { animation: var(--ce-kf-paint, none); }
+  .text-span { animation: var(--ce-kf-text, none); }
   .control-background { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 
   .interaction-debug-badge {

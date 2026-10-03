@@ -599,7 +599,7 @@ onMount(() => {
               <p class="warn">{targets.find((entry) => !entry.status.works).status.detail}</p>
             {/if}
             <FramesEditor frames={selected.frames} onchange={(next) => setProp('frames', next)} />
-            <p class="hint">Scale, turn, move and fade. Colour and text frames are not supported yet.</p>
+            <p class="hint">Scale, turn, move and fade, and two colours: fill recolours a solid fill, a shape or a line; text, its text. A gradient or an image keeps its own colours.</p>
           {:else}
             <div class="colh">
               Changes

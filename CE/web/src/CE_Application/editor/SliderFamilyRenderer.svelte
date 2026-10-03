@@ -3,7 +3,7 @@
   import SliderShapeFill from './SliderShapeFill.svelte';
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { parseTiming } from '../utils/easing.js';
-  import { animationDeclaration } from '../utils/keyframeAnimation.js';
+  import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
   import { resolveSliderSemanticParts } from '../utils/sliderEntityFactory.js';
   import { numberOr, clamp } from '../utils/primitives.js';
   import {
@@ -32,6 +32,8 @@
     height = 0,
     partTransitions = null,
     partAnimations = null,
+    // Keyframe colour channels per part, or null when the control has no colour frames.
+    partColours = null,
     debug = false,
   } = $props();
 
@@ -694,11 +696,22 @@
   // Their colour and opacity still follow the part's timing — a pointer that lights up on press
   // should glide into its colour.
 
-  function pointerStyleFor(partName) {
+  /**
+   * `paint` says what this element paints with the part's colour — 'fill', 'stroke', 'both' or
+   * nothing — so a keyframe colour frame recolours that and leaves a border or a sheen alone. A
+   * masked fill (SliderShapeFill) paints through BackgroundRenderer, which reads the part's colour
+   * from the custom property this sets.
+   */
+  function pointerStyleFor(partName, paint = '') {
     const bucket = partTransitions?.get?.(partName) ?? null;
+    const channels = partColours ? (partColours.get(partName) ?? {}) : null;
+    const extra = !channels ? [] : [
+      ...(paint === 'fill' || paint === 'both' ? (channels.shape ?? []) : []),
+      ...(paint === 'stroke' || paint === 'both' ? (channels.stroke ?? []) : []),
+    ];
     // A keyframe animation on a part composes with whatever draws it: it uses the individual
     // transform properties, about the shape's own centre (utils/keyframeAnimation.js).
-    const animation = animationDeclaration(partAnimations?.get?.(partName) ?? null, { svg: true });
+    const animation = `${animationDeclaration(partAnimations?.get?.(partName) ?? null, { svg: true, extra })} ${channels ? colourVariables(channels) : ''}`.trim();
     if (VALUE_DRAWN_PARTS.includes(String(partName))) {
       return `${buildTransitionStyle(bucket ? { transform: null, size: null, opacity: bucket.opacity, colour: bucket.colour } : null)} ${animation}`.trim();
     }
@@ -710,7 +723,8 @@
   }
 </script>
 
-<div class="slider-family-renderer">
+<!-- The control's own colour frames stop here: what is drawn inside belongs to its parts. -->
+<div class="slider-family-renderer" style={partColours ? colourVariables(null) : undefined}>
   <svg class="slider-svg" viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} width={width} height={height} aria-hidden="true">
     {#snippet tickMark(kind, line, colour, strokeWidth, length, opacity, label)}
       {#if kind === 'dot'}
@@ -763,11 +777,12 @@
       {@const groove = argbToCss(part?.grooveColour, border)}
       {@const plate = argbToCss(part?.plateColour, 'rgba(255,255,255,0.22)')}
       {@const styled = pointerStyleFor(name)}
+      {@const styledFill = pointerStyleFor(name, 'fill')}
       {#if part?.glow === true}
         {#if g.r !== undefined}
-          <circle cx={point.x} cy={point.y} r={g.r * 1.5} fill={fill} opacity={0.5 * op} filter={`url(#${capGlowId})`} style={styled} />
+          <circle cx={point.x} cy={point.y} r={g.r * 1.5} fill={fill} opacity={0.5 * op} filter={`url(#${capGlowId})`} style={styledFill} />
         {:else if g.w !== undefined}
-          <rect x={g.x - 4} y={g.y - 4} width={g.w + 8} height={g.h + 8} rx={g.rx + 4} fill={fill} opacity={0.45 * op} filter={`url(#${capGlowId})`} style={styled} />
+          <rect x={g.x - 4} y={g.y - 4} width={g.w + 8} height={g.h + 8} rx={g.rx + 4} fill={fill} opacity={0.45 * op} filter={`url(#${capGlowId})`} style={styledFill} />
         {/if}
       {/if}
       {#if g.kind === 'ring'}
@@ -782,10 +797,10 @@
           style={styled}
         />
       {:else if g.kind === 'line'}
-        <line x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} stroke={fill} stroke-width={g.stroke} stroke-linecap="round" opacity={op} style={styled} />
+        <line x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} stroke={fill} stroke-width={g.stroke} stroke-linecap="round" opacity={op} style={pointerStyleFor(name, 'stroke')} />
       {:else if g.r !== undefined}
         {#if g.kind === 'glass'}
-          <circle cx={point.x} cy={point.y} r={g.r * 1.5} fill={fill} opacity={0.18 * op} style={styled} />
+          <circle cx={point.x} cy={point.y} r={g.r * 1.5} fill={fill} opacity={0.18 * op} style={styledFill} />
         {/if}
         {#if part?.shadow === true}
           <circle cx={point.x} cy={point.y} r={g.r} fill="#000000" opacity={0.001} filter={`url(#${capShadowId})`} style={styled} />
@@ -1088,7 +1103,7 @@
             r={radial.dot.r}
             fill={argbToCss(pointerCurrentPart?._children?.Background?._children?.Fill?.colour, '#FFFFFF')}
             opacity={numberOr(pointerCurrentPart?.opacity, 1)}
-            style={pointerStyleFor('pointerCurrent')}
+            style={pointerStyleFor('pointerCurrent', 'fill')}
           />
         {:else if radial.line}
           <line
@@ -1100,7 +1115,7 @@
             stroke-width={radial.line.width}
             stroke-linecap="round"
             opacity={numberOr(pointerCurrentPart?.opacity, 1)}
-            style={pointerStyleFor('pointerCurrent')}
+            style={pointerStyleFor('pointerCurrent', 'stroke')}
           />
         {:else}
           <polygon
@@ -1110,7 +1125,7 @@
             stroke-width={radial.polygon.stroke}
             stroke-linejoin="round"
             opacity={numberOr(pointerCurrentPart?.opacity, 1)}
-            style={pointerStyleFor('pointerCurrent')}
+            style={pointerStyleFor('pointerCurrent', 'both')}
           />
         {/if}
       {:else if valueMode === 'single' || valueMode === 'band'}

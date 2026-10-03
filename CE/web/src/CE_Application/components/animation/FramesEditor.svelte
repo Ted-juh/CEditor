@@ -3,15 +3,17 @@
    * A keyframe animation's frames: where each sits in one cycle, and what it sets.
    *
    * The strip along the top is the cycle, left to right, with a mark for every frame. Each row below
-   * is one frame — its position and the five things a frame can set. A cell left empty is not
-   * "zero": the property is left out of that frame and eases through it from the frames either side,
-   * which is how a pulse can scale without also fading. utils/animationModel.js does the edits and
-   * utils/keyframeAnimation.js turns the frames into CSS.
+   * is one frame — its position and the five things a frame can set, and under them its two colours,
+   * fill and text. A cell left empty is not "zero" or "black": the property is left out of that frame
+   * and eases through it from the frames either side, which is how a pulse can scale without also
+   * fading. utils/animationModel.js does the edits and utils/keyframeAnimation.js turns the frames
+   * into CSS.
    */
   import Plus from 'lucide-svelte/icons/plus';
   import X from 'lucide-svelte/icons/x';
   import NumberCell from '../../properties/NumberCell.svelte';
   import { addFrame, removeFrame, setFrameValue } from '../../utils/animationModel.js';
+  import { cleanFrameColour } from '../../utils/keyframeAnimation.js';
 
   let {
     frames = [],
@@ -29,7 +31,29 @@
   ];
 
   const percent = (at) => Math.round(at * 1000) / 10;
+
+  const COLOURS = [
+    { key: 'fill', head: 'fill', title: 'The colour it paints with: its fill, a shape\'s colour, a line\'s stroke' },
+    { key: 'text', head: 'text', title: 'The colour of its text' },
+  ];
+
+  /** AARRGGBB to the #rrggbb a colour input takes; alpha is kept from the frame when it is edited. */
+  const pickerValue = (argb) => `#${String(argb).slice(2).toLowerCase()}`;
+  const fromPicker = (hex, before) => `${String(cleanFrameColour(before) ?? 'FF').slice(0, 2)}${hex.replace('#', '').toUpperCase()}`;
 </script>
+
+{#snippet colourCell(frame, index, colour)}
+  {@const value = frame[colour.key]}
+  <div class="ccell" title={colour.title}>
+    <span class="chead">{colour.head}</span>
+    <input type="color" class="swatch" class:empty={!value} value={value ? pickerValue(value) : '#000000'}
+           aria-label={`Frame ${index + 1} ${colour.key} colour`}
+           onchange={(event) => onchange(setFrameValue(frames, index, colour.key, fromPicker(event.currentTarget.value, value)))} />
+    <input type="text" class="hex" value={value ?? ''} placeholder="—" spellcheck="false"
+           aria-label={`Frame ${index + 1} ${colour.key} hex`}
+           onchange={(event) => onchange(setFrameValue(frames, index, colour.key, event.currentTarget.value.trim()))} />
+  </div>
+{/snippet}
 
 <div class="frames">
   <div class="strip" aria-hidden="true">
@@ -57,6 +81,9 @@
               onclick={() => onchange(removeFrame(frames, index))}>
         <X size={10} />
       </button>
+      <div class="colours">
+        {#each COLOURS as colour (colour.key)}{@render colourCell(frame, index, colour)}{/each}
+      </div>
     </div>
   {/each}
   <button type="button" class="addframe" onclick={() => onchange(addFrame(frames))}>
@@ -96,7 +123,28 @@
     color: #4B545C;
     padding: 0 2px 3px;
   }
-  .frow { margin-top: 3px; }
+  .frow { margin-top: 3px; padding-bottom: 3px; border-bottom: 1px solid #23282D; }
+  .colours { grid-column: 2 / -2; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .ccell { min-width: 0; display: flex; align-items: center; gap: 4px; }
+  .chead {
+    font: 600 7.5px/1 'IBM Plex Mono', ui-monospace, monospace;
+    letter-spacing: 0.1em; text-transform: uppercase; color: #4B545C; width: 26px; flex: none;
+  }
+  .swatch {
+    width: 16px; height: 16px; flex: none; padding: 0; border: 1px solid #3A4148; border-radius: 3px;
+    background: transparent; cursor: pointer;
+  }
+  .swatch::-webkit-color-swatch-wrapper { padding: 0; }
+  .swatch::-webkit-color-swatch { border: none; border-radius: 2px; }
+  /* No colour in this frame: a crossed-out swatch, so "left out" never reads as black. */
+  .swatch.empty { background: linear-gradient(135deg, transparent 45%, #D98C8C 45%, #D98C8C 55%, transparent 55%); }
+  .swatch.empty::-webkit-color-swatch { opacity: 0; }
+  .hex {
+    min-width: 0; flex: 1; height: 18px; box-sizing: border-box; padding: 0 4px;
+    border: 1px solid #2E3439; border-radius: 3px; background: #121517; color: #C3D0DA;
+    font: 400 9px/1 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  .hex:focus { outline: none; border-color: #14B8A6; }
   .cell { min-width: 0; display: flex; }
   .drop {
     width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;

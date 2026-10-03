@@ -7,7 +7,7 @@
   import { materialActive } from '../utils/materialFilter.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
-  import { animationDeclaration } from '../utils/keyframeAnimation.js';
+  import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
 
   let {
     part = null,
@@ -16,6 +16,9 @@
     parentHeight = 0,
     transitionBucket = null,
     animationList = null,
+    // This part's colour channels ({ paint, shape, stroke, text }), {} for none, or null when the
+    // control has no colour frames at all — and then nothing is set (utils/keyframeAnimation.js).
+    colourChannels = null,
     /** Draw a hidden part as invisible rather than not at all, so showing and hiding can fade. */
     fadeHidden = false,
     debug = false,
@@ -180,8 +183,11 @@
       `overflow:${part?.clipChildren === true || editableInput ? 'hidden' : 'visible'}`,
       transforms.length ? `transform:${transforms.join(' ')}; transform-origin:${numberOr(layout?.pivotX, 50)}% ${numberOr(layout?.pivotY, 50)}%` : '',
       buildTransitionStyle(transitionBucket),
-      // Keyframe animations on this part (the control's player decides which are playing).
-      animationDeclaration(animationList),
+      // Keyframe animations on this part (the control's player decides which are playing). A fill
+      // absorbed onto this element is painted here, so its colour channel plays here too; the rest
+      // travel to the layers inside as custom properties.
+      animationDeclaration(animationList, { extra: colourChannels && absorbedFillCSS ? colourChannels.paint : [] }),
+      colourChannels ? colourVariables(colourChannels, { skip: absorbedFillCSS ? ['paint'] : [] }) : '',
       shadowCSS,
       blendCSS,
       filterCSS,
@@ -623,6 +629,12 @@
   .interactive-vector-shape :global(polygon) {
     transition: var(--ce-colour-transition, none);
   }
+
+  /* …and play its keyframe colour frames, each the one property it paints with. */
+  .interactive-simple-background { animation: var(--ce-kf-paint, none); }
+  .interactive-vector-shape :global(polygon) { animation: var(--ce-kf-shape, none); }
+  .interactive-vector-shape :global(line) { animation: var(--ce-kf-stroke, none); }
+  .interactive-part-text { animation: var(--ce-kf-text, none); }
 
   /* Editable value field — make editing visually obvious (caret + focus highlight). */
   .interactive-part-input {
