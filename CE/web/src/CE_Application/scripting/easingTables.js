@@ -32,5 +32,10 @@ export { EASING_BEZIERS, EASING_NAMES };
  */
 export const CURVE_NAMES = ['linear', 'exp', 'log', 's'];
 
-/** Every curve name ce.anim accepts, for the docs and for the "did you mean" report. */
-export const ANIM_CURVE_NAMES = [...CURVE_NAMES, ...Object.keys(EASING_BEZIERS)];
+/**
+ * Every curve NAME ce.anim accepts, for the docs and for the "did you mean" report: ce.math.curve's
+ * four, the panel's named beziers, and "spring" — the Animation tab's spring, which is
+ * ce.anim.spring's formula, its feel taken from the animation's damping and frequency. A curve drawn
+ * by hand is not a name; it is passed as four numbers (panelRuntime.js, drawnCurve).
+ */
+export const ANIM_CURVE_NAMES = [...CURVE_NAMES, ...Object.keys(EASING_BEZIERS), 'spring'];

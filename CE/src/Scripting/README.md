@@ -161,8 +161,12 @@ the value is; a second animation on a path replaces the first.
 
 The named curves are the panel's own easing table (`CE/web/src/CE_Application/utils/easing.js`),
 generated into `animEasings()` here and into each prelude by `gen-script-modules.mjs`: nine named
-beziers, plus ce.math.curve's four shapes (linear among them), thirteen in all.
-`panelApiParity.test.js` fails when a generated table is stale.
+beziers, plus ce.math.curve's four shapes (linear among them). `panelApiParity.test.js` fails when
+a generated table is stale. The Animation tab's other two easings reach scripts too: `curve =
+"spring"` is `animationSpring` with the animation's `damping`/`frequency` (so `ce.anim.to` with it
+and `ce.anim.spring` are one motion), and a curve drawn by hand is passed as its four numbers —
+`{0.2, 0, 0, 1}`, or named `x1`/`y1`/`x2`/`y2` — validated by `ScriptRuntime::drawnCurve` and the
+WebView's `drawnCurve` to the same rules as the tab's `bezier`. Fourteen names in all, plus that.
 
 `ce.anim.play(control, animation)` is the exception in the module: it moves no value. It plays one
 of the control's keyframe animations (made in the Animation tab) from its first frame, through the

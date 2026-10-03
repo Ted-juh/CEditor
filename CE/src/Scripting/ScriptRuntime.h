@@ -523,6 +523,11 @@ public:
         runtimes have to produce the same double, and a loop that stops on a tolerance stops after a
         different number of steps the moment one of them rounds differently. */
     static double cubicBezierEase (double t, double x1, double y1, double x2, double y2);
+    /** A curve drawn by hand, as ce.anim takes it: the two control points x1, y1, x2, y2 — a list of
+        four, which is what the Animation tab's custom easing stores, or named. Both x values stay
+        in [0, 1], the y values in [-2, 3]; anything else is refused rather than clamped. The
+        WebView runtime's drawnCurve applies exactly these rules. */
+    static bool drawnCurve (const juce::var& value, std::array<double, 4>& out);
 
     // --- ce.device: declaring what the app was not shipped knowing (design doc §29) -----------
     /** A parameter or a dump layout a SCRIPT declared, for a synth the app has no profile for.
@@ -621,6 +626,8 @@ private:
         double startBeats = 0.0, syncBeats = 0.0;
         bool sync = false;             // position derived from transport beats, not the wall clock
         juce::String curve = "linear";
+        std::array<double, 4> bezier {};   // a drawn curve's control points, when hasBezier
+        bool hasBezier = false;
         double damping = 6.0, frequency = 12.0;
         int repeat = 0, cycle = 0;     // repeat < 0 runs until stopped
         bool pingpong = false, paused = false;

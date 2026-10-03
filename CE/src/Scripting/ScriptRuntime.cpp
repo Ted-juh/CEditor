@@ -200,8 +200,37 @@ double ScriptRuntime::animationEase (double progress, const juce::String& curve,
     const auto& table = animEasings();
     const auto it = table.find (curve);
     if (it != table.end()) return cubicBezierEase (v, it->second[0], it->second[1], it->second[2], it->second[3]);
+    // The Animation tab's spring, at its default feel: the same formula ce.anim.spring uses, so
+    // curve = "spring" on ce.anim.to and ce.anim.spring are one motion. A spring's own damping and
+    // frequency come from the animation's opts, which this function does not see.
+    if (curve == "spring") return animationSpring (v, 6.0, 12.0);
     if (known != nullptr) *known = false;
     return v;
+}
+
+bool ScriptRuntime::drawnCurve (const juce::var& value, std::array<double, 4>& out)
+{
+    juce::Array<juce::var> list;
+    if (auto* arr = value.getArray())
+        list = *arr;
+    else if (auto* obj = value.getDynamicObject())
+    {
+        // Named keys are read by name; a Lua table's pairs have no order to read them in.
+        if (! obj->hasProperty ("x1")) return false;
+        for (const char* key : { "x1", "y1", "x2", "y2" })
+            list.add (obj->getProperty (key));
+    }
+    if (list.size() != 4) return false;
+    for (int i = 0; i < 4; ++i)
+    {
+        const auto& v = list.getReference (i);
+        if (! (v.isDouble() || v.isInt() || v.isInt64())) return false;
+        out[(size_t) i] = (double) v;
+        if (! std::isfinite (out[(size_t) i])) return false;
+    }
+    if (out[0] < 0.0 || out[0] > 1.0 || out[2] < 0.0 || out[2] > 1.0) return false;
+    if (out[1] < -2.0 || out[1] > 3.0 || out[3] < -2.0 || out[3] > 3.0) return false;
+    return true;
 }
 
 double ScriptRuntime::animationSpring (double progress, double damping, double frequency)
@@ -247,8 +276,10 @@ double ScriptRuntime::animationValueOf (const Animation& a, double progress) con
             : a.samples[i] + (a.samples[i + 1] - a.samples[i]) * (x - (double) i);
         return a.from + (a.to - a.from) * shaped;
     }
-    const double eased = a.kind == "spring" ? animationSpring (progress, a.damping, a.frequency)
-                                            : animationEase (progress, a.curve);
+    const double eased = (a.kind == "spring" || a.curve == "spring")
+                             ? animationSpring (progress, a.damping, a.frequency)
+                             : a.hasBezier ? cubicBezierEase (progress, a.bezier[0], a.bezier[1], a.bezier[2], a.bezier[3])
+                                           : animationEase (progress, a.curve);
     return a.from + (a.to - a.from) * eased;
 }
 
@@ -364,7 +395,17 @@ void ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& p
     a.path = key;
     a.groupId = (o != nullptr && o->hasProperty ("__group")) ? (int) o->getProperty ("__group") : 0;
 
-    if (o != nullptr && o->hasProperty ("curve"))
+    const auto curveVar = o != nullptr ? o->getProperty ("curve") : juce::var();
+    if (curveVar.isArray() || curveVar.isObject())
+    {
+        // A curve drawn by hand — four numbers, see drawnCurve — which is how a script moves along
+        // the same custom curve an animation in the Animation tab uses.
+        a.hasBezier = drawnCurve (curveVar, a.bezier);
+        if (a.hasBezier) a.curve = "custom";
+        else host.log ("[panel] ce.anim: a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), "
+                       "with x1 and x2 between 0 and 1 — animating linear.", juce::var());
+    }
+    else if (o != nullptr && o->hasProperty ("curve"))
     {
         const auto name = o->getProperty ("curve").toString();
         bool known = true;

@@ -553,9 +553,9 @@ export function easingPoints(easing, steps = 24) {
 }
 
 /**
- * Every easing the tab offers: the named curves, then one you draw and one that bounces.
- * The last two are the panel runtime's own — CSS draws them — and ce.anim does not know them, so a
- * script asking for curve = "spring" is told so rather than silently going linear.
+ * Every easing the tab offers: the named curves, then one you draw and one that bounces. ce.anim
+ * moves along both: curve = "spring" with the same damping and frequency, and a drawn curve passed
+ * as the four numbers this tab stores in `bezier` (panelRuntime.js, drawnCurve).
  */
 export const EASING_CHOICES = [...EASING_NAMES, CUSTOM_EASING, SPRING_EASING];
 

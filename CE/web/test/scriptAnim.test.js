@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 
 import {
   scriptApiForTesting, tickAnimations, stopAllAnimations, animationEase, cubicBezierEase,
-  ANIM_SAMPLES,
+  animationSpring, drawnCurve, ANIM_SAMPLES,
 } from '../src/CE_Application/scripting/panelRuntime.js';
 import { MEMBER_BY_ID, memberPath, memberRuntime, RUNTIME_ANY } from '../src/CE_Application/scripting/panelApi.js';
 import { EASING_BEZIERS, ANIM_CURVE_NAMES } from '../src/CE_Application/scripting/easingTables.js';
@@ -115,11 +115,13 @@ test('a curve this build does not know returns nothing rather than silently goin
   assert.equal(animationEase(0.5, 'typo'), undefined);
   assert.equal(animationEase(0.5, 'easeInOutBack'), undefined);
   assert.ok(ANIM_CURVE_NAMES.includes('outCubic'), 'and the name list is what the report suggests');
-  // ce.math.curve's four plus the panel's table. Thirteen since the animation overhaul added
-  // inCubic, inOutCubic and the three "back" curves; it was eight. The count is pinned so a name
-  // added to the table is a decision somebody sees, because it reaches every runtime's prelude.
-  assert.equal(ANIM_CURVE_NAMES.length, 13);
-  assert.deepEqual(ANIM_CURVE_NAMES.slice(4), Object.keys(EASING_BEZIERS));
+  // ce.math.curve's four, the panel's table, and the Animation tab's spring. Fourteen: it was eight
+  // until the animation overhaul added inCubic, inOutCubic and the three "back" curves, and the
+  // spring came after. The count is pinned so a name added is a decision somebody sees, because it
+  // reaches every runtime's prelude.
+  assert.equal(ANIM_CURVE_NAMES.length, 14);
+  assert.deepEqual(ANIM_CURVE_NAMES.slice(4, -1), Object.keys(EASING_BEZIERS));
+  assert.equal(ANIM_CURVE_NAMES.at(-1), 'spring');
 });
 
 /* ------------------------------------------------------------------------ the contract */
@@ -131,8 +133,62 @@ test('the curve names ce.anim documents are exactly the ones it evaluates', () =
   const curve = MEMBER_BY_ID.animateTo.params.find((p) => p.name === 'opts').fields.find((f) => f.name === 'curve');
   assert.deepEqual(curve.values, ANIM_CURVE_NAMES);
   for (const name of curve.values) assert.notEqual(animationEase(0.5, name), undefined, `${name} is documented and not evaluated`);
-  assert.equal(animationEase(0.5, 'spring'), undefined, 'the Animation tab\'s spring is its own, not a ce.anim curve');
+  // "custom" is not a name: a drawn curve is passed as its four numbers, not as the word.
   assert.equal(animationEase(0.5, 'custom'), undefined);
+});
+
+/* ------------------------------------------------------- the Animation tab's other two curves */
+// The tab has eleven easings and two of them are not names in a table: a spring, with its own feel,
+// and a curve drawn by hand. A script writing beside an animation that uses either had no way to
+// move the same way. ScriptRuntimeTests.cpp §39 pins the same numbers on the host side.
+
+test('curve = "spring" is ce.anim.spring\'s formula, with the same defaults', () => {
+  assert.equal(animationEase(0.5, 'spring'), animationSpring(0.5, 6, 12));
+  assert.equal(animationEase(1, 'spring'), 1, 'and it lands exactly');
+  withClock(() => {
+    api.animateTo('a', 100, { duration: 1000, from: 0, curve: 'spring' });
+    api.animateSpring('b', 100, { duration: 1000, from: 0 });
+    tickAnimations(300);
+    assert.equal(api.animateValue('a').value, api.animateValue('b').value, 'one motion, two ways to ask for it');
+    assert.equal(api.animateValue('a').value, 100 * animationSpring(0.3, 6, 12));
+    assert.ok(Math.abs(api.animateValue('a').value - 114.82331692233851) < 1e-9, 'the number ScriptRuntimeTests.cpp §39 pins');
+  });
+  withClock(() => {
+    // Its feel comes from the same opts ce.anim.spring reads.
+    api.animateTo('a', 100, { duration: 1000, from: 0, curve: 'spring', damping: 3, frequency: 20 });
+    tickAnimations(300);
+    assert.equal(api.animateValue('a').value, 100 * animationSpring(0.3, 3, 20));
+  });
+});
+
+test('a drawn curve is four numbers, as a list or named, and traces that bezier', () => {
+  assert.deepEqual(drawnCurve([0.2, 0, 0, 1]), [0.2, 0, 0, 1]);
+  assert.deepEqual(drawnCurve({ y2: 1, x1: 0.2, x2: 0, y1: 0 }), [0.2, 0, 0, 1], 'named keys are read by name');
+  // A Lua table arrives over the wasmoon bridge as an object keyed 1..4.
+  assert.deepEqual(drawnCurve({ 1: 0.2, 2: 0, 3: 0, 4: 1 }), [0.2, 0, 0, 1]);
+  assert.deepEqual(drawnCurve([0.3, -0.5, 0.7, 1.6]), [0.3, -0.5, 0.7, 1.6], 'y may overshoot');
+  for (const bad of [[0.2, 0, 0], [1.2, 0, 0, 1], [0.2, 0, -0.1, 1], [0.2, 4, 0, 1], [0.2, '0', 0, 1], [0.2, NaN, 0, 1], 'outBack', null]) {
+    assert.equal(drawnCurve(bad), null, `${JSON.stringify(bad)} is not a curve`);
+  }
+  withClock(() => {
+    api.animateTo('a', 100, { duration: 1000, from: 0, curve: [0.3, -0.5, 0.7, 1.6] });
+    api.animateTo('b', 100, { duration: 1000, from: 0, curve: { x1: 0.3, y1: -0.5, x2: 0.7, y2: 1.6 } });
+    tickAnimations(300);
+    const expected = 100 * cubicBezierEase(0.3, 0.3, -0.5, 0.7, 1.6);
+    assert.ok(Math.abs(expected - 12.340561441188532) < 1e-9, 'the number ScriptRuntimeTests.cpp §39 pins');
+    assert.equal(api.animateValue('a').value, expected);
+    assert.equal(api.animateValue('b').value, expected);
+  });
+});
+
+test('a drawn curve that is not one says so, and animates linear', () => {
+  withClock(() => {
+    clearScriptTrace();
+    api.animateTo('a', 100, { duration: 1000, from: 0, curve: [1.5, 0, 0, 1] });
+    tickAnimations(250);
+    assert.equal(api.animateValue('a').value, 25);
+    assert.match(getStore(scriptTrace).map((t) => t.message).join('\n'), /a drawn curve is four numbers/);
+  });
 });
 
 test('every phase-13 verb is declared, cross-runtime, and namespaced under ce.anim', () => {

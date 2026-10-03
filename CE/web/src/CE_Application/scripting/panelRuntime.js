@@ -3335,7 +3335,32 @@ export function animationEase(progress, curve) {
   if (curve === 's') return v * v * (3 - 2 * v);
   const b = EASING_BEZIERS[String(curve)];
   if (b) return cubicBezierEase(v, b[0], b[1], b[2], b[3]);
+  // The Animation tab's spring, at its default feel: the same formula ce.anim.spring uses, so
+  // curve = "spring" on ce.anim.to and ce.anim.spring are one motion. A spring's own damping and
+  // frequency come from the animation's opts, which this function does not see.
+  if (curve === 'spring') return animationSpring(v, SPRING_DEFAULT_DAMPING, SPRING_DEFAULT_FREQUENCY);
   return undefined;
+}
+
+const SPRING_DEFAULT_DAMPING = 6;
+const SPRING_DEFAULT_FREQUENCY = 12;
+
+/**
+ * A curve drawn by hand, as ce.anim takes it: the two control points of a cubic-bezier, x1, y1, x2,
+ * y2 — as a list of four, which is what the Animation tab's custom easing stores (so a script can
+ * pass an animation's `bezier` straight in), or named. Both x values stay in [0, 1] (time cannot run
+ * backwards); the y values may overshoot, within [-2, 3]. Anything else is refused, not clamped, so
+ * a typo is "not a curve" and not quietly a different one. ScriptRuntime.cpp applies exactly these
+ * rules. Named keys are read by name: a Lua table's pairs have no order to read them in.
+ */
+export function drawnCurve(values) {
+  const named = values && typeof values === 'object' && !Array.isArray(values) && 'x1' in values;
+  const list = named ? [values.x1, values.y1, values.x2, values.y2] : toList(values);
+  if (list.length !== 4 || !list.every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
+  const [x1, y1, x2, y2] = list;
+  if (x1 < 0 || x1 > 1 || x2 < 0 || x2 > 1) return null;
+  if (y1 < -2 || y1 > 3 || y2 < -2 || y2 > 3) return null;
+  return [x1, y1, x2, y2];
 }
 
 /** A damped oscillation, pinned to exactly 1 at the end so a spring always lands on its target. */
@@ -3431,9 +3456,11 @@ function animationValueOf(a, progress) {
     const shaped = sampleAt(a.samples, progress);
     return a.from + (a.to - a.from) * (Number.isFinite(shaped) ? shaped : 0);
   }
-  const eased = a.kind === 'spring'
+  const eased = a.kind === 'spring' || a.curve === 'spring'
     ? animationSpring(progress, a.damping, a.frequency)
-    : animationEase(progress, a.curve);
+    : a.bezier
+      ? cubicBezierEase(progress, a.bezier[0], a.bezier[1], a.bezier[2], a.bezier[3])
+      : animationEase(progress, a.curve);
   return a.from + (a.to - a.from) * (Number.isFinite(eased) ? eased : progress);
 }
 
@@ -3499,12 +3526,22 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   const envelope = kind === 'envelope';
 
   // An unknown curve REPORTS rather than silently animating linear. "outCubic" is a name the
-  // Properties panel offers three feet away, and it was linear here in every runtime.
+  // Properties panel offers three feet away, and it was linear here in every runtime. A curve can
+  // also be drawn — four numbers, see drawnCurve — which is how a script moves along the same
+  // custom curve an animation in the Animation tab uses.
   let curve = typeof opts?.curve === 'string' ? opts.curve : 'linear';
-  if (!spring && !envelope && animationEase(0.5, curve) === undefined) {
+  let bezier = null;
+  if (!spring && !envelope && opts?.curve && typeof opts.curve === 'object') {
+    bezier = drawnCurve(opts.curve);
+    curve = bezier ? 'custom' : 'linear';
+    if (!bezier) {
+      addScriptTrace('log', scriptId,
+        'ce.anim: a drawn curve is four numbers, x1, y1, x2, y2 (a list, or named), with x1 and x2 between 0 and 1 — animating linear.');
+    }
+  } else if (!spring && !envelope && animationEase(0.5, curve) === undefined) {
     addScriptTrace('log', scriptId,
       `ce.anim: "${curve}" is not a curve this build knows — animating linear. `
-      + `Try one of: ${ANIM_CURVE_NAMES.join(', ')}.`);
+      + `Try one of: ${ANIM_CURVE_NAMES.join(', ')}, or draw one as four numbers, x1, y1, x2, y2.`);
     curve = 'linear';
   }
 
@@ -3560,8 +3597,9 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
     sync,
     syncBeats,
     curve,
-    damping: animNumber(opts, 'damping', 6),
-    frequency: animNumber(opts, 'frequency', 12),
+    bezier,
+    damping: animNumber(opts, 'damping', SPRING_DEFAULT_DAMPING),
+    frequency: animNumber(opts, 'frequency', SPRING_DEFAULT_FREQUENCY),
     repeat,
     cycle: 0,
     pingpong: opts?.pingpong === true,

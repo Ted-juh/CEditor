@@ -573,8 +573,12 @@ onMount(() => {
                   onchange={(value) => setProps({ easing: SPRING_EASING, spring: cleanSpring({ ...selected.curve, frequency: value }) })} /></div>
               </div>
             {/if}
-            {#if selected.easing === CUSTOM_EASING || selected.easing === SPRING_EASING}
-              <p class="hint">Plays in the panel. Scripts' ce.anim knows the named curves only.</p>
+            {#if selected.easing === CUSTOM_EASING}
+              <p class="hint">A script's ce.anim moves the same way given these four as its curve:
+                <code>{selected.curve.points.map((v) => Math.round(v * 1000) / 1000).join(', ')}</code>.</p>
+            {:else if selected.easing === SPRING_EASING}
+              <p class="hint">A script's ce.anim moves the same way with curve <code>"spring"</code>,
+                damping <code>{selected.curve.damping}</code> and frequency <code>{selected.curve.frequency}</code>.</p>
             {/if}
           </div>
         </div>

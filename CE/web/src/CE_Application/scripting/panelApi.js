@@ -962,12 +962,19 @@ export const COMMANDS = [
       { name: 'opts', type: 'object', required: false,
         fields: optionFields([
           'duration', 'beats', 'sync',
-          { name: 'curve', type: 'text', default: '"linear"',
+          { name: 'curve', type: 'text or list', default: '"linear"',
             values: [...ANIM_CURVE_NAMES],
             summary: `The shape of the move. The first ${CURVE_NAMES.length} are ce.math.curve's; the rest are the `
-              + 'named easings the Animation tab offers, so a script and an animation that name the same '
-              + 'curve move the same way. The tab\'s custom and spring curves are its own and are not '
-              + 'accepted here. An unrecognised name is reported and the move runs linear.' },
+              + 'easings the Animation tab offers, so a script and an animation that name the same curve '
+              + 'move the same way. "spring" is ce.anim.spring\'s motion, its feel from `damping` and '
+              + '`frequency`. A curve drawn by hand is four numbers instead of a name — x1, y1, x2, y2, '
+              + 'as a list or named, the tab\'s custom curve exactly, so an animation\'s `bezier` can be '
+              + 'passed straight in; x1 and x2 stay within 0..1. An unrecognised name or a curve that is '
+              + 'not one is reported and the move runs linear.' },
+          { name: 'damping', type: 'number', default: '6',
+            summary: 'With curve = "spring": how quickly the wobble dies away, as ce.anim.spring reads it.' },
+          { name: 'frequency', type: 'number', default: '12',
+            summary: 'With curve = "spring": how fast it wobbles, as ce.anim.spring reads it.' },
           'animFrom', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
     ],

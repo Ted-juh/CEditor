@@ -2724,6 +2724,73 @@ int main()
     }
 
     {
+        // The Animation tab's other two easings. "spring" is ce.anim.spring's formula at its
+        // default feel; a drawn curve is the tab's four bezier numbers. Same fixtures as the
+        // "Animation tab's other two curves" tests in scriptAnim.test.js.
+        check (std::abs (ScriptRuntime::animationEase (0.5, "spring") - 0.9521959362937467) < 1e-9,
+               "curve = \"spring\" is ce.anim.spring at damping 6, frequency 12");
+        check (ScriptRuntime::animationEase (1.0, "spring") == 1.0, "…and it lands exactly");
+        bool known = false;
+        ScriptRuntime::animationEase (0.5, "custom", &known);
+        check (! known, "\"custom\" is not a name: a drawn curve is passed as its numbers");
+
+        std::array<double, 4> points {};
+        juce::Array<juce::var> list { 0.3, -0.5, 0.7, 1.6 };
+        check (ScriptRuntime::drawnCurve (juce::var (list), points)
+                && points == std::array<double, 4> { 0.3, -0.5, 0.7, 1.6 },
+               "a drawn curve is four numbers, and y may overshoot");
+        auto* named = new juce::DynamicObject();
+        named->setProperty ("y2", 1.6); named->setProperty ("x1", 0.3);
+        named->setProperty ("x2", 0.7); named->setProperty ("y1", -0.5);
+        check (ScriptRuntime::drawnCurve (juce::var (named), points)
+                && points == std::array<double, 4> { 0.3, -0.5, 0.7, 1.6 },
+               "…or named, read by name and not by order");
+        const auto refused = [&points] (juce::Array<juce::var> values)
+        {
+            return ! ScriptRuntime::drawnCurve (juce::var (values), points);
+        };
+        check (refused ({ 0.2, 0.0, 0.0 }), "three numbers are not a curve");
+        check (refused ({ 1.2, 0.0, 0.0, 1.0 }) && refused ({ 0.2, 0.0, -0.1, 1.0 }),
+               "time cannot run backwards: x stays within 0..1");
+        check (refused ({ 0.2, 4.0, 0.0, 1.0 }), "y is held to -2..3");
+        check (refused ({ 0.2, "0", 0.0, 1.0 }), "a number written as text is refused, not read");
+        check (! ScriptRuntime::drawnCurve (juce::var ("outBack"), points), "and a name is not a drawing");
+
+        TestHost curveHost;
+        ScriptRuntime curves (curveHost);
+        curves.tickAnimations (0.0);
+        auto opts = [] (std::initializer_list<std::pair<const char*, juce::var>> pairs)
+        {
+            auto* o = new juce::DynamicObject();
+            for (const auto& p : pairs) o->setProperty (p.first, p.second);
+            return juce::var (o);
+        };
+        curves.startAnimation ("to", juce::var ("s"), 100.0,
+                               opts ({ { "duration", 1000.0 }, { "from", 0.0 }, { "curve", "spring" } }));
+        curves.startAnimation ("spring", juce::var ("t"), 100.0, opts ({ { "duration", 1000.0 }, { "from", 0.0 } }));
+        curves.startAnimation ("to", juce::var ("u"), 100.0,
+                               opts ({ { "duration", 1000.0 }, { "from", 0.0 }, { "curve", "spring" },
+                                       { "damping", 3.0 }, { "frequency", 20.0 } }));
+        curves.startAnimation ("to", juce::var ("d"), 100.0,
+                               opts ({ { "duration", 1000.0 }, { "from", 0.0 }, { "curve", juce::var (list) } }));
+        curves.startAnimation ("to", juce::var ("bad"), 100.0,
+                               opts ({ { "duration", 1000.0 }, { "from", 0.0 },
+                                       { "curve", juce::var (juce::Array<juce::var> { 1.5, 0.0, 0.0, 1.0 }) } }));
+        curves.tickAnimations (300.0);
+        check (std::abs ((double) curveHost.values["s"] - 114.82331692233851) < 1e-9,
+               "ce.anim.to with curve = \"spring\" overshoots as the WebView's does");
+        check ((double) curveHost.values["s"] == (double) curveHost.values["t"],
+               "…and is the same motion as ce.anim.spring");
+        check (std::abs ((double) curveHost.values["u"] - 60.96238932635272) < 1e-9,
+               "its feel comes from the same damping and frequency");
+        check (std::abs ((double) curveHost.values["d"] - 12.340561441188532) < 1e-9,
+               "a drawn curve traces that bezier, to the WebView's number");
+        check (std::abs ((double) curveHost.values["bad"] - 30.0) < 1e-9,
+               "a drawing that is not a curve animates linear…");
+        check (curveHost.logs.joinIntoString ("\n").contains ("a drawn curve is four numbers"), "…and says so");
+    }
+
+    {
         TestHost animHost;
         ScriptRuntime anim (animHost);
         anim.tickAnimations (0.0);
