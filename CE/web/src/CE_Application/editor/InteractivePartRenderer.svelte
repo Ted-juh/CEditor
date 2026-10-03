@@ -7,6 +7,7 @@
   import { materialActive } from '../utils/materialFilter.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
+  import { animationDeclaration } from '../utils/keyframeAnimation.js';
 
   let {
     part = null,
@@ -14,6 +15,7 @@
     parentWidth = 0,
     parentHeight = 0,
     transitionBucket = null,
+    animationList = null,
     debug = false,
     editableInput = null,
     oneditableinput = null,
@@ -174,6 +176,8 @@
       `overflow:${part?.clipChildren === true || editableInput ? 'hidden' : 'visible'}`,
       transforms.length ? `transform:${transforms.join(' ')}; transform-origin:${numberOr(layout?.pivotX, 50)}% ${numberOr(layout?.pivotY, 50)}%` : '',
       buildTransitionStyle(transitionBucket),
+      // Keyframe animations on this part (the control's player decides which are playing).
+      animationDeclaration(animationList),
       shadowCSS,
       blendCSS,
       filterCSS,

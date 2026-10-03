@@ -17,6 +17,7 @@
   import Square from 'lucide-svelte/icons/square';
   import InteractiveTestSurface from '../InteractiveTestSurface.svelte';
   import { createInteractionPreviewSession } from '../../stores/interactionPreview.js';
+  import { requestAnimationPlay } from '../../stores/animationActivity.js';
   import { resolveInteractiveControl } from '../../utils/interactionRuntime.js';
   import { playbackPlan } from '../../utils/animationPlayback.js';
 
@@ -64,6 +65,11 @@
   function play() {
     if (!plan?.ok) return;
     stop();
+    if (plan.request) {
+      // A beat or script keyframe animation: ask for it, as ce.anim.play would.
+      requestAnimationPlay(controlId, row?.name);
+      return;
+    }
     const id = runId;
     const steps = plan.steps;
     playing = true;
@@ -86,7 +92,7 @@
 <div class="stage-box">
   <div class="stage-tools">
     <button type="button" class="play" disabled={!plan?.ok && !playing}
-            title={playing ? 'Stop' : plan?.ok ? `Play ${row?.name ?? ''}: ${plan.steps.map((step) => step.label).join(' → ')}` : (plan?.reason ?? 'Select an animation')}
+            title={playing ? 'Stop' : plan?.ok ? (plan.request ? `Play ${row?.name ?? ''} now` : `Play ${row?.name ?? ''}: ${plan.steps.map((step) => step.label).join(' → ')}`) : (plan?.reason ?? 'Select an animation')}
             aria-label={playing ? 'Stop' : 'Play'}
             onclick={() => (playing ? stop() : play())}>
       {#if playing}<Square size={10} />{:else}<Play size={10} />{/if}

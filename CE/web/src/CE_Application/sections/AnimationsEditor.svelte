@@ -271,7 +271,7 @@
                     onchange={() => setAnimationProp('enabled', !(selectedAnimation.enabled !== false))} />
       {/snippet}
       {#if selectedAnimation.enabled !== false}
-      <PropertyCell label="Kind" span={2} hint="Animation family. Transition is the only runtime kind in this slice.">
+      <PropertyCell label="Kind" span={2} hint="Animation family: transition, or keyframes — a shape of its own, edited in the Animation tab. Any other word plays as a transition.">
         <input class="val" type="text" value={selectedAnimation.kind ?? 'transition'} onchange={(e) => setAnimationProp('kind', e.target.value)} />
       </PropertyCell>
       <PropertyCell label="Duration" span={1} compact hint="Transition duration in milliseconds.">

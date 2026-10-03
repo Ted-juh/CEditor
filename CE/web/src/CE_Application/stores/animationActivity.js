@@ -27,3 +27,23 @@ export function noteAnimationsFired(controlId, names) {
 export function clearAnimationActivity() {
   animationActivity.set({});
 }
+
+/**
+ * Requests to play a keyframe animation now, per control: `{ [controlId]: { [name]: seq } }`.
+ *
+ * Written by ce.anim.play and by the Animation tab's Play; read by each control's keyframe player
+ * (utils/keyframeAnimation.js), which plays an animation whose seq moved since its last frame. A
+ * seq rather than a flag, so asking twice plays twice.
+ */
+export const animationPlays = writable({});
+
+let playSeq = 0;
+
+export function requestAnimationPlay(controlId, name) {
+  const id = String(controlId ?? '');
+  const animation = String(name ?? '');
+  if (!id || !animation) return false;
+  playSeq += 1;
+  animationPlays.update((current) => ({ ...current, [id]: { ...(current[id] ?? {}), [animation]: playSeq } }));
+  return true;
+}

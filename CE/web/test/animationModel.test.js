@@ -12,6 +12,13 @@ import { readFileSync } from 'node:fs';
 
 import {
   ANIMATION_KINDS,
+  KEYFRAME_TRIGGER_TYPES,
+  KEYFRAME_TRIGGER_LABELS,
+  keyframeTargets,
+  kindPatch,
+  addFrame,
+  removeFrame,
+  setFrameValue,
   EASING_CHOICES,
   easingPatch,
   cleanSpring,
@@ -309,11 +316,13 @@ test('a custom bezier and a spring draw their own shape, and an unknown name dra
 
 // --- Odds and ends ----------------------------------------------------------
 
-test('one animation kind plays; keyframes are not built yet', () => {
-  // The runtime skips `kind: 'keyframes'` (interactionRuntime.js) so that a second kind can arrive
-  // without the transition path guessing at it. Until it plays, the tab must not offer it.
-  assert.deepEqual(ANIMATION_KINDS, ['transition']);
+test('two animation kinds play: transitions, and keyframes', () => {
+  // This said "one animation kind plays; keyframes are not built yet" until phase 4 of the overhaul
+  // gave the runtime a keyframe player (utils/keyframeAnimation.js). The transition trigger types
+  // are unchanged; keyframes answer three more.
+  assert.deepEqual(ANIMATION_KINDS, ['transition', 'keyframes']);
   assert.deepEqual(TRIGGER_TYPES, ['stateChange', 'valueChange']);
+  assert.deepEqual(Object.keys(KEYFRAME_TRIGGER_LABELS), KEYFRAME_TRIGGER_TYPES);
 });
 
 test('field labels are collected for when the panel rows come out', () => {
@@ -396,11 +405,13 @@ test('the properties panel really is the way this tab says it is', () => {
   // 3. Four easings, no picture of any of them.
   assert.match(source, /const EASING_OPTIONS = \['linear', 'outQuad', 'inOutQuad', 'outCubic'\]/);
 
-  // 4. Kind is a free text box you can type any word into. The panel's own hint says transition is
-  //    the only kind that does anything, so this one is a small tidy-up rather than a trap.
+  // 4. Kind is a free text box you can type any word into. Its hint used to say transition was the
+  //    only kind that did anything; since phase 4 there are two, and the hint names both and sends
+  //    keyframes to this tab, which has the only editor for their frames.
   const kindCell = source.slice(source.indexOf('label="Kind"'), source.indexOf('label="Kind"') + 400);
   assert.match(kindCell, /<input class="val" type="text"/);
-  assert.match(kindCell, /only runtime kind/, 'the panel does warn about this one');
+  assert.match(kindCell, /transition, or keyframes/, 'the panel names both kinds');
+  assert.match(kindCell, /Animation tab/, 'and says where keyframes are edited');
 });
 
 // --- Trigger states ---------------------------------------------------------
@@ -588,4 +599,63 @@ test('dragging a bezier handle keeps time running forwards and the curve inside 
   assert.deepEqual(moveBezierHandle(start, 2, 1.4, 9), [0.25, 0.1, 1, BEZIER_VIEW.yMax], 'x cannot leave [0, 1]');
   assert.deepEqual(moveBezierHandle(start, 1, -1, -9), [0, BEZIER_VIEW.yMin, 0.25, 1]);
   assert.deepEqual(moveBezierHandle('nonsense', 1, 0.5, 0.5), [0.5, 0.5, 0.25, 1], 'bad points start from the default');
+});
+
+// --- Phase 4: keyframe animations ---------------------------------------------------------------
+
+test('switching to keyframes gives a pulse, a trigger keyframes answer, and a pulse\'s duration', () => {
+  const row = describeAnimation('a', { kind: 'transition', duration: 120, trigger: { type: 'stateChange', to: ['hover'] } });
+  const patch = kindPatch(row, 'keyframes');
+  assert.equal(patch.kind, 'keyframes');
+  assert.equal(patch.frames.length, 3);
+  assert.deepEqual(patch.trigger, { type: 'stateChange', to: ['hover'] }, 'a state trigger carries over');
+  assert.equal(patch.duration, 600, 'a 120ms loop would flicker');
+  const slow = kindPatch(describeAnimation('b', { duration: 900, frames: [{ at: 0, opacity: 0 }, { at: 1, opacity: 1 }] }), 'keyframes');
+  assert.equal(slow.duration, undefined, 'a duration that was already slow is kept');
+  assert.deepEqual(slow.frames, [{ at: 0, opacity: 0 }, { at: 1, opacity: 1 }], 'frames from before come back');
+});
+
+test('switching back to a transition gives it a trigger a transition answers, and keeps the frames', () => {
+  const beat = describeAnimation('a', { kind: 'keyframes', trigger: { type: 'beat', every: 2 }, frames: [{ at: 0, scale: 1 }] });
+  const patch = kindPatch(beat, 'transition');
+  assert.equal(patch.kind, 'transition');
+  assert.deepEqual(patch.trigger, { type: 'stateChange', from: ['*'], to: ['hover'], reverse: true });
+  assert.equal('frames' in patch, false, 'nothing deletes them');
+  const value = describeAnimation('b', { kind: 'keyframes', trigger: { type: 'valueChange', source: 'value.raw' } });
+  assert.deepEqual(kindPatch(value, 'transition').trigger, { type: 'valueChange', source: 'value.raw' });
+});
+
+test('a keyframe animation\'s target only has to name a part that exists', () => {
+  const row = describeAnimation('a', { kind: 'keyframes', targets: keyframeTargets('lamp'), frames: [{ at: 0, scale: 1 }] });
+  assert.deepEqual(row.targets, [{ path: 'Parts.lamp' }]);
+  assert.equal(row.part, 'lamp');
+  assert.equal(deadTargetCount(row, ['lamp']), 0, 'no property path is needed, so none is "dead"');
+  assert.equal(deadTargetCount(row, ['other']), 1, 'but a part that is not there is');
+  assert.deepEqual(keyframeTargets(''), [{ path: 'Transform' }]);
+  assert.equal(describeAnimation('b', { kind: 'keyframes', targets: keyframeTargets('') }).part, '');
+});
+
+test('a keyframe row reads its repeat, direction and frames', () => {
+  const row = describeAnimation('a', { kind: 'keyframes', trigger: { type: 'beat' }, direction: 'alternate', frames: [{ at: 1, scale: 2 }, { at: 0, scale: 1 }] });
+  assert.equal(row.iterations, 1, 'a beat plays once per beat by default');
+  assert.equal(row.direction, 'alternate');
+  assert.deepEqual(row.frames.map((frame) => frame.at), [0, 1]);
+  assert.equal(describeAnimation('b', { kind: 'keyframes', trigger: { type: 'always' } }).iterations, 'infinite');
+  assert.equal(describeAnimation('c', { kind: 'keyframes', iterations: 3 }).iterations, 3);
+  assert.deepEqual(describeAnimation('d', { kind: 'transition', frames: [{ at: 0 }] }).frames, [], 'a transition has none');
+});
+
+test('adding a frame puts it in the widest gap, as a copy of the frame before', () => {
+  assert.deepEqual(addFrame([{ at: 0, scale: 1 }, { at: 1, scale: 2 }]), [{ at: 0, scale: 1 }, { at: 0.5, scale: 1 }, { at: 1, scale: 2 }]);
+  assert.deepEqual(addFrame([{ at: 0, scale: 1 }, { at: 0.2, scale: 2 }]).map((frame) => frame.at), [0, 0.2, 0.6]);
+  assert.equal(addFrame([]).length, 1);
+});
+
+test('frame values are set, cleared and re-sorted', () => {
+  const frames = [{ at: 0, scale: 1 }, { at: 0.5, scale: 1.1 }, { at: 1, scale: 1 }];
+  assert.deepEqual(setFrameValue(frames, 1, 'opacity', 0.5)[1], { at: 0.5, scale: 1.1, opacity: 0.5 });
+  assert.deepEqual(setFrameValue(frames, 1, 'scale', '')[1], { at: 0.5 }, 'empty lets it ease through');
+  assert.deepEqual(setFrameValue(frames, 0, 'at', 75).map((frame) => frame.at), [0.5, 0.75, 1], 'at is a percentage in the tab');
+  assert.deepEqual(removeFrame(frames, 1).map((frame) => frame.at), [0, 1]);
+  assert.deepEqual(removeFrame(frames, 9).length, 3);
 });

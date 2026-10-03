@@ -319,6 +319,55 @@ check('and Play says plainly when it cannot sweep a value', async () => {});
 assert.equal(await ev(() => window.__anim.playDisabled()), true);
 assert.match(await ev(() => window.__anim.stageWhy()), /cannot set this control's value/);
 
+// --- Keyframes, the second kind -----------------------------------------------------------------
+
+await ev(() => window.__anim.clickSegment('Kind', 'Keyframes'));
+await settle();
+const kf = await ev(() => window.__anim.storedAnimation('pressEcho'));
+check('switching to Keyframes writes a pulse and keeps the trigger, which keyframes also answer', () => {
+  assert.equal(kf.kind, 'keyframes');
+  assert.equal(kf.frames.length, 3);
+  assert.equal(kf.trigger.type, 'valueChange');
+  assert.equal(kf.duration, 600, 'a 60ms loop would flicker, so it gets a pulse\'s length');
+});
+check('and the target list gives way to where it plays and its frames', async () => {});
+assert.equal(await ev(() => window.__anim.targetListShown()), false);
+assert.equal(await ev(() => window.__anim.frameRows()), 3);
+assert.deepEqual(await ev(() => window.__anim.frameMarks()), ['0%', '50%', '100%']);
+
+await ev(() => window.__anim.addFrame());
+await settle();
+check('adding a frame puts it in the widest gap', async () => {});
+assert.deepEqual((await ev(() => window.__anim.storedAnimation('pressEcho'))).frames.map((f) => f.at), [0, 0.25, 0.5, 1]);
+
+await ev(() => window.__anim.chooseSelect('Keyframe trigger', 'script'));
+await settle();
+check('a script-played animation can be played from the stage', async () => {});
+assert.equal((await ev(() => window.__anim.storedAnimation('pressEcho'))).trigger.type, 'script');
+assert.match(await ev(() => window.__anim.playTitle()), /^Play pressEcho now$/);
+const partName = await ev(() => window.__anim.firstPart());
+assert.equal(await ev((p) => window.__anim.stagePartAnimation(p), partName), 'none', 'nothing plays until asked');
+await ev(() => window.__anim.clickPlay());
+await page.waitForTimeout(120);
+const running = await ev((p) => window.__anim.stagePartAnimation(p), partName);
+check('and Play runs it on the part it is set to, as a CSS animation', () => {
+  assert.match(running, /^ce-kf-[0-9a-z]+-a$/, running);
+});
+assert.deepEqual(await ev(() => window.__anim.lamps()), ['pressEcho'], 'and its lamp lights');
+await ev(() => window.__anim.clickPlay());
+await page.waitForTimeout(120);
+check('Play again restarts it under its other name', async () => {});
+assert.match(await ev((p) => window.__anim.stagePartAnimation(p), partName), /^ce-kf-[0-9a-z]+-b$/);
+
+await ev(() => window.__anim.clickSegment('Kind', 'Transition'));
+await settle();
+const back = await ev(() => window.__anim.storedAnimation('pressEcho'));
+check('and back to a transition, the frames are kept for next time', () => {
+  assert.equal(back.kind, 'transition');
+  assert.equal(back.frames.length, 4);
+  assert.equal(back.trigger.type, 'stateChange', 'a script trigger is not one a transition answers');
+});
+
 // --- Making and unmaking an animation ----------------------------------------------------------
 
 const namesBefore = await ev(() => window.__anim.storedNames());

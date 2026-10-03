@@ -3,6 +3,7 @@
   import SliderShapeFill from './SliderShapeFill.svelte';
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { parseTiming } from '../utils/easing.js';
+  import { animationDeclaration } from '../utils/keyframeAnimation.js';
   import { resolveSliderSemanticParts } from '../utils/sliderEntityFactory.js';
   import { numberOr, clamp } from '../utils/primitives.js';
   import {
@@ -30,6 +31,7 @@
     width = 0,
     height = 0,
     partTransitions = null,
+    partAnimations = null,
     debug = false,
   } = $props();
 
@@ -694,10 +696,13 @@
 
   function pointerStyleFor(partName) {
     const bucket = partTransitions?.get?.(partName) ?? null;
+    // A keyframe animation on a part composes with whatever draws it: it uses the individual
+    // transform properties, about the shape's own centre (utils/keyframeAnimation.js).
+    const animation = animationDeclaration(partAnimations?.get?.(partName) ?? null, { svg: true });
     if (VALUE_DRAWN_PARTS.includes(String(partName))) {
-      return buildTransitionStyle(bucket ? { transform: null, size: null, opacity: bucket.opacity, colour: bucket.colour } : null);
+      return `${buildTransitionStyle(bucket ? { transform: null, size: null, opacity: bucket.opacity, colour: bucket.colour } : null)} ${animation}`.trim();
     }
-    return buildTransitionStyle(bucket);
+    return `${buildTransitionStyle(bucket)} ${animation}`.trim();
   }
 
   function oppositeDirection(direction) {

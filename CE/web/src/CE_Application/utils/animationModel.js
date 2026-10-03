@@ -26,19 +26,28 @@ import {
   readTrigger,
 } from './interactionRuntime.js';
 import { OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT, readEasing, easeAt, cleanBezier } from './easing.js';
+import {
+  KEYFRAME_TRIGGER_TYPES,
+  FRAME_PROPERTIES,
+  FRAME_DEFAULTS,
+  PULSE_FRAMES,
+  cleanFrames,
+  keyframePart,
+  defaultIterations,
+} from './keyframeAnimation.js';
 
 export { EASING_BEZIERS, EASING_NAMES, OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT };
+export { KEYFRAME_TRIGGER_TYPES, FRAME_PROPERTIES, FRAME_DEFAULTS };
 
 /** The four easings the properties panel's dropdown offers. AnimationsEditor.svelte is pinned to it. */
 export const PANEL_EASING_OPTIONS = ['linear', 'outQuad', 'inOutQuad', 'outCubic'];
 
 /**
- * The animation kinds the runtime plays: a transition moves a property when something changes.
- * The runtime already sets `kind: 'keyframes'` aside (interactionRuntime.js) so a second kind can
- * arrive without the transition path guessing at it, but nothing plays one yet, so nothing offers
- * one.
+ * The animation kinds the runtime plays. A transition eases a property from one style to the next
+ * when something changes. A keyframe animation runs a shape of its own — a pulse, a blink — while
+ * its trigger holds, or once each time it fires (utils/keyframeAnimation.js).
  */
-export const ANIMATION_KINDS = ['transition'];
+export const ANIMATION_KINDS = ['transition', 'keyframes'];
 
 export const TRIGGER_TYPES = ['stateChange', 'valueChange'];
 
@@ -177,6 +186,7 @@ export function targetCost(target) {
 /** One animation, read into the shape the tab draws. */
 export function describeAnimation(name, animation) {
   const trigger = readTrigger(animation);
+  const kind = String(animation?.kind ?? 'transition');
   return {
     name: String(name ?? ''),
     enabled: animation?.enabled !== false,
@@ -196,6 +206,13 @@ export function describeAnimation(name, animation) {
     origin: trigger.origin,
     trigger,
     targets: Array.isArray(animation?.targets) ? animation.targets : [],
+    // Keyframe animations only: where they play, how often, which way, and their frames.
+    part: keyframePart(animation),
+    iterations: animation?.iterations === 'infinite' || animation?.iterations === Infinity
+      ? 'infinite'
+      : (Number(animation?.iterations) >= 1 ? Math.round(Number(animation.iterations)) : defaultIterations(trigger.type)),
+    direction: animation?.direction === 'alternate' ? 'alternate' : 'normal',
+    frames: kind === 'keyframes' ? cleanFrames(animation?.frames) : [],
     animation,
   };
 }
@@ -212,14 +229,27 @@ export function animationsEnabled(control) {
   return control?._children?.Animations?.enabled !== false;
 }
 
+/**
+ * A keyframe animation's target only says WHERE it plays — the frames say what moves — so the one
+ * thing that can be wrong with it is a part that is not there.
+ */
+function keyframeTargetStatus(target, partNames) {
+  const part = keyframePart({ targets: [target] });
+  if (part && partNames.length && !partNames.includes(part)) {
+    return { works: false, reason: 'missing part', part, detail: `This control has no part called "${part}", so the animation plays on nothing.` };
+  }
+  return { works: true, animates: 'keyframes', buckets: [], part };
+}
+
 /** Each target with its status attached, ready to list. */
 export function describeTargets(row, partNames = []) {
+  const keyframes = row?.kind === 'keyframes';
   return (row?.targets ?? []).map((target, index) => ({
     index,
     target,
     path: String(target?.path ?? ''),
     properties: Array.isArray(target?.properties) ? target.properties : [],
-    status: targetStatus(target, partNames),
+    status: keyframes ? keyframeTargetStatus(target, partNames) : targetStatus(target, partNames),
   }));
 }
 
@@ -377,6 +407,91 @@ export function clashesFor(name, clashes) {
     }
     return [];
   });
+}
+
+// --- Keyframe animations -----------------------------------------------------
+// The second kind. These are the edits the tab makes to one; utils/keyframeAnimation.js is how it
+// plays.
+
+/** What a keyframe animation's trigger can be, as the tab labels it. */
+export const KEYFRAME_TRIGGER_LABELS = {
+  always: 'All the time',
+  stateChange: 'In a state',
+  valueChange: 'When the value changes',
+  beat: 'On the beat',
+  script: 'When a script plays it',
+};
+
+/** Where a keyframe animation plays, as a targets list: a part, or the control itself. */
+export function keyframeTargets(partName) {
+  return [{ path: partName ? `Parts.${partName}` : 'Transform' }];
+}
+
+/**
+ * What switching an animation's kind writes, as one patch.
+ *
+ * To keyframes: the frames it had (switching back and forth loses nothing) or a gentle pulse; a
+ * trigger a keyframe animation answers (a state or value trigger carries over, anything else becomes
+ * "all the time"); and, if its duration is a quick transition's, a pulse's 600ms instead — a 120ms
+ * loop is a flicker, not a pulse. To a transition: a trigger a transition answers, the frames kept.
+ */
+export function kindPatch(row, kind) {
+  const animation = row?.animation ?? {};
+  const trigger = animation.trigger ?? {};
+  if (kind === 'keyframes') {
+    const frames = cleanFrames(animation.frames);
+    const type = KEYFRAME_TRIGGER_TYPES.includes(trigger.type) ? trigger.type : 'always';
+    const patch = {
+      kind: 'keyframes',
+      frames: frames.length ? frames : PULSE_FRAMES.map((frame) => ({ ...frame })),
+      trigger: { ...trigger, type },
+    };
+    if (!(Number(animation.duration) >= 200)) patch.duration = 600;
+    return patch;
+  }
+  const type = TRIGGER_TYPES.includes(trigger.type) ? trigger.type : 'stateChange';
+  return {
+    kind: 'transition',
+    trigger: type === trigger.type ? { ...trigger } : { type: 'stateChange', from: ['*'], to: ['hover'], reverse: true },
+  };
+}
+
+/** A new frame, placed where there is room: halfway into the widest gap. */
+export function addFrame(frames) {
+  const list = cleanFrames(frames);
+  if (!list.length) return [{ at: 0, ...FRAME_DEFAULTS }];
+  const stops = [0, ...list.map((frame) => frame.at), 1];
+  let best = { gap: -1, at: 1 };
+  for (let i = 1; i < stops.length; i += 1) {
+    const gap = stops[i] - stops[i - 1];
+    if (gap > best.gap) best = { gap, at: (stops[i] + stops[i - 1]) / 2 };
+  }
+  const at = Math.round(best.at * 1000) / 1000;
+  // The new frame starts as the frame before it, so adding one never jumps anything.
+  const before = [...list].reverse().find((frame) => frame.at <= at) ?? list[0];
+  return cleanFrames([...list, { ...before, at }]);
+}
+
+export function removeFrame(frames, index) {
+  const list = cleanFrames(frames);
+  if (index < 0 || index >= list.length) return list;
+  list.splice(index, 1);
+  return list;
+}
+
+/**
+ * One value in one frame. `at` is a percentage in the tab and a fraction here; an empty value
+ * removes the property from the frame, which lets it ease through from the frames either side.
+ */
+export function setFrameValue(frames, index, key, value) {
+  const list = cleanFrames(frames);
+  if (!list[index]) return list;
+  const next = { ...list[index] };
+  if (key === 'at') next.at = Number(value) / 100;
+  else if (value === '' || value === null || value === undefined) delete next[key];
+  else next[key] = Number(value);
+  list[index] = next;
+  return cleanFrames(list);
 }
 
 // --- Editing the target list ------------------------------------------------

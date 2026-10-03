@@ -85,7 +85,9 @@
   import { createTransitionTracker } from '../utils/transitionSelection.js';
   import { rootTransitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
-  import { noteAnimationsFired } from '../stores/animationActivity.js';
+  import { noteAnimationsFired, animationPlays } from '../stores/animationActivity.js';
+  import { createKeyframePlayer, animationDeclaration } from '../utils/keyframeAnimation.js';
+  import { transport } from '../stores/transport.js';
   import {
     getMouseSection,
     resolveCursorCss,
@@ -1646,6 +1648,34 @@
     const root = activeTransitions?.rootTransitions ?? null;
     return `${rootTransitionDeclaration(root)} ${colourTransitionVar(root?.get?.('colour') ?? null)}`.trim();
   });
+
+  // Keyframe animations, the second kind (utils/keyframeAnimation.js): a pulse, a blink, played as
+  // CSS animations. They play where the control is being PREVIEWED — the panel's Preview, the
+  // Animation tab's stage — and not on the design canvas, where a control that never stops moving
+  // is one you cannot line up. The transport and the play requests are only listened to by a
+  // control that has something to hear them with: a panel of two hundred knobs does not wake thirty
+  // times a second because one lamp blinks on the beat.
+  const keyframePlayer = createKeyframePlayer();
+  let keyframeEntries = $derived(previewSessionOverride != null ? (interactionRuntime?.keyframes?.entries ?? []) : []);
+  let needsBeats = $derived(keyframeEntries.some((entry) => entry.trigger?.type === 'beat'));
+  let beatsNow = $state(null);
+  $effect(() => {
+    if (!needsBeats) { beatsNow = null; return undefined; }
+    return transport.subscribe((state) => { beatsNow = state?.running ? state.beats : null; });
+  });
+  let playsNow = $state({});
+  $effect(() => {
+    const id = core?.id;
+    if (!keyframeEntries.length || !id) return undefined;
+    return animationPlays.subscribe((all) => { playsNow = all?.[id] ?? {}; });
+  });
+  let activeKeyframes = $derived(keyframePlayer.next(previewSessionOverride != null ? interactionRuntime : null,
+    { reducedMotion: $systemReducedMotion, beats: beatsNow, plays: playsNow }));
+  $effect(() => {
+    const fired = activeKeyframes?.fired;
+    if (fired?.length) noteAnimationsFired(core?.id, fired);
+  });
+  let rootKeyframeCSS = $derived(animationDeclaration(activeKeyframes?.parts?.get('') ?? null));
   let canvasTransformCSS = $derived.by(() => {
     const transforms = [];
     if (Math.abs(displayRotation) > 0.001) transforms.push(`rotate(${displayRotation}deg)`);
@@ -3461,7 +3491,7 @@
   class:device-drop-incompatible={deviceDropStatus === 'incompatible'}
   class:mouse-transparent={mouseBlocksPointer}
   class:mouse-focus-outline={mouseFocusOutline}
-  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; --inv-scale:{1 / (scale || 1)}; {layerTint ? `--layer-tint:${layerTint};` : ''} {canvasTransformCSS} {rootTransitionCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
+  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; --inv-scale:{1 / (scale || 1)}; {layerTint ? `--layer-tint:${layerTint};` : ''} {canvasTransformCSS} {rootTransitionCSS} {rootKeyframeCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
   onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
   ondblclick={editorInteractionEnabled ? handleDoubleClick : undefined}
   ondragover={editorInteractionEnabled ? handleDeviceParameterDragOver : undefined}
@@ -3489,6 +3519,11 @@
   aria-valuemax={previewInteractive ? previewAriaValueMax : undefined}
   aria-valuetext={previewInteractive ? previewAriaValueText : undefined}
 >
+  {#if activeKeyframes?.rules}
+    <!-- The @keyframes this control's playing animations need. Built from numbers and a hash only
+         (utils/keyframeAnimation.js), never from text in the document, so there is nothing to escape. -->
+    {@html `<style>${activeKeyframes.rules}</style>`}
+  {/if}
   <EffectSurface effects={hasAnatomy ? null : effects} width={displayW} height={displayH} shadowsOnly target="component">
   {#if separateBackground && !hasAnatomy}
     <div class="control-background" style={filterCSS}>
@@ -3721,6 +3756,7 @@
         width={displayW}
         height={displayH}
         partTransitions={activeTransitions?.partTransitions ?? null}
+        partAnimations={activeKeyframes?.parts ?? null}
         debug={interactionDebugEnabled}
       />
     {/if}
@@ -3733,6 +3769,7 @@
           parentWidth={displayW}
           parentHeight={displayH}
           transitionBucket={activeTransitions?.partTransitions?.get?.(partName) ?? null}
+          animationList={activeKeyframes?.parts?.get?.(partName) ?? null}
           debug={interactionDebugEnabled}
           editableInput={editableInputForPart(part)}
           oneditableinput={editableHandlerForPart(part, 'input')}

@@ -13,10 +13,10 @@
    * and two animations tying for one property so the earlier never plays. The tab names all three.
    * utils/animationModel.js has the rules, and its test runs the real runtime to check them.
    *
-   * SECOND, THE PROPERTIES PANEL IS UNTOUCHED. AnimationsEditor still draws every section and still
-   * edits every field, JSON box and all. Nothing has been moved. allAnimationFieldLabels() is there
-   * for the day the panel's rows do come out, because the panel builds its search box from the rows
-   * it draws.
+   * SECOND, THE PROPERTIES PANEL STILL EDITS EVERYTHING it always did, JSON box and all; only its
+   * Kind hint changed, to name keyframes and send them here, since this tab has the only editor for
+   * their frames. allAnimationFieldLabels() is there for the day the panel's rows do come out,
+   * because the panel builds its search box from the rows it draws.
    *
    * The Animation sections in Display and PixelDisplay are a different feature — playing a GIF or
    * sprite sheet on a dot-matrix screen — and have nothing to do with this one. The candidate list
@@ -30,6 +30,7 @@
   import StateChips from './animation/StateChips.svelte';
   import AnimationStage from './animation/AnimationStage.svelte';
   import BezierEditor from './animation/BezierEditor.svelte';
+  import FramesEditor from './animation/FramesEditor.svelte';
   import { animationActivity } from '../stores/animationActivity.js';
   import NumberCell from '../properties/NumberCell.svelte';
   import Segmented from '../properties/Segmented.svelte';
@@ -62,6 +63,11 @@
     SPRING_LIMITS,
     easingPatch,
     cleanSpring,
+    ANIMATION_KINDS,
+    KEYFRAME_TRIGGER_TYPES,
+    KEYFRAME_TRIGGER_LABELS,
+    keyframeTargets,
+    kindPatch,
     targetStatus,
     newAnimationShape,
     cleanAnimationName,
@@ -110,6 +116,9 @@
   // Two animations tying for one property: the later always plays, the earlier never does there.
   let clashes = $derived(findClashes(rows, partNames));
   let selectedClashes = $derived(selected ? clashesFor(selected.name, clashes) : []);
+
+  let keyframes = $derived(selected?.kind === 'keyframes');
+  const KIND_LABELS = { transition: 'Transition', keyframes: 'Keyframes' };
 
   const ORIGIN_LABELS = { any: 'Any', user: 'Mine', external: 'Outside' };
   const ORIGIN_TITLES = {
@@ -344,6 +353,12 @@ onMount(() => {
           <div class="setbox">
             <div class="grp">Timing</div>
             <div class="r">
+              <span class="lab" title="A transition eases between two styles when something changes; keyframes play a shape of their own">Kind</span>
+              <Segmented options={ANIMATION_KINDS.map((value) => ({ value, label: KIND_LABELS[value] }))}
+                         value={keyframes ? 'keyframes' : 'transition'} ariaLabel="Kind"
+                         onchange={(value) => setProps(kindPatch(selected, value))} />
+            </div>
+            <div class="r">
               <label for="anim-dur">Duration</label>
               <div class="cell"><NumberCell label="ms" value={selected.duration} min={0} step={10}
                 onchange={(value) => setProp('duration', Math.max(0, Math.round(value)))} /></div>
@@ -355,47 +370,122 @@ onMount(() => {
             </div>
 
             <div class="grp">Runs when</div>
-            <div class="r">
-              <label for="anim-trigger">Trigger</label>
-              <Segmented options={TRIGGER_TYPES.map((value) => ({ value, label: value === 'stateChange' ? 'State' : 'Value' }))}
-                         value={selected.triggerType} ariaLabel="Trigger"
-                         onchange={(value) => setProp('trigger.type', value)} />
-            </div>
-            {#if selected.triggerType === 'stateChange'}
-              <div class="r top">
-                <span class="lab">From</span>
-                <StateChips choices={stateChoices} value={selected.from} unknown={unknownFrom} ariaLabel="From"
-                            onchange={(next) => setProp('trigger.from', next)} />
-              </div>
-              <div class="r top">
-                <span class="lab">To</span>
-                <StateChips choices={stateChoices} value={selected.to} unknown={unknownTo} ariaLabel="To"
-                            onchange={(next) => setProp('trigger.to', next)} />
-              </div>
+            {#if keyframes}
               <div class="r">
-                <span class="lab" title="Play it backwards when a To state is left — how a hover lift settles">Leaving</span>
-                <Segmented options={[{ value: false, label: 'Snap back' }, { value: true, label: 'Play back' }]}
-                           value={selected.reverse} ariaLabel="Also when leaving"
-                           onchange={(value) => setProp('trigger.reverse', value)} />
+                <span class="lab">Trigger</span>
+                <PropertySelect options={KEYFRAME_TRIGGER_TYPES.map((value) => ({ value, label: KEYFRAME_TRIGGER_LABELS[value] }))}
+                                value={selected.triggerType} ariaLabel="Keyframe trigger"
+                                onchange={(value) => setProps({ trigger: { ...(selected.animation.trigger ?? {}), type: value } })} />
               </div>
-              {#if unknownStates.length}
-                <p class="warn unknownwarn">
-                  <b>{unknownStates.length === 1 ? `“${unknownStates[0]}” is not a state` : `${unknownStates.length} names are not states`} of {controlName}.</b>
-                  A trigger only matches the control's own States{stateNames.length ? ` (${stateNames.join(', ')})` : ''}, so this part of it never plays.
-                </p>
+              {#if selected.triggerType === 'stateChange'}
+                <div class="r top">
+                  <span class="lab">In</span>
+                  <StateChips choices={stateChoices} value={selected.to} unknown={unknownTo} ariaLabel="To"
+                              onchange={(next) => setProp('trigger.to', next)} />
+                </div>
+                {#if selected.iterations !== 'infinite'}
+                  <div class="r top">
+                    <span class="lab">From</span>
+                    <StateChips choices={stateChoices} value={selected.from} unknown={unknownFrom} ariaLabel="From"
+                                onchange={(next) => setProp('trigger.from', next)} />
+                  </div>
+                {/if}
+                <p class="hint">{selected.iterations === 'infinite'
+                  ? 'Loops while the control is in one of these states, and stops when it leaves.'
+                  : 'Plays once each time the control enters one of these states.'}</p>
+                {#if unknownStates.length}
+                  <p class="warn unknownwarn">
+                    <b>{unknownStates.length === 1 ? `“${unknownStates[0]}” is not a state` : `${unknownStates.length} names are not states`} of {controlName}.</b>
+                    A trigger only matches the control's own States{stateNames.length ? ` (${stateNames.join(', ')})` : ''}.
+                  </p>
+                {/if}
+              {:else if selected.triggerType === 'valueChange'}
+                <div class="r">
+                  <label for="anim-kf-source">Source</label>
+                  <input class="txt" id="anim-kf-source" type="text" value={selected.source}
+                         onchange={(event) => setProp('trigger.source', event.currentTarget.value)} />
+                </div>
+                <div class="r">
+                  <span class="lab">Origin</span>
+                  <Segmented options={VALUE_ORIGINS.map((value) => ({ value, label: ORIGIN_LABELS[value], title: ORIGIN_TITLES[value] }))}
+                             value={selected.origin} ariaLabel="Origin"
+                             onchange={(value) => setProp('trigger.origin', value)} />
+                </div>
+                <p class="hint">Plays once per change — not again while it is still playing, and never during a drag.</p>
+              {:else if selected.triggerType === 'beat'}
+                <div class="r">
+                  <span class="lab">Every</span>
+                  <div class="cell"><NumberCell label="beats" value={selected.trigger.every} min={1} step={1}
+                    onchange={(value) => setProp('trigger.every', Math.max(1, Math.round(value)))} /></div>
+                </div>
+                <p class="hint">Plays on every {selected.trigger.every === 1 ? 'beat' : `${selected.trigger.every}th beat`} while the transport runs.</p>
+              {:else if selected.triggerType === 'script'}
+                <p class="hint">Played when a script asks for it, or with Play on the stage.</p>
+              {:else}
+                <p class="hint">Plays all the time the control is shown in Preview.</p>
               {/if}
+              <div class="r">
+                <span class="lab">Repeat</span>
+                <Segmented options={[{ value: 'count', label: 'Count' }, { value: 'infinite', label: 'Loop' }]}
+                           value={selected.iterations === 'infinite' ? 'infinite' : 'count'} ariaLabel="Repeat"
+                           onchange={(value) => setProp('iterations', value === 'infinite' ? 'infinite' : 1)} />
+              </div>
+              {#if selected.iterations !== 'infinite'}
+                <div class="r">
+                  <span class="lab">Times</span>
+                  <div class="cell"><NumberCell label="×" value={selected.iterations} min={1} step={1}
+                    onchange={(value) => setProp('iterations', Math.max(1, Math.round(value)))} /></div>
+                </div>
+              {/if}
+              <div class="r">
+                <span class="lab">Direction</span>
+                <Segmented options={[{ value: 'normal', label: 'Forward' }, { value: 'alternate', label: 'Back and forth' }]}
+                           value={selected.direction} ariaLabel="Direction"
+                           onchange={(value) => setProp('direction', value)} />
+              </div>
             {:else}
               <div class="r">
-                <label for="anim-source">Source</label>
-                <input class="txt" id="anim-source" type="text" value={selected.source}
-                       onchange={(event) => setProp('trigger.source', event.currentTarget.value)} />
+                <label for="anim-trigger">Trigger</label>
+                <Segmented options={TRIGGER_TYPES.map((value) => ({ value, label: value === 'stateChange' ? 'State' : 'Value' }))}
+                           value={selected.triggerType} ariaLabel="Trigger"
+                           onchange={(value) => setProp('trigger.type', value)} />
               </div>
-              <div class="r">
-                <span class="lab">Origin</span>
-                <Segmented options={VALUE_ORIGINS.map((value) => ({ value, label: ORIGIN_LABELS[value], title: ORIGIN_TITLES[value] }))}
-                           value={selected.origin} ariaLabel="Origin"
-                           onchange={(value) => setProp('trigger.origin', value)} />
-              </div>
+              {#if selected.triggerType === 'stateChange'}
+                <div class="r top">
+                  <span class="lab">From</span>
+                  <StateChips choices={stateChoices} value={selected.from} unknown={unknownFrom} ariaLabel="From"
+                              onchange={(next) => setProp('trigger.from', next)} />
+                </div>
+                <div class="r top">
+                  <span class="lab">To</span>
+                  <StateChips choices={stateChoices} value={selected.to} unknown={unknownTo} ariaLabel="To"
+                              onchange={(next) => setProp('trigger.to', next)} />
+                </div>
+                <div class="r">
+                  <span class="lab" title="Play it backwards when a To state is left — how a hover lift settles">Leaving</span>
+                  <Segmented options={[{ value: false, label: 'Snap back' }, { value: true, label: 'Play back' }]}
+                             value={selected.reverse} ariaLabel="Also when leaving"
+                             onchange={(value) => setProp('trigger.reverse', value)} />
+                </div>
+                {#if unknownStates.length}
+                  <p class="warn unknownwarn">
+                    <b>{unknownStates.length === 1 ? `“${unknownStates[0]}” is not a state` : `${unknownStates.length} names are not states`} of {controlName}.</b>
+                    A trigger only matches the control's own States{stateNames.length ? ` (${stateNames.join(', ')})` : ''}, so this part of it never plays.
+                  </p>
+                {/if}
+              {:else}
+                <div class="r">
+                  <label for="anim-source">Source</label>
+                  <input class="txt" id="anim-source" type="text" value={selected.source}
+                         onchange={(event) => setProp('trigger.source', event.currentTarget.value)} />
+                </div>
+                <div class="r">
+                  <span class="lab">Origin</span>
+                  <Segmented options={VALUE_ORIGINS.map((value) => ({ value, label: ORIGIN_LABELS[value], title: ORIGIN_TITLES[value] }))}
+                             value={selected.origin} ariaLabel="Origin"
+                             onchange={(value) => setProp('trigger.origin', value)} />
+                </div>
+              {/if}
             {/if}
             {#each selectedClashes as clash (clash.other + clash.role)}
               <p class="warn clashwarn" class:wins={clash.role === 'wins'}>{clash.text}</p>
@@ -440,43 +530,58 @@ onMount(() => {
           <div class="colh">Stage <s>hover, press, drag — or Play</s></div>
           <AnimationStage {control} row={selected} />
 
-          <div class="colh">
-            Changes
-            <s>{targets.length} {targets.length === 1 ? 'target' : 'targets'}</s>
-          </div>
-          <TargetList
-            rows={targets}
-            selectedIndex={targetIndex}
-            onselect={(index) => { rawTargetIndex = index; }}
-            onremove={drop}
-            onreorder={reorder}
-          />
-
-          <div class="addbox">
-            <div class="r">
-              <label for="anim-part">Part</label>
-              <PropertySelect options={partNames.map((name) => ({ value: name, label: name }))}
-                              value={partForAdd} ariaLabel="Part"
-                              onchange={(value) => { newPart = value; }} />
+          {#if keyframes}
+            <div class="colh">Frames <s>{selected.frames.length} {selected.frames.length === 1 ? 'frame' : 'frames'}</s></div>
+            <div class="playson r">
+              <span class="lab">Plays on</span>
+              <PropertySelect options={[{ value: '', label: 'The control itself' }, ...partNames.map((name) => ({ value: name, label: name }))]}
+                              value={selected.part} ariaLabel="Plays on"
+                              onchange={(value) => setProp('targets', keyframeTargets(value))} />
             </div>
-            <div class="r">
-              <label for="anim-what">Change</label>
-              <PropertySelect options={OFFERED_PROPERTIES.map((entry) => ({ value: entry.path, label: entry.label }))}
-                              value={newProperty} ariaLabel="What to change"
-                              onchange={(value) => { newProperty = value; }} />
-            </div>
-
-            {#if !addStatus.works}
-              <p class="warn">
-                <b>{titleCase(offeredForAdd.label)} does nothing.</b>
-                {addStatus.detail}
-              </p>
+            {#if targets.some((entry) => !entry.status.works)}
+              <p class="warn">{targets.find((entry) => !entry.status.works).status.detail}</p>
             {/if}
+            <FramesEditor frames={selected.frames} onchange={(next) => setProp('frames', next)} />
+            <p class="hint">Scale, turn, move and fade. Colour and text frames are not supported yet.</p>
+          {:else}
+            <div class="colh">
+              Changes
+              <s>{targets.length} {targets.length === 1 ? 'target' : 'targets'}</s>
+            </div>
+            <TargetList
+              rows={targets}
+              selectedIndex={targetIndex}
+              onselect={(index) => { rawTargetIndex = index; }}
+              onremove={drop}
+              onreorder={reorder}
+            />
 
-            <button type="button" class="addbtn" disabled={!partNames.length} onclick={add}>
-              <Plus size={11} /> Add this change
-            </button>
-          </div>
+            <div class="addbox">
+              <div class="r">
+                <label for="anim-part">Part</label>
+                <PropertySelect options={partNames.map((name) => ({ value: name, label: name }))}
+                                value={partForAdd} ariaLabel="Part"
+                                onchange={(value) => { newPart = value; }} />
+              </div>
+              <div class="r">
+                <label for="anim-what">Change</label>
+                <PropertySelect options={OFFERED_PROPERTIES.map((entry) => ({ value: entry.path, label: entry.label }))}
+                                value={newProperty} ariaLabel="What to change"
+                                onchange={(value) => { newProperty = value; }} />
+              </div>
+
+              {#if !addStatus.works}
+                <p class="warn">
+                  <b>{titleCase(offeredForAdd.label)} does nothing.</b>
+                  {addStatus.detail}
+                </p>
+              {/if}
+
+              <button type="button" class="addbtn" disabled={!partNames.length} onclick={add}>
+                <Plus size={11} /> Add this change
+              </button>
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -672,6 +777,7 @@ onMount(() => {
   }
   .warn b { display: block; color: #F0D48A; font-weight: 600; }
   .clashwarn.wins { border-color: #2E3540; background: #12171A; color: #9AA6AE; }
+  .playson { margin: 0 0 8px; }
 
   .addbtn {
     width: 100%;

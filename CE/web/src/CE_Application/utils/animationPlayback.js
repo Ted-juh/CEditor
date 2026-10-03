@@ -75,11 +75,18 @@ export function statePatch(control, stateName) {
   return { patch, exact, name };
 }
 
-/** How long a row's transition can run, at the stage's time scale. */
+/**
+ * How long the stage should hold to show a row: a transition's run; a keyframe one-shot's run, all
+ * its repeats; a loop's first two cycles — it never ends, and two is enough to see it is one.
+ */
 function spanOf(row, timeScale) {
   const scale = Number(timeScale) > 0 ? Number(timeScale) : 1;
   const duration = Math.max(0, Number(row?.duration) || 0);
   const delay = Math.max(0, Number(row?.delay) || 0);
+  if (row?.kind === 'keyframes') {
+    const cycles = row.iterations === 'infinite' ? 2 : Math.max(1, Number(row.iterations) || 1);
+    return (delay + duration * cycles) * scale;
+  }
   return (duration + delay) * scale;
 }
 
@@ -114,6 +121,16 @@ export function playbackPlan(control, row, { timeScale = 1 } = {}) {
   if (!control || !row) return { ok: false, reason: 'Nothing to play.' };
   const trigger = row.trigger ?? readTrigger(row.animation ?? row);
   const span = spanOf(row, timeScale);
+  const keyframes = row.kind === 'keyframes';
+
+  if (keyframes && trigger.type === 'always') {
+    return { ok: false, reason: 'It plays all the time — it is already playing on the stage.' };
+  }
+  if (keyframes && (trigger.type === 'beat' || trigger.type === 'script')) {
+    // Nothing on the stage makes a beat or a script call happen, so Play asks for the animation
+    // directly — exactly what ce.anim.play does.
+    return { ok: true, request: true, steps: [], exact: true, note: '' };
+  }
 
   if (trigger.type === 'stateChange') {
     const known = controlStateNames(control);
@@ -150,7 +167,9 @@ export function playbackPlan(control, row, { timeScale = 1 } = {}) {
       { label: fromLabel, session: { ...REST_SESSION, ...fromSession }, hold: LEAD_MS },
       { label: toName, session: { ...REST_SESSION, ...fromSession, ...toSession }, hold: span + TAIL_MS },
     ];
-    if (trigger.reverse) steps.push({ label: `${fromLabel} again`, session: { ...REST_SESSION, ...fromSession }, hold: span + TAIL_MS });
+    // A keyframe animation has no reverse — a loop stops, a one-shot has finished — but the stage still
+    // goes back where it started, so the next Play begins from the same place.
+    if (trigger.reverse || keyframes) steps.push({ label: `${fromLabel} again`, session: { ...REST_SESSION, ...fromSession }, hold: keyframes ? TAIL_MS : span + TAIL_MS });
     return {
       ok: true,
       steps,

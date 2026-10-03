@@ -35,6 +35,9 @@ import { clamp } from './primitives.js';
 import { formatChannelValue } from './valueDisplayScale.js';
 import { visibleChoiceRows, dependsOnId } from './dependentChoices.js';
 import { easingToCss } from './easing.js';
+// A cycle, and a safe one: keyframeAnimation.js reads readTrigger from here, and this file reads
+// readKeyframes from there, each only when called — never while either module is loading.
+import { readKeyframes } from './keyframeAnimation.js';
 
 function getNodeChild(node, key) {
   return node?._children?.[key];
@@ -481,10 +484,10 @@ function buildTransitionCatalog(control, previewSession) {
   let order = 0;
   for (const [key, animation] of Object.entries(animations?._children ?? {})) {
     if (!animation || typeof animation !== 'object' || animation.enabled === false) continue;
-    // `keyframes` is reserved for a second kind that runs a shape of its own (a pulse, a blink)
-    // rather than easing between two styles; it will not be a transition, so it is set aside here
-    // rather than guessed at. Every other kind — including a word typed into the properties
-    // panel's free text box — is a transition, exactly as before.
+    // `keyframes` is the second kind, which runs a shape of its own (a pulse, a blink) rather than
+    // easing between two styles; buildKeyframeCatalog below reads those. Every other kind —
+    // including a word typed into the properties panel's free text box — is a transition, exactly
+    // as before.
     if (String(animation.kind ?? '') === 'keyframes') continue;
     const transition = animationTiming(animation, timeScale);
     const scale = Number(timeScale) > 0 ? Number(timeScale) : 1;
@@ -521,6 +524,26 @@ function buildTransitionCatalog(control, previewSession) {
   return { enabled: true, reducedMotion, rootTransitions, partTransitions, entries };
 }
 
+/**
+ * The keyframe animations a control plays — the second kind, which runs frames of its own rather
+ * than easing between two styles (utils/keyframeAnimation.js). The same switches as transitions:
+ * the section's, the preview's Animations switch and its Reduced motion, and slow motion. Which of
+ * them is playing at any moment needs the frame before, so a player beside the transition tracker
+ * decides that, in the renderer.
+ */
+function buildKeyframeCatalog(control, previewSession) {
+  const animations = getNodeChild(control, 'Animations');
+  const enabled = animations?.enabled !== false && previewSession?.animationsEnabled !== false;
+  const reducedMotion = previewSession?.reducedMotion === true;
+  if (!enabled) return { enabled: false, reducedMotion, entries: [] };
+  const entries = [];
+  for (const [key, animation] of Object.entries(animations?._children ?? {})) {
+    const entry = readKeyframes(animation, key, { timeScale: previewSession?.animationTimeScale });
+    if (entry) entries.push(entry);
+  }
+  return { enabled: true, reducedMotion, entries };
+}
+
 function createEmptyRuntime(signals = {}) {
   return {
     signals,
@@ -531,6 +554,7 @@ function createEmptyRuntime(signals = {}) {
       partTransitions: new Map(),
       entries: [],
     },
+    keyframes: { enabled: false, reducedMotion: false, entries: [] },
   };
 }
 
@@ -942,6 +966,7 @@ export function resolveInteractiveControl(control, previewSession = {}) {
   if (isCustomComponent) applyCustomInternalScale (resolved);
 
   const transitions = buildTransitionCatalog(resolved, effectivePreviewSession);
+  const keyframes = buildKeyframeCatalog(resolved, effectivePreviewSession);
 
   return {
     control: resolved,
@@ -949,6 +974,7 @@ export function resolveInteractiveControl(control, previewSession = {}) {
       signals,
       activeStates: activeStates.map(([name]) => name),
       transitions,
+      keyframes,
     },
   };
 }

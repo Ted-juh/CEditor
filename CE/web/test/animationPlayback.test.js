@@ -126,3 +126,42 @@ test('what Play cannot do, it says', () => {
   assert.match(playbackPlan(button, row(button, 'glide')).reason, /cannot set this control's value/);
   assert.equal(playbackPlan(null, null).ok, false);
 });
+
+// --- Keyframe animations (phase 4) ---------------------------------------------------------------
+
+function withKeyframes(control, trigger, extra = {}) {
+  control._children.Animations._children.pulse = {
+    _type: 'Animation', name: 'pulse', enabled: true, kind: 'keyframes', trigger,
+    targets: [{ path: 'Transform' }], duration: 500, delay: 0, easing: 'linear',
+    frames: [{ at: 0, scale: 1 }, { at: 0.5, scale: 1.1 }, { at: 1, scale: 1 }], ...extra,
+  };
+  return control;
+}
+
+test('a keyframe animation that plays all the time has nothing for Play to do, and says so', () => {
+  const range = withKeyframes(createControl('Range'), { type: 'always' });
+  const plan = playbackPlan(range, row(range, 'pulse'));
+  assert.equal(plan.ok, false);
+  assert.match(plan.reason, /already playing/);
+});
+
+test('a beat or script keyframe animation is played by asking for it', () => {
+  for (const type of ['beat', 'script']) {
+    const range = withKeyframes(createControl('Range'), { type });
+    assert.deepEqual(playbackPlan(range, row(range, 'pulse')), { ok: true, request: true, steps: [], exact: true, note: '' }, type);
+  }
+});
+
+test('a looping state keyframe animation is shown for two cycles, then the stage goes back', () => {
+  const range = withKeyframes(createControl('Range'), { type: 'stateChange', to: ['hover'] });
+  const plan = playbackPlan(range, row(range, 'pulse'));
+  assert.deepEqual(plan.steps.map((step) => step.label), ['default', 'hover', 'default again']);
+  assert.equal(plan.steps[1].hold, 1000 + TAIL_MS, 'two 500ms cycles');
+  assert.equal(plan.steps[2].hold, TAIL_MS, 'nothing plays on the way back');
+});
+
+test('a one-shot keyframe animation is held for all its repeats', () => {
+  const range = withKeyframes(createControl('Range'), { type: 'stateChange', to: ['pressed'] }, { iterations: 3, delay: 100 });
+  const plan = playbackPlan(range, row(range, 'pulse'), { timeScale: 2 });
+  assert.equal(plan.steps[1].hold, (100 + 500 * 3) * 2 + TAIL_MS);
+});

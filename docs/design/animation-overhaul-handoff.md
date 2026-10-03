@@ -206,38 +206,46 @@ both change a shipped starter's package fingerprint and regenerate QA-07/QA-09, 
   spring; `panelMotion.mjs` checks the computed `transition-timing-function` is a real `linear()`
   that overshoots, and a drawn curve's own `cubic-bezier`.
 
-### Phase 4 — keyframes and new triggers (design, not started)
+### Phase 4 — keyframes done; `ce.anim.play` is its own commit
 
-Animation node with `kind: 'keyframes'`:
+The node, as built (`utils/keyframeAnimation.js` has it in its header):
 
 ```
 { kind: 'keyframes', duration, delay, easing,
   iterations: <n> | 'infinite',            // default: infinite for always/stateChange, 1 otherwise
   direction: 'normal' | 'alternate',
   trigger: { type: 'always'|'stateChange'|'valueChange'|'beat'|'script',
-             to: [...],        // stateChange: plays WHILE a to-state is active
-             source, origin,   // valueChange: one shot per change
-             every },          // beat: one shot every N transport beats
-  targets: [{ path }],         // only the part ('' = control) matters
-  frames: [{ at: 0..1, scale, rotate, x, y, opacity, fill, text }] }
+             to, from,         // stateChange: a loop plays WHILE a To state holds; a count plays on entering
+             source, origin,   // valueChange: once per change, not again mid-run, never during a drag
+             every },          // beat: once every N transport beats while it runs
+  targets: [{ path }],         // only the part matters: 'Parts.<name>', else the control ('Transform')
+  frames: [{ at: 0..1, scale, rotate, x, y, opacity }] }
 ```
 
-- Render as CSS animations using the **individual transform properties** (`scale`, `rotate`,
-  `translate`) so keyframes compose with the existing `transform` instead of replacing it.
-  Generate `@keyframes ce-kf-<hash>` (+ an `-b` twin) into a `<style>` in CanvasControl; restart
-  a one-shot by alternating the two names (the trick `utils/chromeMotion.js` already uses).
-  SVG parts need `transform-box: fill-box; transform-origin: center`.
-- A keyframe player beside the transition tracker decides playing/restart per entry; report
-  firings to `animationActivity`.
-- Beat: subscribe to `stores/transport.js` (`beats`, `running`); fire on integer crossings of
-  `every`. External/MIDI: `trigger.origin: 'external'` on a value trigger (already implemented
-  for transitions).
-- Script: `ce.anim.play(control, animationName)`. Declare in `scripting/panelApi.js` with a
-  runtime badge (it is visual, so preview-only); implement in `panelRuntime.js` as a store event
-  CanvasControl reads. Check the cross-runtime/prelude agreement tests before adding a member —
-  the C++ preludes must at least forward or no-op it. Regenerate the manual (`npm run docs:manual`).
-- Tab: Kind becomes a real choice; keyframe editor (frame list + a small timeline, which the
-  original design doc deferred "until animations get keyframes").
+- **Runtime:** `buildKeyframeCatalog` in `interactionRuntime.js` (same switches as transitions,
+  including slow motion) → `runtime.keyframes`. A `createKeyframePlayer()` per control in
+  CanvasControl decides what plays and restarts; it reports firings to `animationActivity`.
+- **Drawing:** CSS animations on the **individual transform properties** (`scale`, `rotate`,
+  `translate`), so a pulse composes with a control's own turn instead of replacing it (checked in
+  Chromium on a control rotated 20°). `@keyframes ce-kf-<hash>-a|b` go into a `<style>` in the
+  control's root — numbers and a hash only, nothing from document text. A one-shot restarts by
+  flipping between the two names. SVG parts get `transform-box: fill-box; transform-origin: center`.
+  Fill mode `none`, so a control is its own style again when a run ends.
+- **Where:** keyframes play only where a control is previewed (`previewSessionOverride` set — the
+  panel's Preview and the tab's stage), never on the design canvas. Only a control with a beat
+  animation subscribes to the transport, and only one with keyframes listens for play requests.
+- **Beat:** fires on integer crossings of `beats / every` while the transport runs; stopping and
+  starting counts afresh. Value triggers with `origin: 'external'` cover MIDI coming back.
+- **Tab:** Kind (Transition / Keyframes, `kindPatch` keeps the other kind's fields); keyframe
+  triggers in a select; In/From chips for states; Repeat (Count / Loop), Times, Direction; "Plays
+  on" a part or the control; `components/animation/FramesEditor.svelte` (a strip of frame marks and
+  a row of cells per frame, empty cell = property left out). Play on the stage: loops shown for two
+  cycles; beat and script ones played by a request (`requestAnimationPlay`, the store
+  `animationPlays` in `stores/animationActivity.js`).
+- **Not done, said in the tab:** colour and text frames. The layers that paint a control's colour
+  carry inline styles a keyframe on the control cannot reach; a registered custom property read by
+  those layers would be the way.
+- The properties panel's Kind hint now names keyframes and points here (its pinned test updated).
 
 ### Phase 5
 

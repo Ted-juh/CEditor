@@ -251,6 +251,25 @@ window.__anim = {
   },
   lamps: () => [...document.querySelectorAll('.arow')].filter((r) => r.querySelector('.lamp')).map((r) => textOf(r.querySelector('.nm'))),
 
+  // --- keyframes ----------------------------------------------------------------------
+  chooseSelect: (ariaLabel, value) => {
+    const select = document.querySelector(`select[aria-label="${ariaLabel}"]`);
+    if (!select) return false;
+    select.value = value;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  },
+  frameRows: () => document.querySelectorAll('.frames .frow').length,
+  frameMarks: () => [...document.querySelectorAll('.frames .mark')].map((m) => m.style.left),
+  addFrame: () => { document.querySelector('.frames .addframe')?.click(); },
+  targetListShown: () => !!document.querySelector('.targets'),
+  /** The animation running on a part of the control on the stage, as the browser computed it. */
+  stagePartAnimation: (part) => {
+    const el = document.querySelector(`.stage-box .interactive-part[data-part-name="${part}"]`);
+    return el ? getComputedStyle(el).animationName : null;
+  },
+  firstPart: () => first,
+
   sliderCount: () => document.querySelectorAll('input[type=range], .slider, [role=slider]').length,
   jsonBoxes: () => document.querySelectorAll('textarea').length,
 };

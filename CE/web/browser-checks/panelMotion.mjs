@@ -126,6 +126,32 @@ check('and a hand-drawn curve as its own cubic-bezier', () => {
   assert.match(drawn.timing, /^cubic-bezier\(0\.1, 0\.7, 0\.2, 1\.3\)/, drawn.timing);
 });
 
+// --- Keyframes ------------------------------------------------------------------------------------
+
+const pulse = await ev(() => window.__motion.keyframes('pulser'));
+await wait(500);
+const pulseLater = await ev(() => window.__motion.keyframes('pulser'));
+check('an always-on pulse plays as a CSS animation, and composes with the control\'s own turn', () => {
+  assert.match(pulse.name, /^ce-kf-[0-9a-z]+-a$/, pulse.name);
+  assert.notEqual(pulse.scale, pulseLater.scale, `the scale moves: ${pulse.scale} then ${pulseLater.scale}`);
+  assert.notEqual(pulseLater.scale, 'none');
+  // The control's 20° lives in `transform`; the pulse writes `scale`, so the turn is untouched.
+  assert.equal(pulse.transform, pulseLater.transform);
+  assert.match(pulse.transform, /^matrix\(/, `still turned: ${pulse.transform}`);
+});
+
+check('a beat animation waits for the transport', async () => {});
+assert.equal((await ev(() => window.__motion.keyframes('beater'))).name, 'none');
+await ev(() => window.__motion.startTransport(240));
+await wait(700);
+const onBeat = await ev(() => window.__motion.keyframes('beater'));
+const beatFired = await ev(() => window.__motion.activity().beater?.names ?? []);
+await ev(() => window.__motion.stopTransport());
+check('and flashes on the beat once it runs', () => {
+  assert.match(onBeat.name, /^ce-kf-[0-9a-z]+-[ab]$/, onBeat.name);
+  assert.deepEqual(beatFired, ['flash']);
+});
+
 // --- The knob: glide for a value from outside, none for a drag -------------------------------
 
 const markup = () => ev(() => window.__motion.knobMarkup());
@@ -171,10 +197,12 @@ await wait(40);
 const reducedNow = await markup();
 await wait(900);
 const reducedLater = await markup();
-check('with the operating system set to reduce motion, nothing transitions and nothing glides', () => {
+const reducedPulse = await ev(() => window.__motion.keyframes('pulser'));
+check('with the operating system set to reduce motion, nothing transitions, glides or pulses', () => {
   assert.equal(reducedHover.duration, '0s', JSON.stringify(reducedHover));
   assert.equal(reducedHover.colourVar, 'none');
   assert.equal(reducedNow, reducedLater);
+  assert.equal(reducedPulse.name, 'none');
 });
 
 await page.emulateMedia({ reducedMotion: 'no-preference' });

@@ -20,6 +20,7 @@ import {
   updatePanelPreviewSession,
 } from '../src/CE_Application/stores/interactionPreview.js';
 import { animationActivity } from '../src/CE_Application/stores/animationActivity.js';
+import { startTransport, stopTransport, setTransportBpm } from '../src/CE_Application/stores/transport.js';
 
 window.__JUCE__ = undefined;
 
@@ -56,11 +57,27 @@ Object.assign(springy._children.Animations._children.pressIn, { easing: 'spring'
 const drawn = place(createControl('Range'), 'drawn', 20, 150, 120, 28);
 Object.assign(drawn._children.Animations._children.pressIn, { easing: 'custom', bezier: [0.1, 0.7, 0.2, 1.3] });
 
-const panel = { id: 'motion', name: 'Motion', width: 400, height: 200, bgColour: 'FF1E1E1E', controls: [button, knob, springy, drawn] };
+// Keyframes, the second kind: a slow pulse that never stops, on a control turned 20° by its own
+// transform — the pulse has to compose with that, not replace it — and a flash on every beat.
+const keyframes = (name, trigger, frames, duration) => ({
+  _type: 'Animation', name, enabled: true, kind: 'keyframes', trigger, targets: [{ path: 'Transform' }],
+  frames, duration, delay: 0, easing: 'linear',
+});
+const pulser = place(createControl('Range'), 'pulser', 220, 150, 100, 28);
+pulser._children.Transform.rotation = 20;
+pulser._children.Animations._children = {
+  pulse: keyframes('pulse', { type: 'always' }, [{ at: 0, scale: 1 }, { at: 0.5, scale: 1.5 }, { at: 1, scale: 1 }], 2000),
+};
+const beater = place(createControl('Range'), 'beater', 340, 150, 50, 28);
+beater._children.Animations._children = {
+  flash: keyframes('flash', { type: 'beat', every: 1 }, [{ at: 0, opacity: 0.2 }, { at: 1, opacity: 1 }], 200),
+};
+
+const panel = { id: 'motion', name: 'Motion', width: 400, height: 200, bgColour: 'FF1E1E1E', controls: [button, knob, springy, drawn, pulser, beater] };
 panels.set([]);
 addPanel(panel);
 setActivePanel(panel.id);
-panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
+panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn, pulser, beater].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
 mount(GaiaPagesHarness, { target: document.getElementById('host'), props: { panelId: panel.id } });
 setPreviewModeEnabled(true);
 
@@ -87,4 +104,11 @@ window.__motion = {
   /** What the knob draws, as markup — a pointer that moved is markup that changed. */
   knobMarkup: () => root('knob')?.querySelector('svg')?.outerHTML ?? '',
   activity: () => get(animationActivity),
+  /** The keyframe animation on a control and where it has the control right now. */
+  keyframes: (id) => {
+    const style = getComputedStyle(root(id));
+    return { name: style.animationName, scale: style.scale, transform: style.transform };
+  },
+  startTransport: (bpm) => { setTransportBpm(bpm); startTransport(0); },
+  stopTransport: () => stopTransport(),
 };
