@@ -25,6 +25,8 @@ import { contrast } from '../src/CE_Application/models/instrumentDesigns.js';
 import { DEFAULT_GENERAL_SETTINGS, defaultControlSetId } from '../src/CE_Application/stores/runtimePreferences.js';
 import { normalizeGeneralSettings } from '../src/CE_Application/stores/appSettingsSchema.js';
 import { createPanel, serializePanel } from '../src/CE_Application/stores/panelModel.js';
+import { duplicateControlSet } from '../src/CE_Application/stores/controlSetLibrary.js';
+import { controlSetLibrary } from '../src/CE_Application/stores/controlSetLibraryStore.js';
 
 const classic = getControlSet('graphite');
 const designed = getControlSet(NEW_PANEL_CONTROL_SET_ID);
@@ -75,6 +77,20 @@ test('an installed default of Graphite nobody chose moves to the designed one; a
   // The Settings picker is what records the choice.
   const picker = readFileSync(new URL('../src/CE_Application/settings/ControlSetsSettings.svelte', import.meta.url), 'utf8');
   assert.match(picker, /updateGeneralSettings\(\{ defaultControlSetId: event\.target\.value, defaultControlSetChosen: true \}\)/);
+});
+
+test('New Control Set is a copy of the designed Graphite, and keeps its designs', () => {
+  const settings = readFileSync(new URL('../src/CE_Application/settings/ControlSetsSettings.svelte', import.meta.url), 'utf8');
+  assert.match(settings, /duplicateControlSet\(getControlSet\(NEW_PANEL_CONTROL_SET_ID\), 'New Control Set'\)/);
+  try {
+    const made = duplicateControlSet(designed, 'New Control Set');
+    assert.equal(made.basedOn, NEW_PANEL_CONTROL_SET_ID, 'its lineage is the designed Graphite');
+    assert.equal(form('Knob', made), form('Knob', designed), 'its knob is the disc');
+    assert.ok(labelTreatmentFor(made) && sectionTreatmentFor({ ...made, id: made.basedOn }), 'its labels and sections are designed');
+    assert.ok(familyPatchFor(made, 'Macro') && familyPatchFor(made, 'Shape'), 'and its instruments and shapes');
+  } finally {
+    controlSetLibrary.set([]);
+  }
 });
 
 test('the designed Graphite is Graphite: its colours, lettering, lamp, buttons and slider', () => {

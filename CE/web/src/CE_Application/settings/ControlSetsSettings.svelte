@@ -90,7 +90,9 @@
   }
 
   function createSet() {
-    const copy = duplicateControlSet(getControlSet('graphite'), 'New Control Set');
+    // A copy of what a new panel starts on: the designed Graphite, not Classic, which has none of
+    // the designs and is kept only so that old documents keep their look.
+    const copy = duplicateControlSet(getControlSet(NEW_PANEL_CONTROL_SET_ID), 'New Control Set');
     if (copy) choose(copy.id);
   }
 

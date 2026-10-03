@@ -4,8 +4,8 @@
 // (models/controlSets.js). A personal set is a copy of one, and a copy took those designs as they
 // stood the day it was made. A set duplicated before the designs existed has none. One duplicated
 // after kept the original's display face and voices as fixed colours, so recolouring it left its
-// instruments in the original's colours. And "New Control Set" copies Graphite, which has no designs
-// at all, so a set made that way never got any.
+// instruments in the original's colours. And "New Control Set" copied Graphite, which has no designs
+// at all, so a set made that way never got any. (It copies the designed Graphite now.)
 //
 // So a personal set keeps what its author chose, and the rest is derived on every read, from its
 // colours and its lineage:

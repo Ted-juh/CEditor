@@ -890,6 +890,10 @@ they sit on it, a display in its own blue on black rather than the factory's gre
 design the others derive: silkscreened labels, recessed sections, the grammar's frame, instruments
 on its display, the Macro's knob on a ring of that blue.
 
+Settings' **New Control Set** is a copy of it too, so a set somebody starts from scratch starts from
+the designed default (its lineage recorded as `graphite-studio`) rather than from Classic, which has
+none of the designs.
+
 It keeps Graphite's buttons rather than the direction's tiles and sliding tabs: a button that
 carries its legend on its own face is what the set every new panel starts on should insert. The
 tiles are a key drawn beside its caption, one click away in the inspector, and what Graphite's
