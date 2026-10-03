@@ -282,9 +282,13 @@ export pipeline). It cannot bundle C++/C#/Java handlers or CPython. The compilin
 bundles these extra runtimes only for VST3. A requested unsupported combination fails explicitly
 before replacing an export. A failed required handler build also fails the export.
 
-## The player's script MIDI takes a lock on the audio thread — measured, not fixed
+## ~~The player's script MIDI takes a lock on the audio thread~~ — CLOSED
 
-*(Found 2026-10-02 by RealtimeSanitizer; nobody has reported a dropout.)*
+*(Found 2026-10-02 by RealtimeSanitizer; fixed 2026-10-03. The collector is gone:
+`Player/ScriptMidiOutQueue.h` over choc's `VariableSizeFIFO`, with a per-block byte budget.
+`tools/rtsan/run.sh` now reports nothing for CC or SysEx traffic, and `ScriptMidiOutQueueTests` pins
+the order, the budget and the full queue. choc needed three local patches, two of them for bugs of
+its own: `CE/thirdparty/choc/VENDORED.md`.)*
 
 The exported plug-in sends what a panel script queues (`sendCC`, NRPN, SysEx) through JUCE's
 `MidiMessageCollector`. Its `CriticalSection` is taken by the audio thread on every block and by the

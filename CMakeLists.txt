@@ -168,6 +168,13 @@ if(NOT CEDITOR_JUCE_HELPER_DIR STREQUAL JUCE_VENDORED_BIN)
     message(STATUS "CEditor: JUCE helpers from ${CEDITOR_JUCE_HELPER_DIR}")
 endif()
 
+# --- choc: the player's script-MIDI output queue ------------------------------------------------
+# Header-only, ISC. Three headers of Tracktion's choc, with three local patches to the FIFO;
+# CE/thirdparty/choc/VENDORED.md has the commit, the hashes and the patches. SYSTEM, like SQLite,
+# because it is upstream code nobody here edits beyond those patches.
+add_library(ce_choc INTERFACE)
+target_include_directories(ce_choc SYSTEM INTERFACE "${CE_ROOT}/thirdparty/choc")
+
 # --- SQLite: Hostage's sound library ------------------------------------------------------------
 # Vendored, public domain; CE/thirdparty/sqlite/VENDORED.md says where it came from. Built here,
 # above the app block, because the service tests use it as well as the app and the host targets.
@@ -530,6 +537,7 @@ if(CEDITOR_BUILD_APP)
     target_include_directories(CEditorPlayerVST PUBLIC
         "${CE_ROOT}/src"
     )
+    target_link_libraries(CEditorPlayerVST PUBLIC ce_choc)
 
     target_link_libraries(CEditorPlayerVST PRIVATE
         juce::juce_audio_utils
@@ -863,6 +871,14 @@ target_include_directories(CEditorHostMidiInputTests PRIVATE "${CE_ROOT}/src")
 target_link_libraries(CEditorHostMidiInputTests PRIVATE juce::juce_core)
 add_test(NAME HostMidiInputQueue COMMAND CEditorHostMidiInputTests)
 ce_configure_test(CEditorHostMidiInputTests)
+
+# The output direction: what the panel sends, drained in processBlock without a lock or an
+# allocation. Reached otherwise only through PluginProcessor.h, which needs WebView2.
+add_executable(CEditorScriptMidiOutTests "${CE_ROOT}/tests/ScriptMidiOutQueueTests.cpp")
+target_include_directories(CEditorScriptMidiOutTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorScriptMidiOutTests PRIVATE juce::juce_core juce::juce_audio_basics ce_choc)
+add_test(NAME ScriptMidiOutQueue COMMAND CEditorScriptMidiOutTests)
+ce_configure_test(CEditorScriptMidiOutTests)
 
 # The exported plugin's automation list. Also the only thing that COMPILES PanelParameters.h — it is
 # reachable otherwise only through PluginProcessor.h, which needs WebView2 and cannot build off

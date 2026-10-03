@@ -46,6 +46,7 @@ static inline juce::File ceditorPlayerPanelFile()
 
 #if CEDITOR_VALUE_LAYER
  #include "HostMidiInputQueue.h"
+#include "ScriptMidiOutQueue.h"
  #include "PanelParameters.h"
  #include "ProgramBank.h"
  #include "RestorePolicy.h"
@@ -81,7 +82,6 @@ public:
         , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams))
 #endif
     {
-        scriptMidiCollector.reset (44100.0);  // valid before prepareToPlay; the host resets with the real rate
 #if CEDITOR_VALUE_LAYER
         // The panel document, parsed once for the two things the processor reads out of it directly:
         // the restore policy and the baked program bank. Both are constant for the life of the
@@ -169,7 +169,7 @@ public:
     }
 #endif
 
-    void prepareToPlay (double sampleRate, int) override { scriptMidiCollector.reset (sampleRate); }
+    void prepareToPlay (double, int) override {}
     void releaseResources() override {}
     // The plugin PRODUCES MIDI on its output bus; the DAW routes that track to the synth's port (the
     // standard VST3 path — no in-plugin port picker). Drain whatever the panel queued on the message
@@ -182,7 +182,7 @@ public:
         for (const auto message : midi)
             hostMidiInput.push (message.data, message.numBytes);
        #endif
-        scriptMidiCollector.removeNextBlockOfMessages (midi, buffer.getNumSamples());
+        scriptMidiOut.drainInto (midi);   // no lock, no allocation: Player/ScriptMidiOutQueue.h
         captureHostPosition();
     }
 
@@ -292,9 +292,11 @@ private:
 
 public:
 
-    // Script-emitted MIDI is queued here on the message thread and drained into the host's output bus
-    // in processBlock (above). Lives outside the value/scripting #ifs so processBlock always has it.
-    juce::MidiMessageCollector scriptMidiCollector;
+    // Everything the panel sends is queued here off the audio thread and drained into the host's output
+    // bus in processBlock (above). Lives outside the value/scripting #ifs so processBlock always has it.
+    // It was a juce::MidiMessageCollector, which locks on the audio thread; ScriptMidiOutQueue.h says why
+    // it is not any more.
+    ce::ScriptMidiOutQueue scriptMidiOut;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -1306,7 +1308,7 @@ private:
         // interceptMidiOut runs HERE, at the funnel, so a filter sees the assembled bytes rather
         // than each verb's arguments — and so it sees AUTOMATION sends as well as script ones, which
         // is the reason the automation path was routed through here in the first place. A filter
-        // that swallows the message stops it dead: nothing reaches the collector, nothing is
+        // that swallows the message stops it dead: nothing reaches the output queue, nothing is
         // reported as sent.
         if (scriptRuntime != nullptr)
         {
@@ -1334,9 +1336,13 @@ private:
             juce::MidiMessage m (raw.data() + pos, (int) raw.size() - pos, used, status, 0.0, false);
             if (used <= 0) break;
             if (raw[(size_t) pos] >= 0x80) status = raw[(size_t) pos];
-            scriptMidiCollector.addMessageToQueue (m);
+            scriptMidiOut.push (m.getRawData(), m.getRawDataSize());
             pos += used;
         }
+        // Full only if the host has stopped calling processBlock while something keeps sending: 256 KB
+        // is several bank dumps. Say so once per send rather than once per message.
+        if (const auto dropped = scriptMidiOut.takeDroppedCount(); dropped != 0)
+            scriptLogLine ("MIDI output queue full: " + juce::String (dropped) + " message(s) from '" + actionId + "' dropped");
 
        #if CEDITOR_SCRIPTING
         juce::StringArray hex;
@@ -1374,7 +1380,7 @@ private:
     // Window-closed script runtime (Model 2). The full-mirror value model (scriptValues) backs
     // get/set so a script behaves identically whether the GUI is open (WebView/JS) or closed (here).
     // Stage 3 wires instantiation + lifecycle + DAW state; Stage 4 (script MIDI sends) now transmits
-    // via the plugin's MIDI output bus (scriptMidiCollector -> processBlock). JS<->C++ value sync for
+    // via the plugin's MIDI output bus (scriptMidiOut -> processBlock). JS<->C++ value sync for
     // UNBOUND controls (Stage 5) is still TODO. Declared after deviceService and in this order so the
     // runtime (holds host&) tears down before the host, and scriptValues outlives both.
 

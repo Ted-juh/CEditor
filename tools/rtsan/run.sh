@@ -11,7 +11,7 @@ flags="-std=c++20 -O1 -g -fsanitize=realtime -Wno-function-effects \
   -DJUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1 -DJUCE_STANDALONE_APPLICATION=1 -DJUCE_USE_CURL=0 \
   -DJUCE_WEB_BROWSER=0 -DNDEBUG=1 -DJUCE_MODULE_AVAILABLE_juce_core=1 -DJUCE_MODULE_AVAILABLE_juce_events=1 \
   -DJUCE_MODULE_AVAILABLE_juce_audio_basics=1 -DJUCE_MODULE_AVAILABLE_juce_audio_devices=1 \
-  -I$modules -I$root/CE/src"
+  -I$modules -I$root/CE/src -I$root/CE/thirdparty/choc"
 mkdir -p "$out"
 for m in juce_core juce_events juce_audio_basics juce_audio_devices juce_core_CompilationTime; do
   dir=${m%_CompilationTime}
