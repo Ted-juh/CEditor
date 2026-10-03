@@ -7,7 +7,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { playbackPlan, statePatch, valuePatch, REST_SESSION, LEAD_MS, TAIL_MS } from '../src/CE_Application/utils/animationPlayback.js';
+import { playbackPlan, statePatch, valuePatch, ruleValues, REST_SESSION, LEAD_MS, TAIL_MS } from '../src/CE_Application/utils/animationPlayback.js';
+import { createCustomComponentStarterPatch } from '../src/CE_Application/utils/customComponentFactory.js';
 import { readAnimations } from '../src/CE_Application/utils/animationModel.js';
 import { resolveInteractiveControl } from '../src/CE_Application/utils/interactionRuntime.js';
 import { createTransitionTracker } from '../src/CE_Application/utils/transitionSelection.js';
@@ -164,4 +165,45 @@ test('a one-shot keyframe animation is held for all its repeats', () => {
   const range = withKeyframes(createControl('Range'), { type: 'stateChange', to: ['pressed'] }, { iterations: 3, delay: 100 });
   const plan = playbackPlan(range, row(range, 'pulse'), { timeScale: 2 });
   assert.equal(plan.steps[1].hold, (100 + 500 * 3) * 2 + TAIL_MS);
+});
+
+// --- A state the control's own value channels decide ---------------------------------------------
+// Found by running the app: the status lamp's glow is on LampOn, whose rule is `active >= 1` over a
+// value channel, and Play could only report it could not get there.
+
+function starter(id) {
+  const control = createControl('CustomComponent');
+  for (const [dotPath, value] of Object.entries(createCustomComponentStarterPatch(id))) {
+    const parts = dotPath.split('.');
+    if (parts.length === 1) { control._children[parts[0]] = value; continue; }
+    const field = parts.pop();
+    let node = control._children;
+    for (const key of parts) node = node?.[key]?._children ?? node?.[key];
+    if (node && typeof node === 'object') node[field] = value;
+  }
+  return control;
+}
+
+test('a rule over a value channel is met by setting the channel', () => {
+  const lamp = starter('starter.statusLamp');
+  assert.deepEqual(ruleValues(lamp, 'active >= 1'), { active: true });
+  assert.equal(ruleValues(lamp, 'nosuchchannel > 0'), null, 'a rule that names no channel the control has');
+  assert.equal(ruleValues(lamp, 'active >= 5'), null, 'or one nothing obvious satisfies');
+  const lampOn = statePatch(lamp, 'lampon');
+  assert.deepEqual(lampOn, { patch: { customValues: { active: true } }, exact: true, name: 'lampon' });
+});
+
+test('the status lamp\'s glow plays on the stage: lit for the change, back to its own value either side', () => {
+  const lamp = starter('starter.statusLamp');
+  const plan = playbackPlan(lamp, row(lamp, 'lampGlow'));
+  assert.equal(plan.ok, true);
+  assert.equal(plan.exact, true, plan.note);
+  const own = plan.steps[0].session.customValues;
+  assert.deepEqual(plan.steps.map((step) => step.session.customValues), [own, { active: true }, own]);
+  assert.notEqual(own.active, true, 'the channel\'s own value, which leaves the lamp off');
+  // And through the real runtime: the To step is LampOn, and lampGlow is what fires.
+  const states = plan.steps.map((step) => resolveInteractiveControl(lamp, step.session).runtime.activeStates.map((name) => name.toLowerCase()));
+  assert.ok(states[1].includes('lampon'), JSON.stringify(states));
+  assert.ok(!states[0].includes('lampon') && !states[2].includes('lampon'));
+  assert.deepEqual(fired(lamp, plan), [[], ['lampGlow'], ['lampGlow']]);
 });

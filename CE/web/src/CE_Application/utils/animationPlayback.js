@@ -12,11 +12,15 @@
  * Svelte or timers in it. components/animation/AnimationStage.svelte runs it.
  *
  * A state is entered by making its `when` true: `{ hover: true }` is the session's hover flag. A
- * state whose condition is a compound `rule`, or names a signal the preview session does not hold
- * (a custom channel, say), cannot be reproduced exactly; the plan says so (`exact: false`) and plays
- * what it can, because a near miss shown honestly beats a Play button that does nothing.
+ * state with a compound `rule` over a custom component's value channels (`active >= 1`) is entered
+ * by setting those channels — the session holds them as `customValues` — to values the rule accepts,
+ * found by trying each channel's obvious settings against the runtime's own rule evaluator. Running
+ * the app showed why: the status lamp starter's glow is on such a state, and Play could not light
+ * it. A condition the session cannot hold at all is reported (`exact: false`) and played as near as
+ * it can be, because a near miss shown honestly beats a Play button that does nothing.
  */
 import { readTrigger } from './interactionRuntime.js';
+import { getCustomValueChannels, customChannelDefaultValue, customConditionMatches } from './customComponentInteraction.js';
 import { controlStateNames, ANY_STATE, DEFAULT_STATE } from './animationModel.js';
 import { isSliderBehavior, getSliderMin, getSliderMax } from './sliderBehavior.js';
 import { isRangeBehavior, getRangeMin, getRangeMax } from './rangeBehavior.js';
@@ -53,6 +57,52 @@ function implied(patch) {
   return out;
 }
 
+/** The settings worth trying for one value channel: both ways for a switch, each choice, the ends. */
+function channelCandidates(channel) {
+  const type = String(channel?.type ?? 'float').trim().toLowerCase();
+  if (type === 'bool' || type === 'boolean') return [true, false];
+  if (type === 'enum') {
+    const values = Array.isArray(channel?.values) ? channel.values : (Array.isArray(channel?.options) ? channel.options : []);
+    return values.map((value) => (value && typeof value === 'object' ? (value.value ?? value.id ?? value.label) : value));
+  }
+  if (type === 'array' || type === 'text' || type === 'note') return [];
+  const min = Number.isFinite(Number(channel?.min)) ? Number(channel.min) : 0;
+  const max = Number.isFinite(Number(channel?.max)) ? Number(channel.max) : min + 1;
+  return [...new Set([max, min, (min + max) / 2, customChannelDefaultValue(channel)])];
+}
+
+const escapeName = (name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Custom channel values that make a state's rule true, or null when the rule names no channel the
+ * control has, or no combination of the channels' obvious settings satisfies it. `flags` are the
+ * session flags the state's `when` sets, so a rule like `hover == true && level > 0.5` sees them.
+ * Only the channels the rule names are tried, and at most 256 combinations.
+ */
+export function ruleValues(control, rule, flags = {}) {
+  const text = String(rule ?? '').trim();
+  if (!text) return null;
+  const channels = getCustomValueChannels(control) ?? {};
+  const named = Object.keys(channels).filter((name) => new RegExp(`(^|[^\\w.])${escapeName(name)}(?![\\w])`).test(text));
+  if (!named.length) return null;
+  const base = Object.fromEntries(Object.entries(channels).map(([name, channel]) => [name, customChannelDefaultValue(channel)]));
+  const flagValues = Object.fromEntries(FLAGS.map((flag) => [flag, flags?.[flag] === true]));
+  let combos = [{}];
+  for (const name of named) {
+    const candidates = channelCandidates(channels[name]);
+    if (!candidates.length) return null;
+    combos = combos.flatMap((combo) => candidates.map((value) => ({ ...combo, [name]: value })));
+    if (combos.length > 256) return null;
+  }
+  return combos.find((combo) => customConditionMatches(text, { ...base, ...flagValues, ...combo })) ?? null;
+}
+
+/** The channels' own values, for the channels a set of custom values names: where the stage starts. */
+function channelDefaults(control, values) {
+  const channels = getCustomValueChannels(control) ?? {};
+  return Object.fromEntries(Object.keys(values ?? {}).map((name) => [name, customChannelDefaultValue(channels[name])]));
+}
+
 /**
  * The session patch that makes a state true, or null when the control has no such state.
  * `exact` is false when part of the state's condition is beyond what a preview session holds.
@@ -65,11 +115,17 @@ export function statePatch(control, stateName) {
   if (!found) return null;
   const [, state] = found;
   const patch = {};
-  let exact = !String(state?.rule ?? '').trim();
+  let exact = true;
   for (const [key, expected] of Object.entries(state?.when ?? {})) {
     const value = Array.isArray(expected) ? expected[0] : expected;
     if (FLAGS.includes(key) && typeof value === 'boolean') patch[key] = value;
     else if (key === 'activeHandle' && typeof value === 'string') patch[key] = value;
+    else exact = false;
+  }
+  const rule = String(state?.rule ?? '').trim();
+  if (rule) {
+    const values = ruleValues(control, rule, patch);
+    if (values) patch.customValues = values;
     else exact = false;
   }
   return { patch, exact, name };
@@ -163,13 +219,22 @@ export function playbackPlan(control, row, { timeScale = 1 } = {}) {
       fromLabel = Object.keys(fromSession).filter((key) => fromSession[key] === true).join(' + ') || DEFAULT_STATE;
     }
 
+    // Channels a rule set are put back to their own values wherever the stage is not in the To
+    // state, or the lamp lit for the change would still be lit on the way back.
+    const touched = { ...(fromSession.customValues ?? {}), ...(toSession.customValues ?? {}) };
+    const rest = Object.keys(touched).length ? channelDefaults(control, touched) : null;
+    const at = (...sessions) => {
+      const session = Object.assign({}, REST_SESSION, ...sessions);
+      if (rest) session.customValues = Object.assign({}, rest, ...sessions.map((entry) => entry.customValues ?? {}));
+      return session;
+    };
     const steps = [
-      { label: fromLabel, session: { ...REST_SESSION, ...fromSession }, hold: LEAD_MS },
-      { label: toName, session: { ...REST_SESSION, ...fromSession, ...toSession }, hold: span + TAIL_MS },
+      { label: fromLabel, session: at(fromSession), hold: LEAD_MS },
+      { label: toName, session: at(fromSession, toSession), hold: span + TAIL_MS },
     ];
     // A keyframe animation has no reverse — a loop stops, a one-shot has finished — but the stage still
     // goes back where it started, so the next Play begins from the same place.
-    if (trigger.reverse || keyframes) steps.push({ label: `${fromLabel} again`, session: { ...REST_SESSION, ...fromSession }, hold: keyframes ? TAIL_MS : span + TAIL_MS });
+    if (trigger.reverse || keyframes) steps.push({ label: `${fromLabel} again`, session: at(fromSession), hold: keyframes ? TAIL_MS : span + TAIL_MS });
     return {
       ok: true,
       steps,
