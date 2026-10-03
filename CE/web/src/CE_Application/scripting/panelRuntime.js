@@ -5269,6 +5269,24 @@ const COLLECTION_TEMPLATES = {
     _type: 'State', name, group: 'interaction', description: '', enabled: true,
     when: {}, patches: { component: {}, parts: {} },
   }),
+  // An animation is completed the way the Animation tab makes one, so a script and the tab produce
+  // the same thing: a transition from any state into hover and back, 120ms
+  // (animationModel.newAnimationShape — panelCollections.test.js holds the two together; it is
+  // restated rather than imported because the model would pull the whole component runtime into
+  // this file). A spec with `kind = "keyframes"` gets a keyframe animation instead: playing all the
+  // time, on the control, over the frames the spec gives. The trigger merges one level, so
+  // `{ trigger = { to = { "pressed" } } }` keeps the rest of the default.
+  Animations: (name, given) => (String(given?.kind ?? '') === 'keyframes'
+    ? {
+      _type: 'Animation', name, enabled: true, kind: 'keyframes',
+      trigger: { type: 'always' }, targets: [{ path: 'Transform' }], frames: [],
+      duration: 600, delay: 0, easing: 'inOutQuad',
+    }
+    : {
+      _type: 'Animation', name, enabled: true, kind: 'transition',
+      trigger: { type: 'stateChange', from: ['*'], to: ['hover'], reverse: true },
+      targets: [], duration: 120, delay: 0, easing: 'outQuad',
+    }),
 };
 
 /** Resolve (control, section) with the section name matched case-insensitively, as paths are. */
@@ -5321,8 +5339,8 @@ function panelDefineImpl(controlName, section, name, spec) {
     return false;
   }
 
-  const template = COLLECTION_TEMPLATES[found.key]?.(key) ?? { _type: found.key.replace(/s$/, '') };
   const given = spec && typeof spec === 'object' && !Array.isArray(spec) ? spec : {};
+  const template = COLLECTION_TEMPLATES[found.key]?.(key, given) ?? { _type: found.key.replace(/s$/, '') };
   const entry = { ...template, ...given, name: given.name ?? key };
   // One level of merge for the nested shapes a template carries, so a spec that names only
   // `patches.component` does not drop `patches.parts`.

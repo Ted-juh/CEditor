@@ -2184,7 +2184,7 @@ export const COMMANDS = [
   },
   {
     id: 'panelDefine', category: 'Panel structure', signature: 'panelDefine(control, section, name, spec)',
-    summary: 'Create an entry in a collection section, or replace an existing one. The spec is merged over the section\'s own template, so a partial spec is enough. Returns whether it landed.',
+    summary: 'Create an entry in a collection section, or replace an existing one. The spec is merged over the section\'s own template, so a partial spec is enough: a state gets an empty condition and patch, an animation is a transition from any state into hover and back (120ms) as the Animation tab makes one — or, with kind = "keyframes", a keyframe animation playing all the time over the frames you give. Returns whether it landed.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'control', type: 'string', required: true },

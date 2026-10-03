@@ -20,6 +20,12 @@ import { MEMBER_BY_ID, memberPath, memberRuntime, RUNTIME_ANY } from '../src/CE_
 import { EASING_BEZIERS, ANIM_CURVE_NAMES } from '../src/CE_Application/scripting/easingTables.js';
 import { EASING_BEZIERS as PANEL_BEZIERS } from '../src/CE_Application/utils/interactionRuntime.js';
 import { OVERSHOOTING_EASINGS } from '../src/CE_Application/utils/easing.js';
+import { get as getStore } from 'svelte/store';
+import { setRuntimeHost } from '../src/CE_Application/scripting/panelRuntime.js';
+import { animationPlays } from '../src/CE_Application/stores/animationActivity.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
+import { createControl } from '../src/CE_Application/models/componentTypes.js';
+import { RUNTIME_WEBVIEW } from '../src/CE_Application/scripting/panelApi.js';
 
 const api = scriptApiForTesting('', 'anim-script');
 
@@ -440,12 +446,6 @@ test('panel teardown cancels without firing anything into a dead panel', () => {
 // The one ce.anim verb that does not move a value: it plays a keyframe animation the control
 // already has (utils/keyframeAnimation.js), through the same request the Animation tab's Play makes.
 
-import { get as getStore } from 'svelte/store';
-import { setRuntimeHost } from '../src/CE_Application/scripting/panelRuntime.js';
-import { animationPlays } from '../src/CE_Application/stores/animationActivity.js';
-import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
-import { createControl } from '../src/CE_Application/models/componentTypes.js';
-import { RUNTIME_WEBVIEW } from '../src/CE_Application/scripting/panelApi.js';
 
 function withLamp(fn) {
   const lamp = createControl('Range', { name: 'Lamp' });

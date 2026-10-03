@@ -1895,7 +1895,7 @@ const st = ce.panel.entry("knob", "States", "Hover");
 
 #### `panelDefine(control, section, name, spec)`
 
-Create an entry in a collection section, or replace an existing one. The spec is merged over the section's own template, so a partial spec is enough. Returns whether it landed.
+Create an entry in a collection section, or replace an existing one. The spec is merged over the section's own template, so a partial spec is enough: a state gets an empty condition and patch, an animation is a transition from any state into hover and back (120ms) as the Animation tab makes one — or, with kind = "keyframes", a keyframe animation playing all the time over the frames you give. Returns whether it landed.
 
 ```lua
 -- Lua

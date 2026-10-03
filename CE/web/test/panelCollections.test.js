@@ -20,6 +20,8 @@ import { valueAtPath, setNestedValue, probeNestedWrite } from '../src/CE_Applica
 import {
   MEMBER_BY_ID, memberPath, memberRuntime, RUNTIME_WEBVIEW,
 } from '../src/CE_Application/scripting/panelApi.js';
+import { newAnimationShape } from '../src/CE_Application/utils/animationModel.js';
+import { readKeyframes } from '../src/CE_Application/utils/keyframeAnimation.js';
 
 // Mirrors playerScriptHost: a LIVE value moves through the preview session and needs no Value
 // section, so it always lands; anything else is a plain model write that reports whether it did.
@@ -327,5 +329,48 @@ test('a missing control is named by every verb', () => {
       call();
       assert.match(traced(), /no control named "ghost"/);
     }
+  });
+});
+
+/* ----------------------------------------------------------------- defining an animation */
+// An Animations entry used to take the spec as given, with `_type` filled in, so a script that wrote
+// `{ duration = 200 }` made an animation with no trigger and no kind. It is completed now the way
+// the Animation tab completes a new one.
+
+
+test('define completes an animation the way the Animation tab makes one', () => {
+  withControl('Knob', (api, control) => {
+    assert.equal(api.panelDefine('k', 'Animations', 'glow', {}), true);
+    assert.deepEqual(control._children.Animations._children.glow, newAnimationShape('glow'),
+      'restated in panelRuntime.js rather than imported; this is what keeps the two the same');
+  });
+});
+
+test('a partial animation spec keeps the rest of the default, the trigger merged one level', () => {
+  withControl('Knob', (api, control) => {
+    api.panelDefine('k', 'Animations', 'press', {
+      trigger: { to: ['pressed'] }, duration: 80,
+      targets: [{ path: 'Transform.scale', properties: ['transform'] }],
+    });
+    const press = control._children.Animations._children.press;
+    assert.deepEqual(press.trigger, { type: 'stateChange', from: ['*'], to: ['pressed'], reverse: true });
+    assert.equal(press.duration, 80);
+    assert.equal(press.kind, 'transition');
+  });
+});
+
+test('kind = "keyframes" gets a keyframe animation, which ce.anim.play can then play', () => {
+  withControl('Knob', (api, control) => {
+    api.panelDefine('k', 'Animations', 'flash', {
+      kind: 'keyframes', trigger: { type: 'script' },
+      frames: [{ at: 0, opacity: 0.2 }, { at: 1, opacity: 1 }],
+    });
+    const flash = control._children.Animations._children.flash;
+    assert.equal(flash.kind, 'keyframes');
+    assert.equal(flash.duration, 600);
+    const entry = readKeyframes(flash, 'flash');
+    assert.ok(entry, 'the runtime reads it as a keyframe animation');
+    assert.equal(entry.part, '', 'on the control itself');
+    assert.equal(entry.trigger.type, 'script');
   });
 });
