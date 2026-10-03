@@ -22,6 +22,7 @@ import {
 import { animationActivity } from '../src/CE_Application/stores/animationActivity.js';
 import { startTransport, stopTransport, setTransportBpm } from '../src/CE_Application/stores/transport.js';
 import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { createCustomComponentStarterPatch } from '../src/CE_Application/utils/customComponentFactory.js';
 
 window.__JUCE__ = undefined;
 
@@ -75,17 +76,33 @@ beater._children.Animations._children = {
   wink: keyframes('wink', { type: 'script' }, [{ at: 0, scale: 1 }, { at: 0.5, scale: 0.6 }, { at: 1, scale: 1 }], 400),
 };
 
+// The tab-group starter, as the component library makes it: its states swap which page part is
+// visible, and its pageFade animation cross-fades them (phase-5 item K). Built the way
+// tools/scripts/qa/sheets/packages.mjs builds a starter, dot paths into the tree.
+const tabs = place(createControl('CustomComponent'), 'tabs', 20, 200, 260, 160);
+for (const [dotPath, value] of Object.entries(createCustomComponentStarterPatch('starter.tabGroup'))) {
+  const parts = dotPath.split('.');
+  if (parts.length === 1) { tabs._children[parts[0]] = value; continue; }
+  const field = parts.pop();
+  let node = tabs._children;
+  for (const key of parts) node = node?.[key]?._children ?? node?.[key];
+  if (node && typeof node === 'object') node[field] = value;
+}
+Object.assign(tabs._children.Core, { id: 'tabs', name: 'tabs' });
+Object.assign(tabs._children.Transform, { x: 20, y: 200, width: 260, height: 160 });
+tabs._children.Animations._children.pageFade.duration = 800;   // slow enough to sample mid-fade
+
 // ce.anim is declared because this panel has no script of its own for the runtime to derive it from;
 // a panel whose script calls ce.anim.play gets the module from that script.
 const panel = {
-  id: 'motion', name: 'Motion', width: 400, height: 200, bgColour: 'FF1E1E1E',
-  controls: [button, knob, springy, drawn, pulser, beater],
+  id: 'motion', name: 'Motion', width: 400, height: 380, bgColour: 'FF1E1E1E',
+  controls: [button, knob, springy, drawn, pulser, beater, tabs],
   scripting: { modules: ['ce.core', 'ce.anim'] },
 };
 panels.set([]);
 addPanel(panel);
 setActivePanel(panel.id);
-panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn, pulser, beater].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
+panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn, pulser, beater, tabs].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
 mount(GaiaPagesHarness, { target: document.getElementById('host'), props: { panelId: panel.id } });
 setPreviewModeEnabled(true);
 
@@ -118,6 +135,18 @@ window.__motion = {
     return { name: style.animationName, scale: style.scale, transform: style.transform };
   },
   startTransport: (bpm) => { setTransportBpm(bpm); startTransport(0); },
+  /** A part of a control as the browser has it: there at all, visible, and how opaque. */
+  part: (id, name) => {
+    const el = root(id)?.querySelector(`.interactive-part[data-part-name="${name}"]`);
+    if (!el) return null;
+    const style = getComputedStyle(el);
+    return { visibility: style.visibility, opacity: Number(style.opacity), transition: style.transitionProperty };
+  },
+  /** Switch the tab group's page, the way its own tab buttons set the channel. */
+  setTab: (value) => {
+    const session = get(panelPreviewSessions).tabs;
+    updatePanelPreviewSession('tabs', { customValues: { ...(session?.customValues ?? {}), tab: value } });
+  },
   /** A script's ce.anim.play, through the real script API. */
   scriptPlay: (control, name) => scriptApiForTesting('', 'motion-script').animatePlay(control, name),
   stopTransport: () => stopTransport(),

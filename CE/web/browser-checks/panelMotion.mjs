@@ -160,6 +160,30 @@ check('a script\'s ce.anim.play starts a keyframe animation on the control', () 
   assert.match(winking.name, /ce-kf-[0-9a-z]+-a/, winking.name);
 });
 
+// --- A state that swaps which part is visible (phase-5 item K) ----------------------------------
+
+const pageTwoAtRest = await ev(() => window.__motion.part('tabs', 'pageTwo'));
+check('a page a state can fade in is there while hidden: invisible, transparent, not gone', () => {
+  assert.ok(pageTwoAtRest, 'pageTwo is not in the DOM at all, so it would pop in');
+  assert.equal(pageTwoAtRest.visibility, 'hidden');
+  assert.equal(pageTwoAtRest.opacity, 0);
+});
+await ev(() => window.__motion.setTab('two'));
+await wait(300);
+const midOne = await ev(() => window.__motion.part('tabs', 'pageOne'));
+const midTwo = await ev(() => window.__motion.part('tabs', 'pageTwo'));
+await wait(900);
+const endOne = await ev(() => window.__motion.part('tabs', 'pageOne'));
+const endTwo = await ev(() => window.__motion.part('tabs', 'pageTwo'));
+check('switching tabs cross-fades the pages instead of popping them', () => {
+  assert.match(midTwo.transition, /opacity, visibility/, midTwo.transition);
+  assert.ok(midTwo.opacity > 0 && midTwo.opacity < 1, `page two 300ms into an 800ms fade: ${midTwo.opacity}`);
+  assert.ok(midOne.opacity > 0 && midOne.opacity < 1, `page one on its way out: ${midOne.opacity}`);
+  assert.equal(midOne.visibility, 'visible', 'the page going away stays visible for the whole fade');
+  assert.equal(endTwo.opacity, 1);
+  assert.equal(endOne.visibility, 'hidden');
+});
+
 // --- The knob: glide for a value from outside, none for a drag -------------------------------
 
 const markup = () => ev(() => window.__motion.knobMarkup());

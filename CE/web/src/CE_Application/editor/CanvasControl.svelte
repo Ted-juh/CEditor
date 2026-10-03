@@ -442,9 +442,20 @@
     'tickMajor', 'tickMinor', 'tickAccent',
     'labelMin', 'labelMax', 'labelStart', 'labelCurrent', 'labelEnd', 'labelValue', 'labelTitle', 'labelUnit',
   ]);
+  // Parts a state can show or hide WITH a fade (an animation on `Parts.<name>.visible`, read from
+  // the catalog's union of what could animate). Such a part stays in the list while hidden and is
+  // drawn `visibility: hidden; opacity: 0` — a part that is not there has nothing to fade from.
+  // A control with states or animations is never baked (staticPartBaking.js), so these stay live.
+  let fadeableParts = $derived.by(() => {
+    const names = new Set();
+    for (const [name, bucket] of interactionRuntime?.transitions?.partTransitions ?? []) {
+      if (bucket?.visibility) names.add(name);
+    }
+    return names;
+  });
   let renderPartEntries = $derived.by(() =>
     Object.entries(renderParts?._children ?? {})
-      .filter(([, part]) => part?.visible !== false)
+      .filter(([partName, part]) => part?.visible !== false || fadeableParts.has(partName))
       .sort((left, right) => numberOr(left?.[1]?.zIndex, 0) - numberOr(right?.[1]?.zIndex, 0))
   );
   let isSliderControl = $derived(
@@ -3770,6 +3781,7 @@
           parentHeight={displayH}
           transitionBucket={activeTransitions?.partTransitions?.get?.(partName) ?? null}
           animationList={activeKeyframes?.parts?.get?.(partName) ?? null}
+          fadeHidden={fadeableParts.has(partName)}
           debug={interactionDebugEnabled}
           editableInput={editableInputForPart(part)}
           oneditableinput={editableHandlerForPart(part, 'input')}

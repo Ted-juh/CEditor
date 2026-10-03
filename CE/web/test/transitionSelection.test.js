@@ -274,7 +274,7 @@ test('the selection comes out in the shape the renderers read', () => {
   };
   const out = selectionToTransitions(selection);
   assert.equal(out.rootTransitions.get('colour'), 'c');
-  assert.deepEqual(out.partTransitions.get('knob'), { transform: 't', opacity: null, size: null, colour: null });
+  assert.deepEqual(out.partTransitions.get('knob'), { transform: 't', opacity: null, size: null, colour: null, visibility: null });
   assert.equal(out.partTransitions.has('empty'), false);
 });
 
@@ -345,4 +345,43 @@ test('the Animations switch and the preview switch both turn a control off', () 
   step({ animationsEnabled: false });
   assert.equal(step({ pressed: false, animationsEnabled: false }).rootTransitions.size, 0);
   assert.equal(step({ pressed: true, animationsEnabled: false }).rootTransitions.size, 0);
+});
+
+// --- A state that shows and hides parts (phase-5 item K) ----------------------------------------
+
+test('a state that swaps which part is visible picks the fade for both parts', () => {
+  // The shape of the tab-group starter: a state shows page two and hides page one.
+  const control = createControl('CustomComponent');
+  control._children.Parts = {
+    _type: 'Parts',
+    _children: {
+      one: { _type: 'Part', name: 'one', visible: true, Layout: { x: 0, y: 0, width: 50, height: 50 } },
+      two: { _type: 'Part', name: 'two', visible: false, Layout: { x: 0, y: 0, width: 50, height: 50 } },
+    },
+  };
+  control._children.States._children.Two = {
+    _type: 'State', name: 'Two', enabled: true, when: { hover: true },
+    patches: { component: {}, parts: { one: { visible: false }, two: { visible: true } } },
+  };
+  control._children.Animations._children = {
+    pageFade: {
+      _type: 'Animation', name: 'pageFade', enabled: true, kind: 'transition',
+      trigger: { type: 'stateChange', from: ['*'], to: ['two'] },
+      targets: [{ path: 'Parts.one.visible' }, { path: 'Parts.two.visible' }],
+      duration: 180, delay: 0, easing: 'inOutQuad',
+    },
+  };
+  const tracker = createTransitionTracker({ now: () => 0 });
+  const rest = resolveInteractiveControl(control, {});
+  assert.equal(rest.runtime.transitions.partTransitions.get('two').visibility !== null, true,
+    'the catalog says page two can fade, which is what keeps it mounted while hidden');
+  tracker.next(rest.runtime);
+  const swapped = resolveInteractiveControl(control, { hover: true });
+  const out = tracker.next(swapped.runtime);
+  assert.match(out.partTransitions.get('one').visibility, /^180ms /);
+  assert.match(out.partTransitions.get('two').visibility, /^180ms /);
+  assert.equal(swapped.control._children.Parts._children.one.visible, false);
+  assert.equal(swapped.control._children.Parts._children.two.visible, true);
+  const back = tracker.next(resolveInteractiveControl(control, {}).runtime);
+  assert.match(back.partTransitions.get('one').visibility, /^180ms /, 'and fades back on the way out');
 });

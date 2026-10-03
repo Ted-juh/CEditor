@@ -130,7 +130,7 @@ export function matchStrength(entry, change, signals) {
   return 0;
 }
 
-const emptyPartBucket = () => ({ transform: null, opacity: null, size: null, colour: null });
+const emptyPartBucket = () => ({ transform: null, opacity: null, size: null, colour: null, visibility: null });
 
 /**
  * Pick each property's transition for this change.

@@ -7889,9 +7889,9 @@
         },
         "Animations": {
           "_children": {
-            "pressMotion": {
+            "lampGlow": {
               "_type": "Animation",
-              "name": "pressMotion",
+              "name": "lampGlow",
               "enabled": true,
               "kind": "transition",
               "trigger": {
@@ -7900,18 +7900,31 @@
                   "*"
                 ],
                 "to": [
-                  "pressed"
-                ]
+                  "lampon"
+                ],
+                "reverse": true
               },
               "targets": [
                 {
-                  "path": "Transform.scale",
+                  "path": "Parts.lamp.Background.Fill.colour",
                   "properties": [
-                    "transform"
+                    "colour"
+                  ]
+                },
+                {
+                  "path": "Parts.lamp.Background.Border.colour",
+                  "properties": [
+                    "colour"
+                  ]
+                },
+                {
+                  "path": "Parts.caption.Text.Fill.colour",
+                  "properties": [
+                    "colour"
                   ]
                 }
               ],
-              "duration": 90,
+              "duration": 160,
               "delay": 0,
               "easing": "outQuad"
             }
@@ -9478,9 +9491,9 @@
         },
         "Animations": {
           "_children": {
-            "pressMotion": {
+            "pageFade": {
               "_type": "Animation",
-              "name": "pressMotion",
+              "name": "pageFade",
               "enabled": true,
               "kind": "transition",
               "trigger": {
@@ -9489,20 +9502,34 @@
                   "*"
                 ],
                 "to": [
-                  "pressed"
-                ]
+                  "tabtwo",
+                  "tabthree"
+                ],
+                "reverse": true
               },
               "targets": [
                 {
-                  "path": "Transform.scale",
+                  "path": "Parts.pageOne.visible",
                   "properties": [
-                    "transform"
+                    "visibility"
+                  ]
+                },
+                {
+                  "path": "Parts.pageTwo.visible",
+                  "properties": [
+                    "visibility"
+                  ]
+                },
+                {
+                  "path": "Parts.pageThree.visible",
+                  "properties": [
+                    "visibility"
                   ]
                 }
               ],
-              "duration": 90,
+              "duration": 180,
               "delay": 0,
-              "easing": "outQuad"
+              "easing": "inOutQuad"
             }
           }
         },

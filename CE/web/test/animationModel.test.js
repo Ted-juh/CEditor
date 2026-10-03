@@ -533,16 +533,14 @@ test('every shipped control and starter names only states it has, and has no cla
     ...['Button', 'ToggleButton', 'Knob', 'Slider', 'Range', 'Number'].map((type) => [type, createControl(type)]),
     ...CUSTOM_COMPONENT_STARTERS.map((starter) => [`starter ${starter.id}`, buildStarterControl(starter, `qa_${starter.id}`)]),
   ];
-  // Two starters inherit the generic starter press animation without having a Pressed state, so it
-  // never plays on them — and never visibly did, since no state of theirs patches scale. Found by
-  // this test; left for the owner to decide (drop the animation, or give them a Pressed state),
-  // because either changes a shipped starter's package fingerprint. Listed so it cannot grow.
-  const KNOWN = { 'starter starter.statusLamp/pressMotion': ['pressed'], 'starter starter.tabGroup/pressMotion': ['pressed'] };
+  // This test found two starters, the status lamp and the tab group, carrying the generic press
+  // animation with no Pressed state, so it could never play. They now animate what their states do
+  // change (lampGlow, pageFade) and the exception list that held them is gone.
   for (const [label, control] of controls) {
     const rows = readAnimations(control);
     const states = controlStateNames(control);
     for (const row of rows) {
-      assert.deepEqual(unknownTriggerStates(row, states), KNOWN[`${label}/${row.name}`] ?? [], `${label} / ${row.name} names a state it does not have (it has: ${states.join(', ')})`);
+      assert.deepEqual(unknownTriggerStates(row, states), [], `${label} / ${row.name} names a state it does not have (it has: ${states.join(', ')})`);
     }
     const parts = Object.keys(control._children?.Parts?._children ?? {});
     assert.deepEqual(findClashes(rows, parts), [], label);
@@ -651,4 +649,17 @@ test('frame values are set, cleared and re-sorted', () => {
   assert.deepEqual(setFrameValue(frames, 0, 'at', 75).map((frame) => frame.at), [0.5, 0.75, 1], 'at is a percentage in the tab');
   assert.deepEqual(removeFrame(frames, 1).map((frame) => frame.at), [0, 1]);
   assert.deepEqual(removeFrame(frames, 9).length, 3);
+});
+
+test('the status lamp fades into its colour and the tab group cross-fades its pages', async () => {
+  const { buildStarterControl } = await import('../../../tools/scripts/qa/sheets/packages.mjs');
+  const { CUSTOM_COMPONENT_STARTERS } = await import('../src/CE_Application/utils/customComponentFactory.js');
+  const starter = (id) => buildStarterControl(CUSTOM_COMPONENT_STARTERS.find((s) => s.id === id), `qa_${id}`);
+  const lamp = starter('starter.statusLamp');
+  const glow = readAnimations(lamp).find((row) => row.name === 'lampGlow');
+  assert.deepEqual(describeTargets(glow, partsOf(lamp)).map((t) => t.status.animates), ['colour', 'colour', 'colour']);
+  const tabs = starter('starter.tabGroup');
+  const fade = readAnimations(tabs).find((row) => row.name === 'pageFade');
+  assert.deepEqual(describeTargets(fade, partsOf(tabs)).map((t) => t.status.animates), ['visibility', 'visibility', 'visibility']);
+  assert.deepEqual(fade.trigger.to, ['tabtwo', 'tabthree']);
 });

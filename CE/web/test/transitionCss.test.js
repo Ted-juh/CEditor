@@ -50,10 +50,21 @@ test('an SVG shape is coloured with fill and stroke, and has no size bucket CSS 
   assert.deepEqual(BUCKET_PROPERTIES.svg.size, []);
 });
 
-test('every target kind has all four buckets, so no bucket silently vanishes on one renderer', () => {
+test('every target kind has all five buckets, so no bucket silently vanishes on one renderer', () => {
+  // Five since a part's show/hide became animatable ('visibility'); it was four.
   for (const [target, table] of Object.entries(BUCKET_PROPERTIES)) {
-    assert.deepEqual(Object.keys(table).sort(), ['colour', 'opacity', 'size', 'transform'], target);
+    assert.deepEqual(Object.keys(table).sort(), ['colour', 'opacity', 'size', 'transform', 'visibility'], target);
   }
+});
+
+test('showing and hiding a part eases opacity and visibility together', () => {
+  // `visibility` interpolates as "visible" whenever either end is, so the part stays visible for the
+  // whole fade out and turns visible at the start of a fade in; opacity does the fading.
+  assert.equal(transitionDeclaration({ visibility: T }), `transition:opacity ${T}, visibility ${T};`);
+  assert.equal(transitionDeclaration({ visibility: T }, { target: 'svg' }), `transition:opacity ${T}, visibility ${T};`);
+  assert.equal(rootTransitionDeclaration(new Map([['visibility', T]])), '', 'the control itself is not shown and hidden by states');
+  // With an opacity animation too, visibility's comes last and so is the one CSS uses.
+  assert.match(transitionDeclaration({ opacity: 'o', visibility: 'v' }), /opacity o, opacity v, visibility v;$/);
 });
 
 test('the colour timing travels as an inherited custom property, and is always set', () => {

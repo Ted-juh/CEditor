@@ -944,6 +944,33 @@ function createStarterAnimations() {
   };
 }
 
+/**
+ * A starter's Animations with one transition of its own in place of the generic press: for a starter
+ * whose states change something other than a press would. The status lamp and the tab group carried
+ * the generic pressMotion (to: pressed) with no Pressed state, so it could never play — found when
+ * triggers became real and the Animation tab began checking state names.
+ */
+function createStarterTransition(name, to, targets, { duration = 160, easing = 'outQuad' } = {}) {
+  return {
+    _type: 'Animations',
+    enabled: true,
+    debug: false,
+    _children: {
+      [name]: {
+        _type: 'Animation',
+        name,
+        enabled: true,
+        kind: 'transition',
+        trigger: { type: 'stateChange', from: ['*'], to, reverse: true },
+        targets,
+        duration,
+        delay: 0,
+        easing,
+      },
+    },
+  };
+}
+
 function createStarterLifecycleSections() {
   return {
     States: createStarterStates(),
@@ -2215,7 +2242,12 @@ function createStatusLampStarterPatch() {
     'Core.name': 'Status Lamp',
     'Transform.width': 120,
     'Transform.height': 72,
-    Animations: createStarterAnimations(),
+    // The lamp lights by colour, so it fades into its colour: lamp fill and border, and the caption.
+    Animations: createStarterTransition('lampGlow', ['lampon'], [
+      { path: 'Parts.lamp.Background.Fill.colour', properties: ['colour'] },
+      { path: 'Parts.lamp.Background.Border.colour', properties: ['colour'] },
+      { path: 'Parts.caption.Text.Fill.colour', properties: ['colour'] },
+    ]),
     States: {
       _type: 'States',
       enabled: true,
@@ -2526,7 +2558,12 @@ function createTabGroupStarterPatch() {
     'Core.name': 'Tab Group',
     'Transform.width': 260,
     'Transform.height': 160,
-    Animations: createStarterAnimations(),
+    // A tab change swaps which page is visible, so the pages cross-fade instead of popping.
+    Animations: createStarterTransition('pageFade', ['tabtwo', 'tabthree'], [
+      { path: 'Parts.pageOne.visible', properties: ['visibility'] },
+      { path: 'Parts.pageTwo.visible', properties: ['visibility'] },
+      { path: 'Parts.pageThree.visible', properties: ['visibility'] },
+    ], { duration: 180, easing: 'inOutQuad' }),
     States: {
       _type: 'States',
       enabled: true,

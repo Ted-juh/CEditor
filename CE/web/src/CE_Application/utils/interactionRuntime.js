@@ -380,6 +380,10 @@ export const PART_PATH_BUCKETS = {
   'Background.Fill.colour': 'colour',
   'Background.Border.colour': 'colour',
   'Text.Fill.colour': 'colour',
+  // A state that shows or hides a part — a tab group swapping its pages — used to make it pop. With
+  // this target it fades: the renderer keeps such a part mounted while hidden, so there is a
+  // `visibility: hidden; opacity: 0` to ease to and from (utils/transitionCss.js).
+  visible: 'visibility',
 };
 
 export const ROOT_PATH_BUCKETS = {
@@ -405,12 +409,13 @@ export const BUCKET_HINTS = {
   color: 'colour',
   'background-color': 'colour',
   'border-color': 'colour',
+  visibility: 'visibility',
 };
 
 /** The buckets a target on the control itself can fill. The root has no size bucket. */
 export const ROOT_BUCKETS = ['transform', 'opacity', 'colour'];
 
-export const ANIMATION_BUCKETS = ['transform', 'opacity', 'size', 'colour'];
+export const ANIMATION_BUCKETS = ['transform', 'opacity', 'size', 'colour', 'visibility'];
 
 /**
  * Where a target lands: `{ part, buckets }`, with part '' for the control itself. Null when the
@@ -506,7 +511,7 @@ function buildTransitionCatalog(control, previewSession) {
       const landing = targetBuckets(target);
       if (!landing || !landing.buckets.length) continue;
       if (landing.part) {
-        const bucket = partTransitions.get(landing.part) ?? { transform: null, opacity: null, size: null, colour: null };
+        const bucket = partTransitions.get(landing.part) ?? { transform: null, opacity: null, size: null, colour: null, visibility: null };
         const set = entry.parts.get(landing.part) ?? new Set();
         for (const name of landing.buckets) { bucket[name] = transition; set.add(name); }
         partTransitions.set(landing.part, bucket);

@@ -84,6 +84,7 @@ export const OFFERED_PROPERTIES = [
   { path: 'Background.Fill.colour', properties: ['background-color'], label: 'Fill colour' },
   { path: 'Text.Fill.colour', properties: ['color'], label: 'Text colour' },
   { path: 'Background.Border.colour', properties: ['colour'], label: 'Border colour' },
+  { path: 'visible', properties: ['visibility'], label: 'Show / hide (fade)' },
 ];
 
 /** The same for a target on the control itself — no position or size, which the panel owns. */

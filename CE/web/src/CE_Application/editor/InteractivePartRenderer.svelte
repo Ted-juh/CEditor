@@ -16,6 +16,8 @@
     parentHeight = 0,
     transitionBucket = null,
     animationList = null,
+    /** Draw a hidden part as invisible rather than not at all, so showing and hiding can fade. */
+    fadeHidden = false,
     debug = false,
     editableInput = null,
     oneditableinput = null,
@@ -161,6 +163,7 @@
     const rest = css.replace(/^filter:\s*/, '').replace(/;$/, '');
     return `filter: url(#${materialId})${rest ? ` ${rest}` : ''};`;
   });
+  let hiddenForFade = $derived(fadeHidden && part?.visible === false);
   let partStyle = $derived.by(() => {
     const transforms = [];
     if (Math.abs(partRotation) > 0.001) transforms.push(`rotate(${partRotation}deg)`);
@@ -171,7 +174,8 @@
       `top:${frame.top}px`,
       `width:${frame.width}px`,
       `height:${frame.height}px`,
-      `opacity:${numberOr(part?.opacity, 1)}`,
+      // A hidden part kept for a fade: transparent, invisible, and out of the way of the pointer.
+      hiddenForFade ? 'opacity:0; visibility:hidden; pointer-events:none' : `opacity:${numberOr(part?.opacity, 1)}`,
       `z-index:${numberOr(part?.zIndex, 0)}`,
       `overflow:${part?.clipChildren === true || editableInput ? 'hidden' : 'visible'}`,
       transforms.length ? `transform:${transforms.join(' ')}; transform-origin:${numberOr(layout?.pivotX, 50)}% ${numberOr(layout?.pivotY, 50)}%` : '',
@@ -495,7 +499,7 @@
   });
 </script>
 
-{#if part?.visible !== false}
+{#if part?.visible !== false || fadeHidden}
   <div class="interactive-part" class:debug={debug} data-part-name={partName || part?.name || undefined} style={partStyle}>
     {#if materialLit}
       <MaterialFilter id={materialId} {material} />

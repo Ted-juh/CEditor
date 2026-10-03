@@ -21,6 +21,10 @@ export const BUCKET_PROPERTIES = {
     opacity: ['opacity'],
     size: ['width', 'height'],
     colour: ['background-color', 'color', 'border-color', 'fill', 'stroke'],
+    // Showing and hiding: opacity eases, and `visibility` — which interpolates as "visible" whenever
+    // either end is — keeps the part visible for the whole fade out and makes it visible at the start
+    // of a fade in. Listed after opacity, so a part with both buckets fades on this one's timing.
+    visibility: ['opacity', 'visibility'],
   },
   // The control's own box. Its left/top are where it sits on the panel, which no animation moves,
   // so they stay out: a transition there would make dragging a control in the editor lag.
@@ -29,6 +33,8 @@ export const BUCKET_PROPERTIES = {
     opacity: ['opacity'],
     size: ['width', 'height'],
     colour: ['background-color', 'color', 'border-color', 'fill', 'stroke'],
+    // The control itself is shown and hidden by its layer and its own switch, never by a state.
+    visibility: [],
   },
   svg: {
     transform: ['transform', 'translate', 'rotate', 'scale'],
@@ -37,11 +43,12 @@ export const BUCKET_PROPERTIES = {
     // has nothing to act on. utils/animationModel.js says so on the target row.
     size: [],
     colour: ['fill', 'stroke', 'stop-color', 'color'],
+    visibility: ['opacity', 'visibility'],
   },
 };
 
 /** The bucket order the declaration is written in, so equal buckets give an equal string. */
-const ORDER = ['transform', 'opacity', 'size', 'colour'];
+const ORDER = ['transform', 'opacity', 'size', 'colour', 'visibility'];
 
 /**
  * `transition:…;` for one bucket object `{ transform, opacity, size, colour }` (each a timing
