@@ -4607,8 +4607,11 @@
   .ce-colour-anim {
     transition: var(--ce-colour-transition, none);
   }
-  /* Keyframe colour frames (utils/keyframeAnimation.js, HOW COLOUR DRAWS): the fill where it is
-     absorbed onto this element, and the control's text. */
+  /* Keyframe colour frames (utils/keyframeAnimation.js, HOW COLOUR DRAWS). The variables inherit,
+     and a container draws the controls inside it inside its own element, so every control starts
+     from none; a control with colour frames sets its own inline, which wins. Then the fill where
+     it is absorbed onto this element, and the control's text. */
+  .canvas-control { --ce-kf-paint: none; --ce-kf-shape: none; --ce-kf-stroke: none; --ce-kf-text: none; }
   .control-content.absorbs-fill { animation: var(--ce-kf-paint, none); }
   .text-span { animation: var(--ce-kf-text, none); }
   .control-background { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
