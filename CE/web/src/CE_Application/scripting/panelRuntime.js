@@ -3278,6 +3278,15 @@ export function runPreviewSessionsForTesting(sessions = null) {
   return onPreviewSessionsChanged(sessions ?? get(panelPreviewSessions));
 }
 
+/** The same door for the panels-store diff — a value that moved in the document rather than in a
+    preview session. The first call only takes the baseline, as initPanelRuntime's does. */
+export function runPanelsChangedForTesting({ baseline = false } = {}) {
+  live.activePanelId = get(scriptRuntimePanelId);
+  live.enabledGlobal = true;
+  if (baseline) { snapshotValues(); return null; }
+  return onPanelsChanged();
+}
+
 /** Drop every loaded handler, listener, rule and timer — what a panel switch does. Exposed so a
     test can start clean: rules outlive a single `set`, which is the whole point of them, and two
     tests sharing this module would otherwise share each other's formulas and filters. */
@@ -7853,23 +7862,62 @@ function activeScripts() {
  * A control's current "value", wherever it lives:
  *  - standard controls keep it at Value.value,
  *  - custom components keep it in ValueChannels.<name>.currentValue (often several channels).
- * Returns a change-signature (to detect movement) + a representative value (the onValueChanged payload).
+ * Returns a change-signature (to detect movement), a representative value (the onValueChanged
+ * payload of a control with one value), and — for a custom component — each channel's value, in
+ * declaration order, so a change can be reported as the channel that made it (valueEventsFor).
  */
 function controlValueState(control) {
   const v = valueAtPath(control, 'Value.value');
-  if (v !== undefined) return { sig: JSON.stringify(v), value: v };
+  if (v !== undefined) return { sig: JSON.stringify(v), value: v, channels: null };
   const channels = control?._children?.ValueChannels?._children;
   if (channels && typeof channels === 'object') {
-    const parts = [];
-    let rep;
-    for (const key of Object.keys(channels)) {
-      const cv = channels[key]?.currentValue;
-      parts.push(`${key}=${JSON.stringify(cv)}`);
-      if (rep === undefined) rep = cv;
+    const entries = Object.keys(channels).map((key) => [key, channels[key]?.currentValue]);
+    if (entries.length) {
+      return {
+        sig: entries.map(([key, cv]) => `${key}=${JSON.stringify(cv)}`).join('&'),
+        value: entries[0][1],
+        channels: Object.fromEntries(entries),
+      };
     }
-    if (parts.length) return { sig: parts.join('&'), value: rep };
   }
-  return { sig: undefined, value: undefined };
+  return { sig: undefined, value: undefined, channels: null };
+}
+
+/** A custom component's value channel names, in declaration order. */
+function valueChannelNames(control) {
+  return Object.keys(control?._children?.ValueChannels?._children ?? {});
+}
+
+/**
+ * The channels whose value differs between two `{ name: value }` maps, as [name, value] pairs in
+ * declaration order. Content, not identity: an array channel rebuilt with the same items has not
+ * changed, which is the rule watch() already keeps.
+ */
+function changedChannels(names, before, after) {
+  const out = [];
+  for (const name of names) {
+    const was = before?.[name];
+    const now = after?.[name];
+    if (JSON.stringify(was) !== JSON.stringify(now)) out.push([name, now]);
+  }
+  return out;
+}
+
+/**
+ * THE VALUES A CHANGE REPORTS. A control with one value reports it, as it always has. A custom
+ * component with several channels reports each channel that moved, with that channel's own value,
+ * once per channel — what the exported plugin already does with the window closed, where every
+ * public channel is its own host parameter (utils/exportParameters.js, paramFromChannel) and
+ * PluginProcessor raises onValueChanged per parameter that changed.
+ *
+ * Until this, the payload here was the FIRST channel's value whichever channel had moved, so a
+ * script on a three-ring macro was told the first ring's unchanged value when the second turned.
+ */
+function valueEventsFor(control, before, state) {
+  if (state.channels && valueChannelNames(control).length > 1) {
+    return changedChannels(valueChannelNames(control), before?.channels, state.channels).map(([, value]) => value);
+  }
+  return [state.value];
 }
 
 /** Snapshot every control's current value so the next change is measured against it. */
@@ -7881,7 +7929,7 @@ function snapshotValues() {
     // baseline here, so the diff below could never see it change.
     for (const c of flatControls(panel.controls ?? [])) {
       const id = c?._children?.Core?.id;
-      if (id != null) next.set(id, controlValueState(c).sig);
+      if (id != null) next.set(id, controlValueState(c));
     }
   }
   live.last = next;
@@ -7976,26 +8024,32 @@ function onPanelsChanged() {
     const id = c?._children?.Core?.id;
     if (id == null) continue;
     const name = c?._children?.Core?.name ?? id;
-    const { sig, value } = controlValueState(c);
-    next.set(id, sig);
-    if (live.last.has(id) && live.last.get(id) !== sig) {
-      if (behaviorEmits(c, 'onValueChange')) {
-        events.push({ event: 'onValueChange', controlName: name, payload: value });
-        // Panel-wide mirror of the same change, for a script that watches everything at once
-        // rather than attaching to each control.
-        events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value } });
-      }
-      if (behaviorEmits(c, 'onValueChanged')) {
-        events.push({ event: 'onValueChanged', controlName: name, payload: value });
+    const state = controlValueState(c);
+    next.set(id, state);
+    const before = live.last.get(id);
+    if (before && before.sig !== state.sig) {
+      for (const value of valueEventsFor(c, before, state)) {
+        if (behaviorEmits(c, 'onValueChange')) {
+          events.push({ event: 'onValueChange', controlName: name, payload: value });
+          // Panel-wide mirror of the same change, for a script that watches everything at once
+          // rather than attaching to each control.
+          events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value } });
+        }
+        if (behaviorEmits(c, 'onValueChanged')) {
+          events.push({ event: 'onValueChanged', controlName: name, payload: value });
+        }
       }
     }
   }
   live.last = next;
-  if (events.length) dispatchEvents(events);
+  // Returned, as the session diff's is, so a test can wait for the handlers; the store subscriber
+  // ignores it.
+  const dispatched = events.length ? dispatchEvents(events) : null;
   // The reactive rules settle AFTER the declared events, and run even when there were no
   // events at all: a nested field moving (a colour, a section property) produces no
   // control event, and watching exactly those is the point of watch().
   runReactive();
+  return dispatched;
 }
 
 /* --- source 2: preview overlay (user interaction) --- */
@@ -8050,17 +8104,31 @@ function behaviorEmits(control, eventName) {
   return true;
 }
 
+/**
+ * What the session diff remembers about one control. `channels` is the session's customValues
+ * object itself — every writer replaces it rather than editing it, so a reference is a snapshot,
+ * and an unchanged one costs nothing to compare. `dragFrom` is where the channels stood when a drag
+ * began: a multi-channel drag commits what moved during it (onPreviewSessionsChanged).
+ */
+function sessionEntry(s, prev) {
+  const dragging = s.dragging === true;
+  const channels = s.customValues && typeof s.customValues === 'object' ? s.customValues : null;
+  return {
+    value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true,
+    disabled: s.disabled === true, dragging,
+    repeats: Number(s.repeatCount) || 0, executed: s.executed === true,
+    activeHandle: String(s.activeHandle ?? ''),
+    channels,
+    dragFrom: dragging ? (prev?.dragging ? prev.dragFrom : (prev?.channels ?? null)) : null,
+  };
+}
+
 function seedSessionSnapshot() {
   const sessions = get(panelPreviewSessions) ?? {};
   const next = new Map();
-  for (const [id, s] of Object.entries(sessions)) {
-    next.set(id, {
-      value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true,
-      disabled: s.disabled === true, dragging: s.dragging === true,
-      repeats: Number(s.repeatCount) || 0, executed: s.executed === true,
-      activeHandle: String(s.activeHandle ?? ''),
-    });
-  }
+  // Against the entry being replaced: this runs after every dispatch, in the middle of a drag as
+  // often as not, and a re-seed that forgot where the drag began would commit every channel.
+  for (const [id, s] of Object.entries(sessions)) next.set(id, sessionEntry(s, live.sessionLast.get(id)));
   live.sessionLast = next;
 }
 
@@ -8076,14 +8144,9 @@ function onPreviewSessionsChanged(sessions) {
   const next = new Map();
   let controlsById = null;
   for (const [id, s] of Object.entries(sessions ?? {})) {
-    const cur = {
-      value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true,
-      disabled: s.disabled === true, dragging: s.dragging === true,
-      repeats: Number(s.repeatCount) || 0, executed: s.executed === true,
-      activeHandle: String(s.activeHandle ?? ''),
-    };
-    next.set(id, cur);
     const prev = live.sessionLast.get(id);
+    const cur = sessionEntry(s, prev);
+    next.set(id, cur);
     if (!prev) continue;
     // Most entries are unchanged. Previously each entry walked the entire tree
     // twice, even on a single hover/value update (quadratic in panel size).
@@ -8096,21 +8159,47 @@ function onPreviewSessionsChanged(sessions) {
     const confirmedButton = behavior.buttonType === 'timed' || behavior.buttonType === 'one_shot';
     const pressStart = behavior.buttonType === 'momentary' && behavior.fireOn === 'onPressStart';
     const repeating = behavior.buttonType === 'momentary' && behavior.subtype === 'repeating';
-    const valueChanged = !Object.is(prev.value, cur.value) && cur.value !== undefined;
-    if (valueChanged) {
-      if (behaviorEmits(control, 'onValueChange')) {
-        events.push({ event: 'onValueChange', controlName: name, payload: cur.value });
-        events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value: cur.value } });
+    // A custom component with several channels reports each channel that moved, with its own value
+    // (valueEventsFor). `value` here is the FIRST channel, so moving any other one used to raise
+    // nothing at all.
+    const channelNames = cur.channels || prev.channels ? valueChannelNames(control) : [];
+    if (channelNames.length > 1) {
+      const moved = changedChannels(channelNames, prev.channels, cur.channels).filter(([, value]) => value !== undefined);
+      for (const [, value] of moved) {
+        if (behaviorEmits(control, 'onValueChange')) {
+          events.push({ event: 'onValueChange', controlName: name, payload: value });
+          events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value } });
+        }
+        if (s.dragging !== true && behaviorEmits(control, 'onValueChanged')) {
+          events.push({ event: 'onValueChanged', controlName: name, payload: value });
+        }
       }
-      if (s.dragging !== true && behaviorEmits(control, 'onValueChanged')) {
+      // The drag's commit: every channel that moved during it and was not already committed above.
+      if (prev.dragging && !cur.dragging && behaviorEmits(control, 'onValueChanged')) {
+        const committed = new Set(moved.map(([channel]) => channel));
+        for (const [channel, value] of changedChannels(channelNames, prev.dragFrom, cur.channels)) {
+          if (!committed.has(channel) && value !== undefined) {
+            events.push({ event: 'onValueChanged', controlName: name, payload: value });
+          }
+        }
+      }
+    } else {
+      const valueChanged = !Object.is(prev.value, cur.value) && cur.value !== undefined;
+      if (valueChanged) {
+        if (behaviorEmits(control, 'onValueChange')) {
+          events.push({ event: 'onValueChange', controlName: name, payload: cur.value });
+          events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value: cur.value } });
+        }
+        if (s.dragging !== true && behaviorEmits(control, 'onValueChanged')) {
+          events.push({ event: 'onValueChanged', controlName: name, payload: cur.value });
+        }
+      }
+      // Drag commits are an edge, not another value. The last drag sample already advanced the
+      // baseline, so waiting for a value difference on pointer-up swallowed the commit entirely.
+      if (!valueChanged && prev.dragging && !cur.dragging && cur.value !== undefined
+          && behaviorEmits(control, 'onValueChanged')) {
         events.push({ event: 'onValueChanged', controlName: name, payload: cur.value });
       }
-    }
-    // Drag commits are an edge, not another value. The last drag sample already advanced the
-    // baseline, so waiting for a value difference on pointer-up swallowed the commit entirely.
-    if (!valueChanged && prev.dragging && !cur.dragging && cur.value !== undefined
-        && behaviorEmits(control, 'onValueChanged')) {
-      events.push({ event: 'onValueChanged', controlName: name, payload: cur.value });
     }
     if (prev.pressed !== cur.pressed) {
       const mouse = { x: s.pointerX ?? 0, y: s.pointerY ?? 0, button: s.pointerButton ?? 0, modifiers: s.pointerModifiers ?? 0 };

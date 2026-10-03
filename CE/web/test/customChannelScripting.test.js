@@ -37,6 +37,7 @@ import { customChannelOfPath, readsLiveValue } from '../src/CE_Application/scrip
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import * as rt from '../src/CE_Application/scripting/panelRuntime.js';
 import { createPlayerHost } from '../src/CE_Application/scripting/playerScriptHost.js';
+import { deriveExportParameters } from '../src/CE_Application/utils/exportParameters.js';
 
 /** A custom component carrying the named channels, on a live active panel. */
 function componentPanel(channels, { id = 'comp', name = 'comp' } = {}) {
@@ -333,4 +334,115 @@ test('the player host invalidates raw document writes so scripted visuals repain
   // document for those as well would repaint twice for one script call.
   host.writeValue(control, 'ValueChannels.cutoff.currentValue', 61);
   assert.equal(writes.length, 1);
+});
+
+/* ------------------------------------------------- value events: the channel that moved */
+// A custom component with several channels reports each channel that moves, with that channel's own
+// value — what the exported plugin does with the window closed, where every public channel is a
+// host parameter of its own and each one that changes raises onValueChanged. The payload here used
+// to be the FIRST channel's value whichever channel had moved, and in the preview session a move of
+// any other channel raised nothing at all, because the diff only ever looked at the first one.
+
+const RINGS = { ringA: { defaultValue: 10 }, ringB: { defaultValue: 20 }, ringC: { defaultValue: 30 } };
+
+function listen() {
+  const seen = [];
+  const script = api();
+  script.on('*', 'onValueChange', (value) => seen.push(['change', value]));
+  script.on('*', 'onValueChanged', (value) => seen.push(['commit', value]));
+  script.on('*', 'onControlChanged', (info) => seen.push(['control', info.target, info.value]));
+  return seen;
+}
+
+async function sessionBaseline(customValues) {
+  panelPreviewSessions.set({ comp: { customValues } });
+  await rt.runPreviewSessionsForTesting();         // the first diff only takes the baseline
+}
+
+async function move(patch) {
+  updatePanelPreviewSession('comp', patch);
+  await rt.runPreviewSessionsForTesting();
+}
+
+test('the window-closed runtime has one parameter per channel, which is the rule the preview now keeps', () => {
+  const control = componentPanel(RINGS);
+  const ids = deriveExportParameters({ controls: [control] }).map((p) => p.id);
+  assert.deepEqual(ids, ['comp.ringA', 'comp.ringB', 'comp.ringC']);
+});
+
+test('moving the second channel reports the second channel, with its own value', async () => {
+  componentPanel(RINGS);
+  await sessionBaseline({ ringA: 10, ringB: 20, ringC: 30 });
+  const seen = listen();
+  await move({ customValues: { ringA: 10, ringB: 90, ringC: 30 } });
+  assert.deepEqual(seen, [['change', 90], ['control', 'comp', 90], ['commit', 90]]);
+});
+
+test('two channels moving together report one each, in the order the channels are declared', async () => {
+  componentPanel(RINGS);
+  await sessionBaseline({ ringA: 10, ringB: 20, ringC: 30 });
+  const seen = listen();
+  // Written in the opposite order on purpose: declaration order decides, not the patch.
+  await move({ customValues: { ringC: 33, ringB: 20, ringA: 11 } });
+  assert.deepEqual(seen, [
+    ['change', 11], ['control', 'comp', 11], ['commit', 11],
+    ['change', 33], ['control', 'comp', 33], ['commit', 33],
+  ]);
+});
+
+test('a drag across one channel streams its changes and commits that channel once, on release', async () => {
+  componentPanel(RINGS);
+  await sessionBaseline({ ringA: 10, ringB: 20, ringC: 30 });
+  const seen = listen();
+  await move({ dragging: true, customValues: { ringA: 10, ringB: 50, ringC: 30 } });
+  await move({ customValues: { ringA: 10, ringB: 60, ringC: 30 } });
+  assert.deepEqual(seen, [['change', 50], ['control', 'comp', 50], ['change', 60], ['control', 'comp', 60]],
+    'no commit while the drag is still going');
+  seen.length = 0;
+  await move({ dragging: false });
+  assert.deepEqual(seen, [['commit', 60]], 'the channel that moved, and only that one');
+});
+
+test('a drag that moved nothing commits nothing on a multi-channel component', async () => {
+  componentPanel(RINGS);
+  await sessionBaseline({ ringA: 10, ringB: 20, ringC: 30 });
+  const seen = listen();
+  await move({ dragging: true });
+  await move({ dragging: false });
+  assert.deepEqual(seen, [], 'there is no one value to commit, and the old payload — ringA — was an arbitrary one');
+});
+
+test('an array channel that is rebuilt with the same items has not moved', async () => {
+  componentPanel({ pattern: { type: 'array', defaultValue: 0 }, level: { defaultValue: 0 } });
+  await sessionBaseline({ pattern: [1, 2, 3], level: 0 });
+  const seen = listen();
+  await move({ customValues: { pattern: [1, 2, 3], level: 5 } });
+  assert.deepEqual(seen, [['change', 5], ['control', 'comp', 5], ['commit', 5]]);
+});
+
+test('a one-channel component behaves exactly as it always did', async () => {
+  componentPanel({ cutoff: { defaultValue: 40 } });
+  await sessionBaseline({ cutoff: 40 });
+  const seen = listen();
+  await move({ customValues: { cutoff: 70 } });
+  assert.deepEqual(seen, [['change', 70], ['control', 'comp', 70], ['commit', 70]]);
+  seen.length = 0;
+  // Its drag release commits the value even when the drag moved nothing — the existing contract.
+  await move({ dragging: true });
+  await move({ dragging: false });
+  assert.deepEqual(seen, [['commit', 70]]);
+});
+
+test('a channel that moves in the DOCUMENT reports that channel too', async () => {
+  componentPanel(RINGS);
+  const channels = get(panels)[0].controls[0]._children.ValueChannels._children;
+  // Every channel holds a value, so "the first one" is a real, wrong answer rather than undefined.
+  channels.ringA.currentValue = 10; channels.ringB.currentValue = 20; channels.ringC.currentValue = 30;
+  rt.runPanelsChangedForTesting({ baseline: true });
+  const seen = listen();
+  // The document path: an edit or an undo writes currentValue, not the session.
+  channels.ringC.currentValue = 77;
+  await rt.runPanelsChangedForTesting();
+  assert.deepEqual(seen, [['change', 77], ['control', 'comp', 77], ['commit', 77]],
+    'not ringA\'s value, which is what the payload used to be');
 });
