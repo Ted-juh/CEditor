@@ -246,6 +246,14 @@ The node, as built (`utils/keyframeAnimation.js` has it in its header):
   carry inline styles a keyframe on the control cannot reach; a registered custom property read by
   those layers would be the way.
 - The properties panel's Kind hint now names keyframes and points here (its pinned test updated).
+- **`ce.anim.play(control, animation)`** (its own commit): declared in `panelApi.js` as WebView-only
+  (it is drawn, so there is nothing to play with the window shut), implemented in `panelRuntime.js`
+  as the same `requestAnimationPlay` the stage uses; refuses a transition or a typo with the names
+  of the keyframe animations the control has. **C++ touched only through regenerated regions** —
+  the namespace map and the window-closed stub list in the three preludes (`gen-script-modules.mjs
+  --write`); no hand-written C++ changed, and `CEditorScriptingTests` passes (504). Manual, API
+  explorer, cost table and the written example regenerated/added. Checked end to end in Chromium:
+  a script's `ce.anim.play` starts the keyframe animation on a previewed control.
 
 ### Phase 5
 

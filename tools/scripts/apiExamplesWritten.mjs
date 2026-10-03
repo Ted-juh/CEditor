@@ -316,6 +316,10 @@ export const WRITTEN = {
   animateResume: { code: 'ce.anim.resume("Cutoff.value")' },
   animateReverse: { code: 'ce.anim.reverse("Cutoff.value")   -- run back the way it came' },
   animateFinish: { code: 'ce.anim.finish("Cutoff.value")   -- jump to the destination now' },
+  animatePlay: {
+    lua: `-- "flash" is a keyframe animation on the lamp, made in the Animation tab\nce.anim.play("Lamp", "flash")`,
+    js: `// "flash" is a keyframe animation on the lamp, made in the Animation tab\nce.anim.play("Lamp", "flash");`,
+  },
 
   /* ------------------------------------------------------------------ ce.ui */
   uiNotify: {

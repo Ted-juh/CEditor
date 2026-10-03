@@ -420,7 +420,7 @@ onMount(() => {
                 </div>
                 <p class="hint">Plays on every {selected.trigger.every === 1 ? 'beat' : `${selected.trigger.every}th beat`} while the transport runs.</p>
               {:else if selected.triggerType === 'script'}
-                <p class="hint">Played when a script asks for it, or with Play on the stage.</p>
+                <p class="hint">Played by a script — <code>ce.anim.play("{controlName}", "{selected.name}")</code> — or with Play on the stage.</p>
               {:else}
                 <p class="hint">Plays all the time the control is shown in Preview.</p>
               {/if}
@@ -765,6 +765,7 @@ onMount(() => {
   }
   .easing.on span { color: #EAF5FF; }
   .hint { margin: 6px 0 0; font: 400 9px/1.4 'IBM Plex Sans', system-ui, sans-serif; color: #616C75; }
+  .hint code { font: 500 9px/1 'IBM Plex Mono', ui-monospace, monospace; color: #8FEDE3; }
 
   .warn {
     margin: 8px 0 0;

@@ -152,6 +152,14 @@ check('and flashes on the beat once it runs', () => {
   assert.deepEqual(beatFired, ['flash']);
 });
 
+const played = await ev(() => window.__motion.scriptPlay('beater', 'wink'));
+await wait(80);
+const winking = await ev(() => window.__motion.keyframes('beater'));
+check('a script\'s ce.anim.play starts a keyframe animation on the control', () => {
+  assert.equal(played, true);
+  assert.match(winking.name, /ce-kf-[0-9a-z]+-a/, winking.name);
+});
+
 // --- The knob: glide for a value from outside, none for a drag -------------------------------
 
 const markup = () => ev(() => window.__motion.knobMarkup());

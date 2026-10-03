@@ -145,6 +145,7 @@ import {
   dismissNotification as uiDismissStore, updateNotification as uiUpdateStore,
   uiSnapshot as uiSnapshotStore,
 } from '../stores/scriptUi.js';
+import { requestAnimationPlay } from '../stores/animationActivity.js';
 import {
   flatControls, findControlById, findParentOfControl, isContainerControl,
   insertControlIntoTree, mapControlsTree, removeControlFromTree, remintControlIds, controlPanelOffset,
@@ -3704,6 +3705,33 @@ function animationFinishImpl(path) {
   return true;
 }
 
+/**
+ * play(control, animation) — play one of the control's keyframe animations now (ce.anim.play).
+ *
+ * Not one of the value animations above: it asks the control's own keyframe player
+ * (utils/keyframeAnimation.js) to start the named animation from its first frame, through the same
+ * request the Animation tab's Play button makes. Only a keyframe animation can be played this way —
+ * a transition has no shape of its own, only a change to ease — and the refusal says which keyframe
+ * animations the control does have, so a typo is one message away from fixed.
+ */
+function animatePlayImpl(controlName, animationName) {
+  const control = controlNamed(controlName);
+  if (!control) { addScriptTrace('error', '', `ce.anim.play: no control named "${controlName}".`); return false; }
+  const all = control?._children?.Animations?._children ?? {};
+  const wanted = String(animationName ?? '').toLowerCase();
+  const key = Object.keys(all).find((k) => k.toLowerCase() === wanted);
+  const node = key == null ? null : all[key];
+  if (!node || String(node.kind ?? '') !== 'keyframes') {
+    const playable = Object.entries(all).filter(([, a]) => String(a?.kind ?? '') === 'keyframes').map(([k]) => k);
+    const why = node ? `"${key}" is a transition, which plays when its trigger does` : `"${controlName}" has no animation called "${animationName}"`;
+    addScriptTrace('error', '', `ce.anim.play: ${why}. ${playable.length
+      ? `Its keyframe animations: ${playable.join(', ')}.`
+      : 'It has no keyframe animations — make one in the Animation tab.'}`);
+    return false;
+  }
+  return requestAnimationPlay(control._children?.Core?.id, String(node.name ?? key));
+}
+
 /** Advance every animation to `nowMs` and write the values. Exported so tests drive time directly
  *  rather than sleeping — an animation test that waits on a real clock is a flaky test. */
 export function tickAnimations(nowMs) {
@@ -6652,6 +6680,7 @@ function buildApi(ownerName, scriptId = '') {
     animateResume: (path) => animationResumeImpl(path),
     animateReverse: (path) => animationReverseImpl(path),
     animateFinish: (path) => animationFinishImpl(path),
+    animatePlay: (control, animation) => animatePlayImpl(control, animation),
     // ce.ui — a message for whoever is using the panel
     uiNotify: (message, opts) => uiNotifyImpl(message, opts),
     uiDismiss: (id) => uiDismissImpl(id),

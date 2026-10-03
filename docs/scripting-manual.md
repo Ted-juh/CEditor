@@ -1263,6 +1263,10 @@ Turn a running animation around from where it is, travelling back at the same ra
 
 Jump to the target and complete: the value lands exactly where the animation was going and `done` fires with completed = true. Use stop() to cancel instead, leaving the value where it is.
 
+#### `animatePlay(control, animation)`
+
+Play one of a control's keyframe animations now, from its first frame — restarting it if it is already running. Returns true when the control has a keyframe animation of that name; a transition, which plays when its own trigger does, is refused with a message naming the keyframe animations the control does have.
+
 ### User feedback
 
 #### `uiNotify(message [, opts])`

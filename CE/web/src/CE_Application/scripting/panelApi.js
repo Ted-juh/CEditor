@@ -1074,6 +1074,20 @@ export const COMMANDS = [
     params: [{ name: 'path', type: 'path', required: true }],
     scopes: 'any',
   },
+  /* ce.anim's other verbs move a VALUE along a curve. This one plays an animation a control already
+     has — a keyframe animation built in the Animation tab: a pulse, a flash — the way its own trigger
+     would. It is drawn, not computed, so it is panel view only: with the window shut there is
+     nothing to play it on, and the C++ preludes carry a no-op stub for it like every visual verb. */
+  {
+    id: 'animatePlay', category: 'Animation', signature: 'animatePlay(control, animation)',
+    summary: 'Play one of a control\'s keyframe animations now, from its first frame — restarting it if it is already running. Returns true when the control has a keyframe animation of that name; a transition, which plays when its own trigger does, is refused with a message naming the keyframe animations the control does have.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'control', type: 'string', required: true },
+      { name: 'animation', type: 'string', required: true },
+    ],
+    scopes: 'any',
+  },
 
   /* --- User feedback (design doc §6 phase 6, §18) ---
      Panel view only: there is nobody to tell with the window shut. `notify` and `status` are
@@ -3857,7 +3871,7 @@ const MODULE_MEMBERS = {
     // ordinary words a panel author reaches for — so the flat spellings keep the animate prefix.
     envelope: 'animateEnvelope', value: 'animateValue', list: 'animateList',
     pause: 'animatePause', resume: 'animateResume', reverse: 'animateReverse',
-    finish: 'animateFinish',
+    finish: 'animateFinish', play: 'animatePlay',
   },
   'ce.ui': {
     notify: 'uiNotify', status: 'uiStatus', dialog: 'uiDialog',

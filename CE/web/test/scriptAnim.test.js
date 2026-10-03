@@ -424,3 +424,59 @@ test('panel teardown cancels without firing anything into a dead panel', () => {
   assert.equal(api.animateRunning(), false, 'including a repeat that would otherwise run forever');
   assert.equal(calls, 0, 'a completion into a script set that no longer exists is noise');
 });
+
+/* --------------------------------------------------------------------- ce.anim.play */
+// The one ce.anim verb that does not move a value: it plays a keyframe animation the control
+// already has (utils/keyframeAnimation.js), through the same request the Animation tab's Play makes.
+
+import { get as getStore } from 'svelte/store';
+import { setRuntimeHost } from '../src/CE_Application/scripting/panelRuntime.js';
+import { animationPlays } from '../src/CE_Application/stores/animationActivity.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
+import { createControl } from '../src/CE_Application/models/componentTypes.js';
+import { RUNTIME_WEBVIEW } from '../src/CE_Application/scripting/panelApi.js';
+
+function withLamp(fn) {
+  const lamp = createControl('Range', { name: 'Lamp' });
+  lamp._children.Animations._children.flash = {
+    _type: 'Animation', name: 'flash', enabled: true, kind: 'keyframes', trigger: { type: 'script' },
+    targets: [{ path: 'Transform' }], duration: 200, frames: [{ at: 0, opacity: 0.2 }, { at: 1, opacity: 1 }],
+  };
+  const panel = { id: 'p', name: 'P', width: 400, height: 300, controls: [lamp], scripting: { modules: ['ce.core', 'ce.anim'] } };
+  setRuntimeHost({ panel, scripts: [], readValue: () => undefined, writeValue: () => false });
+  clearScriptTrace();
+  try { return fn(scriptApiForTesting('', 'play-script'), lamp); } finally { setRuntimeHost(null); }
+}
+
+const traced = () => getStore(scriptTrace).map((t) => `${t.kind}:${t.message}`).join('\n');
+
+test('ce.anim.play is declared, panel view only, and namespaced with the rest of ce.anim', () => {
+  assert.ok(MEMBER_BY_ID.animatePlay);
+  assert.equal(memberPath('animatePlay'), 'ce.anim.play');
+  // It is drawn, not computed: with the window shut there is nothing to play it on.
+  assert.equal(memberRuntime(MEMBER_BY_ID.animatePlay), RUNTIME_WEBVIEW);
+});
+
+test('ce.anim.play asks the control to play the animation, and asking again plays it again', () => {
+  withLamp((script, lamp) => {
+    const id = lamp._children.Core.id;
+    assert.equal(script.animatePlay('Lamp', 'flash'), true);
+    const first = getStore(animationPlays)[id]?.flash;
+    assert.ok(first > 0, 'a request with a sequence number');
+    assert.equal(script.animatePlay('lamp', 'FLASH'), true, 'names match as paths do, ignoring case');
+    assert.ok(getStore(animationPlays)[id].flash > first, 'a second request is a new one');
+  });
+});
+
+test('ce.anim.play refuses a transition and a typo, and says what it can play', () => {
+  withLamp((script) => {
+    assert.equal(script.animatePlay('Lamp', 'pressIn'), false);
+    assert.match(traced(), /"pressIn" is a transition, which plays when its trigger does\. Its keyframe animations: flash\./);
+    clearScriptTrace();
+    assert.equal(script.animatePlay('Lamp', 'flsh'), false);
+    assert.match(traced(), /has no animation called "flsh"\. Its keyframe animations: flash\./);
+    clearScriptTrace();
+    assert.equal(script.animatePlay('Nobody', 'flash'), false);
+    assert.match(traced(), /no control named "Nobody"/);
+  });
+});

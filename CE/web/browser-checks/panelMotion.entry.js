@@ -21,6 +21,7 @@ import {
 } from '../src/CE_Application/stores/interactionPreview.js';
 import { animationActivity } from '../src/CE_Application/stores/animationActivity.js';
 import { startTransport, stopTransport, setTransportBpm } from '../src/CE_Application/stores/transport.js';
+import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 
 window.__JUCE__ = undefined;
 
@@ -71,9 +72,16 @@ pulser._children.Animations._children = {
 const beater = place(createControl('Range'), 'beater', 340, 150, 50, 28);
 beater._children.Animations._children = {
   flash: keyframes('flash', { type: 'beat', every: 1 }, [{ at: 0, opacity: 0.2 }, { at: 1, opacity: 1 }], 200),
+  wink: keyframes('wink', { type: 'script' }, [{ at: 0, scale: 1 }, { at: 0.5, scale: 0.6 }, { at: 1, scale: 1 }], 400),
 };
 
-const panel = { id: 'motion', name: 'Motion', width: 400, height: 200, bgColour: 'FF1E1E1E', controls: [button, knob, springy, drawn, pulser, beater] };
+// ce.anim is declared because this panel has no script of its own for the runtime to derive it from;
+// a panel whose script calls ce.anim.play gets the module from that script.
+const panel = {
+  id: 'motion', name: 'Motion', width: 400, height: 200, bgColour: 'FF1E1E1E',
+  controls: [button, knob, springy, drawn, pulser, beater],
+  scripting: { modules: ['ce.core', 'ce.anim'] },
+};
 panels.set([]);
 addPanel(panel);
 setActivePanel(panel.id);
@@ -110,5 +118,7 @@ window.__motion = {
     return { name: style.animationName, scale: style.scale, transform: style.transform };
   },
   startTransport: (bpm) => { setTransportBpm(bpm); startTransport(0); },
+  /** A script's ce.anim.play, through the real script API. */
+  scriptPlay: (control, name) => scriptApiForTesting('', 'motion-script').animatePlay(control, name),
   stopTransport: () => stopTransport(),
 };
