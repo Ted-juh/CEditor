@@ -19,6 +19,7 @@ import {
 import { MEMBER_BY_ID, memberPath, memberRuntime, RUNTIME_ANY } from '../src/CE_Application/scripting/panelApi.js';
 import { EASING_BEZIERS, ANIM_CURVE_NAMES } from '../src/CE_Application/scripting/easingTables.js';
 import { EASING_BEZIERS as PANEL_BEZIERS } from '../src/CE_Application/utils/interactionRuntime.js';
+import { OVERSHOOTING_EASINGS } from '../src/CE_Application/utils/easing.js';
 
 const api = scriptApiForTesting('', 'anim-script');
 
@@ -38,9 +39,15 @@ test('the easing table IS the Properties panel\'s, not a copy of it', () => {
 });
 
 test('every named easing starts at 0, ends at 1, and never goes backwards', () => {
+  // The three "back" curves are exempt from the last part, and on purpose: overshooting is what
+  // they are for (a press that squashes past its rest size and settles). They joined the table
+  // with the animation overhaul. Being exempt is not being unchecked — the next test pins that
+  // they DO leave [0, 1] and that nothing else does, so the exemption list cannot hide a broken
+  // curve.
   for (const name of Object.keys(EASING_BEZIERS)) {
     assert.equal(animationEase(0, name), 0, `${name} must start at 0`);
     assert.equal(animationEase(1, name), 1, `${name} must end at 1`);
+    if (OVERSHOOTING_EASINGS.includes(name)) continue;
     let previous = -1;
     for (let i = 0; i <= 100; i += 1) {
       const v = animationEase(i / 100, name);
@@ -48,6 +55,20 @@ test('every named easing starts at 0, ends at 1, and never goes backwards', () =
       previous = v;
     }
   }
+});
+
+test('the overshooting easings are exactly the ones that leave [0, 1]', () => {
+  const leaves = (name) => {
+    for (let i = 0; i <= 200; i += 1) {
+      const v = animationEase(i / 200, name);
+      if (v < -1e-9 || v > 1 + 1e-9) return true;
+    }
+    return false;
+  };
+  const overshooting = Object.keys(EASING_BEZIERS).filter(leaves);
+  assert.deepEqual(overshooting, OVERSHOOTING_EASINGS);
+  // And they come back: an overshoot that never settles is a curve that ends somewhere else.
+  for (const name of OVERSHOOTING_EASINGS) assert.equal(animationEase(1, name), 1, name);
 });
 
 test('the named easings are the BEZIERS the panel stores, not lookalikes', () => {
@@ -88,7 +109,11 @@ test('a curve this build does not know returns nothing rather than silently goin
   assert.equal(animationEase(0.5, 'typo'), undefined);
   assert.equal(animationEase(0.5, 'easeInOutBack'), undefined);
   assert.ok(ANIM_CURVE_NAMES.includes('outCubic'), 'and the name list is what the report suggests');
-  assert.equal(ANIM_CURVE_NAMES.length, 8);
+  // ce.math.curve's four plus the panel's table. Thirteen since the animation overhaul added
+  // inCubic, inOutCubic and the three "back" curves; it was eight. The count is pinned so a name
+  // added to the table is a decision somebody sees, because it reaches every runtime's prelude.
+  assert.equal(ANIM_CURVE_NAMES.length, 13);
+  assert.deepEqual(ANIM_CURVE_NAMES.slice(4), Object.keys(EASING_BEZIERS));
 });
 
 /* ------------------------------------------------------------------------ the contract */

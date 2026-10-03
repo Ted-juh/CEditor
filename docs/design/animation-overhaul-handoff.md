@@ -1,8 +1,9 @@
 # Animation overhaul — handoff
 
-Branch: `animation-overhaul` (one WIP commit on top of `9256502`). **Nothing on it has been run
-through the test suite, the build or a browser yet.** Start by reading this file, then
-`git show --stat HEAD`, then the five files listed under "What is on the branch".
+Branch: `claude/animation-overhaul-phase-1-cdk65v`, which continues `animation-overhaul` (the WIP
+commit `1a74eb0` and this file). **Phase 1 is done and verified** — see
+[Phase 1 — done](#phase-1--done) for what it changed and found. Phases 2–5 are below, in order.
+Start by reading this file, then the files listed under "What is on the branch".
 
 Paste the section [Prompt for Claude Code](#prompt-for-claude-code) to start the next session.
 
@@ -99,53 +100,70 @@ they describe changes — update them deliberately, with the reason in the test'
 - **`CE_Panel/components/BackgroundRenderer.svelte`** — fill/border layers read the colour var.
 - **`utils/animationModel.js`** — top half rewritten on the runtime's tables (no copy):
   colour targets now "work", `OFFERED_PROPERTIES` gains Border colour, new
-  `OFFERED_ROOT_PROPERTIES`, `targetCost` (composite/paint/layout), `ANIMATION_KINDS` now
-  `['transition','keyframes']`, `KEYFRAME_TRIGGER_TYPES`, `VALUE_ORIGINS`.
-  **Unfinished:** the header promises `findClashes` and `unknownTriggerStates` — not written;
-  `readEasing/easeAt/readTrigger` are imported but unused; `easingPoints` only knows named beziers
-  (make it use `readEasing`+`easeAt` so custom/spring draw); `unofferedEasings` default list is
-  stale; `newAnimationShape` should set `trigger.reverse: true`.
+  `OFFERED_ROOT_PROPERTIES`, `targetCost` (composite/paint/layout), `VALUE_ORIGINS`. Phase 1 added
+  `findClashes`/`triggersTie`/`clashesFor`, `controlStateNames`/`triggerStateChoices`/
+  `unknownTriggerStates`/`toggleTriggerState`, `PANEL_EASING_OPTIONS`; `easingPoints` draws any
+  easing (name or node, so custom and spring draw their own shape) through `readEasing`+`easeAt`;
+  `newAnimationShape` writes `trigger.reverse: true`.
 
-### Smoke-checked only
+### Smoke-checked only — superseded
 
-A scratch run of the tracker over a real Knob (`createControl('Knob')` + hoverIn/pressIn) gave the
-expected picks: hover → hoverIn 120ms; press → pressIn 80ms; press kept across entering Dragging;
-drag → no value glide; value change → pointerSlide 140ms on pointers.
+The WIP was smoke-checked with a scratch run of the tracker. That is now covered properly by
+`test/transitionSelection.test.js` (rules and real controls) and `browser-checks/panelMotion.mjs`
+(the real renderers in Chromium).
 
 ---
 
 ## Remaining work, phase by phase
 
-### Phase 1 — finish and verify
+### Phase 1 — done
 
-1. **Tests that will fail and must be updated deliberately:**
-   - `test/animationModel.test.js`: "the two dead ones" (now none dead — rewrite as "the panel's
-     colour choices work"), the dead-path detail test using `background-color`, the
-     `properties: ['colour']` hint test (now works), `unofferedEasings` (`['inQuad']` → more),
-     `ANIMATION_KINDS`, `runtimeAnimates` helper reads union buckets (now include `colour`).
-   - `test/scriptAnim.test.js`: "never goes backwards" must exempt `OVERSHOOTING_EASINGS`.
-   - Generated preludes: the easing table grew, so run
-     `node tools/scripts/gen-script-modules.mjs` (regenerates `ScriptRuntime.cpp animEasings` and
-     the JS/Lua/Python engine tables) and check the generated-modules test + `CE/tests/ScriptRuntimeTests.cpp`.
-   - Make `scripting/panelRuntime.js` import `cubicBezierEase` from `utils/easing.js` and re-export
-     it, deleting its own copy (one solver).
-   - `browser-checks/animationTab.mjs` asserts the old warnings — update.
-2. **New tests:** `test/transitionSelection.test.js` (each rule in the header, with an injected
-   clock), `test/transitionCss.test.js`, `test/easing.test.js` (linear() fallback via
-   `resetCssLinearSupportForTesting`, `parseTiming`, `cleanBezier` refusals).
-3. **Clash warnings (E):** `findClashes(rows, partNames)` — two enabled transitions, same
-   part+bucket, overlapping triggers (same type and intersecting `to`, or either `*`; value:
-   same source). Show on AnimationList rows and the header count.
-4. **Trigger editing in the tab:** replace From/To text boxes with chips from the control's
-   `States` keys (lowercased) + `*` + `default`; warn on unknown names
-   (`unknownTriggerStates`); add "Also when leaving" (reverse) toggle and Origin segmented
-   control for value triggers.
-5. `Animations.debug`: remove from `models/interactionDefaults.js` (or wire it) — check no schema
-   test needs it.
-6. Rename = one undo step (`beginHistoryTransaction` / `commitHistoryTransaction`).
-7. **Verify:** `npm run test:all`, `npm run build`, `npm run test:browser`; then look at it in the
-   app: hover/press a button with hoverIn+pressIn, drag a knob (no lag), send a CC to a knob
-   (glide), turn OS reduced motion on.
+Verified with `npm run test:all` (all green), `npm run build`, `npm run test:browser`'s two animation
+checks, `svelte-check` (0 errors) and `CEditorScriptingTests` (C++, with `CEDITOR_SCRIPTING=ON`).
+
+- **Pinned tests updated deliberately**, each with the reason in its comment:
+  `animationModel.test.js` (colour works now; ten easings; `ANIMATION_KINDS` stays `['transition']`
+  until keyframes play — the WIP had set it to include `keyframes`, which nothing played),
+  `scriptAnim.test.js` (overshooting curves exempt from "never goes backwards", plus a test that the
+  exemption list is exactly the curves that leave [0, 1]; thirteen curve names),
+  `browser-checks/animationTab.mjs` (+ entry: the control has real Hover/Pressed states now).
+- **Preludes regenerated** (`gen-script-modules.mjs --write`): table rows only, plus the cost table.
+  **Finding:** nothing tested the music/time/easing tables, the stub lists or the host easing table
+  for staleness — only the namespace block. `panelApiParity.test.js` now does (checked to fail on the
+  stale file). The comment in `easing.js` that named a non-existent test now names this one.
+- **One solver:** `panelRuntime.js` re-exports `cubicBezierEase` from `utils/easing.js`.
+- **Tracker fixes** (`transitionSelection.js`), both found by the new tests: turning reduced motion
+  on mid-hover (the preview switch) did nothing until the next change, because the "quiet frame"
+  shortcut handed back the old transitions; and a pick held across frames kept its old timing after
+  the animation was edited, deleted or switched off in the tab. Now a catalog key decides "quiet",
+  and carried picks are re-read from the current catalog.
+- **New tests:** `transitionSelection.test.js` (every rule, injected clock, plus a real Range and Knob
+  through the runtime), `transitionCss.test.js`, `easing.test.js`.
+- **Clash warnings (E):** `findClashes` reports only true TIES — same part+bucket, same strength for
+  the same change — because a named state outranking `*` is a fallback someone built, not a fight.
+  Shown on the list row (swords icon, loser only), the header count, and a note under the trigger.
+- **Trigger editing:** From/To are chips (`components/animation/StateChips.svelte`) of the control's
+  States keys plus `*` and `default`; a name the control lacks is shown as typed, marked, and one
+  click from gone; header and row count unknown states. "Leaving: Snap back / Play back" writes
+  `trigger.reverse`; value triggers get Origin (Any / Mine / Outside).
+- **Value glide** also starts from the track fill's size timing (`rangeSlide`), and a re-render
+  mid-glide no longer restarts it.
+- **Rename** is one explicit history transaction (browser check: one undo takes it back whole).
+- **`Animations.debug` stays** (decided, not forgotten): `createControl` merges the schema default,
+  serialization strips values equal to it, and custom-component package fingerprints cover the
+  section — removing it rewrites saved documents and every package fingerprint for an inert field.
+  The comment at `SECTION_DEFAULTS.Animations` says so.
+- **Seen in a browser:** `browser-checks/panelMotion.mjs` (new; in `test:browser`) mounts the real
+  preview surface: hover 400ms vs press 80ms on one property, the fill colour mid-fade at 100ms,
+  pressIn reversing on release, a knob gliding to an outside value and tracking a drag 1:1, and both
+  reduced-motion switches. It stands in for "look at it in the app"; the full app under Xvfb was not
+  run, and MIDI/CC was simulated through the preview session rather than a real device.
+
+**Open, for the owner:** two custom-component starters — `starter.statusLamp` and
+`starter.tabGroup` — inherit the generic `pressMotion` (to: pressed) but have no Pressed state, so it
+never plays on them (and never visibly did). Either drop the animation or give them a Pressed state;
+both change a shipped starter's package fingerprint and regenerate QA-07/QA-09, so it was left.
+`animationModel.test.js` lists them as known exceptions so the list cannot grow.
 
 ### Phase 2
 

@@ -127,6 +127,7 @@ import {
 import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN } from './timeTables.js';
 import { FONT_ADVANCE as PIXEL_ADVANCE, FONT_H as PIXEL_FONT_H } from '../utils/pixelFont.js';
 import { EASING_BEZIERS, ANIM_CURVE_NAMES } from './easingTables.js';
+import { cubicBezierEase } from '../utils/easing.js';
 // ce.time's arithmetic IS the transport's, called rather than restated: a script asking where a
 // beat falls and the Transport drawing that beat have to agree, and one implementation is the only
 // way to promise it. The C++ preludes cannot import, so they transliterate — and
@@ -3306,46 +3307,20 @@ export function resetScriptStateForTesting() { resetScriptState(); }
  * name, and an author who set outCubic in the panel and wrote curve = "outCubic" beside it would
  * get two different motions with nothing to tell them apart.
  *
- * The iteration counts are FIXED rather than "until it converges". Four runtimes have to produce
- * the same double from the same input, and a loop that stops on a tolerance stops after a different
- * number of steps the moment one of them rounds differently.
+ * The solver lives in utils/easing.js, beside the table, and is re-exported here because this is
+ * where ce.anim's tests and callers have always found it. There used to be a copy here as well;
+ * the panel's value glide and ce.anim now evaluate a curve with one function, not two that agree.
  */
-const bezierAt = (s, a, b) => (((1 - 3 * b + 3 * a) * s + (3 * b - 6 * a)) * s + (3 * a)) * s;
-const bezierSlope = (s, a, b) => 3 * (1 - 3 * b + 3 * a) * s * s + 2 * (3 * b - 6 * a) * s + 3 * a;
-
-export function cubicBezierEase(t, x1, y1, x2, y2) {
-  const x = Math.min(1, Math.max(0, Number(t) || 0));
-  if (x1 === y1 && x2 === y2) return x;            // the identity curve is a straight line
-  if (x <= 0) return 0;
-  if (x >= 1) return 1;
-  // Newton-Raphson on the x polynomial: eight steps, then bisection to finish. Newton alone can
-  // wander when the slope is near zero (an ease-out's tail), and bisection alone is slow.
-  let s = x;
-  for (let i = 0; i < 8; i += 1) {
-    const slope = bezierSlope(s, x1, x2);
-    if (slope === 0) break;
-    s -= (bezierAt(s, x1, x2) - x) / slope;
-  }
-  if (!(s >= 0) || !(s <= 1)) {
-    let lo = 0;
-    let hi = 1;
-    s = x;
-    for (let i = 0; i < 24; i += 1) {
-      if (bezierAt(s, x1, x2) < x) lo = s; else hi = s;
-      s = (lo + hi) / 2;
-    }
-  }
-  return bezierAt(s, y1, y2);
-}
+export { cubicBezierEase };
 
 /**
  * Every curve ce.anim animates along.
  *
  * Two vocabularies, kept apart on purpose. `linear|exp|log|s` are ce.math.curve()'s, computed the
- * same way so knowing one is knowing both. `inQuad|outQuad|inOutQuad|outCubic` are the Properties
- * panel's, evaluated as the beziers the panel stores. They are close relatives — exp is t², inQuad
- * is a bezier that LOOKS like t² — and deliberately not merged, because calling them the same thing
- * would be a claim about the numbers that is not true.
+ * same way so knowing one is knowing both. The named beziers (inQuad, outCubic, outBack, …) are
+ * the Properties panel's, evaluated as the control points the panel stores. They are close
+ * relatives — exp is t², inQuad is a bezier that LOOKS like t² — and deliberately not merged,
+ * because calling them the same thing would be a claim about the numbers that is not true.
  *
  * An unknown name returns undefined rather than silently going linear. Before this, curve =
  * "outCubic" — a name the Properties panel offers three feet away — was linear in every runtime and

@@ -3,17 +3,23 @@
    * The animations on this control, as a list.
    *
    * The properties panel picks one from a dropdown, so you can only see the name of the one you
-   * are editing. Each row here says how many things the animation changes and how many of those do
-   * nothing.
+   * are editing. Each row here says how long the animation runs and what is wrong with it without
+   * opening it: targets that do nothing, a trigger naming a state the control does not have, and a
+   * clash it loses — another animation later in the list that answers the same change on the same
+   * property, so this one never plays there.
    */
   import TriangleAlert from 'lucide-svelte/icons/triangle-alert';
+  import Swords from 'lucide-svelte/icons/swords';
+  import CircleHelp from 'lucide-svelte/icons/circle-question-mark';
   import Pencil from 'lucide-svelte/icons/pencil';
   import Trash2 from 'lucide-svelte/icons/trash-2';
-  import { deadTargetCount } from '../../utils/animationModel.js';
+  import { deadTargetCount, unknownTriggerStates, clashesFor } from '../../utils/animationModel.js';
 
   let {
     rows = [],
     partNames = [],
+    stateNames = [],
+    clashes = [],
     selectedName = '',
     onselect = () => {},
     ontoggle = () => {},
@@ -25,6 +31,8 @@
 <div class="list" role="listbox" tabindex="-1" aria-label="Animations">
   {#each rows as row (row.name)}
     {@const dead = deadTargetCount(row, partNames)}
+    {@const unknown = unknownTriggerStates(row, stateNames)}
+    {@const loses = clashesFor(row.name, clashes).filter((clash) => clash.role === 'loses')}
     <div
       class="arow"
       class:sel={row.name === selectedName}
@@ -54,6 +62,16 @@
         {#if dead}
           <i class="bad" title={`${dead} of this animation's targets do nothing`}>
             <TriangleAlert size={9} aria-hidden="true" /> {dead}
+          </i>
+        {/if}
+        {#if unknown.length}
+          <i class="bad unknown" title={`The trigger names ${unknown.map((name) => `"${name}"`).join(', ')}, which this control does not have`}>
+            <CircleHelp size={9} aria-hidden="true" /> {unknown.length}
+          </i>
+        {/if}
+        {#if loses.length && row.enabled}
+          <i class="bad clash" title={loses.map((clash) => clash.text).join('\n')}>
+            <Swords size={9} aria-hidden="true" /> {loses.length}
           </i>
         {/if}
       </span>

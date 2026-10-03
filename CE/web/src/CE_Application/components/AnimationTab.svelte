@@ -6,11 +6,12 @@
    *
    * Two things to know before editing this file.
    *
-   * FIRST, the tab exists because the properties panel offers things that do not work. Its
-   * "Property" dropdown has seven choices and two of them — Fill colour and Text colour — are not
-   * on the list the runtime accepts, so picking one gives you an animation that never runs, with no
-   * message anywhere. utils/animationModel.js has the rule, and its test runs the real runtime over
-   * all seven to check the rule still matches.
+   * FIRST, the tab exists because the editor let you build animations that never run and said
+   * nothing. Its first version caught targets the runtime ignores (Fill colour and Text colour,
+   * until the runtime grew a colour bucket). The animation overhaul made triggers real, which
+   * brought two new ways to be silently wrong: a From/To naming a state the control does not have,
+   * and two animations tying for one property so the earlier never plays. The tab names all three.
+   * utils/animationModel.js has the rules, and its test runs the real runtime to check them.
    *
    * SECOND, THE PROPERTIES PANEL IS UNTOUCHED. AnimationsEditor still draws every section and still
    * edits every field, JSON box and all. Nothing has been moved. allAnimationFieldLabels() is there
@@ -26,11 +27,13 @@
   import AnimationList from './animation/AnimationList.svelte';
   import TargetList from './animation/TargetList.svelte';
   import EasingCurve from './animation/EasingCurve.svelte';
+  import StateChips from './animation/StateChips.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import Segmented from '../properties/Segmented.svelte';
   import PropertySelect from '../properties/PropertySelect.svelte';
   import { activePanel, selectedComponentIds } from '../stores/panels.js';
   import { updateControlProperty, removeControlNode, getSection } from '../stores/controls.js';
+  import { beginHistoryTransaction, commitHistoryTransaction } from '../stores/history.js';
   import { flatControls } from '../utils/containment.js';
   import {
     editorTarget,
@@ -56,6 +59,12 @@
     cleanAnimationName,
     uniqueAnimationName,
     renameBlockedBecause,
+    controlStateNames,
+    triggerStateChoices,
+    unknownTriggerStates,
+    findClashes,
+    clashesFor,
+    VALUE_ORIGINS,
   } from '../utils/animationModel.js';
 
   let mine = $derived(targetOfKind($editorTarget, 'animation'));
@@ -81,6 +90,25 @@
 
   let targets = $derived(selected ? describeTargets(selected, partNames) : []);
   let deadCount = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames), 0));
+
+  // Triggers name states by the control's own States keys; anything else never matches.
+  let stateNames = $derived(control ? controlStateNames(control) : []);
+  let stateChoices = $derived(triggerStateChoices(stateNames));
+  let unknownStates = $derived(selected ? unknownTriggerStates(selected, stateNames) : []);
+  let unknownFrom = $derived(unknownStates.filter((name) => selected?.from.includes(name)));
+  let unknownTo = $derived(unknownStates.filter((name) => selected?.to.includes(name)));
+  let unknownCount = $derived(rows.reduce((sum, row) => sum + unknownTriggerStates(row, stateNames).length, 0));
+
+  // Two animations tying for one property: the later always plays, the earlier never does there.
+  let clashes = $derived(findClashes(rows, partNames));
+  let selectedClashes = $derived(selected ? clashesFor(selected.name, clashes) : []);
+
+  const ORIGIN_LABELS = { any: 'Any', user: 'Mine', external: 'Outside' };
+  const ORIGIN_TITLES = {
+    any: 'Every change of the value',
+    user: 'Only while the pointer or keyboard is on the control — a drag is never animated either way',
+    external: 'Only changes from outside: MIDI coming back, host automation, a script',
+  };
 
   let rawTargetIndex = $state(-1);
   let targetIndex = $derived(rawTargetIndex >= 0 && rawTargetIndex < targets.length ? rawTargetIndex : -1);
@@ -175,11 +203,15 @@ onMount(() => {
     if (!controlId || !from || renameBlockedBecause(rows.map((row) => row.name), from, to)) return;
     if (to === from) return;
     // An animation is a keyed child, so a rename is a move: write the new key with the old value's
-    // fields, then drop the old one. `name` travels inside the value too and has to follow.
+    // fields, then drop the old one. `name` travels inside the value too and has to follow. Two
+    // writes, one edit: the transaction makes them one undo step, so Ctrl+Z cannot leave the
+    // animation under both names, or under neither.
     const source = rows.find((row) => row.name === from)?.animation;
     if (!source) return;
+    const step = beginHistoryTransaction();
     updateControlProperty(controlId, `Animations.${to}`, { ...source, name: to });
     removeControlNode(controlId, `Animations.${from}`);
+    commitHistoryTransaction(step);
     wantedName = to;
   }
 
@@ -224,6 +256,17 @@ onMount(() => {
           {deadCount} {deadCount === 1 ? 'target does' : 'targets do'} nothing
         </span>
       {/if}
+      {#if clashes.length}
+        <span class="alarm clashes" role="status"
+              title={clashes.map((clash) => `${clash.loser} never plays where ${clash.winner} does: ${clash.why}`).join('\n')}>
+          {clashes.length} {clashes.length === 1 ? 'clash' : 'clashes'}
+        </span>
+      {/if}
+      {#if unknownCount}
+        <span class="alarm unknown" role="status" title="A trigger names a state this control does not have, so it never matches">
+          {unknownCount} unknown {unknownCount === 1 ? 'state' : 'states'}
+        </span>
+      {/if}
 
       <label class="allon">
         <span>All animations</span>
@@ -244,6 +287,8 @@ onMount(() => {
         <AnimationList
           {rows}
           {partNames}
+          {stateNames}
+          {clashes}
           {selectedName}
           onselect={(name) => { wantedName = name; rawTargetIndex = -1; }}
           onrename={beginRename}
@@ -297,25 +342,44 @@ onMount(() => {
                          onchange={(value) => setProp('trigger.type', value)} />
             </div>
             {#if selected.triggerType === 'stateChange'}
-              <div class="r">
-                <label for="anim-from">From</label>
-                <input class="txt" id="anim-from" type="text" value={selected.from.join(', ')}
-                       placeholder="* for any"
-                       onchange={(event) => setProp('trigger.from', event.currentTarget.value.split(',').map((v) => v.trim()).filter(Boolean))} />
+              <div class="r top">
+                <span class="lab">From</span>
+                <StateChips choices={stateChoices} value={selected.from} unknown={unknownFrom} ariaLabel="From"
+                            onchange={(next) => setProp('trigger.from', next)} />
+              </div>
+              <div class="r top">
+                <span class="lab">To</span>
+                <StateChips choices={stateChoices} value={selected.to} unknown={unknownTo} ariaLabel="To"
+                            onchange={(next) => setProp('trigger.to', next)} />
               </div>
               <div class="r">
-                <label for="anim-to">To</label>
-                <input class="txt" id="anim-to" type="text" value={selected.to.join(', ')}
-                       placeholder="hover, pressed"
-                       onchange={(event) => setProp('trigger.to', event.currentTarget.value.split(',').map((v) => v.trim()).filter(Boolean))} />
+                <span class="lab" title="Play it backwards when a To state is left — how a hover lift settles">Leaving</span>
+                <Segmented options={[{ value: false, label: 'Snap back' }, { value: true, label: 'Play back' }]}
+                           value={selected.reverse} ariaLabel="Also when leaving"
+                           onchange={(value) => setProp('trigger.reverse', value)} />
               </div>
+              {#if unknownStates.length}
+                <p class="warn unknownwarn">
+                  <b>{unknownStates.length === 1 ? `“${unknownStates[0]}” is not a state` : `${unknownStates.length} names are not states`} of {controlName}.</b>
+                  A trigger only matches the control's own States{stateNames.length ? ` (${stateNames.join(', ')})` : ''}, so this part of it never plays.
+                </p>
+              {/if}
             {:else}
               <div class="r">
                 <label for="anim-source">Source</label>
                 <input class="txt" id="anim-source" type="text" value={selected.source}
                        onchange={(event) => setProp('trigger.source', event.currentTarget.value)} />
               </div>
+              <div class="r">
+                <span class="lab">Origin</span>
+                <Segmented options={VALUE_ORIGINS.map((value) => ({ value, label: ORIGIN_LABELS[value], title: ORIGIN_TITLES[value] }))}
+                           value={selected.origin} ariaLabel="Origin"
+                           onchange={(value) => setProp('trigger.origin', value)} />
+              </div>
             {/if}
+            {#each selectedClashes as clash (clash.other + clash.role)}
+              <p class="warn clashwarn" class:wins={clash.role === 'wins'}>{clash.text}</p>
+            {/each}
 
             <div class="grp">Easing</div>
             <div class="easings">
@@ -506,11 +570,13 @@ onMount(() => {
     align-items: center;
     margin-top: 6px;
   }
-  .r > label {
+  .r > label, .r > .lab {
     font: 400 9.5px/1.15 'IBM Plex Sans', system-ui, sans-serif;
     color: #616C75;
     text-align: right;
   }
+  .r.top { align-items: start; }
+  .r.top > .lab { padding-top: 5px; }
 
   .cell { min-width: 0; display: flex; }
 
@@ -559,6 +625,7 @@ onMount(() => {
     color: #D9BE8A;
   }
   .warn b { display: block; color: #F0D48A; font-weight: 600; }
+  .clashwarn.wins { border-color: #2E3540; background: #12171A; color: #9AA6AE; }
 
   .addbtn {
     width: 100%;

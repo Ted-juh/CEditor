@@ -1774,7 +1774,12 @@ __CE_EASINGS = {}
 __CE_EASINGS["inQuad"] = [0.55,0.085,0.68,0.53]
 __CE_EASINGS["outQuad"] = [0.25,0.46,0.45,0.94]
 __CE_EASINGS["inOutQuad"] = [0.455,0.03,0.515,0.955]
+__CE_EASINGS["inCubic"] = [0.55,0.055,0.675,0.19]
 __CE_EASINGS["outCubic"] = [0.215,0.61,0.355,1]
+__CE_EASINGS["inOutCubic"] = [0.645,0.045,0.355,1]
+__CE_EASINGS["inBack"] = [0.6,-0.28,0.735,0.045]
+__CE_EASINGS["outBack"] = [0.175,0.885,0.32,1.275]
+__CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55]
 # @module ce.music
 # END GENERATED music tables
 

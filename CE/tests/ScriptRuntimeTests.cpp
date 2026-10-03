@@ -2694,6 +2694,15 @@ int main()
                "inQuad likewise — t^2 would be 0.25");
         check (std::abs (ScriptRuntime::animationEase (0.5, "inOutQuad") - 0.5147843674574845) < 1e-9,
                "inOutQuad");
+        // The five the animation overhaul added reach this engine through the generated table. The
+        // "back" curves leave [0, 1] on purpose, so they are the ones worth pinning: a solver that
+        // clamped y, or a sign lost in generation, would still pass every curve above.
+        check (std::abs (ScriptRuntime::animationEase (0.5, "outBack") - 1.0675526850696229) < 1e-9,
+               "outBack overshoots past 1, as the panel's bezier does");
+        check (std::abs (ScriptRuntime::animationEase (0.25, "inBack") - (-0.08694641804551471)) < 1e-9,
+               "inBack dips below 0 first");
+        check (std::abs (ScriptRuntime::animationEase (0.3, "inOutCubic") - 0.13150465517007115) < 1e-9,
+               "inOutCubic");
         // ce.math.curve's four are unchanged and deliberately NOT merged with the panel's: exp is
         // t^2, inQuad is a bezier that looks like t^2, and calling them one thing would be a claim
         // about the numbers that is not true.

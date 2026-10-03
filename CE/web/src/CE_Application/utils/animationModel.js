@@ -29,17 +29,18 @@ import { OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CU
 
 export { EASING_BEZIERS, EASING_NAMES, OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT };
 
+/** The four easings the properties panel's dropdown offers. AnimationsEditor.svelte is pinned to it. */
+export const PANEL_EASING_OPTIONS = ['linear', 'outQuad', 'inOutQuad', 'outCubic'];
+
 /**
- * The animation kinds the runtime plays. A transition moves a property when something changes; a
- * keyframe animation runs a shape of its own — a pulse, a blink — while its trigger holds, or once
- * each time it fires.
+ * The animation kinds the runtime plays: a transition moves a property when something changes.
+ * The runtime already sets `kind: 'keyframes'` aside (interactionRuntime.js) so a second kind can
+ * arrive without the transition path guessing at it, but nothing plays one yet, so nothing offers
+ * one.
  */
-export const ANIMATION_KINDS = ['transition', 'keyframes'];
+export const ANIMATION_KINDS = ['transition'];
 
 export const TRIGGER_TYPES = ['stateChange', 'valueChange'];
-
-/** What can start a keyframe animation. A transition only ever answers a state or value change. */
-export const KEYFRAME_TRIGGER_TYPES = ['always', 'stateChange', 'valueChange', 'beat', 'script'];
 
 /** Which value changes a value trigger answers: any, only the person's own, or only from outside. */
 export const VALUE_ORIGINS = ['any', 'user', 'external'];
@@ -161,6 +162,7 @@ export function targetCost(target) {
 
 /** One animation, read into the shape the tab draws. */
 export function describeAnimation(name, animation) {
+  const trigger = readTrigger(animation);
   return {
     name: String(name ?? ''),
     enabled: animation?.enabled !== false,
@@ -169,9 +171,14 @@ export function describeAnimation(name, animation) {
     delay: Number.isFinite(Number(animation?.delay)) ? Number(animation.delay) : 0,
     easing: String(animation?.easing ?? 'outQuad'),
     triggerType: String(animation?.trigger?.type ?? 'stateChange'),
+    // As written, so the tab shows a misspelt state as it was typed; `trigger` is the runtime's
+    // reading of the same thing (lower-cased, defaults filled in) and is what the checks use.
     from: Array.isArray(animation?.trigger?.from) ? animation.trigger.from.map(String) : [],
     to: Array.isArray(animation?.trigger?.to) ? animation.trigger.to.map(String) : [],
     source: String(animation?.trigger?.source ?? 'value.normalized'),
+    reverse: trigger.reverse,
+    origin: trigger.origin,
+    trigger,
     targets: Array.isArray(animation?.targets) ? animation.targets : [],
     animation,
   };
@@ -203,6 +210,157 @@ export function describeTargets(row, partNames = []) {
 /** How many of an animation's targets do nothing. */
 export function deadTargetCount(row, partNames = []) {
   return describeTargets(row, partNames).filter((entry) => !entry.status.works).length;
+}
+
+// --- Triggers ---------------------------------------------------------------
+// A stateChange trigger names states by the keys of the control's States section, lower-cased
+// ("Pressed" is "pressed"). "*" is any state and "default" is none at all. The runtime compares
+// names and nothing else, so a typo is not an error anywhere — it is an animation that never
+// plays. These are the tab's way of saying so.
+
+export const ANY_STATE = '*';
+export const DEFAULT_STATE = 'default';
+
+/** The state names this control can be in, as triggers spell them. */
+export function controlStateNames(control) {
+  const states = control?._children?.States?._children ?? {};
+  return [...new Set(Object.keys(states).map((key) => String(key).trim().toLowerCase()).filter(Boolean))];
+}
+
+/** What the From and To chips offer: any, none, then every state the control has. */
+export function triggerStateChoices(stateNames = []) {
+  return [ANY_STATE, DEFAULT_STATE, ...stateNames.filter((name) => name !== ANY_STATE && name !== DEFAULT_STATE)];
+}
+
+/**
+ * The state names in a trigger that this control does not have, as they were written.
+ * Only a state trigger names states; a value trigger has nothing to check.
+ */
+export function unknownTriggerStates(row, stateNames = []) {
+  if ((row?.triggerType ?? row?.trigger?.type) !== 'stateChange') return [];
+  const known = new Set([ANY_STATE, DEFAULT_STATE, ...stateNames]);
+  const seen = new Set();
+  const out = [];
+  for (const written of [...(row?.from ?? []), ...(row?.to ?? [])]) {
+    const name = String(written ?? '').trim();
+    const key = name.toLowerCase();
+    if (!key || known.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+
+/**
+ * Toggle one chip in a From or To list, keeping the list meaningful: "*" means any, so choosing it
+ * clears the named states, and choosing a named state clears "*". An empty list reads as "*" too,
+ * which is why removing the last chip leaves "*" rather than nothing.
+ */
+export function toggleTriggerState(list, name) {
+  const current = (Array.isArray(list) ? list : []).map((value) => String(value).trim().toLowerCase()).filter(Boolean);
+  const key = String(name ?? '').trim().toLowerCase();
+  if (!key) return current.length ? current : [ANY_STATE];
+  if (key === ANY_STATE) return [ANY_STATE];
+  const named = current.filter((value) => value !== ANY_STATE);
+  const next = named.includes(key) ? named.filter((value) => value !== key) : [...named, key];
+  return next.length ? next : [ANY_STATE];
+}
+
+// --- Clashes ----------------------------------------------------------------
+// When two animations claim one property of one part for the same change, the runtime gives it to
+// the one later in the list (utils/transitionSelection.js, rule 6) and the earlier one never plays
+// there. That is a rule, not a bug, and it is invisible: nothing on screen says the earlier
+// animation lost. So the tab says it.
+//
+// Only a TIE is a clash. "From * to pressed" and "from * to any state" both answer a press, but the
+// named one outranks the "*" one by rule 1, whatever the order — that is a fallback someone built
+// on purpose, not two animations fighting. Likewise a state trigger and a value trigger answer
+// different changes and rank differently when one frame is both.
+
+const isAnyList = (list) => !list.length || list.includes(ANY_STATE);
+
+/**
+ * Whether two From lists can both match one frame. Named states can be active together — hover
+ * and focused, say — so two lists of different named states can. Only "default", which is no state
+ * at all, rules the others out.
+ */
+function fromListsMeet(a, b) {
+  if (isAnyList(a) || isAnyList(b)) return true;
+  if (a.some((state) => b.includes(state))) return true;
+  const named = (list) => list.some((state) => state !== DEFAULT_STATE);
+  return named(a) && named(b);
+}
+
+/** Why two triggers tie for the same change, or '' when they never do. Both are readTrigger() shapes. */
+export function triggersTie(a, b) {
+  if (!a || !b || a.type !== b.type) return '';
+  if (a.type === 'valueChange') {
+    if (a.source !== b.source) return '';
+    if (a.origin !== 'any' && b.origin !== 'any' && a.origin !== b.origin) return '';
+    return `both answer a change of ${a.source}`;
+  }
+  if (a.type !== 'stateChange') return '';
+  const aAny = isAnyList(a.to);
+  if (aAny !== isAnyList(b.to)) return '';
+  if (!fromListsMeet(a.from, b.from)) return '';
+  if (aAny) return 'both answer any state change';
+  const shared = a.to.filter((state) => b.to.includes(state));
+  return shared.length ? `both answer ${shared.join(', ')}` : '';
+}
+
+/** Where an animation's working targets land, as "part|bucket" keys ('' is the control itself). */
+function landings(row, partNames) {
+  const out = new Map();
+  for (const target of row?.targets ?? []) {
+    const status = targetStatus(target, partNames);
+    if (!status.works) continue;
+    for (const bucket of status.buckets ?? [status.animates]) {
+      out.set(`${status.part}|${bucket}`, { part: status.part, bucket });
+    }
+  }
+  return out;
+}
+
+/**
+ * Every pair of enabled transitions that tie for the same property of the same part.
+ *
+ * Returns `[{ winner, loser, places: [{ part, bucket }], why }]`, `winner` being the later of the
+ * two — the one that plays. Keyframe animations do not take part: they do not use transitions.
+ */
+export function findClashes(rows, partNames = []) {
+  const live = (rows ?? []).filter((row) => row?.enabled !== false && (row?.kind ?? 'transition') !== 'keyframes');
+  const placed = live.map((row) => ({ row, at: landings(row, partNames), trigger: row.trigger ?? readTrigger(row.animation) }));
+  const clashes = [];
+  for (let i = 0; i < placed.length; i += 1) {
+    for (let j = i + 1; j < placed.length; j += 1) {
+      const why = triggersTie(placed[i].trigger, placed[j].trigger);
+      if (!why) continue;
+      const places = [...placed[i].at.keys()].filter((key) => placed[j].at.has(key)).map((key) => placed[i].at.get(key));
+      if (!places.length) continue;
+      clashes.push({ winner: placed[j].row.name, loser: placed[i].row.name, places, why });
+    }
+  }
+  return clashes;
+}
+
+/** "the control" or the part's name, and the bucket — how a clash names where it happens. */
+export function describePlace({ part, bucket }) {
+  return `${part || 'the control'} ${bucket}`;
+}
+
+/** One animation's clashes, each said from its own side. */
+export function clashesFor(name, clashes) {
+  return (clashes ?? []).flatMap((clash) => {
+    if (clash.loser === name) {
+      return [{ role: 'loses', other: clash.winner, places: clash.places, why: clash.why,
+        text: `Never plays on ${clash.places.map(describePlace).join(', ')}: ${clash.winner} is later in the list and ${clash.why}.` }];
+    }
+    if (clash.winner === name) {
+      return [{ role: 'wins', other: clash.loser, places: clash.places, why: clash.why,
+        text: `Overrides ${clash.loser} on ${clash.places.map(describePlace).join(', ')}: ${clash.why}.` }];
+    }
+    return [];
+  });
 }
 
 // --- Editing the target list ------------------------------------------------
@@ -245,42 +403,25 @@ export function buildTarget(partName, offered) {
 /**
  * Points along an easing curve, for drawing it.
  *
- * The editor offers four easing names and shows no picture of any of them. These are the same
- * curves the runtime hands to CSS, so the picture is the real thing rather than an impression of
- * it.
+ * `easing` is a name ("outBack") or an Animation node, which is how a custom bezier or a spring
+ * draws its own shape rather than a named one's. The numbers come from utils/easing.js — the
+ * curves the runtime hands to CSS and the value glide evaluates — so the picture is the real
+ * thing rather than an impression of it. A name the runtime does not know draws CSS `ease`,
+ * because that is what plays.
  */
-export function easingPoints(name, steps = 24) {
+export function easingPoints(easing, steps = 24) {
   const count = Math.max(2, Math.round(steps));
-  const bezier = EASING_BEZIERS[String(name ?? '')];
+  const description = readEasing(easing && typeof easing === 'object' ? easing : { easing: String(easing ?? '') });
   const out = [];
   for (let i = 0; i <= count; i += 1) {
     const t = i / count;
-    out.push({ x: t, y: bezier ? cubicBezierY(bezier, t) : t });
+    out.push({ x: t, y: easeAt(description, t) });
   }
   return out;
 }
 
-/**
- * The y of a CSS cubic-bezier at time x.
- *
- * CSS timing functions are a bezier in which x is time, so finding y means finding the curve
- * parameter that gives that x first. Twenty rounds of bisection is far more than a 90px picture
- * needs and costs nothing.
- */
-function cubicBezierY([x1, y1, x2, y2], x) {
-  const curveX = (t) => 3 * (1 - t) * (1 - t) * t * x1 + 3 * (1 - t) * t * t * x2 + t * t * t;
-  const curveY = (t) => 3 * (1 - t) * (1 - t) * t * y1 + 3 * (1 - t) * t * t * y2 + t * t * t;
-  let low = 0;
-  let high = 1;
-  for (let i = 0; i < 20; i += 1) {
-    const mid = (low + high) / 2;
-    if (curveX(mid) < x) low = mid; else high = mid;
-  }
-  return curveY((low + high) / 2);
-}
-
 /** The easing names the runtime knows but the properties panel never offers. */
-export function unofferedEasings(offered = ['linear', 'outQuad', 'inOutQuad', 'outCubic']) {
+export function unofferedEasings(offered = PANEL_EASING_OPTIONS) {
   return EASING_NAMES.filter((name) => !offered.includes(name));
 }
 
@@ -296,7 +437,9 @@ export function newAnimationShape(name) {
     name: String(name ?? ''),
     enabled: true,
     kind: 'transition',
-    trigger: { type: 'stateChange', from: ['*'], to: ['hover'] },
+    // `reverse` is what every control did before triggers were read — a hover lift settles back
+    // when the pointer leaves — so a new animation says so out loud rather than by omission.
+    trigger: { type: 'stateChange', from: ['*'], to: ['hover'], reverse: true },
     targets: [],
     duration: 120,
     delay: 0,

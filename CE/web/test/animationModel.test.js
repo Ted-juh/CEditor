@@ -1,9 +1,10 @@
 // animationModel.test.js — the Animation tab's working parts.
 //
 // The headline test runs the REAL animation runtime over every property the editor's dropdown
-// offers, and checks that this file's answer matches. That is the whole point of the tab: two of
-// the seven do nothing, and the editor does not say so. If the runtime ever starts accepting more
-// paths, this test fails rather than the tab quietly keeping an out-of-date warning.
+// offers, and checks that this file's answer matches. That is the whole point of the tab. For its
+// first version two of the seven — Fill colour and Text colour — did nothing, because the runtime
+// had no colour bucket; the animation overhaul gave it one, and the same test now says all of them
+// work. If the runtime ever changes again, this fails rather than the tab keeping a stale answer.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,6 +12,16 @@ import { readFileSync } from 'node:fs';
 
 import {
   ANIMATION_KINDS,
+  PANEL_EASING_OPTIONS,
+  OVERSHOOTING_EASINGS,
+  controlStateNames,
+  triggerStateChoices,
+  unknownTriggerStates,
+  toggleTriggerState,
+  triggersTie,
+  findClashes,
+  clashesFor,
+  targetCost,
   newAnimationShape,
   cleanAnimationName,
   uniqueAnimationName,
@@ -35,7 +46,7 @@ import {
   unofferedEasings,
   allAnimationFieldLabels,
 } from '../src/CE_Application/utils/animationModel.js';
-import { resolveInteractiveControl } from '../src/CE_Application/utils/interactionRuntime.js';
+import { resolveInteractiveControl, readTrigger } from '../src/CE_Application/utils/interactionRuntime.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { createCustomComponentPartsDefaults } from '../src/CE_Application/utils/customComponentFactory.js';
 
@@ -91,18 +102,28 @@ test('this file agrees with the runtime about every property the editor offers',
   }
 });
 
-test('and the two dead ones are the two the properties panel offers', () => {
+test('and none of them is dead any more — the panel\'s two colour choices work', () => {
+  // This used to read "the two dead ones are the two the properties panel offers" and expect
+  // ['Fill colour', 'Text colour']. The runtime gained a colour bucket in the animation overhaul,
+  // and the CSS names the panel has always written for those two (`background-color`, `color`)
+  // now name it, so a control saved from the panel years ago starts animating without an edit.
   const dead = OFFERED_PROPERTIES
     .filter((offered) => !targetStatus(buildTarget('label', offered), ['label']).works)
     .map((offered) => offered.label);
-  assert.deepEqual(dead, ['Fill colour', 'Text colour']);
+  assert.deepEqual(dead, []);
+  for (const label of ['Fill colour', 'Text colour', 'Border colour']) {
+    const offered = OFFERED_PROPERTIES.find((entry) => entry.label === label);
+    assert.equal(targetStatus(buildTarget('label', offered), ['label']).animates, 'colour', label);
+  }
 });
 
 test('a dead target says what the runtime does accept', () => {
-  const status = targetStatus({ path: 'Parts.label.Background.Fill.colour', properties: ['background-color'] }, ['label']);
+  // A path no table lists and no hint rescues. It was a colour path until colour started working.
+  const status = targetStatus({ path: 'Parts.label.Text.content' }, ['label']);
   assert.equal(status.works, false);
   assert.equal(status.reason, 'dead path');
   assert.match(status.detail, /Layout\.scale/);
+  assert.match(status.detail, /Background\.Fill\.colour/, 'and the list it gives includes colour now');
 });
 
 // --- The other ways a target can do nothing ---------------------------------
@@ -133,7 +154,7 @@ test('size works on a part and does nothing on the control itself', () => {
   assert.equal(root.reason, 'no size at root');
 });
 
-test('a target on the control itself works for the three paths that exist', () => {
+test('a target on the control itself works for every path in its table', () => {
   for (const path of Object.keys(ROOT_PATHS)) {
     assert.equal(targetStatus({ path }, []).works, true, `${path} should work`);
   }
@@ -141,10 +162,13 @@ test('a target on the control itself works for the three paths that exist', () =
 });
 
 test('a properties hint works even when the path is not in the table', () => {
-  // This is the runtime's own escape hatch, and it is why a colour target could be made to work
-  // one day without changing the editor — the runtime would need a colour bucket first.
+  // The runtime's own escape hatch. This test used to end by asserting that a `colour` hint did
+  // nothing, with the note that the runtime would need a colour bucket first. It has one now.
   assert.equal(targetStatus({ path: 'Parts.label.Anything', properties: ['transform'] }, ['label']).works, true);
-  assert.equal(targetStatus({ path: 'Parts.label.Anything', properties: ['colour'] }, ['label']).works, false);
+  assert.equal(targetStatus({ path: 'Parts.label.Anything', properties: ['colour'] }, ['label']).works, true);
+  assert.equal(targetStatus({ path: 'Parts.label.Anything', properties: ['background-color'] }, ['label']).animates, 'colour');
+  assert.equal(targetStatus({ path: 'Parts.label.Anything', properties: ['filter'] }, ['label']).works, false,
+    'a hint that names no bucket still rescues nothing');
 });
 
 test('every path in the tables maps to a bucket the runtime fills', () => {
@@ -186,14 +210,17 @@ test('the section switch turns everything off', () => {
 });
 
 test('describeTargets attaches a status to each one and counts the dead', () => {
+  const part = partsOf(withAnimation([]))[0];
   const control = withAnimation([
-    { path: 'Parts.label.Layout.scale', properties: ['transform'] },
-    { path: 'Parts.label.Background.Fill.colour', properties: ['background-color'] },
+    { path: `Parts.${part}.Layout.scale`, properties: ['transform'] },
+    // Dead until the overhaul; works now, and is kept here so the count shows it.
+    { path: `Parts.${part}.Background.Fill.colour`, properties: ['background-color'] },
+    { path: `Parts.${part}.Text.content` },
     { path: '' },
   ]);
   const row = readAnimations(control)[0];
   const rows = describeTargets(row, partsOf(control));
-  assert.deepEqual(rows.map((entry) => entry.status.works), [true, false, false]);
+  assert.deepEqual(rows.map((entry) => entry.status.works), [true, true, false, false]);
   assert.equal(deadTargetCount(row, partsOf(control)), 2);
 });
 
@@ -243,14 +270,42 @@ test('an ease-out really is fast at the start', () => {
   assert.ok(out[2].y > linear[2].y, 'outQuad should be ahead of linear early on');
 });
 
-test('the panel offers four easings and the runtime knows five', () => {
-  assert.deepEqual(unofferedEasings(), ['inQuad']);
-  assert.ok(EASING_NAMES.includes('inQuad'));
+test('the panel offers four easings and the runtime knows ten', () => {
+  // It knew five — the panel's four and inQuad — until the overhaul added inCubic, inOutCubic and
+  // the three overshooting "back" curves. The panel's dropdown did not grow; this tab draws them all.
+  assert.deepEqual(PANEL_EASING_OPTIONS, ['linear', 'outQuad', 'inOutQuad', 'outCubic']);
+  assert.deepEqual(unofferedEasings(), ['inQuad', 'inCubic', 'inOutCubic', 'inBack', 'outBack', 'inOutBack']);
+  assert.equal(EASING_NAMES.length, 10);
+});
+
+test('the back curves are drawn overshooting, the rest are not', () => {
+  for (const name of EASING_NAMES) {
+    const ys = easingPoints(name, 48).map((point) => point.y);
+    const leaves = ys.some((y) => y < -1e-6 || y > 1 + 1e-6);
+    assert.equal(leaves, OVERSHOOTING_EASINGS.includes(name), name);
+  }
+});
+
+test('a custom bezier and a spring draw their own shape, and an unknown name draws what plays', () => {
+  const custom = easingPoints({ easing: 'custom', bezier: [0, 0, 1, 1] }, 4);
+  for (const point of custom) assert.ok(Math.abs(point.y - point.x) < 1e-9, 'the identity bezier is a line');
+
+  const spring = easingPoints({ easing: 'spring', spring: { damping: 6, frequency: 12 } }, 40);
+  assert.ok(spring.some((point) => point.y > 1), 'a spring overshoots');
+  assert.equal(spring.at(-1).y, 1, 'and lands');
+
+  // An unknown name is CSS `ease` to the runtime, so that is the picture — it used to be drawn as
+  // a straight line, which is not what anybody would see.
+  const unknown = easingPoints('wobbly', 10);
+  const ease = easingPoints({ easing: 'custom', bezier: [0.25, 0.1, 0.25, 1] }, 10);
+  assert.deepEqual(unknown, ease);
 });
 
 // --- Odds and ends ----------------------------------------------------------
 
-test('only one animation kind does anything', () => {
+test('one animation kind plays; keyframes are not built yet', () => {
+  // The runtime skips `kind: 'keyframes'` (interactionRuntime.js) so that a second kind can arrive
+  // without the transition path guessing at it. Until it plays, the tab must not offer it.
   assert.deepEqual(ANIMATION_KINDS, ['transition']);
   assert.deepEqual(TRIGGER_TYPES, ['stateChange', 'valueChange']);
 });
@@ -272,7 +327,10 @@ test('a new animation is the shape the properties panel makes', () => {
   assert.equal(made.easing, 'outQuad');
   assert.equal(made.duration, 120);
   assert.deepEqual(made.targets, []);
-  assert.deepEqual(made.trigger, { type: 'stateChange', from: ['*'], to: ['hover'] });
+  // `reverse: true` is new and explicit: it is the default either way (a hover lift settles back
+  // when the pointer leaves), and the panel's shape without it reads the same.
+  assert.deepEqual(made.trigger, { type: 'stateChange', from: ['*'], to: ['hover'], reverse: true });
+  assert.deepEqual(readTrigger(made), readTrigger({ trigger: { type: 'stateChange', from: ['*'], to: ['hover'] } }));
   // And it reads back through the tab's own reader without special-casing.
   const described = describeAnimation('hoverGlow', made);
   assert.equal(described.enabled, true);
@@ -308,7 +366,9 @@ test('a rename says why it cannot happen', () => {
 // --- What the properties panel still does -----------------------------------
 // Everything above is about the tab. This last test reads the shipped panel and pins the four
 // things the tab exists to fix. If somebody fixes one of them in the panel, this fails, and the
-// tab's reason for existing has to be rewritten rather than left standing as a stale claim.
+// tab's reason for existing has to be rewritten rather than left standing as a stale claim. (The
+// first of the four used to be that two of the seven did nothing. They work now, in the runtime;
+// what is left is that the panel offers seven and never width or height.)
 
 test('the properties panel really is the way this tab says it is', () => {
   const source = readFileSync(
@@ -316,7 +376,7 @@ test('the properties panel really is the way this tab says it is', () => {
     'utf8'
   );
 
-  // 1. Seven properties on offer, and the two dead ones among them.
+  // 1. Seven properties on offer, colour among them, and no width.
   const list = source.slice(source.indexOf('const TARGET_PROPERTIES'), source.indexOf('const QUICK_STATES'));
   assert.equal((list.match(/path: '/g) ?? []).length, 7, 'the panel offers seven properties');
   assert.match(list, /Background\.Fill\.colour/);
@@ -335,4 +395,146 @@ test('the properties panel really is the way this tab says it is', () => {
   const kindCell = source.slice(source.indexOf('label="Kind"'), source.indexOf('label="Kind"') + 400);
   assert.match(kindCell, /<input class="val" type="text"/);
   assert.match(kindCell, /only runtime kind/, 'the panel does warn about this one');
+});
+
+// --- Trigger states ---------------------------------------------------------
+// A state trigger names states by the keys of the control's States section. The runtime compares
+// names and nothing else, so "presed" is not an error anywhere — it is an animation that never
+// plays. These are how the tab finds that out.
+
+test('a control\'s state names are its States keys, spelled the way triggers spell them', () => {
+  const button = createControl('ToggleButton');
+  const names = controlStateNames(button);
+  for (const name of ['hover', 'pressed', 'focused', 'disabled']) assert.ok(names.includes(name), `${name} in ${names}`);
+  assert.deepEqual(controlStateNames(null), []);
+  assert.deepEqual(triggerStateChoices(['hover', 'pressed']), ['*', 'default', 'hover', 'pressed']);
+});
+
+test('the states a control does not have are reported as they were typed', () => {
+  const row = describeAnimation('a', { trigger: { type: 'stateChange', from: ['*', 'Default'], to: ['Presed', 'hover', 'presed'] } });
+  assert.deepEqual(unknownTriggerStates(row, ['hover', 'pressed']), ['Presed'], 'once, as typed; * and default are always known');
+  const value = describeAnimation('b', { trigger: { type: 'valueChange', source: 'value.normalized' } });
+  assert.deepEqual(unknownTriggerStates(value, []), [], 'a value trigger names no states');
+});
+
+test('choosing * clears the named states, and a named state clears *', () => {
+  assert.deepEqual(toggleTriggerState(['hover'], '*'), ['*']);
+  assert.deepEqual(toggleTriggerState(['*'], 'Pressed'), ['pressed']);
+  assert.deepEqual(toggleTriggerState(['hover', 'pressed'], 'hover'), ['pressed']);
+  assert.deepEqual(toggleTriggerState(['pressed'], 'pressed'), ['*'], 'an empty list means any, so it says so');
+  assert.deepEqual(toggleTriggerState([], 'hover'), ['hover']);
+});
+
+test('describeAnimation reads reverse and origin with the runtime\'s defaults', () => {
+  const row = describeAnimation('a', { trigger: { type: 'stateChange', to: ['hover'] } });
+  assert.equal(row.reverse, true);
+  assert.equal(row.origin, 'any');
+  assert.equal(describeAnimation('b', { trigger: { type: 'stateChange', to: ['hover'], reverse: false } }).reverse, false);
+  assert.equal(describeAnimation('c', { trigger: { type: 'valueChange', origin: 'external' } }).origin, 'external');
+  assert.equal(describeAnimation('d', { trigger: { type: 'valueChange', origin: 'nonsense' } }).origin, 'any');
+});
+
+// --- Clashes ----------------------------------------------------------------
+// Two animations tying for one part's property on the same change: the later one always plays and
+// the earlier one never does there. A rule, not a bug, but invisible until the tab says so.
+
+const trig = (trigger) => readTrigger({ trigger });
+
+test('two state triggers tie when they name a state in common', () => {
+  assert.match(triggersTie(trig({ type: 'stateChange', to: ['pressed'] }), trig({ type: 'stateChange', to: ['pressed', 'hover'] })), /pressed/);
+  assert.equal(triggersTie(trig({ type: 'stateChange', to: ['hover'] }), trig({ type: 'stateChange', to: ['pressed'] })), '',
+    'the default hoverIn and pressIn must not be reported against each other');
+  assert.match(triggersTie(trig({ type: 'stateChange', from: ['*'], to: ['*'] }), trig({ type: 'stateChange', to: [] })), /any state/);
+});
+
+test('a named state beats *, so that is a fallback and not a clash', () => {
+  assert.equal(triggersTie(trig({ type: 'stateChange', to: ['pressed'] }), trig({ type: 'stateChange', to: ['*'] })), '');
+});
+
+test('From lists only keep two triggers apart when one is default and the other is not', () => {
+  const a = trig({ type: 'stateChange', from: ['default'], to: ['pressed'] });
+  assert.equal(triggersTie(a, trig({ type: 'stateChange', from: ['hover'], to: ['pressed'] })), '',
+    'nothing active and hover active cannot both be the frame before');
+  assert.match(triggersTie(trig({ type: 'stateChange', from: ['hover'], to: ['pressed'] }), trig({ type: 'stateChange', from: ['focused'], to: ['pressed'] })), /pressed/,
+    'hover and focused can be active together');
+});
+
+test('value triggers tie on the same source unless their origins rule each other out', () => {
+  const user = trig({ type: 'valueChange', source: 'value.normalized', origin: 'user' });
+  const external = trig({ type: 'valueChange', source: 'value.normalized', origin: 'external' });
+  const any = trig({ type: 'valueChange', source: 'value.normalized' });
+  assert.equal(triggersTie(user, external), '');
+  assert.match(triggersTie(user, any), /value\.normalized/);
+  assert.equal(triggersTie(any, trig({ type: 'valueChange', source: 'value.raw' })), '');
+  assert.equal(triggersTie(any, trig({ type: 'stateChange', to: ['hover'] })), '', 'different kinds of change rank differently');
+});
+
+test('findClashes reports the pair, where, and which one plays', () => {
+  const control = withAnimation([{ path: 'Transform.scale', properties: ['transform'] }]);
+  const animations = control._children.Animations._children;
+  animations.second = {
+    ...structuredClone(animations.test),
+    name: 'second',
+    targets: [{ path: 'Transform.scale', properties: ['transform'] }, { path: 'Transform.opacity' }],
+  };
+  const rows = readAnimations(control);
+  const clashes = findClashes(rows, partsOf(control));
+  assert.equal(clashes.length, 1);
+  assert.deepEqual({ winner: clashes[0].winner, loser: clashes[0].loser }, { winner: 'second', loser: 'test' });
+  assert.deepEqual(clashes[0].places, [{ part: '', bucket: 'transform' }], 'opacity is only on one of them');
+  assert.match(clashesFor('test', clashes)[0].text, /Never plays on the control transform: second is later/);
+  assert.match(clashesFor('second', clashes)[0].text, /Overrides test/);
+  assert.deepEqual(clashesFor('nobody', clashes), []);
+});
+
+test('a switched-off animation, a dead target and a different trigger are not clashes', () => {
+  const control = withAnimation([{ path: 'Transform.scale', properties: ['transform'] }]);
+  const animations = control._children.Animations._children;
+  animations.off = { ...structuredClone(animations.test), name: 'off', enabled: false };
+  animations.press = { ...structuredClone(animations.test), name: 'press', trigger: { type: 'stateChange', from: ['*'], to: ['pressed'] } };
+  animations.typo = { ...structuredClone(animations.test), name: 'typo', targets: [{ path: 'Parts.nosuch.Layout.scale' }] };
+  assert.deepEqual(findClashes(readAnimations(control), partsOf(control)), []);
+});
+
+test('the shipped defaults have no clashes', () => {
+  for (const type of ['Button', 'ToggleButton', 'Knob', 'Slider', 'Range', 'Number']) {
+    const control = createControl(type);
+    const parts = Object.keys(control._children?.Parts?._children ?? {});
+    assert.deepEqual(findClashes(readAnimations(control), parts), [], type);
+  }
+});
+
+// --- Cost --------------------------------------------------------------------
+
+test('what a target costs, cheapest first', () => {
+  assert.equal(targetCost({ path: 'Transform.scale' }).level, 'composite');
+  assert.equal(targetCost({ path: 'Parts.a.opacity' }).level, 'composite');
+  assert.equal(targetCost({ path: 'Parts.a.Background.Fill.colour' }).level, 'paint');
+  assert.equal(targetCost({ path: 'Parts.a.Layout.width' }).level, 'layout');
+  assert.equal(targetCost({ path: 'Parts.a.Text.content' }).level, 'none');
+});
+
+test('every shipped control and starter names only states it has, and has no clashes', async () => {
+  // The rules that made triggers real also made a misspelt state a silent failure. The shipped
+  // defaults are the first place somebody copies from, so they are checked here.
+  const { buildStarterControl } = await import('../../../tools/scripts/qa/sheets/packages.mjs');
+  const { CUSTOM_COMPONENT_STARTERS } = await import('../src/CE_Application/utils/customComponentFactory.js');
+  const controls = [
+    ...['Button', 'ToggleButton', 'Knob', 'Slider', 'Range', 'Number'].map((type) => [type, createControl(type)]),
+    ...CUSTOM_COMPONENT_STARTERS.map((starter) => [`starter ${starter.id}`, buildStarterControl(starter, `qa_${starter.id}`)]),
+  ];
+  // Two starters inherit the generic starter press animation without having a Pressed state, so it
+  // never plays on them — and never visibly did, since no state of theirs patches scale. Found by
+  // this test; left for the owner to decide (drop the animation, or give them a Pressed state),
+  // because either changes a shipped starter's package fingerprint. Listed so it cannot grow.
+  const KNOWN = { 'starter starter.statusLamp/pressMotion': ['pressed'], 'starter starter.tabGroup/pressMotion': ['pressed'] };
+  for (const [label, control] of controls) {
+    const rows = readAnimations(control);
+    const states = controlStateNames(control);
+    for (const row of rows) {
+      assert.deepEqual(unknownTriggerStates(row, states), KNOWN[`${label}/${row.name}`] ?? [], `${label} / ${row.name} names a state it does not have (it has: ${states.join(', ')})`);
+    }
+    const parts = Object.keys(control._children?.Parts?._children ?? {});
+    assert.deepEqual(findClashes(rows, parts), [], label);
+  }
 });

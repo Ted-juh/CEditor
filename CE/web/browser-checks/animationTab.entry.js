@@ -12,6 +12,7 @@ import AnimationTab from '../src/CE_Application/components/AnimationTab.svelte';
 import { panels, activePanelId, selectedComponentIds } from '../src/CE_Application/stores/panels.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { createCustomComponentPartsDefaults } from '../src/CE_Application/utils/customComponentFactory.js';
+import { undo } from '../src/CE_Application/stores/history.js';
 
 const CONTROL_ID = 'ctrl_anim';
 
@@ -22,6 +23,15 @@ control._children.Parts = createCustomComponentPartsDefaults();
 
 const partNames = Object.keys(control._children.Parts._children);
 const first = partNames[0];
+
+// Triggers name states by the control's own States keys, so the control needs some to name.
+const state = (name, when) => ({ _type: 'State', name, enabled: true, when, patches: { component: {}, parts: {} } });
+control._children.States = {
+  _type: 'States',
+  enabled: true,
+  priority: [],
+  _children: { Hover: state('Hover', { hover: true }), Pressed: state('Pressed', { pressed: true }) },
+};
 
 control._children.Animations = {
   _type: 'Animations',
@@ -40,12 +50,14 @@ control._children.Animations = {
       targets: [
         // Works.
         { path: `Parts.${first}.Layout.scale`, properties: ['transform'] },
-        // Dead: the runtime has no colour bucket, and the panel's dropdown offers this.
+        // Works now. This was the tab's first dead target: the runtime had no colour bucket.
         { path: `Parts.${first}.Background.Fill.colour`, properties: ['background-color'] },
         // Works.
         { path: `Parts.${first}.opacity`, properties: ['opacity'] },
-        // Dead in a different way: there is no part called this.
+        // Dead: there is no part called this.
         { path: 'Parts.nosuchpart.Layout.rotation', properties: ['transform'] },
+        // Dead in a different way: the runtime does not animate text content.
+        { path: `Parts.${first}.Text.content` },
       ],
     },
     hoverGlow: {
@@ -58,6 +70,19 @@ control._children.Animations = {
       delay: 0,
       easing: 'inOutQuad',
       targets: [{ path: 'Transform.opacity', properties: ['opacity'] }],
+    },
+    // Ties with pressMotion for the first part's scale on a press, and is later in the list, so
+    // pressMotion never plays there. And one of its states is misspelt.
+    pressEcho: {
+      _type: 'Animation',
+      name: 'pressEcho',
+      enabled: true,
+      kind: 'transition',
+      trigger: { type: 'stateChange', from: ['*'], to: ['pressed', 'presed'] },
+      duration: 60,
+      delay: 0,
+      easing: 'outQuad',
+      targets: [{ path: `Parts.${first}.Layout.scale`, properties: ['transform'] }],
     },
   },
 };
@@ -166,6 +191,30 @@ window.__anim = {
     return !!btn;
   },
   renameError: () => textOf(document.querySelector('.renerr')),
+
+  // --- triggers, clashes ---------------------------------------------------------------
+  clashAlarm: () => textOf(document.querySelector('.alarm.clashes')),
+  unknownAlarm: () => textOf(document.querySelector('.alarm.unknown')),
+  rowMarkers: (name) => {
+    const row = [...document.querySelectorAll('.arow')].find((r) => textOf(r.querySelector('.nm')) === name);
+    return [...(row?.querySelectorAll('.meta i') ?? [])].map((i) => [...i.classList].filter((c) => c !== 'bad' && !c.startsWith('svelte-')).join(' ') || 'dead');
+  },
+  chips: (label) => [...document.querySelectorAll(`.chips[aria-label="${label}"] .chip`)]
+    .map((chip) => `${textOf(chip)}${chip.classList.contains('on') ? '*' : ''}${chip.classList.contains('bad') ? '!' : ''}`),
+  clickChip: (label, name) => {
+    const chip = [...document.querySelectorAll(`.chips[aria-label="${label}"] .chip`)].find((c) => textOf(c) === name);
+    chip?.click();
+    return !!chip;
+  },
+  unknownWarning: () => textOf(document.querySelector('.unknownwarn')),
+  clashWarnings: () => [...document.querySelectorAll('.clashwarn')].map(textOf),
+  storedTrigger: (name) => JSON.parse(JSON.stringify(animation(name).trigger)),
+  clickSegment: (ariaLabel, label) => {
+    const button = [...document.querySelectorAll(`.segmented[aria-label="${ariaLabel}"] button`)].find((b) => textOf(b) === label);
+    button?.click();
+    return !!button;
+  },
+  undo: () => undo(),
 
   sliderCount: () => document.querySelectorAll('input[type=range], .slider, [role=slider]').length,
   jsonBoxes: () => document.querySelectorAll('textarea').length,

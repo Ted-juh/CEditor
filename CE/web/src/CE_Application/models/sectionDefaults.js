@@ -2215,6 +2215,10 @@ export const SECTION_DEFAULTS = {
   Animations: {
     _type: 'Animations',
     enabled: true,
+    // Read by nothing; the Animation tab's "just fired" lights are how you watch an animation now.
+    // It stays because removing a schema field is not free here: serialization strips values equal
+    // to this default, so every saved `debug: false` would start being written out, and a custom
+    // component's package fingerprint covers the section, so every package would re-fingerprint.
     debug: false,
     _children: {},
   },

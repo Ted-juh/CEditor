@@ -21,7 +21,7 @@
  *
  * The C++, Lua, JavaScript and Python preludes are GENERATED from this table by
  * tools/scripts/gen-script-modules.mjs, so a name added here reaches ce.anim in every runtime the
- * next time the generator runs — and generatedScriptModules.test.js fails until it has.
+ * next time the generator runs — and panelApiParity.test.js fails until it has.
  *
  * The three "back" curves overshoot: their y leaves [0, 1] for a moment. That is the point of them
  * (a press that squashes past its rest size and settles), and it is why OVERSHOOTING_EASINGS

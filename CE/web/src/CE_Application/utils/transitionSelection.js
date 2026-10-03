@@ -147,12 +147,27 @@ export function selectTransitions(catalog, change, { signals = {}, previous = nu
   const valueOnly = !change.stateChanged;
 
   // Rule 3: a value-only change keeps everything the previous frame had; a state change keeps only
-  // what may still be in flight.
+  // what may still be in flight. A kept pick is re-read from the catalog as it is NOW: an animation
+  // edited in the tab since (a new duration, a new curve) carries its new timing, and one switched
+  // off, deleted, or no longer aimed at that property lets go of it.
   if (previous) {
-    const keep = (pick) => valueOnly || (pick.until ?? 0) > now;
-    for (const [bucket, pick] of previous.root) if (keep(pick)) root.set(bucket, pick);
+    const byName = new Map((catalog.entries ?? []).map((entry) => [entry.name, entry]));
+    const carry = (pick, aims) => {
+      if (!valueOnly && !((pick.until ?? 0) > now)) return null;
+      const entry = byName.get(pick.name);
+      if (!entry || !aims(entry)) return null;
+      return entry.css === pick.css ? pick : { ...pick, css: entry.css };
+    };
+    for (const [bucket, pick] of previous.root) {
+      const kept = carry(pick, (entry) => entry.root.has(bucket));
+      if (kept) root.set(bucket, kept);
+    }
     for (const [part, buckets] of previous.parts) {
-      const store = new Map([...buckets].filter(([, pick]) => keep(pick)));
+      const store = new Map();
+      for (const [bucket, pick] of buckets) {
+        const kept = carry(pick, (entry) => entry.parts.get(part)?.has(bucket) === true);
+        if (kept) store.set(bucket, kept);
+      }
       if (store.size) parts.set(part, store);
     }
   }
@@ -206,6 +221,20 @@ export function selectionToTransitions(selection) {
 }
 
 /**
+ * What a catalog animates, as a string: two catalogs with the same key give the same selection for
+ * the same change. The tracker uses it to tell a re-render with nothing new from an edit.
+ */
+export function catalogKey(catalog) {
+  if (!catalog) return '';
+  const head = `${catalog.enabled !== false ? 1 : 0}${catalog.reducedMotion === true ? 1 : 0}`;
+  return head + (catalog.entries ?? []).map((entry) => {
+    const parts = [...(entry.parts ?? new Map())].map(([part, buckets]) => `${part}:${[...buckets].join('+')}`).join(',');
+    const t = entry.trigger ?? {};
+    return `|${entry.name};${entry.css};${[...(entry.root ?? [])].join('+')};${parts};${t.type};${(t.from ?? []).join('+')};${(t.to ?? []).join('+')};${t.reverse};${t.source};${t.origin}`;
+  }).join('');
+}
+
+/**
  * One control's memory of the frame before. A renderer keeps one per control on screen and calls
  * `next(runtime)` each time the control resolves; it returns the transitions for that frame in
  * the renderers' shape, plus `fired` — the names of the animations that claimed this change, which
@@ -214,6 +243,7 @@ export function selectionToTransitions(selection) {
 export function createTransitionTracker({ now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) } = {}) {
   let previousFrame = null;
   let previousSelection = null;
+  let previousKey = '';
   let last = { rootTransitions: new Map(), partTransitions: new Map(), fired: [] };
 
   return {
@@ -223,8 +253,13 @@ export function createTransitionTracker({ now = () => (typeof performance !== 'u
       const quiet = !change.first && !change.stateChanged
         && !(runtime?.transitions?.entries ?? []).some((entry) => entry.trigger?.type === 'valueChange' && change.changedSource(entry.trigger.source));
       const draggingFlip = previousFrame && (previousFrame.signals?.dragging === true) !== (frame.signals?.dragging === true);
+      // An edit in the Animation tab, or either reduced-motion switch, changes the catalog without
+      // changing anything an animation listens to. That is not a quiet frame.
+      const key = `${reducedMotion ? 1 : 0}${catalogKey(runtime?.transitions)}`;
+      const edited = key !== previousKey;
       previousFrame = frame;
-      if (quiet && !draggingFlip && previousSelection && !reducedMotion && runtime?.transitions?.enabled !== false) {
+      previousKey = key;
+      if (quiet && !draggingFlip && !edited && previousSelection) {
         // Nothing an animation listens to changed: keep the transitions exactly as they were, so a
         // re-render for some unrelated reason never interrupts one in flight.
         return { rootTransitions: last.rootTransitions, partTransitions: last.partTransitions, fired: [] };
@@ -248,6 +283,7 @@ export function createTransitionTracker({ now = () => (typeof performance !== 'u
     reset() {
       previousFrame = null;
       previousSelection = null;
+      previousKey = '';
       last = { rootTransitions: new Map(), partTransitions: new Map(), fired: [] };
     },
   };

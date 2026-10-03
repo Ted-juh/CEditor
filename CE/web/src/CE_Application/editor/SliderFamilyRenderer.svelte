@@ -222,15 +222,26 @@
   // Knob and Slider both ship one — did nothing on the controls it was written for. The glide moves
   // the DRAWN value along the same curve in JS instead. The tracker in CanvasControl only hands a
   // pointer a timing for a value change that is not a drag, so a drag still tracks the mouse 1:1.
-  let glideTiming = $derived(parseTiming(
-    partTransitions?.get?.('pointerCurrent')?.transform
-      ?? partTransitions?.get?.('pointerStart')?.transform
-      ?? partTransitions?.get?.('pointerEnd')?.transform
-      ?? null
-  ));
+  //
+  // The track fill and selected range are drawn from the same value, so their size timing (the
+  // defaults' rangeSlide) starts a glide too; the pointers' timing wins when both are set, because
+  // one value cannot move on two curves.
+  const VALUE_DRAWN_PARTS = ['pointerCurrent', 'pointerStart', 'pointerEnd', 'bodyTrackFill', 'bodySelectedRange'];
+
+  function glideTimingFrom(transitions) {
+    for (const name of VALUE_DRAWN_PARTS) {
+      const bucket = transitions?.get?.(name);
+      const timing = bucket?.transform ?? bucket?.size ?? null;
+      if (timing) return parseTiming(timing);
+    }
+    return null;
+  }
+
+  let glideTiming = $derived(glideTimingFrom(partTransitions));
   let glide = $state(null);
   let glideFrame = 0;
   let glideFrom = null;
+  let glideTarget = null;
 
   const lerpValues = (a, b, t) => ({
     start: a.start + (b.start - a.start) * t,
@@ -245,8 +256,12 @@
     const next = targetValues;
     const timing = glideTiming;
     untrack(() => {
+      // A re-render mid-glide that does not move the target — the pointer arriving, a state
+      // patch — lets the glide run on. Restarting it would stretch it by a whole duration.
+      if (glideFrame && glideTarget && sameValues(glideTarget, next)) return;
       const from = glide ?? glideFrom;
       glideFrom = next;
+      glideTarget = next;
       if (glideFrame) { cancelAnimationFrame(glideFrame); glideFrame = 0; }
       if (!timing || timing.duration + timing.delay <= 0 || !from || sameValues(from, next)
           || typeof requestAnimationFrame !== 'function') {
@@ -672,10 +687,10 @@
     };
   }
 
-  // The track fill, selected range and pointers are redrawn from the value every frame of a drag or
-  // a glide; a CSS transform transition on them would fight that. Their colour and opacity still
-  // follow the part's timing — a pointer that lights up on press should glide into its colour.
-  const VALUE_DRAWN_PARTS = ['bodyTrackFill', 'bodySelectedRange', 'pointerStart', 'pointerCurrent', 'pointerEnd'];
+  // The track fill, selected range and pointers (VALUE_DRAWN_PARTS, above) are redrawn from the
+  // value every frame of a drag or a glide; a CSS transform transition on them would fight that.
+  // Their colour and opacity still follow the part's timing — a pointer that lights up on press
+  // should glide into its colour.
 
   function pointerStyleFor(partName) {
     const bucket = partTransitions?.get?.(partName) ?? null;

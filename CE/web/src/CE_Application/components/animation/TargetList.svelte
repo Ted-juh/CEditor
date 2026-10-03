@@ -6,9 +6,10 @@
    * button, but to delete one or change the order you edit the JSON by hand, and the only feedback
    * is a red parse error.
    *
-   * Each row here says whether it does anything. Two of the properties the panel's own dropdown
-   * offers — Fill colour and Text colour — are not on the runtime's list, so they animate nothing,
-   * and a target on a part that does not exist is built and then never drawn.
+   * Each row here says whether it does anything. A path the runtime does not animate is reported,
+   * and so is a target on a part that does not exist, which the runtime builds and then never draws.
+   * (Fill colour and Text colour, which the panel's own dropdown offers, were the first dead ones;
+   * the runtime animates colour now.)
    */
   import GripVertical from 'lucide-svelte/icons/grip-vertical';
   import X from 'lucide-svelte/icons/x';

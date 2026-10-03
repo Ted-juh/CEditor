@@ -481,9 +481,10 @@ function buildTransitionCatalog(control, previewSession) {
   let order = 0;
   for (const [key, animation] of Object.entries(animations?._children ?? {})) {
     if (!animation || typeof animation !== 'object' || animation.enabled === false) continue;
-    // Keyframe animations are played by the renderers as CSS animations, not transitions; see
-    // utils/keyframeAnimation.js. Every other kind — including a word typed into the old free
-    // text box — is a transition, exactly as before.
+    // `keyframes` is reserved for a second kind that runs a shape of its own (a pulse, a blink)
+    // rather than easing between two styles; it will not be a transition, so it is set aside here
+    // rather than guessed at. Every other kind — including a word typed into the properties
+    // panel's free text box — is a transition, exactly as before.
     if (String(animation.kind ?? '') === 'keyframes') continue;
     const transition = animationTiming(animation, timeScale);
     const scale = Number(timeScale) > 0 ? Number(timeScale) : 1;
