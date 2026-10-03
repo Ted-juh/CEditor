@@ -49,7 +49,7 @@ const BUILTINS = {
   sqrt: Math.sqrt, pow: Math.pow, fmod: (a, b) => a % b,
   sin: Math.sin, cos: Math.cos, tan: Math.tan, exp: Math.exp, log: Math.log, log10: Math.log10,
   clamp: (v, lo, hi) => Math.min(hi, Math.max(lo, v)),
-  to_string: (x) => String(x), stoi: (x) => parseInt(x, 10), stod: (x) => parseFloat(x), stof: (x) => parseFloat(x),
+  to_string: (x) => cppStr(x), stoi: (x) => parseInt(x, 10), stod: (x) => parseFloat(x), stof: (x) => parseFloat(x),
   static_cast: (x) => x, reinterpret_cast: (x) => x, const_cast: (x) => x, dynamic_cast: (x) => x,
   make_pair: (a, b) => ({ first: a, second: b }), swap: () => {},
   M_PI: Math.PI, M_E: Math.E, npos: -1,
@@ -615,8 +615,12 @@ class Parser {
       let name = k.value;
       while (this.isV('::')) { this.next(); name = this.next().value; } // namespace-qualified → last segment
       if (/cast$/.test(name) && this.isV('<')) this.skipAngles();       // static_cast<T> → drop the <T>
-      if (name === 'true') return { type: 'num', value: 1, bool: true };
-      if (name === 'false') return { type: 'num', value: 0, bool: true };
+      // A bool stays a bool — what a comparison already gave — so `true` reaches the panel API as
+      // one, as a Lua or JS bool does, and the exported handler (ce_runtime.h) sends the same. It
+      // was the number 1, which made `true == (x > 3)` false and sent 1 or true for the same flag
+      // depending on where it came from. Arithmetic on it still works as C++'s does (true + 1 is 2).
+      if (name === 'true') return { type: 'num', value: true };
+      if (name === 'false') return { type: 'num', value: false };
       if (name === 'nullptr' || name === 'NULL') return { type: 'num', value: 0 };
       return { type: 'ident', name };
     }
@@ -634,13 +638,25 @@ function truthy(v) { return typeof v === 'number' ? v !== 0 : typeof v === 'bool
 function cppStr(v) { return typeof v === 'boolean' ? (v ? '1' : '0') : String(v); }
 
 // Default value for a declaration with no initializer, from its type (struct / map / vector / …).
+// The conversions C++ makes when a bool initialises an arithmetic variable and the other way round:
+// `int n = flag` is 1, `bool b = 5` is true. The interpreter keeps a bool as a JS boolean, so where
+// the declared type says otherwise the conversion is its job. (Only at the declaration — a later
+// `n = flag` is not typed here, as no assignment is.)
+const CPP_ARITHMETIC = new Set(['int', 'long', 'short', 'char', 'unsigned', 'signed', 'float', 'double',
+  'size_t', 'int8_t', 'int16_t', 'int32_t', 'int64_t', 'uint8_t', 'uint16_t', 'uint32_t', 'uint64_t']);
+function convertForDecl(d, v) {
+  if (d.typeName === 'bool' && typeof v === 'number') return v !== 0;
+  if (typeof v === 'boolean' && CPP_ARITHMETIC.has(d.typeName)) return v ? 1 : 0;
+  return v;
+}
+
 function declDefault(d, env) {
   if (d.init) {
     // pair p = {a, b}  →  { first, second }
     if (d.typeName === 'pair' && d.init.type === 'array' && d.init.elems.length === 2) {
       return { first: evalNode(d.init.elems[0], env), second: evalNode(d.init.elems[1], env) };
     }
-    return evalNode(d.init, env);
+    return convertForDecl(d, evalNode(d.init, env));
   }
   if (d.ctorArgs) {
     const a = d.ctorArgs.map((x) => evalNode(x, env));
@@ -649,7 +665,7 @@ function declDefault(d, env) {
     if (d.typeName === 'pair') return { first: a[0] ?? 0, second: a[1] ?? 0 };
     const prog = env.get('__program');
     if (prog?.structs?.has(d.typeName)) return constructStruct(prog.structs.get(d.typeName), env);
-    return a.length === 1 ? a[0] : 0; // int x(5)
+    return a.length === 1 ? convertForDecl(d, a[0]) : 0; // int x(5)
   }
   if (d.isArray) return new Array(Math.max(0, (d.arrayLen ? evalNode(d.arrayLen, env) : 0) | 0)).fill(0);
   const prog = env.get('__program');
@@ -658,6 +674,7 @@ function declDefault(d, env) {
   if (d.typeName === 'pair') return { first: 0, second: 0 };
   if (d.typeHint === 'array') return [];
   if (d.typeHint === 'string' || d.typeName === 'string') return '';
+  if (d.typeName === 'bool') return false;
   return 0;
 }
 
@@ -748,11 +765,14 @@ function lvalue(node, env) {
   throw new Error('invalid assignment target');
 }
 
+const promoteBool = (v, other) => (typeof v === 'boolean' && typeof other === 'number' ? (v ? 1 : 0) : v);
+
 function applyBin(op, a, b) {
   switch (op) {
     case '+': return a + b; case '-': return a - b; case '*': return a * b; case '/': return a / b; case '%': return a % b;
-    case '==': return (a instanceof CppIter && b instanceof CppIter) ? (a.container === b.container && a.pos === b.pos) : a === b;
-    case '!=': return (a instanceof CppIter && b instanceof CppIter) ? !(a.container === b.container && a.pos === b.pos) : a !== b;
+    // A bool compared with a number is promoted to 0 or 1 first, as C++ does: (x > 3) == 1.
+    case '==': return (a instanceof CppIter && b instanceof CppIter) ? (a.container === b.container && a.pos === b.pos) : promoteBool(a, b) === promoteBool(b, a);
+    case '!=': return (a instanceof CppIter && b instanceof CppIter) ? !(a.container === b.container && a.pos === b.pos) : promoteBool(a, b) !== promoteBool(b, a);
     case '<': return a < b; case '<=': return a <= b; case '>': return a > b; case '>=': return a >= b;
     case '&': return a & b; case '|': return a | b; case '^': return a ^ b;
   }

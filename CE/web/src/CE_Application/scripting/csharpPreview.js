@@ -334,8 +334,11 @@ class Parser {
     if (k.type === 'interp') return this.parseInterp(k.value);
     if (k.value === '(') { const e = this.parseAssign(); this.eat(')'); return e; }
     if (k.type === 'id') {
-      if (k.value === 'true') return { type: 'num', value: 1 };
-      if (k.value === 'false') return { type: 'num', value: 0 };
+      // A bool is a bool, as it is in C# — and as a comparison already gave here. It was the
+      // number 1, which made `true == (x > 3)` false, printed `true` as 1 and sent the panel API 1
+      // or true for the same flag depending on where it came from.
+      if (k.value === 'true') return { type: 'num', value: true };
+      if (k.value === 'false') return { type: 'num', value: false };
       if (k.value === 'null') return { type: 'null' };
       return { type: 'ident', name: k.value };
     }

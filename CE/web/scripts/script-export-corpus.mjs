@@ -95,6 +95,8 @@ export const CTX_LANGUAGES = ['cpp', 'csharp', 'java'];
 // `ctx` accepts for set/get, log, sendCC/sendNRPN/sendSysex and the six arithmetic helpers (C#'s
 // PascalCase names too). CORE_SOURCES calls every one of them, so the validator can run each sample
 // through the preview and through the real export generators and compare every call it makes.
+// They pass booleans too, literal and computed, because a bool is a bool on both sides: the preview
+// used to read a literal `true` as the number 1, and each export sent something different again.
 //
 // What the preview `ctx` has beyond this core — the rest of the panel API — previews and does not
 // compile: see "What the C++/C#/Java preview subset covers" in the scripting manual.
@@ -125,6 +127,31 @@ export const HELPER_CASES = [
   ['curve', 'zero / zero, "log"'], ['curve', '0.3, "s"'], ['curve', '0.7, "s"'],
   ['curve', '0.123456789, "s"'], ['curve', '0.3, "linear"'], ['curve', '0.3'],
   ['curve', '0.3, "bogus"'],
+];
+
+/* ---------------------------------------------------------- Java's ctx.get, as javac sees it */
+// In an exported Java handler ctx.get returns Object (a number as a Double), and the Java preview,
+// which has no static types, used to run whatever it was given. It now reports the uses javac
+// rejects, and the narrowing casts that compile and then throw (contextReadErrors, javaPreview.js).
+// The validator compiles every one of these with javac against the real runtime, runs the ones that
+// compile, and checks that the preview flags exactly those that fail one way or the other — so the
+// list holds both kinds, including the valid Java that must not be flagged.
+export const JAVA_READ_CASES = [
+  // javac rejects these
+  'double x = ctx.get("a");', 'int n = ctx.get("a");', 'String s = ctx.getValue("t", "value");', 'Double d = ctx.get("a");',
+  'boolean b = ctx.get("on");', 'double y = ctx.get("a") * 2;', 'double y = -ctx.get("a");', 'if (ctx.get("on")) { ctx.log("x"); }',
+  'double y = Math.sqrt(ctx.get("a"));', 'double y = ctx.clamp(ctx.get("a"), 0, 1);', 'double x = 1; x -= ctx.get("a");',
+  'double y = ctx.get("a") + 1;', 'int n = ctx.get("a") > 0.5 ? 1 : 0;', 'String s = ctx.get("a") + ctx.get("b");',
+  'double y = ctx.curve(0.3, ctx.get("shape"));', 'boolean b = !ctx.get("on");', 'int s = ctx.get("on") ? 1 : 0;',
+  'while (ctx.get("on")) { break; }', 'List<Double> l = ctx.get("a");',
+  // these compile and throw: a Double cannot be cast to int, float or long
+  'int n = (int) ctx.get("a");', 'float f = (float) ctx.get("a");', 'long l = (long) ctx.get("a");',
+  // and these are fine Java, which the preview must leave alone
+  'double x = (double) ctx.get("a");', 'Object o = ctx.get("a");', 'var v = ctx.get("a");', 'String s = "v=" + ctx.get("a");',
+  'ctx.set("b", ctx.get("a"));', 'ctx.log("v", ctx.get("a"));', 'int n = (int) (double) ctx.get("a");',
+  'String t = (String) ctx.get("t");', 'if (ctx.get("a") == null) { ctx.log("none"); }', 'ctx.sendCC(1, 2, ctx.get("a"));',
+  'ArrayList<Double> list = new ArrayList<>(); list.add(1.5); double y = list.get(0) * 2;',
+  'boolean b = (boolean) ctx.get("on");', 'String s = String.valueOf(ctx.get("a"));', 'System.out.println(ctx.get("a"));',
 ];
 
 /** What the recording host answers for a get(). Anything else reads as null. */
@@ -158,6 +185,19 @@ export const CORE_SOURCES = {
   std::vector<int> bytes = {0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7};
   ctx.sendSysex(bytes);
   ctx.sendSysex("F0 41 10 42 F7");
+  bool flag = true;
+  bool above = event.value > 0.2;
+  ctx.set("on.value", true);
+  ctx.set("flag.value", flag);
+  ctx.setValue("above.value", above);
+  ctx.set("same.value", flag == above);
+  ctx.set(path, false);
+  int count = above;
+  ctx.set("count.value", count);
+  ctx.log("flag", flag);
+  ctx.sendCC(1, 64, true);
+  ctx.emit("toggled", true);
+  ctx.emit("level", 0.75);
 ${helperCalls((i) => (i % 2 ? 'set' : 'setValue'), (fn) => fn)}
 }
 `,
@@ -186,6 +226,17 @@ ${helperCalls((i) => (i % 2 ? 'set' : 'setValue'), (fn) => fn)}
   ctx.sendSysex(new List<int> { 0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7 });
   ctx.SendSysex(new byte[] { 0xF0, 0x43, 0xF7 });
   ctx.SendSysex("F0 41 10 42 F7");
+  bool flag = true;
+  bool above = e.Value > 0.2;
+  ctx.SetValue("on.value", true);
+  ctx.set("flag.value", flag);
+  ctx.setValue("above.value", above);
+  ctx.SetValue("same.value", flag == above);
+  ctx.Log("flag", flag);
+  ctx.SendCC(1, 64, true);
+  ctx.sendNRPN(2, 1, 10, false);
+  ctx.emit("toggled", true);
+  ctx.emit("level", 0.75);
 ${helperCalls((i) => (i % 2 ? 'set' : 'SetValue'), (fn, i) => (i % 2 ? fn : pascal(fn)))}
 }
 `,
@@ -212,6 +263,17 @@ ${helperCalls((i) => (i % 2 ? 'set' : 'SetValue'), (fn, i) => (i % 2 ? fn : pasc
   bytes.add(0xF0); bytes.add(0x7E); bytes.add(0x7F); bytes.add(0xF7);
   ctx.sendSysex(bytes);
   ctx.sendSysex("F0 41 10 42 F7");
+  boolean flag = true;
+  boolean above = e.value > 0.2;
+  ctx.set("on.value", true);
+  ctx.set("flag.value", flag);
+  ctx.setValue("above.value", above);
+  ctx.set("same.value", flag == above);
+  ctx.log("flag", flag);
+  ctx.sendCC(1, 64, true);
+  ctx.sendNRPN(2, 1, 10, false);
+  ctx.emit("toggled", true);
+  ctx.emit("level", 0.75);
 ${helperCalls((i) => (i % 2 ? 'set' : 'setValue'), (fn) => fn)}
 }
 `,

@@ -184,11 +184,13 @@ static void JNICALL n_emitS(JNIEnv* e, jclass c, jlong host, jstring name, jstri
     (*e)->ReleaseStringUTFChars(e, s, sv);
     (*e)->ReleaseStringUTFChars(e, name, nm);
 }
-/* A value of the kind Java picked: CE_NULL, CE_DOUBLE (d) or CE_STRING (s). The string's UTF-8 is
- * borrowed from `s` and must be released by the caller (ce_release_kind) after the host call. */
+/* A value of the kind Java picked: CE_NULL, CE_DOUBLE (d), CE_BOOL (d is 0 or 1) or CE_STRING (s). The
+ * string's UTF-8 is borrowed from `s` and must be released by the caller (ce_release_kind) after the
+ * host call. */
 static CeValue ce_kind_value(JNIEnv* e, jint kind, jdouble d, jstring s, const char** utf) {
     CeValue v; memset(&v, 0, sizeof v); *utf = NULL;
     if (kind == CE_DOUBLE) { v.tag = CE_DOUBLE; v.u.d = d; }
+    else if (kind == CE_BOOL) { v.tag = CE_BOOL; v.u.b = d != 0 ? 1 : 0; }
     else if (kind == CE_STRING && s) { *utf = (*e)->GetStringUTFChars(e, s, NULL); v.tag = CE_STRING; v.u.s = ce_str(*utf); }
     else v.tag = CE_NULL;
     return v;
@@ -215,6 +217,21 @@ static void JNICALL n_nrpnV(JNIEnv* e, jclass c, jlong host, jint ch, jint msb, 
     const char* utf; CeValue v = ce_kind_value(e, kind, d, s, &utf);
     vt->send_nrpn(vt->host_ctx, ch, msb, lsb, &v);
     ce_release_kind(e, s, utf);
+}
+static void JNICALL n_ccV(JNIEnv* e, jclass c, jlong host, jint ch, jint cc, jint kind, jdouble d, jstring s) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->send_cc) return;
+    const char* utf; CeValue v = ce_kind_value(e, kind, d, s, &utf);
+    vt->send_cc(vt->host_ctx, ch, cc, &v);
+    ce_release_kind(e, s, utf);
+}
+static void JNICALL n_emitV(JNIEnv* e, jclass c, jlong host, jstring name, jint kind, jdouble d, jstring s) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->emit) return;
+    const char* nm = (*e)->GetStringUTFChars(e, name, NULL);
+    CeStr ns = ce_str(nm);
+    const char* utf; CeValue v = ce_kind_value(e, kind, d, s, &utf);
+    vt->emit(vt->host_ctx, &ns, &v);
+    ce_release_kind(e, s, utf);
+    (*e)->ReleaseStringUTFChars(e, name, nm);
 }
 /* sendSysex(int[]): a list of numbers to send_sysex_value, so the host clamps and frames it exactly as
  * it does for Lua and JS. A host older than that slot takes packed bytes, clamped here as it would. */
@@ -293,6 +310,8 @@ static const JNINativeMethod kNatives[] = {
     { "nEmitS",  "(JLjava/lang/String;Ljava/lang/String;)V",     (void*)n_emitS  },
     { "nLogV",   "(JILjava/lang/String;IDLjava/lang/String;)V",  (void*)n_logV   },
     { "nNrpnV",  "(JIIIIDLjava/lang/String;)V",                  (void*)n_nrpnV  },
+    { "nCCv",    "(JIIIDLjava/lang/String;)V",                   (void*)n_ccV    },
+    { "nEmitV",  "(JLjava/lang/String;IDLjava/lang/String;)V",   (void*)n_emitV  },
     { "nSysexList", "(J[I)V",                                    (void*)n_sysexList },
     { "nSysexHex",  "(JLjava/lang/String;)V",                    (void*)n_sysexHex  },
     { "nPKind",  "(JLjava/lang/String;)I",                       (void*)n_pKind  },

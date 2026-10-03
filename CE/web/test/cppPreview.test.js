@@ -456,3 +456,29 @@ test('std::pair via make_pair and brace-init', () => {
   assert.equal(values.a, 10);
   assert.equal(values.b, 10);
 });
+
+// A bool is a bool: `true` was lexed as the number 1 while a comparison gave a JS boolean, so the same
+// flag reached the panel API as 1 or as true depending on where it came from. C++'s own conversions
+// still hold: printing gives 1, arithmetic promotes, and a declared type converts.
+test('bool literals are booleans, with C++ conversions where C++ makes them', () => {
+  const src = `void onValueChanged(CeContext& ctx, const CeEvent& event) {
+    bool lit = true; bool above = event.value > 0.2;
+    ctx.setValue("lit", lit); ctx.setValue("same", lit == above); ctx.setValue("off", false);
+    int n = above; bool fromInt = 5; bool unset;
+    ctx.setValue("n", n); ctx.setValue("fromInt", fromInt); ctx.setValue("unset", unset);
+    ctx.setValue("promoted", above == 1); ctx.setValue("sum", lit + 1);
+    ctx.setValue("text", std::to_string(lit));
+    std::cout << lit << std::endl;
+  }`;
+  const { values, out } = run(src, 'onValueChanged', { value: 0.5 });
+  assert.equal(values.lit, true);
+  assert.equal(values.same, true);
+  assert.equal(values.off, false);
+  assert.equal(values.n, 1);
+  assert.equal(values.fromInt, true);
+  assert.equal(values.unset, false);
+  assert.equal(values.promoted, true);
+  assert.equal(values.sum, 2);
+  assert.equal(values.text, '1');
+  assert.equal(out.join(''), '1\n');
+});

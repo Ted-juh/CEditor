@@ -163,3 +163,18 @@ test('languageService analyzes C#: symbols, diagnostics, folding, go-to-def', ()
   const def = getDefinition(CS, 'csharp', CS.indexOf('Helper((int)'));
   assert.ok(def && def.line === 1);
 });
+
+// `true` was lexed as the number 1: `true == (x > 0.2)` came out false, Console.WriteLine(true)
+// printed 1, and the panel API got 1 for a literal and true for a comparison.
+test('bool literals are booleans', () => {
+  const src = `void OnValueChanged(CeContext ctx, CeEvent e) {
+    bool lit = true; bool above = e.value > 0.2;
+    ctx.SetValue("lit", lit); ctx.SetValue("same", lit == above); ctx.SetValue("off", false);
+    Console.WriteLine(lit); Console.WriteLine("on: " + lit);
+  }`;
+  const { values, out } = run(src, 'OnValueChanged', { value: 0.5 });
+  assert.equal(values.lit, true);
+  assert.equal(values.same, true);
+  assert.equal(values.off, false);
+  assert.deepEqual(out.map((s) => s.trim()), ['True', 'on: True']);
+});

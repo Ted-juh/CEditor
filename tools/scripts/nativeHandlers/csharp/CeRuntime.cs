@@ -301,13 +301,14 @@ namespace Ce
 
         public override string ToString() => AsString();
 
-        // So a handler can pass a string wherever a Var is taken and read a Var back as a number, as it
-        // can in the preview (ce::Var reads back as a double in C++ too). Numbers are not converted
-        // INTO a Var implicitly: with conversions both ways, an int argument matches a Var overload
-        // and a double one equally and the call is ambiguous, so every method that takes a number has
-        // a double overload instead. Nor a bool: the preview reads a C# `true` as the number 1 and
-        // this would send a bool, so a bool keeps needing `new Var(b)`.
+        // So a handler can pass a string or a bool wherever a Var is taken and read a Var back as a
+        // number, as it can in the preview (ce::Var reads back as a double in C++ too); a bool reaches
+        // the host as a bool, as it does from the preview. Numbers are not converted INTO a Var
+        // implicitly: with conversions both ways, an int argument matches a Var overload and a double
+        // one equally and the call is ambiguous, so every method that takes a number has a double
+        // overload instead. A bool converts to nothing numeric in C#, so it cannot be ambiguous.
         public static implicit operator Var(string s) => new Var(s);
+        public static implicit operator Var(bool b) => new Var(b);
         public static implicit operator double(Var v) => v.AsDouble();
     }
 
@@ -466,6 +467,7 @@ namespace Ce
         }
 
         public void log(string msg, double value) => log(msg, new Var(value));
+        public void emit(string name, double data) => emit(name, new Var(data));
 
         public void sendNRPN(int channel, int msb, int lsb, Var v)
         {

@@ -51,7 +51,7 @@ try {
     // and with a PascalCase handler, so the shim and the generator's binding are both exercised.
     const gen = generateCsharpModule({ scripts: [
       { id: 'knob1', name: 'Cutoff', event: 'onValueChanged', source: 'void onValueChanged(CeContext ctx, CeEvent e){ ctx.sendCC(1, 25, 127); ctx.setValue("out", e.value*2+1); ctx.log("ran"); }' },
-      { id: 'knob2', name: 'Values', event: 'onValueChanged', source: 'void OnValueChanged(CeContext ctx, CeEvent e){ ctx.Log("v", 1.5); ctx.SendSysex(new[] { 0xF0, 0x7F, 0xF7 }); ctx.SendSysex("F0 7E F7"); ctx.SendNRPN(1, 2, 3, 400); }' },
+      { id: 'knob2', name: 'Values', event: 'onValueChanged', source: 'void OnValueChanged(CeContext ctx, CeEvent e){ ctx.Log("v", 1.5); ctx.SendSysex(new[] { 0xF0, 0x7F, 0xF7 }); ctx.SendSysex("F0 7E F7"); ctx.SendNRPN(1, 2, 3, 400); ctx.SendCC(1, 64, true); }' },
     ], outDir: work, abiInfo: { dir: ABI_DIR, targetFramework: targetFramework() } });
 
     // 1) Roslyn → self-contained CoreCLR + ce_managed.dll

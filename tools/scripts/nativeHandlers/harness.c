@@ -15,6 +15,7 @@ static char g_out_key[64]; static double g_out_val; static char g_log[64];
 static char g_logv_msg[64]; static double g_logv_val = -1; static int g_logv_tag = -1;
 static int g_sx_list[16]; static int g_sx_list_n = -1; static char g_sx_hex[64]; static int g_sx_calls;
 static int g_nrpn[3] = { -1, -1, -1 }; static double g_nrpn_val = -1;
+static int g_cc_num = -1; static int g_cc_tag = -1; static int g_cc_b = -1;
 
 static int  CE_CALL h_set(void* c, const CeStr* k, const CeValue* v, const CeValue* o) {
     (void)c;(void)o; size_t n = (size_t)k->len < sizeof(g_out_key)-1 ? (size_t)k->len : sizeof(g_out_key)-1;
@@ -22,7 +23,7 @@ static int  CE_CALL h_set(void* c, const CeStr* k, const CeValue* v, const CeVal
     g_out_val = v->tag==CE_DOUBLE ? v->u.d : v->tag==CE_INT64 ? (double)v->u.i : 0; return 0;
 }
 static int  CE_CALL h_get(void* c, const CeStr* k, const CeStr* f, CeValue* out){ (void)c;(void)k;(void)f; if(out) out->tag=CE_NULL; return 0; }
-static void CE_CALL h_cc(void* c,int32_t a,int32_t b,const CeValue* v){ (void)c;(void)a;(void)b;(void)v; }
+static void CE_CALL h_cc(void* c,int32_t a,int32_t b,const CeValue* v){ (void)c;(void)a; g_cc_num=b; g_cc_tag = v ? v->tag : -1; g_cc_b = (v && v->tag==CE_BOOL) ? v->u.b : -1; }
 static double num(const CeValue* v){ return !v ? -1 : v->tag==CE_DOUBLE ? v->u.d : v->tag==CE_INT64 ? (double)v->u.i : -1; }
 static void CE_CALL h_nrpn(void* c,int32_t a,int32_t b,int32_t d,const CeValue* v){ (void)c; g_nrpn[0]=a; g_nrpn[1]=b; g_nrpn[2]=d; g_nrpn_val=num(v); }
 static void CE_CALL h_logv(void* c,int32_t lvl,const CeStr* m,const CeValue* v){
@@ -65,17 +66,20 @@ int main(int argc, char** argv) {
     int ok = ver()==1 && r==0 && hh==1 && g_out_val==21.0 && strcmp(g_log,"ran")==0;
 
     /* knob2, when the module has it: log("v", 1.5), sendSysex({F0,7F,F7}), sendSysex("F0 7E F7"),
-     * sendNRPN(1, 2, 3, 400). Each value must reach the host as the handler passed it. */
+     * sendNRPN(1, 2, 3, 400), sendCC(1, 64, true). Each value must reach the host as the handler
+     * passed it — the bool as a bool. */
     CeStr sid2 = { "knob2", 5 };
     if (has(st, sid2, ev)) {
         disp(st, sid2, ev, &p, NULL);
         int core = strcmp(g_logv_msg,"v")==0 && g_logv_tag==CE_DOUBLE && g_logv_val==1.5
                 && g_sx_calls==2 && g_sx_list_n==3 && g_sx_list[0]==0xF0 && g_sx_list[1]==0x7F && g_sx_list[2]==0xF7
                 && strcmp(g_sx_hex,"F0 7E F7")==0
-                && g_nrpn[0]==1 && g_nrpn[1]==2 && g_nrpn[2]==3 && g_nrpn_val==400;
-        printf("knob2: log('%s', %g) sysex[%d]=%02X..%02X then '%s' nrpn(%d,%d,%d,%g) -> %s\n", g_logv_msg, g_logv_val,
+                && g_nrpn[0]==1 && g_nrpn[1]==2 && g_nrpn[2]==3 && g_nrpn_val==400
+                && g_cc_num==64 && g_cc_tag==CE_BOOL && g_cc_b==1;
+        printf("knob2: log('%s', %g) sysex[%d]=%02X..%02X then '%s' nrpn(%d,%d,%d,%g) cc64=%s -> %s\n", g_logv_msg, g_logv_val,
                g_sx_list_n, g_sx_list_n > 0 ? g_sx_list[0] : 0, g_sx_list_n > 0 ? g_sx_list[g_sx_list_n-1] : 0, g_sx_hex,
-               g_nrpn[0], g_nrpn[1], g_nrpn[2], g_nrpn_val, core ? "ok" : "WRONG");
+               g_nrpn[0], g_nrpn[1], g_nrpn[2], g_nrpn_val, g_cc_tag==CE_BOOL ? (g_cc_b ? "true" : "false") : "not a bool",
+               core ? "ok" : "WRONG");
         ok = ok && core;
     }
     printf("%s\n", ok ? "NATIVE HANDLER E2E PASS" : "FAIL");

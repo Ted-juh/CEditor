@@ -259,14 +259,17 @@ the Lua/JS/Python preludes). Mitigations:
   **Built:** `CE/web/scripts/validate-script-exports.mjs` (`npm run test:script-exports`, part of
   `test:all` and so of CI). For each of C++, C# and Java it generates a module from the canonical
   example and from `CORE_SOURCES` — a handler making every call of the core in every spelling the
-  preview accepts, plus 39 helper calls at their edges — with the real generator, compiles it against
-  the real runtime, dispatches it through the real entry points into a recording host, and compares
-  every call, to the bit, with the same source in the preview (`previewContextFor`/`previewEventFor`,
-  exported from `panelRuntime.js` so the comparison uses the preview's own `ctx`). The only stand-in
+  preview accepts, booleans literal and computed, plus 39 helper calls at their edges — with the real
+  generator, compiles it against the real runtime, dispatches it through the real entry points into a
+  recording host, and compares every call, to the bit, with the same source in the preview
+  (`previewContextFor`/`previewEventFor`, exported from `panelRuntime.js` so the comparison uses the
+  preview's own `ctx`). The only stand-in
   is the far side: the C++ glue is linked into the harness, the C# exports are called through
   function pointers, and Java's `CeRuntime.HOST` is swapped for a recorder. The shims in that gap
   (`CeHost.c`, `ce_java_shim.c`) and the host trampolines are run by `verify-all.mjs`, whose samples
-  now include the two appended slots.
+  now include the two appended slots. A further pass, `java-reads`, compiles a table of Java `ctx.get`
+  uses with javac and checks that the Java preview flags exactly the ones javac rejects or that throw
+  (`get` returns `Object` in Java, which the untyped preview used to accept anywhere).
 
   What it does not cover is the rest of the preview's `ctx`: the preview hands a compiled-language
   handler the whole panel API, and the export only the core. A member past the core previews and

@@ -18,6 +18,7 @@
 #include <initializer_list>
 #include <string>
 #include <cstring>
+#include <type_traits>
 #include <vector>
 
 namespace ce {
@@ -72,12 +73,19 @@ public:
     // The preview's ctx has set/get as well as setValue/getValue (they are one function there), and
     // every path or message may be a std::string as well as a literal.
     //
-    // Values keep to the two overloads setValue always had, Var and double, on purpose. A bool
-    // overload beside them looks harmless and is not: set("label.text", "hello") would pick it — a
-    // pointer converts to bool by a standard conversion, which beats Var's constructor — and set the
-    // label to true; set("x", 5) would become ambiguous between double and bool. And the preview
-    // reads a C++ `true` as 1, so a bool reaching the host as 1.0 by way of the double overload is
-    // what the preview does too.
+    // A bool reaches the host as a bool, as it does from the preview (and from Lua and JS). It does
+    // so through a template that only bool itself can match, not through a plain bool overload: that
+    // would win set("label.text", "hello") — a pointer converts to bool by a standard conversion,
+    // which beats Var's constructor — and set the label to true, and make set("x", 5) ambiguous.
+    // Here a string still reaches Var, an int still the double overload, and only a bool this.
+    template <typename B> requires std::is_same_v<B, bool>
+    void setValue(const char* path, B b)                  { setValue(path, Var(b)); }
+    template <typename B> requires std::is_same_v<B, bool>
+    void setValue(const std::string& path, B b)           { setValue(path.c_str(), Var(b)); }
+    template <typename B> requires std::is_same_v<B, bool>
+    void set(const char* path, B b)                       { setValue(path, Var(b)); }
+    template <typename B> requires std::is_same_v<B, bool>
+    void set(const std::string& path, B b)                { setValue(path.c_str(), Var(b)); }
     void setValue(const std::string& path, const Var& v)  { setValue(path.c_str(), v); }
     void setValue(const std::string& path, double d)      { setValue(path.c_str(), Var(d)); }
     void set(const char* path, const Var& v)              { setValue(path, v); }

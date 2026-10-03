@@ -19,7 +19,7 @@
 //     needs no toolchain, so it always runs.
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { register } from 'node:module';
 import os from 'node:os';
@@ -32,7 +32,7 @@ import { compileCsharp, invokeCsharp } from '../src/CE_Application/scripting/csh
 import { compileJava, invokeJava } from '../src/CE_Application/scripting/javaPreview.js';
 import { RUNNABLE_LANGUAGES } from '../src/CE_Application/scripting/panelApi.js';
 import { ensureTs, transpileTs } from '../src/CE_Application/scripting/tsService.js';
-import { CORE_GET, CORE_SOURCES, EXPECTED, SOURCES, checkEffects, createRecordingApi } from './script-export-corpus.mjs';
+import { CORE_GET, CORE_SOURCES, EXPECTED, JAVA_READ_CASES, SOURCES, checkEffects, createRecordingApi } from './script-export-corpus.mjs';
 
 // The compiled handlers are compared with the preview's own ctx and event, so this needs
 // panelRuntime, which imports its wasm through Vite's `?url` suffix. Plain Node cannot resolve that;
@@ -364,6 +364,7 @@ function previewRecords(language, source) {
     sendCC: (ch, cc, v) => { records.push(['cc', ch, cc, v]); },
     sendNRPN: (ch, msb, lsb, v) => { records.push(['nrpn', ch, msb, lsb, v]); },
     sendSysex: (bytes) => { records.push(['sysex', bytes]); },
+    emit: (name, data) => { records.push(['emit', name, data]); },
     // The WebView's curve reports an unknown shape to the script console rather than through log();
     // the compiled one has only log(). Read it back so the two can be compared.
     curve: (...args) => {
@@ -695,7 +696,8 @@ public final class ExportHarness implements CeHostCalls {
     }
     static String dbl(double d) { return "{\\"f\\":\\"" + String.format("%016x", Double.doubleToRawLongBits(d)) + "\\"}"; }
     static String kind(int kind, double d, String s) {
-        return kind == CeRuntime.CE_DOUBLE ? dbl(d) : kind == CeRuntime.CE_STRING ? text(s) : "null";
+        return kind == CeRuntime.CE_DOUBLE ? dbl(d) : kind == CeRuntime.CE_STRING ? text(s)
+             : kind == CeRuntime.CE_BOOL ? String.valueOf(d != 0) : "null";
     }
     static void out(String call) { System.out.print("R " + call + "\\n"); }
 
@@ -707,6 +709,7 @@ public final class ExportHarness implements CeHostCalls {
     public String getS(long h, String key, String form)     { return ""; }
     public void   ccD(long h, int ch, int cc, double v)     { out("[\\"cc\\"," + ch + "," + cc + "," + dbl(v) + "]"); }
     public void   ccS(long h, int ch, int cc, String v)     { out("[\\"cc\\"," + ch + "," + cc + "," + text(v) + "]"); }
+    public void   ccV(long h, int ch, int cc, int k, double d, String s) { out("[\\"cc\\"," + ch + "," + cc + "," + kind(k, d, s) + "]"); }
     public void   nrpnV(long h, int ch, int msb, int lsb, int k, double d, String s) { out("[\\"nrpn\\"," + ch + "," + msb + "," + lsb + "," + kind(k, d, s) + "]"); }
     public void   sysexList(long h, int[] bytes) {
         StringBuilder sb = new StringBuilder("[\\"sysex\\",[");
@@ -718,6 +721,7 @@ public final class ExportHarness implements CeHostCalls {
     public void   logV(long h, int level, String msg, int k, double d, String s) { out("[\\"log\\"," + text(msg) + "," + kind(k, d, s) + "]"); }
     public void   emitD(long h, String name, double v)      { out("[\\"emit\\"," + text(name) + "," + dbl(v) + "]"); }
     public void   emitS(long h, String name, String v)      { out("[\\"emit\\"," + text(name) + "," + text(v) + "]"); }
+    public void   emitV(long h, String name, int k, double d, String s) { out("[\\"emit\\"," + text(name) + "," + kind(k, d, s) + "]"); }
     public int    pKind(long p, String key)                 { return "value".equals(key) ? CeRuntime.CE_DOUBLE : -1; }
     public double pD(long p, String key)                    { return "value".equals(key) ? ${EV} : 0; }
     public String pS(long p, String key)                    { return ""; }
@@ -757,6 +761,71 @@ async function validateJava() {
   return mismatch
     ? result('java', 'fail', mismatch, { tool: javac })
     : result('java', 'pass', 'genJava module compiled and dispatched; every call matches the preview.', { tool: javac });
+}
+
+// The Java preview reports what javac will say about a ctx read (contextReadErrors). That is only
+// worth anything while it agrees with javac, so every case in JAVA_READ_CASES is compiled against the
+// real runtime — all at once, a javac error mapped back to its case by a marker on its line — and the
+// ones that compile are run against a host that answers with a Double, a String and a Boolean. The
+// preview must flag exactly the cases javac rejects or that throw, and no other.
+async function validateJavaReads() {
+  const javac = resolveCommand(['javac']);
+  const java = resolveCommand(['java']);
+  if (!javac || !java) return result('java-reads', 'skip', 'javac and java are both needed.');
+  const generateJavaModule = await generator('java/genJava.mjs', 'generateJavaModule');
+  const directory = path.join(workspaceRoot, 'java-reads');
+  const moduleFor = async (dir, indices) => {
+    const source = ['void onValueChanged(CeContext ctx, CeEvent e) { }',
+      ...indices.map((i) => `void case${i}(CeContext ctx, CeEvent e) {\n  ${JAVA_READ_CASES[i]} // case ${i}\n}`)].join('\n');
+    await mkdir(path.join(dir, 'classes'), { recursive: true });
+    const gen = generateJavaModule({ scripts: [{ id: 'reads', event: 'onValueChanged', source }], outDir: dir, abiInfo: { dir: abiDir } });
+    return gen.javaSources.map((f) => path.join(dir, f));
+  };
+  const all = JAVA_READ_CASES.map((_, i) => i);
+  const firstDir = path.join(directory, 'all');
+  const first = runExecutable(javac, ['-encoding', 'UTF-8', '-Xmaxerrs', '1000', '-d', path.join(firstDir, 'classes'), ...await moduleFor(firstDir, all)], firstDir);
+  const generated = readFileSync(path.join(firstDir, 'Script_reads.java'), 'utf8').split(/\r?\n/);
+  const rejected = new Set();
+  for (const m of combineOutput(first).matchAll(/Script_reads\.java:(\d+): error/g)) {
+    const marker = /\/\/ case (\d+)/.exec(generated[Number(m[1]) - 1] ?? '');
+    if (!marker) return result('java-reads', 'fail', `a javac error outside every case:\n${combineOutput(first)}`, { tool: javac });
+    rejected.add(Number(marker[1]));
+  }
+  const compiling = all.filter((i) => !rejected.has(i));
+  const runDir = path.join(directory, 'run');
+  const sources = await moduleFor(runDir, compiling);
+  await writeFile(path.join(runDir, 'ReadHost.java'), `public final class ReadHost implements CeHostCalls {
+    public void setD(long h, String k, double v) {} public void setS(long h, String k, String v) {} public void setB(long h, String k, boolean v) {}
+    public int getKind(long h, String k, String f) { return k.equals("a") ? CeRuntime.CE_DOUBLE : k.equals("t") ? CeRuntime.CE_STRING : k.equals("on") ? CeRuntime.CE_BOOL : CeRuntime.CE_NULL; }
+    public double getD(long h, String k, String f) { return k.equals("a") ? 42.5 : k.equals("on") ? 1 : 0; }
+    public String getS(long h, String k, String f) { return "text"; }
+    public void ccD(long h, int a, int b, double v) {} public void ccS(long h, int a, int b, String v) {} public void ccV(long h, int a, int b, int k, double d, String s) {}
+    public void nrpnV(long h, int a, int b, int c, int k, double d, String s) {} public void sysexList(long h, int[] b) {} public void sysexHex(long h, String x) {}
+    public void log(long h, int l, String m) {} public void logV(long h, int l, String m, int k, double d, String s) {}
+    public void emitD(long h, String n, double v) {} public void emitS(long h, String n, String v) {} public void emitV(long h, String n, int k, double d, String s) {}
+    public int pKind(long p, String k) { return -1; } public double pD(long p, String k) { return 0; } public String pS(long p, String k) { return ""; }
+    public static void main(String[] a) {
+      CeRuntime.HOST = new ReadHost();
+      CeContext ctx = new CeContext(1L); CeEvent e = new CeEvent(0L);
+${compiling.map((i) => `      try { Script_reads.INSTANCE.case${i}(ctx, e); System.out.print("ran ${i}\\n"); } catch (Throwable t) { System.out.print("threw ${i}\\n"); }`).join('\n')}
+    }
+  }
+`, 'utf8');
+  const second = runExecutable(javac, ['-encoding', 'UTF-8', '-d', path.join(runDir, 'classes'), ...sources, path.join(runDir, 'ReadHost.java')], runDir);
+  if (second.status !== 0) return result('java-reads', 'fail', `the cases javac accepted did not compile together:\n${combineOutput(second)}`, { tool: javac });
+  const exec = runExecutable(java, ['-cp', path.join(runDir, 'classes'), 'ReadHost'], runDir);
+  const threw = new Set([...exec.stdout.matchAll(/^threw (\d+)/gm)].map((m) => Number(m[1])));
+  const ran = new Set([...exec.stdout.matchAll(/^ran (\d+)/gm)].map((m) => Number(m[1])));
+  const failures = [];
+  for (const i of all) {
+    const actual = rejected.has(i) ? 'javac rejects it' : threw.has(i) ? 'it throws' : ran.has(i) ? 'it runs' : 'it did not run';
+    if (actual === 'it did not run') { failures.push(`case ${i} did not run: ${JAVA_READ_CASES[i]}`); continue; }
+    const flagged = compileJava(`void onValueChanged(CeContext ctx, CeEvent e) {\n  ${JAVA_READ_CASES[i]}\n}`).diagnostics.length > 0;
+    if (flagged !== (actual !== 'it runs')) failures.push(`${JAVA_READ_CASES[i]} — ${actual}, and the preview ${flagged ? 'flags' : 'accepts'} it`);
+  }
+  return failures.length
+    ? result('java-reads', 'fail', failures.join('\n'), { tool: javac })
+    : result('java-reads', 'pass', `the Java preview flags exactly the ${rejected.size + threw.size} of ${all.length} ctx reads javac rejects or that throw.`, { tool: javac });
 }
 
 // The interpreted-subset languages ship TWO executors: the real compiler at export, and the
@@ -821,6 +890,7 @@ const validators = [
   validateCpp,
   validateCsharp,
   validateJava,
+  validateJavaReads,
   validateInterpreters,
 ];
 

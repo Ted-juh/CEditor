@@ -250,7 +250,7 @@ class Parser {
     let e = this.parsePrimary();
     for (;;) {
       const k = this.peek();
-      if (k.value === '.') { this.next(); e = { type: 'member', obj: e, name: this.next().value }; }
+      if (k.value === '.') { this.next(); const nt = this.next(); e = { type: 'member', obj: e, name: nt.value, line: nt.line }; }
       else if (k.value === '::') { this.next(); e = { type: 'member', obj: e, name: this.next().value }; } // method reference ≈ member
       else if (k.value === '(') { this.next(); const args = this.parseArgs(); this.eat(')'); e = { type: 'call', callee: e, args }; }
       else if (k.value === '[') { this.next(); const idx = this.parseAssign(); this.eat(']'); e = { type: 'index', obj: e, index: idx }; }
@@ -282,8 +282,11 @@ class Parser {
     if (k.type === 'str') return { type: 'str', value: k.value };
     if (k.value === '(') { const e = this.parseAssign(); this.eat(')'); return e; }
     if (k.type === 'id') {
-      if (k.value === 'true') return { type: 'num', value: 1 };
-      if (k.value === 'false') return { type: 'num', value: 0 };
+      // A bool is a bool, as it is in Java — and as a comparison already gave here. It was the
+      // number 1, which made `true == (x > 3)` false, printed `true` as 1 and sent the panel API 1
+      // or true for the same flag depending on where it came from.
+      if (k.value === 'true') return { type: 'num', value: true };
+      if (k.value === 'false') return { type: 'num', value: false };
       if (k.value === 'null') return { type: 'null' };
       return { type: 'ident', name: k.value };
     }
@@ -592,6 +595,100 @@ function runBody(body, params, program, thisObj, args) {
   return undefined;
 }
 
+/* ------------------------------------------------------- what javac makes of ctx.get */
+// In the exported module ctx.get and ctx.getValue return Object (CeRuntime.java): a number comes back
+// as a Double, text as a String, a flag as a Boolean. This interpreter has no static types, so it
+// ran `double x = ctx.get("cutoff.value")`, which javac rejects: the handler previewed, then failed
+// the export. These are the uses of a ctx read that javac certainly rejects, and the narrowing casts
+// that compile and certainly throw when they run (a Double cast to int is a ClassCastException) —
+// each reported with the cast that works in both. Nothing else is flagged: a read concatenated to a
+// string, stored as Object or var, compared with ==, or passed where Object is taken is fine Java.
+const NARROWING = new Set(['int', 'long', 'short', 'byte', 'char', 'float']);
+const BOXED_NARROWING = { Integer: 'int', Long: 'long', Short: 'short', Byte: 'byte', Character: 'char', Float: 'float' };
+const NON_OBJECT_OPS = new Set(['-', '*', '/', '%', '<', '<=', '>', '>=', '&', '|', '^', '&&', '||', '<<', '>>', '>>>']);
+const NUMERIC_HELPERS = new Set(['clamp', 'scale', 'round', 'snap', 'lerp', 'curve']);
+
+function contextParamNames(paramToks) {
+  const names = new Set();
+  for (let i = 0; i + 1 < paramToks.length; i++) {
+    if (paramToks[i].value === 'CeContext' && paramToks[i + 1].type === 'id') names.add(paramToks[i + 1].value);
+  }
+  return names;
+}
+
+function castFor(typeName) {
+  if (typeName === 'double' || typeName === 'Double' || typeName === 'Number') return '(double) ';
+  const narrow = NARROWING.has(typeName) ? typeName : BOXED_NARROWING[typeName];
+  if (narrow) return `(${narrow}) (double) `;
+  if (typeName === 'boolean' || typeName === 'Boolean') return '(boolean) ';
+  return `(${typeName}) `;
+}
+
+export function contextReadErrors(fn) {
+  const ctxNames = contextParamNames(fn.paramToks ?? []);
+  if (!ctxNames.size) return [];
+  const errors = [];
+  const isRead = (n) => n?.type === 'call' && n.callee?.type === 'member' && (n.callee.name === 'get' || n.callee.name === 'getValue')
+    && n.callee.obj?.type === 'ident' && ctxNames.has(n.callee.obj.name);
+  const isNumberLiteral = (n) => n?.type === 'num' && typeof n.value === 'number';
+  const named = (n) => `${n.callee.obj.name}.${n.callee.name}(…)`;
+  const report = (n, message) => errors.push(`${message} (line ${n.callee.line ?? fn.line ?? 1})`);
+  const asNumber = (n) => report(n, `${named(n)} is an Object in Java, so javac rejects it here: write (double) ${named(n)} to use it as a number`);
+  const visit = (node) => {
+    if (Array.isArray(node)) { for (const x of node) visit(x); return; }
+    if (!node || typeof node !== 'object') return;
+    switch (node.type) {
+      case 'decl':
+        for (const d of node.decls) {
+          if (isRead(d.init) && d.typeName && d.typeName !== 'Object' && d.typeName !== 'var') {
+            report(d.init, `${d.typeName} ${d.name} = ${named(d.init)}: it is an Object in Java, so javac rejects this. `
+              + `Write ${d.typeName} ${d.name} = ${castFor(d.typeName)}${named(d.init)}`);
+          }
+        }
+        break;
+      case 'bin':
+        if (NON_OBJECT_OPS.has(node.op)) { for (const x of [node.left, node.right]) if (isRead(x)) asNumber(x); }
+        // `+` is string concatenation when the other side is text, so only a number or another read counts.
+        else if (node.op === '+' && (isRead(node.left) || isRead(node.right))
+          && [node.left, node.right].every((x) => isRead(x) || isNumberLiteral(x))) {
+          for (const x of [node.left, node.right]) if (isRead(x)) asNumber(x);
+        }
+        break;
+      case 'unary': if (isRead(node.arg)) asNumber(node.arg); break;
+      case 'assign': if (['-=', '*=', '/=', '%='].includes(node.op) && isRead(node.value)) asNumber(node.value); break;
+      case 'if': case 'while': case 'doWhile': case 'for':
+        if (isRead(node.cond)) report(node.cond, `a condition must be a boolean, and ${named(node.cond)} is an Object in Java: write (boolean) ${named(node.cond)}`);
+        break;
+      case 'cond':
+        if (isRead(node.c)) report(node.c, `a condition must be a boolean, and ${named(node.c)} is an Object in Java: write (boolean) ${named(node.c)}`);
+        break;
+      case 'call': {
+        const callee = node.callee;
+        const takesNumbers = callee?.type === 'member' && callee.obj?.type === 'ident'
+          && (callee.obj.name === 'Math' || (ctxNames.has(callee.obj.name) && NUMERIC_HELPERS.has(callee.name)));
+        if (takesNumbers) {
+          node.args.forEach((x, i) => {
+            if (!isRead(x)) return;
+            if (callee.name === 'curve' && i === 1) report(x, `curve takes the shape as a String, and ${named(x)} is an Object in Java: write (String) ${named(x)}`);
+            else asNumber(x);
+          });
+        }
+        break;
+      }
+      case 'cast':
+        if (NARROWING.has(node.t) && isRead(node.arg)) {
+          report(node.arg, `(${node.t}) ${named(node.arg)} compiles, and throws when it runs in the exported plugin: a number `
+            + `comes back as a Double, which cannot be cast to ${node.t}. Write (${node.t}) (double) ${named(node.arg)}`);
+        }
+        break;
+      default: break;
+    }
+    for (const v of Object.values(node)) if (v && typeof v === 'object') visit(v);
+  };
+  visit(fn.body);
+  return errors;
+}
+
 /* --------------------------------------------------------------------------- public */
 
 export function compileJava(source) {
@@ -607,7 +704,13 @@ export function compileJava(source) {
   // Skip functions that are class constructors / members already captured as class methods.
   const classMethodNames = new Set(); for (const c of program.classes.values()) for (const mn of c.methods.keys()) classMethodNames.add(mn);
   for (const fn of fns) {
-    try { fn.params = paramNames(fn.paramToks); fn.body = new Parser(fn.bodyToks).parseProgram(); fn.program = program; program.funcs.set(fn.name, fn); handlers.set(fn.name, fn); }
+    try {
+      fn.params = paramNames(fn.paramToks); fn.body = new Parser(fn.bodyToks).parseProgram(); fn.program = program;
+      // A handler javac would reject does not run here either, as a function that fails to parse does not.
+      const rejected = contextReadErrors(fn);
+      if (rejected.length) { for (const m of rejected) diagnostics.push(`${fn.name}: ${m}`); continue; }
+      program.funcs.set(fn.name, fn); handlers.set(fn.name, fn);
+    }
     catch (e) { diagnostics.push(`${fn.name}: ${e.message ?? e}`); }
   }
   try { for (const [n, v] of extractGlobals(toks, program)) program.globals.set(n, v); } catch (e) { diagnostics.push(`globals: ${e.message ?? e}`); }

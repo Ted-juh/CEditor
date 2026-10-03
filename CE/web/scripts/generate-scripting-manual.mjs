@@ -227,12 +227,12 @@ That is \`set\`/\`get\` and \`setValue\`/\`getValue\`, \`log\` with or without a
 each of these in its PascalCase form as well (\`SetValue\`, \`Log\`, \`SendCC\`, \`Scale\`, …),
 reads the event as \`e.Value\` and \`e.FirstTime\`, and may name the handler \`OnValueChanged\`.
 Everything else the preview's \`ctx\` offers previews and does **not** compile at export, so keep
-a handler you mean to ship to this core, or write it in Lua or JavaScript. Three more things
-differ:
+a handler you mean to ship to this core, or write it in Lua or JavaScript. Two more things:
 
-- Pass \`1\` and \`0\`, not \`true\` and \`false\`, as a value. The preview reads \`true\` as
-  the number 1; the exported C++ sends 1 too, but Java sends a bool and C# does not accept one.
-- A Java \`get\` returns an \`Object\`: read a number as \`(double) ctx.get("cutoff.value")\`.
+- A Java \`get\` returns an \`Object\`, since the value may be a number, text or a flag. Read a
+  number as \`(double) ctx.get("cutoff.value")\` and an int as \`(int) (double) ctx.get(...)\`: a
+  number comes back as a \`Double\`, and \`(int)\` on its own compiles and then throws. The
+  preview reports a read that javac would reject, with the cast to write, and does not run it.
 - Only the handler for the script's own event is compiled, and \`setup\` is not called, so
   \`on(...)\` listeners registered there run in the preview only.
 

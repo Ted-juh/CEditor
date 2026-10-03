@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { compileJava, invokeJava } from '../src/CE_Application/scripting/javaPreview.js';
+import { analyzeJava, compileJava, invokeJava } from '../src/CE_Application/scripting/javaPreview.js';
 
 function run(src, handler, event, initial) {
   const { handlers, diagnostics } = compileJava(src);
@@ -170,4 +170,58 @@ test('languageService analyzes Java: symbols, diagnostics, folding, go-to-def', 
 
   const def = getDefinition(JV, 'java', JV.indexOf('helper((int)'));
   assert.ok(def && def.line === 1);
+});
+
+// `true` was lexed as the number 1: `true == (x > 0.2)` came out false, println(true) printed 1,
+// "on: " + true gave "on: 1", and the panel API got 1 for a literal and true for a comparison.
+test('bool literals are booleans', () => {
+  const src = `void onValueChanged(CeContext ctx, CeEvent e) {
+    boolean lit = true; boolean above = e.value > 0.2;
+    ctx.setValue("lit", lit); ctx.setValue("same", lit == above); ctx.setValue("off", false);
+    System.out.println(lit); System.out.println("on: " + lit);
+  }`;
+  const { values, out } = run(src, 'onValueChanged', { value: 0.5 });
+  assert.equal(values.lit, true);
+  assert.equal(values.same, true);
+  assert.equal(values.off, false);
+  assert.deepEqual(out.map((s) => s.trim()), ['true', 'on: true']);
+});
+
+// In an exported handler ctx.get returns Object, so `double x = ctx.get(...)` previewed here and
+// failed javac at export. The preview now says what javac will, with the cast that works in both,
+// and does not run the handler, as it does not run one that fails to parse. validate-script-exports
+// checks the same rules against javac itself (JAVA_READ_CASES).
+test('a ctx read javac would reject is reported, with the cast to write, and does not run', () => {
+  const src = `void onValueChanged(CeContext ctx, CeEvent e) {
+    ctx.setValue("ran", 1);
+    double cutoff = ctx.get("cutoff.value");
+  }`;
+  const { handlers, diagnostics } = compileJava(src);
+  assert.equal(handlers.has('onValueChanged'), false);
+  assert.equal(diagnostics.length, 1);
+  assert.match(diagnostics[0], /double cutoff = ctx\.get\(…\): it is an Object in Java, so javac rejects this\. Write double cutoff = \(double\) ctx\.get\(…\) \(line 3\)/);
+
+  const { diagnostics: shown } = analyzeJava(src);
+  assert.equal(shown[0].line, 3);
+});
+
+test('each kind of rejected read gets the advice that fits it', () => {
+  const advice = (body) => compileJava(`void onValueChanged(CeContext ctx, CeEvent e) {\n  ${body}\n}`).diagnostics.join(' ');
+  assert.match(advice('int n = ctx.get("step.value");'), /Write int n = \(int\) \(double\) ctx\.get/);
+  assert.match(advice('String s = ctx.get("label.text");'), /Write String s = \(String\) ctx\.get/);
+  assert.match(advice('double y = ctx.get("a") * 2;'), /write \(double\) ctx\.get\(…\) to use it as a number/);
+  assert.match(advice('if (ctx.get("led.on")) { }'), /a condition must be a boolean.*\(boolean\) ctx\.get/);
+  assert.match(advice('int n = (int) ctx.get("a");'), /compiles, and throws when it runs.*Write \(int\) \(double\) ctx\.get/);
+});
+
+test('valid Java reads are left alone', () => {
+  for (const body of [
+    'double x = (double) ctx.get("a");', 'Object o = ctx.get("a");', 'var v = ctx.get("a");',
+    'String s = "v=" + ctx.get("a");', 'ctx.set("b", ctx.get("a"));', 'int n = (int) (double) ctx.get("a");',
+    'if (ctx.get("a") == null) { }', 'ctx.log("v", ctx.get("a"));', 'System.out.println(ctx.get("a"));',
+  ]) {
+    const { handlers, diagnostics } = compileJava(`void onValueChanged(CeContext ctx, CeEvent e) {\n  ${body}\n}`);
+    assert.deepEqual(diagnostics, [], body);
+    assert.ok(handlers.has('onValueChanged'), body);
+  }
 });
