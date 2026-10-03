@@ -454,9 +454,13 @@ export function normalizeControlSetDefinition(value) {
     ? Object.fromEntries(Object.entries(entry).filter(([, v]) => typeof v === 'string')) : null);
   const chosen = plainStrings(value.chosenFamilies);
   if (chosen && Object.keys(chosen).length) out.chosenFamilies = chosen;
+  // What the designs wrote on the last read, per family: key and value, or (as the label design kept
+  // it before values were recorded) a list of keys. An empty record is kept: it says the design wrote
+  // nothing its author had not already, which no record would not.
   if (value.designed && typeof value.designed === 'object' && !Array.isArray(value.designed)) {
     const designed = Object.fromEntries(Object.entries(value.designed)
-      .filter(([, keys]) => Array.isArray(keys)).map(([family, keys]) => [family, keys.filter((key) => typeof key === 'string')]));
+      .filter(([, record]) => record && typeof record === 'object')
+      .map(([family, record]) => [family, Array.isArray(record) ? record.filter((key) => typeof key === 'string') : { ...record }]));
     if (Object.keys(designed).length) out.designed = designed;
   }
   // A set written before `panel.surface` existed still names its panel colour; that is the role.

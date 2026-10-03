@@ -145,25 +145,23 @@ export function sectionFrame(set, radius = 8) {
     'Effects.Shadows.items': [] };
 }
 
-const isFrameKey = (key) => key.startsWith('Background.') || key.startsWith('Effects.');
+export const isFrameKey = (key) => key.startsWith('Background.') || key.startsWith('Effects.');
 
 /**
- * The set with its sections designed. The frame the set's families gave a section (the button's,
- * copied) is replaced, not merged: a section is not a button. Everything else a family says about a
- * section (its lettering's face, a tab strip's appearance, a scrollbar) stays. A full-panel
- * Background block loses the factory's white 2px border, since it is the panel's face, not a frame.
+ * What the section design writes, per family: each section's frame and lettering, and the full-panel
+ * Background block without the factory's white 2px border, since it is the panel's face, not a
+ * frame. Null for a set with no section design (Graphite). Personal sets merge this under what their
+ * author wrote (models/personalSetDesigns.js); the built-ins take it through withSectionDesign.
  */
-export function withSectionDesign(set) {
+export function sectionFamilies(set) {
   // The set's own corner: the one its families already gave a section, which is its design
   // direction's radius (controlSetCoverage).
   const radius = Number(set.families?.Group?.component?.['Background.Corners.radius'] ?? 8);
   const frame = sectionFrame(set, Number.isFinite(radius) ? radius : 8);
-  if (!frame) return set;
-  const families = { ...set.families };
+  if (!frame) return null;
+  const families = {};
   for (const type of SECTION_TYPES) {
-    const current = families[type]?.component ?? {};
-    const kept = Object.fromEntries(Object.entries(current).filter(([key]) => !isFrameKey(key)));
-    const component = { ...kept, 'Text.Fill.colour': '{text.primary}', ...frame };
+    const component = { 'Text.Fill.colour': '{text.primary}', ...frame };
     if (type === 'TabContainer') {
       // The strip and the idle tabs are the section, and idle lettering reads on it like any
       // lettering in a section. The chosen tab keeps the set's checked surface, with whichever
@@ -175,8 +173,26 @@ export function withSectionDesign(set) {
         'TabContainer.activeLabelColour': inkFor(set, literal(set, 'surface.checked')),
       });
     }
-    families[type] = { ...families[type], component };
+    families[type] = { component };
   }
-  families.Background = { ...families.Background, component: { ...(families.Background?.component ?? {}), 'Background.Border.enabled': false } };
+  families.Background = { component: { 'Background.Border.enabled': false } };
+  return families;
+}
+
+/**
+ * The set with its sections designed. The frame the set's families gave a section (the button's,
+ * copied) is replaced, not merged: a section is not a button. Everything else a family says about a
+ * section (its lettering's face, a tab strip's appearance, a scrollbar) stays.
+ */
+export function withSectionDesign(set) {
+  const designed = sectionFamilies(set);
+  if (!designed) return set;
+  const families = { ...set.families };
+  for (const type of SECTION_TYPES) {
+    const current = families[type]?.component ?? {};
+    const kept = Object.fromEntries(Object.entries(current).filter(([key]) => !isFrameKey(key)));
+    families[type] = { ...families[type], component: { ...kept, ...designed[type].component } };
+  }
+  families.Background = { ...families.Background, component: { ...(families.Background?.component ?? {}), ...designed.Background.component } };
   return { ...set, families };
 }

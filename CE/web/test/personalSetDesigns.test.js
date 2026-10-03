@@ -138,3 +138,50 @@ test('lineage: named, or matched from the id duplication made', () => {
   assert.ok(familyPatchFor(orphan, 'Group'));
   assert.ok(DERIVED_ROLES.every((role) => resolveToken(role, orphan)), 'every derived role has a value');
 });
+
+test('a set file that says what its sections, instruments and displays are keeps it, read after read', () => {
+  // The library is normalised as it loads and written straight back, so a key the designs overwrote
+  // on a read was gone for good the moment the program started.
+  const tolex = clone(getControlSet('tolex'));
+  const authored = {
+    Group: { 'Background.Fill.colour': 'FF112233', 'Background.Corners.radius': 3 },
+    Macro: { 'Macro.knobDesign': 'own' },
+    LcdDisplay: { 'Display.showGrid': true, 'Display.dotShape': 'round' },
+    Shape: { 'Shape.strokeColour': 'FFCC2200' },
+  };
+  const file = {
+    id: 'hand-made', name: 'Hand Made', tokens: tolex.tokens, panel: tolex.panel, type: tolex.type,
+    families: Object.fromEntries(Object.entries(authored).map(([type, component]) => [type, { component: { ...component } }])),
+  };
+  let set = normalizeControlSetDefinition(clone(file));
+  for (let read = 0; read < 3; read += 1) {
+    for (const [type, component] of Object.entries(authored)) {
+      for (const [key, value] of Object.entries(component)) assert.deepEqual(set.families[type].component[key], value, `read ${read}: ${type} ${key}`);
+    }
+    set = normalizeControlSetDefinition(JSON.parse(JSON.stringify(set)));
+  }
+  assert.equal(resolveControlForSet(createControl('Group'), set)._children.Background._children.Fill.colour, 'FF112233');
+  assert.equal(macroUsesSetKnob(resolveControlForSet(createControl('Macro'), set)), false, 'its Macro keeps its own knob');
+  // Everything it does not say is still designed: its sections' frame, its instruments' case.
+  assert.ok(set.families.Group.component['Background.Border.colour'], 'a frame round its sections');
+  assert.ok(familyPatchFor(set, 'Turing'), 'and its instruments dressed');
+});
+
+test('a copy keeps what its author changed after it was made, and the rest still moves with its colours', () => {
+  const copy = normalizeControlSetDefinition({ ...clone(getControlSet('tolex')), id: 'my-amp', name: 'My Amp', basedOn: 'tolex' });
+  assert.ok(copy.designed?.Shape && copy.designed?.Group && copy.designed?.Turing, 'what the designs wrote is recorded');
+  const designedGrid = copy.families.LcdDisplay.component['Display.showGrid'];
+  // Edited by hand in its set file: two keys the designs had written.
+  const edited = clone(copy);
+  edited.families.LcdDisplay.component['Display.showGrid'] = !designedGrid;
+  edited.families.Group.component['Background.Fill.colour'] = 'FF445566';
+  const read = normalizeControlSetDefinition(edited);
+  assert.equal(read.families.LcdDisplay.component['Display.showGrid'], !designedGrid);
+  assert.equal(read.families.Group.component['Background.Fill.colour'], 'FF445566');
+  // Recoloured afterwards: the edits stay, and what the designs wrote follows the new colours.
+  const keysBefore = read.families.Keyboard.component['Keyboard.whiteColour'];
+  const recoloured = normalizeControlSetDefinition({ ...clone(read), tokens: { ...read.tokens, 'panel.surface': 'FF0E2A3A', 'text.primary': 'FFFFF4C8' } });
+  assert.equal(recoloured.families.LcdDisplay.component['Display.showGrid'], !designedGrid);
+  assert.equal(recoloured.families.Group.component['Background.Fill.colour'], 'FF445566');
+  assert.notEqual(recoloured.families.Keyboard.component['Keyboard.whiteColour'], keysBefore, 'keys the design tinted by the panel follow the new panel');
+});

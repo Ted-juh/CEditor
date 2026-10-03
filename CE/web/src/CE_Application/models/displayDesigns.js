@@ -143,15 +143,16 @@ export function displayFamilies(set) {
 
 /**
  * The set with its displays and shapes designed. A built-in that names one of these families keeps
- * what it names; with `replace` (a personal set, read again) the design wins over an earlier read.
+ * what it names. (A personal set merges this under what its author wrote, by its own record:
+ * models/personalSetDesigns.js.)
  */
-export function withDisplayDesign(set, { replace = false } = {}) {
+export function withDisplayDesign(set) {
   const designed = displayFamilies(set);
   if (!designed) return set;
   const families = { ...set.families };
   for (const [type, family] of Object.entries(designed)) {
     const own = families[type]?.component ?? {};
-    families[type] = { ...family, ...families[type], component: replace ? { ...own, ...family.component } : { ...family.component, ...own } };
+    families[type] = { ...family, ...families[type], component: { ...family.component, ...own } };
   }
   return { ...set, families };
 }

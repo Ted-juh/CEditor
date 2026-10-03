@@ -758,8 +758,17 @@ a file all get it. What the author chose is kept:
   knob, at that size, is a dot.
 - `chosenFamilies` records the families picked in Settings' Control families. A chosen Labels design
   is not redesigned, and a chosen Knobs design gives a Graphite descendant's Macro the set's knob.
-- `designed` records what the label design wrote, so the next read takes it out first: turning a
-  set's metal finish off then leaves no engraved lip under the new silkscreen.
+- `designed` records what every design wrote on the last read, per family, key by key with its value.
+  The next read takes back exactly the keys that still hold those values and derives them again, so
+  turning a set's metal finish off leaves no engraved lip under the new silkscreen and recolouring a
+  set moves its instruments. A key holding anything else is its author's and wins over the design.
+  This used to cover only labels, and the section, instrument and display designs simply won: a set
+  file that said what its Groups, its Macro or its LCD were lost it on the first read, and since the
+  library is written straight back as it loads, starting the program erased it for good.
+- A set read before `designed` covered a family has no record of it. A copy of a built-in carries that
+  built-in's designs as they stood, which are taken back (on every copy made before sections had a
+  design, a section's frame is the button's, copied). A set with no lineage carries only what its
+  author wrote, less the button frame and the plain field fill every section was given before then.
 
 The derived roles (`section.surface`, the instrument face and inks, the series) are never kept from
 a previous read; they follow the set's colours, and Settings' preview reads the draft the same way,
