@@ -17,7 +17,7 @@
    * The native plug-in editor pane is the NEXT increment — loading works from here already,
    * the vendor UI does not show yet.
    */
-  import { onDestroy, tick } from 'svelte';
+  import { onDestroy, tick, untrack } from 'svelte';
   import {
     hostState,
     undoHostEdit, redoHostEdit,
@@ -28,7 +28,7 @@
     requestAudioDevices, setAudioDevice, setMidiInputEnabled, setMackieSection,
     hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct,
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
-    parameterControlKind, setParameterText, groupParameters, assignedParameterIds, quickLearnParameter,
+    parameterControlKind, setParameterText, groupParameters, assignedParameterIds, parameterPlaces, isBipolarParameter, quickLearnParameter,
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
     addControlPage, removeControlPage, renameControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
     hostMidiLearn, learnControlSlotMidi, cancelMidiLearn, clearControlSlotMidi,
@@ -60,8 +60,16 @@
     midiSlotTypes, midiSlotLabels,
     addMidiSlot, removeMidiSlot, moveMidiSlot, setMidiSlotBypassed, setMidiSlotOptions,
     setStageLock, beginStageUnlock, cancelStageUnlock,
+    surfaceStatusText,
   } from '../stores/instrumentHost.js';
+  const surfaceStatus = $derived(surfaceStatusText($hostSurface));
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import { selectAllOnFocus } from '../utils/selectOnFocus.js';
+  import ScrubValue from '../components/controls/ScrubValue.svelte';
+  import ParamBar from '../components/controls/ParamBar.svelte';
+  import Knob from '../components/controls/Knob.svelte';
+  import HostZoneEditor from './HostZoneEditor.svelte';
+  import MacroTargetBand from './MacroTargetBand.svelte';
   import PerformancePanel from './PerformancePanel.svelte';
   import HostMixerPanel from './HostMixerPanel.svelte';
   import LayerGroupsPanel from './LayerGroupsPanel.svelte';
@@ -81,6 +89,7 @@
   import KeyboardMusic from 'lucide-svelte/icons/keyboard-music';
   import Crosshair from 'lucide-svelte/icons/crosshair';
   import SoundBrowser from './SoundBrowser.svelte';
+  import { sounds } from './sounds/soundsBrowser.svelte.js';
   import HostLibraryPanel from './HostLibraryPanel.svelte';
   import HostSurfacePanel from './HostSurfacePanel.svelte';
   import Ctrl49ScreenCard from './Ctrl49ScreenCard.svelte';
@@ -125,6 +134,7 @@
 
   const buildWorkspaces = [
     { id: 'rack', label: 'Rack' },
+    { id: 'sounds', label: 'Sounds' },
     { id: 'performance', label: 'Performance' },
     { id: 'mixer', label: 'Mixer' },
     { id: 'layers', label: 'Layers' },
@@ -328,11 +338,14 @@
 
 
   async function showSounds(text = '') {
-    buildWorkspace = 'rack';
-    dockTab = 'sounds';
-    dockOpen = true;
-    await tick();
-    soundBrowser?.search(text);
+    // The Sounds page, when it is open, is where a search lands; otherwise the dock's tab.
+    if (buildWorkspace !== 'sounds') {
+      buildWorkspace = 'rack';
+      dockTab = 'sounds';
+      dockOpen = true;
+      await tick();
+    }
+    sounds.search(text);
   }
 
   function chooseUtility(id) {
@@ -363,7 +376,7 @@
       dockOpen = true;
       if (issue.target === 'routing') requestAudioDevices();
       await tick();
-      document.querySelector(issue.target === 'zone' ? '.midi-zone select' : '.hw-config select')?.focus();
+      document.querySelector(issue.target === 'zone' ? '[data-testid="zone-channel"]' : '.hw-config select')?.focus();
     }
   }
 
@@ -371,6 +384,8 @@
   let effects = $derived(filterEffects($hostState.effectClasses, search));
 
   let assignedIds = $derived(assignedParameterIds($hostState, paramTargetId));
+  let places = $derived(parameterPlaces($hostState, paramTargetId));
+  const focusOnMount = (node) => { node.focus(); node.select(); };
   let paramAssignedOnly = $state(false);
   let visibleParameters = $derived(
     filterParameters($hostParameters.parameters, paramSearch)
@@ -440,10 +455,6 @@
   let selectedMacro = $derived(
     $hostState.rack.macros.find((m) => m.macroId === selectedMacroId) ?? $hostState.rack.macros[0] ?? null);
 
-  function stepFor(parameter) {
-    return parameter.numSteps > 1 ? 1 / (parameter.numSteps - 1) : 0.001;
-  }
-
   // Typed entry: double-click the value, type what the plug-in itself would print.
   let editingParamId = $state(null);
   let editingParamText = $state('');
@@ -477,7 +488,21 @@
     assignControlSlot(selectedPage.pageId, firstEmptySlot.slotId, paramTargetId, parameter.id);
   }
   let parts = $derived($hostState.rack.parts);
+  // Part levels are linear 0..2 underneath (1 = unity); the rows read and write them in dB.
+  const volumeDb = (v) => (v <= 0.001 ? -60 : Math.max(-60, Math.min(6, Math.round(20 * Math.log10(v) * 10) / 10)));
+  const volumeFromDb = (db) => (db <= -60 ? 0 : Math.min(2, Math.pow(10, db / 20)));
   let transport = $derived($hostState.performance.transport);
+
+  // Tap tempo: the average gap of the last four taps, if they came within two and a half
+  // seconds of each other. One tap alone changes nothing.
+  let taps = [];
+  function tapTempo() {
+    const now = performance.now();
+    taps = [...taps.filter((t) => now - t < 2500), now].slice(-4);
+    if (taps.length < 2) return;
+    const gap = (taps.at(-1) - taps[0]) / (taps.length - 1);
+    setTempo(Math.max(20, Math.min(300, Math.round(600000 / gap) / 10)));
+  }
   let scales = $derived($hostState.performance.scales);
   let focusedPartId = $derived($hostState.rack.focusedPartId);
   let focusedPart = $derived(parts.find((p) => p.partId === focusedPartId) ?? null);
@@ -533,6 +558,9 @@
       $hostState.rack.macros.length,
     ].join(':');
     contentStamp;
+    // Not while the grip is held: a state push mid-drag would re-fit the dock and snap it back
+    // to the height it had when the drag began.
+    if (untrack(() => gripping)) return;
     void fitDock(dockTab);
   });
 
@@ -624,7 +652,7 @@
 }} onblur={cancelTransientInput} />
 <svelte:document onvisibilitychange={cancelBuildHoldWhenHidden} />
 
-<div class="host-workspace" data-testid="instrument-host-workspace">
+<div class="host-workspace" data-testid="instrument-host-workspace" use:selectAllOnFocus>
   <header class="host-header">
     <div class="host-brand">
       <span class="host-logo-frame">
@@ -674,18 +702,26 @@
             <button type="button" class="ghost transport-action"
                     title="Return to the beginning" aria-label="Return transport to start"
                     onclick={() => setTransportPosition(0)}>↤</button>
-            <input type="number" class="tempo" min="20" max="300" step="0.1" value={transport.tempo}
-                   aria-label="Tempo" title="Tempo"
-                   onchange={(e) => setTempo(Number(e.currentTarget.value))} />
             <span class="transport-position" title="Bar and beat">{transport.bar}.{transport.beat}</span>
-            <input type="number" class="ts" min="1" max="32" value={transport.numerator}
-                   aria-label="Time signature numerator"
-                   onchange={(e) => setTimeSignature(Number(e.currentTarget.value), transport.denominator)} />
+            <!-- Where the bar is, at a glance: one dot per beat, the current one lit while it runs. -->
+            <span class="beat-dots" aria-hidden="true" data-testid="host-beat-dots">
+              {#each Array(Math.min(16, transport.numerator)) as _, i (i)}
+                <i class:on={transport.playing && transport.beat === i + 1}></i>
+              {/each}
+            </span>
+            <ScrubValue value={transport.tempo} min={20} max={300} step={1} fineStep={0.1} label="Tempo"
+                        testid="host-tempo" format={(v) => (Number.isInteger(v) ? String(v) : v.toFixed(1))}
+                        title="Tempo: drag up or down (Shift for tenths), or click to type"
+                        onchange={(v) => setTempo(v)} />
+            <button type="button" class="ghost transport-action tap" data-testid="host-tap-tempo"
+                    title="Tap on the beat: the tempo follows your last four taps" onclick={tapTempo}>tap</button>
+            <ScrubValue value={transport.numerator} min={1} max={32} label="Beats per bar" testid="host-ts-numerator" compact
+                        pixelsPerStep={8} onchange={(v) => setTimeSignature(v, transport.denominator)} />
             <span class="ts-slash">/</span>
-            <select class="ts" value={transport.denominator} aria-label="Time signature denominator"
-                    onchange={(e) => setTimeSignature(transport.numerator, Number(e.currentTarget.value))}>
-              {#each [2, 4, 8, 16] as d (d)}<option value={d}>{d}</option>{/each}
-            </select>
+            <!-- The beat unit is a value like the beats: four toggles do not fit a full header. -->
+            <ScrubValue value={transport.denominator} choices={[[2, '2'], [4, '4'], [8, '8'], [16, '16']]} pixelsPerStep={10} compact
+                        label="Beat unit" testid="host-ts-denominator"
+                        onchange={(v) => setTimeSignature(transport.numerator, v)} />
             <button type="button" class="toggle" class:on={transport.externalClock}
                     class:warn={transport.clockLost}
                     title={transport.clockLost
@@ -793,17 +829,8 @@
         <span class="device-midi-title">Control surface</span>
         <span class="device-midi-row surface-row" data-testid="host-surface-status">
           <span class="surface-dot {$hostSurface.state}"></span>
-          {#if $hostSurface.state === 'connected'}
-            {$hostSurface.device || 'CTRL49'} connected
-          {:else if $hostSurface.state === 'connecting'}
-            Starting the CTRL49 display…
-          {:else if $hostSurface.state === 'heldElsewhere'}
-            CTRL49 is in use by another instance
-          {:else if $hostSurface.state === 'failed'}
-            CTRL49 failed{$hostSurface.detail ? ` — ${$hostSurface.detail}` : ''}
-          {:else}
-            Looking for a CTRL49 — plug it in and it connects by itself
-          {/if}
+          <span title={surfaceStatus.detail}>{surfaceStatus.short}{surfaceStatus.hint ? ` — ${surfaceStatus.hint}` : ''}</span>
+          {#if surfaceStatus.detail}<span class="surface-detail" data-testid="host-surface-detail">{surfaceStatus.detail}</span>{/if}
         </span>
         <!-- The Mackie section: read as controls (faders, B1-B8, Bank, transport), or passed to
              the instruments as plain MIDI — where fader 1 bends the pitch of channel 1. -->
@@ -916,11 +943,59 @@
     </div>
   {/if}
 
-  {#if buildWorkspace === 'rack' || buildWorkspace === 'mixer' || buildWorkspace === 'layers'}
+  {#if buildWorkspace === 'rack' || buildWorkspace === 'mixer' || buildWorkspace === 'layers' || buildWorkspace === 'sounds'}
     <HostKeyboard />
   {/if}
 
-  {#if buildWorkspace === 'performance'}
+  {#snippet soundSaveActions()}
+    <div class="sound-save-actions">
+      <!-- A hardware part saves the patch it captured. The library is where a sound lives
+           whichever box makes it, so "warm pad" finds the Serum preset and the Juno patch
+           in one list. -->
+      <button type="button"
+              disabled={!(focusedPart?.hasInstrument
+                          || (focusedPart?.hardware && focusedPart?.hardwarePatchBytes > 0))}
+              title={focusedPart?.hasInstrument ? `Save ${partTitle(focusedPart)}'s current instrument settings as a preset in the library`
+                     : focusedPart?.hardware
+                       ? (focusedPart.hardwarePatchBytes > 0
+                            ? `Save ${partTitle(focusedPart)}'s captured patch to the library`
+                            : 'Capture a patch from the synth first (Routing tab)')
+                       : 'Focus a part with an instrument first'}
+              onclick={() => saveUserPreset(focusedPart.partId)}
+              data-testid="host-save-preset">{focusedPart?.hardware ? 'Save patch' : 'Save preset'}</button>
+      <button type="button"  disabled={!focusedPart?.hasInstrument}
+              title={focusedPart?.hasInstrument
+                     ? `Save ${partTitle(focusedPart)} with its instrument settings, MIDI modules and insert effects to the library`
+                     : 'Focus a part with an instrument first'}
+              onclick={() => saveChainToLibrary(focusedPart.partId)}
+              data-testid="host-save-chain">Save chain</button>
+      <button type="button"  onclick={() => saveRackToLibrary()}
+              title="Save the complete Hostage rack and performance settings to the library"
+              data-testid="host-save-rack">Save rack</button>
+    </div>
+  {/snippet}
+
+  {#if buildWorkspace === 'sounds'}
+    <!-- The library with the whole screen. The part it loads into is named at the top, and Esc
+         (or Rack) goes back to the rack with the new sound playing. -->
+    <main class="primary-workspace sounds-workspace" data-testid="host-primary-sounds">
+      <div class="sounds-page-bar">
+        <button type="button" class="ghost" data-testid="sounds-back-to-rack" title="Back to the rack (Esc)"
+                onclick={() => (buildWorkspace = 'rack')}>◂ Rack</button>
+        <HostPartPicker {parts} partId={focusedPartId || ''} label="LOADING INTO" ariaLabel="Sounds target part"
+                        onchange={(id) => focusRackPart(id, { followEditor: false })} />
+        {@render soundSaveActions()}
+        <span class="sounds-page-spacer"></span>
+        <button type="button" class="manage-library" data-testid="sounds-page-manage-library"
+                aria-expanded={activeUtility === 'library'} onclick={() => activeUtility = 'library'}>Manage library</button>
+      </div>
+      <SoundBrowser layout="page" {focusedPart} partTitle={soundTargetTitle}
+                    onManageLibrary={() => activeUtility = 'library'}
+                    onBack={() => (buildWorkspace = 'rack')}
+                    auditionOn={audition.enabled}
+                    onToggleAudition={() => setPresetAudition({ enabled: !audition.enabled })} />
+    </main>
+  {:else if buildWorkspace === 'performance'}
     <main class="primary-workspace" data-testid="host-primary-performance">
       <PerformancePanel onShowMixer={() => buildWorkspace = 'mixer'} />
     </main>
@@ -1089,19 +1164,20 @@
                     onclick={() => setPartMixer(part.partId, { mute: !part.mute })}>Mute</button>
             <button type="button" class="toggle" class:on={part.solo} title="Solo"
                     onclick={() => setPartMixer(part.partId, { solo: !part.solo })}>Solo</button>
-            <!-- Two sliders with nothing written on them were two sliders nobody could name.
-                 The word is the label; the number is in the tooltip, where it is wanted
-                 while dragging and not otherwise. -->
-            <label class="mini" title={`Volume ${part.volume.toFixed(2)} (1.00 is unity)`}>
+            <!-- The level as a value you read, drag or type, in dB (0 is unity, -∞ is off);
+                 the pan as a knob that a double-click centres. -->
+            <span class="mini">
               <span class="mini-label">Vol</span>
-              <input type="range" min="0" max="2" step="0.01" value={part.volume} aria-label="Volume"
-                     oninput={(e) => setPartMixer(part.partId, { volume: Number(e.currentTarget.value) })} />
-            </label>
-            <label class="mini" title={`Pan ${panLabel(part.pan)}`}>
+              <ScrubValue value={volumeDb(part.volume)} min={-60} max={6} step={0.5} fineStep={0.1} label="Volume"
+                          testid="part-volume" format={(v) => (v <= -60 ? '-∞' : `${v > 0 ? '+' : ''}${v.toFixed(1)}`)}
+                          unit="dB" title="Level: drag up or down (Shift for fine), click to type"
+                          onchange={(v) => setPartMixer(part.partId, { volume: volumeFromDb(v) })} />
+            </span>
+            <span class="mini">
               <span class="mini-label">Pan</span>
-              <input type="range" min="-1" max="1" step="0.01" value={part.pan} aria-label="Pan"
-                     oninput={(e) => setPartMixer(part.partId, { pan: Number(e.currentTarget.value) })} />
-            </label>
+              <Knob value={part.pan} min={-1} max={1} reset={0} size={26} label="Pan" testid="part-pan"
+                    format={panLabel} onchange={(v) => setPartMixer(part.partId, { pan: v })} />
+            </span>
             </div>
           </div>
           </div>
@@ -1410,6 +1486,9 @@
         <span class="dock-subject">{dockSubject}</span>
       {/if}
       {#if dockTab === 'sounds'}
+        <button type="button" class="ghost" data-testid="sounds-open-page"
+                title="The library with the whole screen: a rail, sortable columns, a map and several sounds at once"
+                onclick={() => (buildWorkspace = 'sounds')}>⤢ Full page</button>
         <button type="button" class="manage-library" data-testid="sounds-manage-library"
           aria-expanded={activeUtility === 'library'} onclick={() => activeUtility = 'library'}>Manage library</button>
       {/if}
@@ -1434,32 +1513,7 @@
               onchange={(id) => focusRackPart(id, { followEditor: false })} />
           {/if}
           {#if dockTab === 'sounds'}
-            <div class="sound-save-actions">
-      <!-- A hardware part saves the patch it captured. The library is where a sound lives
-           whichever box makes it, so "warm pad" finds the Serum preset and the Juno patch
-           in one list. -->
-      <button type="button"
-              disabled={!(focusedPart?.hasInstrument
-                          || (focusedPart?.hardware && focusedPart?.hardwarePatchBytes > 0))}
-              title={focusedPart?.hasInstrument ? `Save ${partTitle(focusedPart)}'s current instrument settings as a preset in the library`
-                     : focusedPart?.hardware
-                       ? (focusedPart.hardwarePatchBytes > 0
-                            ? `Save ${partTitle(focusedPart)}'s captured patch to the library`
-                            : 'Capture a patch from the synth first (Routing tab)')
-                       : 'Focus a part with an instrument first'}
-              onclick={() => saveUserPreset(focusedPart.partId)}
-              data-testid="host-save-preset">{focusedPart?.hardware ? 'Save patch' : 'Save preset'}</button>
-      <button type="button"  disabled={!focusedPart?.hasInstrument}
-              title={focusedPart?.hasInstrument
-                     ? `Save ${partTitle(focusedPart)} with its instrument settings, MIDI modules and insert effects to the library`
-                     : 'Focus a part with an instrument first'}
-              onclick={() => saveChainToLibrary(focusedPart.partId)}
-              data-testid="host-save-chain">Save chain</button>
-      <button type="button"  onclick={() => saveRackToLibrary()}
-              title="Save the complete Hostage rack and performance settings to the library"
-              data-testid="host-save-rack">Save rack</button>
-
-            </div>
+            {@render soundSaveActions()}
           {/if}
           {#if dockTab === 'params' && paramContext}
             <span class="target-separator" aria-hidden="true">›</span>
@@ -1568,40 +1622,10 @@
                         onToggleAudition={() => setPresetAudition({ enabled: !audition.enabled })} />
         {:else if dockTab === 'zone'}
         {#if focusedPart}
-          <div class="midi-zone">
-            <strong>MIDI zone — {partTitle(focusedPart)}</strong>
-            <div class="zone-grid">
-              <label>Channel
-                <select value={focusedPart.channel}
-                        onchange={(e) => setPartMidiRules(focusedPart.partId, { channel: Number(e.currentTarget.value) })}>
-                  <option value={0}>Omni</option>
-                  {#each Array.from({ length: 16 }, (_, i) => i + 1) as ch}
-                    <option value={ch}>{ch}</option>
-                  {/each}
-                </select>
-              </label>
-              <label>Key low
-                <input type="number" min="0" max="127" value={focusedPart.keyLow}
-                       onchange={(e) => setPartMidiRules(focusedPart.partId, { keyLow: Number(e.currentTarget.value) })} />
-              </label>
-              <label>Key high
-                <input type="number" min="0" max="127" value={focusedPart.keyHigh}
-                       onchange={(e) => setPartMidiRules(focusedPart.partId, { keyHigh: Number(e.currentTarget.value) })} />
-              </label>
-              <label>Vel low
-                <input type="number" min="1" max="127" value={focusedPart.velocityLow}
-                       onchange={(e) => setPartMidiRules(focusedPart.partId, { velocityLow: Number(e.currentTarget.value) })} />
-              </label>
-              <label>Vel high
-                <input type="number" min="1" max="127" value={focusedPart.velocityHigh}
-                       onchange={(e) => setPartMidiRules(focusedPart.partId, { velocityHigh: Number(e.currentTarget.value) })} />
-              </label>
-              <label>Transpose
-                <input type="number" min="-60" max="60" value={focusedPart.transpose}
-                       onchange={(e) => setPartMidiRules(focusedPart.partId, { transpose: Number(e.currentTarget.value) })} />
-              </label>
-            </div>
-          </div>
+          <HostZoneEditor part={focusedPart} activity={$hostMidiActivity}
+                          others={$hostState.rack.parts.filter((p) => p.partId !== focusedPart.partId)
+                                    .map((p) => ({ partId: p.partId, name: partTitle(p), keyLow: p.keyLow, keyHigh: p.keyHigh }))}
+                          onset={(fields) => setPartMidiRules(focusedPart.partId, fields)} />
         {/if}
         {:else if dockTab === 'midi'}
         {#if focusedPart}
@@ -1930,29 +1954,34 @@
                               onclick={() => nudgeParameterStep(parameter, 1)}>›</button>
                     </span>
                   {:else}
-                    <input type="range" min="0" max="1" step={stepFor(parameter)} value={parameter.value}
-                           aria-label={parameter.name}
-                           onpointerdown={() => startParameterGesture(paramTargetId, parameter.id)}
-                           onpointerup={finishParameterGesture}
-                           onpointercancel={finishParameterGesture}
-                           onlostpointercapture={finishParameterGesture}
-                           oninput={(e) => setParameter(paramTargetId, parameter.id, Number(e.currentTarget.value))} />
+                    <!-- One bar: drag sideways, click the number to type, double-click to reset. -->
+                    <ParamBar value={parameter.value} text={parameter.text} unit={parameter.label} label={parameter.name}
+                              bipolar={isBipolarParameter(parameter)} steps={parameter.numSteps}
+                              testid="param-bar"
+                              onstart={() => startParameterGesture(paramTargetId, parameter.id)}
+                              onchange={(v) => setParameter(paramTargetId, parameter.id, v)}
+                              onend={finishParameterGesture}
+                              ontype={(t) => setParameterText(paramTargetId, parameter.id, t)}
+                              onreset={() => resetParameter(paramTargetId, parameter.id)} />
                   {/if}
-                  {#if editingParamId === parameter.id}
-                    <!-- svelte-ignore a11y_autofocus -->
-                    <input class="param-edit" type="text" bind:value={editingParamText} autofocus
-                           aria-label={`Type a value for ${parameter.name}`}
-                           onkeydown={(e) => {
-                             if (e.key === 'Enter') commitParamEdit(parameter);
-                             if (e.key === 'Escape') editingParamId = null;
-                           }}
-                           onblur={() => (editingParamId = null)} />
-                  {:else}
-                    <span class="param-value" role="button" tabindex="-1"
-                          title="Double-click to type a value"
-                          ondblclick={() => beginParamEdit(parameter)}
-                          onkeydown={(e) => e.key === 'Enter' && beginParamEdit(parameter)}>
-                      {parameter.text}{parameter.label ? ` ${parameter.label}` : ''}</span>
+                  {#if parameterControlKind(parameter) !== 'slider'}
+                    {#if editingParamId === parameter.id}
+                      <input class="param-edit" type="text" bind:value={editingParamText} use:focusOnMount
+                             aria-label={`Type a value for ${parameter.name}`}
+                             onkeydown={(e) => {
+                               if (e.key === 'Enter') commitParamEdit(parameter);
+                               if (e.key === 'Escape') editingParamId = null;
+                             }}
+                             onblur={() => (editingParamId = null)} />
+                    {:else}
+                      <button type="button" class="ctl param-value" title="Click to type a value"
+                              onclick={() => beginParamEdit(parameter)}>
+                        {parameter.text}{parameter.label ? ` ${parameter.label}` : ''}</button>
+                    {/if}
+                  {/if}
+                  {#if places.get(parameter.id)}
+                    <span class="param-place" data-testid="param-place" title={places.get(parameter.id).join(', ')}>
+                      {places.get(parameter.id)[0]}{places.get(parameter.id).length > 1 ? ` +${places.get(parameter.id).length - 1}` : ''}</span>
                   {/if}
                   <button type="button" class="ghost" title="Reset to the plug-in's default"
                           onclick={() => resetParameter(paramTargetId, parameter.id)}>↺</button>
@@ -2039,11 +2068,12 @@
                 <input type="text" class="send-name editable-name" value={ret.name}
                        aria-label="Return name" title="Rename return"
                        onchange={(e) => renameReturn(ret.returnId, e.currentTarget.value)} />
-                <label class="mini return-level" title="Return level">
-                  <input type="range" min="0" max="2" step="0.01" value={ret.level}
-                         aria-label={`${ret.name} level`}
-                         oninput={(e) => setReturnLevel(ret.returnId, Number(e.currentTarget.value))} />
-                </label>
+                <span class="return-level" title="Return level: drag up or down, double-click for 0 dB">
+                  <Knob value={ret.level} min={0} max={2} reset={1} size={28} label={`${ret.name} level`}
+                        testid="return-level" format={(v) => (v <= 0.001 ? '-∞ dB' : `${(20 * Math.log10(v)).toFixed(1)} dB`)}
+                        onchange={(v) => setReturnLevel(ret.returnId, v)} />
+                  <small>{ret.level <= 0.001 ? '-∞' : (20 * Math.log10(ret.level)).toFixed(1)} dB</small>
+                </span>
                 <button type="button" class="ghost danger" class:confirming={pendingDestructive === `return:${ret.returnId}`}
                         title={pendingDestructive === `return:${ret.returnId}` ? 'Click again to confirm' : 'Remove this return (its sends go with it)'}
                         onclick={() => guardedAction(`return:${ret.returnId}`, () => removeReturn(ret.returnId))}>
@@ -2068,9 +2098,12 @@
                      onfocus={() => (selectedMacroId = macro.macroId)}
                      onclick={() => (selectedMacroId = macro.macroId)}
                      onchange={(e) => renameMacro(macro.macroId, e.currentTarget.value)} />
-              <input type="range" min="0" max="1" step="0.001" value={macro.value} aria-label={macro.name}
-                     oninput={(e) => setMacroValue(macro.macroId, Number(e.currentTarget.value))}
-                     onchange={(e) => setMacroValue(macro.macroId, Number(e.currentTarget.value), true)} />
+              <!-- The macro's value: a knob that sends as you turn and settles once you let go. -->
+              <Knob value={macro.value} min={0} max={1} reset={0} step={0.001} size={30} label={macro.name}
+                    testid="macro-knob" format={(v) => `${Math.round(v * 100)}%`}
+                    onchange={(v) => setMacroValue(macro.macroId, v)}
+                    oncommit={(v) => setMacroValue(macro.macroId, v, true)} />
+              <span class="macro-value">{Math.round(macro.value * 100)}%</span>
               <button type="button" class="ghost danger" class:confirming={pendingDestructive === `macro:${macro.macroId}`}
                       title={pendingDestructive === `macro:${macro.macroId}` ? 'Click again to confirm' : 'Remove this macro'}
                       onclick={() => guardedAction(`macro:${macro.macroId}`, () => removeMacro(macro.macroId))}>
@@ -2086,30 +2119,10 @@
                     <span class="macro-target-name">
                       {target.displayName} — {target.targetName || 'missing'}
                     </span>
-                    <label class="macro-bound" title="Output when the macro is at minimum">
-                      <span>Min</span>
-                      <input type="number" min="0" max={target.rangeMax} step="0.01" value={target.rangeMin}
-                             aria-label={`${target.displayName} minimum`}
-                             onchange={(e) => setMacroTargetOptions(
-                               macro.macroId, target.targetId, target.parameterId,
-                               { rangeMin: Number(e.currentTarget.value) })} />
-                    </label>
-                    <label class="macro-bound" title="Output when the macro is at maximum">
-                      <span>Max</span>
-                      <input type="number" min={target.rangeMin} max="1" step="0.01" value={target.rangeMax}
-                             aria-label={`${target.displayName} maximum`}
-                             onchange={(e) => setMacroTargetOptions(
-                               macro.macroId, target.targetId, target.parameterId,
-                               { rangeMax: Number(e.currentTarget.value) })} />
-                    </label>
-                    <span class="macro-invert">
-                      <PropertyToggle value={target.inverted} label="Inv" compact
-                                      title="Reverse this target's response"
-                                      ariaLabel={`Invert ${target.displayName}`}
-                                      onchange={(inverted) => setMacroTargetOptions(
-                                        macro.macroId, target.targetId, target.parameterId,
-                                        { inverted })} />
-                    </span>
+                    <!-- The range as a band: drag its ends, past each other to reverse it. -->
+                    <MacroTargetBand {target} position={macro.value}
+                                     onset={(fields) => setMacroTargetOptions(
+                                       macro.macroId, target.targetId, target.parameterId, fields)} />
                     <button type="button" class="ghost danger"
                             class:confirming={pendingDestructive === `macro-target:${macro.macroId}:${target.targetId}:${target.parameterId}`}
                             title={pendingDestructive === `macro-target:${macro.macroId}:${target.targetId}:${target.parameterId}`
@@ -2314,6 +2327,10 @@
   }
   .primary-workspace :global(.mixer) { min-height: 100%; box-sizing: border-box; }
   .controller-workspace { display: flex; overflow: hidden; }
+  .sounds-workspace { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+  .sounds-page-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: none; padding: 6px 12px;
+                     border-bottom: 1px solid var(--host-line); background: var(--host-surface-raised); }
+  .sounds-page-spacer { flex: 1; }
 
   .utility-drawer {
     position: absolute;
@@ -2407,6 +2424,8 @@
 
   .device-midi-title { color: #aab4bd; font-size: 12px; }
   .surface-row { color: #aab4bd; font-size: 12px; align-items: center; }
+  .surface-row { flex-wrap: wrap; }
+  .surface-detail { flex-basis: 100%; color: #d6a3a3; font-size: 11px; line-height: 1.35; }
   .surface-dot { width: 7px; height: 7px; border-radius: 50%; background: #5c6672;
                  display: inline-block; flex: 0 0 auto; }
   .surface-dot.connected { background: #35c46f; }
@@ -2493,14 +2512,21 @@
     background: var(--host-surface);
   }
   .host-dock.collapsed { height: auto; }
+  /* The grip is visible: a bar with a handle in the middle, so the dock reads as something
+     you can pull up. Dragging up grows it; a double-click fits it to the tab. */
   .dock-grip {
-    height: 10px;
-    margin-top: -5px;
+    height: 9px;
+    flex: none;
     cursor: ns-resize;
     touch-action: none;
-    background: transparent;
+    background: var(--host-surface-raised, #20272e);
+    border-bottom: 1px solid var(--host-line-soft, #2c353e);
+    display: grid;
+    place-items: center;
   }
-  .dock-grip:hover { background: #2c6ca8; }
+  .dock-grip::after { content: ''; width: 44px; height: 3px; border-radius: 2px; background: var(--host-line-strong, #526170); }
+  .dock-grip:hover { background: #24313d; }
+  .dock-grip:hover::after { background: #5b9bd5; }
   .dock-tabs {
     display: flex;
     align-items: center;
@@ -2689,24 +2715,6 @@
   .part-vendor { color: #96a2ad; font-size: 12px; }
 
   .part-controls { flex: 1; min-width: 290px; display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
-  .mini input[type="range"] { width: 84px; }
-
-  .midi-zone {
-    border: 1px solid #2c343d;
-    border-radius: 5px;
-    padding: 8px;
-    background: #1c2126;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .zone-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .zone-grid label { display: flex; flex-direction: column; gap: 3px; color: #9aa5b1; font-size: 11px; }
-  .zone-grid input, .zone-grid select { width: 100%; }
 
   .instrument-list { display: flex; flex-direction: column; gap: 4px; }
   .instrument {
@@ -2761,7 +2769,10 @@
     color: #e0cf9a;
     font-size: 12px;
   }
-  .param-list { overflow-y: auto; max-height: 260px; display: flex; flex-direction: column; gap: 4px; }
+  /* The list fills the dock; the dock is what you size (the grip above it). */
+  .param-list { display: flex; flex-direction: column; gap: 4px; }
+  .param-place { flex: none; font: 600 9px var(--host-font-mono, monospace); color: #ff9408; letter-spacing: .04em;
+                 border: 1px solid #5a4020; border-radius: 9px; padding: 1px 6px; white-space: nowrap; }
   .param-group { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
                  background: #161e27; border: 1px solid #232c36; border-radius: 4px;
                  color: #aab4bd; font-size: 12px; font-weight: 600; padding: 4px 8px;
@@ -2795,15 +2806,16 @@
   .param-edit { width: 90px; font-size: 11px; background: #10161c; color: #d6dbe0;
                 border: 1px solid #3d81c4; border-radius: 3px; padding: 1px 4px; }
   .param-name { flex: 0 0 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-  .param-row input[type='range'] { flex: 1; min-width: 60px; }
-  .param-value { flex: 0 0 92px; text-align: right; color: #aab4bd; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .param-value { background: none; border: 0; padding: 0; font: inherit; cursor: text; flex: 0 0 92px; text-align: right; color: #aab4bd; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .param-diag { color: #8795a0; font-size: 11px; margin: -2px 0 0 138px; }
 
   .transport { display: flex; align-items: center; gap: 4px; }
   .transport-action { min-width: 26px; padding: 2px 5px; }
   .transport-action:disabled { opacity: 0.35; cursor: default; }
-  .transport .tempo { width: 62px; }
-  .transport .ts { width: 44px; }
+  .beat-dots { display: inline-flex; gap: 3px; align-items: center; }
+  .beat-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--host-line, #3b4652); display: block; }
+  .beat-dots i.on { background: #ff9408; box-shadow: 0 0 5px #ff9408; }
+  .transport-action.tap { min-width: 34px; font-size: 11px; }
   .ts-slash { color: #7d8894; }
   .transport-position {
     min-width: 44px;
@@ -2825,7 +2837,8 @@
   .send-row input[type='range'] { flex: 1; min-width: 60px; }
   .return-block { display: flex; flex-direction: column; gap: 4px; }
   .return-block .fx-chain { border-top: none; padding-top: 0; margin-left: 8px; }
-  .return-level input[type='range'] { width: 120px; }
+  .return-level { display: inline-flex; align-items: center; gap: 6px; }
+  .return-level small { font: 11px var(--host-font-mono, monospace); color: var(--host-text-soft); min-width: 52px; }
   .hw-error {
     padding: 4px 8px;
     border: 1px solid #7a4a4a;
@@ -2925,32 +2938,20 @@
   .macro-row { display: flex; align-items: center; gap: 8px; }
   .macro-row.on .macro-name { color: #d6dbe0; border-color: #5b9bd5; }
   .macro-name { box-sizing: border-box; flex: 0 0 112px; min-width: 0; font-size: 12px; }
-  .macro-row input[type='range'] { flex: 1; min-width: 60px; }
-  .macro-targets { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 8px; }
+  .macro-value { font: 600 12px var(--host-font-mono, monospace); color: var(--host-text-soft); min-width: 38px; }
+  /* One target a row: its name, the band it drives, remove. */
+  .macro-targets { display: flex; flex-direction: column; gap: 4px; margin-left: 8px; }
   .macro-target {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 10px;
     border: 1px solid #3b4652;
     border-radius: 3px;
-    padding: 1px 4px;
+    padding: 3px 6px;
     font-size: 11px;
     color: #9aa5b1;
   }
-  .macro-target-name { white-space: nowrap; }
-  .macro-bound, .macro-invert { display: inline-flex; align-items: center; gap: 2px; }
-  .macro-bound span, .macro-invert span { color: #74808b; font-size: 9px; text-transform: uppercase; }
-  .macro-bound input[type='number'] {
-    width: 42px;
-    min-width: 42px;
-    height: 20px;
-    padding: 1px 3px;
-    border: 1px solid #46515d;
-    border-radius: 2px;
-    background: #171c21;
-    color: #cbd2d8;
-    font-size: 10px;
-  }
+  .macro-target-name { flex: 0 0 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .macro-target.unresolved { color: #d6a3a3; border-color: #7a4a4a; }
 
   .pages {
@@ -3035,7 +3036,6 @@
     }
     .preset-walk { width: 100%; min-width: 0; }
     .part-controls { width: 100%; min-width: 0; justify-content: flex-start; gap: 5px; }
-    .mini input[type="range"] { width: 64px; }
   }
 
   /* Below this, even an asymmetric pair cannot give a useful width to both columns. Keep

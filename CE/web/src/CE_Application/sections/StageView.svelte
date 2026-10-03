@@ -1,38 +1,78 @@
 <script>
-  /** The calm, locked-down reading of the rig used while playing. */
+  /**
+   * The stage screen: the rig read from the drum riser while playing a set. Large type, the whole
+   * setlist, the song's notes in full, where you are in the song, the controls and the parts, and
+   * anything wrong with its fix on it. Keys and foot pedals run the set; panic is always on screen.
+   *
+   * Three layouts, remembered per machine: Full for the laptop, Minimal (now, next, the time)
+   * for a tablet on the floor, Controls for playing mostly knobs. Daylight contrast for outdoors.
+   */
   import { onDestroy, onMount } from 'svelte';
-  import HostPickupIndicator from './HostPickupIndicator.svelte';
   import {
     hostState, hostSurface, hostMidiActivity, hostLastError, hostPanic,
     hostSurfaceLayout, hostAudioDevices, requestSurfaceLayout, requestAudioDevices,
-    setlistPrev, setlistNext, transportPlay, transportStop,
+    setlistPrev, setlistNext, setlistGo, transportPlay, transportStop, launchScene, resetSetlistClock,
   } from '../stores/instrumentHost.js';
-  import { noteName } from '../utils/pianoGeometry.js';
   import {
     changedSurfaceSlot, stageSetlistContext, stageSurfaceModel, surfaceSlotForMidiActivity, stageControllerContext,
   } from '../utils/stageViewModel.js';
+  import {
+    arrangementBlocks, formatDuration, pushHistory, stageKeyAction, stageTimers, stageTroubles,
+  } from '../utils/stageScreen.js';
+  import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
+  import StageControls from './stage/StageControls.svelte';
+  import StageRig from './stage/StageRig.svelte';
+  import StageTrouble from './stage/StageTrouble.svelte';
+
+  const PREFS_KEY = 'ceditor.instrumentHost.stageScreen.v1';
+  const prefs = readStoredJson(PREFS_KEY, {}) ?? {};
+  let layout = $state(['full', 'minimal', 'controls'].includes(prefs.layout) ? prefs.layout : 'full');
+  let daylight = $state(prefs.daylight === true);
+  let notesSize = $state(Math.max(14, Math.min(40, Number(prefs.notesSize) || 20)));
+  $effect(() => writeStoredJson(PREFS_KEY, { layout, daylight, notesSize }));
 
   let performance = $derived($hostState.performance);
   let transport = $derived(performance.transport);
   let setlist = $derived(stageSetlistContext(performance));
-  let currentScene = $derived(setlist.current
-    ? performance.scenes.find((scene) => scene.sceneId === setlist.current.sceneId) ?? null
-    : null);
   let surface = $derived(stageSurfaceModel($hostState.rack, performance, $hostSurface));
+  let surfacePageId = $derived(surface.type === 'controls' ? ($hostState.rack.pages[surface.pageIndex]?.pageId ?? '') : '');
   let controller = $derived(stageControllerContext($hostSurfaceLayout, $hostAudioDevices, $hostSurface, $hostState.audio.enabled));
+  let currentScene = $derived(performance.scenes.find((s) => s.sceneId === performance.currentSceneId)
+    ?? (setlist.current ? performance.scenes.find((s) => s.sceneId === setlist.current.sceneId) : null) ?? null);
+  // The scene is always named, as a label, never hidden: a song and the scene it plays are two
+  // different things, and leaving one out made it look missing.
+  let sceneLabel = $derived(currentScene?.name ?? '');
+  let hasMacros = $derived($hostState.rack.macros.length > 0);
+  let activeParts = $derived($hostState.rack.parts.filter((part) => part.hasInstrument || part.hardware || part.unresolved));
+  let troubles = $derived(stageTroubles($hostState.reliability));
+  let troubledParts = $derived(new Set(troubles.filter((t) => t.kind === 'note')
+    .flatMap((t) => t.actions.filter((a) => a.partId).map((a) => a.partId))));
+  let blocks = $derived(arrangementBlocks(performance.arrangement));
+
+  // The clocks and the CPU line move once a second; nothing else needs a timer.
+  let now = $state(Date.now());
+  let cpuHistory = $state([]);
+  let clockTimer;
   onMount(() => {
     requestAudioDevices();
     // Preserve the profile selected in Build; request its default only when none is loaded.
     if (!$hostSurfaceLayout.profileId) requestSurfaceLayout();
+    clockTimer = setInterval(() => {
+      now = Date.now();
+      cpuHistory = pushHistory(cpuHistory, $hostState.audio.cpu);
+    }, 1000);
   });
-  let activeParts = $derived($hostState.rack.parts.filter(
-    (part) => part.hasInstrument || part.hardware || part.unresolved));
+  // A new song reads 0:00 the moment it starts, not up to a tick later with the last song's time.
+  $effect(() => { if (performance.setlist.songStartedAtMs) now = Date.now(); });
+  let timers = $derived(stageTimers(performance.setlist, now));
+  const clockText = $derived(new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+
+  // A control lights while the hardware (or a learned MIDI control) moves it.
   let movingSlot = $state(-1);
   let previousSurfaceEntries = [];
   let previousMovementSeq;
   let previousMidiSeq;
   let movementTimer;
-
   $effect(() => {
     const current = surface.entries;
     const movementSeq = $hostSurface.movementSeq;
@@ -52,23 +92,110 @@
     movementTimer = setTimeout(() => (movingSlot = -1), 450);
   });
 
-  onDestroy(() => clearTimeout(movementTimer));
+  // A song in the list arms on the first tap and goes on the second, so a brush never changes
+  // the song in the middle of a set.
+  let armed = $state(-1);
+  let armTimer;
+  function tapSong(index) {
+    if (index === setlist.currentIndex) return;
+    if (armed === index) { armed = -1; clearTimeout(armTimer); setlistGo(index); return; }
+    armed = index;
+    clearTimeout(armTimer);
+    armTimer = setTimeout(() => (armed = -1), 4000);
+  }
 
-  const percent = (value) => `${Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100)}%`;
-  const partName = (part) => part.pluginName || part.midiOutputName || 'Unresolved part';
+  // Keys: the ones a USB foot switch or page turner sends run the set. Panic on the keyboard is
+  // held for half a second, so a stray key cannot silence a show; the button is instant.
+  let panicHold = null;
+  let panicHint = $state(false);
+  function key(event) {
+    // A focused knob or fader already used its arrows; a modifier means a shortcut elsewhere.
+    if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+    const action = stageKeyAction(event);
+    if (!action) return;
+    if (action.kind === 'panicHold') {
+      event.preventDefault();
+      if (event.repeat || panicHold) return;
+      panicHint = true;
+      panicHold = setTimeout(() => { firePanic(); panicHold = 'fired'; panicHint = false; }, 500);
+      return;
+    }
+    if (event.repeat) return;
+    if (action.kind === 'playStop') { event.preventDefault(); transport.playing ? transportStop() : transportPlay(); }
+    else if (action.kind === 'next' && setlist.canNext) { event.preventDefault(); setlistNext(); }
+    else if (action.kind === 'previous' && setlist.canPrevious) { event.preventDefault(); setlistPrev(); }
+    else if (action.kind === 'song' && setlist.items[action.index]) { event.preventDefault(); tapSong(action.index); }
+    else if (action.kind === 'go' && armed >= 0) { event.preventDefault(); tapSong(armed); }
+    else if (action.kind === 'scene' && performance.scenes[action.index]) { event.preventDefault(); launchScene(performance.scenes[action.index].sceneId); }
+    else if (action.kind === 'notesSize') notesSize = Math.max(14, Math.min(40, notesSize + action.delta));
+    else if (action.kind === 'disarm') armed = -1;
+  }
+  // A panic says it happened: the button reads ALL NOTES OFF for a moment, then is PANIC again.
+  let panicFired = $state(false);
+  let panicFlash;
+  function firePanic() {
+    hostPanic();
+    panicFired = true;
+    clearTimeout(panicFlash);
+    panicFlash = setTimeout(() => (panicFired = false), 1200);
+  }
+  // A button clicked with the mouse lets go of focus, so it does not keep a ring that reads as
+  // "still on" (and Space, the play key, cannot press it a second time). Keyboard focus stays.
+  function releaseClickFocus(event) {
+    if (event.detail > 0) event.target?.closest?.('button')?.blur();
+  }
+
+  function keyUp(event) {
+    if (event.key !== 'p' && event.key !== 'P') return;
+    if (panicHold && panicHold !== 'fired') clearTimeout(panicHold);
+    panicHold = null;
+    panicHint = false;
+  }
+
+  let fullscreen = $state(false);
+  function toggleFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else document.documentElement.requestFullscreen?.().catch(() => {});
+  }
+  const onFullscreen = () => (fullscreen = Boolean(document.fullscreenElement));
+
+  onDestroy(() => { clearTimeout(movementTimer); clearTimeout(armTimer); clearTimeout(panicFlash); clearInterval(clockTimer); if (panicHold && panicHold !== 'fired') clearTimeout(panicHold); });
+
   const audioStatus = (audio) => {
     if (!audio.enabled) return 'Audio off';
     if (!audio.running) return 'Audio starting';
-    return `${audio.deviceName || 'Audio'} · ${Math.round(audio.cpu * 100)}% CPU`
-      + (audio.xruns > 0 ? ` · ${audio.xruns} xruns` : '');
+    return `${audio.deviceName || 'Audio'} · ${Math.round(audio.cpu * 100)}% CPU`;
   };
+  const sparkPath = (values) => values.length < 2 ? ''
+    : values.map((v, i) => `${i ? 'L' : 'M'}${((i / (values.length - 1)) * 80).toFixed(1)},${(16 - v * 16).toFixed(1)}`).join(' ');
+  // Cues written in capitals ("CHORUS: scene 2") stand out in the notes.
+  const noteParts = (text) => String(text ?? '').split(/(\b[A-Z][A-Z0-9]{2,}(?:\s[0-9]+)?\b)/g)
+    .map((part, i) => ({ text: part, cue: i % 2 === 1 }));
+  const aheadText = (ms) => (ms === null ? '' : Math.abs(ms) < 5000 ? 'on time' : `${formatDuration(Math.abs(ms))} ${ms > 0 ? 'early' : 'late'}`);
 </script>
 
-<main class="stage" data-testid="host-stage-view">
+<svelte:window onkeydown={key} onkeyup={keyUp} />
+<svelte:document onfullscreenchange={onFullscreen} />
+
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+<main class={`stage ${layout}`} class:daylight class:no-macros={!hasMacros} data-testid="host-stage-view" onclick={releaseClickFocus}>
   <section class="stage-status" aria-label="Performance status">
+   <div class="status-main">
+    <span class="clock" data-testid="stage-clock">{clockText}</span>
+    <button type="button" class="ctl timer" data-testid="stage-reset-clock" disabled={setlist.currentIndex < 0}
+            title="Since the first song of the set. Click to restart the set and song clocks from now."
+            onclick={() => resetSetlistClock()}>set <b data-testid="stage-set-timer">{formatDuration(timers.setMs)}</b>
+      {#if timers.ahead !== null}<em class:late={timers.ahead < -5000}>{aheadText(timers.ahead)}</em>{/if}</button>
+    <span class="timer" title="Since this song began">song <b data-testid="stage-song-timer">{formatDuration(timers.songMs)}</b>{#if timers.plannedMs}
+      <em class:late={timers.over}>/ {formatDuration(timers.plannedMs)}</em>{/if}</span>
     <div class="status-item" class:good={$hostState.audio.running} class:warn={$hostState.audio.xruns > 0}>
       <span class="status-dot"></span>
-      <span>{audioStatus($hostState.audio)}</span>
+      <span class="device" title={audioStatus($hostState.audio)}>{audioStatus($hostState.audio)}</span>
+      {#if $hostState.audio.running && cpuHistory.length > 1}
+        <svg class="spark" viewBox="0 0 80 16" aria-hidden="true"><path d={sparkPath(cpuHistory)} /></svg>
+      {/if}
+      {#if $hostState.audio.xruns > 0}<span class="xruns" title="Audio dropouts since the audio started">{$hostState.audio.xruns} dropouts</span>{/if}
     </div>
     <div class="status-item" class:good={controller.midiEnabled} title={controller.midiDetail} data-testid="stage-midi-status">
       <span class="status-dot"></span>
@@ -83,231 +210,332 @@
     {#if $hostLastError}
       <span class="stage-error" role="alert">
         <span>{$hostLastError}</span>
-        <button type="button" aria-label="Dismiss error" onclick={() => hostLastError.set('')}>×</button>
+        <button type="button" class="ctl" aria-label="Dismiss error" onclick={() => hostLastError.set('')}>×</button>
       </span>
     {/if}
+   </div>
+   <div class="status-side">
+    <span class="views" role="group" aria-label="Stage layout">
+      {#each [['full', 'Full'], ['minimal', 'Minimal'], ['controls', 'Controls']] as [value, label] (value)}
+        <button type="button" class="ctl view" aria-pressed={layout === value} data-testid={`stage-layout-${value}`}
+                onclick={() => (layout = value)}>{label}</button>
+      {/each}
+      <button type="button" class="ctl view" aria-pressed={daylight} data-testid="stage-daylight"
+              title="High contrast for bright rooms and outdoor stages" onclick={() => (daylight = !daylight)}>☀</button>
+      <button type="button" class="ctl view" aria-pressed={fullscreen} data-testid="stage-fullscreen"
+              title="Fill the screen" onclick={toggleFullscreen}>⤢</button>
+    </span>
     <span class="stage-lock" class:pending={!$hostState.stageLocked}>
       {$hostState.stageLocked ? 'STAGE LOCKED' : 'LOCKING…'}
     </span>
+    <button type="button" class="ctl stage-panic" class:hint={panicHint} class:fired={panicFired} data-testid="stage-panic"
+            onclick={firePanic} title="All notes off, every part, once. On the keyboard: hold P.">
+      {panicFired ? 'ALL OFF' : 'PANIC'}</button>
+   </div>
   </section>
 
-  <section class="transport-card" aria-label="Transport">
-    <button type="button" class="play" class:playing={transport.playing}
-            aria-label={transport.playing ? 'Stop' : 'Play'}
-            onclick={() => (transport.playing ? transportStop() : transportPlay())}>
-      {transport.playing ? '■' : '▶'}
-    </button>
-    <div class="position">
-      <strong>{transport.bar}.{transport.beat}</strong>
-      <span>BAR · BEAT</span>
-    </div>
-    <div class="tempo">
-      <strong>{Math.round(transport.tempo)}</strong>
-      <span>BPM</span>
-    </div>
-    <div class="clock" class:warn={transport.clockLost}>
-      {transport.externalClock ? (transport.clockLost ? 'NO CLOCK' : 'EXT CLOCK') : 'INTERNAL'}
-    </div>
-  </section>
+  <StageTrouble {troubles} />
 
-  <section class="setlist-grid" aria-label="Setlist position">
-    <button type="button" class="step-button previous" disabled={!setlist.canPrevious}
-            onclick={() => setlistPrev()} aria-label="Previous setlist item">
-      <span class="arrow">←</span><span>PREVIOUS</span>
-    </button>
-
-    <div class="song-card current-song">
-      <span class="eyebrow">NOW</span>
-      {#if setlist.current}
-        <strong>{setlist.current.name}</strong>
-        <span class="scene-name">{setlist.loadingIndex === setlist.currentIndex
-          ? 'Loading rig…' : (setlist.current.sceneName || 'Scene')}</span>
-        {#if setlist.current.notes}<p>{setlist.current.notes}</p>{/if}
-        <span class="song-count">{setlist.currentIndex + 1} / {setlist.items.length}</span>
-      {:else}
-        <strong>{setlist.items.length ? 'Ready' : 'No setlist'}</strong>
-        <span class="scene-name">{setlist.items.length ? 'Press Next to begin' : 'Add scenes in Build mode'}</span>
-      {/if}
-    </div>
-
-    <div class="song-card next-song">
-      <span class="eyebrow">NEXT</span>
-      {#if setlist.next}
-        <strong>{setlist.next.name}</strong>
-        <span class="scene-name">{setlist.next.sceneName || 'Scene'}</span>
-        {#if setlist.next.tempo > 0}<span>{setlist.next.tempo} BPM</span>{/if}
-        {#if setlist.nextReadiness}
-          <span class="next-readiness" class:ready={setlist.nextReadiness.state === 'ready'}
-                class:warn={setlist.nextReadiness.state === 'warning'} role="status"
-                title={setlist.nextReadiness.detail}
-                aria-label={`${setlist.nextReadiness.label}. ${setlist.nextReadiness.detail}`}
-                data-testid="stage-next-readiness">{setlist.nextReadiness.label}</span>
-        {/if}
-      {:else}
-        <strong>End of set</strong>
-        <span class="scene-name">No following song</span>
-      {/if}
-    </div>
-
-    <button type="button" class="step-button next" disabled={!setlist.canNext}
-            onclick={() => setlistNext()} aria-label={setlist.currentIndex < 0 ? 'Start setlist' : 'Next setlist item'}>
-      <span>{setlist.currentIndex < 0 ? 'START' : 'NEXT'}</span><span class="arrow">→</span>
-    </button>
-  </section>
-
-  <div class="stage-body">
-    <section class="stage-panel parts-panel" aria-label="Active parts">
-      <div class="panel-head">
-        <div><span class="eyebrow">RIG</span><strong>Active parts</strong></div>
-        {#if currentScene}<span class="scene-chip">{currentScene.name}</span>{/if}
-      </div>
-      <div class="parts">
-        {#each activeParts as part (part.partId)}
-          <article class="stage-part" class:muted={part.mute || !part.enabled} class:solo={part.solo}>
-            <span class="part-state">{!part.enabled ? 'OFF' : part.mute ? 'MUTE' : part.solo ? 'SOLO' : 'LIVE'}</span>
-            <strong>{partName(part)}</strong>
-            <span class="preset">{part.presetName || (part.hardware ? part.hardwarePatchName : '') || 'No preset name'}</span>
-            <div class="part-detail">
-              <span>{noteName(part.keyLow)}–{noteName(part.keyHigh)}</span>
-              <span>{Math.round(part.volume * 100)}%</span>
-            </div>
-          </article>
+  {#if layout === 'full'}
+    <nav class="set-rail" aria-label="Setlist" data-testid="stage-setlist">
+      <div class="rail-head"><span class="eyebrow">Songs</span>
+        <span class="count">{setlist.currentIndex >= 0 ? `${setlist.currentIndex + 1} / ${setlist.items.length}` : `${setlist.items.length} songs`}</span></div>
+      <div class="songs">
+        {#each setlist.items as item, index (item.itemId)}
+          <button type="button" class="ctl song" class:done={index < setlist.currentIndex} class:now={index === setlist.currentIndex}
+                  class:next={setlist.next === item} class:armed={armed === index} class:missing={item.missing}
+                  data-testid="stage-song" aria-current={index === setlist.currentIndex ? 'true' : undefined}
+                  title={index === setlist.currentIndex ? 'Playing now' : armed === index ? 'Tap again to go' : 'Tap to choose, again to go'}
+                  onclick={() => tapSong(index)}>
+            <span class="n">{index < setlist.currentIndex ? '✓' : index + 1}</span>
+            <span class="t">{item.name}</span>
+            <span class="d">{[item.sceneName ? `scene ${item.sceneName}` : '', item.tempo > 0 ? `${Math.round(item.tempo)} BPM` : '', item.plannedSeconds > 0 ? formatDuration(item.plannedSeconds * 1000) : ''].filter(Boolean).join(' · ')}</span>
+          </button>
         {/each}
-        {#if activeParts.length === 0}
-          <div class="empty">No active parts. Return to Build mode and load an instrument.</div>
-        {/if}
+        {#if setlist.items.length === 0}<div class="empty">No setlist. Add songs in Build, under Performance.</div>{/if}
       </div>
-    </section>
+      {#if timers.totalPlannedMs > 0}<div class="rail-foot">Planned set {formatDuration(timers.totalPlannedMs)}</div>{/if}
+    </nav>
+  {/if}
 
-    <section class="stage-panel controls-panel" aria-label="Controls">
-      <div class="panel-head">
-        <div><span class="eyebrow" data-testid="stage-controller-name"
-          title={controller.profileName ? `Selected controller profile: ${controller.profileName}` : 'Controls'}>
-          Controls{controller.profileName ? ` · ${controller.profileName}` : ''}</span><strong>{surface.name}</strong></div>
-        <span class="page-count">PAGE {surface.pageIndex + 1} / {surface.pageCount}</span>
+  <section class="hero" aria-label="Now playing" data-testid="stage-now">
+    <div class="hero-main">
+      <span class="eyebrow now-label">{setlist.currentIndex >= 0 ? `Now · song ${setlist.currentIndex + 1} of ${setlist.items.length}` : 'Now'}</span>
+      <strong class="song-name" data-testid="stage-song-name">{setlist.current ? setlist.current.name : setlist.items.length ? 'Ready' : 'No setlist'}</strong>
+      <span class="scene-line">
+        {#if setlist.current && setlist.loadingIndex === setlist.currentIndex}Loading rig…
+        {:else if sceneLabel}<span class="tag">Scene</span> <b>{sceneLabel}</b>{#if performance.snapshotMorph.active} · morphing {Math.round(performance.snapshotMorph.progress * 100)}%{/if}
+        {:else if performance.snapshotMorph.active}Morphing {Math.round(performance.snapshotMorph.progress * 100)}%
+        {:else if !setlist.current}{setlist.items.length ? 'Press Next, → or Page Down to begin' : 'Add scenes in Build mode'}{/if}
+      </span>
+    </div>
+    <div class="hero-tempo">
+      <button type="button" class="ctl play" class:playing={transport.playing} aria-label={transport.playing ? 'Stop' : 'Play'}
+              onclick={() => (transport.playing ? transportStop() : transportPlay())}>{transport.playing ? '■' : '▶'}</button>
+      <span class="bpm" data-testid="stage-tempo">{Math.round(transport.tempo)}<small>BPM</small></span>
+      <span class="pos">{transport.bar}.{transport.beat} · {transport.numerator}/{transport.denominator}</span>
+      <span class="beats" aria-hidden="true" data-testid="stage-beats">
+        {#each Array(Math.min(12, transport.numerator)) as _, i (i)}
+          <i class:on={transport.playing && transport.beat === i + 1} class:one={i === 0}></i>
+        {/each}
+      </span>
+      <span class="clock-src" class:warn={transport.clockLost}>
+        {transport.externalClock ? (transport.clockLost ? 'NO CLOCK' : 'EXT CLOCK') : 'INTERNAL'}</span>
+    </div>
+    {#if timers.plannedMs > 0}
+      <!-- The song against its planned length: how much is left, or how far over. -->
+      <div class="song-progress" class:over={timers.over} data-testid="stage-song-progress">
+        <span class="bar"><i style={`width:${Math.min(100, (timers.songMs / timers.plannedMs) * 100)}%`}></i></span>
+        <span class="left">{timers.over ? `${formatDuration(-timers.songLeftMs)} over` : `${formatDuration(timers.songLeftMs)} left`}</span>
       </div>
-      <div class="stage-controls">
-        {#each surface.entries as entry, index (entry.slotId || `empty-${index}`)}
-          <article class="stage-control" class:empty={!entry.assigned}
-                   class:unresolved={entry.assigned && !entry.resolved}
-                   class:active={entry.active || (surface.type === 'controls' && surface.activeSlot === index)}
-                   class:moving={surface.type === 'controls' && movingSlot === index}
-                   class:pending={entry.pending}>
-            <span class="control-number">{index + 1}</span>
-            <strong>{entry.assigned ? entry.displayName : '—'}</strong>
-            <span class="control-part">{surface.type === 'controls' && movingSlot === index
-              ? 'MOVING' : entry.partName || (entry.pending ? 'queued' : entry.active ? 'running' : '')}</span>
-            <span class="control-value">
-              {entry.assigned ? (entry.valueText || percent(entry.value)) : 'unassigned'}
-              <HostPickupIndicator direction={entry.pickupDirection} />
+    {/if}
+    {#if blocks.playing && layout !== 'minimal'}
+      <div class="arrangement" data-testid="stage-arrangement">
+        <div class="blocks">
+          {#each blocks.blocks as block (block.itemId)}
+            <span class={`block ${block.state}`} style={`flex:${block.bars}`}>
+              {#if block.state === 'now'}<i style={`width:${block.progress * 100}%`}></i>{/if}<em>{block.name}</em>
             </span>
-            {#if entry.assigned && Number.isFinite(entry.value)}
-              <span class="value-track"><span style={`width:${percent(entry.value)}`}></span></span>
-            {/if}
-          </article>
-        {/each}
+          {/each}
+        </div>
+        <span class="block-meta"><b>{blocks.barsLeft}</b> {blocks.barsLeft === 1 ? 'bar' : 'bars'} to {blocks.nextName}</span>
       </div>
-    </section>
-  </div>
+    {/if}
+  </section>
 
-  <button type="button" class="stage-panic" onclick={() => hostPanic()}
-          title="All notes off, every part">PANIC · ALL NOTES OFF</button>
+  <section class="next-card" aria-label="Next song" data-testid="stage-next">
+    <span class="eyebrow next-label">Next song</span>
+    {#if setlist.next}
+      <strong class="next-name">{setlist.next.name}</strong>
+      <span class="next-meta">{[setlist.next.sceneName ? `scene ${setlist.next.sceneName}` : '',
+        setlist.next.tempo > 0 ? `${Math.round(setlist.next.tempo)} BPM` : '',
+        setlist.next.plannedSeconds > 0 ? formatDuration(setlist.next.plannedSeconds * 1000) : ''].filter(Boolean).join(' · ')}</span>
+      {#if setlist.nextReadiness}
+        <span class="next-readiness" class:ready={setlist.nextReadiness.state === 'ready'}
+              class:warn={setlist.nextReadiness.state === 'warning'} role="status"
+              title={setlist.nextReadiness.detail}
+              aria-label={`${setlist.nextReadiness.label}. ${setlist.nextReadiness.detail}`}
+              data-testid="stage-next-readiness">{setlist.nextReadiness.label}</span>
+      {/if}
+    {:else}
+      <strong class="next-name">End of set</strong>
+      <span class="next-meta">No following song</span>
+    {/if}
+    <div class="go">
+      <button type="button" class="ctl big" disabled={!setlist.canPrevious} onclick={() => setlistPrev()}
+              aria-label="Previous setlist item">◀ PREV<small>← · Page Up</small></button>
+      <button type="button" class="ctl big primary" disabled={!setlist.canNext} onclick={() => setlistNext()}
+              aria-label={setlist.currentIndex < 0 ? 'Start setlist' : 'Next setlist item'}>
+        {setlist.currentIndex < 0 ? 'START' : 'NEXT'} ▶<small>→ · Page Down</small></button>
+    </div>
+  </section>
+
+  {#if layout !== 'controls'}
+    <section class="notes-card" aria-label="Song notes" data-testid="stage-notes">
+      <div class="notes-head"><span class="eyebrow">Notes</span>
+        <span class="size">
+          <button type="button" class="ctl mini" aria-label="Smaller notes" onclick={() => (notesSize = Math.max(14, notesSize - 2))}>A−</button>
+          <button type="button" class="ctl mini" aria-label="Bigger notes" onclick={() => (notesSize = Math.min(40, notesSize + 2))}>A+</button>
+        </span></div>
+      <div class="notes" style={`font-size:${notesSize}px`} data-testid="stage-notes-text">{#if setlist.current?.notes}{#each noteParts(setlist.current.notes) as part, i (i)}{#if part.cue}<mark>{part.text}</mark>{:else}{part.text}{/if}{/each}{:else}<span class="empty">No notes for this song. Write them in Build, on the setlist entry.</span>{/if}</div>
+    </section>
+  {/if}
+
+  {#if layout !== 'minimal'}
+    <StageControls {surface} {controller} {movingSlot} pageId={surfacePageId} {performance} />
+  {/if}
+  {#if layout === 'full'}
+    <StageRig parts={activeParts} macros={$hostState.rack.macros} {troubledParts} show="parts" />
+  {/if}
+  {#if layout !== 'minimal'}
+    <StageRig parts={activeParts} macros={$hostState.rack.macros} {troubledParts} show="macros" />
+  {/if}
+
+  <span class="keys-help" aria-hidden="true">→ ← songs · 1–9 pick a song (twice) · Shift+1–8 scenes · Space play · hold P panic · N notes size</span>
 </main>
 
 <style>
   .stage {
-    flex: 1;
-    min-height: 0;
-    display: grid;
-    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-    gap: 12px;
-    padding: 12px 14px 14px;
-    overflow: hidden;
-    background: radial-gradient(circle at 50% -30%, #263441 0, #161b20 42%, #111519 100%);
-    color: #e7edf2;
+    --stage-bg: #0b0f13; --stage-panel: #121820; --stage-raised: #1a222c; --stage-field: #0e1318;
+    --stage-line: #2a3542; --stage-line-soft: #1e2731; --stage-line-strong: #3e4c5b;
+    --stage-text: #eef3f7; --stage-soft: #b3bfca; --stage-dim: #7c8997;
+    --stage-now: #ffb347; --stage-now-deep: #6b4a1e; --stage-now-surface: #2a2216; --stage-next: #79b9ee; --stage-next-surface: #152a3d;
+    --stage-live: #58d68d; --stage-warn: #f2c14e; --stage-warn-surface: #2b2410; --stage-warn-text: #f2c14e;
+    --stage-panic: #ff4d4d; --stage-hw: #ff9408; --stage-hw-surface: #2a1b0c;
+    --stage-font: var(--host-font, 'Archivo', 'Segoe UI', sans-serif); --stage-mono: var(--host-font-mono, 'JetBrains Mono', monospace);
+    position: relative; flex: 1; min-height: 0; overflow: auto; box-sizing: border-box; padding: 12px; gap: 10px;
+    display: grid; color: var(--stage-text); font-family: var(--stage-font);
+    background: radial-gradient(120% 90% at 30% 0%, #16202b 0%, var(--stage-bg) 60%);
   }
-  .stage-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; min-height: 20px; }
-  .status-item { display: inline-flex; align-items: center; gap: 7px; min-width: 0; color: #8f9ba5; font-size: 12px; }
-  .status-item > span:last-child { min-width: 0; overflow-wrap: anywhere; }
-  .status-dot { flex: none; }
-  .controls-panel .panel-head > div { min-width: 0; overflow-wrap: anywhere; }
-  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #64707a; box-shadow: 0 0 0 3px #64707a20; }
-  .status-item.good .status-dot { background: #48c47a; box-shadow: 0 0 0 3px #48c47a20; }
-  .status-item.warn { color: #e3b275; }
-  .status-item.warn .status-dot { background: #e3a34f; box-shadow: 0 0 0 3px #e3a34f20; }
-  .stage-lock { margin-left: auto; color: #a2d6b8; border: 1px solid #47755d; border-radius: 999px; padding: 4px 10px; font-size: 11px; letter-spacing: 0.12em; }
-  .stage-lock.pending { color: #e3b275; border-color: #856739; }
-  .stage-error { min-width: 0; display: inline-flex; align-items: center; gap: 7px; color: #ffc3c3; font-size: 12px; }
-  .stage-error > span { max-width: 430px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .stage-error button { width: 24px; height: 24px; padding: 0; border: 1px solid #7d4a4a; background: #321f21; color: #ffc3c3; cursor: pointer; }
+  .stage.daylight {
+    --stage-bg: #f4f6f8; --stage-panel: #ffffff; --stage-raised: #e8edf2; --stage-field: #f0f3f6;
+    --stage-line: #b9c4cf; --stage-line-soft: #d4dce4; --stage-line-strong: #8d9aa7;
+    --stage-text: #0b1015; --stage-soft: #2d3945; --stage-dim: #4e5b68;
+    --stage-now: #b35a00; --stage-now-deep: #f0c48e; --stage-now-surface: #fbe9d4; --stage-next: #0a5ea8; --stage-next-surface: #dcebf8;
+    --stage-live: #117a3c; --stage-warn: #a36b00; --stage-warn-surface: #fff4d6; --stage-warn-text: #8a5d00; --stage-hw-surface: #fde7cf;
+    background: var(--stage-bg);
+  }
+  .stage.full { grid-template-columns: 250px minmax(0, 1fr) 360px; grid-template-rows: auto auto minmax(160px, auto) minmax(160px, 1fr) auto auto auto;
+    grid-template-areas: 'status status status' 'trouble trouble trouble' 'rail hero next' 'rail hero notes' 'rail controls controls' 'rail parts macros' 'help help help'; }
+  .stage.minimal { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1.4fr) minmax(0, 1fr) auto;
+    grid-template-areas: 'status status' 'trouble trouble' 'hero hero' 'next notes' 'help help'; }
+  .stage.controls { grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+    grid-template-areas: 'status status' 'trouble trouble' 'hero next' 'controls controls' 'macros macros' 'help help'; }
+  /* No macros: the parts take the row, and the controls the rest of the Controls layout. */
+  .stage.full.no-macros { grid-template-areas: 'status status status' 'trouble trouble trouble' 'rail hero next' 'rail hero notes' 'rail controls controls' 'rail parts parts' 'help help help'; }
+  .stage.controls.no-macros { grid-template-areas: 'status status' 'trouble trouble' 'hero next' 'controls controls' '. .' 'help help'; }
+  .stage-status { grid-area: status; }
+  .stage :global(.trouble) { grid-area: trouble; }
+  .set-rail { grid-area: rail; }
+  .hero { grid-area: hero; }
+  .next-card { grid-area: next; }
+  .notes-card { grid-area: notes; }
+  .stage :global(.controls-panel) { grid-area: controls; }
+  .stage :global(.parts-panel) { grid-area: parts; }
+  .stage :global(.macros-panel) { grid-area: macros; }
+  /* These rows are sized by what is in them: a panel allowed to shrink to nothing has its knobs
+     spill over the row beneath on a short screen. The rail and the notes scroll instead. */
+  .stage :global(.controls-panel), .stage :global(.parts-panel), .stage :global(.macros-panel) { min-height: auto; }
 
-  .transport-card { display: flex; align-items: center; gap: 18px; min-height: 64px; padding: 8px 12px; border: 1px solid #33414d; border-radius: 8px; background: #151c22d9; }
-  .play { width: 48px; height: 48px; border: 1px solid #3f5669; border-radius: 50%; background: #22303b; color: #bad8ee; font-size: 18px; cursor: pointer; }
-  .play.playing { background: #234c39; border-color: #4e8b68; color: #c9f0d8; }
-  .position, .tempo { display: flex; align-items: baseline; gap: 8px; }
-  .position strong { font-size: 30px; font-variant-numeric: tabular-nums; letter-spacing: 0.03em; }
-  .tempo strong { font-size: 25px; font-variant-numeric: tabular-nums; }
-  .position span, .tempo span { color: #96a3ad; font-size: 10px; letter-spacing: 0.12em; }
-  .clock { margin-left: auto; color: #a2b0ba; font-size: 12px; letter-spacing: 0.08em; }
-  .clock.warn { color: #e4a15a; }
+  .stage :global(.stage-panel), .set-rail, .hero, .next-card, .notes-card {
+    background: var(--stage-panel); border: 1px solid var(--stage-line-soft); border-radius: 10px; padding: 12px; min-width: 0; min-height: 0; box-sizing: border-box; }
+  .eyebrow { font: 700 11px var(--stage-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--stage-dim); }
 
-  .setlist-grid { display: grid; grid-template-columns: 92px minmax(220px, 1.2fr) minmax(180px, 0.8fr) 92px; gap: 8px; min-height: 112px; }
-  .step-button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px solid #415563; border-radius: 8px; background: #1a232a; color: #d7e1e8; font-size: 12px; letter-spacing: 0.08em; cursor: pointer; }
-  .step-button.next { border-color: #47759a; background: #1d3446; color: #dcecf7; }
-  .step-button:disabled { opacity: 0.3; cursor: default; }
-  .arrow { font-size: 24px; line-height: 1; }
-  .song-card { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 12px 16px; border: 1px solid #303c46; border-radius: 8px; background: #171e24; min-width: 0; }
-  .song-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .current-song { border-color: #497ba1; background: linear-gradient(135deg, #1c3344, #172128); }
-  .current-song strong { font-size: 23px; }
-  .next-song strong { font-size: 17px; color: #c2ccd3; }
-  .next-readiness { font-size: 12px; color: #a6b5c1; overflow-wrap: anywhere; }
-  .next-readiness.ready { color: #82bd8d; }
-  .next-readiness.warn { color: #e3b275; }
-  .eyebrow { color: #82b3d8; font-size: 10px; font-weight: 700; letter-spacing: 0.16em; }
-  .scene-name { color: #8997a2; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .song-card p { margin: 2px 0 0; color: #c2cbd1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .song-count { position: absolute; right: 12px; top: 10px; color: #91a9ba; font-size: 12px; }
+  /* The readings wrap among themselves; the layout buttons, the lock and PANIC never leave the
+     top right, however long the audio device's name is. */
+  .stage-status { display: flex; align-items: flex-start; gap: 14px; min-width: 0; padding: 8px 12px;
+                  background: var(--stage-panel); border: 1px solid var(--stage-line-soft); border-radius: 10px;
+                  font: 13px var(--stage-mono); color: var(--stage-soft); }
+  .status-main { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 42px; }
+  .status-side { flex: none; display: flex; align-items: center; gap: 10px; }
+  .device { max-width: 260px; }
+  .clock { font-size: 22px; font-weight: 700; color: var(--stage-text); }
+  button.timer { font: inherit; color: inherit; background: none; border: 1px solid transparent; border-radius: 5px; padding: 2px 5px; margin: -3px -5px; cursor: pointer; }
+  button.timer:hover:not(:disabled) { border-color: var(--stage-line); }
+  button.timer:disabled { cursor: default; }
+  .timer b { color: var(--stage-text); }
+  .timer em { font-style: normal; color: var(--stage-dim); margin-left: 4px; }
+  .timer em.late { color: var(--stage-warn); }
+  .status-item { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+  .status-item > span:not(.status-dot) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--stage-dim); flex: none; }
+  .status-item.good .status-dot { background: var(--stage-live); box-shadow: 0 0 6px var(--stage-live); }
+  .status-item.warn .status-dot { background: var(--stage-warn); }
+  .spark { width: 80px; height: 16px; flex: none; }
+  .spark path { fill: none; stroke: var(--stage-live); stroke-width: 1.5; }
+  .xruns { color: var(--stage-warn); }
+  .stage-error { display: inline-flex; align-items: center; gap: 6px; max-width: 420px; color: var(--stage-warn); }
+  .stage-error > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stage-error button { background: none; border: 0; color: inherit; font-size: 16px; cursor: pointer; }
+  .views { display: inline-flex; gap: 2px; padding: 2px; background: var(--stage-field); border: 1px solid var(--stage-line-soft); border-radius: 6px; }
+  button.view { font: 600 12px var(--stage-font); padding: 5px 9px; border: 0; border-radius: 4px; background: transparent; color: var(--stage-soft); cursor: pointer; }
+  button.view[aria-pressed='true'] { background: var(--stage-now-surface); color: var(--stage-now); box-shadow: inset 0 0 0 1px var(--stage-now-deep); }
+  .stage-lock { font: 700 11px var(--stage-mono); letter-spacing: .1em; color: var(--stage-now); border: 1px solid var(--stage-now-deep); padding: 4px 8px; border-radius: 4px; white-space: nowrap; }
+  .stage-lock.pending { color: var(--stage-dim); border-color: var(--stage-line); }
+  button.stage-panic { font: 800 17px var(--stage-font); letter-spacing: .08em; color: #fff; background: var(--stage-panic); border: 0;
+                       border-radius: 7px; padding: 10px 20px; cursor: pointer; box-shadow: 0 0 0 2px #ff4d4d55; }
+  button.stage-panic { min-width: 118px; }
+  button.stage-panic.hint { box-shadow: 0 0 0 4px #ff4d4daa; }
+  button.stage-panic.fired { background: #fff; color: var(--stage-panic); box-shadow: 0 0 0 4px var(--stage-panic); }
 
-  .stage-body { min-height: 0; display: grid; grid-template-columns: minmax(260px, 0.8fr) minmax(520px, 1.7fr); gap: 12px; }
-  .stage-panel { min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid #2f3b45; border-radius: 8px; background: #141a1fd9; overflow: hidden; }
-  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .panel-head > div { display: flex; flex-direction: column; gap: 3px; }
-  .panel-head strong { font-size: 15px; }
-  .scene-chip, .page-count { color: #a9b7c1; border: 1px solid #41515d; border-radius: 999px; padding: 4px 8px; font-size: 11px; }
-  .parts { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 8px; overflow-y: auto; }
-  .stage-part { position: relative; display: flex; flex-direction: column; gap: 5px; min-height: 72px; padding: 10px; border: 1px solid #35434e; border-left: 4px solid #4b8fbd; border-radius: 6px; background: #192128; }
-  .stage-part.muted { opacity: 0.55; border-left-color: #9b5e5e; }
-  .stage-part.solo { border-left-color: #d1aa4c; }
-  .stage-part strong, .preset { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .preset { color: #a5b0b9; font-size: 12px; }
-  .part-state { position: absolute; top: 9px; right: 9px; color: #94cdb0; font-size: 10px; letter-spacing: 0.1em; }
-  .part-detail { display: flex; justify-content: space-between; color: #96a3ad; font-size: 11px; }
-  .empty { color: #77838d; padding: 16px 4px; }
+  .set-rail { display: flex; flex-direction: column; gap: 6px; }
+  .rail-head { display: flex; justify-content: space-between; align-items: center; }
+  .count { font: 12px var(--stage-mono); color: var(--stage-dim); }
+  .songs { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; min-height: 0; flex: 1; }
+  button.song { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 1px 8px; align-items: center; padding: 9px 10px; border-radius: 7px;
+                border: 1px solid transparent; background: none; color: var(--stage-soft); text-align: left; cursor: pointer; font: inherit; }
+  button.song:hover { background: var(--stage-raised); }
+  button.song .n { font: 12px var(--stage-mono); color: var(--stage-dim); }
+  button.song .t { font-size: 15px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  button.song .d { grid-column: 2; font: 11px var(--stage-mono); color: var(--stage-dim); }
+  button.song .d:empty { display: none; }
+  button.song.done { opacity: .45; }
+  button.song.now { background: var(--stage-now-surface); border-color: var(--stage-now-deep); color: var(--stage-text); }
+  button.song.now .n { color: var(--stage-now); }
+  button.song.next { border-color: var(--stage-next-surface); }
+  button.song.armed { border-color: var(--stage-warn); box-shadow: 0 0 0 1px var(--stage-warn); }
+  button.song.missing .t { color: var(--stage-warn); }
+  .rail-foot { font: 12px var(--stage-mono); color: var(--stage-dim); }
+  .empty { color: var(--stage-dim); font-size: 13px; }
 
-  .stage-controls { min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; overflow-y: auto; }
-  .stage-control { position: relative; min-height: 84px; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 10px 9px 30px; border: 1px solid #35434e; border-radius: 6px; background: #192128; overflow: hidden; }
-  .stage-control.active { border-color: #d2ad58; box-shadow: inset 0 0 0 1px #d2ad5840; }
-  .stage-control.moving { border-color: #e8ca75; box-shadow: inset 0 0 0 2px #e8ca7560, 0 0 12px #e8ca7526; }
-  .stage-control.moving .control-value { color: #ffe49a; }
-  .stage-control.pending { border-color: #b08b4a; }
-  .stage-control.unresolved { border-color: #7f5050; background: #281c1e; }
-  .stage-control.empty { opacity: 0.38; }
-  .stage-control strong, .control-part, .control-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .stage-control strong { font-size: 12px; }
-  .control-number { position: absolute; left: 9px; top: 10px; color: #6f9dc0; font-size: 11px; font-weight: 700; }
-  .control-part { color: #96a3ad; font-size: 11px; min-height: 14px; }
-  .control-value { color: #d6e0e6; font-size: 13px; font-variant-numeric: tabular-nums; }
-  .value-track { display: block; height: 3px; margin-top: 2px; background: #222d35; border-radius: 2px; overflow: hidden; }
-  .value-track span { display: block; height: 100%; background: #4b91c2; }
+  /* The song name grows with the room it has: a wall screen gets a wall-sized name. */
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 22px; align-content: center; container-type: inline-size; }
+  .hero-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .now-label { color: var(--stage-now); }
+  .song-name { font-size: clamp(44px, 9cqw, 200px); line-height: 1.02; font-weight: 800; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stage.minimal .song-name { font-size: clamp(56px, 11cqw, 240px); }
+  .stage.minimal .hero { align-content: center; }
+  .scene-line { font-size: 20px; color: var(--stage-soft); }
+  .scene-line b { color: var(--stage-now); }
+  .scene-line .tag { font: 700 12px var(--stage-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--stage-dim); vertical-align: middle; }
+  .hero-tempo { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  button.play { width: 58px; height: 58px; border-radius: 50%; border: 2px solid var(--stage-live); background: transparent; color: var(--stage-live); font-size: 22px; cursor: pointer; }
+  button.play.playing { background: var(--stage-live); color: #04140a; }
+  .bpm { font: 700 clamp(44px, 4.5cqw, 96px) var(--stage-mono); line-height: 1; }
+  .stage.minimal .bpm { font-size: clamp(56px, 6.5cqw, 140px); }
+  .bpm small { font-size: 16px; color: var(--stage-dim); margin-left: 4px; }
+  .pos { font: 600 22px var(--stage-mono); color: var(--stage-soft); }
+  .beats { display: flex; gap: 8px; }
+  .beats i { width: 20px; height: 20px; border-radius: 50%; background: var(--stage-raised); border: 1px solid var(--stage-line); display: block; }
+  .beats i.on { background: var(--stage-now); border-color: var(--stage-now); box-shadow: 0 0 12px var(--stage-now); }
+  .beats i.on.one { background: #fff; border-color: #fff; box-shadow: 0 0 14px #fff; }
+  .stage.daylight .beats i.on.one { background: var(--stage-now); border-color: var(--stage-now); }
+  .clock-src { font: 700 11px var(--stage-mono); letter-spacing: .1em; color: var(--stage-dim); }
+  .clock-src.warn { color: var(--stage-warn); }
+  .song-progress { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+  .song-progress .bar { flex: 1; height: 12px; border-radius: 6px; background: var(--stage-raised); overflow: hidden; }
+  .song-progress .bar i { display: block; height: 100%; background: var(--stage-now); border-radius: 6px; }
+  .song-progress .left { font: 700 20px var(--stage-mono); color: var(--stage-soft); white-space: nowrap; }
+  .song-progress.over .bar i { background: var(--stage-warn); }
+  .song-progress.over .left { color: var(--stage-warn); }
+  .arrangement { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 5px; }
+  .blocks { display: flex; gap: 3px; height: 30px; }
+  .block { position: relative; overflow: hidden; border-radius: 4px; background: var(--stage-raised); display: flex; align-items: center; padding-left: 8px; min-width: 0; }
+  .block em { position: relative; font: 600 12px var(--stage-font); font-style: normal; color: var(--stage-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .block i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--stage-now-surface); }
+  .block.now { box-shadow: inset 0 0 0 1px var(--stage-now); }
+  .block.now em { color: var(--stage-text); }
+  .block.queued { box-shadow: inset 0 0 0 1px var(--stage-next); }
+  .block.queued em { color: var(--stage-next); }
+  .block.done { opacity: .5; }
+  .block-meta { font: 13px var(--stage-mono); color: var(--stage-dim); }
+  .block-meta b { color: var(--stage-text); }
 
-  .stage-panic { justify-self: end; min-width: 190px; height: 36px; border: 1px solid #8f5151; border-radius: 5px; background: #2b1c1e; color: #f4bebe; font-size: 12px; letter-spacing: 0.08em; cursor: pointer; }
+  .next-card { display: flex; flex-direction: column; gap: 6px; }
+  .next-label { color: var(--stage-next); }
+  .next-name { font-size: 30px; font-weight: 750; line-height: 1.08; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .next-meta { font: 13px var(--stage-mono); color: var(--stage-dim); }
+  .next-readiness { align-self: flex-start; font: 600 12px var(--stage-mono); padding: 4px 8px; border-radius: 12px; border: 1px solid var(--stage-line); color: var(--stage-soft); }
+  .next-readiness.ready { border-color: var(--stage-live); color: var(--stage-live); }
+  .next-readiness.warn { border-color: var(--stage-warn); color: var(--stage-warn); }
+  .go { display: flex; gap: 8px; margin-top: auto; padding-top: 6px; }
+  button.big { flex: 1; font: 800 18px var(--stage-font); letter-spacing: .04em; padding: 14px 8px; border-radius: 8px; cursor: pointer;
+               background: var(--stage-raised); color: var(--stage-text); border: 1px solid var(--stage-line-strong); }
+  button.big.primary { background: var(--stage-next-surface); border-color: var(--stage-next); color: var(--stage-next); }
+  button.big:disabled { opacity: .4; cursor: default; }
+  button.big small { display: block; font: 500 11px var(--stage-mono); letter-spacing: 0; color: var(--stage-dim); margin-top: 2px; }
 
+  .notes-card { display: flex; flex-direction: column; gap: 6px; }
+  .notes-head { display: flex; justify-content: space-between; align-items: center; }
+  .size { display: inline-flex; gap: 4px; }
+  button.mini { font: 700 12px var(--stage-font); padding: 3px 8px; border-radius: 5px; background: var(--stage-raised); color: var(--stage-soft); border: 1px solid var(--stage-line); cursor: pointer; }
+  .notes { overflow-y: auto; line-height: 1.45; white-space: pre-wrap; color: var(--stage-text); min-height: 0; flex: 1; }
+  .notes mark { background: none; color: var(--stage-now); font-weight: 750; }
+  .notes .empty { font-size: 14px; }
+
+  .keys-help { grid-area: help; justify-self: end; font: 11px var(--stage-mono); color: var(--stage-dim); opacity: .7; }
+  .stage :global(button:focus-visible) { outline: 2px solid var(--stage-next); outline-offset: 2px; }
+
+  /* A narrow window stacks everything in reading order: status, trouble, now, next, notes, the rest. */
   @media (max-width: 900px) {
-    .stage { overflow-y: auto; grid-template-rows: auto auto auto auto auto; }
-    .setlist-grid { grid-template-columns: 68px minmax(180px, 1fr) 68px; }
-    .next-song { display: none; }
-    .stage-body { grid-template-columns: 1fr; }
-    .stage-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stage.full, .stage.minimal, .stage.controls { grid-template-columns: minmax(0, 1fr); grid-template-rows: none;
+      grid-template-areas: 'status' 'trouble' 'hero' 'next' 'notes' 'rail' 'controls' 'parts' 'macros'; }
+    .song-name, .stage.minimal .song-name { font-size: 40px; }
+    .bpm, .stage.minimal .bpm { font-size: 40px; }
+    .stage-status { flex-wrap: wrap; }
+    .status-side { margin-left: auto; }
+    .hero { grid-template-columns: minmax(0, 1fr); }
+    .hero-tempo { align-items: flex-start; }
+    .keys-help { display: none; }
   }
 </style>

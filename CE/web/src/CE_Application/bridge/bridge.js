@@ -1101,6 +1101,22 @@ export function onInstrumentHostRandomModulatorActivity(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** The Chords module playing ({ partId, chord, step, pads }): the set chord it last played,
+    the progression step that plays next, and a bit per sounding pad. */
+/** The MIDI modules' lights ({ partId, slots: { slotId: count } }): how many blocks each module
+    has changed something in; a count that moved means it just did. */
+export function onInstrumentHostModuleActivity(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostModuleActivity', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onInstrumentHostChordsLive(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostChordsLive', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 export function onInstrumentHostChordLearn(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('instrumentHostChordLearn', callback);

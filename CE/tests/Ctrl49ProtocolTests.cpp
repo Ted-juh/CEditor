@@ -186,8 +186,32 @@ int main()
 
     // --- frame validation -------------------------------------------------------------------------
     checkThrows ([] { buildFrame (0x02, 0x3B, { 0x80 }); }, "frame rejects payload byte >= 0x80");
-    checkThrows ([] { buildFrame (0x02, 0x3B, Bytes (0x4000, 0x00)); },
-                 "frame rejects payload > 0x3FFF bytes");
+    checkThrows ([] { buildFrame (0x02, 0x3B, Bytes (1001, 0x00)); },
+                 "frame rejects a payload over the device's 1000-byte limit");
+    check (buildFrame (0x02, 0x3B, Bytes (1000, 0x00)).size() == 1000 + 11, "and takes exactly 1000");
+    {   // the largest upload chunk the session sends stays inside it
+        const auto chunks = buildObjectUpload (ObjectKey { 0x000E, 0x0200 }, Bytes (512, 0xFF));
+        check (chunks.size() == 3 && chunks[1].size() - 11 <= kMaxPayloadBytes,
+               "a full 512-byte upload chunk fits the frame limit");
+    }
+
+    // --- replies ----------------------------------------------------------------------------------
+    {   // captured from VIP's startup: draw acknowledged OK
+        const Bytes ok { 0xF0, 0x00, 0x01, 0x05, 0x31, 0x08, 0x02, 0x3D, 0x00, 0x04, 0x0D, 0x02, 0x39, 0x40, 0xF7 };
+        const auto ack = parseAck (ok);
+        check (ack && ack->command == 0x39 && ack->ok() && ackStatusName (ack->status) == "OK",
+               "a captured 02/3D reply parses to its command and OK");
+        auto refused = ok;
+        refused[12] = 0x3C;
+        refused[13] = kAckScriptError;
+        const auto bad = parseAck (refused);
+        check (bad && ! bad->ok() && ackStatusName (bad->status) == "Lua script error"
+                 && displayCommandName (bad->command) == "Lua call",
+               "a refusal names what was refused and why");
+        check (! parseAck (buildKeepalive()) && ! parseAck (Bytes { 0xB0, 0x28, 0x7F }),
+               "anything that is not an acknowledgement is not one");
+        check (ackStatusName (0x55) == "status 0x55", "an unseen status is shown, not hidden");
+    }
 
     std::cout << "--------------------\n"
               << (failures == 0 ? "ALL PASS" : std::to_string (failures) + " FAILED") << std::endl;

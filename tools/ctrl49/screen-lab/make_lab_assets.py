@@ -222,9 +222,10 @@ SPIN, SPIN_FRAMES = 32, 16
 
 
 def logo_strip():
-    """The HoSTage logo (tools/ctrl49/hostage_logo.png, an alpha mask) in orange, with a band of
-    light sweeping across it once per loop: 16 frames the device steps through."""
-    mask = Image.open(os.path.join(HERE, '..', 'hostage_logo.png')).convert('RGBA').split()[3]
+    """The HoSTage logo (tools/ctrl49/hostage_logo.png, a grey coverage mask: the grey palette
+    format the device tints) in orange, with a band of light sweeping across it once per loop:
+    16 frames the device steps through."""
+    mask = Image.open(os.path.join(HERE, '..', 'hostage_logo.png')).convert('L')
     mask = mask.resize((LOGO_W, LOGO_H), Image.LANCZOS)
     strip = Image.new('RGBA', (LOGO_W, LOGO_H * LOGO_FRAMES), (0, 0, 0, 0))
     for f in range(LOGO_FRAMES):

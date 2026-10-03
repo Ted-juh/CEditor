@@ -29,8 +29,11 @@ struct PerformanceTransportView
     double tempo = 120.0;
     int bar = 1;
     int beat = 1;
+    int beatsPerBar = 4;
     bool externalClock = false;
     bool clockLost = false;
+    std::string song;    // the setlist song on stage, "" when no set is running
+    std::string scene;   // the scene last applied
 };
 
 struct PerformanceClipView
@@ -44,8 +47,9 @@ struct PerformanceClipView
 using PerformanceClipViews = std::array<PerformanceClipView, 8>;
 
 /** The one line a player reads at a glance: "▶ 3.2 128" — running state, bar.beat, tempo,
-    with "EXT" appended when slaved and "NO CLK" when slaved to nothing. ASCII only, because
-    the display is. */
+    with "EXT" appended when slaved and "NO CLK" when slaved to nothing. With a set running it
+    starts with the song and the scene: "Glass Harbour / Chorus  > 3.2 96". ASCII only,
+    because the display is. */
 std::string buildPerformanceTitle (const PerformanceTransportView& transport);
 
 /** set_labels payload: the transport line as the title, then the eight clip names. A clip
@@ -54,9 +58,15 @@ std::string buildPerformanceTitle (const PerformanceTransportView& transport);
 Bytes buildPerformanceLabelPayload (const PerformanceTransportView& transport,
                                     const PerformanceClipViews& clips);
 
-/** The 22-byte set_values state: phase per clip in the value bytes, and a switch flag per
-    clip — lit for running, and also for pending, so a pad that has been pressed reads as
-    armed rather than dead. */
+/** The knob page's nine-byte set_values: the active clip, then each clip's phase as a knob
+    position. (Running and pending are marked in the labels; there is no room for them here.) */
 Bytes buildPerformanceStatePayload (int activeClip, const PerformanceClipViews& clips);
+
+/** The same nine bytes and three more the page reads only on the performance page:
+    [9] page kind (1 = performance), [10] the beat in the bar (1-based, 0 when stopped),
+    [11] beats per bar. The knob page draws beat dots from them; a control page sends nine
+    bytes, so [9] reads 0 there and nothing extra is drawn. */
+Bytes buildPerformanceStatePayload (int activeClip, const PerformanceClipViews& clips,
+                                    const PerformanceTransportView& transport);
 
 } // namespace ceditor::ctrl49

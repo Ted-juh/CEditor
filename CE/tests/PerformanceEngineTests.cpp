@@ -1632,6 +1632,114 @@ void testArpeggiator()
         check (fromF.size() >= 3 && fromF[0] == 65 && fromF[1] == 72 && fromF[2] == 77,
                "and the same drawing transposes with the finger — that is the point");
     }
+
+    // --- the step lane: repeats, octave jumps, chance, ties and the feel --------------------
+    {
+        struct Hit { int block; int sample; bool on; int note; };
+        // Holds `keys` for `blocks` blocks (one beat is ~93), then lets go and drains.
+        auto runLane = [] (const ArpSettings& s, std::initializer_list<int> keys, int blocks)
+        {
+            ArpEngine lane;
+            lane.setSettings (s);
+            Transport clock;
+            clock.setTempo (120.0);
+            clock.start();
+            std::vector<Hit> hits;
+            juce::MidiBuffer hold, lift;
+            for (const auto key : keys)
+            {
+                hold.addEvent (juce::MidiMessage::noteOn (1, key, (juce::uint8) 100), 0);
+                lift.addEvent (juce::MidiMessage::noteOff (1, key), 0);
+            }
+            for (int b = 0; b < blocks + 40; ++b)
+            {
+                juce::MidiBuffer out;
+                lane.process (b == 0 ? hold : b == blocks ? lift : juce::MidiBuffer(), out,
+                              clock.advance (blockSize, sampleRate), blockSize);
+                for (const auto metadata : out)
+                    if (metadata.getMessage().isNoteOnOrOff())
+                        hits.push_back ({ b, metadata.samplePosition, metadata.getMessage().isNoteOn(),
+                                          metadata.getMessage().getNoteNumber() });
+            }
+            juce::MidiBuffer rest;
+            lane.allNotesOff (rest, 0);
+            for (const auto metadata : rest)
+                hits.push_back ({ blocks + 40, 0, false, metadata.getMessage().getNoteNumber() });
+            return hits;
+        };
+        auto ons = [] (const std::vector<Hit>& hits)
+        {
+            std::vector<int> notes;
+            for (const auto& h : hits)
+                if (h.on) notes.push_back (h.note);
+            return notes;
+        };
+        auto balanced = [] (const std::vector<Hit>& hits)
+        {
+            std::map<int, int> sounding;
+            for (const auto& h : hits)
+                sounding[h.note] += h.on ? 1 : -1;
+            for (const auto& [note, count] : sounding)
+                if (count != 0)
+                    return false;
+            return true;
+        };
+
+        ArpSettings s;
+        s.enabled = true;
+        s.mode = ArpSettings::Mode::up;
+        s.stepsPerBeat = 4;
+        s.gate = 0.5f;
+
+        s.ratchetPattern = { 2, 1, 1, 4 };
+        auto hits = runLane (s, { 60 }, 92);
+        check (ons (hits).size() == 2 + 1 + 1 + 4, "repeats: a step plays its hits inside its own time");
+        check (balanced (hits), "and every repeat ends");
+        s.ratchetPattern.clear();
+
+        s.octavePattern = { 0, 1, 0, -1 };
+        check (ons (runLane (s, { 60 }, 92)) == std::vector<int> ({ 60, 72, 60, 48 }),
+               "octave jumps move a step up or down by whole octaves");
+        s.octavePattern.clear();
+
+        s.chancePattern = { 0 };
+        check (ons (runLane (s, { 60, 64 }, 92)).empty(), "a step with no chance never plays");
+        s.chancePattern = { 100, 0 };
+        check (ons (runLane (s, { 60, 64 }, 92)).size() == 2,
+               "and the lane keeps counting through the skipped ones");
+        s.chancePattern.clear();
+
+        s.tiePattern = { 1, 0 };
+        hits = runLane (s, { 60, 64 }, 50);
+        int firstOff = -1, secondOn = -1;
+        for (int i = 0; i < (int) hits.size(); ++i)
+        {
+            if (! hits[(size_t) i].on && hits[(size_t) i].note == 60 && firstOff < 0) firstOff = i;
+            if (hits[(size_t) i].on && hits[(size_t) i].note == 64 && secondOn < 0) secondOn = i;
+        }
+        check (firstOff > secondOn && secondOn >= 0,
+               "a tied step is still sounding when the next one starts: legato");
+        check (balanced (hits), "and it ends after all");
+        s.tiePattern.clear();
+
+        s.feel = "triplet";
+        check (ons (runLane (s, { 60 }, 92)).size() == 6, "triplet sixteenths are six to the beat");
+        s.feel = "dotted";
+        const auto dotted = ons (runLane (s, { 60 }, 185));   // two beats
+        check (dotted.size() == 6, "dotted sixteenths fall every 3/8 beat: six in two beats");
+
+        ArpSettings saved = s;
+        saved.ratchetPattern = { 1, 3 };
+        saved.tiePattern = { 0, 1 };
+        saved.octavePattern = { -2, 2 };
+        saved.chancePattern = { 100, 40 };
+        ArpSettings restored;
+        arpFromVar (arpToVar (saved), restored);
+        check (restored.ratchetPattern == saved.ratchetPattern && restored.tiePattern == saved.tiePattern
+                 && restored.octavePattern == saved.octavePattern
+                 && restored.chancePattern == saved.chancePattern && restored.feel == "dotted",
+               "the lane's rows and the feel survive the trip");
+    }
 }
 
 // The MIDI insert chain: the event chain stops being welded to the part. What must hold is
@@ -1702,6 +1810,50 @@ void testMidiInsertRack()
         const auto before = notesFrom (foldBefore, 60);
         check (after != before,
                "a scale fold before or after a chord is audibly not the same chain");
+    }
+
+    {
+        // The Key module: transpose and scale in one, snapping or dropping what falls outside.
+        check (slot ("transpose").type == "key" && slot ("scale").type == "key",
+               "Transpose and Scale are the Key module now, by their old names too");
+        auto key = slot ("key");
+        key.fx.transpose = 2;
+        key.fx.constrainToScale = true;
+        key.fx.scaleType = "major";
+        key.fx.scaleRoot = 0;
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ key });
+        check (notesFrom (rack, 60) == std::vector<int> { 62 } && notesFrom (rack, 62) == std::vector<int> { 64 },
+               "a Key module transposes and folds in one place");
+        check (notesFrom (rack, 61) == std::vector<int> { 64 }, "snap: C# up a tone is D#, which snaps up to E");
+
+        key.fx.scaleFold = "drop";
+        rack.setSlots ({ key });
+        check (notesFrom (rack, 61).empty(), "drop: a note that lands outside the scale is not played");
+        check (notesFrom (rack, 60) == std::vector<int> { 62 }, "and the ones inside still are");
+
+        // The song key reaches the modules that follow it, and only those.
+        auto follows = slot ("key");
+        follows.fx.constrainToScale = true;
+        follows.fx.scaleType = "major";
+        follows.fx.followSongKey = true;
+        auto own = MidiSlot::create ("key", "slot-key-own");
+        own.fx.followSongKey = false;
+        own.fx.scaleType = "dorian";
+        const auto resolved = withSongKey ({ follows, own }, "minor", 9);
+        check (resolved[0].fx.scaleType == "minor" && resolved[0].fx.scaleRoot == 9
+                 && resolved[1].fx.scaleType == "dorian",
+               "following modules take the song key; one with its own key keeps it");
+        check (MidiSlot::create ("chord", "x").fx.followSongKey, "a module added now follows the song key");
+
+        MidiSlot old;
+        auto* stored = new juce::DynamicObject();
+        stored->setProperty ("slotId", "s1");
+        stored->setProperty ("type", "scale");
+        midiSlotFromVar (juce::var (stored), old);
+        check (old.type == "key" && ! old.fx.followSongKey,
+               "a saved Scale module loads as Key, keeping its own scale until told otherwise");
     }
 
     {
@@ -2063,26 +2215,39 @@ void testMidiFxChain()
         check (notesFor (leading, 65) == std::vector<int> { 60, 65, 69 },
                "then chooses F/C so C stays put and the other voices move minimally");
 
-        // --- and its learned half: per-key chords, exactly as captured ------------------
+        // --- and its key-map layer: a key plays its set chord, exactly -----------------
         MidiFxChain learned;
         MidiFxSettings learnedSettings;
-        learnedSettings.chord = MidiFxSettings::ChordType::keyChords;
-        MidiFxSettings::KeyChord captured;
-        captured.key = 60;
-        captured.offsets = { 0, 3, 7, 12 };
-        learnedSettings.keyChords.add (captured);
+        learnedSettings.chordKeyMap = true;
+        learnedSettings.mapKey (60, learnedSettings.findOrAddSetChord ({ 60, 63, 67, 72 }));
         learned.setSettings (learnedSettings);
 
         check (notesFor (learned, 60) == std::vector<int> { 60, 63, 67, 72 },
-               "a mapped key plays exactly the chord captured for it");
+               "a mapped key plays exactly the chord in the set");
         check (notesFor (learned, 61) == std::vector<int> { 61 },
-               "an unmapped key passes through plain — the map is the whole rule");
+               "an unmapped key passes through plain when nothing follows");
+
+        learnedSettings.chord = MidiFxSettings::ChordType::triad;
+        learned.setSettings (learnedSettings);
+        check (notesFor (learned, 60) == std::vector<int> { 60, 63, 67, 72 }
+                 && notesFor (learned, 62) == std::vector<int> { 62, 66, 69 },
+               "with following on too, the mapped key keeps its chord and the rest follow");
+
+        learnedSettings.chordKeyMap = false;
+        learned.setSettings (learnedSettings);
+        check (notesFor (learned, 60) == std::vector<int> { 60, 64, 67 },
+               "switching the key map off keeps the map but stops playing it");
+        learnedSettings.chordKeyMap = true;
+        learnedSettings.chord = MidiFxSettings::ChordType::off;
+
+        learnedSettings.transpose = 2;
+        learned.setSettings (learnedSettings);
+        check (notesFor (learned, 60) == std::vector<int> { 62, 65, 69, 74 },
+               "transpose moves a mapped chord with its key");
+        learnedSettings.transpose = 0;
 
         // Six voices release cleanly: press a wide mapped chord, lift, count the offs.
-        MidiFxSettings::KeyChord wide;
-        wide.key = 48;
-        wide.offsets = { 0, 4, 7, 12, 16, 19 };
-        learnedSettings.keyChords.add (wide);
+        learnedSettings.mapKey (48, learnedSettings.findOrAddSetChord ({ 48, 52, 55, 60, 64, 67 }));
         learned.setSettings (learnedSettings);
         juce::MidiBuffer press, sound, lift, silence;
         press.addEvent (juce::MidiMessage::noteOn (1, 48, (juce::uint8) 100), 0);
@@ -2093,6 +2258,194 @@ void testMidiFxChain()
         for (const auto metadata : sound) ons += metadata.getMessage().isNoteOn() ? 1 : 0;
         for (const auto metadata : silence) offs += metadata.getMessage().isNoteOff() ? 1 : 0;
         check (ons == 6 && offs == 6, "six captured voices sound and all six release");
+
+        // Removing a chord from the set unmaps its keys and renumbers the rest.
+        learnedSettings.removeSetChord (0);
+        check (learnedSettings.chordSet.size() == 1 && learnedSettings.keyMap.size() == 1
+                 && learnedSettings.keyMap[0].key == 48 && learnedSettings.keyMap[0].chord == 0,
+               "removing a set chord forgets its key and keeps the others pointing right");
+        check (learnedSettings.findOrAddSetChord ({ 67, 48, 52, 55, 60, 64 }) == 0,
+               "the same notes in any order are the same set chord, not a second copy");
+    }
+
+    {
+        // --- pads and the progression: chords of the set, from a pad or in order ----------
+        MidiFxSettings settings;
+        const auto c = settings.findOrAddSetChord ({ 60, 64, 67 });
+        const auto am = settings.findOrAddSetChord ({ 57, 60, 64 });
+        const auto f = settings.findOrAddSetChord ({ 53, 57, 60 });
+        const auto g = settings.findOrAddSetChord ({ 55, 59, 62 });
+        settings.chordPads = true;
+        settings.padMap = { c, am, -1, -1, -1, -1, -1, -1, f };   // A1 = C, A2 = Am, B1 = F
+        MidiFxChain chords;
+        chords.setSettings (settings);
+
+        auto block = [&chords] (juce::MidiBuffer in = {})
+        {
+            juce::MidiBuffer out;
+            chords.process (in, out);
+            std::vector<std::pair<bool, int>> events;
+            for (const auto metadata : out)
+                if (metadata.getMessage().isNoteOnOrOff())
+                    events.push_back ({ metadata.getMessage().isNoteOn(), metadata.getMessage().getNoteNumber() });
+            return events;
+        };
+        using Ev = std::vector<std::pair<bool, int>>;
+
+        check (chords.triggerPad (1, 90) && block() == Ev { { true, 57 }, { true, 60 }, { true, 64 } },
+               "a struck pad plays its set chord");
+        check (chords.lastSetChord() == am && chords.soundingPads() == 2u,
+               "and says which set chord that was, and that pad 2 sounds");
+        chords.triggerPad (1, 0);
+        check (block() == Ev { { false, 57 }, { false, 60 }, { false, 64 } } && chords.soundingPads() == 0u,
+               "letting go releases exactly what it played");
+        chords.triggerPad (8, 100);
+        check (block().size() == 3 && chords.lastSetChord() == f, "bank B starts at pad index 8");
+        chords.triggerPad (2, 100);
+        check (block().empty(), "an empty pad plays nothing");
+        chords.triggerPad (0, 100);
+        chords.triggerPad (0, 100);
+        const auto restruck = block();
+        check (restruck.size() == 3 + 3 + 3,
+               "a pad struck twice restrikes: its notes end before they start again");
+        juce::MidiBuffer panic;
+        chords.allNotesOff (panic, 0);
+        auto released = 0;
+        for (const auto metadata : panic)
+            released += metadata.getMessage().isNoteOff() ? 1 : 0;
+        check (released == 6, "panic releases every sounding pad");
+
+        // The progression: each press plays the next step, whatever the key.
+        settings.chordProgression = true;
+        settings.progression = { c, am, f, g };
+        settings.progressionLow = 36;
+        settings.progressionHigh = 59;
+        chords.setSettings (settings);
+        auto press = [&block] (int key)
+        {
+            juce::MidiBuffer on, off;
+            on.addEvent (juce::MidiMessage::noteOn (1, key, (juce::uint8) 100), 0);
+            std::vector<int> notes;
+            for (const auto& [isOn, note] : block (on))
+                if (isOn) notes.push_back (note);
+            off.addEvent (juce::MidiMessage::noteOff (1, key), 0);
+            block (off);
+            return notes;
+        };
+        check (press (48) == std::vector<int> ({ 60, 64, 67 }) && press (40) == std::vector<int> ({ 57, 60, 64 })
+                 && press (50) == std::vector<int> ({ 53, 57, 60 }) && press (48) == std::vector<int> ({ 55, 59, 62 })
+                 && press (48) == std::vector<int> ({ 60, 64, 67 }),
+               "each press in range plays the next chord of the progression, and it wraps");
+        check (press (72) == std::vector<int> ({ 72 }), "a key above the range plays alone");
+        chords.moveProgression (2, true);
+        block();
+        check (chords.progressionStep() == 2 && press (48) == std::vector<int> ({ 53, 57, 60 }),
+               "a step command jumps to a step");
+        chords.moveProgression (-1, false);
+        block();
+        check (press (48) == std::vector<int> ({ 53, 57, 60 }), "and a relative one steps back");
+
+        settings.progressionAdvance = "pedal";
+        chords.setSettings (settings);
+        chords.moveProgression (0, true);
+        block();
+        check (press (48) == std::vector<int> ({ 60, 64, 67 }) && press (52) == std::vector<int> ({ 60, 64, 67 }),
+               "with the pedal stepping, keys replay the current chord");
+        juce::MidiBuffer pedal;
+        pedal.addEvent (juce::MidiMessage::controllerEvent (1, 64, 127), 0);
+        pedal.addEvent (juce::MidiMessage::controllerEvent (1, 64, 0), 1);
+        juce::MidiBuffer pedalOut;
+        chords.process (pedal, pedalOut);
+        check (pedalOut.isEmpty() && press (48) == std::vector<int> ({ 57, 60, 64 }),
+               "one press of the pedal is one step, and the pedal itself is consumed");
+
+        // Removing a set chord lets go of it everywhere and renumbers what follows.
+        settings.removeSetChord (am);
+        check (settings.padMap[0] == c && settings.padMap[1] == -1 && settings.padMap[8] == f - 1
+                 && settings.progression == juce::Array<int> { c, f - 1, g - 1 },
+               "removing a chord empties its pads, drops its steps and renumbers the rest");
+
+        MidiFxSettings restored;
+        midiFxFromVar (midiFxToVar (settings), restored);
+        check (restored.chordPads && restored.padMap == settings.padMap
+                 && restored.chordProgression && restored.progression == settings.progression
+                 && restored.progressionAdvance == "pedal" && restored.progressionLow == 36
+                 && restored.progressionHigh == 59,
+               "pads and the progression survive the trip");
+
+        check (MidiFxSettings::chordNameOf ({ 60, 64, 67 }) == "C"
+                 && MidiFxSettings::chordNameOf ({ 64, 67, 72 }) == "C/E"
+                 && MidiFxSettings::chordNameOf ({ 57, 60, 64, 67 }) == "Am7"
+                 && MidiFxSettings::chordNameOf ({ 60, 63, 66, 70 }) == "Cm7b5"
+                 && MidiFxSettings::chordNameOf ({ 55, 60, 62 }) == "Gsus4"
+                 && MidiFxSettings::chordNameOf ({ 66, 69, 72 }) == "F#dim"
+                 && MidiFxSettings::chordNameOf ({ 60, 61 }) == "C.C#",
+               "chords are named the way the editor names them, in ASCII for the screen");
+    }
+
+    {
+        // --- the builder's shapes, the follow range, the bass and the top voice ----------
+        MidiFxChain chords;
+        MidiFxSettings settings;
+        auto shapeAt = [&] (MidiFxSettings::ChordType type, int key)
+        {
+            settings.chord = type;
+            chords.setSettings (settings);
+            juce::MidiBuffer press, result, lift, flush;
+            press.addEvent (juce::MidiMessage::noteOn (1, key, (juce::uint8) 100), 0);
+            chords.process (press, result);
+            std::vector<int> notes;
+            for (const auto metadata : result)
+                notes.push_back (metadata.getMessage().getNoteNumber());
+            lift.addEvent (juce::MidiMessage::noteOff (1, key), 0);
+            chords.process (lift, flush);
+            return notes;
+        };
+        using T = MidiFxSettings::ChordType;
+        check (shapeAt (T::minor, 60) == std::vector<int> { 60, 63, 67 }
+                 && shapeAt (T::major7, 60) == std::vector<int> { 60, 64, 67, 71 }
+                 && shapeAt (T::minor7, 60) == std::vector<int> { 60, 63, 67, 70 }
+                 && shapeAt (T::sus2, 60) == std::vector<int> { 60, 62, 67 }
+                 && shapeAt (T::sus4, 60) == std::vector<int> { 60, 65, 67 }
+                 && shapeAt (T::sixth, 60) == std::vector<int> { 60, 64, 67, 69 }
+                 && shapeAt (T::add9, 60) == std::vector<int> { 60, 64, 67, 74 }
+                 && shapeAt (T::ninth, 60) == std::vector<int> { 60, 64, 67, 70, 74 }
+                 && shapeAt (T::diminished, 60) == std::vector<int> { 60, 63, 66 }
+                 && shapeAt (T::augmented, 60) == std::vector<int> { 60, 64, 68 }
+                 && shapeAt (T::halfDiminished, 60) == std::vector<int> { 60, 63, 66, 70 },
+               "every builder shape plays its intervals on the key");
+        check (MidiFxSettings::chordTypeFromName ("m7b5") == T::halfDiminished
+                 && MidiFxSettings::chordTypeFromName (MidiFxSettings::chordTypeName (T::add9)) == T::add9,
+               "and each shape's name reads back as itself");
+
+        settings.chordFollowLow = 0;
+        settings.chordFollowHigh = 59;
+        check (shapeAt (T::minor, 48) == std::vector<int> { 48, 51, 55 }
+                 && shapeAt (T::minor, 60) == std::vector<int> { 60 },
+               "following stops at the top of its range — a split with melody above");
+        settings.chordFollowHigh = 127;
+
+        settings.chordFollow = false;
+        check (shapeAt (T::minor, 60) == std::vector<int> { 60 },
+               "the follow light off keeps the shape and plays the key alone");
+        settings.chordFollow = true;
+
+        settings.chordBass = true;
+        check (shapeAt (T::triad, 60) == std::vector<int> { 60, 64, 67, 48 },
+               "the bass adds the chord's root an octave down");
+        settings.chordBass = false;
+
+        settings.chordTopAccent = 20;
+        settings.chord = T::triad;
+        chords.setSettings (settings);
+        juce::MidiBuffer press, result;
+        press.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        chords.process (press, result);
+        std::vector<int> velocities;
+        for (const auto metadata : result)
+            velocities.push_back (metadata.getMessage().getVelocity());
+        check (velocities == std::vector<int> { 100, 100, 120 },
+               "the top voice is played harder by the accent, the others as played");
     }
 }
 
@@ -2386,7 +2739,7 @@ void testScalesAndSerialization()
 
     Setlist setlist;
     setlist.items.add ({ "i1", "Opener", "s1", "rack-capture-1", "page-filter",
-                         "count in on the hats", 128.0 });
+                         "count in on the hats", 128.0, 245 });
     setlist.currentIndex = 0;
     setlist.preloadAhead = 2;
     Setlist restoredSetlist;
@@ -2395,9 +2748,19 @@ void testScalesAndSerialization()
              && restoredSetlist.items[0].rackRecordId == "rack-capture-1"
              && restoredSetlist.items[0].pageId == "page-filter"
              && restoredSetlist.items[0].notes == "count in on the hats"
+             && restoredSetlist.items[0].plannedSeconds == 245
              && restoredSetlist.currentIndex == 0
              && restoredSetlist.preloadAhead == 2,
-           "and a setlist keeps full-rack/page recall, preload policy, notes and its place");
+           "and a setlist keeps full-rack/page recall, preload policy, notes, planned length and its place");
+
+    setlist.items.getReference (0).sections.items.add ({ "x1", "Intro", "s1", 8 });
+    setlist.items.getReference (0).sections.loop = true;
+    Setlist withSections;
+    check (setlistFromVar (setlistToVar (setlist), withSections)
+             && withSections.items[0].sections.items.size() == 1
+             && withSections.items[0].sections.items[0].bars == 8
+             && withSections.items[0].sections.loop,
+           "a song keeps its own sections and whether they loop");
 
     Arrangement arrangement;
     arrangement.items.add ({ "a1", "Intro", "s1", 2 });
@@ -2439,11 +2802,16 @@ void testScalesAndSerialization()
     fx.chordInversion = 2;
     fx.chordVoicing = MidiFxSettings::ChordVoicing::drop2;
     fx.chordVoiceLeading = true;
+    fx.chordFollowHigh = 59;
+    fx.chordBass = true;
+    fx.chordTopAccent = 12;
+    fx.chordKeyMap = true;
     {
-        MidiFxSettings::KeyChord kc;
-        kc.key = 62;
-        kc.offsets = { -2, 2, 5 };
-        fx.keyChords.add (kc);
+        const auto index = fx.findOrAddSetChord ({ 60, 64, 67 });
+        fx.chordSet.getReference (index).name = "Home";
+        fx.chordSet.getReference (index).root = 60;
+        fx.chordSet.getReference (index).quality = "triad";
+        fx.mapKey (62, index);
     }
     fx.constrainToScale = true;
     fx.scaleType = "dorian";
@@ -2479,9 +2847,40 @@ void testScalesAndSerialization()
              && restoredFx.expressionInputMin == 4 && restoredFx.expressionInputMax == 110
              && restoredFx.expressionOutputMin == 10 && restoredFx.expressionOutputMax == 118,
            "and so do the MIDI FX");
-    check (restoredFx.keyChords.size() == 1 && restoredFx.keyChords[0].key == 62
-             && restoredFx.keyChords[0].offsets == juce::Array<int> { -2, 2, 5 },
-           "the learned key map survives the trip");
+    check (restoredFx.chordSet.size() == 1 && restoredFx.chordSet[0].name == "Home"
+             && restoredFx.chordSet[0].notes == juce::Array<int> { 60, 64, 67 }
+             && restoredFx.chordSet[0].root == 60 && restoredFx.chordSet[0].quality == "triad"
+             && restoredFx.keyMap.size() == 1 && restoredFx.keyMap[0].key == 62
+             && restoredFx.keyMap[0].chord == 0,
+           "the chord set and the key map survive the trip");
+    check (restoredFx.chordFollow && restoredFx.chordKeyMap && restoredFx.chordFollowHigh == 59
+             && restoredFx.chordBass && restoredFx.chordTopAccent == 12,
+           "and so do the layers' lights, the follow range, the bass and the accent");
+
+    {
+        // A save from before the set: "custom keys" and offsets from each key.
+        auto* old = new juce::DynamicObject();
+        old->setProperty ("chord", "custom keys");
+        auto* kc = new juce::DynamicObject();
+        kc->setProperty ("key", 62);
+        kc->setProperty ("offsets", juce::Array<juce::var> { -2, 2, 5 });
+        old->setProperty ("keyChords", juce::Array<juce::var> { juce::var (kc) });
+        MidiFxSettings migrated;
+        midiFxFromVar (juce::var (old), migrated);
+        check (migrated.chordKeyMap && ! migrated.chordFollow
+                 && migrated.chordSet.size() == 1
+                 && migrated.chordSet[0].notes == juce::Array<int> { 60, 64, 67 }
+                 && migrated.keyMap.size() == 1 && migrated.keyMap[0].key == 62,
+               "an old learned key chord becomes a set chord its key points at");
+
+        auto* shaped = new juce::DynamicObject();
+        shaped->setProperty ("chord", "seventh");
+        MidiFxSettings following;
+        midiFxFromVar (juce::var (shaped), following);
+        check (following.chordFollow && ! following.chordKeyMap
+                 && following.chord == MidiFxSettings::ChordType::seventh,
+               "and an old shape becomes the follow layer, on");
+    }
 
     NoteModuleSettings strum;
     strum.strumBeats = 0.5;
@@ -2688,6 +3087,243 @@ void testNoteModules()
             wrapped = wrapped || event.note < 100;
         check (! wrapped, "a repeat past the top of the keyboard is dropped, never wrapped");
         check (balanced (ceilingEvents), "and what did sound still stops");
+    }
+
+    // -- strum in guitar mode -------------------------------------------------------------
+    {
+        auto shape = [] (std::initializer_list<int> chord)
+        {
+            std::vector<int> notes (chord);
+            int out[StrumEngine::strings], owner[StrumEngine::strings];
+            const auto count = StrumEngine::guitarVoicing (notes.data(), (int) notes.size(), out, owner);
+            return std::vector<int> (out, out + count);
+        };
+        check (shape ({ 60, 64, 67 }) == std::vector<int> ({ 48, 52, 55, 60, 64 }),
+               "guitar mode frets C major as the open C chord (x32010)");
+        check (shape ({ 55, 59, 62 }) == std::vector<int> ({ 43, 47, 50, 55, 59, 67 }),
+               "G major as the open G (320003)");
+        check (shape ({ 57, 60, 64 }) == std::vector<int> ({ 45, 52, 57, 60, 64 }),
+               "A minor as x02210");
+        check (shape ({ 62, 66, 69 }) == std::vector<int> ({ 50, 57, 62, 66 }),
+               "and D major as xx0232, the bass on the lowest sounding string");
+
+        auto guitar = slot ("strum");
+        guitar.mod.strumBeats = 0.25;
+        guitar.mod.strumGuitar = true;
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ guitar });
+
+        // Hold the chord well past the strum, then let go: every string must stop.
+        Transport clock;
+        clock.setTempo (120.0);
+        std::vector<Event> events;
+        for (int block = 0; block < 300; ++block)
+        {
+            juce::MidiBuffer in, out;
+            if (block == 0)
+                for (const auto note : { 60, 64, 67 })
+                    in.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 100), 0);
+            if (block == 150)
+                for (const auto note : { 60, 64, 67 })
+                    in.addEvent (juce::MidiMessage::noteOff (1, note), 0);
+            rack.process (in, out, clock.advance (blockSize, sampleRate), blockSize);
+            for (const auto metadata : out)
+            {
+                const auto message = metadata.getMessage();
+                if (message.isNoteOnOrOff())
+                    events.push_back ({ block, metadata.samplePosition, message.isNoteOn(),
+                                        message.getNoteNumber(), message.getVelocity() });
+            }
+        }
+        std::vector<int> strung;
+        for (const auto& event : events)
+            if (event.on) strung.push_back (event.note);
+        check (strung == std::vector<int> ({ 48, 52, 55, 60, 64 }),
+               "a played C major goes out as the five strings, strummed low to high");
+        check (balanced (events), "and releasing the three keys stops all five strings");
+
+        // Released inside the collection window, before the strings were dealt.
+        MidiInsertRack quick;
+        quick.prepare (blockSize);
+        quick.setSlots ({ guitar });
+        juce::MidiBuffer stab;
+        for (const auto note : { 57, 60, 64 })
+        {
+            stab.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 90), 0);
+            stab.addEvent (juce::MidiMessage::noteOff (1, note), 20);
+        }
+        const auto stabbed = run (quick, stab, 300);
+        check (onsOf (stabbed) == 5 && balanced (stabbed),
+               "a stab released before the strum still sounds every string and ends every one");
+    }
+
+    // -- strum and humanize extras: stroke by velocity, harder is faster, rhythm re-strums,
+    //    lay back, swing, beat accents and a frozen roll -------------------------------------
+    {
+        // A timed script through one rack: {block, sample, message}. Parked transport, so
+        // block b sample s is at (b * 256 + s) / 24000 beats.
+        struct At { int block; int sample; juce::MidiMessage message; };
+        const auto play = [] (const MidiSlot& s, std::vector<At> script, int blocks)
+        {
+            MidiInsertRack rack;
+            rack.prepare (blockSize);
+            rack.setSlots ({ s });
+            Transport clock;
+            clock.setTempo (120.0);
+            std::vector<Event> events;
+            for (int block = 0; block < blocks; ++block)
+            {
+                juce::MidiBuffer in, out;
+                for (const auto& a : script)
+                    if (a.block == block)
+                        in.addEvent (a.message, a.sample);
+                rack.process (in, out, clock.advance (blockSize, sampleRate), blockSize);
+                for (const auto metadata : out)
+                    if (metadata.getMessage().isNoteOnOrOff())
+                        events.push_back ({ block, metadata.samplePosition, metadata.getMessage().isNoteOn(),
+                                            metadata.getMessage().getNoteNumber(), metadata.getMessage().getVelocity() });
+            }
+            return events;
+        };
+        const auto on  = [] (int note, int velocity = 100) { return juce::MidiMessage::noteOn (1, note, (juce::uint8) velocity); };
+        const auto off = [] (int note) { return juce::MidiMessage::noteOff (1, note); };
+        const auto onsIn = [] (const std::vector<Event>& events)
+        {
+            std::vector<int> notes;
+            for (const auto& e : events) if (e.on) notes.push_back (e.note);
+            return notes;
+        };
+
+        auto strum = slot ("strum");
+        strum.mod.strumBeats = 0.25;
+        strum.mod.strumPattern = NoteModuleSettings::StrumPattern::byVelocity;
+        check (onsIn (play (strum, { { 0, 0, on (60, 127) }, { 0, 1, on (64, 127) }, { 0, 2, on (67, 127) } }, 60))
+                 == std::vector<int> ({ 67, 64, 60 })
+               && onsIn (play (strum, { { 0, 0, on (60, 50) }, { 0, 1, on (64, 50) }, { 0, 2, on (67, 50) } }, 60))
+                 == std::vector<int> ({ 60, 64, 67 }),
+               "by velocity: a hard hit strums down, a soft one up");
+
+        strum.mod.strumPattern = NoteModuleSettings::StrumPattern::ascending;
+        strum.mod.strumHarderFaster = true;
+        const auto spanOf = [&] (int velocity)
+        {
+            const auto events = play (strum, { { 0, 0, on (60, velocity) }, { 0, 1, on (64, velocity) }, { 0, 2, on (67, velocity) } }, 80);
+            int first = -1, last = -1;
+            for (const auto& e : events) if (e.on) { if (first < 0) first = e.block; last = e.block; }
+            return last - first;
+        };
+        check (spanOf (127) < spanOf (20), "harder is faster: a hard hit strums tighter than a soft one");
+        strum.mod.strumHarderFaster = false;
+
+        strum.mod.strumBeats = 0.0625;
+        strum.mod.strumRepeatPerBeat = 4;
+        const auto rhythm = play (strum, { { 0, 0, on (60) }, { 0, 1, on (64) }, { 0, 2, on (67) },
+                                            { 93, 0, off (60) }, { 93, 0, off (64) }, { 93, 0, off (67) } }, 160);
+        check (onsIn (rhythm).size() == 12, "re-strum: a chord held for a beat is struck on each quarter of it");
+        check (balanced (rhythm), "and every strike ends when the keys come up");
+        const auto struck = onsIn (rhythm);
+        const std::vector<int> firstTwoStrokes (struck.begin() + 3, struck.begin() + 6);
+        check (firstTwoStrokes == std::vector<int> ({ 67, 64, 60 }), "the strokes alternate: the next one is a down-stroke");
+
+        auto human = slot ("humanize");
+        human.mod.humanizeLayBackBeats = 0.1;
+        const auto laidBack = play (human, { { 0, 0, on (60) }, { 20, 0, off (60) } }, 40);
+        check (! laidBack.empty() && laidBack[0].on && laidBack[0].block == 9, "lay back: every note a tenth of a beat late");
+        human.mod.humanizeLayBackBeats = 0.0;
+
+        human.mod.humanizeSwing = 0.5f;
+        const auto swung = play (human, { { 0, 0, on (60) }, { 23, 112, on (62) }, { 40, 0, off (60) }, { 40, 0, off (62) } }, 60);
+        int onBeatBlock = -1, offBeatBlock = -1;
+        for (const auto& e : swung)
+        {
+            if (e.on && e.note == 60) onBeatBlock = e.block;
+            if (e.on && e.note == 62) offBeatBlock = e.block;
+        }
+        check (onBeatBlock == 0 && offBeatBlock == 29, "swing: the off-beat sixteenth moves late, the on-beat stays");
+        human.mod.humanizeSwing = 0.0f;
+
+        human.mod.humanizeAccent = 20;
+        std::vector<int> accented;
+        for (const auto& e : play (human, { { 0, 0, on (60) }, { 47, 0, on (62) }, { 60, 0, off (60) }, { 60, 0, off (62) } }, 70))
+            if (e.on) accented.push_back (e.velocity);
+        check (accented == std::vector<int> ({ 120, 100 }), "accent: a note on the beat is louder, one between is not");
+        human.mod.humanizeAccent = 0;
+
+        human.mod.humanizeVelocity = 30;
+        human.mod.humanizeFreeze = true;
+        std::vector<int> frozenVelocities;
+        for (const auto& e : play (human, { { 0, 0, on (60) }, { 10, 0, off (60) },
+                                            { 375, 0, on (60) }, { 385, 0, off (60) } }, 400))
+            if (e.on) frozenVelocities.push_back (e.velocity);
+        check (frozenVelocities.size() == 2 && frozenVelocities[0] == frozenVelocities[1],
+               "freeze: the same note in the same place of the bar varies the same way");
+
+        NoteModuleSettings saved;
+        saved.strumPattern = NoteModuleSettings::StrumPattern::byVelocity;
+        saved.strumHarderFaster = true;
+        saved.strumRepeatPerBeat = 3;
+        saved.humanizeLayBackBeats = 0.05;
+        saved.humanizeSwing = 0.4f;
+        saved.humanizeSwingGrid = 0.5;
+        saved.humanizeAccent = 12;
+        saved.humanizeFreeze = true;
+        saved.humanizeSeed = 77;
+        NoteModuleSettings restored;
+        noteModuleFromVar (noteModuleToVar (saved), restored);
+        check (restored.strumPattern == NoteModuleSettings::StrumPattern::byVelocity && restored.strumHarderFaster
+                 && restored.strumRepeatPerBeat == 3 && restored.humanizeLayBackBeats == 0.05
+                 && juce::approximatelyEqual (restored.humanizeSwing, 0.4f) && restored.humanizeSwingGrid == 0.5
+                 && restored.humanizeAccent == 12 && restored.humanizeFreeze && restored.humanizeSeed == 77,
+               "the strum and humanize extras survive the trip");
+    }
+
+    // -- every module: the Amount scales the effect, the light counts what it changed ------
+    {
+        auto strum = slot ("strum");
+        strum.mod.strumBeats = 0.5;
+        strum.amount = 0.0f;
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ strum });
+        juce::MidiBuffer chord;
+        for (const auto note : { 60, 64, 67 })
+            chord.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 100), 0);
+        std::set<int> blocks;
+        for (const auto& e : run (rack, chord, 60))
+            if (e.on) blocks.insert (e.block);
+        check (blocks.size() == 1, "Amount 0: a strum plays the chord at once");
+        strum.amount = 1.0f;
+        rack.setSlots ({ strum });
+        std::set<int> spread;
+        juce::MidiBuffer again;
+        for (const auto note : { 48, 52, 55 })
+            again.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 100), 0);
+        for (const auto& e : run (rack, again, 80))
+            if (e.on) spread.insert (e.block);
+        check (spread.size() == 3, "and at full Amount it spreads again, the settings untouched");
+
+        auto chance = slot ("chance");
+        chance.mod.chance = 0.0f;
+        chance.amount = 0.0f;
+        MidiInsertRack thinning;
+        thinning.prepare (blockSize);
+        thinning.setSlots ({ chance });
+        juce::MidiBuffer note;
+        note.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        check (onsOf (run (thinning, note, 2)) == 1, "Amount 0 on Chance lets every note through");
+
+        auto key = slot ("key");
+        key.fx.transpose = 12;
+        auto idle = MidiSlot::create ("key", "slot-key-idle");
+        MidiInsertRack lights;
+        lights.prepare (blockSize);
+        lights.setSlots ({ idle, key });
+        run (lights, note, 2);
+        std::array<MidiInsertRack::ModuleActivity, MidiInsertRack::maxSlots> counts;
+        const auto n = lights.moduleActivity (counts);
+        check (n == 2 && counts[0].count == 0 && counts[1].count > 0,
+               "the light counts only the module that changed something");
     }
 
     // -- strum --------------------------------------------------------------------------
@@ -3062,6 +3698,171 @@ void testNoteModules()
         juce::MidiBuffer panic;
         rack.allNotesOff (panic, 0);
         check (! panic.isEmpty(), "panic reaches what a latch is holding");
+    }
+
+    // -- the small modules' new options: echo feel/scale/floor/shorter, chance keeping the
+    //    beat and dropping soft notes first, length at most/at least, latch add/toggle/pedal.
+    {
+        // Feeds `script` (block -> messages) through a rack and records every note event. The
+        // transport is parked, so block b starts at b * 256 / 48000 * 2 beats (~0.0107 beat).
+        const auto play = [] (MidiInsertRack& rack, const std::map<int, juce::MidiBuffer>& script, int blocks)
+        {
+            Transport clock;
+            clock.setTempo (120.0);
+            std::vector<Event> events;
+            for (int block = 0; block < blocks; ++block)
+            {
+                juce::MidiBuffer out;
+                const auto found = script.find (block);
+                rack.process (found != script.end() ? found->second : juce::MidiBuffer(), out,
+                              clock.advance (blockSize, sampleRate), blockSize);
+                for (const auto metadata : out)
+                {
+                    const auto message = metadata.getMessage();
+                    if (message.isNoteOnOrOff())
+                        events.push_back ({ block, metadata.samplePosition, message.isNoteOn(),
+                                            message.getNoteNumber(), message.getVelocity() });
+                }
+            }
+            return events;
+        };
+        const auto rackOf = [] (const MidiSlot& s)
+        {
+            auto rack = std::make_unique<MidiInsertRack>();
+            rack->prepare (blockSize);
+            rack->setSlots ({ s });
+            return rack;
+        };
+        const auto on  = [] (int note, int velocity = 100) { return juce::MidiMessage::noteOn (1, note, (juce::uint8) velocity); };
+        const auto off = [] (int note) { return juce::MidiMessage::noteOff (1, note); };
+        const auto buffer = [] (std::initializer_list<juce::MidiMessage> messages)
+        {
+            juce::MidiBuffer b;
+            for (const auto& m : messages)
+                b.addEvent (m, 0);
+            return b;
+        };
+
+        auto echo = slot ("echo");
+        echo.mod.echoRepeats = 2;
+        echo.mod.echoStepBeats = 0.5;
+        echo.mod.echoFeel = "dotted";
+        auto events = play (*rackOf (echo), { { 0, buffer ({ on (60), off (60) }) } }, 200);
+        std::vector<int> onBlocks;
+        for (const auto& e : events) if (e.on) onBlocks.push_back (e.block);
+        check (onBlocks.size() == 3 && onBlocks[1] == 70 && onBlocks[2] == 140,
+               "a dotted echo repeats every three sixteenths");
+
+        echo.mod.echoFeel = "straight";
+        echo.mod.echoTranspose = 2;
+        echo.mod.echoScaleClimb = true;
+        echo.fx.scaleType = "major";
+        echo.fx.scaleRoot = 0;
+        std::vector<int> climbed;
+        for (const auto& e : play (*rackOf (echo), { { 0, buffer ({ on (60), off (60) }) } }, 120))
+            if (e.on) climbed.push_back (e.note);
+        check (climbed == std::vector<int> ({ 60, 64, 67 }), "climbing in the scale goes C, E, G, not C, D, E");
+
+        echo.mod.echoTranspose = 0;
+        echo.mod.echoScaleClimb = false;
+        echo.mod.echoRepeats = 3;
+        echo.mod.echoFeedback = 0.1f;
+        echo.mod.echoFloor = 40;
+        std::vector<int> loudness;
+        for (const auto& e : play (*rackOf (echo), { { 0, buffer ({ on (60), off (60) }) } }, 200))
+            if (e.on) loudness.push_back (e.velocity);
+        check (loudness == std::vector<int> ({ 100, 40, 40, 40 }), "repeats stop getting quieter at the floor");
+
+        echo.mod.echoFeedback = 0.7f;
+        echo.mod.echoFloor = 1;
+        echo.mod.echoRepeats = 2;
+        echo.mod.echoShorter = true;
+        std::map<int, int> began, lasted;
+        for (const auto& e : play (*rackOf (echo), { { 0, buffer ({ on (60), off (60) }) } }, 200))
+        {
+            if (e.on) began[(int) began.size()] = e.block;
+            else if ((int) lasted.size() < (int) began.size()) lasted[(int) lasted.size()] = e.block - began[(int) lasted.size()];
+        }
+        check (lasted.size() == 3 && lasted[2] < lasted[1], "each repeat is shorter than the one before");
+
+        auto chance = slot ("chance");
+        chance.mod.chance = 0.0f;
+        chance.mod.chanceKeepDownbeats = true;
+        std::vector<int> kept;
+        for (const auto& e : play (*rackOf (chance), { { 0, buffer ({ on (60), off (60) }) },
+                                                        { 20, buffer ({ on (62), off (62) }) },
+                                                        { 94, buffer ({ on (64), off (64) }) } }, 100))
+            if (e.on) kept.push_back (e.note);
+        check (kept == std::vector<int> ({ 60, 64 }), "at no chance, only the notes on the beat get through");
+
+        chance.mod.chance = 0.5f;
+        chance.mod.chanceKeepDownbeats = false;
+        chance.mod.chanceSoftFirst = true;
+        auto weightedRack = rackOf (chance);
+        int soft = 0, loud = 0;
+        for (int i = 0; i < 400; ++i)
+        {
+            const auto velocity = i % 2 == 0 ? 10 : 127;
+            for (const auto& e : play (*weightedRack, { { 0, buffer ({ on (60, velocity), off (60) }) } }, 1))
+                if (e.on) (velocity == 10 ? soft : loud) += 1;
+        }
+        check (loud > soft + 60, "soft notes drop first: loud ones get through far more often");
+
+        auto length = slot ("length");
+        length.mod.lengthBeats = 0.25;
+        length.mod.lengthMode = "at most";
+        auto endOf = [&] (const MidiSlot& s, int releaseBlock)
+        {
+            int end = -1;
+            for (const auto& e : play (*rackOf (s), { { 0, buffer ({ on (60) }) }, { releaseBlock, buffer ({ off (60) }) } }, 120))
+                if (! e.on) end = end < 0 ? e.block : -2;   // -2: more than one off
+            return end;
+        };
+        check (endOf (length, 10) == 10, "at most: a short note ends where you let go");
+        check (endOf (length, 60) == 23, "and a long one is cut at the length, with one off only");
+        length.mod.lengthMode = "at least";
+        check (endOf (length, 5) == 23, "at least: a tap rings on to the length");
+        check (endOf (length, 60) == 60, "and a longer note ends as played");
+
+        auto latch = slot ("latch");
+        latch.mod.latchOn = true;
+        latch.mod.latchMode = "add";
+        events = play (*rackOf (latch), { { 0, buffer ({ on (60), on (64), off (60), off (64) }) },
+                                          { 5, buffer ({ on (67), off (67) }) } }, 10);
+        check (onsOf (events) == 3 && ! balanced (events) && [&] { for (auto& e : events) if (! e.on) return false; return true; }(),
+               "add: a new phrase joins what is held instead of replacing it");
+
+        latch.mod.latchMode = "toggle";
+        events = play (*rackOf (latch), { { 0, buffer ({ on (60), on (64), off (60), off (64) }) },
+                                          { 5, buffer ({ on (64), off (64) }) } }, 10);
+        check (onsOf (events) == 2 && events.back().note == 64 && ! events.back().on,
+               "toggle: playing a held note again lets go of just that note");
+
+        latch.mod.latchMode = "replace";
+        latch.mod.latchPedalRelease = true;
+        auto pedalRack = rackOf (latch);
+        juce::MidiBuffer pedal;
+        pedal.addEvent (juce::MidiMessage::controllerEvent (1, 64, 127), 0);
+        events = play (*pedalRack, { { 0, buffer ({ on (60), off (60) }) }, { 5, pedal } }, 10);
+        check (balanced (events), "the pedal lets go of everything held");
+
+        NoteModuleSettings saved;
+        saved.echoFeel = "triplet";
+        saved.echoScaleClimb = true;
+        saved.echoShorter = true;
+        saved.echoFloor = 33;
+        saved.chanceKeepDownbeats = true;
+        saved.chanceSoftFirst = true;
+        saved.lengthMode = "at least";
+        saved.latchMode = "toggle";
+        saved.latchPedalRelease = true;
+        NoteModuleSettings restored;
+        noteModuleFromVar (noteModuleToVar (saved), restored);
+        check (restored.echoFeel == "triplet" && restored.echoScaleClimb && restored.echoShorter
+                 && restored.echoFloor == 33 && restored.chanceKeepDownbeats && restored.chanceSoftFirst
+                 && restored.lengthMode == "at least" && restored.latchMode == "toggle"
+                 && restored.latchPedalRelease,
+               "the small modules' new options survive the trip");
     }
 
     // Retyping a slot must release what the old module was holding — the same rule the arp

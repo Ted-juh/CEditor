@@ -17,8 +17,10 @@ test('the selected-control inspector exposes assignment and mapping options', ()
   assert.match(source, /data-testid="surface-control-inspector"/);
   assert.match(source, />Assign selected<\/button>/);
   assert.match(source, /Learn hardware/);
-  assert.match(source, /rangeMin/);
-  assert.match(source, /rangeMax/);
+  // The range is drawn and dragged; SlotResponse turns its two ends back into the binding.
+  assert.match(source, /<SlotResponse slot=\{selectedSlot\} onset=\{\(fields\) => updateSelectedOptions\(fields\)\}/);
+  const response = fs.readFileSync(new URL('../src/CE_Application/sections/SlotResponse.svelte', import.meta.url), 'utf8');
+  assert.match(response, /onset\(bindingFromEnds\(/);
   assert.match(source, /Invert control direction/);
   assert.match(source, /Pad mode/);
   assert.match(source, /Clear MIDI binding/);

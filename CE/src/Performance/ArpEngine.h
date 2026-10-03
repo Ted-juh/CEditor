@@ -63,6 +63,20 @@ public:
             degrees[(size_t) i].store (juce::jlimit (-1, 63, settings.degreePattern[i]));
         degreeCount.store (drawn);
         semitoneRows.store (settings.patternSemitones);
+
+        // The lane's other rows: repeats, ties, octave jumps and chance per step.
+        const auto storeRow = [] (const juce::Array<int>& from, auto& into, auto& count, int low, int high)
+        {
+            const auto n = juce::jmin (maxPatternSteps, from.size());
+            for (int i = 0; i < n; ++i)
+                into[(size_t) i].store (juce::jlimit (low, high, from[i]));
+            count.store (n);
+        };
+        storeRow (settings.ratchetPattern, ratchets, ratchetCount, 1, maxRatchet);
+        storeRow (settings.tiePattern, ties, tieCount, 0, 1);
+        storeRow (settings.octavePattern, octaveJumps, octaveJumpCount, -2, 2);
+        storeRow (settings.chancePattern, chances, chanceCount, 0, 100);
+        stepScale.store (settings.feel == "triplet" ? 2.0 / 3.0 : settings.feel == "dotted" ? 1.5 : 1.0);
     }
 
     /** The scale the arp folds its notes into when the part asks it to; 0x0fff = chromatic. */
@@ -91,6 +105,7 @@ public:
                 releaseAll (out, 0);
             heldCount = 0;
             releasedAll = true;
+            pendingCount = 0;
             livePatternStep.store (-1);
             out.addEvents (in, 0, -1, 0);
             localPpq = block.playing ? block.endPpq : localPpq;
@@ -120,11 +135,12 @@ public:
 
         if (heldCount == 0)
         {
+            pendingCount = 0;   // the keys are up: the rest of a ratchet goes with them
             livePatternStep.store (-1);
             return;
         }
 
-        const auto stepPpq = 1.0 / (double) stepsPerBeat.load();
+        const auto stepPpq = stepScale.load() / (double) stepsPerBeat.load();
         const auto swingAmount = (double) swing.load();
 
         // Which step indices could land in this window, swing included.
@@ -143,19 +159,29 @@ public:
             if (stepTime < startPpq || stepTime >= endPpq)
                 continue;
 
-            const auto offset = block.playing
-                                  ? block.sampleFor (stepTime, numSamples)
-                                  : juce::jlimit (0, juce::jmax (0, numSamples - 1),
-                                                  (int) ((stepTime - startPpq)
-                                                          / juce::jmax (1.0e-9, block.ppqPerSample)));
+            emitStep (out, step, stepTime, stepPpq,
+                      offsetFor (stepTime, startPpq, block, numSamples));
+        }
 
-            emitStep (out, step, stepTime + (double) gate.load() * stepPpq, offset);
+        // Ratchet hits later in their step, as their time comes (this block or a later one).
+        for (int i = 0; i < pendingCount;)
+        {
+            auto& hit = pending[(size_t) i];
+            if (hit.ppq >= endPpq)
+            {
+                ++i;
+                continue;
+            }
+            startNote (out, hit.note, hit.velocity, hit.releasePpq,
+                       offsetFor (juce::jmax (hit.ppq, startPpq), startPpq, block, numSamples));
+            pending[(size_t) i] = pending[(size_t) --pendingCount];
         }
     }
 
     /** Releases everything the arp is sounding and forgets the held set. */
     void allNotesOff (juce::MidiBuffer& out, int position)
     {
+        pendingCount = 0;
         releaseAll (out, position);
         heldCount = 0;
         releasedAll = true;
@@ -327,10 +353,47 @@ private:
         return held[(size_t) within].note + octave * 12;
     }
 
-    void emitStep (juce::MidiBuffer& out, int step, double releasePpq, int offset)
+    static int offsetFor (double ppq, double startPpq, const Transport::BlockTime& block,
+                          int numSamples) noexcept
+    {
+        return block.playing ? block.sampleFor (ppq, numSamples)
+                             : juce::jlimit (0, juce::jmax (0, numSamples - 1),
+                                             (int) ((ppq - startPpq)
+                                                     / juce::jmax (1.0e-9, block.ppqPerSample)));
+    }
+
+    /** Reads row `row` of the lane at `lane`, or `fallback` when the row is empty. */
+    template <typename Row, typename Count>
+    static int laneValue (const Row& row, const Count& count, int lane, int fallback) noexcept
+    {
+        const auto n = count.load();
+        return n > 0 ? (int) row[(size_t) (lane % n)].load() : fallback;
+    }
+
+    void emitStep (juce::MidiBuffer& out, int step, double stepTime, double stepPpq, int offset)
     {
         if (sequenceOrigin == noOrigin)
             sequenceOrigin = step;
+
+        // Where this step sits on the lane, read before anything below moves the counter.
+        const auto lane = stepCounter;
+        const auto hits = laneValue (ratchets, ratchetCount, lane, 1);
+        const auto tied = laneValue (ties, tieCount, lane, 0) != 0;
+        const auto jump = laneValue (octaveJumps, octaveJumpCount, lane, 0) * 12;
+        const auto chance = laneValue (chances, chanceCount, lane, 100);
+
+        // A tie holds to just past the next step's start, so the two overlap (legato) and a
+        // mono synth glides instead of retriggering. Ratchets split the step evenly; the gate
+        // applies to each hit, and a tie stretches only the last.
+        const auto hitPpq = stepPpq / (double) hits;
+        const auto hitGate = (double) gate.load() * hitPpq;
+        const auto releaseOf = [&] (int hit)
+        {
+            if (tied && hit == hits - 1)
+                return stepTime + stepPpq + 0.02 * stepPpq;
+            return stepTime + (double) hit * hitPpq + hitGate;
+        };
+        const auto releasePpq = releaseOf (0);
 
         const bool patternMode = (ArpSettings::Mode) mode.load() == ArpSettings::Mode::pattern
                                    && degreeCount.load() > 0;
@@ -381,13 +444,17 @@ private:
                 return;
         }
 
+        // The playhead follows the lane: its longest row in use (the UI keeps them equal).
+        const auto laneLength = juce::jmax (velocityCount.load(), ratchetCount.load(), tieCount.load(),
+                                            juce::jmax (octaveJumpCount.load(), chanceCount.load()));
+        if (! patternMode && laneLength > 0)
+            livePatternStep.store (lane % laneLength);
+
         const auto patternCount = velocityCount.load();
         if (patternCount > 0)
         {
             const auto patternIndex = stepCounter % patternCount;
             const auto patternVelocity = velocities[(size_t) patternIndex].load();
-            if (! patternMode)   // the playhead follows whichever grid is being drawn
-                livePatternStep.store (patternIndex);
             ++stepCounter;
             if (patternVelocity == 0)
                 return;   // a rest: the grid advances, nothing sounds
@@ -398,19 +465,39 @@ private:
             ++stepCounter;
         }
 
+        // Chance is rolled after the lane has moved on, so a skipped step still counts.
+        if (chance < 100 && (int) (nextRandom() % 100u) >= chance)
+            return;
+
         const auto scale = constrain.load() ? mask.load() : (juce::uint16) 0x0fff;
+        const auto play = [&] (int n)
+        {
+            const auto pitch = juce::jlimit (0, 127, constrainNoteToScale (n, scale) + jump);
+            startNote (out, pitch, velocity, releasePpq, offset);
+            for (int hit = 1; hit < hits; ++hit)
+                if (pendingCount < maxPending)
+                    pending[(size_t) pendingCount++] = { stepTime + (double) hit * hitPpq, pitch,
+                                                         velocity, releaseOf (hit) };
+        };
 
         if (chordAll)
         {
             const auto octaveCount = octaves.load();
             for (int octave = 0; octave < octaveCount; ++octave)
                 for (int i = 0; i < heldCount; ++i)
-                    startNote (out, constrainNoteToScale (held[(size_t) i].note + octave * 12, scale),
-                               velocity, releasePpq, offset);
+                    play (held[(size_t) i].note + octave * 12);
             return;
         }
 
-        startNote (out, constrainNoteToScale (note, scale), velocity, releasePpq, offset);
+        play (note);
+    }
+
+    juce::uint32 nextRandom() noexcept
+    {
+        randomState ^= randomState << 13;
+        randomState ^= randomState >> 17;
+        randomState ^= randomState << 5;
+        return randomState;
     }
 
     void startNote (juce::MidiBuffer& out, int note, juce::uint8 velocity, double releasePpq,
@@ -510,6 +597,23 @@ private:
     std::atomic<int> degreeCount { 0 };
     std::atomic<bool> semitoneRows { false };
     std::atomic<int> livePatternStep { -1 };
+
+    static constexpr int maxRatchet = 4;
+    static constexpr int maxPending = 64;
+    struct PendingHit { double ppq = 0.0; int note = 0; juce::uint8 velocity = 100; double releasePpq = 0.0; };
+    std::array<PendingHit, maxPending> pending {};   // audio thread only
+    int pendingCount = 0;
+    juce::uint32 randomState = 0x2545f491u;
+
+    std::array<std::atomic<int>, maxPatternSteps> ratchets {};
+    std::atomic<int> ratchetCount { 0 };
+    std::array<std::atomic<int>, maxPatternSteps> ties {};
+    std::atomic<int> tieCount { 0 };
+    std::array<std::atomic<int>, maxPatternSteps> octaveJumps {};
+    std::atomic<int> octaveJumpCount { 0 };
+    std::array<std::atomic<int>, maxPatternSteps> chances {};
+    std::atomic<int> chanceCount { 0 };
+    std::atomic<double> stepScale { 1.0 };
 };
 
 } // namespace ceditor::perf

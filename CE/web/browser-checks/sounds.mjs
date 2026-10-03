@@ -113,13 +113,15 @@ try {
   await page.getByRole('button', { name: 'Cancel · restore original' }).click();
   assert.equal(await page.evaluate(() => window.soundCommands.at(-1).cmd), 'cancelSoundComparison');
   await page.evaluate(() => window.setSoundsComparison(false));
-  await page.getByTestId('host-audition').check();
+  await page.getByTestId('host-audition').click();
+  // One audition bar: the phrase is picked there, and the preview plays the same phrase.
+  await page.locator('[data-testid=audition-phrase] [data-value=riff]').click();
+  assert.deepEqual(await page.evaluate(() => window.soundCommands.findLast(c => c.cmd === 'setPresetAudition')), { cmd: 'setPresetAudition', phrase: 'riff' });
+  assert.deepEqual(await page.evaluate(() => window.soundCommands.at(-1)), { cmd: 'setAuditionPhrase', phrase: 'phrase' });
   await page.getByRole('button', { name: /^Filters/ }).click();
-  await page.getByTestId('host-audition-config').locator('select').selectOption('riff');
-  assert.deepEqual(await page.evaluate(() => window.soundCommands.at(-1)), { cmd: 'setPresetAudition', phrase: 'riff' });
   assert.ok(await page.getByTestId('preset-list').evaluate(el => el.clientHeight) >= 32);
   await page.getByRole('button', { name: /^Filters/ }).click();
-  await page.getByTestId('host-audition').uncheck();
+  await page.getByTestId('host-audition').click();
   await page.evaluate(() => window.setSoundsMorph());
   await page.getByTestId('browser-search').fill('no-such-preset');
   await page.getByTestId('sound-selection-bar').getByText('No preset selected', { exact: true }).waitFor();
@@ -139,8 +141,8 @@ try {
   await page.keyboard.press('End');
   await page.getByTestId('sound-load').filter({ hasText: 'Load effect' }).waitFor();
   await page.getByRole('button', { name: /^Filters/ }).click();
-  await page.getByLabel('Browser view').selectOption('map');
-  await page.getByLabel('Browser view').selectOption('list');
+  await page.locator('[data-testid=browser-view] [data-value=map]').click();
+  await page.locator('[data-testid=browser-view] [data-value=list]').click();
   assert.ok(await page.getByTestId('preset-list').evaluate(el => el.scrollTop) > 100000,
     'list restores its virtual scroll window after changing views');
   await page.getByRole('button', { name: /^Filters/ }).click();
@@ -174,9 +176,9 @@ try {
   assert.ok(await page.getByTestId('preset-row').count() > 0, 'saved sounds remain usable during the update');
   await page.evaluate(() => window.finishSoundsUpdate());
   await page.getByTestId('library-update-result').filter({ hasText: '1 plug-in needs attention' }).waitFor();
-  assert.equal(await page.locator('.scan-report').evaluate(el => el.open), true, 'issues are expanded in the update results');
   await page.locator('.scan-report').getByText('Preset files are missing.', { exact: false }).waitFor();
-  assert.ok((await page.locator('.scan-report').innerText()).includes('4139 usable presets'));
+  assert.ok((await page.locator('.scan-report').innerText()).includes('4139 presets'));
+  assert.match(await page.locator('.scan-report .report-head').innerText(), /1 need attention/, 'only the failure needs attention');
   await page.getByTestId('host-library-close').click();
   await page.getByTestId('library-update-result').click();
   await page.getByTestId('duplicate-set').click();
@@ -184,9 +186,9 @@ try {
   await page.getByTestId('browser-search').fill('');
   await page.getByTestId('host-library-close').click();
   await page.getByRole('button', { name: /^Filters/ }).click();
-  await page.getByLabel('Preset row spacing').selectOption('comfortable');
+  await page.locator('[data-testid=row-spacing] [data-value=comfortable]').click();
   assert.equal(Math.round(await page.getByTestId('preset-row').first().evaluate(el => el.getBoundingClientRect().height)), 42);
-  await page.getByLabel('Preset row spacing').selectOption('compact');
+  await page.locator('[data-testid=row-spacing] [data-value=compact]').click();
   await page.getByRole('button', { name: /^Filters/ }).click();
   for (const width of [1280, 900, 640]) {
     await page.setViewportSize({ width, height: 940 });

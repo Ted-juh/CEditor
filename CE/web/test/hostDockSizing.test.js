@@ -11,18 +11,19 @@ import {
   storeDockHeights,
 } from '../src/CE_Application/utils/hostDockSizing.js';
 
-test('dock bounds preserve most of the workspace and remain usable in a short window', () => {
-  assert.deepEqual(dockHeightBounds(1000), { minimum: 140, maximum: 480 });
-  assert.deepEqual(dockHeightBounds(500), { minimum: 140, maximum: 240 });
-  assert.equal(clampDockHeight(600, 500), 240);
+test('the dock may take three quarters of the workspace, and stays usable in a short window', () => {
+  assert.deepEqual(dockHeightBounds(1000), { minimum: 140, maximum: 750 });
+  assert.deepEqual(dockHeightBounds(1800), { minimum: 140, maximum: 1350 }, 'a tall window gives the editor the room');
+  assert.deepEqual(dockHeightBounds(160), { minimum: 140, maximum: 140 });
+  assert.equal(clampDockHeight(600, 500), 375);
   assert.equal(clampDockHeight(20, 500), 140);
 });
 
-test('short tabs stay compact while content-heavy tabs fit up to the safe limit', () => {
+test('short tabs stay compact while content-heavy tabs fit up to the limit', () => {
   assert.equal(preferredDockHeight('zone', 40, 700), 170);
   assert.equal(preferredDockHeight('params', 80, 700), 240);
-  assert.equal(preferredDockHeight('midi', 400, 700), 336);
-  assert.equal(preferredDockHeight('rack', 900, 500), 240);
+  assert.equal(preferredDockHeight('midi', 400, 700), 454);
+  assert.equal(preferredDockHeight('rack', 900, 500), 375);
 });
 
 test('manual heights are remembered per tab and hostile values are ignored', () => {

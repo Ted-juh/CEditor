@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { PERFORMANCE_GROUPS, performanceGroupFor, normalisePerformanceNavigation,
   selectPerformanceTool, restorePerformanceNavigation, storePerformanceNavigation } from '../src/CE_Application/utils/performanceNavigation.js';
 
-test('all thirteen existing Performance tools occur once in a group', () => {
+test('all twelve Performance tools occur once in a group', () => {
   const ids = PERFORMANCE_GROUPS.flatMap(g => g.tools.map(t => t.id));
-  assert.equal(new Set(ids).size, 13);
+  assert.equal(new Set(ids).size, 12);
   assert.deepEqual([...ids].sort(), ['patterns','looper','gestures','recorder','modulation','lfos',
-    'envelopes','msegs','random','tuning','clips','arranger','setlist'].sort());
+    'envelopes','msegs','random','tuning','clips','setlist'].sort());
 });
 test('switching tools remembers each group independently, including direct navigation', () => {
   let state = selectPerformanceTool(null, 'lfos');
@@ -27,10 +27,10 @@ test('saved navigation survives reload and rejects malformed or cross-group memo
   storePerformanceNavigation(state, storage);
   assert.deepEqual(restorePerformanceNavigation(storage), state);
   saved = '{broken';
-  assert.equal(restorePerformanceNavigation(storage).tab, 'patterns');
+  assert.equal(restorePerformanceNavigation(storage).tab, 'setlist', 'a broken memory opens on the songs');
   assert.equal(normalisePerformanceNavigation({ tab: 'lfos', lastTools: { capture: 'lfos' } }).lastTools.capture, 'looper');
-  assert.equal(normalisePerformanceNavigation(null).tab, 'patterns');
+  assert.equal(normalisePerformanceNavigation(null).tab, 'setlist');
   const blocked = { getItem() { throw Error('blocked'); }, setItem() { throw Error('full'); } };
-  assert.equal(restorePerformanceNavigation(blocked).tab, 'patterns');
+  assert.equal(restorePerformanceNavigation(blocked).tab, 'setlist');
   assert.doesNotThrow(() => storePerformanceNavigation(state, blocked));
 });

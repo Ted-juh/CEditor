@@ -15,7 +15,7 @@
   import { onDestroy } from 'svelte';
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
-  import { ctrl49Screen, hostSurface, surfaceInput, setControlSlotValue } from '../stores/instrumentHost.js';
+  import { ctrl49Screen, hostSurface, surfaceInput, setControlSlotValue, surfaceStatusText } from '../stores/instrumentHost.js';
   import { createCtrl49Screen } from '../screen/ctrl49Runtime.js';
 
   const KIND = { control: 'Controls', performance: 'Performance', browse: 'Sound browser' };
@@ -200,12 +200,10 @@
     else if (event.key === 'ArrowRight') { surfaceInput(40, 127); event.preventDefault(); }
   }
 
-  const status = $derived({
-    connected: 'Showing on the keyboard too',
-    connecting: 'Keyboard found, starting up…',
-    heldElsewhere: 'The keyboard is in use by another window — shown here only',
-    failed: `The keyboard did not start${$hostSurface.detail ? `: ${$hostSurface.detail}` : ''} — shown here only`,
-  }[$hostSurface.state] ?? 'No keyboard connected — shown here only');
+  // The keyboard's own status, and whether this card is also what the keyboard shows.
+  const surfaceStatus = $derived(surfaceStatusText($hostSurface));
+  const status = $derived($hostSurface.state === 'connected' ? 'Showing on the keyboard too'
+                          : `${surfaceStatus.short} — shown here only`);
 </script>
 
 <section class="ctrl49-screen" data-testid="ctrl49-screen-card" aria-label="CTRL49 screen">
@@ -275,6 +273,14 @@
     </div>
   </div>
 
+  {#if surfaceStatus.detail && $hostSurface.state !== 'connected'}
+    <p class="failure" role="status" data-testid="ctrl49-status-detail">{surfaceStatus.detail}</p>
+  {/if}
+  {#if $hostSurface.deviceError}
+    <p class="failure" role="status" data-testid="ctrl49-device-error">
+      {$hostSurface.deviceError}{$hostSurface.deviceRefusals > 1 ? ` (${$hostSurface.deviceRefusals} refusals this connection)` : ''}
+    </p>
+  {/if}
   {#if failure}
     <p class="failure" role="alert" data-testid="ctrl49-screen-failure">{failure}</p>
   {/if}

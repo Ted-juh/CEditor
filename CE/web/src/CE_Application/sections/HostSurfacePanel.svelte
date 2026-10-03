@@ -1,5 +1,8 @@
 <script>
   import HostConfirmButton from './HostConfirmButton.svelte';
+  import SlotResponse from './SlotResponse.svelte';
+  import Segmented from '../components/controls/Segmented.svelte';
+  import ScrubValue from '../components/controls/ScrubValue.svelte';
   import HostPickupIndicator from './HostPickupIndicator.svelte';
   /**
    * HostSurfacePanel.svelte — the controller as a picture (rack-canvas plan, the surface note).
@@ -28,6 +31,7 @@
   import Pencil from 'lucide-svelte/icons/pencil';
   import Trash2 from 'lucide-svelte/icons/trash-2';
   import Plus from 'lucide-svelte/icons/plus';
+  import Link from 'lucide-svelte/icons/link';
   import HostPartPicker from './HostPartPicker.svelte';
   import Ctrl49ScreenCard from './Ctrl49ScreenCard.svelte';
   import {
@@ -39,7 +43,8 @@
     setFaderLayers, setFaderActiveLayer,
     setControlSlotOptions, focusRackPart,
     setUserSurface, clearUserSurface, learnUserSurface, finishUserSurfaceLearn,
-    addControlPage, removeControlPage, renameControlPage, generateControlPages, ctrl49Screen,
+    addControlPage, removeControlPage, renameControlPage, generateControlPages, ctrl49Screen, surfaceStatusText,
+    showControlPage, setControlPagePreset,
   } from '../stores/instrumentHost.js';
 
   let zoom = $state('');        // '' = the whole instrument, else a region id
@@ -47,6 +52,9 @@
   let defaultedLayout = '';
   let selectedControlId = $state('');
   let selectedParameterId = $state('');
+  // A rack macro is assignable like a parameter: the knob drives the macro, the macro drives
+  // everything it targets, on any part. The backend has always accepted it ('@macro').
+  let selectedMacroId = $state('');
   let clearArmed = $state(false);
   let clearTimer;
 
@@ -161,6 +169,15 @@
     : control.kind === 'fader' ? (page?.faderLayers ?? { count: 1, active: 0 }) : { count: 1, active: 0 };
   let faderLayerCount = $derived(page?.faderLayers?.count ?? 1);
   let faderLayerActive = $derived(page?.faderLayers?.active ?? 0);
+  const LAYER_COUNTS = Array.from({ length: MAX_PAD_LAYERS }, (_, i) => ({
+    value: i + 1, label: String(i + 1), title: i === 0 ? 'One layer: no layers' : `${i + 1} layers` }));
+  // How a CC control sends: a position, or one of the three ways encoders send a turn.
+  const MIDI_MODES = [
+    { value: 'absolute', label: 'Absolute', title: 'A position, 0-127' },
+    { value: 'relative-0', label: '1 / 127', title: 'Relative: 1 = up one, 127 = down one; 2..63 up faster, 126..65 down faster' },
+    { value: 'relative-1', label: '64 centre', title: 'Relative: 64 = rest; 65.. up, ..63 down' },
+    { value: 'relative-2', label: 'Sign bit', title: 'Relative: 1..63 up; 65..127 down' },
+  ];
 
   const learningControl = (control) => $hostMidiLearn.armed
     && $hostMidiLearn.pageId === (page?.pageId ?? '')
@@ -318,9 +335,17 @@
       selectedParameterId = '';
   });
 
+  let macros = $derived($hostState.rack.macros ?? []);
+  let selectedMacro = $derived(macros.find((m) => m.macroId === selectedMacroId) ?? null);
+
   function assignSelected() {
-    if (!selectedControl || !selectedParameter || !focusedPart
-        || !addressable(selectedControl)) return;
+    if (!selectedControl || !addressable(selectedControl)) return;
+    if (selectedMacro) {
+      assignSurfaceControl(page?.pageId ?? '', selectedControl.kind, selectedControl.index,
+                           selectedMacro.macroId, '@macro');
+      return;
+    }
+    if (!selectedParameter || !focusedPart) return;
     assignSurfaceControl(page?.pageId ?? '', selectedControl.kind, selectedControl.index,
                          focusedPart.partId, selectedParameter.id);
   }
@@ -362,7 +387,7 @@
     <div class="workspace-heading"><SlidersHorizontal size={18} /><div><h2>MIDI learn</h2>
       <p>Drag a parameter onto a control, then learn its hardware binding.</p></div></div>
     <span class="connection-state" class:connected={$hostSurface.state === 'connected'}>
-      <i></i>{$hostSurface.state === 'connected' ? ($hostSurface.device || 'Controller connected') : ($hostSurface.state || 'No controller connected')}
+      <i></i><span title={surfaceStatusText($hostSurface).detail}>{surfaceStatusText($hostSurface).short}</span>
     </span>
   </div>
   <div class="surface-head">
@@ -381,6 +406,7 @@
       </select>
     {:else}
       <strong>{layout.displayName || 'No controller profile'}</strong>
+      {#if layout.connected}<span class="plugged-in" data-testid="surface-connected" title="This controller is plugged in">● plugged in</span>{/if}
       {#if layout.vendor}<span class="dim">{layout.vendor}</span>{/if}
     {/if}
     <button type="button" class="ghost" data-testid="surface-describe"
@@ -401,13 +427,27 @@
         {:else}
           <select data-testid="surface-page" aria-label="Control page shown on the drawing"
                   value={page?.pageId ?? ''}
-                  onchange={(e) => (pageId = e.currentTarget.value)}>
+                  onchange={(e) => { pageId = e.currentTarget.value; showControlPage(pageId); }}>
             {#each pages as p (p.pageId)}
               <option value={p.pageId}>{p.name}</option>
             {/each}
           </select>
           <button type="button" class="ghost" title="Rename this page" aria-label="Rename page"
                   data-testid="surface-page-rename-start" onclick={() => (renaming = true)}><Pencil size={14} /></button>
+          <!-- Tie this page to the preset the focused part has loaded, so loading that preset
+               shows it; tied, the same button unties it. -->
+          {#if page?.presetRecordId}
+            <button type="button" class="toggle on preset-tie" data-testid="surface-page-preset"
+                    title={`Shown when "${page.presetName || 'its preset'}" is loaded. Click to make it an ordinary page.`}
+                    onclick={() => setControlPagePreset(page.pageId)}><Link size={14} /> {page.presetName || 'Preset'}</button>
+          {:else}
+            <button type="button" class="ghost preset-tie" data-testid="surface-page-preset"
+                    disabled={!focusedPart?.presetRecordId}
+                    title={focusedPart?.presetRecordId
+                      ? `Show this page whenever "${focusedPart.presetName}" is loaded`
+                      : 'Load a preset on the focused part to tie this page to it'}
+                    onclick={() => setControlPagePreset(page.pageId, focusedPart.partId)}><Link size={14} /></button>
+          {/if}
           <HostConfirmButton identity={`surface-page:${page?.pageId ?? ''}`} type="button" class="ghost"
                              title="Remove this page" aria-label="Remove page" data-testid="surface-page-remove"
                              onclick={() => page && removeControlPage(page.pageId)}><Trash2 size={14} /></HostConfirmButton>
@@ -498,7 +538,7 @@
                    class:selected={selectedParameterId === parameter.id}
                    data-testid="surface-param"
                    title={`${parameter.name || parameter.id} — select or drag onto a control`}
-                   onclick={() => (selectedParameterId = parameter.id)}
+                   onclick={() => { selectedParameterId = parameter.id; selectedMacroId = ''; }}
                    ondragstart={(e) => {
                      hostParamDrag.set({ partId: focusedPart.partId, parameterId: parameter.id,
                                          name: parameter.name });
@@ -518,6 +558,26 @@
             {/if}
           </div>
           <p class="parameter-hint">Drag to map · or select and assign</p>
+        {/if}
+        {#if macros.length > 0}
+          <div class="panel-heading macro-heading"><strong>Macros</strong><span>{macros.length}</span></div>
+          <div class="param-scroll macro-list" data-testid="surface-macros">
+            {#each macros as macro (macro.macroId)}
+              <button type="button" class="param-chip" draggable="true"
+                   class:selected={selectedMacroId === macro.macroId}
+                   data-testid="surface-macro"
+                   title={`${macro.name || 'Macro'} — one knob for everything this macro targets, on any part`}
+                   onclick={() => { selectedMacroId = macro.macroId; selectedParameterId = ''; }}
+                   ondragstart={(e) => {
+                     hostParamDrag.set({ partId: macro.macroId, parameterId: '@macro', name: macro.name || 'Macro' });
+                     e.dataTransfer?.setData('text/plain', macro.name || 'Macro');
+                     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+                   }}
+                   ondragend={() => hostParamDrag.set({ partId: '', parameterId: '', name: '' })}>
+                <GripVertical size={13} /><span>{macro.name || 'Macro'}</span>
+              </button>
+            {/each}
+          </div>
         {/if}
       </div>
 
@@ -646,15 +706,11 @@
                    Bank ◀ ▶ does on the keyboard, and the faders pick their new parameters up
                    where they are rather than jumping them. -->
               <div class="pad-layer-editor" data-testid="surface-fader-layers">
-                <label>Fader layers
-                  <select aria-label="Number of fader layers" value={faderLayerCount}
-                          data-testid="surface-fader-layer-count"
-                          onchange={(e) => setFaderLayers(page?.pageId ?? '', Number(e.currentTarget.value))}>
-                    {#each Array.from({ length: MAX_PAD_LAYERS }, (_, i) => i + 1) as count (count)}
-                      <option value={count}>{count === 1 ? '1 (no layers)' : count}</option>
-                    {/each}
-                  </select>
-                </label>
+                <div class="layer-count">Fader layers
+                  <Segmented options={LAYER_COUNTS} value={faderLayerCount} label="Number of fader layers"
+                             testid="surface-fader-layer-count"
+                             onchange={(count) => setFaderLayers(page?.pageId ?? '', count)} />
+                </div>
                 {#if faderLayerCount > 1}
                   <div class="layer-tabs" role="group" aria-label="Layer the faders play">
                     {#each Array.from({ length: faderLayerCount }, (_, i) => i) as layer (layer)}
@@ -673,16 +729,11 @@
                    state a long press on the small button above the pad steps through — so the
                    assignment below is always the one you would hear. -->
               <div class="pad-layer-editor" data-testid="surface-pad-layers">
-                <label>Layers
-                  <select aria-label="Number of layers on this pad" value={layers.count}
-                          data-testid="surface-pad-layer-count"
-                          onchange={(e) => setPadLayers(page?.pageId ?? '', selectedControl.index,
-                                                        Number(e.currentTarget.value))}>
-                    {#each Array.from({ length: MAX_PAD_LAYERS }, (_, i) => i + 1) as count (count)}
-                      <option value={count}>{count === 1 ? '1 (no layers)' : count}</option>
-                    {/each}
-                  </select>
-                </label>
+                <div class="layer-count">Layers
+                  <Segmented options={LAYER_COUNTS} value={layers.count} label="Number of layers on this pad"
+                             testid="surface-pad-layer-count"
+                             onchange={(count) => setPadLayers(page?.pageId ?? '', selectedControl.index, count)} />
+                </div>
                 {#if layers.count > 1}
                   <div class="layer-tabs" role="group" aria-label="Layer this pad plays">
                     {#each layerPips(selectedControl) as pip (pip.layer)}
@@ -716,7 +767,8 @@
                 <HostPickupIndicator direction={selectedSlot?.pickupDirection} /></strong>
               <span>{selectedSlot?.partName || (selectedParameter
                 ? `Ready to assign ${selectedParameter.name || selectedParameter.id}`
-                : 'Select a parameter or drag one onto the control')}</span>
+                : selectedMacro ? `Ready to assign macro ${selectedMacro.name || ''}`
+                : 'Select a parameter or macro, or drag one onto the control')}</span>
               {#if selectedSlot?.midiNote >= 0}
                 <span>Hardware binding · note {selectedSlot.midiNote}</span>
               {:else if selectedSlot?.midiCc >= 0}
@@ -727,7 +779,7 @@
             </div>
 
             <div class="inspector-actions">
-              <button type="button" disabled={!selectedParameter || !focusedPart}
+              <button type="button" disabled={!selectedMacro && (!selectedParameter || !focusedPart)}
                       data-testid="surface-assign-selected" onclick={assignSelected}>Assign selected</button>
               <button type="button" class="toggle" class:on={$hostMidiLearn.armed}
                       data-testid="surface-learn-selected" onclick={learnSelected}>
@@ -743,42 +795,41 @@
             {/if}
 
             {#if selectedSlot?.assigned}
+              <!-- The mapping, drawn: the control's travel across, the parameter up. Its ends are
+                   rangeMin and rangeMax, swapped when the control is inverted. -->
+              <SlotResponse slot={selectedSlot} onset={(fields) => updateSelectedOptions(fields)} />
               <div class="option-grid">
-                <label>Minimum
-                  <input type="number" min="0" max="1" step="0.01" value={selectedSlot.rangeMin}
-                         onchange={(e) => updateSelectedOptions({ rangeMin: Number(e.currentTarget.value) })} />
-                </label>
-                <label>Maximum
-                  <input type="number" min="0" max="1" step="0.01" value={selectedSlot.rangeMax}
-                         onchange={(e) => updateSelectedOptions({ rangeMax: Number(e.currentTarget.value) })} />
-                </label>
-              </div>
-              <div class="check-row">
-                <span>Invert control direction</span>
-                <PropertyToggle
-                  compact
-                  value={selectedSlot.inverted}
-                  ariaLabel="Invert control direction"
-                  onchange={(value) => updateSelectedOptions({ inverted: value })}
-                />
+                <!-- Stepped: a waveform selector with 4 shapes wants 4 positions, not 128. -->
+                <div class="option" title="Smooth, or snap to that many positions: an encoder then moves one position per click.">Steps
+                  <ScrubValue value={selectedSlot.steps ?? 0} min={0} max={128} pixelsPerStep={6}
+                              format={(n) => (n < 2 ? 'smooth' : `${n}`)} label="Steps" testid="slot-steps"
+                              onchange={(steps) => updateSelectedOptions({ steps: steps === 1 ? 0 : steps })} />
+                </div>
+                <div class="option">Direction
+                  <button type="button" class="toggle" class:on={selectedSlot.inverted} aria-pressed={selectedSlot.inverted}
+                          aria-label="Invert control direction" data-testid="slot-invert"
+                          title="Swap the ends: the parameter goes down as the control goes up"
+                          onclick={() => updateSelectedOptions({ inverted: !selectedSlot.inverted })}>
+                    ⇅ {selectedSlot.inverted ? 'Inverted' : 'Normal'}</button>
+                </div>
               </div>
               {#if pressable(selectedControl)}
-                <label>{selectedControl.kind === 'pad' ? 'Pad mode' : 'Button mode'}
-                  <select value={selectedSlot.toggle ? 'latching' : 'momentary'}
-                          onchange={(e) => updateSelectedOptions({ toggle: e.currentTarget.value === 'latching' })}>
-                    <option value="momentary">Momentary</option>
-                    <option value="latching">Latching</option>
-                  </select>
-                </label>
+                <div class="option">{selectedControl.kind === 'pad' ? 'Pad mode' : 'Button mode'}
+                  <Segmented options={[{ value: false, label: 'Momentary', title: 'Down is the top of the range, up is the bottom' },
+                                       { value: true, label: 'Latching', title: 'Each press flips between the two ends' }]}
+                             value={selectedSlot.toggle} label={selectedControl.kind === 'pad' ? 'Pad mode' : 'Button mode'}
+                             testid="slot-press-mode" onchange={(toggle) => updateSelectedOptions({ toggle })} />
+                </div>
               {/if}
               {#if selectedSlot.midiCc >= 0 && selectedSlot.midiNote < 0 && !pressable(selectedControl) && !selectedSlot.toggle}
-                <label>MIDI mode
-                  <select aria-label="MIDI control mode" value={selectedSlot.midiRelative ? 'relative' : 'absolute'}
-                          onchange={(e) => updateSelectedOptions({ midiRelative: e.currentTarget.value === 'relative' })}>
-                    <option value="absolute">Absolute</option>
-                    <option value="relative">Relative (1 / 127)</option>
-                  </select>
-                </label>
+                <div class="option">MIDI mode
+                  <!-- A relative encoder sends a turn, not a position, and controllers disagree on how:
+                       which one yours uses is in its manual (or try each and turn the knob). -->
+                  <Segmented options={MIDI_MODES} label="MIDI control mode" testid="slot-midi-mode"
+                             value={selectedSlot.midiRelative ? `relative-${selectedSlot.midiRelativeFormat ?? 0}` : 'absolute'}
+                             onchange={(v) => updateSelectedOptions(v === 'absolute' ? { midiRelative: false }
+                               : { midiRelative: true, midiRelativeFormat: Number(v.slice(-1)) })} />
+                </div>
                 {#if !selectedSlot.midiRelative}
                   <div class="check-row">
                     <span title="Wait until the physical control reaches the current software value">Pickup</span>
@@ -840,6 +891,8 @@
   .page-picker > span, .eyebrow { color: #81acd0; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
   .page-picker select { min-width: 150px; font-weight: 650; }
   .page-picker .page-rename { width: 170px; font-weight: 650; }
+  .plugged-in { color: #8fd0a4; font-size: 11px; }
+  .preset-tie { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .page-picker button { display: inline-flex; align-items: center; gap: 4px; }
 
   .describe { display: flex; flex-direction: column; gap: 6px; padding: 8px;
@@ -1191,8 +1244,8 @@
   .learning-notice span { display: flex; flex-direction: column; gap: 3px; }
   .inspector-actions.secondary { display: flex; flex-wrap: wrap; }
   .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .option-grid label, .control-inspector > label { display: flex; flex-direction: column; gap: 4px; color: #aab5be; font-size: 11px; }
-  .option-grid input { width: 100%; box-sizing: border-box; }
+  .option-grid .option, .control-inspector .option, .pad-layer-editor .layer-count {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px; color: #aab5be; font-size: 11px; }
   .control-inspector .check-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; color: #aab5be; font-size: 11px; }
   .control-inspector button.confirming { border-color: #c57575; background: #51282c; color: #ffd8d8; }
   .inspector-empty { margin: auto 0; text-align: center; align-items: center; padding: 12px; }

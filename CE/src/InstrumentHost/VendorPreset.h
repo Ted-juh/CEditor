@@ -6,9 +6,19 @@
 
 namespace ceditor::host
 {
+/** "stateFile" is a file from a preset folder assigned to one plug-in: the plug-in's own saved
+    state written to disk under a vendor's extension (Sugar Bytes' .sbtr, for one). It is only
+    ever indexed from a folder the host has test-loaded into that plug-in and seen take. */
 inline bool isVendorPresetSource (const juce::String& source)
 {
-    return source == "vstpreset" || source == "nksf" || source == "fxp" || source == "spire" || source == "h2p";
+    return source == "vstpreset" || source == "nksf" || source == "fxp" || source == "spire" || source == "h2p"
+        || source == "stateFile";
+}
+
+/** The file formats read by name rather than as a plug-in's raw saved state. */
+inline bool isNamedVendorPresetFile (const juce::File& file)
+{
+    return file.hasFileExtension ("vstpreset;nksf;fxp;spf2;h2p");
 }
 
 // Zebra3's MIDI program selector reports numbered slots, not its disk preset library.
@@ -119,6 +129,22 @@ private:
 };
 }
 
+/** reFX names every Vanguard preset with a two-letter type code ("LD Clav Man", "PD Warm"),
+    and the .fxp carries no category of its own; the code is the category. */
+inline juce::String vanguardCategory (const juce::String& presetName)
+{
+    static const std::pair<const char*, const char*> codes[] {
+        { "LD", "Lead" }, { "AR", "Arp" }, { "SY", "Synth" }, { "PD", "Pad" }, { "BA", "Bass" },
+        { "TG", "Trance gate" }, { "FX", "FX" }, { "PL", "Pluck" }, { "AT", "Atmosphere" },
+        { "SQ", "Sequence" }, { "DR", "Drums" }, { "OR", "Organ" }, { "CH", "Chord" },
+        { "ST", "Strings" }, { "PN", "Piano" }, { "BL", "Bell" }, { "GT", "Guitar" },
+        { "MA", "Mallet" }, { "BR", "Brass" }, { "VO", "Vocal" }, { "KY", "Keys" }, { "KB", "Keys" } };
+    const auto code = presetName.trim().upToFirstOccurrenceOf (" ", false, false);
+    for (const auto& [prefix, category] : codes)
+        if (code == prefix) return category;
+    return {};
+}
+
 inline VendorPreset readVendorPreset (const juce::File& file)
 {
     VendorPreset result;
@@ -203,6 +229,7 @@ inline VendorPreset readVendorPreset (const juce::File& file)
         result.sourceType = "fxp";
         result.instrument = "Vanguard";
         result.manufacturer = "reFX";
+        result.category = vanguardCategory (result.name);
         result.componentState = juce::MemoryBlock (data + 60, size - 60);
     }
     else if (file.hasFileExtension ("h2p"))

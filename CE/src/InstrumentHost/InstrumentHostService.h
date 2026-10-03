@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <deque>
+#include <functional>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -249,7 +251,10 @@
 //   setPartArp {partId, enabled?,mode?,stepsPerBeat?,gate?,swing?,octaves?,latch?,
 //     constrainToScale?,velocityPattern?}
 //   setPartMidiFx {partId, transpose?,constrainToScale?,scaleRoot?,scaleType?,chord?,
+//     chordFollow?,chordFollowLow?,chordFollowHigh?,chordBass?,chordTopAccent?,chordKeyMap?,
+//     chordSet?[{name,notes,root,quality,inversion,voicing,bass}],keyMap?[{key,chord}],
 //     velocityFixed?,velocityScale?}
+//   learnKeyChord {partId, slotId?} | cancelKeyChordLearn | clearKeyChord {partId, slotId?, key}
 //     (both are modes over the shared transport, applied in the part's own event chain.)
 //
 // VIRTUAL PARAMETER ADDRESSES (Stage 5). A parameterId starting with '@' resolves against
@@ -535,8 +540,17 @@ public:
         active layer the way a learned note would — momentary follows the pad, a latching pad
         flips on the strike. Skipped (false) when that slot has a learned binding, because the
         learned path already plays it and a toggle driven twice is a toggle that did nothing. */
-    bool pressSurfacePad (const juce::String& pageId, int padIndex, bool down)
-    { return pressSurfaceControl (pageId, "pad", padIndex, down); }
+    /** A pad with NOTHING on its active layer (no binding, no learned note) plays the Chords
+        pads instead, in the CTRL49's own bank (0..3 = A..D): the focused part's Chords module
+        when it has the Pads layer on, else the first part that does. */
+    bool pressSurfacePad (const juce::String& pageId, int padIndex, bool down,
+                          int velocity = 100, int bank = 0);
+    /** padLight for the pad bank the surface is on: a free pad playing chords is lit in its
+        chord's colour, bright while it sounds. */
+    int padLight (const juce::String& pageId, int padIndex, int bank) const;
+    /** " | B Am7" — the bank and the chord the surface's Chords part last played from the
+        set, for a control page's title; empty when no part plays chords from pads. */
+    juce::String surfaceChordTitle (int bank) const;
     /** The same for any pressable control — a pad or a button, on the layer it is playing. */
     bool pressSurfaceControl (const juce::String& pageId, const juce::String& kind, int index, bool down);
 
@@ -580,6 +594,11 @@ public:
         no such tab never sends it, and the default is on. */
     bool hardwareSurfaceWanted() const noexcept { return surfaceWanted; }
 
+    /** The MIDI port names the controller drawing is matched against (SurfaceProfile::
+        portNameHints). Null uses the system's ports; tests put fake ones here. */
+    std::function<juce::StringArray()> midiPortNamesForProfiles;
+    static juce::StringArray currentMidiPortNames();
+
     // -- the Stage 6 performance system ------------------------------------------------------
 
     /** Recompiles the patterns and clips and publishes them to the engine. Called after any
@@ -610,8 +629,11 @@ public:
         double tempo = 120.0;
         int bar = 1;
         int beat = 1;
+        int beatsPerBar = 4;
         bool externalClock = false;
         bool clockLost = false;
+        juce::String song;    // the setlist song that is on, "" before the set starts
+        juce::String scene;   // the scene last applied
     };
 
     struct SurfaceClip
@@ -638,7 +660,7 @@ public:
     /** Which lane the surface's encoders and step pads address. */
     bool setSurfaceLane (const juce::String& patternId, const juce::String& laneId);
 
-    enum class SurfaceEncoder { tempo = 0, swing, gate, rate, length, probability, velocity };
+    enum class SurfaceEncoder { tempo = 0, swing, gate, rate, length, probability, velocity, masterLevel };
 
     /** A relative encoder movement on the performance page. Returns false when there is
         nothing focused for that encoder to move. */
@@ -963,7 +985,11 @@ private:
         unmodulated one, as with gain and pan), and why it cannot be ridden right now when it
         cannot. Void when the part has none. */
     juce::var morphProjection (const RackPart& part, float amount) const;
-    void emitLibrary (const LibraryQuery& query, const juce::String& consumer = {});
+    /** The records `query` keeps, from `offset`, at most `limit` of them (0 = all), plus the
+        counts, facets and rail. `counts.matched` is always the whole result, so a page holding
+        one slice still knows how long the list is. */
+    void emitLibrary (const LibraryQuery& query, const juce::String& consumer = {},
+                      int offset = 0, int limit = 0);
     juce::String saveCapturedLibraryRecord (LibraryRecord record);
     void scanVstPresets();
     void scanCataloguePrograms (std::shared_ptr<juce::Array<PluginClassRecord>>, int index);
@@ -1072,6 +1098,32 @@ private:
         for the same dozen on the same synth every time, whichever rack it happens to be in
         today. A per-user preference about a plug-in, so it lives beside the catalogue and the
         thumbnails rather than in the Performance. */
+    /** Velocity/expression calibrations, per keyboard: named, with the port name they belong
+        to. A fact about the owner's hands and desk, so it lives beside the catalogue. */
+    /** Module settings saved by name, per module type ("saveModulePreset"). */
+    juce::File modulePresetsFile() const
+    {
+        return options.dataDirectory.getChildFile ("module-presets.json");
+    }
+    const juce::Array<juce::var>& loadModulePresets() const;
+    mutable juce::Array<juce::var> modulePresetsCache;
+    mutable bool modulePresetsLoaded = false;
+    std::map<juce::String, juce::String> lastModuleActivityByPart;
+
+    juce::File responseProfilesFile() const
+    {
+        return options.dataDirectory.getChildFile ("response-profiles.json");
+    }
+    /** The saved profiles, read once and again after each save. */
+    const juce::Array<juce::var>& loadResponseProfiles() const;
+    /** The saved profile whose port hint matches a connected MIDI port, or a void var. The
+        port list is refreshed at most every two seconds: state goes out on every edit. */
+    juce::var responseProfileForPorts() const;
+    mutable juce::Array<juce::var> responseProfilesCache;
+    mutable bool responseProfilesLoaded = false;
+    mutable juce::StringArray responseProfilePorts;
+    mutable juce::uint32 responseProfilePortsAt = 0;
+
     juce::File parameterFavouritesFile() const
     {
         return options.dataDirectory.getChildFile ("parameter-favourites.json");
@@ -1168,6 +1220,10 @@ private:
     int queueSceneLaunch (const juce::String& sceneId, perf::Quantize quantize);
     bool startArrangementPlayback (int index);
     void stopArrangementPlayback (bool stopClips);
+    // What plays: the current song's sections, or the show-wide arrangement when no song is
+    // current. `arrangementFor` finds a song's sections by its setlist item id ("" = show-wide).
+    const perf::Arrangement& playingArrangement() const;
+    perf::Arrangement* arrangementFor (const juce::String& songId);
     void tickArrangement();
     /** Queues one held-fill edge after resolving the clip's configured alternate pattern. */
     bool setClipFillState (const juce::String& clipId, bool active, bool reportError = true);
@@ -1414,7 +1470,7 @@ private:
         twelve-thousand-preset library; past it, the least recently heard go first. */
     static constexpr juce::int64 snapshotBudgetBytes = 400ll * 1024 * 1024;
     RecentPlay recentPlay;
-    juce::String auditionPhraseMode { "recent" };   // "note" | "chord" | "recent"
+    juce::String auditionPhraseMode { "recent" };   // "phrase" (the audition settings) | "recent"
     int auditionBars = 4;
     juce::String auditioningRecordId;
     // Where the hardware browser is. Off until asked for, because a surface that suddenly
@@ -1427,7 +1483,27 @@ private:
     // empty query: favouriting a record must not silently drop you back to all 12,000 sounds
     // while the filter chips on screen still claim to be on.
     LibraryQuery libraryView;
+    // How much of `libraryView` the browser has asked for so far (0 = all of it). An answer the
+    // host sends on its own (a favourite toggled, a scan finished) re-sends that much from the
+    // top, so the page does not lose the rows it had scrolled to.
+    int libraryViewLimit = 0;
     juce::StringArray libraryPaths; // user-added .vstpreset folders, beside the standard roots
+
+    // A folder of one plug-in's presets in a format only that plug-in reads (its own saved state
+    // under a vendor extension). Indexed only after a test load showed the plug-in taking two
+    // of its files as two different sounds, and taking the first again as the same one.
+    struct StateFolder
+    {
+        juce::String path, ceId, pluginName, extension;
+        juce::String status;    // "checking" | "ok" | "refused"
+        juce::String detail;
+        int count = 0;
+    };
+    juce::Array<StateFolder> stateFolders;
+    int findStateFolder (const juce::String& path) const;
+    void saveStateFolders();
+    void verifyStateFolder (const juce::String& path);
+    void indexStateFolder (int index, juce::Array<LibraryRecord> records);
 
     // "When a rack asks for that sound and the plug-in is gone, I chose this one." Keyed by
     // substitutionKey(); the value is a library record id. Machine-local — see
@@ -1481,6 +1557,9 @@ private:
     juce::String currentSurfacePageId;
     juce::String requestedSurfacePageId;
     std::vector<std::vector<std::uint8_t>> virtualSurfaceInput;
+    // Each part's loaded preset as last seen, so a change can show that preset's page.
+    std::map<juce::String, juce::String> seenPartPresets;
+    void followPresetPages();
     bool surfaceWanted = true;
     struct WarmSetlistProcessor
     {
@@ -1515,6 +1594,12 @@ private:
         double tempo = 0.0;
         double startedMs = 0.0;
     } pendingSetlistRecall;
+    // The stage's clocks, in wall-clock milliseconds: when the set began (the first song of a
+    // run) and when the current song did. Kept for the session only; a restart is a new set.
+    juce::int64 setlistStartedAtMs = 0;
+    juce::int64 setlistSongStartedAtMs = 0;
+    // The scene whose state was applied last: what the stage calls "the scene you are in".
+    juce::String currentSceneId;
     struct FailoverRuntime
     {
         juce::String targetId, ceId, name, error;
@@ -1778,6 +1863,13 @@ private:
     // carries the numbers rather than a second lookup living here.
     int midiActivityCc = -1, midiActivityChannel = 0, midiActivityValue = 0;
     int midiActivityNote = -1;   // the drawing lights a pad the same way it lights a knob
+    // Everything touch-shaped since the last drain, for the Velocity designer's live dots: a
+    // chord is several notes in one UI tick, and "the latest message" would show one of them.
+    // kind: 0 = note-on (a = note, b = velocity), 1 = controller (a = number, b = value),
+    // 2 = channel pressure (b), 3 = poly aftertouch (a = note, b).
+    struct TouchEvent { int kind = 0; int a = 0; int b = 0; };
+    std::array<TouchEvent, 32> recentTouch {};
+    int recentTouchCount = 0;
     juce::int64 midiActivitySeq = 0, midiActivityEmittedSeq = 0;
 
     // Controller changes captured by the same observer, coalesced per (channel, cc) so a
@@ -1787,8 +1879,12 @@ private:
     // and a key is a pad if you say so. Notes are never coalesced — each press counts.
     struct PendingCc {
         int channel = 0; int cc = 0; int value = 0; int note = -1; bool on = false;
-        int relativeDelta = 0, minimum = 0, maximum = 0;
-        int relativeMinimum = 0, relativeMaximum = 127;
+        int minimum = 0, maximum = 0;
+        // One running total per relative format (MidiPickup::RelativeFormat): the queue does
+        // not know which slot a CC feeds, and the same value means different turns in each.
+        std::array<int, 3> relativeDelta {};
+        std::array<int, 3> relativeMinimum {};
+        std::array<int, 3> relativeMaximum { 127, 127, 127 };
     };
     std::vector<PendingCc> pendingCcs;
 
@@ -1833,6 +1929,7 @@ private:
     {
         bool armed = false;
         juce::String partId;
+        juce::String slotId;           // the Chords module learning; empty = the part's first
         int key = -1;                  // -1 until the target key was tapped
         juce::Array<int> groupNotes;   // the notes of the group currently held
         int downCount = 0;
@@ -1842,6 +1939,18 @@ private:
     struct PendingNoteEvent { int note = 0; bool on = false; };
     std::vector<PendingNoteEvent> pendingChordNotes;
     void drainChordLearn();
+    /** The part whose Chords pads the surface plays: focused first. Empty when none. */
+    juce::String surfaceChordsPart() const;
+    /** True when the pad's active layer has no binding and no learned MIDI of its own. */
+    bool padIsFree (const juce::String& pageId, int padIndex) const;
+    std::map<juce::String, juce::String> lastChordsLiveByPart;
+    // What each surface pad struck, so its release reaches the same chord pad even if the
+    // bank or the focused part changed while it was held.
+    std::array<std::pair<juce::String, int>, 8> surfaceChordPadsHeld {};
+    /** Edits one chord module's settings: the slot named, else the part's first Chords slot,
+        else the part-level block. `edit` returns false to change nothing. */
+    bool editChordModule (const juce::String& partId, const juce::String& slotId,
+                          const std::function<bool (perf::MidiFxSettings&)>& edit);
     void emitChordLearn (bool armed, const juce::String& stage, int key, int chordSize);
 
     // -- hardware total recall -------------------------------------------------------------
@@ -1934,6 +2043,11 @@ private:
     bool libraryScanBusy = false;
     bool libraryScanFinished = false;
     juce::Array<juce::var> libraryScanReport;
+    // What the last update found on disk for plug-ins with no readable presets, by ceId: a
+    // folder named after the plug-in, in a format it alone reads. Offered for a test load.
+    std::map<juce::String, juce::var> presetCandidates;
+    juce::File libraryScanReportFile() const { return options.dataDirectory.getChildFile ("library-scan-report.json"); }
+    void refreshScanReportCounts();
     juce::uint64 libraryLoadSerial = 0;
     std::atomic<bool> scanBusy { false };
     std::atomic<bool> stopRequested { false };

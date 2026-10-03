@@ -88,16 +88,30 @@ try {
     await page.screenshot({ path: process.env.CONTROLLER_SCREENSHOT.replace('.png', '-pickup.png') });
   await page.evaluate(() => window.setPickupDirection(-1));
   assert.equal(await page.getByTestId('surface-encoder-1').getByTestId('pickup-direction').innerText(), '↓');
-  await page.getByLabel('MIDI control mode').selectOption('relative');
+  // Four modes now: absolute, and the three ways encoders send a turn. Pick 64-centre.
+  const midiMode = page.getByTestId('slot-midi-mode');
+  assert.equal(await midiMode.locator('button').count(), 4, 'absolute plus three relative formats');
+  await midiMode.locator('[data-value=relative-1]').click();
+  assert.equal(await midiMode.locator('[data-value=relative-1]').getAttribute('aria-pressed'), 'true', 'the chosen relative format sticks');
   assert.equal(await pickup.count(), 0, 'relative controls have no pickup setting to wait on');
   assert.equal(await page.getByTestId('pickup-direction').count(), 0);
-  await page.getByLabel('MIDI control mode').selectOption('absolute');
+  await midiMode.locator('[data-value=absolute]').click();
   assert.equal(await pickup.getAttribute('aria-checked'), 'true', 'absolute pickup preference is retained');
   await pickup.click();
   assert.equal(await pickup.getAttribute('aria-checked'), 'false');
-  await page.getByLabel('Minimum', { exact: true }).fill('0.2');
-  await page.getByLabel('Minimum', { exact: true }).press('Tab');
-  assert.equal(await page.evaluate(() => window.controllerCommands.findLast(c => c.cmd === 'setControlSlotOptions').rangeMin), .2);
+  // The range is a picture: the bottom end, dragged up, raises the minimum.
+  const bottomEnd = page.getByTestId('slot-response-start');
+  const endBox = await bottomEnd.boundingBox();
+  await page.mouse.move(endBox.x + endBox.width / 2, endBox.y + endBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(endBox.x + endBox.width / 2, endBox.y + endBox.height / 2 - 24, { steps: 6 });
+  await page.mouse.up();
+  const dragged = await page.evaluate(() => window.controllerCommands.findLast(c => c.cmd === 'setControlSlotOptions'));
+  assert.ok(dragged.rangeMin > 0.1 && dragged.rangeMin < 0.3 && dragged.inverted === false, `dragging the bottom end up (${dragged.rangeMin})`);
+  await page.getByTestId('slot-response-end').press('ArrowDown');
+  assert.equal(await page.evaluate(() => window.controllerCommands.findLast(c => c.cmd === 'setControlSlotOptions').rangeMax), .95,
+    'arrow keys move a focused end');
+  if (process.env.SLOT_SCREENSHOT) await page.getByTestId('slot-response').screenshot({ path: process.env.SLOT_SCREENSHOT });
   await page.getByRole('button', { name: 'Clear MIDI binding', exact: true }).click();
   assert.notEqual(await page.evaluate(() => window.controllerCommands.at(-1).cmd), 'clearControlSlotMidi');
   await page.getByRole('button', { name: 'Confirm: Clear MIDI binding', exact: true }).click();
@@ -149,7 +163,7 @@ try {
   await page.getByTestId('surface-param').first().dragTo(page.getByTestId('surface-pad-1'));
   assert.equal(await page.evaluate(() => window.controllerCommands.findLast(c => c.cmd === 'assignSurfaceControl').kind), 'pad');
   // Pad layers: the count, then which one the pad plays, both from the inspector.
-  await page.getByTestId('surface-pad-layer-count').selectOption('3');
+  await page.getByTestId('surface-pad-layer-count').locator('[data-value="3"]').click();
   assert.deepEqual(await page.evaluate(() => window.controllerCommands.findLast(c => c.cmd === 'setPadLayers')),
     { cmd: 'setPadLayers', pageId: 'page-1', index: 1, count: 3 });
   await page.getByTestId('surface-layers-pad-1').waitFor();
@@ -163,7 +177,7 @@ try {
   // The faders' layers are one set for the whole bank.
   await page.getByTestId('surface-back').click();
   await page.getByTestId('surface-fader-3').click();
-  await page.getByTestId('surface-fader-layer-count').selectOption('2');
+  await page.getByTestId('surface-fader-layer-count').locator('[data-value="2"]').click();
   assert.deepEqual(await page.evaluate(() => window.controllerCommands.findLast(c => c.cmd === 'setFaderLayers')),
     { cmd: 'setFaderLayers', pageId: 'page-1', count: 2 });
   await page.getByTestId('surface-fader-layer-2').click();

@@ -41,6 +41,9 @@ struct Ctrl49Action
     bool switchChanged = false;
     int  switchSlot    = -1;   // 0..7 when switchChanged
     bool switchDown    = false;
+    // Shift + Page Left / Right: the previous (-1) or next (+1) song of the setlist. The page
+    // does not move; plain Page Left / Right still turns pages.
+    int  setlistStep   = 0;
     std::string text;          // human-readable description for logging
 };
 

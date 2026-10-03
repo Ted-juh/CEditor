@@ -150,6 +150,7 @@ import {
   buildStrumPlan,
   buildArticulationMessages,
   applySmartChordVoicing,
+  applyMockChordsLive,
   factoryGrooveTemplates,
   normalizeGrooveTemplate,
   applyGrooveToPattern,
@@ -1789,8 +1790,10 @@ test('mock reducer: auditioning reports the stages the indicator draws', () => {
 });
 
 test('mock reducer: the audition phrase is a setting, and nonsense is refused', () => {
+  setAuditionPhrase('phrase');
+  assert.equal(get(hostAudition).phrase, 'phrase', 'the phrase from the audition settings');
   setAuditionPhrase('chord');
-  assert.equal(get(hostAudition).phrase, 'chord');
+  assert.equal(get(hostAudition).phrase, 'phrase', 'a chord is one of those settings, not a mode of its own');
   setAuditionPhrase('recent', 8);
   assert.deepEqual([get(hostAudition).phrase, get(hostAudition).bars], ['recent', 8]);
   setAuditionPhrase('nonsense');
@@ -4679,26 +4682,27 @@ test('normalizeHostSurface shapes broker payloads and fails safe on garbage', ()
                            pageIndex: 2, activeSlot: 5, padBank: 1,
                            movementSeq: 12, movingSlot: 5 }),
     { state: 'connected', detail: 'ready', device: 'CTRL49 USB',
-      pageIndex: 2, activeSlot: 5, padBank: 1, movementSeq: 12, movingSlot: 5 });
+      pageIndex: 2, activeSlot: 5, padBank: 1, movementSeq: 12, movingSlot: 5,
+      deviceError: '', deviceRefusals: 0, searchReason: '' });
   assert.deepEqual(
     normalizeHostSurface({ state: 'heldElsewhere', detail: '', device: '' }),
     { state: 'heldElsewhere', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
-      movementSeq: 0, movingSlot: -1 });
+      movementSeq: 0, movingSlot: -1, deviceError: '', deviceRefusals: 0, searchReason: '' });
 
   // Anything else — unknown states, missing fields, non-objects — lands on searching,
   // because a status row must never be the thing that crashes the devices panel.
   assert.equal(normalizeHostSurface({ state: 'exploded' }).state, 'searching');
   assert.deepEqual(normalizeHostSurface(null),
     { state: 'searching', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
-      movementSeq: 0, movingSlot: -1 });
+      movementSeq: 0, movingSlot: -1, deviceError: '', deviceRefusals: 0, searchReason: '' });
   assert.deepEqual(normalizeHostSurface('nonsense'),
     { state: 'searching', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
-      movementSeq: 0, movingSlot: -1 });
+      movementSeq: 0, movingSlot: -1, deviceError: '', deviceRefusals: 0, searchReason: '' });
   assert.equal(normalizeHostSurface({ detail: 7, device: 9 }).detail, '7');
   assert.deepEqual(
     normalizeHostSurface({ pageIndex: 99, activeSlot: -4, padBank: 8 }),
     { state: 'searching', detail: '', device: '', pageIndex: 99, activeSlot: 0, padBank: 3,
-      movementSeq: 0, movingSlot: -1 },
+      movementSeq: 0, movingSlot: -1, deviceError: '', deviceRefusals: 0, searchReason: '' },
     'hardware indices clamp to the physical surface');
 });
 
@@ -4935,26 +4939,148 @@ test('floating and stacked editors move each processor between the two hosts', (
     'absent reads as an empty set, never undefined');
 });
 
-test('the chorder: key maps normalize, and the mock learns and clears', () => {
+test('Chords: the set and layers normalize, old key chords migrate, the mock learns and clears', () => {
   const shaped = normalizeHostState({ rack: { parts: [
     { partId: 'p1', midiFx: { chord: 'custom keys',
       keyChords: [{ key: 62, offsets: [-2, 2, 5] }] } },
   ] } });
-  assert.equal(shaped.rack.parts[0].midiFx.chord, 'custom keys');
-  assert.equal(shaped.rack.parts[0].midiFx.chordInversion, 0);
-  assert.equal(shaped.rack.parts[0].midiFx.chordVoicing, 'close');
-  assert.equal(shaped.rack.parts[0].midiFx.chordVoiceLeading, false);
-  assert.deepEqual(shaped.rack.parts[0].midiFx.keyChords, [{ key: 62, offsets: [-2, 2, 5] }]);
+  const fx = shaped.rack.parts[0].midiFx;
+  assert.equal(fx.chordKeyMap, true, 'the old "custom keys" is the key-map layer');
+  assert.equal(fx.chordFollow, false, 'and following stays off');
+  assert.equal(fx.chord, 'triad', 'custom keys is never left as a follow shape');
+  assert.deepEqual(fx.chordSet.map((c) => c.notes), [[60, 64, 67]],
+    'the learned offsets become a set chord of the notes they played');
+  assert.deepEqual(fx.keyMap, [{ key: 62, chord: 0 }]);
+  assert.equal(fx.chordInversion, 0);
+  assert.equal(fx.chordVoicing, 'close');
+  assert.equal(fx.chordVoiceLeading, false);
+  assert.equal(fx.chordFollowLow, 0);
+  assert.equal(fx.chordFollowHigh, 127);
+  const following = normalizeHostState({ rack: { parts: [{ partId: 'p1', midiFx: { chord: 'seventh' } }] } })
+    .rack.parts[0].midiFx;
+  assert.equal(following.chordFollow, true, 'an old shape is the follow layer, on');
+  assert.equal(following.chordKeyMap, false);
+  const stray = normalizeHostState({ rack: { parts: [{ partId: 'p1', midiFx: {
+    chordFollow: true, chordSet: [{ notes: [67, 60, 64] }], keyMap: [{ key: 40, chord: 0 }, { key: 41, chord: 3 }],
+  } }] } }).rack.parts[0].midiFx;
+  assert.deepEqual(stray.chordSet[0].notes, [60, 64, 67], 'set notes are sorted');
+  assert.deepEqual(stray.keyMap, [{ key: 40, chord: 0 }], 'a key pointing past the set is dropped');
   assert.deepEqual(normalizeHostState({}).rack.parts, [], 'nothing crashes on nothing');
 
   let state = mockHostState();
   const partId = state.rack.parts[0].partId;
   state = applyMockCommand(state, { cmd: 'learnKeyChord', partId });
-  const learned = state.rack.parts[0].midiFx.keyChords;
-  assert.deepEqual(learned, [{ key: 60, offsets: [0, 4, 7] }],
-    'the mock hears a triad onto middle C at once');
+  assert.deepEqual(state.rack.parts[0].midiFx.chordSet.map((c) => c.notes), [[60, 64, 67]],
+    'the mock hears a triad at once and adds it to the set');
+  assert.deepEqual(state.rack.parts[0].midiFx.keyMap, [{ key: 60, chord: 0 }], 'onto middle C');
+  assert.equal(state.rack.parts[0].midiFx.chordKeyMap, true, 'learning switches the key map on');
   state = applyMockCommand(state, { cmd: 'clearKeyChord', partId, key: 60 });
-  assert.deepEqual(state.rack.parts[0].midiFx.keyChords, [], 'clear takes it away');
+  assert.deepEqual(state.rack.parts[0].midiFx.keyMap, [], 'clear forgets the key');
+  assert.equal(state.rack.parts[0].midiFx.chordSet.length, 1, 'and keeps the chord in the set');
+
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'chord' });
+  const slot = () => state.rack.parts[0].midiChain.find((s) => s.type === 'chord');
+  state = applyMockCommand(state, { cmd: 'learnKeyChord', partId, slotId: slot().slotId });
+  assert.deepEqual(slot().fx.keyMap, [{ key: 60, chord: 0 }], 'a named Chords module learns into itself');
+  state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId: slot().slotId,
+    chordSet: [{ name: 'Home', notes: [48, 52, 55] }, { notes: [50, 53, 57] }],
+    keyMap: [{ key: 36, chord: 1 }] });
+  assert.equal(slot().fx.chordSet[0].name, 'Home', 'the set is written whole');
+  assert.deepEqual(slot().fx.keyMap, [{ key: 36, chord: 1 }], 'and so is the map');
+  state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId: slot().slotId, chord: 'off' });
+  assert.equal(slot().fx.chordFollow, false, 'chord alone still speaks its old meaning: off stops following');
+  state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId: slot().slotId, chord: 'm7' });
+  assert.equal(slot().fx.chordFollow, true, 'and a shape starts it');
+  assert.equal(slot().fx.chord, 'm7');
+});
+
+test('Chords pads and progression normalize, and localhost plays them as the engine does', () => {
+  const fx = normalizeHostState({ rack: { parts: [{ partId: 'p1', midiFx: {
+    chordFollow: true, chordSet: [{ notes: [60, 64, 67] }, { notes: [57, 60, 64] }],
+    chordPads: true, padMap: [1, 0, 9], chordProgression: true, progression: [0, 5, 1],
+    progressionAdvance: 'pedal', progressionLow: 70, progressionHigh: 40,
+  } }] } }).rack.parts[0].midiFx;
+  assert.equal(fx.padMap.length, 32, 'always 32 pad places, 8 pads x 4 banks');
+  assert.deepEqual(fx.padMap.slice(0, 4), [1, 0, -1, -1], 'a pad past the set is empty');
+  assert.deepEqual(fx.progression, [0, 1], 'a step past the set is dropped');
+  assert.equal(fx.progressionAdvance, 'pedal');
+  assert.deepEqual([fx.progressionLow, fx.progressionHigh], [40, 70], 'the range is put in order');
+  const plain = normalizeHostState({ rack: { parts: [{ partId: 'p1', midiFx: {} }] } }).rack.parts[0].midiFx;
+  assert.equal(plain.chordPads, false);
+  assert.equal(plain.progressionAdvance, 'key');
+
+  let live = applyMockChordsLive(undefined, fx, { cmd: 'chordPad', pad: 0, velocity: 100 });
+  assert.deepEqual(live, { chord: 1, step: 0, pads: 1 }, 'a pad plays its chord and lights');
+  live = applyMockChordsLive(live, fx, { cmd: 'chordPad', pad: 0, velocity: 0 });
+  assert.equal(live.pads, 0, 'and goes out when let go');
+  assert.equal(applyMockChordsLive(live, fx, { cmd: 'chordPad', pad: 2, velocity: 100 }).pads, 0,
+    'an empty pad does nothing');
+  live = applyMockChordsLive(live, fx, { cmd: 'chordStep', delta: -1 });
+  assert.equal(live.step, 1, 'stepping back from the first step wraps to the last');
+  assert.equal(applyMockChordsLive(live, fx, { cmd: 'chordStep', step: 0 }).step, 0);
+});
+
+test('response profiles: normalized as calibrations, saved and removed by name in the mock', () => {
+  const state = normalizeHostState({ responseProfiles: [
+    { name: '  Stage keys ', portHint: 'CTRL49', velocityCurve: 'custom', velocityInputMin: 130,
+      velocityCurveValues: [0, 30, 50, 66, 80, 92, 104, 116, 127], velocityFixed: 90 },
+    { name: '' },
+  ], responseProfileForPorts: 'Stage keys' });
+  assert.equal(state.responseProfiles.length, 1, 'a profile without a name is dropped');
+  const profile = state.responseProfiles[0];
+  assert.equal(profile.name, 'Stage keys');
+  assert.equal(profile.velocityInputMax, 127);
+  assert.equal(profile.velocityInputMin, 127, 'ranges clamp like the module fields');
+  assert.equal(profile.velocityCurveValues[1], 30);
+  assert.equal('velocityFixed' in profile, false, 'a profile carries the calibration, not the part settings');
+  assert.equal(state.responseProfileForPorts, 'Stage keys');
+  assert.deepEqual(normalizeHostState({}).responseProfiles, []);
+
+  let mock = mockHostState();
+  mock = applyMockCommand(mock, { cmd: 'saveResponseProfile', name: 'Mine', portHint: 'X', velocityCurve: 'soft' });
+  mock = applyMockCommand(mock, { cmd: 'saveResponseProfile', name: 'Mine', portHint: 'Y', velocityCurve: 'hard' });
+  assert.equal(mock.responseProfiles.length, 1, 'saving the same name replaces it');
+  assert.equal(mock.responseProfiles[0].velocityCurve, 'hard');
+  mock = applyMockCommand(mock, { cmd: 'removeResponseProfile', name: 'Mine' });
+  assert.deepEqual(mock.responseProfiles, []);
+});
+
+test('the Key module and the song key: old names migrate, parts carry a key, new modules follow it', () => {
+  assert.equal(normalizeMidiSlot({ type: 'transpose' }).type, 'key');
+  assert.equal(normalizeMidiSlot({ type: 'scale' }).type, 'key');
+  assert.equal(normalizeMidiSlot({ type: 'key' }).fx.scaleFold, 'snap');
+  assert.equal(normalizeMidiSlot({ type: 'key', fx: { scaleFold: 'drop', followSongKey: true } }).fx.scaleFold, 'drop');
+  const legacy = normalizeHostState({ rack: { parts: [{ partId: 'p', midiFx: { scaleType: 'dorian', scaleRoot: 2 } }] } });
+  assert.deepEqual([legacy.rack.parts[0].keyRoot, legacy.rack.parts[0].keyScale], [2, 'dorian'],
+    'a part from before the song key takes its old note-shaping scale');
+
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'scale' });
+  const added = state.rack.parts[0].midiChain.at(-1);
+  assert.equal(added.type, 'key', 'adding by the old name makes a Key module');
+  assert.equal(added.fx.followSongKey, true, 'which follows the song key');
+  state = applyMockCommand(state, { cmd: 'setPartKey', partId, root: 7, scale: 'mixolydian' });
+  assert.deepEqual([state.rack.parts[0].keyRoot, state.rack.parts[0].keyScale], [7, 'mixolydian']);
+});
+
+test('module Amount and presets: normalized, and the mock saves, replaces and removes by type and name', () => {
+  assert.equal(normalizeMidiSlot({ type: 'strum' }).amount, 1, 'a module applies all of its effect by default');
+  assert.equal(normalizeMidiSlot({ type: 'strum', amount: 3 }).amount, 1);
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'strum' });
+  const slotId = state.rack.parts[0].midiChain.at(-1).slotId;
+  state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId, amount: 0.4 });
+  assert.equal(state.rack.parts[0].midiChain.at(-1).amount, 0.4);
+  state = applyMockCommand(state, { cmd: 'saveModulePreset', type: 'strum', name: 'Folk', settings: { strumBeats: 0.25 } });
+  state = applyMockCommand(state, { cmd: 'saveModulePreset', type: 'strum', name: 'Folk', settings: { strumBeats: 0.5 } });
+  assert.equal(state.modulePresets.length, 1);
+  assert.equal(state.modulePresets[0].settings.strumBeats, 0.5, 'saving a name again replaces it');
+  const shaped = normalizeHostState({ modulePresets: [{ type: 'scale', name: 'Old', settings: {} }, { type: 'wobble', name: 'x' }] });
+  assert.deepEqual(shaped.modulePresets.map((p) => p.type), ['key'], 'old type names read as Key; unknown ones are dropped');
+  state = applyMockCommand(state, { cmd: 'removeModulePreset', type: 'strum', name: 'Folk' });
+  assert.deepEqual(state.modulePresets, []);
 });
 
 test('Smart Chorder inversion, voicing and nearest-motion rules match the native engine', () => {
@@ -5223,4 +5349,18 @@ test('vendor sources and background scan state survive library normalization', (
   assert.deepEqual(normalizeHostLibrary({}).scanReport, []);
   assert.ok(library.records.every((record) => record.available));
   assert.equal(normalizeHostLibrary({}).scanning, false);
+});
+
+test('the CTRL49 status says why it is not connected, not just that it is not', async () => {
+  const { surfaceStatusText, normalizeHostSurface } = await import('../src/CE_Application/stores/instrumentHost.js');
+  const read = (payload) => surfaceStatusText(normalizeHostSurface(payload));
+  assert.match(read({ state: 'searching', searchReason: 'unplugged' }).short, /No CTRL49 connected/);
+  const noDriver = read({ state: 'searching', searchReason: 'noDriver', detail: 'Install the M-Audio CTRL49 driver' });
+  assert.match(noDriver.short, /driver is missing/);
+  assert.match(noDriver.detail, /Install/);
+  assert.match(read({ state: 'searching', searchReason: 'portBusy' }).short, /in use by another program/);
+  assert.match(read({ state: 'searching', searchReason: 'captureFailed' }).short, /would not open/);
+  assert.match(read({ state: 'heldElsewhere' }).short, /another HoSTage window/);
+  assert.match(read({ state: 'connected', device: 'CTRL49 USB' }).short, /CTRL49 USB connected/);
+  assert.equal(normalizeHostSurface({ searchReason: 'nonsense' }).searchReason, '', 'unknown reasons are dropped');
 });

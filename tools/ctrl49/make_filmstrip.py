@@ -4,7 +4,8 @@ the knob swept to value N. White-on-transparent so the device can tint it per st
 draw time (the VIP rotary_page.lua technique). This is a Phase-3 probe/beauty-test asset;
 the production path generates strips from CEditor's own renderer at bundle-compile time.
 
-Pure standard library (zlib + struct) — no Pillow. Output is an 8-bit RGBA PNG.
+Pure standard library (zlib + struct) — no Pillow. Output is an 8-bit grey palette PNG
+(coverage as grey), the format the CTRL49 tints; see write_png.
 
     python make_filmstrip.py knob_strip.png [--frame 64] [--frames 128]
 
@@ -66,18 +67,25 @@ def build_frame(pixels, strip_w, y0, size, value, frames):
 
 
 def write_png(path, width, height, pixels):
+    """Writes the strip in the format the CTRL49 can TINT: an 8-bit palette PNG of 256 greys, no
+    transparency, each pixel's grey level being its coverage (the RGBA alpha). This is what VIP's
+    own tinted images are (its arc filmstrips, arrows and tabs), and what decode_image(..., WHITE)
+    turns into the "8-bit buffer" that draw_image's colour applies to. An RGBA PNG decodes to a
+    colour buffer instead, and the device then ignores the tint: every knob came out white."""
     def chunk(tag, data):
         return (struct.pack(">I", len(data)) + tag + data
                 + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF))
 
     raw = bytearray()
-    stride = width * 4
     for y in range(height):
         raw.append(0)  # filter type 0 (none)
-        raw.extend(pixels[y * stride:(y + 1) * stride])
+        row = pixels[y * width * 4:(y + 1) * width * 4]
+        raw.extend(row[3::4])  # alpha -> grey index
+    palette = bytes(v for i in range(256) for v in (i, i, i))
 
     png = b"\x89PNG\r\n\x1a\n"
-    png += chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+    png += chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 3, 0, 0, 0))
+    png += chunk(b"PLTE", palette)
     png += chunk(b"IDAT", zlib.compress(bytes(raw), 9))
     png += chunk(b"IEND", b"")
     with open(path, "wb") as f:

@@ -7,6 +7,8 @@
 #include <deque>
 #include <limits>
 #include <map>
+#include <mutex>
+#include <optional>
 #include <utility>
 
 namespace ceditor::host
@@ -1367,7 +1369,58 @@ juce::Array<const LibraryRecord*> searchLibrary (const Library& library, const L
         if (matchesQuery (record, query, lowered, isAvailable))
             out.add (&record);
 
+    if (query.sort.isNotEmpty())
+        sortLibraryResults (out, query.sort, query.sortDescending);
     return out;
+}
+
+void sortLibraryResults (juce::Array<const LibraryRecord*>& results, const juce::String& key,
+                         bool descending)
+{
+    // A number per record, or nothing when the record has no value for the key. Text keys
+    // compare separately below.
+    const auto number = [&key] (const LibraryRecord& r) -> std::optional<double>
+    {
+        if (key == "rating")     return r.user.rating > 0 ? std::optional<double> (r.user.rating) : std::nullopt;
+        if (key == "recent")     return r.lastLoadedAtMs > 0 ? std::optional<double> ((double) r.lastLoadedAtMs) : std::nullopt;
+        if (key == "loads")      return r.loadCount > 0 ? std::optional<double> (r.loadCount) : std::nullopt;
+        if (key == "added")      return r.addedAtMs > 0 ? std::optional<double> ((double) r.addedAtMs) : std::nullopt;
+        if (! r.sonic.measured)  return std::nullopt;
+        if (key == "brightness") return r.sonic.brightness;
+        if (key == "attack")     return r.sonic.attack;
+        if (key == "tail")       return r.sonic.tail;
+        if (key == "width")      return r.sonic.width;
+        return std::nullopt;
+    };
+    const auto text = [&key] (const LibraryRecord& r) -> const juce::String&
+    {
+        if (key == "instrument") return r.instrument;
+        if (key == "category")   return r.category;
+        return r.name;
+    };
+    const bool textual = key == "name" || key == "instrument" || key == "category";
+    if (! textual && key != "rating" && key != "recent" && key != "loads" && key != "added"
+        && key != "brightness" && key != "attack" && key != "tail" && key != "width")
+        return;   // an unknown key keeps library order rather than guessing
+
+    std::stable_sort (results.begin(), results.end(),
+                      [&] (const LibraryRecord* a, const LibraryRecord* b)
+                      {
+                          if (textual)
+                          {
+                              const auto& ta = text (*a);
+                              const auto& tb = text (*b);
+                              // An empty category or instrument is an unknown too: last.
+                              if (ta.isEmpty() != tb.isEmpty()) return tb.isEmpty();
+                              const auto c = ta.compareNatural (tb);
+                              if (c != 0) return descending ? c > 0 : c < 0;
+                              return a->name.compareNatural (b->name) < 0;
+                          }
+                          const auto na = number (*a), nb = number (*b);
+                          if (na.has_value() != nb.has_value()) return na.has_value();
+                          if (na.has_value() && *na != *nb) return descending ? *na > *nb : *na < *nb;
+                          return a->name.compareNatural (b->name) < 0;
+                      });
 }
 
 LibraryFacets libraryFacets (const Library& library, const LibraryQuery& query,
@@ -1411,6 +1464,8 @@ juce::var libraryQueryToVar (const LibraryQuery& query)
     o->setProperty ("neverLoadedOnly", query.neverLoadedOnly);
     o->setProperty ("availableOnly",  query.availableOnly);
     o->setProperty ("measuredOnly",   query.measuredOnly);
+    o->setProperty ("sort",           query.sort);
+    o->setProperty ("sortDescending", query.sortDescending);
     o->setProperty ("facets",         juce::var (facets));
 
     auto* ranges = new juce::DynamicObject();
@@ -1449,6 +1504,8 @@ LibraryQuery libraryQueryFromVar (const juce::var& stored)
     query.neverLoadedOnly = (bool) stored.getProperty ("neverLoadedOnly", false);
     query.availableOnly = (bool) stored.getProperty ("availableOnly", false);
     query.measuredOnly = (bool) stored.getProperty ("measuredOnly", false);
+    query.sort = stored.getProperty ("sort", {}).toString();
+    query.sortDescending = (bool) stored.getProperty ("sortDescending", false);
 
     const auto ranges = stored.getProperty ("ranges", {});
     const std::pair<const char*, LibraryRange*> named[] {

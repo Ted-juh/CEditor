@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -94,6 +95,36 @@ public:
         count = 0;
     }
 
+    /** Removes every queued note-on for this note (a key let go before its re-strum came). */
+    void removeNoteOns (int channel, int note) noexcept
+    {
+        int kept = 0;
+        for (int i = 0; i < count; ++i)
+        {
+            const auto& message = events[(size_t) i].message;
+            if (! (message.isNoteOn() && message.getChannel() == channel && message.getNoteNumber() == note))
+                events[(size_t) kept++] = events[(size_t) i];
+        }
+        count = kept;
+    }
+
+    /** Removes the first queued note-off for this note. False when there was none. */
+    bool removeNoteOff (int channel, int note) noexcept
+    {
+        for (int i = 0; i < count; ++i)
+        {
+            const auto& message = events[(size_t) i].message;
+            if (message.isNoteOff() && message.getChannel() == channel && message.getNoteNumber() == note)
+            {
+                for (int j = i; j + 1 < count; ++j)
+                    events[(size_t) j] = events[(size_t) (j + 1)];
+                --count;
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Drops everything that is not a note-off. Used when a module is asked to let go: the
         offs still have to happen, the ons must not. */
     void dropNoteOns() noexcept
@@ -140,9 +171,36 @@ public:
     void setSettings (const NoteModuleSettings& settings) noexcept
     {
         repeats.store (juce::jlimit (0, 8, settings.echoRepeats));
-        stepPpq.store (juce::jlimit (0.03125, 4.0, settings.echoStepBeats));
+        const auto feel = settings.echoFeel == "dotted" ? 1.5 : settings.echoFeel == "triplet" ? 2.0 / 3.0 : 1.0;
+        stepPpq.store (juce::jlimit (0.03125, 4.0, settings.echoStepBeats) * feel);
         feedback.store (juce::jlimit (0.1f, 1.0f, settings.echoFeedback));
         semitones.store (juce::jlimit (-12, 12, settings.echoTranspose));
+        scaleClimb.store (settings.echoScaleClimb);
+        shorter.store (settings.echoShorter);
+        floorVelocity.store (juce::jlimit (1, 127, settings.echoFloor));
+    }
+
+    /** The part's scale, for climbing in scale steps; 0x0fff = chromatic. */
+    void setScaleMask (juce::uint16 newMask) noexcept { mask.store (newMask); }
+
+    /** `note` moved `steps` scale degrees up or down within `scale` (chromatic when the scale
+        is empty or has every note). Off the keyboard returns -1. */
+    static int climbInScale (int note, int steps, juce::uint16 scale) noexcept
+    {
+        if (scale == 0 || scale == (juce::uint16) 0x0fff)
+            return juce::isPositiveAndBelow (note + steps, 128) ? note + steps : -1;
+        auto n = note;
+        const auto direction = steps > 0 ? 1 : -1;
+        for (int s = 0; s < std::abs (steps); ++s)
+        {
+            do
+            {
+                n += direction;
+                if (! juce::isPositiveAndBelow (n, 128))
+                    return -1;
+            } while ((scale & (1 << (n % 12))) == 0);
+        }
+        return n;
     }
 
     void process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
@@ -156,6 +214,10 @@ public:
         const auto step = stepPpq.load();
         const auto decay = feedback.load();
         const auto climb = semitones.load();
+        const auto inScale = scaleClimb.load();
+        const auto scale = mask.load();
+        const auto shortening = shorter.load();
+        const auto floorAt = (float) floorVelocity.load();
 
         for (const auto metadata : in)
         {
@@ -170,20 +232,26 @@ public:
             const auto at = window.start + (double) metadata.samplePosition * block.ppqPerSample;
             auto velocity = (float) message.getVelocity();
 
+            auto length = step * 0.9;
             for (int repeat = 1; repeat <= count; ++repeat)
             {
-                velocity *= decay;
-                const auto note = message.getNoteNumber() + repeat * climb;
+                // Quieter each time, but never below the floor, so a tail stays audible on
+                // synths that fade out quiet notes.
+                velocity = juce::jmax (floorAt, velocity * decay);
+                const auto note = inScale ? climbInScale (message.getNoteNumber(), repeat * climb, scale)
+                                          : message.getNoteNumber() + repeat * climb;
                 if (! juce::isPositiveAndBelow (note, 128) || velocity < 1.0f)
                     break;      // off the keyboard or below hearing: stop, do not wrap
 
+                if (shortening)
+                    length *= 0.75;
                 const auto onAt = at + (double) repeat * step;
                 pending.add (onAt, juce::MidiMessage::noteOn (message.getChannel(), note,
                                                               (juce::uint8) juce::jlimit (1, 127,
                                                                   juce::roundToInt (velocity))));
                 // Nine tenths of a step: long enough to sound, short enough that consecutive
                 // repeats of the same pitch do not overlap into one held note.
-                pending.add (onAt + step * 0.9,
+                pending.add (onAt + length,
                              juce::MidiMessage::noteOff (message.getChannel(), note));
             }
         }
@@ -202,6 +270,10 @@ private:
     std::atomic<double> stepPpq { 0.5 };
     std::atomic<float> feedback { 0.7f };
     std::atomic<int> semitones { 0 };
+    std::atomic<bool> scaleClimb { false };
+    std::atomic<bool> shorter { false };
+    std::atomic<int> floorVelocity { 1 };
+    std::atomic<juce::uint16> mask { 0x0fff };
 };
 
 //==================================================================================================
@@ -227,6 +299,119 @@ public:
         pattern.store ((int) chosenPattern);
         curve.store (juce::jlimit (-1.0f, 1.0f, settings.strumCurve));
         velocityRamp.store (juce::jlimit (-64, 64, settings.strumVelocityRamp));
+        guitar.store (settings.strumGuitar);
+        harderFaster.store (settings.strumHarderFaster);
+        repeatPerBeat.store (settings.strumRepeatPerBeat >= 2 ? juce::jmin (4, settings.strumRepeatPerBeat) : 0);
+    }
+
+    static constexpr int strings = 6;
+    /** Standard tuning, low E to high E. */
+    static constexpr int tuning[strings] = { 40, 45, 50, 55, 59, 64 };
+
+    /** A chord laid onto six strings the way a guitarist would fret it: the lowest sounding
+        string plays the chord's bass note, every other string the nearest chord tone inside a
+        four-fret hand position (open strings always allowed), duplicate pitches skipped. Of all
+        hand positions up to the ninth fret, the one covering every chord tone with the most
+        strings wins; ties go to the lower position. `owner[i]` is the index in `notes` whose
+        pitch class string `i` of the result plays. Returns how many strings sound. */
+    static int guitarVoicing (const int* notes, int count, int (&out)[strings],
+                              int (&owner)[strings]) noexcept
+    {
+        if (count <= 0)
+            return 0;
+        auto lowest = 0;
+        for (int i = 1; i < count; ++i)
+            if (notes[i] < notes[lowest])
+                lowest = i;
+        const auto bassClass = notes[lowest] % 12;
+        auto ownerOf = [&] (int note)
+        {
+            if (note % 12 == bassClass)
+                return lowest;
+            for (int i = 0; i < count; ++i)
+                if (notes[i] % 12 == note % 12)
+                    return i;
+            return -1;
+        };
+
+        auto bestScore = std::numeric_limits<int>::max();
+        auto bestCount = 0;
+        for (int base = 0; base <= 9; ++base)
+        {
+            const auto low = juce::jmax (1, base);
+            // The lowest note on string `s` in this hand position that is a chord tone above
+            // `floor` (open string first), or -1 for a muted string.
+            auto fret = [&] (int s, int floor, bool bassOnly)
+            {
+                auto fits = [&] (int note)
+                {
+                    return note > floor && ownerOf (note) >= 0 && (! bassOnly || note % 12 == bassClass);
+                };
+                if (fits (tuning[s]))
+                    return tuning[s];
+                for (int f = low; f <= low + 3; ++f)
+                    if (fits (tuning[s] + f))
+                        return tuning[s] + f;
+                return -1;
+            };
+
+            // The bass string is the lowest that can play the bass note; everything under it
+            // is muted, and nothing above it may sound lower than it.
+            auto first = 0, bassNote = -1;
+            for (; first < strings; ++first)
+                if ((bassNote = fret (first, -1, true)) >= 0)
+                    break;
+            if (first == strings)
+                continue;
+
+            int fretted[strings];
+            for (int s = 0; s < strings; ++s)
+                fretted[s] = s < first ? -1 : s == first ? bassNote : fret (s, bassNote, false);
+
+            int voiced[strings], owners[strings];
+            auto sounding = 0, innerMutes = 0;
+            juce::uint16 covered = 0;
+            for (int s = first; s < strings; ++s)
+            {
+                if (fretted[s] < 0)
+                {
+                    ++innerMutes;
+                    continue;
+                }
+                auto duplicate = false;
+                for (int k = 0; k < sounding; ++k)
+                    duplicate = duplicate || voiced[k] == fretted[s];
+                if (duplicate)
+                    continue;
+                voiced[sounding] = fretted[s];
+                owners[sounding] = ownerOf (fretted[s]);
+                covered |= (juce::uint16) (1 << (fretted[s] % 12));
+                ++sounding;
+            }
+
+            auto missing = 0;
+            for (int i = 0; i < count; ++i)
+                if ((covered & (1 << (notes[i] % 12))) == 0)
+                {
+                    ++missing;
+                    covered |= (juce::uint16) (1 << (notes[i] % 12));   // count each class once
+                }
+
+            // Every chord tone first, then no gaps inside the chord, then the lowest position:
+            // guitarists reach for the open shape before a barre.
+            const auto score = missing * 1000 + innerMutes * 20 + base * 3 + first;
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestCount = sounding;
+                for (int k = 0; k < sounding; ++k)
+                {
+                    out[k] = voiced[k];
+                    owner[k] = owners[k];
+                }
+            }
+        }
+        return bestCount;
     }
 
     void process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
@@ -238,8 +423,8 @@ public:
 
         // Spreading nothing must not cost the collection window's latency. A strum turned off
         // is a wire, not a very fast strum.
-        if (spreadPpq.load() <= 0.0 && collecting == 0 && trackedNotes == 0
-            && pending.isEmpty())
+        if (spreadPpq.load() <= 0.0 && ! guitar.load() && repeatPerBeat.load() == 0
+            && collecting == 0 && trackedNotes == 0 && pending.isEmpty() && ringingCount == 0)
         {
             for (const auto metadata : in)
                 out.addEvent (metadata.getMessage(), metadata.samplePosition);
@@ -277,6 +462,14 @@ public:
                         goto nextEvent;
                     }
 
+                // A key whose chord went out on strings releases the strings it owns.
+                if (releaseStrings (message.getChannel(), message.getNoteNumber(), at, out,
+                                    metadata.samplePosition))
+                    goto nextEvent;
+
+                // It stops ringing, and a re-strum of it still waiting must not start.
+                stopRinging (message.getChannel(), message.getNoteNumber());
+
                 double releaseDelay = 0.0;
                 if (takeReleaseDelay (message.getChannel(), message.getNoteNumber(), releaseDelay))
                 {
@@ -295,6 +488,20 @@ public:
         if (collecting > 0 && window.end >= collectUntil)
             dealOut (out, block, numSamples, window);
 
+        // Rhythm: the chord still held is strummed again on each tick of the beat, the
+        // direction alternating, until its keys come up.
+        if (const auto per = repeatPerBeat.load(); per > 0 && ringingCount > 0)
+        {
+            const auto tick = 1.0 / (double) per;
+            for (auto t = std::ceil (window.start / tick) * tick; t < window.end; t += tick)
+            {
+                if (t <= lastStrumAt + tick * 0.5)
+                    continue;      // too close to the stroke you played
+                restrum (t);
+                lastStrumAt = t;
+            }
+        }
+
         // An off delayed by less than this block belongs in this block, not one buffer late.
         pending.flushDue (out, window.start, window.end, block, numSamples);
     }
@@ -302,6 +509,7 @@ public:
     void allNotesOff (juce::MidiBuffer& out, int position) noexcept
     {
         collecting = 0;
+        ringingCount = 0;
         pending.dropNoteOns();
         pending.flushAll (out, position);
         for (int channel = 0; channel < 16; ++channel)
@@ -313,9 +521,88 @@ public:
                 entry.active = false;
             }
         trackedNotes = 0;
+        for (auto& channel : stringsOf)
+            for (auto& key : channel)
+                key.count = 0;
     }
 
 private:
+    /** Which string notes a played key put out, so its note-off can release them. */
+    struct StringSet
+    {
+        juce::uint8 notes[strings] {};
+        juce::uint8 count = 0;
+    };
+
+    bool releaseStrings (int channel, int note, double at, juce::MidiBuffer& out, int position) noexcept
+    {
+        if (channel < 1 || channel > 16 || ! juce::isPositiveAndBelow (note, 128))
+            return false;
+        auto& set = stringsOf[(size_t) (channel - 1)][(size_t) note];
+        if (set.count == 0)
+            return false;
+        for (int i = 0; i < set.count; ++i)
+        {
+            const auto emitted = (int) set.notes[i];
+            stopRinging (channel, emitted);
+            const auto off = juce::MidiMessage::noteOff (channel, emitted);
+            double delay = 0.0;
+            if (takeReleaseDelay (channel, emitted, delay) && delay > 0.0)
+                pending.add (at + delay, off);
+            else
+                out.addEvent (off, position);
+        }
+        set.count = 0;
+        return true;
+    }
+
+    /** Guitar mode: replaces the collected chord with its six-string voicing. Every string
+        note inherits the velocity, timing and (if it already came) the release of the key
+        that owns it, and each key remembers its strings for a note-off that comes later. */
+    void voiceOnStrings() noexcept
+    {
+        if (collecting <= 0)
+            return;
+        int notes[maxChord], voiced[strings], owner[strings];
+        for (int i = 0; i < collecting; ++i)
+            notes[i] = collected[(size_t) i].message.getNoteNumber();
+        const auto sounding = guitarVoicing (notes, collecting, voiced, owner);
+        if (sounding == 0)
+            return;
+
+        std::array<Waiting, maxChord> source = collected;
+        for (int i = 0; i < collecting; ++i)
+        {
+            // A key struck again while its last strings still ring lets those go first.
+            const auto& key = source[(size_t) i].message;
+            auto& old = stringsOf[(size_t) (key.getChannel() - 1)][(size_t) key.getNoteNumber()];
+            for (int k = 0; k < old.count; ++k)
+            {
+                double ignored = 0.0;
+                takeReleaseDelay (key.getChannel(), old.notes[k], ignored);
+                pending.add (collectUntil, juce::MidiMessage::noteOff (key.getChannel(), old.notes[k]));
+            }
+            old.count = 0;
+        }
+        for (int k = 0; k < sounding; ++k)
+        {
+            const auto& from = source[(size_t) owner[k]];
+            const auto channel = from.message.getChannel();
+            auto& w = collected[(size_t) k];
+            w = from;
+            w.message = juce::MidiMessage::noteOn (channel, voiced[k], from.message.getVelocity());
+            if (from.hasNoteOff)
+                w.noteOff = juce::MidiMessage::noteOff (channel, voiced[k]);
+            else
+            {
+                auto& set = stringsOf[(size_t) (channel - 1)][(size_t) from.message.getNoteNumber()];
+                if (set.count < strings)
+                    set.notes[set.count++] = (juce::uint8) voiced[k];
+            }
+        }
+        collecting = sounding;
+    }
+
     struct Waiting
     {
         juce::MidiMessage message;
@@ -350,10 +637,15 @@ private:
     }
 
     void makeOrder (NoteModuleSettings::StrumPattern stroke, int count,
-                    int (&order)[maxChord]) noexcept
+                    int (&order)[maxChord], int averageVelocity = 100) noexcept
     {
         for (int i = 0; i < count; ++i)
             order[i] = i;
+
+        // By velocity: a hard hit is a down-stroke (high to low), a soft one an up-stroke.
+        if (stroke == NoteModuleSettings::StrumPattern::byVelocity)
+            stroke = averageVelocity >= 90 ? NoteModuleSettings::StrumPattern::descending
+                                           : NoteModuleSettings::StrumPattern::ascending;
 
         if (stroke == NoteModuleSettings::StrumPattern::alternate)
         {
@@ -429,6 +721,9 @@ private:
     void dealOut (juce::MidiBuffer& out, const Transport::BlockTime& block, int numSamples,
                   ModuleClock::Window window) noexcept
     {
+        if (guitar.load())
+            voiceOnStrings();
+
         // Insertion sort by pitch: sixteen notes at most, and no allocation.
         for (int i = 1; i < collecting; ++i)
         {
@@ -443,11 +738,19 @@ private:
             collected[(size_t) (j + 1)] = held;
         }
 
-        const auto spread = spreadPpq.load();
+        auto averageVelocity = 0;
+        for (int i = 0; i < collecting; ++i)
+            averageVelocity += collected[(size_t) i].message.getVelocity();
+        averageVelocity /= juce::jmax (1, collecting);
+
+        // Harder is faster: a hard hit strums in half the spread, a soft one in half again as
+        // much, the way a pick moves quicker when you dig in.
+        const auto spread = spreadPpq.load()
+                          * (harderFaster.load() ? juce::jlimit (0.5, 1.5, 1.5 - (double) averageVelocity / 127.0) : 1.0);
         const auto shape = curve.load();
         const auto velocityChange = velocityRamp.load();
         int order[maxChord] {};
-        makeOrder ((NoteModuleSettings::StrumPattern) pattern.load(), collecting, order);
+        makeOrder ((NoteModuleSettings::StrumPattern) pattern.load(), collecting, order, averageVelocity);
 
         for (int rank = 0; rank < collecting; ++rank)
         {
@@ -473,8 +776,58 @@ private:
             }
         }
 
+        // What is still held rings on, for the rhythm re-strum.
+        ringingCount = 0;
+        for (int i = 0; i < collecting && ringingCount < maxChord; ++i)
+        {
+            const auto& w = collected[(size_t) i];
+            if (! w.hasNoteOff)
+                ringing[(size_t) ringingCount++] = { w.message.getChannel(), w.message.getNoteNumber(),
+                                                     w.message.getVelocity() };
+        }
+        lastStrumAt = collectUntil;
+        restrumDown = false;
+        lastSpread = spread;
+
         collecting = 0;
         pending.flushDue (out, window.start, window.end, block, numSamples);
+    }
+
+    void stopRinging (int channel, int note) noexcept
+    {
+        for (int i = 0; i < ringingCount;)
+        {
+            if (ringing[(size_t) i].channel == channel && ringing[(size_t) i].note == note)
+            {
+                pending.removeNoteOns (channel, note);
+                ringing[(size_t) i] = ringing[(size_t) --ringingCount];
+            }
+            else
+                ++i;
+        }
+    }
+
+    /** One more stroke of the chord still held, at `t`: everything ringing stops, then plays
+        again across the spread, up and down in turn; the up-strokes a little softer. */
+    void restrum (double t) noexcept
+    {
+        // Pitch order, so the stroke order means low-to-high.
+        std::array<Ringing, maxChord> sorted = ringing;
+        std::sort (sorted.begin(), sorted.begin() + ringingCount,
+                   [] (const Ringing& a, const Ringing& b) { return a.note < b.note; });
+        for (int i = 0; i < ringingCount; ++i)
+            pending.add (t, juce::MidiMessage::noteOff (sorted[(size_t) i].channel, sorted[(size_t) i].note));
+
+        restrumDown = ! restrumDown;
+        const auto shape = curve.load();
+        for (int rank = 0; rank < ringingCount; ++rank)
+        {
+            const auto index = restrumDown ? ringingCount - 1 - rank : rank;
+            const auto& r = sorted[(size_t) index];
+            const auto velocity = restrumDown ? (int) r.velocity : juce::roundToInt ((float) r.velocity * 0.8f);
+            pending.add (t + lastSpread * strokePosition (rank, ringingCount, shape),
+                         juce::MidiMessage::noteOn (r.channel, r.note, (juce::uint8) juce::jlimit (1, 127, velocity)));
+        }
     }
 
     ModuleClock clock;
@@ -491,6 +844,16 @@ private:
     std::atomic<int> pattern { (int) NoteModuleSettings::StrumPattern::ascending };
     std::atomic<float> curve { 0.0f };
     std::atomic<int> velocityRamp { 0 };
+    std::atomic<bool> guitar { false };
+    std::atomic<bool> harderFaster { false };
+    std::atomic<int> repeatPerBeat { 0 };
+    struct Ringing { int channel = 1; int note = 0; juce::uint8 velocity = 100; };
+    std::array<Ringing, maxChord> ringing {};
+    int ringingCount = 0;
+    double lastStrumAt = 0.0;
+    double lastSpread = 0.0;
+    bool restrumDown = false;
+    std::array<std::array<StringSet, 128>, 16> stringsOf {};
     bool alternateDescending = false;
     juce::uint32 randomState = 0x51f15e1du;
 };
@@ -516,6 +879,38 @@ public:
         gateAmount.store (juce::jlimit (0, 100, settings.humanizeGatePercent));
         preserveChords.store (settings.humanizePreserveChords);
         protectBeats.store (settings.humanizeProtectBeats);
+        layBackPpq.store (juce::jlimit (0.0, 0.125, settings.humanizeLayBackBeats));
+        swingAmount.store (juce::jlimit (0.0f, 0.75f, settings.humanizeSwing));
+        swingGrid.store (settings.humanizeSwingGrid >= 0.375 ? 0.5 : 0.25);
+        accentAmount.store (juce::jlimit (0, 40, settings.humanizeAccent));
+        frozen.store (settings.humanizeFreeze);
+        seed.store (juce::jlimit (1, 9999, settings.humanizeSeed));
+    }
+
+    /** A number in [0, 1) fixed by where a note is in a four-beat bar, which note it is and
+        what it is for, so a frozen humanize plays the same notes the same way every time. */
+    static double frozenRoll (double atPpq, int note, int salt, int seed) noexcept
+    {
+        auto place = (juce::uint32) juce::roundToInt (std::fmod (juce::jmax (0.0, atPpq), 4.0) * 96.0);
+        auto h = place * 0x9e3779b1u ^ (juce::uint32) note * 0x85ebca6bu ^ (juce::uint32) salt * 0xc2b2ae35u
+                 ^ (juce::uint32) seed * 0x27d4eb2fu;
+        h ^= h >> 15; h *= 0x2c1b3c6du;
+        h ^= h >> 12; h *= 0x297a2d39u;
+        h ^= h >> 15;
+        return (double) h / 4294967296.0;
+    }
+
+    /** How late the swing grid moves a note at `atPpq`: the off-beat of each pair, by the
+        amount the arpeggiator's swing uses (half the swing of one grid step). */
+    static double swingDelay (double atPpq, double grid, float swing) noexcept
+    {
+        if (swing <= 0.0f)
+            return 0.0;
+        const auto position = atPpq / grid;
+        const auto nearest = std::round (position);
+        if (std::abs (position - nearest) > 0.1 || ((long long) nearest % 2) == 0)
+            return 0.0;
+        return grid * (double) swing * 0.5;
     }
 
     void process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
@@ -530,6 +925,17 @@ public:
         const auto gateJitter = (double) gateAmount.load() / 100.0;
         const auto keepChordsTogether = preserveChords.load();
         const auto keepBeatAnchors = protectBeats.load();
+        const auto layBack = layBackPpq.load();
+        const auto swing = swingAmount.load();
+        const auto grid = swingGrid.load();
+        const auto accent = accentAmount.load();
+        const auto freeze = frozen.load();
+        const auto roll = seed.load();
+        // Random, or fixed by the note's place when frozen.
+        const auto chance = [&] (double atPpq, int note, int salt)
+        {
+            return freeze ? frozenRoll (atPpq, note, salt, roll) : random.nextDouble();
+        };
         auto lastAttackAt = std::numeric_limits<double>::lowest();
         auto lastAttackDelay = 0.0;
 
@@ -542,7 +948,8 @@ public:
             {
                 const auto onBeat = std::abs (at - std::round (at))
                                       <= block.ppqPerSample * 0.5;
-                auto delay = keepBeatAnchors && onBeat ? 0.0 : jitter * random.nextDouble();
+                auto delay = (keepBeatAnchors && onBeat ? 0.0 : jitter * chance (at, message.getNoteNumber(), 1))
+                             + layBack + swingDelay (at, grid, swing);
                 if (keepChordsTogether
                     && std::abs (at - lastAttackAt) <= block.ppqPerSample * 0.5)
                     delay = lastAttackDelay;
@@ -556,9 +963,11 @@ public:
                     delays[(size_t) index] = { message.getChannel(), message.getNoteNumber(),
                                               delay, at, at + delay };
 
-                auto velocity = (int) message.getVelocity();
+                auto velocity = (int) message.getVelocity() + (onBeat ? accent : 0);
                 if (velocityJitter > 0)
-                    velocity += random.nextInt (velocityJitter * 2 + 1) - velocityJitter;
+                    velocity += juce::jlimit (0, velocityJitter * 2,
+                                              (int) (chance (at, message.getNoteNumber(), 2) * (velocityJitter * 2 + 1)))
+                                - velocityJitter;
 
                 pending.add (at + delay,
                              juce::MidiMessage::noteOn (message.getChannel(),
@@ -578,7 +987,7 @@ public:
 
                 const auto playedDuration = juce::jmax (0.0, at - timing.sourceOnPpq);
                 const auto gateScale = gateJitter > 0.0
-                    ? (random.nextDouble() * 2.0 - 1.0) * gateJitter : 0.0;
+                    ? (chance (timing.sourceOnPpq, message.getNoteNumber(), 3) * 2.0 - 1.0) * gateJitter : 0.0;
                 auto releaseAt = at + timing.delayPpq + playedDuration * gateScale;
                 // The source release has arrived, so this is the earliest real-time-safe
                 // shortening. The delayed on must still sound for at least one sample.
@@ -644,6 +1053,12 @@ private:
     std::atomic<int> gateAmount { 0 };
     std::atomic<bool> preserveChords { false };
     std::atomic<bool> protectBeats { false };
+    std::atomic<double> layBackPpq { 0.0 };
+    std::atomic<float> swingAmount { 0.0f };
+    std::atomic<double> swingGrid { 0.25 };
+    std::atomic<int> accentAmount { 0 };
+    std::atomic<bool> frozen { false };
+    std::atomic<int> seed { 1 };
 };
 
 //==================================================================================================
@@ -658,12 +1073,18 @@ public:
     void setSettings (const NoteModuleSettings& settings) noexcept
     {
         probability.store (juce::jlimit (0.0f, 1.0f, settings.chance));
+        keepDownbeats.store (settings.chanceKeepDownbeats);
+        softFirst.store (settings.chanceSoftFirst);
     }
 
-    void process (const juce::MidiBuffer& in, juce::MidiBuffer& out) noexcept
+    void process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
+                  const Transport::BlockTime& block, int numSamples) noexcept
     {
         out.clear();
         const auto pass = probability.load();
+        const auto window = clock.advance (block, numSamples);
+        const auto beats = keepDownbeats.load();
+        const auto weighted = softFirst.load();
 
         for (const auto metadata : in)
         {
@@ -671,7 +1092,15 @@ public:
 
             if (message.isNoteOn())
             {
-                if (random.nextFloat() <= pass)
+                // A note within a 64th of a whole beat is ON the beat: those always pass, so
+                // the pulse survives however much is thinned out around it.
+                const auto at = window.start + (double) metadata.samplePosition * block.ppqPerSample;
+                const auto onBeat = beats && std::abs (at - std::round (at)) < 1.0 / 64.0;
+                // Soft notes drop first: the chance scales from half (silent) to one and a half
+                // times (full) with velocity, so loud notes carry the phrase.
+                const auto p = weighted ? juce::jlimit (0.0f, 1.0f, pass * (0.5f + (float) message.getVelocity() / 127.0f))
+                                        : pass;
+                if (onBeat || random.nextFloat() <= p)
                     out.addEvent (message, metadata.samplePosition);
                 else
                     mark (message.getChannel(), message.getNoteNumber());
@@ -711,7 +1140,10 @@ private:
 
     std::array<juce::uint64, 16> dropped {};
     juce::Random random { 0x1a2b3c4d };
+    ModuleClock clock;
     std::atomic<float> probability { 1.0f };
+    std::atomic<bool> keepDownbeats { false };
+    std::atomic<bool> softFirst { false };
 };
 
 //==================================================================================================
@@ -727,6 +1159,7 @@ public:
     {
         lengthPpq.store (juce::jlimit (0.0, 8.0, settings.lengthBeats));
         legato.store (settings.legato);
+        mode.store (settings.lengthMode == "at most" ? atMost : settings.lengthMode == "at least" ? atLeast : fixed);
     }
 
     void process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
@@ -738,11 +1171,15 @@ public:
 
         const auto length = lengthPpq.load();
         const auto holding = legato.load();
+        const auto rule = mode.load();
 
         for (const auto metadata : in)
         {
             const auto message = metadata.getMessage();
             const auto at = window.start + (double) metadata.samplePosition * block.ppqPerSample;
+            const auto channel = message.getChannel();
+            const auto note = message.getNoteNumber();
+            const auto tracked = channel >= 1 && channel <= 16 && juce::isPositiveAndBelow (note, 128);
 
             if (message.isNoteOn())
             {
@@ -750,12 +1187,38 @@ public:
                     releaseSounding (out, metadata.samplePosition);
 
                 out.addEvent (message, metadata.samplePosition);
-                remember (message.getChannel(), message.getNoteNumber());
+                remember (channel, note);
+                if (tracked)
+                    startedAt[(size_t) (channel - 1)][(size_t) note] = at;
 
-                if (! holding && length > 0.0)
-                    pending.add (at + length,
-                                 juce::MidiMessage::noteOff (message.getChannel(),
-                                                             message.getNoteNumber()));
+                // Fixed and "at most" both plan the end now; "at most" lets an earlier key-up
+                // win (below). "At least" decides at key-up.
+                if (! holding && length > 0.0 && rule != atLeast)
+                    pending.add (at + length, juce::MidiMessage::noteOff (channel, note));
+                continue;
+            }
+
+            if (message.isNoteOff() && ! holding && length > 0.0 && rule == atMost)
+            {
+                // Let go before the cut: end it now and forget the planned end. After the cut
+                // it has already ended, and this off belongs to nothing.
+                if (pending.removeNoteOff (channel, note))
+                {
+                    out.addEvent (message, metadata.samplePosition);
+                    forget (channel, note);
+                }
+                continue;
+            }
+
+            if (message.isNoteOff() && ! holding && length > 0.0 && rule == atLeast && tracked)
+            {
+                // A tap shorter than the length rings on to it; a longer note ends as played.
+                const auto earliest = startedAt[(size_t) (channel - 1)][(size_t) note] + length;
+                if (at < earliest)
+                    pending.add (earliest, message);
+                else
+                    out.addEvent (message, metadata.samplePosition);
+                forget (channel, note);
                 continue;
             }
 
@@ -809,6 +1272,9 @@ private:
     std::array<Sounding, 32> sounding {};
     std::atomic<double> lengthPpq { 0.5 };
     std::atomic<bool> legato { false };
+    enum Rule { fixed = 0, atMost, atLeast };
+    std::atomic<int> mode { fixed };
+    std::array<std::array<double, 128>, 16> startedAt {};
 };
 
 //==================================================================================================
@@ -824,6 +1290,8 @@ public:
     void setSettings (const NoteModuleSettings& settings) noexcept
     {
         on.store (settings.latchOn);
+        mode.store (settings.latchMode == "add" ? add : settings.latchMode == "toggle" ? toggle : replace);
+        pedalReleases.store (settings.latchPedalRelease);
     }
 
     void process (const juce::MidiBuffer& in, juce::MidiBuffer& out) noexcept
@@ -840,6 +1308,9 @@ public:
             return;
         }
 
+        const auto rule = mode.load();
+        const auto pedal = pedalReleases.load();
+
         for (const auto metadata : in)
         {
             const auto message = metadata.getMessage();
@@ -847,12 +1318,29 @@ public:
 
             if (message.isNoteOn())
             {
-                if (keysDown == 0)
+                ++keysDown;
+                if (rule == toggle && forget (message.getChannel(), message.getNoteNumber()))
+                {
+                    // Played again while held: that note lets go instead of retriggering.
+                    out.addEvent (juce::MidiMessage::noteOff (message.getChannel(), message.getNoteNumber()), position);
+                    continue;
+                }
+                if (rule == replace && keysDown == 1)
                     releaseLatched (out, position);      // a new phrase replaces the old one
 
-                ++keysDown;
                 out.addEvent (message, position);
                 remember (message.getChannel(), message.getNoteNumber());
+                continue;
+            }
+
+            if (pedal && message.isController() && message.getControllerNumber() == 64)
+            {
+                // The pedal is the release here, not a sustain: consumed, and one press lets
+                // go of everything held.
+                const auto down = message.getControllerValue() >= 64;
+                if (down && ! pedalDown)
+                    releaseLatched (out, position);
+                pedalDown = down;
                 continue;
             }
 
@@ -889,6 +1377,17 @@ private:
             }
     }
 
+    bool forget (int channel, int note) noexcept
+    {
+        for (auto& entry : latched)
+            if (entry.channel == channel && entry.note == note)
+            {
+                entry.note = -1;
+                return true;
+            }
+        return false;
+    }
+
     void releaseLatched (juce::MidiBuffer& out, int position) noexcept
     {
         for (auto& entry : latched)
@@ -901,7 +1400,11 @@ private:
 
     std::array<Held, 32> latched {};
     int keysDown = 0;
+    bool pedalDown = false;
     std::atomic<bool> on { false };
+    enum Rule { replace = 0, add, toggle };
+    std::atomic<int> mode { replace };
+    std::atomic<bool> pedalReleases { false };
 };
 
 } // namespace ceditor::perf

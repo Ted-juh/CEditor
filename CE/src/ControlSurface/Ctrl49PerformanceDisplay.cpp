@@ -9,7 +9,7 @@ namespace
 {
     void appendString (Bytes& out, const std::string& s)
     {
-        const auto length = s.size() > 255 ? std::size_t { 255 } : s.size();
+        const auto length = s.size() > kMaxLabelCharacters ? kMaxLabelCharacters : s.size();
         out.push_back (static_cast<std::uint8_t> (length));
         for (std::size_t i = 0; i < length; ++i)
         {
@@ -34,7 +34,12 @@ std::string buildPerformanceTitle (const PerformanceTransportView& transport)
 {
     // ">" and "#" rather than the usual glyphs: the display is ASCII, and a '?' where the
     // play symbol should be is worse than a character that reads as one.
-    std::string title = transport.playing ? ">" : "#";
+    std::string title;
+    if (! transport.song.empty())
+        title = transport.song + (transport.scene.empty() ? "" : " / " + transport.scene) + "  ";
+    else if (! transport.scene.empty())
+        title = transport.scene + "  ";
+    title += transport.playing ? ">" : "#";
     title += " " + std::to_string (transport.bar) + "." + std::to_string (transport.beat);
     title += " " + wholeNumber (transport.tempo);
 
@@ -82,6 +87,16 @@ Bytes buildPerformanceStatePayload (int activeClip, const PerformanceClipViews& 
         result[1 + clip] = static_cast<std::uint8_t> (clamp127 (static_cast<int> (phase * 127.0f)));
     }
 
+    return result;
+}
+
+Bytes buildPerformanceStatePayload (int activeClip, const PerformanceClipViews& clips,
+                                    const PerformanceTransportView& transport)
+{
+    auto result = buildPerformanceStatePayload (activeClip, clips);
+    result.push_back (1);   // page kind: performance
+    result.push_back (static_cast<std::uint8_t> (transport.playing ? clamp127 (transport.beat) : 0));
+    result.push_back (static_cast<std::uint8_t> (clamp127 (transport.beatsPerBar)));
     return result;
 }
 

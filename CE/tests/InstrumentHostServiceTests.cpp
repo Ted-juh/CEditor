@@ -26,6 +26,7 @@
 #include "InstrumentHost/SnapshotStore.h"
 #include "InstrumentHost/AuditionPlayer.h"
 #include "InstrumentHost/RecentPlay.h"
+#include "InstrumentHost/VendorPresetDiscovery.h"
 #include <juce_cryptography/juce_cryptography.h>
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "ControlSurface/Ctrl49Protocol.h"
@@ -3447,6 +3448,43 @@ void testAuditioner()
     check (library()->getProperty ("records", {}).size() == 4,
            "which is a filter, not a deletion — it is still there unfiltered");
 
+    // Paging: a slice of the result, and always the whole count, so a page holding the first
+    // rows still knows how long the list is.
+    const auto names = [&library]
+    {
+        juce::StringArray out;
+        for (const auto& r : *library()->getProperty ("records", {}).getArray())
+            out.add (r.getProperty ("name", {}).toString());
+        return out;
+    };
+    h.emits.clear();
+    h.cmd ("getLibrary", { { "sort", "name" }, { "limit", 2 } });
+    const auto firstPage = names();
+    check (firstPage.size() == 2 && counts ("matched") == 4
+             && (int) library()->getProperty ("offset", -1) == 0,
+           "a limited answer carries its slice and the whole count");
+    h.emits.clear();
+    h.cmd ("getLibrary", { { "sort", "name" }, { "offset", 2 }, { "limit", 2 } });
+    const auto secondPage = names();
+    check (secondPage.size() == 2 && (int) library()->getProperty ("offset", -1) == 2
+             && ! firstPage.contains (secondPage[0]) && ! firstPage.contains (secondPage[1]),
+           "the next page continues where the first stopped");
+    check (firstPage[0].compareNatural (firstPage[1]) <= 0 && firstPage[1].compareNatural (secondPage[0]) <= 0,
+           "in the order the query asked for, across the pages");
+    h.emits.clear();
+    h.cmd ("getLibrary", { { "sort", "name" }, { "sortDescending", true }, { "limit", 1 } });
+    check (names().size() == 1 && names()[0] == secondPage[1], "descending starts from the other end");
+    h.cmd ("getLibrary", { { "sort", "name" }, { "limit", 2 } });
+    h.cmd ("getLibrary", { { "sort", "name" }, { "offset", 2 }, { "limit", 2 } });
+    const auto someRecord = library()->getProperty ("records", {})[0].getProperty ("recordId", {});
+    h.emits.clear();
+    h.cmd ("setLibraryUserMetadata", { { "recordId", someRecord }, { "favourite", true } });
+    check (library() != nullptr && names().size() == 4 && (int) library()->getProperty ("offset", -1) == 0,
+           "an answer the host sends on its own re-sends as much as the page had scrolled to");
+    h.emits.clear();
+    h.cmd ("getLibrary", { { "sort", "name" }, { "offset", 9 }, { "limit", 5 } });
+    check (names().isEmpty() && counts ("matched") == 4, "a page past the end is empty, not an error");
+
     // Folding. The stub plays the same DC whatever program is selected, so all three programs
     // measure identically — and they are still THREE SOUNDS, because they are three different
     // presets of one plug-in with three different names. Folding on measurement alone would
@@ -3525,14 +3563,14 @@ void testAuditioner()
 
     // The phrase setting is remembered and reported.
     h.emits.clear();
-    h.cmd ("setAuditionPhrase", { { "phrase", "chord" }, { "bars", 8 } });
+    h.cmd ("setAuditionPhrase", { { "phrase", "phrase" }, { "bars", 8 } });
     const auto* phrase = h.emits.last ("instrumentHostAudition");
-    check (phrase != nullptr && phrase->getProperty ("phrase", {}).toString() == "chord"
+    check (phrase != nullptr && phrase->getProperty ("phrase", {}).toString() == "phrase"
              && (int) phrase->getProperty ("bars", 0) == 8,
            "the audition phrase is a setting, and every answer carries it");
-    h.cmd ("setAuditionPhrase", { { "phrase", "nonsense" } });
-    check (h.emits.last ("instrumentHostAudition")->getProperty ("phrase", {}).toString() == "chord",
-           "and a phrase nobody offers is refused rather than stored");
+    h.cmd ("setAuditionPhrase", { { "phrase", "chord" } });
+    check (h.emits.last ("instrumentHostAudition")->getProperty ("phrase", {}).toString() == "phrase",
+           "and a phrase nobody offers is refused rather than stored: the notes are the audition settings'");
 
 }
 
@@ -3668,6 +3706,74 @@ void testMovedLibraryRelinks()
 //
 // The other half is that folding must never be the thing that loses somebody's work: the curation
 // of every member arrives on the survivor before the rest go quiet.
+
+// Sorting the browse. The page holds one slice of a large result, so the order is the host's:
+// a page cannot sort what it has not been sent.
+void testLibrarySort()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::LibraryQuery;
+    using ceditor::host::searchLibrary;
+
+    std::cout << "\nsorting the library" << std::endl;
+
+    const auto preset = [] (const juce::String& name, const juce::String& category, int rating,
+                            juce::int64 lastLoaded, float brightness, bool measured)
+    {
+        LibraryRecord r;
+        r.type = "preset";
+        r.sourceType = "vstpreset";
+        r.sourceLocator = "/p/" + name + ".vstpreset";
+        r.name = name;
+        r.category = category;
+        r.targetCeId = "VST3-synth";
+        r.fingerprint = "fp-" + name;
+        r.factory = true;
+        r.user.rating = rating;
+        r.lastLoadedAtMs = lastLoaded;
+        r.sonic.measured = measured;
+        r.sonic.brightness = brightness;
+        return r;
+    };
+
+    Library library;
+    library.mergeVendorScan ("vstpreset", {
+        preset ("Pad 10", "Pad",  0, 0,    0.9f, true),
+        preset ("Bass",   "",     5, 3000, 0.2f, true),
+        preset ("Pad 2",  "Pad",  3, 1000, 0.0f, false),
+        preset ("Lead",   "Lead", 4, 2000, 0.6f, true),
+    });
+
+    const auto order = [&library] (const juce::String& key, bool descending)
+    {
+        LibraryQuery query;
+        query.sort = key;
+        query.sortDescending = descending;
+        juce::StringArray names;
+        for (const auto* r : searchLibrary (library, query))
+            names.add (r->name);
+        return names.joinIntoString (",");
+    };
+
+    check (order ("", false) == "Pad 10,Bass,Pad 2,Lead", "no sort is library order");
+    check (order ("name", false) == "Bass,Lead,Pad 2,Pad 10", "names sort naturally: Pad 2 before Pad 10");
+    check (order ("name", true) == "Pad 10,Pad 2,Lead,Bass", "and descending reverses them");
+    check (order ("category", false) == "Lead,Pad 2,Pad 10,Bass",
+           "an empty category is unknown and goes last; a tie goes by name");
+    check (order ("rating", true) == "Bass,Lead,Pad 2,Pad 10", "highest rated first, unrated last");
+    check (order ("rating", false) == "Pad 2,Lead,Bass,Pad 10", "and unrated stays last the other way round");
+    check (order ("recent", true) == "Bass,Lead,Pad 2,Pad 10", "most recently loaded first, never loaded last");
+    check (order ("brightness", true) == "Pad 10,Lead,Bass,Pad 2", "brightest first, the unmeasured last");
+    check (order ("brightness", false) == "Bass,Lead,Pad 10,Pad 2", "darkest first, the unmeasured still last");
+    check (order ("nonsense", false) == "Pad 10,Bass,Pad 2,Lead", "an unknown key keeps library order");
+
+    LibraryQuery stored;
+    stored.sort = "tail";
+    stored.sortDescending = true;
+    const auto back = ceditor::host::libraryQueryFromVar (ceditor::host::libraryQueryToVar (stored));
+    check (back.sort == "tail" && back.sortDescending, "a saved search keeps its order");
+}
 
 void testDuplicateFold()
 {
@@ -4616,6 +4722,12 @@ struct FakeSurface
         input.push_back ({ a, b, c });
     }
 
+    void feedFrame (ceditor::ctrl49::Bytes frame)
+    {
+        const std::scoped_lock scoped (lock);
+        input.push_back (std::move (frame));
+    }
+
     int frameCount()
     {
         const std::scoped_lock scoped (lock);
@@ -4627,6 +4739,75 @@ struct FakeSurface
     std::vector<ceditor::ctrl49::Bytes> input;
     std::atomic<bool> running { false };
 };
+
+void testCtrl49DiscoveryReasons()
+{
+    std::cout << "\nthe CTRL49 says why it is not connected" << std::endl;
+
+    using ceditor::ctrl49::Ctrl49SurfaceBroker;
+    using ceditor::ctrl49::Ctrl49DiscoveryProblem;
+
+    const auto dir = freshDataDir ("surface-reasons");
+    Harness h (dir);
+    h.cmd ("getState");
+
+    double fakeNow = 0.0;
+    std::function<std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints>()> behave =
+        []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+
+    Ctrl49SurfaceBroker::Options options;
+    options.discover = [&behave] { return behave(); };
+    options.emit = [&h] (const juce::String& name, const juce::var& payload)
+    {
+        h.emits.entries.push_back ({ name, payload });
+    };
+    options.pageLua = { 't' };
+    options.now = [&fakeNow] { return fakeNow; };
+    options.searchIntervalMs = 10.0;
+    Ctrl49SurfaceBroker broker (*h.service, options);
+
+    const auto settle = [&]
+    {
+        for (int i = 0; i < 50; ++i)
+        {
+            fakeNow += 20.0;
+            broker.tick();
+            std::this_thread::sleep_for (std::chrono::milliseconds (2));
+        }
+        return h.emits.last ("instrumentHostSurface");
+    };
+
+    auto* status = settle();
+    check (status != nullptr && status->getProperty ("state", {}).toString() == "searching"
+             && status->getProperty ("searchReason", {}).toString() == "unplugged",
+           "no keyboard at all reads as unplugged");
+
+    behave = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints>
+    { throw Ctrl49DiscoveryProblem ("noDriver", "Install the M-Audio CTRL49 driver"); };
+    status = settle();
+    check (status != nullptr && status->getProperty ("searchReason", {}).toString() == "noDriver"
+             && status->getProperty ("detail", {}).toString().contains ("Install"),
+           "a keyboard without its driver says so, with what to do");
+
+    behave = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints>
+    { throw Ctrl49DiscoveryProblem ("portBusy", "Close VIP or your DAW"); };
+    status = settle();
+    check (status != nullptr && status->getProperty ("searchReason", {}).toString() == "portBusy",
+           "a port another program holds reads as busy, not as missing");
+
+    behave = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints>
+    { throw std::runtime_error ("something odd"); };
+    status = settle();
+    check (status != nullptr && status->getProperty ("searchReason", {}).toString() == "error"
+             && status->getProperty ("detail", {}).toString() == "something odd",
+           "anything else is still reported, with its own words");
+
+    behave = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+    status = settle();
+    check (status != nullptr && status->getProperty ("searchReason", {}).toString() == "unplugged"
+             && status->getProperty ("detail", {}).toString().isEmpty(),
+           "and unplugging it afterwards clears the old explanation");
+}
 
 void testCtrl49AppScreen()
 {
@@ -4705,6 +4886,18 @@ void testCtrl49AppScreen()
     screen = h.emits.last ("instrumentHostSurfaceScreen");
     check (screen != nullptr && screen->getProperty ("pageKind", {}).toString() == "performance",
            "and on to the performance page after them");
+
+    const auto masterBefore = h.service->getRackHost().getPerformance().masterLevel;
+    const auto tempoBefore = h.service->surfaceTransport().tempo;
+    for (int i = 0; i < 12; ++i)
+        press (18, 1);                          // encoder 8, clockwise
+    tickPast();
+    check (h.service->getRackHost().getPerformance().masterLevel > masterBefore
+             && juce::approximatelyEqual (h.service->surfaceTransport().tempo, tempoBefore),
+           "on the performance page encoder 8 is the master level, not a second tempo knob");
+    screen = h.emits.last ("instrumentHostSurfaceScreen");
+    check (screen != nullptr && screen->getProperty ("values", {}).size() == 12,
+           "and the page is sent its beat and bar length with the clip phases");
 
     h.cmd ("setStageLock", { { "enabled", true } });
     h.emits.clear();
@@ -4806,6 +4999,29 @@ void testCtrl49Broker()
     broker.tick();
     check (fake.frameCount() == afterFirstPaint,
            "and an unchanged display sends nothing — only bytes that changed travel");
+
+    // The keyboard's replies: an OK passes unremarked, a refusal reaches the app by name.
+    {
+        using ceditor::ctrl49::Bytes;
+        const Bytes okDraw { 0xF0, 0x00, 0x01, 0x05, 0x31, 0x08, 0x02, 0x3D, 0x00, 0x04, 0x0D, 0x02, 0x3B, 0x40, 0xF7 };
+        fake.feedFrame (okDraw);
+        broker.tick();
+        const auto* quiet = h.emits.last ("instrumentHostSurface");
+        check (quiet != nullptr && quiet->getProperty ("deviceError", {}).toString().isEmpty(),
+               "an acknowledged draw is not an error");
+
+        auto refused = okDraw;
+        refused[13] = 0x42;                       // out of memory
+        fake.feedFrame (refused);
+        broker.tick();
+        const auto* status = h.emits.last ("instrumentHostSurface");
+        check (status != nullptr
+                 && status->getProperty ("deviceError", {}).toString() == "The keyboard refused draw: out of memory"
+                 && (int) status->getProperty ("deviceRefusals", 0) == 1,
+               "a refused draw reaches the app with the command and the reason");
+        check (broker.state() == Ctrl49SurfaceBroker::State::connected,
+               "and the surface keeps running: a refusal is news, not a disconnect");
+    }
 
     // Loss (§17.4): stop sending immediately, release the claim, go back to searching.
     fake.running.store (false);
@@ -5133,6 +5349,160 @@ void testCtrl49Broker()
     }
 }
 
+void testSectionsMigration()
+{
+    std::cout << "\nsongs own their sections" << std::endl;
+    using ceditor::host::Performance;
+    Performance before;
+    before.performanceId = "p1";
+    before.setlist.items.add ({ "song-1", "Opener", "s1" });
+    before.setlist.items.add ({ "song-2", "Closer", "s1" });
+    before.arrangement.items.add ({ "a1", "Intro", "s1", 8 });
+    before.arrangement.loop = true;
+    Performance after;
+    check (Performance::fromVar (before.toVar(), after)
+             && after.setlist.items[0].sections.items.size() == 1
+             && after.setlist.items[0].sections.loop
+             && after.setlist.items[1].sections.items.isEmpty()
+             && after.arrangement.items.isEmpty(),
+           "a show-wide arrangement from before songs had sections becomes the first song's");
+    Performance alone;
+    alone.performanceId = "p2";
+    alone.arrangement.items.add ({ "a1", "Intro", "s1", 8 });
+    Performance kept;
+    check (Performance::fromVar (alone.toVar(), kept) && kept.arrangement.items.size() == 1,
+           "with no songs it stays show-wide");
+}
+
+void testStateFolders()
+{
+    std::cout << "\npreset folders a plug-in reads as its own state" << std::endl;
+
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+
+    const auto dir = freshDataDir ("state-folders");
+    seedCatalog (dir);
+    // Transfigure-shaped: the plug-in's saved state under a vendor extension, in category
+    // folders, with a readme beside them.
+    const auto good = dir.getChildFile ("Sugar/Presets");
+    good.getChildFile ("Subtle").createDirectory();
+    good.getChildFile ("Subtle/Arp.sbx").replaceWithText ("arp");
+    good.getChildFile ("Subtle/Drift.sbx").replaceWithText ("drift");
+    good.getChildFile ("Wide.sbx").replaceWithText ("wide");
+    good.getChildFile ("readme.txt").replaceWithText ("not a preset");
+    // Files the plug-in does not read: loading them leaves it as it was.
+    const auto ignored = dir.getChildFile ("Other");
+    ignored.createDirectory();
+    ignored.getChildFile ("a.xyz").replaceWithText ("a");
+    ignored.getChildFile ("b.xyz").replaceWithText ("b");
+
+    int applications = 0;
+    const auto tweak = [&applications] (InstrumentHostService::Options& options)
+    {
+        options.applyVstPreset = [&applications] (juce::AudioProcessor& processor, const juce::File& file)
+        {
+            ++applications;
+            if (file.hasFileExtension ("sbx"))
+                static_cast<StubSynthProcessor&> (processor).patch = 1 + (file.loadFileAsString().hashCode() & 0xffff);
+            return true;
+        };
+    };
+    const auto folders = [] (Harness& h) { return h.emits.last ("instrumentHostLibrary")->getProperty ("stateFolders", {}); };
+    const auto stateRecords = [&dir]
+    {
+        // Through the store, as the next start reads it: library.json is only an import source.
+        const auto library = storedLibrary (dir);
+        juce::Array<LibraryRecord> out;
+        for (const auto& record : library.allRecords())
+            if (record.sourceType == "stateFile" && ! record.missing) out.add (record);
+        return out;
+    };
+
+    {
+        Harness h (dir, {}, tweak);
+        h.cmd ("getState");
+        h.cmd ("addStateFolder", { { "path", good.getFullPathName() }, { "ceId", "VST3-good-synth" } });
+        const auto list = folders (h);
+        check (list.size() == 1 && list[0].getProperty ("status", {}).toString() == "ok"
+                 && list[0].getProperty ("extension", {}).toString() == "sbx"
+                 && (int) list[0].getProperty ("count", 0) == 3,
+               "a folder the plug-in takes is checked, and its three presets are indexed");
+        check (applications >= 3, "the check loads two different files and the first again");
+        const auto records = stateRecords();
+        check (records.size() == 3, "the readme beside the presets is not a preset");
+        bool categorised = false;
+        juce::String arpId;
+        for (const auto& record : records)
+        {
+            categorised |= record.name == "Arp" && record.category == "Subtle";
+            if (record.name == "Arp") arpId = record.recordId;
+        }
+        check (categorised && records[0].targetCeId == "VST3-good-synth",
+               "each preset belongs to the plug-in, filed under the folder it sits in");
+
+        h.cmd ("addStateFolder", { { "path", ignored.getFullPathName() }, { "ceId", "VST3-good-synth" } });
+        const auto refused = folders (h)[1];
+        check (refused.getProperty ("status", {}).toString() == "refused"
+                 && refused.getProperty ("detail", {}).toString().contains ("as it was"),
+               "files that leave the plug-in as it was are refused, and the reason is given");
+        check (stateRecords().size() == 3, "and nothing from that folder reaches the library");
+
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        const auto before = applications;
+        h.cmd ("loadLibraryRecord", { { "recordId", arpId }, { "action", "focused" }, { "partId", partId } });
+        check (applications == before + 1 && h.lastStub != nullptr
+                 && h.lastStub->patch == 1 + (juce::String ("arp").hashCode() & 0xffff),
+               "a preset from the folder loads onto a part through the preset loader");
+    }
+    {
+        Harness h (dir, {}, tweak);
+        h.cmd ("getState");
+        h.cmd ("getLibrary");
+        const auto list = folders (h);
+        check (list.size() == 2 && list[0].getProperty ("status", {}).toString() == "ok",
+               "the folders and their verdicts survive a restart");
+        h.cmd ("removeStateFolder", { { "path", good.getFullPathName() } });
+        check (folders (h).size() == 1 && stateRecords().isEmpty(),
+               "removing a folder takes its presets out of the library");
+    }
+
+    // Finding the folder in the first place: named after the plug-in, alone or under its vendor.
+    {
+        const auto roots = dir.getChildFile ("roots");
+        roots.getChildFile ("Documents/Sugar Bytes/Transfigure/Presets/Subtle").createDirectory();
+        for (const auto* name : { "Arp", "Drift", "Hall" })
+            roots.getChildFile ("Documents/Sugar Bytes/Transfigure/Presets/Subtle").getChildFile (juce::String (name) + ".sbtr")
+                .replaceWithText (name);
+        roots.getChildFile ("ProgramData/TB-303").createDirectory();
+        roots.getChildFile ("ProgramData/TB-303/Acid.bin").replaceWithText ("bank");
+        roots.getChildFile ("ProgramData/TB-303/Names.dat").replaceWithText ("x");
+        roots.getChildFile ("ProgramData/TB-303/Techno.bin").replaceWithText ("bank");
+        roots.getChildFile ("Documents/Spire").createDirectory();
+        roots.getChildFile ("Documents/Spire/Lead.vstpreset").replaceWithText ("named format");
+        const juce::Array<juce::File> dataRoots { roots.getChildFile ("Documents"), roots.getChildFile ("ProgramData") };
+        const auto plugin = [] (const char* name, const char* vendor)
+        {
+            PluginClassRecord record;
+            record.name = name; record.vendor = vendor; record.ceId = juce::String ("VST3-") + name;
+            return record;
+        };
+        const auto transfigure = ceditor::host::findPresetCandidate (plugin ("Transfigure", "Sugar Bytes"), dataRoots);
+        check (transfigure.getProperty ("extension", {}).toString() == "sbtr" && (int) transfigure.getProperty ("files", 0) == 3
+                 && transfigure.getProperty ("path", {}).toString().endsWith ("Transfigure"),
+               "a plug-in's folder under its vendor's is found, with its format and how many files");
+        const auto tb = ceditor::host::findPresetCandidate (plugin ("TB-303", "Roland Cloud"), dataRoots);
+        check (tb.getProperty ("extension", {}).toString() == "bin" && (int) tb.getProperty ("files", 0) == 2,
+               "and one named after the plug-in at the top, counting only the commonest kind of file");
+        check (! ceditor::host::findPresetCandidate (plugin ("Spire", "Reveal Sound"), dataRoots).isObject(),
+               "formats read by name are not offered for a test load");
+        check (! ceditor::host::findPresetCandidate (plugin ("WORMHOLE", "Zynaptiq"), dataRoots).isObject(),
+               "and a plug-in with nothing on disk has no folder to offer");
+    }
+    dir.deleteRecursively();
+}
+
 void testEditorPolicy()
 {
     std::cout << "\nstacked editor pane policy" << std::endl;
@@ -5207,6 +5577,28 @@ void testEditorPolicy()
     h.cmd ("unloadInstrument", { { "partId", a } });
     check (! h.paneLog.empty() && h.paneLog.front() == "hide",
            "unloading hides the editor too");
+
+    // On stage: a scene made on a part with an instrument opens that editor in Build only,
+    // entering Stage closes the docked pane, and the × on an editor is never locked out.
+    const auto c = h.partIdAt (1);
+    h.cmd ("loadInstrument", { { "partId", c }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("focusPart", { { "partId", c } });
+    h.cmd ("addScene", { { "name", "Keys" } });
+    const auto sceneId = h.emits.lastState()->getProperty ("performance", {})
+                           .getProperty ("scenes", {})[0].getProperty ("sceneId", {}).toString();
+    h.cmd ("closeEditor", { { "partId", c } });
+    h.cmd ("launchScene", { { "sceneId", sceneId } });
+    check (h.openPaneEditors.contains (c), "in Build a scene brings up the editor of its part");
+
+    h.cmd ("setStageLock", { { "enabled", true } });
+    check (h.openPaneEditors.isEmpty(), "entering Stage closes the docked editor pane");
+    h.cmd ("launchScene", { { "sceneId", sceneId } });
+    check (h.openPaneEditors.isEmpty(), "on stage a scene never opens an editor over the set");
+
+
+    h.emits.clear();
+    h.cmd ("closeEditor", { { "partId", c } });
+    check (! h.emits.lastError().contains ("Stage Lock"), "and closing an editor is never locked out");
 }
 
 void testScan (const juce::File& stubWorker)
@@ -5583,6 +5975,160 @@ void testSetlistSoundcheck()
     check ((double) row().getProperty ("peak", 0) == peak, "reference recheck retains measured levels");
 }
 
+void testSteppedControlsAndShownPage()
+{
+    std::cout << "\nstepped controls, and a knob shared between pages drives the shown one" << std::endl;
+    const auto dir = freshDataDir ("stepped-shown");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    auto* stub = h.lastStub;
+    const auto near = [stub] (float a, float b)
+    {
+        const auto expected = stub->cutoff->getNormalisableRange().snapToLegalValue (b);
+        const bool matches = std::abs (a - expected) < 0.001f;
+        if (! matches) std::cout << "    actual " << a << ", expected " << expected << std::endl;
+        return matches;
+    };
+    const auto pageAt = [&h] (int i) { return h.emits.lastState()->getProperty ("rack", {})
+        .getProperty ("pages", {})[i].getProperty ("pageId", {}).toString(); };
+    const auto move = [&h] (int value)
+    {
+        h.service->noteMidiActivity ("Keys", juce::MidiMessage::controllerEvent (1, 74, value));
+        h.service->drainParameterEvents();
+    };
+
+    h.cmd ("addControlPage", { { "name", "A" } });
+    const auto pageA = pageAt (0);
+    h.cmd ("assignControlSlot", { { "pageId", pageA }, { "slotId", "s1" },
+        { "partId", partId }, { "parameterId", "cutoff" } });
+    h.cmd ("setControlSlotOptions", { { "pageId", pageA }, { "slotId", "s1" }, { "steps", 5 } });
+
+    h.cmd ("setControlSlotValue", { { "pageId", pageA }, { "slotId", "s1" }, { "value", 0.3 } });
+    check (near (stub->cutoff->get(), 0.25f), "five steps: 0.3 snaps to the nearest step, 0.25");
+    h.service->nudgeControlSlot (pageA, "s1", 1);
+    check (near (stub->cutoff->get(), 0.5f), "one encoder detent is one step, not 1/127");
+    h.service->nudgeControlSlot (pageA, "s1", -9);
+    check (near (stub->cutoff->get(), 0.0f), "and the steps stop at the ends");
+
+    h.cmd ("learnControlSlotMidi", { { "pageId", pageA }, { "slotId", "s1" } });
+    move (0);
+    h.cmd ("setControlSlotOptions", { { "pageId", pageA }, { "slotId", "s1" }, { "midiRelative", true } });
+    move (1);
+    check (near (stub->cutoff->get(), 0.25f), "a relative CC also moves one step per detent");
+    move (100);
+    h.cmd ("setControlSlotOptions", { { "pageId", pageA }, { "slotId", "s1" }, { "midiRelative", false } });
+    move (100);
+    check (near (stub->cutoff->get(), 0.75f), "and an absolute CC lands on a step (100/127 -> 0.75)");
+    {
+        ceditor::host::Performance saved;
+        check (ceditor::host::Performance::fromVar (h.service->captureStateVar(), saved)
+                 && saved.pages[0].slots[0].binding.steps == 5,
+               "the step count survives a session round trip");
+    }
+
+    // The same CC learned on a second page, bound to something else.
+    h.cmd ("setControlSlotOptions", { { "pageId", pageA }, { "slotId", "s1" }, { "steps", 0 } });
+    h.cmd ("addControlPage", { { "name", "B" } });
+    const auto pageB = pageAt (1);
+    h.cmd ("assignControlSlot", { { "pageId", pageB }, { "slotId", "s1" },
+        { "partId", partId }, { "parameterId", "drive" } });
+    h.cmd ("learnControlSlotMidi", { { "pageId", pageB }, { "slotId", "s1" } });
+    move (0);
+
+    h.cmd ("showControlPage", { { "pageId", pageA } });
+    stub->cutoff->setValueNotifyingHost (0.5f);
+    move (127);
+    check (near (stub->cutoff->get(), 1.0f), "with page A shown, the shared knob drives page A");
+
+    h.cmd ("showControlPage", { { "pageId", pageB } });
+    stub->cutoff->setValueNotifyingHost (0.5f);
+    move (20);
+    check (near (stub->cutoff->get(), 0.5f), "with page B shown, page A's parameter is left alone");
+
+    // A knob learned on one page only still answers from any page.
+    h.cmd ("clearControlSlotMidi", { { "pageId", pageB }, { "slotId", "s1" } });
+    move (127);
+    check (near (stub->cutoff->get(), 1.0f), "a knob learned on a single page answers whatever page is shown");
+}
+
+void testPresetPages()
+{
+    std::cout << "\na page made for a preset is shown when that preset loads" << std::endl;
+
+    const auto dir = freshDataDir ("preset-pages");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    h.service->drainParameterEvents();
+
+    const auto recordId = [&h] (const juce::String& name)
+    {
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        if (const auto* lib = h.emits.last ("instrumentHostLibrary"))
+            for (const auto& r : *lib->getProperty ("records", {}).getArray())
+                if (r.getProperty ("name", {}).toString() == name)
+                    return r.getProperty ("recordId", {}).toString();
+        return juce::String();
+    };
+    h.cmd ("saveUserPreset", { { "partId", partId }, { "name", "Warm" } });
+    h.cmd ("saveUserPreset", { { "partId", partId }, { "name", "Cold" } });
+    const auto warm = recordId ("Warm"), cold = recordId ("Cold");
+    check (warm.isNotEmpty() && cold.isNotEmpty(), "two presets to switch between");
+
+    const auto load = [&] (const juce::String& id)
+    {
+        h.cmd ("loadLibraryRecord", { { "recordId", id }, { "action", "replace" }, { "partId", partId } });
+        h.service->drainParameterEvents();
+    };
+    const auto pageAt = [&h] (int i) { return h.emits.lastState()->getProperty ("rack", {})
+        .getProperty ("pages", {})[i].getProperty ("pageId", {}).toString(); };
+
+    h.cmd ("addControlPage", { { "name", "Ordinary" } });
+    h.cmd ("addControlPage", { { "name", "For Warm" } });
+    const auto ordinary = pageAt (0), forWarm = pageAt (1);
+
+    load (warm);
+    h.service->consumeSurfacePageRequest();
+    h.cmd ("setControlPagePreset", { { "pageId", forWarm }, { "partId", partId } });
+    check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {})[1]
+               .getProperty ("presetName", {}).toString() == "Warm",
+           "a page is tied to the preset the part has loaded");
+
+    h.cmd ("showControlPage", { { "pageId", ordinary } });
+    h.service->consumeSurfacePageRequest();
+
+    load (cold);
+    check (h.service->consumeSurfacePageRequest().isEmpty(),
+           "a preset with no page of its own leaves an ordinary page where it is");
+
+    load (warm);
+    check (h.service->consumeSurfacePageRequest() == forWarm, "loading the preset shows its page");
+
+    load (cold);
+    check (h.service->consumeSurfacePageRequest() == ordinary,
+           "and loading another sound goes back to an ordinary page, not the old preset's");
+
+    h.cmd ("setControlPagePreset", { { "pageId", forWarm } });
+    load (warm);
+    check (h.service->consumeSurfacePageRequest().isEmpty(), "an untied page is ordinary again");
+
+    {
+        h.cmd ("setControlPagePreset", { { "pageId", forWarm }, { "partId", partId } });
+        ceditor::host::Performance saved;
+        check (ceditor::host::Performance::fromVar (h.service->captureStateVar(), saved)
+                 && saved.pages[1].presetRecordId == warm && saved.pages[1].presetName == "Warm",
+               "the tie survives a session round trip");
+    }
+}
+
 void testMidiPickup()
 {
     std::cout << "\nOptional MIDI pickup and relative CCs" << std::endl;
@@ -5668,6 +6214,37 @@ void testMidiPickup()
     queue (127); queue (1);
     h.service->drainParameterEvents();
     check (near (stub->cutoff->get(), 1.0f / 127.0f), "relative turns retain their order at the lower limit");
+
+    // The other two encoder formats, and faster turns (steps above one).
+    stub->cutoff->setValueNotifyingHost (0.5f);
+    move (3);
+    check (near (stub->cutoff->get(), 0.5f + 3.0f / 127.0f), "two's complement: 3 is three steps up, not ignored");
+    move (125);
+    check (near (stub->cutoff->get(), 0.5f), "and 125 is three steps down");
+
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" }, { "midiRelativeFormat", 1 } });
+    stub->cutoff->setValueNotifyingHost (0.5f);
+    move (66);
+    check (near (stub->cutoff->get(), 0.5f + 2.0f / 127.0f), "offset binary: 66 is two steps up");
+    move (63);
+    check (near (stub->cutoff->get(), 0.5f + 1.0f / 127.0f), "and 63 is one step down");
+    move (64);
+    check (near (stub->cutoff->get(), 0.5f + 1.0f / 127.0f), "and 64 is rest");
+
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" }, { "midiRelativeFormat", 2 } });
+    stub->cutoff->setValueNotifyingHost (0.5f);
+    move (2);
+    check (near (stub->cutoff->get(), 0.5f + 2.0f / 127.0f), "sign bit: 2 is two steps up");
+    move (66);
+    check (near (stub->cutoff->get(), 0.5f), "and 66 is two steps down");
+    check ((int) slot().getProperty ("midiRelativeFormat", -1) == 2, "the format is part of the slot's state");
+    {
+        ceditor::host::Performance withFormat;
+        check (ceditor::host::Performance::fromVar (h.service->captureStateVar(), withFormat)
+                 && withFormat.pages[0].slots[0].midiRelativeFormat == 2,
+               "and survives a session round trip");
+    }
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" }, { "midiRelativeFormat", 0 } });
 
     ceditor::host::Performance restored;
     check (ceditor::host::Performance::fromVar (h.service->captureStateVar(), restored)
@@ -6505,6 +7082,177 @@ void testChainPresets()
     }
 }
 
+// Response profiles: a keyboard's velocity/expression calibration saved by name, with the port
+// it belongs to. Saving and removing go to a file beside the catalogue; a new Velocity module
+// starts from the profile of the keyboard that is connected; the touch readout lists every
+// note of a chord, not just the last message.
+void testResponseProfiles()
+{
+    std::cout << "\nresponse profiles and the touch readout" << std::endl;
+
+    const auto dir = freshDataDir ("response-profiles");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    juce::StringArray ports { "Some Other Port" };
+    h.service->midiPortNamesForProfiles = [&ports] { return ports; };
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+
+    h.cmd ("saveResponseProfile", { { "name", "Stage keys" }, { "portHint", "CTRL49" },
+                                    { "velocityCurve", "custom" },
+                                    { "velocityCurveValues", juce::Array<juce::var> { 0, 30, 50, 66, 80, 92, 104, 116, 127 } },
+                                    { "velocityInputMin", 12 }, { "velocityInputMax", 110 },
+                                    { "velocityFixed", 90 } });
+    auto profiles = [&h] { return h.emits.lastState()->getProperty ("responseProfiles", {}); };
+    check (profiles().size() == 1 && profiles()[0].getProperty ("name", {}).toString() == "Stage keys"
+             && (int) profiles()[0].getProperty ("velocityInputMin", 0) == 12,
+           "a saved profile is listed in the state");
+    check (! profiles()[0].getDynamicObject()->hasProperty ("velocityFixed"),
+           "and carries the calibration only, not what the part does with it");
+    check (dir.getChildFile ("response-profiles.json").existsAsFile(), "it is written beside the catalogue");
+    check (h.emits.lastState()->getProperty ("responseProfileForPorts", {}).toString().isEmpty(),
+           "with its keyboard not connected, nothing matches");
+
+    auto velocitySlot = [&h]
+    {
+        const auto chain = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                               .getProperty ("midiChain", {});
+        juce::var found;
+        for (int i = 0; i < chain.size(); ++i)
+            if (chain[i].getProperty ("type", {}).toString() == "velocity")
+                found = chain[i];
+        return found;
+    };
+    h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "velocity" } });
+    check (velocitySlot().getProperty ("fx", {}).getProperty ("velocityCurve", {}).toString() == "linear",
+           "a new Velocity module without its keyboard starts plain");
+
+    ports.add ("CTRL49 USB");
+    h.cmd ("saveResponseProfile", { { "name", "Stage keys" }, { "portHint", "CTRL49" },
+                                    { "velocityCurve", "custom" },
+                                    { "velocityCurveValues", juce::Array<juce::var> { 0, 30, 50, 66, 80, 92, 104, 116, 127 } },
+                                    { "velocityInputMin", 12 }, { "velocityInputMax", 110 } });
+    check (profiles().size() == 1, "saving the same name replaces it");
+    check (h.emits.lastState()->getProperty ("responseProfileForPorts", {}).toString() == "Stage keys",
+           "with its keyboard connected, the profile is the one that matches");
+    h.cmd ("removeMidiSlot", { { "partId", partId }, { "slotId", velocitySlot().getProperty ("slotId", {}) } });
+    h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "velocity" } });
+    const auto fx = velocitySlot().getProperty ("fx", {});
+    check (fx.getProperty ("velocityCurve", {}).toString() == "custom"
+             && (int) fx.getProperty ("velocityInputMin", 0) == 12
+             && (int) fx.getProperty ("velocityCurveValues", {})[1] == 30
+             && fx.getProperty ("responseProfileName", {}).toString() == "Stage keys",
+           "and a new Velocity module starts from it, named");
+
+    h.cmd ("removeResponseProfile", { { "name", "Stage keys" } });
+    check (profiles().size() == 0, "removing takes it away");
+    h.emits.clear();
+    h.cmd ("saveResponseProfile", { { "name", "  " } });
+    check (h.emits.lastError().contains ("needs a name"), "a profile without a name is refused");
+
+    // The touch readout: three notes of a chord in one tick arrive as three touches.
+    h.emits.clear();
+    for (const auto note : { 60, 64, 67 })
+        h.service->noteMidiActivity ("Keys", juce::MidiMessage::noteOn (1, note, (juce::uint8) (40 + note - 60)));
+    h.service->noteMidiActivity ("Keys", juce::MidiMessage::channelPressureChange (1, 77));
+    h.service->drainParameterEvents();
+    const auto* activity = h.emits.last ("instrumentHostMidiActivity");
+    const auto touch = activity != nullptr ? activity->getProperty ("touch", {}) : juce::var();
+    check (touch.size() == 4 && (int) touch[0][0] == 0 && (int) touch[1][1] == 64 && (int) touch[2][2] == 47
+             && (int) touch[3][0] == 2 && (int) touch[3][2] == 77,
+           "every note of a chord and the pressure reach the readout, in order");
+}
+
+// The song key: set on the part, applied to the modules that follow it, saved with the part,
+// and migrated from the part's old note-shaping scale for a session written before it existed.
+void testSongKey()
+{
+    std::cout << "\nthe song key" << std::endl;
+
+    const auto dir = freshDataDir ("song-key");
+    seedTwoSynthCatalog (dir);
+    juce::String partId;
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("setPartKey", { { "partId", partId }, { "root", 9 }, { "scale", "minor" } });
+        const auto part = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
+        check ((int) part.getProperty ("keyRoot", -1) == 9 && part.getProperty ("keyScale", {}).toString() == "minor",
+               "the part carries its song key");
+        h.emits.clear();
+        h.cmd ("setPartKey", { { "partId", partId }, { "scale", "mixolydian-ish" } });
+        check (h.emits.lastError().contains ("Unknown scale"), "a scale the engine does not know is refused");
+
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "transpose" } });
+        const auto chain = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                               .getProperty ("midiChain", {});
+        juce::var key;
+        for (int i = 0; i < chain.size(); ++i)
+            if (chain[i].getProperty ("type", {}).toString() == "key")
+                key = chain[i];
+        check (key.isObject() && (bool) key.getProperty ("fx", {}).getProperty ("followSongKey", false),
+               "adding a Transpose makes a Key module that follows the song key");
+
+        // The arp's scale lives in its fx block; its key fields reach it through the slot options.
+        juce::String arpId;
+        for (int i = 0; i < chain.size(); ++i)
+            if (chain[i].getProperty ("type", {}).toString() == "arp")
+                arpId = chain[i].getProperty ("slotId", {}).toString();
+        h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", arpId },
+                                       { "followSongKey", false }, { "scaleType", "dorian" }, { "scaleRoot", 2 } });
+        const auto after = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                               .getProperty ("midiChain", {});
+        juce::var arpFx;
+        for (int i = 0; i < after.size(); ++i)
+            if (after[i].getProperty ("slotId", {}).toString() == arpId)
+                arpFx = after[i].getProperty ("fx", {});
+        check (! (bool) arpFx.getProperty ("followSongKey", true) && arpFx.getProperty ("scaleType", {}).toString() == "dorian"
+                 && (int) arpFx.getProperty ("scaleRoot", 0) == 2,
+               "the arpeggiator can be given a key of its own");
+
+        // A module's Amount is a parameter like any other: listed, readable, writable.
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "strum" } });
+        const auto withStrum = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                                   .getProperty ("midiChain", {});
+        const auto strumId = withStrum[withStrum.size() - 1].getProperty ("slotId", {}).toString();
+        h.emits.clear();
+        h.cmd ("getParameters", { { "partId", partId } });
+        const auto params = h.emits.entries.back().payload.getProperty ("parameters", {});
+        juce::var amount;
+        for (int i = 0; i < params.size(); ++i)
+            if (params[i].getProperty ("id", {}).toString() == "@amount:" + strumId)
+                amount = params[i];
+        check (amount.isObject() && amount.getProperty ("group", {}).toString() == "MIDI modules"
+                 && amount.getProperty ("name", {}).toString() == juce::String (juce::CharPointer_UTF8 ("Amount \xe2\x80\x94 Strum"))
+                 && juce::approximatelyEqual ((float) (double) amount.getProperty ("value", 0.0), 1.0f),
+               "each strum, humanize, echo and chance module lists its Amount");
+        h.cmd ("setParameter", { { "partId", partId }, { "id", "@amount:" + strumId }, { "value", 0.25 } });
+        const auto after2 = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                                .getProperty ("midiChain", {});
+        check (juce::approximatelyEqual ((float) (double) after2[after2.size() - 1].getProperty ("amount", 0.0), 0.25f),
+               "and a knob on it sets the module's Amount");
+
+        // Module presets: saved per type, listed in the state, removed by name.
+        h.cmd ("saveModulePreset", { { "type", "strum" }, { "name", "Folk" },
+                                     { "settings", juce::var (new juce::DynamicObject()) } });
+        check (h.emits.lastState()->getProperty ("modulePresets", {}).size() == 1, "a module preset is saved");
+        h.cmd ("removeModulePreset", { { "type", "strum" }, { "name", "Folk" } });
+        check (h.emits.lastState()->getProperty ("modulePresets", {}).size() == 0, "and removed");
+    }
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        const auto part = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
+        check ((int) part.getProperty ("keyRoot", -1) == 9 && part.getProperty ("keyScale", {}).toString() == "minor",
+               "and keeps it across a restart");
+    }
+}
+
 void testChordLearn()
 {
     std::cout << "\nchord learn (the chorder's capture)" << std::endl;
@@ -6560,25 +7308,118 @@ void testChordLearn()
 
         const auto fx = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
                             .getProperty ("midiFx", {});
-        const auto chords = fx.getProperty ("keyChords", {});
-        check (chords.size() == 1 && (int) chords[0].getProperty ("key", -1) == 62,
-               "the capture sits in the part's MIDI FX");
-        const auto offsets = chords[0].getProperty ("offsets", {});
-        check (offsets.size() == 3 && (int) offsets[0] == -2 && (int) offsets[1] == 2
-                 && (int) offsets[2] == 5,
-               "stored as offsets from the target key, sorted");
+        const auto set = fx.getProperty ("chordSet", {});
+        const auto keys = fx.getProperty ("keyMap", {});
+        check (set.size() == 1 && keys.size() == 1 && (int) keys[0].getProperty ("key", -1) == 62
+                 && (int) keys[0].getProperty ("chord", -1) == 0,
+               "the capture joins the part's chord set and the key points at it");
+        const auto notes = set[0].getProperty ("notes", {});
+        check (notes.size() == 3 && (int) notes[0] == 60 && (int) notes[1] == 64
+                 && (int) notes[2] == 67 && (bool) fx.getProperty ("chordKeyMap", false),
+               "stored as the notes played, sorted, with the key-map layer on");
     }
 
     {
         // Manifest state: a fresh service still knows the chord; clearing removes it.
         Harness h (dir);
         h.cmd ("getState");
-        auto chordsOf = [&h] { return h.emits.lastState()->getProperty ("rack", {})
-                                        .getProperty ("parts", {})[0]
-                                        .getProperty ("midiFx", {}).getProperty ("keyChords", {}); };
-        check (chordsOf().size() == 1, "the learned chord survives restart with the part");
+        auto fxOf = [&h] { return h.emits.lastState()->getProperty ("rack", {})
+                                    .getProperty ("parts", {})[0].getProperty ("midiFx", {}); };
+        check (fxOf().getProperty ("keyMap", {}).size() == 1,
+               "the learned chord survives restart with the part");
         h.cmd ("clearKeyChord", { { "partId", partId }, { "key", 62 } });
-        check (chordsOf().size() == 0, "and clearing takes exactly it away");
+        check (fxOf().getProperty ("keyMap", {}).size() == 0
+                 && fxOf().getProperty ("chordSet", {}).size() == 1,
+               "clearing forgets the key and keeps the chord in the set");
+    }
+
+    {
+        // A Chords module in the chain learns into itself, named by its slot.
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "chord" } });
+        auto chainOf = [&h] { return h.emits.lastState()->getProperty ("rack", {})
+                                       .getProperty ("parts", {})[0].getProperty ("midiChain", {}); };
+        juce::var chordSlot;
+        for (int i = 0; i < chainOf().size(); ++i)
+            if (chainOf()[i].getProperty ("type", {}).toString() == "chord")
+                chordSlot = chainOf()[i];
+        const auto slotId = chordSlot.getProperty ("slotId", {}).toString();
+        check (slotId.isNotEmpty(), "a Chords module is in the chain");
+
+        h.cmd ("learnKeyChord", { { "partId", partId }, { "slotId", slotId } });
+        h.service->noteMidiActivity ("Keys", on (48));
+        h.service->noteMidiActivity ("Keys", off (48));
+        h.service->drainParameterEvents();
+        for (const auto note : { 57, 60, 64 }) h.service->noteMidiActivity ("Keys", on (note));
+        for (const auto note : { 57, 60, 64 }) h.service->noteMidiActivity ("Keys", off (note));
+        h.service->drainParameterEvents();
+
+        juce::var fx;
+        for (int i = 0; i < chainOf().size(); ++i)
+            if (chainOf()[i].getProperty ("slotId", {}).toString() == slotId)
+                fx = chainOf()[i].getProperty ("fx", {});
+        check (fx.getProperty ("keyMap", {}).size() == 1
+                 && (int) fx.getProperty ("keyMap", {})[0].getProperty ("key", -1) == 48
+                 && fx.getProperty ("chordSet", {})[0].getProperty ("notes", {}).size() == 3,
+               "the named module holds the learned chord, not the part-level block");
+
+        // The set and the map can be written whole, and a key past the set is dropped.
+        juce::Array<juce::var> set;
+        auto* chord = new juce::DynamicObject();
+        chord->setProperty ("notes", juce::Array<juce::var> { 50, 53, 57 });
+        chord->setProperty ("quality", "minor");
+        chord->setProperty ("root", 50);
+        set.add (juce::var (chord));
+        juce::Array<juce::var> map;
+        auto* good = new juce::DynamicObject();
+        good->setProperty ("key", 36); good->setProperty ("chord", 0);
+        auto* stray = new juce::DynamicObject();
+        stray->setProperty ("key", 37); stray->setProperty ("chord", 4);
+        map.add (juce::var (good));
+        map.add (juce::var (stray));
+        h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", slotId },
+                                       { "chordSet", set }, { "keyMap", map },
+                                       { "chord", "m7" }, { "chordFollow", false },
+                                       { "chordFollowHigh", 59 }, { "chordBass", true } });
+        for (int i = 0; i < chainOf().size(); ++i)
+            if (chainOf()[i].getProperty ("slotId", {}).toString() == slotId)
+                fx = chainOf()[i].getProperty ("fx", {});
+        check (fx.getProperty ("chordSet", {}).size() == 1
+                 && fx.getProperty ("keyMap", {}).size() == 1
+                 && (int) fx.getProperty ("keyMap", {})[0].getProperty ("key", -1) == 36,
+               "the set and map are replaced whole, and a key pointing past the set is dropped");
+        check (fx.getProperty ("chord", {}).toString() == "m7"
+                 && ! (bool) fx.getProperty ("chordFollow", true)
+                 && (int) fx.getProperty ("chordFollowHigh", 0) == 59
+                 && (bool) fx.getProperty ("chordBass", false),
+               "beside chordFollow, chord only picks the shape; the light stays where it was put");
+
+        // Pads and the progression are fields like the rest; steps past the set are dropped.
+        h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", slotId },
+                                       { "chordPads", true }, { "padMap", juce::Array<juce::var> { 0, -1, 7 } },
+                                       { "chordProgression", true }, { "progression", juce::Array<juce::var> { 0, 3, 0 } },
+                                       { "progressionAdvance", "pedal" }, { "progressionHigh", 59 } });
+        for (int i = 0; i < chainOf().size(); ++i)
+            if (chainOf()[i].getProperty ("slotId", {}).toString() == slotId)
+                fx = chainOf()[i].getProperty ("fx", {});
+        const auto pads = fx.getProperty ("padMap", {});
+        const auto steps = fx.getProperty ("progression", {});
+        check ((bool) fx.getProperty ("chordPads", false) && pads.size() == 3 && (int) pads[0] == 0
+                 && (int) pads[2] == -1,
+               "pads keep their places, and a pad past the set is empty");
+        check ((bool) fx.getProperty ("chordProgression", false) && steps.size() == 2
+                 && fx.getProperty ("progressionAdvance", {}).toString() == "pedal"
+                 && (int) fx.getProperty ("progressionHigh", 0) == 59,
+               "the progression keeps its steps in order, without the one past the set");
+
+        h.emits.clear();
+        h.cmd ("chordPad", { { "partId", partId }, { "pad", 0 }, { "velocity", 100 } });
+        h.cmd ("chordPad", { { "partId", partId }, { "pad", 0 }, { "velocity", 0 } });
+        h.cmd ("chordStep", { { "partId", partId }, { "delta", 1 } });
+        check (h.emits.lastError().isEmpty(), "playing a pad and stepping are accepted");
+        h.cmd ("chordPad", { { "partId", "nope" }, { "pad", 0 } });
+        check (h.emits.lastError().contains ("Unknown rack part"), "and an unknown part says so");
     }
 }
 
@@ -9773,10 +10614,47 @@ void testPerformanceSystem()
         // -- the setlist ---------------------------------------------------------------------
         h.cmd ("addSetlistItem", { { "sceneId", sceneId }, { "name", "Opener" } });
         h.cmd ("addSetlistItem", { { "sceneId", "gone-scene" }, { "name", "Broken" } });
+        const auto beforeGo = juce::Time::currentTimeMillis();
         h.cmd ("setlistGo", { { "index", 0 } });
         check ((int) h.emits.lastState()->getProperty ("performance", {})
                    .getProperty ("setlist", {}).getProperty ("currentIndex", -1) == 0,
                "the setlist recalls its first item");
+        {
+            const auto performanceState = h.emits.lastState()->getProperty ("performance", {});
+            const auto setlistState = performanceState.getProperty ("setlist", {});
+            const auto started = (juce::int64) (double) setlistState.getProperty ("startedAtMs", 0.0);
+            const auto songStarted = (juce::int64) (double) setlistState.getProperty ("songStartedAtMs", 0.0);
+            check (started >= beforeGo && songStarted == started,
+                   "the set and its first song start their clocks together");
+            check (performanceState.getProperty ("currentSceneId", {}).toString() == sceneId,
+                   "and the scene it recalled is the scene the stage is in");
+
+            const auto itemId = setlistState.getProperty ("items", {})[0].getProperty ("itemId", {}).toString();
+            h.cmd ("setSetlistItem", { { "itemId", itemId }, { "plannedSeconds", 245 } });
+            const auto planned = (int) h.emits.lastState()->getProperty ("performance", {})
+                                     .getProperty ("setlist", {}).getProperty ("items", {})[0]
+                                     .getProperty ("plannedSeconds", 0);
+            check (planned == 245, "a song can carry how long it should take");
+            h.cmd ("setSetlistItem", { { "itemId", itemId }, { "plannedSeconds", 99999 } });
+            check ((int) h.emits.lastState()->getProperty ("performance", {})
+                       .getProperty ("setlist", {}).getProperty ("items", {})[0]
+                       .getProperty ("plannedSeconds", 0) == 3600, "at most an hour");
+            h.cmd ("setSetlistItem", { { "itemId", itemId }, { "plannedSeconds", 245 } });
+
+            juce::Thread::sleep (20);
+            h.cmd ("resetSetlistClock");
+            const auto reset = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {});
+            check ((juce::int64) (double) reset.getProperty ("startedAtMs", 0.0) > started
+                     && reset.getProperty ("startedAtMs", 0.0) == reset.getProperty ("songStartedAtMs", 1.0)
+                     && (int) reset.getProperty ("currentIndex", -1) == 0,
+                   "the clocks can restart from here without moving the song");
+            juce::Thread::sleep (20);
+            h.cmd ("setlistGo", { { "index", 0 } });
+            const auto again = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {});
+            check ((juce::int64) (double) again.getProperty ("startedAtMs", 0.0)
+                       > (juce::int64) (double) reset.getProperty ("startedAtMs", 0.0),
+                   "going to song 1 starts the set over");
+        }
 
         h.emits.clear();
         h.cmd ("setlistNext");
@@ -9786,17 +10664,28 @@ void testPerformanceSystem()
                    .getProperty ("setlist", {}).getProperty ("currentIndex", -1) == 0,
                "and leaves the rig on the last item that worked");
 
-        // -- the song/scene arranger: ordered scene blocks, not a second timeline ------------
-        h.cmd ("addArrangementItem", { { "sceneId", sceneId }, { "name", "Intro" },
+        // -- a song's sections: ordered scene blocks, not a second timeline -----------------
+        const auto songId = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {})
+                              .getProperty ("items", {})[0].getProperty ("itemId", {}).toString();
+        h.cmd ("addArrangementItem", { { "songId", songId }, { "sceneId", sceneId }, { "name", "Intro" },
                                          { "bars", 2 } });
-        h.cmd ("addArrangementItem", { { "sceneId", sceneId }, { "name", "Verse" } });
+        h.cmd ("addArrangementItem", { { "songId", songId }, { "sceneId", sceneId }, { "name", "Verse" } });
         auto arrangement = h.emits.lastState()->getProperty ("performance", {})
                                .getProperty ("arrangement", {});
+        check (arrangement.getProperty ("songId", {}).toString() == songId
+                 && arrangement.getProperty ("items", {}).size() == 2,
+               "what plays is the current song's sections");
+        check (h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {})
+                   .getProperty ("items", {})[0].getProperty ("sections", {}).size() == 2,
+               "and the song carries them");
         const auto secondArrangementId = arrangement.getProperty ("items", {})[1]
                                            .getProperty ("itemId", {}).toString();
-        h.cmd ("setArrangementItem", { { "itemId", secondArrangementId }, { "bars", 8 } });
-        h.cmd ("moveArrangementItem", { { "itemId", secondArrangementId }, { "index", 0 } });
-        h.cmd ("setArrangementOptions", { { "loop", true } });
+        h.cmd ("setArrangementItem", { { "songId", songId }, { "itemId", secondArrangementId }, { "bars", 8 } });
+        h.cmd ("moveArrangementItem", { { "songId", songId }, { "itemId", secondArrangementId }, { "index", 0 } });
+        h.cmd ("setArrangementOptions", { { "songId", songId }, { "loop", true } });
+        h.emits.clear();
+        h.cmd ("addArrangementItem", { { "songId", "no-such-song" }, { "sceneId", sceneId } });
+        check (h.emits.lastError().contains ("Unknown song"), "a song that is not in the set is refused");
         // This assertion exercises the parked-start path. The looper deliberately started
         // the shared transport earlier, so park it and let the audio edge consume the stop.
         h.cmd ("transportStop");
@@ -9808,6 +10697,28 @@ void testPerformanceSystem()
                  && (int) arrangement.getProperty ("currentIndex", -1) == 0,
                "the arranger recalls its first block while parked and arms the shared transport");
         h.cmd ("stopArrangement");
+
+        // Going to a song while the transport runs plays its sections from the top.
+        h.cmd ("transportPlay");
+        buffer.clear(); h.service->getGraph().processBlock (buffer, midi);
+        h.cmd ("setlistGo", { { "index", 0 } });
+        arrangement = h.emits.lastState()->getProperty ("performance", {}).getProperty ("arrangement", {});
+        check ((bool) arrangement.getProperty ("playing", false) && arrangement.getProperty ("songId", {}).toString() == songId,
+               "a song with sections starts them when it begins while the transport runs");
+        h.cmd ("stopArrangement");
+        h.cmd ("transportStop");
+        buffer.clear(); h.service->getGraph().processBlock (buffer, midi);
+
+        // Moving songs around the current one keeps it current.
+        h.cmd ("addSetlistItem", { { "sceneId", sceneId }, { "name", "Closer" } });
+        const auto closerId = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {})
+                                .getProperty ("items", {})[2].getProperty ("itemId", {}).toString();
+        h.cmd ("moveSetlistItem", { { "itemId", closerId }, { "index", 0 } });
+        const auto moved = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {});
+        check ((int) moved.getProperty ("currentIndex", -1) == 1
+                 && moved.getProperty ("items", {})[1].getProperty ("itemId", {}).toString() == songId,
+               "moving another song in front keeps the current song current");
+        h.cmd ("removeSetlistItem", { { "itemId", closerId } });
 
         // -- MIDI Freeze/Bounce -------------------------------------------------------------
         h.cmd ("setPartMidiFx", { { "partId", partA }, { "transpose", 12 } });
@@ -9848,6 +10759,7 @@ void testPerformanceSystem()
              && performance.getProperty ("clips", {}).size() == 6
              && performance.getProperty ("scenes", {}).size() == 1
              && performance.getProperty ("setlist", {}).getProperty ("items", {}).size() == 2
+             && performance.getProperty ("setlist", {}).getProperty ("items", {})[0].getProperty ("sections", {}).size() == 2
              && performance.getProperty ("arrangement", {}).getProperty ("items", {}).size() == 2
              && (bool) performance.getProperty ("arrangement", {}).getProperty ("loop", false),
            "patterns, clips, scenes, setlist and arrangement all come back");
@@ -11630,7 +12542,9 @@ void testPluginSnapshots()
             check (shot.isEmpty(), "a class with no artwork carries no snapshotUrl at all");
     }
 
-    check (url.startsWith ("/plugin-snapshot/"), "the class with artwork carries a route, not a path");
+    check (url.contains ("plugin-snapshot/"), "the class with artwork carries a route, not a path");
+    check (url.startsWith ("https://juce.backend/plugin-snapshot/") || url.startsWith ("juce://juce.backend/plugin-snapshot/"),
+           "at the resource provider's root, so a page served by Vite in a dev build still reaches it");
     check (! url.containsIgnoreCase (dir.getFullPathName()) && ! url.contains ("good-synth.png"),
            "and the route says nothing about where the file is");
 
@@ -12317,6 +13231,52 @@ void testParameterLearnAndFavourites()
 // many of each control it has. The owner says, or CEditor counts while they sweep. Everything
 // downstream — the drawing, assignment on it, live feedback, page generation — then works
 // exactly as it does for the CTRL49, because it all keys off the same indices.
+void testSurfaceByConnectedPort()
+{
+    std::cout << "\nthe controller drawing is of what is plugged in" << std::endl;
+
+    ceditor::ctrl49::SurfaceProfile fake;
+    fake.profileId = "test-fakekeys";
+    fake.displayName = "FakeKeys 25";
+    fake.vendor = "Test";
+    fake.capabilities.encoders = 4;
+    fake.layout = ceditor::ctrl49::buildGenericLayout (fake.capabilities);
+    fake.portNameHints = { "FakeKeys" };
+    ceditor::ctrl49::SurfaceProfileRegistry::instance().registerProfile (fake);
+
+    Harness h (freshDataDir ("surface-by-port"));
+    h.cmd ("getState");
+    juce::StringArray ports { "2- FAKEKEYS MIDI 1", "Some Other Synth" };
+    h.service->midiPortNamesForProfiles = [&ports] { return ports; };
+
+    const auto layout = [&h]
+    {
+        h.cmd ("getSurfaceLayout");
+        const auto* emitted = h.emits.last ("instrumentHostSurfaceLayout");
+        return emitted != nullptr ? *emitted : juce::var();
+    };
+
+    auto shown = layout();
+    check (shown.getProperty ("profileId", {}).toString() == "test-fakekeys"
+             && (bool) shown.getProperty ("connected", false),
+           "a connected controller's own drawing is shown, matched by its port name");
+
+    ports = { "Some Other Synth" };
+    shown = layout();
+    check (shown.getProperty ("profileId", {}).toString() == "akai-ctrl49"
+             && ! (bool) shown.getProperty ("connected", true),
+           "with nothing recognised plugged in, the first authored drawing answers, not claiming to be connected");
+
+    ports = { "CTRL49 USB", "2- FAKEKEYS MIDI 1" };
+    shown = layout();
+    check ((bool) shown.getProperty ("connected", false), "a CTRL49 is recognised by its port too");
+
+    h.cmd ("getSurfaceLayout", { { "profileId", "test-fakekeys" } });
+    const auto* asked = h.emits.last ("instrumentHostSurfaceLayout");
+    check (asked != nullptr && asked->getProperty ("profileId", {}).toString() == "test-fakekeys",
+           "and a drawing asked for by name is still the one shown");
+}
+
 void testUserDescribedSurface()
 {
     std::cout << "\na controller nobody profiled" << std::endl;
@@ -13049,15 +14009,20 @@ int main (int argc, char* argv[])
     testFirstClickAndTheOnScreenKeyboard();
     testMidiLearn();
     testMidiPickup();
+    testSteppedControlsAndShownPage();
+    testPresetPages();
     testSetlistSoundcheck();
     testPresetWalking();
     testFloatingEditors();
     testChordLearn();
+    testResponseProfiles();
+    testSongKey();
     testMidiChainCommands();
     testChainPresets();
     testGroupBuses();
     testCtrl49Broker();
     testCtrl49AppScreen();
+    testCtrl49DiscoveryReasons();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();
     testSupersededLoad();
@@ -13068,6 +14033,8 @@ int main (int argc, char* argv[])
     testSupportBundle();
     testEditionsInTheService();
     testEditorPolicy();
+    testStateFolders();
+    testSectionsMigration();
     testScan (stubWorker);
     testWrapperContext();
     testParameterModel();
@@ -13124,6 +14091,7 @@ int main (int argc, char* argv[])
     testRecordRecency();
     testRecordFamily();
     testMovedLibraryRelinks();
+    testLibrarySort();
     testDuplicateFold();
     testDuplicateFoldCommands();
     testUsageCounters();
@@ -13138,6 +14106,7 @@ int main (int argc, char* argv[])
     testCustomArtwork();
     testParameterLearnAndFavourites();
     testUserDescribedSurface();
+    testSurfaceByConnectedPort();
     testMicrotuningManager();
     testWholePerformanceRecorderAndReplay();
     testAutomaticFailover();

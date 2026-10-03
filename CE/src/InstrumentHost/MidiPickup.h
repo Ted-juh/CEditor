@@ -41,7 +41,27 @@ struct MidiPickup
         return previous < target ? 1 : -1;
     }
 
-    // Explicit 1/127 relative mode; other encodings are never guessed from a sweep.
-    static int relativeStep (int value) { return value == 1 ? 1 : value == 127 ? -1 : 0; }
+    // The three ways controllers send an encoder turn as one CC value. Chosen per slot, never
+    // guessed from a sweep: 1 and 127 mean +1/-1 in two's complement and "far down"/"far up"
+    // in offset binary, so no single reading of a value is safe for every controller.
+    //   twosComplement  1..63 = +n, 65..127 = n-128 (so 127 = -1). Includes the old 1/127 mode.
+    //   offsetBinary    64 is rest, 65.. = +n, ..63 = -n.
+    //   signMagnitude   bit 6 is the sign: 1..63 = +n, 65..127 = -(n-64).
+    enum class RelativeFormat { twosComplement = 0, offsetBinary = 1, signMagnitude = 2 };
+    static constexpr int relativeFormatCount = 3;
+
+    static int relativeStep (int value, RelativeFormat format = RelativeFormat::twosComplement)
+    {
+        value &= 0x7F;
+        switch (format)
+        {
+            case RelativeFormat::offsetBinary:  return value - 64;
+            case RelativeFormat::signMagnitude: return value == 0 || value == 64 ? 0
+                                                     : (value & 0x40) ? -(value & 0x3F) : (value & 0x3F);
+            case RelativeFormat::twosComplement:
+            default:                            return value == 0 || value == 64 ? 0
+                                                     : value < 64 ? value : value - 128;
+        }
+    }
 };
 }

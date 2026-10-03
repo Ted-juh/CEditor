@@ -45,6 +45,12 @@ inline bool applyVendorPresetInWorker (juce::AudioPluginInstance& instrument, co
         return file.getSize() <= 64 * 1024 * 1024 && file.loadFileAsData (bytes)
             && juce::VST3PluginFormat::setStateFromVSTPresetFile (&instrument, bytes);
 
+    // Anything else reaches here only from a preset folder that was assigned to this plug-in
+    // and passed a test load: the file is the plug-in's own saved component state.
+    if (! isNamedVendorPresetFile (file))
+        return file.getSize() > 0 && file.getSize() <= 64 * 1024 * 1024 && file.loadFileAsData (bytes)
+            && applyVendorComponentState (instrument, bytes);
+
     const auto preset = readVendorPreset (file);
     const auto description = instrument.getPluginDescription();
     if (! preset || ! description.name.equalsIgnoreCase (preset.instrument)

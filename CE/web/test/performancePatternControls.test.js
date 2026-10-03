@@ -21,6 +21,9 @@ import {
   hostState, mockHostState, applyMockCommand,
 } from '../src/CE_Application/stores/instrumentHost.js';
 
+// Performance opens on the songs; these tests are about the Patterns page, so open there.
+globalThis.localStorage = { getItem: () => JSON.stringify({ tab: 'patterns' }), setItem() {} };
+
 function renderWith(state) {
   hostState.set(state);
   return render(PerformancePanel, { props: {} }).body;

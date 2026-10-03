@@ -59,7 +59,7 @@ try {
   assert.equal(await zone.count(), 1, 'only the selected part gets the input observation');
   await zone.click();
   assert.match(await page.getByTestId('dock-tab-zone').getAttribute('class'), /\bon\b/);
-  assert.equal(await page.locator('.midi-zone select').evaluate(el => el === document.activeElement), true);
+  assert.equal(await page.getByTestId('zone-channel').evaluate(el => el === document.activeElement), true);
   await zone.waitFor({ state: 'detached', timeout: 4000 });
   await page.evaluate(() => window.sendIssueNote(72));
   assert.equal(await zone.count(), 0, 'accepted note is quiet');
@@ -91,6 +91,9 @@ try {
   for (const width of [1280, 900, 640]) {
     await page.setViewportSize({ width, height: 900 });
     const icon = page.getByTestId('part-issue-solo-other').first();
+    // Arrive fresh, as a user would: re-focusing the icon that already has focus fires no focus
+    // event, and the resize that would re-place the tip lands a frame after setViewportSize.
+    await icon.evaluate((el) => el.blur());
     await icon.focus();
     const box = await page.locator('.issue-tip').boundingBox();
     assert.ok(box.x >= 0 && box.x + box.width <= width, `tooltip fits at ${width}`);

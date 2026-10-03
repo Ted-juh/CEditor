@@ -2,16 +2,20 @@
 // draws what the keyboard would be sent. Each function names the one it mirrors; when those
 // change, these change with them. test/ctrl49Payloads.test.js pins the byte layouts.
 //
-//   set_labels  [titleLen][title][ 8 x [labelLen][label] ]   ASCII, '?' for anything else, 255 cap
+//   set_labels  [titleLen][title][ 8 x [labelLen][label] ]   ASCII, '?' for anything else, 90 cap
 //   set_values  [activeSlot][v0..v7]                          each 0..127
 
 const encoder = new TextEncoder();
+
+// kMaxLabelCharacters in Ctrl49RackDisplay.h: nine strings this long still fit the device's
+// 1000-byte frame.
+export const MAX_LABEL_CHARACTERS = 90;
 
 // appendString in Ctrl49RackDisplay.cpp / Ctrl49PerformanceDisplay.cpp: the std::string is UTF-8,
 // and every byte at or above 0x80 becomes '?' — so "é" is two question marks, as on the device.
 function appendString(out, text) {
   const bytes = encoder.encode(String(text ?? ''));
-  const length = Math.min(255, bytes.length);
+  const length = Math.min(MAX_LABEL_CHARACTERS, bytes.length);
   out.push(length);
   for (let i = 0; i < length; i++) out.push(bytes[i] < 0x80 ? bytes[i] : 0x3f);
 }
@@ -60,12 +64,17 @@ export function performanceLabelPayload(transport, clips) {
   return out;
 }
 
-/** buildPerformanceStatePayload: the active clip, then each clip's phase as a knob. */
-export function performanceStatePayload(activeClip, clips) {
+/** buildPerformanceStatePayload: the active clip, then each clip's phase as a knob. With a
+    transport, three more bytes the page reads only on the performance page: [9] kind (1),
+    [10] the beat in the bar (0 when stopped), [11] beats per bar. */
+export function performanceStatePayload(activeClip, clips, transport) {
   const out = [clamp127(activeClip)];
   for (let i = 0; i < 8; i++) {
     const phase = Math.max(0, Math.min(1, Number(clips[i]?.phase) || 0));
     out.push(clamp127(Math.trunc(phase * 127)));
+  }
+  if (transport) {
+    out.push(1, transport.playing ? clamp127(transport.beat ?? 1) : 0, clamp127(transport.beatsPerBar ?? 4));
   }
   return out;
 }

@@ -313,6 +313,13 @@ struct LibraryQuery
     LibraryRange brightness, attack, tail, width, cost;
     bool measuredOnly = false;
 
+    // The order results come back in. Empty is library order. The others are "name",
+    // "instrument", "category", "rating", "recent" (last loaded), "loads", "added", and the
+    // measured "brightness", "attack", "tail" and "width". Sorting happens here rather than in
+    // the page because the page only ever holds one slice of a large result.
+    juce::String sort;
+    bool sortDescending = false;
+
     /** True when any measured axis is narrowed — what the browser gates its "unmeasured" notice
         on, and what tells the service the analysis is worth offering. */
     bool usesMeasurements() const
@@ -538,10 +545,17 @@ juce::Array<const LibraryRecord*> searchLibrary (const Library& library,
                                                  const juce::String& query,
                                                  const juce::String& type = {});
 
-/** Everything the query keeps, in library order. */
+/** Everything the query keeps, in the query's `sort` order (library order when it names none). */
 juce::Array<const LibraryRecord*> searchLibrary (const Library& library,
                                                  const LibraryQuery& query,
                                                  const LibraryAvailability& isAvailable = {});
+
+/** Puts results in the order `key` names (see LibraryQuery::sort), ascending unless
+    `descending`. Ties go by name, then library order. A record with no value for the key (never
+    loaded, never rated, no arrival time, not measured) goes last in either direction: an unknown
+    is not the smallest value, and "brightest first" should not open on sounds nobody has heard. */
+void sortLibraryResults (juce::Array<const LibraryRecord*>& results, const juce::String& key,
+                         bool descending);
 
 /** One sound in a family, as `recordFamily` found it. */
 struct FamilyNode

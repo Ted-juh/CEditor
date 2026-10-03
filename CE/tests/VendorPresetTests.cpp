@@ -94,6 +94,13 @@ void testParsersAndDiscovery()
     check (nk && nk.sourceType == "nksf" && nk.instrument == "Massive X"
            && nk.componentState.getSize() == 16 && nk.name.startsWith ("Warm"), "NKS identity, UTF-8 metadata and unwrapped component state");
     check (readVendorPreset (fxp).componentState.getSize() == 16, "FXP strips its 60-byte VST2 wrapper");
+    check (readVendorPreset (fxp).category.isEmpty(), "a Vanguard name without a type code has no category");
+    const auto coded = root.getChildFile ("LD Clav Man.fxp");
+    coded.replaceWithData (data.getData(), data.getSize());
+    check (readVendorPreset (coded).category == "Lead", "a Vanguard type code names the category");
+    check (vanguardCategory ("TG Pulse") == "Trance gate" && vanguardCategory ("LDX Odd").isEmpty()
+             && vanguardCategory ("Leads") .isEmpty(), "only a known two-letter code counts");
+    coded.deleteFile();
     check (readVendorPreset (spire).sourceType == "spire", "Spire reads its parameter map");
     const auto catalog = fixtureCatalog();
     const auto records = discoverVendorPresets (catalog, { root, nks.getParentDirectory(), root });

@@ -4,7 +4,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { compile } from 'svelte/compiler';
+import { compile, compileModule } from 'svelte/compiler';
 import ts from 'typescript';
 
 // Vite asset imports (`import wasm from 'x/y.wasm?url'`) are resolved by the bundler, not by Node,
@@ -49,6 +49,14 @@ export async function load(url, context, nextLoad) {
       fileName: filename,
     });
     return { format: 'module', shortCircuit: true, source: outputText };
+  }
+  // Rune modules (`x.svelte.js`): shared state written with $state and $derived, compiled the
+  // same way as a component so a component importing one can still be rendered in a test.
+  if (url.endsWith('.svelte.js')) {
+    const filename = fileURLToPath(url);
+    const source = await readFile(filename, 'utf8');
+    const { js } = compileModule(source, { filename, generate: 'server' });
+    return { format: 'module', shortCircuit: true, source: js.code };
   }
   if (!url.endsWith('.svelte')) return nextLoad(url, context);
   const filename = fileURLToPath(url);
