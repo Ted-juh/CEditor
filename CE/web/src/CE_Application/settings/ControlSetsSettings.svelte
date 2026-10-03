@@ -104,7 +104,7 @@
     if (typeof window !== 'undefined' && !window.confirm(`Delete “${draft.name}” from your library?`)) return;
     const wasDefault = $generalSettings.defaultControlSetId === draft.id;
     removeControlSetFromLibrary(draft.id);
-    if (wasDefault) updateGeneralSettings({ defaultControlSetId: NEW_PANEL_CONTROL_SET_ID });
+    if (wasDefault) updateGeneralSettings({ defaultControlSetId: NEW_PANEL_CONTROL_SET_ID, defaultControlSetChosen: false });
     choose(wasDefault ? NEW_PANEL_CONTROL_SET_ID : ($generalSettings.defaultControlSetId || NEW_PANEL_CONTROL_SET_ID));
     status = 'Removed from your library.';
   }
@@ -188,7 +188,7 @@
     <div class="card-head"><h2>Control Sets</h2><p>Choose the starting design for new panels and manage reusable visual systems.</p></div>
     <div class="default-row">
       <label><span>Default for new panels</span>
-        <select value={defaultSetId} onchange={(event) => updateGeneralSettings({ defaultControlSetId: event.target.value })}>
+        <select value={defaultSetId} onchange={(event) => updateGeneralSettings({ defaultControlSetId: event.target.value, defaultControlSetChosen: true })}>
           {#if mySets.length}
             <optgroup label="My sets">{#each mySets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
           {/if}

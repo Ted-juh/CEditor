@@ -303,6 +303,15 @@ export function normalizeDeviceSession(session) {
   };
 }
 
+// The default set for new panels. 'graphite' was the default before the designed Graphite, so every
+// settings file written since the default existed holds it, chosen or not: one nobody chose in
+// Settings is the old default, and moves to the new one. A choice made in Settings is kept.
+function defaultControlSetFrom(general) {
+  const fallback = DEFAULT_GENERAL_SETTINGS.defaultControlSetId;
+  const stored = String(general?.defaultControlSetId ?? fallback).trim() || fallback;
+  return stored === 'graphite' && general?.defaultControlSetChosen !== true ? fallback : stored;
+}
+
 export function normalizeGeneralSettings(general) {
   return {
     reopenLastSession: general?.reopenLastSession !== false,
@@ -346,7 +355,8 @@ export function normalizeGeneralSettings(general) {
       1,
       400
     ),
-    defaultControlSetId: String(general?.defaultControlSetId ?? DEFAULT_GENERAL_SETTINGS.defaultControlSetId).trim() || DEFAULT_GENERAL_SETTINGS.defaultControlSetId,
+    defaultControlSetId: defaultControlSetFrom(general),
+    defaultControlSetChosen: general?.defaultControlSetChosen === true,
     // Export defaults (plan E5). Empty strings survive as empty: an invented vendor name baked
     // into somebody's plugin is worse than a blank field, because nobody notices the first one.
     exportVendor: String(general?.exportVendor ?? '').slice(0, 120),

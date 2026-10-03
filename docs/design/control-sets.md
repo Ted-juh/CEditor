@@ -895,12 +895,16 @@ carries its legend on its own face is what the set every new panel starts on sho
 tiles are a key drawn beside its caption, one click away in the inspector, and what Graphite's
 starter draws.
 
-The default is a setting (Settings → Control Sets, "Default for new panels"). A settings file that
-already names one keeps it, Graphite Classic included: an installation that has saved its settings
-since the default existed has `graphite` written there, and that may have been a choice. Choosing
-Graphite there, or on a panel, is one click. `designedGraphite.test.js` pins the base set as it was,
-the new panel naming the designed one, the designed one as Graphite with the starter's knob and
-meter and its buttons kept, and every design reaching it.
+The default is a setting (Settings → Control Sets, "Default for new panels"). The app writes the
+whole general block whenever any setting changes, so every installation that has saved its settings
+since the default existed has `graphite` written there, chosen or not, and keeping it would have kept
+the designed Graphite from nearly everybody. So a stored `graphite` nobody chose moves to the new
+default, and the picker now records a choice (`defaultControlSetChosen`): a pick made there, Graphite
+Classic included, is kept from then on, and any other stored default was a choice already. The one
+case this gets wrong is somebody who picked Graphite before the flag existed; picking Classic again
+is one click. `designedGraphite.test.js` pins the base set as it was, the new panel naming the
+designed one, the migration and the choice that survives it, the designed one as Graphite with the
+starter's knob and meter and its buttons kept, and every design reaching it.
 
 `browser-checks/controlSetShot.mjs` photographs a second row now, for what the sets reach since the
 specimen was drawn: a Group with its title and captions on the section's face, a Macro hosting the

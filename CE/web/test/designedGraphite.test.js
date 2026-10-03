@@ -8,6 +8,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   BASE_CONTROL_SET, DEFAULT_CONTROL_SET_ID, NEW_PANEL_CONTROL_SET_ID, getControlSet, normalizeControlSet, resolveToken, serializeControlSet,
@@ -51,8 +52,6 @@ test('a new panel starts on the designed Graphite and its file says so', () => {
   assert.equal(DEFAULT_GENERAL_SETTINGS.defaultControlSetId, NEW_PANEL_CONTROL_SET_ID);
   assert.equal(normalizeGeneralSettings({}).defaultControlSetId, NEW_PANEL_CONTROL_SET_ID);
   assert.equal(normalizeGeneralSettings({ defaultControlSetId: '' }).defaultControlSetId, NEW_PANEL_CONTROL_SET_ID);
-  assert.equal(normalizeGeneralSettings({ defaultControlSetId: 'graphite' }).defaultControlSetId, 'graphite',
-    'a settings file that names Classic keeps it');
 
   defaultControlSetId.set(DEFAULT_GENERAL_SETTINGS.defaultControlSetId);
   const panel = createPanel();
@@ -60,6 +59,22 @@ test('a new panel starts on the designed Graphite and its file says so', () => {
   assert.deepEqual(panel.controlSets, [], 'a built-in is named, not carried');
   assert.deepEqual(JSON.parse(serializePanel(panel)).controlSet, { id: NEW_PANEL_CONTROL_SET_ID },
     'the file names it, so it keeps its look whatever the base set is');
+});
+
+test('an installed default of Graphite nobody chose moves to the designed one; a choice stays', () => {
+  // Every settings file written before the designed Graphite says 'graphite', chosen or not.
+  assert.equal(normalizeGeneralSettings({ defaultControlSetId: 'graphite' }).defaultControlSetId, NEW_PANEL_CONTROL_SET_ID);
+  assert.equal(normalizeGeneralSettings({ defaultControlSetId: 'graphite' }).defaultControlSetChosen, false);
+  // A pick made in Settings, Classic included, is kept from then on.
+  const chosen = normalizeGeneralSettings({ defaultControlSetId: 'graphite', defaultControlSetChosen: true });
+  assert.equal(chosen.defaultControlSetId, 'graphite');
+  assert.equal(normalizeGeneralSettings(chosen).defaultControlSetId, 'graphite', 'and survives being read again');
+  // Any other default was a choice whatever the flag says.
+  assert.equal(normalizeGeneralSettings({ defaultControlSetId: 'tolex' }).defaultControlSetId, 'tolex');
+  assert.equal(normalizeGeneralSettings({ defaultControlSetId: 'my-amp' }).defaultControlSetId, 'my-amp');
+  // The Settings picker is what records the choice.
+  const picker = readFileSync(new URL('../src/CE_Application/settings/ControlSetsSettings.svelte', import.meta.url), 'utf8');
+  assert.match(picker, /updateGeneralSettings\(\{ defaultControlSetId: event\.target\.value, defaultControlSetChosen: true \}\)/);
 });
 
 test('the designed Graphite is Graphite: its colours, lettering, lamp, buttons and slider', () => {

@@ -30,8 +30,13 @@ export const DEFAULT_GENERAL_SETTINGS = {
   // Visual language assigned to newly created panels. Kept as an id so a built-in can be
   // selected without copying its full definition into the application settings file. The designed
   // Graphite (models/controlSets.js NEW_PANEL_CONTROL_SET_ID; written out so this module stays free
-  // of the sets). A settings file that already names a default keeps it, Graphite Classic included.
+  // of the sets).
   defaultControlSetId: 'graphite-studio',
+  // Whether the user picked the default in Settings. Every settings file written before the
+  // designed Graphite holds 'graphite', the old default, whether or not anybody chose it; one that
+  // was not chosen moves to the new default (appSettingsSchema normalizeGeneralSettings), and a
+  // pick made in Settings, Graphite Classic included, is kept from then on.
+  defaultControlSetChosen: false,
   // OFF, and this one is a default rather than a preference in the usual sense. Checking for
   // updates sends this machine's IP address to GitHub — unremarkable, and still not something a
   // program should do on its own the first time somebody starts it. Help → Check for Updates works
