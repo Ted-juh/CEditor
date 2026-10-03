@@ -10,10 +10,16 @@
    * and so is a target on a part that does not exist, which the runtime builds and then never draws.
    * (Fill colour and Text colour, which the panel's own dropdown offers, were the first dead ones;
    * the runtime animates colour now.)
+   *
+   * And what each working one costs the browser: transform and opacity are moved by the compositor,
+   * colour repaints, width and height re-run layout every frame (animationModel.targetCost). On a
+   * panel of two hundred controls that is the difference between smooth and not, and nothing else
+   * on screen says so.
    */
   import GripVertical from 'lucide-svelte/icons/grip-vertical';
   import X from 'lucide-svelte/icons/x';
   import TriangleAlert from 'lucide-svelte/icons/triangle-alert';
+  import { targetCost } from '../../utils/animationModel.js';
 
   let {
     rows = [],
@@ -74,6 +80,7 @@
      onpointermove={moveDrag} onpointerup={endDrag} onpointercancel={endDrag}>
   {#each rows as row (row.index)}
     {@const bits = shortPath(row.path)}
+    {@const cost = row.status.works ? targetCost(row.target) : null}
     <div
       class="trow"
       class:sel={row.index === selectedIndex}
@@ -115,6 +122,8 @@
         {/if}
       </span>
 
+      <span class="cost {cost?.level ?? ''}" title={cost?.detail ?? ''}>{cost?.label ?? ''}</span>
+
       <button type="button" class="drop" title="Remove this target"
               aria-label={`Remove ${row.path}`}
               onclick={(event) => { event.stopPropagation(); onremove(row.index); }}>
@@ -140,7 +149,7 @@
   .trow {
     position: relative;
     display: grid;
-    grid-template-columns: 12px minmax(0, 1fr) auto 18px;
+    grid-template-columns: 12px minmax(0, 1fr) auto auto 18px;
     align-items: center;
     gap: 6px;
     padding: 5px 6px;
@@ -185,6 +194,18 @@
   }
   .trow.bad .does { color: #E5A029; }
   .does .note { font-style: normal; color: #4B545C; border: 1px solid #2A3038; border-radius: 2px; padding: 1px 3px; }
+
+  .cost {
+    font: 500 7.5px/1 'IBM Plex Mono', ui-monospace, monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 4px;
+    border-radius: 2px;
+    color: #4B545C;
+  }
+  .cost:empty { padding: 0; }
+  .cost.paint { color: #C9A35A; border: 1px solid #4A3A1C; }
+  .cost.layout { color: #E07A6B; border: 1px solid #5C2E28; }
 
   .drop {
     width: 18px;

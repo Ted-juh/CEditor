@@ -675,9 +675,15 @@ export function renameBlockedBecause(existingNames, from, to) {
 /**
  * Every label this tab can edit.
  *
- * The properties panel builds its search box from the rows it draws. When these rows eventually
- * leave the panel, the search has to be fed from here instead.
+ * The properties panel builds its search box from the rows it draws, and its Animations rows are
+ * gone (phase 5): the search finds these instead, through utils/dockFieldIndex.js, and a match
+ * offers to open this tab. A field added to the tab and not here is a field the search cannot find.
  */
 export function allAnimationFieldLabels() {
-  return ['Kind', 'Duration', 'Delay', 'Easing', 'Trigger', 'From', 'To', 'Source', 'Targets', 'Animation'];
+  return [
+    'Animation', 'Kind', 'Duration', 'Delay', 'Easing', 'Custom curve', 'Spring', 'Damping', 'Bounce',
+    'Trigger', 'From', 'To', 'Leaving', 'Origin', 'Source', 'Targets', 'Change',
+    'Frames', 'Repeat', 'Times', 'Direction', 'Plays on', 'Every',
+    'Presets', 'Stage', 'Play', 'Slow motion',
+  ];
 }

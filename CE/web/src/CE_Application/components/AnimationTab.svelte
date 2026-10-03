@@ -36,7 +36,8 @@
   import Segmented from '../properties/Segmented.svelte';
   import PropertySelect from '../properties/PropertySelect.svelte';
   import { activePanel, selectedComponentIds } from '../stores/panels.js';
-  import { updateControlProperty, removeControlNode, getSection } from '../stores/controls.js';
+  import { updateControlProperty, removeControlNode, getSection, applyControlPatch } from '../stores/controls.js';
+  import { ANIMATION_PRESETS, PRESET_BY_ID, presetPatch, presetBlockedBecause } from '../utils/animationPresets.js';
   import { beginHistoryTransaction, commitHistoryTransaction } from '../stores/history.js';
   import { flatControls } from '../utils/containment.js';
   import {
@@ -243,6 +244,36 @@ onMount(() => {
     wantedName = to;
   }
 
+  // --- Presets -----------------------------------------------------------------------------------
+  // A preset is an animation AND the state change it animates (utils/animationPresets.js). It goes on
+  // the armed control, or on every selected control at once — one undo step either way.
+  let presetId = $state(ANIMATION_PRESETS[0].id);
+  let presetReport = $state('');
+  let preset = $derived(PRESET_BY_ID[presetId] ?? ANIMATION_PRESETS[0]);
+  let presetBlocked = $derived(control ? presetBlockedBecause(control, preset) : '');
+  let selectionIds = $derived([...($selectedComponentIds ?? [])]);
+
+  function addPreset(toSelection) {
+    const ids = toSelection ? selectionIds : [controlId];
+    const step = beginHistoryTransaction();
+    const added = [];
+    const skipped = [];
+    for (const id of ids) {
+      const target = panelControls.find((entry) => entry._children?.Core?.id === id);
+      const result = presetPatch(target, presetId);
+      const label = target?._children?.Core?.name || id;
+      if (!result.patch) { skipped.push(`${label} (${result.reason})`); continue; }
+      applyControlPatch(id, result.patch);
+      added.push(label);
+      if (id === controlId) wantedName = result.name;
+    }
+    commitHistoryTransaction(step);
+    presetReport = [
+      added.length ? `${preset.label} added to ${added.length === 1 ? added[0] : `${added.length} controls`}.` : '',
+      skipped.length ? `Skipped ${skipped.join('; ')}.` : '',
+    ].filter(Boolean).join(' ');
+  }
+
   function toggleAll() {
     if (!controlId) return;
     updateControlProperty(controlId, 'Animations.enabled', !allOn);
@@ -345,6 +376,28 @@ onMount(() => {
           {/if}
         </div>
         {#if renameError}<p class="renerr">{renameError}</p>{/if}
+
+        <div class="presets">
+          <div class="colh">Presets</div>
+          <PropertySelect options={ANIMATION_PRESETS.map((entry) => ({ value: entry.id, label: entry.label }))}
+                          value={presetId} ariaLabel="Preset"
+                          onchange={(value) => { presetId = value; presetReport = ''; }} />
+          <p class="hint">{preset.summary}</p>
+          {#if presetBlocked}<p class="renerr">{presetBlocked}</p>{/if}
+          <div class="presetbtns">
+            <button type="button" class="mk" disabled={!!presetBlocked} onclick={() => addPreset(false)}
+                    title={`Add ${preset.label} to ${controlName}`}>
+              <Plus size={11} /> Add
+            </button>
+            {#if selectionIds.length > 1}
+              <button type="button" class="mk" onclick={() => addPreset(true)}
+                      title="Add it to every selected control, as one undo step">
+                <Plus size={11} /> Add to {selectionIds.length} selected
+              </button>
+            {/if}
+          </div>
+          {#if presetReport}<p class="hint report">{presetReport}</p>{/if}
+        </div>
       </div>
 
       {#if selected}
@@ -779,6 +832,10 @@ onMount(() => {
   .warn b { display: block; color: #F0D48A; font-weight: 600; }
   .clashwarn.wins { border-color: #2E3540; background: #12171A; color: #9AA6AE; }
   .playson { margin: 0 0 8px; }
+  .presets { margin-top: 14px; }
+  .presetbtns { display: flex; gap: 4px; margin-top: 6px; }
+  .presetbtns .mk { height: 24px; }
+  .report { color: #8FEDE3; }
 
   .addbtn {
     width: 100%;

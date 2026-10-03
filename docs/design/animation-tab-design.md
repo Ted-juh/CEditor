@@ -1,6 +1,8 @@
 # The Animation tab
 
-Status: **built**, 2026-09-10. The properties panel is untouched — see [What was built](#what-was-built).
+Status: **built**, 2026-09-10; **overhauled** 2026-10-03 — triggers are real, keyframes, a stage, and
+the properties panel's rows are gone. See [The overhaul](#the-overhaul-2026-10-03) and
+[`animation-overhaul-handoff.md`](animation-overhaul-handoff.md), which has the detail phase by phase.
 
 Candidate 8 from [`display-panel-candidates.md`](display-panel-candidates.md). Drawn in
 [`animation-tab-mockups.html`](animation-tab-mockups.html).
@@ -179,21 +181,52 @@ the panel's rows do come out.
   text box a trap. The panel's own hint already says transition is the only kind that works, so the
   claim was wrong as written. The test now asserts the hint is there, so nobody can put it back.
 
+## The overhaul (2026-10-03)
+
+An audit found the tab honest about targets and the runtime ignoring half of what it let you set:
+triggers were dead data, so `pressIn` and `hoverIn` on one property could never differ. Five phases
+later (the handoff has each one's files, tests and findings):
+
+| What changed | Where |
+|---|---|
+| Triggers decide which animation plays; reverse, origin, ties | `utils/transitionSelection.js` |
+| One transition writer; a colour bucket; left/top glide with a part's transform | `utils/transitionCss.js` |
+| Every curve in one file; ten named easings, custom bezier, spring as CSS `linear()` | `utils/easing.js` |
+| The slider value glide (SVG attributes cannot be transitioned) | `editor/SliderFamilyRenderer.svelte` |
+| Keyframes: a second kind, played as CSS animations on the individual transform properties | `utils/keyframeAnimation.js` |
+| `ce.anim.play(control, animation)` | `scripting/panelApi.js`, `scripting/panelRuntime.js` |
+| Clash and unknown-state warnings, state chips, a stage with Play and 0.25×, fired lamps | `components/AnimationTab.svelte`, `components/animation/*` |
+| Presets that write the state change with the animation, and merge into existing states | `utils/animationPresets.js` |
+| Cost tags on target rows (cheap · paint · layout) | `components/animation/TargetList.svelte` |
+| The properties panel's Animations rows replaced by a summary and the way into this tab | `sections/AnimationsEditor.svelte` |
+
+**The panel's rows came out.** Everything they did, this tab does, and their Quick buttons are the
+presets — which merge into a state of the same name instead of replacing it. The panel's search is
+fed from `allAnimationFieldLabels()`, so typing "easing" still finds it and offers this tab. The one
+thing not carried over is the panel's "Debug animation" button, which dumped the node as JSON into
+the Debug dock; the tab shows every field, and the stage shows what it does.
+
+Findings 1, 3 and 4 above are history now: colour animates, every easing is drawn (and two you
+shape), and Kind is a real choice between two kinds that both play. Finding 2's JSON box is gone.
+
 ## Still open
 
-1. **Nothing is relocated yet**, and the panel needs its search index extended before anything is.
+1. ~~Nothing is relocated yet~~ — done in the overhaul: the panel shows a summary.
 2. **Adding, deleting and renaming an animation are built here now** (2026-09-10, step 3 of the
    panel cleanup). `newAnimationShape` is one definition of what a new animation is, so the panel's
    Add and this one make the same thing — and unlike the panel's, a duplicate name is suffixed
    rather than silently doing nothing. The panel's quick-add buttons stay where they are.
 3. **No timeline.** The candidate list wanted one. With one duration, one delay and one easing per
    animation there is nothing to lay out along a time axis that the three numbers do not already
-   say. If animations ever get keyframes, that changes.
-4. **`kind` is not edited here at all.** Transition is the only one that works, so the tab writes it
-   and does not offer the box. If a second kind ever ships, this needs a real choice.
+   say. Keyframes changed that: their frames editor has a strip showing where each frame sits in a
+   cycle. A timeline across animations (who plays when, on one axis) is still not built.
+4. ~~`kind` is not edited here at all~~ — it is a real choice now, transition or keyframes.
+5. **Keyframes cannot animate colour or text yet** — the layers that paint a control's colour carry
+   inline styles a keyframe on the control cannot reach.
 
 ## Notes
 
+- 2026-10-03: The overhaul, phases 1–5. See the handoff file.
 - 2026-09-10: Written and built together. The heights were measured first and the space argument
   rejected; all four findings were checked against the shipped code, and the fourth was corrected
   by that check before the document was written.

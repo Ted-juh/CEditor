@@ -270,6 +270,17 @@ window.__anim = {
   },
   firstPart: () => first,
 
+  // --- presets and costs --------------------------------------------------------------
+  costTags: () => [...document.querySelectorAll('.trow .cost')].map(textOf),
+  presetHint: () => textOf(document.querySelector('.presets .hint')),
+  addPreset: () => {
+    const btn = [...document.querySelectorAll('.presets .mk')].find((b) => textOf(b) === 'Add');
+    btn?.click();
+    return !!btn;
+  },
+  presetReport: () => textOf(document.querySelector('.presets .report')),
+  storedState: (key) => JSON.parse(JSON.stringify(live()._children.States._children[key] ?? null)),
+
   sliderCount: () => document.querySelectorAll('input[type=range], .slider, [role=slider]').length,
   jsonBoxes: () => document.querySelectorAll('textarea').length,
 };

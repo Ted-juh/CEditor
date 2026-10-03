@@ -378,40 +378,33 @@ test('a rename says why it cannot happen', () => {
   assert.match(renameBlockedBecause(['a'], 'a', '   '), /letters, digits or underscores/);
 });
 
-// --- What the properties panel still does -----------------------------------
-// Everything above is about the tab. This last test reads the shipped panel and pins the four
-// things the tab exists to fix. If somebody fixes one of them in the panel, this fails, and the
-// tab's reason for existing has to be rewritten rather than left standing as a stale claim. (The
-// first of the four used to be that two of the seven did nothing. They work now, in the runtime;
-// what is left is that the panel offers seven and never width or height.)
+// --- What the properties panel does now -------------------------------------
+// This test used to pin the four things the tab existed to fix in the panel — seven properties
+// with two dead among them, a raw JSON target box, four easings with no picture, a free-text Kind —
+// so that fixing one in the panel would force the tab's reason to be rewritten. Phase 5 of the
+// overhaul took the rows out instead: everything they did, the tab does. What is pinned now is the
+// replacement, so the rows cannot creep back one at a time.
 
-test('the properties panel really is the way this tab says it is', () => {
+test('the properties panel summarises the animations and sends you to the tab', () => {
   const source = readFileSync(
     new URL('../src/CE_Application/sections/AnimationsEditor.svelte', import.meta.url),
     'utf8'
   );
+  assert.match(source, /<OpenInDock tab="animation"/, 'the way into the tab');
+  assert.equal((source.match(/<OpenInDock/g) ?? []).length, 1, 'one way in: dockOpeners counts them');
+  assert.match(source, /readAnimations/, 'the summary reads the model, not its own copy');
+  assert.match(source, /findClashes/, 'and shows what is wrong');
+  for (const gone of [/<textarea/, /TARGET_PROPERTIES/, /EASING_OPTIONS/, /updateControlProperty/, /applyControlPatch/, /removeControlNode/]) {
+    assert.ok(!gone.test(source), `the panel edits animations again (${gone}) — edit them in the tab`);
+  }
+});
 
-  // 1. Seven properties on offer, colour among them, and no width.
-  const list = source.slice(source.indexOf('const TARGET_PROPERTIES'), source.indexOf('const QUICK_STATES'));
-  assert.equal((list.match(/path: '/g) ?? []).length, 7, 'the panel offers seven properties');
-  assert.match(list, /Background\.Fill\.colour/);
-  assert.match(list, /Text\.Fill\.colour/);
-  assert.ok(!/Layout\.width/.test(list), 'the panel has never offered width');
-
-  // 2. The target list is a raw JSON textarea.
-  assert.match(source, /targetsDraft/);
-  assert.match(source, /<textarea[^>]*rows="12"/);
-
-  // 3. Four easings, no picture of any of them.
-  assert.match(source, /const EASING_OPTIONS = \['linear', 'outQuad', 'inOutQuad', 'outCubic'\]/);
-
-  // 4. Kind is a free text box you can type any word into. Its hint used to say transition was the
-  //    only kind that did anything; since phase 4 there are two, and the hint names both and sends
-  //    keyframes to this tab, which has the only editor for their frames.
-  const kindCell = source.slice(source.indexOf('label="Kind"'), source.indexOf('label="Kind"') + 400);
-  assert.match(kindCell, /<input class="val" type="text"/);
-  assert.match(kindCell, /transition, or keyframes/, 'the panel names both kinds');
-  assert.match(kindCell, /Animation tab/, 'and says where keyframes are edited');
+test('every field the tab edits is in the label list the panel search reads', () => {
+  const labels = allAnimationFieldLabels();
+  for (const label of ['Kind', 'Duration', 'Delay', 'Easing', 'Trigger', 'From', 'To', 'Leaving', 'Origin',
+    'Source', 'Targets', 'Frames', 'Repeat', 'Direction', 'Plays on', 'Every', 'Presets', 'Stage', 'Spring', 'Custom curve']) {
+    assert.ok(labels.includes(label), `${label} is edited in the tab and the panel search cannot find it`);
+  }
 });
 
 // --- Trigger states ---------------------------------------------------------

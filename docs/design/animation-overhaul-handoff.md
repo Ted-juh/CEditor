@@ -1,9 +1,10 @@
 # Animation overhaul — handoff
 
 Branch: `claude/animation-overhaul-phase-1-cdk65v`, which continues `animation-overhaul` (the WIP
-commit `1a74eb0` and this file). **Phase 1 is done and verified** — see
-[Phase 1 — done](#phase-1--done) for what it changed and found. Phases 2–5 are below, in order.
-Start by reading this file, then the files listed under "What is on the branch".
+commit `1a74eb0` and this file). **Phases 1–5 are done, verified and pushed**, one commit each (4 is
+two: keyframes, then `ce.anim.play`), except Phase 5's item K, which assumes a feature that does not
+exist. "Remaining work" below records what each phase did and found, and ends with what is still
+open. Start by reading this file, then the files listed under "What is on the branch".
 
 Paste the section [Prompt for Claude Code](#prompt-for-claude-code) to start the next session.
 
@@ -114,7 +115,7 @@ The WIP was smoke-checked with a scratch run of the tracker. That is now covered
 
 ---
 
-## Remaining work, phase by phase
+## Remaining work, phase by phase — now a record of what was done
 
 ### Phase 1 — done
 
@@ -255,17 +256,46 @@ The node, as built (`utils/keyframeAnimation.js` has it in its header):
   explorer, cost table and the written example regenerated/added. Checked end to end in Chromium:
   a script's `ce.anim.play` starts the keyframe animation on a previewed control.
 
-### Phase 5
+### Phase 5 — done, except K, which has no model to build on
 
-- J: `utils/animationPresets.js` (hover lift, press squish, fade when disabled, LED blink while
-  checked, beat pulse, value glide); apply to every selected control in one history transaction.
-- K: per-layer `transition` for state-driven layer visibility/z-order (Layers tab named states) —
-  find the model in `utils/panelLayers.js` / `utils/sceneryModel.js` first.
-- L: `targetCost` is written; show it on TargetList rows.
-- M: replace the Animations rows in `sections/AnimationsEditor.svelte` with a summary and an
-  "Open in Animation tab" button (`properties/OpenInDock.svelte`); feed the panel search from
-  `allAnimationFieldLabels()` (`utils/dockFieldIndex.js`); rewrite the test that pins the panel's
-  old shape. Update `docs/design/animation-tab-design.md`.
+- **J, presets** (`utils/animationPresets.js`): hover lift, press squish, fade when disabled, blink
+  while on, beat pulse, value glide. A preset writes the animation **and the state change it
+  animates** — a transition eases a change, it does not make one — merged into a state of the same
+  name (matched ignoring case) rather than replacing it, and a value the state already sets is left
+  as the author's. The panel's old Quick buttons replaced the state, so pressing one on a button
+  threw away its own Pressed colour. Each preset says when it cannot go on a control (no pointer
+  part for value glide, or a pointer glide already there — Knobs and Sliders ship `pointerSlide`,
+  and a second would only clash with it; never checked for blink while on). The tab's picker adds to the armed
+  control or to every selected control, one history transaction either way. Tests apply each preset
+  with the real tree writer and run the control through the runtime, tracker and player.
+- **K, animated layer-state changes: not built — the feature it assumes does not exist.** The
+  Layers tab has no named states: a layer carries `visible`, `locked`, `kind` and a colour, all
+  editor-side (`utils/panelLayers.js`; `utils/sceneryModel.js` is the scenery bake). Nothing at
+  runtime switches a layer. The nearest real thing is a custom component's page layers, swapped by
+  rule-driven states (`customComponentFactory.js`, the tab-group starter) — those are part state
+  patches, which transitions already animate when the patch is opacity and cannot when it is
+  visibility (CSS does not transition `display`). Deciding what a "layer state" should be is the
+  owner's call; it is a feature, not a polish item.
+- **L, cost hints:** each working target row carries cheap / paint / layout (`targetCost`), with
+  the reason in its tooltip.
+- **M, panel cleanup:** `sections/AnimationsEditor.svelte` is now a summary — each animation's
+  kind, trigger in words and duration, the dead/clash/unknown counts — and the one way into the tab
+  (`OpenInDock`; the openers check counts eight). The panel search was already fed from
+  `allAnimationFieldLabels()`; the list now names every field the tab edits, and a test checks it.
+  The test that pinned the panel's old shape now pins the summary, so the rows cannot creep back.
+  Not carried over: the panel's "Debug animation" JSON dump. `animation-tab-design.md` updated.
+
+### Still open, for whoever picks this up
+
+1. **K** — needs a decision on what a layer state is (see above).
+2. **Two starters** (`statusLamp`, `tabGroup`) name a Pressed state they do not have (Phase 1).
+3. **Keyframe colour and text frames** — needs a way for a keyframe to reach the painting layers
+   (a registered custom property they read, say).
+4. **custom/spring easings in ce.anim** — panel-only today; C++ parity would be a runtime change.
+5. **A timeline across animations** — who plays when, on one axis. The frames editor has a strip
+   per animation; there is nothing that lays several out together.
+6. **The full app was not run under Xvfb.** `panelMotion.mjs` mounts the real preview surface in
+   Chromium and stands in for it; MIDI was simulated through preview sessions, not a device.
 
 ---
 
@@ -273,11 +303,10 @@ The node, as built (`utils/keyframeAnimation.js` has it in its header):
 
 ```
 Read CLAUDE.md, then docs/design/animation-overhaul-handoff.md, and check out the branch
-animation-overhaul. Continue the animation overhaul from where the handoff says it stopped:
-finish and verify Phase 1 first (update the pinned tests deliberately, add the new tests, clash
-warnings, trigger chips, reverse/origin controls, regenerate the script preludes, run
-npm run test:all, npm run build and npm run test:browser). Commit per phase with messages in the
-repo's voice and push when green. Then do Phases 2 to 5 in order, keeping the handoff file's
-"Remaining work" section up to date as you go. Ask me before anything that widens CI or changes
-the C++ script runtime beyond regenerated tables.
+claude/animation-overhaul-phase-1-cdk65v. Phases 1 to 5 of the animation overhaul are done and
+pushed; "Still open" at the end of the Remaining work section lists what is left and why. Pick
+from that list only what the owner has decided on — K in particular needs a decision first.
+Verify locally before pushing (npm run test:all, npm run build, npm run test:browser), commit in
+the repo's voice, and ask before anything that widens CI or changes the C++ script runtime beyond
+regenerated regions.
 ```

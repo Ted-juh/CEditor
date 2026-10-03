@@ -437,6 +437,34 @@ await settle();
 check('and deleting takes them back off', async () => {});
 assert.deepEqual(await ev(() => window.__anim.storedNames()), ['pressMotion', 'hoverGlow', 'pressEcho']);
 
+// --- Costs and presets (phase 5) ------------------------------------------------------------
+
+await ev(() => window.__anim.selectAnimation('pressMotion'));
+await settle();
+const costs = await ev(() => window.__anim.costTags());
+check('each working target says what it costs the browser, and a dead one says nothing', () => {
+  // pressMotion: scale, fill colour, opacity, a missing part, and the width added earlier.
+  assert.deepEqual(costs, ['cheap', 'paint', 'cheap', '', 'layout'], costs.join(' | '));
+});
+
+await ev(() => window.__anim.chooseSelect('Preset', 'hoverLift'));
+await settle();
+check('a preset says what it does before you add it', async () => {});
+assert.match(await ev(() => window.__anim.presetHint()), /Grows a little under the pointer/);
+await ev(() => window.__anim.addPreset());
+await settle();
+const lifted = await ev(() => window.__anim.storedAnimation('hoverLift'));
+const hoverState = await ev(() => window.__anim.storedState('Hover'));
+check('adding it writes the animation AND the change it animates, into the state that was there', () => {
+  assert.equal(lifted.trigger.to[0], 'hover');
+  assert.equal(hoverState.patches.component['Transform.scale'], 1.04);
+  assert.deepEqual(hoverState.when, { hover: true }, 'the Hover state keeps its own condition');
+});
+assert.match(await ev(() => window.__anim.presetReport()), /Hover lift added to Big Knob/);
+assert.equal(await ev(() => window.__anim.selectedAnimation()), 'hoverLift', 'and the new animation is selected');
+await ev(() => window.__anim.removeAnimation('hoverLift'));
+await settle();
+
 // --- The rules --------------------------------------------------------------------------------
 
 check('there is not one slider in the tab', async () => {});

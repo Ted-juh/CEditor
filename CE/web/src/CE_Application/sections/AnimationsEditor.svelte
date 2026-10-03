@@ -1,422 +1,118 @@
 <script>
-  import { getSection, updateControlProperty, removeControlNode, applyControlPatch } from '../stores/controls.js';
+  /**
+   * A control's Animations in the properties panel: what is there, what is wrong with it, and the
+   * way into the Animation tab, where they are edited.
+   *
+   * This used to be four sections of rows: a dropdown that showed one animation at a time, a Kind
+   * text box you could type any word into, the trigger's states as comma-separated text, four of the
+   * ten easings, and the target list as a twelve-row box of raw JSON. Two of the seven properties it
+   * offered animated nothing until the runtime grew a colour bucket, and its Quick buttons replaced
+   * a state of the same name, so pressing one on a button threw away its own Pressed colour.
+   *
+   * Everything those rows did, the Animation tab does — with clash and unknown-state warnings, a
+   * stage to play them on, keyframes, and presets that merge rather than replace — so the rows are
+   * gone and this is the summary. The panel's search still finds every field the tab edits: it is
+   * fed from allAnimationFieldLabels() (utils/dockFieldIndex.js), and a match offers to open the tab.
+   */
+  import { getSection } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
-  import { setDebugDock } from '../stores/debugDock.js';
-  import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
-  import NumberCell from '../properties/NumberCell.svelte';
-  import HeaderPill from '../properties/HeaderPill.svelte';
   import OpenInDock from '../properties/OpenInDock.svelte';
   import Play from 'lucide-svelte/icons/play';
-  import Target from 'lucide-svelte/icons/target';
-  import Pencil from 'lucide-svelte/icons/pencil';
-  import Zap from 'lucide-svelte/icons/zap';
+  import {
+    readAnimations,
+    animationsEnabled,
+    deadTargetCount,
+    findClashes,
+    controlStateNames,
+    unknownTriggerStates,
+  } from '../utils/animationModel.js';
 
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
-  let designer = $derived(getSection(control, 'Designer'));
-  let parts = $derived(getSection(control, 'Parts'));
   let animations = $derived(getSection(control, 'Animations'));
   let multiEdit = $derived($selectedComponentIds.size > 1);
-  let partNames = $derived(Object.keys(parts?._children ?? {}));
-  let selectedLayer = $derived(partNames.includes(designer?.selectedLayer) ? designer.selectedLayer : (partNames[0] ?? ''));
+  let partNames = $derived(Object.keys(getSection(control, 'Parts')?._children ?? {}));
+  let stateNames = $derived(control ? controlStateNames(control) : []);
 
-  let selectedAnimationName = $state('');
-  let newAnimationName = $state('');
-  let targetsDraft = $state('[]');
-  let parseError = $state('');
-  let targetPart = $state('');
-  let targetProperty = $state('Layout.scale');
-  let quickState = $state('pressed');
+  let rows = $derived(control ? readAnimations(control) : []);
+  let allOn = $derived(control ? animationsEnabled(control) : true);
+  let dead = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames), 0));
+  let unknown = $derived(rows.reduce((sum, row) => sum + unknownTriggerStates(row, stateNames).length, 0));
+  let clashes = $derived(findClashes(rows, partNames).length);
 
-  let animationNames = $derived(Object.keys(animations?._children ?? {}));
-  let selectedAnimation = $derived(animations?._children?.[selectedAnimationName] ?? null);
-
-  $effect(() => {
-    if (designer?.selectedAnimation && animationNames.includes(designer.selectedAnimation)) {
-      selectedAnimationName = designer.selectedAnimation;
-      return;
+  /** "when entering pressed", "on the beat" — the trigger in a few words. */
+  function when(row) {
+    const t = row.trigger;
+    if (row.kind === 'keyframes') {
+      if (t.type === 'always') return 'all the time';
+      if (t.type === 'beat') return t.every === 1 ? 'on the beat' : `every ${t.every} beats`;
+      if (t.type === 'script') return 'from a script';
     }
-    if (!animationNames.length) {
-      selectedAnimationName = '';
-      return;
-    }
-    if (!selectedAnimationName || !animationNames.includes(selectedAnimationName)) {
-      selectedAnimationName = animationNames[0];
-    }
-  });
-
-  $effect(() => {
-    targetsDraft = JSON.stringify(selectedAnimation?.targets ?? [], null, 2);
-    parseError = '';
-  });
-
-  function setAnimationProp(prop, value) {
-    if (!core?.id || !selectedAnimationName) return;
-    updateControlProperty(core.id, `Animations.${selectedAnimationName}.${prop}`, value);
+    if (t.type === 'valueChange') return `when ${t.source} changes`;
+    const to = !t.to.length || t.to.includes('*') ? 'any state' : t.to.join(', ');
+    return row.kind === 'keyframes' && row.iterations === 'infinite' ? `while ${to}` : `entering ${to}`;
   }
-
-  function addAnimation() {
-    const name = String(newAnimationName ?? '').trim();
-    if (!core?.id || !name || animations?._children?.[name]) return;
-    updateControlProperty(core.id, `Animations.${name}`, {
-      _type: 'Animation',
-      name,
-      enabled: true,
-      kind: 'transition',
-      trigger: {
-        type: 'stateChange',
-        from: ['*'],
-        to: ['hover'],
-      },
-      targets: [],
-      duration: 120,
-      delay: 0,
-      easing: 'outQuad',
-    });
-    newAnimationName = '';
-    selectedAnimationName = name;
-  }
-
-  function removeAnimation() {
-    if (!core?.id || !selectedAnimationName) return;
-    removeControlNode(core.id, `Animations.${selectedAnimationName}`);
-    selectedAnimationName = '';
-  }
-
-  function commitTargets() {
-    if (!core?.id || !selectedAnimationName) return;
-    try {
-      const parsed = JSON.parse(targetsDraft || '[]');
-      updateControlProperty(core.id, `Animations.${selectedAnimationName}.targets`, parsed);
-      parseError = '';
-    } catch (error) {
-      parseError = error?.message ?? 'Invalid JSON';
-    }
-  }
-
-  function handleTriggerList(prop, rawValue) {
-    const values = String(rawValue ?? '')
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-    setAnimationProp(`trigger.${prop}`, values);
-  }
-
-  function dumpAnimationDebug() {
-    if (!selectedAnimationName || !selectedAnimation) return;
-    setDebugDock({
-      title: 'Animation Debug',
-      source: `${core?.id ?? ''}:${selectedAnimationName}`,
-      text: JSON.stringify(selectedAnimation, null, 2),
-    });
-  }
-
-  function selectedTargetDescriptor() {
-    const target = TARGET_PROPERTIES.find((entry) => entry.path === targetProperty) ?? TARGET_PROPERTIES[0];
-    return {
-      path: `Parts.${targetPart || selectedLayer}.${target.path}`,
-      properties: target.props,
-    };
-  }
-
-  function appendTarget() {
-    if (!core?.id || !selectedAnimationName || !(targetPart || selectedLayer)) return;
-    try {
-      const parsed = JSON.parse(targetsDraft || '[]');
-      const nextTargets = Array.isArray(parsed) ? parsed : [];
-      nextTargets.push(selectedTargetDescriptor());
-      updateControlProperty(core.id, `Animations.${selectedAnimationName}.targets`, nextTargets);
-      targetsDraft = JSON.stringify(nextTargets, null, 2);
-      parseError = '';
-    } catch (error) {
-      parseError = error?.message ?? 'Invalid JSON';
-    }
-  }
-
-  function addQuickAnimation(kind) {
-    if (!core?.id || !(targetPart || selectedLayer)) return;
-    const partName = targetPart || selectedLayer;
-    const stateName = quickState || 'pressed';
-    const property = kind === 'rotate' ? 'rotation' : 'scale';
-    const animationName = `${partName}_${kind}_${stateName}`;
-    const target = kind === 'fade'
-      ? { path: `Parts.${partName}.opacity`, properties: ['opacity'] }
-      : { path: `Parts.${partName}.Layout.${property}`, properties: ['transform'] };
-    const partPatch = kind === 'fade'
-      ? { opacity: stateName === 'disabled' ? 0.45 : 0.82 }
-      : { [`Layout.${property}`]: kind === 'rotate' ? 12 : 0.94 };
-
-    applyControlPatch(core.id, {
-      [`Animations.${animationName}`]: {
-        _type: 'Animation',
-        name: animationName,
-        enabled: true,
-        kind: 'transition',
-        trigger: { type: 'stateChange', from: ['*'], to: [stateName] },
-        targets: [target],
-        duration: kind === 'press' ? 90 : 140,
-        delay: 0,
-        easing: kind === 'press' ? 'outQuad' : 'inOutQuad',
-      },
-      [`States.${stateName}`]: {
-        _type: 'State',
-        name: stateName,
-        group: 'interaction',
-        description: `${stateName} visual state for ${partName}.`,
-        enabled: true,
-        when: { [stateName]: true },
-        patches: {
-          component: {},
-          parts: { [partName]: partPatch },
-        },
-      },
-      'Designer.selectedLayer': partName,
-    });
-    selectedAnimationName = animationName;
-  }
-
-  const TRIGGER_TYPES = ['stateChange', 'valueChange'];
-  const EASING_OPTIONS = ['linear', 'outQuad', 'inOutQuad', 'outCubic'];
-  const TARGET_PROPERTIES = [
-    { path: 'Layout.scale', props: ['transform'], label: 'Scale' },
-    { path: 'Layout.rotation', props: ['transform'], label: 'Rotation' },
-    { path: 'Layout.x', props: ['transform'], label: 'X Position' },
-    { path: 'Layout.y', props: ['transform'], label: 'Y Position' },
-    { path: 'opacity', props: ['opacity'], label: 'Opacity' },
-    { path: 'Background.Fill.colour', props: ['background-color'], label: 'Fill Colour' },
-    { path: 'Text.Fill.colour', props: ['color'], label: 'Text Colour' },
-  ];
-  const QUICK_STATES = ['hover', 'pressed', 'focused', 'dragging', 'disabled', 'checked'];
-
-  $effect(() => {
-    if (!targetPart && selectedLayer) targetPart = selectedLayer;
-  });
 </script>
 
-<!--
-  The way into the dock tab that covers this editor, in PropertySection's `tools` slot.
-  Until this button existed the tab could not be reached from the properties panel at all —
-  you had to find it in the dock strip yourself and press "Use selection".
-  utils/dockOpeners.js has the reasoning and the registry.
--->
-{#snippet openAnimationTab()}
-  <OpenInDock tab="animation" controlId={core?.id ?? ''} what="this control's animations" compact />
-{/snippet}
-
 {#if multiEdit}
-  <div class="placeholder">Animation editing is single-selection only right now.</div>
+  <div class="placeholder">
+    Animations are edited one control at a time, in the Animation tab. Its presets can go on every
+    selected control at once.
+  </div>
 {:else if animations}
-  <PropertySection title="Animation List" icon={Play} tools={openAnimationTab}>
-    <PropertyCell label="Add" span={3} hint="Create a new animation node.">
-      <input class="val" type="text" bind:value={newAnimationName} placeholder="Animation name" />
-    </PropertyCell>
-    <PropertyCell label="" span={1} hint="Create the animation with a neutral transition shape." compact>
-      <button class="action-btn" onclick={addAnimation}>Add</button>
-    </PropertyCell>
-    <PropertyCell label="Animations" span={3} hint="Select the animation to edit.">
-      <select class="val" bind:value={selectedAnimationName}>
-        {#each animationNames as name}
-          <option value={name}>{name}</option>
-        {/each}
-      </select>
-    </PropertyCell>
-    <PropertyCell label="" span={1} hint="Remove the selected animation." compact>
-      <button class="action-btn danger" onclick={removeAnimation} disabled={!selectedAnimationName}>Remove</button>
-    </PropertyCell>
-  </PropertySection>
-
-  {#if selectedAnimation}
-    {#if partNames.length}
-      <PropertySection title="Target" icon={Target}>
-        <PropertyCell label="Part" span={2} hint="Layer/part this animation target should affect.">
-          <select class="val" bind:value={targetPart}>
-            {#each partNames as name}
-              <option value={name}>{name}</option>
-            {/each}
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Property" span={2} hint="Common animatable property.">
-          <select class="val" bind:value={targetProperty}>
-            {#each TARGET_PROPERTIES as target}
-              <option value={target.path}>{target.label}</option>
-            {/each}
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Append" span={2} hint="Add this target to the selected animation target list.">
-          <button class="action-btn" onclick={appendTarget}>Append target</button>
-        </PropertyCell>
-        <PropertyCell label="State" span={1} hint="State used by quick animation presets.">
-          <select class="val" bind:value={quickState}>
-            {#each QUICK_STATES as state}
-              <option value={state}>{state}</option>
-            {/each}
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Quick" span={1} hint="Create a state and animation preset for the chosen part.">
-          <div class="mini-actions">
-            <button class="mini-btn" type="button" onclick={() => addQuickAnimation('press')}>Scale</button>
-            <button class="mini-btn" type="button" onclick={() => addQuickAnimation('rotate')}>Rotate</button>
-            <button class="mini-btn" type="button" onclick={() => addQuickAnimation('fade')}>Fade</button>
-          </div>
-        </PropertyCell>
-      </PropertySection>
-    {/if}
-
-    <PropertySection title="Animation" icon={Pencil}>
-      {#snippet tools()}
-        <HeaderPill value={selectedAnimation.enabled !== false}
-                    title="Enable or disable this animation."
-                    onchange={() => setAnimationProp('enabled', !(selectedAnimation.enabled !== false))} />
-      {/snippet}
-      {#if selectedAnimation.enabled !== false}
-      <PropertyCell label="Kind" span={2} hint="Animation family: transition, or keyframes — a shape of its own, edited in the Animation tab. Any other word plays as a transition.">
-        <input class="val" type="text" value={selectedAnimation.kind ?? 'transition'} onchange={(e) => setAnimationProp('kind', e.target.value)} />
-      </PropertyCell>
-      <PropertyCell label="Duration" span={1} compact hint="Transition duration in milliseconds.">
-        <NumberCell label="Dur" value={selectedAnimation.duration ?? 120} step={1} min={0} defaultValue={120} onchange={(value) => setAnimationProp('duration', value)} />
-      </PropertyCell>
-      <PropertyCell label="Delay" span={1} compact hint="Transition delay in milliseconds.">
-        <NumberCell label="Delay" value={selectedAnimation.delay ?? 0} step={1} min={0} defaultValue={0} onchange={(value) => setAnimationProp('delay', value)} />
-      </PropertyCell>
-      <PropertyCell label="Easing" span={2} hint="Named easing curve, mapped to a CSS timing function.">
-        <select class="val" value={selectedAnimation.easing ?? 'outQuad'} onchange={(e) => setAnimationProp('easing', e.target.value)}>
-          {#each EASING_OPTIONS as option}
-            <option value={option}>{option}</option>
-          {/each}
-        </select>
-      </PropertyCell>
-      <PropertyCell label="Trigger" span={2} hint="Trigger family that causes this transition to run.">
-        <select class="val" value={selectedAnimation.trigger?.type ?? 'stateChange'} onchange={(e) => setAnimationProp('trigger.type', e.target.value)}>
-          {#each TRIGGER_TYPES as option}
-            <option value={option}>{option}</option>
-          {/each}
-        </select>
-      </PropertyCell>
-      {/if}
-    </PropertySection>
-
-    {#if selectedAnimation.trigger?.type === 'stateChange'}
-      <PropertySection title="State Trigger" icon={Zap}>
-        <PropertyCell label="From" span={2} hint="Comma-separated previous states. Use * to match any state set.">
-          <input class="val" type="text" value={(selectedAnimation.trigger?.from ?? []).join(', ')} onchange={(e) => handleTriggerList('from', e.target.value)} />
-        </PropertyCell>
-        <PropertyCell label="To" span={2} hint="Comma-separated next states that activate this animation.">
-          <input class="val" type="text" value={(selectedAnimation.trigger?.to ?? []).join(', ')} onchange={(e) => handleTriggerList('to', e.target.value)} />
-        </PropertyCell>
-      </PropertySection>
-    {:else}
-      <PropertySection title="Value Trigger" icon={Zap}>
-        <PropertyCell label="Source" span={4} hint="Value source that should be smoothed by this transition.">
-          <input class="val" type="text" value={selectedAnimation.trigger?.source ?? 'value.normalized'} onchange={(e) => setAnimationProp('trigger.source', e.target.value)} />
-        </PropertyCell>
-      </PropertySection>
-    {/if}
-
-    <PropertySection title="Targets" icon={Target}>
-      <PropertyCell label="Targets" span={4} hint="JSON array of target descriptors. Each item can provide a path and optional property hints.">
-        <textarea class="val code" rows="12" bind:value={targetsDraft} onblur={commitTargets}></textarea>
-      </PropertyCell>
-      <PropertyCell label="" span={4} hint="Send the selected animation payload to the Debug panel." compact>
-        <div class="patch-footer">
-          <span class="error">{parseError}</span>
-          <button class="action-btn" onclick={dumpAnimationDebug}>Debug animation</button>
+  <PropertySection title="Animations" icon={Play}>
+    <div class="summary">
+      <div class="head">
+        <span class="count">{rows.length} {rows.length === 1 ? 'animation' : 'animations'}{allOn ? '' : ' — all off'}</span>
+        {#if dead}<span class="bad">{dead} {dead === 1 ? 'target does' : 'targets do'} nothing</span>{/if}
+        {#if clashes}<span class="bad">{clashes} {clashes === 1 ? 'clash' : 'clashes'}</span>{/if}
+        {#if unknown}<span class="bad">{unknown} unknown {unknown === 1 ? 'state' : 'states'}</span>{/if}
+      </div>
+      {#each rows as row (row.name)}
+        <div class="row" class:off={!row.enabled || !allOn}>
+          <span class="nm">{row.name}</span>
+          <span class="ms">{row.duration}ms</span>
+          <span class="what">{row.kind === 'keyframes' ? 'keyframes' : 'transition'} · {when(row)}</span>
         </div>
-      </PropertyCell>
-    </PropertySection>
-  {/if}
+      {/each}
+      {#if !rows.length}<p class="none">No animations yet.</p>{/if}
+      <div class="open">
+        <OpenInDock tab="animation" controlId={core?.id ?? ''} what="this control's animations" />
+      </div>
+    </div>
+  </PropertySection>
 {/if}
 
 <style>
-  .placeholder {
-    padding: 16px;
-    color: #666;
-    font-size: 11px;
-  }
-
-  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
-
-  /* A textarea wears `.val` too, and the shared skin is sized for a single-line field. Rows
-     decide its height; the token is only a floor. */
-  textarea.val {
-    height: auto;
-    min-height: var(--pp-field-height, 26px);
-    padding: 4px 6px;
-    line-height: 1.4;
-    resize: vertical;
-  }
-
-  .val.code {
-    font-family: Consolas, 'Courier New', monospace;
-    line-height: 1.4;
-  }
-
-  .val:focus {
-    border-color: var(--pp-field-focus, #5B9BD5);
-  }
-
-  .action-btn {
-    width: 100%;
-    background: #252525;
-    border: 1px solid #3B3B3B;
+  .placeholder { padding: 10px 12px; font: 400 11px/1.5 'IBM Plex Sans', system-ui, sans-serif; color: #8A949C; }
+  /* PropertySection lays its children on a four-column grid; the summary takes the whole width. */
+  .summary { grid-column: 1 / -1; min-width: 0; padding: 4px 10px 10px; }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .count { font: 500 10px/1 'IBM Plex Sans', system-ui, sans-serif; color: #C3D0DA; }
+  .bad {
+    font: 600 9px/1 'IBM Plex Sans', system-ui, sans-serif;
+    color: #F0D48A;
+    border: 1px solid #6B4A1E;
+    background: #241d10;
     border-radius: 3px;
-    color: #DDD;
-    font-size: 11px;
-    padding: 4px 8px;
-    cursor: pointer;
-    font-family: inherit;
+    padding: 3px 6px;
   }
-
-  .action-btn:hover:not(:disabled) {
-    border-color: #5B9BD5;
-    color: #FFF;
-  }
-
-  .action-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-
-  .action-btn.danger:hover:not(:disabled) {
-    border-color: #D56B6B;
-  }
-
-  .mini-actions {
+  .row {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
-    width: 100%;
-  }
-
-  .mini-btn {
-    min-height: 24px;
-    border: 1px solid #3B3B3B;
-    background: #252525;
-    color: #DDD;
-    border-radius: 3px;
-    font-size: 10px;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: inherit;
-  }
-
-  .mini-btn:hover {
-    border-color: #5B9BD5;
-    color: #FFF;
-  }
-
-  .patch-footer {
-    display: flex;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+    row-gap: 1px;
     align-items: center;
-    gap: 8px;
-    width: 100%;
+    padding: 4px 0;
+    border-top: 1px solid #23282D;
+    font: 400 10px/1.3 'IBM Plex Sans', system-ui, sans-serif;
   }
-
-  .error {
-    flex: 1;
-    color: #C96A6A;
-    font-size: 10px;
-    min-height: 12px;
-  }
+  .row.off { opacity: 0.45; }
+  .nm { color: #C3D0DA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .what { grid-column: 1 / -1; color: #8A949C; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ms { font: 400 9px/1 'IBM Plex Mono', ui-monospace, monospace; color: #616C75; }
+  .none { margin: 4px 0; font: 400 10px/1.4 'IBM Plex Sans', system-ui, sans-serif; color: #69737B; }
+  .open { margin-top: 8px; display: flex; }
 </style>
