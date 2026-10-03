@@ -15,7 +15,7 @@
 // in as a runtime rather than written into the control: the knob control stays the same object while
 // the Macro turns, and only the runtime changes.
 
-import { pristineControlFor, resolveControlForSet } from '../models/controlSetFamilies.js';
+import { familyPatchFor, pristineControlFor, resolveControlForSet } from '../models/controlSetFamilies.js';
 import { resolveToken } from '../models/controlSets.js';
 import { contrast } from '../models/instrumentDesigns.js';
 import { deepClone } from './deepClone.js';
@@ -102,6 +102,18 @@ export function macroKnobHalo(knob, set) {
   // The light must read on the face, or there is no ring to see: a reflective set's ink is dark.
   const lit = resolveToken('display.lit', set);
   return /^[0-9A-F]{8}$/i.test(String(lit)) && contrast(lit, face) >= 3 ? lit : null;
+}
+
+/**
+ * What the hosted knob and its ring are built from, as a string the canvas keys the knob on: the
+ * Macro's id and set pin, the knob's box, and everything the knob and the ring read from the set,
+ * which is its colours and its Knob family. The knob is rebuilt only when this changes, so it has to
+ * change whenever any of those does: a set edited in Settings keeps its id and its face while its
+ * display light or its cap colour moves.
+ */
+export function macroKnobSignature(macro, box, set = null) {
+  const core = macro?._children?.Core ?? {};
+  return JSON.stringify([core.id ?? '', core.controlSetId ?? '', box, set?.id ?? '', set?.tokens ?? null, familyPatchFor(set, 'Knob')]);
 }
 
 /** The knob's runtime at rest, computed once per knob. */

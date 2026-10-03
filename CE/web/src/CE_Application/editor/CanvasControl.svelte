@@ -147,8 +147,8 @@
   import { CONTROL_SET_LAMP_CONTEXT_KEY, resolveToken } from '../models/controlSets.js';
   import { SERIES_ROLES, chromeTone } from '../models/instrumentDesigns.js';
   import { macroGeometry, macroValue } from '../utils/macroLayout.js';
-  import { macroKnobBaseRuntime, macroKnobBox, macroKnobControl, macroKnobHalo, macroKnobRuntime, macroUsesSetKnob } from '../utils/macroKnob.js';
-  import { resolveControlForSet, controlSetForControl, familyPatchFor } from '../models/controlSetFamilies.js';
+  import { macroKnobBaseRuntime, macroKnobBox, macroKnobControl, macroKnobHalo, macroKnobRuntime, macroKnobSignature, macroUsesSetKnob } from '../utils/macroKnob.js';
+  import { resolveControlForSet, controlSetForControl } from '../models/controlSetFamilies.js';
 
   let {
     control: documentControl,
@@ -389,10 +389,10 @@
   // (utils/macroKnob.js). The knob is rebuilt only when its box or what it takes from the set
   // changes, never as the Macro turns: the key is a string, so an unchanged key notifies nothing,
   // and the value goes in as a runtime. The set is keyed by content, not identity, since a document
-  // set can arrive as a new object on any change to the panel.
+  // set can arrive as a new object on any change to the panel, and by all of its colours, which the
+  // knob and its ring read (macroKnobSignature).
   let macroKnobKey = $derived(isMacro && macroUsesSetKnob(renderControl)
-    ? JSON.stringify([core?.id ?? '', core?.controlSetId ?? '', macroKnobBox(macroGeometry(displayW, displayH, renderControl), renderControl),
-      controlSet?.id ?? '', resolveToken('instrument.face', controlSet) ?? '', familyPatchFor(controlSet, 'Knob')])
+    ? macroKnobSignature(renderControl, macroKnobBox(macroGeometry(displayW, displayH, renderControl), renderControl), controlSet)
     : '');
   let macroKnob = $derived.by(() => {
     if (!macroKnobKey) return null;

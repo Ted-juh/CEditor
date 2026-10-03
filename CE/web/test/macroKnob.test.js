@@ -14,7 +14,7 @@ import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { contrast } from '../src/CE_Application/models/instrumentDesigns.js';
 import { macroGeometry } from '../src/CE_Application/utils/macroLayout.js';
 import {
-  macroKnobBaseRuntime, macroKnobBox, macroKnobControl, macroKnobHalo, macroKnobRuntime, macroUsesSetKnob,
+  macroKnobBaseRuntime, macroKnobBox, macroKnobControl, macroKnobHalo, macroKnobRuntime, macroKnobSignature, macroUsesSetKnob,
 } from '../src/CE_Application/utils/macroKnob.js';
 
 const others = BUILT_IN_CONTROL_SETS.filter((s) => s.id !== 'graphite');
@@ -125,4 +125,23 @@ test('a dark round knob on the dark face sits on a ring of the set\'s display li
   assert.equal(ring('walnut'), null, 'a tuning dial is not a round cap');
   assert.equal(ring('ladder'), null, 'a reflective set\'s ink is dark: no ring to see');
   assert.equal(macroKnobHalo(null, getControlSet('tolex')), null);
+});
+
+test('the knob is rebuilt for any colour it or its ring reads, and not for a new copy of the same set', () => {
+  // The canvas keys the hosted knob on this. A set edited in Settings keeps its id and its face
+  // while its display light moves, and the ring is drawn in that light: keyed on the face alone,
+  // the ring stayed in the old colour, or stayed when it should have gone.
+  const source = macro();
+  const box = boxFor(source);
+  const flightdeck = getControlSet('flightdeck');
+  const key = macroKnobSignature(source, box, flightdeck);
+  assert.equal(macroKnobSignature(source, box, JSON.parse(JSON.stringify(flightdeck))), key, 'the same set as a new object');
+  const relit = { ...flightdeck, tokens: { ...flightdeck.tokens, 'display.lit': 'FFFF5FA2' } };
+  assert.equal(resolveToken('instrument.face', relit), resolveToken('instrument.face', flightdeck), 'the face is unchanged');
+  assert.notEqual(macroKnobSignature(source, box, relit), key, 'a new display light rebuilds the knob');
+  assert.notEqual(macroKnobHalo(macroKnobControl(source, box, relit), relit), macroKnobHalo(macroKnobControl(source, box, flightdeck), flightdeck),
+    'and the ring the rebuilt knob sits on is in the new light');
+  const recapped = { ...flightdeck, tokens: { ...flightdeck.tokens, surface: 'FFE8E2D0' } };
+  assert.notEqual(macroKnobSignature(source, box, recapped), key, 'so does a new cap colour, which decides whether there is a ring');
+  assert.notEqual(macroKnobSignature(source, { ...box, width: box.width + 4 }, flightdeck), key, 'and a new box');
 });
