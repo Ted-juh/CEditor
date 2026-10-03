@@ -102,6 +102,30 @@ check('letting go plays pressIn backwards', () => {
   assert.ok(release.duration.split(', ').every((d) => d === '0.08s'), release.duration);
 });
 
+// --- The easings CSS has no name for -----------------------------------------------------------
+
+await set('springy', { hover: true });
+await wait(60);
+await set('springy', { hover: true, pressed: true });
+await wait(60);
+const spring = await transition('springy');
+await set('drawn', { hover: true });
+await wait(60);
+await set('drawn', { hover: true, pressed: true });
+await wait(60);
+const drawn = await transition('drawn');
+check('a spring reaches the browser as CSS linear(), so it overshoots and settles', () => {
+  // The browser writes the stops back with their positions: linear(0 0%, 0.1777 2.5%, …, 1 100%).
+  assert.match(spring.timing, /^linear\(0( 0%)?, /, spring.timing.slice(0, 60));
+  assert.match(spring.timing, /, 1( 100%)?\)/, 'and it lands');
+  const peak = Math.max(...[...spring.timing.matchAll(/(\d+\.\d+) \d/g)].map((m) => Number(m[1])));
+  assert.ok(peak > 1.1, `a spring overshoots: its highest stop is ${peak}`);
+  assert.match(spring.duration, /^0\.5s/);
+});
+check('and a hand-drawn curve as its own cubic-bezier', () => {
+  assert.match(drawn.timing, /^cubic-bezier\(0\.1, 0\.7, 0\.2, 1\.3\)/, drawn.timing);
+});
+
 // --- The knob: glide for a value from outside, none for a drag -------------------------------
 
 const markup = () => ev(() => window.__motion.knobMarkup());

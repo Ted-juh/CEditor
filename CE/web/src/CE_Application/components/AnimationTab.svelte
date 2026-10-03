@@ -29,6 +29,7 @@
   import EasingCurve from './animation/EasingCurve.svelte';
   import StateChips from './animation/StateChips.svelte';
   import AnimationStage from './animation/AnimationStage.svelte';
+  import BezierEditor from './animation/BezierEditor.svelte';
   import { animationActivity } from '../stores/animationActivity.js';
   import NumberCell from '../properties/NumberCell.svelte';
   import Segmented from '../properties/Segmented.svelte';
@@ -55,7 +56,12 @@
     buildTarget,
     OFFERED_PROPERTIES,
     TRIGGER_TYPES,
-    EASING_NAMES,
+    EASING_CHOICES,
+    CUSTOM_EASING,
+    SPRING_EASING,
+    SPRING_LIMITS,
+    easingPatch,
+    cleanSpring,
     targetStatus,
     newAnimationShape,
     cleanAnimationName,
@@ -141,6 +147,17 @@ onMount(() => {
     if (!controlId || !selectedName) return;
     updateControlProperty(controlId, `Animations.${selectedName}.${prop}`, value);
   }
+
+  /** Several fields of the selected animation in one write — one undo step, one re-render. */
+  function setProps(patch) {
+    if (!controlId || !selectedName || !selected) return;
+    updateControlProperty(controlId, `Animations.${selectedName}`, { ...selected.animation, ...patch });
+  }
+
+  const EASING_TITLES = {
+    [CUSTOM_EASING]: 'Draw your own curve: two control points you drag',
+    [SPRING_EASING]: 'A spring that overshoots and settles; set how stiff and how bouncy',
+  };
 
   function writeTargets(next) {
     if (!controlId || !selectedName) return;
@@ -386,14 +403,36 @@ onMount(() => {
 
             <div class="grp">Easing</div>
             <div class="easings">
-              {#each EASING_NAMES as name (name)}
-                <button type="button" class="easing" class:on={selected.easing === name}
-                        title={`Use ${name}`} onclick={() => setProp('easing', name)}>
-                  <EasingCurve {name} active={selected.easing === name} width={64} height={44} />
+              {#each EASING_CHOICES as name (name)}
+                {@const on = selected.easing === name}
+                <button type="button" class="easing" class:on
+                        title={EASING_TITLES[name] ?? `Use ${name}`}
+                        onclick={() => { if (!on) setProps(easingPatch(selected, name)); }}>
+                  <EasingCurve easing={on ? selected.animation : (EASING_TITLES[name] ? easingPatch(selected, name) : name)}
+                               active={on} width={64} height={44} label={`${name} easing curve`} />
                   <span>{name}</span>
                 </button>
               {/each}
             </div>
+            {#if selected.easing === CUSTOM_EASING}
+              <BezierEditor points={selected.curve.points} onchange={(points) => setProps({ easing: CUSTOM_EASING, bezier: points })} />
+            {:else if selected.easing === SPRING_EASING}
+              <div class="r">
+                <span class="lab" title="How quickly the bounce dies away">Damping</span>
+                <div class="cell"><NumberCell label="damp" value={selected.curve.damping} step={0.5}
+                  min={SPRING_LIMITS.damping[0]} max={SPRING_LIMITS.damping[1]}
+                  onchange={(value) => setProps({ easing: SPRING_EASING, spring: cleanSpring({ ...selected.curve, damping: value }) })} /></div>
+              </div>
+              <div class="r">
+                <span class="lab" title="How many times it swings before it settles">Bounce</span>
+                <div class="cell"><NumberCell label="freq" value={selected.curve.frequency} step={1}
+                  min={SPRING_LIMITS.frequency[0]} max={SPRING_LIMITS.frequency[1]}
+                  onchange={(value) => setProps({ easing: SPRING_EASING, spring: cleanSpring({ ...selected.curve, frequency: value }) })} /></div>
+              </div>
+            {/if}
+            {#if selected.easing === CUSTOM_EASING || selected.easing === SPRING_EASING}
+              <p class="hint">Plays in the panel. Scripts' ce.anim knows the named curves only.</p>
+            {/if}
           </div>
         </div>
 
@@ -620,6 +659,7 @@ onMount(() => {
     color: #8A949C;
   }
   .easing.on span { color: #EAF5FF; }
+  .hint { margin: 6px 0 0; font: 400 9px/1.4 'IBM Plex Sans', system-ui, sans-serif; color: #616C75; }
 
   .warn {
     margin: 8px 0 0;

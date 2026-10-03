@@ -105,16 +105,17 @@ check('and the dead count follows it down', () => {
 
 const easings = await ev(() => window.__anim.easingNames());
 const curves = await ev(() => window.__anim.easingCurves());
-check('every easing is drawn, and there are ten of them — the panel offers four', () => {
-  assert.equal(easings.length, 10, `offered: ${easings.join(', ')}`);
+check('every easing is drawn: ten named curves, then custom and spring — the panel offers four', () => {
+  assert.equal(easings.length, 12, `offered: ${easings.join(', ')}`);
   assert.ok(easings.includes('inQuad'), `the panel never offers inQuad: ${easings.join(', ')}`);
   assert.ok(easings.includes('outBack'), `the overshooting curves are drawn too: ${easings.join(', ')}`);
-  assert.equal(curves, 10, 'each one should have drawn a curve');
+  assert.deepEqual(easings.slice(-2), ['custom', 'spring']);
+  assert.equal(curves, 12, 'each one should have drawn a curve');
 });
 
 const linear = await ev(() => window.__anim.easingPathData('linear'));
 const outCubic = await ev(() => window.__anim.easingPathData('outCubic'));
-check('and the curves really differ — they are not ten copies of one picture', () => {
+check('and the curves really differ — they are not twelve copies of one picture', () => {
   assert.equal(linear.length, 1);
   assert.notEqual(linear[0], outCubic[0], 'linear and outCubic drew the same path');
 });
@@ -124,6 +125,39 @@ await page.waitForTimeout(300);
 check('picking a curve writes it to the control', async () => {});
 assert.equal(await ev(() => window.__anim.storedEasing('pressMotion')), 'inQuad');
 assert.equal(await ev(() => window.__anim.activeEasing()), 'inQuad');
+
+await ev(() => window.__anim.pickEasing('custom'));
+await settle();
+const custom = await ev(() => window.__anim.storedAnimation('pressMotion'));
+check('custom starts from the curve that was there, and opens the curve editor', async () => {});
+assert.equal(custom.easing, 'custom');
+assert.deepEqual(custom.bezier, [0.55, 0.085, 0.68, 0.53], 'inQuad\'s points');
+assert.equal(await ev(() => window.__anim.bezierEditor()), true);
+
+await ev(() => window.__anim.dragHandle(-40, -30));
+await settle();
+const dragged = await ev(() => window.__anim.storedAnimation('pressMotion'));
+check('dragging a handle writes the new curve once, on release', () => {
+  assert.equal(dragged.easing, 'custom');
+  assert.ok(dragged.bezier[2] < custom.bezier[2], `x2 should move left: ${dragged.bezier}`);
+  assert.ok(dragged.bezier[3] > custom.bezier[3], `y2 should move up: ${dragged.bezier}`);
+  assert.deepEqual(dragged.bezier.slice(0, 2), custom.bezier.slice(0, 2), 'and the other handle stays');
+});
+
+await ev(() => window.__anim.pickEasing('spring'));
+await settle();
+const sprung = await ev(() => window.__anim.storedAnimation('pressMotion'));
+check('spring writes its feel and shows its two cells; the drawn curve is kept for coming back', () => {
+  assert.equal(sprung.easing, 'spring');
+  assert.deepEqual(sprung.spring, { damping: 6, frequency: 12 });
+  assert.deepEqual(sprung.bezier, dragged.bezier);
+});
+assert.deepEqual(await ev(() => window.__anim.springCells()), ['Damping', 'Bounce']);
+assert.equal(await ev(() => window.__anim.bezierEditor()), false);
+
+await ev(() => window.__anim.pickEasing('inQuad'));
+await settle();
+assert.equal(await ev(() => window.__anim.storedEasing('pressMotion')), 'inQuad');
 
 // --- Adding a change, with the warning before the click ---------------------------------------
 

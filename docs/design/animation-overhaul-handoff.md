@@ -184,13 +184,27 @@ both change a shipped starter's package fingerprint and regenerate QA-07/QA-09, 
   check the right animation fires); `animationTab.mjs` plays hoverGlow on the stage and checks the
   stage control's computed transition (0.14s, then 0.56s slowed) and the lamp.
 
-### Phase 3
+### Phase 3 — done
 
-- Table already extended (F). Add the easing row's new curves to the tab (EasingCurve via
-  `readEasing`), a **custom bezier editor** (two draggable handles on the existing curve
-  drawing; writes `easing: 'custom'`, `bezier: [...]`), and **spring** (damping/frequency number
-  cells; writes `easing: 'spring'`, `spring: {...}`). ce.anim: named curves reach every runtime via
-  the generator; `custom`/`spring` stay panel-only unless C++ parity is added too.
+- **F, more easings:** the table grew in phase 1 (ten named curves, generated into every runtime).
+  The tab's easing row now offers all ten plus **custom** and **spring** (`EASING_CHOICES`), each
+  drawn by `EasingCurve` — which now takes a whole node, so a drawn curve or a spring shows its own
+  shape, and leaves room above and below so an overshoot is not clipped into looking like none.
+- **Custom bezier editor** (`components/animation/BezierEditor.svelte`): the curve with two
+  draggable control points; x kept in [0, 1] (CSS refuses time running backwards), y within the
+  view's [-0.5, 1.5]; rounded to three places; drawn live, written once on release (one undo step);
+  four number cells for exact values. Choosing custom starts from the curve the animation had
+  (`easingPatch`), so the handles begin where the motion was.
+- **G, spring:** damping and bounce cells (`cleanSpring` keeps them where a spring settles and does
+  not buzz); `easing.js` writes it as CSS `linear()` with an `outBack` fallback where `linear()` is
+  unsupported. Switching easing keeps the other kinds' fields, so going back loses nothing.
+- **ce.anim:** named curves reach every runtime through the generator. custom and spring are
+  panel-only — the tab says so — and `ce.anim` reports them as unknown curves rather than going
+  linear, as it does any name it does not know. C++ parity for them was not added.
+- Tests: model (`easingPatch`, `cleanSpring`, `moveBezierHandle`); `animationTab.mjs` picks custom
+  (starts from inQuad's points), drags a handle with pointer events and checks one write, picks
+  spring; `panelMotion.mjs` checks the computed `transition-timing-function` is a real `linear()`
+  that overshoots, and a drawn curve's own `cubic-bezier`.
 
 ### Phase 4 — keyframes and new triggers (design, not started)
 

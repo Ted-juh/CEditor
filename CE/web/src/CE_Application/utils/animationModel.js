@@ -25,7 +25,7 @@ import {
   targetBuckets,
   readTrigger,
 } from './interactionRuntime.js';
-import { OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT, readEasing, easeAt } from './easing.js';
+import { OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT, readEasing, easeAt, cleanBezier } from './easing.js';
 
 export { EASING_BEZIERS, EASING_NAMES, OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT };
 
@@ -184,6 +184,8 @@ export function describeAnimation(name, animation) {
     duration: Number.isFinite(Number(animation?.duration)) ? Number(animation.duration) : 120,
     delay: Number.isFinite(Number(animation?.delay)) ? Number(animation.delay) : 0,
     easing: String(animation?.easing ?? 'outQuad'),
+    // The curve as the runtime reads it — a custom bezier's points, a spring's feel.
+    curve: readEasing(animation ?? {}),
     triggerType: String(animation?.trigger?.type ?? 'stateChange'),
     // As written, so the tab shows a misspelt state as it was typed; `trigger` is the runtime's
     // reading of the same thing (lower-cased, defaults filled in) and is what the checks use.
@@ -432,6 +434,66 @@ export function easingPoints(easing, steps = 24) {
     out.push({ x: t, y: easeAt(description, t) });
   }
   return out;
+}
+
+/**
+ * Every easing the tab offers: the named curves, then one you draw and one that bounces.
+ * The last two are the panel runtime's own — CSS draws them — and ce.anim does not know them, so a
+ * script asking for curve = "spring" is told so rather than silently going linear.
+ */
+export const EASING_CHOICES = [...EASING_NAMES, CUSTOM_EASING, SPRING_EASING];
+
+/** The limits the spring editor keeps to: below them it never settles, above them it buzzes. */
+export const SPRING_LIMITS = Object.freeze({ damping: [1, 30], frequency: [2, 40] });
+
+/** A spring's feel, clamped to what the editor offers. */
+export function cleanSpring(spring) {
+  const pick = (key) => {
+    const [lo, hi] = SPRING_LIMITS[key];
+    const value = Number(spring?.[key]);
+    return Number.isFinite(value) ? Math.min(hi, Math.max(lo, Math.round(value * 10) / 10)) : SPRING_DEFAULTS[key];
+  };
+  return { damping: pick('damping'), frequency: pick('frequency') };
+}
+
+/**
+ * What choosing an easing writes, as one patch for the animation node.
+ *
+ * Choosing "custom" starts from the curve the animation already had — outCubic, say — so the
+ * handles begin where the motion was rather than somewhere arbitrary. Choosing "spring" keeps a
+ * feel already set. The extra fields of the other two kinds are left in place, so switching back
+ * and forth loses nothing.
+ */
+export function easingPatch(row, choice) {
+  const name = String(choice ?? '');
+  if (name === CUSTOM_EASING) {
+    const own = cleanBezier(row?.animation?.bezier);
+    const current = readEasing(row?.animation ?? { easing: row?.easing });
+    const from = current.kind === 'bezier' ? current.points : current.kind === 'linear' ? [0, 0, 1, 1] : CUSTOM_DEFAULT;
+    return { easing: CUSTOM_EASING, bezier: [...(own ?? from)] };
+  }
+  if (name === SPRING_EASING) {
+    return { easing: SPRING_EASING, spring: cleanSpring(row?.animation?.spring ?? SPRING_DEFAULTS) };
+  }
+  return { easing: name };
+}
+
+/** The y range the bezier editor draws and lets a handle reach — room to overshoot both ways. */
+export const BEZIER_VIEW = Object.freeze({ yMin: -0.5, yMax: 1.5 });
+
+/**
+ * A control point moved to (x, y): the new four numbers, with x kept in [0, 1] (CSS refuses
+ * anything else) and y inside the editor's view, rounded to three places so the stored numbers
+ * read like the named curves' rather than like a mouse position.
+ */
+export function moveBezierHandle(points, handle, x, y) {
+  const base = cleanBezier(points) ?? [...CUSTOM_DEFAULT];
+  const round = (value) => Math.round(value * 1000) / 1000;
+  const nx = round(Math.min(1, Math.max(0, Number(x) || 0)));
+  const ny = round(Math.min(BEZIER_VIEW.yMax, Math.max(BEZIER_VIEW.yMin, Number(y) || 0)));
+  const next = [...base];
+  if (handle === 2) { next[2] = nx; next[3] = ny; } else { next[0] = nx; next[1] = ny; }
+  return next;
 }
 
 /** The easing names the runtime knows but the properties panel never offers. */

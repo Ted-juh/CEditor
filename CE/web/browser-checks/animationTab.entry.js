@@ -138,6 +138,23 @@ window.__anim = {
     return !!button;
   },
   activeEasing: () => textOf(document.querySelector('.easing.on span')),
+  storedAnimation: (name) => JSON.parse(JSON.stringify(animation(name))),
+  bezierEditor: () => !!document.querySelector('.bezier svg'),
+  springCells: () => [...document.querySelectorAll('.setbox .r .lab')].map(textOf).filter((t) => t === 'Damping' || t === 'Bounce'),
+  /** Drag the second bezier handle by (dx, dy) screen pixels, as a person would. */
+  dragHandle: async (dx, dy) => {
+    const handle = document.querySelector('.bezier .handle.h2');
+    const svg = document.querySelector('.bezier svg');
+    if (!handle || !svg) return false;
+    const box = handle.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    const opts = (cx, cy) => ({ bubbles: true, clientX: cx, clientY: cy, pointerId: 7, isPrimary: true });
+    handle.dispatchEvent(new PointerEvent('pointerdown', opts(x, y)));
+    for (let i = 1; i <= 4; i += 1) svg.dispatchEvent(new PointerEvent('pointermove', opts(x + (dx * i) / 4, y + (dy * i) / 4)));
+    svg.dispatchEvent(new PointerEvent('pointerup', opts(x + dx, y + dy)));
+    return true;
+  },
   storedEasing: (name) => animation(name).easing,
 
   addOptions: () => [...document.querySelectorAll('.addbox select')].map((s) => [...s.options].map((o) => o.textContent.trim())),

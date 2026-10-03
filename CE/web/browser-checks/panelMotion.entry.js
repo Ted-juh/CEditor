@@ -49,11 +49,18 @@ button._children.Animations._children = {
 const knob = place(createControl('Knob'), 'knob', 220, 20, 120, 120);
 for (const name of ['pointerSlide', 'rangeSlide']) knob._children.Animations._children[name].duration = 600;
 
-const panel = { id: 'motion', name: 'Motion', width: 400, height: 200, bgColour: 'FF1E1E1E', controls: [button, knob] };
+// Two Ranges whose press animation uses the two easings CSS has no name for: a spring, written as
+// CSS linear(), and a curve drawn by hand.
+const springy = place(createControl('Range'), 'springy', 20, 100, 120, 28);
+Object.assign(springy._children.Animations._children.pressIn, { easing: 'spring', spring: { damping: 6, frequency: 12 }, duration: 500 });
+const drawn = place(createControl('Range'), 'drawn', 20, 150, 120, 28);
+Object.assign(drawn._children.Animations._children.pressIn, { easing: 'custom', bezier: [0.1, 0.7, 0.2, 1.3] });
+
+const panel = { id: 'motion', name: 'Motion', width: 400, height: 200, bgColour: 'FF1E1E1E', controls: [button, knob, springy, drawn] };
 panels.set([]);
 addPanel(panel);
 setActivePanel(panel.id);
-panelPreviewSessions.set(Object.fromEntries([button, knob].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
+panelPreviewSessions.set(Object.fromEntries([button, knob, springy, drawn].map((c) => [c._children.Core.id, createInteractionPreviewSession(c)])));
 mount(GaiaPagesHarness, { target: document.getElementById('host'), props: { panelId: panel.id } });
 setPreviewModeEnabled(true);
 
@@ -65,7 +72,7 @@ window.__motion = {
   /** The control's own transition, as the browser computed it. */
   rootTransition: (id) => {
     const style = getComputedStyle(root(id));
-    return { property: style.transitionProperty, duration: style.transitionDuration, colourVar: style.getPropertyValue('--ce-colour-transition').trim() };
+    return { property: style.transitionProperty, duration: style.transitionDuration, timing: style.transitionTimingFunction, colourVar: style.getPropertyValue('--ce-colour-transition').trim() };
   },
   /** Every element inside the control that is transitioning a colour, and its computed background. */
   paintLayers: (id) => [...root(id).querySelectorAll('*')]

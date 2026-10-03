@@ -12,6 +12,12 @@ import { readFileSync } from 'node:fs';
 
 import {
   ANIMATION_KINDS,
+  EASING_CHOICES,
+  easingPatch,
+  cleanSpring,
+  moveBezierHandle,
+  BEZIER_VIEW,
+  SPRING_LIMITS,
   PANEL_EASING_OPTIONS,
   OVERSHOOTING_EASINGS,
   controlStateNames,
@@ -545,4 +551,41 @@ test('a working colour target says that only a solid colour fades', () => {
   assert.equal(colour.works, true);
   assert.match(colour.note, /gradient, an image or a material switches/);
   assert.equal(targetStatus({ path: 'Transform.scale' }, []).note, undefined, 'scale has nothing to warn about');
+});
+
+// --- Phase 3: a curve you draw, and one that bounces ---------------------------------------------
+
+test('the tab offers the ten named curves, then custom and spring', () => {
+  assert.deepEqual(EASING_CHOICES.slice(-2), ['custom', 'spring']);
+  assert.equal(EASING_CHOICES.length, 12);
+});
+
+test('choosing custom starts from the curve the animation already had', () => {
+  const row = describeAnimation('a', { easing: 'outCubic' });
+  assert.deepEqual(easingPatch(row, 'custom'), { easing: 'custom', bezier: EASING_BEZIERS.outCubic });
+  assert.notEqual(easingPatch(row, 'custom').bezier, EASING_BEZIERS.outCubic, 'a copy, never the shared table');
+  assert.deepEqual(easingPatch(describeAnimation('b', { easing: 'linear' }), 'custom').bezier, [0, 0, 1, 1]);
+  const own = describeAnimation('c', { easing: 'outQuad', bezier: [0.2, 0.3, 0.4, 0.5] });
+  assert.deepEqual(easingPatch(own, 'custom').bezier, [0.2, 0.3, 0.4, 0.5], 'a curve drawn before comes back');
+});
+
+test('choosing spring keeps a feel already set, and choosing a name writes only the name', () => {
+  const sprung = describeAnimation('a', { easing: 'outQuad', spring: { damping: 9, frequency: 18 } });
+  assert.deepEqual(easingPatch(sprung, 'spring'), { easing: 'spring', spring: { damping: 9, frequency: 18 } });
+  assert.deepEqual(easingPatch(describeAnimation('b', {}), 'spring').spring, { damping: 6, frequency: 12 });
+  assert.deepEqual(easingPatch(sprung, 'inBack'), { easing: 'inBack' }, 'the spring stays stored for coming back');
+});
+
+test('a spring is kept inside the range where it settles and does not buzz', () => {
+  assert.deepEqual(cleanSpring({ damping: 0, frequency: 400 }), { damping: SPRING_LIMITS.damping[0], frequency: SPRING_LIMITS.frequency[1] });
+  assert.deepEqual(cleanSpring({ damping: 'x' }), { damping: 6, frequency: 12 });
+  assert.deepEqual(cleanSpring({ damping: 7.25, frequency: 11.04 }), { damping: 7.3, frequency: 11 });
+});
+
+test('dragging a bezier handle keeps time running forwards and the curve inside the view', () => {
+  const start = [0.25, 0.1, 0.25, 1];
+  assert.deepEqual(moveBezierHandle(start, 1, 0.33333, 0.6666), [0.333, 0.667, 0.25, 1], 'rounded like the named curves');
+  assert.deepEqual(moveBezierHandle(start, 2, 1.4, 9), [0.25, 0.1, 1, BEZIER_VIEW.yMax], 'x cannot leave [0, 1]');
+  assert.deepEqual(moveBezierHandle(start, 1, -1, -9), [0, BEZIER_VIEW.yMin, 0.25, 1]);
+  assert.deepEqual(moveBezierHandle('nonsense', 1, 0.5, 0.5), [0.5, 0.5, 0.25, 1], 'bad points start from the default');
 });
