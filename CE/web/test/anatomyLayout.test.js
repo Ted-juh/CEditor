@@ -1,5 +1,5 @@
 // anatomyLayout.test.js — a button's or switch's anatomy form reads at the sizes people give it
-// (utils/anatomyLayout.js). The browser check anatomyButtons.mjs measures the drawing; these pin
+// (utils/anatomyLayout.js). The browser check anatomyForms.mjs measures the drawing; these pin
 // the arithmetic.
 
 import test from 'node:test';

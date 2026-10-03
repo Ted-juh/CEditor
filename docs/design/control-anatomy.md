@@ -49,6 +49,10 @@ set smaller, to 8px, then cut. The device is never drawn smaller than the frame 
 frame reads in keeps the frame exactly as before. Captions in the frame that named no face of their own
 fell back to the page's serif; they take the control's lettering now too.
 
+The flat disc, Graphite's knob, drew its value only by its pointer, beside sliders that fill to theirs.
+It draws an arc in its accent along its track now, from the start of the sweep to the pointer, and none
+at zero.
+
 ## Behavior and states
 
 The original control owns focus, keyboard, drag, wheel, disabled state and MIDI. Rotary
@@ -74,8 +78,9 @@ supply form defaults which can be overridden with an individual form or Original
 changes, clicked switch states, pressed/released action faces, crossfader drag, disabled
 controls, the Original parts escape hatch, gallery grayscale and starter creation.
 `controlAnatomy.test.js` verifies saved overrides, value ranges and unchanged musical
-configuration. `anatomyButtons.mjs` draws buttons and switches at five sizes under six sets and
+configuration. `anatomyForms.mjs` draws buttons and switches at five sizes under six sets and
 measures each caption (8px or more, inside the box, clear of the device) and device (no smaller than
-the frame drew it); `anatomyLayout.test.js` pins the arithmetic. Generated starters and importable set files are regenerated with the existing
+the frame drew it), and checks that each disc's arc ends at its pointer; `anatomyLayout.test.js`
+pins the layout's arithmetic. Generated starters and importable set files are regenerated with the existing
 export scripts. The QA-09 fixture must be refreshed when Core defaults change because its
 embedded custom packages include those defaults in their fingerprints.

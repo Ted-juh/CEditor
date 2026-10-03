@@ -1,6 +1,6 @@
 /**
- * A button or switch drawn as an anatomy form reads at the sizes people give it
- * (utils/anatomyLayout.js), checked where it is drawn.
+ * Anatomy forms, checked where they are drawn: a button or switch reads at the sizes people give it
+ * (utils/anatomyLayout.js), and the flat disc knob shows its value.
  *
  * The forms are drawn in a fixed 160 by 100 frame, device above caption. Scaled whole into a
  * button's usual 132 by 40, the frame met the box at 0.4: a sliver of a device and a 4px caption,
@@ -11,7 +11,9 @@
  *   - the device is beside or above the caption, not under it, inside the box, and no smaller than
  *     the frame drew it;
  *   - a box the frame fits keeps the frame, caption and all, exactly as it was;
- *   - no caption in the drawing falls back to the page's serif.
+ *   - no caption in the drawing falls back to the page's serif;
+ *   - the disc (Graphite's knob) draws its value as an arc on its track that ends at its pointer,
+ *     and none at zero. It drew only the pointer.
  */
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
@@ -104,8 +106,32 @@ try {
     });
     console.log(`  ok  ${id}: buttons and switches read at ${shown.sizes.map(([w, h]) => `${w}x${h}`).join(', ')}`);
   }
+
+  // The disc, at the specimen's values and at zero.
+  const discs = async () => {
+    await page.waitForTimeout(400);
+    return page.evaluate(() => [...document.querySelectorAll('svg.anatomy[data-form="disc"]')].map((svg) => ({
+      position: Number(svg.getAttribute('data-position')),
+      arc: svg.querySelector('path.value-arc')?.getAttribute('d') ?? null,
+    })));
+  };
+  const shownSpecimen = await page.evaluate(() => window.__controlSetShot.show('graphite-studio'));
+  await page.waitForFunction((n) => document.querySelectorAll('[data-control-id]').length >= n, shownSpecimen.controls, { timeout: 30000 });
+  const atValue = await discs();
+  assert.ok(atValue.length >= 3, `the designed Graphite draws its knobs as discs (${atValue.length})`);
+  for (const disc of atValue) {
+    assert.ok(disc.arc, `a disc at ${disc.position} draws its value`);
+    const [x, y] = disc.arc.trim().split(/[\s,A]+/).slice(-2).map(Number);
+    const a = (-135 + disc.position * 270) * Math.PI / 180;
+    assert.ok(Math.hypot(x - (80 + Math.sin(a) * 58), y - (76 - Math.cos(a) * 58)) < 0.05, `the arc ends at the pointer for ${disc.position}`);
+  }
+  await page.evaluate(() => window.__controlSetShot.showMacro('graphite-studio', { value: 0 }));
+  await page.waitForFunction(() => document.querySelectorAll('[data-control-id]').length >= 2, null, { timeout: 30000 });
+  const atZero = await discs();
+  assert.ok(atZero.length >= 1 && atZero.every((disc) => disc.position === 0 && disc.arc === null), 'a disc at zero draws no arc');
+  console.log('  ok  the disc knob draws its value as an arc that ends at its pointer');
   assert.deepEqual(errors, [], 'the page must render without throwing');
-  console.log('anatomyButtons: anatomy buttons and switches read at the sizes people give them');
+  console.log('anatomyForms: buttons and switches read at the sizes people give them; the disc shows its value');
 } finally {
   await browser.close();
   server.close();

@@ -41,6 +41,12 @@
   let captionSpacing = $derived(Math.max(0, Number(font.letterSpacing) || 0));
   let lay = $derived(!knob && !meter ? buttonAnatomyLayout(width, height, label, { letterSpacing: captionSpacing }) : null);
   const point = (a,r,cx=80,cy=76) => ({x:cx+Math.sin(a*Math.PI/180)*r,y:cy-Math.cos(a*Math.PI/180)*r});
+  // The disc's value: an arc in the accent along its track, from the start of the sweep to the pointer.
+  let discArc = $derived.by(() => {
+    if (!(p > 0.001)) return '';
+    const a = point(-135, 58), b = point(angle, 58);
+    return `M${a.x.toFixed(2)} ${a.y.toFixed(2)} A58 58 0 ${p * 270 > 180 ? 1 : 0} 1 ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
+  });
   function polygon(n,r1,r2) { return Array.from({length:n*2},(_,i)=>{const q=point(i*180/n,i%2?r2:r1);return `${q.x},${q.y}`;}).join(' '); }
 </script>
 
@@ -63,7 +69,7 @@
   {:else if knob}
     <g transform={`translate(80 76) scale(${size}) translate(-80 -76)`}>
     {#if form==='disc'}
-      <path d="M39 117 A58 58 0 1 1 121 117" fill="none" stroke={ink} stroke-opacity=".2" stroke-width="5"/>
+      <path d="M39 117 A58 58 0 1 1 121 117" fill="none" stroke={ink} stroke-opacity=".2" stroke-width="5"/>{#if discArc}<path class="value-arc" d={discArc} fill="none" stroke={accent} stroke-width="5"/>{/if}
       <circle cx="80" cy="76" r="43" fill={face}/><g transform={`rotate(${angle} 80 76)`}><rect x="77" y="36" width="6" height="25" rx="3" fill={accent}/></g>
     {:else if form==='pointer'}
       {@render ticks()}<circle cx="80" cy="76" r="45" fill="none" stroke={ink} stroke-dasharray="2 5"/>

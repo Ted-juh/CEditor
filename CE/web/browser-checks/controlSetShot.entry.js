@@ -102,7 +102,7 @@ window.__controlSetShot = {
     return { controls: panel.controls.length, macroId: macro._children.Core.id, knobId: knob._children.Core.id };
   },
   /**
-   * Buttons and switches at the sizes people give them, under one set (anatomyButtons.mjs): the
+   * Buttons and switches at the sizes people give them, under one set (anatomyForms.mjs): the
    * usual 132 by 40, a slim 200 by 30, a square pad, a tall key, and one the anatomy frame fits.
    */
   showButtons(setId) {
