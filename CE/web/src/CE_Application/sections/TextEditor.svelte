@@ -19,7 +19,8 @@
   import Spline from 'lucide-svelte/icons/spline';
   import TextAlignJustify from 'lucide-svelte/icons/text-align-justify';
   import Type from 'lucide-svelte/icons/type';
-  import { getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
+  import { getSection, selectedControls, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
+  import { effectiveSwatchColour } from '../utils/setSwatchValue.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { availableFonts, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { activateInspectorColorTarget } from '../stores/colorTarget.js';
@@ -159,7 +160,10 @@
   // Linked to the control set ('{text.primary}'): show the set's colour, name the token. See
   // BackgroundEditor for the same arrangement and the reasoning.
   let textFillToken = $derived(tokenNameOf(textFill?.colour));
-  let displayTextFillColour = $derived(resolveColourLiteral(textFill?.colour ?? 'FFFFFFFF', $activeControlSet, 'FFFFFFFF').slice(-6));
+  // And where the set's family patch draws the lettering instead, show that: utils/setSwatchValue.js.
+  let documentControl = $derived($selectedControls.find((c) => c?._children?.Core?.id === core?.id) ?? null);
+  let setTextFill = $derived(effectiveSwatchColour(documentControl, $activeControlSet, `${textPathPrefix}.Fill.colour`, textFill?.colour ?? 'FFFFFFFF'));
+  let displayTextFillColour = $derived(setTextFill?.fromSet ? setTextFill.value.slice(-6) : resolveColourLiteral(textFill?.colour ?? 'FFFFFFFF', $activeControlSet, 'FFFFFFFF').slice(-6));
 
   $effect(() => {
     const current = String(text?.content ?? '');
@@ -1243,7 +1247,7 @@
       >
         <PropertyCell label="Colour" span={2} hint="The text fill colour. The swatch opens it in the display panel.">
           <div class="color-input">
-            <button class="mini-swatch" title="Pick colour" style={`background:#${displayTextFillColour}`} onclick={handleFillColorSwatch}></button>
+            <button class="mini-swatch" title={setTextFill?.fromSet ? 'From the control set. Pick a colour to make it this control\'s own' : 'Pick colour'} style={`background:#${displayTextFillColour}`} onclick={handleFillColorSwatch}></button>
             <input class="val" type="text" value={displayTextFillColour} onfocus={selectAll} onchange={setTextFillDisplayColour} />
           </div>
           {#if textFillToken}

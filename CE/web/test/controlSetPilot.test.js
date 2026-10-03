@@ -18,8 +18,10 @@ import { get } from 'svelte/store';
 import {
   BUILT_IN_CONTROL_SETS,
   CONTROL_SET_TOKEN_NAMES,
+  DEFAULT_CONTROL_SET_ID,
   controlSetForPanel,
   getControlSet,
+  newPanelControlSet,
   normalizeControlSetDefinition,
   normalizeControlSetList,
   resolveToken,
@@ -42,6 +44,7 @@ import {
 import { DEFAULT_LAMP, MATERIAL_KINDS, materialActive, materialPrimitives, resolveMaterialLamp } from '../src/CE_Application/utils/materialFilter.js';
 import { buttonFamily, knobFamily, lampFamily, mergeFamilies, sliderFamily, typeFamilies } from '../src/CE_Application/models/controlSetRecipes.js';
 import { hasSurfaceEffects } from '../src/CE_Application/utils/surfaceEffects.js';
+import { DERIVED_ROLES } from '../src/CE_Application/models/personalSetDesigns.js';
 import { COMPONENT_GROUPS } from '../src/CE_Application/utils/effectStack.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
@@ -49,6 +52,7 @@ import { createSliderSemanticParts, resolveSliderSemanticParts } from '../src/CE
 import { buildSolidStyle } from '../src/CE_Application/utils/backgroundCSS.js';
 import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import { createPanel, deserializePanel, serializePanel } from '../src/CE_Application/stores/panelModel.js';
+import { createControlSetStarter } from '../src/CE_Application/models/controlSetStarter.js';
 import { activeControlSet, setActivePanelControlSet, setPanelControlSet } from '../src/CE_Application/stores/controlSets.js';
 import { defaultControlSetId } from '../src/CE_Application/stores/runtimePreferences.js';
 import {
@@ -102,11 +106,12 @@ test('Tolex and Machined are built in, define every role, and carry what colour 
   assert.equal(BUILT_IN_CONTROL_SETS.filter((set) => ['tolex', 'machined'].includes(set.id)).length, 2);
 });
 
-test('the catalogue: seventy-eight built-in sets, each id once, every family patch landing on a real control', () => {
+test('the catalogue: seventy-nine built-in sets, each id once, every family patch landing on a real control', () => {
   const ids = BUILT_IN_CONTROL_SETS.map((set) => set.id);
-  assert.equal(ids.length, 78);
+  assert.equal(ids.length, 79);
   assert.equal(new Set(ids).size, ids.length, 'ids are unique');
   assert.equal(ids[0], 'graphite', 'the default set comes first');
+  assert.equal(ids[1], 'graphite-studio', 'and the designed Graphite new panels start on, beside it');
   for (const set of BUILT_IN_CONTROL_SETS) {
     for (const [type, family] of Object.entries(set.families ?? {})) {
       const control = createControl(type);
@@ -138,10 +143,16 @@ test('normalizeControlSetDefinition keeps a set, drops what is not one, and norm
   assert.equal(normalizeControlSetDefinition({ name: 'no id', tokens: {} }), null);
   assert.equal(normalizeControlSetDefinition({ id: 'x' }), null, 'no tokens is not a set');
   const set = normalizeControlSetDefinition({ id: ' x ', tokens: { accent: ' ff112233 ' }, lamp: { azimuth: '10', elevation: 'nope' }, families: 'bad' });
-  assert.deepEqual(set, { id: 'x', name: 'x', description: '', tokens: { accent: 'ff112233' } });
+  // What it adds beyond what it was given is only what a set derives from its own colours
+  // (models/personalSetDesigns.js): the derived roles and the families its designs write.
+  const { tokens, families, designed, ...rest } = set;
+  assert.deepEqual(rest, { id: 'x', name: 'x', description: '' }, 'no lamp from a half-valid one');
+  assert.equal(tokens.accent, 'ff112233');
+  assert.deepEqual(Object.keys(tokens).filter((name) => name !== 'accent' && !DERIVED_ROLES.includes(name)), []);
+  assert.equal(families.Knob, undefined, 'the malformed families are not kept');
   const withLamp = normalizeControlSetDefinition({ id: 'y', name: 'Y', tokens: {}, lamp: { azimuth: 10, elevation: 20 }, families: { Knob: {} }, panel: { colour: 'FF000000' } });
   assert.deepEqual(withLamp.lamp, { azimuth: 10, elevation: 20 });
-  assert.deepEqual(withLamp.families, { Knob: {} });
+  assert.deepEqual(withLamp.families.Knob, {}, 'a family it was given is kept as given');
   assert.deepEqual(withLamp.panel, { colour: 'FF000000' });
   assert.deepEqual(normalizeControlSetList([withLamp, withLamp, null, { id: 'z', tokens: {} }]).map((s) => s.id), ['y', 'z']);
 });
@@ -243,6 +254,9 @@ test('Settings can import without mutating a document and can edit only a person
 
   const copy = duplicateControlSet(ivory, 'Ivory Workshop');
   assert.ok(copy.id.startsWith('ivory-workshop'));
+  // A copy remembers where it came from, and so does a copy of the copy: its designs are Ivory's.
+  assert.equal(copy.basedOn, 'ivory');
+  assert.equal(duplicateControlSet(copy).basedOn, 'ivory');
   assert.equal(updateControlSetInLibrary(copy.id, { ...copy, name: 'Ivory Workshop II' }).name, 'Ivory Workshop II');
   assert.equal(updateControlSetInLibrary('ivory', { ...ivory, name: 'Changed built-in' }), null,
     'built-in ids stay protected');
@@ -255,7 +269,60 @@ test('Settings can import without mutating a document and can edit only a person
 test('the application control-set default is applied to new panels', () => {
   defaultControlSetId.set('machined');
   assert.equal(createPanel().controlSet.id, 'machined');
+  assert.deepEqual(createPanel().controlSets, [], 'a built-in default is named, not carried');
   defaultControlSetId.set('graphite');
+});
+
+test('one of your own sets can be the default, and a new panel carries it so it survives the trip', () => {
+  const vellum = { ...ivory, id: 'vellum', name: 'Vellum', tokens: { ...ivory.tokens, accent: 'FF7A3E9A' } };
+  controlSetLibrary.set([vellum]);
+  defaultControlSetId.set('vellum');
+  try {
+    const panel = createPanel();
+    assert.equal(panel.controlSet.id, 'vellum');
+    assert.deepEqual(panel.controlSets.map((set) => set.id), ['vellum']);
+    assert.notEqual(panel.controlSets[0], vellum, 'the document gets its own copy, not the library object');
+    assert.notEqual(panel.controlSets[0].tokens, vellum.tokens);
+
+    // The file names it and carries it, so a reader with an empty library (the Player, the build,
+    // somebody else's machine) still renders Vellum rather than falling back to Graphite.
+    const saved = JSON.parse(serializePanel(panel));
+    assert.equal(saved.controlSet.id, 'vellum');
+    assert.equal(saved.controlSets[0].name, 'Vellum');
+    controlSetLibrary.set([]);
+    const reopened = deserializePanel(JSON.stringify(saved), '/tmp/v.cepanel', 'v');
+    assert.equal(resolveToken('accent', controlSetForPanel(reopened)), 'FF7A3E9A');
+
+    // A default nobody has any more starts the panel on the base set instead of a missing name.
+    assert.equal(createPanel().controlSet.id, DEFAULT_CONTROL_SET_ID);
+    assert.deepEqual(createPanel().controlSets, []);
+  } finally {
+    controlSetLibrary.set([]);
+    defaultControlSetId.set('graphite');
+  }
+});
+
+test('a library set that shares a built-in id is the one a new panel carries', () => {
+  const myIvory = { ...ivory, name: 'My Ivory', tokens: { ...ivory.tokens, accent: 'FF123456' } };
+  assert.deepEqual(newPanelControlSet('ivory', []), { controlSet: { id: 'ivory' }, controlSets: [] });
+  const fromLibrary = newPanelControlSet('ivory', [myIvory]);
+  assert.equal(fromLibrary.controlSet.id, 'ivory');
+  assert.equal(fromLibrary.controlSets[0].name, 'My Ivory',
+    'the editor resolves the library copy first, so the file has to carry that copy');
+  assert.deepEqual(newPanelControlSet('', []), { controlSet: { id: DEFAULT_CONTROL_SET_ID }, controlSets: [] });
+});
+
+test('a set starter shows its built-in and does not carry the library default with it', () => {
+  controlSetLibrary.set([{ ...ivory, id: 'vellum', name: 'Vellum' }]);
+  defaultControlSetId.set('vellum');
+  try {
+    const starter = createControlSetStarter('tolex');
+    assert.equal(starter.controlSet.id, 'tolex');
+    assert.deepEqual(starter.controlSets, []);
+  } finally {
+    controlSetLibrary.set([]);
+    defaultControlSetId.set('graphite');
+  }
 });
 
 test('choosing a library set copies it into the document; a built-in is not copied; the copy survives a save', () => {

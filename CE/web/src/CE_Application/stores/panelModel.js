@@ -6,7 +6,8 @@ import { collectExportParameters } from '../utils/exportParameters.js';
 import { expandControl, shrinkControl } from './documentShape.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
 import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
-import { DEFAULT_CONTROL_SET_ID, normalizeControlSet, normalizeControlSetList, serializeControlSet } from '../models/controlSets.js';
+import { controlSetLibrary } from './controlSetLibraryStore.js';
+import { newPanelControlSet, normalizeControlSet, normalizeControlSetList, serializeControlSet } from '../models/controlSets.js';
 import { resolveControlForSet } from '../models/controlSetFamilies.js';
 import { dedupeSnapshotIds } from '../utils/snapshotModel.js';
 import { migrateDottedControlNames } from '../utils/controlNames.js';
@@ -31,6 +32,9 @@ export function makeGuid() {
 
 export function createPanel(name = null) {
   const id = nextId++;
+  // The user's default set (Settings → Control Sets), which may be one of their own; see
+  // newPanelControlSet for why a library default arrives already carried in the document.
+  const startingSet = newPanelControlSet(get(defaultControlSetId), get(controlSetLibrary));
 
   return {
     id,
@@ -208,11 +212,12 @@ export function createPanel(name = null) {
     // The control set this panel's ready-made controls resolve their colour tokens against
     // (models/controlSets.js). Always present in the model so readers can index into it; written
     // to the file only when it is not the default — see serializePanel.
-    controlSet: { id: get(defaultControlSetId) || DEFAULT_CONTROL_SET_ID },
+    controlSet: startingSet.controlSet,
     // The sets this document carries with it (stores/controlSetLibrary.js): a set chosen from the
     // user's library or imported from a file is copied here so a shared panel arrives with the set
-    // it was designed in. Built-ins are never copied. Written only when there is something in it.
-    controlSets: [],
+    // it was designed in — and so is a library set that is the default for new panels. Built-ins
+    // are never copied. Written only when there is something in it.
+    controlSets: startingSet.controlSets,
     modified: false,
     controls: [],
     // Paint order, back to front. One layer to begin with, because a panel with none is a panel

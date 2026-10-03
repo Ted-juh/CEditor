@@ -19,6 +19,16 @@ export const STARTER_CONTROL_SETS = [
 ];
 
 const DIRECTIONS = new Map(STARTER_CONTROL_SETS.map((entry) => [entry.id, entry]));
+
+// The step sequencer's cell for the twelve starting directions, which name no pad form of their
+// own: a shape that says what their keys are (Blueprint's crosshair keys, Soft's cushions, Field's
+// guarded keys). The additional directions carry `padForm` and keep it.
+const STEP_CELLS = {
+  // Graphite's flat discs, for the designed Graphite (Graphite itself takes no direction).
+  graphite: 'porthole',
+  blueprint: 'diamond', pop: 'petal', soft: 'pod', frost: 'porthole', obsidian: 'shutter', console: 'ribbed',
+  carbon: 'concertina', machined: 'hex', tolex: 'reel', field: 'shield', phosphor: 'hex',
+};
 export function starterDirection(id) { return DIRECTIONS.get(id) ?? null; }
 
 // The remaining catalogue reuses the nearest family grammar. The picker distinguishes the
@@ -27,9 +37,22 @@ const RELATED = {
   ivory: 'blueprint', atelier: 'blueprint', ember: 'carbon', neon: 'obsidian',
   backlit: 'carbon', eurorack: 'phosphor', chrome: 'console', rackmount: 'console',
   anodised: 'machined', aerospace: 'machined', laboratory: 'machined', ladder: 'field',
-  walnut: 'tolex', valve: 'tolex', reel: 'tolex', 'saddle-brass': 'tolex',
-  'ceramic-oak': 'soft', receiver: 'tolex',
+  // Keyed by set id. Saddle and Ceramic were keyed by their file names ('saddle-brass',
+  // 'ceramic-oak'), found no direction, and stayed recolours of twenty-odd controls.
+  walnut: 'tolex', valve: 'tolex', reel: 'tolex', saddle: 'tolex',
+  ceramic: 'soft', receiver: 'tolex',
+  // The designed Graphite draws in Graphite's own direction, which Graphite itself does not take.
+  'graphite-studio': 'graphite',
 };
+// Those two were drawn with knobs and buttons of their own (Saddle's cream caps on brass skirts,
+// Ceramic's white caps with a blue arc), which the typo happened to protect. They keep them: the
+// direction fills the controls they had no design for, not the ones they had. The designed
+// Graphite keeps Graphite's flat buttons and switch: a button that carries its legend on its own
+// face is what the set every new panel starts on should insert. The direction's tiles and sliding
+// tabs, a key drawn beside its caption, stay one click away, and are what Graphite's starter draws.
+const BUTTON_TYPES = ['Button', 'MomentaryButton', 'ToggleButton', 'TimedButton', 'OneShotButton'];
+const OWN_MECHANISMS = { saddle: 'all', ceramic: 'all', 'graphite-studio': BUTTON_TYPES };
+const keepsOwn = (id, type) => OWN_MECHANISMS[id] === 'all' || (OWN_MECHANISMS[id] ?? []).includes(type);
 
 export function extendControlSet(set) {
   // Graphite remains the compatibility baseline for existing documents.
@@ -97,6 +120,7 @@ export function extendControlSet(set) {
     families[type] = { ...families[type], component: { ...families[type]?.component, 'Text.Fill.colour': surfaceInk } };
   }
   for (const type of ['Knob', 'Button', 'MomentaryButton', 'ToggleButton', 'TimedButton', 'OneShotButton', 'Meter', 'ProgressBar']) {
+    if (keepsOwn(set.id, type)) continue;
     families[type] = { ...families[type], component: { ...families[type]?.component,
       'Core.controlForm': setAnatomy(type, d.id),
       'Core.formFaceColour': '{surface}', 'Core.formInkColour': inkOn(set.tokens.surface), 'Core.formLabelColour': '{text.primary}', 'Core.formAccentColour': '{accent}',
@@ -107,7 +131,23 @@ export function extendControlSet(set) {
   if (d.padForm) {
     Object.assign(families.DrumPads.component, { 'DrumPads.padForm': d.padForm, 'DrumPads.padLayout': d.padLayout });
     families.Number = additionalNumberFamily(d.id);
-    families.StepSequencer = { component: { ...(d.physical ? {'Background.Fill.colour':'{control.field}','Background.Fill.gradientEnabled':false} : {}), 'StepSequencer.cellForm': d.padForm, 'StepSequencer.cellColour': '{surface}', 'StepSequencer.cellOnColour': '{accent}', 'StepSequencer.labelColour': '{text.primary}', 'StepSequencer.gridColour': '{border}', 'StepSequencer.playheadColour': '{accent}' } };
   }
+  const cellForm = d.padForm ?? STEP_CELLS[d.id];
+  if (cellForm) {
+    families.StepSequencer = { component: { ...(d.physical ? {'Background.Fill.colour':'{control.field}','Background.Fill.gradientEnabled':false} : {}), 'StepSequencer.cellForm': cellForm, 'StepSequencer.cellColour': '{surface}', 'StepSequencer.cellOnColour': '{accent}', 'StepSequencer.labelColour': '{text.primary}', 'StepSequencer.gridColour': '{border}', 'StepSequencer.playheadColour': '{accent}' } };
+  }
+  // A Range is two value fields and two steppers. The fields are the set's value windows, in its
+  // corners and line; the steppers are its buttons. Only Background paths: a part has no Effects.
+  const buttonFace = Object.fromEntries(Object.entries(face).filter(([path]) => path.startsWith('Background.')));
+  const valueWindow = { 'Background.Fill.colour': '{control.field}', 'Background.Corners.radius': Math.min(d.radius, 14), 'Background.Border.enabled': true, 'Background.Border.colour': '{border}', 'Background.Border.thickness': d.pad === 'outline' ? 1 : 1.5, 'Text.Fill.colour': fieldInk };
+  const stepper = { 'Background.Corners.radius': Math.min(d.radius, 14), ...buttonFace, 'Text.Fill.colour': surfaceInk };
+  const rangeParts = families.Range?.parts ?? {};
+  families.Range = { ...families.Range, parts: {
+    ...rangeParts,
+    lowField: { ...valueWindow, ...(rangeParts.lowField ?? {}) },
+    highField: { ...valueWindow, ...(rangeParts.highField ?? {}) },
+    decrement: { ...stepper, ...(rangeParts.decrement ?? {}) },
+    increment: { ...stepper, ...(rangeParts.increment ?? {}) },
+  } };
   return { ...set, families };
 }

@@ -11,12 +11,21 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "5417bca0",
+  "fingerprint": "16e4f708",
   "set": {
     "id": "blueprint",
     "name": "Blueprint",
     "description": "Line work only. One ink, one paper, hairline strokes on a faint grid. The schematic, for panels that are documents.",
     "tokens": {
+      "instrument.face": "FF0E1A2C",
+      "instrument.ink": "FF9EAAB9",
+      "instrument.text": "FFDCE8F5",
+      "series.one": "FFDCE8F5",
+      "series.two": "FFF2C462",
+      "series.three": "FF8FE3B0",
+      "series.four": "FF7FA6D6",
+      "series.five": "FFDD8A88",
+      "series.alert": "FFE5534B",
       "surface": "FF14243A",
       "surface.hover": "FF1D3252",
       "surface.pressed": "FF0E1A2C",
@@ -60,7 +69,9 @@
       "display.lit": "FFDCE8F5",
       "display.unlit": "24DCE8F5",
       "display.screen": "FF0E1A2C",
-      "display.backlight": "FF2B3545"
+      "display.backlight": "FF2B3545",
+      "panel.surface": "FF14243A",
+      "section.surface": "FF101C2D"
     },
     "lamp": {
       "azimuth": 225,
@@ -361,56 +372,72 @@
       },
       "Group": {
         "component": {
-          "Background.Corners.radius": 0,
-          "Background.Border.thickness": 1,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Border.colour": "FFDCE8F5",
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "JetBrains Mono",
-          "Background.Fill.gradientEnabled": false
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": []
         }
       },
       "Container": {
         "component": {
-          "Background.Corners.radius": 0,
-          "Background.Border.thickness": 1,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Border.colour": "FFDCE8F5",
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "JetBrains Mono",
-          "Background.Fill.gradientEnabled": false
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": []
         }
       },
       "TabContainer": {
         "component": {
-          "Background.Corners.radius": 0,
-          "Background.Border.thickness": 1,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Border.colour": "FFDCE8F5",
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "JetBrains Mono",
-          "Background.Fill.gradientEnabled": false,
           "TabContainer.appearance": "flat",
           "TabContainer.accentColour": "{accent}",
-          "TabContainer.stripColour": "{control.field}",
-          "TabContainer.tabColour": "{surface}",
+          "TabContainer.stripColour": "{section.surface}",
+          "TabContainer.tabColour": "{section.surface}",
           "TabContainer.activeTabColour": "{surface.checked}",
           "TabContainer.labelColour": "{text.primary}",
-          "TabContainer.activeLabelColour": "{text.inverse}"
+          "TabContainer.activeLabelColour": "FF15171A",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": []
         }
       },
       "ScrollArea": {
         "component": {
-          "Background.Corners.radius": 0,
-          "Background.Border.thickness": 1,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Border.colour": "FFDCE8F5",
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "JetBrains Mono",
-          "Background.Fill.gradientEnabled": false,
           "ScrollArea.scrollbarSize": 5,
           "ScrollArea.trackColour": "{control.track}",
-          "ScrollArea.thumbColour": "{control.cap}"
+          "ScrollArea.thumbColour": "{control.cap}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": []
         }
       },
       "Meter": {
@@ -636,6 +663,470 @@
           "Joystick.puckColour": "{control.cap}",
           "Joystick.cornerColour": "{text.muted}",
           "Joystick.labelColour": "FFF2F2F2"
+        }
+      },
+      "StepSequencer": {
+        "component": {
+          "StepSequencer.cellForm": "diamond",
+          "StepSequencer.cellColour": "{surface}",
+          "StepSequencer.cellOnColour": "{accent}",
+          "StepSequencer.labelColour": "{text.primary}",
+          "StepSequencer.gridColour": "{border}",
+          "StepSequencer.playheadColour": "{accent}"
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 0,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1,
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 0,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1,
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "decrement": {
+            "Background.Corners.radius": 0,
+            "Background.Border.thickness": 1,
+            "Background.Fill.colour": "00000000",
+            "Background.Border.colour": "FFDCE8F5",
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "increment": {
+            "Background.Corners.radius": 0,
+            "Background.Border.thickness": 1,
+            "Background.Fill.colour": "00000000",
+            "Background.Border.colour": "FFDCE8F5",
+            "Text.Fill.colour": "FFF2F2F2"
+          }
+        }
+      },
+      "Label": {
+        "component": {
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": true,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Border.thickness": 1
+        }
+      },
+      "Background": {
+        "component": {
+          "Background.Border.enabled": false
+        }
+      },
+      "Macro": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Macro.knobDesign": "set",
+          "Macro.knobColour": "FF2B3545",
+          "Macro.arcColour": "{series.one}",
+          "Macro.trackColour": "FF1A2537",
+          "Macro.labelColour": "{instrument.ink}"
+        }
+      },
+      "Orbit": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Orbit.fieldColour": "{instrument.face}",
+          "Orbit.ringColour": "338FE3B0",
+          "Orbit.centreColour": "FF394352",
+          "Orbit.labelColour": "{instrument.ink}"
+        }
+      },
+      "Looper": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Looper.laneColour": "FF152132",
+          "Looper.gridColour": "229EAAB9",
+          "Looper.playheadColour": "{series.two}",
+          "Looper.labelColour": "{instrument.ink}"
+        }
+      },
+      "Router": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Router.curveColour": "{series.one}",
+          "Router.inputColour": "{series.two}",
+          "Router.fieldColour": "{instrument.face}",
+          "Router.gridColour": "189EAAB9",
+          "Router.labelColour": "{instrument.ink}"
+        }
+      },
+      "Timbre": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Timbre.fieldColour": "{instrument.face}",
+          "Timbre.puckColour": "{series.two}",
+          "Timbre.labelColour": "{instrument.ink}"
+        }
+      },
+      "Turing": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Turing.barColour": "{series.one}",
+          "Turing.headColour": "{series.two}",
+          "Turing.fieldColour": "{instrument.face}",
+          "Turing.labelColour": "{instrument.ink}"
+        }
+      },
+      "Kinetic": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Kinetic.fieldColour": "{instrument.face}",
+          "Kinetic.ballColour": "{series.one}",
+          "Kinetic.wallColour": "338FE3B0",
+          "Kinetic.labelColour": "{instrument.ink}"
+        }
+      },
+      "Constellation": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Constellation.fieldColour": "{instrument.face}",
+          "Constellation.probeColour": "{series.two}",
+          "Constellation.linkColour": "338FE3B0",
+          "Constellation.labelColour": "{instrument.ink}"
+        }
+      },
+      "Constraint": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Constraint.fieldColour": "{instrument.face}",
+          "Constraint.trackColour": "189EAAB9",
+          "Constraint.linkColour": "55F2C462",
+          "Constraint.labelColour": "{instrument.ink}"
+        }
+      },
+      "Keyboard": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Keyboard.whiteColour": "FFE1E1DE",
+          "Keyboard.blackColour": "FF14181E",
+          "Keyboard.heldColour": "FF8FE3B0",
+          "Keyboard.outOfKeyColour": "FF858788",
+          "Keyboard.labelColour": "FF565654"
+        }
+      },
+      "ChordPad": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "ChordPad.echoColour": "{series.one}",
+          "ChordPad.fieldColour": "{instrument.face}",
+          "ChordPad.padColour": "FF1C2839",
+          "ChordPad.inKeyColour": "{series.three}",
+          "ChordPad.tonicColour": "{series.two}",
+          "ChordPad.minorColour": "{series.four}",
+          "ChordPad.labelColour": "{instrument.ink}"
+        }
+      },
+      "Arp": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Arp.fieldColour": "{instrument.face}",
+          "Arp.stepColour": "{series.three}",
+          "Arp.headColour": "{series.two}",
+          "Arp.restColour": "FF263141",
+          "Arp.labelColour": "{instrument.ink}"
+        }
+      },
+      "NoteRibbon": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "NoteRibbon.echoColour": "{series.one}",
+          "NoteRibbon.fieldColour": "{instrument.face}",
+          "NoteRibbon.zoneColour": "FF1C2839",
+          "NoteRibbon.inKeyColour": "{series.three}",
+          "NoteRibbon.rootColour": "{series.two}",
+          "NoteRibbon.touchColour": "{series.two}",
+          "NoteRibbon.labelColour": "{instrument.ink}"
+        }
+      },
+      "Phrase": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Phrase.faceColour": "{instrument.face}",
+          "Phrase.cellColour": "FF212C3D",
+          "Phrase.noteColour": "{series.one}",
+          "Phrase.playColour": "{series.two}",
+          "Phrase.labelColour": "{instrument.ink}"
+        }
+      },
+      "Recorder": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Recorder.faceColour": "{instrument.face}",
+          "Recorder.noteColour": "{series.three}",
+          "Recorder.recordColour": "{series.alert}",
+          "Recorder.playheadColour": "{series.two}",
+          "Recorder.labelColour": "{instrument.ink}"
+        }
+      },
+      "Harmoniser": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Harmoniser.faceColour": "{instrument.face}",
+          "Harmoniser.whiteColour": "FFE1E1DE",
+          "Harmoniser.blackColour": "FF14181E",
+          "Harmoniser.playedColour": "{series.two}",
+          "Harmoniser.addedColour": "{series.four}",
+          "Harmoniser.labelColour": "{instrument.ink}"
+        }
+      },
+      "SplitZone": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "SplitZone.faceColour": "{instrument.face}",
+          "SplitZone.whiteColour": "FFE1E1DE",
+          "SplitZone.blackColour": "FF14181E",
+          "SplitZone.litColour": "{series.two}",
+          "SplitZone.gapColour": "FF394352",
+          "SplitZone.labelColour": "{instrument.ink}"
+        }
+      },
+      "Setlist": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Setlist.faceColour": "{instrument.face}",
+          "Setlist.rowColour": "FF212C3D",
+          "Setlist.currentColour": "{series.three}",
+          "Setlist.textColour": "{instrument.text}",
+          "Setlist.labelColour": "{instrument.ink}"
+        }
+      },
+      "Transport": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Transport.faceColour": "{instrument.face}",
+          "Transport.accentColour": "{series.one}",
+          "Transport.beatColour": "{series.two}",
+          "Transport.labelColour": "{instrument.ink}"
+        }
+      },
+      "Panic": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Text.Font.family": "JetBrains Mono",
+          "Panic.faceColour": "FF392532",
+          "Panic.borderColour": "{series.alert}",
+          "Panic.labelColour": "{instrument.text}",
+          "Panic.flashColour": "{series.alert}"
+        }
+      },
+      "LcdDisplay": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Display.backlightOn": false,
+          "Display.showGhost": false,
+          "Display.showGlass": false,
+          "Display.glassTint": "00FFFFFF",
+          "Display.showScanlines": false,
+          "Display.showGrid": true,
+          "Display.dotShape": "square"
+        }
+      },
+      "PixelDisplay": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "{text.primary}",
+          "Background.Corners.radius": 0,
+          "Effects.Shadows.items": [],
+          "Pixel.litColour": "{display.lit}",
+          "Pixel.unlitColour": "{display.unlit}",
+          "Pixel.screenColour": "{display.screen}",
+          "Pixel.backlightColour": "{display.backlight}",
+          "Pixel.backlightOn": false,
+          "Pixel.showGhost": false,
+          "Pixel.showGlass": false,
+          "Pixel.glassTint": "00FFFFFF",
+          "Pixel.showScanlines": false,
+          "Pixel.dotShape": "square",
+          "Pixel.glow": 0
+        }
+      },
+      "Shape": {
+        "component": {
+          "Shape.fillColour": "{section.surface}",
+          "Shape.strokeColour": "{text.primary}",
+          "Shape.strokeWidth": 1,
+          "Shape.cornerRadius": 0,
+          "Shape.strokeStyle": "dashed"
         }
       }
     },

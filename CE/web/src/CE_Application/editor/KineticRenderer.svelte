@@ -8,7 +8,7 @@
     kineticGeometry, kineticToPx,
   } from '../utils/kineticLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 8;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -46,7 +46,7 @@
 </script>
 
 <svg class="kinetic" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
-  <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx="6" fill={fieldCss} stroke="rgba(36,36,48,1)" />
+  <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx="6" fill={fieldCss} stroke={tone('rgba(36,36,48,1)')} />
   {#if cfg.showWalls !== false}
     <rect x={geom.x0 + 1} y={geom.y0 + 1} width={geom.w - 2} height={geom.h - 2} rx="5" fill="none" stroke={wallCss} stroke-width="2" />
   {/if}

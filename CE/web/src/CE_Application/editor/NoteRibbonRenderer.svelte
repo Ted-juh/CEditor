@@ -11,7 +11,7 @@
   } from '../utils/noteRibbonLayout.js';
   import { noteName, useFlats, SCALE_LABELS } from '../utils/chordPadLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 8;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -94,8 +94,8 @@
 
 <svg class="ribbon" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   {#if showHeader}
-    <rect x={PAD} y={PAD - 4} width={Math.max(10, width - PAD * 2)} height={headerH - 4} rx="6" fill="rgba(20,20,32,1)" stroke="rgba(42,42,54,1)" />
-    <text x={PAD + 9} y={PAD + 9} font-size="10" fill="rgba(232,232,238,1)" style="font-weight:600">{keyLabel}</text>
+    <rect x={PAD} y={PAD - 4} width={Math.max(10, width - PAD * 2)} height={headerH - 4} rx="6" fill={tone('rgba(20,20,32,1)')} stroke={tone('rgba(42,42,54,1)')} />
+    <text x={PAD + 9} y={PAD + 9} font-size="10" fill={tone('rgba(232,232,238,1)')} style="font-weight:600">{keyLabel}</text>
     {#if !narrow}
       <text x={width / 2} y={PAD + 9} font-size="9" fill={labelCss} text-anchor="middle" opacity="0.8">{RIBBON_MODE_LABELS[mode] ?? mode}</text>
     {/if}
@@ -114,7 +114,7 @@
     <rect x={c.r.x + 0.5} y={c.r.y + 0.5 + (horizontal ? inset : 0)}
           width={Math.max(1, c.r.w - 1 - (horizontal ? 0 : inset))} height={Math.max(1, c.r.h - 1 - (horizontal ? inset : 0))}
           rx="3"
-          fill={c.z.inScale ? zoneCss : 'rgba(9,9,13,1)'}
+          fill={c.z.inScale ? zoneCss : tone('rgba(9,9,13,1)')}
           stroke={c.z.isRoot ? accent : 'rgba(255,255,255,0.05)'}
           stroke-width={c.z.isRoot ? 1.4 : 1}
           opacity={c.z.inScale ? 1 : 0.9} />

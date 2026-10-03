@@ -28,13 +28,16 @@ import {
   isTokenReference,
   makeTokenReference,
   normalizeControlSet,
+  normalizeControlSetDefinition,
   resolveColourLiteral,
   resolveColourValue,
   resolveControlTokens,
   resolveToken,
   serializeControlSet,
   tokenNameOf,
+  withPanelSurface,
 } from '../src/CE_Application/models/controlSets.js';
+import { resolveControlForSet } from '../src/CE_Application/models/controlSetFamilies.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { createStatesDefaults } from '../src/CE_Application/models/interactionDefaults.js';
 import { resolveInteractiveControl } from '../src/CE_Application/utils/interactionRuntime.js';
@@ -206,6 +209,69 @@ test('the other families resolve to their old colours under the base set as well
   }
 });
 
+// --- labels sit on the panel ---------------------------------------------------------------------
+
+// WCAG relative-luminance contrast between two AARRGGBB/RRGGBB literals (alpha ignored).
+function contrast(a, b) {
+  const luminance = (hex) => {
+    const [r, g, bl] = [0, 2, 4].map((at) => parseInt(String(hex).slice(-6).slice(at, at + 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+test('a Label reads in every built-in set: its lettering against what is behind it is at least 4.5:1', () => {
+  // The sets choose their text colours to read on the PANEL. A Label used to fill with `surface`,
+  // the button face, and on a third of the catalogue that is the text colour's own tone: Tolex
+  // drew cream lettering on a cream plate at 1.0:1. Most sets now draw no plate at all
+  // (models/labelDesigns.js), and then what is behind the lettering is the panel.
+  for (const set of BUILT_IN_CONTROL_SETS) {
+    const label = resolveControlForSet(createControl('Label'), set)._children;
+    const fill = label.Background._children.Fill.colour;
+    const behind = fill.startsWith('00') ? resolveToken('panel.surface', set) : fill;
+    const ink = label.Text._children.Fill.colour;
+    assert.ok(isColourLiteral(behind) && isColourLiteral(ink), `${set.id}: ${behind} / ${ink}`);
+    assert.ok(contrast(behind, ink) >= 4.5, `${set.id}: ${ink} on ${behind} is ${contrast(behind, ink).toFixed(2)}:1`);
+  }
+});
+
+test('a Background block takes the panel colour a set names, a factory Label too, and Graphite keeps its own', () => {
+  for (const set of BUILT_IN_CONTROL_SETS) {
+    const expected = set.panel?.colour ? String(set.panel.colour).toUpperCase() : resolveToken('surface', set);
+    assert.equal(resolveToken('panel.surface', set), expected, set.id);
+    assert.equal(resolveControlForSet(createControl('Background'), set)._children.Background._children.Fill.colour, expected, `${set.id} Background`);
+    // The Label's own default, before a set's label design: what a set without one draws.
+    assert.equal(resolveControlTokens(createControl('Label'), set)._children.Background._children.Fill.colour, expected, `${set.id} Label`);
+  }
+  // Rule 1 above: a document that never chose a set looks exactly as it did.
+  for (const type of ['Label', 'Background']) {
+    const control = resolveControlTokens(createControl(type), BASE_CONTROL_SET)._children;
+    assert.equal(control.Background._children.Fill.colour, 'FF3A3A3A', type);
+  }
+  assert.equal(resolveControlTokens(createControl('Label'), BASE_CONTROL_SET)._children.Text._children.Fill.colour, 'FFFFFFFF');
+});
+
+test('a set written before panel.surface existed gets it from its panel colour, or reads as it did', () => {
+  const tokens = { surface: 'FFEFE3C8', 'text.primary': 'FFF1E6CC' };
+  // A library copy of an amp-style set: cream buttons, cream text, black panel.
+  const amp = normalizeControlSetDefinition({ id: 'my-amp', tokens, panel: { colour: 'ff1c1a17' } });
+  assert.equal(amp.tokens['panel.surface'], 'FF1C1A17');
+  // One with no panel colour (a copy of Graphite) gets no token and reaches Graphite's alias,
+  // which resolves against its own surface: what its labels sat on before.
+  const plain = normalizeControlSetDefinition({ id: 'my-plain', tokens });
+  assert.equal('panel.surface' in plain.tokens, false);
+  assert.equal(resolveToken('panel.surface', plain), 'FFEFE3C8');
+  // A set that says what its panel surface is keeps it.
+  const own = normalizeControlSetDefinition({ id: 'mine', tokens: { ...tokens, 'panel.surface': 'FF102030' }, panel: { colour: 'FF1C1A17' } });
+  assert.equal(own.tokens['panel.surface'], 'FF102030');
+  // An alias to the button face inherited alongside a panel colour is the clash itself: replaced.
+  assert.equal(withPanelSurface({ id: 'x', tokens: { 'panel.surface': '{surface}' }, panel: { colour: 'FF000000' } }).tokens['panel.surface'], 'FF000000');
+  // Nothing to say, nothing changed: the same object back.
+  assert.equal(withPanelSurface(plain), plain);
+});
+
 test('switching the set changes every family together', () => {
   for (const type of ['Slider', 'Knob', 'Number', 'Range', 'Button', 'ToggleButton', 'Combobox', 'Listbox', 'TextInput']) {
     const base = JSON.stringify(resolveControlTokens(createControl(type), BASE_CONTROL_SET));
@@ -292,8 +358,9 @@ test('controlSetForPanel: the named set, or the base set for none or an unknown 
 });
 
 test('a panel on the default set writes no controlSet key; any other set writes {id}', () => {
-  const panel = createPanel('Sets');
-  assert.deepEqual(panel.controlSet, { id: DEFAULT_CONTROL_SET_ID });
+  // On the base set, as every document from before sets is. A new panel starts on the designed
+  // Graphite and names it (designedGraphite.test.js).
+  const panel = { ...createPanel('Sets'), controlSet: { id: DEFAULT_CONTROL_SET_ID } };
   const plain = JSON.parse(serializePanel(panel));
   assert.equal('controlSet' in plain, false);
 
@@ -338,7 +405,7 @@ test('a saved document keeps its references; a build payload is baked to literal
 // --- the store --------------------------------------------------------------------------------------
 
 test('activeControlSet follows the active panel, and setActivePanelControlSet writes through', () => {
-  const panel = openPanel();
+  const panel = openPanel({ controlSet: { id: DEFAULT_CONTROL_SET_ID } });
   assert.equal(get(activeControlSet), BASE_CONTROL_SET);
 
   setActivePanelControlSet('ivory');

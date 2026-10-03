@@ -85,3 +85,26 @@ test('document colours harvest deduplicates, ranks by use, strips alpha', () => 
   assert.ok(colours.includes('222222'), 'panel background included');
   assert.ok(!colours.includes('FFFFFF'), 'fully transparent tint skipped');
 });
+
+test('template captions are one line that shrinks to fit, with the whole box for the line, and none overlap', () => {
+  // Whether they fit in every set's lettering is a browser question (browser-checks/templateLabels.mjs);
+  // what the template has to say for that to be possible is checked here.
+  for (const template of PANEL_TEMPLATES) {
+    const labels = template.build().filter((c) => c._children.Core.controlType === 'Label');
+    for (const label of labels) {
+      const { Text, ContentLayout } = label._children;
+      const name = `${template.id} "${Text.content}"`;
+      assert.equal(Text._children.Multiline.wrapMode, 'none', name);
+      assert.equal(Text._children.Multiline.fitMode, 'shrink', name);
+      assert.equal(ContentLayout.paddingTop + ContentLayout.paddingBottom, 0, `${name}: the box is the line`);
+      assert.ok(ContentLayout.paddingLeft + ContentLayout.paddingRight <= 4, name);
+    }
+    for (let i = 0; i < labels.length; i++) {
+      for (let j = i + 1; j < labels.length; j++) {
+        const a = labels[i]._children.Transform, b = labels[j]._children.Transform;
+        const apart = a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y;
+        assert.ok(apart, `${template.id}: "${labels[i]._children.Text.content}" overlaps "${labels[j]._children.Text.content}"`);
+      }
+    }
+  }
+});

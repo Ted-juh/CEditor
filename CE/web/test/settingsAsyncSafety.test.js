@@ -18,8 +18,8 @@ test('deleting the default custom control set repairs the persisted default', ()
   const text = source('ControlSetsSettings.svelte');
   const removal = text.slice(text.indexOf('function removeSelected()'), text.indexOf('function setToken'));
   assert.match(removal, /const wasDefault = \$generalSettings\.defaultControlSetId === draft\.id/);
-  assert.match(removal, /if \(wasDefault\) updateGeneralSettings\(\{ defaultControlSetId: 'graphite' \}\)/);
-  assert.match(removal, /choose\(wasDefault \? 'graphite'/);
+  assert.match(removal, /if \(wasDefault\) updateGeneralSettings\(\{ defaultControlSetId: NEW_PANEL_CONTROL_SET_ID, defaultControlSetChosen: false \}\)/);
+  assert.match(removal, /choose\(wasDefault \? NEW_PANEL_CONTROL_SET_ID/);
 });
 
 test('icon imports suppress stale and post-destroy status updates', () => {

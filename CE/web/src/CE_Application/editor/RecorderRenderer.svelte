@@ -11,7 +11,7 @@
     takeEventCount, lastPass, isRecordingState, RECORDER_STATE_LABELS,
   } from '../utils/noteRecorderLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 8;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -90,13 +90,13 @@
 
 <svg class="recorder" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <rect x={PAD - 4} y={PAD - 4} width={Math.max(8, width - PAD * 2 + 8)} height={Math.max(8, height - PAD * 2 + 8)}
-        rx="6" fill={faceCss} stroke="rgba(42,42,54,1)" />
+        rx="6" fill={faceCss} stroke={tone('rgba(42,42,54,1)')} />
 
   {#if showHeader}
     <!-- The state dot is red only when it is actually capturing. Armed pulses
          in the preview; here it is simply a distinct, dimmer red. -->
     <circle cx={PAD + 3} cy={PAD + 5} r="3.5"
-            fill={recording ? recCss : state === 'armed' ? recCss : recorderPlaying(control) ? noteCss : 'rgba(90,90,100,1)'}
+            fill={recording ? recCss : state === 'armed' ? recCss : recorderPlaying(control) ? noteCss : tone('rgba(90,90,100,1)')}
             opacity={state === 'armed' ? 0.45 : 1} />
     <text x={PAD + 12} y={PAD + 9} font-size="9.5" fill={recording ? recCss : labelCss} opacity="0.9">
       {RECORDER_STATE_LABELS[state]} · {countLabel}

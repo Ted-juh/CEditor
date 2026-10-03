@@ -8,7 +8,7 @@
     constraintGeometry, barRect,
   } from '../utils/constraintLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, series = null, tone = (colour) => colour } = $props();
 
   const PAD = 8;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -22,6 +22,11 @@
   }
   function n(v, f = 0) { const x = Number(v); return Number.isFinite(x) ? x : f; }
   const MEMBER_PALETTE = ['rgba(57,217,138,1)', 'rgba(91,155,213,1)', 'rgba(155,138,255,1)', 'rgba(242,153,74,1)', 'rgba(242,201,76,1)', 'rgba(235,87,87,1)'];
+  // The set's series of voices (series.one to series.alert, models/instrumentDesigns.js), in
+  // this control's own order. Graphite's series is the palette above, so a panel that never
+  // chose a set is unchanged.
+  const SERIES_ORDER = [1, 3, 4, 5, 2, 6];
+  let palette = $derived(Array.isArray(series) && series.length >= 6 ? SERIES_ORDER.map((n, i) => css(series[n - 1], MEMBER_PALETTE[i])) : MEMBER_PALETTE);
 
   let cfg = $derived(constraintConfig(control));
   let mode = $derived(constraintMode(control));
@@ -41,7 +46,7 @@
   let bars = $derived.by(() => members.map((m, i) => ({
     m, i,
     r: barRect(geom, i, m.value),
-    colour: m.colour ? css(m.colour) : MEMBER_PALETTE[i % MEMBER_PALETTE.length],
+    colour: m.colour ? css(m.colour) : palette[i % palette.length],
     isDrag: i === dragIndex,
   })));
   // The chain glyph runs across the bar tops (only when a rule links them).
@@ -71,7 +76,7 @@
   <!-- per-member value + label -->
   {#each bars as b (b.i)}
     {#if cfg.showValues !== false}
-      <text x={b.r.cx} y={Math.max(geom.y0 + 9, b.r.y - 3)} font-size={Math.max(7, labelSize - 1)} fill="rgba(232,232,238,0.95)" text-anchor="middle" style="font-variant-numeric:tabular-nums">{Math.round(b.m.value * 100)}</text>
+      <text x={b.r.cx} y={Math.max(geom.y0 + 9, b.r.y - 3)} font-size={Math.max(7, labelSize - 1)} fill={tone('rgba(232,232,238,0.95)')} text-anchor="middle" style="font-variant-numeric:tabular-nums">{Math.round(b.m.value * 100)}</text>
     {/if}
     <text x={b.r.cx} y={geom.y0 + geom.h + 12} font-size={labelSize} fill={labelCss} text-anchor="middle" style="letter-spacing:.01em">{b.m.label}</text>
   {/each}

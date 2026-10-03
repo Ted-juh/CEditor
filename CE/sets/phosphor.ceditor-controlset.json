@@ -11,12 +11,21 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "960ad108",
+  "fingerprint": "6d91fcf6",
   "set": {
     "id": "phosphor",
     "name": "Phosphor",
     "description": "Hardware from a rack: LED rings, segmented meters, one green phosphor on matte black. Nothing is drawn that a real front panel could not light up.",
     "tokens": {
+      "instrument.face": "FF050705",
+      "instrument.ink": "FF97B5A0",
+      "instrument.text": "FFD6FFE3",
+      "series.one": "FF39FF7A",
+      "series.two": "FFFFB020",
+      "series.three": "FF1FA35A",
+      "series.four": "FFD6FFE3",
+      "series.five": "FF48F0E1",
+      "series.alert": "FFE5534B",
       "surface": "FF151815",
       "surface.hover": "FF1F241F",
       "surface.pressed": "FF0F110F",
@@ -60,7 +69,9 @@
       "display.lit": "FF39FF7A",
       "display.unlit": "2439FF7A",
       "display.screen": "FF050705",
-      "display.backlight": "FF232523"
+      "display.backlight": "FF232523",
+      "panel.surface": "FF0B0D0B",
+      "section.surface": "FF090A09"
     },
     "lamp": {
       "azimuth": 225,
@@ -368,56 +379,112 @@
       },
       "Group": {
         "component": {
-          "Background.Corners.radius": 3,
-          "Background.Border.thickness": 1,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Border.colour": "FF39FF7A",
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "JetBrains Mono",
-          "Background.Fill.gradientEnabled": false
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ]
         }
       },
       "Container": {
         "component": {
-          "Background.Corners.radius": 3,
-          "Background.Border.thickness": 1,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Border.colour": "FF39FF7A",
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "JetBrains Mono",
-          "Background.Fill.gradientEnabled": false
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ]
         }
       },
       "TabContainer": {
         "component": {
-          "Background.Corners.radius": 3,
-          "Background.Border.thickness": 1,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Border.colour": "FF39FF7A",
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "JetBrains Mono",
-          "Background.Fill.gradientEnabled": false,
           "TabContainer.appearance": "flat",
           "TabContainer.accentColour": "{accent}",
-          "TabContainer.stripColour": "{control.field}",
-          "TabContainer.tabColour": "{surface}",
+          "TabContainer.stripColour": "{section.surface}",
+          "TabContainer.tabColour": "{section.surface}",
           "TabContainer.activeTabColour": "{surface.checked}",
           "TabContainer.labelColour": "{text.primary}",
-          "TabContainer.activeLabelColour": "{text.inverse}"
+          "TabContainer.activeLabelColour": "FFF6F7F9",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ]
         }
       },
       "ScrollArea": {
         "component": {
-          "Background.Corners.radius": 3,
-          "Background.Border.thickness": 1,
-          "Background.Fill.colour": "{control.field}",
-          "Background.Border.colour": "FF39FF7A",
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "JetBrains Mono",
-          "Background.Fill.gradientEnabled": false,
           "ScrollArea.scrollbarSize": 5,
           "ScrollArea.trackColour": "{control.track}",
-          "ScrollArea.thumbColour": "{control.cap}"
+          "ScrollArea.thumbColour": "{control.cap}",
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Effects.Material.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ]
         }
       },
       "Meter": {
@@ -643,6 +710,692 @@
           "Joystick.puckColour": "{control.cap}",
           "Joystick.cornerColour": "{text.muted}",
           "Joystick.labelColour": "FFF2F2F2"
+        }
+      },
+      "StepSequencer": {
+        "component": {
+          "StepSequencer.cellForm": "hex",
+          "StepSequencer.cellColour": "{surface}",
+          "StepSequencer.cellOnColour": "{accent}",
+          "StepSequencer.labelColour": "{text.primary}",
+          "StepSequencer.gridColour": "{border}",
+          "StepSequencer.playheadColour": "{accent}"
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 3,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1,
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "highField": {
+            "Background.Fill.colour": "{control.field}",
+            "Background.Corners.radius": 3,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{border}",
+            "Background.Border.thickness": 1,
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "decrement": {
+            "Background.Corners.radius": 2,
+            "Background.Border.thickness": 1,
+            "Background.Fill.colour": "00000000",
+            "Background.Border.colour": "FF39FF7A",
+            "Text.Fill.colour": "FFF2F2F2"
+          },
+          "increment": {
+            "Background.Corners.radius": 2,
+            "Background.Border.thickness": 1,
+            "Background.Fill.colour": "00000000",
+            "Background.Border.colour": "FF39FF7A",
+            "Text.Fill.colour": "FFF2F2F2"
+          }
+        }
+      },
+      "Label": {
+        "component": {
+          "Background.Fill.colour": "00000000",
+          "Background.Border.enabled": false,
+          "Text.Effects.glowEnabled": true,
+          "Text.Effects.glowSize": 3,
+          "Text.Effects.glowIntensity": 1,
+          "Text.Effects.glowColour": "B3D6FFE3"
+        }
+      },
+      "Background": {
+        "component": {
+          "Background.Border.enabled": false
+        }
+      },
+      "Macro": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Macro.knobDesign": "set",
+          "Macro.knobColour": "FF232523",
+          "Macro.arcColour": "{series.one}",
+          "Macro.trackColour": "FF121312",
+          "Macro.labelColour": "{instrument.ink}"
+        }
+      },
+      "Orbit": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Orbit.fieldColour": "{instrument.face}",
+          "Orbit.ringColour": "331FA35A",
+          "Orbit.centreColour": "FF323432",
+          "Orbit.labelColour": "{instrument.ink}"
+        }
+      },
+      "Looper": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Looper.laneColour": "FF0D0E0D",
+          "Looper.gridColour": "2297B5A0",
+          "Looper.playheadColour": "{series.two}",
+          "Looper.labelColour": "{instrument.ink}"
+        }
+      },
+      "Router": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Router.curveColour": "{series.one}",
+          "Router.inputColour": "{series.two}",
+          "Router.fieldColour": "{instrument.face}",
+          "Router.gridColour": "1897B5A0",
+          "Router.labelColour": "{instrument.ink}"
+        }
+      },
+      "Timbre": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Timbre.fieldColour": "{instrument.face}",
+          "Timbre.puckColour": "{series.two}",
+          "Timbre.labelColour": "{instrument.ink}"
+        }
+      },
+      "Turing": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Turing.barColour": "{series.one}",
+          "Turing.headColour": "{series.two}",
+          "Turing.fieldColour": "{instrument.face}",
+          "Turing.labelColour": "{instrument.ink}"
+        }
+      },
+      "Kinetic": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Kinetic.fieldColour": "{instrument.face}",
+          "Kinetic.ballColour": "{series.one}",
+          "Kinetic.wallColour": "331FA35A",
+          "Kinetic.labelColour": "{instrument.ink}"
+        }
+      },
+      "Constellation": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Constellation.fieldColour": "{instrument.face}",
+          "Constellation.probeColour": "{series.two}",
+          "Constellation.linkColour": "331FA35A",
+          "Constellation.labelColour": "{instrument.ink}"
+        }
+      },
+      "Constraint": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Constraint.fieldColour": "{instrument.face}",
+          "Constraint.trackColour": "1897B5A0",
+          "Constraint.linkColour": "55FFB020",
+          "Constraint.labelColour": "{instrument.ink}"
+        }
+      },
+      "Keyboard": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Keyboard.whiteColour": "FFE0DFDA",
+          "Keyboard.blackColour": "FF121212",
+          "Keyboard.heldColour": "FF1FA35A",
+          "Keyboard.outOfKeyColour": "FF838380",
+          "Keyboard.labelColour": "FF555553"
+        }
+      },
+      "ChordPad": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "ChordPad.echoColour": "{series.one}",
+          "ChordPad.fieldColour": "{instrument.face}",
+          "ChordPad.padColour": "FF141614",
+          "ChordPad.inKeyColour": "{series.three}",
+          "ChordPad.tonicColour": "{series.two}",
+          "ChordPad.minorColour": "{series.four}",
+          "ChordPad.labelColour": "{instrument.ink}"
+        }
+      },
+      "Arp": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Arp.fieldColour": "{instrument.face}",
+          "Arp.stepColour": "{series.three}",
+          "Arp.headColour": "{series.two}",
+          "Arp.restColour": "FF1E201E",
+          "Arp.labelColour": "{instrument.ink}"
+        }
+      },
+      "NoteRibbon": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "NoteRibbon.echoColour": "{series.one}",
+          "NoteRibbon.fieldColour": "{instrument.face}",
+          "NoteRibbon.zoneColour": "FF141614",
+          "NoteRibbon.inKeyColour": "{series.three}",
+          "NoteRibbon.rootColour": "{series.two}",
+          "NoteRibbon.touchColour": "{series.two}",
+          "NoteRibbon.labelColour": "{instrument.ink}"
+        }
+      },
+      "Phrase": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Phrase.faceColour": "{instrument.face}",
+          "Phrase.cellColour": "FF191B19",
+          "Phrase.noteColour": "{series.one}",
+          "Phrase.playColour": "{series.two}",
+          "Phrase.labelColour": "{instrument.ink}"
+        }
+      },
+      "Recorder": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Recorder.faceColour": "{instrument.face}",
+          "Recorder.noteColour": "{series.three}",
+          "Recorder.recordColour": "{series.alert}",
+          "Recorder.playheadColour": "{series.two}",
+          "Recorder.labelColour": "{instrument.ink}"
+        }
+      },
+      "Harmoniser": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Harmoniser.faceColour": "{instrument.face}",
+          "Harmoniser.whiteColour": "FFE0DFDA",
+          "Harmoniser.blackColour": "FF121212",
+          "Harmoniser.playedColour": "{series.two}",
+          "Harmoniser.addedColour": "{series.four}",
+          "Harmoniser.labelColour": "{instrument.ink}"
+        }
+      },
+      "SplitZone": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "SplitZone.faceColour": "{instrument.face}",
+          "SplitZone.whiteColour": "FFE0DFDA",
+          "SplitZone.blackColour": "FF121212",
+          "SplitZone.litColour": "{series.two}",
+          "SplitZone.gapColour": "FF323432",
+          "SplitZone.labelColour": "{instrument.ink}"
+        }
+      },
+      "Setlist": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Setlist.faceColour": "{instrument.face}",
+          "Setlist.rowColour": "FF191B19",
+          "Setlist.currentColour": "{series.three}",
+          "Setlist.textColour": "{instrument.text}",
+          "Setlist.labelColour": "{instrument.ink}"
+        }
+      },
+      "Transport": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Transport.faceColour": "{instrument.face}",
+          "Transport.accentColour": "{series.one}",
+          "Transport.beatColour": "{series.two}",
+          "Transport.labelColour": "{instrument.ink}"
+        }
+      },
+      "Panic": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{instrument.face}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Text.Font.family": "JetBrains Mono",
+          "Panic.faceColour": "FF321613",
+          "Panic.borderColour": "{series.alert}",
+          "Panic.labelColour": "{instrument.text}",
+          "Panic.flashColour": "{series.alert}"
+        }
+      },
+      "LcdDisplay": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Display.backlightOn": true,
+          "Display.showGhost": false,
+          "Display.showGlass": true,
+          "Display.glassTint": "1AFFFFFF",
+          "Display.showScanlines": true,
+          "Display.showGrid": false,
+          "Display.dotShape": "round"
+        }
+      },
+      "PixelDisplay": {
+        "component": {
+          "Background.Fill.gradientEnabled": false,
+          "Effects.Bevel.enabled": false,
+          "Background.Fill.colour": "{section.surface}",
+          "Background.Border.enabled": true,
+          "Background.Border.thickness": 1,
+          "Background.Border.colour": "8C39FF7A",
+          "Background.Corners.radius": 6,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "outer-glow",
+              "offsetX": 0,
+              "offsetY": 0,
+              "blur": 10,
+              "spread": 0,
+              "colour": "4039FF7A"
+            }
+          ],
+          "Pixel.litColour": "{display.lit}",
+          "Pixel.unlitColour": "{display.unlit}",
+          "Pixel.screenColour": "{display.screen}",
+          "Pixel.backlightColour": "{display.backlight}",
+          "Pixel.backlightOn": true,
+          "Pixel.showGhost": false,
+          "Pixel.showGlass": true,
+          "Pixel.glassTint": "1AFFFFFF",
+          "Pixel.showScanlines": true,
+          "Pixel.dotShape": "round",
+          "Pixel.glow": 0.45
+        }
+      },
+      "Shape": {
+        "component": {
+          "Shape.fillColour": "{section.surface}",
+          "Shape.strokeColour": "B339FF7A",
+          "Shape.strokeWidth": 1,
+          "Shape.cornerRadius": 6,
+          "Shape.strokeStyle": "solid"
         }
       }
     },

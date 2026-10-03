@@ -33,6 +33,26 @@ Parts renderer; **Follow set** inherits the set's form. Sliders, pads, envelopes
 families retain their existing editable renderers and earlier design recipes. This is a
 focused reconstruction of the most visually defining controls, not 58 entirely new families.
 
+## Size
+
+Every form is drawn in one fixed frame, 160 by 100: the device in the top 80, the caption under it.
+Scaled whole into a box, that frame reads in a box its shape and about its size, and a button's usual
+120 by 40 is neither: the frame met the box at 0.4, and every action key and switch on every set that
+draws them as forms was a sliver of a device over a 4px caption. Sliders, pads and knobs have a frame
+of their own shape and were not affected.
+
+So a box too small for the frame's caption (under 8px) lays the control out in its own pixels
+(`utils/anatomyLayout.js`). The caption is set at 9 to 12px in the control's own lettering, which is
+the set's legend face, and the device takes what is left at the largest scale that fits: beside the
+caption in a box wider than the frame, above it in a narrower one. A caption longer than the room is
+set smaller, to 8px, then cut. The device is never drawn smaller than the frame drew it. A box the
+frame reads in keeps the frame exactly as before. Captions in the frame that named no face of their own
+fell back to the page's serif; they take the control's lettering now too.
+
+The flat disc, Graphite's knob, drew its value only by its pointer, beside sliders that fill to theirs.
+It draws an arc in its accent along its track now, from the start of the sweep to the pointer, and none
+at zero.
+
 ## Behavior and states
 
 The original control owns focus, keyboard, drag, wheel, disabled state and MIDI. Rotary
@@ -46,9 +66,11 @@ Scale divisions are visual and do not quantize values. Set Behavior → step for
 values. The protective rails are visible housing, not safety interlocks. Rubber shapes do
 not imply pressure-sensing hardware. The existing control behavior determines those functions.
 
-Graphite remains the default compatibility appearance for existing documents. Its new flat
-forms are explicitly selected in its starter. Other sets supply form defaults which can be
-overridden with an individual form or Original parts.
+Graphite remains the default compatibility appearance for existing documents (listed as Graphite
+Classic). Its new flat forms are explicitly selected in its starter. New panels start on the
+designed Graphite, which takes the flat disc and the continuous bar as its defaults and keeps
+Graphite's flat buttons (control-sets.md, "New panels start on a designed Graphite"). Other sets
+supply form defaults which can be overridden with an individual form or Original parts.
 
 ## Verification
 
@@ -56,6 +78,9 @@ overridden with an individual form or Original parts.
 changes, clicked switch states, pressed/released action faces, crossfader drag, disabled
 controls, the Original parts escape hatch, gallery grayscale and starter creation.
 `controlAnatomy.test.js` verifies saved overrides, value ranges and unchanged musical
-configuration. Generated starters and importable set files are regenerated with the existing
+configuration. `anatomyForms.mjs` draws buttons and switches at five sizes under six sets and
+measures each caption (8px or more, inside the box, clear of the device) and device (no smaller than
+the frame drew it), and checks that each disc's arc ends at its pointer; `anatomyLayout.test.js`
+pins the layout's arithmetic. Generated starters and importable set files are regenerated with the existing
 export scripts. The QA-09 fixture must be refreshed when Core defaults change because its
 embedded custom packages include those defaults in their fingerprints.

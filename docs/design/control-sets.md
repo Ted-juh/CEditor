@@ -568,3 +568,357 @@ enough to read.
 **How to look at a set before it is one.** `CONTROL_SET_SHOT_FILE=my.ceditor-controlset.json`
 renders the specimen under a set file instead of the built-ins — the harness gained a
 `showSet(set)` for it — so a design can be seen in the real renderer in one command.
+
+## Labels sit on the panel
+
+A Label and a Background block used to fill with `surface`, the body of a button. Every set picks
+its text roles to read on its *panel*: the additional sets compute `text.*` as the ink for their
+panel colour, and the hand-written ones agree, at 4.7:1 or better against `panel.colour` in all
+of them. So wherever a set's buttons are the same tone as its lettering, a Label was lettering on
+a button-coloured plate. Tolex is the clearest case, with cream text on cream pushbuttons at 1.0:1.
+Thirty-one of the seventy-eight built-ins had labels under 4.5:1. The same fill on a full-panel
+Background block, which the New Panel templates lay down first, covered the set's own panel with
+the button colour, and took every knob's and slider's caption down with it.
+
+`panel.surface` is the role for the panel's face. Both types now default to it. A set that names a
+panel colour gets that colour, derived when the set is built or read (`withPanelSurface`), so a
+library set or a document's copy written before the role existed picks it up too. Graphite names
+no panel colour and aliases it to `{surface}`, so it is unchanged, as rule 1 requires. A user's
+set without a panel colour reaches that alias through the base set and reads as it always did.
+Every built-in's Label now reads at 4.7:1 or better (`controlSets.test.js` holds them to 4.5:1),
+and Knob, Slider and Button resolve exactly as before in every set. The Settings editor's
+"Panel surface" swatch, which had been editing `surface`, now edits this role and the panel colour
+behind it. `surface` keeps its own swatch as "Button surface".
+
+The templates' captions failed for the other half of the same reason: their boxes were sized for
+Graphite's 12px Arial, and a set's `type.label` is often bolder, wider or letter-spaced. Measured in
+the browser, 181 template labels were cut off at the templates' own sizes, across all 78 sets with
+Graphite among them, since a 40px box less 8px of padding a side left "VOL" 24px. Scaled down to
+the Control bar preset, where the padding does not scale, it was 928. The captions are now one line
+(`wrapMode: 'none'`) that shrinks to fit, the box is the line (no vertical padding, 2px a side), and
+they use the width their layout already had. That needed a fix in `buildBlockTextLayoutState`:
+the canvas lays captions in a line box forced to the full width, the layout reported that box as
+the text's width, and so Fit → Shrink compared the box with itself and never shrank anything for
+being too *wide*. It fits against `contentWidth` now. `browser-checks/templateLabels.mjs` renders
+every template under every set, at its own size and at the preset that shrinks it most, and holds
+every caption to one line inside its box: 2,028 of them, none needing to shrink at full size.
+
+## Labels, designed
+
+A set changed five things on a Label (face, two weights, letter-spacing, ink) against a median of
+49 on a knob and 74 on a slider. Every set therefore drew the same white 2px box, which is the
+default border every control inherits. It is a literal, not a token, and no hardware looks like it:
+a panel's legends are printed on the panel. "The boards' type" above called the boards' engraved
+and backlit labels a further step; `models/labelDesigns.js` takes it.
+
+Five treatments, written as family-patch properties the editor exposes, under the family rule (only
+where a Label still holds its factory value, so an author's colours and borders survive):
+
+| Treatment | What it is | Sets |
+| --- | --- | --- |
+| silkscreen | no plate, no box: the lettering on the panel | every set not below (44) |
+| engraved | silkscreen with a one-pixel lip: light under dark lettering, dark over light | panel material blast, brushed or hammertone (20) |
+| backlit | silkscreen, glowing in its own ink | Neon, Backlit, Obsidian, Phosphor, Edge Light, Floating Halo, Gemstone |
+| plate | a brass plate with a darker rim and dark engraved lettering | Walnut, Valve, Saddle, Valve Console, Brassworks |
+| frame | a hairline in the ink colour | Blueprint |
+
+Graphite has none, as rule 1 requires. Every Label still reads at 4.7:1 or better against what is
+behind it: the panel, or the brass plate at 6.7:1. The Settings editor's Control families gained
+Labels, so a personal set can take any template's label design the way it takes a knob's.
+
+Two things the designs found. A caption with a text shadow or glow is drawn as SVG. Folded scenery
+is baked in a detached element where nothing is measured, so its SVG copy was anchored on the line
+box's left edge with half its width cut off: "Cutoff" read "toff". That had been true of any
+folded label with a text effect. `svgTextBaseX` now takes the origin's width, which falls back to
+the layout's line box, as `textUnrotatedOrigin` already did after the same trap cut "CATEGORY" to
+"CATEG". `browser-checks/templateLabels.mjs` measures the SVG copy across the box as well as the
+DOM text, and on the old code reports 832 captions cut off. And a backlit glow wider than a
+caption's line is cut square at the label's box, so the glow is tight and bright: 3px at 70%.
+
+## Sections are part of the panel
+
+The label designs above shipped a regression. A silkscreen label carries no plate, so it reads on
+whatever is behind it, and the contrast test measured it against the panel only. But every set drew
+a Group, a Container, a tab page and a scroll area as an enlarged button: `controlSetCoverage`
+copied the button's face onto them and filled them with `control.field`, the colour of a value
+window. On seven sets that window is pale. Tolex, Machined, Frost, Rackmount, Anodised, Eurorack
+and Receiver had cream or silver section slabs, and a label inside one read at about 1:1.
+
+`models/sectionDesigns.js` makes a section part of the panel. `section.surface` is the panel moved a
+step further from its lettering (darker under light lettering, lighter under dark), so its contrast
+only ever grows, and anything that reads on the panel reads in a section. The frame is the set's
+decision. The button copy is removed, not merged, because a section is not a button. Five frames:
+
+| Frame | What it is | Sets |
+| --- | --- | --- |
+| well | section surface, a hairline edge, an inset shadow | the rest (47) |
+| milled | a harder inset with a lit lower lip, tight corners, the panel's own finish | the engraved (metal) sets (20) |
+| glow | a glass face and a hairline lit in the accent | the backlit sets (7) |
+| piping | no face, a cream piping line | Tolex, Saddle |
+| hairline | no face, one ink line | Blueprint |
+
+The full-panel Background block also loses the factory's white 2px border, since it is the panel's
+face. Tab strips take the section surface with readable idle tabs, and the chosen tab takes whichever
+ink reads best on the set's checked surface: it had been `text.inverse` regardless, under 3:1 on
+twelve sets and as low as 1.1:1. Graphite's sections are untouched. `sectionDesigns.test.js` measures
+a label inside every section type in every set; on the previous code it fails at Tolex's
+Group, 1.07:1.
+
+## Instruments wear the set's display
+
+Twenty controls ignored the set entirely: the Macro, Orbit, Looper, Router, Timbre, Turing, Kinetic,
+Constellation, Constraint, Keyboard, ChordPad, Arp, NoteRibbon, Phrase, Recorder, Harmoniser,
+SplitZone, Setlist, Transport and Panic. Each drew one design in one palette (a near-black slab,
+green and yellow voices, a blue accent) on Tolex exactly as on Graphite. Most of their colours were
+already properties with editor fields. No set wrote them.
+
+`models/instrumentDesigns.js` treats them as what they are, screens, and dresses them in the set's
+own display:
+
+- **The face.** `instrument.face` is the set's `display.screen` when that is dark, otherwise the
+  panel taken nearly to black. Its lettering is `instrument.ink` (captions, 4.5:1) and
+  `instrument.text` (readouts, 7:1).
+- **The voices.** `series.one` to `series.five` and `series.alert` are six colours drawn from the
+  set's own colours: its lit display ink, its range handles and band, its hot accent, its fill and
+  its light lettering. Each is nudged until it reads at 3:1 on the face, and one too close to a
+  voice already taken is passed over. When a set's own colours run out, hue siblings of its display
+  ink fill in. No voice is a grey. Graphite's series *is* the old palette.
+- **Each instrument's properties.** A family per instrument writes the properties it already had:
+  `Turing.barColour` is `{series.one}`, `Arp.headColour` is `{series.two}`, the keys of a Keyboard
+  are ivory tinted by the panel, and so on. Every one is a path the editor exposes. The Macro gained
+  an Appearance section for its knob, arc, track and label, and the ChordPad gained swatches for its
+  field and echo.
+
+Two things the instruments drew were never properties, and they follow the set too:
+
+- **Lanes, slots, scenes and tracks** carry a colour each as data, and the factory gives them the
+  palette's. One that still wears one of the six palette colours speaks that voice and takes the
+  set's colour for it (`withSetVoices` in `controlSetFamilies.js`, at draw time, like a family
+  patch). A colour the author chose is theirs. The step sequencer's tracks are included. The
+  Meter's zones are not, because green, amber and red there mean levels, not voices.
+- **The chrome** around a readout (a header plate, its edge, an idle lamp, a piano strip) was a run
+  of fixed greys picked between Graphite's face and lettering. `chromeTone` keeps each grey's place
+  on that run and draws it between the set's face and lettering instead, so Tolex's Arp header is
+  brown with cream lettering rather than navy. Under Graphite it is the identity function.
+
+A role's name must start every dotted part with a letter, which is why the voices are named and not
+numbered: `{series.1}` is not a token reference. Nothing fails when one is written. The resolver
+keeps the text, the renderer falls back to its own colour, and the set looks dressed while its
+voices are Graphite's. `instrumentDesigns.test.js` checks that every role in
+`CONTROL_SET_TOKEN_ROLES` can be written as a reference, and that no instrument property is left
+holding one unresolved.
+
+### The Macro's knob is the set's knob
+
+A set's knob is not a colour. It is a form (a tuning dial on Tolex, a lens on Neon, a vernier on
+Machined, a chicken-head on Chicken Head), with a cap, a pointer, a scale and a material, and the
+Macro drew its own dark disc beside it. `Macro.knobDesign` now follows the set: every set but Graphite
+writes `'set'`, and the Macro hosts a real Knob in its knob's place (`utils/macroKnob.js`). It is the
+factory Knob, resolved through the set's family like any Knob on the panel and drawn by the same
+`CanvasControl`, so whatever a set does to its knobs it does to the Macro's.
+
+The hosted knob only draws. The Macro keeps the value, the drag, its caption and its readout. The
+knob's labels are removed and its value goes in as a runtime, so the knob control is rebuilt only
+when its box or its set changes, not every frame as the Macro turns. It is rendered `embedded`, with
+no `data-control-id` and no pointer events, so hit-testing, selection and the scenery never find a
+control that is not in the document. Its box is fitted between the Macro's caption and readout,
+because a set's knob draws to the edge of its box and the Macro's own arc did not.
+
+It sits on the Macro's face, not on the panel its markings were chosen for. Where they would vanish
+there, two things are re-inked, and only those: the scale printed around the knob (its legend) takes
+`instrument.ink`, and the needle of a bodiless form (`pointer`: Ivory, Atelier, Blueprint) takes
+`instrument.text`. Markings drawn on a knob's own body keep the set's ink. The editor's Appearance
+section offers Follow set, The set's knob, and Macro's own, and an author's choice wins either way.
+`macroKnob.test.js` checks the model, and `browser-checks/macroSetKnob.mjs` checks the drawn knob
+across eight forms: the form a Knob on the same panel has, at the Macro's value, with no control id.
+
+## Personal sets get the designs too
+
+The label, section and instrument designs above are made once, when the program builds its
+built-ins. A personal set is a copy of one, and a copy kept the designs as they stood the day it was
+made:
+
+- one saved before they existed had none, so its Groups were still the pale button copy and its
+  instruments Graphite's;
+- one saved after kept the original's display face and voices as fixed colours, so recolouring it
+  left its instruments in the original's colours;
+- "New Control Set" is a copy of Graphite, which has no designs, so a set made that way never got any.
+
+`models/personalSetDesigns.js` derives them again on every read, from the set's own colours and its
+lineage, in `normalizeControlSetDefinition`, so a set read from the library, from a document or from
+a file all get it. What the author chose is kept:
+
+- `basedOn` is the built-in a set was duplicated from. Its treatments are that built-in's: Tolex's
+  piping, Walnut's plates, Neon's glow. Duplicate writes it, and a copy of a copy inherits it. A set
+  saved before it existed is matched by its id, which duplication made from the original's name
+  (`tolex-copy`, `vintage-mono-copy-2`; fourteen built-ins have a name that is not their id), or by
+  `new-control-set`, Settings' name for a copy of Graphite.
+- A set descended from Graphite takes the general treatments (Graphite has none only so that existing
+  documents keep their look), and its Macro keeps the Macro's own knob, as Graphite's does: Graphite's
+  knob, at that size, is a dot.
+- `chosenFamilies` records the families picked in Settings' Control families. A chosen Labels design
+  is not redesigned, and a chosen Knobs design gives a Graphite descendant's Macro the set's knob.
+- `designed` records what every design wrote on the last read, per family, key by key with its value.
+  The next read takes back exactly the keys that still hold those values and derives them again, so
+  turning a set's metal finish off leaves no engraved lip under the new silkscreen and recolouring a
+  set moves its instruments. A key holding anything else is its author's and wins over the design.
+  This used to cover only labels, and the section, instrument and display designs simply won: a set
+  file that said what its Groups, its Macro or its LCD were lost it on the first read, and since the
+  library is written straight back as it loads, starting the program erased it for good.
+- A set read before `designed` covered a family has no record of it. A copy of a built-in carries that
+  built-in's designs as they stood, which are taken back (on every copy made before sections had a
+  design, a section's frame is the button's, copied). A set with no lineage carries only what its
+  author wrote, less the button frame and the plain field fill every section was given before then.
+
+The derived roles (`section.surface`, the instrument face and inks, the series) are never kept from
+a previous read; they follow the set's colours, and Settings' preview reads the draft the same way,
+so they follow the swatches while they are edited. A set with a built-in's id is left exactly as it
+is, so the shipped set files do not move. `personalSetDesigns.test.js` reads the Tolex file as it
+shipped before any of these designs, which is what a copy saved then holds; on the previous code its
+light lettering reads at 1.07:1 on its cream Groups and its voices are Graphite's green.
+
+## Measuring the reach
+
+The instruments were invisible to the sets for a long time because a control a set does not touch has
+no symptom: every test passes and the set just looks generic. `scripts/control-set-reach.mjs`
+measures it for every control on the Insert menu and every set but Graphite: what the set changes,
+whether any of it is form or only colour (every value that differs is a colour, a colour token, or
+sits under a colour-named property), and how many different forms the sets give the control.
+
+```bash
+node scripts/control-set-reach.mjs   # from CE/web
+```
+
+`test/controlSetReach.test.js` holds the table to three rules, each with a list that is asserted
+exactly, so a gap that is fixed has to be crossed off and a new one has to be named:
+
+- **Reach.** Every set changes every control, or the control is named with a reason. Image and
+  Custom Component are the author's own.
+- **Form.** Every control takes at least three forms across the sets, or is named. Background is
+  frameless everywhere by design, and is the only one.
+- **Debt.** The sets that only recolour a control are counted per control. A new recolour fails, and
+  a paid one fails until its count is lowered, so the table only goes down.
+
+The first debts it showed are paid. Ceramic and Saddle recoloured twenty-odd controls each because
+`controlSetCoverage.js` keyed them by their file names ('saddle-brass', 'ceramic-oak') and so found
+no design direction; keyed by id they take Tolex's and Soft's families for every control they had
+none for, and keep the knobs and buttons they were drawn with. The step sequencer kept the factory
+rectangle in the 29 sets whose direction names no pad form: the twelve starting directions now name a
+cell (Blueprint's diamond, Soft's pod, Field's shield). Range was two number fields and two steppers
+drawn the same everywhere: its fields are now the set's value windows and its steppers its buttons.
+
+Reach is the weakest of the three, and the history says so: before the instrument designs every set
+did change the twenty instruments, but only their text colour, so they passed reach and fail form
+(one form each) and debt (77 sets recolouring each). Form is generous too: the instruments pass it on
+their corner radius alone, which is a thinner kind of form than a knob's cap or a fader's handle.
+
+## Displays and shapes
+
+The table's first gaps were the three controls that draw a picture rather than a value. The LCD
+took the set's four display colours and nothing else, the same green-station panel with the same
+round cells in every set. The Pixel Display did not take the colours either: it was a white OLED
+everywhere. A Shape's own fill and stroke were factory grey in every set, because the sets wrote
+only its Background, which a Shape keeps switched off. Pixel Display was unreached; LCD and Shape
+were one form each.
+
+`models/displayDesigns.js` reads what kind of readout a set's display window is from the colours
+it already chose for it, glass and ink together:
+
+| Readout | From | Sets |
+| --- | --- | --- |
+| reflective | pale glass: dark segments, no backlight, a brighter glass sheen | Ceramic, Rackmount, Reel, Ladder |
+| glow | dark glass and a saturated ink: a VFD, LED or nixie, round cells, the cell mesh showing, a halo on the Pixel Display | 33, Tolex's amber and Valve's nixie among them |
+| scan | a black screen with a green trace: a phosphor tube, scanlines | Phosphor, Switchboard, Digital Grid |
+| oled | a black screen otherwise: square cells, no glass, no ghosts | 8, Obsidian's family |
+| drafting | the line-work set: a grid, no glass | Blueprint |
+| backlit | everything else: a lit LCD, as the factory one is, with square cells | 28 |
+
+The Pixel Display now shows `display.*` like the LCD, and both sit in the set's bezel: the section
+surface, with the set's corners. A Shape is drawn in the set's section language: the section
+surface, the frame's corners and weight (Tolex pipes its shapes at 2 px, Machined mills them at
+1.5 with tight corners), and a line that is mostly lettering, because a line is often a divider on
+the bare panel and has to read there. At the frame's old weight (30% lettering) it was 1.65:1 on
+Flightdeck and all but vanished on Ivory; at 70% it reads at 3:1 on every set, against its fill and
+against the panel. The line-work set draws construction lines, dashed.
+
+Graphite's displays and shapes are untouched, and personal sets get these from their own colours on
+every read like the other designs. `displayDesigns.test.js` pins the treatments, the colours, the 3:1
+lines and Graphite. The reach table crossed all three off.
+
+## A grammar, and the frame as a signature
+
+What made the instruments look generic after they took the sets' colours was everything the sets
+did not say about them. Their lettering was Arial in every set, beside panels set in Barlow, Libre
+Franklin, Space Grotesk or JetBrains Mono. Their cases differed by a corner radius at most: their
+border was the factory's and their drop shadow was switched off. And each set's frame (its piping,
+its glow, its milling) stopped at its sections.
+
+`models/designGrammar.js` names the few decisions every framed control reads:
+
+- **frame**: well, milled, glow, piping or hairline, the section treatment, decided first for the
+  sections and read from there;
+- **corners**: the set's radius, as its frame clamps it;
+- **line**: a hairline 1, a milled edge 1.5, piping 2;
+- **lettering**: its legend, field and label faces.
+
+`frameFor(set, { fill })` is the section frame round a control whose face is its own, without the
+panel's material, which belongs to things cut into the panel rather than to a screen. Instrument
+cases and display bezels are drawn in it, so the frame is the set's signature, repeated wherever it
+holds something: Tolex pipes its sections, shapes, LCD bezels and instrument cases in cream; Neon
+lights all their edges; Machined mills them; Blueprint draws each in one square line. The instruments
+letter in the set's legend face, and shapes take the grammar's line. This paid the rest of the reach
+table's debt: the keyboard's case in 37 sets and seven instruments each on Walnut, Valve, Ladder and
+Field had only changed colour, and the Turing now takes 48 forms across the sets rather than 10.
+The debt list in `controlSetReach.test.js` is empty and stays, so the next recolour fails.
+
+### Dark knobs on the Macro's face
+
+A Macro hosting its set's knob draws it on the set's display window, and a mid-grey cap on a
+near-black screen reads at about 2:1 (Flightdeck, Stompbox, Bakelite). A lighter plate behind it would
+sit too close to the grey; light behind a dark silhouette does not, so such a knob sits on an
+underlit ring in the set's display light (`macroKnobHalo` in `utils/macroKnob.js`), as knobs do on a
+backlit synth. Only round caps get one, since a ring round a tuning dial, a roller, a tile or a balance
+beam reads as a mistake; only where that light reads on the face at 3:1, since a reflective set's
+ink is dark; and never a knob that lights itself (a lens, an LED ring, line-work). Sixteen sets.
+
+## New panels start on a designed Graphite
+
+Graphite was the least designed set on purpose. It is the base set: every document from before sets,
+and every one that never chose a set, is drawn in it and stores no set at all, so it takes none of
+the designs above. That also made it the look of every new panel, so the one set everybody saw first
+was the one set nobody was allowed to design.
+
+The two are now apart. The base set keeps its id, `graphite`, and its look exactly, and is listed as
+**Graphite Classic**: a file that names no set opens on it as it always did, and a panel on it still
+writes no key. New panels start on **Graphite** (`graphite-studio`, `NEW_PANEL_CONTROL_SET_ID`),
+which is a set like the others, so a panel on it names it in its file and keeps its look whatever the
+base set does. It is Graphite: its greys and blue, its DM Sans, its lamp, its flat buttons and its pill
+slider. To that it adds the knob and meter Graphite's starter template already drew with (the flat
+disc and the continuous bar, the `graphite` direction), a panel a step darker than its controls so
+they sit on it, a display in its own blue on black rather than the factory's green STN, and every
+design the others derive: silkscreened labels, recessed sections, the grammar's frame, instruments
+on its display, the Macro's knob on a ring of that blue.
+
+Settings' **New Control Set** is a copy of it too, so a set somebody starts from scratch starts from
+the designed default (its lineage recorded as `graphite-studio`) rather than from Classic, which has
+none of the designs.
+
+It keeps Graphite's buttons rather than the direction's tiles and sliding tabs: a button that
+carries its legend on its own face is what the set every new panel starts on should insert. The
+tiles are a key drawn beside its caption, one click away in the inspector, and what Graphite's
+starter draws.
+
+The default is a setting (Settings → Control Sets, "Default for new panels"). The app writes the
+whole general block whenever any setting changes, so every installation that has saved its settings
+since the default existed has `graphite` written there, chosen or not, and keeping it would have kept
+the designed Graphite from nearly everybody. So a stored `graphite` nobody chose moves to the new
+default, and the picker now records a choice (`defaultControlSetChosen`): a pick made there, Graphite
+Classic included, is kept from then on, and any other stored default was a choice already. The one
+case this gets wrong is somebody who picked Graphite before the flag existed; picking Classic again
+is one click. `designedGraphite.test.js` pins the base set as it was, the new panel naming the
+designed one, the migration and the choice that survives it, the designed one as Graphite with the
+starter's knob and meter and its buttons kept, and every design reaching it.
+
+`browser-checks/controlSetShot.mjs` photographs a second row now, for what the sets reach since the
+specimen was drawn: a Group with its title and captions on the section's face, a Macro hosting the
+set's knob, a Shape and a Pixel Display.

@@ -16,6 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
+import { DEFAULT_CONTROL_SET_ID } from '../../../CE/web/src/CE_Application/models/controlSets.js';
 import { buildComponentsSheet } from './sheets/components.mjs';
 import { buildCustomStressSheet } from './sheets/customStress.mjs';
 import { buildExportSheet } from './sheets/export.mjs';
@@ -68,6 +69,10 @@ export function serializeSheet(sheet) {
   panel.panelGuid = guidFromName(sheet.file);
   panel.scriptId = slug;
   panel.filePath = null;
+  // The base set, Graphite Classic, which every sheet has always been drawn on. createPanel starts
+  // a new panel on the user's default set (the designed Graphite), and a sheet is a fixture whose
+  // screenshots and reviews assume the look it has always had.
+  panel.controlSet = { id: DEFAULT_CONTROL_SET_ID };
   return `${serializePanel(panel)}\n`;
 }
 

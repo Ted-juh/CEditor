@@ -10,7 +10,7 @@
     constellationGeometry, constellationToPx, constellationLinks, selectedPreset,
   } from '../utils/constellationLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 10;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -60,7 +60,7 @@
 </script>
 
 <svg class="constellation" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
-  <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx="8" fill={fieldCss} stroke="rgba(36,36,48,1)" />
+  <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx="8" fill={fieldCss} stroke={tone('rgba(36,36,48,1)')} />
   {#if cfg.showField !== false}
     <svg class="constellation-field-layer" x={geom.x0} y={geom.y0} width={geom.w} height={geom.h}
          viewBox={`${geom.x0} ${geom.y0} ${geom.w} ${geom.h}`} overflow="hidden" preserveAspectRatio="none">

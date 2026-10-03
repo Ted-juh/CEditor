@@ -283,12 +283,16 @@ export function buildBlockTextLayout(content, {
   });
   const lineBoxWidth = forceLineBoxWidth && maxWidth > 0 ? maxWidth : 0;
   const visualWidths = stretchedLineEntries.map((entry) => (lineBoxWidth > 0 ? lineBoxWidth : entry.visualWidth));
+  const contentWidths = stretchedLineEntries.map((entry) => entry.visualWidth);
 
   return {
     lines,
     lineEntries: stretchedLineEntries,
     renderedContent: lines.join('\n'),
     width: visualWidths.length > 0 ? Math.max(...visualWidths) : 0,
+    // What the text itself measures, whatever box it is laid in. `width` is the line box when
+    // `forceLineBoxWidth` is set, so it always equals maxWidth and cannot say the text is wider.
+    contentWidth: contentWidths.length > 0 ? Math.max(...contentWidths) : 0,
     lineBoxWidth,
     height: lines.length * lineHeight,
     lineHeight,
@@ -330,12 +334,17 @@ export function buildBlockTextLayoutState(content, {
   };
 
   const baseLayout = buildBlockTextLayout(content, layoutArgs);
+  // Fit against what the text measures, not its line box. The canvas lays every caption in a box
+  // forced to the full width (forceLineBoxWidth), whose `width` is maxWidth by construction, so
+  // measuring that box against maxWidth always fitted: a one-line caption too wide for its control
+  // was never shrunk, only clipped. Only text that was too TALL ever shrank.
+  const fitWidth = (layout) => layout.contentWidth ?? layout.width;
   // No room at all — padding larger than the control, say — is not something shrinking can solve.
   // Scaling against the 0.0001 stand-in made the text a hundred-thousandth of its size, so a button
   // squeezed below its own padding went blank; unscaled, it at least shows what it says.
   const roomToFit = maxWidth > 0 && maxHeight > 0;
   const baseScale = fitMode === 'shrink' && roomToFit
-    ? Math.min(1, maxWidth / Math.max(0.0001, baseLayout.width), maxHeight / Math.max(0.0001, baseLayout.height))
+    ? Math.min(1, maxWidth / Math.max(0.0001, fitWidth(baseLayout)), maxHeight / Math.max(0.0001, baseLayout.height))
     : 1;
 
   if (
@@ -359,7 +368,7 @@ export function buildBlockTextLayoutState(content, {
     ...layoutArgs,
     maxWidth: maxWidth / low,
   });
-  const initialFits = (initialLayout.width * low) <= (maxWidth + 0.5)
+  const initialFits = (fitWidth(initialLayout) * low) <= (maxWidth + 0.5)
     && (initialLayout.height * low) <= (maxHeight + 0.5);
 
   if (initialFits) {
@@ -378,7 +387,7 @@ export function buildBlockTextLayoutState(content, {
       ...layoutArgs,
       maxWidth: maxWidth / mid,
     });
-    const scaledWidth = candidateLayout.width * mid;
+    const scaledWidth = fitWidth(candidateLayout) * mid;
     const scaledHeight = candidateLayout.height * mid;
     const fits = scaledWidth <= (maxWidth + 0.5) && scaledHeight <= (maxHeight + 0.5);
 
