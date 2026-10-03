@@ -2,9 +2,11 @@
 
 Branch: `claude/animation-overhaul-phase-1-cdk65v`, which continues `animation-overhaul` (the WIP
 commit `1a74eb0` and this file). **Phases 1–5 are done, verified and pushed**, one commit each (4 is
-two: keyframes, then `ce.anim.play`), except Phase 5's item K, which assumes a feature that does not
-exist. "Remaining work" below records what each phase did and found, and ends with what is still
-open. Start by reading this file, then the files listed under "What is on the branch".
+two: keyframes, then `ce.anim.play`), and so is everything the first pass left open — K read as the
+page layers a state swaps, the starters, colour frames, ce.anim's spring and drawn curves with C++
+parity, a timeline, Debug, and a run of the real app. "Remaining work" below records what each phase
+did and found; "Done after phase 5" the rest. Start by reading this file, then the files listed under
+"What is on the branch".
 
 Paste the section [Prompt for Claude Code](#prompt-for-claude-code) to start the next session.
 
@@ -199,9 +201,8 @@ both change a shipped starter's package fingerprint and regenerate QA-07/QA-09, 
 - **G, spring:** damping and bounce cells (`cleanSpring` keeps them where a spring settles and does
   not buzz); `easing.js` writes it as CSS `linear()` with an `outBack` fallback where `linear()` is
   unsupported. Switching easing keeps the other kinds' fields, so going back loses nothing.
-- **ce.anim:** named curves reach every runtime through the generator. custom and spring are
-  panel-only — the tab says so — and `ce.anim` reports them as unknown curves rather than going
-  linear, as it does any name it does not know. C++ parity for them was not added. Follow-up: the
+- **ce.anim:** named curves reach every runtime through the generator. custom and spring were
+  panel-only at the end of this phase — they reach scripts now, see "Done after phase 5". Follow-up: the
   documented `curve` option in `panelApi.js` was a typed-out list and still offered the old eight
   names; it is derived from the easing table now (`ANIM_CURVE_NAMES`), with a test, and
   `CE/src/Scripting/README.md` lists all of ce.anim, `play` marked panel view only.
@@ -259,7 +260,7 @@ The node, as built (`utils/keyframeAnimation.js` has it in its header):
   explorer, cost table and the written example regenerated/added. Checked end to end in Chromium:
   a script's `ce.anim.play` starts the keyframe animation on a previewed control.
 
-### Phase 5 — done, except K, which has no model to build on
+### Phase 5 — done; K first left open, then built (see "Done after phase 5")
 
 - **J, presets** (`utils/animationPresets.js`): hover lift, press squish, fade when disabled, blink
   while on, beat pulse, value glide. A preset writes the animation **and the state change it
@@ -288,17 +289,59 @@ The node, as built (`utils/keyframeAnimation.js` has it in its header):
   The test that pinned the panel's old shape now pins the summary, so the rows cannot creep back.
   Not carried over: the panel's "Debug animation" JSON dump. `animation-tab-design.md` updated.
 
-### Still open, for whoever picks this up
+### Done after phase 5
 
-1. **K** — needs a decision on what a layer state is (see above).
-2. **Two starters** (`statusLamp`, `tabGroup`) name a Pressed state they do not have (Phase 1).
-3. **Keyframe colour and text frames** — needs a way for a keyframe to reach the painting layers
-   (a registered custom property they read, say).
-4. **custom/spring easings in ce.anim** — panel-only today; C++ parity would be a runtime change.
-5. **A timeline across animations** — who plays when, on one axis. The frames editor has a strip
-   per animation; there is nothing that lays several out together.
-6. **The full app was not run under Xvfb.** `panelMotion.mjs` mounts the real preview surface in
-   Chromium and stands in for it; MIDI was simulated through preview sessions, not a device.
+The owner asked for everything left open to be done, including the C++ runtime change the first
+pass held back. One commit each, in this order:
+
+1. **Starters + K** (`b490de0`). K is read as what it can mean in this codebase: a state that
+   shows or hides a part. `visible` gets a visibility bucket (opacity and `visibility`, which CSS
+   can transition where it cannot `display`), and a part a state can fade in stays mounted while
+   hidden — transparent, invisible, out of the pointer's way — so it fades instead of popping. The
+   two starters that named a Pressed state they do not have now ship animations on states they do:
+   the status lamp's `lampGlow` eases its lamp and caption colours into LampOn, and the tab group's
+   `pageFade` cross-fades its pages. `QA-07-packages.cepanel` regenerated.
+2. **`ce.panel.define`** (`fdfd85d`) completes an Animations node the way the tab makes one
+   (`newAnimationShape`; a test pins the two together).
+3. **ce.anim's spring and drawn curves, with C++ parity** (`00796fb`). `curve = "spring"` is
+   `ce.anim.spring`'s formula with the same `damping`/`frequency`; a drawn curve is the tab's four
+   bezier numbers, as a list or named, refused rather than clamped when it is not one.
+   `ScriptRuntime::drawnCurve` and the spring case in `animationEase` hold the host to the
+   WebView's rules, with the same fixtures in `scriptAnim.test.js` and `ScriptRuntimeTests.cpp`
+   §39. The tab's hint under those easings now gives the script equivalent.
+4. **Keyframe colour and text frames** (`8782dbb`). A frame can set `fill` and `text` (AARRGGBB,
+   nothing else accepted: it is written into a `<style>`). Each becomes its own @keyframes per
+   channel — paint (background-color), shape (fill), stroke, text (color) — carried to the layers
+   that paint by inherited custom properties, `none` on every part so a control's pulse does not
+   leak into its parts. Not reached: a gradient or image fill, a physical-form (anatomy) control's
+   drawing, and a slider's readout text; the tab's hint says what fill recolours.
+5. **Timeline and Debug** (`cb7f24a`). Every animation of the control on one axis from the moment
+   its trigger fires; bars are buttons (the tab's no-slider rule stands) that a drag or the arrows
+   retime, written once on release. Debug beside the selected animation sends the stored node to
+   the Console tab's debug pane — the properties panel's old "Debug animation".
+6. **The app, under Xvfb** (`e3d0855`). Built and run as CLAUDE.md describes, QA-07 opened, the
+   status lamp armed in the Animation tab. Timeline, drag-to-retime with undo, and Debug all work
+   in WebKitGTK. It found one real defect: the stage could not play `lampGlow`, because LampOn is
+   a rule over a value channel (`active >= 1`) and Play only set `when` flags. The stage now sets
+   the channels a rule names to values the rule accepts, and resets them either side; in the app,
+   Play lights the lamp and lets it go.
+
+Verified locally before the push: `npm run test:all` (5,472 pass, 0 fail; Lua and C# export checks
+skip for missing toolchains), `npm run build`, `npm run test:browser`, svelte-check (one
+pre-existing warning). C++ with scripting on: ScriptRuntime and PlayerScriptIntegration pass, and
+so does everything else that built, except three targets none of these commits touch —
+DeviceProfileEngine and InstrumentHostService did not link because that build tree was configured
+before ALSA was installed (CLAUDE.md's stale-configure trap), and PluginCatalog's "an atomic
+replacement failure reaches the caller" (a directory as the save target) does not fail on Linux as
+root.
+
+### Still open
+
+1. **MIDI from a real device** was never in the loop: value changes from outside were simulated
+   through preview sessions, here and in Chromium.
+2. **Windows.** The `ScriptRuntime` change compiles and passes under GCC; MSVC's opinion is CI's to
+   give, and the WebView2 path was not run.
+3. **Colour frames** on gradients, images, physical-form controls and slider readouts (item 4).
 
 ---
 
@@ -307,8 +350,8 @@ The node, as built (`utils/keyframeAnimation.js` has it in its header):
 ```
 Read CLAUDE.md, then docs/design/animation-overhaul-handoff.md, and check out the branch
 claude/animation-overhaul-phase-1-cdk65v. Phases 1 to 5 of the animation overhaul are done and
-pushed; "Still open" at the end of the Remaining work section lists what is left and why. Pick
-from that list only what the owner has decided on — K in particular needs a decision first.
+pushed, and so is everything the first pass left open ("Done after phase 5"); "Still open" lists
+the little that remains and why.
 Verify locally before pushing (npm run test:all, npm run build, npm run test:browser), commit in
 the repo's voice, and ask before anything that widens CI or changes the C++ script runtime beyond
 regenerated regions.
