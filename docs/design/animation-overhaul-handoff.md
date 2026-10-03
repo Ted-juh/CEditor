@@ -201,7 +201,10 @@ both change a shipped starter's package fingerprint and regenerate QA-07/QA-09, 
   unsupported. Switching easing keeps the other kinds' fields, so going back loses nothing.
 - **ce.anim:** named curves reach every runtime through the generator. custom and spring are
   panel-only — the tab says so — and `ce.anim` reports them as unknown curves rather than going
-  linear, as it does any name it does not know. C++ parity for them was not added.
+  linear, as it does any name it does not know. C++ parity for them was not added. Follow-up: the
+  documented `curve` option in `panelApi.js` was a typed-out list and still offered the old eight
+  names; it is derived from the easing table now (`ANIM_CURVE_NAMES`), with a test, and
+  `CE/src/Scripting/README.md` lists all of ce.anim, `play` marked panel view only.
 - Tests: model (`easingPatch`, `cleanSpring`, `moveBezierHandle`); `animationTab.mjs` picks custom
   (starts from inQuad's points), drags a handle with pointer events and checks one write, picks
   spring; `panelMotion.mjs` checks the computed `transition-timing-function` is a real `linear()`

@@ -128,7 +128,8 @@ index had to be floored first. `solToVar` already folded the other direction; th
 | Panel components | 229 verbs across 28 families: `split*` `phrase*` `recorder*` `harmony*` `setlist*` hand-written, the other 23 families expanded from `scripting/componentVerbs.js` | **panel view only** — see below |
 | Panel structure | `panelCreate` `panelClone` `panelDestroy` `panelParent` `panelFind` `panelInfo` `panelTypes` | **panel view only** — creating a control needs a renderer |
 | Drawing | `drawClear` `drawFill` `drawStroke` `drawRect` `drawCircle` `drawLine` `drawPath` `drawText` `drawRedraw` | **panel view only** — drawing needs a surface |
-| Animation | `animateTo` `animateSpring` `animateStop` `animateRunning` | everywhere — the engine lives in ScriptRuntime |
+| Animation | `animateTo` `animateSpring` `animateEnvelope` `animateStop` `animateRunning` `animateValue` `animateList` `animatePause` `animateResume` `animateReverse` `animateFinish` | everywhere — the engine lives in ScriptRuntime |
+| Animation playback | `animatePlay` | **panel view only** — plays a control's keyframe animation, which is drawn |
 | User feedback | `uiNotify` `uiStatus` | **panel view only** — nobody to tell with the window shut |
 
 `checksum(type, bytes)` takes `"roland"`/`"yamaha"` (the same two's-complement 7-bit sum, both
@@ -157,6 +158,16 @@ never an accumulated step: two integrators drift, two evaluations of one formula
 `ScriptRuntime::animationEase`/`animationSpring` and the JS pair in `panelRuntime.js` are pinned to
 the same fixture by both test suites. A spring lands exactly on its target; `from` defaults to where
 the value is; a second animation on a path replaces the first.
+
+The named curves are the panel's own easing table (`CE/web/src/CE_Application/utils/easing.js`),
+generated into `animEasings()` here and into each prelude by `gen-script-modules.mjs`: nine named
+beziers, plus ce.math.curve's four shapes (linear among them), thirteen in all.
+`panelApiParity.test.js` fails when a generated table is stale.
+
+`ce.anim.play(control, animation)` is the exception in the module: it moves no value. It plays one
+of the control's keyframe animations (made in the Animation tab) from its first frame, through the
+same request the tab's Play button makes. It is drawn, so it is panel view only — each prelude
+carries the generated window-closed stub, and in the plugin window the WebView runtime plays it.
 
 ### User feedback
 

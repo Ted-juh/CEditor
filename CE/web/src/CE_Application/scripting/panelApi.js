@@ -38,6 +38,9 @@ import {
   BACKGROUND_FITS, BACKGROUND_ALIGNS, TEXT_FITS, IMAGE_BLENDS, IMAGE_CLIP_MODES, IMAGE_LAYER_IDS,
 } from '../utils/imageLayers.js';
 import { FEATURE_KEYS, CASE_MODES, SCRIPT_MODES, JUSTIFICATIONS } from './textStyle.js';
+// And ce.anim's curve names from the table ce.anim evaluates. This list was typed out, and when the
+// animation overhaul added five easings every runtime accepted them and the documentation did not.
+import { ANIM_CURVE_NAMES, CURVE_NAMES } from './easingTables.js';
 
 /** `"a", "b" or "c"` from a table, for a summary that names the values a verb accepts.
  *
@@ -960,9 +963,11 @@ export const COMMANDS = [
         fields: optionFields([
           'duration', 'beats', 'sync',
           { name: 'curve', type: 'text', default: '"linear"',
-            values: ['linear', 'exp', 'log', 's', 'inQuad', 'outQuad', 'inOutQuad', 'outCubic'],
-            summary: 'The shape of the move. The first four are ce.math.curve\'s; the last four are '
-              + 'the Properties panel\'s. An unrecognised name is reported and the move runs linear.' },
+            values: [...ANIM_CURVE_NAMES],
+            summary: `The shape of the move. The first ${CURVE_NAMES.length} are ce.math.curve's; the rest are the `
+              + 'named easings the Animation tab offers, so a script and an animation that name the same '
+              + 'curve move the same way. The tab\'s custom and spring curves are its own and are not '
+              + 'accepted here. An unrecognised name is reported and the move runs linear.' },
           'animFrom', 'delay', 'stagger', 'repeat', 'pingpong', 'done',
         ]) },
     ],

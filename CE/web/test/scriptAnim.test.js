@@ -118,6 +118,17 @@ test('a curve this build does not know returns nothing rather than silently goin
 
 /* ------------------------------------------------------------------------ the contract */
 
+test('the curve names ce.anim documents are exactly the ones it evaluates', () => {
+  // The `curve` option's list used to be typed out in panelApi.js. When the animation overhaul added
+  // inCubic, inOutCubic and the three back curves, every runtime accepted them and the manual, the
+  // API explorer and the editor's completions still offered the old eight.
+  const curve = MEMBER_BY_ID.animateTo.params.find((p) => p.name === 'opts').fields.find((f) => f.name === 'curve');
+  assert.deepEqual(curve.values, ANIM_CURVE_NAMES);
+  for (const name of curve.values) assert.notEqual(animationEase(0.5, name), undefined, `${name} is documented and not evaluated`);
+  assert.equal(animationEase(0.5, 'spring'), undefined, 'the Animation tab\'s spring is its own, not a ce.anim curve');
+  assert.equal(animationEase(0.5, 'custom'), undefined);
+});
+
 test('every phase-13 verb is declared, cross-runtime, and namespaced under ce.anim', () => {
   for (const [id, path] of [
     ['animateEnvelope', 'ce.anim.envelope'], ['animateValue', 'ce.anim.value'],

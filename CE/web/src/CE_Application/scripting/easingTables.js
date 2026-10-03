@@ -1,9 +1,9 @@
 // easingTables.js — the named easing curves ce.anim animates along, in one place.
 //
-// Same rule as musicTheory.js and timeTables.js, and here it bites hardest. The Properties panel's
-// Animations section offers `linear | inQuad | outQuad | inOutQuad | outCubic`, and stores them as
-// CSS cubic-bezier control points — there is no numeric evaluator anywhere in the app, because a
-// CSS transition does not need one.
+// Same rule as musicTheory.js and timeTables.js, and here it bites hardest. The panel's Animations
+// store their easing as a NAME, and the runtime hands it to CSS as cubic-bezier control points — a
+// CSS transition needs no numeric evaluator. (The Animation tab offers ten names today, and a curve
+// you draw and a spring besides; those two are the panel's own and ce.anim does not take them.)
 //
 // ce.anim DOES need one: it writes values, not stylesheets. So the choice was between adopting the
 // panel's NAMES with lookalike formulas (1 - (1-t)^2 for outQuad, which is not what
@@ -16,7 +16,11 @@
 // Before this, a script asking for "outCubic" got LINEAR — the ease() fall-through — in every
 // runtime, silently.
 
-import { EASING_BEZIERS, EASING_NAMES } from '../utils/interactionRuntime.js';
+// From utils/easing.js, where the table lives — the same object interactionRuntime.js re-exports, so
+// scriptAnim.test.js's identity check holds — without loading the whole component runtime to get
+// it. panelApi.js reads ANIM_CURVE_NAMES from here for the documented `curve` option, and a file the
+// contract imports has to stay light.
+import { EASING_BEZIERS, EASING_NAMES } from '../utils/easing.js';
 
 export { EASING_BEZIERS, EASING_NAMES };
 
