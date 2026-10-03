@@ -101,6 +101,24 @@ window.__controlSetShot = {
     mounted = mount(ControlSetShotHarness, { target: document.getElementById('host'), props: { panel } });
     return { controls: panel.controls.length, macroId: macro._children.Core.id, knobId: knob._children.Core.id };
   },
+  /**
+   * Buttons and switches at the sizes people give them, under one set (anatomyButtons.mjs): the
+   * usual 132 by 40, a slim 200 by 30, a square pad, a tall key, and one the anatomy frame fits.
+   */
+  showButtons(setId) {
+    if (mounted) unmount(mounted);
+    const sizes = [[132, 40], [200, 30], [64, 64], [80, 120], [170, 106]];
+    const controls = [];
+    sizes.forEach(([w, h], i) => {
+      const y = 20;
+      const x = 20 + sizes.slice(0, i).reduce((sum, [sw]) => sum + sw + 20, 0);
+      controls.push(createControl('Button', { Transform: { x, y, width: w, height: h }, Text: { content: 'TRIGGER' } }));
+      controls.push(createControl('ToggleButton', { Transform: { x, y: y + 140, width: w, height: h }, Text: { content: 'LEGATO' }, Behavior: { defaultValue: true } }));
+    });
+    const panel = { ...createPanel(), id: 1, width: 900, height: 290, controls, controlSet: normalizeControlSet(setId) };
+    mounted = mount(ControlSetShotHarness, { target: document.getElementById('host'), props: { panel } });
+    return { controls: controls.length, sizes, ids: controls.map((c) => c._children.Core.id) };
+  },
   /** The same specimen under a set given as an object — a set file's contents, or a probe. */
   showSet(set) {
     if (mounted) unmount(mounted);

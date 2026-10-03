@@ -890,10 +890,10 @@ they sit on it, a display in its own blue on black rather than the factory's gre
 design the others derive: silkscreened labels, recessed sections, the grammar's frame, instruments
 on its display, the Macro's knob on a ring of that blue.
 
-It keeps Graphite's buttons rather than the direction's tiles and sliding tabs. An anatomy form is
-drawn in a fixed frame, and at a button's usual 120 by 40 a tile shrinks to a sliver with a caption
-too small to read, which the set every new panel starts on cannot have. (Every set that draws its
-buttons as anatomy forms has that at those sizes; it is the next thing on that list.)
+It keeps Graphite's buttons rather than the direction's tiles and sliding tabs: a button that
+carries its legend on its own face is what the set every new panel starts on should insert. The
+tiles are a key drawn beside its caption, one click away in the inspector, and what Graphite's
+starter draws.
 
 The default is a setting (Settings → Control Sets, "Default for new panels"). A settings file that
 already names one keeps it, Graphite Classic included: an installation that has saved its settings

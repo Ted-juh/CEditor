@@ -71,7 +71,7 @@ test('the designed Graphite is Graphite: its colours, lettering, lamp, buttons a
   assert.deepEqual(designed.lamp, classic.lamp);
   assert.deepEqual(designed.families.Slider, classic.families.Slider);
   for (const type of ['Button', 'MomentaryButton', 'ToggleButton', 'TimedButton', 'OneShotButton']) {
-    assert.equal(form(type, designed), '', `${type}: Graphite's flat button, not a tile that shrinks at 120 by 40`);
+    assert.equal(form(type, designed), '', `${type}: Graphite's flat button, its legend on its face`);
   }
 });
 

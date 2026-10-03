@@ -5,6 +5,7 @@
   import { anatomyValue } from '../models/controlAnatomy.js';
   import { meterConfig, meterPosition } from '../utils/meterLayout.js';
   import { formatSliderNumericValue } from '../utils/sliderBehavior.js';
+  import { buttonAnatomyLayout } from '../utils/anatomyLayout.js';
   let { control, runtime = null, width = 160, height = 160, checked = false, label = '' } = $props();
   const uid = $props.id();
   let core = $derived(control?._children?.Core ?? {});
@@ -30,11 +31,20 @@
   let legend = $derived(css(core.formLabelColour, ink));
   let accent = $derived(css(core.formAccentColour, '#40bccc'));
   let vh = $derived(knob ? 170 : 100);
+  // A button or switch in a box too small for the frame's caption is laid out in the box's own
+  // pixels: the device beside or above a caption that reads (utils/anatomyLayout.js).
+  // Set in the control's own lettering, which is the set's legend face: the compact caption, and
+  // every caption in the frame that names no face of its own (they fell back to the page's serif).
+  let font = $derived(control?._children?.Text?._children?.Font ?? {});
+  let captionFamily = $derived(font.family ? `'${String(font.family).replace(/'/g, '')}', sans-serif` : 'sans-serif');
+  let captionWeight = $derived(Number(font.weightValue) || (/bold/i.test(String(font.weight ?? '')) ? 700 : 400));
+  let captionSpacing = $derived(Math.max(0, Number(font.letterSpacing) || 0));
+  let lay = $derived(!knob && !meter ? buttonAnatomyLayout(width, height, label, { letterSpacing: captionSpacing }) : null);
   const point = (a,r,cx=80,cy=76) => ({x:cx+Math.sin(a*Math.PI/180)*r,y:cy-Math.cos(a*Math.PI/180)*r});
   function polygon(n,r1,r2) { return Array.from({length:n*2},(_,i)=>{const q=point(i*180/n,i%2?r2:r1);return `${q.x},${q.y}`;}).join(' '); }
 </script>
 
-<svg class="anatomy" data-form={form} data-position={p} data-active={active} viewBox={`0 0 160 ${vh}`} {width} {height} aria-hidden="true" style={`--face:${face};--ink:${ink};--accent:${accent};`}>
+<svg class="anatomy" data-form={form} data-position={p} data-active={active} viewBox={lay ? `0 0 ${width} ${height}` : `0 0 160 ${vh}`} {width} {height} aria-hidden="true" style={`--face:${face};--ink:${ink};--accent:${accent};font-family:${captionFamily};`}>
   <defs>
     <linearGradient id={`${uid}-metal`} x2="0" y2="1"><stop stop-color="#fff" stop-opacity={.8*depth}/><stop offset=".42" stop-color={face}/><stop offset=".55" stop-color={face}/><stop offset="1" stop-color="#000" stop-opacity={.65*depth}/></linearGradient>
     <radialGradient id={`${uid}-dome`} cx=".32" cy=".25" r=".8"><stop stop-color="#fff" stop-opacity={.85*depth}/><stop offset=".45" stop-color={face}/><stop offset="1" stop-color="#000" stop-opacity={.6*depth}/></radialGradient>
@@ -45,10 +55,11 @@
       <line x1={q.x} y1={q.y} x2={z.x} y2={z.y} stroke={legend} stroke-width={i%3?1:2}/>
     {/each}
   {/snippet}
+  <g transform={lay?.device}>
   {#if PHYSICAL_DIRECTIONS.some(d=>form===`new-${d.id}`)}
-    <PhysicalAnatomy design={form.slice(4)} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} showValue={core.formShowValue!==false} />
+    <PhysicalAnatomy design={form.slice(4)} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} showValue={core.formShowValue!==false} caption={!lay} />
   {:else if String(form).startsWith('new-')}
-    <AdditionalAnatomy design={form.slice(4)} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} showValue={core.formShowValue!==false} />
+    <AdditionalAnatomy design={form.slice(4)} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} showValue={core.formShowValue!==false} caption={!lay} />
   {:else if knob}
     <g transform={`translate(80 76) scale(${size}) translate(-80 -76)`}>
     {#if form==='disc'}
@@ -164,8 +175,10 @@
       </g>
     {/if}
     </g>
-    <text x="80" y="96" text-anchor="middle" fill={legend} font-size="11" font-family="inherit">{label || (toggle ? 'SWITCH' : 'PRESS')}{toggle ? ` · ${active?'ON':'OFF'}` : ''}</text>
+    {#if !lay}<text x="80" y="96" text-anchor="middle" fill={legend} font-size="11" font-family="inherit">{label || (toggle ? 'SWITCH' : 'PRESS')}{toggle ? ` · ${active?'ON':'OFF'}` : ''}</text>{/if}
   {/if}
+  </g>
+  {#if lay?.caption}<text class="caption" x={lay.caption.x} y={lay.caption.y} text-anchor={lay.caption.anchor} fill={legend} font-size={lay.caption.size} font-family={captionFamily} font-weight={captionWeight} letter-spacing={captionSpacing}>{lay.caption.text}</text>{/if}
 </svg>
 
 <style>

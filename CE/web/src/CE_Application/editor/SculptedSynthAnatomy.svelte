@@ -1,6 +1,6 @@
 <script>
   import {SYNTH_SCULPTED} from '../models/synthSculptedSets.js';
-  let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue}=$props();
+  let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue,caption=true} = $props();
   const uid=$props.id(), paint=n=>`url(#${uid}-${n})`;
   let cfg=$derived(SYNTH_SCULPTED.find(d=>d.id===design));
   let angle=$derived(-135+p*270);
@@ -72,5 +72,5 @@
     {:else if type==='lens'}<rect x="27" y="19" width="106" height="47" rx="12" fill={paint('glass')} stroke="white" stroke-opacity=".4"/><path d="M38 26Q80 15 122 26" fill="none" stroke="white" stroke-opacity=".35"/>
     {:else}<rect x="27" y="18" width="106" height="49" rx={type==='inset'?8:3} fill={paint('dome')} stroke="#172023"/>
     {/if}<path d="M55 55h50" stroke={active?accent:ink} stroke-width="3"/></g></g>
-  <text x="80" y="96" fill={legend} text-anchor="middle" font-size="11">{label}</text>
+  {#if caption}<text x="80" y="96" fill={legend} text-anchor="middle" font-size="11">{label}</text>{/if}
 {/if}

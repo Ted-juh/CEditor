@@ -47,9 +47,9 @@ const RELATED = {
 // Those two were drawn with knobs and buttons of their own (Saddle's cream caps on brass skirts,
 // Ceramic's white caps with a blue arc), which the typo happened to protect. They keep them: the
 // direction fills the controls they had no design for, not the ones they had. The designed
-// Graphite keeps Graphite's flat buttons and switch: the direction's tiles and sliding tabs are
-// drawn in a fixed frame, and at a button's usual 120 by 40 they shrink to a sliver with a caption
-// too small to read, which the set every new panel starts on cannot have.
+// Graphite keeps Graphite's flat buttons and switch: a button that carries its legend on its own
+// face is what the set every new panel starts on should insert. The direction's tiles and sliding
+// tabs, a key drawn beside its caption, stay one click away, and are what Graphite's starter draws.
 const BUTTON_TYPES = ['Button', 'MomentaryButton', 'ToggleButton', 'TimedButton', 'OneShotButton'];
 const OWN_MECHANISMS = { saddle: 'all', ceramic: 'all', 'graphite-studio': BUTTON_TYPES };
 const keepsOwn = (id, type) => OWN_MECHANISMS[id] === 'all' || (OWN_MECHANISMS[id] ?? []).includes(type);
