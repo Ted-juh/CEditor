@@ -400,4 +400,89 @@ SH-201: 34 booleans declare `trueValue: 1` with `boolean-u7` — C++ sends `01`,
 `test-sysex-synth` (in the user's device list) has `mod.depth` 0..255 on a 1-byte u7 and a `currentPatchDump` with no
 payload size, so it cannot build. Observed-in-test.
 
+### C-34 — Closing the Hostage plug-in while Library → Listen is measuring crashes the DAW   (S1 · bug · Hostage VST3 — if that product ships)
+
+**Repro.** CEHostVST3: Library → Listen (`analyseLibrary`); while it runs, remove the plug-in or close the project.
+**Observed.** `~InstrumentHostService` joins `analysisThread` (`InstrumentHostService.cpp:123-125`); the thread's last
+act posts a closure capturing `this` (`:11318-11351` — `library.edit`, `saveLibrary`, `snapshots->sweep`,
+`emitLibrary`) through `options.onControlThread`, which in the plug-in is a bare `MessageManager::callAsync`
+(`HostPluginProcessor.cpp:209-212`). The DAW's message loop runs it after the service is freed: use-after-free.
+**Expected.** The library preset scan already drops its `finish` closure via an `alive` token (`:12316`); this one
+does not.
+**Evidence level.** read-in-code; Claude confirmed the `this` capture and the unguarded `callAsync`.
+
+### C-35 — A failed preset load leaves the part named and saved as the new plug-in, holding the old plug-in's state   (S1 · bug · Hostage session persistence)
+
+**Repro.** Part has plug-in A; load a library preset of plug-in B (`loadLibraryRecord`, `auditionRecord`,
+`walkPartPreset`) and let the load fail (worker crash in construction, 15 s handshake timeout on a licence dialog or a
+big sampler, safe mode refusing the module).
+**Observed.** `loadPresetRecord` primes B's identity into the part document before the async load
+(`InstrumentHostService.cpp:12941`, `InstrumentRackHost.cpp:1291-1303`); the failure path only reports (`:12845`). The
+card says B while A plays; the next save or DAW `getStateInformation` writes A's live state into the part whose
+`pluginCeId` is B (`InstrumentRackHost.cpp:2388-2403`); on the next start `commitLoad` feeds that blob to B
+(`:1735-1740`). The user's A and its tweaks are gone from the session; B gets foreign state.
+**Expected.** Identity changes when the load commits, as plain `loadInstrument` does.
+**Evidence level.** read-in-code.
+
+### C-36 — The browse audition's phrase arrives as one block of notes: nothing is heard   (S2 · bug · Hostage audition)
+
+**Repro.** Audio running; ▶ in the audition bar, a tile with audition on, or 1–4 in Compare (default phrase "recent",
+4 bars).
+**Observed.** `playPhrase` queues every note on a `juce::MidiMessageCollector` with future timestamps
+(`InstrumentHostService.cpp:11444-11472`); the collector does not schedule — it empties into the next block and drops
+anything >1 s older than the newest. Real collector + `RecentPlay`: a single note's on and off land on the same
+sample; "your last 4 bars" delivers 5 of 33 messages (the all-notes-off among the dropped). The UI says "Playing your
+last 4 bars".
+**Expected.** The "Also on load" path's own scheduler (`startPresetAudition`, `:12529-12574`) does this right.
+**Evidence level.** observed-in-test (the function body run against the real classes).
+
+### C-37 — Auditioning a preset of a different plug-in plays the phrase on the OLD plug-in, then nothing on the new one   (S2 · bug · Hostage audition)
+
+`auditionRecord` starts B's load asynchronously, then hands off at once because `rack.getInstrument(partId)` still
+returns A (`InstrumentHostService.cpp:7058-7062`; the old node goes only in `commitLoad`); when B commits,
+`handOffAudition` returns early (`:11498`). Compare (keys 1–4) uses the same call. The test covers only the same-class
+case (`InstrumentHostServiceTests.cpp:3517-3521`). Read-in-code.
+
+### C-38 — Picking another preset while a new plug-in is still loading applies it to the old plug-in; the first pick wins   (S2 · bug · Hostage library load)
+
+After B1's prime the part claims B while A is live, so B2 counts as `sameClassLoaded` (`InstrumentHostService.cpp:12891`)
+and is applied to A (a vendor `.vstpreset` is refused "The plug-in refused this preset"; a program number selects on A;
+a captured state goes into A's `setStateInformation`). B2 is reported loaded; when B commits, B1's afterCommit applies
+B1 — B1 plays under B2's name. A capture in that window overwrites B1's primed state with A's. No in-flight-load
+tracking exists. Audition mode (every tile click loads) hits this naturally. Read-in-code.
+
+### C-39 — The audition snapshot ignores a Stop that arrives before the next audio block and plays its full 2 s over the live sound   (S3 · bug · AuditionPlayer)
+
+`processBlock` picks up the pending clip and resets `fading = false; gain = 1` (`AuditionPlayer.h:84-93`), losing a
+`stop()` made in the same message-thread call (the C-37 path, a fast in-place apply, Stop right after a click).
+Real class: 188 blocks (2.005 s) of snapshot audio after `stop()`, against 3 for the intended 30 ms fade. `stop()` also
+writes plain `fading`/`fadeSamplesRemaining` from the message thread while the audio thread reads them (a data race).
+Observed-in-test.
+
+### C-40 — If the scanner worker cannot launch, every plug-in is quarantined after two scans — and stays so when the worker is back   (S3 · faulty · plug-in scan)
+
+`launchFailed` counts as a module failure (`PluginScannerCoordinator.cpp:200-216`). Real coordinator: pass 2
+quarantines; after restoring the worker, `scanned=0 skippedQuarantined=1`. Recovery is one Retry click per module.
+Triggers: antivirus, a build without `CEDITOR_SCANNER_WORKER`, a hand-copied install. Observed-in-test.
+
+### C-41 — The host trusts the worker-writable shared-memory header on every block; one changed field makes the host write outside the mapping   (S3 · bug · plug-in isolation)
+
+Geometry is validated once, then `plane.getHeader()->config` is re-read every block (`PluginWorkerBlockBridge.h:176`,
+`PluginWorkerDataPlane.h:333-341`). A mapping sized for 512 frames with the worker side setting
+`config.maxFrames = 16384`: ASan SEGV, WRITE in `copyInputAudio` (`PluginWorkerBlockBridge.h:299`). A plug-in that
+corrupts memory inside the worker can take the host down — the thing process isolation exists to prevent
+(`plugin-process-isolation.md`). Observed-in-test (ASan).
+
+### C-42 — "Your last N bars" does nothing to the "Also on load" audition   (S3 · faulty · Hostage audition)
+
+`choosePhrase('recent')` sends only `setAuditionPhrase` (`SoundsAuditionBar.svelte:34-35`); `startPresetAudition`
+never reads `auditionPhraseMode` (`InstrumentHostService.cpp:12550-12558`). The bar's own header promises the same
+phrase for both. Read-in-code.
+
+### C-43 — Retry on a quarantined module during a scan is undone when the scan finishes   (S3 · bug · plug-in scan)
+
+`clearQuarantine` edits `catalog` and saves (`InstrumentHostService.cpp:981-990`); the scan ends with
+`catalog = working; saveCatalog();` from a copy taken before the Retry (`:17880-17912`). Retry is not disabled while
+scanning (`ReliabilityPanel.svelte:381`). Read-in-code.
+
 ## Verification of the other's findings
