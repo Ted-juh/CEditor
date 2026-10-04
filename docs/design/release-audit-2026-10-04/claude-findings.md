@@ -848,4 +848,81 @@ failure. Observed (Linux build, GAIA panel, clap-validator built from source).
 step fails ("cannot open display"). With `DISPLAY=:99` (Xvfb) it builds. CLAUDE.md's "Validating the plug-in" recipe
 runs the build without one. Observed.
 
+## Wave 2 — runtime testing in the live app
+
+Wave 2 drives the real Svelte app in Chromium against a warm dev server, through the repo's own `behaviourKit`
+(make, set, geo, pixel, reopen, sent MIDI). Scripts and screenshots stay in the audit run's scratch area; each finding
+names its script.
+
+### C-87 — On a Knob or Slider, the Scale, Rotation, X, Y and Show/hide targets the Animation tab calls "works" draw nothing on any part — 365 of 396 part × property combinations change nothing   (S2 · faulty · animation / slider renderer)
+
+**Repro.** For each of the 18 Knob/Slider parts × 11 "Change" options the tab offers, the tab's own `targetStatus` /
+`sequenceTargetStatus` answer "works" (396 of 396). Write that property into the Hover state patch (what a transition
+or sequence track moves), Preview, hover, compare rendered DOM and computed style.
+**Observed.** 31 of 396 change the drawing. Scale, Rotation, X, Y and Show/hide: 0 of 180. Opacity on 5 of 18 Knob
+parts, Fill colour on 4, Width 4, Height 2. The Knob's **own shipped states** (Hover `pointerCurrent Layout.scale
+1.06`, Pressed 0.96, Dragging/ActiveHandle 1.08) are never drawn either — geometry identical on hover even with scale 2
+/ rotation 45 patched in, while the resolver holds the values.
+**Expected.** The tab's header: it exists because "the editor let you build animations that never run and said
+nothing".
+**Where.** `editor/SliderFamilyRenderer.svelte:323-456` reads only `Layout.width/height/offset` from parts (Claude
+grepped the 1,276-line file: no `scale`, `rotation`, `x` or `y` read at all); `pointerStyleFor` (`:705-719`) adds
+transition/keyframe CSS but no transform. The tab's verdict comes from the runtime bucket table
+(`animationModel.js:134`), not from what this renderer draws.
+**Evidence level.** observed-in-app (browser, 396 combinations; rows and screenshots kept).
+
+### C-88 — On Button, ToggleButton, Combobox and Listbox the Animation tab cannot add any transition or sequence target at all   (S2 · faulty · Animation tab — extends C-45)
+
+Part select: 0 options; "Add this change" / "Add this track" disabled for all 11 Change options; no warning — the tab
+still says "Pick a part and a property below and add one". Only presets (root `Transform.*`) and the Keyframes kind
+work on these types. `AnimationTab.svelte` `.addbtn` `disabled={!partNames.length && offeredForAdd?.scope !== 'control'}`;
+`offeredTargetsFor` offers part paths only; `OFFERED_ROOT_PROPERTIES` exists for exactly this and is unused.
+Observed-in-app (locator state + screenshot).
+
+### C-89 — `ce.anim` on a handful of controls drops the Preview to 2–14 fps   (S2 · faulty · scripting / animation performance)
+
+One JS `onPanelLoad`: `ce.anim.to([names], 1, {from:0, duration:1000, curve:"linear", repeat:-1, pingpong:true})` over N
+Knobs. Idle Preview 60 fps at every N; with the sweep: N=1 43 fps (max frame 150 ms), 5 → 14 fps, 10 → 5, 25 → 4,
+50 → 2 fps (median frame 617 ms, 3.1 s of long tasks per 3 s). 50 CSS keyframe loops run at 60 fps. A sweep across a
+few knobs with `stagger` is the API's documented use. Likely `tickAnimations` (`scripting/panelRuntime.js` ~3790):
+each path `setValue` → session-store write → whole-panel re-resolve every 16 ms (not traced). Observed-in-app (machine
+loaded by other testers; the idle control stayed at 60 fps throughout).
+
+### C-90 — A script write to a custom component's value channel moves neither its filmstrip frame nor a Value-triggered sequence — only a pointer drag does   (S2 · bug · animation / custom components)
+
+Filmstrip Knob starter: `set("Film.mainValue", 1)` in `onPanelLoad` → trace "now 1", `customValues.mainValue = 1`, but
+`customNormalizedValue` stays 0.5 and the frame stays at frame 4; with a Value-trigger sequence the frame is pinned at
+the 0.5 pose while `ce.anim` sweeps 0 → 1. A real drag to 0.83 moves the frame. Same in `player.html`. The keyframe
+player follows `interactionRuntime.signals.valueNormalized` (`CanvasControl.svelte:394`), fed by
+`session.customNormalizedValue`, which script writes never update. MIDI/automation input not checked — **likely the same
+for host automation of a filmstrip knob in an exported plug-in; Codex: worth a DAW check.** Observed-in-app.
+
+### C-91 — Adding a colour track whose authored colour is a theme token turns the part black at once; "Keyframe at playhead" stores black   (S3 · bug · Animation tab)
+
+Knob → sequence (Value trigger) → Add track bodyCap · Fill colour: the seeded keyframe is `{"time":0,"value":"{control.cap}"}`
+and the cap pixel goes rgb(58,58,58) → rgb(0,0,0); "Keyframe at 500 ms" stores `FF000000` twice. `baseValueAt` seeds the
+unresolved token; `keyframeModel.js:73-84` falls back to black (C-47's fallback by another road). The tab promises a
+new track "changes nothing on screen until a second one". Observed-in-app.
+
+### C-92 — A "beat" keyframe animation skips the downbeat the transport starts on   (S4 · faulty · animation triggers)
+
+Beat pulse preset at 120 bpm, `startTransport(0)`: restarts land at beats 1.03, 2.01, 3.02 … none at beat 0. Observed.
+
+### C-93 — Switching a new animation to Sequence keeps a 120 ms Length   (S4 · polish)
+
+`newAnimationShape` uses duration 120; `kindPatch` replaces only values under 100, so the sequence axis is 120 ms until
+a Length is typed. Observed.
+
+**Runtime evidence added to wave-1 findings:** C-44 confirmed in the app (a hover-triggered sequence on the Two-State
+Button changes nothing; To = any plays, and with Loop it never stops while Preview is on — anime's ticker keeps 61
+rAF/s after the pointer leaves). C-53 seen in the tab header. C-51: with OS reduced motion, transitions and keyframes
+are suppressed; sequences not re-measured.
+
+**Animation runtime that held up:** all 12 transition easings fit their curves (rms ≤ 0.002, spring peak 1.233 vs
+formula 1.234); delay, snap-back and trigger chips; all six presets do what their names say; Keyframes kind (loop,
+count, alternate, in-state, `ce.anim.play` from a script, part blink); `ce.anim.spring`; 28 of 28 undo checks through the
+tab; save/reopen byte-identical with identical re-measured motion; **the player page moves exactly like the editor's
+Preview** (hover lift rms 0 both, settle 599 vs 598 ms); drag and delete during Play; 0 rAF/s after every animation
+ends.
+
 ## Verification of the other's findings
