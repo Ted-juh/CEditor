@@ -121,7 +121,10 @@ panel API — no filesystem/network/OS". Shared panels are the release's adverti
 scope; also `:7173-7177` for installed modules). Sinks: `CE/src/ValueTreeBridgeHandlers.cpp:556-581` (savePanel),
 `:990-1072` (requestFileData). No trust prompt and no script stripping on `panelSharingActions.js` `openPackageText`.
 Python (Pyodide's `import js`) very likely has the same reach — not demonstrated.
-**Evidence level.** observed-in-test (node test with a stub backend: the crafted script emitted the `savePanel` call);
+**Evidence level.** observed-in-test, **found independently by two reviewers**: one through the real stores and package
+open path, one through the real `runScript` — `requestFileData {"filePath":"/home/user/.ssh/id_rsa"}` and a `savePanel`
+into `…/Start Menu/Programs/Startup/run.cmd` both reached the stand-in bridge, and the script saw `window`, `fetch` and
+`__JUCE__` (so what it reads can also be sent away). The native engines keep the sandbox; the WebView runtime does not.
 Claude confirmed the executor and the unrestricted native handler by reading them.
 
 ### C-09 — Save As, then one Undo, silently points the tab back at the ORIGINAL file; the next Save overwrites it   (S1 · data loss · save / undo)
@@ -580,5 +583,115 @@ and `ce.anim` alike (`utils/easing.js`). Observed-in-test.
 `ce.anim.play` on a sequence says `"<name>" is a transition…` (`panelRuntime.js:3771`); sequences never light the
 "just fired" lamps (`keyframePlayer.js` never calls `noteAnimationsFired`); `animation-tab-design.md:271-279` still
 says the second kind is `spring` and that `springEase` lives in `interactionRuntime.js`. Read-in-code.
+
+### C-57 — One infinite loop in any preview script freezes the editor (or the plug-in's open window) with no recovery   (S1 · bug · scripting runtime)
+
+**Repro.** A handler, or JS top-level code, containing `while (true) {}`; Preview.
+**Observed.** JS, Lua (real wasmoon), C++, C# and Java previews never return; a 500 ms timer in the same process never
+fires (killed by `timeout 10`, exit 124); a bounded loop returns in 101 ms and the timer fires. Scripts run on the
+WebView's main thread (`App.svelte:92`, `Player.svelte:577`, no Worker): the whole editor hangs and unsaved edits since
+the last recovery snapshot are lost. JS top-level code runs at load, so the panel freezes again when reopened and
+previewed.
+**Expected.** `panel-api-spec.md:260`: a watchdog "interrupts a stuck `while true` instead of freezing the
+editor/DAW". The native engines have one (QuickJS 2 s, `JsScriptEngine.cpp:2403-2406`; Lua instruction hook,
+`LuaScriptEngine.cpp:2588-2611`; Python watchdog thread).
+**Where.** `panelRuntime.js:7296-7307` (JS/TS), `:7333-7405` (wasmoon), `:7556-7621` (C++/C#/Java interpreters),
+`:7815-7835`.
+**Evidence level.** observed-in-test (five languages through the real `runScript`).
+
+### C-58 — Lua preview: a script's `self`, `log`, `state` and helpers belong to whichever Lua script loaded last   (S2 · bug · preview ≠ export)
+
+Knobs A and B each with a Lua `onValueChanged` using `self` (as the manual teaches): turning A logs
+`(script sb) knob A handler ran with v=0.9; self.value = 0.2` and sets B's tooltip; script A calls script B's
+`label()`. JS is correct; the exported plug-in with its window closed is correct (native Lua gives each script its own
+environment, `LuaScriptEngine.cpp:2830`); the open plug-in window is wrong. `panelRuntime.js:7390-7392` binds these as
+globals of one shared wasmoon engine — `:7330` "per-script sandboxing is a later refinement". Observed-in-test.
+
+### C-59 — Python preview: lists passed to the API arrive empty — `sendSysex([...])`/`sendMidi([...])` send nothing, `checksum` is wrong   (S2 · bug · Python)
+
+Real runtime + Pyodide 0.26.4: `sendSysex: no bytes given`, `sendMidi: no bytes given`, `checksum([0x40,0x00,0x7F]) = 0`
+(Roland checksum is 65); the hex-string form works. A Pyodide list arrives as a proxy and `toByteArray` makes `[]`
+(`panelRuntime.js:2014-2019, 2242-2248, 7448-7453`). Also in the open plug-in window; the plug-in's own Python (window
+closed) is right. Observed-in-test.
+
+### C-60 — Python: payloads support `info.x` in the preview but only `info["x"]` in the plug-in — no spelling works in both   (S2 · bug · preview ≠ export)
+
+Preview: `info.firstTime` works, `info["firstTime"]` and `transportInfo()["playing"]` raise "JsProxy object is not
+subscriptable". Plug-in CPython converts to `dict` (`PythonScriptEngine.cpp:128-140, 649-661, 3136-3140`), so the
+editor's own `onPanelReady` skeleton (`if info.firstTime:`) raises AttributeError window-closed. Preview observed;
+plug-in read-in-code (dict behaviour checked with python3).
+
+### C-61 — Plug-in window: onPanelLoad/onPanelReady re-run on every window open, `info.firstTime` is always true, the dump is requested twice   (S2 · bug · Player lifecycle)
+
+Each open creates a fresh web view; `Player.svelte:499-511` toggles preview, firing `onPanelLoad`, `onPanelBuild` and
+`onPanelReady({firstTime: true})` (`panelRuntime.js:8340-8357`); on the same open `PluginProcessor.h:656` fires the
+native `scriptRuntime->onPanelReady`, whose `requestDump` really sends (`:1700-1706`). The cookbook §4 pattern
+(`if info.firstTime then requestDump("patch")`) requests twice on first open and again on every reopen; init SysEx in
+onPanelLoad is resent per open. Read-in-code (three paths traced). **Codex: visible in a DAW with a MIDI monitor (W4/W6).**
+
+### C-62 — Toolchains: "Install" for Python downloads a runtime nothing uses, then says Installed while export still fails   (S2 · unfinished · toolchains)
+
+With no system `python`: Install flips status to `installed:true`; the export check passes
+(`export-panel-vst3.mjs:117`); bundling fails "Install Python and make it available on PATH" (`:202`) — it copies the
+system python, and CMake's `find_package(Python3 Development.Embed)` cannot use the download. Also reachable from the
+installer's Python component (`CEditor.iss:92`). `languages.mjs:49-50`;
+`scripting-language-options-and-shippable-export.md:14,30` says the download is bundled. Status flip observed; export
+failure read-in-code.
+
+### C-63 — Python: the editor's skeletons for onPanelLoad/Build/Close/Destroy throw TypeError   (S3 · bug · Python)
+
+Generated `def onPanelLoad():` takes no argument; both the preview (`fn(payload)`) and the plug-in
+(`PyObject_CallFunctionObjArgs(f, None)`) pass one: "takes 0 positional arguments but 1 was given".
+`scriptModel.js:41-46`, `panelRuntime.js:7453`, `PythonScriptEngine.cpp:3140`, `ScriptRuntime.cpp:777, 794`. Workaround
+`def onPanelLoad(_=None):`. Preview observed.
+
+### C-64 — Python in the editor and in the open plug-in window needs the internet   (S3 · faulty · Python)
+
+`getPyodideEngine` loads from `https://cdn.jsdelivr.net/pyodide/v0.26.4/full/` (`panelRuntime.js:7414-7431`); offline
+every Python script reports "Pyodide failed to load", including an exported plug-in's open window (where the native
+engine does not handle value events, `PluginProcessor.h:677`). Lua and TS are bundled; no doc says Python is not.
+Read-in-code.
+
+### C-65 — C++/C#/Java preview: an exception is logged "[object Object]", never reaches onError, and is followed by "ran …()"   (S3 · bug · scripting errors)
+
+JS: `[error] kaboom-js` then onError fires. C++/C#/Java: `C++ preview runtime error: [object Object]`, then
+`ran onCustom() in "cpp"`; onError never fires, compile diagnostics skip it. `panelRuntime.js:7569, 7592, 7616, 7831`.
+Observed-in-test.
+
+### C-66 — Exported native handlers: C#/Java errors lose their message; on Windows one C++ `throw` disables every C++ handler as a "hardware fault"   (S3 · bug · native export)
+
+C# (`CeRuntime.cs:782-786`, `-3`) and Java (`CeRuntime.java:119-121`, `-1`) discard the exception text. The generated
+C++ glue has no try/catch (`genCpp.mjs:76-83`) — the sibling 85bb071 left behind — so on Windows the crash guard's
+`__except(EXCEPTION_EXECUTE_HANDLER)` (`NativeHandlerCrashGuard.c:20-29`) catches the C++ exception and
+`NativeHandlerEngine.cpp:380-388` marks the module dead "hardware fault… restart the host" for the session.
+Read-in-code. **Codex: MSVC behaviour is yours to confirm.**
+
+### C-67 — C++/C#/Java handlers that preview cleanly fail the export build; the validator says nothing   (S3 · faulty · preview ≠ export)
+
+`validateScript` returns `[]` for C++ `ctx.sendNote(...)`, Java `ctx.sendProgramChange(...)`, C# onDawSaveState; the
+generated C++ fails `'ce::Context' has no member named 'sendNote'`. No C++ text read works in both (`std::string s =
+ctx.get(...)` previews but does not compile; `.asString()` compiles but fails in the preview). With `auto`, one failed
+module fails the whole export. Observed-in-test.
+
+### C-68 — onDawSaveState is offered for C++/C#/Java but cannot save anything   (U · unfinished · native export)
+
+Void skeleton, no storage call in the export context, `ScriptRuntime.cpp:812-830` only merges a returned object;
+`genCpp.mjs:81` and `CeRuntime.cs:777` still say "value-returning handlers (onDawSaveState) are a TODO". Nothing is saved
+and nothing says so. Read-in-code.
+
+### C-69 — Toolchain provisioning: an interrupted extract stays "already provisioned" forever; downloads are never verified   (S3 · faulty · toolchains)
+
+A partial `llvm-mingw` folder is not removed on failure (`provision.mjs:117-120`): status `installed:false,
+missingToolchains:["ninja"]`, while `provision.mjs llvm-mingw` prints "already provisioned … skipped"; C++ has no Remove,
+so the user must delete the folder by hand. `manifest.json` carries no checksums; `dotnet-install.ps1` runs with
+`-ExecutionPolicy Bypass` on an unpinned "10.0" channel (`provision.mjs:81`). Stuck state observed; verification
+read-in-code.
+
+### C-70 — The scripting manual's language table contradicts the product   (S4 · docs)
+
+"Runs live in the editor": Python "⬜ preview only" (it runs live); C++/C#/Java "compile-at-export planned" (they
+compile at export, as the manual says 30 lines later). Generated from `panelApi.js:90-125` via
+`generate-scripting-manual.mjs:100`. `panel-api-spec.md:300-307` still says the WebView never runs scripts.
+Read-in-code.
 
 ## Verification of the other's findings
