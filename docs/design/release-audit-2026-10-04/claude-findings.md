@@ -163,8 +163,13 @@ keeps any `result.ok`, even 100 % unmapped), `:1062-1091` (sends them first);
 `CE/src/DeviceProfile/DeviceProfileEngine.cpp:1205-1223` (fills with `defaultByte`, unmapped is "reported, not
 refused"). Masked today for the shipped panels by C-12 — it bites exactly the user who follows the release notes'
 "bind a panel to a device".
-**Evidence level.** observed-in-test with the editor's JS copy of the builder over the shipped GAIA profile; Claude
-read the C++ (`refreshCapturedDumps` and the fill loop) and it applies the same rule.
+On the AN1x it is worse: `$slot` defaults to 0, so the restore's `userVoice` bulk (`F0 43 00 5C 0F 16 11 00 00 …`)
+writes User Voice 001 memory and `userPattern` (`F0 43 00 5C 00 46 01 00 00 …`) User Pattern 1 — stored patches
+destroyed. GAIA system block at zero also means Master Level 0 (silent synth), Master Tune and Tempo 0 (below their
+ranges), D-Beam sensitivity 0.
+**Evidence level.** observed-in-test, **found independently by two reviewers**: one through the editor's JS copy of the
+builder, one through a line-by-line port of `refreshCapturedDumps → buildDumpMessage → validateAndEncodeValue`, both over
+the shipped GAIA and AN1x panels and profiles. Claude read the C++ (`refreshCapturedDumps` and the fill loop).
 
 ### C-12 — The plug-in looks up dumps, program recall and `ce.device.buildDump` under a hard-coded `mainSynth` role: Total Recall and the Programs menu do nothing for the shipped panels   (S2 · bug · Player)
 
@@ -310,5 +315,89 @@ opens it with no chooser. New Panel from Device Profile lists Test CC/NRPN/SysEx
   tree has since gained the CLAP/LV2 template export and the animation overhaul — by its own legend they are STALE.
 - Checklist E still open: no `Recorder.snapToScale` line in RELEASE-NOTES; the six unreachable fields are still declared.
 **Evidence level.** counts demonstrated with the real `classifyType`, `autoPanelPlan` and catalogues; the rest read.
+
+### C-25 — AN1x profile: Scene 2 and Free-EG tracks 2–4 in every dump read and write the Scene 1 / track 1 parameters   (S1 · bug · device profiles / DPD emitter)
+
+**Repro.** Parse an AN1x Scene 2 bulk dump with Poly Mode = Legato; build a Scene 2 dump with Scene 1 poly, Scene 2 mono.
+**Observed.** The Scene 2 dump sets `scPolyMode` (Scene 1, address 10 10 00) and leaves `scene2.scPolyMode` undefined;
+the built Scene 2 payload carries Scene 1's value. Claude's own count over
+`CE/profiles/test/yamaha-an1x-dpd.ceditor-device.json`: the `scene2` dump has 111 mappings and **zero** `scene2.*`
+ids although the profile defines 111 of them; `voiceCommon` maps 840 entries onto 264 distinct ids (192 mapped four
+times — FEG tracks 2–4 land on track 1); `userVoice` 364 onto 253. So reading Scene 2 moves Scene 1's controls,
+after reading voiceCommon track 1 shows track 4's curve, and every built dump (Total Recall, `ce.device.sendDump`,
+librarian sends) writes Scene 1 values into Scene 2.
+**Where.** `CE/dpd/emit-legacy-core.mjs:88` — dump mappings use `flat(p.resolvedId)`, stripping the instance prefix,
+while `legacyParam` (`:151`) keeps it for instance > 0. The in-app Designer saves through the same emitter: **every
+instanced DPD has this.**
+**Evidence level.** observed-in-test, and Claude re-counted the shipped profile. The reviewer's validator also reports
+1,121 address/offset mismatches in the AN1x profile (not individually checked).
+
+### C-26 — Exported plug-in sends a choice parameter's menu index as the device's wire value   (S2 · bug · Player)
+
+**Observed** (shipped AN1x panel + profile, JS engine with the C++ rule): `arpSceneSwitch` (wire 1,2,3): "Scene 1"
+→ not sent, "Scene 2" → sends scene-1, "Both" → sends scene-2; `cc64-sustain-switch` (0,127): "On" → not sent;
+`sysKbdTxChannel`/`sysArpTxChannel`/`sysRxChannel1/2`: "Off"(16) → not sent. Six parameters in the shipped panel,
+window-closed automation and the restore push; the same index goes into Total Recall dumps.
+**Where.** `PluginProcessor.h:1172-1186`, `:1011-1020` pass the `AudioParameterChoice` index as a number;
+`DeviceProfileEngine.cpp:2263` matches a number against each choice's wire `value`, not its position.
+**Evidence level.** observed-in-test (JS engine, same rule); C++ read.
+
+### C-27 — Total Recall's "dump first, values after" does not hold: the dump goes out the DAW's MIDI bus, the values straight to the port   (S2 · faulty · Player)
+
+**Observed.** When dumps are captured, `sendRestoredDumps` queues them on the plug-in's MIDI output bus, drained at the
+next `processBlock` and routed wherever the DAW sends it; the values go `sendParamMidi →
+sendOrQueueTransaction → MidiOutput::sendMessageNow` on the message thread to the port the Player opened. The values
+reach the synth first — or the dump never does. (`PluginProcessor.h:1288-1291` claims "the plugin never opens a port
+itself"; profile-bound sends do.)
+**Where.** `PluginProcessor.h:1102-1121` (`runRestorePush`), `:1301-1340`; `DeviceProfileServiceMidiIO.cpp:341-388`.
+**Evidence level.** read-in-code.
+
+### C-28 — GAIA "from DPD" (and any Designer-saved signed parameter): s7 becomes u7 but keeps −63..63 — negatives never send, others arrive 64 low   (S2 · bug · DPD emitter)
+
+**Observed.** Filter Env Depth (tones 1–3) in `roland-gaia-dpd`: −20 → not sent (expect `2C`), 0 → `00` (expect `40`),
++20 → `14` (expect `54`); the default −63 cannot be sent.
+**Where.** `CE/dpd/emit-legacy-core.mjs:182-188` (s7 → u7) with `:169-170` copying the signed range unchanged
+(Claude read both); the C++ u7 encoder (`DeviceProfileEngine.cpp:2187-2193`) applies no offset.
+**Evidence level.** observed-in-test.
+
+### C-29 — `ce.device.setVariable` / `setTiming` report success but the sending engine never sees them   (S2 · bug · scripting / device service)
+
+**Observed.** The JS side stores the override and `ce.device.variables()` reports it; C++ `setDeviceRoleMapping` ignores
+`variables` and `timingOverrides` (`DeviceProfileServiceMidiIO.cpp:66-118`, `RoleMapping` has no field for them,
+`DeviceProfileService.h:105-118`); recipes resolve `$deviceId`/`$channel` from the profile only
+(`DeviceProfileEngine.cpp:1774`). The plug-in's `cb.deviceSet` (`PluginProcessor.h:1815-1855`) is the same. With no
+other per-role device-ID/channel UI, a synth on another channel or device ID is reachable only by editing the profile.
+**Expected.** `docs/scripting-manual.md` (deviceSetVariable): "point this panel at a different unit".
+**Evidence level.** read-in-code.
+
+### C-30 — Profile pacing is ignored: push sync and the restore fire DT1 messages back-to-back   (S3 · faulty · device service)
+
+`delayAfterMs: 20` on the DT1 recipe and `timing.minDelayBetweenMessagesMs: 20` are not honoured for parameter sends:
+`compileSysex` never sets `delayAfterMs` (`DeviceProfileEngine.cpp:2488+`; only NRPN `:2430` and requests `:500` read
+it), `minDelayBetweenMessagesMs` is read only by bulk jobs (`DeviceProfileServiceJobs.cpp:260-267`), and the rate limit
+is per parameter (`DeviceProfileServiceMidiIO.cpp:428-433`). `pushRuntimeStateToDevice`
+(`DeviceProfileServiceRequests.cpp:168-190`) and the restore push send every DT1 in one loop. Read-in-code; the
+hardware effect is unproven — **a real-device question for the owner.**
+
+### C-31 — Device-request `retries` never happen; one lost reply ends the whole startup sync   (S3 · unfinished · device service)
+
+`processPendingRequestTimeouts` erases a timed-out request and never acts on `retriesRemaining`
+(`DeviceProfileServiceRequests.cpp:409-445`); the next request in the chain is sent only after a reply (`:277, :332,
+:386`). The GAIA's 27-step pull declares `retries: 1` per step; one dropped reply leaves the panel half-synced.
+Read-in-code.
+
+### C-32 — A MIDI-learn chip drops the channel it learned: a CC learned on channel 5 sends on channel 1   (S3 · bug · MIDI learn)
+
+**Observed.** Chip "CC 74 · ch 5" → `binding.channel = 0` → sends `B0 4A 64`; "NRPN 1:32" (ch 5) → `B0 63 01 B0 62 20 …`.
+**Where.** `midiLearnChips.js:232-251` (`chipDragPayload` carries no channel); `midiControlBindings.js:269`
+(`channel: 0`). Workaround: set the channel by hand in Device Bindings.
+**Evidence level.** observed-in-test.
+
+### C-33 — The preview JS engine still builds different bytes from the C++ engine   (S4 · faulty · preview)
+
+SH-201: 34 booleans declare `trueValue: 1` with `boolean-u7` — C++ sends `01`, the JS preview/Designer shows `7F`
+(`deviceProfileLocalEngine.js:250`). Out of range: JS clamps (−20 → `00`), C++ refuses. The shipped test fixture
+`test-sysex-synth` (in the user's device list) has `mod.depth` 0..255 on a 1-byte u7 and a `currentPatchDump` with no
+payload size, so it cannot build. Observed-in-test.
 
 ## Verification of the other's findings
