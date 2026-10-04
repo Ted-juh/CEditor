@@ -97,4 +97,47 @@ GitHub pre-release will not fix it**: `releases/latest` skips pre-releases and k
 `v0.2.0` as a full release, or retag/delete `Alpha0.04`.
 **Evidence level.** read-in-code + the live GitHub API reply. (To be observed in the running Linux app.)
 
+### C-08 — A shared panel's JavaScript can read and write any file on the machine through the app's native bridge   (S1 · security · scripting / sharing)
+
+**Repro.** A `.cepanel` or `.cepanelpkg` whose JS script contains, at top level,
+`window.__JUCE__.backend.emitEvent('savePanel', { panelId:'0', filePath:'<Startup folder>/x.bat', data:'…' })`.
+File → Open Shared Panel… (or Open Panel), then press **Preview** — or export it / load it in the Player, which run
+`onPanelLoad`/`onPanelBuild` unconditionally.
+**Observed.** The script's top-level code runs and the bridge event fires with the attacker's path and contents.
+The native `savePanel` handler writes any path (`writeTextAtomically(juce::File(filePath), …)`); `requestFileData`
+reads any path and returns it base64 to the page; `buildVst3`, `provisionToolchains`, `installScriptModule` run
+processes and write files.
+**Expected.** `docs/design/panel-api-spec.md:262` and `scripting-redesign-plan.md:142` promise "scripts see only the
+panel API — no filesystem/network/OS". Shared panels are the release's advertised way to pass work around.
+**Where.** `CE/web/src/CE_Application/scripting/panelRuntime.js:7296-7305` (`runJsSource` →
+`new Function(...Object.keys(api), body)`: the API is passed in, but the function body still runs in the page's global
+scope; also `:7173-7177` for installed modules). Sinks: `CE/src/ValueTreeBridgeHandlers.cpp:556-581` (savePanel),
+`:990-1072` (requestFileData). No trust prompt and no script stripping on `panelSharingActions.js` `openPackageText`.
+Python (Pyodide's `import js`) very likely has the same reach — not demonstrated.
+**Evidence level.** observed-in-test (node test with a stub backend: the crafted script emitted the `savePanel` call);
+Claude confirmed the executor and the unrestricted native handler by reading them.
+
+### C-09 — Save As, then one Undo, silently points the tab back at the ORIGINAL file; the next Save overwrites it   (S1 · data loss · save / undo)
+
+**Repro.** Open `master.cepanel`, edit, File → Save As → `variant.cepanel`, press Ctrl+Z once, press Ctrl+S.
+**Observed.** After Save As: `{ filePath: '/docs/B.cepanel', name: 'B', modified: false }`. After one undo:
+`{ filePath: '/docs/A.cepanel', name: 'Original', modified: true }` — the tab label flips back too. Ctrl+S then
+writes the variant's content over `master.cepanel`.
+**Expected.** A file's path and name are document identity, not undoable content.
+**Where.** `CE/web/src/CE_Application/stores/history.js:319` — `snapshotOf` excludes only
+`id, modified, bgImage, bgTexture, viewer`, so `filePath` and `name` are captured; `history.js:572-582` spreads the
+snapshot over the live panel; `stores/panels.js:1091-1097` saves to `panel.filePath`.
+**Evidence level.** observed-in-test (real stores: `addPanel` → edit → `applyPanelSavedPayload` → `undo()`); Claude
+confirmed the destructuring at `history.js:319`.
+
+### C-10 — The × on a Screen (CTRL49) tab does nothing   (S3 · bug · tabs)
+
+**Repro.** Welcome → New Screen (CTRL49); click the tab's × (or right-click → Close / Close Others, or middle-click).
+**Observed.** The tab stays. Ctrl+W does close it — without the unsaved-changes prompt every other document gets — and a
+screen document has no save path at all (the editor shows its assignment JSON read-only), so its "modified" dot can
+never clear.
+**Where.** `CE/web/src/CE_Application/editor/TabBar.svelte:288-307` (no `screen` branch; the `else` calls
+`closePanel(id)`, a no-op for a `ctrl_screen_…` id); `stores/screenBuilder.js:102-105` (no confirm on Ctrl+W).
+**Evidence level.** observed-in-test (store test) + read-in-code.
+
 ## Verification of the other's findings
