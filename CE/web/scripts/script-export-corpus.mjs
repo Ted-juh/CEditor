@@ -152,10 +152,32 @@ export const JAVA_READ_CASES = [
   'String t = (String) ctx.get("t");', 'if (ctx.get("a") == null) { ctx.log("none"); }', 'ctx.sendCC(1, 2, ctx.get("a"));',
   'ArrayList<Double> list = new ArrayList<>(); list.add(1.5); double y = list.get(0) * 2;',
   'boolean b = (boolean) ctx.get("on");', 'String s = String.valueOf(ctx.get("a"));', 'System.out.println(ctx.get("a"));',
+  // the typed reads, which are what the preview's reports point to
+  'double x = ctx.getDouble("a");', 'int n = ctx.getInt("a");', 'String s = ctx.getString("t");',
+  'boolean b = ctx.getBoolean("on");', 'double y = ctx.getDouble("a") * 2;', 'if (ctx.getBoolean("on")) { ctx.log("x"); }',
+  'long l = (long) ctx.getDouble("a");', 'double y = Math.sqrt(ctx.getDouble("a", "value"));',
 ];
 
-/** What the recording host answers for a get(). Anything else reads as null. */
-export const CORE_GET = { path: 'cutoff.value', value: 42.5 };
+/** What the recording host answers for a get(): one value of each kind a read has to convert — a
+ *  number, text, flags, zero, NaN, -0 and numbers past the int range. Any other path reads as null. */
+export const CORE_VALUES = {
+  'cutoff.value': 42.5,
+  'label.text': 'Hello \u2014 world',
+  'led.on': true,
+  'led.off': false,
+  'zero.value': 0,
+  'step.value': -3.7,
+  'neg0.value': -0,
+  'nan.value': NaN,
+  'big.value': 1e12,
+  'negbig.value': -1e12,
+};
+
+// Java's typed reads, each asked for every value above and for a path that has none.
+const typedReads = () => ['getDouble', 'getInt', 'getString', 'getBoolean']
+  .flatMap((fn) => [...Object.keys(CORE_VALUES), 'missing.value']
+    .map((path) => `  ctx.set("read.${fn}.${path}", ctx.${fn}("${path}"));`))
+  .join('\n');
 
 const pascal = (name) => name.charAt(0).toUpperCase() + name.slice(1);
 // C# asks half the questions in each spelling, so both are compiled and both are run.
@@ -172,8 +194,8 @@ export const CORE_SOURCES = {
   ctx.set("c.text", "hello");
   ctx.set("e.value", 3);
   std::string path = "d.value";
-  ctx.set(path, ctx.get("${CORE_GET.path}"));
-  ctx.setValue(path, ctx.getValue("${CORE_GET.path}", "value"));
+  ctx.set(path, ctx.get("cutoff.value"));
+  ctx.setValue(path, ctx.getValue("cutoff.value", "value"));
   ctx.log("plain");
   ctx.log("with a number", 42.5);
   ctx.log("with text", "abc");
@@ -211,9 +233,9 @@ ${helperCalls((i) => (i % 2 ? 'set' : 'setValue'), (fn) => fn)}
   ctx.set("c.text", "hello");
   ctx.SetValue("e.value", 3);
   string path = "d.value";
-  ctx.set(path, ctx.get("${CORE_GET.path}"));
-  ctx.SetValue(path, ctx.GetValue("${CORE_GET.path}", "value"));
-  double cutoff = ctx.getValue("${CORE_GET.path}");
+  ctx.set(path, ctx.get("cutoff.value"));
+  ctx.SetValue(path, ctx.GetValue("cutoff.value", "value"));
+  double cutoff = ctx.getValue("cutoff.value");
   ctx.setValue("f.value", cutoff + 1);
   ctx.Log("plain");
   ctx.log("with a number", 42.5);
@@ -249,9 +271,9 @@ ${helperCalls((i) => (i % 2 ? 'set' : 'SetValue'), (fn, i) => (i % 2 ? fn : pasc
   ctx.set("c.text", "hello");
   ctx.set("e.value", 3);
   String path = "d.value";
-  ctx.set(path, ctx.get("${CORE_GET.path}"));
-  ctx.setValue(path, ctx.getValue("${CORE_GET.path}", "value"));
-  double cutoff = (double) ctx.get("${CORE_GET.path}");
+  ctx.set(path, ctx.get("cutoff.value"));
+  ctx.setValue(path, ctx.getValue("cutoff.value", "value"));
+  double cutoff = (double) ctx.get("cutoff.value");
   ctx.set("f.value", cutoff + 1);
   ctx.log("plain");
   ctx.log("with a number", 42.5);
@@ -274,6 +296,12 @@ ${helperCalls((i) => (i % 2 ? 'set' : 'SetValue'), (fn, i) => (i % 2 ? fn : pasc
   ctx.sendNRPN(2, 1, 10, false);
   ctx.emit("toggled", true);
   ctx.emit("level", 0.75);
+${typedReads()}
+  int step = ctx.getInt("step.value");
+  double level = ctx.getDouble("cutoff.value", "value");
+  ctx.set("read.sum", step + level);
+  ctx.set("read.text", "label: " + ctx.getString("label.text"));
+  if (ctx.getBoolean("led.on")) ctx.log("lit");
 ${helperCalls((i) => (i % 2 ? 'set' : 'setValue'), (fn) => fn)}
 }
 `,

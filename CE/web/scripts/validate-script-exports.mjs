@@ -32,7 +32,7 @@ import { compileCsharp, invokeCsharp } from '../src/CE_Application/scripting/csh
 import { compileJava, invokeJava } from '../src/CE_Application/scripting/javaPreview.js';
 import { RUNNABLE_LANGUAGES } from '../src/CE_Application/scripting/panelApi.js';
 import { ensureTs, transpileTs } from '../src/CE_Application/scripting/tsService.js';
-import { CORE_GET, CORE_SOURCES, EXPECTED, JAVA_READ_CASES, SOURCES, checkEffects, createRecordingApi } from './script-export-corpus.mjs';
+import { CORE_SOURCES, CORE_VALUES, EXPECTED, JAVA_READ_CASES, SOURCES, checkEffects, createRecordingApi } from './script-export-corpus.mjs';
 
 // The compiled handlers are compared with the preview's own ctx and event, so this needs
 // panelRuntime, which imports its wasm through Vite's `?url` suffix. Plain Node cannot resolve that;
@@ -351,6 +351,20 @@ function parseRecords(stdout) {
   return runs;
 }
 
+// CORE_VALUES as source text in each harness's language: every value exact, NaN and -0 included.
+const coreValueEntries = Object.entries(CORE_VALUES);
+function numberLiteral(lang, v) {
+  if (Number.isNaN(v)) return { cpp: 'std::numeric_limits<double>::quiet_NaN()', csharp: 'double.NaN', java: 'Double.NaN' }[lang];
+  if (Object.is(v, -0)) return '-0.0';
+  const text = String(v);
+  return /[.e]/.test(text) ? text : `${text}.0`;
+}
+// A C string: printable ASCII as it is, every other byte as an octal escape (which, unlike \x, cannot
+// run on into the characters after it). C# and Java take \u escapes for anything past ASCII.
+const cString = (text) => `"${[...Buffer.from(text, 'utf8')].map((b) => (b >= 0x20 && b < 0x7f && b !== 0x22 && b !== 0x5c
+  ? String.fromCharCode(b) : `\\${b.toString(8).padStart(3, '0')}`)).join('')}"`;
+const unicodeString = (text) => JSON.stringify(text).replace(/[\u007f-\uffff]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+
 /** The same source through the preview, with the preview's own ctx and event over a recording API. */
 function previewRecords(language, source) {
   const base = scriptApiForTesting('', `export-${language}`);
@@ -359,7 +373,7 @@ function previewRecords(language, source) {
   const api = {
     ...base,
     set: (p, v) => { records.push(['set', p, v]); },
-    get: (p) => (p === CORE_GET.path ? CORE_GET.value : null),
+    get: (p) => (Object.prototype.hasOwnProperty.call(CORE_VALUES, p) ? CORE_VALUES[p] : null),
     log: (...args) => { records.push(['log', ...args]); },
     sendCC: (ch, cc, v) => { records.push(['cc', ch, cc, v]); },
     sendNRPN: (ch, msb, lsb, v) => { records.push(['nrpn', ch, msb, lsb, v]); },
@@ -414,6 +428,7 @@ function cppRecordingHost() {
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <string>
 
 static const char* kHex = "0123456789abcdef";
@@ -458,7 +473,11 @@ static void out(const std::string& call) { std::fputs(("R " + call + "\\n").c_st
 static int  CE_CALL h_set(void*, const CeStr* k, const CeValue* v, const CeValue*) { out("[\\"set\\"," + str(k) + "," + enc(v) + "]"); return 0; }
 static int  CE_CALL h_get(void*, const CeStr* k, const CeStr*, CeValue* o) {
   o->tag = CE_NULL;
-  if (k && std::string(k->ptr, (size_t) k->len) == ${JSON.stringify(CORE_GET.path)}) { o->tag = CE_DOUBLE; o->u.d = ${CORE_GET.value}; }
+  const std::string key = k ? std::string(k->ptr, (size_t) k->len) : std::string();
+${coreValueEntries.map(([path, v]) => `  if (key == ${cString(path)}) { ${
+    typeof v === 'string' ? `static const char s[] = ${cString(v)}; o->tag = CE_STRING; o->u.s = CeStr { s, (int64_t) (sizeof s - 1) };`
+    : typeof v === 'boolean' ? `o->tag = CE_BOOL; o->u.b = ${v ? 1 : 0};`
+    : `o->tag = CE_DOUBLE; o->u.d = ${numberLiteral('cpp', v)};`} }`).join('\n')}
   return 0;
 }
 static void CE_CALL h_cc(void*, int32_t ch, int32_t cc, const CeValue* v) { out("[\\"cc\\"," + std::to_string(ch) + "," + std::to_string(cc) + "," + enc(v) + "]"); }
@@ -579,7 +598,11 @@ namespace Ce
         static int Get(IntPtr c, CeStr* k, CeStr* f, CeValue* o)
         {
             o->tag = (int)CeTag.Null;
-            if (Utf8.Decode(*k) == ${JSON.stringify(CORE_GET.path)}) { o->tag = (int)CeTag.Double; o->d = ${CORE_GET.value}; }
+            string key = Utf8.Decode(*k);
+${coreValueEntries.map(([path, v]) => `            if (key == ${unicodeString(path)}) { ${
+    typeof v === 'string' ? `string s = ${unicodeString(v)}; o->tag = (int)CeTag.String; o->s = new CeStr { ptr = Marshal.StringToCoTaskMemUTF8(s), len = Encoding.UTF8.GetByteCount(s) };`
+    : typeof v === 'boolean' ? `o->tag = (int)CeTag.Bool; o->b = ${v ? 1 : 0};`
+    : `o->tag = (int)CeTag.Double; o->d = ${numberLiteral('csharp', v)};`} }`).join('\n')}
             return 0;
         }
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
@@ -704,9 +727,18 @@ public final class ExportHarness implements CeHostCalls {
     public void   setD(long h, String key, double v)        { out("[\\"set\\"," + text(key) + "," + dbl(v) + "]"); }
     public void   setS(long h, String key, String v)        { out("[\\"set\\"," + text(key) + "," + text(v) + "]"); }
     public void   setB(long h, String key, boolean v)       { out("[\\"set\\"," + text(key) + "," + v + "]"); }
-    public int    getKind(long h, String key, String form)  { return ${JSON.stringify(CORE_GET.path)}.equals(key) ? CeRuntime.CE_DOUBLE : CeRuntime.CE_NULL; }
-    public double getD(long h, String key, String form)     { return ${JSON.stringify(CORE_GET.path)}.equals(key) ? ${CORE_GET.value} : 0; }
-    public String getS(long h, String key, String form)     { return ""; }
+    public int    getKind(long h, String key, String form)  {
+${coreValueEntries.map(([path, v]) => `        if (${unicodeString(path)}.equals(key)) return CeRuntime.${typeof v === 'string' ? 'CE_STRING' : typeof v === 'boolean' ? 'CE_BOOL' : 'CE_DOUBLE'};`).join('\n')}
+        return CeRuntime.CE_NULL;
+    }
+    public double getD(long h, String key, String form)     {
+${coreValueEntries.filter(([, v]) => typeof v !== 'string').map(([path, v]) => `        if (${unicodeString(path)}.equals(key)) return ${typeof v === 'boolean' ? (v ? '1' : '0') : numberLiteral('java', v)};`).join('\n')}
+        return 0;
+    }
+    public String getS(long h, String key, String form)     {
+${coreValueEntries.filter(([, v]) => typeof v === 'string').map(([path, v]) => `        if (${unicodeString(path)}.equals(key)) return ${unicodeString(v)};`).join('\n')}
+        return "";
+    }
     public void   ccD(long h, int ch, int cc, double v)     { out("[\\"cc\\"," + ch + "," + cc + "," + dbl(v) + "]"); }
     public void   ccS(long h, int ch, int cc, String v)     { out("[\\"cc\\"," + ch + "," + cc + "," + text(v) + "]"); }
     public void   ccV(long h, int ch, int cc, int k, double d, String s) { out("[\\"cc\\"," + ch + "," + cc + "," + kind(k, d, s) + "]"); }

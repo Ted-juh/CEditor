@@ -229,10 +229,14 @@ reads the event as \`e.Value\` and \`e.FirstTime\`, and may name the handler \`O
 Everything else the preview's \`ctx\` offers previews and does **not** compile at export, so keep
 a handler you mean to ship to this core, or write it in Lua or JavaScript. Two more things:
 
-- A Java \`get\` returns an \`Object\`, since the value may be a number, text or a flag. Read a
-  number as \`(double) ctx.get("cutoff.value")\` and an int as \`(int) (double) ctx.get(...)\`: a
-  number comes back as a \`Double\`, and \`(int)\` on its own compiles and then throws. The
-  preview reports a read that javac would reject, with the cast to write, and does not run it.
+- A Java \`get\` returns an \`Object\`, since the value may be a number, text or a flag. To read
+  at a type use \`ctx.getDouble\`, \`ctx.getInt\`, \`ctx.getString\` or \`ctx.getBoolean\` (each
+  also takes a form), which behave the same in the preview and the export and never throw:
+  \`getDouble\` gives a number as it is, a flag as 1 or 0 and anything else as 0; \`getInt\` is
+  that with the fraction dropped, as Java's \`(int)\` does; \`getString\` gives text, or \`""\`
+  for anything else; \`getBoolean\` gives a flag, or whether a number is non-zero. A cast such as
+  \`(int) ctx.get(...)\` compiles and then throws, since a number comes back as a \`Double\`. The
+  preview reports a read javac would reject, with the typed read to write, and does not run it.
 - Only the handler for the script's own event is compiled, and \`setup\` is not called, so
   \`on(...)\` listeners registered there run in the preview only.
 

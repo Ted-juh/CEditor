@@ -7507,6 +7507,7 @@ function runSetupEntryPoint(script, handlers, ctx, invoke, print, label) {
  */
 export function previewContextFor(language, api) {
   const ctx = { ...api, setValue: api.set, getValue: api.get };
+  if (language === 'java') return { ...ctx, ...javaTypedReads(api) };
   if (language !== 'csharp') return ctx;
   // C# in both spellings: the API's own lower-case names and C#'s PascalCase ones.
   return {
@@ -7514,6 +7515,36 @@ export function previewContextFor(language, api) {
     SetValue: api.set, GetValue: api.get, Log: api.log,
     SendCC: api.sendCC, SendNRPN: api.sendNRPN, SendSysex: api.sendSysex,
     Clamp: api.clamp, Scale: api.scale, Round: api.round, Snap: api.snap, Lerp: api.lerp, Curve: api.curve,
+  };
+}
+
+/**
+ * Java's typed reads, getDouble/getInt/getString/getBoolean. In an exported Java handler ctx.get
+ * returns Object (CeRuntime.java), which a Java variable cannot take without a cast, and a cast throws
+ * when the value is not the type cast to. These read at the type wanted and never throw. They convert
+ * as the native runtimes' Var already does (asDouble/asBool/asString in ce_runtime.h and
+ * CeRuntime.cs): a number as itself, a bool as 1 or 0, anything else as 0; text as itself, anything
+ * else as ""; a bool as itself, anything else as whether its number is non-zero. getInt is Java's
+ * (int) of getDouble — toward zero, NaN as 0, held to the int range. CeRuntime.java has the same
+ * four, and validate-script-exports compares the two on every kind of value.
+ */
+const javaDouble = (v) => (typeof v === 'number' ? v : typeof v === 'boolean' ? (v ? 1 : 0) : 0);
+function javaInt(v) {
+  const d = javaDouble(v);
+  if (Number.isNaN(d)) return 0;
+  if (d >= 2147483647) return 2147483647;
+  if (d <= -2147483648) return -2147483648;
+  return Math.trunc(d) + 0; // + 0 because a Java int has no -0
+}
+function javaTypedReads(api) {
+  // Without a form, ask without one: the export passes "value", which the host reads as no form at
+  // all, so the two agree even on a path ending in .normalizedValue.
+  const read = (path, form) => (form === undefined ? api.get(path) : api.get(path, form));
+  return {
+    getDouble: (path, form) => javaDouble(read(path, form)),
+    getInt: (path, form) => javaInt(read(path, form)),
+    getString: (path, form) => { const v = read(path, form); return typeof v === 'string' ? v : ''; },
+    getBoolean: (path, form) => { const v = read(path, form); return typeof v === 'boolean' ? v : javaDouble(v) !== 0; },
   };
 }
 

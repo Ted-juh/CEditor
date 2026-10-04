@@ -601,8 +601,9 @@ function runBody(body, params, program, thisObj, args) {
 // ran `double x = ctx.get("cutoff.value")`, which javac rejects: the handler previewed, then failed
 // the export. These are the uses of a ctx read that javac certainly rejects, and the narrowing casts
 // that compile and certainly throw when they run (a Double cast to int is a ClassCastException) —
-// each reported with the cast that works in both. Nothing else is flagged: a read concatenated to a
-// string, stored as Object or var, compared with ==, or passed where Object is taken is fine Java.
+// each reported with the typed read that works in both (getDouble, getInt, getString, getBoolean;
+// see javaTypedReads in panelRuntime.js). Nothing else is flagged: a read concatenated to a string,
+// stored as Object or var, compared with ==, or passed where Object is taken is fine Java.
 const NARROWING = new Set(['int', 'long', 'short', 'byte', 'char', 'float']);
 const BOXED_NARROWING = { Integer: 'int', Long: 'long', Short: 'short', Byte: 'byte', Character: 'char', Float: 'float' };
 const NON_OBJECT_OPS = new Set(['-', '*', '/', '%', '<', '<=', '>', '>=', '&', '|', '^', '&&', '||', '<<', '>>', '>>>']);
@@ -616,12 +617,15 @@ function contextParamNames(paramToks) {
   return names;
 }
 
-function castFor(typeName) {
-  if (typeName === 'double' || typeName === 'Double' || typeName === 'Number') return '(double) ';
+// What to write instead of `<ctx>.get(…)` where a value of `typeName` is wanted.
+function typedRead(ctxName, typeName) {
+  if (typeName === 'double' || typeName === 'Double' || typeName === 'Number') return `${ctxName}.getDouble(…)`;
+  if (typeName === 'int' || typeName === 'Integer') return `${ctxName}.getInt(…)`;
+  if (typeName === 'String') return `${ctxName}.getString(…)`;
+  if (typeName === 'boolean' || typeName === 'Boolean') return `${ctxName}.getBoolean(…)`;
   const narrow = NARROWING.has(typeName) ? typeName : BOXED_NARROWING[typeName];
-  if (narrow) return `(${narrow}) (double) `;
-  if (typeName === 'boolean' || typeName === 'Boolean') return '(boolean) ';
-  return `(${typeName}) `;
+  if (narrow) return `(${narrow}) ${ctxName}.getDouble(…)`;
+  return `(${typeName}) ${ctxName}.get(…)`;
 }
 
 export function contextReadErrors(fn) {
@@ -633,7 +637,7 @@ export function contextReadErrors(fn) {
   const isNumberLiteral = (n) => n?.type === 'num' && typeof n.value === 'number';
   const named = (n) => `${n.callee.obj.name}.${n.callee.name}(…)`;
   const report = (n, message) => errors.push(`${message} (line ${n.callee.line ?? fn.line ?? 1})`);
-  const asNumber = (n) => report(n, `${named(n)} is an Object in Java, so javac rejects it here: write (double) ${named(n)} to use it as a number`);
+  const asNumber = (n) => report(n, `${named(n)} is an Object in Java, so javac rejects it here: write ${n.callee.obj.name}.getDouble(…) to use it as a number`);
   const visit = (node) => {
     if (Array.isArray(node)) { for (const x of node) visit(x); return; }
     if (!node || typeof node !== 'object') return;
@@ -642,7 +646,7 @@ export function contextReadErrors(fn) {
         for (const d of node.decls) {
           if (isRead(d.init) && d.typeName && d.typeName !== 'Object' && d.typeName !== 'var') {
             report(d.init, `${d.typeName} ${d.name} = ${named(d.init)}: it is an Object in Java, so javac rejects this. `
-              + `Write ${d.typeName} ${d.name} = ${castFor(d.typeName)}${named(d.init)}`);
+              + `Write ${d.typeName} ${d.name} = ${typedRead(d.init.callee.obj.name, d.typeName)}`);
           }
         }
         break;
@@ -657,10 +661,10 @@ export function contextReadErrors(fn) {
       case 'unary': if (isRead(node.arg)) asNumber(node.arg); break;
       case 'assign': if (['-=', '*=', '/=', '%='].includes(node.op) && isRead(node.value)) asNumber(node.value); break;
       case 'if': case 'while': case 'doWhile': case 'for':
-        if (isRead(node.cond)) report(node.cond, `a condition must be a boolean, and ${named(node.cond)} is an Object in Java: write (boolean) ${named(node.cond)}`);
+        if (isRead(node.cond)) report(node.cond, `a condition must be a boolean, and ${named(node.cond)} is an Object in Java: write ${node.cond.callee.obj.name}.getBoolean(…)`);
         break;
       case 'cond':
-        if (isRead(node.c)) report(node.c, `a condition must be a boolean, and ${named(node.c)} is an Object in Java: write (boolean) ${named(node.c)}`);
+        if (isRead(node.c)) report(node.c, `a condition must be a boolean, and ${named(node.c)} is an Object in Java: write ${node.c.callee.obj.name}.getBoolean(…)`);
         break;
       case 'call': {
         const callee = node.callee;
@@ -669,7 +673,7 @@ export function contextReadErrors(fn) {
         if (takesNumbers) {
           node.args.forEach((x, i) => {
             if (!isRead(x)) return;
-            if (callee.name === 'curve' && i === 1) report(x, `curve takes the shape as a String, and ${named(x)} is an Object in Java: write (String) ${named(x)}`);
+            if (callee.name === 'curve' && i === 1) report(x, `curve takes the shape as a String, and ${named(x)} is an Object in Java: write ${x.callee.obj.name}.getString(…)`);
             else asNumber(x);
           });
         }
@@ -678,7 +682,7 @@ export function contextReadErrors(fn) {
       case 'cast':
         if (NARROWING.has(node.t) && isRead(node.arg)) {
           report(node.arg, `(${node.t}) ${named(node.arg)} compiles, and throws when it runs in the exported plugin: a number `
-            + `comes back as a Double, which cannot be cast to ${node.t}. Write (${node.t}) (double) ${named(node.arg)}`);
+            + `comes back as a Double, which cannot be cast to ${node.t}. Write ${typedRead(node.arg.callee.obj.name, node.t)}`);
         }
         break;
       default: break;

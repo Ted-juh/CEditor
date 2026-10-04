@@ -269,7 +269,11 @@ the Lua/JS/Python preludes). Mitigations:
   (`CeHost.c`, `ce_java_shim.c`) and the host trampolines are run by `verify-all.mjs`, whose samples
   now include the two appended slots. A further pass, `java-reads`, compiles a table of Java `ctx.get`
   uses with javac and checks that the Java preview flags exactly the ones javac rejects or that throw
-  (`get` returns `Object` in Java, which the untyped preview used to accept anywhere).
+  (`get` returns `Object` in Java, which the untyped preview used to accept anywhere). Java reads at a
+  type through `getDouble`/`getInt`/`getString`/`getBoolean`, present in the preview's Java `ctx` and in
+  `CeRuntime.java` alike, converting as `ce::Var` does; the core sample asks each of them for every kind
+  of value the recording host holds (a number, text, flags, zero, NaN, -0, numbers past the int range,
+  and nothing).
 
   What it does not cover is the rest of the preview's `ctx`: the preview hands a compiled-language
   handler the whole panel API, and the export only the core. A member past the core previews and

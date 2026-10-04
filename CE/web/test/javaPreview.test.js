@@ -199,7 +199,7 @@ test('a ctx read javac would reject is reported, with the cast to write, and doe
   const { handlers, diagnostics } = compileJava(src);
   assert.equal(handlers.has('onValueChanged'), false);
   assert.equal(diagnostics.length, 1);
-  assert.match(diagnostics[0], /double cutoff = ctx\.get\(…\): it is an Object in Java, so javac rejects this\. Write double cutoff = \(double\) ctx\.get\(…\) \(line 3\)/);
+  assert.match(diagnostics[0], /double cutoff = ctx\.get\(…\): it is an Object in Java, so javac rejects this\. Write double cutoff = ctx\.getDouble\(…\) \(line 3\)/);
 
   const { diagnostics: shown } = analyzeJava(src);
   assert.equal(shown[0].line, 3);
@@ -207,11 +207,12 @@ test('a ctx read javac would reject is reported, with the cast to write, and doe
 
 test('each kind of rejected read gets the advice that fits it', () => {
   const advice = (body) => compileJava(`void onValueChanged(CeContext ctx, CeEvent e) {\n  ${body}\n}`).diagnostics.join(' ');
-  assert.match(advice('int n = ctx.get("step.value");'), /Write int n = \(int\) \(double\) ctx\.get/);
-  assert.match(advice('String s = ctx.get("label.text");'), /Write String s = \(String\) ctx\.get/);
-  assert.match(advice('double y = ctx.get("a") * 2;'), /write \(double\) ctx\.get\(…\) to use it as a number/);
-  assert.match(advice('if (ctx.get("led.on")) { }'), /a condition must be a boolean.*\(boolean\) ctx\.get/);
-  assert.match(advice('int n = (int) ctx.get("a");'), /compiles, and throws when it runs.*Write \(int\) \(double\) ctx\.get/);
+  assert.match(advice('int n = ctx.get("step.value");'), /Write int n = ctx\.getInt\(…\)/);
+  assert.match(advice('long n = ctx.get("step.value");'), /Write long n = \(long\) ctx\.getDouble\(…\)/);
+  assert.match(advice('String s = ctx.get("label.text");'), /Write String s = ctx\.getString\(…\)/);
+  assert.match(advice('double y = ctx.get("a") * 2;'), /write ctx\.getDouble\(…\) to use it as a number/);
+  assert.match(advice('if (ctx.get("led.on")) { }'), /a condition must be a boolean.*write ctx\.getBoolean\(…\)/);
+  assert.match(advice('int n = (int) ctx.get("a");'), /compiles, and throws when it runs.*Write ctx\.getInt\(…\)/);
 });
 
 test('valid Java reads are left alone', () => {
@@ -219,6 +220,7 @@ test('valid Java reads are left alone', () => {
     'double x = (double) ctx.get("a");', 'Object o = ctx.get("a");', 'var v = ctx.get("a");',
     'String s = "v=" + ctx.get("a");', 'ctx.set("b", ctx.get("a"));', 'int n = (int) (double) ctx.get("a");',
     'if (ctx.get("a") == null) { }', 'ctx.log("v", ctx.get("a"));', 'System.out.println(ctx.get("a"));',
+    'double y = ctx.getDouble("a") * 2;', 'int n = ctx.getInt("a");', 'if (ctx.getBoolean("on")) { }',
   ]) {
     const { handlers, diagnostics } = compileJava(`void onValueChanged(CeContext ctx, CeEvent e) {\n  ${body}\n}`);
     assert.deepEqual(diagnostics, [], body);

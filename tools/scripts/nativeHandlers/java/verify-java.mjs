@@ -24,7 +24,7 @@ const SCRIPTS = [
   { id: 'knob1', name: 'Cutoff', event: 'onValueChanged', source: 'void onValueChanged(CeContext ctx, CeEvent e){ ctx.sendCC(1, 26, 127); ctx.setValue("out", e.value*2+1); ctx.log("ran"); }' },
   // The calls whose value goes through the slots appended after ABI 1 (log_value, send_sysex_value),
   // so the shim's marshalling of them is run, not only the Java above it. harness.c checks each.
-  { id: 'knob2', name: 'Values', event: 'onValueChanged', source: 'void onValueChanged(CeContext ctx, CeEvent e){ ctx.log("v", 1.5); ctx.sendSysex(new int[] { 0xF0, 0x7F, 0xF7 }); ctx.sendSysex("F0 7E F7"); ctx.sendNRPN(1, 2, 3, 400); ctx.sendCC(1, 64, true); }' },
+  { id: 'knob2', name: 'Values', event: 'onValueChanged', source: 'void onValueChanged(CeContext ctx, CeEvent e){ ctx.log("v", 1.5); ctx.sendSysex(new int[] { 0xF0, 0x7F, 0xF7 }); ctx.sendSysex("F0 7E F7"); ctx.sendNRPN(1, 2, 3, 400); ctx.sendCC(1, 64, true); ctx.setValue("typed", ctx.getDouble("cutoff.value") + ctx.getInt("cutoff.value")); }' },
 ];
 
 function which(c) { try { execSync(`command -v ${c}`, { stdio: 'ignore' }); return true; } catch { return false; } }
