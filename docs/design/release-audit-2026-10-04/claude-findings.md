@@ -967,4 +967,102 @@ serialise/deserialise (the schema correctly refuses a non-string `Core.name` / n
 extreme writes × undo → redo → undo: 0 real failures. All 58 types with extreme values through save → reload →
 reopen: 0 losses. 10 of 225,797 writes took over 400 ms (worst 622 ms, apart from the 1e9 counts).
 
+### C-96 — Python: a script that saves a dict setting leaves the panel impossible to save, even after the script is removed   (S1 · data loss · Python preview)
+
+**Repro.** Panel Python script `def onPanelLoad(_=None): saveSetting("lastPatch", {"name": "Bass", "cutoff": 64})`;
+Preview on, off; delete the script; Ctrl+S.
+**Observed.** No save event is emitted; two page errors "This borrowed proxy was automatically destroyed at the end of a
+function call"; `serializePanel` throws, so the recovery snapshot fails the same way; a later `loadSetting` throws. The
+user is told nothing and cannot save the panel's edits. The same call in JavaScript saves fine.
+**Where.** `scripting/panelRuntime.js:7448-7453` — `py.toPy(api)` hands Python dicts to the API as borrowed PyProxies
+(Claude confirmed: no `create_proxy`/`toJs` anywhere in the file), and `saveSetting` (~`:6497`) stores the proxy in the
+panel document. **The same root cause produces C-97, C-98, C-99 and extends C-59** — one conversion fix at the
+boundary closes all of them.
+**Evidence level.** observed-in-app (browser, twice).
+
+### C-97 — Python: every callback handed to the API is dead by the time it should run   (S2 · bug · Python preview)
+
+`on(…, fn)`, `after`, `watch`, `compute`, `intercept`, `defineAction` + `run`, `uiDialog`, `interceptMidiOut`: JS, TS and
+Lua each produce the same 11 callback lines (intercept clamps to 0.3, `run` returns 7, the dialog appears); Python
+produces 10× "borrowed proxy … destroyed", `run` returns null, and the dialog never appears (its callback fires at once
+with no choice). Same root cause as C-96. Observed-in-app.
+
+### C-98 — Python: `ce.*` does not exist — every namespaced call raises AttributeError in Preview, and works in the plug-in   (S2 · bug · preview ≠ export)
+
+All 15 tested members (`ce.panel.create`, `ce.midi.sendCC`, `ce.ui.notify`, `ce.components.arp.pattern` …):
+`AttributeError: 'dict' object has no attribute 'panel'`. JS and Lua work. The manual teaches `ce.*` throughout; the
+native engine builds `ce` as a `SimpleNamespace` (`PythonScriptEngine.cpp:2960-2984`). `py.toPy(api)` deep-converts
+`api.ce` to a dict. Observed-in-app.
+
+### C-99 — Python: options objects arrive empty — names, queries and specs are silently ignored   (S2 · bug · Python preview)
+
+| Call | JavaScript | Python |
+| --- | --- | --- |
+| `panelCreate("Knob",{name:"osc1",…})` | `"osc1"` | `"Knob_1791155993776"` |
+| `panelFind({type:"Knob"})` | `["cutoff"]` | `[]` |
+| `textStyle("status",{size:18})` | `true` | `false` |
+| `deviceDefineParameter("pX",{…cc:20})` | `true` | `false` |
+| `encodeJson({a:[1,2],b:"x"})` | `{"a":[1,2],"b":"x"}` | `"{}"` |
+| `uiDialog` / `uiPrompt` / `uiChoose` | `true` | `false` |
+
+Same root cause as C-96. C-59's empty lists reach much further than recorded: minOf/maxOf/mean/median/randomChoice → nil,
+sumOf → 0, mapCurve and quantizeTo wrong, shuffle/voiceLead/arpOrder → `[]`, tapTempo → nil, every panelAlign/Grid/…
+→ 0, drawLines/Points/Curve do nothing, feedMidi "no bytes given". Observed-in-app (run twice).
+
+### C-100 — Lua preview: `pairs()` over anything the API returns crashes the handler — including the manual's own example   (S2 · bug · Lua preview)
+
+`for k, v in pairs(ce.storage.all()) do … end` (verbatim from the manual's `allSettings`) → `TypeError: Cannot read
+properties of null (reading 'then')`, handler stops; same for `pairs()` over `hexToRgb`, `panelTypes`, `ce.panel.info`,
+`transportInfo`, `decodeJson(…).a`. `ipairs` works; returned tables report `type(t) == "userdata"`. wasmoon 1.16.0
+(`node_modules/wasmoon/dist/index.js:981-988`): `__pairs` returns `MultiReturn.of(iter, self, null)` and the promise
+extension reads `null.then`; the runtime's `nilSafe` guard (`panelRuntime.js:7346-7375`) covers only top-level returns.
+Native Lua is fine. Observed-in-app (6 shapes).
+
+### C-101 — C#: the manual's headline example sends no MIDI — PascalCase calls are invisible to the AUTO module gating   (S2 · bug · C# preview)
+
+The manual's C# `OnValueChanged`: the `SetValue` calls work; `SendCC` is stubbed ("sendCC() needs the ce.midi module,
+which this panel has not enabled… Add "ce.midi" to the panel's Scripting Modules" — but the panel is on AUTO);
+`ctx.Round` likewise. The same example in Lua, JS, TS, Python, C++ and Java sends `B0 4A 40`. `panelApi.js`
+`modulesUsedBy` (~`:4218`): `modulesUsedBy('ctx.SendCC(1,74,64);')` → `[]`, `ctx.sendCC` → `["ce.midi"]`. Observed-in-app.
+
+### C-102 — onDraw never runs in Preview unless another script calls `ce.draw.redraw()`   (S3 · faulty · ce.draw)
+
+The manual's onDraw example alone: 0 draw commands. With a panel script calling `ce.draw.redraw("cutoff")` in
+onPanelReady: 1 command, onDraw runs with `{target, width:140, height:140}`. The manual: "Called on repaint".
+`panelRuntime.js:4665` — `runDrawPass` is called only from `drawRedrawImpl` (`:4705`). Observed-in-app.
+
+### C-103 — Lua errors point one line too far down and name the runtime's internal chunk   (S3 · bug · Lua errors)
+
+`error()` on line 3 → `[string "onPanelLoad=nil;onPanelBuild=nil;onError=nil;..."]:4: boom on line 3`; a syntax error on
+line 2 → `:3:`. Reaches `onError(info).message` too. `panelRuntime.js:7400` prepends a line and leaves the chunk
+unnamed. Observed-in-app.
+
+### C-104 — `ce.language` answers "javascript" in Lua, TypeScript and Python Preview   (S3 · bug · preview ≠ export)
+
+`panelRuntime.js:7136` hard-codes it (Claude confirmed); the native engines set "lua" and "python"
+(`LuaScriptEngine.cpp:2546`, `PythonScriptEngine.cpp:2977`); the manual: it "names the language it is written in".
+Observed-in-app.
+
+### C-105 — onDumpReceived carries no `dump.bytes`; the manual's `applyDump(dump.bytes)` passes nil   (S3 · faulty · docs/payload)
+
+Payload in all four languages, and in the native player (`PluginProcessor.h:1552`):
+`{"values":{"cutoff":30},"kind":"patch","role":"mainSynth"}`. The manual's Device events table promises `dump.bytes`.
+Observed-in-app.
+
+### C-106 — onPointerMove fires on plain hover; the manual says "while down", and the payload lacks `button`/`modifiers`   (S4 · faulty · events)
+
+`PanelPreviewSurface.svelte:7632-7639`. Observed-in-app in all four languages.
+
+### C-107 — The manual's JavaScript `loadSetting` example is a syntax error   (S4 · docs)
+
+`const v = loadSetting("key", default);` → "Unexpected token 'default'". Observed.
+
+**Scripting runtime that held up:** **761 API members × 4 languages = 3,044 cells, 0 page errors; JavaScript,
+TypeScript and Lua agree on every member** (all 58 real differences are Python). 36 documented events × 4 languages
+fired through the real UI — each fires the right number of times with the same payload shape in every language. All 9
+callback kinds identical in JS/TS/Lua. The manual's headline example is byte-identical in Lua, JS, TS, Python, C++ and
+Java (`B0 4A 40`). Script Editor edit → save → Preview takes effect without reopening, in all four. 362 runs of the
+manual's examples (failures above). Leads not reduced: Pyodide died twice mid-matrix ("memory access out of bounds",
+then every later Python script fails until reload) after ~13–28 interleaved loads — not reproduced in isolation.
+
 ## Verification of the other's findings
