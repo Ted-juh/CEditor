@@ -150,6 +150,8 @@ window.__anim = {
   addKeyframe: () => { [...document.querySelectorAll('.transport .mk')].find((b) => /Keyframe at/.test(b.textContent))?.click(); },
   selectTrack: (index) => { document.querySelectorAll('.trow')[index]?.click(); },
   keyframeBox: () => !!document.querySelector('.kfbox'),
+  selectedKeyframeText: () => textOf(document.querySelector('.transport .kfat')),
+  keyframeTimeCell: () => document.querySelector('.kfbox input')?.value ?? '',
   axisRect: () => {
     const r = document.querySelector('.kft .axis')?.getBoundingClientRect();
     return r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null;

@@ -253,6 +253,16 @@ onMount(() => {
   });
   let playing = $state(false);
   let stopPreview = null;
+  // The keyframe in the hand, while it is being dragged: { track, index, time }. The document is
+  // written once, on release, so this is what the readouts show until then.
+  let draggedKeyframe = $state(null);
+  // The selected keyframe's time, live. The transport's other number is the playhead's, and the
+  // "Keyframe at … ms" button says where a NEW one would go; neither says where this one is.
+  let selectedKeyframeTime = $derived(
+    draggedKeyframe && keyframeAt && draggedKeyframe.track === keyframeAt.track && draggedKeyframe.index === keyframeAt.index
+      ? draggedKeyframe.time
+      : (keyframeAt?.keyframe.time ?? null)
+  );
 
   function trackLabel(row) {
     const [, partName, ...rest] = row.path.startsWith('Parts.') ? row.path.split('.') : ['', '', row.path];
@@ -849,10 +859,15 @@ onMount(() => {
                   <button type="button" class="mk" class:on={playing} onclick={togglePlay} title={playing ? 'Stop' : 'Play on the canvas'} aria-label={playing ? 'Stop' : 'Play'}>
                     {#if playing}<Square size={10} />{:else}<Play size={10} />{/if}
                   </button>
-                  <span class="time" aria-live="off">{playhead} ms <s>of {axisLength}</s></span>
+                  <span class="time" aria-live="off" title="Where the playhead is">{playhead} ms <s>of {axisLength}</s></span>
                   <button type="button" class="mk" disabled={!targets.length} onclick={addKeyframeAtPlayhead} title="Add a keyframe to the selected track at the playhead">
                     <Plus size={10} /> Keyframe at {playhead} ms
                   </button>
+                  {#if selectedKeyframeTime !== null}
+                    <span class="kfat" class:moving={!!draggedKeyframe} aria-live="off" title="Where the selected keyframe is. It follows the keyframe while you drag it.">
+                      <i aria-hidden="true"></i> selected keyframe {selectedKeyframeTime} ms
+                    </span>
+                  {/if}
                 </div>
                 <KeyframeTimeline
                   {tracks}
@@ -861,13 +876,14 @@ onMount(() => {
                   selected={selectedKeyframe}
                   ontime={scrubTo}
                   onmove={moveKeyframes}
+                  ondrag={(at) => { draggedKeyframe = at; }}
                   onselect={(at) => { selectedKeyframe = at; if (at) rawTargetIndex = at.track; }}
                 />
                 {#if keyframeAt}
                   <div class="kfbox">
                     <div class="r">
                       <label for="kf-time">Time</label>
-                      <div class="cell"><NumberCell label="ms" value={keyframeAt.keyframe.time} min={0} step={10}
+                      <div class="cell"><NumberCell label="ms" value={selectedKeyframeTime ?? keyframeAt.keyframe.time} min={0} step={10}
                         onchange={(value) => patchSelectedKeyframe({ time: Math.max(0, Math.round(value)) })} /></div>
                     </div>
                     <div class="r">
@@ -1181,6 +1197,10 @@ onMount(() => {
   .transport { display: flex; align-items: center; gap: 8px; }
   .transport .time { font-size: 11px; color: #EAF5FF; font-variant-numeric: tabular-nums; }
   .transport .time s { text-decoration: none; color: #6E7A86; margin-left: 4px; }
+  /* The selected keyframe's own time: the red of a selected diamond, so it is read as that one. */
+  .transport .kfat { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #B9C4CE; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .transport .kfat i { width: 7px; height: 7px; background: #E5484D; transform: rotate(45deg); flex: 0 0 auto; }
+  .transport .kfat.moving { color: #EAF5FF; }
   .mk.on { border-color: #F5B83D; color: #F5B83D; }
   .mk.danger { align-self: flex-start; color: #E5A029; }
   .kfbox { border: 1px solid #2A3038; border-radius: 4px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; background: #15181B; }

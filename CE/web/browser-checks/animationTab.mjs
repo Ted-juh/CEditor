@@ -661,10 +661,23 @@ assert.equal(await playheadMs(), 0);
 await page.mouse.move(xAt(0), rowY);
 await page.mouse.down();
 await page.mouse.move(xAt(250), rowY, { steps: 5 });
+await page.waitForTimeout(300);
+// Still in the hand: nothing is written yet, and the readout already says where it is.
+const midDragText = await ev(() => window.__anim.selectedKeyframeText());
+const midDragStored = (await ev(() => window.__anim.storedKeyframes('seqDemo')))[0][0][0];
 await page.mouse.move(xAt(500), rowY, { steps: 5 });
 await page.mouse.up();
 await page.waitForTimeout(PAST_DOUBLE_CLICK);
+const afterDragText = await ev(() => window.__anim.selectedKeyframeText());
+check('the selected keyframe\'s time is shown, and follows it while it is dragged', () => {
+  const mid = parseInt(midDragText.replace(/\D+/, ''), 10);
+  assert.match(midDragText, /^selected keyframe \d+ ms$/, midDragText);
+  assert.ok(Math.abs(mid - 250) <= 10, `halfway through the drag it read ${midDragText}`);
+  assert.equal(midDragStored, 0, 'while the document still had it at 0');
+  assert.match(afterDragText, /^selected keyframe \d+ ms$/, afterDragText);
+});
 const draggedTrack = (await ev(() => window.__anim.storedKeyframes('seqDemo')))[0];
+assert.equal(parseInt(afterDragText.replace(/\D+/, ''), 10), draggedTrack[0][0], 'and on release it reads what was written');
 const afterDrag = await playheadMs();
 check('dragging a keyframe the playhead sits on moves the keyframe, and the playhead stays', () => {
   assert.equal(draggedTrack.length, 1, JSON.stringify(draggedTrack));

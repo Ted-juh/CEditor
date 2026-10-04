@@ -21,6 +21,7 @@
     ontime = () => {},
     onmove = () => {},    // [{ track, index, time }]
     onselect = () => {},  // { track, index } or null
+    ondrag = () => {},    // { track, index, time } while a keyframe is being dragged, null when it ends
   } = $props();
 
   let host = $state(null);
@@ -143,6 +144,13 @@
       ontime(Math.max(0, Math.round(event.val)));
     });
     timeline.onDragStarted(() => { dragging = true; });
+    // Where the keyframe is while it is still in the hand. Nothing is written until it is let go,
+    // so without this the only number on screen during a drag was the playhead's.
+    timeline.onDrag((event) => {
+      const keyframe = event.target?.keyframe ?? event.elements?.[0]?.keyframe;
+      const at = keyframe ? where.get(keyframe) : null;
+      if (at) ondrag({ ...at, time: Math.max(0, Math.round(keyframe.val)) });
+    });
     timeline.onDragFinished((event) => {
       dragging = false;
       const moves = [];
@@ -151,6 +159,7 @@
         if (at) moves.push({ ...at, time: Math.max(0, Math.round(element.keyframe.val)) });
       }
       if (moves.length) onmove(moves);
+      ondrag(null);
       if (modelStale) applyModel();
     });
     // A press on the ruler moves time; it is not a request to drop the selection, so the empty
