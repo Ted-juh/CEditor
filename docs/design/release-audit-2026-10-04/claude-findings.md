@@ -123,7 +123,11 @@ panel API — no filesystem/network/OS". Shared panels are the release's adverti
 scope; also `:7173-7177` for installed modules). Sinks: `CE/src/ValueTreeBridgeHandlers.cpp:556-581` (savePanel),
 `:990-1072` (requestFileData). No trust prompt and no script stripping on `panelSharingActions.js` `openPackageText`.
 Python (Pyodide's `import js`) very likely has the same reach — not demonstrated.
-**Evidence level.** observed-in-test, **found independently by two reviewers**: one through the real stores and package
+**Evidence level.** **observed-in-app** (Linux build of f37550c): a copy of `CE/qa/QA-04-scripting.cepanel` with one
+panel-scope JS script calling `emitEvent('savePanel', { filePath: '<scratch>/SANDBOX-ESCAPE.txt', … })`; File → Open
+Panel → the canvas shows the panel and nothing runs; press **Preview** → `SANDBOX-ESCAPE.txt` appears on disk
+("written by a panel script at 2026-10-04T19:06:38.874Z"). No prompt at any point. Also observed-in-test,
+**found independently by two reviewers**: one through the real stores and package
 open path, one through the real `runScript` — `requestFileData {"filePath":"/home/user/.ssh/id_rsa"}` and a `savePanel`
 into `…/Start Menu/Programs/Startup/run.cmd` both reached the stand-in bridge, and the script saw `window`, `fetch` and
 `__JUCE__` (so what it reads can also be sent away). The native engines keep the sandbox; the WebView runtime does not.
@@ -139,8 +143,11 @@ writes the variant's content over `master.cepanel`.
 **Where.** `CE/web/src/CE_Application/stores/history.js:319` — `snapshotOf` excludes only
 `id, modified, bgImage, bgTexture, viewer`, so `filePath` and `name` are captured; `history.js:572-582` spreads the
 snapshot over the live panel; `stores/panels.js:1091-1097` saves to `panel.filePath`.
-**Evidence level.** observed-in-test (real stores: `addPanel` → edit → `applyPanelSavedPayload` → `undo()`); Claude
-confirmed the destructuring at `history.js:319`.
+**Evidence level.** **observed-in-app** (Linux build of f37550c): open `sandbox-test.cepanel` (SHA-1 `97cda5c…`), nudge
+one control, File → Save As → `variant-B.cepanel` (tab becomes "variant-B", original untouched), toolbar Undo once —
+its tooltip reads "Undo Change panel settings", i.e. the Save As itself is an undo step — the tab flips back to
+"sandbox-test •", toolbar Save → `sandbox-test.cepanel` rewritten (SHA-1 `f44a037…`, 574 KB, same size as the variant).
+Also observed-in-test through the real stores; Claude confirmed the destructuring at `history.js:319`.
 
 ### C-10 — The × on a Screen (CTRL49) tab does nothing   (S3 · bug · tabs)
 
