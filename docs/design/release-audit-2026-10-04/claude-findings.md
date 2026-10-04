@@ -811,14 +811,41 @@ handler (`ValueTreeBridgeHandlers.cpp` savePanel → `writeTextAtomically`) then
 was not. WebView2 is a different path, so Windows is probably clean — **Codex: confirm a Windows save keeps "·"**.
 **Evidence level.** observed-in-app (byte counts on the saved files) + read in vendored JUCE.
 
-### C-82 — The `pluginPresets` browser check writes its screenshot to `C:/tmp/…`: off Windows it creates `CE/web/C:/tmp/` in the working tree   (S4 · dev)
+### C-82 — Browser checks write into the tracked tree: `pluginPresets` creates `CE/web/C:/tmp/`, others rewrite `work/` and drop JSON beside themselves   (S4 · dev)
 
 `CE/web/browser-checks/pluginPresets.mjs:55` defaults `PRESETS_SCREENSHOT` to `'C:/tmp/plugin-presets.png'`; it is in
-`npm run test:browser`. Observed (the run here left `CE/web/C:/tmp/plugin-presets.png`, since removed).
+`npm run test:browser`. Also, a full run modifies the tracked `work/component-behavior/results.json`, adds eight PNGs
+beside it, creates `work/editor-acceptance/` and `CE/web/browser-checks/text-placement.json`. Observed (all removed
+here after the run).
 
 ### C-83 — At 1280 px the selection context bar draws "SCRIPTS · no logic attached · Script Editor" over the Box/Effects tabs   (S4 · layout)
 
 Observed in the app with a Label selected (window 1280×720): the scripts chip overlaps the Text/Fill/Border/Box/Effects
 tab row. Cosmetic.
+
+### C-84 — Browser checks outside CI have drifted: seven fail on `main` on a quiet machine   (S4 · test health)
+
+Of 120 browser checks, after re-running every failure on a quiet machine against one warm dev server: **113 pass**.
+Still failing: `behaviourCustom` (expects a hidden tab page to be absent from the DOM; since fade-on-hide it is present
+at opacity 0 / `visibility: hidden` and takes no clicks — the product is right, the check is stale);
+`pixelSelection`, `screenRuntime`, `screenAnimation` (hard-code the Edge browser channel, so they only run on Windows);
+`previewPreparation` (its fixture finds no Label control: `editCaption` reads `_children` of undefined);
+`targetContext` (waits for a Hostage surface parameter "Cutoff for part-2" that never appears);
+`gaiaPatternEditing` (asserts while the GAIA sync queue still reads "SENDING 497/529"). The last three are **not
+triaged** — each may be harness drift or a product change. The behaviour ledgers also cannot boot a cold dev server
+inside their 30 s `page.goto` limit on a 4-core machine under load (`CE_BEHAVIOUR_URL` with a warm server avoids it).
+None of these checks runs in CI, which is how they drift. **Codex: please run the three Edge-only checks on Windows.**
+
+### C-85 — The exported player's CLAP passes clap-validator with two warnings   (S4 · plug-in)
+
+`process-audio-denormals`: processing took 3.24× longer with denormals (no flush-to-zero). `state-invalid-random`:
+the plug-in "loaded random bytes successfully" — `setStateInformation` ignores garbage and reports success rather than
+failure. Observed (Linux build, GAIA panel, clap-validator built from source).
+
+### C-86 — Building the LV2 on Linux fails without a display; the documented recipe does not say so   (S4 · dev docs)
+
+`juce_lv2_helper` loads the plug-in to write its `.ttl` files; the plug-in starts GTK, and with no `DISPLAY` the link
+step fails ("cannot open display"). With `DISPLAY=:99` (Xvfb) it builds. CLAUDE.md's "Validating the plug-in" recipe
+runs the build without one. Observed.
 
 ## Verification of the other's findings

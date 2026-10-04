@@ -1,6 +1,6 @@
 # Release audit — consolidated list
 
-> **Status, 2026-10-04:** Claude's half is complete — **83 findings**, in `claude-findings.md` with repro, cause and
+> **Status, 2026-10-04:** Claude's half is complete — **86 findings**, in `claude-findings.md` with repro, cause and
 > evidence for each. **Codex's half (Windows) has not been pushed yet**; its rows and its verdicts on Claude's S1/S2
 > findings will be merged here when it is. Tree: `main` @ `f37550c`.
 
@@ -11,7 +11,7 @@ they live in are switched off for the beta. Four of the seven need only a small,
 
 | | S1 | S2 | S3 | Unfinished | S4 | Total |
 | --- | --- | --- | --- | --- | --- | --- |
-| Claude | 7 | 25 | 39 | 3 | 9 | 83 |
+| Claude | 7 | 25 | 39 | 3 | 12 | 86 |
 | Codex | — | — | — | — | — | pending |
 
 Evidence: 9 findings reproduced **in the running app** (Linux build of this commit), 39 **demonstrated by a test or
@@ -134,6 +134,9 @@ test; C-34 and C-35 are code traces.
 | [C-79](claude-findings.md) | S4 | faulty | Off Windows, Hostage says "No CTRL49 connected — plug it in and it connects by itself", though support is compiled out | in a test | pending |
 | [C-82](claude-findings.md) | S4 | dev | The `pluginPresets` browser check writes its screenshot to `C:/tmp/…`: off Windows it creates `CE/web/C:/tmp/` in the working tree | read in code | pending |
 | [C-83](claude-findings.md) | S4 | layout | At 1280 px the selection context bar draws "SCRIPTS · no logic attached · Script Editor" over the Box/Effects tabs | read in code | pending |
+| [C-84](claude-findings.md) | S4 | test health | Browser checks outside CI have drifted: seven fail on `main` on a quiet machine | in a test | pending |
+| [C-85](claude-findings.md) | S4 | plug-in | The exported player's CLAP passes clap-validator with two warnings | in a test | pending |
+| [C-86](claude-findings.md) | S4 | dev docs | Building the LV2 on Linux fails without a display; the documented recipe does not say so | in a test | pending |
 
 ## What was tested and held up
 
@@ -146,10 +149,9 @@ test; C-34 and C-35 are code traces.
 | Production build | clean |
 | Windows CI run #315 on `f37550c` (MSVC build, ctest, pluginval + clap-validator) | **success** |
 | Every enabled menu item, and all 56 Insert types, clicked in Chromium on the production bundle | 0 page errors, 0 console errors |
-| Official browser suite (`test:browser`, 30 checks) | 27 pass; 3 timed out before any test ran (harness, re-run pending) |
-| Behaviour and authoring ledgers (~90 checks) | second pass on one warm dev server in progress |
+| All 120 browser checks (official suite + behaviour/authoring ledgers), failures re-run on a quiet machine | **113 pass**; 7 fail — 1 stale test, 3 Windows-only harness, 3 untriaged (C-84) |
 | The app on Linux (WebKitGTK, Xvfb): launch, menus, About, update check, New Panel from Device Profile, Open, Save As, Undo, Preview, quit and recovery | runs; findings C-07, C-08, C-09, C-23, C-57, C-71, C-72, C-80, C-81 come from here |
-| Player plug-in on Linux (VST3 / CLAP / LV2) under pluginval and clap-validator | in progress |
+| Player plug-in with the GAIA panel on Linux: pluginval (VST3, LV2) strictness 5 with and without GUI tests; clap-validator (CLAP) | **all pass**; CLAP 33 passed, 2 warnings (C-85) |
 
 Each reviewer also recorded what it checked and found sound — among them: failed saves are reported as failures;
 27 hostile `.cepanel` documents open cleanly or are refused; round-trips of all QA panels are byte-stable; the
