@@ -32,7 +32,7 @@ const SPECS = [
   ['str', /"(?:\\.|[^"\\])*"/y],
   ['char', /'(?:\\.|[^'\\])'/y],
   ['id', /[A-Za-z_]\w*/y],
-  ['op', /=>|==|!=|<=|>=|&&|\|\||\+\+|--|\+=|-=|\*=|\/=|%=|\?\?|\?\.|[+\-*/%=<>!?:.,;(){}\[\]&|~^]/y],
+  ['op', /=>|==|!=|<=|>=|&&|\|\||\+\+|--|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|\?\?|\?\.|[+\-*/%=<>!?:.,;(){}\[\]&|~^]/y],
 ];
 
 function unescape(s) {
@@ -235,7 +235,7 @@ class Parser {
   parseAssign() {
     const left = this.parseLambdaOr();
     const k = this.peek();
-    if (k.type === 'op' && ['=', '+=', '-=', '*=', '/=', '%='].includes(k.value)) { this.next(); return { type: 'assign', op: k.value, target: left, value: this.parseAssign() }; }
+    if (k.type === 'op' && ['=', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^='].includes(k.value)) { this.next(); return { type: 'assign', op: k.value, target: left, value: this.parseAssign() }; }
     return left;
   }
 
@@ -443,7 +443,10 @@ function applyBin(op, a, b) {
     case '-': return a - b; case '*': return a * b; case '/': return a / b; case '%': return a % b;
     case '==': return a === b; case '!=': return a !== b;
     case '<': return a < b; case '<=': return a <= b; case '>': return a > b; case '>=': return a >= b;
-    case '&': return a & b; case '|': return a | b; case '^': return a ^ b;
+    // On two bools these are C#'s logical operators, which give a bool; JS's bitwise ones give 1.
+    case '&': return typeof a === 'boolean' && typeof b === 'boolean' ? a && b : a & b;
+    case '|': return typeof a === 'boolean' && typeof b === 'boolean' ? a || b : a | b;
+    case '^': return typeof a === 'boolean' && typeof b === 'boolean' ? a !== b : a ^ b;
     case '??': return a == null ? b : a;
   }
   throw new Error(`unsupported operator '${op}'`);

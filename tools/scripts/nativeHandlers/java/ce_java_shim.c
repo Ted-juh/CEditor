@@ -88,55 +88,72 @@ static double ce_as_double(const CeValue* v) {
  * The leading `jlong host` is THIS instance's CeHostVtable* (threaded from dispatch), so two plugin
  * instances sharing the process-global JVM each reach their own host. */
 
+/* A Java String's UTF-8, borrowed until ce_unutf. A null reference must never reach
+ * GetStringUTFChars: the JVM crashes, and the plugin host with it, on what Java code treats as an
+ * ordinary mistake (ctx.log(label, v) with label unset). It throws NullPointerException back into the
+ * handler instead, which CeRuntime.dispatch catches and reports as a failed handler, as it does any
+ * other exception. NULL means an exception is pending (GetStringUTFChars can also fail for memory),
+ * and the native returns without calling the host. */
+static const char* ce_utf(JNIEnv* e, jstring s, const char* what) {
+    if (!s) {
+        char msg[96]; snprintf(msg, sizeof msg, "%s is null", what);
+        jclass npe = (*e)->FindClass(e, "java/lang/NullPointerException");
+        if (npe) (*e)->ThrowNew(e, npe, msg);
+        return NULL;
+    }
+    return (*e)->GetStringUTFChars(e, s, NULL);
+}
+static void ce_unutf(JNIEnv* e, jstring s, const char* utf) { if (s && utf) (*e)->ReleaseStringUTFChars(e, s, utf); }
+
 static void JNICALL n_setD(JNIEnv* e, jclass c, jlong host, jstring key, jdouble v) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->set) return;
-    const char* k = (*e)->GetStringUTFChars(e, key, NULL);
+    const char* k = ce_utf(e, key, "the path"); if (!k) return;
     CeStr ks = ce_str(k); CeValue val; memset(&val, 0, sizeof val); val.tag = CE_DOUBLE; val.u.d = v;
     vt->set(vt->host_ctx, &ks, &val, NULL);
-    (*e)->ReleaseStringUTFChars(e, key, k);
+    ce_unutf(e, key, k);
 }
 static void JNICALL n_setS(JNIEnv* e, jclass c, jlong host, jstring key, jstring s) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->set) return;
-    const char* k = (*e)->GetStringUTFChars(e, key, NULL);
-    const char* sv = (*e)->GetStringUTFChars(e, s, NULL);
+    const char* k = ce_utf(e, key, "the path"); if (!k) return;
+    const char* sv = ce_utf(e, s, "the text"); if (!sv) { ce_unutf(e, key, k); return; }
     CeStr ks = ce_str(k); CeValue val; memset(&val, 0, sizeof val); val.tag = CE_STRING; val.u.s = ce_str(sv);
     vt->set(vt->host_ctx, &ks, &val, NULL);
-    (*e)->ReleaseStringUTFChars(e, s, sv);
-    (*e)->ReleaseStringUTFChars(e, key, k);
+    ce_unutf(e, s, sv);
+    ce_unutf(e, key, k);
 }
 static void JNICALL n_setB(JNIEnv* e, jclass c, jlong host, jstring key, jboolean b) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->set) return;
-    const char* k = (*e)->GetStringUTFChars(e, key, NULL);
+    const char* k = ce_utf(e, key, "the path"); if (!k) return;
     CeStr ks = ce_str(k); CeValue val; memset(&val, 0, sizeof val); val.tag = CE_BOOL; val.u.b = b ? 1 : 0;
     vt->set(vt->host_ctx, &ks, &val, NULL);
-    (*e)->ReleaseStringUTFChars(e, key, k);
+    ce_unutf(e, key, k);
 }
 static jint JNICALL n_getKind(JNIEnv* e, jclass c, jlong host, jstring key, jstring form) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->get) return CE_NULL;
-    const char* k = (*e)->GetStringUTFChars(e, key, NULL);
-    const char* f = (*e)->GetStringUTFChars(e, form, NULL);
+    const char* k = ce_utf(e, key, "the path"); if (!k) return CE_NULL;
+    const char* f = ce_utf(e, form, "the form"); if (!f) { ce_unutf(e, key, k); return CE_NULL; }
     CeStr ks = ce_str(k), fs = ce_str(f); CeValue out; memset(&out, 0, sizeof out);
     vt->get(vt->host_ctx, &ks, &fs, &out);
     jint t = out.tag;
     if (vt->free_value) vt->free_value(vt->host_ctx, &out);
-    (*e)->ReleaseStringUTFChars(e, form, f); (*e)->ReleaseStringUTFChars(e, key, k);
+    ce_unutf(e, form, f); ce_unutf(e, key, k);
     return t;
 }
 static jdouble JNICALL n_getD(JNIEnv* e, jclass c, jlong host, jstring key, jstring form) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->get) return 0;
-    const char* k = (*e)->GetStringUTFChars(e, key, NULL);
-    const char* f = (*e)->GetStringUTFChars(e, form, NULL);
+    const char* k = ce_utf(e, key, "the path"); if (!k) return 0;
+    const char* f = ce_utf(e, form, "the form"); if (!f) { ce_unutf(e, key, k); return 0; }
     CeStr ks = ce_str(k), fs = ce_str(f); CeValue out; memset(&out, 0, sizeof out);
     vt->get(vt->host_ctx, &ks, &fs, &out);
     double d = ce_as_double(&out);
     if (vt->free_value) vt->free_value(vt->host_ctx, &out);
-    (*e)->ReleaseStringUTFChars(e, form, f); (*e)->ReleaseStringUTFChars(e, key, k);
+    ce_unutf(e, form, f); ce_unutf(e, key, k);
     return d;
 }
 static jstring JNICALL n_getS(JNIEnv* e, jclass c, jlong host, jstring key, jstring form) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->get) return (*e)->NewStringUTF(e, "");
-    const char* k = (*e)->GetStringUTFChars(e, key, NULL);
-    const char* f = (*e)->GetStringUTFChars(e, form, NULL);
+    const char* k = ce_utf(e, key, "the path"); if (!k) return NULL;
+    const char* f = ce_utf(e, form, "the form"); if (!f) { ce_unutf(e, key, k); return NULL; }
     CeStr ks = ce_str(k), fs = ce_str(f); CeValue out; memset(&out, 0, sizeof out);
     vt->get(vt->host_ctx, &ks, &fs, &out);
     jstring r;
@@ -146,7 +163,7 @@ static jstring JNICALL n_getS(JNIEnv* e, jclass c, jlong host, jstring key, jstr
         r = (*e)->NewStringUTF(e, tmp); free(tmp);
     } else { r = (*e)->NewStringUTF(e, ""); }
     if (vt->free_value) vt->free_value(vt->host_ctx, &out);
-    (*e)->ReleaseStringUTFChars(e, form, f); (*e)->ReleaseStringUTFChars(e, key, k);
+    ce_unutf(e, form, f); ce_unutf(e, key, k);
     return r;
 }
 static void JNICALL n_ccD(JNIEnv* e, jclass c, jlong host, jint ch, jint cc, jdouble v) {
@@ -156,33 +173,33 @@ static void JNICALL n_ccD(JNIEnv* e, jclass c, jlong host, jint ch, jint cc, jdo
 }
 static void JNICALL n_ccS(JNIEnv* e, jclass c, jlong host, jint ch, jint cc, jstring s) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->send_cc) return;
-    const char* sv = (*e)->GetStringUTFChars(e, s, NULL);
+    const char* sv = ce_utf(e, s, "the text"); if (!sv) return;
     CeValue val; memset(&val, 0, sizeof val); val.tag = CE_STRING; val.u.s = ce_str(sv);
     vt->send_cc(vt->host_ctx, ch, cc, &val);
-    (*e)->ReleaseStringUTFChars(e, s, sv);
+    ce_unutf(e, s, sv);
 }
 static void JNICALL n_log(JNIEnv* e, jclass c, jlong host, jint level, jstring msg) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->log) return;
-    const char* m = (*e)->GetStringUTFChars(e, msg, NULL);
+    const char* m = ce_utf(e, msg, "the message"); if (!m) return;
     CeStr ms = ce_str(m);
     vt->log(vt->host_ctx, level, &ms);
-    (*e)->ReleaseStringUTFChars(e, msg, m);
+    ce_unutf(e, msg, m);
 }
 static void JNICALL n_emitD(JNIEnv* e, jclass c, jlong host, jstring name, jdouble v) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->emit) return;
-    const char* nm = (*e)->GetStringUTFChars(e, name, NULL);
+    const char* nm = ce_utf(e, name, "the event name"); if (!nm) return;
     CeStr ns = ce_str(nm); CeValue val; memset(&val, 0, sizeof val); val.tag = CE_DOUBLE; val.u.d = v;
     vt->emit(vt->host_ctx, &ns, &val);
-    (*e)->ReleaseStringUTFChars(e, name, nm);
+    ce_unutf(e, name, nm);
 }
 static void JNICALL n_emitS(JNIEnv* e, jclass c, jlong host, jstring name, jstring s) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->emit) return;
-    const char* nm = (*e)->GetStringUTFChars(e, name, NULL);
-    const char* sv = (*e)->GetStringUTFChars(e, s, NULL);
+    const char* nm = ce_utf(e, name, "the event name"); if (!nm) return;
+    const char* sv = ce_utf(e, s, "the text"); if (!sv) { ce_unutf(e, name, nm); return; }
     CeStr ns = ce_str(nm); CeValue val; memset(&val, 0, sizeof val); val.tag = CE_STRING; val.u.s = ce_str(sv);
     vt->emit(vt->host_ctx, &ns, &val);
-    (*e)->ReleaseStringUTFChars(e, s, sv);
-    (*e)->ReleaseStringUTFChars(e, name, nm);
+    ce_unutf(e, s, sv);
+    ce_unutf(e, name, nm);
 }
 /* A value of the kind Java picked: CE_NULL, CE_DOUBLE (d), CE_BOOL (d is 0 or 1) or CE_STRING (s). The
  * string's UTF-8 is borrowed from `s` and must be released by the caller (ce_release_kind) after the
@@ -191,17 +208,17 @@ static CeValue ce_kind_value(JNIEnv* e, jint kind, jdouble d, jstring s, const c
     CeValue v; memset(&v, 0, sizeof v); *utf = NULL;
     if (kind == CE_DOUBLE) { v.tag = CE_DOUBLE; v.u.d = d; }
     else if (kind == CE_BOOL) { v.tag = CE_BOOL; v.u.b = d != 0 ? 1 : 0; }
-    else if (kind == CE_STRING && s) { *utf = (*e)->GetStringUTFChars(e, s, NULL); v.tag = CE_STRING; v.u.s = ce_str(*utf); }
+    else if (kind == CE_STRING && s && (*utf = (*e)->GetStringUTFChars(e, s, NULL)) != NULL) { v.tag = CE_STRING; v.u.s = ce_str(*utf); }
     else v.tag = CE_NULL;
     return v;
 }
-static void ce_release_kind(JNIEnv* e, jstring s, const char* utf) { if (utf) (*e)->ReleaseStringUTFChars(e, s, utf); }
+static void ce_release_kind(JNIEnv* e, jstring s, const char* utf) { ce_unutf(e, s, utf); }
 
 /* log(message, value): the value goes to the host as it is, through log_value. A host older than that
  * slot gets the message alone, which is what a compiled handler always got before. */
 static void JNICALL n_logV(JNIEnv* e, jclass c, jlong host, jint level, jstring msg, jint kind, jdouble d, jstring s) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt) return;
-    const char* m = (*e)->GetStringUTFChars(e, msg, NULL);
+    const char* m = ce_utf(e, msg, "the message"); if (!m) return;
     CeStr ms = ce_str(m);
     if (CE_HAS_FIELD(vt, log_value) && vt->log_value) {
         const char* utf; CeValue v = ce_kind_value(e, kind, d, s, &utf);
@@ -210,7 +227,7 @@ static void JNICALL n_logV(JNIEnv* e, jclass c, jlong host, jint level, jstring 
     } else if (vt->log) {
         vt->log(vt->host_ctx, level, &ms);
     }
-    (*e)->ReleaseStringUTFChars(e, msg, m);
+    ce_unutf(e, msg, m);
 }
 static void JNICALL n_nrpnV(JNIEnv* e, jclass c, jlong host, jint ch, jint msb, jint lsb, jint kind, jdouble d, jstring s) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->send_nrpn) return;
@@ -226,12 +243,12 @@ static void JNICALL n_ccV(JNIEnv* e, jclass c, jlong host, jint ch, jint cc, jin
 }
 static void JNICALL n_emitV(JNIEnv* e, jclass c, jlong host, jstring name, jint kind, jdouble d, jstring s) {
     (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->emit) return;
-    const char* nm = (*e)->GetStringUTFChars(e, name, NULL);
+    const char* nm = ce_utf(e, name, "the event name"); if (!nm) return;
     CeStr ns = ce_str(nm);
     const char* utf; CeValue v = ce_kind_value(e, kind, d, s, &utf);
     vt->emit(vt->host_ctx, &ns, &v);
     ce_release_kind(e, s, utf);
-    (*e)->ReleaseStringUTFChars(e, name, nm);
+    ce_unutf(e, name, nm);
 }
 /* sendSysex(int[]): a list of numbers to send_sysex_value, so the host clamps and frames it exactly as
  * it does for Lua and JS. A host older than that slot takes packed bytes, clamped here as it would. */
@@ -262,32 +279,32 @@ static void JNICALL n_sysexHex(JNIEnv* e, jclass c, jlong host, jstring hex) {
         if (vt->log) { CeStr m = ce_str("sendSysex(\"\xE2\x80\xA6\"): this host takes a list of bytes, not a hex string."); vt->log(vt->host_ctx, 0, &m); }
         return;
     }
-    const char* h = (*e)->GetStringUTFChars(e, hex, NULL);
+    const char* h = ce_utf(e, hex, "the hex string"); if (!h) return;
     CeValue v; memset(&v, 0, sizeof v); v.tag = CE_STRING; v.u.s = ce_str(h);
     vt->send_sysex_value(vt->host_ctx, &v);
-    (*e)->ReleaseStringUTFChars(e, hex, h);
+    ce_unutf(e, hex, h);
 }
 
 /* payload accessors: p = (CeValue*) address (no host needed) */
 static jint JNICALL n_pKind(JNIEnv* e, jclass c, jlong p, jstring key) {
     (void)c;
-    const char* k = (*e)->GetStringUTFChars(e, key, NULL);
+    const char* k = ce_utf(e, key, "the field name"); if (!k) return -1;
     const CeValue* f = ce_field((const CeValue*)(intptr_t)p, k);
-    (*e)->ReleaseStringUTFChars(e, key, k);
+    ce_unutf(e, key, k);
     return f ? f->tag : -1;
 }
 static jdouble JNICALL n_pD(JNIEnv* e, jclass c, jlong p, jstring key) {
     (void)c;
-    const char* k = (*e)->GetStringUTFChars(e, key, NULL);
+    const char* k = ce_utf(e, key, "the field name"); if (!k) return 0;
     const CeValue* f = ce_field((const CeValue*)(intptr_t)p, k);
-    (*e)->ReleaseStringUTFChars(e, key, k);
+    ce_unutf(e, key, k);
     return ce_as_double(f);
 }
 static jstring JNICALL n_pS(JNIEnv* e, jclass c, jlong p, jstring key) {
     (void)c;
-    const char* k = (*e)->GetStringUTFChars(e, key, NULL);
+    const char* k = ce_utf(e, key, "the field name"); if (!k) return NULL;
     const CeValue* f = ce_field((const CeValue*)(intptr_t)p, k);
-    (*e)->ReleaseStringUTFChars(e, key, k);
+    ce_unutf(e, key, k);
     if (f && f->tag == CE_STRING && f->u.s.ptr) {
         char* tmp = (char*)malloc((size_t)f->u.s.len + 1);
         memcpy(tmp, f->u.s.ptr, (size_t)f->u.s.len); tmp[f->u.s.len] = 0;

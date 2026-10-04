@@ -8,7 +8,7 @@
 // threads/synchronized, reflection, annotations with logic, var-args. Those raise a diagnostic.
 
 const TYPE_WORDS = new Set(['int', 'long', 'short', 'byte', 'double', 'float', 'boolean', 'char',
-  'void', 'var', 'String', 'Object', 'Integer', 'Long', 'Double', 'Float', 'Boolean', 'Character', 'Number']);
+  'void', 'var', 'String', 'Object', 'Integer', 'Long', 'Short', 'Byte', 'Double', 'Float', 'Boolean', 'Character', 'Number']);
 const DECL_LEADERS = new Set([...TYPE_WORDS, 'final', 'static', 'public', 'private', 'protected', 'abstract', 'synchronized', 'transient', 'volatile', 'native']);
 const MODIFIERS = new Set(['public', 'private', 'protected', 'static', 'final', 'abstract', 'synchronized', 'transient', 'volatile', 'native', 'strictfp', 'default']);
 const BINPREC = { '||': 2, '&&': 3, '|': 4, '^': 5, '&': 6, '==': 7, '!=': 7, '<': 8, '<=': 8, '>': 8, '>=': 8, '<<': 9, '>>': 9, '>>>': 9, '+': 10, '-': 10, '*': 11, '/': 11, '%': 11 };
@@ -26,7 +26,7 @@ const SPECS = [
   ['str', /"(?:\\.|[^"\\])*"/y],
   ['char', /'(?:\\.|[^'\\])'/y],
   ['id', /[A-Za-z_$][\w$]*/y],
-  ['op', /->|==|!=|<=|>=|&&|\|\||\+\+|--|\+=|-=|\*=|\/=|%=|::|>>>|>>|<<|[+\-*/%=<>!?:.,;(){}\[\]&|~^]/y],
+  ['op', /->|==|!=|<=|>=|&&|\|\||\+\+|--|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|::|>>>|>>|<<|[+\-*/%=<>!?:.,;(){}\[\]&|~^]/y],
 ];
 
 function unescape(s) { return s.replace(/\\(.)/g, (_, c) => ({ n: '\n', t: '\t', r: '\r', '0': '\0', '"': '"', "'": "'", '\\': '\\' }[c] ?? c)); }
@@ -213,7 +213,7 @@ class Parser {
   parseAssign() {
     const left = this.parseLambdaOr();
     const k = this.peek();
-    if (k.type === 'op' && ['=', '+=', '-=', '*=', '/=', '%='].includes(k.value)) { this.next(); return { type: 'assign', op: k.value, target: left, value: this.parseAssign() }; }
+    if (k.type === 'op' && ['=', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^='].includes(k.value)) { this.next(); return { type: 'assign', op: k.value, target: left, value: this.parseAssign() }; }
     return left;
   }
 
@@ -392,7 +392,10 @@ function applyBin(op, a, b) {
     case '-': return a - b; case '*': return a * b; case '/': return a / b; case '%': return a % b;
     case '==': return a === b; case '!=': return a !== b;
     case '<': return a < b; case '<=': return a <= b; case '>': return a > b; case '>=': return a >= b;
-    case '&': return a & b; case '|': return a | b; case '^': return a ^ b;
+    // On two bools these are Java's logical operators, which give a bool; JS's bitwise ones give 1.
+    case '&': return typeof a === 'boolean' && typeof b === 'boolean' ? a && b : a & b;
+    case '|': return typeof a === 'boolean' && typeof b === 'boolean' ? a || b : a | b;
+    case '^': return typeof a === 'boolean' && typeof b === 'boolean' ? a !== b : a ^ b;
     case '<<': return a << b; case '>>': return a >> b; case '>>>': return a >>> b;
   }
   throw new Error(`unsupported operator '${op}'`);
@@ -600,13 +603,19 @@ function runBody(body, params, program, thisObj, args) {
 // as a Double, text as a String, a flag as a Boolean. This interpreter has no static types, so it
 // ran `double x = ctx.get("cutoff.value")`, which javac rejects: the handler previewed, then failed
 // the export. These are the uses of a ctx read that javac certainly rejects, and the narrowing casts
-// that compile and certainly throw when they run (a Double cast to int is a ClassCastException) —
-// each reported with the typed read that works in both (getDouble, getInt, getString, getBoolean;
-// see javaTypedReads in panelRuntime.js). Nothing else is flagged: a read concatenated to a string,
-// stored as Object or var, compared with ==, or passed where Object is taken is fine Java.
+// that compile and certainly throw when they run (a Double cast to int, or to Integer, is a
+// ClassCastException) — each reported with the typed read that works in both (getDouble, getInt,
+// getString, getBoolean; see javaTypedReads in panelRuntime.js), the one that fits what the code
+// does with it: getBoolean under ! && ||, getInt under a shift. Nothing else is flagged: a read
+// concatenated to a string, stored as Object or var, compared with ==, or passed where Object is
+// taken is fine Java.
 const NARROWING = new Set(['int', 'long', 'short', 'byte', 'char', 'float']);
 const BOXED_NARROWING = { Integer: 'int', Long: 'long', Short: 'short', Byte: 'byte', Character: 'char', Float: 'float' };
 const NON_OBJECT_OPS = new Set(['-', '*', '/', '%', '<', '<=', '>', '>=', '&', '|', '^', '&&', '||', '<<', '>>', '>>>']);
+// What each operator takes, for the read to suggest: getDouble would fail javac again under these.
+const BOOLEAN_OPS = new Set(['&&', '||', '!']);
+const INTEGER_OPS = new Set(['<<', '>>', '>>>', '~']);
+const BOOLEAN_OR_INTEGER_OPS = new Set(['&', '|', '^']);
 const NUMERIC_HELPERS = new Set(['clamp', 'scale', 'round', 'snap', 'lerp', 'curve']);
 
 function contextParamNames(paramToks) {
@@ -638,6 +647,14 @@ export function contextReadErrors(fn) {
   const named = (n) => `${n.callee.obj.name}.${n.callee.name}(…)`;
   const report = (n, message) => errors.push(`${message} (line ${n.callee.line ?? fn.line ?? 1})`);
   const asNumber = (n) => report(n, `${named(n)} is an Object in Java, so javac rejects it here: write ${n.callee.obj.name}.getDouble(…) to use it as a number`);
+  // The operand of `op`, with the typed read that fits what op takes.
+  const operand = (n, op) => {
+    const ctx = n.callee.obj.name;
+    if (BOOLEAN_OPS.has(op)) report(n, `${op} takes a boolean, and ${named(n)} is an Object in Java: write ${ctx}.getBoolean(…)`);
+    else if (INTEGER_OPS.has(op)) report(n, `${op} takes an integer, and ${named(n)} is an Object in Java: write ${ctx}.getInt(…)`);
+    else if (BOOLEAN_OR_INTEGER_OPS.has(op)) report(n, `${op} takes two booleans or two integers, and ${named(n)} is an Object in Java: write ${ctx}.getBoolean(…) for a flag or ${ctx}.getInt(…) for bits`);
+    else asNumber(n);
+  };
   const visit = (node) => {
     if (Array.isArray(node)) { for (const x of node) visit(x); return; }
     if (!node || typeof node !== 'object') return;
@@ -651,15 +668,15 @@ export function contextReadErrors(fn) {
         }
         break;
       case 'bin':
-        if (NON_OBJECT_OPS.has(node.op)) { for (const x of [node.left, node.right]) if (isRead(x)) asNumber(x); }
+        if (NON_OBJECT_OPS.has(node.op)) { for (const x of [node.left, node.right]) if (isRead(x)) operand(x, node.op); }
         // `+` is string concatenation when the other side is text, so only a number or another read counts.
         else if (node.op === '+' && (isRead(node.left) || isRead(node.right))
           && [node.left, node.right].every((x) => isRead(x) || isNumberLiteral(x))) {
           for (const x of [node.left, node.right]) if (isRead(x)) asNumber(x);
         }
         break;
-      case 'unary': if (isRead(node.arg)) asNumber(node.arg); break;
-      case 'assign': if (['-=', '*=', '/=', '%='].includes(node.op) && isRead(node.value)) asNumber(node.value); break;
+      case 'unary': if (isRead(node.arg)) operand(node.arg, node.op); break;
+      case 'assign': if (['-=', '*=', '/=', '%=', '&=', '|=', '^='].includes(node.op) && isRead(node.value)) operand(node.value, node.op[0]); break;
       case 'if': case 'while': case 'doWhile': case 'for':
         if (isRead(node.cond)) report(node.cond, `a condition must be a boolean, and ${named(node.cond)} is an Object in Java: write ${node.cond.callee.obj.name}.getBoolean(…)`);
         break;
@@ -680,7 +697,7 @@ export function contextReadErrors(fn) {
         break;
       }
       case 'cast':
-        if (NARROWING.has(node.t) && isRead(node.arg)) {
+        if ((NARROWING.has(node.t) || Object.hasOwn(BOXED_NARROWING, node.t)) && isRead(node.arg)) {
           report(node.arg, `(${node.t}) ${named(node.arg)} compiles, and throws when it runs in the exported plugin: a number `
             + `comes back as a Double, which cannot be cast to ${node.t}. Write ${typedRead(node.arg.callee.obj.name, node.t)}`);
         }

@@ -187,6 +187,31 @@ test('bool literals are booleans', () => {
   assert.deepEqual(out.map((s) => s.trim()), ['true', 'on: true']);
 });
 
+// On two bools, & | and ^ are the logical operators, and give a bool; the preview used JS's bitwise
+// ones and gave 1, so `both == true` was false again, while the export sends a bool.
+test('& | and ^ on two bools give a bool', () => {
+  const src = `void onValueChanged(CeContext ctx, CeEvent e) {
+    boolean flag = e.value > 0.2; boolean above = e.value > 0.4; boolean low = e.value > 0.9;
+    boolean both = flag & above;
+    ctx.setValue("both", both); ctx.setValue("eq", both == true);
+    ctx.setValue("either", low | flag); ctx.setValue("differ", flag ^ low); ctx.setValue("same", flag ^ above);
+    boolean any = false; any |= flag; ctx.setValue("orAssigned", any);
+    boolean all = true; all &= low; ctx.setValue("andAssigned", all);
+    boolean flip = true; flip ^= true; ctx.setValue("xorAssigned", flip);
+    ctx.setValue("bits", 6 & 3);
+  }`;
+  const { values } = run(src, 'onValueChanged', { value: 0.5 });
+  assert.equal(values.both, true);
+  assert.equal(values.eq, true);
+  assert.equal(values.either, true);
+  assert.equal(values.differ, true);
+  assert.equal(values.same, false);
+  assert.equal(values.orAssigned, true);
+  assert.equal(values.andAssigned, false);
+  assert.equal(values.xorAssigned, false);
+  assert.equal(values.bits, 2);
+});
+
 // In an exported handler ctx.get returns Object, so `double x = ctx.get(...)` previewed here and
 // failed javac at export. The preview now says what javac will, with the cast that works in both,
 // and does not run the handler, as it does not run one that fails to parse. validate-script-exports
@@ -213,6 +238,22 @@ test('each kind of rejected read gets the advice that fits it', () => {
   assert.match(advice('double y = ctx.get("a") * 2;'), /write ctx\.getDouble\(…\) to use it as a number/);
   assert.match(advice('if (ctx.get("led.on")) { }'), /a condition must be a boolean.*write ctx\.getBoolean\(…\)/);
   assert.match(advice('int n = (int) ctx.get("a");'), /compiles, and throws when it runs.*Write ctx\.getInt\(…\)/);
+  // A boxed cast throws as the primitive one does: the value is a Double, which is not an Integer.
+  assert.match(advice('Integer i = (Integer) ctx.get("a");'), /\(Integer\) ctx\.get\(…\) compiles, and throws when it runs.*Write ctx\.getInt\(…\)/);
+  assert.match(advice('Long l = (Long) ctx.get("a");'), /compiles, and throws when it runs.*Write \(long\) ctx\.getDouble\(…\)/);
+  for (const boxed of ['Float', 'Short', 'Byte', 'Character']) {
+    assert.match(advice(`Object o = (${boxed}) ctx.get("a");`), /compiles, and throws when it runs/, boxed);
+  }
+  // ! && and || take a boolean, and getDouble would fail javac again; shifts take an integer; & | ^
+  // take either, and the report says so.
+  for (const body of ['boolean b = !ctx.get("led.on");', 'boolean b = ctx.get("led.on") && true;', 'boolean b = false || ctx.get("led.on");']) {
+    assert.match(advice(body), /takes a boolean.*write ctx\.getBoolean\(…\)/, body);
+    assert.doesNotMatch(advice(body), /getDouble/, body);
+  }
+  assert.match(advice('int n = ctx.get("step.value") << 1;'), /takes an integer.*write ctx\.getInt\(…\)/);
+  assert.match(advice('boolean b = ctx.get("led.on") & true;'), /write ctx\.getBoolean\(…\) for a flag or ctx\.getInt\(…\) for bits/);
+  assert.match(advice('int n = 0; n |= ctx.get("step.value");'), /write ctx\.getBoolean\(…\) for a flag or ctx\.getInt\(…\) for bits/);
+  assert.match(advice('double y = -ctx.get("a");'), /write ctx\.getDouble\(…\) to use it as a number/);
 });
 
 test('valid Java reads are left alone', () => {
@@ -221,6 +262,8 @@ test('valid Java reads are left alone', () => {
     'String s = "v=" + ctx.get("a");', 'ctx.set("b", ctx.get("a"));', 'int n = (int) (double) ctx.get("a");',
     'if (ctx.get("a") == null) { }', 'ctx.log("v", ctx.get("a"));', 'System.out.println(ctx.get("a"));',
     'double y = ctx.getDouble("a") * 2;', 'int n = ctx.getInt("a");', 'if (ctx.getBoolean("on")) { }',
+    'Double d = (Double) ctx.get("a");', 'Number n = (Number) ctx.get("a");', 'Boolean b = (Boolean) ctx.get("on");',
+    'Integer i = ctx.getInt("a");', 'boolean b = !ctx.getBoolean("on");', 'int m = ctx.getInt("a") & 1;',
   ]) {
     const { handlers, diagnostics } = compileJava(`void onValueChanged(CeContext ctx, CeEvent e) {\n  ${body}\n}`);
     assert.deepEqual(diagnostics, [], body);

@@ -446,3 +446,41 @@ test('a channel that moves in the DOCUMENT reports that channel too', async () =
   assert.deepEqual(seen, [['change', 77], ['control', 'comp', 77], ['commit', 77]],
     'not ringA\'s value, which is what the payload used to be');
 });
+
+// A session's customValues are overrides: a channel the session has not written reads the
+// document (currentValue, then default). The diff compared the raw override maps, so a drag that
+// began with no session entry — or with one a hover had created, whose customValues is {} — had no
+// baseline, and its release committed every channel, the untouched ones included.
+test('a drag that begins before any session exists commits only the channel it moved', async () => {
+  componentPanel(RINGS);
+  await rt.runPreviewSessionsForTesting();         // the baseline: no session for the component at all
+  const seen = listen();
+  await move({ dragging: true, customValues: { ringA: 10, ringB: 50, ringC: 30 } });
+  await move({ customValues: { ringA: 10, ringB: 60, ringC: 30 } });
+  await move({ dragging: false });
+  assert.deepEqual(seen.filter(([kind]) => kind === 'commit'), [['commit', 60]],
+    'ringA and ringC never moved, so they do not commit');
+});
+
+test('a drag after a hover compares channels by what they hold, not by what the session wrote', async () => {
+  componentPanel(RINGS);
+  await sessionBaseline({});                       // a hover-only session: no channel written yet
+  const seen = listen();
+  await move({ dragging: true, customValues: { ringA: 10, ringB: 50, ringC: 30 } });
+  assert.deepEqual(seen, [['change', 50], ['control', 'comp', 50]],
+    'ringA and ringC hold their defaults before and after, so they did not move');
+  seen.length = 0;
+  await move({ dragging: false });
+  assert.deepEqual(seen, [['commit', 50]]);
+});
+
+test('a channel dragged away and back still commits on release, as a one-channel control does', async () => {
+  componentPanel(RINGS);
+  await sessionBaseline({ ringA: 10, ringB: 20, ringC: 30 });
+  const seen = listen();
+  await move({ dragging: true, customValues: { ringA: 10, ringB: 50, ringC: 30 } });
+  await move({ customValues: { ringA: 10, ringB: 20, ringC: 30 } });
+  seen.length = 0;
+  await move({ dragging: false });
+  assert.deepEqual(seen, [['commit', 20]], 'it moved during the drag, so the release commits where it ended');
+});

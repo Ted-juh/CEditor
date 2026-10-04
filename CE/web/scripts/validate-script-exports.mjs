@@ -403,12 +403,16 @@ const sameValue = (a, b) => (Array.isArray(a) || Array.isArray(b)
   : Object.is(a, b));
 const show = (r) => JSON.stringify(r, (_, v) => (Object.is(v, -0) ? '-0' : typeof v === 'number' && !Number.isFinite(v) ? String(v) : v));
 
-/** Compare a compiled run with the preview's, and the canonical run with EXPECTED. '' when they agree. */
-function compareRuns(language, runs) {
+/** Compare a compiled run with the preview's, and the canonical run with EXPECTED. '' when they agree.
+ *  A source the preview will not run (a diagnostic, no handler) is a difference like any other: it
+ *  fails this language and leaves the rest of the run alone. */
+export function compareRuns(language, runs, sources = { canonical: SOURCES[language], core: CORE_SOURCES[language] }) {
   for (const id of ['canonical', 'core']) {
     const compiled = runs[id];
     if (!compiled) return `${id}: the compiled module did not run it`;
-    const preview = previewRecords(language, id === 'canonical' ? SOURCES[language] : CORE_SOURCES[language]);
+    let preview;
+    try { preview = previewRecords(language, sources[id]); }
+    catch (error) { return `${id}: ${error?.message ?? error}`; }
     const n = Math.max(compiled.length, preview.length);
     for (let i = 0; i < n; i++) {
       if (!compiled[i] || !preview[i] || !sameValue(compiled[i], preview[i])) {
@@ -661,6 +665,16 @@ ${coreValueEntries.map(([path, v]) => `            if (key == ${unicodeString(pa
 `;
 }
 
+/** The framework to build the C# harness for, from `dotnet --list-sdks`: genCsharp's own default
+ *  (net10.0) when that SDK is installed, otherwise the newest one that is — the rule verify-csharp.mjs
+ *  follows. A fixed net8.0 failed on a machine with only a newer SDK, which needs the net8.0 targeting
+ *  pack fetched to build it and a .NET 8 runtime to run it. */
+export function targetFrameworkFor(listSdks) {
+  const majors = String(listSdks).split('\n').map((line) => parseInt(line, 10)).filter((n) => Number.isFinite(n));
+  if (!majors.length || majors.includes(10)) return 'net10.0';
+  return `net${Math.max(...majors)}.0`;
+}
+
 async function validateCsharp() {
   const dotnet = resolveCommand(['dotnet']);
   if (!dotnet) return result('csharp', 'skip', 'dotnet SDK not found.');
@@ -668,6 +682,7 @@ async function validateCsharp() {
   if (sdks.status !== 0 || !sdks.stdout.trim()) {
     return result('csharp', 'skip', 'dotnet runtime found, but no .NET SDK is installed for build validation.', { tool: dotnet });
   }
+  const targetFramework = targetFrameworkFor(sdks.stdout);
   const directory = path.join(workspaceRoot, 'csharp');
   const genDir = path.join(directory, 'module');
   const runDir = path.join(directory, 'run');
@@ -682,7 +697,7 @@ async function validateCsharp() {
     '<Project Sdk="Microsoft.NET.Sdk">',
     '  <PropertyGroup>',
     '    <OutputType>Exe</OutputType>',
-    '    <TargetFramework>net8.0</TargetFramework>',
+    `    <TargetFramework>${targetFramework}</TargetFramework>`,
     '    <Nullable>enable</Nullable>',
     '    <ImplicitUsings>disable</ImplicitUsings>',
     '    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>',
@@ -926,11 +941,16 @@ const validators = [
   validateInterpreters,
 ];
 
-export async function validateScriptExportToolchains() {
+// A validator that throws is a fail for its own target (validateJavaReads → java-reads), so one
+// problem never costs the results of the others.
+const targetOf = (validator) => validator.name.replace(/^validate/, '').replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+
+export async function validateScriptExportToolchains(list = validators) {
   await resetWorkspace();
   const results = [];
-  for (const validator of validators) {
-    results.push(await validator());
+  for (const validator of list) {
+    try { results.push(await validator()); }
+    catch (error) { results.push(result(targetOf(validator), 'fail', `the check itself failed: ${error?.stack ?? error}`)); }
   }
   return {
     workspaceRoot,

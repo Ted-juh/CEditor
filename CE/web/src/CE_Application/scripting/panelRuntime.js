@@ -8154,11 +8154,15 @@ function behaviorEmits(control, eventName) {
   return true;
 }
 
+const NO_CHANNELS = Object.freeze(new Set());
+
 /**
  * What the session diff remembers about one control. `channels` is the session's customValues
  * object itself — every writer replaces it rather than editing it, so a reference is a snapshot,
  * and an unchanged one costs nothing to compare. `dragFrom` is where the channels stood when a drag
- * began: a multi-channel drag commits what moved during it (onPreviewSessionsChanged).
+ * began (null: no session had written any, so they stood where the document has them), and
+ * `dragTouched` the channels that moved at any point during it: a multi-channel drag commits those
+ * on release (onPreviewSessionsChanged).
  */
 function sessionEntry(s, prev) {
   const dragging = s.dragging === true;
@@ -8170,7 +8174,19 @@ function sessionEntry(s, prev) {
     activeHandle: String(s.activeHandle ?? ''),
     channels,
     dragFrom: dragging ? (prev?.dragging ? prev.dragFrom : (prev?.channels ?? null)) : null,
+    dragTouched: dragging && prev?.dragging ? prev.dragTouched : NO_CHANNELS,
   };
+}
+
+/**
+ * What each channel HOLDS under a session's customValues, in readLiveValue's order: the session's
+ * value, else the channel's currentValue, else its default — what the screen draws and get()
+ * returns. customValues are overrides, so the raw maps cannot be compared: a fresh or hover-only
+ * session's {} holds exactly what the document does, not nothing.
+ */
+function channelHoldings(control, id, names, customValues) {
+  const sessions = { [id]: { customValues: customValues ?? {} } };
+  return Object.fromEntries(names.map((name) => [name, readLiveValue(sessions, control, `ValueChannels.${name}.currentValue`)]));
 }
 
 function seedSessionSnapshot() {
@@ -8214,7 +8230,12 @@ function onPreviewSessionsChanged(sessions) {
     // nothing at all.
     const channelNames = cur.channels || prev.channels ? valueChannelNames(control) : [];
     if (channelNames.length > 1) {
-      const moved = changedChannels(channelNames, prev.channels, cur.channels).filter(([, value]) => value !== undefined);
+      // By what the channels hold, not by the override maps (channelHoldings), and only when the
+      // session's customValues were replaced at all: a hover or a press leaves them as they were.
+      const holds = (customValues) => channelHoldings(control, id, channelNames, customValues);
+      const moved = prev.channels === cur.channels ? []
+        : changedChannels(channelNames, holds(prev.channels), holds(cur.channels)).filter(([, value]) => value !== undefined);
+      if (cur.dragging && moved.length) cur.dragTouched = new Set([...cur.dragTouched, ...moved.map(([channel]) => channel)]);
       for (const [, value] of moved) {
         if (behaviorEmits(control, 'onValueChange')) {
           events.push({ event: 'onValueChange', controlName: name, payload: value });
@@ -8224,12 +8245,16 @@ function onPreviewSessionsChanged(sessions) {
           events.push({ event: 'onValueChanged', controlName: name, payload: value });
         }
       }
-      // The drag's commit: every channel that moved during it and was not already committed above.
+      // The drag's commit: every channel that moved during it and was not already committed above —
+      // one that went away and came back included, as a one-channel control commits on release.
       if (prev.dragging && !cur.dragging && behaviorEmits(control, 'onValueChanged')) {
         const committed = new Set(moved.map(([channel]) => channel));
-        for (const [channel, value] of changedChannels(channelNames, prev.dragFrom, cur.channels)) {
-          if (!committed.has(channel) && value !== undefined) {
-            events.push({ event: 'onValueChanged', controlName: name, payload: value });
+        const now = holds(cur.channels);
+        const net = new Set(changedChannels(channelNames, holds(prev.dragFrom), now).map(([channel]) => channel));
+        for (const channel of channelNames) {
+          if (committed.has(channel) || now[channel] === undefined) continue;
+          if (prev.dragTouched.has(channel) || net.has(channel)) {
+            events.push({ event: 'onValueChanged', controlName: name, payload: now[channel] });
           }
         }
       }

@@ -87,6 +87,19 @@ int main(int argc, char** argv) {
                g_out_key, g_out_val, core ? "ok" : "WRONG");
         ok = ok && core;
     }
+
+    /* knob3, when the module has it (Java): eight calls with a null String, each of which must throw
+     * NullPointerException in the handler rather than reach the host, then a log with a null value,
+     * which is fine, and set("refused", 8). Before, the first of them crashed the JVM. */
+    CeStr sid3 = { "knob3", 5 };
+    if (has(st, sid3, ev)) {
+        g_logv_msg[0] = 0; g_logv_tag = -1;
+        int rc = disp(st, sid3, ev, &p, NULL);
+        int nulls = rc == 0 && strcmp(g_out_key,"refused")==0 && g_out_val==8
+                 && strcmp(g_logv_msg,"still running")==0 && g_logv_tag==CE_NULL;
+        printf("knob3: dispatch=%d %s=%g last log '%s' -> %s\n", rc, g_out_key, g_out_val, g_logv_msg, nulls ? "ok" : "WRONG");
+        ok = ok && nulls;
+    }
     printf("%s\n", ok ? "NATIVE HANDLER E2E PASS" : "FAIL");
     return ok ? 0 : 1;
 }

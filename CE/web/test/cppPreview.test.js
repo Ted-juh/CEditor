@@ -482,3 +482,70 @@ test('bool literals are booleans, with C++ conversions where C++ makes them', ()
   assert.equal(values.text, '1');
   assert.equal(out.join(''), '1\n');
 });
+
+// Making `true` a bool left the conversions C++ makes everywhere but a declaration to the preview,
+// which did not make them: a cast, an assignment, a parameter and a return value each passed the
+// bool on, where the exported handler (ce_runtime.h) sends the number its type holds. And
+// `switch (flag) { case 1: }` stopped matching, since the case test was strict equality.
+test('a bool converts where its type changes: casts, assignments, parameters, returns, switch', () => {
+  const src = `
+    struct Counter { int hits; bool seen; };
+    int asInt(int x) { return x; }
+    double half(bool on) { return on ? 0.5 : 0.0; }
+    bool nonZero(double v) { return v; }
+    int truncated(double v) { return v; }
+    void store(CeContext& ctx, int x) { ctx.setValue("paramOnly", x); }
+    auto echo(bool b) { return b; }
+    void onValueChanged(CeContext& ctx, const CeEvent& event) {
+      bool flag = event.value > 0.2;
+      ctx.setValue("cDouble", (double)flag); ctx.setValue("cInt", (int)flag);
+      ctx.setValue("cBool", (bool)5); ctx.setValue("cZero", (bool)0.0);
+      ctx.setValue("cLong", (unsigned int)flag); ctx.setValue("cNeg", (int)-0.5);
+      ctx.setValue("sInt", static_cast<int>(flag)); ctx.setValue("sTrunc", static_cast<int>(63.5));
+      ctx.setValue("sBool", static_cast<bool>(2)); ctx.setValue("sDouble", static_cast<double>(flag));
+      ctx.setValue("sQualified", static_cast<std::int64_t>(-7.9));
+      int n; n = flag; ctx.setValue("assigned", n);
+      bool b = false; b = 3; ctx.setValue("assignedBool", b);
+      bool any = false; any |= flag; ctx.setValue("orAssigned", any);
+      Counter c; c.hits = flag; c.seen = 2; ctx.setValue("field", c.hits); ctx.setValue("fieldBool", c.seen);
+      ctx.setValue("param", asInt(flag)); ctx.setValue("paramBool", half(7));
+      store(ctx, flag); ctx.setValue("paramAuto", echo(7));
+      ctx.setValue("ret", nonZero(0.25)); ctx.setValue("retInt", truncated(flag));
+      auto twice = [](int x) -> double { return x * 2; };
+      auto isSet = [](double x) -> bool { return x; };
+      ctx.setValue("lambda", twice(flag)); ctx.setValue("lambdaRet", isSet(3));
+      switch (flag) { case 1: ctx.setValue("switched", "one"); break; default: ctx.setValue("switched", "default"); }
+      int one = 1;
+      switch (one) { case true: ctx.setValue("caseTrue", "matched"); break; default: ctx.setValue("caseTrue", "default"); }
+      auto kept = flag; ctx.setValue("auto", kept);
+    }`;
+  const { values, diagnostics } = run(src, 'onValueChanged', { value: 0.5 });
+  assert.deepEqual(diagnostics, []);
+  assert.equal(values.cDouble, 1);
+  assert.equal(values.cInt, 1);
+  assert.equal(values.cBool, true);
+  assert.equal(values.cZero, false);
+  assert.equal(values.cLong, 1);
+  assert.ok(Object.is(values.cNeg, 0), 'an int has no -0');
+  assert.equal(values.sInt, 1);
+  assert.equal(values.sTrunc, 63);
+  assert.equal(values.sBool, true);
+  assert.equal(values.sDouble, 1);
+  assert.equal(values.sQualified, -7);
+  assert.equal(values.assigned, 1);
+  assert.equal(values.assignedBool, true);
+  assert.equal(values.orAssigned, true);
+  assert.equal(values.field, 1);
+  assert.equal(values.fieldBool, true);
+  assert.equal(values.param, 1);
+  assert.equal(values.paramBool, 0.5);
+  assert.equal(values.paramOnly, 1);
+  assert.equal(values.paramAuto, true);
+  assert.equal(values.ret, true);
+  assert.equal(values.retInt, 1);
+  assert.equal(values.lambda, 2);
+  assert.equal(values.lambdaRet, true);
+  assert.equal(values.switched, 'one');
+  assert.equal(values.caseTrue, 'matched');
+  assert.equal(values.auto, true);
+});

@@ -15,10 +15,14 @@
 #pragma once
 #include "NativeHandlerAbi.h"
 #include <cmath>
+#include <cstdint>
 #include <initializer_list>
+#include <iterator>
+#include <limits>
 #include <string>
 #include <cstring>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace ce {
@@ -29,12 +33,36 @@ namespace ce {
 class Var {
 public:
     Var() { v_.tag = CE_NULL; }
-    Var(double d)            { v_.tag = CE_DOUBLE; v_.u.d = d; }
-    Var(int i)               { v_.tag = CE_INT64;  v_.u.i = i; }
-    Var(long long i)         { v_.tag = CE_INT64;  v_.u.i = i; }
-    Var(bool b)              { v_.tag = CE_BOOL;   v_.u.b = b ? 1 : 0; }
-    Var(const char* s)       { s_ = s; bindStr(); }
+    // Any number, from one constructor, so every arithmetic type converts to a Var exactly one way:
+    // with separate int, long long, double and bool constructors an unsigned, a size_t, a long or an
+    // int64_t (long on Linux and macOS) matched several equally well, and ctx.log("n", items.size())
+    // did not compile. A bool stays a bool, an integer (or an enum's value) is an integer, the rest a
+    // double. An unsigned 64-bit value past what int64 holds goes as a double rather than wrap.
+    template <typename T> requires (std::is_arithmetic_v<T> || std::is_enum_v<T>)
+    Var(T x) {
+        if constexpr (std::is_same_v<T, bool>) { v_.tag = CE_BOOL; v_.u.b = x ? 1 : 0; }
+        else if constexpr (std::is_enum_v<T>) { v_.tag = CE_INT64; v_.u.i = (int64_t) x; }
+        else if constexpr (std::is_integral_v<T>) {
+            if constexpr (std::is_unsigned_v<T> && sizeof(T) >= sizeof(int64_t))
+                if (x > (T) (std::numeric_limits<int64_t>::max)()) { v_.tag = CE_DOUBLE; v_.u.d = (double) x; return; }
+            v_.tag = CE_INT64; v_.u.i = (int64_t) x;
+        }
+        else { v_.tag = CE_DOUBLE; v_.u.d = (double) x; }
+    }
+    Var(const char* s)       { s_ = s ? s : ""; bindStr(); }
     Var(const std::string& s){ s_ = s; bindStr(); }
+
+    // A Var holding text hands the host a pointer into its own string, so a copy or a move points the
+    // new Var at the new Var's string. The ones the compiler writes copied the pointer, and left it
+    // aimed at the source: once that changed or went away (a Var stored in a vector that grew, a copy
+    // that outlived the read it came from) the host was handed freed or overwritten memory.
+    Var(const Var& o) : v_(o.v_), ext_(o.ext_), s_(o.s_) { rebind(); }
+    Var(Var&& o) noexcept : v_(o.v_), ext_(o.ext_), s_(std::move(o.s_)) { rebind(); o.rebind(); }
+    Var& operator=(const Var& o) { if (this != &o) { v_ = o.v_; ext_ = o.ext_; s_ = o.s_; rebind(); } return *this; }
+    Var& operator=(Var&& o) noexcept {
+        if (this != &o) { v_ = o.v_; ext_ = o.ext_; s_ = std::move(o.s_); rebind(); o.rebind(); }
+        return *this;
+    }
 
     static Var view(const CeValue* v) { Var r; r.ext_ = v; return r; }
     const CeValue* abi() const { return ext_ ? ext_ : &v_; }
@@ -47,10 +75,20 @@ public:
 
 private:
     void bindStr() { v_.tag = CE_STRING; v_.u.s = CeStr { s_.data(), (int64_t) s_.size() }; }
+    void rebind() { if (!ext_ && v_.tag == CE_STRING) bindStr(); }
     CeValue v_ {};
     const CeValue* ext_ = nullptr;
     std::string s_;
 };
+
+// What sendSysex takes as bytes: a container or array whose elements are integers — but not char
+// (nor the other character types), which is text, and not bool.
+template <typename T> inline constexpr bool isTextChar = std::is_same_v<T, char> || std::is_same_v<T, wchar_t>
+    || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t> || std::is_same_v<T, char32_t>;
+template <typename R> concept SysexBytes = requires (const R& r) { std::begin(r); std::end(r); }
+    && std::is_integral_v<std::remove_cvref_t<decltype(*std::begin(std::declval<const R&>()))>>
+    && !std::is_same_v<std::remove_cvref_t<decltype(*std::begin(std::declval<const R&>()))>, bool>
+    && !isTextChar<std::remove_cvref_t<decltype(*std::begin(std::declval<const R&>()))>>;
 
 class Context {
 public:
@@ -110,19 +148,17 @@ public:
     void sendNRPN(int ch, int msb, int lsb, const Var& v) { h_->send_nrpn(h_->host_ctx, ch, msb, lsb, v.abi()); }
 
     /** sendSysex(bytes) or sendSysex("F0 41 10 …"). The list or the string goes to the host as it
-        is — the host clamps each byte and adds F0/F7 exactly as it does for Lua and JS. */
-    void sendSysex(const std::vector<int>& bytes) {
-        std::vector<CeValue> items(bytes.size());
-        for (size_t i = 0; i < bytes.size(); ++i) { items[i] = CeValue{}; items[i].tag = CE_INT64; items[i].u.i = bytes[i]; }
-        CeValue list{}; list.tag = CE_LIST; list.u.list.items = items.data(); list.u.list.len = (int64_t) items.size();
-        if (CE_HAS_FIELD(h_, send_sysex_value) && h_->send_sysex_value) { h_->send_sysex_value(h_->host_ctx, &list); return; }
-        // A host older than the slot takes packed bytes: clamp them first, as the host would.
-        std::vector<uint8_t> packed(bytes.size());
-        for (size_t i = 0; i < bytes.size(); ++i) packed[i] = (uint8_t) (bytes[i] < 0 ? 0 : bytes[i] > 255 ? 255 : bytes[i]);
-        CeBytes b { packed.data(), (int64_t) packed.size() };
-        h_->send_sysex(h_->host_ctx, &b);
+        is — the host clamps each byte and adds F0/F7 exactly as it does for Lua and JS. The bytes
+        may be any container or array of integers: std::vector<uint8_t>, std::array<int, N>,
+        int bytes[] = {…}, a braced list. Not of char, which is text: a std::string or a char
+        array is the hex form. */
+    template <typename R> requires SysexBytes<R>
+    void sendSysex(const R& bytes) {
+        std::vector<int64_t> values;
+        for (const auto& b : bytes) values.push_back((int64_t) b);
+        sendSysexValues(values);
     }
-    void sendSysex(std::initializer_list<int> bytes) { sendSysex(std::vector<int>(bytes)); }
+    void sendSysex(std::initializer_list<int> bytes) { sendSysexValues(std::vector<int64_t>(bytes.begin(), bytes.end())); }
     void sendSysex(const char* hex) {
         if (!(CE_HAS_FIELD(h_, send_sysex_value) && h_->send_sysex_value)) { log("sendSysex(\"\xE2\x80\xA6\"): this host takes a list of bytes, not a hex string."); return; }
         Var v(hex); h_->send_sysex_value(h_->host_ctx, v.abi());
@@ -189,6 +225,17 @@ public:
     double curve(double v, const std::string& shape) { return curve(v, shape.c_str()); }
 
 private:
+    void sendSysexValues(const std::vector<int64_t>& bytes) {
+        std::vector<CeValue> items(bytes.size());
+        for (size_t i = 0; i < bytes.size(); ++i) { items[i] = CeValue{}; items[i].tag = CE_INT64; items[i].u.i = bytes[i]; }
+        CeValue list{}; list.tag = CE_LIST; list.u.list.items = items.data(); list.u.list.len = (int64_t) items.size();
+        if (CE_HAS_FIELD(h_, send_sysex_value) && h_->send_sysex_value) { h_->send_sysex_value(h_->host_ctx, &list); return; }
+        // A host older than the slot takes packed bytes: clamp them first, as the host would.
+        std::vector<uint8_t> packed(bytes.size());
+        for (size_t i = 0; i < bytes.size(); ++i) packed[i] = (uint8_t) (bytes[i] < 0 ? 0 : bytes[i] > 255 ? 255 : bytes[i]);
+        CeBytes b { packed.data(), (int64_t) packed.size() };
+        h_->send_sysex(h_->host_ctx, &b);
+    }
     static CeStr cstr(const char* s) { return CeStr { s, (int64_t) std::strlen(s) }; }
     static Var copyOut(const CeValue& o) {
         if (o.tag==CE_STRING) return Var(std::string(o.u.s.ptr, (size_t) o.u.s.len));

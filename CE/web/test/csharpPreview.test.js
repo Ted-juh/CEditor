@@ -178,3 +178,28 @@ test('bool literals are booleans', () => {
   assert.equal(values.off, false);
   assert.deepEqual(out.map((s) => s.trim()), ['True', 'on: True']);
 });
+
+// On two bools, & | and ^ are the logical operators, and give a bool; the preview used JS's bitwise
+// ones and gave 1, so `both == true` was false again, while the export sends a bool.
+test('& | and ^ on two bools give a bool', () => {
+  const src = `void OnValueChanged(CeContext ctx, CeEvent e) {
+    bool flag = e.value > 0.2; bool above = e.value > 0.4; bool low = e.value > 0.9;
+    bool both = flag & above;
+    ctx.SetValue("both", both); ctx.SetValue("eq", both == true);
+    ctx.SetValue("either", low | flag); ctx.SetValue("differ", flag ^ low); ctx.SetValue("same", flag ^ above);
+    bool any = false; any |= flag; ctx.SetValue("orAssigned", any);
+    bool all = true; all &= low; ctx.SetValue("andAssigned", all);
+    bool flip = true; flip ^= true; ctx.SetValue("xorAssigned", flip);
+    ctx.SetValue("bits", 6 & 3);
+  }`;
+  const { values } = run(src, 'OnValueChanged', { value: 0.5 });
+  assert.equal(values.both, true);
+  assert.equal(values.eq, true);
+  assert.equal(values.either, true);
+  assert.equal(values.differ, true);
+  assert.equal(values.same, false);
+  assert.equal(values.orAssigned, true);
+  assert.equal(values.andAssigned, false);
+  assert.equal(values.xorAssigned, false);
+  assert.equal(values.bits, 2);
+});

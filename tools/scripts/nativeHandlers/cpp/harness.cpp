@@ -3,11 +3,13 @@
 // (generated glue + NativeHandlerAbi.h + ce_runtime.h) loads, dispatches per-script, and calls back
 // into the host. Builds against a module produced by genCpp.mjs from a fixed set of sample scripts.
 #include "NativeHandlerAbi.h"
+#include "ce_runtime.h"
 #include <dlfcn.h>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <map>
+#include <vector>
 
 static std::map<std::string,double> g_set;
 static int g_cc = -1;
@@ -27,6 +29,25 @@ static void CE_CALL h_emit(void*, const CeStr*, const CeValue*){}
 static void CE_CALL h_freev(void*, CeValue*){}
 static void* CE_CALL h_alloc(void*, size_t n){ return malloc(n); }
 static void  CE_CALL h_dealloc(void*, void* p, size_t){ free(p); }
+
+// A Var holding text hands the host a pointer into its own string, through copies, moves and a vector
+// that grows (which moves every element). The copies and moves the compiler wrote kept the source's
+// pointer, so these read freed or overwritten memory: the strings came back empty or as another's.
+static bool varKeepsItsText(){
+  auto text = [](const ce::Var& v){ const CeValue* a = v.abi(); return a->tag==CE_STRING ? std::string(a->u.s.ptr,(size_t)a->u.s.len) : std::string("<not text>"); };
+  bool ok = true;
+  std::vector<ce::Var> held;
+  for (int i = 0; i < 40; ++i) held.push_back(ce::Var(std::string("item ") + std::to_string(i)));
+  for (int i = 0; i < 40; ++i) ok = ok && text(held[i]) == "item " + std::to_string(i);
+  ce::Var a(std::string("short")); ce::Var b = a; a = ce::Var(std::string("XXXXX"));
+  ok = ok && text(b) == "short" && text(a) == "XXXXX";
+  ce::Var c(std::string("moved")); ce::Var d = std::move(c);
+  ok = ok && text(d) == "moved" && c.abi()->u.s.ptr != d.abi()->u.s.ptr;
+  ce::Var e; e = std::move(d); d = ce::Var(std::string("again"));
+  ok = ok && text(e) == "moved" && text(d) == "again";
+  printf("Var text through copies, moves and a growing vector: %s\n", ok ? "ok" : "WRONG");
+  return ok;
+}
 
 int main(){
   void* lib = dlopen("./ce_handlers_cpp.so", RTLD_NOW);
@@ -58,7 +79,7 @@ int main(){
   disp(st,S("p1"),S("onPanelReady"),&ready,nullptr);
   printf("cc=%d (expect 7)\n", g_cc);
 
-  bool ok = g_set["out"]==21 && g_log=="ran" && g_set["r"]==20 && g_cc==7;
+  bool ok = g_set["out"]==21 && g_log=="ran" && g_set["r"]==20 && g_cc==7 && varKeepsItsText();
   printf("%s\n", ok? "ALL PASS ✓" : "FAIL ✗");
   return ok?0:1;
 }

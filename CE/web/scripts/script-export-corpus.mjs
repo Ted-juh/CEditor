@@ -143,9 +143,14 @@ export const JAVA_READ_CASES = [
   'double y = Math.sqrt(ctx.get("a"));', 'double y = ctx.clamp(ctx.get("a"), 0, 1);', 'double x = 1; x -= ctx.get("a");',
   'double y = ctx.get("a") + 1;', 'int n = ctx.get("a") > 0.5 ? 1 : 0;', 'String s = ctx.get("a") + ctx.get("b");',
   'double y = ctx.curve(0.3, ctx.get("shape"));', 'boolean b = !ctx.get("on");', 'int s = ctx.get("on") ? 1 : 0;',
-  'while (ctx.get("on")) { break; }', 'List<Double> l = ctx.get("a");',
-  // these compile and throw: a Double cannot be cast to int, float or long
+  'while (ctx.get("on")) { break; }', 'List<Double> l = ctx.get("a");', 'boolean b = ctx.get("on") && true;',
+  'boolean b = false || ctx.get("on");', 'int n = ctx.get("a") << 1;', 'boolean b = ctx.get("on") & true;',
+  'int n = 0; n |= ctx.get("a");',
+  // these compile and throw: a Double cannot be cast to int, float or long, nor to Integer and the
+  // other boxes but Double
   'int n = (int) ctx.get("a");', 'float f = (float) ctx.get("a");', 'long l = (long) ctx.get("a");',
+  'Integer i = (Integer) ctx.get("a");', 'Long l = (Long) ctx.get("a");', 'Float f = (Float) ctx.get("a");',
+  'Short s = (Short) ctx.get("a");', 'Byte b = (Byte) ctx.get("a");', 'Character c = (Character) ctx.get("a");',
   // and these are fine Java, which the preview must leave alone
   'double x = (double) ctx.get("a");', 'Object o = ctx.get("a");', 'var v = ctx.get("a");', 'String s = "v=" + ctx.get("a");',
   'ctx.set("b", ctx.get("a"));', 'ctx.log("v", ctx.get("a"));', 'int n = (int) (double) ctx.get("a");',
@@ -156,6 +161,10 @@ export const JAVA_READ_CASES = [
   'double x = ctx.getDouble("a");', 'int n = ctx.getInt("a");', 'String s = ctx.getString("t");',
   'boolean b = ctx.getBoolean("on");', 'double y = ctx.getDouble("a") * 2;', 'if (ctx.getBoolean("on")) { ctx.log("x"); }',
   'long l = (long) ctx.getDouble("a");', 'double y = Math.sqrt(ctx.getDouble("a", "value"));',
+  'Integer i = ctx.getInt("a");', 'Long l = (long) ctx.getDouble("a");', 'Short s = (short) ctx.getDouble("a");',
+  'boolean b = !ctx.getBoolean("on");', 'boolean b = ctx.getBoolean("on") && true;', 'int n = ctx.getInt("a") << 1;',
+  'boolean b = ctx.getBoolean("on") & true;', 'int m = ctx.getInt("a") & 1;', 'int n = 0; n |= ctx.getInt("a");',
+  'Double d = (Double) ctx.get("a");', 'Number n = (Number) ctx.get("a");', 'Boolean b = (Boolean) ctx.get("on");',
 ];
 
 /** What the recording host answers for a get(): one value of each kind a read has to convert — a
@@ -186,7 +195,14 @@ const helperCalls = (setter, name) => HELPER_CASES
   .join('\n');
 
 export const CORE_SOURCES = {
-  cpp: `void onValueChanged(CeContext& ctx, const CeEvent& event) {
+  cpp: `#include <array>
+#include <vector>
+struct Hits { int count; bool seen; };
+int asInt(int x) { return x; }
+void store(CeContext& ctx, int x) { ctx.set("conv.param", x); }
+bool nonZero(double v) { return v; }
+
+void onValueChanged(CeContext& ctx, const CeEvent& event) {
   double zero = 0.0;
   double half = event.value;
   ctx.set("a.value", event.value);
@@ -220,6 +236,42 @@ export const CORE_SOURCES = {
   ctx.sendCC(1, 64, true);
   ctx.emit("toggled", true);
   ctx.emit("level", 0.75);
+  ctx.set("conv.cast", (double)flag);
+  ctx.set("conv.int", (int)above);
+  ctx.set("conv.wide", (unsigned int)flag);
+  ctx.set("conv.static", static_cast<int>(flag));
+  ctx.set("conv.trunc", static_cast<int>(63.5));
+  ctx.set("conv.neg", (int)-0.5);
+  ctx.set("conv.bool", static_cast<bool>(2));
+  int assigned; assigned = flag;
+  ctx.set("conv.assigned", assigned);
+  bool any = false; any |= above;
+  ctx.set("conv.or", any);
+  Hits hits; hits.count = flag; hits.seen = 2;
+  ctx.set("conv.field", hits.count);
+  ctx.set("conv.fieldBool", hits.seen);
+  ctx.set("conv.ret", asInt(flag));
+  store(ctx, above);
+  ctx.set("conv.nonZero", nonZero(0.25));
+  switch (flag) { case 1: ctx.log("switch matched"); break; default: ctx.log("switch default"); }
+  std::vector<int> items = {1, 2, 3};
+  ctx.log("count", items.size());
+  unsigned int wide = 3;
+  ctx.sendNRPN(2, 1, 11, wide);
+  ctx.sendCC(1, 76, 5L);
+  ctx.emit("index", (int64_t) 7);
+  ctx.log("small", (uint8_t) 200);
+  std::vector<uint8_t> raw = {0xF0, 0x43, 0xF7};
+  ctx.sendSysex(raw);
+  int fixed[] = {0xF0, 0x44, 0xF7};
+  ctx.sendSysex(fixed);
+  std::array<long, 3> longs = {0xF0, 0x45, 0xF7};
+  ctx.sendSysex(longs);
+  auto label = ctx.get("label.text");
+  auto copy = label;
+  label = "replaced";
+  ctx.set("copy.text", copy);
+  ctx.set("label.text", label);
 ${helperCalls((i) => (i % 2 ? 'set' : 'setValue'), (fn) => fn)}
 }
 `,
@@ -259,6 +311,11 @@ ${helperCalls((i) => (i % 2 ? 'set' : 'setValue'), (fn) => fn)}
   ctx.sendNRPN(2, 1, 10, false);
   ctx.emit("toggled", true);
   ctx.emit("level", 0.75);
+  bool both = flag & above;
+  ctx.set("both.value", both);
+  ctx.SetValue("both.eq", both == true);
+  bool any = false; any |= above; any ^= flag;
+  ctx.set("any.value", any);
 ${helperCalls((i) => (i % 2 ? 'set' : 'SetValue'), (fn, i) => (i % 2 ? fn : pascal(fn)))}
 }
 `,
@@ -296,6 +353,11 @@ ${helperCalls((i) => (i % 2 ? 'set' : 'SetValue'), (fn, i) => (i % 2 ? fn : pasc
   ctx.sendNRPN(2, 1, 10, false);
   ctx.emit("toggled", true);
   ctx.emit("level", 0.75);
+  boolean both = flag & above;
+  ctx.set("both.value", both);
+  ctx.set("both.eq", both == true);
+  boolean any = false; any |= above; any ^= flag;
+  ctx.set("any.value", any);
 ${typedReads()}
   int step = ctx.getInt("step.value");
   double level = ctx.getDouble("cutoff.value", "value");

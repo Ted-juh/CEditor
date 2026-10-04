@@ -159,8 +159,9 @@ a handler you mean to ship to this core, or write it in Lua or JavaScript. Two m
   `getDouble` gives a number as it is, a flag as 1 or 0 and anything else as 0; `getInt` is
   that with the fraction dropped, as Java's `(int)` does; `getString` gives text, or `""`
   for anything else; `getBoolean` gives a flag, or whether a number is non-zero. A cast such as
-  `(int) ctx.get(...)` compiles and then throws, since a number comes back as a `Double`. The
-  preview reports a read javac would reject, with the typed read to write, and does not run it.
+  `(int) ctx.get(...)` or `(Integer) ctx.get(...)` compiles and then throws, since a number comes
+  back as a `Double`. The preview reports a read javac would reject, with the typed read to
+  write, and does not run it.
 - Only the handler for the script's own event is compiled, and `setup` is not called, so
   `on(...)` listeners registered there run in the preview only.
 
