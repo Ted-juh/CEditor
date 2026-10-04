@@ -95,7 +95,14 @@ not named with a version number ("Alpha0.04")."
 **Where.** `CE/src/UpdateCheck.h:120-129` — the code is right; the published release is not. **Publishing 0.2.0 as a
 GitHub pre-release will not fix it**: `releases/latest` skips pre-releases and keeps returning `Alpha0.04`. Publish
 `v0.2.0` as a full release, or retag/delete `Alpha0.04`.
-**Evidence level.** read-in-code + the live GitHub API reply. (To be observed in the running Linux app.)
+Also: on Windows JUCE returns a stream for a 4xx reply and `ValueTreeBridgeHandlers.cpp:782-788` tests only
+`body.isEmpty()`, so a 404 (no full release) or a 403 rate limit is reported as the same naming error, not as a
+service error. Related: About → "Open the release page" is a `target="_blank"` link (`AboutOverlay.svelte:53`) and
+`WebViewHost.cpp` does not override `newWindowAttemptingToLoad`, so the link opens nothing; and "Check for Updates on
+Startup" only writes to the About overlay and the Console (`stores/updateChannel.js:35-53`) — no notice is raised,
+although the release notes and that file's own header say it tells you.
+**Evidence level.** observed-in-test — the live `releases/latest` reply and GitHub's 404/403 bodies fed to the app's
+own `readLatestRelease`/`updateCheckSummary`; the 4xx and new-window paths read in vendored JUCE.
 
 ### C-08 — A shared panel's JavaScript can read and write any file on the machine through the app's native bridge   (S1 · security · scripting / sharing)
 
@@ -139,5 +146,169 @@ never clear.
 **Where.** `CE/web/src/CE_Application/editor/TabBar.svelte:288-307` (no `screen` branch; the `else` calls
 `closePanel(id)`, a no-op for a `ctrl_screen_…` id); `stores/screenBuilder.js:102-105` (no confirm on Ctrl+W).
 **Evidence level.** observed-in-test (store test) + read-in-code.
+
+### C-11 — "Send saved sound" overwrites every dump parameter the panel does not export with 0 — including the synth's System block   (S1 · faulty · Total Recall)
+
+**Repro.** A panel bound (default role `mainSynth`) to a profile with `dumpDefinitions` — e.g. `roland-gaia-sh01`,
+26 dumps. Export, save a DAW project, reopen, press **Send saved sound** (or policy `restoreHardware: always`).
+**Observed.** Every declared dump is built from the APVTS values alone; parameters with no value get
+`payload.defaultByte` (0). GAIA: `system` 89 of 89 unmapped →
+`F0 41 10 00 00 41 12 01 00 00 00 00 00 00 …` (Master Tune, Clock Source, Rx/Tx channel, Rx Program Change … all
+raw 0); all 16 arpeggio patterns zeroed; 694 parameters written as 0 across the 26 dumps — sent *before* the values.
+**Expected.** RELEASE-NOTES: a reopened project "puts the whole saved patch back on the synth". `PluginProcessor.h:1002`
+"The dump is the patch". A dump the panel binds nothing in should not be sent at all, and unbound bytes should come
+from a captured device dump, not from zero.
+**Where.** `CE/src/Player/PluginProcessor.h:1031-1053` (`refreshCapturedDumps`: builds every `dumpDefinitionIds()`,
+keeps any `result.ok`, even 100 % unmapped), `:1062-1091` (sends them first);
+`CE/src/DeviceProfile/DeviceProfileEngine.cpp:1205-1223` (fills with `defaultByte`, unmapped is "reported, not
+refused"). Masked today for the shipped panels by C-12 — it bites exactly the user who follows the release notes'
+"bind a panel to a device".
+**Evidence level.** observed-in-test with the editor's JS copy of the builder over the shipped GAIA profile; Claude
+read the C++ (`refreshCapturedDumps` and the fill loop) and it applies the same rule.
+
+### C-12 — The plug-in looks up dumps, program recall and `ce.device.buildDump` under a hard-coded `mainSynth` role: Total Recall and the Programs menu do nothing for the shipped panels   (S2 · bug · Player)
+
+**Repro.** Export `Roland GAIA SH-01.cepanel` (role "Roland GAIA SH-01"), `Yamaha AN1x.cepanel` ("Yamaha AN1x") or any
+New Panel from Device Profile panel (role `primary`, `autoPanel.js:78`).
+**Observed.** `deviceService.engineForRole({})` resolves to `mainSynth`, which in the plug-in is the constructor
+default `test-cc-synth` (`DeviceProfileService.cpp:11-19`): 0 dumps, no presets. So no dump is ever stored ("pushed
+0 dump(s)"), a baked program bank shows names in the DAW but recalling one fails "Profile has no preset model", and
+`ce.device.buildDump` fails. GAIA's export parameters use its role 188×, AN1x's 397×; neither uses `mainSynth`.
+**Where.** `CE/src/Player/PluginProcessor.h:883, 1032, 1067, 1751` (`engineForRole({})`); the Player web side was
+already moved to the panel's own role (`Player.svelte:47-49, 420-450`), the processor was not.
+**Evidence level.** read-in-code; roles and profile contents measured.
+
+### C-13 — An exported plug-in cannot find a device profile the user imported; its device-bound controls send nothing   (S2 · bug · export)
+
+**Repro.** File → Import Device Profile… (from Documents), bind a panel to it, export, load the plug-in.
+**Observed.** The template exporter copies only `<install>/CE/profiles/test` into the bundle
+(`export-panel-template.mjs:304-307`); the plug-in loads profiles only from `<module>/CE/profiles/test`
+(`DeviceProfileService.cpp:600-619`); nothing embeds the panel's own profile. Every message compile fails "No device
+profile mapped for role". Only the nine shipped profiles work in an export.
+**Expected.** RELEASE-NOTES: "Bind a panel to a device … and export the result as a plugin."
+**Evidence level.** read-in-code (whole lookup chain traced). Related: imported profiles are not re-listed after a
+restart (only that folder is scanned), and editing a shipped profile under Program Files writes to its own file —
+very likely refused without elevation. **Codex: worth checking on the installed build.**
+
+### C-14 — Renaming the panel, its file, plug-in name or vendor changes the CLAP id and LV2 URI: saved CLAP/LV2 sessions lose the plug-in   (S2 · faulty · export identity)
+
+**Repro.** Open the same GAIA document saved under two file names and export.
+**Observed.** VST3 id `OLLs` both times; CLAP `com.tedjuh.roland-gaia-sh-01.69eedf81` vs
+`com.tedjuh.gaia-live-rig.69eedf81`; LV2 URI likewise. "Update this plugin" does not keep them either.
+**Expected.** `panel-export-pipeline-plan.md:24` "Re-exporting the same panel → the same identity";
+`PanelExportIdentity.h` "same GUID → identical identity".
+**Where.** `CE/src/Export/PanelExportIdentity.h:107-110` (id = `com.<vendorSlug>.<nameSlug>.<hash>`) and its JS copy
+`utils/exportIdentity.js`; `Lv2SidecarIdentity.h:51`.
+**Evidence level.** observed-in-test.
+
+### C-15 — Hostage in the editor is locked to the Free edition — one plug-in at a time — and no licence can unlock it   (S2 · faulty · licensing — needs an owner decision)
+
+**Repro.** File → Hostage…, load an instrument, then load a second on another part; or use scenes/setlists,
+patterns/clips, return buses, script actions. Edition tab → Install a licence…, paste any licence.
+**Observed.** Second instrument: "The Free edition loads one plug-in at a time…". Others: "… are part of Pro. You are on
+Free…". Every licence: "This build carries no licence key, so nothing can be verified." The same Edition page lists
+"Basic splits, layers and multis" under "None of these is ever withheld" beside "More than one plug-in at a time ·
+1 of 1 loaded".
+**Expected.** `docs/licence-and-sunset-policy.md` calls the edition ladder "a plan, not an offer" (no JUCE commercial
+licence yet) and promises a published sunset key "licenses every edition on every machine" — impossible without a
+public key. RELEASE-NOTES does not mention Hostage or any limit.
+**Where.** `InstrumentHostService.cpp:19873-19879` reads `hostProject.licencePublicKey`, which nothing outside
+`CE/tests` writes (Claude grepped `CE/src`, `CE/web/src`, `tools`); `Licence.cpp:151-157`;
+`Entitlements.cpp:39-49` (`maxLoadedParts = 1` for Free); refusal at `InstrumentHostService.cpp:8448-8459`.
+**Evidence level.** read-in-code; Claude confirmed the missing writer and the Free cap. **Codex: please observe this on
+Windows (W5), where a second instrument can actually be loaded.**
+
+### C-16 — Old panels show LV2 on in the Export tab; the installed exporter silently builds no LV2   (S3 · faulty · export)
+
+**Repro.** A panel whose `exportSettings` lacks `exportClap`/`exportLv2` (saved by an intermediate build, or
+hand-made); Build → Export Plugin from the installed app.
+**Observed.** Export tab note `.vst3 + .clap + .lv2`, compiling exporter builds all three, installed exporter builds
+`vst3 + clap` with no warning.
+**Where.** `export-panel-template.mjs:193-196` (`=== true`) vs `PanelCardContent.svelte:214-220` and
+`export-panel-vst3.mjs:390` (`!== false`); `panelModel.js:456-457` does not backfill keys inside `exportSettings`.
+`known-issues.md:259-261` describes the compiling exporter's reading backwards.
+**Evidence level.** observed-in-test.
+
+### C-17 — The Export tab tells installed users CLAP and LV2 need a source checkout, and that output goes to `export-out/`   (S3 · faulty · export UI)
+
+**Observed.** CLAP and LV2 hints: "Requires export from a source checkout with a C++ build environment"; section note:
+"Additional formats … require the compiling exporter"; Output hint: "into export-out/" — the installed app writes
+Documents\CEditor\Exports; the CLAP hint says "next to the .vst3", the template writes `<Name>/<Name>.clap`.
+**Expected.** RELEASE-NOTES: "VST3, CLAP and LV2 … without Visual Studio or a source checkout, into Documents →
+CEditor → Exports"; the installer stages all three templates (`package-installer.ps1:191-242`).
+**Where.** `CE/web/src/CE_Application/panels/PanelCardContent.svelte:805, 1093-1107`.
+**Evidence level.** read-in-code.
+
+### C-18 — A failed compiler-free export destroys the previous working export   (S3 · faulty · export)
+
+**Observed.** With every format on, a second export whose LV2 helper exits 3 fails "LV2 manifests could not be written"
+after the VST3 and CLAP folders were already replaced; the old LV2 is left as a bundle with no `.ttl` (hosts ignore
+it), and a raw Node stack line lands in the build log.
+**Expected.** The compiling exporter stages and swaps on success (`export-panel-vst3.mjs:442-517`); known-issues says an
+export "fails explicitly before replacing an export".
+**Where.** `tools/scripts/export-panel-template.mjs:244-318` (`rmSync` then copy, per format, no staging).
+**Evidence level.** observed-in-test (simulated install tree, fake templates).
+
+### C-19 — A panel with no `panelGuid` gets a new random GUID on every open; a re-export silently makes a different plug-in   (S3 · bug · export identity)
+
+**Observed.** The AN1x document without `panelGuid`, opened twice: `48796eac…` (code `Cpmq`) then `e441f522…` (`Y8ly`),
+both `modified: false`; the export registry says "adopt", the next export overwrites `Exports/<Name>.vst3` with a new
+FUID and old DAW projects lose it.
+**Where.** `stores/panelModel.js:455-476` (`{...createPanel(), ...data}` mints a GUID) makes the "mint and persist"
+branch in `panels.js:1193-1197` unreachable.
+**Evidence level.** observed-in-test.
+
+### C-20 — Two different panels with the same plug-in name overwrite each other's export without a word   (S3 · faulty · export)
+
+**Observed.** Two documents, different GUIDs, both "Yamaha AN1x" → both report `Exports/Yamaha AN1x.vst3`; one bundle
+survives, carrying the second GUID.
+**Where.** `export-panel-template.mjs:252-256`; `ValueTreeBridgeHandlers.cpp:1601-1606`. The registry checks GUID
+collisions only.
+**Evidence level.** observed-in-test.
+
+### C-21 — Exports from a source checkout read their panel from an absolute path in `export-out/`   (S3 · faulty · compiling exporter)
+
+**Observed.** `CE_VST_PANEL_PATH` bakes the absolute `export-out/<productName>.cepanel` into the binary and the panel is
+not copied into the bundle: moved to another machine the plug-in loads no panel (0 parameters); a same-named re-export
+rewrites what the earlier plug-in reads; the CLAP is a bare file, not the folder the release notes describe; a `/` or
+`:` in the product name fails.
+**Where.** `export-panel-vst3.mjs:327-331, 408, 488-490`; `CMakeLists.txt:523-524`; `PluginProcessor.h:30-37`.
+**Evidence level.** read-in-code. Developer path, but it is the path `CLAUDE.md` and the docs show first.
+
+### C-22 — Neither the installer nor the app ships the AGPL text or says where the source is   (S3 · faulty · licensing)
+
+**Observed.** `tools/installer/CEditor.iss` has no `LicenseFile` and does not install `LICENSE`; `CMakeLists.txt`
+install rules (1958-1980) install no licence; About summarises the AGPL with no text and no repository URL; exported
+plug-in folders carry no licence file.
+**Expected.** AGPLv3 §4/§6: the licence accompanies the program, and object code comes with directions to the
+Corresponding Source — the app's own notice tells exporters to do exactly this.
+**Evidence level.** read-in-code.
+
+### C-23 — On a fresh install the default device, and File → Open Device Profile, are a test fixture ("Test CC Synth")   (S3 · faulty · first run)
+
+**Observed.** `selectedDeviceProfileId` and the `mainSynth` mapping default to `test-cc-synth`; Open Device Profile
+opens it with no chooser. New Panel from Device Profile lists Test CC/NRPN/SysEx Synth and three GAIA SH-01 variants
+(15, 882 and 40 parameters) side by side.
+**Where.** `stores/deviceProfileStores.js:32, 39`; `stores/appSettingsSchema.js:231`;
+`stores/deviceProfileSession.js:266`; `layout/MenuBar.svelte:107-117`; `DeviceProfileService.cpp:600-615`.
+**Evidence level.** read-in-code (to be observed in the Linux app run).
+
+### C-24 — Release notes, README and user docs quote numbers and formats the product no longer matches   (S4 · docs)
+
+- "50 component types", "24 export … 26 decline" (RELEASE-NOTES, known-issues CLOSED): the code has **58** registered,
+  56 insertable (Claude counted 56 in the Insert menu), **28 export / 30 decline**.
+- "793 parameters become 1624 controls in a second": `roland-gaia-sh01` now gives **882 → 1804**, ~2.7 s in node.
+- "C# and Java … ~230 MB and ~195 MB": the manifest totals **409 MB** and **379 MB** (Settings shows these correctly).
+- README: panels "export as a VST3, CLAP, LV2 or standalone application"; `clap-export.md` "(and the standalone)" —
+  RELEASE-NOTES: the standalone is not a per-panel export option.
+- `clap-export.md`: LV2 "builds by default too" — new panels are VST3 only; a Python `.clap` "runs window-open only"
+  — `exportValidation.mjs:24-33` refuses that combination.
+- `scripting-language-options-and-shippable-export.md` §1: "The installed app cannot export".
+- The regenerated VST3 `moduleinfo.json` is always version 1.0.0 (`export-panel-template.mjs:110`), whatever the
+  panel's version.
+- `release-checklist-2026-09-14.md` says "none hold stale evidence", but A6/D1/D2/D4 quote 14 Sep (`43d50bc4`) and the
+  tree has since gained the CLAP/LV2 template export and the animation overhaul — by its own legend they are STALE.
+- Checklist E still open: no `Recorder.snapToScale` line in RELEASE-NOTES; the six unreachable fields are still declared.
+**Evidence level.** counts demonstrated with the real `classifyType`, `autoPanelPlan` and catalogues; the rest read.
 
 ## Verification of the other's findings
