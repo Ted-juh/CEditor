@@ -237,3 +237,26 @@ The run on 2026-09-08, all on the Linux binary under Xvfb:
 
 Every number above came out of `~/.config/CEditor/instrument-host/library.json` on that
 machine, not out of a test stub.
+
+### The second run, 2026-10-01
+
+Repeated from this page at commit `3b574a4`, on a container with the same packages, to show that
+the recipe still holds after the library moved to SQLite and the player gained its template
+formats. Nothing in the recipe needed changing; one of its own warnings was the only thing that
+went wrong (see the last row).
+
+| Step | Result |
+| --- | --- |
+| Link | `CEditor` 19.9 MB and `CEditorPluginScanner`, zero errors, incremental from a tree configured on 2026-09-30 |
+| First paint | within the 95 s waited; `WebKitWebProcess` and the `--juce-gtkwebkitfork-child` present, build stamp of the head commit in the title bar |
+| Hostage | opened from File → Hostage…; header *No audio device*, banner *Audio device: no channels* — the native service, not the browser mock |
+| Scan | Library → Scan plug-ins over one directory: *1 candidates: 1 scanned, 0 unchanged, 0 quarantined, 0 wrong architecture, 0 failed* |
+| What it scanned | `Roland GAIA SH-01.vst3` as written that morning by the compiler-free template exporter — a second host, loading the template export through the real out-of-process worker |
+| Catalogue | `plugin-catalog.json`: fingerprint `56b726ab3de8867b`, `failureCount: 0`, class *Roland GAIA SH-01* by *Tedjuh* (the first run of this read *Tedjuh-inc*, which is what led to `3b574a4`) |
+| Library | `library.db` with its WAL beside it — the SQLite store of `046fa85`, created by the real service on first start |
+| The bite | `pkill -f "Xvfb :99"` matched the shell that ran it and killed that instead; Xvfb never started. The last row of [Things that will bite you](#things-that-will-bite-you-all-of-them-did), met again. Start Xvfb with `setsid` and check with `pgrep -x Xvfb`. |
+
+Not exercised this time: instruments, presets, the auditioner and the map. No synth was built for
+the run; the catalogue and the library were the point. The limits in [What runs](#what-runs-and-what-does-not)
+are unchanged, and the two Windows-only failures found by CI the same day (a crash-dump test and a
+race between two hardware-surface claims) were in exactly the territory that section names.

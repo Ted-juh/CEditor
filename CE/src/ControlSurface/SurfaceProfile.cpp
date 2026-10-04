@@ -29,6 +29,17 @@ void SurfaceProfileRegistry::registerProfile (SurfaceProfile profile)
     profiles.push_back (std::move (profile));
 }
 
+const SurfaceProfile* SurfaceProfileRegistry::findForPorts (const juce::StringArray& portNames) const
+{
+    for (const auto& id : profileIds())
+        if (const auto* profile = find (id))
+            for (const auto& hint : profile->portNameHints)
+                for (const auto& port : portNames)
+                    if (hint.isNotEmpty() && port.containsIgnoreCase (hint))
+                        return profile;
+    return nullptr;
+}
+
 const SurfaceProfile* SurfaceProfileRegistry::find (const juce::String& profileId) const
 {
     for (const auto& profile : profiles)
@@ -339,6 +350,9 @@ void registerCtrl49Profile()
     profile.profileId = "akai-ctrl49";
     profile.displayName = "M-Audio CTRL49";
     profile.vendor = "M-Audio";
+    // Its public ports are "CTRL49 USB", "CTRL49 MIDI" and "CTRL49 Mackie/HUI"; VIP spells it
+    // "CTRL 49" in places, so both.
+    profile.portNameHints = { "CTRL49", "CTRL 49" };
 
     profile.capabilities.encoders = 8;
     // Nine faders are on the box and all nine are driveable: they sit in the unit's Mackie

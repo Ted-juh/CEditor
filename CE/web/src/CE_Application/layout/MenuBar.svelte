@@ -7,10 +7,12 @@
   import { INSERT_CATEGORIES } from '../models/insertCatalog.js';
   import { openNewPanelDialog } from '../stores/newPanelDialog.js';
   import { addControl, duplicateControl, removeControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
+  import { createComponentFromSelectionWithPrompt } from '../stores/componentFromSelectionActions.js';
   import { bringForward, bringToFront, sendBackward, sendToBack, tidyGrid, arrangeCircular } from '../stores/alignment.js';
   import { editMenuAvailability } from '../utils/editMenuAvailability.js';
   import { closeApplication } from '../bridge/bridge.js';
-  import { undo, redo } from '../stores/history.js';
+  import { undo, redo, undoLabel, redoLabel } from '../stores/history.js';
+  import { openHistoryWindow } from '../stores/historyWindow.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { requestFitToWindow, requestZoomStep, requestZoomToSelection } from '../stores/editorCommands.js';
   import { createComponentDocument } from '../stores/componentWorkspace.js';
@@ -38,7 +40,10 @@
   import { clearSelection } from '../stores/panels.js';
   import { requestPropertiesTab } from '../stores/propertiesTab.js';
   import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
+  import { newPanelFromSvgArtwork, updatePanelFromSvgArtwork } from '../stores/svgPanelImportActions.js';
+  import { newPanelFromPsdArtwork, updatePanelFromPsdArtwork } from '../stores/psdPanelImportActions.js';
   import WorkspacePicker from './WorkspacePicker.svelte';
+  import { floating } from '../utils/floatingUi.js';
 
   // Menu state predicates, evaluated when a dropdown opens. A menu item that
   // is always enabled and never shows state cannot tell the user whether
@@ -154,6 +159,13 @@
       // range, its choices and the bytes to send, and until this existed the only way to get that
       // onto a screen was to place and bind every control by hand.
       { type: 'submenu', label: 'New Panel from Device Profile', items: generateFromProfileItems },
+      // Panel artwork is drawn in a vector editor; the placeholders in its "components" layer say
+      // where every control goes. utils/svgPanelImport.js has the convention.
+      { label: 'New Panel from SVG Artwork...', action: () => newPanelFromSvgArtwork() },
+      { label: 'Update Panel from SVG Artwork...', enabled: hasPanel, action: () => updatePanelFromSvgArtwork() },
+      // The same convention from a Photoshop file: a "components" layer group (utils/psdPanelImport.js).
+      { label: 'New Panel from Photoshop Artwork...', action: () => newPanelFromPsdArtwork() },
+      { label: 'Update Panel from Photoshop Artwork...', enabled: hasPanel, action: () => updatePanelFromPsdArtwork() },
       { type: 'submenu', label: 'Open Recent', enabled: () => recentGroups.length > 0, items: recentSubmenuItems },
       { type: 'separator' },
       { label: 'New Custom Component', action: () => newCustomComponent() },
@@ -188,8 +200,11 @@
       { label: 'Close Program', shortcut: 'Alt+F4', action: () => closeApplication() },
     ],
     Edit: [
-      { label: 'Undo', shortcut: 'Ctrl+Z', enabled: () => get(undoAvailable), action: () => undo() },
-      { label: 'Redo', shortcut: 'Ctrl+Y', enabled: () => get(redoAvailable), action: () => redo() },
+      // Getters, so the row names the step it will take back ("Undo Move Cutoff"). The dropdown is
+      // rebuilt each time it opens, which is when these are read; the access key stays U / R.
+      { get label() { const step = undoLabel(); return step ? `Undo ${step}` : 'Undo'; }, shortcut: 'Ctrl+Z', enabled: () => get(undoAvailable), action: () => undo() },
+      { get label() { const step = redoLabel(); return step ? `Redo ${step}` : 'Redo'; }, shortcut: 'Ctrl+Y', enabled: () => get(redoAvailable), action: () => redo() },
+      { label: 'History...', action: () => openHistoryWindow() },
       { type: 'separator' },
       { label: 'Cut',   shortcut: 'Ctrl+X', enabled: hasSelection, action: () => cutSelection() },
       { label: 'Copy',  shortcut: 'Ctrl+C', enabled: hasSelection, action: () => copySelection() },
@@ -203,6 +218,9 @@
       } },
       { type: 'separator' },
       { label: 'Group into Container', shortcut: 'Ctrl+G', enabled: () => editAvailability().canGroup, action: () => groupSelectionIntoContainer() },
+      // Artwork into one reusable, linked component. utils/customComponentFromControls.js says what
+      // converts and why the rest is refused.
+      { label: 'Create Component from Selection...', enabled: hasSelection, action: () => createComponentFromSelectionWithPrompt() },
       { label: 'Ungroup', shortcut: 'Ctrl+Shift+G', enabled: () => editAvailability().canUngroup, action: () => {
         const id = editAvailability().ungroupTargetId;
         if (id != null) ungroupContainer(id);
@@ -321,13 +339,13 @@
   /** Index of the item whose submenu is open, and the roving focus inside it. */
   let openSubmenuIndex = $state(-1);
   let subFocusIndex = $state(-1);
-  /**
-   * Where the open submenu sits, in viewport pixels. The submenu is `position: fixed` because its
-   * parent dropdown scrolls: `overflow-y: auto` forces `overflow-x` to auto as well, so a submenu
-   * positioned inside it at `left: 100%` was clipped to nothing — Open Recent opened, and nobody
-   * could see it. Fixed positioning takes it out of that box; the row's rect says where to put it.
+  /*
+   * Placement is utils/floatingUi.js's. The submenu is `position: fixed` because its parent dropdown
+   * scrolls: `overflow-y: auto` forces `overflow-x` to auto as well, so a submenu positioned inside it at
+   * `left: 100%` was clipped to nothing — Open Recent opened, and nobody could see it. It hangs off its
+   * row, flips left at the window's right edge, and follows the row when the dropdown scrolls. The
+   * dropdown hangs off its bar button and moves left when it would run off the right edge.
    */
-  let submenuAnchor = $state(null);
   /** The menu bar is one tab stop: this is which button that stop is on. */
   let barFocusName = $state(menuNames[0]);
 
@@ -359,7 +377,6 @@
 
   function closeSubmenu() {
     openSubmenuIndex = -1;
-    submenuAnchor = null;
     subFocusIndex = -1;
     submenuItems = [];
     subEls = [];
@@ -398,15 +415,8 @@
     subEls = [];
     submenuItems = item.items ? item.items() : [];
     openSubmenuIndex = index;
-    placeSubmenu();
     focusIndex = index;
     subFocusIndex = focusFirst ? firstFocusableIndex(submenuItems) : -1;
-  }
-
-  /** Level with the row that opened it: the dropdown's 4px padding and 1px border sit above it. */
-  function placeSubmenu() {
-    const rect = itemEls[openSubmenuIndex]?.getBoundingClientRect();
-    submenuAnchor = rect ? { left: rect.right - 4, top: rect.top - 5 } : null;
   }
 
   function handleItemClick(item) {
@@ -598,7 +608,7 @@
           aria-label={name}
           tabindex="-1"
           onkeydown={handleDropdownKeydown}
-          onscroll={() => { if (openSubmenuIndex >= 0) placeSubmenu(); }}
+          use:floating={{ anchor: barEls[name], placement: 'bottom-start', fallbackPlacements: ['bottom-end'], fit: false, slide: false }}
         >
           {#each menus[name] as item, index}
             {#if item.type === 'separator'}
@@ -647,9 +657,7 @@
                   role="menu"
                   aria-label={item.label}
                   tabindex="-1"
-                  style:left={submenuAnchor ? `${submenuAnchor.left}px` : undefined}
-                  style:top={submenuAnchor ? `${submenuAnchor.top}px` : undefined}
-                  style:max-height={submenuAnchor ? `calc(100vh - ${submenuAnchor.top}px - 8px)` : undefined}
+                  use:floating={{ anchor: itemEls[index], placement: 'right-start', offset: { mainAxis: -4, crossAxis: -5 }, fallbackPlacements: ['left-start'] }}
                   onkeydown={handleSubmenuKeydown}
                 >
                   {#each submenuItems as subItem, subIndex}
@@ -689,7 +697,8 @@
       title="Open Component"
       entries={componentLibraryEntries}
       emptyText="No saved component packages yet."
-      anchorStyle="left: 8px; top: calc(100% + 2px);"
+      placement="bottom-start"
+      offset={{ mainAxis: 2, crossAxis: 8 }}
       onPick={handlePickerPick}
       onClose={() => { picker = ''; }}
     />
@@ -741,9 +750,7 @@
 
   /* Dropdown */
   .dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
+    position: fixed;
     min-width: 200px;
     max-height: calc(100vh - 60px);
     overflow-y: auto;
@@ -756,7 +763,7 @@
   }
 
   /* A submenu hangs off its parent row, not off the menu bar, level with the row that opened it —
-     which is what makes the pointer travel feel right. Fixed, not absolute: see submenuAnchor. */
+     which is what makes the pointer travel feel right. Fixed, not absolute: see the note by openSubmenuIndex. */
   .dropdown.submenu {
     position: fixed;
     z-index: 210;

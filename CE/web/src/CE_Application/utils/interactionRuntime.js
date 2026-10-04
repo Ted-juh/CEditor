@@ -30,6 +30,8 @@ import {
 import { sliderValueToAngle } from './sliderGeometry.js';
 import { materializeCustomComponent } from './customComponentMaterializer.js';
 import { applyCustomInternalScale } from './customComponentScale.js';
+import { attachBooleanInputs } from './booleanGroups.js';
+import { applyActiveVariant, applyVariantPatches } from './customComponentVariants.js';
 import { constrainCustomValues, customConditionMatches } from './customComponentInteraction.js';
 import { clamp } from './primitives.js';
 import { formatChannelValue } from './valueDisplayScale.js';
@@ -108,7 +110,7 @@ function normalizeRange(value, min, max) {
 // and a script asking for "outCubic" have to read one object, not two that agree today.
 export { EASING_BEZIERS, EASING_NAMES } from './easing.js';
 
-function treeValueAtPath(node, path) {
+export function treeValueAtPath(node, path) {
   if (!node || !path) return undefined;
   const parts = String(path).split('.');
   let current = node;
@@ -324,6 +326,8 @@ function evaluateState(state, signals) {
   const when = state.when ?? {};
   return Object.entries(when).every(([key, expected]) => {
     const actual = stateSignalValue(key, signals);
+    // "Is this zone among the focused ones" — the one list-valued signal a state asks about.
+    if (key === 'focusedCustomHitZones') return Array.isArray(actual) && actual.includes(expected);
     if (Array.isArray(expected)) return expected.includes(actual);
     return actual === expected;
   });
@@ -494,6 +498,10 @@ function buildTransitionCatalog(control, previewSession) {
     // including a word typed into the properties panel's free text box — is a transition, exactly
     // as before.
     if (String(animation.kind ?? '') === 'keyframes') continue;
+    // `sequence` is the third: tracks of keyframes along a time axis, whose values the sequence
+    // player drives itself (utils/keyframePlayer.js). A CSS transition on top would ease what is
+    // already eased.
+    if (String(animation.kind ?? '') === 'sequence') continue;
     const transition = animationTiming(animation, timeScale);
     const scale = Number(timeScale) > 0 ? Number(timeScale) : 1;
     const entry = {
@@ -547,6 +555,20 @@ function buildKeyframeCatalog(control, previewSession) {
     if (entry) entries.push(entry);
   }
   return { enabled: true, reducedMotion, entries };
+}
+
+/** The channel entries of a keyframe overlay, apart from the ones that patch the look. */
+const CHANNEL_OVERLAY = /^ValueChannels\.([^.]+)$/;
+function splitKeyframeOverlay(overlay) {
+  if (!overlay) return { channelOverrides: null, lookOverlay: null };
+  let channelOverrides = null;
+  let lookOverlay = null;
+  for (const [path, value] of Object.entries(overlay)) {
+    const match = CHANNEL_OVERLAY.exec(path);
+    if (match) (channelOverrides ??= {})[match[1]] = value;
+    else (lookOverlay ??= {})[path] = value;
+  }
+  return { channelOverrides, lookOverlay };
 }
 
 function createEmptyRuntime(signals = {}) {
@@ -725,6 +747,8 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
     activeCustomHitZone: previewSession?.activeCustomHitZone ?? '',
     hoveredCustomBehavior: previewSession?.hoveredCustomBehavior ?? '',
     hoveredCustomHitZone: previewSession?.hoveredCustomHitZone ?? '',
+    focusedCustomHitZones: Array.isArray(previewSession?.focusedCustomHitZones) ? previewSession.focusedCustomHitZones : [],
+    domFocusCustomHitZone: previewSession?.domFocusCustomHitZone ?? '',
     hover: previewSession?.hover === true,
     pressed: previewSession?.pressed === true,
     focused: previewSession?.focused === true,
@@ -936,8 +960,19 @@ export function resolveInteractiveControl(control, previewSession = {}) {
   }
 
   const resolved = deepClone(control);
-  const signals = resolveInteractionContext(control, effectivePreviewSession);
+  // A keyframe track on a value channel (`ValueChannels.<name>`, utils/keyframeModel.js) is a
+  // value, not a look: it goes into the session's custom values so the signals, and everything
+  // bindings and generators draw from them (a filmstrip's frame, a meter's bar), follow it.
+  const { channelOverrides, lookOverlay } = splitKeyframeOverlay(effectivePreviewSession?.keyframeOverlay);
+  const signalSession = channelOverrides
+    ? { ...(effectivePreviewSession ?? {}), customValues: { ...(effectivePreviewSession?.customValues ?? {}), ...channelOverrides } }
+    : effectivePreviewSession;
+  const signals = resolveInteractionContext(control, signalSession);
+  // The copy's chosen variant is its base look: applied first, so bindings and states still act
+  // on top of it. Patches on a part a generator makes are retried once the generators have run.
+  const variantPending = isCustomComponent ? applyActiveVariant(resolved) : null;
   materializeCustomComponent(resolved, signals);
+  if (variantPending) applyVariantPatches(resolved, variantPending);
   applyCustomBindings(resolved, signals);
   const resolvedStates = getNodeChild(resolved, 'States');
 
@@ -964,11 +999,22 @@ export function resolveInteractiveControl(control, previewSession = {}) {
     applyStatePatches(resolved, state);
   }
 
+  // A running keyframe animation, or the Animation tab's playhead: a path → value map written by
+  // utils/keyframePlayer.js into stores/keyframeOverlays.js and handed in with the session. It
+  // lands after the states, where a state's own patch would, and before scaling, like one.
+  if (lookOverlay) {
+    applyPatchMap(resolved, lookOverlay);
+  }
+
   // Resize policy: with Transform.contentScaleMode === 'scaleInternals',
   // px-unit internals (parts, zones) scale to the instance size relative to
   // the stamped design size. Applied last so materialization, bindings, and
   // state patches all keep authoring in design space.
   if (isCustomComponent) applyCustomInternalScale (resolved);
+
+  // Combined shapes (utils/booleanGroups.js) take their operands as they are NOW — after variants,
+  // generators, bindings, states and scaling — so a binding that moves a hole moves it in the shape.
+  if (isCustomComponent) attachBooleanInputs(getNodeChild(resolved, 'Parts')?._children);
 
   const transitions = buildTransitionCatalog(resolved, effectivePreviewSession);
   const keyframes = buildKeyframeCatalog(resolved, effectivePreviewSession);

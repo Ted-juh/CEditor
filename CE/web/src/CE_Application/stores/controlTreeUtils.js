@@ -146,6 +146,64 @@ export function setNestedValue(control, path, value) {
 }
 
 /**
+ * `setNestedValue`, without touching `control`: returns a new control that shares every object the
+ * write does not pass through.
+ *
+ * WHY. The edit path used to deepClone a whole control before writing one path into it. A control
+ * is the expanded tree, ~15-35 KB with every section at its defaults, so nudging one pixel copied
+ * all of it — and undo history then kept that copy. Fifty select-all nudges on the AN1x panel held
+ * 1.3 GB and each stalled a quarter of a second in the copy alone; moving GAIA's biggest container
+ * copied 6.5 MB of children (docs/design/undo-history-measurement-2026-09-29.md).
+ *
+ * HOW, and why it cannot drift from setNestedValue: it copies only the SPINE — each node the write
+ * will walk through, found by the same rules resolveWriteTarget walks by — and then runs the real
+ * setNestedValue on that spine. Every node setNestedValue can write into is therefore a fresh
+ * copy, and every node it cannot reach stays shared. A section materialised from a template on the
+ * way is deepCloned by resolveWriteTarget itself, into a map that is already a copy.
+ *
+ * `value` is stored by reference, exactly as setNestedValue stores it.
+ */
+export function setNestedValueShared(control, path, value) {
+  const root = copyNode(control);
+  const parts = String(path).split('.');
+  if (parts.length > 1 && root?._children?.[parts[0]] !== undefined) {
+    let current = copyNode(root._children[parts[0]]);
+    root._children[parts[0]] = current;
+    for (let index = 1; index < parts.length - 1; index += 1) {
+      const key = parts[index];
+      let next;
+      if (Array.isArray(current) && isArrayIndexSegment(key)) {
+        if (current[Number(key)] === undefined) break;
+        next = copyNode(current[Number(key)]);
+        current[Number(key)] = next;
+      } else if (current?._children && current._children[key] !== undefined) {
+        next = copyNode(current._children[key]);
+        current._children[key] = next;
+      } else if (getDefaultChildTemplate(current?._type, key) !== undefined) {
+        break;                      // resolveWriteTarget materialises a fresh clone from here on
+      } else if (current?.[key] !== undefined && current[key] !== null && typeof current[key] === 'object') {
+        next = copyNode(current[key]);
+        current[key] = next;
+      } else {
+        break;                      // the walk stops or ends on a primitive; nothing below to protect
+      }
+      current = next;
+    }
+  }
+  const landed = setNestedValue(root, path, value);
+  return { control: root, landed };
+}
+
+/** A shallow copy of one tree node, with its own `_children` map, so writing into either is safe. */
+function copyNode(node) {
+  if (Array.isArray(node)) return node.slice();
+  if (node === null || typeof node !== 'object') return node;
+  const copy = { ...node };
+  if (node._children && typeof node._children === 'object') copy._children = { ...node._children };
+  return copy;
+}
+
+/**
  * Would `setNestedValue` land, and is the last segment a property this node already has?
  *
  * `{ writes: false }` means the write goes nowhere — the caller should say so rather than let it

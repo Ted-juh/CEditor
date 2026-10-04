@@ -173,6 +173,11 @@ export function layerKind(part) {
 
 export function layerKindLabel(part) {
   const kind = layerKind(part);
+  // A combined shape (utils/booleanGroups.js) is named for what it does.
+  if (kind === 'boolean') {
+    const operation = String(part?.meta?.boolean?.operation ?? 'unite');
+    return operation[0].toUpperCase() + operation.slice(1);
+  }
   const labels = {
     roundedRectangle: 'Rounded',
     rectangle: 'Rect',
@@ -184,6 +189,7 @@ export function layerKindLabel(part) {
     capsule: 'Capsule',
     ring: 'Ring',
     viewport: 'View',
+    path: 'Path',
   };
   return labels[kind] ?? kind;
 }
@@ -214,7 +220,9 @@ export function layerThumbPartStyle(frame, part, artboardWidth, artboardHeight) 
     `background:${partFillColour(part, '#23323B')}`,
     `border-color:${partStrokeColour(part, '#5B9BD5')}`,
     `opacity:${clampNumber(numberOr(part?.opacity, 1), 0.18, 1)}`,
-  ].join(';');
+    // Turned and scaled as drawn, so the thumbnail is the part's silhouette and not its layout box.
+    partTransformCSS(part),
+  ].filter(Boolean).join(';');
 }
 
 export function zoneThumbPartStyle(frame, zone, artboardWidth, artboardHeight) {
@@ -228,21 +236,25 @@ export function zoneThumbPartStyle(frame, zone, artboardWidth, artboardHeight) {
   ].join(';');
 }
 
-export function partOverlayStyle(frame, part) {
+/** The part's own turn and scale about its pivot, as the renderer's CSS applies them — or ''. */
+export function partTransformCSS(part) {
   const layout = part?._children?.Layout ?? {};
   const rotation = numberOr(layout.rotation, 0);
   const scale = Math.max(0.01, numberOr(layout.scale, 1));
   const transforms = [];
   if (Math.abs(rotation) > 0.001) transforms.push(`rotate(${rotation}deg)`);
   if (Math.abs(scale - 1) > 0.001) transforms.push(`scale(${scale})`);
+  return transforms.length ? `transform:${transforms.join(' ')}; transform-origin:${numberOr(layout.pivotX, 50)}% ${numberOr(layout.pivotY, 50)}%` : '';
+}
 
+export function partOverlayStyle(frame, part) {
   return [
     `left:${frame.left}px`,
     `top:${frame.top}px`,
     `width:${frame.width}px`,
     `height:${frame.height}px`,
     `z-index:${1000 + numberOr(part?.zIndex, 0)}`,
-    transforms.length ? `transform:${transforms.join(' ')}; transform-origin:${numberOr(layout.pivotX, 50)}% ${numberOr(layout.pivotY, 50)}%` : '',
+    partTransformCSS(part),
   ].filter(Boolean).join(';');
 }
 
@@ -255,7 +267,9 @@ export function hitZoneStyle(frame, zone) {
     `height:${Math.max(0, frame.height)}px`,
     `border-radius:${['circle', 'ellipse', 'ring'].includes(shape) ? '999px' : '5px'}`,
     `z-index:${1800 + numberOr(zone?.priority, 0)}`,
-  ].join(';');
+    // A zone following a turned or scaled part is drawn turned with it, about the part's pivot.
+    frame.turn ? `transform:rotate(${frame.turn.rotation}deg) scale(${frame.turn.scale}); transform-origin:${frame.turn.originX - frame.left}px ${frame.turn.originY - frame.top}px` : '',
+  ].filter(Boolean).join(';');
 }
 
 export function inlineTextEditorStyle(frame, part) {
@@ -272,7 +286,9 @@ export function inlineTextEditorStyle(frame, part) {
     `font-family:${font?.family ?? 'Arial'}`,
     `font-size:${numberOr(font?.size, 12)}px`,
     `font-weight:${numberOr(font?.weightValue, 600)}`,
-  ].join(';');
+    // Over the text as it is drawn: a turned or scaled label is edited turned and scaled.
+    partTransformCSS(part),
+  ].filter(Boolean).join(';');
 }
 
 export function handleStyle(id) {

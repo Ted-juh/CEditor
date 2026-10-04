@@ -1,13 +1,13 @@
 <script>
   import { onDestroy, onMount } from 'svelte';
-  import SetlistSoundcheckRow from './SetlistSoundcheckRow.svelte';
+  import SongsPage from './performance/SongsPage.svelte';
   import HostConfirmButton from './HostConfirmButton.svelte';
   /**
    * PerformancePanel.svelte — Hostage's performance system.
    *
    * Several views over ONE engine, which is the whole point of the stage: the pattern editor
-   * writes lanes and steps, the clip and scene grid launches them, the arranger chains them,
-   * and the setlist walks whole rigs. None keeps its own playback state — every control sends a command and the
+   * writes lanes and steps, the Launcher's scene and clip grid launches them, and Songs builds
+   * each song from sections of those scenes and walks the set. None keeps its own playback state — every control sends a command and the
    * next `instrumentHostState` push is what gets drawn, so a launch that the engine is still
    * holding for its quantization boundary renders as "pending" rather than as a lie.
    *
@@ -30,29 +30,69 @@
     startPerformanceRecording, finishPerformanceRecording, cancelPerformanceRecording,
     removePerformanceTake, replayPerformanceTake, stopPerformanceReplay,
     addModulationRoute, setModulationRoute, removeModulationRoute, clearModulationRoutes,
-    addMidiLfo, setMidiLfo, resetMidiLfo, removeMidiLfo,
-    addMidiLfoOutput, setMidiLfoOutput, removeMidiLfoOutput,
-    addEnvelope, setEnvelope, triggerEnvelope, resetEnvelope, removeEnvelope,
-    addMseg, setMseg, resetMseg, removeMseg,
-    addRandomModulator, setRandomModulator, resetRandomModulator, removeRandomModulator,
-    deterministicRandomUnit,
+    addMidiLfo,
+    addEnvelope, triggerEnvelope,
+    addMseg,
+    addRandomModulator,
     importScalaTuning, parseScalaTuning, resetMicrotuning, setMicrotuning,
     setPartMicrotuning, sendMicrotuning,
     addScene, removeScene, renameScene, captureScene, setSceneOptions, setSceneClip, launchScene,
     createSceneVariations,
-    addSetlistItem, removeSetlistItem, moveSetlistItem, setSetlistItem, setSetlistOptions,
-    setlistGo, setlistNext, setlistPrev,
-    checkSetlistSoundcheck, startSoundcheck, finishSoundcheck,
-    addArrangementItem, removeArrangementItem, setArrangementItem, moveArrangementItem,
-    setArrangementOptions, startArrangement, stopArrangement,
+    addSetlistItem, finishSoundcheck,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import { PERFORMANCE_GROUPS, performanceGroupFor, restorePerformanceNavigation,
     storePerformanceNavigation, selectPerformanceTool } from '../utils/performanceNavigation.js';
   import FollowGraph from './FollowGraph.svelte';
+  import LfoCard from './performance/LfoCard.svelte';
+  import EnvelopeCard from './performance/EnvelopeCard.svelte';
+  import MsegCard from './performance/MsegCard.svelte';
+  import RandomCard from './performance/RandomCard.svelte';
+  import PatternStepRows from './performance/PatternStepRows.svelte';
+  import ScrubValue from '../components/controls/ScrubValue.svelte';
+  import { parseSongLength as parseLength } from '../utils/stageScreen.js';
+  import Segmented from '../components/controls/Segmented.svelte';
 
   let { onShowMixer = () => {} } = $props();
   const stopMeasurement = () => { if ($hostState.soundcheck.activeItemId) finishSoundcheck(); };
+  const songCount = (sceneId) => performance.setlist.items.filter((item) => item.sceneId === sceneId).length;
+
+  // The Launcher: scenes are rows and clips columns, so what a scene starts is visible at a
+  // glance. Picking a column or a row shows that clip's or scene's settings under the grid.
+  let pickedClipId = $state('');
+  let pickedSceneId = $state('');
+  let knownSceneCount = 0;
+  const pickedClip = $derived(performance.clips.find((c) => c.clipId === pickedClipId) ?? performance.clips[0] ?? null);
+  const pickedScene = $derived(performance.scenes.find((s) => s.sceneId === pickedSceneId) ?? performance.scenes[0] ?? null);
+  $effect(() => {
+    // A scene just added is the one about to be set up.
+    const count = performance.scenes.length;
+    if (count > knownSceneCount && knownSceneCount > 0) pickedSceneId = performance.scenes[count - 1].sceneId;
+    knownSceneCount = count;
+  });
+  const SCENE_COLOURS = ['#d98b3a', '#4f9fd6', '#9a7ad6', '#52b58a', '#d6698f', '#c9b24a', '#4fc1c9', '#8c9aa8'];
+  const sceneColour = (index) => SCENE_COLOURS[index % SCENE_COLOURS.length];
+  const clipParts = (clip) => {
+    const pattern = performance.patterns.find((p) => p.patternId === clip.patternId);
+    const names = new Set();
+    for (const lane of pattern?.lanes ?? []) {
+      const part = $hostState.rack.parts.find((candidate) => candidate.partId === lane.targetPartId);
+      if (part) names.add(part.name || part.pluginName || 'Part');
+    }
+    return [...names];
+  };
+  const clipFlow = (clip) => {
+    if (clip.followAction === 'none') return clip.loop ? 'loops' : 'plays once';
+    if (clip.followAction === 'stop') return 'then stops';
+    if (clip.followAction === 'next') return 'then the next clip';
+    if (clip.followAction === 'random') return 'then a random clip';
+    const target = performance.clips.find((c) => c.clipId === clip.followClipId);
+    return target ? `then ${target.name}` : 'then a clip';
+  };
+  const sceneUse = (sceneId) => {
+    const songs = performance.setlist.items.filter((item) => item.sceneId === sceneId).length;
+    return songs === 0 ? 'no song' : songs === 1 ? '1 song' : `${songs} songs`;
+  };
   onDestroy(stopMeasurement);
   const heldFillClipIds = new Set();
   const heldEnvelopeIds = new Set();
@@ -120,9 +160,6 @@
   let modAmount = $state(0.25);
   let modChannel = $state(0);
   let modCcNumber = $state(74);
-  let msegDrag = $state(null);
-  let selectedMsegId = $state('');
-  let selectedMsegPointId = $state('');
   let tuningFileMessage = $state('');
   let variationAmount = $state(0.55);
   let variationAmountPatternId = $state('');
@@ -258,20 +295,6 @@
           && parameter.id !== '@macro')
       : []);
 
-  const lfoSyncRates = [
-    { beats: 0.125, label: '1/32' },
-    { beats: 1 / 6, label: '1/16T' },
-    { beats: 0.25, label: '1/16' },
-    { beats: 1 / 3, label: '1/8T' },
-    { beats: 0.5, label: '1/8' },
-    { beats: 2 / 3, label: '1/4T' },
-    { beats: 1, label: '1/4' },
-    { beats: 2, label: '1/2' },
-    { beats: 4, label: '1 bar' },
-    { beats: 8, label: '2 bars' },
-    { beats: 16, label: '4 bars' },
-  ];
-
   // The clip a lane belongs to, for arming capture straight from the editor.
   let clipForSelectedPattern = $derived(
     performance.clips.find((c) => c.patternId === selectedPattern?.patternId) ?? null);
@@ -357,6 +380,24 @@
     { value: 8, label: '8 beats' },
     { value: 16, label: '16 beats' },
   ];
+  const QUANTIZE_CHOICES = quantizeOptions.map((option) => [option, option]);
+  const MORPH_CHOICES = snapshotMorphOptions.map((option) => [option.value, option.label]);
+  // What a clip does after its loops, as pictures (24 × 14): nothing, stop, the next clip, a
+  // random one, or a clip you name.
+  const FOLLOW_ACTIONS = [
+    { value: 'none', label: 'No follow action', path: 'M5 7 H19', iconOnly: true },
+    { value: 'stop', label: 'Stop', path: 'M8 3 H16 V11 H8 Z', iconOnly: true },
+    { value: 'next', label: 'Next clip', path: 'M4 7 H18 M14 3 L18 7 L14 11', iconOnly: true },
+    { value: 'random', label: 'A random clip', path: 'M4 4 H8 L15 10 H20 M4 10 H8 L15 4 H20 M17 2 L20 4 L17 6 M17 8 L20 10 L17 12', iconOnly: true },
+    { value: 'clip', label: 'A clip you choose', path: 'M5 12 V6 H18 M14 2 L18 6 L14 10', iconOnly: true },
+  ];
+  const FILL_CHANNELS = [[0, 'any'], ...Array.from({ length: 16 }, (_, i) => [i + 1, String(i + 1)])];
+  let openFills = $state(new Set());
+  const toggleFill = (clipId) => {
+    const next = new Set(openFills);
+    if (next.has(clipId)) next.delete(clipId); else next.add(clipId);
+    openFills = next;
+  };
   const laneTypes = ['note', 'chord', 'drum', 'cc', 'parameter'];
   const noteName = (note) => {
     const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -480,9 +521,10 @@
 
   const rollUp = () => (rollDrag = null);
 
-  // Velocity bars for the selected note/chord/drum lane, and value bars for cc/parameter
-  // lanes: same bar-per-step gesture the arp grid uses.
+  // Value bars for cc/parameter lanes: the same bar-per-step gesture the arp grid uses. The
+  // other per-step values are PatternStepRows under the selected lane.
   let barDrag = $state(null);   // { laneId, field, lastIndex }
+  let rollSideWidth = $state(0);
 
   function barFromEvent(lane, event) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -501,15 +543,8 @@
 
   function barApply(lane, field, event) {
     const { index, height } = barFromEvent(lane, event);
-    const step = lane.steps[index];
-    if (field === 'velocity') {
-      if (!step?.active) return;   // velocity without a note is noise
-      setStep(selectedPattern.patternId, lane.laneId, index,
-              { velocity: Math.max(1, Math.round(height * 127)) });
-    } else {
-      setStep(selectedPattern.patternId, lane.laneId, index,
-              { active: true, value: Math.round(height * 100) / 100 });
-    }
+    setStep(selectedPattern.patternId, lane.laneId, index,
+            { active: true, value: Math.round(height * 100) / 100 });
   }
 
   function barMove(lane, field, event) {
@@ -657,58 +692,6 @@
     selectTool('modulation');
   }
 
-  const randomModeLabel = (mode) => ({
-    sampleHold: 'Sample & hold', smoothRandom: 'Smooth random',
-    chaos: 'Chaos', randomWalk: 'Bounded walk',
-  })[mode] ?? 'Sample & hold';
-
-  function randomPreviewValues(random, count = 24) {
-    let target = 0.5;
-    let chaosValue = 0.05
-      + 0.9 * deterministicRandomUnit(random.seed, 0, 0x68bc21eb);
-    let walkValue = 0.5;
-    const values = [];
-    for (let step = 0; step < count; step += 1) {
-      const changes = random.probability >= 1
-        || deterministicRandomUnit(random.seed, step, 0xa341316c) < random.probability;
-      if (random.mode === 'chaos' && changes) {
-        chaosValue = Math.max(0.0001, Math.min(0.9999,
-          (3.57 + 0.43 * random.chaos) * chaosValue * (1 - chaosValue)));
-        target = chaosValue;
-      } else if (random.mode === 'randomWalk' && changes) {
-        let walked = walkValue
-          + (deterministicRandomUnit(random.seed, step, 0xad90777d) * 2 - 1)
-            * random.stepSize;
-        if (walked < 0) walked = -walked;
-        if (walked > 1) walked = 2 - walked;
-        walkValue = Math.max(0, Math.min(1, walked));
-        target = walkValue;
-      } else if (!['chaos', 'randomWalk'].includes(random.mode) && changes) {
-        target = deterministicRandomUnit(random.seed, step, 0xc8013ea4);
-      }
-      values.push(random.minimum + target * (random.maximum - random.minimum));
-    }
-    return values;
-  }
-
-  function randomPreviewPath(random) {
-    const values = randomPreviewValues(random);
-    if (values.length === 0) return '';
-    const y = (value) => (1 - value) * 60;
-    const x = (index) => index * 100 / (values.length - 1);
-    const path = [`M 0 ${y(values[0])}`];
-    for (let index = 1; index < values.length; index += 1) {
-      if (random.mode === 'sampleHold') path.push(`L ${x(index)} ${y(values[index - 1])}`);
-      path.push(`L ${x(index)} ${y(values[index])}`);
-    }
-    return path.join(' ');
-  }
-
-  function reseedRandom(random) {
-    const seed = (Math.floor(Date.now() + Math.random() * 0x3fffffff) % 0x7ffffffe) + 1;
-    setRandomModulator(random.randomId, { seed });
-  }
-
   // A pattern's seed decides how every probability rolls, on every loop, for ever — same seed,
   // same performance, across runs and machines (deterministicRoll in CompiledPattern.h). Minted
   // in the same range the native side uses, and never zero: setPatternOptions clamps to 1 and a
@@ -726,179 +709,6 @@
   // is the difference between "this control is broken" and "nothing in here rolls yet".
   const patternRolls = (pattern) => (pattern?.lanes ?? []).some(
     (lane) => (lane.steps ?? []).some((step) => step.probability > 0 && step.probability < 100));
-
-  const msegDisplayPoints = (mseg) => msegDrag?.msegId === mseg.msegId
-    ? msegDrag.points : mseg.points;
-
-  function msegPath(points) {
-    if (points.length === 0) return '';
-    const path = [`M ${points[0].position * 100} ${(1 - points[0].value) * 60}`];
-    for (let index = 1; index < points.length; index += 1) {
-      const left = points[index - 1];
-      const right = points[index];
-      const span = right.position - left.position;
-      if (span <= 0.000001) {
-        path.push(`L ${right.position * 100} ${(1 - right.value) * 60}`);
-        continue;
-      }
-      for (let sample = 1; sample <= 12; sample += 1) {
-        const progress = sample / 12;
-        const shaped = progress ** (4 ** right.curve);
-        const position = left.position + span * progress;
-        const value = left.value + (right.value - left.value) * shaped;
-        path.push(`L ${position * 100} ${(1 - value) * 60}`);
-      }
-    }
-    return path.join(' ');
-  }
-
-  function msegCoordinates(element, event) {
-    const rect = element.getBoundingClientRect();
-    return {
-      position: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
-      value: Math.max(0, Math.min(1, 1 - (event.clientY - rect.top) / rect.height)),
-    };
-  }
-
-  function selectMsegPoint(mseg, pointId) {
-    selectedMsegId = mseg.msegId;
-    selectedMsegPointId = pointId;
-  }
-
-  function addMsegPoint(mseg, event) {
-    if (mseg.points.length >= 64) return;
-    const { position, value } = msegCoordinates(event.currentTarget, event);
-    const point = {
-      pointId: `mseg-point-${Date.now()}-${mseg.points.length + 1}`,
-      position: Math.max(0.001, Math.min(0.999, position)), value, curve: 0,
-    };
-    const points = [...mseg.points, point].sort((a, b) => a.position - b.position);
-    selectMsegPoint(mseg, point.pointId);
-    setMseg(mseg.msegId, { points });
-  }
-
-  function beginMsegDrag(mseg, point, event) {
-    event.preventDefault();
-    event.stopPropagation();
-    selectMsegPoint(mseg, point.pointId);
-    msegDrag = {
-      msegId: mseg.msegId,
-      pointId: point.pointId,
-      points: mseg.points.map((candidate) => ({ ...candidate })),
-    };
-    event.currentTarget.ownerSVGElement?.setPointerCapture?.(event.pointerId);
-  }
-
-  function moveMsegPoint(mseg, event) {
-    if (msegDrag?.msegId !== mseg.msegId) return;
-    const { position, value } = msegCoordinates(event.currentTarget, event);
-    const points = msegDrag.points.map((point, index, all) => {
-      if (point.pointId !== msegDrag.pointId) return point;
-      const fixedEndpoint = index === 0 || index === all.length - 1;
-      return { ...point, position: fixedEndpoint ? point.position : position, value };
-    }).sort((a, b) => a.position - b.position);
-    points[0].position = 0;
-    points[points.length - 1].position = 1;
-    msegDrag = { ...msegDrag, points };
-  }
-
-  function endMsegDrag(mseg, event) {
-    if (msegDrag?.msegId !== mseg.msegId) return;
-    setMseg(mseg.msegId, { points: msegDrag.points });
-    event.currentTarget.releasePointerCapture?.(event.pointerId);
-    msegDrag = null;
-  }
-
-  function deleteMsegPoint(mseg, point, event) {
-    event.preventDefault();
-    event.stopPropagation();
-    const index = mseg.points.findIndex((candidate) => candidate.pointId === point.pointId);
-    if (mseg.points.length <= 2 || index <= 0 || index === mseg.points.length - 1) return;
-    const points = mseg.points.filter((candidate) => candidate.pointId !== point.pointId);
-    if (selectedMsegPointId === point.pointId) selectedMsegPointId = points[0].pointId;
-    setMseg(mseg.msegId, { points });
-  }
-
-  function msegPointKey(mseg, point, index, event) {
-    const step = event.shiftKey ? 0.05 : 0.01;
-    if (['Delete', 'Backspace'].includes(event.key)) {
-      deleteMsegPoint(mseg, point, event);
-      return;
-    }
-    const changes = {};
-    if (event.key === 'ArrowUp') changes.value = Math.min(1, point.value + step);
-    else if (event.key === 'ArrowDown') changes.value = Math.max(0, point.value - step);
-    else if (event.key === 'ArrowLeft' && index > 0 && index < mseg.points.length - 1)
-      changes.position = Math.max(0, point.position - step);
-    else if (event.key === 'ArrowRight' && index > 0 && index < mseg.points.length - 1)
-      changes.position = Math.min(1, point.position + step);
-    else return;
-    event.preventDefault();
-    selectMsegPoint(mseg, point.pointId);
-    setSelectedMsegPoint(mseg, changes);
-  }
-
-  function setSelectedMsegPoint(mseg, fields) {
-    const pointId = selectedMsegId === mseg.msegId && selectedMsegPointId
-      ? selectedMsegPointId : mseg.points[0]?.pointId;
-    if (!pointId) return;
-    selectMsegPoint(mseg, pointId);
-    const points = mseg.points.map((point, index, all) => point.pointId === pointId
-      ? {
-          ...point,
-          ...fields,
-          position: index === 0 ? 0 : index === all.length - 1 ? 1
-            : Math.max(0, Math.min(1, Number(fields.position ?? point.position))),
-        }
-      : point).sort((a, b) => a.position - b.position);
-    setMseg(mseg.msegId, { points });
-  }
-
-  function applyMsegPreset(mseg, values) {
-    const points = values.map(([position, value, curve = 0], index) => ({
-      pointId: `mseg-point-${Date.now()}-${index + 1}`, position, value, curve,
-    }));
-    selectedMsegId = mseg.msegId;
-    selectedMsegPointId = points[0].pointId;
-    setMseg(mseg.msegId, { points });
-  }
-
-  function envelopeVisual(envelope) {
-    const timeWidth = (milliseconds, width) => {
-      const normalized = Math.log10(Math.max(0, Number(milliseconds)) + 10) / Math.log10(60010);
-      return 5 + normalized * width;
-    };
-    const attackX = 2 + timeWidth(envelope.attackMs, 23);
-    const decayX = Math.min(61, attackX + timeWidth(envelope.decayMs, 22));
-    const releaseX = Math.max(72, decayX + 8);
-    const sustainY = 49 - Math.max(0, Math.min(1, envelope.sustain)) * 46;
-    let markerX = 2;
-    if (envelope.stage === 'attack') markerX = 2 + (attackX - 2) * envelope.stageProgress;
-    else if (envelope.stage === 'decay') markerX = attackX + (decayX - attackX) * envelope.stageProgress;
-    else if (envelope.stage === 'sustain') markerX = decayX + (releaseX - decayX) * 0.5;
-    else if (envelope.stage === 'release') markerX = releaseX + (98 - releaseX) * envelope.stageProgress;
-    return {
-      points: `2,49 ${attackX},3 ${decayX},${sustainY} ${releaseX},${sustainY} 98,49`,
-      attackX, decayX, releaseX,
-      markerX,
-      markerY: 49 - Math.max(0, Math.min(1, envelope.value)) * 46,
-    };
-  }
-
-  // A linear 60-second fader would make the useful first second almost impossible to set.
-  // The editor is logarithmic while the stored/native value remains ordinary milliseconds.
-  const envelopeTimePosition = (milliseconds) =>
-    Math.log10(Math.max(0, Math.min(60000, Number(milliseconds))) + 1) / Math.log10(60001);
-  const envelopeTimeFromPosition = (position) =>
-    Math.round((60001 ** Math.max(0, Math.min(1, Number(position))) - 1) / 5) * 5;
-
-  function addHardwareLfoOutput(lfo) {
-    const target = hardwareParts[0];
-    if (!target) return;
-    addMidiLfoOutput(lfo.lfoId, {
-      type: 'cc', targetPartId: target.partId, channel: target.midiOutChannel || 1, number: 1,
-    });
-  }
 
   async function importScalaFile(event) {
     const input = event.currentTarget;
@@ -986,21 +796,21 @@
     {/if}
   </div>
 
-  <div class="performance-navigation">
-    <nav class="perf-groups" aria-label="Performance groups">
-      {#each PERFORMANCE_GROUPS as group (group.id)}
-        <button type="button" class:on={activeGroup.id === group.id}
-          aria-pressed={activeGroup.id === group.id} data-testid={`perf-group-${group.id}`}
-          onclick={() => selectTool(navigation.lastTools[group.id])}>{group.label}</button>
-      {/each}
-    </nav>
-    <nav class="perf-tabs" aria-label="Tools in selected Performance group">
-      {#each activeGroup.tools as tool (tool.id)}
-        <button type="button" class="toggle" class:on={tab === tool.id} aria-pressed={tab === tool.id}
+  <!-- One rail: every tool is one click, under the group it belongs to. A group's heading goes
+       back to the tool last used in it. -->
+  <div class="perf-layout">
+  <nav class="performance-navigation perf-rail" aria-label="Performance tools">
+    {#each PERFORMANCE_GROUPS as group (group.id)}
+      <button type="button" class="rail-group" class:on={activeGroup.id === group.id}
+        aria-pressed={activeGroup.id === group.id} data-testid={`perf-group-${group.id}`}
+        onclick={() => selectTool(navigation.lastTools[group.id])}>{group.label}</button>
+      {#each group.tools as tool (tool.id)}
+        <button type="button" class="rail-tool" class:on={tab === tool.id} aria-pressed={tab === tool.id}
           onclick={() => selectTool(tool.id)} data-testid={`perf-tab-${tool.id}`}>{tool.label}</button>
       {/each}
-    </nav>
-  </div>
+    {/each}
+  </nav>
+  <div class="perf-content">
 
   {#if tab === 'patterns'}
     <div class="perf-body">
@@ -1044,27 +854,23 @@
                 {selectedPattern.variationLabel}
               </span>
             {/if}
-            <label class="mini-field variation-amount"
-                   title="How far B, C and D move away from the authored A pattern">
+            <div class="mini-field variation-amount"
+                 title="How far B, C and D move away from the authored A pattern">
               Variations
-              <select value={variationAmount}
-                      onchange={(e) => { variationAmount = Number(e.currentTarget.value); }}>
-                <option value="0.25">Subtle</option>
-                <option value="0.55">Balanced</option>
-                <option value="0.85">Bold</option>
-              </select>
-            </label>
+              <Segmented options={[{ value: 0.25, label: 'Subtle' }, { value: 0.55, label: 'Balanced' }, { value: 0.85, label: 'Bold' }]}
+                         value={variationAmount} label="How far variations move" testid="variation-amount"
+                         onchange={(v) => { variationAmount = v; }} />
+            </div>
             <button type="button" class="variation-create"
                     title="Create related feel, sparse and fill patterns; existing variation clips keep working"
                     onclick={() => createPatternVariations(selectedPattern.patternId, variationAmount)}>
               {selectedPattern.variationLabel ? 'Regenerate B/C/D' : 'Create B/C/D'}
             </button>
-            <label class="mini-field" title="Delays every second step of each lane's own grid">
+            <div class="mini-field" title="Delays every second step of each lane's own grid">
               Swing
-              <input type="range" min="0" max="0.75" step="0.01" value={selectedPattern.swing}
-                     onchange={(e) => setPatternOptions(selectedPattern.patternId,
-                                                       { swing: Number(e.currentTarget.value) })} />
-            </label>
+              <ScrubValue value={Math.round(selectedPattern.swing * 100)} min={0} max={75} unit="%" label="Swing" testid="pattern-swing"
+                          onchange={(v) => setPatternOptions(selectedPattern.patternId, { swing: v / 100 })} />
+            </div>
             <label class="mini-field seed-field"
                    title={patternRolls(selectedPattern)
                      ? 'Which way every probability rolls. The same seed plays the same performance, every run and every machine — write it down and you can rehearse it.'
@@ -1096,9 +902,10 @@
                 <option value={groove.grooveId}>{groove.name}</option>
               {/each}
             </select>
-            <label class="mini-field groove-strength">Strength — {Math.round(grooveAmount * 100)}%
-              <input type="range" min="0" max="1" step="0.05" bind:value={grooveAmount} />
-            </label>
+            <div class="mini-field groove-strength">Strength
+              <ScrubValue value={Math.round(grooveAmount * 100)} min={0} max={100} step={5} fineStep={1} unit="%"
+                          label="Groove strength" testid="groove-strength" onchange={(v) => { grooveAmount = v / 100; }} />
+            </div>
             <PropertyToggle compact label="Velocity accents" value={grooveVelocity}
                             onchange={(on) => { grooveVelocity = on; }} />
             <button type="button" disabled={!selectedGroove}
@@ -1185,32 +992,13 @@
                       </div>
                     {/each}
                   </div>
-                  <div class="roll-side">
+                  <div class="roll-side" bind:clientWidth={rollSideWidth}>
                     <button type="button" class="ghost" title="One octave up"
                             onclick={() => shiftRoll(lane, 1)}>▲</button>
                     <button type="button" class="ghost" title="One octave down"
                             onclick={() => shiftRoll(lane, -1)}>▼</button>
                   </div>
                 </div>
-                {#if selectedLane?.laneId === lane.laneId}
-                  <!-- Dynamics under the melody, exactly the arp's gesture. -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <div class="bar-lane" data-testid={`velocity-lane-${lane.laneId}`}
-                       title="Velocity per step — drag"
-                       onpointerdown={(e) => barDown(lane, 'velocity', e)}
-                       onpointermove={(e) => barMove(lane, 'velocity', e)}
-                       onpointerup={barUp} onpointercancel={barUp}>
-                    {#each lane.steps as step, index (index)}
-                      <div class="bar-col" class:idle={!step.active}
-                           class:locked={stepHasLocks(lane, index)}
-                           class:playing={playingColumn(lane) === index}>
-                        {#if step.active}
-                          <div class="bar-fill" style={`height: ${Math.max(step.velocity / 127 * 100, 4)}%`}></div>
-                        {/if}
-                      </div>
-                    {/each}
-                  </div>
-                {/if}
               {:else if lane.type === 'cc' || lane.type === 'parameter'}
                 <!-- A value curve is bars, not a slider hidden behind each step. Dragging a
                      column writes and activates it; the step options still deactivate. -->
@@ -1256,45 +1044,30 @@
                     </button>
                   {/each}
                 </div>
-                {#if selectedLane?.laneId === lane.laneId && lane.type === 'drum'}
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <div class="bar-lane" data-testid={`velocity-lane-${lane.laneId}`}
-                       title="Velocity per step — drag"
-                       onpointerdown={(e) => barDown(lane, 'velocity', e)}
-                       onpointermove={(e) => barMove(lane, 'velocity', e)}
-                       onpointerup={barUp} onpointercancel={barUp}>
-                    {#each lane.steps as step, index (index)}
-                      <div class="bar-col" class:idle={!step.active}
-                           class:locked={stepHasLocks(lane, index)}
-                           class:playing={playingColumn(lane) === index}>
-                        {#if step.active}
-                          <div class="bar-fill" style={`height: ${Math.max(step.velocity / 127 * 100, 4)}%`}></div>
-                        {/if}
-                      </div>
-                    {/each}
-                  </div>
-                {/if}
+              {/if}
+              {#if selectedLane?.laneId === lane.laneId}
+                <!-- The step values as rows under the lane: drag along one to draw it. -->
+                <PatternStepRows {lane} playing={playingColumn(lane)} selected={selectedStepIndex}
+                                 gutterLeft={lane.type === 'note' || lane.type === 'chord' ? 29 : 0}
+                                 gutterRight={lane.type === 'note' || lane.type === 'chord' ? rollSideWidth + 3 : 0}
+                                 onset={(index, fields) => setStep(selectedPattern.patternId, lane.laneId, index, fields)}
+                                 onselect={(index) => { selectedStepIndex = index; }} />
               {/if}
             </div>
           {/each}
 
           {#if selectedLane}
             <div class="lane-options" data-testid="perf-lane-options">
-              <label class="mini-field">Steps
-                <input type="number" min="1" max="64" value={selectedLane.stepCount}
-                       onchange={(e) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId,
-                                                       { stepCount: Number(e.currentTarget.value) })} />
-              </label>
-              <label class="mini-field" title="Steps per beat — a lane's own rate, which is what makes polymeter free">
-                Rate
-                <select value={selectedLane.stepsPerBeat}
-                        onchange={(e) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId,
-                                                        { stepsPerBeat: Number(e.currentTarget.value) })}>
-                  {#each [1, 2, 3, 4, 6, 8, 12, 16] as rate (rate)}
-                    <option value={rate}>{rate}/beat</option>
-                  {/each}
-                </select>
-              </label>
+              <div class="mini-field">Steps
+                <ScrubValue value={selectedLane.stepCount} min={1} max={64} label="Steps in this lane" testid="lane-steps"
+                            onchange={(stepCount) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId, { stepCount })} />
+              </div>
+              <div class="mini-field" title="Steps per beat — a lane's own rate, which is what makes polymeter free">
+                Steps per beat
+                <Segmented options={[1, 2, 3, 4, 6, 8, 12, 16].map((rate) => ({ value: rate, label: String(rate), title: `${rate} steps per beat` }))}
+                           value={selectedLane.stepsPerBeat} label="Steps per beat" testid="lane-rate"
+                           onchange={(stepsPerBeat) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId, { stepsPerBeat })} />
+              </div>
               {#if selectedLane.type !== 'parameter'}
                 <label class="mini-field">Part
                   <select value={selectedLane.targetPartId}
@@ -1307,30 +1080,28 @@
                 </label>
               {/if}
               {#if selectedLane.type === 'drum'}
-                <label class="mini-field">Note
-                  <input type="number" min="0" max="127" value={selectedLane.drumNote}
-                         onchange={(e) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId,
-                                                         { drumNote: Number(e.currentTarget.value) })} />
-                </label>
+                <div class="mini-field">Note
+                  <ScrubValue value={selectedLane.drumNote} min={0} max={127} format={noteName} label="Drum note" testid="lane-drum-note"
+                              onchange={(drumNote) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId, { drumNote })} />
+                </div>
               {/if}
               {#if selectedLane.type === 'cc'}
-                <label class="mini-field">CC
-                  <input type="number" min="0" max="127" value={selectedLane.ccNumber}
-                         onchange={(e) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId,
-                                                         { ccNumber: Number(e.currentTarget.value) })} />
-                </label>
+                <div class="mini-field">CC
+                  <ScrubValue value={selectedLane.ccNumber} min={0} max={127} label="CC number" testid="lane-cc"
+                              onchange={(ccNumber) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId, { ccNumber })} />
+                </div>
               {/if}
               {#if selectedLane.type === 'cc' || selectedLane.type === 'parameter'}
                 <PropertyToggle compact label="Glide" value={selectedLane.glide}
                                 ariaLabel="Interpolate between steps"
                                 onchange={(on) => setLaneOptions(selectedPattern.patternId, selectedLane.laneId, { glide: on })} />
               {/if}
-              <label class="mini-field" title="Spread N hits evenly over the lane's steps">
+              <div class="mini-field" title="Spread N hits evenly over the lane's steps">
                 Euclid
-                <input type="number" min="0" max={selectedLane.stepCount} value={selectedLane.euclidPulses}
-                       onchange={(e) => euclidFill(selectedPattern.patternId, selectedLane.laneId,
-                                                   Number(e.currentTarget.value))} />
-              </label>
+                <ScrubValue value={selectedLane.euclidPulses} min={0} max={selectedLane.stepCount} pixelsPerStep={8}
+                            format={(n) => (n === 0 ? 'off' : `${n} hits`)} label="Euclidean hits" testid="lane-euclid"
+                            onchange={(pulses) => euclidFill(selectedPattern.patternId, selectedLane.laneId, pulses)} />
+              </div>
               <HostConfirmButton identity={JSON.stringify([selectedPattern.patternId, selectedLane.laneId])} title="Clear lane" aria-label="Clear lane" type="button" class="ghost"
                       onclick={() => clearLane(selectedPattern.patternId, selectedLane.laneId)}>Clear</HostConfirmButton>
               {#if clipForSelectedPattern}
@@ -1349,53 +1120,26 @@
             <div class="step-options" data-testid="perf-step-options">
               <strong>Step {selectedStepIndex + 1}</strong>
               {#if selectedLane.type === 'note' || selectedLane.type === 'chord'}
-                <label class="mini-field">Note
-                  <input type="number" min="0" max="127" value={selectedStep.note}
-                         onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                  { note: Number(e.currentTarget.value) })} />
-                </label>
+                <div class="mini-field">Note
+                  <ScrubValue value={selectedStep.note} min={0} max={127} format={noteName} label="Note" testid="step-note"
+                              onchange={(note) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex, { note })} />
+                </div>
               {/if}
               {#if selectedLane.type === 'cc' || selectedLane.type === 'parameter'}
-                <label class="mini-field">Value
-                  <input type="range" min="0" max="1" step="0.01" value={selectedStep.value}
-                         onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                  { value: Number(e.currentTarget.value) })} />
-                </label>
+                <div class="mini-field">Value
+                  <ScrubValue value={Math.round(selectedStep.value * 100)} min={0} max={100} unit="%" label="Value" testid="step-value"
+                              onchange={(v) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex, { value: v / 100 })} />
+                </div>
               {:else}
-                <label class="mini-field">Velocity
-                  <input type="number" min="1" max="127" value={selectedStep.velocity}
-                         onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                  { velocity: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field">Gate
-                  <input type="range" min="0.05" max="4" step="0.05" value={selectedStep.gate}
-                         onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                  { gate: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field" title="Retriggers inside this step">Ratchet
-                  <input type="number" min="1" max="8" value={selectedStep.ratchets}
-                         onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                  { ratchets: Number(e.currentTarget.value) })} />
-                </label>
                 <PropertyToggle compact label="Tie" value={selectedStep.tie} ariaLabel="Tie to the previous step"
                                 onchange={(on) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex, { tie: on })} />
               {/if}
-              <label class="mini-field" title="Rolled from the pattern's seed, so the same seed replays the same show">
-                Chance
-                <input type="number" min="0" max="100" value={selectedStep.probability}
-                       onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                { probability: Number(e.currentTarget.value) })} />
-              </label>
-              <label class="mini-field" title="Nudge, as a fraction of a step">Nudge
-                <input type="range" min="-0.5" max="0.5" step="0.01" value={selectedStep.microtiming}
-                       onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                { microtiming: Number(e.currentTarget.value) })} />
-              </label>
-              <label class="mini-field" title="Play only on every Nth loop">Every
-                <input type="number" min="1" max="16" value={selectedStep.every}
-                       onchange={(e) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex,
-                                                { every: Number(e.currentTarget.value) })} />
-              </label>
+              <div class="mini-field" title="Play only on every Nth loop">Plays
+                <ScrubValue value={selectedStep.every} min={1} max={16} pixelsPerStep={8} label="Play on every Nth loop" testid="step-every"
+                            format={(n) => (n === 1 ? 'every loop' : `every ${n} loops`)}
+                            onchange={(every) => setStep(selectedPattern.patternId, selectedLane.laneId, selectedStepIndex, { every })} />
+              </div>
+              <span class="step-hint">Velocity, length, chance, nudge and ratchet: drag them in the rows under the lane.</span>
 
               <div class="lock-editor" data-testid="perf-parameter-locks">
                 <div class="lock-head">
@@ -1963,167 +1707,7 @@
       {#if $hostState.rack.midiLfos.length > 0}
         <div class="lfo-grid">
           {#each $hostState.rack.midiLfos as lfo (lfo.lfoId)}
-            <article class="lfo-card" class:disabled={!lfo.enabled}>
-              <header class="lfo-card-head">
-                <button type="button" class="route-power" class:on={lfo.enabled}
-                        title={lfo.enabled ? 'Disable LFO' : 'Enable LFO'}
-                        onclick={() => setMidiLfo(lfo.lfoId, { enabled: !lfo.enabled })}>
-                  {lfo.enabled ? '●' : '○'}
-                </button>
-                <input class="lfo-name" value={lfo.name} aria-label="LFO name"
-                       onchange={(e) => setMidiLfo(lfo.lfoId, { name: e.currentTarget.value })} />
-                <span class="perf-spacer"></span>
-                <button type="button" class="ghost" onclick={() => resetMidiLfo(lfo.lfoId)}>
-                  Restart
-                </button>
-                <HostConfirmButton identity={JSON.stringify([lfo.lfoId])} aria-label="Remove MIDI LFO" type="button" class="ghost danger" title="Remove LFO"
-                        onclick={() => removeMidiLfo(lfo.lfoId)}>×</HostConfirmButton>
-              </header>
-
-              <div class="lfo-scope" aria-label={`${lfo.name} current value ${Math.round(lfo.value * 100)}%`}>
-                <span class="lfo-midline"></span>
-                <span class="lfo-trace" style={`width: ${Math.round(lfo.phase * 100)}%`}></span>
-                <span class="lfo-dot"
-                      style={`left: ${Math.round(lfo.phase * 100)}%; top: ${Math.round((1 - lfo.value) * 100)}%`}></span>
-                <output>{Math.round(lfo.value * 100)}%</output>
-              </div>
-
-              <div class="lfo-controls">
-                <label class="mini-field">
-                  <span>Shape</span>
-                  <select value={lfo.shape}
-                          onchange={(e) => setMidiLfo(lfo.lfoId, { shape: e.currentTarget.value })}>
-                    <option value="sine">Sine</option>
-                    <option value="triangle">Triangle</option>
-                    <option value="sawUp">Saw up</option>
-                    <option value="sawDown">Saw down</option>
-                    <option value="square">Square</option>
-                    <option value="sampleHold">Sample & hold</option>
-                  </select>
-                </label>
-                <label class="mini-field lfo-sync-field">
-                  <span>Clock</span>
-                  <button type="button" class="toggle" class:on={lfo.sync}
-                          onclick={() => setMidiLfo(lfo.lfoId, { sync: !lfo.sync })}>
-                    {lfo.sync ? 'Tempo sync' : 'Free Hz'}
-                  </button>
-                </label>
-                {#if lfo.sync}
-                  <label class="mini-field">
-                    <span>Cycle</span>
-                    <select value={lfo.syncBeats}
-                            onchange={(e) => setMidiLfo(lfo.lfoId,
-                                                       { syncBeats: Number(e.currentTarget.value) })}>
-                      {#each lfoSyncRates as rate (rate.label)}
-                        <option value={rate.beats}>{rate.label}</option>
-                      {/each}
-                    </select>
-                  </label>
-                {:else}
-                  <label class="mini-field">
-                    <span>Rate Hz</span>
-                    <input type="number" min="0.01" max="40" step="0.01" value={lfo.rateHz}
-                           onchange={(e) => setMidiLfo(lfo.lfoId,
-                                                      { rateHz: Number(e.currentTarget.value) })} />
-                  </label>
-                {/if}
-                <label class="mini-field lfo-range">
-                  <span>Phase {Math.round(lfo.phaseOffset * 360)}°</span>
-                  <input type="range" min="0" max="1" step="0.01" value={lfo.phaseOffset}
-                         onchange={(e) => setMidiLfo(lfo.lfoId,
-                                                    { phaseOffset: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field lfo-range">
-                  <span>Minimum {Math.round(lfo.minimum * 100)}%</span>
-                  <input type="range" min="0" max={lfo.maximum} step="0.01" value={lfo.minimum}
-                         onchange={(e) => setMidiLfo(lfo.lfoId,
-                                                    { minimum: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field lfo-range">
-                  <span>Maximum {Math.round(lfo.maximum * 100)}%</span>
-                  <input type="range" min={lfo.minimum} max="1" step="0.01" value={lfo.maximum}
-                         onchange={(e) => setMidiLfo(lfo.lfoId,
-                                                    { maximum: Number(e.currentTarget.value) })} />
-                </label>
-                <button type="button" class="mod-add-button route-lfo"
-                        onclick={() => routeLfo(lfo)}>Route in matrix →</button>
-              </div>
-
-              <div class="lfo-midi-head">
-                <div>
-                  <strong>Hardware MIDI</strong>
-                  <span>Outputs are added muted and must be enabled explicitly.</span>
-                </div>
-                <button type="button" class="ghost" disabled={hardwareParts.length === 0}
-                        title={hardwareParts.length === 0 ? 'Add a hardware part first' : 'Add a MIDI output'}
-                        onclick={() => addHardwareLfoOutput(lfo)}>+ Output</button>
-              </div>
-              {#if lfo.outputs.length === 0}
-                <div class="lfo-output-empty">
-                  {hardwareParts.length === 0
-                    ? 'Add a hardware part to make CC, NRPN or SysEx destinations available.'
-                    : 'No direct hardware output. Matrix routes still work.'}
-                </div>
-              {:else}
-                <div class="lfo-outputs">
-                  {#each lfo.outputs as output (output.outputId)}
-                    <div class="lfo-output" class:unresolved={!output.resolved}>
-                      <button type="button" class="route-power" class:on={output.enabled}
-                              title={output.enabled ? 'Mute output' : 'Enable output'}
-                              onclick={() => setMidiLfoOutput(lfo.lfoId, output.outputId,
-                                                              { enabled: !output.enabled })}>
-                        {output.enabled ? '●' : '○'}
-                      </button>
-                      <label class="mini-field">
-                        <span>Protocol</span>
-                        <select value={output.type}
-                                onchange={(e) => setMidiLfoOutput(lfo.lfoId, output.outputId,
-                                                                  { type: e.currentTarget.value })}>
-                          <option value="cc">CC</option>
-                          <option value="nrpn">NRPN 14-bit</option>
-                          <option value="sysex">SysEx</option>
-                        </select>
-                      </label>
-                      <label class="mini-field lfo-output-target">
-                        <span>Hardware part</span>
-                        <select value={output.targetPartId}
-                                onchange={(e) => setMidiLfoOutput(lfo.lfoId, output.outputId,
-                                                                  { targetPartId: e.currentTarget.value })}>
-                          {#each hardwareParts as part (part.partId)}
-                            <option value={part.partId}>{part.midiOutputName || part.pluginName || 'Hardware part'}</option>
-                          {/each}
-                        </select>
-                      </label>
-                      {#if output.type !== 'sysex'}
-                        <label class="mini-field lfo-output-small">
-                          <span>Channel</span>
-                          <input type="number" min="1" max="16" value={output.channel}
-                                 onchange={(e) => setMidiLfoOutput(lfo.lfoId, output.outputId,
-                                                                  { channel: Number(e.currentTarget.value) })} />
-                        </label>
-                        <label class="mini-field lfo-output-number">
-                          <span>{output.type === 'nrpn' ? 'NRPN' : 'CC'}</span>
-                          <input type="number" min="0" max={output.type === 'nrpn' ? 16383 : 127}
-                                 value={output.number}
-                                 onchange={(e) => setMidiLfoOutput(lfo.lfoId, output.outputId,
-                                                                  { number: Number(e.currentTarget.value) })} />
-                        </label>
-                      {:else}
-                        <label class="mini-field lfo-sysex">
-                          <span>Template · use {'{value7}'}, {'{valueMSB}'}, {'{valueLSB}'}</span>
-                          <input value={output.sysexTemplate} spellcheck="false"
-                                 onchange={(e) => setMidiLfoOutput(lfo.lfoId, output.outputId,
-                                                                  { sysexTemplate: e.currentTarget.value })} />
-                        </label>
-                      {/if}
-                      {#if !output.resolved}<span class="route-missing">Unresolved</span>{/if}
-                      <HostConfirmButton identity={JSON.stringify([lfo.lfoId, output.outputId])} aria-label="Remove MIDI LFO output" type="button" class="ghost danger" title="Remove output"
-                              onclick={() => removeMidiLfoOutput(lfo.lfoId, output.outputId)}>×</HostConfirmButton>
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-            </article>
+            <LfoCard {lfo} {hardwareParts} onroute={() => routeLfo(lfo)} />
           {/each}
         </div>
       {/if}
@@ -2152,133 +1736,7 @@
       {:else}
         <div class="envelope-grid">
           {#each $hostState.rack.envelopes as envelope (envelope.envelopeId)}
-            {@const visual = envelopeVisual(envelope)}
-            <article class="envelope-card" class:disabled={!envelope.enabled}>
-              <header class="lfo-card-head">
-                <button type="button" class="route-power" class:on={envelope.enabled}
-                        title={envelope.enabled ? 'Disable envelope' : 'Enable envelope'}
-                        onclick={() => setEnvelope(envelope.envelopeId,
-                                                  { enabled: !envelope.enabled })}>
-                  {envelope.enabled ? '●' : '○'}
-                </button>
-                <input class="lfo-name" value={envelope.name} aria-label="Envelope name"
-                       onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                    { name: e.currentTarget.value })} />
-                <span class="envelope-stage" class:active={envelope.stage !== 'idle'}>
-                  {envelope.stage} · {Math.round(envelope.value * 100)}%
-                </span>
-                <span class="perf-spacer"></span>
-                <button type="button" class="ghost" onclick={() => resetEnvelope(envelope.envelopeId)}>
-                  Reset
-                </button>
-                <HostConfirmButton identity={JSON.stringify([envelope.envelopeId])} aria-label="Remove envelope" type="button" class="ghost danger" title="Remove envelope"
-                        onclick={() => removeEnvelope(envelope.envelopeId)}>×</HostConfirmButton>
-              </header>
-
-              <div class="envelope-scope"
-                   aria-label={`${envelope.name}, ${envelope.stage}, ${Math.round(envelope.value * 100)} percent`}>
-                <svg viewBox="0 0 100 52" preserveAspectRatio="none" aria-hidden="true">
-                  <line x1={visual.attackX} y1="0" x2={visual.attackX} y2="52"></line>
-                  <line x1={visual.decayX} y1="0" x2={visual.decayX} y2="52"></line>
-                  <line x1={visual.releaseX} y1="0" x2={visual.releaseX} y2="52"></line>
-                  <polyline points={visual.points}></polyline>
-                  <circle cx={visual.markerX} cy={visual.markerY} r="2.2"></circle>
-                </svg>
-                <div class="envelope-stage-labels" aria-hidden="true">
-                  <span>A</span><span>D</span><span>S</span><span>R</span>
-                </div>
-              </div>
-
-              <div class="envelope-controls">
-                <label class="mini-field envelope-time">
-                  <span>Attack {Math.round(envelope.attackMs)} ms</span>
-                  <input type="range" min="0" max="1" step="0.001"
-                         value={envelopeTimePosition(envelope.attackMs)}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                           { attackMs: envelopeTimeFromPosition(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field envelope-time">
-                  <span>Decay {Math.round(envelope.decayMs)} ms</span>
-                  <input type="range" min="0" max="1" step="0.001"
-                         value={envelopeTimePosition(envelope.decayMs)}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                           { decayMs: envelopeTimeFromPosition(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field envelope-time">
-                  <span>Sustain {Math.round(envelope.sustain * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.01" value={envelope.sustain}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                      { sustain: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field envelope-time">
-                  <span>Release {Math.round(envelope.releaseMs)} ms</span>
-                  <input type="range" min="0" max="1" step="0.001"
-                         value={envelopeTimePosition(envelope.releaseMs)}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                           { releaseMs: envelopeTimeFromPosition(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field envelope-time">
-                  <span>Curve {envelope.curve > 0 ? '+' : ''}{envelope.curve.toFixed(2)}</span>
-                  <input type="range" min="-1" max="1" step="0.01" value={envelope.curve}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                      { curve: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field envelope-time">
-                  <span>Velocity {Math.round(envelope.velocityAmount * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.01" value={envelope.velocityAmount}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                      { velocityAmount: Number(e.currentTarget.value) })} />
-                </label>
-              </div>
-
-              <div class="envelope-trigger-row">
-                <label class="mini-field">
-                  <span>MIDI channel</span>
-                  <select value={envelope.channel}
-                          onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                       { channel: Number(e.currentTarget.value) })}>
-                    <option value={0}>Omni</option>
-                    {#each Array.from({ length: 16 }, (_, index) => index + 1) as channel (channel)}
-                      <option value={channel}>{channel}</option>
-                    {/each}
-                  </select>
-                </label>
-                <label class="mini-field envelope-note">
-                  <span>Lowest note</span>
-                  <input type="number" min="0" max="127" value={envelope.noteLow}
-                         title={noteName(envelope.noteLow)}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                      { noteLow: Number(e.currentTarget.value) })} />
-                  <output>{noteName(envelope.noteLow)}</output>
-                </label>
-                <label class="mini-field envelope-note">
-                  <span>Highest note</span>
-                  <input type="number" min="0" max="127" value={envelope.noteHigh}
-                         title={noteName(envelope.noteHigh)}
-                         onchange={(e) => setEnvelope(envelope.envelopeId,
-                                                      { noteHigh: Number(e.currentTarget.value) })} />
-                  <output>{noteName(envelope.noteHigh)}</output>
-                </label>
-                <label class="mini-field">
-                  <span>Held notes</span>
-                  <button type="button" class="toggle" class:on={envelope.retrigger}
-                          onclick={() => setEnvelope(envelope.envelopeId,
-                                                    { retrigger: !envelope.retrigger })}>
-                    {envelope.retrigger ? 'Retrigger' : 'Legato'}
-                  </button>
-                </label>
-                <span class="perf-spacer"></span>
-                <button type="button" class="envelope-audition" disabled={!envelope.enabled}
-                        onpointerdown={() => setEnvelopeAuditionHeld(envelope.envelopeId, true)}
-                        onpointerup={() => setEnvelopeAuditionHeld(envelope.envelopeId, false)}
-                        onpointercancel={() => setEnvelopeAuditionHeld(envelope.envelopeId, false)}
-                        onpointerleave={() => setEnvelopeAuditionHeld(envelope.envelopeId, false)}>
-                  Hold to audition
-                </button>
-                <button type="button" class="mod-add-button"
-                        onclick={() => routeEnvelope(envelope)}>Route in matrix →</button>
-              </div>
-            </article>
+            <EnvelopeCard {envelope} {setEnvelopeAuditionHeld} onroute={() => routeEnvelope(envelope)} />
           {/each}
         </div>
       {/if}
@@ -2307,148 +1765,7 @@
       {:else}
         <div class="mseg-grid">
           {#each $hostState.rack.msegs as mseg (mseg.msegId)}
-            {@const points = msegDisplayPoints(mseg)}
-            {@const selectedPoint = (selectedMsegId === mseg.msegId
-              ? points.find((point) => point.pointId === selectedMsegPointId) : null) ?? points[0]}
-            {@const selectedPointIndex = points.findIndex(
-              (point) => point.pointId === selectedPoint.pointId)}
-            <article class="mseg-card" class:disabled={!mseg.enabled}>
-              <header class="lfo-card-head">
-                <button type="button" class="route-power" class:on={mseg.enabled}
-                        title={mseg.enabled ? 'Disable MSEG' : 'Enable MSEG'}
-                        onclick={() => setMseg(mseg.msegId, { enabled: !mseg.enabled })}>
-                  {mseg.enabled ? '●' : '○'}
-                </button>
-                <input class="lfo-name" value={mseg.name} aria-label="MSEG name"
-                       onchange={(e) => setMseg(mseg.msegId, { name: e.currentTarget.value })} />
-                <span class="mseg-readout">
-                  phase {Math.round(mseg.phase * 100)}% · value {Math.round(mseg.value * 100)}%
-                </span>
-                <span class="perf-spacer"></span>
-                <button type="button" class="ghost" onclick={() => resetMseg(mseg.msegId)}>
-                  Restart
-                </button>
-                <HostConfirmButton identity={JSON.stringify([mseg.msegId])} aria-label="Remove MSEG" type="button" class="ghost danger" title="Remove MSEG"
-                        onclick={() => removeMseg(mseg.msegId)}>×</HostConfirmButton>
-              </header>
-
-              <div class="mseg-editor">
-                <svg viewBox="0 0 100 60" preserveAspectRatio="none" role="application"
-                     aria-label={`${mseg.name} curve editor. Double-click to add, drag points, right-click to remove.`}
-                     ondblclick={(e) => addMsegPoint(mseg, e)}
-                     onpointermove={(e) => moveMsegPoint(mseg, e)}
-                     onpointerup={(e) => endMsegDrag(mseg, e)}
-                     onpointercancel={(e) => endMsegDrag(mseg, e)}>
-                  <g class="mseg-grid-lines" aria-hidden="true">
-                    {#each [25, 50, 75] as x (x)}<line x1={x} y1="0" x2={x} y2="60"></line>{/each}
-                    {#each [15, 30, 45] as y (y)}<line x1="0" y1={y} x2="100" y2={y}></line>{/each}
-                  </g>
-                  <path class="mseg-curve" d={msegPath(points)}></path>
-                  <line class="mseg-playhead" x1={mseg.phase * 100} y1="0"
-                        x2={mseg.phase * 100} y2="60"></line>
-                  <rect class="mseg-live-dot" x={mseg.phase * 100 - 0.7}
-                        y={(1 - mseg.value) * 60 - 2.5} width="1.4" height="5"></rect>
-                  {#each points as point, pointIndex (point.pointId)}
-                    <rect class="mseg-point"
-                          class:selected={selectedMsegId === mseg.msegId
-                            && selectedMsegPointId === point.pointId}
-                          x={point.position * 100 - 0.85} y={(1 - point.value) * 60 - 3}
-                          width="1.7" height="6"
-                          role="button" tabindex="0"
-                          aria-label={`Point ${pointIndex + 1}, position ${Math.round(point.position * 100)} percent, value ${Math.round(point.value * 100)} percent`}
-                          onpointerdown={(e) => beginMsegDrag(mseg, point, e)}
-                          ondblclick={(e) => e.stopPropagation()}
-                          onkeydown={(e) => msegPointKey(mseg, point, pointIndex, e)}
-                          oncontextmenu={(e) => deleteMsegPoint(mseg, point, e)}>
-                      <title>{Math.round(point.position * 100)}% · {Math.round(point.value * 100)}%</title>
-                    </rect>
-                  {/each}
-                </svg>
-                <div class="mseg-axis" aria-hidden="true">
-                  <span>0</span><span>¼</span><span>½</span><span>¾</span><span>1 cycle</span>
-                </div>
-              </div>
-
-              <div class="mseg-controls">
-                <label class="mini-field mseg-clock">
-                  <span>Clock</span>
-                  <button type="button" class="toggle" class:on={mseg.sync}
-                          onclick={() => setMseg(mseg.msegId, { sync: !mseg.sync })}>
-                    {mseg.sync ? 'Tempo sync' : 'Free Hz'}
-                  </button>
-                </label>
-                {#if mseg.sync}
-                  <label class="mini-field">
-                    <span>Cycle</span>
-                    <select value={mseg.syncBeats}
-                            onchange={(e) => setMseg(mseg.msegId,
-                              { syncBeats: Number(e.currentTarget.value) })}>
-                      {#each lfoSyncRates as rate (rate.label)}
-                        <option value={rate.beats}>{rate.label}</option>
-                      {/each}
-                    </select>
-                  </label>
-                {:else}
-                  <label class="mini-field">
-                    <span>Rate Hz</span>
-                    <input type="number" min="0.01" max="40" step="0.01" value={mseg.rateHz}
-                           onchange={(e) => setMseg(mseg.msegId,
-                             { rateHz: Number(e.currentTarget.value) })} />
-                  </label>
-                {/if}
-                <label class="mini-field mseg-phase">
-                  <span>Phase {Math.round(mseg.phaseOffset * 360)}°</span>
-                  <input type="range" min="0" max="1" step="0.01" value={mseg.phaseOffset}
-                         onchange={(e) => setMseg(mseg.msegId,
-                           { phaseOffset: Number(e.currentTarget.value) })} />
-                </label>
-                <div class="mseg-presets">
-                  <span>Shape</span>
-                  <button type="button" class="ghost"
-                          onclick={() => applyMsegPreset(mseg, [[0, 0], [1, 1]])}>Ramp</button>
-                  <button type="button" class="ghost"
-                          onclick={() => applyMsegPreset(mseg,
-                            [[0, 0], [0.1, 1, -0.35], [0.45, 0.18, 0.2], [1, 0]])}>Pluck</button>
-                  <button type="button" class="ghost"
-                          onclick={() => applyMsegPreset(mseg,
-                            [[0, 0], [0.24, 0], [0.25, 1], [0.74, 1], [0.75, 0], [1, 0]])}>Pulse</button>
-                </div>
-                <span class="perf-spacer"></span>
-                <button type="button" class="mod-add-button"
-                        onclick={() => routeMseg(mseg)}>Route in matrix →</button>
-              </div>
-
-              <div class="mseg-point-inspector">
-                <strong>Point {selectedPointIndex + 1}</strong>
-                <label class="mini-field mseg-point-control">
-                  <span>Position {Math.round(selectedPoint.position * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.005" value={selectedPoint.position}
-                         disabled={selectedPointIndex === 0 || selectedPointIndex === points.length - 1}
-                         onchange={(e) => setSelectedMsegPoint(mseg,
-                           { position: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field mseg-point-control">
-                  <span>Value {Math.round(selectedPoint.value * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.005" value={selectedPoint.value}
-                         onchange={(e) => setSelectedMsegPoint(mseg,
-                           { value: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field mseg-point-control">
-                  <span>Curve {selectedPoint.curve > 0 ? '+' : ''}{selectedPoint.curve.toFixed(2)}</span>
-                  <input type="range" min="-1" max="1" step="0.01" value={selectedPoint.curve}
-                         disabled={selectedPointIndex === 0}
-                         onchange={(e) => setSelectedMsegPoint(mseg,
-                           { curve: Number(e.currentTarget.value) })} />
-                </label>
-                <HostConfirmButton identity={selectedPoint.pointId} title="Remove point"
-                        disabled={points.length <= 2 || selectedPointIndex === 0
-                          || selectedPointIndex === points.length - 1}
-                        onclick={(e) => deleteMsegPoint(mseg, selectedPoint, e)}>
-                  Remove point
-                </HostConfirmButton>
-                <span class="mseg-point-count">{points.length} / 64 points</span>
-              </div>
-            </article>
+            <MsegCard {mseg} onroute={() => routeMseg(mseg)} />
           {/each}
         </div>
       {/if}
@@ -2478,146 +1795,7 @@
       {:else}
         <div class="random-grid">
           {#each $hostState.rack.randomModulators as random (random.randomId)}
-            {@const preview = randomPreviewValues(random)}
-            {@const liveStep = ((Math.max(0, random.step) % preview.length) + preview.length)
-              % preview.length}
-            <article class="random-card" class:disabled={!random.enabled}>
-              <header class="lfo-card-head">
-                <button type="button" class="route-power" class:on={random.enabled}
-                        title={random.enabled ? 'Disable random modulator' : 'Enable random modulator'}
-                        onclick={() => setRandomModulator(random.randomId,
-                          { enabled: !random.enabled })}>
-                  {random.enabled ? '●' : '○'}
-                </button>
-                <input class="lfo-name" value={random.name} aria-label="Random modulator name"
-                       onchange={(e) => setRandomModulator(random.randomId,
-                         { name: e.currentTarget.value })} />
-                <span class="random-mode-readout">{randomModeLabel(random.mode)}</span>
-                <span class="random-value-readout">{Math.round(random.value * 100)}%</span>
-                <span class="perf-spacer"></span>
-                <button type="button" class="ghost"
-                        onclick={() => resetRandomModulator(random.randomId)}>Restart</button>
-                <HostConfirmButton identity={JSON.stringify([random.randomId])} aria-label="Remove random modulator" type="button" class="ghost danger" title="Remove random modulator"
-                        onclick={() => removeRandomModulator(random.randomId)}>×</HostConfirmButton>
-              </header>
-
-              <div class="random-scope"
-                   aria-label={`${random.name}, ${randomModeLabel(random.mode)}, current value ${Math.round(random.value * 100)} percent`}>
-                <svg viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true">
-                  <g class="random-grid-lines">
-                    {#each [25, 50, 75] as x (x)}<line x1={x} y1="0" x2={x} y2="60"></line>{/each}
-                    {#each [15, 30, 45] as y (y)}<line x1="0" y1={y} x2="100" y2={y}></line>{/each}
-                  </g>
-                  <path class="random-preview" d={randomPreviewPath(random)}></path>
-                  <line class="random-playhead"
-                        x1={(liveStep + random.phase) * 100 / preview.length} y1="0"
-                        x2={(liveStep + random.phase) * 100 / preview.length} y2="60"></line>
-                  <rect class="random-live-dot"
-                        x={(liveStep + random.phase) * 100 / preview.length - 0.8}
-                        y={(1 - random.value) * 60 - 3} width="1.6" height="6"></rect>
-                </svg>
-                <div class="random-scope-labels" aria-hidden="true">
-                  <span>Seed {random.seed}</span>
-                  <span>Step {Math.max(0, random.step) + 1}</span>
-                </div>
-              </div>
-
-              <div class="random-controls">
-                <label class="mini-field">
-                  <span>Character</span>
-                  <select value={random.mode}
-                          onchange={(e) => setRandomModulator(random.randomId,
-                            { mode: e.currentTarget.value })}>
-                    <option value="sampleHold">Sample &amp; hold</option>
-                    <option value="smoothRandom">Smooth random</option>
-                    <option value="chaos">Chaos</option>
-                    <option value="randomWalk">Bounded walk</option>
-                  </select>
-                </label>
-                <label class="mini-field random-clock">
-                  <span>Clock</span>
-                  <button type="button" class="toggle" class:on={random.sync}
-                          onclick={() => setRandomModulator(random.randomId,
-                            { sync: !random.sync })}>
-                    {random.sync ? 'Tempo sync' : 'Free Hz'}
-                  </button>
-                </label>
-                {#if random.sync}
-                  <label class="mini-field">
-                    <span>Decision rate</span>
-                    <select value={random.syncBeats}
-                            onchange={(e) => setRandomModulator(random.randomId,
-                              { syncBeats: Number(e.currentTarget.value) })}>
-                      {#each lfoSyncRates as rate (rate.label)}
-                        <option value={rate.beats}>{rate.label}</option>
-                      {/each}
-                    </select>
-                  </label>
-                {:else}
-                  <label class="mini-field">
-                    <span>Rate Hz</span>
-                    <input type="number" min="0.01" max="40" step="0.01" value={random.rateHz}
-                           onchange={(e) => setRandomModulator(random.randomId,
-                             { rateHz: Number(e.currentTarget.value) })} />
-                  </label>
-                {/if}
-                <label class="mini-field random-wide">
-                  <span>Chance {Math.round(random.probability * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.01" value={random.probability}
-                         onchange={(e) => setRandomModulator(random.randomId,
-                           { probability: Number(e.currentTarget.value) })} />
-                </label>
-                {#if random.mode === 'smoothRandom'}
-                  <label class="mini-field random-wide">
-                    <span>Glide {Math.round(random.smoothing * 100)}%</span>
-                    <input type="range" min="0" max="1" step="0.01" value={random.smoothing}
-                           onchange={(e) => setRandomModulator(random.randomId,
-                             { smoothing: Number(e.currentTarget.value) })} />
-                  </label>
-                {:else if random.mode === 'chaos'}
-                  <label class="mini-field random-wide">
-                    <span>Chaos {Math.round(random.chaos * 100)}%</span>
-                    <input type="range" min="0" max="1" step="0.01" value={random.chaos}
-                           onchange={(e) => setRandomModulator(random.randomId,
-                             { chaos: Number(e.currentTarget.value) })} />
-                  </label>
-                {:else if random.mode === 'randomWalk'}
-                  <label class="mini-field random-wide">
-                    <span>Step size {Math.round(random.stepSize * 100)}%</span>
-                    <input type="range" min="0" max="1" step="0.01" value={random.stepSize}
-                           onchange={(e) => setRandomModulator(random.randomId,
-                             { stepSize: Number(e.currentTarget.value) })} />
-                  </label>
-                {/if}
-              </div>
-
-              <div class="random-range-row">
-                <label class="mini-field random-range">
-                  <span>Minimum {Math.round(random.minimum * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.01" value={random.minimum}
-                         onchange={(e) => setRandomModulator(random.randomId,
-                           { minimum: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field random-range">
-                  <span>Maximum {Math.round(random.maximum * 100)}%</span>
-                  <input type="range" min="0" max="1" step="0.01" value={random.maximum}
-                         onchange={(e) => setRandomModulator(random.randomId,
-                           { maximum: Number(e.currentTarget.value) })} />
-                </label>
-                <label class="mini-field random-seed">
-                  <span>Seed</span>
-                  <input type="number" min="1" max="2147483647" step="1" value={random.seed}
-                         onchange={(e) => setRandomModulator(random.randomId,
-                           { seed: Number(e.currentTarget.value) })} />
-                </label>
-                <button type="button" class="ghost" onclick={() => reseedRandom(random)}>
-                  New seed
-                </button>
-                <span class="perf-spacer"></span>
-                <button type="button" class="mod-add-button"
-                        onclick={() => routeRandom(random)}>Route in matrix →</button>
-              </div>
-            </article>
+            <RandomCard {random} onroute={() => routeRandom(random)} />
           {/each}
         </div>
       {/if}
@@ -2736,23 +1914,89 @@
   {/if}
 
   {#if tab === 'clips'}
-    <div class="perf-body clip-scene-body">
+    <div class="perf-body clip-scene-body" data-testid="perf-launcher">
+      <div class="perf-head launcher-head">
+        <strong>Launcher</strong>
+        <span class="launcher-note">Scenes are rows, clips are columns. A lit cell means the scene starts that clip.</span>
+        <span class="perf-spacer"></span>
+        {#if performance.clips.some((clip) => clip.active)}
+          <button type="button" class="ghost" data-testid="perf-stop-all" onclick={() => stopAllClips()}>
+            ■ Stop all · {performance.clips.filter((clip) => clip.active).length} playing</button>
+        {/if}
+        <button type="button" onclick={() => addScene()} data-testid="perf-add-scene"
+                title="A new scene with the rig as it is now">+ Scene from the rig</button>
+      </div>
+      {#if performance.snapshotMorph.active}
+        <div class="snapshot-morph-status" data-testid="snapshot-morph-status">
+          <span>Morphing to <strong>{performance.snapshotMorph.name}</strong></span>
+          <span>{performance.snapshotMorph.targetCount} controls</span>
+          <span class="snapshot-morph-track" aria-label="Snapshot morph progress">
+            <span style={`width:${performance.snapshotMorph.progress * 100}%`}></span>
+          </span>
+        </div>
+      {/if}
+      {#if performance.scenes.length > 0 || performance.clips.length > 0}
+        <div class="launch-scroll">
+        <div class="launch-grid" role="group" aria-label="Scenes and the clips they start"
+             style={`grid-template-columns: minmax(150px, 190px) repeat(${performance.clips.length}, minmax(104px, 1fr)) minmax(96px, 130px)`}>
+          <span class="lg-corner"></span>
+          {#each performance.clips as clip (clip.clipId)}
+            <div class="lg-clip" class:picked={pickedClip?.clipId === clip.clipId} class:active={clip.active} data-testid="launch-clip">
+              <button type="button" class="lg-play" data-testid="launch-clip-play"
+                      title={clip.active ? 'Stop at the next boundary' : 'Launch at the next boundary'}
+                      onclick={() => (clip.active ? stopClip(clip.clipId) : launchClip(clip.clipId))}>
+                {clip.pending ? '⧗' : clip.active ? '■' : '▶'}</button>
+              <button type="button" class="lg-name" title="Show this clip's settings below"
+                      onclick={() => (pickedClipId = clip.clipId)}>
+                <b>{clip.name}{clip.frozenMidi ? ' ❄' : ''}</b>
+                <small>{clipParts(clip).join(', ') || 'no part yet'} · {clipFlow(clip)}</small></button>
+            </div>
+          {/each}
+          <span class="lg-corner lg-used">Used in</span>
+          {#each performance.scenes as scene, index (scene.sceneId)}
+            <div class="lg-scene" class:picked={pickedScene?.sceneId === scene.sceneId}
+                 class:now={performance.currentSceneId === scene.sceneId}
+                 class:queued={performance.queuedSceneId === scene.sceneId} data-testid="launch-scene">
+              <button type="button" class="lg-play" data-testid="launch-scene-play"
+                      title={scene.morphBeats > 0 ? `Launch, morphing over ${scene.morphBeats} beats` : 'Launch this scene at its boundary'}
+                      onclick={() => launchScene(scene.sceneId)}>▶</button>
+              <span class="lg-swatch" style={`background:${sceneColour(index)}`}></span>
+              <button type="button" class="lg-name" title="Show this scene's settings below"
+                      onclick={() => (pickedSceneId = scene.sceneId)}>
+                <b>{scene.name}</b>{#if scene.variationLabel}<small>variation {scene.variationLabel}</small>{/if}</button>
+            </div>
+            {#each performance.clips as clip (clip.clipId)}
+              {@const on = scene.clipIds.includes(clip.clipId)}
+              <button type="button" class="lg-cell" class:on class:playing={on && clip.active}
+                      style={on ? `--cell:${sceneColour(index)}` : ''} aria-pressed={on} data-testid="launch-cell"
+                      aria-label={`${scene.name} starts ${clip.name}`}
+                      title={on ? `${scene.name} starts ${clip.name}. Click to leave it out.` : `Make ${scene.name} start ${clip.name}`}
+                      onclick={() => setSceneClip(scene.sceneId, clip.clipId, !on)}>{on ? clip.name : ''}</button>
+            {/each}
+            <span class="lg-meta" class:unused={songCount(scene.sceneId) === 0}>{sceneUse(scene.sceneId)}</span>
+          {/each}
+        </div>
+        </div>
+      {/if}
+      <div class="launcher-details">
       <div class="clip-column">
         <div class="perf-head">
-          <strong>Clips</strong>
-          <label class="freeze-cycles" title="How many source cycles become one deterministic clip">
-            Freeze
-            <select aria-label="MIDI freeze cycles" value={freezeCycles}
-                    onchange={(e) => (freezeCycles = Number(e.currentTarget.value))}>
-              {#each [1, 2, 4, 8] as cycles (cycles)}
-                <option value={cycles}>{cycles}×</option>
-              {/each}
-            </select>
-          </label>
-          <button type="button" class="ghost" onclick={() => stopAllClips()}>Stop all</button>
+          <strong>{pickedClip ? `Clip · ${pickedClip.name}` : 'Clips'}</strong>
+          <!-- Only what can act: freezing needs a clip, stopping needs one playing. -->
+          {#if performance.clips.length > 0}
+            <div class="freeze-cycles" title="How many source cycles become one deterministic clip">
+              Freeze
+              <Segmented options={[1, 2, 4, 8].map((cycles) => ({ value: cycles, label: `${cycles}×`, title: `${cycles} source cycles` }))}
+                         value={freezeCycles} label="MIDI freeze cycles" testid="freeze-cycles"
+                         onchange={(cycles) => (freezeCycles = cycles)} />
+            </div>
+          {/if}
         </div>
         {#if performance.clips.length === 0}
-          <div class="empty-hint">No clips yet — make one from a pattern.</div>
+          <div class="empty-hint first-step" data-testid="perf-clips-empty">
+            <span>No clips yet. A clip plays a pattern: open a pattern and press <strong>+ Clip</strong>.</span>
+            <button type="button" onclick={() => selectTool('patterns')}>Go to Patterns</button>
+          </div>
         {/if}
 
         <!-- The song form as a map. The rows below stay the editor; a follow action is five
@@ -2760,7 +2004,7 @@
              like one that will. -->
         <FollowGraph clips={performance.clips} />
 
-        {#each performance.clips as clip (clip.clipId)}
+        {#each pickedClip ? [pickedClip] : [] as clip (clip.clipId)}
           <div class="clip-row" class:active={clip.active} class:pending={clip.pending}
                data-testid="perf-clip">
             <button type="button" class="clip-launch"
@@ -2776,72 +2020,53 @@
             <span class="clip-phase" aria-hidden="true">
               <span class="clip-phase-fill" style={`width: ${Math.round(clip.phase * 100)}%`}></span>
             </span>
-            <select value={clip.launchQuantize} aria-label={`${clip.name} launch quantization`}
-                    onchange={(e) => setClipOptions(clip.clipId, { launchQuantize: e.currentTarget.value })}>
-              {#each quantizeOptions as option (option)}
-                <option value={option}>{option}</option>
-              {/each}
-            </select>
+            <ScrubValue value={clip.launchQuantize} choices={QUANTIZE_CHOICES} pixelsPerStep={10}
+                        label={`${clip.name} launch quantization`} testid="clip-quantize"
+                        title="Launches on this boundary: drag up or down, or click to type"
+                        onchange={(launchQuantize) => setClipOptions(clip.clipId, { launchQuantize })} />
             <PropertyToggle compact label="Loop" value={clip.loop} ariaLabel={`${clip.name} loops`}
                             onchange={(on) => setClipOptions(clip.clipId, { loop: on })} />
-            <select class="follow-action" value={clip.followAction}
-                    aria-label={`${clip.name} follow action`}
-                    title="What happens after the configured number of loops"
-                    onchange={(e) => {
-                      const followAction = e.currentTarget.value;
-                      const patch = {
-                        followAction,
-                        followAfterLoops: followAction === 'none'
-                          ? 0 : Math.max(1, clip.followAfterLoops || 1),
-                      };
-                      if (followAction === 'clip' && !clip.followClipId)
-                        patch.followClipId = followTargetsFor(clip)[0]?.clipId ?? '';
-                      setClipOptions(clip.clipId, patch);
-                    }}>
-              <option value="none">No follow</option>
-              <option value="clip">Target clip</option>
-              <option value="next">Next clip</option>
-              <option value="random">Random clip</option>
-              <option value="stop">Stop</option>
-            </select>
-            {#if clip.followAction !== 'none'}
-              <label class="follow-loops" title="Complete this many loops before the action">
-                after
-                <input type="number" min="1" max="64" value={Math.max(1, clip.followAfterLoops)}
-                       aria-label={`${clip.name} follow loops`}
-                       onchange={(e) => setClipOptions(clip.clipId,
-                         { followAfterLoops: Number(e.currentTarget.value) })} />
-              </label>
-            {/if}
-            {#if clip.followAction === 'clip'}
-              <select class="follow-target" value={clip.followClipId}
-                      aria-label={`${clip.name} follow target`}
-                      onchange={(e) => setClipOptions(clip.clipId, { followClipId: e.currentTarget.value })}>
-                <option value="">Choose clip…</option>
-                {#each followTargetsFor(clip) as target (target.clipId)}
-                  <option value={target.clipId}>{target.name}</option>
-                {/each}
-              </select>
-            {/if}
-            <select class="fill-pattern" value={clip.fillPatternId}
-                    aria-label={`${clip.name} fill pattern`}
-                    title="Temporary pattern used while Fill is held"
-                    onchange={(e) => setClipOptions(clip.clipId, { fillPatternId: e.currentTarget.value })}>
-              <option value="">No fill</option>
-              {#each fillPatternsFor(clip) as pattern (pattern.patternId)}
-                <option value={pattern.patternId}>
-                  {pattern.variationLabel ? `${pattern.variationLabel} · ` : ''}{pattern.name}
-                </option>
-              {/each}
-            </select>
-            <select class="fill-quantize" value={clip.fillQuantize}
-                    aria-label={`${clip.name} fill quantization`}
-                    title="Boundary used for both press and release"
-                    onchange={(e) => setClipOptions(clip.clipId, { fillQuantize: e.currentTarget.value })}>
-              {#each quantizeOptions as option (option)}
-                <option value={option}>{option}</option>
-              {/each}
-            </select>
+            <Segmented options={FOLLOW_ACTIONS} value={clip.followAction} label={`${clip.name} follow action`}
+                       testid="clip-follow"
+                       onchange={(followAction) => {
+                         const patch = {
+                           followAction,
+                           followAfterLoops: followAction === 'none' ? 0 : Math.max(1, clip.followAfterLoops || 1),
+                         };
+                         if (followAction === 'clip' && !clip.followClipId)
+                           patch.followClipId = followTargetsFor(clip)[0]?.clipId ?? '';
+                         setClipOptions(clip.clipId, patch);
+                       }} />
+            <!-- Fixed slots, filled or not, so every clip's controls line up in columns. -->
+            <span class="follow-slot loops">
+              {#if clip.followAction !== 'none'}
+                <ScrubValue value={Math.max(1, clip.followAfterLoops)} min={1} max={64} pixelsPerStep={8}
+                            format={(n) => `after ${n} ${n === 1 ? 'loop' : 'loops'}`}
+                            label={`${clip.name} follow loops`} testid="clip-follow-loops"
+                            onchange={(followAfterLoops) => setClipOptions(clip.clipId, { followAfterLoops })} />
+              {/if}
+            </span>
+            <span class="follow-slot target">
+              {#if clip.followAction === 'clip'}
+                <select class="follow-target" value={clip.followClipId}
+                        aria-label={`${clip.name} follow target`}
+                        onchange={(e) => setClipOptions(clip.clipId, { followClipId: e.currentTarget.value })}>
+                  <option value="">Choose clip…</option>
+                  {#each followTargetsFor(clip) as target (target.clipId)}
+                    <option value={target.clipId}>{target.name}</option>
+                  {/each}
+                </select>
+              {/if}
+            </span>
+            <!-- The fill's settings live in a panel under the row; the row keeps the button you
+                 hold while playing, once there is a fill to hold. -->
+            <button type="button" class="ghost fill-open" aria-expanded={openFills.has(clip.clipId)}
+                    data-testid="clip-fill-open" title="The pattern a held Fill plays, and its pedal"
+                    onclick={() => toggleFill(clip.clipId)}>
+              Fill{clip.fillPatternId ? ' ✓' : ''} {openFills.has(clip.clipId) ? '▴' : '▾'}
+            </button>
+            <span class="follow-slot hold">
+            {#if clip.fillPatternId}
             <button type="button" class="fill-hold" class:on={clip.fillActive || clip.fillPending}
                     disabled={!clip.active || !clip.fillPatternId}
                     title="Hold for the temporary fill; release to return without restarting the clip"
@@ -2864,18 +2089,8 @@
                     }}>
               {clip.fillPending ? 'Fill…' : clip.fillActive ? 'Filling' : 'Hold Fill'}
             </button>
-            <label class="fill-midi" title="Momentary MIDI controller; -1 disables the pedal">
-              CC
-              <input type="number" min="-1" max="127" value={clip.fillCc}
-                     aria-label={`${clip.name} fill pedal CC`}
-                     onchange={(e) => setClipOptions(clip.clipId, { fillCc: Number(e.currentTarget.value) })} />
-            </label>
-            <label class="fill-midi" title="0 accepts the fill pedal on any MIDI channel">
-              Ch
-              <input type="number" min="0" max="16" value={clip.fillChannel}
-                     aria-label={`${clip.name} fill pedal channel`}
-                     onchange={(e) => setClipOptions(clip.clipId, { fillChannel: Number(e.currentTarget.value) })} />
-            </label>
+            {/if}
+            </span>
             <button type="button" class="ghost freeze-button" disabled={clip.frozenMidi}
                     title={clip.frozenMidi
                       ? 'This clip already contains rendered post-MIDI-FX notes'
@@ -2885,29 +2100,52 @@
             </button>
             <HostConfirmButton identity={JSON.stringify([clip.clipId])} title="Remove clip" aria-label="Remove clip" type="button" class="ghost danger" onclick={() => removeClip(clip.clipId)}>×</HostConfirmButton>
           </div>
+          {#if openFills.has(clip.clipId)}
+            <div class="fill-panel" data-testid="clip-fill-panel">
+              <div class="mini-field">Fill pattern
+                <select class="fill-pattern" value={clip.fillPatternId}
+                        aria-label={`${clip.name} fill pattern`}
+                        title="Temporary pattern used while Fill is held"
+                        onchange={(e) => setClipOptions(clip.clipId, { fillPatternId: e.currentTarget.value })}>
+                  <option value="">No fill</option>
+                  {#each fillPatternsFor(clip) as pattern (pattern.patternId)}
+                    <option value={pattern.patternId}>
+                      {pattern.variationLabel ? `${pattern.variationLabel} · ` : ''}{pattern.name}
+                    </option>
+                  {/each}
+                </select>
+              </div>
+              <div class="mini-field" title="Boundary used for both press and release">On
+                <ScrubValue value={clip.fillQuantize} choices={QUANTIZE_CHOICES} pixelsPerStep={10}
+                            label={`${clip.name} fill quantization`} testid="clip-fill-quantize"
+                            onchange={(fillQuantize) => setClipOptions(clip.clipId, { fillQuantize })} />
+              </div>
+              <div class="mini-field" title="A momentary MIDI controller that holds the fill">Pedal CC
+                <ScrubValue value={clip.fillCc} min={-1} max={127} format={(n) => (n < 0 ? 'off' : `CC ${n}`)}
+                            label={`${clip.name} fill pedal CC`} testid="clip-fill-cc"
+                            onchange={(fillCc) => setClipOptions(clip.clipId, { fillCc })} />
+              </div>
+              <div class="mini-field" title="The channel the pedal is heard on">Channel
+                <ScrubValue value={clip.fillChannel} choices={FILL_CHANNELS} pixelsPerStep={8}
+                            label={`${clip.name} fill pedal channel`} testid="clip-fill-channel"
+                            onchange={(fillChannel) => setClipOptions(clip.clipId, { fillChannel })} />
+              </div>
+            </div>
+          {/if}
         {/each}
       </div>
 
       <div class="scene-column">
         <div class="perf-head">
-          <strong>Scenes</strong>
-          <button type="button" onclick={() => addScene()} data-testid="perf-add-scene">+ Scene</button>
+          <strong>{pickedScene ? `Scene · ${pickedScene.name}` : 'Scenes'}</strong>
         </div>
-        {#if performance.snapshotMorph.active}
-          <div class="snapshot-morph-status" data-testid="snapshot-morph-status">
-            <span>Morphing to <strong>{performance.snapshotMorph.name}</strong></span>
-            <span>{performance.snapshotMorph.targetCount} controls</span>
-            <span class="snapshot-morph-track" aria-label="Snapshot morph progress">
-              <span style={`width:${performance.snapshotMorph.progress * 100}%`}></span>
-            </span>
-          </div>
-        {/if}
         {#if performance.scenes.length === 0}
           <div class="empty-hint">
-            A scene recalls clips, mixer state and macros together — add one to capture the rig as it stands.
+            No scenes yet. A scene is a sound setup: which parts play, their levels and macros, and which clips start.
+            <strong>+ Scene from the rig</strong> takes the rig as it is now.
           </div>
         {/if}
-        {#each performance.scenes as scene (scene.sceneId)}
+        {#each pickedScene ? [pickedScene] : [] as scene (scene.sceneId)}
           <div class="scene-row" data-testid="perf-scene">
             <button type="button" class="clip-launch"
                     title={scene.morphBeats > 0
@@ -2926,33 +2164,22 @@
               </span>
             {/if}
             <span class="scene-detail">{scene.clipIds.length} clips · {scene.numSlots} slots · {scene.numMacros} macros · {scene.numParameters} mapped</span>
-            <select value={scene.launchQuantize} aria-label={`${scene.name} launch quantization`}
-                    onchange={(e) => setSceneOptions(scene.sceneId, { launchQuantize: e.currentTarget.value })}>
-              {#each quantizeOptions as option (option)}
-                <option value={option}>{option}</option>
-              {/each}
-            </select>
-            <label class="scene-morph" title="Continuous scene values move together; clips, mute and tempo still land on the boundary">
+            <ScrubValue value={scene.launchQuantize} choices={QUANTIZE_CHOICES} pixelsPerStep={10}
+                        label={`${scene.name} launch quantization`} testid="scene-quantize"
+                        onchange={(launchQuantize) => setSceneOptions(scene.sceneId, { launchQuantize })} />
+            <span class="scene-morph" title="Continuous scene values move together; clips, mute and tempo still land on the boundary">
               Morph
-              <select value={String(scene.morphBeats)} aria-label={`${scene.name} snapshot morph time`}
-                      onchange={(e) => setSceneOptions(scene.sceneId,
-                        { morphBeats: Number(e.currentTarget.value) })}>
-                {#each snapshotMorphOptions as option (option.value)}
-                  <option value={String(option.value)}>{option.label}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="scene-morph" title="CTRL49 control layout recalled with this scene">
+              <ScrubValue value={scene.morphBeats} choices={MORPH_CHOICES} pixelsPerStep={10}
+                          label={`${scene.name} snapshot morph time`} testid="scene-morph"
+                          onchange={(morphBeats) => setSceneOptions(scene.sceneId, { morphBeats })} />
+            </span>
+            <span class="scene-morph" title="CTRL49 control layout recalled with this scene">
               Controls
-              <select value={scene.pageId} aria-label={`${scene.name} CTRL49 controls`}
-                      onchange={(e) => setSceneOptions(scene.sceneId,
-                        { pageId: e.currentTarget.value })}>
-                <option value="">Keep page</option>
-                {#each $hostState.rack.pages.slice(0, 3) as page (page.pageId)}
-                  <option value={page.pageId}>{page.name}</option>
-                {/each}
-              </select>
-            </label>
+              <Segmented options={[{ value: '', label: 'Keep', title: 'Keep the page that is showing' },
+                                   ...$hostState.rack.pages.slice(0, 3).map((page) => ({ value: page.pageId, label: page.name }))]}
+                         value={scene.pageId} label={`${scene.name} CTRL49 controls`} testid="scene-page"
+                         onchange={(pageId) => setSceneOptions(scene.sceneId, { pageId })} />
+            </span>
             <button type="button" class="ghost" title="Replace this scene's contents with the rig as it stands"
                     onclick={() => captureScene(scene.sceneId)}>Capture</button>
             <!-- A variation of the thing you are PLAYING, not of one lane of it. Each clip gets
@@ -2963,192 +2190,29 @@
                     onclick={() => createSceneVariations(scene.sceneId, variationAmount)}>
               {scene.variationLabel ? 'Regen B/C/D' : 'B/C/D'}
             </button>
-            <button type="button" class="ghost" title="Add to the setlist"
-                    onclick={() => addSetlistItem(scene.sceneId)}>+ Set</button>
-            <button type="button" class="ghost" title="Add a four-bar block to the song arranger"
-                    onclick={() => addArrangementItem(scene.sceneId)}>+ Arrange</button>
+            <!-- "+ Set" read like "make a set" and changed nothing you could see: it adds a song
+                 to the one setlist, and the count beside it is the acknowledgement. -->
+            <button type="button" class="ghost" title="Add a song to the setlist that recalls this scene"
+                    data-testid="scene-add-song"
+                    onclick={() => addSetlistItem(scene.sceneId, `Song ${performance.setlist.items.length + 1}`)}>+ Song</button>
+            {#if songCount(scene.sceneId) > 0}
+              <span class="in-setlist" data-testid="scene-in-setlist"
+                    title="Songs in the setlist (Live setup › Setlist) that recall this scene">
+                {songCount(scene.sceneId) === 1 ? 'in setlist' : `in setlist ×${songCount(scene.sceneId)}`}</span>
+            {/if}
             <HostConfirmButton identity={JSON.stringify([scene.sceneId])} title="Remove scene" aria-label="Remove scene" type="button" class="ghost danger" onclick={() => removeScene(scene.sceneId)}>×</HostConfirmButton>
           </div>
-          {#if performance.clips.length > 0}
-            <div class="scene-clips">
-              {#each performance.clips as clip (clip.clipId)}
-                <button type="button" class="chip" class:on={scene.clipIds.includes(clip.clipId)}
-                        title={`Include ${clip.name} in ${scene.name}`}
-                        onclick={() => setSceneClip(scene.sceneId, clip.clipId,
-                                                    !scene.clipIds.includes(clip.clipId))}>
-                  {clip.name}
-                </button>
-              {/each}
-            </div>
-          {/if}
         {/each}
       </div>
-    </div>
-  {/if}
-
-  {#if tab === 'arranger'}
-    <div class="perf-body arranger-body" data-testid="perf-arranger">
-      <div class="perf-head arranger-head">
-        <strong>Song / Scene Arranger</strong>
-        {#if performance.arrangement.playing}
-          <button type="button" class="arranger-stop" onclick={() => stopArrangement()}
-                  data-testid="perf-arrangement-stop">■ Stop</button>
-        {:else}
-          <button type="button" disabled={performance.arrangement.items.length === 0}
-                  onclick={() => startArrangement(0)} data-testid="perf-arrangement-play">▶ Play</button>
-        {/if}
-        <PropertyToggle compact label="Loop song" value={performance.arrangement.loop}
-                        disabled={performance.arrangement.playing}
-                        onchange={(value) => setArrangementOptions({ loop: value })} />
-        <span class="arranger-explainer">Scenes change on bar boundaries; clips remain editable in their own patterns.</span>
-      </div>
-
-      {#if performance.arrangement.items.length === 0}
-        <div class="empty-hint">
-          No song blocks yet — use “+ Arrange” beside a scene. Each block simply holds that scene for a number of bars.
-        </div>
-      {/if}
-
-      <div class="arranger-list">
-        {#each performance.arrangement.items as item, index (item.itemId)}
-          <div class="arranger-item" class:current={performance.arrangement.currentIndex === index}
-               class:queued={performance.arrangement.queuedIndex === index} class:missing={item.missing}
-               data-testid="perf-arrangement-item">
-            <button type="button" class="arranger-play-here"
-                    disabled={performance.arrangement.playing || item.missing}
-                    title={`Play the arrangement from ${item.name}`}
-                    onclick={() => startArrangement(index)}>▶ {index + 1}</button>
-            <div class="arranger-order">
-              <button type="button" class="ghost" disabled={performance.arrangement.playing || index === 0}
-                      aria-label={`Move ${item.name} earlier`}
-                      onclick={() => moveArrangementItem(item.itemId, index - 1)}>↑</button>
-              <button type="button" class="ghost"
-                      disabled={performance.arrangement.playing || index === performance.arrangement.items.length - 1}
-                      aria-label={`Move ${item.name} later`}
-                      onclick={() => moveArrangementItem(item.itemId, index + 1)}>↓</button>
-            </div>
-            <input type="text" class="arranger-name" value={item.name}
-                   disabled={performance.arrangement.playing}
-                   aria-label={`Arrangement block ${index + 1} name`}
-                   onchange={(e) => setArrangementItem(item.itemId, { name: e.currentTarget.value })} />
-            <select class="arranger-scene" value={item.sceneId} disabled={performance.arrangement.playing}
-                    aria-label={`${item.name} scene`}
-                    onchange={(e) => setArrangementItem(item.itemId, { sceneId: e.currentTarget.value })}>
-              {#if item.missing}<option value={item.sceneId}>Missing scene</option>{/if}
-              {#each performance.scenes as scene (scene.sceneId)}
-                <option value={scene.sceneId}>{scene.name}</option>
-              {/each}
-            </select>
-            <label class="arranger-bars">Bars
-              <input type="number" min="1" max="128" value={item.bars}
-                     disabled={performance.arrangement.playing}
-                     aria-label={`${item.name} duration in bars`}
-                     onchange={(e) => setArrangementItem(item.itemId,
-                                           { bars: Number(e.currentTarget.value) })} />
-            </label>
-            <div class="arranger-status">
-              {#if performance.arrangement.currentIndex === index}
-                <span>{performance.arrangement.ending ? 'Ending' : `Bar ${performance.arrangement.bar} / ${item.bars}`}</span>
-                <span class="arranger-progress"><span style={`width:${performance.arrangement.progress * 100}%`}></span></span>
-              {:else if performance.arrangement.queuedIndex === index}
-                <span>Queued for next bar</span>
-              {:else}
-                <span>{item.bars} {item.bars === 1 ? 'bar' : 'bars'}</span>
-              {/if}
-            </div>
-            <HostConfirmButton identity={JSON.stringify([item.itemId])} title="Remove arrangement item" type="button" class="ghost danger" disabled={performance.arrangement.playing}
-                    aria-label={`Remove ${item.name} from arrangement`}
-                    onclick={() => removeArrangementItem(item.itemId)}>×</HostConfirmButton>
-          </div>
-        {/each}
       </div>
     </div>
   {/if}
 
   {#if tab === 'setlist'}
-    <div class="perf-body setlist-body" data-testid="perf-setlist">
-      <div class="perf-head">
-        <strong>Setlist</strong>
-        <span class="soundcheck-label" title="Session soundcheck · Main output 1/2 · dBFS">Soundcheck</span>
-        <button type="button" class="ghost" disabled={!performance.setlist.items.length}
-          title="Check saved rig references without loading plug-ins or sending MIDI"
-          onclick={() => checkSetlistSoundcheck()}>Check setlist</button>
-        <button type="button" class="ghost" onclick={showMixer}>Mixer</button>
-        <label class="mini-field" title="Warm upcoming full-rack captures before they are needed">Preload
-          <select value={String(performance.setlist.preloadAhead)}
-                  onchange={(e) => setSetlistOptions({ preloadAhead: Number(e.currentTarget.value) })}>
-            <option value="0">Off</option>
-            <option value="1">Next song</option>
-            <option value="2">Next 2 songs</option>
-          </select>
-        </label>
-        <button type="button" class="ghost" onclick={() => setlistPrev()}>← Prev</button>
-        <button type="button" class="ghost" onclick={() => setlistNext()} data-testid="perf-setlist-next">Next →</button>
-      </div>
-      {#if performance.setlist.items.length === 0}
-        <div class="empty-hint">
-          Nothing in the setlist — add scenes to it, then walk them with Prev and Next on stage.
-        </div>
-      {/if}
-      {#each performance.setlist.items as item, index (item.itemId)}
-        {@const preload = preloadFor(item)}
-        <div class="setlist-entry">
-        <div class="setlist-item" class:current={performance.setlist.currentIndex === index}
-             class:missing={item.missing} class:loading={performance.setlist.loadingIndex === index}>
-          <button type="button" class="ghost setlist-go" onclick={() => setlistGo(index)}>{index + 1}</button>
-          <span class="setlist-order" aria-label={`Move ${item.name}`}>
-            <button type="button" class="ghost" disabled={index === 0}
-                    title="Move earlier" aria-label={`Move ${item.name} earlier`}
-                    onclick={() => moveSetlistItem(item.itemId, index - 1)}>↑</button>
-            <button type="button" class="ghost" disabled={index === performance.setlist.items.length - 1}
-                    title="Move later" aria-label={`Move ${item.name} later`}
-                    onclick={() => moveSetlistItem(item.itemId, index + 1)}>↓</button>
-          </span>
-          <input type="text" class="setlist-name" value={item.name}
-                 aria-label={`Song name ${index + 1}`}
-                 onchange={(e) => setSetlistItem(item.itemId, { name: e.currentTarget.value })} />
-          <span class="setlist-scene">
-            {item.missing ? 'scene is gone'
-              : performance.setlist.loadingIndex === index ? 'loading rig…' : item.sceneName}
-          </span>
-          {#if preload}
-            <span class={`preload-state ${preload.state}`} title={preload.error}>
-              {preload.state === 'ready' ? 'ready'
-                : preload.state === 'degraded' ? `degraded ${preload.ready}/${preload.total}`
-                : `warming ${preload.ready}/${preload.total}`}
-            </span>
-          {/if}
-          <input type="text" class="setlist-notes" placeholder="notes for the stage…" value={item.notes}
-                 onchange={(e) => setSetlistItem(item.itemId, { notes: e.currentTarget.value })} />
-          <label class="mini-field" title="Optional full-rack Library capture for this song">Rig
-            <select value={item.rackRecordId}
-                    onchange={(e) => setSetlistItem(item.itemId, { rackRecordId: e.currentTarget.value })}>
-              <option value="">Current rig</option>
-              {#each rackCaptures as record (record.recordId)}
-                <option value={record.recordId} disabled={!record.available}>{record.name}</option>
-              {/each}
-            </select>
-          </label>
-          <label class="mini-field" title="CTRL49 controls shown when this song is recalled">Controls
-            <select value={item.pageId}
-                    onchange={(e) => setSetlistItem(item.itemId, { pageId: e.currentTarget.value })}>
-              <option value="">Keep page</option>
-              {#each $hostState.rack.pages.slice(0, 3) as page (page.pageId)}
-                <option value={page.pageId}>{page.name}</option>
-              {/each}
-            </select>
-          </label>
-          <label class="mini-field" title="0 keeps the current tempo">Tempo
-            <input type="number" min="0" max="300" value={item.tempo}
-                   onchange={(e) => setSetlistItem(item.itemId, { tempo: Number(e.currentTarget.value) })} />
-          </label>
-          <HostConfirmButton identity={JSON.stringify([item.itemId])} title="Remove setlist item" aria-label="Remove setlist item" type="button" class="ghost danger" onclick={() => removeSetlistItem(item.itemId)}>×</HostConfirmButton>
-        </div>
-        <SetlistSoundcheckRow {item} soundcheck={$hostState.soundcheck} onMeasure={startSoundcheck} onStop={finishSoundcheck}/>
-        </div>
-      {/each}
-    </div>
+    <SongsPage {performance} {rackCaptures} {preloadFor} onShowMixer={showMixer} />
   {/if}
+  </div>
+  </div>
   <div class="perf-location" data-testid="perf-location" role="status">Performance / {activeGroup.label} / {activeTool.label}</div>
 </div>
 
@@ -3171,13 +2235,19 @@
 
   .perf-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 2px 8px; }
   .perf-toolbar h2 { margin: 0; font-size: 18px; font-weight: 650; }
-  .performance-navigation { flex: none; border: 1px solid var(--host-line); border-radius: var(--host-radius-panel); overflow: hidden; }
-  .perf-groups { display: flex; flex-wrap: wrap; background: var(--host-bg-deep); border-bottom: 1px solid var(--host-line); padding: 0 8px; }
-  :global(.host-workspace.host-workspace) .perf-panel .perf-groups button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; min-height: 42px; padding: 10px 14px; color: var(--host-text-soft); }
-  :global(.host-workspace.host-workspace) .perf-panel .perf-groups button.on { border-bottom-color: var(--host-accent-strong); background: var(--host-accent-surface); color: var(--host-text); }
-  .perf-tabs { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding: 10px; }
-  :global(.host-workspace.host-workspace) .perf-panel .perf-tabs button { background: transparent; border-color: transparent; }
-  :global(.host-workspace.host-workspace) .perf-panel .perf-tabs button.on { background: var(--host-accent-surface); border-color: var(--host-accent); color: var(--host-text); }
+  .perf-layout { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; align-items: start; min-height: 0; }
+  .perf-content { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .perf-rail { position: sticky; top: 0; display: flex; flex-direction: column; gap: 1px; padding: 8px 6px;
+               border: 1px solid var(--host-line); border-radius: var(--host-radius-panel); background: var(--host-bg-deep); }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-rail button { border: 0; border-radius: 5px; background: transparent;
+               text-align: left; justify-content: flex-start; min-height: 0; }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-rail button.rail-group { margin-top: 8px; padding: 2px 8px;
+               font: 600 10px var(--host-font-mono, monospace); letter-spacing: .12em; text-transform: uppercase; color: var(--host-text-dim); }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-rail button.rail-group:first-child { margin-top: 0; }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-rail button.rail-group.on { color: var(--host-text-soft); background: transparent; box-shadow: none; }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-rail button.rail-tool { padding: 5px 10px; color: var(--host-text-soft); }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-rail button.rail-tool.on { background: var(--host-accent-surface);
+               color: var(--host-text); box-shadow: inset 2px 0 var(--host-accent-strong); }
   .perf-location { flex: none; border-top: 1px solid var(--host-line-soft); margin-top: auto; padding: 10px 2px 0; font-size: 11px; color: var(--host-text-soft); }
   .perf-spacer { flex: 1; }
   .recording { color: #e4b3b3; border-color: #7a4a4a; }
@@ -3207,8 +2277,10 @@
   @media (max-width: 650px) {
     .perf-toolbar > .perf-spacer { display: none; }
     .retrospective { padding-left: 0; border-left: 0; }
-    :global(.host-workspace.host-workspace) .perf-panel .perf-groups button { padding: 9px 10px; }
-    .perf-groups { padding: 0; }
+    /* Narrow: the rail lies down above the page and wraps. */
+    .perf-layout { grid-template-columns: minmax(0, 1fr); }
+    .perf-rail { position: static; flex-direction: row; flex-wrap: wrap; align-items: center; }
+    :global(.host-workspace.host-workspace) .perf-panel .perf-rail button.rail-group { margin: 0 0 0 8px; }
   }
 
   .looper-body { display: flex; flex-direction: column; gap: 12px; }
@@ -3378,349 +2450,16 @@
 
   .lfo-body { display: flex; flex-direction: column; gap: 10px; }
   .lfo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 10px; }
-  .lfo-card {
-    min-width: 0;
-    padding: 9px;
-    border: 1px solid #393d40;
-    border-left: 3px solid #d7863b;
-    background: #181c20;
-  }
-  .lfo-card.disabled { border-left-color: #59616a; opacity: 0.67; }
-  .lfo-card-head { display: flex; align-items: center; gap: 7px; }
-  .lfo-name {
-    width: 150px !important;
-    border: 0 !important;
-    border-bottom: 1px solid #4a4f53 !important;
-    background: transparent !important;
-    color: #e0e4e7 !important;
-    font-weight: 650;
-  }
-  .lfo-scope {
-    position: relative;
-    height: 62px;
-    margin: 9px 0;
-    border: 1px solid #31383e;
-    background:
-      linear-gradient(90deg, transparent 24.8%, #2b3238 25%, transparent 25.2%, transparent 49.8%, #2b3238 50%, transparent 50.2%, transparent 74.8%, #2b3238 75%, transparent 75.2%),
-      #12171b;
-    overflow: hidden;
-  }
-  .lfo-midline { position: absolute; inset: 50% 0 auto; border-top: 1px solid #2d343a; }
-  .lfo-trace {
-    position: absolute;
-    left: 0;
-    top: calc(50% - 1px);
-    height: 2px;
-    background: linear-gradient(90deg, #774924, #d7863b);
-  }
-  .lfo-dot {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    transform: translate(-4px, -4px);
-    border: 1px solid #ffd1a5;
-    background: #df8739;
-    box-shadow: 0 0 7px #d7863b99;
-  }
-  .lfo-scope output {
-    position: absolute;
-    right: 5px;
-    bottom: 3px;
-    color: #d99a62;
-    font: 9px 'JetBrains Mono', monospace;
-  }
-  .lfo-controls { display: flex; align-items: flex-end; gap: 7px; flex-wrap: wrap; }
-  .lfo-controls select { width: auto; min-width: 90px; }
-  .lfo-sync-field .toggle { min-width: 86px; }
-  .lfo-range { min-width: 120px; flex: 1 1 120px; }
-  .lfo-range input { width: 100% !important; }
   .route-lfo { margin-left: auto; }
-  .lfo-midi-head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 10px;
-    padding-top: 8px;
-    border-top: 1px solid #30363b;
-    font-size: 10px;
-  }
-  .lfo-midi-head > div { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-  .lfo-midi-head span { color: #737f89; }
-  .lfo-output-empty { padding: 7px 0 1px; color: #717c86; font-size: 10px; }
-  .lfo-outputs { display: flex; flex-direction: column; gap: 5px; margin-top: 7px; }
-  .lfo-output {
-    display: flex;
-    align-items: flex-end;
-    gap: 7px;
-    padding: 7px;
-    border: 1px solid #323a41;
-    background: #151a1e;
-  }
 
   .envelope-body { display: flex; flex-direction: column; gap: 10px; }
   .envelope-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 10px; }
-  .envelope-card {
-    min-width: 0;
-    padding: 9px;
-    border: 1px solid #393d40;
-    border-left: 3px solid #d7863b;
-    background: #181c20;
-  }
-  .envelope-card.disabled { border-left-color: #59616a; opacity: 0.67; }
-  .envelope-stage {
-    color: #74818b;
-    font: 9px 'JetBrains Mono', monospace;
-    text-transform: uppercase;
-  }
-  .envelope-stage.active { color: #e2a46c; }
-  .envelope-scope {
-    position: relative;
-    height: 104px;
-    margin: 9px 0;
-    border: 1px solid #31383e;
-    background:
-      linear-gradient(#2a3137 1px, transparent 1px) 0 50% / 100% 50%,
-      #12171b;
-    overflow: hidden;
-  }
-  .envelope-scope svg { display: block; width: 100%; height: calc(100% - 17px); overflow: visible; }
-  .envelope-scope line { stroke: #283138; stroke-width: 0.35; vector-effect: non-scaling-stroke; }
-  .envelope-scope polyline {
-    fill: none;
-    stroke: #d7863b;
-    stroke-width: 1.35;
-    vector-effect: non-scaling-stroke;
-  }
-  .envelope-scope circle {
-    fill: #e38b3e;
-    stroke: #ffd1a5;
-    stroke-width: 0.8;
-    vector-effect: non-scaling-stroke;
-    filter: drop-shadow(0 0 2px #d7863b);
-  }
-  .envelope-stage-labels {
-    position: absolute;
-    inset: auto 7px 2px;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    color: #65717a;
-    font: 8px 'JetBrains Mono', monospace;
-    text-align: center;
-  }
-  .envelope-controls { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: 8px; }
-  .envelope-time input { width: 100% !important; }
-  .envelope-trigger-row { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-  .envelope-trigger-row select { width: auto; min-width: 68px; }
-  .envelope-note { position: relative; }
-  .envelope-note input { width: 68px !important; padding-right: 28px !important; }
-  .envelope-note output {
-    position: absolute;
-    right: 5px;
-    bottom: 5px;
-    color: #89949d;
-    font: 8px 'JetBrains Mono', monospace;
-    pointer-events: none;
-  }
-  .envelope-audition {
-    border-color: #775333;
-    color: #e6ad78;
-    user-select: none;
-    touch-action: none;
-  }
-  .envelope-audition:active { border-color: #dc8b43; background: #38271b; color: #ffd3aa; }
 
   .mseg-body { display: flex; flex-direction: column; gap: 10px; }
   .mseg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); gap: 10px; }
-  .mseg-card {
-    min-width: 0;
-    padding: 9px;
-    border: 1px solid #393d40;
-    border-left: 3px solid #d7863b;
-    background: #181c20;
-  }
-  .mseg-card.disabled { border-left-color: #59616a; opacity: 0.67; }
-  .mseg-readout {
-    color: #9a7760;
-    font: 9px 'JetBrains Mono', monospace;
-    white-space: nowrap;
-  }
-  .mseg-editor {
-    position: relative;
-    height: 190px;
-    margin: 9px 0;
-    border: 1px solid #343b40;
-    background: #11171b;
-    overflow: hidden;
-  }
-  .mseg-editor svg {
-    display: block;
-    width: 100%;
-    height: calc(100% - 18px);
-    cursor: crosshair;
-    touch-action: none;
-  }
-  .mseg-grid-lines line {
-    stroke: #273037;
-    stroke-width: 0.45;
-    vector-effect: non-scaling-stroke;
-  }
-  .mseg-curve {
-    fill: none;
-    stroke: #d7863b;
-    stroke-width: 1.5;
-    vector-effect: non-scaling-stroke;
-  }
-  .mseg-playhead {
-    stroke: #ecc79f;
-    stroke-width: 1;
-    stroke-opacity: 0.55;
-    vector-effect: non-scaling-stroke;
-    pointer-events: none;
-  }
-  .mseg-live-dot {
-    fill: #ffb673;
-    stroke: #fff0df;
-    stroke-width: 0.8;
-    vector-effect: non-scaling-stroke;
-    pointer-events: none;
-  }
-  .mseg-point {
-    fill: #151c21;
-    stroke: #db8c47;
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-    cursor: grab;
-  }
-  .mseg-point:hover, .mseg-point.selected { fill: #e28a3d; stroke: #ffe0c1; }
-  .mseg-point:active { cursor: grabbing; }
-  .mseg-axis {
-    position: absolute;
-    inset: auto 7px 2px;
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    color: #65717a;
-    font: 8px 'JetBrains Mono', monospace;
-  }
-  .mseg-axis span:nth-child(2), .mseg-axis span:nth-child(3), .mseg-axis span:nth-child(4) {
-    text-align: center;
-  }
-  .mseg-axis span:last-child { text-align: right; }
-  .mseg-controls { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
-  .mseg-controls select { width: auto; min-width: 88px; }
-  .mseg-clock .toggle { min-width: 86px; }
-  .mseg-phase { min-width: 130px; }
-  .mseg-phase input { width: 130px !important; }
-  .mseg-presets { display: flex; align-items: flex-end; gap: 4px; }
-  .mseg-presets > span {
-    align-self: center;
-    color: #77838c;
-    font-size: 9px;
-    text-transform: uppercase;
-  }
-  .mseg-point-inspector {
-    display: flex;
-    align-items: flex-end;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 10px;
-    padding: 8px;
-    border: 1px solid #30383e;
-    background: #151a1e;
-  }
-  .mseg-point-inspector > strong {
-    align-self: center;
-    min-width: 52px;
-    color: #d7a06d;
-    font: 10px 'JetBrains Mono', monospace;
-  }
-  .mseg-point-control { flex: 1 1 125px; }
-  .mseg-point-control input { width: 100% !important; }
-  .mseg-point-count {
-    align-self: center;
-    color: #707b84;
-    font: 9px 'JetBrains Mono', monospace;
-    white-space: nowrap;
-  }
 
   .random-body { display: flex; flex-direction: column; gap: 10px; }
   .random-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); gap: 10px; }
-  .random-card {
-    min-width: 0;
-    padding: 9px;
-    border: 1px solid #393d40;
-    border-left: 3px solid #d7863b;
-    background: #181c20;
-  }
-  .random-card.disabled { border-left-color: #59616a; opacity: 0.67; }
-  .random-mode-readout {
-    color: #c58b5b;
-    font: 9px 'JetBrains Mono', monospace;
-    text-transform: uppercase;
-  }
-  .random-value-readout {
-    min-width: 36px;
-    color: #efb47d;
-    font: 10px 'JetBrains Mono', monospace;
-    text-align: right;
-  }
-  .random-scope {
-    position: relative;
-    height: 142px;
-    margin: 9px 0;
-    border: 1px solid #343b40;
-    background: #11171b;
-    overflow: hidden;
-  }
-  .random-scope svg { display: block; width: 100%; height: calc(100% - 19px); }
-  .random-grid-lines line {
-    stroke: #273037;
-    stroke-width: 0.45;
-    vector-effect: non-scaling-stroke;
-  }
-  .random-preview {
-    fill: none;
-    stroke: #d7863b;
-    stroke-width: 1.25;
-    stroke-opacity: 0.86;
-    vector-effect: non-scaling-stroke;
-  }
-  .random-playhead {
-    stroke: #f1c79e;
-    stroke-width: 1;
-    stroke-opacity: 0.52;
-    vector-effect: non-scaling-stroke;
-  }
-  .random-live-dot {
-    fill: #ffb673;
-    stroke: #fff0df;
-    stroke-width: 0.8;
-    vector-effect: non-scaling-stroke;
-  }
-  .random-scope-labels {
-    position: absolute;
-    inset: auto 7px 3px;
-    display: flex;
-    justify-content: space-between;
-    color: #65717a;
-    font: 8px 'JetBrains Mono', monospace;
-  }
-  .random-controls, .random-range-row {
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .random-controls select { width: auto; min-width: 104px; }
-  .random-clock .toggle { min-width: 86px; }
-  .random-wide { min-width: 135px; flex: 1 1 135px; }
-  .random-wide input, .random-range input { width: 100% !important; }
-  .random-range-row {
-    margin-top: 10px;
-    padding-top: 8px;
-    border-top: 1px solid #30363b;
-  }
-  .random-range { min-width: 130px; flex: 1 1 130px; }
-  .random-seed input { width: 112px !important; font: 9px 'JetBrains Mono', monospace; }
 
   .tuning-body { display: flex; flex-direction: column; gap: 10px; width: 100%; }
   .tuning-card {
@@ -3803,37 +2542,59 @@
   .tuning-part-name strong { color: #cbd3da; font-size: 12px; }
   .tuning-part-name span { color: #7f8b96; font-size: 10px; }
   .tuning-part-name span.error { color: #d99086; }
-  .lfo-output.unresolved { border-color: #744d42; }
-  .lfo-output select { width: auto; min-width: 85px; }
-  .lfo-output-target { flex: 1; min-width: 130px; }
-  .lfo-output-target select { width: 100%; }
-  .lfo-output-small input { width: 48px !important; }
-  .lfo-output-number input { width: 72px !important; }
-  .lfo-sysex { flex: 1; min-width: 220px; }
-  .lfo-sysex input { width: 100% !important; font: 10px 'JetBrains Mono', monospace; }
 
   @media (max-width: 760px) {
     .lfo-grid { grid-template-columns: minmax(0, 1fr); }
     .envelope-grid, .mseg-grid, .random-grid { grid-template-columns: minmax(0, 1fr); }
-    .envelope-controls { grid-template-columns: repeat(2, minmax(100px, 1fr)); }
-    .lfo-output { align-items: stretch; flex-wrap: wrap; }
-    .lfo-sysex { flex-basis: 100%; }
     .tuning-summary { grid-template-columns: minmax(0, 1fr); }
     .tuning-file-row, .tuning-part { flex-wrap: wrap; }
   }
 
   .perf-body { display: flex; gap: 16px; align-items: flex-start; }
   .clip-scene-body { flex-direction: column; width: 100%; }
+  .launcher-head { width: 100%; }
+  .launcher-note { font-size: 11px; color: var(--host-text-soft, #9aa5b1); }
+  .launch-scroll { width: 100%; overflow-x: auto; }
+  .launch-grid { display: grid; gap: 4px; align-items: stretch; min-width: min-content; }
+  .lg-corner { font: 600 10px var(--host-font-mono, monospace); letter-spacing: .1em; text-transform: uppercase;
+               color: var(--host-text-dim, #6c7783); align-self: end; padding: 0 4px 6px; }
+  .lg-clip, .lg-scene { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 6px; border-radius: 6px;
+                        border: 1px solid var(--host-line-soft, #2b333d); background: var(--host-bg-deep, #12171b); }
+  .lg-clip { align-items: flex-start; }
+  .lg-clip.picked, .lg-scene.picked { border-color: var(--host-accent, #80d8bc); }
+  .lg-clip.active { box-shadow: inset 0 -2px 0 #58d68d; }
+  .lg-scene.now { box-shadow: inset 0 0 0 1px #ffb347; }
+  .lg-scene.queued { box-shadow: inset 0 0 0 1px #79b9ee; }
+  :global(.host-workspace.host-workspace) .perf-panel button.lg-play { flex: none; width: 24px; height: 24px; min-height: 0; padding: 0;
+               border-radius: 50%; border: 1.5px solid #58d68d; color: #58d68d; background: transparent; font-size: 9px; }
+  :global(.host-workspace.host-workspace) .perf-panel button.lg-name { flex: 1; min-width: 0; min-height: 0; padding: 0; border: 0;
+               background: transparent; text-align: left; justify-content: flex-start; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+  .lg-name b { font-size: 12px; color: var(--host-text, #d6dbe0); font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lg-name small { font-size: 10px; color: var(--host-text-dim, #6c7783); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lg-swatch { flex: none; width: 7px; height: 24px; border-radius: 2px; }
+  :global(.host-workspace.host-workspace) .perf-panel button.lg-cell { min-height: 36px; padding: 0 8px; border-radius: 5px;
+               border: 1px dashed #2a343e; background: transparent; color: #0d1115; font-size: 11px; font-weight: 600;
+               justify-content: flex-start; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  :global(.host-workspace.host-workspace) .perf-panel button.lg-cell:hover { border-color: #4a5866; }
+  :global(.host-workspace.host-workspace) .perf-panel button.lg-cell.on { border: 1px solid transparent; background: var(--cell); }
+  :global(.host-workspace.host-workspace) .perf-panel button.lg-cell.playing { outline: 2px solid #58d68d; outline-offset: -2px; }
+  .lg-meta { align-self: center; font: 10.5px var(--host-font-mono, monospace); color: var(--host-text-soft, #9aa5b1); padding: 0 4px; }
+  .lg-meta.unused { color: var(--host-text-dim, #6c7783); }
+  .lg-used { text-align: left; }
+  .launcher-details { display: flex; flex-direction: column; gap: 12px; width: 100%; }
   .clip-scene-body .clip-column, .clip-scene-body .scene-column { width: 100%; flex: none; }
   .clip-scene-body .clip-row, .clip-scene-body .scene-row { flex-wrap: wrap; }
   .perf-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .empty-hint { color: #7d8894; padding: 8px 2px; font-size: 12px; }
+  .empty-hint strong { color: var(--host-text, #d6dbe0); font-weight: 600; }
+  .empty-hint.first-step { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
   .pattern-list { flex: 0 0 250px; display: flex; flex-direction: column; gap: 6px; }
   .pattern-row { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 12px; }
   .pattern-row.on .pattern-name { color: #edf5fa; border-color: #5b9bd5; background: #24384c; }
   .pattern-name { flex: 1; text-align: left; }
   .pattern-detail { color: #98a4ae; font-size: 12px; }
+  .in-setlist { font: 600 11px 'JetBrains Mono', monospace; color: #8fd19e; border: 1px solid #2f5a3a; border-radius: 10px; padding: 1px 7px; white-space: nowrap; }
   .variation-badge {
     display: inline-flex; align-items: center; justify-content: center;
     width: 20px; height: 20px; flex: 0 0 20px;
@@ -3842,7 +2603,6 @@
   }
   .variation-badge.editor-badge { width: 24px; height: 24px; flex-basis: 24px; }
   .variation-amount { flex-direction: row; align-items: center; }
-  .variation-amount select { width: auto; min-width: 84px; }
   .variation-create { border-color: #8c592e; }
 
   .pattern-editor { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
@@ -3926,6 +2686,7 @@
   .step.selected { outline: 2px solid #e4bd53; outline-offset: -2px; }
   .step-mark { pointer-events: none; }
 
+  .step-hint { align-self: center; color: #7f8b96; font-size: 11px; }
   .lane-options, .step-options {
     display: flex;
     align-items: flex-end;
@@ -3986,7 +2747,6 @@
 
   .clip-column, .scene-column { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .freeze-cycles { display: inline-flex; align-items: center; gap: 4px; color: #98a4ae; font-size: 11px; }
-  .freeze-cycles select { width: auto; min-width: 46px; }
   .freeze-button { white-space: nowrap; border-color: #456579; color: #a9ccdf; }
   /* --- the gesture library --------------------------------------------------------------- */
   .gesture-library { margin-top: 14px; border-top: 1px solid #262c33; padding-top: 10px; }
@@ -4010,23 +2770,23 @@
   .clip-launch { padding: 2px 8px; }
   .clip-row.active .clip-launch { color: #9fd6a3; border-color: #4a7a52; }
   .clip-row.pending .clip-launch { color: #e0cf9a; border-color: #7a6a3a; }
-  .fill-pattern { max-width: 130px; }
-  .fill-quantize { max-width: 82px; }
-  .follow-action { max-width: 104px; }
-  .follow-target { max-width: 120px; }
-  .follow-loops { display: inline-flex; align-items: center; gap: 3px; color: #98a4ae; }
-  .follow-loops input { width: 42px; }
+  .follow-slot { flex: none; display: inline-flex; }
+  .follow-slot.loops { width: 116px; }
+  .follow-slot.target { width: 124px; }
+  .follow-slot.hold { width: 84px; }
+  .follow-target { width: 100%; }
+  .fill-open { white-space: nowrap; }
   .fill-hold { white-space: nowrap; border-color: #8c592e; }
   .fill-hold.on { color: #18120d; border-color: #f0a45a; background: #f0a45a; }
-  .fill-midi { display: inline-flex; align-items: center; gap: 3px; color: #98a4ae; }
-  .fill-midi input { width: 44px; }
+  .fill-panel { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 0 0 6px 38px; padding: 8px 10px;
+                border: 1px solid #3a3129; border-left: 3px solid #8c592e; background: #1a1714; }
+  .fill-pattern { max-width: 180px; }
   .clip-name { flex: 0 0 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .scene-name-input { box-sizing: border-box; min-width: 0; }
   .clip-phase { flex: 1; height: 4px; background: #14171a; border-radius: 2px; overflow: hidden; min-width: 30px; }
   .clip-phase-fill { display: block; height: 100%; background: #5b9bd5; }
   .scene-detail { flex: 1; color: #98a4ae; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .scene-morph { display: inline-flex; align-items: center; gap: 4px; color: #98a4ae; font-size: 10px; }
-  .scene-morph select { width: auto; min-width: 70px; }
   .snapshot-morph-status {
     display: grid; grid-template-columns: auto auto minmax(70px, 1fr); align-items: center; gap: 8px;
     min-height: 28px; padding: 4px 7px; border: 1px solid #80542f;
@@ -4053,41 +2813,15 @@
   .setlist-order { display: inline-flex; flex-direction: column; gap: 2px; }
   .setlist-order button { width: 22px; height: 15px; padding: 0; line-height: 12px; }
   .setlist-order button:disabled { opacity: 0.28; cursor: default; }
-  .setlist-name { flex: 0 0 140px; }
-  .setlist-scene { flex: 0 0 120px; color: #98a4ae; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .setlist-name { width: 160px; }
+  .setlist-loading { color: #98a4ae; font-size: 12px; }
+  .song-field .setlist-name { font-weight: 600; }
+  .setlist-scene { width: 160px; color: #98a4ae; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .setlist-item.missing .setlist-scene { color: #d6a3a3; }
-  .setlist-notes { flex: 1; min-width: 80px; }
+  .setlist-notes { flex: 1 1 220px; min-width: 160px; min-height: 36px; resize: vertical; font: inherit; font-size: 12px; }
   .preload-state { flex: 0 0 auto; font-size: 10px; color: #9aa6b0; text-transform: uppercase; }
   .preload-state.ready { color: #82bd8d; }
   .preload-state.degraded { color: #df9a76; }
 
-  .arranger-body { flex-direction: column; }
-  .arranger-head { flex-wrap: wrap; }
-  .arranger-explainer { color: #87939e; font-size: 11px; }
-  .arranger-stop { color: #e8b0a6; border-color: #765049; }
-  .arranger-list { display: flex; flex-direction: column; gap: 5px; }
-  .arranger-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 38px;
-    padding: 3px 5px;
-    border: 1px solid #2d3741;
-    background: #171d23;
-    font-size: 12px;
-  }
-  .arranger-item.current { border-color: #b56e32; background: #282119; }
-  .arranger-item.queued { border-color: #6d6742; }
-  .arranger-item.missing { border-color: #744c4c; }
-  .arranger-play-here { flex: 0 0 46px; }
-  .arranger-order { display: flex; flex-direction: column; gap: 1px; }
-  .arranger-order button { min-width: 24px; padding: 0 5px; line-height: 14px; }
-  .arranger-name { flex: 0 1 150px; min-width: 90px; }
-  .arranger-scene { flex: 0 1 155px; min-width: 100px; }
-  .arranger-bars { display: inline-flex; align-items: center; gap: 4px; color: #98a4ae; }
-  .arranger-bars input { width: 48px; }
-  .arranger-status { display: flex; align-items: center; gap: 8px; flex: 1; color: #98a4ae; min-width: 125px; }
-  .arranger-progress { display: block; width: 90px; height: 4px; background: #101419; overflow: hidden; }
-  .arranger-progress > span { display: block; height: 100%; background: #d3833d; }
 
 </style>

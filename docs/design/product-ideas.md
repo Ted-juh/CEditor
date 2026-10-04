@@ -1661,6 +1661,12 @@ the whole control minus its id — a stable content address for a component.
 
 ## 27.1 Instances and packages: the primitive is built, the operations are missing
 
+> **Status, 2026-09-28:** diff, pull (Update), reset and detach are built, along with updating every
+> clean copy on a panel at once. See `utils/customComponentSourceLink.js`,
+> `sections/CustomSourceLinkCard.svelte` and [the user doc](../panel-artwork-import.md#linked-components).
+> **Push** followed the same day, as "Save to library as X.Y.Z" on the Source card, offered only
+> while the library has not moved on. The text below is the case as it was made.
+
 **What exists.** `Designer.sourcePackage` records where a component came from — name, version,
 fingerprint, readiness score, asset counts. `CustomPublicPropertiesEditor.svelte` computes the live
 fingerprint and compares it:
@@ -2065,7 +2071,8 @@ twice rather than differently.
 >
 > - There is **no export or import of a library record at all**. No command, nothing under
 >   `tools/`, nothing in the bridge. Grepping for one finds the support bundle and nothing else.
-> - The **support bundle is an allowlist** and `library.json` is not on it — `SupportBundle.cpp`
+> - The **support bundle is an allowlist** and `library.json` is not on it (nor, since, is the
+>   `library.db` that replaced it) — `SupportBundle.cpp`
 >   names every file that travels, and says so in the manifest it writes.
 > - A **built product ships `session-performance.json` as `factory-performance.json`** — the rack
 >   manifest, not the library.

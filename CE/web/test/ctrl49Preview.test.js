@@ -28,7 +28,7 @@ test('rack labels: title first, then eight length-prefixed labels, ASCII only', 
     5, ...ascii('!Gone'),                  // unresolved is marked, not hidden
     0, 0, 0, 0, 0,                         // unassigned and missing slots carry no label
   ]);
-  assert.equal(rackLabelPayload('x'.repeat(300), [])[0], 255, 'a label caps at its length byte');
+  assert.equal(rackLabelPayload('x'.repeat(300), [])[0], 90, 'a label caps at 90, the most a frame can carry nine of');
 });
 
 test('rack state: the nine bytes the knob page reads', () => {
@@ -45,6 +45,10 @@ test('performance: ASCII transport title, clip marks, phase as knob', () => {
   const labels = performanceLabelPayload({ playing: true, bar: 1, beat: 1, tempo: 120 }, clips);
   assert.deepEqual(labels.slice(labels[0] + 1, labels[0] + 1 + 8), [2, ...ascii('*A'), 2, ...ascii('>B'), 1, ...ascii('C')]);
   assert.deepEqual(performanceStatePayload(1, clips), [1, 0, 0, 63, 0, 0, 0, 0, 0]);
+  assert.deepEqual(performanceStatePayload(1, clips, { playing: true, beat: 3, beatsPerBar: 4 }),
+    [1, 0, 0, 63, 0, 0, 0, 0, 0, 1, 3, 4], 'the performance page adds its kind, the beat and the bar length');
+  assert.deepEqual(performanceStatePayload(0, [], { playing: false, beat: 2, beatsPerBar: 3 }).slice(9),
+    [1, 0, 3], 'stopped, no beat is lit');
 });
 
 test('browse: the cursor row takes a full knob, long names end in a dot', () => {
@@ -79,6 +83,31 @@ test('the preview runs the file the app embeds, not a copy of it', () => {
   assert.match(view, /0x0200: knobStripUrl, 0x0210: logoUrl/);
   const vite = read('../vite.config.js');
   assert.match(vite, /tools\/ctrl49/, 'the dev server may read that directory');
+});
+
+test('the images the keyboard tints are grey palette PNGs, the only kind it tints', () => {
+  // An RGBA PNG decodes to a colour buffer on the CTRL49 and draw_image's colour is ignored:
+  // the logo and every knob came out white on the hardware. VIP's own tinted images (captured
+  // from its uploads) are all 8-bit palette PNGs of greys.
+  for (const file of ['knob_strip.png', 'hostage_logo.png']) {
+    const png = fs.readFileSync(new URL(`../../../tools/ctrl49/${file}`, import.meta.url));
+    assert.equal(png[24], 8, `${file} is 8-bit`);
+    assert.equal(png[25], 3, `${file} is a palette PNG`);
+    const at = png.indexOf('PLTE');
+    const length = png.readUInt32BE(at - 4);
+    for (let i = 0; i < length; i += 3) {
+      const [r, g, b] = [png[at + 4 + i], png[at + 5 + i], png[at + 6 + i]];
+      assert.ok(r === g && g === b, `${file}'s palette is greys only`);
+    }
+    assert.equal(png.indexOf('tRNS'), -1, `${file} carries coverage in the grey, not in transparency`);
+  }
+});
+
+test("the page keeps its ids inside the device's 1024-entry object table", () => {
+  const lua = read('../../../tools/ctrl49/Hostage_MultiKnob.lua');
+  const ids = [...lua.matchAll(/^local \w+_ID\s*=\s*(0x[0-9A-Fa-f]+|\d+)/gm)].map((m) => Number(m[1]));
+  assert.ok(ids.length >= 4, 'the page declares its image ids');
+  for (const id of ids) assert.ok(id < 1024, `id ${id} is under 1024`);
 });
 
 test('every function the broker calls is one the page defines', () => {

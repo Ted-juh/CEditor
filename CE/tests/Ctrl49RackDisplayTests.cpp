@@ -50,7 +50,13 @@ int main()
     RackSlotViews longSlots {};
     longSlots[0] = { std::string (300, 'x'), 0, true, true };
     const auto capped = buildRackLabelPayload ("t", longSlots);
-    check (capped[2] == 255, "a runaway label caps at the length byte's reach");
+    check (capped[2] == kMaxLabelCharacters, "a runaway label caps at kMaxLabelCharacters");
+
+    RackSlotViews allLong {};
+    for (auto& s : allLong) s = { std::string (300, 'x'), 0, true, true };
+    const auto worst = buildRackLabelPayload (std::string (300, 't'), allLong);
+    check (buildLuaCall (2, "set_labels", worst).size() - 11 <= kMaxPayloadBytes,
+           "the longest possible labels call still fits the device's 1000-byte frame");
 
     // --- the 22-byte state -------------------------------------------------------------
     slots[1].resolved = false;   // assigned but unresolved: the label must say so
@@ -119,6 +125,23 @@ int main()
         check (buildPerformanceTitle (transport) == "# 3.2 128 NO CLK",
                "and a master that went quiet is named, not guessed at");
 
+        {
+            PerformanceTransportView onStage;
+            onStage.playing = true;
+            onStage.tempo = 96.0;
+            onStage.bar = 12;
+            onStage.beat = 3;
+            onStage.song = "Glass Harbour";
+            onStage.scene = "Chorus";
+            check (buildPerformanceTitle (onStage) == "Glass Harbour / Chorus  > 12.3 96",
+                   "with a set running, the song and the scene lead the line");
+            onStage.scene.clear();
+            check (buildPerformanceTitle (onStage) == "Glass Harbour  > 12.3 96", "a song with no scene yet");
+            onStage.song.clear();
+            onStage.scene = "Verse";
+            check (buildPerformanceTitle (onStage) == "Verse  > 12.3 96", "a scene without a set");
+        }
+
         PerformanceClipViews clips {};
         clips[0] = { "Verse", true, false, 0.5f };
         clips[1] = { "Chorus", false, true, 0.0f };
@@ -137,6 +160,16 @@ int main()
         PerformanceClipViews empty {};
         const auto emptyState = buildPerformanceStatePayload (0, empty);
         check (emptyState.size() == 9, "an empty bank still builds a valid payload");
+
+        PerformanceTransportView playing;
+        playing.playing = true;
+        playing.beat = 3;
+        playing.beatsPerBar = 7;
+        const auto withBeat = buildPerformanceStatePayload (0, clips, playing);
+        check (withBeat.size() == 12 && withBeat[9] == 1 && withBeat[10] == 3 && withBeat[11] == 7,
+               "the performance page's payload adds its kind, the beat and the beats per bar");
+        playing.playing = false;
+        check (buildPerformanceStatePayload (0, clips, playing)[10] == 0, "stopped, no beat is lit");
         for (std::size_t i = 1; i < 9; ++i)
             check (emptyState[i] == 0, "with nothing turning");
     }

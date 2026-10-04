@@ -307,7 +307,7 @@ the top of it.
 6. **regl-scatterplot plus umap-js under Constellation and Timbre Space.**
 7. **Real Ctrlr panels for the importer's first run** — with the authors asked before anything ships.
 8. **Surge tuning-library and MTS-ESP.**
-9. **pluginval in the export pipeline.**
+9. **pluginval in the export pipeline.** Done 2026-09-30, with clap-validator beside it: `tools/scripts/validate-plugins.mjs`, [docs/plugin-validation.md](../plugin-validation.md). Its first run found five real defects.
 10. **Strudel's mini-notation in the phrase sequencer.**
 
 ---
@@ -597,7 +597,7 @@ afternoon.
 4. **culori plus @cantoo/color-blindness plus color-thief** under the colour chooser: perceptual palettes, the colour-blind check, and palettes from a photo.
 5. **Theatre.js studio** as the linkable reference for the Animation tab; **bezier-easing** for a draggable curve.
 6. **ruff-wasm and StyLua-wasm** behind the script editor now; **Monaco only for TypeScript type errors**, if at all; CodeMirror kept as an option, not a plan.
-7. **The VCV Rack SVG convention** (colour-coded placeholders on a named layer) plus the Synth Panels Designer extension as an "import from Inkscape" path.
+7. **The VCV Rack SVG convention** (colour-coded placeholders on a named layer) plus the Synth Panels Designer extension as an "import from Inkscape" path. *Built 2026-09-28 as File › New Panel from SVG Artwork — `utils/svgPanelImport.js`, [user doc](../panel-artwork-import.md). Rack's green and blue (jacks) are given to buttons and labels, which a CEditor panel needs and Rack's does not.*
 8. **SVG-Edit or Piskel** embedded in the custom-component designer rather than a third in-house editor.
 9. **minisearch** for the panel search index and the help.
 10. **odiff in `browser-checks/`**.

@@ -168,6 +168,37 @@ if(NOT CEDITOR_JUCE_HELPER_DIR STREQUAL JUCE_VENDORED_BIN)
     message(STATUS "CEditor: JUCE helpers from ${CEDITOR_JUCE_HELPER_DIR}")
 endif()
 
+# --- choc: the player's script-MIDI output queue ------------------------------------------------
+# Header-only, ISC. Three headers of Tracktion's choc, with three local patches to the FIFO;
+# CE/thirdparty/choc/VENDORED.md has the commit, the hashes and the patches. SYSTEM, like SQLite,
+# because it is upstream code nobody here edits beyond those patches.
+add_library(ce_choc INTERFACE)
+target_include_directories(ce_choc SYSTEM INTERFACE "${CE_ROOT}/thirdparty/choc")
+
+# --- SQLite: Hostage's sound library ------------------------------------------------------------
+# Vendored, public domain; CE/thirdparty/sqlite/VENDORED.md says where it came from. Built here,
+# above the app block, because the service tests use it as well as the app and the host targets.
+# The options are sqlite.org's recommended set, plus SQLITE_OMIT_LOAD_EXTENSION: nothing loads
+# extensions, and leaving it in would need libdl on Linux. Warnings are off because it is upstream
+# code nobody here edits. It is position-independent because the host plug-in (CEHostVST3) links it
+# into a shared object.
+find_package(Threads REQUIRED)
+add_library(ce_sqlite STATIC "${CE_ROOT}/thirdparty/sqlite/sqlite3.c")
+target_include_directories(ce_sqlite SYSTEM PUBLIC "${CE_ROOT}/thirdparty/sqlite")
+target_compile_definitions(ce_sqlite PRIVATE
+    SQLITE_DQS=0
+    SQLITE_DEFAULT_MEMSTATUS=0
+    SQLITE_DEFAULT_WAL_SYNCHRONOUS=1
+    SQLITE_LIKE_DOESNT_MATCH_BLOBS
+    SQLITE_MAX_EXPR_DEPTH=0
+    SQLITE_OMIT_DEPRECATED
+    SQLITE_OMIT_LOAD_EXTENSION
+    SQLITE_OMIT_SHARED_CACHE
+    SQLITE_USE_ALLOCA)
+target_compile_options(ce_sqlite PRIVATE $<IF:$<C_COMPILER_ID:MSVC>,/w,-w>)
+set_target_properties(ce_sqlite PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(ce_sqlite PUBLIC Threads::Threads)
+
 # ------------------------------------------------------------------ the app, the player, the VST
 # Everything from here to the tests needs WebView2 and a native juceaide. See CEDITOR_BUILD_APP.
 
@@ -275,6 +306,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+        "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/FloatingEditorWindows.cpp"
         "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
@@ -307,7 +339,7 @@ if(CEDITOR_BUILD_APP)
         "${CMAKE_BINARY_DIR}/BinaryData"
     )
 
-    target_link_libraries(CEditor PRIVATE
+    target_link_libraries(CEditor PRIVATE ce_sqlite
         $<$<PLATFORM_ID:Windows>:winmm>   # CTRL49 WinMM transport, see the test target's note
         juce::juce_core
         juce::juce_cryptography
@@ -385,7 +417,12 @@ if(CEDITOR_BUILD_APP)
     # stamp out unique-per-panel binaries (the Ctrlr fix: distinct PLUGIN_CODE/name -> distinct FUID).
     set(CE_VST_PRODUCT_NAME "CEditor Player VST" CACHE STRING "Per-panel plugin product name")
     set(CE_VST_PLUGIN_CODE  "Cep1"               CACHE STRING "Per-panel 4-char plugin code")
-    set(CE_VST_COMPANY_NAME "Tedjuh-inc"         CACHE STRING "Plugin vendor / company name")
+    # "Tedjuh", not "Tedjuh-inc": this default is what a template player bakes in as its VST3 vendor
+    # string, and it must agree with the fallback the exporters use when a panel names no vendor
+    # (panelIdentityInputs.js, PanelIdentitySidecar.h), or the same panel's compiled VST3, template
+    # VST3 and CLAP report three different vendors. The app's and host's own COMPANY_NAME are
+    # separate products and stay as they are.
+    set(CE_VST_COMPANY_NAME "Tedjuh"             CACHE STRING "Plugin vendor / company name")
     set(CE_VST_MFR_CODE     "Tdjh"               CACHE STRING "4-char plugin manufacturer code")
     set(CE_VST_VERSION      "1.0.0"              CACHE STRING "Plugin version string")
     # Empty by default: the export pipeline always passes the real panel via -DCE_VST_PANEL_PATH.
@@ -500,6 +537,7 @@ if(CEDITOR_BUILD_APP)
     target_include_directories(CEditorPlayerVST PUBLIC
         "${CE_ROOT}/src"
     )
+    target_link_libraries(CEditorPlayerVST PUBLIC ce_choc)
 
     target_link_libraries(CEditorPlayerVST PRIVATE
         juce::juce_audio_utils
@@ -536,7 +574,11 @@ if(CEDITOR_BUILD_APP)
             CLAP_ID "${CE_CLAP_ID}"
             # A MIDI controller surface, not an audio processor: "utility" is the honest category
             # and "external" marks it as controlling outboard gear (both from the CLAP taxonomy).
-            CLAP_FEATURES utility external)
+            # CLAP also REQUIRES one main category, and "utility" is not one — clap-validator's
+            # features-categories test failed on every export without it. "audio-effect" is the
+            # one that matches what the plug-in is to a host: it passes audio through untouched,
+            # and the VST3 build already declares itself Fx (VST3_CATEGORIES above).
+            CLAP_FEATURES audio-effect utility external)
         message(STATUS "CEditor: CLAP format ENABLED (target CEditorPlayerVST_CLAP, id ${CE_CLAP_ID}).")
     endif()
 
@@ -599,6 +641,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+        "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/FloatingEditorWindows.cpp"
         "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
@@ -631,7 +674,7 @@ if(CEDITOR_BUILD_APP)
         "${CMAKE_BINARY_DIR}/PlayerWebData"
     )
 
-    target_link_libraries(CEHostStandalone PRIVATE
+    target_link_libraries(CEHostStandalone PRIVATE ce_sqlite
         $<$<PLATFORM_ID:Windows>:winmm>   # CTRL49 WinMM transport, see the test target's note
         juce::juce_core
         # The licence check (Licensing/*.cpp in the shared host sources above) uses RSAKey and
@@ -688,7 +731,7 @@ if(CEDITOR_BUILD_APP)
         "${CMAKE_BINARY_DIR}/PlayerWebData"
     )
 
-    target_link_libraries(CEHostVST3 PRIVATE
+    target_link_libraries(CEHostVST3 PRIVATE ce_sqlite
         $<$<PLATFORM_ID:Windows>:winmm>   # CTRL49 WinMM transport, see the test target's note
         juce::juce_core
         # The licence check (Licensing/*.cpp in the shared host sources above) uses RSAKey and
@@ -828,6 +871,14 @@ target_include_directories(CEditorHostMidiInputTests PRIVATE "${CE_ROOT}/src")
 target_link_libraries(CEditorHostMidiInputTests PRIVATE juce::juce_core)
 add_test(NAME HostMidiInputQueue COMMAND CEditorHostMidiInputTests)
 ce_configure_test(CEditorHostMidiInputTests)
+
+# The output direction: what the panel sends, drained in processBlock without a lock or an
+# allocation. Reached otherwise only through PluginProcessor.h, which needs WebView2.
+add_executable(CEditorScriptMidiOutTests "${CE_ROOT}/tests/ScriptMidiOutQueueTests.cpp")
+target_include_directories(CEditorScriptMidiOutTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorScriptMidiOutTests PRIVATE juce::juce_core juce::juce_audio_basics ce_choc)
+add_test(NAME ScriptMidiOutQueue COMMAND CEditorScriptMidiOutTests)
+ce_configure_test(CEditorScriptMidiOutTests)
 
 # The exported plugin's automation list. Also the only thing that COMPILES PanelParameters.h — it is
 # reachable otherwise only through PluginProcessor.h, which needs WebView2 and cannot build off
@@ -1095,6 +1146,7 @@ if(WIN32)
         "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+        "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
     )
     target_compile_features(Ctrl49RackDemo PRIVATE cxx_std_23)
     target_compile_definitions(Ctrl49RackDemo PRIVATE
@@ -1105,7 +1157,7 @@ if(WIN32)
         JUCE_STANDALONE_APPLICATION=1
     )
     target_include_directories(Ctrl49RackDemo PRIVATE "${CE_ROOT}/src")
-    target_link_libraries(Ctrl49RackDemo PRIVATE juce::juce_cryptography winmm juce::juce_audio_utils
+    target_link_libraries(Ctrl49RackDemo PRIVATE ce_sqlite juce::juce_cryptography winmm juce::juce_audio_utils
                                             juce::juce_dsp)
 
     add_executable(Ctrl49BridgeDemo
@@ -1252,19 +1304,33 @@ target_link_libraries(CEditorVendorPresetTests PRIVATE juce::juce_core juce::juc
 add_test(NAME VendorPresets COMMAND CEditorVendorPresetTests)
 ce_configure_test(CEditorVendorPresetTests)
 
-# The library index's read/write contract (§18.6.5). Separate from the vendor tests above
-# because it proves a rule about FAILURE rather than about any format: an index that could not
-# be read is never written over by the empty library that failing to read it produced. juce_core
-# only — files and JSON are the whole surface.
+# The library's read/write contract (§18.6.5). Separate from the vendor tests above because it
+# proves rules about FAILURE rather than about any format: a library that could not be read is
+# never written over by the empty library that failing to read it produced, and a change is never
+# lost to another CEditor process. Covers the JSON form and LibraryStore (SQLite): juce_core and
+# ce_sqlite are the whole surface.
 add_executable(CEditorLibraryPersistenceTests
     "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+    "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
     "${CE_ROOT}/tests/LibraryPersistenceTests.cpp"
 )
 target_compile_features(CEditorLibraryPersistenceTests PRIVATE cxx_std_23)
 target_include_directories(CEditorLibraryPersistenceTests PRIVATE "${CE_ROOT}/src")
-target_link_libraries(CEditorLibraryPersistenceTests PRIVATE juce::juce_core)
+target_link_libraries(CEditorLibraryPersistenceTests PRIVATE ce_sqlite juce::juce_core)
 add_test(NAME LibraryPersistence COMMAND CEditorLibraryPersistenceTests)
 ce_configure_test(CEditorLibraryPersistenceTests)
+
+# What the library costs to keep at the size it is designed for (12,000 presets): import, open, a
+# favourite click, an audition, a capture, searches, two instances. A measurement, not a test — no
+# add_test, and EXCLUDE_FROM_ALL so neither CI nor a plain build pays for it. See the source's header.
+add_executable(CEditorLibraryBench EXCLUDE_FROM_ALL
+    "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+    "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
+    "${CE_ROOT}/tests/LibraryBench.cpp"
+)
+target_include_directories(CEditorLibraryBench PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorLibraryBench PRIVATE ce_sqlite juce::juce_core)
+ce_configure_test(CEditorLibraryBench)
 
 # The licence document, its signature and the edition table (§19 "Trust", §20, §26.2, §27).
 # juce_cryptography is the only module beyond juce_core: RSAKey and SHA256, the two primitives
@@ -1494,6 +1560,7 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
     "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+    "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
     "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
     "${CE_ROOT}/src/InstrumentHost/SonicAnalysisJob.cpp"
     "${CE_ROOT}/src/InstrumentHost/SonicAnalysisWorker.cpp"
@@ -1504,7 +1571,7 @@ add_executable(CEditorInstrumentHostServiceTests
 target_compile_definitions(CEditorInstrumentHostServiceTests PRIVATE JUCE_MODAL_LOOPS_PERMITTED=1)
 target_compile_features(CEditorInstrumentHostServiceTests PRIVATE cxx_std_23)
 target_include_directories(CEditorInstrumentHostServiceTests PRIVATE "${CE_ROOT}/src")
-target_link_libraries(CEditorInstrumentHostServiceTests PRIVATE
+target_link_libraries(CEditorInstrumentHostServiceTests PRIVATE ce_sqlite
     juce::juce_core
     juce::juce_cryptography
     juce::juce_audio_utils   # AudioProcessorPlayer for the service's preview audio engine
@@ -1584,6 +1651,7 @@ if (CEDITOR_REAL_PLUGIN_CHECK)
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+        "${CE_ROOT}/src/InstrumentHost/LibraryStore.cpp"
         "${CE_ROOT}/tests/RealPluginCheck.cpp"
     )
     target_compile_features(CEditorRealPluginCheck PRIVATE cxx_std_23)
@@ -1597,7 +1665,7 @@ if (CEDITOR_REAL_PLUGIN_CHECK)
         JUCE_MODAL_LOOPS_PERMITTED=1
     )
     target_include_directories(CEditorRealPluginCheck PRIVATE "${CE_ROOT}/src")
-    target_link_libraries(CEditorRealPluginCheck PRIVATE
+    target_link_libraries(CEditorRealPluginCheck PRIVATE ce_sqlite
         juce::juce_core
         juce::juce_cryptography
         juce::juce_audio_utils
@@ -1775,6 +1843,12 @@ if (CEDITOR_SCRIPTING)
         sol2::sol2
         lua_static                 # from walterschell/Lua; rename if your Lua provider differs
     )
+    # Both static libraries end up inside the player PLUG-IN, which is a shared module. On Linux that
+    # needs position-independent code, and neither target asks for it: the link failed with
+    # "relocation R_X86_64_TPOFF32 ... recompile with -fPIC" (sol2's thread_local Lua state), and no
+    # Linux .vst3, .clap or .lv2 could be built at all. Windows DLLs and macOS need nothing here and
+    # CMake emits nothing for them. Found by building a plug-in to run pluginval against.
+    set_target_properties(ceditor_scripting lua_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
     # --- Optional: native embedded CPython (third language, full stdlib) ---
     if (CEDITOR_PYTHON)

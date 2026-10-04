@@ -146,8 +146,13 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         .withStatusBarDisabled()
         .withUserDataFolder (userDataFolder);
 
+    // WebView2 by name on Windows only, as WebViewHost.cpp does for the app: elsewhere JUCE accepts
+    // the platform default alone, and naming webview2 there means the missing-runtime message
+    // instead of the panel (WebKitGTK on Linux; the bridge is window.__JUCE__ on every backend).
     auto options = juce::WebBrowserComponent::Options()
+       #if JUCE_WINDOWS
         .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
+       #endif
         .withKeepPageLoadedWhenBrowserIsHidden()
         .withWinWebView2Options (webview2Options)
         .withNativeIntegrationEnabled();

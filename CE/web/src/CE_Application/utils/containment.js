@@ -32,6 +32,22 @@ export function getChildControls(control) {
 }
 
 /**
+ * getChildControls, but the SAME array for as long as the children are the same objects in the same
+ * order — so what is keyed on the list (the canvas's spatial index, controlSpatialIndex.js) survives
+ * from one pointer move to the next. Read-only: do not sort or splice what it returns.
+ */
+const stableChildLists = new WeakMap();
+export function stableChildControls(control) {
+  const map = childrenMapOf(control);
+  if (!map) return [];
+  const fresh = Object.values(map).filter((child) => child?._children?.Core);
+  const cached = stableChildLists.get(map);
+  if (cached && cached.length === fresh.length && cached.every((child, index) => child === fresh[index])) return cached;
+  stableChildLists.set(map, fresh);
+  return fresh;
+}
+
+/**
  * Depth-first walk. fn(control, parent, depth) — parent is null for
  * top-level controls.
  */

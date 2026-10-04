@@ -22,6 +22,7 @@
   import { onMount, untrack } from 'svelte';
   import ColorChooser from '../ColorChooser.svelte';
   import { splitColourAlpha, alphaToHex } from '../../utils/colorMath.js';
+  import { floating } from '../../utils/floatingUi.js';
 
   let { colour = 'FF000000', label = 'Colour', oninput, oncommit, oncancel } = $props();
 
@@ -69,7 +70,9 @@
   });
 </script>
 
-<div class="fx-popover" bind:this={rootEl} role="dialog" aria-label="{label} colour">
+<!-- Hangs under the swatch it edits (the element it is nested in), flipping above when there is no room. -->
+<div class="fx-popover" bind:this={rootEl} role="dialog" aria-label="{label} colour"
+  use:floating={{ anchor: 'parent', placement: 'bottom-end', offset: 4, fallbackPlacements: ['top-end', 'bottom-start', 'top-start'] }}>
   <div class="ph">
     <span class="pt">{label}</span>
     <span class="px">#{live}</span>
@@ -85,11 +88,7 @@
 
 <style>
   .fx-popover {
-    position: absolute;
-    z-index: 40;
-    right: 0;
-    top: 100%;
-    margin-top: 4px;
+    z-index: 1600;
     width: 236px;
     max-width: calc(100vw - 24px);
     background: #1E1E1E;

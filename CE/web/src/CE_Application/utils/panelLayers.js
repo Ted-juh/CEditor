@@ -62,7 +62,9 @@ export function createLayer(name = DEFAULT_LAYER_NAME, overrides = {}) {
     ...overrides,
     // AFTER the spread, not before. Callers pass the raw stored entry as `overrides` while passing
     // the already-normalized name separately, so spreading last let an untrimmed or empty stored
-    // name win and produced a layer nothing could match by name.
+    // name win and produced a layer nothing could match by name. The key above the spread is not
+    // dead: it fixes `_type` as the FIRST key, and the committed panels are compared as text.
+    // eslint-disable-next-line no-dupe-keys
     _type: 'Layer',
     name: normalizeLayerName(name),
   };

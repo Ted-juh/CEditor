@@ -313,6 +313,8 @@ void Ctrl49PrivateInput::captureLoop (std::wstring devicePath)
 
             if (! message.empty())
             {
+                if (observer_ != nullptr)
+                    observer_ (message);
                 std::lock_guard<std::mutex> lock (queueMutex_);
                 messages_.push_back (message);
             }

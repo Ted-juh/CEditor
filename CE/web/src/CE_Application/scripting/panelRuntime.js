@@ -127,7 +127,7 @@ import {
 import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN } from './timeTables.js';
 import { FONT_ADVANCE as PIXEL_ADVANCE, FONT_H as PIXEL_FONT_H } from '../utils/pixelFont.js';
 import { EASING_BEZIERS, ANIM_CURVE_NAMES } from './easingTables.js';
-import { cubicBezierEase } from '../utils/easing.js';
+import { cubicBezierEase, springEase } from '../utils/easing.js';
 // ce.time's arithmetic IS the transport's, called rather than restated: a script asking where a
 // beat falls and the Transport drawing that beat have to agree, and one implementation is the only
 // way to promise it. The C++ preludes cannot import, so they transliterate — and
@@ -3374,9 +3374,7 @@ export function drawnCurve(values) {
 
 /** A damped oscillation, pinned to exactly 1 at the end so a spring always lands on its target. */
 export function animationSpring(progress, damping, frequency) {
-  const x = Math.min(1, Math.max(0, Number(progress) || 0));
-  if (x >= 1) return 1;
-  return 1 - Math.exp(-damping * x) * Math.cos(frequency * x);
+  return springEase(progress, damping, frequency);
 }
 
 const animations = new Map();   // path -> descriptor

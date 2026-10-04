@@ -560,6 +560,7 @@ IsolatedPluginProxy::IsolatedPluginProxy (Metadata metadataToUse,
 
 IsolatedPluginProxy::~IsolatedPluginProxy()
 {
+    alive->store (false);
     if (connection == nullptr)
         return;
     logDiagnostic ("shutdown_requested");
@@ -1505,6 +1506,21 @@ bool IsolatedPluginProxy::applyVstPreset (const juce::File& presetFile)
 {
     if (! presetFile.existsAsFile())
         return false;
+    const auto values = [this]
+    {
+        std::vector<float> out;
+        for (auto* parameter : getParameters()) out.push_back (parameter->getValue());
+        return out;
+    };
+    const auto differing = [] (const std::vector<float>& a, const std::vector<float>& b)
+    {
+        int count = 0;
+        for (size_t i = 0; i < juce::jmin (a.size(), b.size()); ++i)
+            count += std::abs (a[i] - b[i]) > 1.0e-5f ? 1 : 0;
+        return count;
+    };
+    const auto started = juce::Time::getMillisecondCounterHiRes();
+    const auto before = values();
     auto* object = new juce::DynamicObject();
     object->setProperty ("path", presetFile.getFullPathName());
     juce::String error;
@@ -1512,6 +1528,29 @@ bool IsolatedPluginProxy::applyVstPreset (const juce::File& presetFile)
                                                    jsonPayload (juce::var (object)), 5000, error);
     if (applied)
         refreshStateCache();    // the cached state just went stale; best effort, never fatal
+
+    // A preset the host reports as loaded while the plug-in keeps playing the old sound is
+    // invisible from here unless it is written down: what changed at once, and whether it
+    // stayed changed a few seconds later (a plug-in's own editor can write its sound back).
+    const auto after = values();
+    const auto changed = differing (before, after);
+    logDiagnostic (applied ? "preset_applied" : "preset_refused",
+                   presetFile.getFileName() + "; " + juce::String (juce::roundToInt (juce::Time::getMillisecondCounterHiRes() - started))
+                     + " ms; " + juce::String (changed) + " of " + juce::String ((int) after.size())
+                     + " parameters changed" + (error.isNotEmpty() ? "; " + error : juce::String()));
+    if (applied && juce::MessageManager::getInstanceWithoutCreating() != nullptr)
+        juce::Timer::callAfterDelay (3000, [this, flag = alive, before, after, values, differing,
+                                            name = presetFile.getFileName()]
+        {
+            if (! flag->load()) return;
+            const auto now = values();
+            int reverted = 0;
+            for (size_t i = 0; i < juce::jmin (now.size(), juce::jmin (before.size(), after.size())); ++i)
+                reverted += std::abs (after[i] - before[i]) > 1.0e-5f && std::abs (now[i] - before[i]) <= 1.0e-5f ? 1 : 0;
+            logDiagnostic ("preset_followup", name + ": 3 s later " + juce::String (differing (after, now))
+                             + " parameters moved since the load, " + juce::String (reverted)
+                             + " of them back to the previous sound");
+        });
     return applied;
 }
 

@@ -92,7 +92,8 @@ try {
   const profileRequests = await page.evaluate(() => window.targetCommands.filter(c => c.cmd === 'getSurfaceLayout').length);
   await page.getByRole('button', { name: 'Stage', exact: true }).click();
   const stage = page.getByTestId('host-stage-view');
-  assert.equal(await stage.getByTestId('stage-controller-name').innerText(), 'Controls · My fader controller');
+  // textContent: the stage draws this eyebrow in capitals, which innerText would report.
+  assert.equal(await stage.getByTestId('stage-controller-name').textContent(), 'Controls · My fader controller');
   assert.equal(await stage.getByTestId('stage-midi-status').innerText(), 'MIDI · USB MIDI keyboard');
   assert.equal(await stage.getByTestId('stage-display-status').count(), 0);
   assert.equal(await stage.getByText('Looking for CTRL49', { exact: true }).count(), 0);

@@ -308,6 +308,9 @@ test('every verb either changes something or explains why it cannot', () => {
         const lo = Number.isFinite(verb.min) ? verb.min : 0;
         const hi = Number.isFinite(verb.max) ? verb.max : 1;
         const mid = lo + (hi - lo) / 3;
+        // An integer verb rounds what it is given, and a third of a short range (1..3) rounds onto
+        // the default — a no-op that says nothing about the verb. Offer whole numbers it can land on.
+        if (verb.k === 'int') return [[Math.round(mid), hi, lo].find((n) => n !== Number(current)) ?? hi];
         return [mid === current ? lo + (hi - lo) / 2 : mid];
       }
     }

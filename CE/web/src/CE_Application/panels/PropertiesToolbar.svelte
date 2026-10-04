@@ -19,7 +19,7 @@
   import SquareStack from 'lucide-svelte/icons/square-stack';
   import Play from 'lucide-svelte/icons/play';
   import Square from 'lucide-svelte/icons/square';
-  import { undo, redo, undoAvailable, redoAvailable } from '../stores/history.js';
+  import { undo, redo, undoAvailable, redoAvailable, undoLabel, redoLabel, historyVersion } from '../stores/history.js';
   import Search from 'lucide-svelte/icons/search';
   import X from 'lucide-svelte/icons/x';
   import ChevronsDownUp from 'lucide-svelte/icons/chevrons-down-up';
@@ -68,13 +68,17 @@
     const next = !allCollapsed;
     for (const scope of collapseScopes) setAllCollapsedInScope(scope, next);
   }
+
+  // Name the step each button would take back or put back. Re-read only when a stack changes.
+  let undoTip = $derived.by(() => { void $historyVersion; const step = $undoAvailable ? undoLabel() : ''; return step ? `Undo ${step}` : 'Undo'; });
+  let redoTip = $derived.by(() => { void $historyVersion; const step = $redoAvailable ? redoLabel() : ''; return step ? `Redo ${step}` : 'Redo'; });
 </script>
 
 <div class="props-toolbar">
-  <button class="toolbar-btn" class:active={$undoAvailable} disabled={!$undoAvailable} title="Undo" aria-label="Undo" onclick={undo}>
+  <button class="toolbar-btn" class:active={$undoAvailable} disabled={!$undoAvailable} title={undoTip} aria-label="Undo" onclick={undo}>
     <Undo2 size={18} strokeWidth={1.5} />
   </button>
-  <button class="toolbar-btn" class:active={$redoAvailable} disabled={!$redoAvailable} title="Redo" aria-label="Redo" onclick={redo}>
+  <button class="toolbar-btn" class:active={$redoAvailable} disabled={!$redoAvailable} title={redoTip} aria-label="Redo" onclick={redo}>
     <Redo2 size={18} strokeWidth={1.5} />
   </button>
 

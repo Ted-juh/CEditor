@@ -15,26 +15,37 @@ namespace
         if (slot.type == "fx")
             return slot.fx;
 
-        if (slot.type == "transpose")
+        if (slot.type == "key")
         {
+            // Transpose and scale, the two halves of "what key am I playing in".
             out.transpose = slot.fx.transpose;
             out.transposeMode = slot.fx.transposeMode;
-            out.scaleType = slot.fx.scaleType;
-            out.scaleRoot = slot.fx.scaleRoot;
-        }
-        else if (slot.type == "scale")
-        {
             out.constrainToScale = slot.fx.constrainToScale;
+            out.scaleFold = slot.fx.scaleFold;
             out.scaleType = slot.fx.scaleType;
             out.scaleRoot = slot.fx.scaleRoot;
         }
         else if (slot.type == "chord")
         {
             out.chord = slot.fx.chord;
+            out.chordFollow = slot.fx.chordFollow;
+            out.chordFollowLow = slot.fx.chordFollowLow;
+            out.chordFollowHigh = slot.fx.chordFollowHigh;
             out.chordInversion = slot.fx.chordInversion;
             out.chordVoicing = slot.fx.chordVoicing;
             out.chordVoiceLeading = slot.fx.chordVoiceLeading;
-            out.keyChords = slot.fx.keyChords;
+            out.chordBass = slot.fx.chordBass;
+            out.chordTopAccent = slot.fx.chordTopAccent;
+            out.chordKeyMap = slot.fx.chordKeyMap;
+            out.chordSet = slot.fx.chordSet;
+            out.keyMap = slot.fx.keyMap;
+            out.chordPads = slot.fx.chordPads;
+            out.padMap = slot.fx.padMap;
+            out.chordProgression = slot.fx.chordProgression;
+            out.progression = slot.fx.progression;
+            out.progressionAdvance = slot.fx.progressionAdvance;
+            out.progressionLow = slot.fx.progressionLow;
+            out.progressionHigh = slot.fx.progressionHigh;
             // Diatonic chords are chosen per scale degree, so the chorder reads the scale
             // even when it is not folding anything into it.
             out.scaleType = slot.fx.scaleType;
@@ -120,10 +131,29 @@ void MidiInsertRack::configure (Module& module, const MidiSlot& slot)
     }
     else
     {
-        if (module.echo != nullptr)     module.echo->setSettings (slot.mod);
-        if (module.strum != nullptr)    module.strum->setSettings (slot.mod);
-        if (module.humanize != nullptr) module.humanize->setSettings (slot.mod);
-        if (module.chance != nullptr)   module.chance->setSettings (slot.mod);
+        // The Amount scales the module's main effect here, on the way to the engine; the
+        // slot keeps the values that were set.
+        auto mod = slot.mod;
+        const auto a = juce::jlimit (0.0f, 1.0f, slot.amount);
+        if (a < 1.0f)
+        {
+            mod.strumBeats *= (double) a;
+            mod.humanizeTimingBeats *= (double) a;
+            mod.humanizeVelocity = juce::roundToInt ((float) mod.humanizeVelocity * a);
+            mod.humanizeGatePercent = juce::roundToInt ((float) mod.humanizeGatePercent * a);
+            mod.humanizeLayBackBeats *= (double) a;
+            mod.humanizeSwing *= a;
+            mod.echoRepeats = juce::roundToInt ((float) mod.echoRepeats * a);
+            mod.chance = 1.0f - (1.0f - mod.chance) * a;
+        }
+        if (module.echo != nullptr)
+        {
+            module.echo->setSettings (mod);
+            module.echo->setScaleMask (scaleMask (slot.fx.scaleType, slot.fx.scaleRoot));
+        }
+        if (module.strum != nullptr)    module.strum->setSettings (mod);
+        if (module.humanize != nullptr) module.humanize->setSettings (mod);
+        if (module.chance != nullptr)   module.chance->setSettings (mod);
         if (module.length != nullptr)   module.length->setSettings (slot.mod);
         if (module.latch != nullptr)    module.latch->setSettings (slot.mod);
         if (module.mpe != nullptr)      module.mpe->setSettings (slot.mod);
@@ -251,7 +281,7 @@ void MidiInsertRack::process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
         else if (module->length != nullptr)
             module->length->process (front, back, block, juce::jmax (1, numSamples));
         else if (module->chance != nullptr)
-            module->chance->process (front, back);
+            module->chance->process (front, back, block, juce::jmax (1, numSamples));
         else if (module->latch != nullptr)
             module->latch->process (front, back);
         else if (module->mpe != nullptr)
@@ -260,6 +290,10 @@ void MidiInsertRack::process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
         {
             continue;
         }
+
+        // The module's light: did it change anything this block?
+        if (! sameEvents (front, back))
+            module->activity.fetch_add (1, std::memory_order_relaxed);
 
         front.swapWith (back);
     }
@@ -295,6 +329,76 @@ void MidiInsertRack::allNotesOff (juce::MidiBuffer& out, int position)
         out.addEvent (metadata.getMessage(), position);
     pendingFlush.clear();
     hasPendingFlush = false;
+}
+
+namespace
+{
+    template <typename Modules>
+    auto* findChords (const Modules& modules, const juce::String& slotId)
+    {
+        for (const auto& module : modules)
+            if (module != nullptr && module->fx != nullptr
+                && (slotId.isNotEmpty() ? module->slotId == slotId : module->type == "chord"))
+                return module.get();
+        return static_cast<decltype (modules.front().get())> (nullptr);
+    }
+}
+
+bool MidiInsertRack::triggerChordPad (const juce::String& slotId, int pad, int velocity)
+{
+    const juce::SpinLock::ScopedLockType sl (lock);
+    auto* module = findChords (modules, slotId);
+    return module != nullptr && ! module->bypassed && module->fx->triggerPad (pad, velocity);
+}
+
+bool MidiInsertRack::moveChordProgression (const juce::String& slotId, int value, bool absolute)
+{
+    const juce::SpinLock::ScopedLockType sl (lock);
+    auto* module = findChords (modules, slotId);
+    return module != nullptr && module->fx->moveProgression (value, absolute);
+}
+
+MidiInsertRack::ChordsLive MidiInsertRack::chordsLive (const juce::String& slotId) const
+{
+    ChordsLive live;
+    const juce::SpinLock::ScopedLockType sl (lock);
+    const auto* module = findChords (modules, slotId);
+    if (module == nullptr)
+        return live;
+    live.present = true;
+    live.lastChord = module->fx->lastSetChord();
+    live.step = module->fx->progressionStep();
+    live.pads = module->fx->soundingPads();
+    for (int pad = 0; pad < MidiFxSettings::maxPads; ++pad)
+        live.padChords[pad] = module->fx->padSetChord (pad);
+    return live;
+}
+
+bool MidiInsertRack::sameEvents (const juce::MidiBuffer& a, const juce::MidiBuffer& b) noexcept
+{
+    if (a.getNumEvents() != b.getNumEvents())
+        return false;
+    auto i = a.begin();
+    auto j = b.begin();
+    for (; i != a.end() && j != b.end(); ++i, ++j)
+    {
+        const auto x = *i;
+        const auto y = *j;
+        if (x.samplePosition != y.samplePosition || x.numBytes != y.numBytes
+            || std::memcmp (x.data, y.data, (size_t) x.numBytes) != 0)
+            return false;
+    }
+    return true;
+}
+
+int MidiInsertRack::moduleActivity (std::array<ModuleActivity, maxSlots>& out) const
+{
+    const juce::SpinLock::ScopedLockType sl (lock);
+    int count = 0;
+    for (const auto& module : modules)
+        if (module != nullptr && count < maxSlots)
+            out[(size_t) count++] = { module->slotId, module->activity.load (std::memory_order_relaxed) };
+    return count;
 }
 
 int MidiInsertRack::arpPatternStep() const noexcept

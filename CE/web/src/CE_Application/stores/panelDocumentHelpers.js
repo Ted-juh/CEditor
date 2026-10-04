@@ -1,5 +1,6 @@
 import { deepClone } from '../utils/deepClone.js';
 import { mapControlsTree } from '../utils/containment.js';
+import { setNestedValueShared } from './controlTreeUtils.js';
 
 export function updatePanelInList(list, panelId, updater) {
   let changed = false;
@@ -35,6 +36,34 @@ export function mutatePanelControlsInList(list, panelId, matcher, mutator) {
       return result && result !== true ? result : draft;
     });
 
+    if (!changed) return panel;
+    return { ...panel, controls: nextControls, modified: true };
+  });
+}
+
+/**
+ * Write dotted-path patches into controls, copying only what each write passes through.
+ *
+ * `patchFor(control)` returns `{ path: value, ... }` for a control to change, or null to leave it.
+ * The result is what mutatePanelControlsInList with a setNestedValue mutator would produce, except
+ * that every section a patch does not touch is SHARED with the control it came from instead of
+ * deep-copied — so a nudge costs one Transform, not a whole control, and undo history keeps one
+ * Transform per step (see setNestedValueShared). A container's children are never copied by a
+ * patch to the container itself.
+ */
+export function patchPanelControlsInList(list, panelId, patchFor) {
+  return updatePanelInList(list, panelId, (panel) => {
+    let changed = false;
+    const nextControls = mapControlsTree(panel.controls, (control) => {
+      const patch = patchFor(control);
+      if (!patch) return control;
+      const entries = Object.entries(patch);
+      if (entries.length === 0) return control;
+      let next = control;
+      for (const [path, value] of entries) next = setNestedValueShared(next, path, value).control;
+      changed = true;
+      return next;
+    });
     if (!changed) return panel;
     return { ...panel, controls: nextControls, modified: true };
   });

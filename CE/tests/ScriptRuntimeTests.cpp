@@ -2166,6 +2166,27 @@ int main()
         check (! runtime.matchDeviceDump ("secondSynth", arriving).isObject(),
                "declarations are per role — another role has none, so nothing matches");
 
+        // A dump that matches a layout and then turns out malformed. The decoder returns void, and it
+        // used to leave its half-built values object behind on every such path: LeakSanitizer
+        // reported it (docs/design/checkers-run-2026-10-02.md). Run under the sanitizer build, this
+        // case is what shows the leak; in a plain build it pins that the dump is refused.
+        check (runtime.defineDeviceParameter ("mainSynth", "patchName",
+                   spec (R"({ "type": "text", "length": 4, "cc": 20 })")),
+               "a text parameter is declared");
+        check (runtime.defineDeviceDump ("mainSynth", "named", spec (
+                   R"({ "request": "f0 7d 09 f7", "match": { "prefix": ["f0","7d","09"], "suffix": ["f7"] },)"
+                   R"( "offset": 3, "fields": [{ "parameter": "patchName", "offset": 0 }] })")),
+               "…and a layout carrying it as a name");
+        const juce::var garbled (juce::Array<juce::var> { 0xF0, 0x7D, 0x09, 0x41, 0x01, 0x42, 0x43, 0xF7 });
+        check (! runtime.matchDeviceDump ("mainSynth", garbled).isObject(),
+               "a name holding a control character is refused rather than decoded");
+        const juce::var named (juce::Array<juce::var> { 0xF0, 0x7D, 0x09, 0x50, 0x61, 0x64, 0x20, 0xF7 });
+        const auto namedDecoded = runtime.matchDeviceDump ("mainSynth", named);
+        auto* namedValues = namedDecoded.getDynamicObject() != nullptr
+                                ? namedDecoded.getDynamicObject()->getProperty ("values").getDynamicObject() : nullptr;
+        check (namedValues != nullptr && namedValues->getProperty ("patchName").toString() == "Pad",
+               "…while a clean one decodes, trimmed");
+
         // -- the same, driven from a script, in both always-on engines.
         for (const char* lang : { "lua", "javascript" })
         {

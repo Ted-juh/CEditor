@@ -20,6 +20,7 @@
   import HostPartIdentity from './HostPartIdentity.svelte';
   import { hostPartLabel } from '../utils/hostTargetContext.js';
   import HostStereoMeter from './HostStereoMeter.svelte';
+  import Knob from '../components/controls/Knob.svelte';
   import { hostMeters, advanceHostMeters, resetHostMeterPeaks } from '../stores/hostMeters.js';
   import { meterDbText } from '../utils/mixerMeters.js';
 
@@ -42,6 +43,8 @@
     return `${value >= 0 ? '+' : ''}${value.toFixed(1)}`;
   }
 
+  const panText = (pan) => (Math.abs(pan) < 0.005 ? 'C' : `${pan < 0 ? 'L' : 'R'}${Math.round(Math.abs(pan) * 100)}`);
+
   function stripTitle(part) {
     return hostPartLabel(part, parts.findIndex(candidate => candidate.partId === part.partId));
   }
@@ -59,7 +62,7 @@
     ? `${meterDbText($hostMeters.channels[id].maximumDb)} dBFS` : '—'}</span>
 {/snippet}
 
-<div class="mixer" data-testid="host-mixer" style={`--mixer-upper-height:${34 + returns.length * 28}px`}>
+<div class="mixer" data-testid="host-mixer" style={`--mixer-upper-height:${40 + returns.length * 30}px`}>
   <div class="mixer-heading"><h2>Mixer</h2><span>OUTPUT · dBFS</span>
     <button type="button" class="ghost" data-testid="mixer-clear-peaks" onclick={() => resetHostMeterPeaks()}>Clear peaks</button>
   </div>
@@ -73,24 +76,23 @@
           <HostPartIdentity {part} {index} stacked />
         </button>
         <div class="strip-upper">
-        <label class="pan" title={`Pan ${part.pan.toFixed(2)}`}>
-          <input type="range" min="-1" max="1" step="0.01" value={part.pan}
-                 aria-label={`Pan — ${stripTitle(part)}`}
-                 ondblclick={() => setPartMixer(part.partId, { pan: 0 })}
-                 oninput={(e) => setPartMixer(part.partId, { pan: Number(e.currentTarget.value) })} />
-        </label>
+        <span class="pan">
+          <Knob value={part.pan} min={-1} max={1} reset={0} size={34} label={`Pan — ${stripTitle(part)}`}
+                format={panText} testid="mixer-pan" onchange={(v) => setPartMixer(part.partId, { pan: v })} />
+          <small>{panText(part.pan)}</small>
+        </span>
         {#if returns.length > 0}
           <!-- One send row per RETURN, whether the part sends there yet or not: moving a
                silent row's slider creates the send natively (setSendLevel is create-or-
                update), which is exactly how a desk's aux knobs behave at zero. -->
           <div class="sends">
             {#each returns as chain (chain.returnId)}
-              <label class="send" title={`Send to ${chain.name}`}>
+              <span class="send" title={`Send to ${chain.name}`}>
+                <Knob value={part.sends.find((s) => s.returnId === chain.returnId)?.level ?? 0} min={0} max={2} reset={0}
+                      size={26} label={`Send to ${chain.name} — ${stripTitle(part)}`} testid="mixer-send"
+                      format={(v) => `${db(v)} dB`} onchange={(v) => setSendLevel(part.partId, chain.returnId, v)} />
                 <span>{chain.name.slice(0, 6)}</span>
-                <input type="range" min="0" max="2" step="0.01"
-                       value={part.sends.find((s) => s.returnId === chain.returnId)?.level ?? 0}
-                       oninput={(e) => setSendLevel(part.partId, chain.returnId, Number(e.currentTarget.value))} />
-              </label>
+              </span>
             {/each}
           </div>
         {/if}
@@ -224,10 +226,10 @@
   span.strip-name { cursor: default; }
   input.strip-name { width: 92px; box-sizing: border-box; text-align: center; }
   .strip-kind { font-size: 11px; color: #8d9aa5; }
-  .pan input { width: 76px; }
+  .pan { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #96a2ad; font-variant-numeric: tabular-nums; }
+  .pan small { min-width: 26px; }
   .sends { display: flex; flex-direction: column; gap: 4px; width: 100%; }
-  .send { display: flex; height: 24px; align-items: center; gap: 5px; font-size: 11px; color: #96a2ad; }
-  .send input { flex: 1; min-width: 0; }
+  .send { display: flex; height: 28px; align-items: center; gap: 6px; font-size: 11px; color: #96a2ad; }
   /* The one vertical control in the app: a real fader. Chromium (which WebView2 is)
      renders a range vertically from writing-mode alone; rtl puts loud at the top. */
   .fader { writing-mode: vertical-lr; direction: rtl; width: 22px; height: var(--mixer-meter-height); margin: 0; }

@@ -9,8 +9,10 @@
   import { plainFillCSS } from '../utils/plainFillCSS.js';
   import { observeElementMetrics } from '../utils/batchedElementMetrics.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
+  import { drawnPartEntries } from '../utils/booleanGroups.js';
   import { bakeStaticPartEntries } from '../utils/staticPartBaking.js';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
+  import { SLIDER_SEMANTIC_PARTS, hasSliderControlParts } from '../utils/sliderControlPart.js';
   import ControlAnatomy from './ControlAnatomy.svelte';
   import { anatomyForm } from '../models/controlAnatomy.js';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
@@ -71,10 +73,12 @@
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
   import { get } from 'svelte/store';
   import { onDestroy } from 'svelte';
+  import { keyframeOverlays } from '../stores/keyframeOverlays.js';
+  import { syncKeyframePlayer, disposeKeyframePlayer } from '../utils/keyframePlayer.js';
   import { showDistances } from '../stores/editorView.js';
   import { guides, selectedGuide } from '../stores/guides.js';
   import { fileCache, loadFile } from '../stores/fileCache.js';
-  import { findAlignmentSnap, computeDistances } from '../utils/canvasSnapping.js';
+  import { findAlignmentSnap, computeDistances, snapMovingRect, snapResizeRect } from '../utils/canvasSnapping.js';
   import { framedGuides, hasSelectedAncestor, multiDragPatches, toPanelDistances, toPanelGuides } from '../utils/canvasDragFrame.js';
   import { setActivePanelSnapGuides, clearActivePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
@@ -366,7 +370,13 @@
     ? applyPanelDependentChoices(flatControls(allControls), {})?.[control?._children?.Core?.id] ?? null
     : null);
   let previewSession = $derived(previewSessionOverride ?? designChoiceSession);
-  let appliedPreviewSession = $derived(previewSession?.enabled === false ? {} : previewSession);
+  // A running keyframe animation, or the Animation tab's playhead, rides in with the session so
+  // the resolver can pose the control (stores/keyframeOverlays.js). Null when nothing is running.
+  let keyframeOverlay = $derived($keyframeOverlays[core?.id] ?? null);
+  let appliedPreviewSession = $derived.by(() => {
+    const base = previewSession?.enabled === false ? {} : previewSession;
+    return keyframeOverlay ? { ...(base ?? {}), keyframeOverlay } : base;
+  });
   let interactiveRenderingEnabled = $derived(isCustomComponent || previewSessionOverride !== null || editorInteractionEnabled === false);
   let shouldResolveInteractive = $derived(interactiveRenderingEnabled && resolvedControlOverride == null && interactionRuntimeOverride == null);
   let resolvedInteractive = $derived(shouldResolveInteractive ? resolveInteractiveControl(control, appliedPreviewSession) : null);
@@ -378,6 +388,21 @@
     interactionRuntimeOverride
       ?? (interactiveRenderingEnabled ? (resolvedInteractive?.runtime ?? null) : null)
   );
+  // The keyframe player (utils/keyframePlayer.js) wants to know when the states or the value
+  // change — not every frame the overlay changes — so it is fed strings that only change then.
+  let keyframeStatesKey = $derived((interactionRuntime?.activeStates ?? []).join('|'));
+  let keyframeValueKey = $derived(interactionRuntime?.signals?.valueNormalized ?? null);
+  let keyframesEnabled = $derived(previewSession?.animationsEnabled !== false && getSection(control, 'Animations')?.enabled !== false);
+  $effect(() => {
+    const id = core?.id;
+    if (!id || !interactiveRenderingEnabled) return;
+    syncKeyframePlayer(id, control, {
+      activeStates: keyframeStatesKey ? keyframeStatesKey.split('|') : [],
+      valueNormalized: keyframeValueKey,
+      enabled: keyframesEnabled,
+    });
+  });
+  onDestroy(() => { if (core?.id) disposeKeyframePlayer(core.id); });
   let svgIdSeed = $derived.by(() => {
     const baseId = safeSvgId(core?.id);
     const namespace = safeSvgId(renderIdNamespace);
@@ -436,12 +461,6 @@
       .filter(([, zone]) => zone?.enabled !== false && zone?.visibleInEditor !== false)
       .sort((left, right) => numberOr(left?.[1]?.priority, 0) - numberOr(right?.[1]?.priority, 0))
   );
-  const SLIDER_SEMANTIC_PARTS = new Set([
-    'bodyTrackBase', 'bodyTrackFill', 'bodySelectedRange', 'bodyCenterMarker', 'bodyCap',
-    'pointerStart', 'pointerCurrent', 'pointerEnd',
-    'tickMajor', 'tickMinor', 'tickAccent',
-    'labelMin', 'labelMax', 'labelStart', 'labelCurrent', 'labelEnd', 'labelValue', 'labelTitle', 'labelUnit',
-  ]);
   // Parts a state can show or hide WITH a fade (an animation on `Parts.<name>.visible`, read from
   // the catalog's union of what could animate). Such a part stays in the list while hidden and is
   // drawn `visibility: hidden; opacity: 0` — a part that is not there has nothing to fade from.
@@ -453,8 +472,9 @@
     }
     return names;
   });
+  // A combined shape's operands are drawn by the shape (utils/booleanGroups.js), not as themselves.
   let renderPartEntries = $derived.by(() =>
-    Object.entries(renderParts?._children ?? {})
+    drawnPartEntries(Object.entries(renderParts?._children ?? {}))
       .filter(([partName, part]) => part?.visible !== false || fadeableParts.has(partName))
       .sort((left, right) => numberOr(left?.[1]?.zIndex, 0) - numberOr(right?.[1]?.zIndex, 0))
   );
@@ -532,6 +552,10 @@
   // whatever sits behind it, and it has no hover. See utils/displayMode.js for the trade.
   let mouseBlocksPointer = $derived(mouseAppliesToSurface && !acceptsPointerFor(mouseSection, flowBehavior));
   let mouseChildrenTakePointer = $derived(mouseAppliesToSurface && childrenAcceptPointer(mouseSection));
+  // A component carrying panel knobs (utils/sliderControlPart.js) is one focusable element where the
+  // panel had one per knob, so the preview's keyboard focus ring moves off it onto the knob that holds
+  // its focus — the ring the panel knob itself wore.
+  let carriesKnobs = $derived(isCustomComponent && hasSliderControlParts(control));
   let mouseFocusOutline = $derived(mouseAppliesToSurface && showsFocusOutline(mouseSection));
   let mouseRaisesOnClick = $derived(mouseAppliesToSurface && raisesOnClick(mouseSection));
 
@@ -900,12 +924,13 @@
   // stay readable. findAlignmentSnap uses my frame's controls + ruler guides;
   // computeDistances additionally filters out co-selected siblings and
   // only runs for the dragged (key-object) component.
-  function alignSnap(x, y, w, h) {
+  function alignSnap(x, y, w, h, edges = null) {
     const align = findAlignmentSnap(
       { x, y, w, h }, core?.id, mySiblings, myFrameGuides, getSection,
       myFrameSize,
       // 5 screen px of stickiness at every zoom level.
       5 / (scale || 1),
+      edges,
     );
     // Publish the live guides so the panel rulers can mirror them (parity with
     // the component editor). Cleared on drag/resize end. The rulers are panel-space,
@@ -1331,7 +1356,10 @@
     }
 
     // Alignment snap overrides grid when within threshold
-    const align = snapSuspended ? { x: newX, y: newY, guides: [] } : alignSnap(newX, newY, displayW, displayH);
+    // A rotated control lines up by its rotated footprint — what is on screen (utils/canvasSnapping.js).
+    const align = snapSuspended
+      ? { x: newX, y: newY, guides: [] }
+      : snapMovingRect({ x: newX, y: newY, w: displayW, h: displayH }, transform?.rotation, (box) => alignSnap(box.x, box.y, box.w, box.h));
     if (snapSuspended) setActivePanelSnapGuides([]);
     transientX = Math.round(align.x);
     transientY = Math.round(align.y);
@@ -1535,13 +1563,17 @@
     // Grid snap
     if (!snapSuspended && snapToGrid) rect = snapRectToGrid(rect, gridSize, snapToGridX, snapToGridY);
 
-    // Alignment snap overrides grid when within threshold
-    const align = snapSuspended ? { x: rect.x, y: rect.y, guides: [] } : alignSnap(rect.x, rect.y, rect.w, rect.h);
+    // Alignment snap overrides grid when within threshold — on the dragged edges only, changing the
+    // size rather than moving the box (snapResizeRect).
+    const align = snapSuspended
+      ? { ...rect, guides: [] }
+      : snapResizeRect(rect, resizeHandle, (box, edges) => alignSnap(box.x, box.y, box.w, box.h, edges), resizeOpts);
     if (snapSuspended) setActivePanelSnapGuides([]);
+    else setActivePanelSnapGuides(toPanelGuides(align.guides, parentOffset));
     transientX = Math.round(align.x);
     transientY = Math.round(align.y);
-    transientW = Math.round(rect.w);
-    transientH = Math.round(rect.h);
+    transientW = Math.round(align.w);
+    transientH = Math.round(align.h);
     publishMeasurements(align, $showDistances ? distancesFor(transientX, transientY, transientW, transientH) : []);
   }
 
@@ -3506,6 +3538,7 @@
   class:device-drop-incompatible={deviceDropStatus === 'incompatible'}
   class:mouse-transparent={mouseBlocksPointer}
   class:mouse-focus-outline={mouseFocusOutline}
+  class:carries-knobs={carriesKnobs}
   style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; --inv-scale:{1 / (scale || 1)}; {layerTint ? `--layer-tint:${layerTint};` : ''} {canvasTransformCSS} {rootTransitionCSS} {rootKeyframeCSS} {rootColourCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
   onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
   ondblclick={editorInteractionEnabled ? handleDoubleClick : undefined}
@@ -3784,7 +3817,9 @@
           {partName}
           parentWidth={displayW}
           parentHeight={displayH}
-          transitionBucket={activeTransitions?.partTransitions?.get?.(partName) ?? null}
+          transitionBucket={activeTransitions?.partTransitions?.get?.(partName)
+            ?? activeTransitions?.partTransitions?.get?.(part?.meta?.booleanInputs?.paintFrom)
+            ?? null}
           animationList={activeKeyframes?.parts?.get?.(partName) ?? null}
           colourChannels={keyframeColours ? (keyframeColours.get(partName) ?? {}) : null}
           fadeHidden={fadeableParts.has(partName)}
@@ -4480,6 +4515,7 @@
     outline-offset: 1px;
   }
 
+
   /* Nested-children layers. Transparent to pointer events so Child Clicks off
      makes the container one hit target; the on-state below re-enables both the
      layer and each nested control. */
@@ -4953,6 +4989,21 @@
   }
 
   .canvas-control.preview-keyboard-focus::after {
+    border: 1px solid rgba(91, 155, 213, 0.6);
+  }
+
+  /* A component carrying panel knobs: the keyboard ring goes round the knob that has the focus, as
+     it went round that knob on the panel, not round the whole component. Same ring, same place. */
+  .canvas-control.preview-keyboard-focus.carries-knobs::after {
+    content: none;
+  }
+
+  .canvas-control.preview-keyboard-focus.carries-knobs :global(.interactive-part[data-focus-ring])::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 12px;
+    pointer-events: none;
     border: 1px solid rgba(91, 155, 213, 0.6);
   }
 

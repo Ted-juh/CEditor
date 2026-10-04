@@ -185,6 +185,46 @@ still draws all five of its sections and still edits every field. Nothing is rel
 parts that copied the source. A rename is a move with references to follow. The name is shown and
 not editable rather than pretending otherwise and breaking links quietly.
 
+**The references now have an index** (`utils/assetReferences.js`, 2026-10-01), the first of the
+steps a rename and a "replace everywhere" need. For each asset it lists what uses it, found from
+the code that reads assets rather than from a list of fields:
+
+- a filmstrip generator's `assetName`, counted even when the generator is disabled;
+- the same generator with no name, or a name that is gone, which the materializer quietly points
+  at the *first* filmstrip — the use nobody would guess, and the one that changes picture when
+  that filmstrip is removed;
+- any `Assets.images.<name>…` / `Assets.filmstrips.<name>…` path, wherever it sits (bindings,
+  animation targets, published properties all write them);
+- a copy of the asset's source in a part, here or on another control, or the panel background;
+- the same bytes in another asset, reported as a duplicate rather than a use.
+
+Script source is not read: a path built at run time is not in the document. The tab shows the list
+under **Used by**, marks unused assets in the library, and asks before removing one that is used,
+naming each use. The live count covers the component; the panel-wide search runs once, on
+removal, because walking every string of a large panel on every edit is not free.
+
+**Rename and replace are built on it** (`utils/assetEdits.js`, the same day). Both are planned
+as patches over the index and applied in one store update inside a labelled history transaction,
+so a rename that rewrites the map, a generator and two paths is one undo step, and so is a replace
+that writes the new picture into the asset and into every part that copied it, on this control or
+another. The browser check undoes each once and reads the document back. Three things the plan is
+honest about rather than quiet:
+
+- The panel's own `bgImage`/`bgTexture` are kept out of history snapshots on purpose, so a copy
+  there is rewritten and the status line says undo does not cover it.
+- A name has to be a path segment — letters, digits, `-` and `_` — because it is one.
+  `safeAssetFileName` allows dots, so an import named `knob.v2` already produces a path nobody
+  can match; the rename refuses to make another, and the import rule is a separate fix.
+- A baked filmstrip is a picture of the component, and the component just changed. The plan lists
+  every other baked strip on the control as stale when the replaced asset was used by the
+  component at all, each with the options to bake it again from its own record. Baking takes
+  longer than the history debounce, so the tab asks and makes it a second undo step, saying so.
+  Replacing a baked strip itself with a file makes it an imported one: `generated` and the bake
+  record go with the old bytes.
+
+Not followed: duplicates (another asset with the same bytes) are their own assets and stay as they
+are, named in the status line.
+
 ### Corrected after review
 
 The tab shipped and then two things about it turned out to be wrong. Both are recorded here rather

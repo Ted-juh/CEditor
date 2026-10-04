@@ -127,8 +127,15 @@ try {
       // either, because which one a zone wants is the zone's business, not this file's.
       await kit.click(at);
       let after = r3((await values(id))[zone.channel]);
+      // Out of the double-click window before pressing the same spot again. Two presses on one
+      // control within 350ms and 5px are a double-click, which RESETS a slider channel to its
+      // default and deliberately starts no drag (PanelPreviewSurface handlePointerDown). Without the
+      // wait, click-then-drag was a double-click: each slider snapped to its default and the drag
+      // was swallowed — which read as "press and both drags left it at <its default>".
+      await kit.settle(400);
       if (after === before) {
         await kit.drag(at, { x: Math.min(box.x + box.w - 4, at.x + box.w * 0.3), y: at.y });
+        await kit.settle(400);
         after = r3((await values(id))[zone.channel]);
       }
       if (after === before) {

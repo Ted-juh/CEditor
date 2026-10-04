@@ -232,13 +232,16 @@ std::optional<juce::WebBrowserComponent::Resource> makeMissingFrontendPage()
 // there, which is the whole point of routing artwork through a registry rather than letting
 // the frontend fetch an absolute path.
 //
-// Dev mode note: the page is served by Vite, so a relative /plugin-snapshot URL goes to the
-// dev server and 404s. The tile falls back to its generated artwork when the image fails to
-// load, so a dev run looks like a machine whose plug-ins ship no snapshots.
+// The service publishes the URL absolute, at the provider root, so this route is reached from a
+// dev build's Vite-served page too (a relative one went to Vite and the tiles showed initials).
 constexpr const char* snapshotRoutePrefix = "/plugin-snapshot/";
 
 std::optional<juce::WebBrowserComponent::Resource> providePluginSnapshot (const juce::String& path)
 {
+    // The service spells the provider root out (it is built without the web module too).
+    jassert (ceditor::host::PluginSnapshotRegistry::routeUrl ({})
+             == juce::WebBrowserComponent::getResourceProviderRoot() + "plugin-snapshot/");
+
     const auto token = path.fromFirstOccurrenceOf (snapshotRoutePrefix, false, false);
     const auto file = ceditor::host::PluginSnapshotRegistry::instance().resolve (token);
 

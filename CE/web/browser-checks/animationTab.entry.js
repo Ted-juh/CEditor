@@ -15,6 +15,7 @@ import { createCustomComponentPartsDefaults } from '../src/CE_Application/utils/
 import { undo } from '../src/CE_Application/stores/history.js';
 import { debugDockState } from '../src/CE_Application/stores/debugDock.js';
 import { displayTabRequest } from '../src/CE_Application/stores/displayTab.js';
+import { keyframeOverlays } from '../src/CE_Application/stores/keyframeOverlays.js';
 
 const CONTROL_ID = 'ctrl_anim';
 
@@ -22,6 +23,9 @@ const control = createControl('CustomComponent');
 control._children.Core.id = CONTROL_ID;
 control._children.Core.name = 'Big Knob';
 control._children.Parts = createCustomComponentPartsDefaults();
+control._children.ValueChannels = { _type: 'ValueChannels', _children: {
+  mainValue: { _type: 'ValueChannel', name: 'mainValue', label: 'Knob Value', type: 'float', min: 0, max: 1, step: 0.01, defaultValue: 0.5, currentValue: 0.5 },
+} };
 
 const partNames = Object.keys(control._children.Parts._children);
 const first = partNames[0];
@@ -134,6 +138,23 @@ window.__anim = {
     const button = [...document.querySelectorAll('.easing')].find((b) => textOf(b.querySelector('span')) === name);
     return [...(button?.querySelectorAll('svg path') ?? [])].map((p) => p.getAttribute('d'));
   },
+  pickKind: (kind) => { [...document.querySelectorAll('[aria-label="Kind"] button')].find((b) => new RegExp(`^${kind}$`, 'i').test(b.textContent.trim()))?.click(); },
+  changeOptions: () => [...document.querySelectorAll('[aria-label="What to change"] option')].map((o) => o.textContent.trim()),
+  partPickerDisabled: () => !!document.querySelector('[aria-label="Part"]')?.disabled,
+  storedTargetPaths: (name) => animation(name).targets.map((t) => t.path),
+  storedKeyframes: (name) => animation(name).targets.map((t) => (t.keyframes ?? []).map((k) => [k.time, k.value])),
+  storedLoopHold: (name) => ({ loop: animation(name).loop, hold: animation(name).hold, duration: animation(name).duration }),
+  timelineCanvases: () => document.querySelectorAll('.kft canvas').length,
+  trackLabels: () => [...document.querySelectorAll('.kft .lbl')].map(textOf),
+  playheadText: () => textOf(document.querySelector('.transport .time')),
+  addKeyframe: () => { [...document.querySelectorAll('.transport .mk')].find((b) => /Keyframe at/.test(b.textContent))?.click(); },
+  selectTrack: (index) => { document.querySelectorAll('.trow')[index]?.click(); },
+  keyframeBox: () => !!document.querySelector('.kfbox'),
+  deleteKeyframe: () => { document.querySelector('.kfbox .danger')?.click(); },
+  overlay: () => get(keyframeOverlays)[CONTROL_ID] ?? null,
+  play: () => { document.querySelector('.transport .mk[aria-label="Play"]')?.click(); },
+  stop: () => { document.querySelector('.transport .mk[aria-label="Stop"]')?.click(); },
+  storedKind: (name) => animation(name).kind,
   pickEasing: (name) => {
     const button = [...document.querySelectorAll('.easing')].find((b) => textOf(b.querySelector('span')) === name);
     button?.click();

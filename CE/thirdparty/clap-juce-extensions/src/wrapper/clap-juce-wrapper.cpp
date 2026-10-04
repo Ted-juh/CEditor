@@ -1450,8 +1450,10 @@ class ClapJuceWrapper : public clap::helpers::Plugin<
 
         if (!usingLegacyParameterAPI)
         {
+            // CEditor patch (VENDORED.md): copyToUTF8 NUL-terminates and never splits a multi-byte
+            // character at the buffer's end; strncpy did neither.
             auto res = pbi.processorParam->getText((float)value, (int)size);
-            strncpy(display, res.toStdString().c_str(), size);
+            res.copyToUTF8(display, size);
         }
         else
         {
@@ -1460,7 +1462,7 @@ class ClapJuceWrapper : public clap::helpers::Plugin<
              * event that the JUCE parameter mode is more or less like a VST2
              */
             auto res = pbi.processorParam->getCurrentValueAsText();
-            strncpy(display, res.toStdString().c_str(), size);
+            res.copyToUTF8(display, size);
         }
 
         return true;
@@ -1470,7 +1472,10 @@ class ClapJuceWrapper : public clap::helpers::Plugin<
     {
         auto pbi = paramPtrByClapID[paramId];
         *value = (double)getUnNormalisedParameterValue(
-            pbi, pbi.processorParam->getValueForText(display));
+            // CEditor patch (VENDORED.md): the host's text is UTF-8. juce::String(const char*) reads
+            // it as ASCII, so a label like "Up · keep low+high" matched nothing and came back as
+            // the first choice.
+            pbi, pbi.processorParam->getValueForText(juce::String::fromUTF8(display)));
         return true;
     }
 
@@ -2559,13 +2564,57 @@ JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE("-Wredundant-decls")
 juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter();
 JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 
+// CEditor patch (VENDORED.md): a template player takes its identity from the panel beside it.
+#ifndef CEDITOR_SIDECAR_IDENTITY
+#define CEDITOR_SIDECAR_IDENTITY 0
+#endif
+#if CEDITOR_SIDECAR_IDENTITY
+#include "Export/ClapSidecarIdentity.h"
+#endif
+
+#if JUCE_WINDOWS
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 namespace ClapAdapter
 {
-static bool clap_init(const char *) { return true; }
+static bool clap_init(const char *)
+{
+#if JUCE_WINDOWS
+    // CEditor patch (VENDORED.md): JUCE finds "this module" through the instance handle a plugin
+    // wrapper sets in DllMain. The VST3, VST2 and AAX wrappers set it; this one had no DllMain, so
+    // inside a CLAP JUCE took the host's executable for the plugin: currentExecutableFile, and
+    // everything looked up beside it, pointed at the DAW. init is the first thing a host calls.
+    HMODULE module = nullptr;
+    if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                               GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           reinterpret_cast<LPCWSTR>(&clap_init), &module))
+        juce::Process::setCurrentModuleInstanceHandle(module);
+#endif
+#if CEDITOR_SIDECAR_IDENTITY
+    ceditor::applyClapSidecarIdentity(ClapJuceWrapper::desc);
+#endif
+    return true;
+}
 
 static void clap_deinit(void) {}
 
-static uint32_t clap_get_plugin_count(const struct clap_plugin_factory *) { return 1; }
+static uint32_t clap_get_plugin_count(const struct clap_plugin_factory *)
+{
+#if CEDITOR_SIDECAR_IDENTITY
+    // CEditor patch (VENDORED.md): a template copied without its panel is no plugin at all, rather
+    // than one more copy of the template's built-in identity.
+    return ceditor::clapSidecarPluginCount();
+#else
+    return 1;
+#endif
+}
 
 static const clap_plugin_descriptor *clap_get_plugin_descriptor(const struct clap_plugin_factory *,
                                                                 uint32_t)

@@ -72,6 +72,11 @@ void Ctrl49SurfaceBroker::emitStatus() const
     // advances it even when the same encoder remains focused or a parameter value is clamped.
     obj->setProperty ("movementSeq", movementSequence);
     obj->setProperty ("movingSlot", movingSlot);
+    // The last thing the keyboard refused, and how many times it has refused anything since
+    // this connection started. Empty and zero when all is well.
+    obj->setProperty ("deviceError", deviceError);
+    obj->setProperty ("deviceRefusals", deviceRefusals);
+    obj->setProperty ("searchReason", searchReason);
     options.emit ("instrumentHostSurface", juce::var (obj));
 }
 
@@ -109,20 +114,29 @@ void Ctrl49SurfaceBroker::beginDiscovery()
     worker = std::thread ([this]
     {
         std::unique_ptr<Ctrl49SurfaceEndpoints> found;
-        juce::String failure;
+        juce::String failure, reason;
         try
         {
             if (options.discover != nullptr)
                 found = options.discover();
+            if (found == nullptr)
+                reason = "unplugged";
+        }
+        catch (const Ctrl49DiscoveryProblem& problem)
+        {
+            failure = problem.what();
+            reason = problem.reason;
         }
         catch (const std::exception& e)
         {
             failure = e.what();
+            reason = "error";
         }
 
         const std::scoped_lock lock (handoffLock);
         discovered = std::move (found);
         workerFailure = failure;
+        workerReason = reason;
         workerDone = true;
     });
 }
@@ -235,7 +249,7 @@ void Ctrl49SurfaceBroker::tick()
             // is out. §17.4: this never blocks — absence costs one cheap check per interval.
             bool done = false;
             std::unique_ptr<Ctrl49SurfaceEndpoints> found;
-            juce::String failure;
+            juce::String failure, reason;
             {
                 const std::scoped_lock lock (handoffLock);
                 if (workerDone)
@@ -244,6 +258,7 @@ void Ctrl49SurfaceBroker::tick()
                     workerDone = false;
                     found = std::move (discovered);
                     failure = workerFailure;
+                    reason = workerReason;
                 }
             }
 
@@ -253,9 +268,16 @@ void Ctrl49SurfaceBroker::tick()
 
                 if (found == nullptr)
                 {
-                    enter (currentState == State::heldElsewhere ? State::heldElsewhere
-                                                                : State::searching,
-                           failure.isNotEmpty() ? failure : statusDetail);
+                    // The reason is news only when it changes: the poll runs every two
+                    // seconds, and an unchanged "unplugged" should not re-announce itself.
+                    const auto reasonChanged = reason != searchReason;
+                    searchReason = reason;
+                    const auto next = currentState == State::heldElsewhere ? State::heldElsewhere
+                                                                           : State::searching;
+                    const auto detailNow = reason == "unplugged" ? juce::String() : failure;
+                    if (reasonChanged && currentState == next && statusDetail == detailNow)
+                        emitStatus();
+                    enter (next, detailNow);
                     return;
                 }
 
@@ -272,6 +294,9 @@ void Ctrl49SurfaceBroker::tick()
                 }
 
                 endpoints = std::move (found);
+                deviceError.clear();
+                deviceRefusals = 0;
+                searchReason.clear();
                 enter (State::connecting, endpoints->description);
                 beginSessionStart();
                 return;
@@ -436,12 +461,35 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
     // below knows or cares which it was.
     const auto handle = [&] (const std::uint8_t* data, std::size_t size)
     {
+        // The keyboard answers every display command. A refusal used to be dropped with the
+        // rest of the SysEx here, which is how a page it would not draw became a black screen
+        // with no reason given; now the reason reaches the app.
+        if (const auto ack = parseAck (Bytes (data, data + size)); ack && ! ack->ok())
+        {
+            ++deviceRefusals;
+            deviceError = "The keyboard refused " + juce::String (displayCommandName (ack->command))
+                          + ": " + juce::String (ackStatusName (ack->status));
+            emitStatus();
+            return;
+        }
+
         const auto previousPage = reducer.page();
         const auto previousSlot = reducer.activeSlot();
         const auto previousBank = reducer.padBank();
         const auto action = reducer.process (data, size);
         if (! action)
             return;
+
+        // Shift + Page Left / Right steps the setlist from any page: the song is the one thing
+        // a player needs to change without looking for it. Through the command surface, so the
+        // stage lock and the screen see it like a click.
+        if (action->setlistStep != 0)
+        {
+            auto* payload = new juce::DynamicObject();
+            payload->setProperty ("cmd", action->setlistStep < 0 ? "setlistPrev" : "setlistNext");
+            service.handleCommand (juce::var (payload));
+            return;
+        }
 
         const auto encoderMoved = action->encoderMoved && action->encoderSlot >= 0;
         if (encoderMoved)
@@ -489,7 +537,7 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
                     SurfaceEncoder::tempo,  SurfaceEncoder::swing,
                     SurfaceEncoder::rate,   SurfaceEncoder::length,
                     SurfaceEncoder::gate,   SurfaceEncoder::velocity,
-                    SurfaceEncoder::probability, SurfaceEncoder::tempo,
+                    SurfaceEncoder::probability, SurfaceEncoder::masterLevel,
                 };
                 service.nudgePerformanceEncoder (
                     encoders[(std::size_t) juce::jlimit (0, 7, action->encoderSlot)],
@@ -531,8 +579,10 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
         {
             // Pad N drives whatever pad N is playing on its active layer — by number, the way
             // the encoders drive their slots, so a pad needs no learning to work.
+            // A pad with nothing on it plays the Chords pads, in the keyboard's own bank.
             service.pressSurfacePad (performance.pages.getReference (reducer.page()).pageId,
-                                     action->pad, action->velocity > 0);
+                                     action->pad, action->velocity > 0, action->velocity,
+                                     reducer.padBank());
         }
     };
 
@@ -580,7 +630,8 @@ void Ctrl49SurfaceBroker::paintPads()
     for (int pad = 1; pad <= 8; ++pad)
     {
         const auto rgb = onControlPage
-                           ? service.padLight (performance.pages.getReference (page).pageId, pad)
+                           ? service.padLight (performance.pages.getReference (page).pageId, pad,
+                                               reducer.padBank())
                            : 0xFFA500;
         auto& painted = paintedPads[(std::size_t) (pad - 1)];
         if (painted == rgb)
@@ -659,8 +710,9 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     else if (reducer.page() == performancePage)
     {
         const auto t = service.surfaceTransport();
-        PerformanceTransportView transport { t.playing, t.tempo, t.bar, t.beat,
-                                             t.externalClock, t.clockLost };
+        PerformanceTransportView transport { t.playing, t.tempo, t.bar, t.beat, t.beatsPerBar,
+                                             t.externalClock, t.clockLost,
+                                             t.song.toStdString(), t.scene.toStdString() };
 
         PerformanceClipViews clipViews {};
         if (reducer.padBank() == 1)
@@ -680,7 +732,7 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
         }
 
         labels = buildPerformanceLabelPayload (transport, clipViews);
-        state = buildPerformanceStatePayload (reducer.activeSlot(), clipViews);
+        state = buildPerformanceStatePayload (reducer.activeSlot(), clipViews, transport);
     }
     else if (controlPages > 0)
     {
@@ -695,7 +747,8 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
                                        s.assigned, s.resolved };
         }
 
-        labels = buildRackLabelPayload (page.name.toStdString(), views);
+        labels = buildRackLabelPayload ((page.name + service.surfaceChordTitle (reducer.padBank()))
+                                            .toStdString(), views);
         state = buildRackStatePayload (reducer.activeSlot(), views);
     }
 

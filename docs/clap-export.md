@@ -28,6 +28,41 @@ shell differs.
 Windows hosts with CLAP support: Bitwig, Reaper, FL Studio (and other CLAP hosts). Cubase, Live,
 and Studio One do not host CLAP — for those, the VST3 remains the door. CLAP is additive.
 
+## Without a compiler
+
+The installed app has no compiler, so it cannot bake `CE_CLAP_ID` into a fresh build. Instead it
+ships one prebuilt **template** `.clap` (`-DCEDITOR_TEMPLATE_PLAYER=ON`) and copies it per panel,
+the way it does the VST3:
+
+- The template fills its descriptor — id, name, vendor, version — at `clap_entry.init` from the
+  `.cepanel` beside the module (`CE/src/Export/ClapSidecarIdentity.h`, a few lines patched into the
+  vendored wrapper). The id is `deriveIdentity(...).clapId`, the one a compiled export of the same
+  panel bakes, so a session saved against either finds the plugin.
+- A `.clap` is one file in a folder every CLAP shares, so each export is a folder of its own:
+  `<Name>/<Name>.clap`, `panel.cepanel` and `CE/profiles/`. Hosts search CLAP folders recursively.
+- The vendor is one place the two templates differ: the CLAP's comes from the panel; the VST3's
+  class entry does too, but its factory vendor is baked in (`CE_VST_COMPANY_NAME`, default
+  `Tedjuh`, the same fallback the exporters use) and that is the one a JUCE-based host shows.
+- The LV2 template goes the same way (`CE/src/Export/Lv2SidecarIdentity.h`), with one difference:
+  its Turtle files are not copied but written again per export by `juce_lv2_helper` over the copied
+  binary with the panel beside it, so they carry the panel's URI and parameters. Off Windows the
+  helper needs a display (`DISPLAY`, or Xvfb). A template `.lv2` without its panel keeps the
+  compiled `urn:ceditor:default`, since the template build writes its own manifests that way.
+- A template with no panel beside it reports **zero** plugins, never the template's own identity —
+  otherwise every stray copy would be the same plugin to a host.
+- On Windows the wrapper had no `DllMain`, so JUCE took the host's executable for the module and
+  looked for the panel beside the DAW. `clap_init` now hands JUCE the module's own handle first.
+- The descriptor is read while a host scans, so only the panel's first members are read
+  (`topLevelMembers` in `PanelIdentitySidecar.h`): building the whole 94 MB GAIA panel took the
+  scan to 1.2 s, which clap-validator flags; reading its head takes 5 ms. The VST3 template uses
+  the same reader.
+
+Verified on Linux 2026-10-01 with the GAIA panel: the template exported as a CLAP folder passes
+clap-validator (33 passed, the two warnings in [plugin-validation.md](plugin-validation.md)),
+reporting `com.tedjuh.roland-gaia-sh-01.69eedf81` under the panel's name; the bare template reports
+0 plugins; the VST3 from the same template passes pluginval. That run also found the Linux VST3
+export had never loaded: the exporter renamed the module inside the bundle on Windows only.
+
 ## The other formats
 
 The policy is "every format reachable without a third-party gate ships":

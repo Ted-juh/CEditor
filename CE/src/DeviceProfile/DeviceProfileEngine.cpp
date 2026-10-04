@@ -1940,7 +1940,8 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
         decodeBase = 0;
     }
 
-    auto* values = new juce::DynamicObject();
+    // Owned from the start: two failure paths below return before `values` reaches the result.
+    juce::DynamicObject::Ptr values = new juce::DynamicObject();
     for (const auto& mappingValue : *mappings)
     {
         auto* mapping = asObject (mappingValue);
@@ -1971,7 +1972,7 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
         values->setProperty (parameterId, semanticValue);
     }
 
-    DumpParseResult result { true, {}, dumpId, dumpName, checksumStatus, juce::var (values) };
+    DumpParseResult result { true, {}, dumpId, dumpName, checksumStatus, juce::var (values.get()) };
     result.matchStatus = "ok";
     result.complete = true;
     result.expectedMessageCount = expectedMessageCount;

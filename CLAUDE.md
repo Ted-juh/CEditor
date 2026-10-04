@@ -289,6 +289,28 @@ non-ASCII patch name desynchronised the pipe for good.
 Note that the eleven C++ test targets, the Windows-only `#if JUCE_WINDOWS` branches and MSVC's
 opinion of the source are still what they were: a green run here is not a Windows run.
 
+**Validating the plug-in.** The same configure builds the player plug-in in every format; point it
+at a panel and run the hosts' conformance suites over the result
+([docs/plugin-validation.md](docs/plugin-validation.md) says where to get them):
+
+```bash
+node tools/scripts/prepare-export-panel.mjs "CE/panels/Roland GAIA SH-01.cepanel" /tmp/gaia-export.cepanel
+cmake build/app -DCE_VST_PANEL_PATH=/tmp/gaia-export.cepanel "-DCE_VST_PRODUCT_NAME=GAIA Validate"
+cmake --build build/app --target CEditorPlayerVST_VST3 CEditorPlayerVST_CLAP CEditorPlayerVST_LV2
+node tools/scripts/validate-plugins.mjs build/app/CEditorPlayerVST_artefacts/Release/{VST3,CLAP,LV2}/GAIA\ Validate.*
+```
+
+**Never point `CE_VST_PANEL_PATH` at a saved `.cepanel`.** A saved file stores each control as a
+difference from its type's defaults. The plug-in cannot rebuild the defaults, so every
+default-valued property is missing from it. The first validation runs did exactly that, and the
+player log filled with 14,000 refused script writes that were an artefact of the setup, not of the
+panel. `prepare-export-panel.mjs` writes the complete form the app would export. The exporters do
+this themselves.
+
+Do this when you touch `CE/src/Player/`, the CLAP wrapper or the plug-in's CMake. Its first run
+found five defects that no other test here could see. Linux is also where the host-thread
+problems show: an LV2 there has a message thread of its own inside the plug-in.
+
 For a single file, `-fsyntax-only` is faster than standing the whole thing up, and catches the same
 class of mistake:
 

@@ -1283,7 +1283,9 @@ juce::var ScriptRuntime::decodeDeclaredDump (const juce::String& role, const Dec
         if (bytes[dump.checksumAt] != checksumOver (kind, bytes, dump.checksumFrom, to)) return {};
     }
 
-    auto* values = new juce::DynamicObject();
+    // Owned from the start: every malformed-dump path below returns {} before `values` is wrapped
+    // in a var, and a raw DynamicObject nobody references is never freed.
+    juce::DynamicObject::Ptr values = new juce::DynamicObject();
     for (int i = 0; i < dump.fieldParameters.size(); ++i)
     {
         const auto* p = findDeclaredParameter (role, dump.fieldParameters[i]);
@@ -1342,7 +1344,7 @@ juce::var ScriptRuntime::decodeDeclaredDump (const juce::String& role, const Dec
     auto* out = new juce::DynamicObject();
     out->setProperty ("kind", dump.id);
     out->setProperty ("name", dump.name);
-    out->setProperty ("values", juce::var (values));
+    out->setProperty ("values", juce::var (values.get()));
     return juce::var (out);
 }
 

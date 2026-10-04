@@ -3,11 +3,14 @@
   import { componentListWithElement } from '../utils/componentElements.js';
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
+  import FieldList from '../properties/FieldList.svelte';
+  import {
+    METER_ARC_FIELDS, METER_FIELDS, METER_FILL_FIELDS, METER_PEAK_FIELDS, METER_READOUT_FIELDS, METER_VALUE_FIELDS,
+  } from '../models/inspectorFieldSets.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
-  import PropertyToggle from '../properties/PropertyToggle.svelte';
   import HeaderPill from '../properties/HeaderPill.svelte';
   import Gauge from 'lucide-svelte/icons/gauge';
   import Hash from 'lucide-svelte/icons/hash';
@@ -48,31 +51,8 @@
 </script>
 
 {#if m}
-  <PropertySection title="Meter" icon={Gauge}>
-    <PropertyCell label="Orientation" span={2} hint="Horizontal / vertical bar, or a radial arc.">
-      <select class="val" value={m.orientation ?? 'horizontal'} onchange={(e) => set('orientation', e.target.value)}>
-        <option value="horizontal">Horizontal</option>
-        <option value="vertical">Vertical</option>
-        <option value="arc">Arc</option>
-      </select>
-    </PropertyCell>
-    <PropertyCell label="Scale" span={2} hint="Linear, or decibel (0 dB near full scale).">
-      <select class="val" value={m.scale ?? 'linear'} onchange={(e) => set('scale', e.target.value)}>
-        <option value="linear">Linear</option>
-        <option value="db">Decibel</option>
-      </select>
-    </PropertyCell>
-    {#if String(m.scale) === 'db'}
-      <PropertyCell label="dB floor" span={1} compact hint="Decibels at the bottom of the meter.">
-        <NumberCell label="Floor" value={m.dbFloor ?? -60} defaultValue={-60} onchange={(v) => set('dbFloor', v)} />
-      </PropertyCell>
-      <PropertyCell label="dB ceil" span={1} compact hint="Decibels at the top of the meter.">
-        <NumberCell label="Ceil" value={m.dbCeil ?? 6} defaultValue={6} onchange={(v) => set('dbCeil', v)} />
-      </PropertyCell>
-    {/if}
-  </PropertySection>
-
-  <PropertySection title="Value" icon={Hash}>
+  <!-- Ordinary fields are data (models/inspectorFieldSets.js); the cells below are the editor's own. -->
+  {#snippet source()}
     <PropertyCell label="Source" span={4} hint="A knob / slider / number whose live value drives the meter in preview (a bound device parameter drives it at runtime).">
       <select class="val" value={m.valueSourceId ?? ''} onchange={(e) => set('valueSourceId', e.target.value)}>
         <option value="">— Static / bound level —</option>
@@ -81,37 +61,42 @@
         {/each}
       </select>
     </PropertyCell>
-    {#if !m.valueSourceId}
-      <PropertyCell label="Value" span={1} compact hint="Static/test value shown when nothing drives the meter.">
-        <NumberCell label="Val" value={m.value ?? 0} defaultValue={0} onchange={(v) => set('value', v)} />
-      </PropertyCell>
-    {/if}
-    <PropertyCell label="Min" span={1} compact hint="Value at empty.">
-      <NumberCell label="Min" value={m.valueMin ?? 0} defaultValue={0} onchange={(v) => set('valueMin', v)} />
-    </PropertyCell>
-    <PropertyCell label="Max" span={1} compact hint="Value at full.">
-      <NumberCell label="Max" value={m.valueMax ?? 1} defaultValue={1} onchange={(v) => set('valueMax', v)} />
-    </PropertyCell>
-  </PropertySection>
-
-  <PropertySection title="Fill" icon={PaintBucket}>
-    <PropertyCell label="Segments" span={1} compact hint="0 = smooth continuous fill; N = N discrete LED segments.">
-      <NumberCell label="Seg" min={0} max={64} value={m.segments ?? 0} defaultValue={0} onchange={(v) => set('segments', Math.max(0, Math.round(v)))} />
-    </PropertyCell>
-    <PropertyCell label="Gradient" span={1} hint="Blend zone colours smoothly vs hard steps.">
-      <PropertyToggle value={m.gradient !== false} onchange={() => set('gradient', !(m.gradient !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Rounded" span={1} compact hint="Fill corner radius (px).">
-      <NumberCell label="Rad" min={0} value={m.rounded ?? 3} defaultValue={3} onchange={(v) => set('rounded', Math.max(0, v))} />
-    </PropertyCell>
-    <PropertyCell label="Thickness" span={1} compact hint="Bar/arc thickness in px (0 = fill the box).">
-      <NumberCell label="Thick" min={0} value={m.thickness ?? 0} defaultValue={0} onchange={(v) => set('thickness', Math.max(0, v))} />
-    </PropertyCell>
+  {/snippet}
+  {#snippet track()}
     <PropertyCell label="Track" span={2} hint="Unlit background colour. Click the swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
         { key: 'trackColour', label: 'Track', value: m.trackColour ?? 'FF1B1B1B', target: { type: 'control', controlId: core?.id, path: 'Meter.trackColour' } },
       ]} />
     </PropertyCell>
+  {/snippet}
+  {#snippet peakColour()}
+    <PropertyCell label="Colour" span={2} hint="Peak marker colour. Click the swatch to edit it in the Colors tab.">
+      <SwatchCluster swatches={[
+        { key: 'peakColour', label: 'Peak', value: m.peakColour ?? 'FFF2F2F2', target: { type: 'control', controlId: core?.id, path: 'Meter.peakColour' } },
+      ]} />
+    </PropertyCell>
+  {/snippet}
+  {#snippet suffix()}
+    <PropertyCell label="Suffix" span={1} hint="Unit after the number (e.g. dB, %).">
+      <input class="val" type="text" value={m.valueSuffix ?? ''} onchange={(e) => set('valueSuffix', e.target.value)} />
+    </PropertyCell>
+  {/snippet}
+  {#snippet caption()}
+    <PropertyCell label="Caption" span={3} hint="A text label shown with the meter.">
+      <input class="val" type="text" value={m.label ?? ''} onchange={(e) => set('label', e.target.value)} />
+    </PropertyCell>
+  {/snippet}
+
+  <PropertySection title="Meter" icon={Gauge}>
+    <FieldList fields={METER_FIELDS} values={m} {set} />
+  </PropertySection>
+
+  <PropertySection title="Value" icon={Hash}>
+    <FieldList fields={METER_VALUE_FIELDS} values={m} {set} slots={{ source }} />
+  </PropertySection>
+
+  <PropertySection title="Fill" icon={PaintBucket}>
+    <FieldList fields={METER_FILL_FIELDS} values={m} {set} slots={{ track }} />
   </PropertySection>
 
   <PropertySection title="Zones" icon={SquareDashed}>
@@ -144,61 +129,16 @@
                   title="Show a marker at the recent maximum that holds then falls."
                   onchange={() => toggle('peakHold')} />
     {/snippet}
-    {#if m.peakHold === true}
-      <PropertyCell label="Hold (ms)" span={1} compact hint="How long the marker holds before falling.">
-        <NumberCell label="Hold" min={0} value={m.peakHoldMs ?? 1200} defaultValue={1200} onchange={(v) => set('peakHoldMs', Math.max(0, v))} />
-      </PropertyCell>
-      <PropertyCell label="Decay/s" span={1} compact hint="Normalized units per second the marker falls.">
-        <NumberCell label="Decay" min={0} step={0.05} value={m.peakDecayPerSec ?? 0.4} defaultValue={0.4} onchange={(v) => set('peakDecayPerSec', Math.max(0, v))} />
-      </PropertyCell>
-      <PropertyCell label="Colour" span={2} hint="Peak marker colour. Click the swatch to edit it in the Colors tab.">
-        <SwatchCluster swatches={[
-          { key: 'peakColour', label: 'Peak', value: m.peakColour ?? 'FFF2F2F2', target: { type: 'control', controlId: core?.id, path: 'Meter.peakColour' } },
-        ]} />
-      </PropertyCell>
-    {/if}
+    <FieldList fields={METER_PEAK_FIELDS} values={m} {set} slots={{ peakColour }} />
   </PropertySection>
 
   <PropertySection title="Scale & readout" icon={Ruler}>
-    <PropertyCell label="Ticks" span={1} hint="Draw scale tick marks along the meter.">
-      <PropertyToggle value={m.showTicks === true} onchange={() => toggle('showTicks')} />
-    </PropertyCell>
-    {#if m.showTicks === true}
-      <PropertyCell label="Tick count" span={1} compact hint="Number of divisions (marks = count + 1).">
-        <NumberCell label="Ticks" min={1} max={20} value={m.tickCount ?? 4} defaultValue={4} onchange={(v) => set('tickCount', Math.max(1, Math.round(v)))} />
-      </PropertyCell>
-    {/if}
-    <PropertyCell label="Readout" span={1} hint="Show the numeric value overlaid on the meter.">
-      <PropertyToggle value={m.showValue === true} onchange={() => toggle('showValue')} />
-    </PropertyCell>
-    {#if m.showValue === true}
-      <PropertyCell label="Precision" span={1} compact hint="Decimal places in the readout.">
-        <NumberCell label="Prec" min={0} max={6} value={m.valuePrecision ?? 0} defaultValue={0} onchange={(v) => set('valuePrecision', Math.max(0, Math.round(v)))} />
-      </PropertyCell>
-      <PropertyCell label="Suffix" span={1} hint="Unit after the number (e.g. dB, %).">
-        <input class="val" type="text" value={m.valueSuffix ?? ''} onchange={(e) => set('valueSuffix', e.target.value)} />
-      </PropertyCell>
-    {/if}
-    <PropertyCell label="Caption" span={3} hint="A text label shown with the meter.">
-      <input class="val" type="text" value={m.label ?? ''} onchange={(e) => set('label', e.target.value)} />
-    </PropertyCell>
-    <PropertyCell label="Position" span={1} hint="Where the caption sits.">
-      <select class="val" value={m.labelPosition ?? 'none'} onchange={(e) => set('labelPosition', e.target.value)}>
-        <option value="none">None</option>
-        <option value="above">Above</option>
-        <option value="below">Below</option>
-      </select>
-    </PropertyCell>
+    <FieldList fields={METER_READOUT_FIELDS} values={m} {set} slots={{ suffix, caption }} />
   </PropertySection>
 
   {#if String(m.orientation) === 'arc'}
     <PropertySection title="Arc" icon={Radius}>
-      <PropertyCell label="Start°" span={1} compact hint="Arc start angle (clockwise from 3 o'clock).">
-        <NumberCell label="Start" value={m.arcStart ?? 135} defaultValue={135} onchange={(v) => set('arcStart', v)} />
-      </PropertyCell>
-      <PropertyCell label="Sweep°" span={1} compact hint="Degrees the arc sweeps.">
-        <NumberCell label="Sweep" value={m.arcSweep ?? 270} defaultValue={270} onchange={(v) => set('arcSweep', v)} />
-      </PropertyCell>
+      <FieldList fields={METER_ARC_FIELDS} values={m} {set} />
     </PropertySection>
   {/if}
 {/if}

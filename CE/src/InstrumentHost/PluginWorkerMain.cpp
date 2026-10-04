@@ -1019,7 +1019,9 @@ public:
                     {
                         bool applied = false;
                         juce::MemoryBlock beforeState;
-                        const bool deferredState = preset.hasFileExtension ("nksf;fxp");
+                        // Raw saved state is applied the way NKS and FXP are, and the plug-ins that
+                        // take it (Transfigure, Vanguard) settle it after acknowledging.
+                        const bool deferredState = ! preset.hasFileExtension ("vstpreset;spf2;h2p");
                         invokeExclusiveProcessor ([&]
                         {
                             if (deferredState) processor.getStateInformation (beforeState);

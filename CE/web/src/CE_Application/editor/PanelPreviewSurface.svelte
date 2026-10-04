@@ -1,6 +1,6 @@
 <script>
   import { openDialog } from '../stores/scriptUi.js';
-  import { parameterGroup, parameterAccent, parameterFeedback } from '../utils/parameterStatus.js';
+  import { parameterGroup, parameterAccent, parameterFeedback, parameterEntries, parameterBindingFor, splitParameterItemId } from '../utils/parameterStatus.js';
   import { rangeResetValue } from '../utils/rangeReset.js';
   import { keyedStoreView } from '../utils/keyedStoreView.js';
   import { onDestroy, setContext, untrack } from 'svelte';
@@ -51,6 +51,7 @@
     commitPanelPreviewSelectAction,
     setPreviewInspectedControlId,
   } from '../stores/interactionPreview.js';
+  import { keyframeOverlays } from '../stores/keyframeOverlays.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { sceneryHoldSet } from '../utils/sceneryModel.js';
   import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
@@ -301,6 +302,12 @@
     seedCustomValues,
     snapCustomChannelValue,
   } from '../utils/customComponentInteraction.js';
+  import {
+    firstSliderControlZone, hasSliderControlParts, sliderControlBlurPatch, sliderControlFocusZonePatch,
+    sliderControlForZone, sliderControlKeyValue, sliderControlPressFocusPatch, sliderControlResetValue,
+    sliderControlWheelValue,
+  } from '../utils/sliderControlPart.js';
+  import { floating } from '../utils/floatingUi.js';
   import { dispatchInteraction } from '../scripting/panelRuntime.js';
   import { customNumericFields, customNumericPatch, customArpeggiatorKeyPatch } from '../utils/customNumericEditing.js';
   import { numberOr } from '../utils/primitives.js';
@@ -493,6 +500,9 @@
   let pointerSliderHandle = $state('');
   let pointerCustomHitZone = $state(null);
   let pointerCustomStartValues = $state({});
+  // One pointer gesture's drag state for a component's knob part (utils/sliderControlPart.js keeps
+  // the gesture's scrub in it, as the panel keeps `sliderScrub`). Plain, not $state: it is mutated.
+  let pointerCustomDragState = null;
   let keyboardFocusControlId = $state('');
   let lastInputMode = $state('pointer');
   let openComboboxControlId = $state('');
@@ -630,6 +640,10 @@
   // Cross-control displays still track every source they actually read.
   const previewSessionView = keyedStoreView(panelPreviewSessions);
   onDestroy(previewSessionView.destroy);
+  // A running keyframe animation's pose (stores/keyframeOverlays.js), per control, so a frame of
+  // one animation re-resolves one control and not the panel.
+  const keyframeOverlayView = keyedStoreView(keyframeOverlays);
+  onDestroy(keyframeOverlayView.destroy);
 
   function sessionFor(control) {
     const controlId = getControlId(control);
@@ -638,7 +652,11 @@
 
   function resolvedPreviewFor(rawControl) {
     const session = sessionFor(rawControl);
-    const previewOverrides = session?.enabled === false ? {} : session;
+    const baseOverrides = session?.enabled === false ? {} : session;
+    // The keyframe pose rides in with the session: this surface resolves the control itself and
+    // hands CanvasControl the result, so the overlay has to be applied here, not there.
+    const keyframeOverlay = keyframeOverlayView.values.get(getControlId(rawControl)) ?? null;
+    const previewOverrides = keyframeOverlay ? { ...(baseOverrides ?? {}), keyframeOverlay } : baseOverrides;
     // Host automation of a field on the component's OWN section (an Arp's rate, a joystick's x)
     // lands here first, so every apply*ValueSource below and the renderer itself read the section
     // as they always do. It has to happen before the chain rather than inside it: several of those
@@ -1306,12 +1324,17 @@
     if (focus) parameterFocus = id;
     parameterRecent = [id, ...parameterRecent.filter(other => other !== id)].slice(0, 6);
   }
+  // Item ids are control ids, plus `controlId::channel` for a component's further channel bindings
+  // (utils/parameterStatus.js parameterEntries). Every item still acts on its control.
   function parameterItem(id) {
-    const src = controlById(id), s = src?._children;
-    const binding = s?.DeviceBindings?.bindings?.find(b => b.kind === 'deviceParameter');
+    const { controlId, port } = splitParameterItemId(id);
+    const src = controlById(controlId), s = src?._children;
+    const binding = src ? parameterBindingFor(src, id) : null;
     if (!binding || ['trigger', 'text', 'pageIndex'].includes(binding.port) || s.Designer?.arpeggiator?.enabled) return null;
-    const meta = s.Designer?.lcdReadout ?? {}, info = lcdSourceInfo(src);
     const channel = s.ValueChannels?._children?.[binding.port];
+    // The component's readout speaks for its first parameter; a further channel for itself.
+    const meta = port ? { label: channel?.label || port } : (s.Designer?.lcdReadout ?? {});
+    const info = port ? null : lcdSourceInfo(src);
     const behavior = getBehavior(src), session = sessionFor(src);
     let value, min = 0, max = 127, step = 1, choices = [];
     if (channel && channel.type !== 'array') {
@@ -1337,9 +1360,10 @@
       disabled: isDisabled(src) || isReadOnly(src), feedback: parameterFeedback(binding, value, $deviceSyncFeedback) };
   }
   function writeParameter(id, requested, dragging = false) {
-    const item = parameterItem(id), src = controlById(id);
+    const { controlId, port } = splitParameterItemId(id);
+    const item = parameterItem(id), src = controlById(controlId);
     if (!item || item.disabled) return;
-    const s = src._children, binding = s.DeviceBindings.bindings.find(b => b.kind === 'deviceParameter');
+    const s = src._children, binding = parameterBindingFor(src, id);
     let value;
     if (item.choices.length) {
       const choice = item.choices.find(c => String(c.value) === String(requested));
@@ -1351,15 +1375,20 @@
     }
     rememberParameter(id, false);
     if (String(value) === String(item.value) && sessionFor(src)?.dragging !== true) return;
-    if (s.ValueChannels?._children?.[binding.port]) {
-      patchControlSession(id, { customValues: { [binding.port]: value }, valueOverrideEnabled: true, valueOverride: value, dragging });
-    } else if (binding.port === 'state') patchControlSession(id, { checked: !!value, dragging });
-    else patchControlSession(id, { valueOverrideEnabled: true, valueOverride: value, dragging });
+    if (port) {
+      // A further channel writes only itself; the control's own value belongs to its first parameter.
+      patchControlSession(controlId, { customValues: { [binding.port]: value }, dragging });
+    } else if (s.ValueChannels?._children?.[binding.port]) {
+      patchControlSession(controlId, { customValues: { [binding.port]: value }, valueOverrideEnabled: true, valueOverride: value, dragging });
+    } else if (binding.port === 'state') patchControlSession(controlId, { checked: !!value, dragging });
+    else patchControlSession(controlId, { valueOverrideEnabled: true, valueOverride: value, dragging });
   }
   function parameterEditorModel(control) {
     if (!control?._children?.Display?.parameterEditor) return null;
     const scope = control._children.Display.activeScope ?? [];
-    const items = scope.map(parameterItem).filter(Boolean);
+    const items = scope
+      .flatMap((controlId) => { const c = controlById(controlId); return c ? parameterEntries(c).map((entry) => entry.id) : [controlId]; })
+      .map(parameterItem).filter(Boolean);
     const fallback = items.find(i => i.parameterId === 'tone1.filter.cutoff')?.id ?? items[0]?.id;
     const graphs = allControls.filter(c => linkedEnvelopeConfig(c)).map(c => ({ id: getControlId(c),
       sources: Object.values(linkedEnvelopeConfig(c)).map(link => link.controlId), points: envWorkingPoints(c) }));
@@ -5744,6 +5773,14 @@
     return String(getBehavior(control)?.buttonType ?? '').trim().toLowerCase() === 'listbox';
   }
 
+  // A listbox's keyboard focus lives on the option-owning list, not the control's wrapper, which
+  // has no tabindex by design (85864af) — so focusing the wrapper on a press did nothing, and the
+  // keys pressed after clicking a row went to whatever had focus before.
+  function pointerFocus(control, wrapper) {
+    const target = isListboxControl(control) ? (wrapper?.querySelector?.('[role="listbox"]') ?? wrapper) : wrapper;
+    target?.focus?.({ preventScroll: true });
+  }
+
   // --- TextInput: an editable text field committing to Behavior.defaultValue ---
   function isTextInputControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'TextInput';
@@ -6027,21 +6064,25 @@
       ?? '';
   }
 
-  function comboboxMenuStyle(control) {
-    // The dropdown lives at panel level, including for controls inside tabs or
-    // scroll containers. Use the rendered box so padding, anchors, scrolling and
-    // zoom are already accounted for; local Transform.x/y cannot locate a child.
+  // The dropdown lives at panel level, including for controls inside tabs or scroll containers, and
+  // hangs off the control's rendered element, so padding, anchors, scrolling and zoom are already
+  // accounted for (local Transform.x/y cannot locate a child). Placement is utils/floatingUi.js's: below
+  // the control, ABOVE it when the panel's bottom is nearer than the list is long — a combobox in the
+  // bottom row used to open off the panel — and kept inside what is visible. It stays inside the scaled
+  // surface, so it is drawn at the panel's zoom like everything else on it.
+  function comboboxElement(control) {
     const id = getControlId(control);
-    const element = surfaceRef && [...surfaceRef.querySelectorAll('.canvas-control[data-control-id]')]
-      .find(node => node.getAttribute('data-control-id') === id);
+    return surfaceRef && [...surfaceRef.querySelectorAll('.canvas-control[data-control-id]')]
+      .find(node => node.getAttribute('data-control-id') === id) || null;
+  }
+
+  function comboboxMenuWidth(control) {
+    const element = comboboxElement(control);
     const surfaceBox = surfaceRef?.getBoundingClientRect();
-    const box = element?.getBoundingClientRect();
     const zoom = surfaceBox?.width > 0 && surfaceRef.offsetWidth > 0 ? surfaceBox.width / surfaceRef.offsetWidth : scale || 1;
-    const rect = controlPanelRect(panel.controls, id) ?? { x: 0, y: 0, w: 160, h: 34 };
-    const x = box ? (box.left - surfaceBox.left) / zoom - surfaceRef.clientLeft : rect.x;
-    const y = box ? (box.bottom - surfaceBox.top) / zoom - surfaceRef.clientTop : rect.y + rect.h;
-    const width = Math.max(32, box ? box.width / zoom : rect.w);
-    return `left:${x}px; top:${y + 4}px; width:${width}px;`;
+    const box = element?.getBoundingClientRect();
+    const rect = controlPanelRect(panel.controls, getControlId(control)) ?? { w: 160 };
+    return Math.max(32, box ? box.width / zoom : rect.w);
   }
 
   function selectComboboxRow(control, row) {
@@ -6528,11 +6569,20 @@
   function emitDeviceBindingsForPatch(control, patch = {}, previous = null) {
     const controlId = getControlId(control);
     const interactionPhase = patch.dragging === true ? 'continuous' : 'commit';
+    // A component's patch carries every channel's value, so a channel that did not change is not
+    // sent — except the one this patch is driving (the zone being dragged, the knob wheeled or keyed),
+    // which sends on every patch as a panel knob does: a press sends the value it is already at, so
+    // touching a knob puts the synth where the screen is.
+    const driven = patch.drivenCustomChannel
+      ?? (patch.activeCustomHitZone ? getCustomHitZones(control)?.[patch.activeCustomHitZone]?.targetValueChannel : '')
+      ?? '';
+    const unchangedChannel = (binding, value) => binding.port !== 'value' && binding.port !== driven
+      && !!control?._children?.ValueChannels?._children?.[binding.port]
+      && value === previous?.customValues?.[binding.port];
     for (const binding of activeDeviceBindings(control)) {
       const value = bindingValueForPatch(binding, patch, control);
       if (value === undefined) continue;
-      if (binding.port !== 'value' && control?._children?.ValueChannels?._children?.[binding.port]
-        && value === previous?.customValues?.[binding.port]) continue;
+      if (unchangedChannel(binding, value)) continue;
       commitDeviceParameter({
         requestId: `panel_preview_${controlId || 'control'}_${interactionPhase}_${Date.now()}`,
         deviceRole: binding.deviceRole || DEFAULT_DEVICE_ROLE,
@@ -6548,6 +6598,8 @@
     for (const binding of activeMidiControlBindings(control)) {
       const value = bindingValueForPatch(binding, patch, control);
       if (value === undefined) continue;
+      // Without this, each move of one knob re-sent every other knob's CC.
+      if (unchangedChannel(binding, value)) continue;
       const message = midiControlMessage(binding, value);
       if (!message) continue;
       triggerRawMidiAction({
@@ -6855,6 +6907,7 @@
       startClientX: pointerDownPoint?.x,
       startClientY: pointerDownPoint?.y,
       startValues: pointerCustomStartValues,
+      dragState: pointerCustomDragState,
       fine: event?.shiftKey === true,
       coarse: event?.ctrlKey === true || event?.metaKey === true,
     });
@@ -6878,6 +6931,7 @@
       startClientX: pointerDownPoint?.x,
       startClientY: pointerDownPoint?.y,
       startValues: pointerCustomStartValues,
+      dragState: pointerCustomDragState,
       fine: event?.shiftKey === true,
       coarse: event?.ctrlKey === true || event?.metaKey === true,
     });
@@ -7416,6 +7470,30 @@
     }
     if (isCustomComponent(control)) {
       if (isDisabled(control)) return;
+      // A component carrying panel knobs (Create Component from Selection) wheels the way those
+      // knobs did on the panel: only the knob under the pointer, only if it took the wheel, one step
+      // a notch. Over its artwork, nothing — the panel's plate never moved a knob.
+      if (hasSliderControlParts(control)) {
+        const rect = event?.currentTarget?.getBoundingClientRect?.();
+        const resolvedPreview = resolvedPreviewFor(control);
+        const hit = resolveCustomHitZoneAtPoint(resolvedPreview?.control ?? control, rect, event.clientX, event.clientY, sessionFor(control)?.customValues ?? {});
+        const knob = hit ? sliderControlForZone(control, hit.zone) : null;
+        const channel = knob ? getCustomValueChannels(control)?.[knob.channelName] : null;
+        if (!knob || !channel) return;
+        const values = customSessionValues(control);
+        const next = sliderControlWheelValue(knob.snapshot, values?.[knob.channelName] ?? channel.defaultValue, event.deltaY < 0 ? 1 : -1);
+        if (next == null) return;
+        event.preventDefault();
+        event.stopPropagation();
+        patchControlSession(getControlId(control), {
+          customValues: { ...values, [knob.channelName]: next },
+          drivenCustomChannel: knob.channelName,
+          ...sliderControlFocusZonePatch(sessionFor(control), hit.name),
+          focused: true,
+          hover: true,
+        });
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       const baseDirection = event.deltaY < 0 ? 1 : -1;
@@ -7533,6 +7611,7 @@
       pointerSliderHandle = '';
       pointerCustomHitZone = null;
       pointerCustomStartValues = {};
+      pointerCustomDragState = null;
       removeWindowListeners();
     }
 
@@ -7773,6 +7852,16 @@
       const rect = event.currentTarget?.getBoundingClientRect?.();
       const hit = resolveCustomHitZoneAtPoint(resolvedPreviewFor(control)?.control ?? control,
         rect, event.clientX, event.clientY, customSessionValues(control));
+      const knob = hit ? sliderControlForZone(control, hit.zone) : null;
+      if (knob) {
+        // A panel knob carried by the component resets as it did on the panel.
+        const value = sliderControlResetValue(knob.snapshot);
+        if (value == null || !getCustomValueChannels(control)?.[knob.channelName]) return false;
+        patchControlSession(id, { customValues: { [knob.channelName]: value }, drivenCustomChannel: knob.channelName, dragging: false, pressed: false });
+        lcdActiveAt[id] = Date.now(); lcdActiveId = id; rememberParameter(id);
+        inspectPreviewControl(id);
+        return true;
+      }
       const behavior = getCustomBehaviors(control)[hit?.zone?.targetBehavior];
       if (!['slider', 'knob', 'dial', 'ring'].includes(String(behavior?.role ?? behavior?.type).toLowerCase())) return false;
       const channelName = hit?.zone?.targetValueChannel ?? behavior.valueChannel;
@@ -7785,6 +7874,11 @@
         valueOverrideEnabled: true, valueOverride: value, dragging: false, pressed: false });
     } else if (isRangeControl(control) && !isTwoValueSpinner(control)) {
       const behavior = getBehavior(control);
+      // A control that springs back on release has nowhere to be reset TO: release already takes
+      // it to rest. So a quick second press is what it looks like — the hand grabbing it again,
+      // mid-glide — and falls through to an ordinary grab, which stops the spring (startValueReturn).
+      // Resetting here instead left the spring running, which overwrote the reset and slid on.
+      if (restValueFor(behavior) !== null) return false;
       const role = isSliderControl(control) ? currentSliderActiveHandle(control) : 'current';
       const defaultValue = role === 'start' ? behavior.defaultStartValue
         : role === 'end' ? behavior.defaultEndValue : behavior.defaultCurrentValue ?? behavior.defaultValue;
@@ -7815,6 +7909,8 @@
         event.preventDefault(); event.stopPropagation();
         event.currentTarget?.focus?.({ preventScroll: true });
         lastPointerDownId = ''; lastPointerDownAt = 0;
+        // A reset is the hand's decision; no spring still gliding from an earlier release may undo it.
+        cancelReturn(downId);
         // Do not start another drag: its release would overwrite the reset.
         return;
       }
@@ -7853,7 +7949,7 @@
     // Only the POINTER path takes this. The keyboard handlers below focus deliberately, and
     // scrolling a control into view is the right thing when you arrived by Tab rather than by
     // pointing at something already on screen.
-    event.currentTarget?.focus?.({ preventScroll: true });
+    pointerFocus(control, event.currentTarget);
     lastInputMode = 'pointer';
     keyboardFocusControlId = '';
     pointerActiveControlId = getControlId(control);
@@ -7972,6 +8068,7 @@
     sliderScrub = null;
     pointerCustomHitZone = null;
     pointerCustomStartValues = {};
+    pointerCustomDragState = null;
     pointerStartValue = isSliderControl(control)
       ? currentSliderRoleValue(control, currentSliderActiveHandle(control))
       : currentRangeValue(control);
@@ -7985,6 +8082,11 @@
         ?? customHitZoneFromEventTarget(resolvedPreview?.control ?? control, event)
         ?? customHitZoneFromEventTarget(control, event);
       pointerCustomStartValues = { ...(sessionFor(control)?.customValues ?? {}) };
+      pointerCustomDragState = {};
+      // Panel knobs inside: a press moves "DOM focus" to the knob pressed and clears its focus flag.
+      const knobFocus = hasSliderControlParts(control)
+        ? sliderControlPressFocusPatch(sessionFor(control), sliderControlForZone(control, pointerCustomHitZone?.zone) ? pointerCustomHitZone.name : '')
+        : {};
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
       const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || ['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action) || action === '';
       if (isDragAction) {
@@ -7993,8 +8095,11 @@
           pressed: false,
           focused: false,
           dragging: true,
+          ...knobFocus,
         });
-        updateCustomDragFromPointer(control, event);
+        // A panel knob's press is one patch, value included (setSliderRoleValue); the press above
+        // already is that for a knob part, and a second at the same point would send it twice.
+        if (!sliderControlForZone(control, pointerCustomHitZone?.zone)) updateCustomDragFromPointer(control, event);
       } else {
         patchControlSession(pointerActiveControlId, {
           hover: true,
@@ -8003,6 +8108,7 @@
           dragging: false,
           activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
           activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+          ...knobFocus,
         });
       }
       window.addEventListener('pointermove', handleWindowPointerMove);
@@ -8318,6 +8424,7 @@
       pointerSliderHandle = '';
       pointerCustomHitZone = null;
       pointerCustomStartValues = {};
+      pointerCustomDragState = null;
       const abandoned = momentaryButtonPreview.releasePress(activeId, activeBehavior);
       if (abandoned) patchControlSession(activeId, abandoned);
       removeWindowListeners();
@@ -8373,6 +8480,7 @@
     pointerSliderHandle = '';
     pointerCustomHitZone = null;
     pointerCustomStartValues = {};
+    pointerCustomDragState = null;
     if (!cancelled && listboxDrag?.id === activeId) startListboxMomentum(activeControl, listboxDrag);
     listboxDrag = null;
     removeWindowListeners();
@@ -8388,7 +8496,13 @@
     const controlId = getControlId(control);
     keyboardFocusControlId = controlId;
     inspectPreviewControl(controlId);
-    patchControlSession(controlId, { focused: true });
+    // Tab into a component carrying panel knobs focuses a knob, as Tab focused one on the panel.
+    const knobZone = isCustomComponent(control) && hasSliderControlParts(control)
+      ? (sessionFor(control)?.domFocusCustomHitZone || firstSliderControlZone(control))
+      : '';
+    patchControlSession(controlId, knobZone
+      ? { focused: true, activeCustomHitZone: knobZone, domFocusCustomHitZone: knobZone, ...sliderControlFocusZonePatch(sessionFor(control), knobZone) }
+      : { focused: true });
   }
 
   function handleBlur(control, event) {
@@ -8417,6 +8531,7 @@
       dragging: false,
       valueInputActive: false,
       ...(momentaryRelease ?? {}),
+      ...(isCustomComponent(control) && hasSliderControlParts(control) ? sliderControlBlurPatch(sessionFor(control)) : {}),
     });
 
     if (pointerActiveControlId === controlId) {
@@ -8541,6 +8656,30 @@
       if (isTimedButtonBehavior(getBehavior(control))) {
         timedButtonPreview.beginPress(controlId, getBehavior(control));
       }
+      return;
+    }
+
+    // A component carrying panel knobs: keys move the knob last pressed, by the panel knob's own key
+    // rules. It is one focus stop where the panel had one per knob, so "focused" is the last touched.
+    if (isCustomComponent(control) && hasSliderControlParts(control)
+      && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+      const zoneName = sessionFor(control)?.activeCustomHitZone ?? '';
+      const zone = getCustomHitZones(control)?.[zoneName];
+      const knob = zone ? sliderControlForZone(control, zone) : null;
+      const channel = knob ? getCustomValueChannels(control)?.[knob.channelName] : null;
+      if (!knob || !channel) return;
+      const values = customSessionValues(control);
+      const next = sliderControlKeyValue(knob.snapshot, values?.[knob.channelName] ?? channel.defaultValue, event.key);
+      if (next == null) return;
+      event.preventDefault();
+      event.currentTarget?.focus?.();
+      patchControlSession(controlId, {
+        customValues: { ...values, [knob.channelName]: next },
+        drivenCustomChannel: knob.channelName,
+        ...sliderControlFocusZonePatch(sessionFor(control), zoneName),
+        focused: true,
+        hover: true,
+      });
       return;
     }
 
@@ -8832,7 +8971,8 @@
   {#if openComboboxControlId}
     {@const control = controlById(openComboboxControlId)}
     {#if control && isComboboxControl(control) && getValueRows(control).length}
-      <div class="panel-combobox-menu" data-control-id={getControlId(control)} style={comboboxMenuStyle(control)} role="listbox"
+      <div class="panel-combobox-menu" data-control-id={getControlId(control)} style={`width:${comboboxMenuWidth(control)}px;`} role="listbox"
+        use:floating={{ anchor: comboboxElement(control), placement: 'bottom-start', offset: 4, padding: 4, fallbackPlacements: ['top-start'], fit: false }}
         onfocusout={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) openComboboxControlId = ''; }}>
         {#if String(getBehavior(control)?.subtype) === 'searchable'}
           <input class="combobox-search" aria-label="Search choices" placeholder="Search choices…" value={comboboxQuery}

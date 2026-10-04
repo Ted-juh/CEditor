@@ -330,7 +330,7 @@ void InstrumentRackHost::syncEngineBindings()
                                         i < LayerRouter::maxParts ? i : -1);
             lp->gain->setLayerRouter (&layerRouter,
                                       i < LayerRouter::maxParts ? i : -1);
-            lp->filter->setMidiChain (part.midiChain);
+            lp->filter->setMidiChain (perf::withSongKey (part.midiChain, part.keyScale, part.keyRoot));
         }
     }
     refreshLayerRouting();
@@ -415,7 +415,19 @@ bool InstrumentRackHost::setPartMidiChain (const juce::String& partId,
         chain.removeLast();
 
     part->midiChain = std::move (chain);
-    lp->filter->setMidiChain (part->midiChain);
+    lp->filter->setMidiChain (perf::withSongKey (part->midiChain, part->keyScale, part->keyRoot));
+    return true;
+}
+
+bool InstrumentRackHost::setPartKey (const juce::String& partId, int root, const juce::String& scale)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+    part->keyRoot = juce::jlimit (0, 11, root);
+    part->keyScale = scale;
+    if (auto* lp = findLive (partId))
+        lp->filter->setMidiChain (perf::withSongKey (part->midiChain, part->keyScale, part->keyRoot));
     return true;
 }
 
@@ -464,6 +476,50 @@ int InstrumentRackHost::arpLiveStep (const juce::String& partId) const
 {
     const auto* lp = findLive (partId);
     return lp != nullptr ? lp->filter->getMidiInserts().arpPatternStep() : -1;
+}
+
+bool InstrumentRackHost::triggerChordPad (const juce::String& partId, const juce::String& slotId,
+                                          int pad, int velocity)
+{
+    auto* lp = findLive (partId);
+    return lp != nullptr && lp->filter->getMidiInserts().triggerChordPad (slotId, pad, velocity);
+}
+
+bool InstrumentRackHost::moveChordProgression (const juce::String& partId, const juce::String& slotId,
+                                               int value, bool absolute)
+{
+    auto* lp = findLive (partId);
+    return lp != nullptr && lp->filter->getMidiInserts().moveChordProgression (slotId, value, absolute);
+}
+
+perf::MidiInsertRack::ChordsLive InstrumentRackHost::chordsLive (const juce::String& partId,
+                                                                const juce::String& slotId) const
+{
+    const auto* lp = findLive (partId);
+    return lp != nullptr ? lp->filter->getMidiInserts().chordsLive (slotId)
+                         : perf::MidiInsertRack::ChordsLive {};
+}
+
+int InstrumentRackHost::moduleActivity (const juce::String& partId,
+                                        std::array<perf::MidiInsertRack::ModuleActivity, perf::MidiInsertRack::maxSlots>& out) const
+{
+    const auto* lp = findLive (partId);
+    return lp != nullptr ? lp->filter->getMidiInserts().moduleActivity (out) : 0;
+}
+
+bool InstrumentRackHost::setSlotAmount (const juce::String& partId, const juce::String& slotId, float amount)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+    auto chain = part->midiChain;
+    for (auto& slot : chain)
+        if (slot.slotId == slotId)
+        {
+            slot.amount = juce::jlimit (0.0f, 1.0f, amount);
+            return setPartMidiChain (partId, std::move (chain));
+        }
+    return false;
 }
 
 bool InstrumentRackHost::setPartArp (const juce::String& partId, const perf::ArpSettings& settings)
@@ -1309,6 +1365,17 @@ bool InstrumentRackHost::setSlotBinding (const juce::String& pageId, const juce:
     return true;
 }
 
+bool InstrumentRackHost::setPagePreset (const juce::String& pageId, const juce::String& recordId,
+                                        const juce::String& name)
+{
+    auto* page = model.findPage (pageId);
+    if (page == nullptr)
+        return false;
+    page->presetRecordId = recordId;
+    page->presetName = recordId.isEmpty() ? juce::String() : name;
+    return true;
+}
+
 bool InstrumentRackHost::setPartLastPreset (const juce::String& partId, const juce::String& recordId,
                                             const juce::String& name)
 {
@@ -1387,13 +1454,14 @@ bool InstrumentRackHost::setSlotMidiNote (const juce::String& pageId, const juce
 }
 
 bool InstrumentRackHost::setSlotMidiOptions (const juce::String& pageId, const juce::String& slotId,
-                                            bool pickup, bool relative)
+                                            bool pickup, bool relative, int relativeFormat)
 {
     auto* page = model.findPage (pageId);
     auto* slot = page != nullptr ? page->findSlot (slotId) : nullptr;
     if (slot == nullptr) return false;
     slot->midiPickup = pickup;
     slot->midiRelative = relative;
+    slot->midiRelativeFormat = juce::jlimit (0, 2, relativeFormat);
     return true;
 }
 

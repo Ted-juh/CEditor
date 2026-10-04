@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)), base: './', plugins: [svelte()],
   define: { __APP_BUILD__: JSON.stringify({ sha: 'acceptance', branch: 'main', time: '', version: '0.2.0' }) },
+  // As in the main config: the font worker splits its bundle, which only an ES module worker can do.
+  worker: { format: 'es' },
   build: { outDir: '../dist-acceptance', emptyOutDir: true, chunkSizeWarningLimit: 4500,
     rollupOptions: { treeshake: false, input: fileURLToPath(new URL('./editorAcceptance.html', import.meta.url)) } },
 });

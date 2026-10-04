@@ -14,11 +14,14 @@ const TAB_MINIMUMS = Object.freeze({
 
 const STORAGE_KEY = 'ceditor.instrumentHost.dockHeights.v1';
 
+// The dock may take up to three quarters of the workspace: the part editor is where the work
+// happens, and a tall window should give it the room rather than the rack list above it. The
+// rack keeps a quarter, enough for a few parts and the keyboard.
 export function dockHeightBounds(availableHeight = 0) {
   const minimum = 140;
   const maximum = availableHeight > 0
-    ? Math.max(minimum, Math.min(520, Math.floor(availableHeight * 0.48)))
-    : 520;
+    ? Math.max(minimum, Math.floor(availableHeight * 0.75))
+    : 720;
   return { minimum, maximum };
 }
 
@@ -41,7 +44,7 @@ export function normaliseDockHeights(value = {}) {
   return Object.fromEntries(HOST_DOCK_TABS.flatMap((tab) => {
     if (value?.[tab] === null || value?.[tab] === undefined || value?.[tab] === '') return [];
     const height = Number(value?.[tab]);
-    return Number.isFinite(height) ? [[tab, Math.max(140, Math.min(720, Math.round(height)))]] : [];
+    return Number.isFinite(height) ? [[tab, Math.max(140, Math.min(2400, Math.round(height)))]] : [];
   }));
 }
 

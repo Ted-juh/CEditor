@@ -78,6 +78,28 @@ const char* kModulePanel = R"JSON({
   ]
 })JSON";
 
+// A script that paints a long list and then moves a bound control, in that order — the GAIA preset
+// list's load in miniature. 1,500 label writes are well past the 1,000-sends-a-second flood guard.
+const char* kPaintPanel = R"JSON({
+  "name": "Paint",
+  "scripting": { "enabled": true, "runOnExport": true },
+  "scripts": [
+    { "id": "paint", "name": "paint", "language": "javascript", "scope": "panel", "event": "onPaint", "target": "*", "enabled": true,
+      "source": "function onPaint(){ for (var i = 0; i < 1500; i++) set('lbl.text.content', 'row ' + i); set('cutoff.value', 50); }\nfunction onFlood(){ for (var i = 0; i < 1500; i++) set('cutoff.value', i % 128); }" }
+  ],
+  "controls": [
+    { "_type": "Control", "_children": {
+      "Core": { "_type": "Core", "id": "c1", "name": "cutoff" },
+      "Behavior": { "_type": "Behavior", "family": "range", "role": "knob", "min": 0, "max": 127 },
+      "Value": { "_type": "Value", "value": 0 }
+    } },
+    { "_type": "Control", "_children": {
+      "Core": { "_type": "Core", "id": "l1", "name": "lbl" },
+      "Text": { "_type": "Text", "content": "" }
+    } }
+  ]
+})JSON";
+
 juce::String hex (const juce::Array<int>& bytes)
 {
     juce::StringArray out;
@@ -394,6 +416,43 @@ int main()
         // state patch are ONE map key, not three path steps.
         check (! model.setValue ("cutoff.States.Hover.patches.component.Background.Fill.colour", 1),
                "a state patch key is not a path, and saying so is the point");
+    }
+
+    // --- the MIDI flood guard counts only writes that could send ----------------------------
+    // Before: every set() spent the budget, so painting 1,500 labels used it up and the bound
+    // control's write right after lost its MIDI. With transmitsTo, only bound paths count.
+    {
+        auto run = [] (bool withTransmitsTo, const juce::String& action, int& sentWrites, int& lastTransmit)
+        {
+            PanelValueModel paintModel;
+            paintModel.loadFromJson (kPaintPanel);
+            sentWrites = 0;
+            lastTransmit = -1;
+            BridgeScriptHost::Callbacks pcb;
+            pcb.getValue = [&] (const juce::String& p, const juce::String& f) { return paintModel.getValue (p, f); };
+            pcb.setValue = [&] (const juce::String& p, const juce::var& v, bool transmit, const juce::String& f)
+            {
+                paintModel.setValue (p, v, f);
+                if (p.startsWith ("cutoff")) { lastTransmit = transmit ? 1 : 0; if (transmit) ++sentWrites; }
+            };
+            if (withTransmitsTo)
+                pcb.transmitsTo = [] (const juce::String& p) { return p.startsWith ("cutoff"); };
+            pcb.log = [] (const juce::String&, const juce::var&) {};
+            BridgeScriptHost paintHost (std::move (pcb));
+            ScriptRuntime paintRuntime (paintHost);
+            paintHost.attachRuntime (&paintRuntime);
+            paintRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+            paintRuntime.loadScripts (gatherPanelScripts (paintModel.panel()));
+            paintRuntime.runAction (action, juce::var());
+        };
+
+        int sent = 0, last = -1;
+        run (false, "onPaint", sent, last);
+        check (last == 0, "without transmitsTo, 1,500 label writes spend the budget and the bound write loses its MIDI (the old behaviour)");
+        run (true, "onPaint", sent, last);
+        check (last == 1, "with transmitsTo, label writes spend nothing and the bound write still sends");
+        run (true, "onFlood", sent, last);
+        check (sent == 1000, "a real flood of bound writes is still cut at 1,000 a second (sent " + juce::String (sent) + ")");
     }
 
     std::cout << "--------------------------------------------\n"

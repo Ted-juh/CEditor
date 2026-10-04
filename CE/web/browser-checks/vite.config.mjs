@@ -11,6 +11,8 @@ export default defineConfig({
   // The app's entry reads a build stamp the main config injects. These harnesses do not care what
   // it says, only that the identifier resolves.
   define: { __APP_BUILD__: JSON.stringify({ sha: 'check', branch: 'check', time: '', version: '0.0.0' }) },
+  // As in the main config: the font worker splits its bundle, which only an ES module worker can do.
+  worker: { format: 'es' },
   build: {
     outDir: '../dist-scenery',
     emptyOutDir: true,
@@ -20,7 +22,7 @@ export default defineConfig({
       // 93% of a 4m22s build there. It bit here the moment a harness imported Player.svelte and so
       // pulled in the whole app graph — the build went from 8s to not finishing inside 400s.
       treeshake: false,
-      input: ['sceneryGround', 'textPlacement', 'midi', 'monitor', 'strip', 'playerInbound', 'learnChips', 'panelShot', 'effectsTab', 'assetsTab', 'screenTab', 'apiTab', 'libraryTab', 'animationTab', 'designerTab', 'dockOpeners', 'propertyFilter', 'panelStrip', 'insertFlyout', 'releaseWorkflow', 'controlSetShot', 'previewPreparation', 'gaiaPages', 'numberCellSelection', 'panelMotion'].map(page),
+      input: ['sceneryGround', 'textPlacement', 'midi', 'monitor', 'strip', 'playerInbound', 'learnChips', 'panelShot', 'effectsTab', 'assetsTab', 'screenTab', 'apiTab', 'libraryTab', 'sourceLink', 'fromSelection', 'fromSelectionQa', 'animationTab', 'designerTab', 'dockOpeners', 'propertyFilter', 'panelStrip', 'insertFlyout', 'releaseWorkflow', 'controlSetShot', 'previewPreparation', 'gaiaPages', 'numberCellSelection', 'panelMotion'].map(page),
     },
   },
 });

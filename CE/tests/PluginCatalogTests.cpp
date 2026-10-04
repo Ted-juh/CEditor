@@ -208,8 +208,12 @@ void testUnsafeCataloguesAreNeverOverwritten()
              && newer.lastSaveFailure() == PluginCatalog::SaveFailure::newerSchema,
            "an older build cannot downgrade the newer catalogue");
 
+    // A directory where the file should go, and not an empty one: JUCE's deleteFile removes an EMPTY
+    // directory on Linux and macOS (rmdir), so the replacement then succeeded there and this check
+    // only held on Windows. With something inside, no platform can clear the way.
     const auto blocked = dir.getChildFile ("blocked.json");
     blocked.createDirectory();
+    blocked.getChildFile ("occupied").create();
     PluginCatalog unwritable;
     unwritable.commitScanResult (sampleResult ("C:\\VST3\\New.vst3"));
     check (! unwritable.saveTo (blocked)

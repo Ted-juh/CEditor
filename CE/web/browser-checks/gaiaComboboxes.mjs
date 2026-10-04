@@ -71,7 +71,12 @@ try {
     assert.equal(await options.count(), combo.rows.length, combo.name);
     const controlBox = await control.boundingBox(), menuBox = await menu.boundingBox();
     assert.ok(Math.abs(menuBox.x - controlBox.x) < 1, `${combo.name}: menu is anchored to the rendered control`);
-    assert.ok(Math.abs(menuBox.y - controlBox.y - controlBox.height - 4) < 1, `${combo.name}: menu is below the control: ${JSON.stringify({ controlBox, menuBox })}`);
+    // Below the control, or above it when the window's bottom is nearer than the list is long
+    // (utils/floatingUi.js flips it rather than letting it run off the window) — and on screen either way.
+    const above = (await menu.getAttribute('data-placement'))?.startsWith('top');
+    const gap = above ? controlBox.y - menuBox.y - menuBox.height : menuBox.y - controlBox.y - controlBox.height;
+    assert.ok(Math.abs(gap - 4) < 1, `${combo.name}: menu is ${above ? 'above' : 'below'} the control: ${JSON.stringify({ controlBox, menuBox })}`);
+    assert.ok(menuBox.y >= 0 && menuBox.y + menuBox.height <= 1000, `${combo.name}: menu is on screen: ${JSON.stringify(menuBox)}`);
     const choice = combo.rows.at(-1);
     await options.last().click();
     assert.equal(String(await page.evaluate(name => window.__gaia.session(name).valueOverride, combo.name)), String(choice.value), combo.name);
@@ -105,7 +110,9 @@ try {
   await popup.waitFor();
   const box = await dbeamControl.boundingBox(), popupBox = await popup.boundingBox();
   assert.ok(Math.abs(box.x - popupBox.x) < 1);
-  assert.ok(Math.abs(popupBox.y - box.y - box.height - 3) < 1);
+  const dbeamAbove = (await popup.getAttribute('data-placement'))?.startsWith('top');
+  const dbeamGap = dbeamAbove ? box.y - popupBox.y - popupBox.height : popupBox.y - box.y - box.height;
+  assert.ok(Math.abs(dbeamGap - 3) < 1, `D Beam popup ${dbeamAbove ? 'above' : 'below'}, 4 panel units (3px at 75%) from its control: ${JSON.stringify({ box, popupBox })}`);
   await popup.getByRole('option').last().click();
   assert.deepEqual(errors, []);
   assert.equal(checked, menus.length);

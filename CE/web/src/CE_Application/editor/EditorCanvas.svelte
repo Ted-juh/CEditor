@@ -16,7 +16,8 @@
   import { computeGridOrigin, buildGridStyle } from '../utils/gridCSS.js';
   import { handleEditorShortcut } from '../utils/editorShortcuts.js';
   import { findControlsInRect, findControlAtPoint, marqueeScopeId } from '../utils/canvasSelection.js';
-  import { controlPanelOffset, controlPanelRect, findParentOfControl, getChildControls } from '../utils/containment.js';
+  import { controlPanelOffset, controlPanelRect, findParentOfControl, stableChildControls } from '../utils/containment.js';
+  import { distanceCandidates, spatialIndexFor, worthIndexing } from '../utils/controlSpatialIndex.js';
   import { gestureHudParts, gestureTargetFor, readGestureGeometry, rewindGesture } from '../utils/canvasGesture.js';
   import { measureBetweenRects } from '../utils/canvasMeasure.js';
   import { detectEqualSpacing } from '../utils/equalSpacing.js';
@@ -50,7 +51,7 @@
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
   import { activeComponentControl, closeComponentWorkspace, componentWorkspaceMode, createComponentDocument, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
-  import { undo, redo, undoAvailable, redoAvailable, flushHistory } from '../stores/history.js';
+  import { undo, redo, undoAvailable, redoAvailable, flushHistory, undoLabel, redoLabel, historyVersion } from '../stores/history.js';
 
   // The four keys whose autorepeat is one undo step (see handleEditorKeyUp).
   const ARROW_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
@@ -473,16 +474,24 @@
     endGesture();
   }
 
-  // The sibling rects of a control, in the frame its own x/y is measured in —
-  // panel space at the top level, the container's content space inside one.
-  // Equal spacing is only meaningful between things in one frame.
-  function frameSiblingRects(id) {
-    if (!canvasPanel || id == null) return [];
-    const parent = findParentOfControl(canvasPanel.controls, id);
-    const list = parent ? getChildControls(parent) : canvasPanel.controls;
+  // The siblings of the control being moved, in the frame its own x/y is measured in — panel space at
+  // the top level, the container's content space inside one — and where that frame sits on the panel.
+  // Keyed on the gesture's id, not its geometry: once per drag, not once per frame. Equal spacing is only
+  // meaningful between things in one frame.
+  let gestureId = $derived(gesture?.id ?? null);
+  let spacingFrame = $derived.by(() => {
+    if (gestureId == null || !canvasPanel) return null;
+    const parent = findParentOfControl(canvasPanel.controls, gestureId);
+    return {
+      siblings: parent ? stableChildControls(parent) : canvasPanel.controls,
+      offset: controlPanelOffset(canvasPanel.controls, gestureId),
+    };
+  });
+
+  function siblingRects(list, id) {
     return list
       .map((c) => ({ control: c, t: c?._children?.Transform }))
-      .filter((entry) => entry.t)
+      .filter((entry) => entry.t && entry.control._children.Core.id !== id)
       .map(({ control, t }) => ({
         id: control._children.Core.id,
         x: t.x ?? 0, y: t.y ?? 0, w: t.width ?? 0, h: t.height ?? 0,
@@ -490,14 +499,17 @@
   }
 
   // Equal-gap indicators for the control being moved. Figma shows these while
-  // you drag, which is when they can still change the outcome.
+  // you drag, which is when they can still change the outcome. On a big panel only the siblings in the
+  // target's own rows and columns can be in a run with it (controlSpatialIndex.js).
   let gestureSpacing = $derived.by(() => {
-    if (!gesture?.id || !canvasPanel || $previewModeEnabled) return null;
+    if (!gesture?.id || !spacingFrame || $previewModeEnabled) return null;
     const g = gesture.geometry;
     const target = { id: gesture.id, x: g.x, y: g.y, w: g.w, h: g.h };
-    const groups = detectEqualSpacing(target, frameSiblingRects(gesture.id).filter((r) => r.id !== gesture.id));
+    const { siblings, offset } = spacingFrame;
+    const pool = worthIndexing(siblings) ? distanceCandidates(spatialIndexFor(siblings), target) : siblings;
+    const groups = detectEqualSpacing(target, siblingRects(pool, gesture.id));
     if (!groups.length) return null;
-    return { groups, offset: controlPanelOffset(canvasPanel.controls, gesture.id) };
+    return { groups, offset };
   });
 
   // --- Alt-hover measuring ---
@@ -814,6 +826,10 @@
     if (document?.id) setActiveEditorTab({ type: 'screen', id: document.id });
   }
 
+
+  // Name the step each button would take back or put back. Re-read only when a stack changes.
+  let undoTip = $derived.by(() => { void $historyVersion; const step = $undoAvailable ? undoLabel() : ''; return step ? `Undo ${step}` : 'Undo'; });
+  let redoTip = $derived.by(() => { void $historyVersion; const step = $redoAvailable ? redoLabel() : ''; return step ? `Redo ${step}` : 'Redo'; });
 </script>
 
 <!-- The canvas annotation layer: everything the editor DRAWS OVER the panel
@@ -911,7 +927,8 @@
                 class="icon-btn"
                 class:active={$undoAvailable}
                 disabled={!$undoAvailable}
-                title="Undo (Ctrl+Z)"
+                title={`${undoTip} (Ctrl+Z)`}
+                aria-label="Undo"
                 onclick={undo}
               ><Undo2 size={14} strokeWidth={2} /></button>
               <button
@@ -919,7 +936,8 @@
                 class="icon-btn"
                 class:active={$redoAvailable}
                 disabled={!$redoAvailable}
-                title="Redo (Ctrl+Y)"
+                title={`${redoTip} (Ctrl+Y)`}
+                aria-label="Redo"
                 onclick={redo}
               ><Redo2 size={14} strokeWidth={2} /></button>
               {#if $componentDesignerStatus?.kind}

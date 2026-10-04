@@ -38,6 +38,7 @@ import {
   createDefaultSettings,
   createFontId,
   getBuiltinFonts,
+  inferFontMimeTypeFromFileName,
   normalizeFamilyName,
   normalizeFontEntry,
   normalizeGeneralSettings,

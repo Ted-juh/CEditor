@@ -42,14 +42,23 @@ export const TEMPLATE_FORMATS = [
   },
   {
     id: 'clap',
-    // Retained as a known format for explicit refusal. Its wrapper still uses a build-time ID,
-    // and a shared sidecar directory cannot safely hold independent panel exports.
+    // A Windows/Linux CLAP is one file, and the CLAP folder is shared by every CLAP installed, so a
+    // panel loose beside it would be ambiguous. Each export gets a folder of its own —
+    // <Name>/<Name>.clap beside panel.cepanel and the device profiles — which hosts find because
+    // the CLAP spec has them search CLAP folders recursively. CE/src/Export/ClapSidecarIdentity.h
+    // is the other end.
     ext: '.clap',
     bundle: false,
+    folder: true,
     panelDir: (root) => path.dirname(root),
   },
   {
     id: 'lv2',
+    // An .lv2 is a folder of its own with the binary at its top, so the panel sits beside the
+    // binary. The bundle's Turtle files are not copied from the template: they are written again
+    // per export by juce_lv2_helper, which loads the copied binary with the panel beside it and
+    // calls the plug-in's own writers, so they carry the panel's URI and parameters
+    // (CE/src/Export/Lv2SidecarIdentity.h, JUCE/VENDORED.md patch 4).
     ext: '.lv2',
     bundle: true,
     panelDir: (root) => root,
@@ -120,23 +129,71 @@ export function findTemplate(templatesDir, format) {
   return match ? path.join(templatesDir, match) : null;
 }
 
+/**
+ * The LV2 helper: JUCE's own, which loads a plug-in binary and has it write its Turtle files. An
+ * installation ships the vendored Windows build in tools/bin; a source checkout has it in JUCE/bin
+ * on Windows and builds a native one on Linux (any build tree). CEDITOR_LV2_HELPER names one by hand.
+ */
+export function findLv2Helper() {
+  if (process.env.CEDITOR_LV2_HELPER && existsSync(process.env.CEDITOR_LV2_HELPER)) return process.env.CEDITOR_LV2_HELPER;
+  // The vendored helper is a Windows build; off Windows only a native one can load a native binary.
+  const name = process.platform === 'win32' ? 'juce_lv2_helper.exe' : 'juce_lv2_helper';
+  const candidates = [path.join(REPO, 'tools/bin', name), path.join(REPO, 'JUCE/bin/JUCE-8.0.7', name)];
+  const buildRoot = path.join(REPO, 'build');
+  if (process.platform !== 'win32' && existsSync(buildRoot)) {
+    for (const dir of readdirSync(buildRoot)) candidates.push(path.join(buildRoot, dir, 'juce_lv2_helper'));
+  }
+  return candidates.find((p) => existsSync(p)) ?? null;
+}
+
+/**
+ * Write an LV2 bundle's manifest.ttl, dsp.ttl and ui.ttl by running the helper over its binary.
+ * The panel is already beside the binary, so the plug-in reports the panel's URI and parameters.
+ * The helper initialises JUCE's GUI, so off Windows it needs a display (DISPLAY, or Xvfb).
+ */
+function writeLv2Manifests(bundle, lv2Helper, log) {
+  const binary = readdirSync(bundle).find((name) => /\.(so|dll)$/i.test(name));
+  // The shipped helper is an executable. A .cmd or .bat stand-in (the test suite's, on Windows) can
+  // only be run through the shell: Node refuses to spawn a batch file directly (EINVAL), and with a
+  // shell nothing is quoted for us.
+  const batch = /\.(cmd|bat)$/i.test(lv2Helper);
+  const quote = (p) => (batch ? `"${p}"` : p);
+  try {
+    execFileSync(quote(lv2Helper), [quote(path.join(bundle, binary))], { stdio: 'pipe', env: process.env, shell: batch });
+  } catch (error) {
+    const detail = String(error.stderr ?? error.message).trim().split('\n').filter(Boolean).pop() ?? '';
+    for (const stale of readdirSync(bundle).filter((f) => f.toLowerCase().endsWith('.ttl'))) rmSync(path.join(bundle, stale));
+    throw new Error(`LV2 manifests could not be written for ${path.basename(bundle)}: ${detail || 'juce_lv2_helper failed'}`);
+  }
+  const written = readdirSync(bundle).filter((f) => f.toLowerCase().endsWith('.ttl')).sort();
+  if (!written.includes('manifest.ttl') || !written.includes('dsp.ttl')) {
+    throw new Error(`juce_lv2_helper wrote ${written.join(', ') || 'nothing'} for ${path.basename(bundle)}; manifest.ttl and dsp.ttl are needed.`);
+  }
+  log(`  lv2: ${written.join(', ')} written from the placed panel`);
+}
+
 export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir, formats, log = console.log }) {
-  const panelDoc = JSON.parse(readFileSync(panelFile, 'utf8'));
+  let panelDoc = JSON.parse(readFileSync(panelFile, 'utf8'));
+  // A saved .cepanel passed by hand from a source checkout is completed as the app would complete it
+  // (lib/exportDocument.mjs). An installation has no editor source to do that with, and needs none:
+  // the app always hands this script the complete document it prepared.
+  if (existsSync(path.join(REPO, 'CE/web/src/CE_Application/stores/documentShape.js'))) {
+    const { completeExportDocument } = await import(pathToFileURL(path.join(HERE, 'lib/exportDocument.mjs')).href);
+    panelDoc = await completeExportDocument(panelDoc, path.resolve(panelFile));
+  }
+  // What the bytes are, before anything is written: the one number an export used to give was the
+  // bundle's, and on GAIA it was taken to be artwork when there was none (lib/exportSizeReport.mjs).
+  {
+    const { exportSizeReport, formatExportSizeReport } = await import(pathToFileURL(path.join(HERE, 'lib/exportSizeReport.mjs')).href);
+    for (const line of formatExportSizeReport(exportSizeReport(panelDoc))) log(line);
+  }
   const explicitFormats = formats !== undefined;
+  // VST3 always; CLAP unless turned off (it was a factory default); LV2 only when turned on, as the
+  // compiling exporter reads it.
   formats ??= TEMPLATE_FORMATS.filter((format) =>
     format.id === 'vst3' || (format.id === 'clap'
       ? panelDoc.exportSettings?.exportClap !== false
-      : panelDoc.exportSettings?.exportLv2 !== false));
-  const unsupported = formats.filter((format) => format.id !== 'vst3');
-  if (unsupported.length) {
-    if (explicitFormats || !formats.some((format) => format.id === 'vst3')) {
-      throw new Error('Compiler-free export currently supports VST3 only. Use the compiling exporter for CLAP and LV2.');
-    }
-    // Older documents contain true for both formats because those were factory defaults.
-    // Keep their settings intact while allowing the installed editor to export a usable VST3.
-    log(`Warning: ${unsupported.map((format) => format.id.toUpperCase()).join(' and ')} skipped: the installed exporter supports VST3 only. Use the compiling exporter for those formats. Exporting VST3; saved format settings are unchanged.`);
-    formats = formats.filter((format) => format.id === 'vst3');
-  }
+      : panelDoc.exportSettings?.exportLv2 === true));
   validateTemplateScripting(panelDoc);
   if (panelDoc.controls?.length && !Array.isArray(panelDoc.exportParameters)) {
     throw new Error('This panel has not been prepared for plugin export. Open it in CEditor and use Build → Export Plugin to prepare its automation parameters and embedded assets.');
@@ -156,10 +213,27 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
   log(`  identity: pluginCode=${identity.pluginCode} auSubtype=${identity.auSubtype}`);
   log(`  clapId:   ${identity.clapId}`);
 
-  // Refuse an incomplete format set before replacing any previous export.
-  const missingFormats = formats.filter((format) => !findTemplate(templatesDir, format));
+  // Refuse an incomplete format set before replacing any previous export. A format the panel's
+  // settings ask for, with no template installed for it (an install from before CLAP templates
+  // shipped), is skipped and said; one the caller asked for by name is not.
+  let missingFormats = formats.filter((format) => !findTemplate(templatesDir, format));
+  if (missingFormats.length && !explicitFormats && missingFormats.length < formats.length) {
+    log(`Warning: ${missingFormats.map((format) => format.id.toUpperCase()).join(' and ')} skipped: no player template for it is installed in ${templatesDir}.`);
+    formats = formats.filter((format) => !missingFormats.includes(format));
+    missingFormats = [];
+  }
   if (missingFormats.length) {
     throw new Error(`Missing player templates for ${missingFormats.map((format) => format.id).join(', ')} in ${templatesDir}. Install those templates or disable those export formats.`);
+  }
+  // An LV2 bundle's Turtle files are written by juce_lv2_helper over the copied binary. Without the
+  // helper the bundle would be a binary with no manifest, which a host does not see, so the format
+  // is refused by name and skipped when it was only implied.
+  const lv2Helper = findLv2Helper();
+  if (!lv2Helper && formats.some((format) => format.id === 'lv2')) {
+    const message = 'juce_lv2_helper was not found (it writes the bundle\'s manifest, dsp and ui Turtle files)';
+    if (explicitFormats) throw new Error(`LV2 cannot be exported: ${message}.`);
+    log(`Warning: LV2 skipped: ${message}.`);
+    formats = formats.filter((format) => format.id !== 'lv2');
   }
   mkdirSync(outDir, { recursive: true });
   const helperExe = ['juce_vst3_helper.exe', 'juce_vst3_helper']
@@ -174,21 +248,41 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
       continue;
     }
 
-    const dest = path.join(outDir, safeName + format.ext);
-    rmSync(dest, { recursive: true, force: true });
+    // What the export is: the bundle itself, or for CLAP the folder that holds the plugin.
+    const root = format.folder ? path.join(outDir, safeName) : path.join(outDir, safeName + format.ext);
+    const dest = format.folder ? path.join(root, safeName + format.ext) : root;
+    rmSync(root, { recursive: true, force: true });
+    mkdirSync(path.dirname(dest), { recursive: true });
     cpSync(template, dest, { recursive: format.bundle });
 
-    // The Windows VST3 loader derives the DLL name from its enclosing bundle name.
-    // Renaming only the outer directory makes an otherwise valid template unloadable.
-    if (format.id === 'vst3' && process.platform === 'win32') {
+    // A VST3 loader derives the module's name from its enclosing bundle's: Contents/<arch>-win/<Name>.vst3
+    // on Windows, Contents/<arch>-linux/<Name>.so on Linux. Renaming only the outer directory makes an
+    // otherwise valid template unloadable. Keyed on the architecture folders, not on the platform this
+    // runs on, so a Linux template exported anywhere loads too.
+    if (format.id === 'vst3') {
       const contents = path.join(dest, 'Contents');
-      for (const architecture of readdirSync(contents).filter((name) => name.endsWith('-win'))) {
+      const moduleExt = { '-win': '.vst3', '-linux': '.so' };
+      for (const architecture of readdirSync(contents)) {
+        const suffix = Object.keys(moduleExt).find((s) => architecture.endsWith(s));
+        if (!suffix) continue;
         const binDir = path.join(contents, architecture);
-        const binaries = readdirSync(binDir).filter((name) => name.toLowerCase().endsWith('.vst3'));
+        const binaries = readdirSync(binDir).filter((name) => name.toLowerCase().endsWith(moduleExt[suffix]));
         if (binaries.length !== 1) throw new Error(`Expected one VST3 binary in ${binDir}. Reinstall the player template.`);
-        const target = path.join(binDir, `${safeName}.vst3`);
+        const target = path.join(binDir, safeName + moduleExt[suffix]);
         if (path.join(binDir, binaries[0]) !== target) renameSync(path.join(binDir, binaries[0]), target);
       }
+    }
+
+    // An LV2's binary is named for the bundle too (libName.so, Name.dll); the manifests the helper
+    // writes name it, so it is renamed before they are. The template's own manifests go: they
+    // describe the template, and a stale one beside a fresh one is two plug-ins in one bundle.
+    if (format.id === 'lv2') {
+      for (const stale of readdirSync(dest).filter((f) => f.toLowerCase().endsWith('.ttl'))) rmSync(path.join(dest, stale));
+      const binaries = readdirSync(dest).filter((name) => /\.(so|dll)$/i.test(name));
+      if (binaries.length !== 1) throw new Error(`Expected one LV2 binary in ${dest}. Reinstall the player template.`);
+      const extension = path.extname(binaries[0]).toLowerCase();
+      const target = path.join(dest, extension === '.so' ? `lib${safeName}.so` : `${safeName}${extension}`);
+      if (path.join(dest, binaries[0]) !== target) renameSync(path.join(dest, binaries[0]), target);
     }
 
     const panelDir = format.panelDir(dest);
@@ -200,20 +294,27 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
     for (const stale of readdirSync(panelDir).filter((f) => f.toLowerCase().endsWith('.cepanel'))) {
       rmSync(path.join(panelDir, stale));
     }
-    writeFileSync(path.join(panelDir, 'panel.cepanel'), JSON.stringify(panelDoc, null, 2));
+    // Compact: the plug-in parses it in full at load and nobody reads it. GAIA's indented panel was
+    // 94 MB where the compact one is 28 MB, and the load parses it three times.
+    writeFileSync(path.join(panelDir, 'panel.cepanel'), JSON.stringify(panelDoc));
 
-    // The native MIDI service needs its codecs on a machine without CEditor's checkout.
-    // Contents is the parent of the VST3 module directory on Windows/Linux.
+    // The native MIDI service needs its codecs on a machine without CEditor's checkout. It looks
+    // in the module's directory and the one above (DeviceProfileServiceInternal.h, sourceRoot):
+    // Contents for a VST3, whose module sits in Contents/<arch>; the export's folder for a CLAP.
     const profiles = path.join(REPO, 'CE/profiles/test');
-    if (format.id === 'vst3' && existsSync(profiles)) {
-      cpSync(profiles, path.join(dest, 'Contents/CE/profiles/test'), { recursive: true });
+    if (existsSync(profiles)) {
+      if (format.id === 'vst3') cpSync(profiles, path.join(dest, 'Contents/CE/profiles/test'), { recursive: true });
+      if (format.id === 'clap' || format.id === 'lv2') cpSync(profiles, path.join(root, 'CE/profiles/test'), { recursive: true });
     }
 
     if (format.id === 'vst3') fixVst3Manifest(dest, helperExe, log);
+    if (format.id === 'lv2') writeLv2Manifests(dest, lv2Helper, log);
 
-    const size = format.bundle ? dirSize(dest) : statSync(dest).size;
-    log(`  ${format.id}: ${path.relative(REPO, dest)} (${(size / 1048576).toFixed(1)} MB)`);
-    written.push(dest);
+    const size = format.bundle || format.folder ? dirSize(root) : statSync(root).size;
+    log(`  ${format.id}: ${path.relative(REPO, root)} (${(size / 1048576).toFixed(1)} MB)`);
+    if (format.folder) log(`  ${format.id}: install the whole "${safeName}" folder into your CLAP folder; the plugin needs the panel beside it.`);
+    if (format.id === 'lv2') log(`  ${format.id}: install the whole "${safeName}.lv2" folder into your LV2 path; the plugin needs the panel beside it.`);
+    written.push(root);
   }
 
   if (written.length === 0) {

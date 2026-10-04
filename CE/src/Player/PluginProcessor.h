@@ -46,6 +46,7 @@ static inline juce::File ceditorPlayerPanelFile()
 
 #if CEDITOR_VALUE_LAYER
  #include "HostMidiInputQueue.h"
+#include "ScriptMidiOutQueue.h"
  #include "PanelParameters.h"
  #include "ProgramBank.h"
  #include "RestorePolicy.h"
@@ -81,7 +82,6 @@ public:
         , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams))
 #endif
     {
-        scriptMidiCollector.reset (44100.0);  // valid before prepareToPlay; the host resets with the real rate
 #if CEDITOR_VALUE_LAYER
         // The panel document, parsed once for the two things the processor reads out of it directly:
         // the restore policy and the baked program bank. Both are constant for the life of the
@@ -101,28 +101,75 @@ public:
         startTimerHz (30);
 #endif
 #if CEDITOR_SCRIPTING
-        setupScripting();   // window-closed: load the panel's scripts + fire onPanelLoad
+        // window-closed: load the panel's scripts + fire onPanelLoad — ON the message thread,
+        // whichever thread the host is building us on (see onMessageThread).
+        onMessageThread ([this] { setupScripting(); });
 #endif
+    }
+
+    /**
+     * Run `fn` on JUCE's message thread, now, and return when it is done.
+     *
+     * The scripts belong to the message thread. Their timers, this processor's 30 Hz timer and the
+     * device callbacks all run there and call straight into the Lua, JavaScript and Python engines,
+     * and the engines themselves are tied to the thread that creates them: QuickJS measures its
+     * stack limit from the creating thread's stack, and CPython's thread state is per thread. A
+     * host may build and destroy the plug-in on a thread of its own, though. On Linux an LV2 (and a
+     * VST3 in some hosts) runs a message thread INSIDE the plug-in, and the host constructs and
+     * frees instances from wherever it likes — pluginval does both from its test thread.
+     *
+     * What pluginval found on the LV2 build, in order: a crash in JavascriptEngine::evaluate on the
+     * message thread while ~JavascriptEngine ran on the host's, with a Lua "invalid key to 'next'"
+     * before it (the destroy handlers racing a timer in one Lua state); and under a lock instead,
+     * every JavaScript call failing with "stack overflow" — 1.1 million of them in the player log —
+     * because each engine had been created on the host's thread and was being run on this one.
+     *
+     * So script setup and teardown are handed to the message thread and the caller waits. On the
+     * message thread already — Windows, macOS and most hosts — `fn` just runs.
+     */
+    template <typename Fn>
+    static void onMessageThread (Fn&& fn)
+    {
+        auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+        if (mm == nullptr || mm->isThisTheMessageThread() || mm->currentThreadHasLockedMessageManager())
+        {
+            fn();
+            return;
+        }
+        std::function<void()> call (std::forward<Fn> (fn));
+        mm->callFunctionOnMessageThread ([] (void* context) -> void*
+        {
+            (*static_cast<std::function<void()>*> (context))();
+            return nullptr;
+        }, &call);
     }
 
 #if CEDITOR_VALUE_LAYER
     ~PlayerAudioProcessor() override
     {
-       #if CEDITOR_SCRIPTING
-        // FIRST, while everything a teardown handler needs still works: its timers, its state, the
-        // device service, set() and sendCC(). This is the plugin being unloaded — the real end of
-        // the scripts, as distinct from the window closing (onPanelClose), which they survive.
-        if (scriptRuntime != nullptr) scriptRuntime->onPanelDestroy();
-       #endif
-        stopTimer();
-       #if CEDITOR_SCRIPTING
-        deviceService.setEventCallback (nullptr);  // stop device events reaching the about-to-die runtime
-        scriptTimers.stopAll();                    // stop script timers before the runtime is destroyed
-       #endif
+        // The WHOLE teardown on the message thread — the destroy handlers, the timer stops AND the
+        // runtime itself — so no callback is mid-flight and every engine dies on the thread that
+        // made it (onMessageThread).
+        onMessageThread ([this]
+        {
+           #if CEDITOR_SCRIPTING
+            // FIRST, while everything a teardown handler needs still works: its timers, its state,
+            // the device service, set() and sendCC(). This is the plugin being unloaded — the real
+            // end of the scripts, as distinct from the window closing (onPanelClose), which they
+            // survive.
+            if (scriptRuntime != nullptr) scriptRuntime->onPanelDestroy();
+           #endif
+            stopTimer();
+           #if CEDITOR_SCRIPTING
+            deviceService.setEventCallback (nullptr);  // stop device events reaching the about-to-die runtime
+            scriptTimers.stopAll();                    // stop script timers before the runtime is destroyed
+            scriptRuntime.reset();                     // here, not later as a member
+           #endif
+        });
     }
 #endif
 
-    void prepareToPlay (double sampleRate, int) override { scriptMidiCollector.reset (sampleRate); }
+    void prepareToPlay (double, int) override {}
     void releaseResources() override {}
     // The plugin PRODUCES MIDI on its output bus; the DAW routes that track to the synth's port (the
     // standard VST3 path — no in-plugin port picker). Drain whatever the panel queued on the message
@@ -135,7 +182,7 @@ public:
         for (const auto message : midi)
             hostMidiInput.push (message.data, message.numBytes);
        #endif
-        scriptMidiCollector.removeNextBlockOfMessages (midi, buffer.getNumSamples());
+        scriptMidiOut.drainInto (midi);   // no lock, no allocation: Player/ScriptMidiOutQueue.h
         captureHostPosition();
     }
 
@@ -245,9 +292,11 @@ private:
 
 public:
 
-    // Script-emitted MIDI is queued here on the message thread and drained into the host's output bus
-    // in processBlock (above). Lives outside the value/scripting #ifs so processBlock always has it.
-    juce::MidiMessageCollector scriptMidiCollector;
+    // Everything the panel sends is queued here off the audio thread and drained into the host's output
+    // bus in processBlock (above). Lives outside the value/scripting #ifs so processBlock always has it.
+    // It was a juce::MidiMessageCollector, which locks on the audio thread; ScriptMidiOutQueue.h says why
+    // it is not any more.
+    ce::ScriptMidiOutQueue scriptMidiOut;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -432,6 +481,18 @@ public:
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
             markSessionRestored();
         }
+        else
+        {
+            return;
+        }
+
+        // Every parameter may have just moved, and the host has to be told to read them again. A
+        // DAW reopening a project builds a FRESH instance and loads the state into it, so what it
+        // read at creation was the defaults; without this it keeps showing them. JUCE's VST3
+        // wrapper re-reads after setState on its own, but the CLAP wrapper only rescans on a
+        // "program changed" notice — clap-validator's state-reproducibility tests failed on every
+        // export until this was sent. Synchronous, and on the calling (main) thread.
+        updateHostDisplay (ChangeDetails().withProgramChanged (true));
 #else
         juce::ignoreUnused (data, sizeInBytes);
 #endif
@@ -1247,7 +1308,7 @@ private:
         // interceptMidiOut runs HERE, at the funnel, so a filter sees the assembled bytes rather
         // than each verb's arguments — and so it sees AUTOMATION sends as well as script ones, which
         // is the reason the automation path was routed through here in the first place. A filter
-        // that swallows the message stops it dead: nothing reaches the collector, nothing is
+        // that swallows the message stops it dead: nothing reaches the output queue, nothing is
         // reported as sent.
         if (scriptRuntime != nullptr)
         {
@@ -1275,9 +1336,13 @@ private:
             juce::MidiMessage m (raw.data() + pos, (int) raw.size() - pos, used, status, 0.0, false);
             if (used <= 0) break;
             if (raw[(size_t) pos] >= 0x80) status = raw[(size_t) pos];
-            scriptMidiCollector.addMessageToQueue (m);
+            scriptMidiOut.push (m.getRawData(), m.getRawDataSize());
             pos += used;
         }
+        // Full only if the host has stopped calling processBlock while something keeps sending: 256 KB
+        // is several bank dumps. Say so once per send rather than once per message.
+        if (const auto dropped = scriptMidiOut.takeDroppedCount(); dropped != 0)
+            scriptLogLine ("MIDI output queue full: " + juce::String (dropped) + " message(s) from '" + actionId + "' dropped");
 
        #if CEDITOR_SCRIPTING
         juce::StringArray hex;
@@ -1315,7 +1380,7 @@ private:
     // Window-closed script runtime (Model 2). The full-mirror value model (scriptValues) backs
     // get/set so a script behaves identically whether the GUI is open (WebView/JS) or closed (here).
     // Stage 3 wires instantiation + lifecycle + DAW state; Stage 4 (script MIDI sends) now transmits
-    // via the plugin's MIDI output bus (scriptMidiCollector -> processBlock). JS<->C++ value sync for
+    // via the plugin's MIDI output bus (scriptMidiOut -> processBlock). JS<->C++ value sync for
     // UNBOUND controls (Stage 5) is still TODO. Declared after deviceService and in this order so the
     // runtime (holds host&) tears down before the host, and scriptValues outlives both.
 
@@ -1559,6 +1624,17 @@ private:
                 scriptLogLine ("[script] set(\"" + path + "\"): nothing was written — that path does "
                                "not lead anywhere on this panel. A state patch key like "
                                "\"Background.Fill.colour\" is ONE map key rather than three path steps.");
+        };
+        // Only a control bound to a host parameter sends anything window-closed (setValue above), so
+        // only a write to one spends the flood budget.
+        cb.transmitsTo = [this] (const juce::String& path)
+        {
+           #if CEDITOR_VALUE_LAYER
+            return scriptBoundParamByPath.find (path) != scriptBoundParamByPath.end();
+           #else
+            juce::ignoreUnused (path);
+            return false;
+           #endif
         };
        #if CEDITOR_VALUE_LAYER
         // Raw CC/NRPN/Sysex mirror the byte construction in panelRuntime.js so a script transmits

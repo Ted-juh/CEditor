@@ -71,9 +71,9 @@
     const controlId = getSection(control, 'Core')?.id;
     if (!controlId) return;
     if ($selectedComponentIds.size > 1) {
-      applySelectedPatch(patch);
+      applySelectedPatch(patch, { pin: true });
     } else {
-      applyControlPatch(controlId, patch);
+      applyControlPatch(controlId, patch, { pin: true });
     }
   }
 

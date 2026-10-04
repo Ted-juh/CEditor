@@ -41,6 +41,8 @@ import {
   onInstrumentHostMsegActivity,
   onInstrumentHostRandomModulatorActivity,
   onInstrumentHostChordLearn,
+  onInstrumentHostChordsLive,
+  onInstrumentHostModuleActivity,
   onInstrumentHostHardwarePatchCapture,
   onInstrumentHostHardwarePatchSend,
   onInstrumentHostHardwarePatchPrompt,
@@ -274,13 +276,13 @@ export const hostSupportBundle = writable(emptySupportBundle());
 export const hostLicenceReceipt = writable('');
 /** The latest MIDI message seen on any enabled input, with a monotonically increasing `seq`
  *  so the view can flash on every arrival even when two identical notes repeat. */
-export const hostMidiActivity = writable({ device: '', text: '', cc: -1, note: -1, channel: 0, value: 0, seq: 0 });
+export const hostMidiActivity = writable({ device: '', text: '', cc: -1, note: -1, channel: 0, value: 0, touch: [], seq: 0 });
 // The CTRL49 hardware surface as the broker reports it: searching (no device), connecting,
 // connected, heldElsewhere (another instance owns it), failed. Fail-safe like every other
 // host store — a malformed payload lands on 'searching', never a crash.
 export const hostSurface = writable({
   state: 'searching', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
-  movementSeq: 0, movingSlot: -1,
+  movementSeq: 0, movingSlot: -1, deviceError: '', deviceRefusals: 0, searchReason: '',
 });
 
 // --- the CTRL49 screen in the app ---------------------------------------------------------------
@@ -314,6 +316,15 @@ export const hostSurfaceScreen = writable(emptySurfaceScreen());
 /** Press or turn one of the keyboard's controls from the app: the three bytes the hidden cable
     would carry (CC 11-18 encoders, 01 up / 7F down; 19-26 encoder switches; 39/40 Page Left/Right;
     1-8 pads). The broker cannot tell these from the real keyboard, which is the point. */
+/** Shows a control page: the keyboard (or its screen card) moves there, the drawing follows,
+    and knobs learned on several pages drive this one. */
+export const showControlPage = (pageId) => send({ cmd: 'showControlPage', pageId });
+
+/** Ties a page to the preset `partId` has loaded now, so loading that preset shows it; with no
+    partId the page is untied and becomes an ordinary page again. */
+export const setControlPagePreset = (pageId, partId = '') =>
+  send({ cmd: 'setControlPagePreset', pageId, partId });
+
 export const surfaceInput = (cc, value) =>
   send({ cmd: 'surfaceInput', data: [0xB0, Math.trunc(cc) & 0x7f, Math.trunc(value) & 0x7f] });
 
@@ -339,8 +350,8 @@ export function mockSurfaceScreen(state, cursor) {
              pageIndex, pageCount, pageKind: 'control', pageId: page.pageId, onKeyboard: false, received: true };
   }
   const tempo = Number(state?.performance?.transport?.tempo ?? 120) || 120;
-  const transport = { playing: false, bar: 1, beat: 1, tempo };
-  return { labels: performanceLabelPayload(transport, []), values: performanceStatePayload(cursor.active, []),
+  const transport = { playing: false, bar: 1, beat: 1, tempo, beatsPerBar: 4 };
+  return { labels: performanceLabelPayload(transport, []), values: performanceStatePayload(cursor.active, [], transport),
            pageIndex, pageCount, pageKind: 'performance', pageId: '', onKeyboard: false, received: true };
 }
 
@@ -390,6 +401,33 @@ export const hostArpStep = writable({});
 // then the chord). Driven by instrumentHostChordLearn events; the map itself lands in the
 // part's midiFx via the state.
 export const hostChordLearn = writable({ armed: false, partId: '', stage: '', key: -1 });
+
+// The Chords module playing, by part: { chord, step, pads } — the set chord it last played,
+// the progression step that plays next, a bit per sounding pad. instrumentHostChordsLive.
+export const hostChordsLive = writable({});
+
+// Each MIDI module's light, by part and slot: a count that moves when the module changes a note.
+export const hostModuleActivity = writable({});
+
+/** What localhost pretends the engine did with a chordPad / chordStep (MidiFxChain's rules),
+    so the editor's lights can be tried without a host. */
+export function applyMockChordsLive(live, fx, payload) {
+  const was = live ?? { chord: -1, step: 0, pads: 0 };
+  const steps = fx?.chordProgression ? (fx.progression ?? []).length : 0;
+  if (payload?.cmd === 'chordPad') {
+    const pad = Number(payload.pad);
+    if (!(pad >= 0 && pad < 32)) return was;
+    if (Number(payload.velocity ?? 100) <= 0) return { ...was, pads: was.pads & ~(1 << pad) };
+    const chord = fx?.chordPads ? (fx.padMap?.[pad] ?? -1) : -1;
+    if (chord < 0 || chord >= (fx.chordSet ?? []).length) return was;
+    return { ...was, chord, pads: was.pads | (1 << pad) };
+  }
+  if (payload?.cmd === 'chordStep' && steps > 0) {
+    const to = 'step' in payload ? Number(payload.step) : was.step + Number(payload.delta ?? 1);
+    return { ...was, step: ((to % steps) + steps) % steps };
+  }
+  return was;
+}
 
 // The one keyboard on screen has two jobs. `play`: a selectable span to audition with. `range`: all
 // 128 keys with every part's key range drawn beneath, for setting a split by dragging — the
@@ -481,13 +519,43 @@ export function normalizeHostSurface(payload) {
     padBank: Math.max(0, Math.min(3, Number(payload?.padBank ?? 0) || 0)),
     movementSeq: Math.max(0, Math.trunc(Number(payload?.movementSeq ?? 0) || 0)),
     movingSlot: Math.max(-1, Math.min(7, Math.trunc(Number(payload?.movingSlot ?? -1) || 0))),
+    // The keyboard's last refusal of a display command, by name ("The keyboard refused draw:
+    // out of memory"), and how many there have been this connection.
+    deviceError: String(payload?.deviceError ?? ''),
+    deviceRefusals: Math.max(0, Math.trunc(Number(payload?.deviceRefusals ?? 0) || 0)),
+    // Why it is not connected, when that is known: see surfaceStatusText.
+    searchReason: ['unplugged', 'noDriver', 'portBusy', 'captureFailed', 'error'].includes(payload?.searchReason)
+      ? payload.searchReason : '',
   };
+}
+
+/** The CTRL49's status in words, for every place that shows it. `short` is one line for a
+    status row; `detail` is the broker's own explanation (a driver hint, the port error), shown
+    wherever there is room. Each reason is a different thing to do, so each reads differently —
+    before, a keyboard with no driver and a keyboard in a drawer both said "looking for a CTRL49". */
+export function surfaceStatusText(surface) {
+  const detail = String(surface?.detail ?? '');
+  switch (surface?.state) {
+    case 'connected': return { short: `${surface.device || 'CTRL49'} connected`, detail: '', tone: 'ok' };
+    case 'connecting': return { short: 'CTRL49 found, starting its display…', detail: '', tone: 'busy' };
+    case 'heldElsewhere': return { short: 'CTRL49 is in use by another HoSTage window', detail: '', tone: 'warn' };
+    case 'failed': return { short: 'The CTRL49 did not start', detail, tone: 'error' };
+    case 'paused': return { short: 'CTRL49 released (HoSTage is closed)', detail: '', tone: 'idle' };
+    default: break;
+  }
+  switch (surface?.searchReason) {
+    case 'noDriver': return { short: 'CTRL49 plugged in, but its driver is missing', detail, tone: 'error' };
+    case 'portBusy': return { short: 'CTRL49 is in use by another program', detail, tone: 'warn' };
+    case 'captureFailed': return { short: "CTRL49's display port would not open", detail, tone: 'error' };
+    case 'error': return { short: 'CTRL49 could not be opened', detail, tone: 'error' };
+    default: return { short: 'No CTRL49 connected', detail: '', tone: 'idle', hint: 'plug it in and it connects by itself' };
+  }
 }
 
 // --- the surface as a picture --------------------------------------------------------------------
 
 export function emptySurfaceLayout() {
-  return { displayName: '', vendor: '', aspect: 0, controls: [], regions: [],
+  return { displayName: '', vendor: '', aspect: 0, controls: [], regions: [], connected: false,
            // The owner's own controller, when they described one: what to prefill the form
            // with, and whether a count is running.
            profileId: '', own: false, profiles: [], userSurface: '', userEncoders: 0, userFaders: 0, userPads: 0,
@@ -543,6 +611,8 @@ export function normalizeSurfaceLayout(payload) {
 
   return {
     profileId: String(p.profileId ?? ''),
+    // The drawing is of a controller plugged in right now (matched by its MIDI port name).
+    connected: p.connected === true,
     displayName: String(p.displayName ?? ''),
     vendor: String(p.vendor ?? ''),
     aspect: Number(p.aspect ?? 0) || 0,
@@ -553,6 +623,7 @@ export function normalizeSurfaceLayout(payload) {
     // Which drawing this is, and which others exist: the described one stands in for the
     // authored ones by default, and the picker in the panel is how you get the CTRL49's own
     // picture back without forgetting what you described.
+    // eslint-disable-next-line no-dupe-keys -- the first `profileId` keeps the key in first place
     profileId: String(p?.profileId ?? ''),
     own: p?.own === true,
     profiles: (Array.isArray(p?.profiles) ? p.profiles : []).map((r) => ({
@@ -747,7 +818,66 @@ export function emptyLibraryQuery() {
     // to "all of it" would still refuse every record the auditioner has not reached yet.
     ranges: Object.fromEntries(MEASURED_AXES.map((a) => [a, { min: 0, max: 1, active: false }])),
     measuredOnly: false,
+    // The order the host returns results in ('' = library order). The host sorts, because the
+    // page only ever holds one slice of a large result. See LIBRARY_SORTS.
+    sort: '',
+    sortDescending: false,
   };
+}
+
+/** The orders the browser offers, mirroring sortLibraryResults in Library.cpp. `descending` is
+    the direction a click first picks: newest, most loaded, brightest and best rated come first. */
+export const LIBRARY_SORTS = Object.freeze([
+  { key: '', label: 'Library order', descending: false },
+  { key: 'name', label: 'Name', descending: false },
+  { key: 'instrument', label: 'Plug-in', descending: false },
+  { key: 'category', label: 'Category', descending: false },
+  { key: 'rating', label: 'Rating', descending: true },
+  { key: 'recent', label: 'Recently loaded', descending: true },
+  { key: 'loads', label: 'Most loaded', descending: true },
+  { key: 'added', label: 'Newest', descending: true },
+  { key: 'brightness', label: 'Brightness', descending: true },
+  { key: 'attack', label: 'Attack', descending: false },
+  { key: 'tail', label: 'Tail', descending: true },
+  { key: 'width', label: 'Width', descending: true },
+]);
+const SORT_KEYS = LIBRARY_SORTS.map((s) => s.key);
+
+/** The JavaScript half of sortLibraryResults (Library.cpp), for the browser demo and its tests:
+    ties by name, and a record with no value for the key last in either direction. */
+export function sortLibraryRecords(records, key, descending = false) {
+  if (!key || !SORT_KEYS.includes(key)) return [...records];
+  const natural = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+  const textual = ['name', 'instrument', 'category'].includes(key);
+  const number = (r) => {
+    if (key === 'rating') return r.rating > 0 ? r.rating : null;
+    if (key === 'recent') return r.lastLoadedAtMs > 0 ? r.lastLoadedAtMs : null;
+    if (key === 'loads') return r.loadCount > 0 ? r.loadCount : null;
+    if (key === 'added') return r.addedAtMs > 0 ? r.addedAtMs : null;
+    return r.sonic ? Number(r.sonic[key] ?? 0) : null;
+  };
+  return records.map((r, i) => [r, i]).sort(([a, ia], [b, ib]) => {
+    if (textual) {
+      const ta = String(a[key] ?? ''), tb = String(b[key] ?? '');
+      if (!ta !== !tb) return ta ? -1 : 1;
+      const c = natural(ta, tb);
+      if (c !== 0) return descending ? -c : c;
+    } else {
+      const na = number(a), nb = number(b);
+      if ((na === null) !== (nb === null)) return na === null ? 1 : -1;
+      if (na !== null && na !== nb) return descending ? nb - na : na - nb;
+    }
+    return natural(a.name, b.name) || ia - ib;
+  }).map(([r]) => r);
+}
+
+/** A page of the library joins the rows already held when it continues the same view, and is
+    dropped when it belongs to a view that has since changed. A first page (offset 0) replaces. */
+export function mergeLibraryPage(previous, next) {
+  if (!(next.offset > 0)) return next;
+  const same = JSON.stringify(previous.request) === JSON.stringify(next.request);
+  if (!same || previous.records.length < next.offset) return previous;
+  return { ...next, offset: 0, records: [...previous.records.slice(0, next.offset), ...next.records] };
 }
 
 const strings = (value) => (Array.isArray(value) ? value.map(String).filter(Boolean) : []);
@@ -779,6 +909,8 @@ export function normalizeLibraryQuery(payload) {
       return [axis, { min: Math.min(min, max), max: Math.max(min, max), active: r.active === true }];
     })),
     measuredOnly: p.measuredOnly === true,
+    sort: SORT_KEYS.includes(p.sort) ? p.sort : '',
+    sortDescending: p.sortDescending === true,
   };
 }
 
@@ -814,6 +946,7 @@ export function cycleLibraryFacet(query, facet, value, straightToExclude = false
 
 export function emptyHostLibrary() {
   return {
+    offset: 0,
     scanning: false,
     updateFinished: false,
     scanReport: [],
@@ -828,6 +961,7 @@ export function emptyHostLibrary() {
     collections: [],
     request: emptyLibraryQuery(),
     paths: [],
+    stateFolders: [],
     query: '',
     type: '',
   };
@@ -851,14 +985,22 @@ function refusedByCause(raw) {
 export function normalizeHostLibrary(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   return {
+    // Where these records start in the whole result: 0 for a first page (which replaces what the
+    // browser holds), more for a page that continues it (see mergeLibraryPage).
+    offset: Math.max(0, Math.floor(Number(p.offset ?? 0)) || 0),
     scanning: p.scanning === true,
     updateFinished: p.updateFinished === true,
     scanReport: (Array.isArray(p.scanReport) ? p.scanReport : []).map((r) => ({
-      name: String(r?.name ?? ''), kind: String(r?.kind ?? ''),
+      name: String(r?.name ?? ''), kind: String(r?.kind ?? ''), ceId: String(r?.ceId ?? ''),
       count: Number(r?.count ?? 0), reason: String(r?.reason ?? ''),
       files: Math.max(0, Number(r?.files) || 0), programs: Math.max(0, Number(r?.programs) || 0),
       unavailable: Math.max(0, Number(r?.unavailable) || 0),
       unnamedPrograms: Math.max(0, Number(r?.unnamedPrograms) || 0),
+      // A folder named after the plug-in holding files only it reads, found on the last update.
+      candidate: r?.candidate && typeof r.candidate === 'object' && r.candidate.path
+        ? { path: String(r.candidate.path), extension: String(r.candidate.extension ?? ''),
+            files: Math.max(0, Number(r.candidate.files) || 0) }
+        : null,
     })),
     records: (Array.isArray(p.records) ? p.records : []).map((r) => ({
       recordId: String(r?.recordId ?? ''),
@@ -980,6 +1122,13 @@ export function normalizeHostLibrary(payload) {
     })).filter((c) => c.name !== ''),
     request: normalizeLibraryQuery(p.request ?? { query: p.query, type: p.type }),
     paths: (Array.isArray(p.paths) ? p.paths : []).map(String),
+    // Folders of one plug-in's presets in its own format, and what their test load said.
+    stateFolders: (Array.isArray(p.stateFolders) ? p.stateFolders : []).map((f) => ({
+      path: String(f?.path ?? ''), ceId: String(f?.ceId ?? ''), plugin: String(f?.plugin ?? ''),
+      extension: String(f?.extension ?? ''),
+      status: ['checking', 'ok', 'refused'].includes(f?.status) ? f.status : 'refused',
+      detail: String(f?.detail ?? ''), count: Math.max(0, Number(f?.count) || 0),
+    })).filter((f) => f.path !== ''),
     query: String(p.query ?? ''),
     type: String(p.type ?? ''),
   };
@@ -1128,6 +1277,23 @@ export function mockSonicDistance(a, b) {
 }
 
 let mockSmartCollections = [];
+// The demo's Library page: one plug-in with presets, two whose preset files sit in a folder
+// of their own (one of which will not read), and one with nothing on disk at all.
+let mockStateFolders = [];
+const MOCK_PRESET_REPORT = [
+  { name: 'Massive X', kind: 'Instrument', ceId: 'mock-massive', count: 4139, files: 4139 },
+  { name: 'Transfigure', kind: 'Effect', ceId: 'mock-transfigure', count: 0,
+    candidate: { path: 'C:\\Users\\You\\Documents\\Sugar Bytes\\Transfigure', extension: 'sbtr', files: 262 } },
+  { name: 'TB-303', kind: 'Instrument', ceId: 'mock-tb303', count: 0,
+    candidate: { path: 'C:\\ProgramData\\Roland Cloud\\TB-303', extension: 'bin', files: 9 } },
+  { name: 'WORMHOLE', kind: 'Effect', ceId: 'mock-wormhole', count: 0 },
+];
+function mockPresetReport() {
+  return MOCK_PRESET_REPORT.map((row) => {
+    const folder = mockStateFolders.find((f) => f.ceId === row.ceId && f.status === 'ok');
+    return folder ? { ...row, count: folder.count, files: folder.count, candidate: null } : row;
+  });
+}
 // The browser demo remembers its view for the same reason the service does: a mutation must
 // not silently drop you back to the whole library while the chips on screen still filter.
 let mockLibraryView = emptyLibraryQuery();
@@ -1343,14 +1509,18 @@ export function mockUnplayedLikeHabits(records, count = 20, minimumRecords = 5) 
   return { enough: true, from, matches };
 }
 
-export function mockHostLibrary(query = '', type = '') {
+export function mockHostLibrary(query = '', type = '', page = {}) {
   const all = mockLibraryRecords();
 
   // Both call shapes: the older (text, type) pair and the whole query object.
   const request = normalizeLibraryQuery(
     typeof query === 'object' && query !== null ? query : { text: query, type });
 
-  const records = all.filter((r) => matchesLibraryQuery(r, request));
+  const matches = sortLibraryRecords(all.filter((r) => matchesLibraryQuery(r, request)),
+                                     request.sort, request.sortDescending);
+  const offset = Math.min(matches.length, Math.max(0, Number(page.offset ?? 0) || 0));
+  const limit = Math.max(0, Number(page.limit ?? 0) || 0);
+  const records = limit > 0 ? matches.slice(offset, offset + limit) : matches.slice(offset);
 
   const statics = new Map();
   for (const record of all)
@@ -1359,12 +1529,13 @@ export function mockHostLibrary(query = '', type = '') {
 
   return normalizeHostLibrary({
     records,
+    offset,
     counts: { total: all.length,
               presets: all.filter((r) => r.type === 'preset').length,
               racks: all.filter((r) => r.type === 'rack').length,
               chains: all.filter((r) => r.type === 'chain').length,
               missing: 0,
-              matched: records.length,
+              matched: matches.length,
               snapshots: all.filter((r) => r.sonic && !r.sonic.silent).length,
               snapshotBytes: all.filter((r) => r.sonic).length * 35000,
               measured: all.filter((r) => r.sonic).length,
@@ -1389,6 +1560,8 @@ export function mockHostLibrary(query = '', type = '') {
     collections: [...statics.entries()].map(([name, count]) => ({ name, count })),
     request,
     paths: [],
+    stateFolders: mockStateFolders,
+    scanReport: mockPresetReport(),
     query: request.text,
     type: request.type,
   });
@@ -1503,6 +1676,17 @@ export function normalizeHostParameters(payload) {
  *  rendering them all as one continuous slider is what made a three-value switch mostly
  *  dead travel. Booleans toggle; a labelled handful gets segments; a countable set gets a
  *  stepper that snaps exactly; only the genuinely continuous get the slider. */
+/** Whether a parameter is two-sided (pan, detune, an envelope amount): its default sits in the
+    middle AND it says so, by name or by printing a sign or a side. A default of one half alone
+    is not enough: plenty of plug-ins start a cutoff there. The Params bar fills these from the
+    centre. */
+export function isBipolarParameter(parameter) {
+  if (Math.abs(Number(parameter?.defaultValue ?? 0) - 0.5) > 0.01) return false;
+  if (/pan|balance|detune|fine|bend|spread|offset|amount|width/i.test(String(parameter?.name ?? ''))) return true;
+  const text = String(parameter?.text ?? '').trim();
+  return /^[+\-−]\s*\d/.test(text) || /^[LR]\s*\d/.test(text) || text === 'C';
+}
+
 export function parameterControlKind(parameter) {
   if (parameter?.boolean) return 'toggle';
   const steps = Number(parameter?.numSteps ?? 0);
@@ -1549,6 +1733,21 @@ export function groupParameters(parameters) {
 
 /** Every parameterId of this target that some control slot, macro or modulation route drives — the
  *  "assigned" filter's ground truth, read from the same state the panels render. */
+/** Where each of a part's parameters sits, for the Params rows: "Page 1 · knob 3", "Macro
+    Brightness". A parameter in several places lists them all, control pages first. */
+export function parameterPlaces(state, targetId) {
+  const places = new Map();
+  const add = (id, text) => places.set(id, [...(places.get(id) ?? []), text]);
+  for (const page of state?.rack?.pages ?? [])
+    for (const slot of page.slots)
+      if (slot.assigned && slot.partId === targetId)
+        add(slot.parameterId, `${page.name} · ${slot.kind === 'encoder' ? 'knob' : slot.kind} ${slot.index + 1}`);
+  for (const macro of state?.rack?.macros ?? [])
+    for (const target of macro.targets)
+      if (target.targetId === targetId) add(target.parameterId, `Macro ${macro.name}`);
+  return places;
+}
+
 export function assignedParameterIds(state, targetId) {
   const ids = new Set();
   for (const page of state?.rack?.pages ?? [])
@@ -1759,6 +1958,9 @@ export function emptyHostState() {
     editorOpenPartId: '',
     editorOpenPartIds: [],
     floatingEditorPartIds: [],
+    responseProfiles: [],
+    responseProfileForPorts: '',
+    modulePresets: [],
     audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0,
              inputChannels: 0, cpu: 0, xruns: 0 },
     rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], returns: [], buses: [],
@@ -2134,9 +2336,12 @@ export function emptyPerformance() {
     snapshotMorph: {
       active: false, sceneId: '', name: '', durationBeats: 0, progress: 0, targetCount: 0,
     },
-    setlist: { items: [], currentIndex: -1, preloadAhead: 1, loadingIndex: -1, preloads: [] },
+    setlist: { items: [], currentIndex: -1, preloadAhead: 1, loadingIndex: -1, preloads: [],
+               startedAtMs: 0, songStartedAtMs: 0 },
+    currentSceneId: '',
+    queuedSceneId: '',
     arrangement: {
-      items: [], loop: false, playing: false, currentIndex: -1, queuedIndex: -1,
+      items: [], songId: '', loop: false, playing: false, currentIndex: -1, queuedIndex: -1,
       ending: false, progress: 0, bar: 0,
     },
     capture: {
@@ -2581,16 +2786,29 @@ const normalizeArp = (a) => ({
   velocityPattern: (Array.isArray(a?.velocityPattern) ? a.velocityPattern : []).map(Number),
   degreePattern: (Array.isArray(a?.degreePattern) ? a.degreePattern : []).map(Number),
   patternSemitones: a?.patternSemitones === true,
+  // The step lane's other rows (ArpSettings): empty means the plain behaviour on every step.
+  ratchetPattern: laneRow(a?.ratchetPattern, 1, 4, 1),
+  tiePattern: laneRow(a?.tiePattern, 0, 1, 0),
+  octavePattern: laneRow(a?.octavePattern, -2, 2, 0),
+  chancePattern: laneRow(a?.chancePattern, 0, 100, 100),
+  feel: ['triplet', 'dotted'].includes(a?.feel) ? a.feel : 'straight',
 });
+
+function laneRow(values, low, high, fallback) {
+  return (Array.isArray(values) ? values : []).slice(0, 32).map((v) => clampInt(v, low, high, fallback));
+}
 
 // One MIDI insert. A slot carries both settings blocks and shows the one its type needs —
 // the same shape the native side keeps, so the UI never has to guess which half is live.
-export const midiSlotTypes = ['arp', 'transpose', 'scale', 'chord', 'velocity', 'fx',
+export const midiSlotTypes = ['arp', 'key', 'chord', 'velocity', 'fx',
                               'echo', 'strum', 'humanize', 'chance', 'length', 'latch', 'mpe',
                               'articulation'];
 
+/** Old names still say what they mean: Transpose and Scale are the Key module now. */
+export const canonicalSlotType = (type) => (type === 'transpose' || type === 'scale' ? 'key' : type);
+
 export const midiSlotLabels = {
-  arp: 'Arpeggiator', transpose: 'Transpose', scale: 'Scale', chord: 'Chorder',
+  arp: 'Arpeggiator', key: 'Key', chord: 'Chords',
   velocity: 'Velocity / Expression', fx: 'Note shaping',
   echo: 'Echo', strum: 'Strum', humanize: 'Humanize', chance: 'Chance',
   length: 'Note length', latch: 'Latch', mpe: 'MPE Transformer',
@@ -2598,11 +2816,13 @@ export const midiSlotLabels = {
 };
 
 export function normalizeMidiSlot(slot) {
-  const type = String(slot?.type ?? '');
+  const type = canonicalSlotType(String(slot?.type ?? ''));
   return {
     slotId: String(slot?.slotId ?? ''),
     type: midiSlotTypes.includes(type) ? type : 'arp',
     bypassed: slot?.bypassed === true,
+    // How much of its effect the module applies (MidiSlot::amount); 1 = as set.
+    amount: clampNumber(slot?.amount, 0, 1, 1),
     arp: normalizeArp(slot?.arp),
     fx: normalizeMidiFx(slot?.fx),
     mod: normalizeNoteModule(slot?.mod),
@@ -2611,7 +2831,7 @@ export function normalizeMidiSlot(slot) {
 
 /** The later note modules' settings. Every default is transparent, which is the same rule the
     native side keeps: an inserted module must not change the sound by existing. */
-const STRUM_PATTERNS = ['ascending', 'descending', 'alternate', 'outside in', 'inside out', 'random'];
+const STRUM_PATTERNS = ['ascending', 'descending', 'alternate', 'outside in', 'inside out', 'random', 'by velocity'];
 const MPE_FORMATS = ['mpe', 'poly aftertouch', 'channel pressure', 'cc'];
 const MPE_AXES = ['pressure', 'timbre', 'pitch bend'];
 const MPE_COLLAPSE = ['latest', 'highest', 'average'];
@@ -2646,20 +2866,38 @@ const normalizeNoteModule = (m) => {
     echoStepBeats: clampNumber(m?.echoStepBeats, 0.03125, 4, 0.5),
     echoFeedback: clampNumber(m?.echoFeedback, 0.1, 1, 0.7),
     echoTranspose: clampInt(m?.echoTranspose, -12, 12, 0),
+    echoFeel: ['dotted', 'triplet'].includes(m?.echoFeel) ? m.echoFeel : 'straight',
+    echoScaleClimb: m?.echoScaleClimb === true,
+    echoShorter: m?.echoShorter === true,
+    echoFloor: clampInt(m?.echoFloor, 1, 127, 1),
     strumBeats: clampNumber(m?.strumBeats, 0, 1, 0),
     strumDown: strumPattern === 'descending',
     strumPattern,
     strumCurve: clampNumber(m?.strumCurve, -1, 1, 0),
     strumVelocityRamp: clampInt(m?.strumVelocityRamp, -64, 64, 0),
+    strumGuitar: m?.strumGuitar === true,
+    strumHarderFaster: m?.strumHarderFaster === true,
+    strumRepeatPerBeat: [2, 3, 4].includes(Number(m?.strumRepeatPerBeat)) ? Number(m.strumRepeatPerBeat) : 0,
     humanizeTimingBeats: clampNumber(m?.humanizeTimingBeats, 0, 0.25, 0),
     humanizeVelocity: clampInt(m?.humanizeVelocity, 0, 64, 0),
     humanizeGatePercent: clampInt(m?.humanizeGatePercent, 0, 100, 0),
     humanizePreserveChords: m?.humanizePreserveChords === true,
     humanizeProtectBeats: m?.humanizeProtectBeats === true,
+    humanizeLayBackBeats: clampNumber(m?.humanizeLayBackBeats, 0, 0.125, 0),
+    humanizeSwing: clampNumber(m?.humanizeSwing, 0, 0.75, 0),
+    humanizeSwingGrid: Number(m?.humanizeSwingGrid) >= 0.375 ? 0.5 : 0.25,
+    humanizeAccent: clampInt(m?.humanizeAccent, 0, 40, 0),
+    humanizeFreeze: m?.humanizeFreeze === true,
+    humanizeSeed: clampInt(m?.humanizeSeed, 1, 9999, 1),
     chance: clampNumber(m?.chance, 0, 1, 1),
+    chanceKeepDownbeats: m?.chanceKeepDownbeats === true,
+    chanceSoftFirst: m?.chanceSoftFirst === true,
     lengthBeats: clampNumber(m?.lengthBeats, 0, 8, 0),
     legato: m?.legato === true,
+    lengthMode: ['at most', 'at least'].includes(m?.lengthMode) ? m.lengthMode : 'fixed',
     latchOn: m?.latchOn === true,
+    latchMode: ['add', 'toggle'].includes(m?.latchMode) ? m.latchMode : 'replace',
+    latchPedalRelease: m?.latchPedalRelease === true,
     mpeEnabled: m?.mpeEnabled === true,
     mpeInput: MPE_FORMATS.includes(String(m?.mpeInput)) ? String(m.mpeInput) : 'mpe',
     mpeOutput: MPE_FORMATS.includes(String(m?.mpeOutput)) ? String(m.mpeOutput) : 'poly aftertouch',
@@ -2854,13 +3092,18 @@ const normalizeMidiFx = (f) => {
     transpose: Number(f?.transpose ?? 0),
     transposeMode: f?.transposeMode === 'diatonic' ? 'diatonic' : 'chromatic',
     constrainToScale: f?.constrainToScale === true,
+    scaleFold: f?.scaleFold === 'drop' ? 'drop' : 'snap',
+    followSongKey: f?.followSongKey === true,
     scaleRoot: Number(f?.scaleRoot ?? 0),
     scaleType: String(f?.scaleType ?? 'major'),
-    chord: String(f?.chord ?? 'off'),
+    ...normalizeChordLayers(f),
     chordInversion: clampInt(f?.chordInversion, 0, 3, 0),
     chordVoicing: CHORD_VOICINGS.includes(String(f?.chordVoicing ?? 'close'))
       ? String(f?.chordVoicing ?? 'close') : 'close',
     chordVoiceLeading: f?.chordVoiceLeading === true,
+    chordBass: f?.chordBass === true,
+    ...normalizePadsAndProgression(f),
+    chordTopAccent: clampInt(f?.chordTopAccent, 0, 40, 0),
     velocityFixed: clampInt(f?.velocityFixed, 0, 127, 0),
     velocityScale: clampNumber(f?.velocityScale, 0.1, 2, 1),
     responseProfileName: String(f?.responseProfileName ?? '').trim().slice(0, 80),
@@ -2880,12 +3123,126 @@ const normalizeMidiFx = (f) => {
     expressionOutputMin: expressionOutput[0],
     expressionOutputMax: expressionOutput[1],
     expressionCurveValues: normalizeResponseCurvePoints(f?.expressionCurveValues),
-    keyChords: (Array.isArray(f?.keyChords) ? f.keyChords : []).map((kc) => ({
-      key: Number(kc?.key ?? 60),
-      offsets: (Array.isArray(kc?.offsets) ? kc.offsets : []).map(Number),
-    })),
   };
 };
+
+const MAX_SET_CHORDS = 32;
+
+const normalizeSetChord = (c) => ({
+  name: String(c?.name ?? '').slice(0, 40),
+  notes: (Array.isArray(c?.notes) ? c.notes : []).slice(0, 6)
+    .map((n) => clampInt(n, 0, 127, 60)).sort((a, b) => a - b),
+  root: clampInt(c?.root, -1, 127, -1),
+  quality: String(c?.quality ?? ''),
+  inversion: clampInt(c?.inversion, 0, 3, 0),
+  voicing: CHORD_VOICINGS.includes(String(c?.voicing)) ? String(c.voicing) : 'close',
+  bass: c?.bass === true,
+});
+
+/** The Chords module's set and layers (MidiFxSettings in PatternModel.h), including the
+    reading of a state from before the layers, where `chord` alone said everything and learned
+    chords were offsets from their key. */
+function normalizeChordLayers(f) {
+  let chord = String(f?.chord ?? 'off');
+  const chordSet = (Array.isArray(f?.chordSet) ? f.chordSet : []).slice(0, MAX_SET_CHORDS)
+    .map(normalizeSetChord);
+  const keyMap = [];
+  const mapKey = (key, index) => {
+    const at = keyMap.findIndex((m) => m.key === key);
+    if (at >= 0) keyMap.splice(at, 1);
+    if (key >= 0 && key <= 127 && index >= 0 && index < chordSet.length) keyMap.push({ key, chord: index });
+  };
+  for (const m of Array.isArray(f?.keyMap) ? f.keyMap : [])
+    mapKey(clampInt(m?.key, -1, 127, -1), clampInt(m?.chord, -1, 1000, -1));
+  for (const kc of Array.isArray(f?.keyChords) ? f.keyChords : []) {
+    const key = clampInt(kc?.key, 0, 127, 60);
+    const notes = (Array.isArray(kc?.offsets) ? kc.offsets : [])
+      .map((o) => clampInt(key + Number(o), 0, 127, key)).slice(0, 6).sort((a, b) => a - b);
+    if (notes.length === 0) continue;
+    let index = chordSet.findIndex((c) => c.notes.join() === notes.join());
+    if (index < 0 && chordSet.length < MAX_SET_CHORDS) {
+      chordSet.push(normalizeSetChord({ notes }));
+      index = chordSet.length - 1;
+    }
+    if (index >= 0) mapKey(key, index);
+  }
+  let chordFollow = f?.chordFollow !== false;
+  let chordKeyMap = f?.chordKeyMap === true;
+  if (typeof f?.chordFollow !== 'boolean') {
+    chordFollow = chord !== 'off' && chord !== 'custom keys';
+    chordKeyMap = chord === 'custom keys';
+  }
+  if (chord === 'custom keys') chord = 'triad';
+  const low = clampInt(f?.chordFollowLow, 0, 127, 0);
+  const high = clampInt(f?.chordFollowHigh, 0, 127, 127);
+  return {
+    chord, chordFollow, chordKeyMap,
+    chordFollowLow: Math.min(low, high), chordFollowHigh: Math.max(low, high),
+    chordSet, keyMap: keyMap.sort((a, b) => a.key - b.key),
+  };
+}
+
+/** The Pads and Progression layers: 32 pad places (bank * 8 + pad, -1 empty) and the steps in
+    order. A pad past the set is empty; a step past it is dropped (midiFxFromVar's rule). */
+function normalizePadsAndProgression(f) {
+  const setSize = Math.min(MAX_SET_CHORDS, Array.isArray(f?.chordSet) ? f.chordSet.length : 0);
+  const inSet = (n) => Number.isInteger(Number(n)) && Number(n) >= 0 && Number(n) < setSize;
+  const pads = Array.isArray(f?.padMap) ? f.padMap : [];
+  const low = clampInt(f?.progressionLow, 0, 127, 0);
+  const high = clampInt(f?.progressionHigh, 0, 127, 59);
+  return {
+    chordPads: f?.chordPads === true,
+    padMap: Array.from({ length: 32 }, (_, i) => (inSet(pads[i]) ? Number(pads[i]) : -1)),
+    chordProgression: f?.chordProgression === true,
+    progression: (Array.isArray(f?.progression) ? f.progression : []).filter(inSet).map(Number).slice(0, 32),
+    progressionAdvance: f?.progressionAdvance === 'pedal' ? 'pedal' : 'key',
+    progressionLow: Math.min(low, high),
+    progressionHigh: Math.max(low, high),
+  };
+}
+
+/** The native applyMidiFxFields rule for `chord` sent without `chordFollow`: its old
+    one-field meaning. The mock applies it so localhost behaves like the host. */
+function applyLegacyChordField(block, payload) {
+  if (!('chord' in payload) || 'chordFollow' in payload) return;
+  const chord = String(payload.chord);
+  if (chord === 'off') { block.chordFollow = false; return; }
+  if (chord === 'custom keys') { block.chordFollow = false; block.chordKeyMap = true; return; }
+  block.chord = chord;
+  block.chordFollow = true;
+}
+
+/** Array fields of the note-shaping block whose entries are objects, not numbers. */
+const OBJECT_ARRAY_FIELDS = ['chordSet', 'keyMap', 'articulations'];
+// (padMap and progression are arrays of numbers, which the generic rule already handles.)
+
+/** The calibration fields a response profile carries: which keyboard, not what a part does
+    with it (fixed velocity and the final scale stay per part). saveResponseProfile's list. */
+export const RESPONSE_PROFILE_FIELDS = [
+  'velocityCurve', 'velocityCurveValues', 'velocityInputMin', 'velocityInputMax',
+  'velocityOutputMin', 'velocityOutputMax', 'expressionSource', 'expressionCc', 'expressionCurve',
+  'expressionCurveValues', 'expressionInputMin', 'expressionInputMax', 'expressionOutputMin',
+  'expressionOutputMax',
+];
+
+/** A saved keyboard calibration, read with the same rules as a module's own fields. */
+export function normalizeResponseProfile(profile) {
+  const fx = normalizeMidiFx(profile ?? {});
+  return {
+    name: String(profile?.name ?? '').trim().slice(0, 80),
+    portHint: String(profile?.portHint ?? '').trim().slice(0, 80),
+    ...Object.fromEntries(RESPONSE_PROFILE_FIELDS.map((key) => [key, fx[key]])),
+  };
+}
+
+const normalizeSection = (i) => ({
+  itemId: String(i?.itemId ?? ''),
+  name: String(i?.name ?? ''),
+  sceneId: String(i?.sceneId ?? ''),
+  sceneName: String(i?.sceneName ?? ''),
+  missing: i?.missing === true,
+  bars: Math.max(1, Math.min(128, Number(i?.bars ?? 4))),
+});
 
 export function normalizePerformance(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
@@ -3024,6 +3381,10 @@ export function normalizePerformance(payload) {
       variationSourceSceneId: String(s?.variationSourceSceneId ?? ''),
       variationAmount: Math.max(0, Math.min(1, Number(s?.variationAmount ?? 0))),
     })),
+    // The scene whose state was applied last (the scene the stage is in), and one waiting for
+    // its boundary.
+    currentSceneId: String(p.currentSceneId ?? ''),
+    queuedSceneId: String(p.queuedSceneId ?? ''),
     snapshotMorph: {
       active: snapshotMorph.active === true,
       sceneId: String(snapshotMorph.sceneId ?? ''),
@@ -3043,8 +3404,16 @@ export function normalizePerformance(payload) {
         missing: i?.missing === true,
         notes: String(i?.notes ?? ''),
         tempo: Number(i?.tempo ?? 0),
+        // How long the song should take on stage, in seconds; 0 = not planned.
+        plannedSeconds: Math.max(0, Math.min(3600, Math.round(Number(i?.plannedSeconds ?? 0)) || 0)),
+        // The song's own structure: sections, each a scene held for a number of bars.
+        sections: (Array.isArray(i?.sections) ? i.sections : []).map(normalizeSection),
+        sectionsLoop: i?.sectionsLoop === true,
       })),
       currentIndex: Number(setlist.currentIndex ?? -1),
+      // The stage's clocks, wall-clock ms: when the set began, and when the song on stage did.
+      startedAtMs: Math.max(0, Number(setlist.startedAtMs ?? 0) || 0),
+      songStartedAtMs: Math.max(0, Number(setlist.songStartedAtMs ?? 0) || 0),
       preloadAhead: Math.max(0, Math.min(2, Number(setlist.preloadAhead ?? 1))),
       loadingIndex: Number(setlist.loadingIndex ?? -1),
       preloads: (Array.isArray(setlist.preloads) ? setlist.preloads : []).map((preload) => ({
@@ -3058,14 +3427,9 @@ export function normalizePerformance(payload) {
       })),
     },
     arrangement: {
-      items: (Array.isArray(arrangement.items) ? arrangement.items : []).map((i) => ({
-        itemId: String(i?.itemId ?? ''),
-        name: String(i?.name ?? ''),
-        sceneId: String(i?.sceneId ?? ''),
-        sceneName: String(i?.sceneName ?? ''),
-        missing: i?.missing === true,
-        bars: Math.max(1, Math.min(128, Number(i?.bars ?? 4))),
-      })),
+      // What plays: the current song's sections (songId), or the show-wide list ('').
+      items: (Array.isArray(arrangement.items) ? arrangement.items : []).map(normalizeSection),
+      songId: String(arrangement.songId ?? ''),
       loop: arrangement.loop === true,
       playing: arrangement.playing === true,
       currentIndex: Number(arrangement.currentIndex ?? -1),
@@ -3849,6 +4213,13 @@ export function normalizeHostState(payload) {
     editorOpenPartId: editorOpenPartIds.at(-1) ?? '',
     editorOpenPartIds,
     floatingEditorPartIds: (Array.isArray(p.floatingEditorPartIds) ? p.floatingEditorPartIds : []).map(String),
+    responseProfiles: (Array.isArray(p.responseProfiles) ? p.responseProfiles : []).map(normalizeResponseProfile)
+      .filter((profile) => profile.name),
+    responseProfileForPorts: String(p.responseProfileForPorts ?? ''),
+    modulePresets: (Array.isArray(p.modulePresets) ? p.modulePresets : [])
+      .map((preset) => ({ type: canonicalSlotType(String(preset?.type ?? '')), name: String(preset?.name ?? '').slice(0, 80),
+                          settings: preset?.settings && typeof preset.settings === 'object' ? preset.settings : {} }))
+      .filter((preset) => preset.name && midiSlotTypes.includes(preset.type)),
     audio: {
       enabled: p.audio?.enabled === true,
       running: p.audio?.running === true,
@@ -4103,6 +4474,9 @@ export function normalizeHostState(payload) {
         name: String(page?.name ?? ''),
         generated: page?.generated === true,
         generatedForPartId: String(page?.generatedForPartId ?? ''),
+        // A page made for one preset: loading it shows this page (see setControlPagePreset).
+        presetRecordId: String(page?.presetRecordId ?? ''),
+        presetName: String(page?.presetName ?? ''),
         slots: (Array.isArray(page?.slots) ? page.slots : []).map((slot, position, all) => ({
           slotId: String(slot?.slotId ?? ''),
           // Which control on the surface: kind and index in the layout's own terms. Absent
@@ -4128,6 +4502,10 @@ export function normalizeHostState(payload) {
           midiNote: Number.isInteger(slot?.midiNote) ? Math.max(-1, Math.min(127, slot.midiNote)) : -1,
           midiPickup: slot?.midiPickup === true,
           midiRelative: slot?.midiRelative === true,
+          // 0 two's complement (1 = +1, 127 = -1), 1 offset binary (64 +/- n), 2 sign bit.
+          midiRelativeFormat: [0, 1, 2].includes(slot?.midiRelativeFormat) ? slot.midiRelativeFormat : 0,
+          // 0 = smooth; 2+ = snaps to that many positions.
+          steps: Math.max(0, Math.min(128, Math.trunc(Number(slot?.steps ?? 0) || 0))),
           pickupDirection: slot?.midiPickup === true && slot?.midiRelative !== true && slot?.toggle !== true
             && slot?.midiCc >= 0 && !(slot?.midiNote >= 0) && [-1, 1].includes(slot?.pickupDirection)
             ? slot.pickupDirection : 0,
@@ -4213,6 +4591,9 @@ export function normalizeHostState(payload) {
         arp: normalizeArp(part?.arp),
         midiFx: normalizeMidiFx(part?.midiFx),
         midiChain: (Array.isArray(part?.midiChain) ? part.midiChain : []).map(normalizeMidiSlot),
+        // The song key; modules that follow it (fx.followSongKey) read it instead of their own.
+        keyRoot: clampInt(part?.keyRoot, 0, 11, clampInt(part?.midiFx?.scaleRoot, 0, 11, 0)),
+        keyScale: String(part?.keyScale ?? part?.midiFx?.scaleType ?? 'major'),
         enabled: part?.enabled !== false,
         mute: part?.mute === true,
         solo: part?.solo === true,
@@ -4842,6 +5223,30 @@ function applyMockSnapshot(scene, state) {
 
 /** The mock reducer: applies one command to a normalized state, so the browser-only app
  *  behaves instead of stalling. Deliberately mirrors the native semantics the tests pin. */
+/** The mock keeps the host's rule: a song's sections are its own, and what plays is the
+    current song's (or the show-wide list with no song current). Edits name the song. */
+function mockSectionsFor(perf, songId) {
+  if (songId) {
+    const song = perf.setlist.items.find((item) => item.itemId === songId);
+    if (!song) return null;
+    song.sections ??= [];
+    return { items: song.sections, setLoop: (loop) => { song.sectionsLoop = loop; } };
+  }
+  perf.showArrangement ??= { items: [...perf.arrangement.items], loop: perf.arrangement.loop };
+  const show = perf.showArrangement;
+  return { items: show.items, setLoop: (loop) => { show.loop = loop; } };
+}
+function mockIsPlaying(perf, songId) {
+  return (perf.arrangement.songId ?? '') === (songId ?? '');
+}
+function mockShowPlaying(perf) {
+  const song = perf.setlist.items[perf.setlist.currentIndex];
+  const show = perf.showArrangement ?? { items: perf.arrangement.items, loop: perf.arrangement.loop };
+  perf.arrangement.items = (song ? song.sections ?? [] : show.items).map((item) => ({ ...item }));
+  perf.arrangement.loop = song ? song.sectionsLoop === true : show.loop;
+  perf.arrangement.songId = song?.itemId ?? '';
+}
+
 export function applyMockCommand(state, payload) {
   const cmd = payload?.cmd;
   const next = normalizeHostState(state);
@@ -4984,6 +5389,31 @@ export function applyMockCommand(state, payload) {
       // One editor per processor: docking pulls a floating part back in.
       next.floatingEditorPartIds = next.floatingEditorPartIds.filter((id) => id !== payload.partId);
     }
+    return next;
+  }
+  if (cmd === 'saveModulePreset' || cmd === 'removeModulePreset') {
+    const type = canonicalSlotType(String(payload.type ?? ''));
+    const name = String(payload.name ?? '').trim().slice(0, 80);
+    if (!name || !midiSlotTypes.includes(type)) return next;
+    const kept = (next.modulePresets ?? []).filter((p) => !(p.type === type && p.name === name));
+    next.modulePresets = cmd === 'saveModulePreset'
+      ? [...kept, { type, name, settings: JSON.parse(JSON.stringify(payload.settings ?? {})) }] : kept;
+    return next;
+  }
+  if (cmd === 'setPartKey') {
+    const target = part(payload.partId);
+    if (!target) return next;
+    if ('root' in payload) target.keyRoot = clampInt(payload.root, 0, 11, target.keyRoot);
+    if ('scale' in payload) target.keyScale = String(payload.scale);
+    return next;
+  }
+  if (cmd === 'saveResponseProfile' || cmd === 'removeResponseProfile') {
+    const name = String(payload.name ?? '').trim().slice(0, 80);
+    if (!name) return next;
+    const kept = (next.responseProfiles ?? []).filter((profile) => profile.name !== name);
+    next.responseProfiles = cmd === 'saveResponseProfile'
+      ? [...kept, normalizeResponseProfile({ ...payload, name })]
+      : kept;
     return next;
   }
   if (cmd === 'floatEditor') {
@@ -5885,7 +6315,7 @@ export function applyMockCommand(state, payload) {
         resolved: true,
       });
     } else {
-      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'toggle', 'label', 'midiPickup', 'midiRelative', 'colour'])
+      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'toggle', 'label', 'midiPickup', 'midiRelative', 'midiRelativeFormat', 'steps', 'colour'])
         if (payload[key] !== undefined) slot[key] = payload[key];
       slot.pickupDirection = 0;
       if (payload.label !== undefined && payload.label) slot.displayName = String(payload.label);
@@ -6017,21 +6447,36 @@ export function applyMockCommand(state, payload) {
                           displayName: first.name, partName: part.pluginName, resolved: true });
     return next;
   }
-  if (cmd === 'learnKeyChord') {
-    // No keys to hear in the browser: the mock captures a C-major triad onto middle C at
-    // once, enough to demo the map, the badge, and the clear.
+  if (cmd === 'learnKeyChord' || cmd === 'clearKeyChord') {
+    // Which module: the slot named, else the part's first Chords slot, else the part-level
+    // block — InstrumentHostService::editChordModule's order.
     const target = part(payload.partId);
     if (!target) return next;
-    target.midiFx.keyChords = [
-      ...target.midiFx.keyChords.filter((kc) => kc.key !== 60),
-      { key: 60, offsets: [0, 4, 7] },
-    ];
-    return next;
-  }
-  if (cmd === 'clearKeyChord') {
-    const target = part(payload.partId);
-    if (!target) return next;
-    target.midiFx.keyChords = target.midiFx.keyChords.filter((kc) => kc.key !== Number(payload.key));
+    const slot = payload.slotId
+      ? target.midiChain.find((s) => s.slotId === payload.slotId)
+      : target.midiChain.find((s) => s.type === 'chord');
+    if (payload.slotId && !slot) return next;
+    const fx = slot ? slot.fx : target.midiFx;
+    if (cmd === 'learnKeyChord') {
+      // No keys to hear in the browser: the mock captures a C-major triad onto middle C at
+      // once, enough to demo the set, the map and the clear.
+      const notes = [60, 64, 67];
+      let index = fx.chordSet.findIndex((c) => c.notes.join() === notes.join());
+      if (index < 0) {
+        if (fx.chordSet.length >= MAX_SET_CHORDS) return next;
+        fx.chordSet.push(normalizeSetChord({ notes }));
+        index = fx.chordSet.length - 1;
+      }
+      fx.keyMap = [...fx.keyMap.filter((m) => m.key !== 60), { key: 60, chord: index }]
+        .sort((a, b) => a.key - b.key);
+      fx.chordKeyMap = true;
+    } else {
+      fx.keyMap = fx.keyMap.filter((m) => m.key !== Number(payload.key));
+    }
+    if (!slot) {
+      const mirror = target.midiChain.find((s) => s.type !== 'arp');
+      if (mirror) mirror.fx = { ...fx };
+    }
     return next;
   }
   if (cmd === 'walkPartPreset') {
@@ -6874,6 +7319,7 @@ export function applyMockCommand(state, payload) {
     }
     if (scene.tempo > 0) perf.transport.tempo = scene.tempo;
     applyMockSnapshot(scene, next);
+    perf.currentSceneId = scene.sceneId;
     perf.snapshotMorph = {
       active: false, sceneId: scene.sceneId, name: scene.name,
       durationBeats: scene.morphBeats, progress: 1,
@@ -6895,6 +7341,9 @@ export function applyMockCommand(state, payload) {
       missing: !!payload.sceneId && !scene,
       notes: '',
       tempo: 0,
+      plannedSeconds: 0,
+      sections: [],
+      sectionsLoop: false,
     });
     return next;
   }
@@ -6906,18 +7355,24 @@ export function applyMockCommand(state, payload) {
   if (cmd === 'removeSetlistItem' || cmd === 'setSetlistItem' || cmd === 'moveSetlistItem') {
     const index = perf.setlist.items.findIndex((i) => i.itemId === payload.itemId);
     if (index < 0) return next;
+    // As natively: the current song stays current as others move; removing it leaves none.
+    const currentId = perf.setlist.items[perf.setlist.currentIndex]?.itemId ?? '';
     if (cmd === 'removeSetlistItem') {
       perf.setlist.items.splice(index, 1);
-      perf.setlist.currentIndex = Math.min(perf.setlist.currentIndex, perf.setlist.items.length - 1);
+      perf.setlist.currentIndex = perf.setlist.items.findIndex((i) => i.itemId === currentId);
+      mockShowPlaying(perf);
     } else if (cmd === 'moveSetlistItem') {
       const [item] = perf.setlist.items.splice(index, 1);
       perf.setlist.items.splice(Math.min(perf.setlist.items.length,
                                          Math.max(0, Number(payload.index ?? index))), 0, item);
+      perf.setlist.currentIndex = perf.setlist.items.findIndex((i) => i.itemId === currentId);
     } else {
       const item = perf.setlist.items[index];
       for (const key of ['name', 'notes', 'rackRecordId', 'pageId'])
         if (payload[key] !== undefined) item[key] = String(payload[key]);
       if (payload.tempo !== undefined) item.tempo = Number(payload.tempo);
+      if (payload.plannedSeconds !== undefined)
+        item.plannedSeconds = Math.max(0, Math.min(3600, Math.round(Number(payload.plannedSeconds)) || 0));
       if (payload.sceneId !== undefined) {
         item.sceneId = String(payload.sceneId);
         const scene = perf.scenes.find((s) => s.sceneId === item.sceneId);
@@ -6927,21 +7382,36 @@ export function applyMockCommand(state, payload) {
     }
     return next;
   }
+  if (cmd === 'resetSetlistClock') {
+    if (perf.setlist.currentIndex >= 0) perf.setlist.startedAtMs = perf.setlist.songStartedAtMs = Date.now();
+    return next;
+  }
   if (cmd === 'setlistGo' || cmd === 'setlistNext' || cmd === 'setlistPrev') {
     const target = cmd === 'setlistGo' ? Number(payload.index ?? 0)
       : cmd === 'setlistNext' ? perf.setlist.currentIndex + 1 : perf.setlist.currentIndex - 1;
     const item = perf.setlist.items[target];
     // The native rule, mirrored: an item whose scene is gone leaves the rig where it was.
     if (!item || item.missing) return next;
+    // The stage's clocks, as the host keeps them: the song starts now, and so does the set
+    // when this is its first song or the set is starting over at song 1.
+    const now = Date.now();
+    if (perf.setlist.currentIndex < 0 || target === 0 || !perf.setlist.startedAtMs) perf.setlist.startedAtMs = now;
+    perf.setlist.songStartedAtMs = now;
+    if (perf.arrangement.playing) { perf.arrangement.playing = false; perf.arrangement.currentIndex = -1; }
     perf.setlist.currentIndex = target;
     perf.setlist.loadingIndex = -1;
-    if (item.sceneId) return applyMockCommand(next, { cmd: 'launchScene', sceneId: item.sceneId });
+    mockShowPlaying(perf);
+    const sections = item.sections ?? [];
+    if (sections.length > 0 && perf.transport.playing) return applyMockCommand(next, { cmd: 'startArrangement', index: 0 });
+    const opening = item.sceneId || sections[0]?.sceneId;
+    if (opening) return applyMockCommand(next, { cmd: 'launchScene', sceneId: opening });
     return next;
   }
   if (cmd === 'addArrangementItem') {
     const scene = perf.scenes.find((s) => s.sceneId === payload.sceneId);
-    if (!scene || perf.arrangement.playing) return next;
-    perf.arrangement.items.push({
+    const target = mockSectionsFor(perf, payload.songId);
+    if (!scene || !target || (perf.arrangement.playing && mockIsPlaying(perf, payload.songId))) return next;
+    target.items.push({
       itemId: nextMockId('mock-arrangement'),
       name: String(payload.name || scene.name),
       sceneId: scene.sceneId,
@@ -6949,21 +7419,23 @@ export function applyMockCommand(state, payload) {
       missing: false,
       bars: Math.max(1, Math.min(128, Number(payload.bars ?? 4))),
     });
+    mockShowPlaying(perf);
     return next;
   }
   if (cmd === 'removeArrangementItem' || cmd === 'setArrangementItem'
       || cmd === 'moveArrangementItem') {
-    if (perf.arrangement.playing) return next;
-    const index = perf.arrangement.items.findIndex((i) => i.itemId === payload.itemId);
+    const target = mockSectionsFor(perf, payload.songId);
+    if (!target || (perf.arrangement.playing && mockIsPlaying(perf, payload.songId))) return next;
+    const index = target.items.findIndex((i) => i.itemId === payload.itemId);
     if (index < 0) return next;
     if (cmd === 'removeArrangementItem') {
-      perf.arrangement.items.splice(index, 1);
+      target.items.splice(index, 1);
     } else if (cmd === 'moveArrangementItem') {
-      const [item] = perf.arrangement.items.splice(index, 1);
-      perf.arrangement.items.splice(Math.min(perf.arrangement.items.length,
+      const [item] = target.items.splice(index, 1);
+      target.items.splice(Math.min(target.items.length,
         Math.max(0, Number(payload.index ?? index))), 0, item);
     } else {
-      const item = perf.arrangement.items[index];
+      const item = target.items[index];
       if (payload.name !== undefined) item.name = String(payload.name);
       if (payload.bars !== undefined)
         item.bars = Math.max(1, Math.min(128, Number(payload.bars)));
@@ -6975,10 +7447,13 @@ export function applyMockCommand(state, payload) {
         item.missing = false;
       }
     }
+    mockShowPlaying(perf);
     return next;
   }
   if (cmd === 'setArrangementOptions') {
-    if (payload.loop !== undefined) perf.arrangement.loop = payload.loop === true;
+    const target = mockSectionsFor(perf, payload.songId);
+    if (target && payload.loop !== undefined) target.setLoop(payload.loop === true);
+    mockShowPlaying(perf);
     return next;
   }
   if (cmd === 'startArrangement') {
@@ -7136,9 +7611,10 @@ export function applyMockCommand(state, payload) {
     const index = chain.findIndex((s) => s.slotId === payload.slotId);
 
     if (cmd === 'addMidiSlot') {
-      if (!midiSlotTypes.includes(payload.type) || chain.length >= 8) return next;
-      chain.push(normalizeMidiSlot({ slotId: nextMockId('mock-slot'),
-                                     type: payload.type }));
+      const type = canonicalSlotType(payload.type);
+      if (!midiSlotTypes.includes(type) || chain.length >= 8) return next;
+      // A module added now follows the part's song key, as MidiSlot::create does.
+      chain.push(normalizeMidiSlot({ slotId: nextMockId('mock-slot'), type, fx: { followSongKey: true } }));
       return next;
     }
     if (index < 0) return next;
@@ -7160,13 +7636,20 @@ export function applyMockCommand(state, payload) {
         : chain[index].fx;
       for (const [key, value] of Object.entries(payload)) {
         if (['cmd', 'partId', 'slotId'].includes(key) || !(key in block)) continue;
-        block[key] = key === 'articulations'
+        block[key] = OBJECT_ARRAY_FIELDS.includes(key)
           ? (Array.isArray(value) ? value.map((entry) => ({ ...entry })) : block[key])
           : typeof block[key] === 'boolean' ? value === true
           : typeof block[key] === 'number' ? Number(value)
           : Array.isArray(block[key]) ? (Array.isArray(value) ? value.map(Number) : block[key])
           : String(value);
       }
+      if (block === chain[index].fx) applyLegacyChordField(block, payload);
+      if ('amount' in payload) chain[index].amount = clampNumber(payload.amount, 0, 1, 1);
+      // The arp's scale lives in its fx block, as on the native side.
+      if (chain[index].type === 'arp')
+        for (const key of ['followSongKey', 'scaleType', 'scaleRoot'])
+          if (key in payload) chain[index].fx[key] = key === 'followSongKey' ? payload[key] === true
+            : key === 'scaleRoot' ? Number(payload[key]) : String(payload[key]);
       if (chain[index].type === 'strum') {
         if ('strumDown' in payload && !('strumPattern' in payload))
           block.strumPattern = payload.strumDown === true ? 'descending' : 'ascending';
@@ -7185,11 +7668,14 @@ export function applyMockCommand(state, payload) {
     const block = cmd === 'setPartArp' ? target.arp : target.midiFx;
     for (const [key, value] of Object.entries(payload)) {
       if (key === 'cmd' || key === 'partId' || !(key in block)) continue;
-      block[key] = typeof block[key] === 'boolean' ? value === true
+      block[key] = OBJECT_ARRAY_FIELDS.includes(key)
+        ? (Array.isArray(value) ? value.map((entry) => ({ ...entry })) : block[key])
+        : typeof block[key] === 'boolean' ? value === true
         : typeof block[key] === 'number' ? Number(value)
         : Array.isArray(block[key]) ? (Array.isArray(value) ? value.map(Number) : block[key])
         : String(value);
     }
+    if (cmd === 'setPartMidiFx') applyLegacyChordField(block, payload);
     // The part-level setters are doors onto the chain's first slot of that family, exactly
     // as the native side treats them — mirroring here keeps one truth on screen.
     const wantsArp = cmd === 'setPartArp';
@@ -7257,7 +7743,7 @@ export function initInstrumentHostBridge() {
       hostRackCaptures.set(normalized.records.filter((record) => record.type === 'rack'));
       return;
     }
-    hostLibrary.set(normalized);
+    hostLibrary.update((previous) => mergeLibraryPage(previous, normalized));
   });
   onInstrumentHostVersionDiff((payload) => hostVersionDiff.set(normalizeVersionDiff(payload)));
   onInstrumentHostSimilar((payload) => hostSimilar.set(normalizeSimilar(payload)));
@@ -7296,6 +7782,10 @@ export function initInstrumentHostBridge() {
     note: Number.isInteger(payload?.note) ? payload.note : -1,
     channel: Number(payload?.channel ?? 0),
     value: Number(payload?.value ?? 0),
+    // Every touch since the last tick ([kind, a, b]): 0 note-on (note, velocity), 1 controller
+    // (number, value), 2 channel pressure (-, value), 3 poly aftertouch (note, value).
+    touch: (Array.isArray(payload?.touch) ? payload.touch : [])
+      .filter((t) => Array.isArray(t) && t.length === 3).map((t) => t.map(Number)),
     seq: a.seq + 1,
   })));
   onInstrumentHostSurface((payload) => hostSurface.set(normalizeHostSurface(payload)));
@@ -7429,6 +7919,19 @@ export function initInstrumentHostBridge() {
       },
     };
   }));
+  onInstrumentHostModuleActivity((payload) => hostModuleActivity.update((all) => ({
+    ...all,
+    [String(payload?.partId ?? '')]: Object.fromEntries(Object.entries(payload?.slots ?? {})
+      .map(([slotId, count]) => [slotId, Number(count) || 0])),
+  })));
+  onInstrumentHostChordsLive((payload) => hostChordsLive.update((all) => ({
+    ...all,
+    [String(payload?.partId ?? '')]: {
+      chord: Number.isInteger(payload?.chord) ? payload.chord : -1,
+      step: Number.isInteger(payload?.step) ? payload.step : 0,
+      pads: Number(payload?.pads ?? 0) >>> 0,
+    },
+  })));
   onInstrumentHostChordLearn((payload) => hostChordLearn.set({
     armed: payload?.armed === true,
     partId: String(payload?.partId ?? ''),
@@ -7558,8 +8061,20 @@ function send(payload) {
     hostLastError.set('');
   }
   if (!isJuceAvailable()) {
+    if (payload?.cmd === 'chordPad' || payload?.cmd === 'chordStep') {
+      const part = (get(hostState)?.rack?.parts ?? []).find((p) => p.partId === payload.partId);
+      const slot = part?.midiChain.find((s) => (payload.slotId ? s.slotId === payload.slotId : s.type === 'chord'));
+      if (slot) hostChordsLive.update((all) => ({
+        ...all, [payload.partId]: applyMockChordsLive(all[payload.partId], slot.fx, payload) }));
+      return;
+    }
     if (payload?.cmd === 'surfaceInput') {
       mockSurfaceInput(payload.data);
+      return;
+    }
+    if (payload?.cmd === 'showControlPage') {
+      const index = (get(hostState)?.rack?.pages ?? []).findIndex((p) => p.pageId === payload.pageId);
+      if (index >= 0) mockSurfaceCursor.update((c) => ({ ...c, page: index, active: 0 }));
       return;
     }
     if (payload?.cmd === 'beginStageUnlock') {
@@ -7784,11 +8299,12 @@ function send(payload) {
       const requestedView = payload.cmd === 'getLibrary' ? normalizeLibraryQuery(payload)
                                                          : mockLibraryView;
       if (!payload.consumer) mockLibraryView = requestedView;
-      const library = mockHostLibrary(requestedView);
+      const page = { offset: payload.offset, limit: payload.limit };
+      const library = mockHostLibrary(requestedView, '', payload.cmd === 'getLibrary' ? page : {});
       if (payload.consumer === 'setlist')
         hostRackCaptures.set(library.records.filter((record) => record.type === 'rack'));
       else
-        hostLibrary.set(library);
+        hostLibrary.update((previous) => mergeLibraryPage(previous, library));
       return;
     }
     if (payload?.cmd === 'analyseLibrary') {
@@ -8105,7 +8621,7 @@ function send(payload) {
     if (payload?.cmd === 'setAuditionPhrase') {
       hostAudition.update((was) => ({
         ...was,
-        phrase: ['note', 'chord', 'recent'].includes(payload.phrase) ? payload.phrase : was.phrase,
+        phrase: ['phrase', 'recent'].includes(payload.phrase) ? payload.phrase : was.phrase,
         bars: payload.bars ? Math.min(16, Math.max(1, Number(payload.bars))) : was.bars,
       }));
       return;
@@ -8186,15 +8702,21 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'setLibraryUserMetadata') {
-      hostLibrary.update((lib) => ({
-        ...lib,
-        records: lib.records.map((r) => r.recordId === payload.recordId
+      hostLibrary.update((lib) => {
+        const records = lib.records.map((r) => r.recordId === payload.recordId
           ? { ...r,
               favourite: payload.favourite !== undefined ? payload.favourite === true : r.favourite,
               rating: payload.rating !== undefined ? Number(payload.rating) : r.rating,
-              notes: payload.notes !== undefined ? String(payload.notes) : r.notes }
-          : r),
-      }));
+              notes: payload.notes !== undefined ? String(payload.notes) : r.notes,
+              tags: Array.isArray(payload.tags) ? payload.tags.map(String) : r.tags,
+              collections: Array.isArray(payload.collections) ? payload.collections.map(String) : r.collections }
+          : r);
+        // Collections exist because records name them, as they do in the host.
+        const counts = new Map();
+        for (const r of records) for (const name of r.collections) counts.set(name, (counts.get(name) ?? 0) + 1);
+        return { ...lib, records, collections: [...counts].map(([name, count]) => ({ name, count }))
+          .sort((x, y) => x.name.localeCompare(y.name)) };
+      });
       return;
     }
     if (payload?.cmd === 'unplayedLikeHabits') {
@@ -8402,6 +8924,31 @@ function send(payload) {
     }
     if (payload?.cmd === 'addLibraryPath' || payload?.cmd === 'removeLibraryPath'
         || payload?.cmd === 'browseLibraryPath') return;
+    if (payload?.cmd === 'browseStateFolder' || payload?.cmd === 'addStateFolder' || payload?.cmd === 'removeStateFolder') {
+      // The native test load, as far as the demo can tell it: Roland's banks are not a saved
+      // state, Sugar Bytes' files are.
+      const row = MOCK_PRESET_REPORT.find((r) => r.ceId === payload.ceId);
+      if (payload.cmd === 'removeStateFolder') {
+        mockStateFolders = mockStateFolders.filter((f) => f.path !== payload.path);
+      } else {
+        const path = payload.cmd === 'addStateFolder' ? String(payload.path ?? '')
+          : row?.candidate?.path ?? `C:\\Presets\\${row?.name ?? 'Plug-in'}`;
+        const extension = row?.candidate?.extension ?? 'preset';
+        const reads = extension !== 'bin';
+        mockStateFolders = [...mockStateFolders.filter((f) => f.path !== path), {
+          path, ceId: String(payload.ceId ?? ''), plugin: row?.name ?? '', extension,
+          status: reads ? 'ok' : 'refused',
+          detail: reads ? '' : `Loading Acid House.${extension} left ${row?.name} as it was, so these are not its presets.`,
+          count: reads ? (row?.candidate?.files ?? 3) : 0,
+        }];
+      }
+      hostLibrary.update((previous) => ({
+        ...previous,
+        stateFolders: normalizeHostLibrary({ stateFolders: mockStateFolders }).stateFolders,
+        scanReport: normalizeHostLibrary({ scanReport: mockPresetReport() }).scanReport,
+      }));
+      return;
+    }
     if (payload?.cmd === 'setControlSlotValue') {
       // Mirror the native mapping far enough for the demo: drive the parameter view when the
       // bound part's registry is on screen.
@@ -8704,15 +9251,38 @@ export const startSoundComparison = (partId, recordIds = []) =>
 export const stepSoundComparison = (delta = 1) => send({ cmd: 'stepSoundComparison', delta });
 export const keepSoundComparison = () => send({ cmd: 'keepSoundComparison' });
 export const cancelSoundComparison = () => send({ cmd: 'cancelSoundComparison' });
-export const learnKeyChord = (partId) => send({ cmd: 'learnKeyChord', partId });
+export const learnKeyChord = (partId, slotId = '') =>
+  send({ cmd: 'learnKeyChord', partId, ...(slotId ? { slotId } : {}) });
 export const cancelKeyChordLearn = () => send({ cmd: 'cancelKeyChordLearn' });
-export const clearKeyChord = (partId, key) => send({ cmd: 'clearKeyChord', partId, key });
+/** Saves (or replaces) a module's settings under a name, for its module type. */
+export const saveModulePreset = (type, name, settings) => send({ cmd: 'saveModulePreset', type, name, settings });
+export const removeModulePreset = (type, name) => send({ cmd: 'removeModulePreset', type, name });
+/** The part's song key: { root?: 0..11, scale?: name }. */
+export const setPartKey = (partId, fields) => send({ cmd: 'setPartKey', partId, ...fields });
+/** Saves (or replaces, by name) a keyboard's velocity/expression calibration. */
+export const saveResponseProfile = (name, portHint, fields) => send({
+  cmd: 'saveResponseProfile', name, portHint,
+  ...Object.fromEntries(RESPONSE_PROFILE_FIELDS.filter((key) => key in fields).map((key) => [key, fields[key]])),
+});
+export const removeResponseProfile = (name) => send({ cmd: 'removeResponseProfile', name });
+/** Plays (velocity > 0) or releases a pad of a Chords module: bank * 8 + pad. */
+export const chordPad = (partId, slotId, pad, velocity) =>
+  send({ cmd: 'chordPad', partId, pad, velocity, ...(slotId ? { slotId } : {}) });
+/** Moves a Chords progression: { step } jumps there, { delta } steps by that much. */
+export const chordStep = (partId, slotId, move) =>
+  send({ cmd: 'chordStep', partId, ...move, ...(slotId ? { slotId } : {}) });
+export const clearKeyChord = (partId, key, slotId = '') =>
+  send({ cmd: 'clearKeyChord', partId, key, ...(slotId ? { slotId } : {}) });
 /** Ask for a view of the library. Takes either the older (text, type) pair or a whole
     LibraryQuery — the native side reads both, so the two callers can coexist. */
 export const requestLibrary = (query = '', type = '') =>
   (typeof query === 'object' && query !== null
     ? send({ cmd: 'getLibrary', ...normalizeLibraryQuery(query) })
     : send({ cmd: 'getLibrary', query, type }));
+/** One page of a view: `limit` rows from `offset`. A first page starts the view over; a later
+    one continues it (mergeLibraryPage). */
+export const requestLibraryPage = (query, offset, limit) =>
+  send({ cmd: 'getLibrary', ...normalizeLibraryQuery(query), offset, limit });
 export const requestRackCaptures = () => send({ cmd: 'getLibrary', type: 'rack', consumer: 'setlist' });
 
 /** Save the view you are looking at as a rail entry. Omitting the query means "what is on
@@ -8818,6 +9388,10 @@ export const setAuditionPhrase = (phrase, bars) =>
 export const scanLibrary = () => send({ cmd: 'scanLibrary' });
 export const browseLibraryPath = () => send({ cmd: 'browseLibraryPath' });
 export const removeLibraryPath = (path) => send({ cmd: 'removeLibraryPath', path });
+/** Pick a folder of one plug-in's presets; the host test-loads two of them before indexing. */
+export const browseStateFolder = (ceId) => send({ cmd: 'browseStateFolder', ceId });
+export const addStateFolder = (path, ceId) => send({ cmd: 'addStateFolder', path, ceId });
+export const removeStateFolder = (path) => send({ cmd: 'removeStateFolder', path });
 export const saveUserPreset = (partId, name) => send({ cmd: 'saveUserPreset', partId, name });
 export const saveRackToLibrary = (name) => send({ cmd: 'saveRackToLibrary', name });
 export const requestSurfaceLayout = (profileId) =>
@@ -8924,17 +9498,20 @@ export const setSetlistItem = (itemId, fields) => send({ cmd: 'setSetlistItem', 
 export const moveSetlistItem = (itemId, index) => send({ cmd: 'moveSetlistItem', itemId, index });
 export const setSetlistOptions = (fields) => send({ cmd: 'setSetlistOptions', ...fields });
 export const setlistGo = (index) => send({ cmd: 'setlistGo', index });
+/** Restart the set and song clocks from now, leaving the song where it is. */
+export const resetSetlistClock = () => send({ cmd: 'resetSetlistClock' });
 export const setlistNext = () => send({ cmd: 'setlistNext' });
 export const setlistPrev = () => send({ cmd: 'setlistPrev' });
-export const addArrangementItem = (sceneId, name) =>
-  send(name ? { cmd: 'addArrangementItem', sceneId, name }
-            : { cmd: 'addArrangementItem', sceneId });
-export const removeArrangementItem = (itemId) => send({ cmd: 'removeArrangementItem', itemId });
-export const setArrangementItem = (itemId, fields) =>
-  send({ cmd: 'setArrangementItem', itemId, ...fields });
-export const moveArrangementItem = (itemId, index) =>
-  send({ cmd: 'moveArrangementItem', itemId, index });
-export const setArrangementOptions = (fields) => send({ cmd: 'setArrangementOptions', ...fields });
+// Sections belong to a song: `songId` names it (a setlist item id); left out, the show-wide list.
+const withSong = (payload, songId) => (songId ? { ...payload, songId } : payload);
+export const addArrangementItem = (sceneId, name, songId, bars) =>
+  send(withSong({ cmd: 'addArrangementItem', sceneId, ...(name ? { name } : {}), ...(bars ? { bars } : {}) }, songId));
+export const removeArrangementItem = (itemId, songId) => send(withSong({ cmd: 'removeArrangementItem', itemId }, songId));
+export const setArrangementItem = (itemId, fields, songId) =>
+  send(withSong({ cmd: 'setArrangementItem', itemId, ...fields }, songId));
+export const moveArrangementItem = (itemId, index, songId) =>
+  send(withSong({ cmd: 'moveArrangementItem', itemId, index }, songId));
+export const setArrangementOptions = (fields, songId) => send(withSong({ cmd: 'setArrangementOptions', ...fields }, songId));
 export const startArrangement = (index = 0) => send({ cmd: 'startArrangement', index });
 export const stopArrangement = () => send({ cmd: 'stopArrangement' });
 export const setPartArp = (partId, fields) => send({ cmd: 'setPartArp', partId, ...fields });

@@ -1,7 +1,8 @@
 # Vendor preset discovery and recall
 
-Sounds keeps its persistent index in `instrument-host/library.json`. Scanning merges discovered
-sources into that index; it preserves record identities and personal metadata, and marks missing
+Sounds keeps its persistent index in `instrument-host/library.db`, a SQLite database
+(`LibraryStore`; an older `library.json` is imported into it once and left in place). Scanning
+merges discovered sources into that index; it preserves record identities and personal metadata, and marks missing
 sources rather than deleting them. It does not modify vendor files or vendor databases.
 
 The supported file adapters are:

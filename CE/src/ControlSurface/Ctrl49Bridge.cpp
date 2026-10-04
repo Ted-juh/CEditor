@@ -464,7 +464,10 @@ int runSelfTest()
                                 "function draw" })
             check (lua.contains (fn), fn);
     }
-    check (assets::kKnobStripPngSize > 10000, "knob filmstrip embedded");
+    // A PNG, and the grey palette kind the device can tint (colour type 3): an RGBA strip decodes
+    // to colour on the CTRL49 and every knob draws white. Not a size: that one is ~7 KB now.
+    check (assets::kKnobStripPngSize > 26 && assets::kKnobStripPng[1] == 'P'
+             && assets::kKnobStripPng[25] == 3, "knob filmstrip embedded, as a tintable grey palette PNG");
     check (assets::kGaiaProfileJsonSize > 1000, "GAIA profile embedded");
 
     juce::String error;

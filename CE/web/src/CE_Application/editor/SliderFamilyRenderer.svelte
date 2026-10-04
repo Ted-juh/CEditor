@@ -728,15 +728,15 @@
   <svg class="slider-svg" viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} width={width} height={height} aria-hidden="true">
     {#snippet tickMark(kind, line, colour, strokeWidth, length, opacity, label)}
       {#if kind === 'dot'}
-        <circle cx={(line.x1 + line.x2) / 2} cy={(line.y1 + line.y2) / 2} r={Math.max(1.5, length * 0.45)} fill={colour} opacity={opacity} />
+        <circle data-tick cx={(line.x1 + line.x2) / 2} cy={(line.y1 + line.y2) / 2} r={Math.max(1.5, length * 0.45)} fill={colour} opacity={opacity} />
       {:else if kind === 'numeral'}
-        <text x={line.x2 + (line.x2 - line.x1) * 0.6} y={line.y2 + (line.y2 - line.y1) * 0.6} text-anchor="middle" dominant-baseline="central"
+        <text data-tick x={line.x2 + (line.x2 - line.x1) * 0.6} y={line.y2 + (line.y2 - line.y1) * 0.6} text-anchor="middle" dominant-baseline="central"
           font-size={Math.max(6, length * 1.4)} font-weight="700" fill={colour} opacity={opacity}>{label}</text>
       {:else if kind === 'engraved'}
         <line x1={line.x1 + 0.6} y1={line.y1 + 0.8} x2={line.x2 + 0.6} y2={line.y2 + 0.8} stroke="#FFFFFF" stroke-width={strokeWidth} stroke-linecap="round" opacity={opacity * 0.35} />
-        <line x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke={colour} stroke-width={strokeWidth} stroke-linecap="round" opacity={opacity} />
+        <line data-tick x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke={colour} stroke-width={strokeWidth} stroke-linecap="round" opacity={opacity} />
       {:else}
-        <line x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke={colour} stroke-width={strokeWidth} opacity={opacity} />
+        <line data-tick x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke={colour} stroke-width={strokeWidth} opacity={opacity} />
       {/if}
     {/snippet}
 
@@ -778,6 +778,8 @@
       {@const plate = argbToCss(part?.plateColour, 'rgba(255,255,255,0.22)')}
       {@const styled = pointerStyleFor(name)}
       {@const styledFill = pointerStyleFor(name, 'fill')}
+      <!-- data-pointer: which handle this is (start / current / end), on the element that outlines it. -->
+      {@const handle = name.replace(/^pointer/, '').toLowerCase()}
       {#if part?.glow === true}
         {#if g.r !== undefined}
           <circle cx={point.x} cy={point.y} r={g.r * 1.5} fill={fill} opacity={0.5 * op} filter={`url(#${capGlowId})`} style={styledFill} />
@@ -796,8 +798,9 @@
           opacity={op}
           style={styled}
         />
+        <circle data-pointer={handle} cx={point.x} cy={point.y} r={g.r + g.stroke / 2} fill="none" stroke="none" pointer-events="none" />
       {:else if g.kind === 'line'}
-        <line x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} stroke={fill} stroke-width={g.stroke} stroke-linecap="round" opacity={op} style={pointerStyleFor(name, 'stroke')} />
+        <line data-pointer={handle} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} stroke={fill} stroke-width={g.stroke} stroke-linecap="round" opacity={op} style={pointerStyleFor(name, 'stroke')} />
       {:else if g.r !== undefined}
         {#if g.kind === 'glass'}
           <circle cx={point.x} cy={point.y} r={g.r * 1.5} fill={fill} opacity={0.18 * op} style={styledFill} />
@@ -818,7 +821,7 @@
         {#if g.kind === 'lens' || part?.sheen === true}
           <circle cx={point.x} cy={point.y} r={g.r} fill={`url(#${capDomeId})`} opacity={op} style={styled} />
         {/if}
-        <circle cx={point.x} cy={point.y} r={g.r} fill="none" stroke={border} stroke-width={borderWidth} opacity={op} style={styled} />
+        <circle data-pointer={handle} cx={point.x} cy={point.y} r={g.r} fill="none" stroke={border} stroke-width={borderWidth} opacity={op} style={styled} />
         {#if g.kind === 'lens'}
           <!-- Lit from inside: a small source in the groove colour (the set's light), blurred, and its sharp core. -->
           <circle cx={point.x} cy={point.y} r={g.r * 0.6} fill={groove} opacity={0.9 * op} filter={`url(#${capGlowId})`} style={styled} />
@@ -846,7 +849,7 @@
           <rect x={g.plate.x} y={g.plate.y} width={g.plate.w} height={g.plate.h} rx={g.plate.rx} fill={plate} opacity={op} style={styled} />
           <rect x={g.plate.x} y={g.plate.y} width={g.plate.w} height={g.plate.h} rx={g.plate.rx} fill={`url(#${capSheenId})`} opacity={0.6 * op} style={styled} />
         {/if}
-        <rect x={g.x} y={g.y} width={g.w} height={g.h} rx={g.rx} fill="none" stroke={border} stroke-width={borderWidth} opacity={op} style={styled} />
+        <rect data-pointer={handle} x={g.x} y={g.y} width={g.w} height={g.h} rx={g.rx} fill="none" stroke={border} stroke-width={borderWidth} opacity={op} style={styled} />
         <line x1={g.groove.x1} y1={g.groove.y1} x2={g.groove.x2} y2={g.groove.y2} stroke={groove} stroke-width={Math.max(1, g.kind === 'block' ? 2 : g.stroke)} stroke-linecap="round" opacity={op * (g.kind === 'block' ? 1 : 0.85)} style={styled} />
       {/if}
     {/snippet}
@@ -1097,7 +1100,7 @@
       {#if (valueMode === 'single' || valueMode === 'band') && pointerKind !== 'dot'}
         {@const radial = radialPointerShape(pointerKind)}
         {#if radial.dot}
-          <circle
+          <circle data-pointer="current"
             cx={radial.dot.cx}
             cy={radial.dot.cy}
             r={radial.dot.r}
@@ -1106,7 +1109,7 @@
             style={pointerStyleFor('pointerCurrent', 'fill')}
           />
         {:else if radial.line}
-          <line
+          <line data-pointer="current"
             x1={radial.line.x1}
             y1={radial.line.y1}
             x2={radial.line.x2}
@@ -1118,7 +1121,7 @@
             style={pointerStyleFor('pointerCurrent', 'stroke')}
           />
         {:else}
-          <polygon
+          <polygon data-pointer="current"
             points={radial.polygon.points}
             fill={argbToCss(pointerCurrentPart?._children?.Background?._children?.Fill?.colour, '#1C1A17')}
             stroke={argbToCss(pointerCurrentPart?._children?.Background?._children?.Fill?.colour, '#1C1A17')}
@@ -1140,7 +1143,7 @@
           opacity={numberOr(pointerCurrentPart?.opacity, 1)}
           style={pointerStyleFor('pointerCurrent')}
         />
-        <circle
+        <circle data-pointer="current"
           cx={currentCircularPoint.x}
           cy={currentCircularPoint.y}
           r={pointerCurrentSize / 2}

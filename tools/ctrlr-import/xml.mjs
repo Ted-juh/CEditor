@@ -10,6 +10,18 @@
 // WHAT A CTRLR PANEL ACTUALLY IS: an attribute bag. `<uiComponent componentRectangle="10 10 60 60"
 // uiSliderStyle="rotary" .../>` — no mixed content, no namespaces, text only inside a few Lua and
 // resource nodes. So the model is nodes with a name, a flat attribute map, children, and text.
+//
+// SVG USES IT TOO (CE_Application/utils/svgPanelImport.js), with two options that stay off for Ctrlr:
+//
+//   offsets        each node also carries `start`/`end`, its span in the source. The SVG importer
+//                  cuts its placeholder layer out of the artwork by span, because this model drops
+//                  the position of text among children and cannot write the document back.
+//   doctypeSubset  'skip' steps over the whole DOCTYPE instead of refusing it. Illustrator writes
+//                  `<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://…dtd" [<!ENTITY ns_svg …>]>`
+//                  and older SVG tools the same without the subset. It is skipped, NEVER read: the
+//                  entities it declares are not expanded — an unknown entity stays literal, as above
+//                  — and this parser has no code that fetches anything, so the external identifier
+//                  is inert text. The attacks the refusal guards against need one or the other.
 
 const NAME = /[A-Za-z_:][-A-Za-z0-9_:.]*/y;
 
@@ -29,9 +41,11 @@ export function decodeEntities(text) {
 }
 
 class Reader {
-  constructor(text) {
+  constructor(text, options = {}) {
     this.text = text;
     this.at = 0;
+    this.offsets = options.offsets === true;
+    this.skipSubset = options.doctypeSubset === 'skip';
   }
 
   error(message) {
@@ -60,10 +74,19 @@ class Reader {
       } else if (this.text.startsWith('<!DOCTYPE', this.at)) {
         // An external or internal subset is where entity-expansion attacks live. A Ctrlr panel has
         // no use for either, so a DOCTYPE with a body is refused rather than parsed carefully.
-        const end = this.text.indexOf('>', this.at);
+        let end = this.text.indexOf('>', this.at);
         if (end < 0) throw this.error('Unterminated DOCTYPE');
         const doctype = this.text.slice(this.at, end);
-        if (doctype.includes('[') || /SYSTEM|PUBLIC|ENTITY/i.test(doctype)) {
+        const open = doctype.indexOf('[');
+        if (this.skipSubset && open >= 0) {
+          const close = /\]\s*>/g;
+          close.lastIndex = this.at + open;
+          const match = close.exec(this.text);
+          if (!match) throw this.error('Unterminated DOCTYPE');
+          end = match.index + match[0].length - 1;
+        } else if (this.skipSubset) {
+          // Nothing to do: see the header — skipped whole, identifiers and all.
+        } else if (doctype.includes('[') || /SYSTEM|PUBLIC|ENTITY/i.test(doctype)) {
           throw this.error('DOCTYPE with a subset or external reference is refused');
         }
         this.at = end + 1;
@@ -105,15 +128,21 @@ class Reader {
     }
   }
 
+  node(node, start) {
+    if (this.offsets) { node.start = start; node.end = this.at; }
+    return node;
+  }
+
   readElement() {
     if (this.text[this.at] !== '<') throw this.error('Expected an element');
+    const start = this.at;
     this.at += 1;
     const name = this.readName();
     const attributes = this.readAttributes();
 
     if (this.text[this.at] === '/') {
       this.at += 2;   // "/>"
-      return { name, attributes, children: [], text: '' };
+      return this.node({ name, attributes, children: [], text: '' }, start);
     }
     this.at += 1;     // ">"
 
@@ -130,7 +159,7 @@ class Reader {
         this.skipSpace();
         if (this.text[this.at] !== '>') throw this.error(`</${closing}> is malformed`);
         this.at += 1;
-        return { name, attributes, children, text: text.trim() };
+        return this.node({ name, attributes, children, text: text.trim() }, start);
       }
 
       if (this.text.startsWith('<!--', this.at)) {
@@ -162,12 +191,16 @@ class Reader {
   }
 }
 
-/** Parse a document. Throws with a line number on anything malformed. */
-export function parseXml(source) {
+/**
+ * Parse a document. Throws with a line number on anything malformed. `options` are the two in the
+ * header — `{ offsets: true, doctypeSubset: 'skip' }` — and both default off. Offsets index the text
+ * AFTER a leading byte-order mark is removed, so slice that, not the raw input.
+ */
+export function parseXml(source, options = {}) {
   const text = String(source ?? '').replace(/^﻿/, '');
   if (!text.trim()) throw new Error('The file is empty');
 
-  const reader = new Reader(text);
+  const reader = new Reader(text, options);
   reader.skipProlog();
   if (reader.text[reader.at] !== '<') throw reader.error('No root element');
   const root = reader.readElement();

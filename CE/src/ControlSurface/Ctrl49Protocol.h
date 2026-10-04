@@ -17,6 +17,8 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
+#include <string>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
@@ -42,8 +44,15 @@ Bytes decodeMidi7 (const Bytes& encoded, std::size_t rawSize);
 //==================================================================================================
 // Framing
 
+// The firmware refuses a frame whose payload is over 1000 bytes: every command handler checks
+// `cmp #0x3E8; bhi <reject>` first (read statically from the Akai ADVANCE 1.0.10 firmware, which
+// runs the same VIP runtime; see "What the firmware says" in tools/ctrl49/README.md). The
+// length field itself would allow 0x3FFF, so
+// an oversized frame used to be built without complaint and dropped by the keyboard in silence.
+inline constexpr std::size_t kMaxPayloadBytes = 1000;
+
 // Wraps a payload in the vendor frame. Throws std::invalid_argument if any payload byte
-// is >= 0x80 or the payload exceeds 0x3FFF bytes.
+// is >= 0x80 or the payload exceeds kMaxPayloadBytes.
 Bytes buildFrame (std::uint8_t type, std::uint8_t command, const Bytes& payload);
 
 //==================================================================================================
@@ -133,5 +142,50 @@ Bytes buildPadRgb (std::uint8_t padId, std::uint8_t red, std::uint8_t green, std
 inline constexpr int kScreenWidth  = 480;
 inline constexpr int kScreenHeight = 272;
 inline constexpr int kKeepaliveIntervalMs = 900;
+
+// Target, widget and canvas ids index a 1024-entry table on the device (`cmp #0x400; bhs`).
+inline constexpr int kMaxObjectTableId = 1023;
+
+// A text object keeps at most ~100 characters (the firmware's copy truncates to its capacity).
+inline constexpr std::size_t kMaxTextCharacters = 100;
+
+// The longest title or label a set_labels payload carries. Nine strings of 90 plus their length
+// bytes is 819 raw bytes, 936 MIDI-7 encoded, 958 in the frame: under the device's 1000-byte
+// frame limit (kMaxPayloadBytes) and its ~100-character text objects (kMaxTextCharacters). The
+// old cap was the length byte's reach, 255, which could build a frame the keyboard drops.
+inline constexpr std::size_t kMaxLabelCharacters = 90;
+
+//==================================================================================================
+// Replies
+
+// 02/3D: the device acknowledges every type-02 command (except 02/11 and 02/23) with
+// [routing][routing][original command][status]. The status byte, from the firmware's reply
+// builder: 0x40 OK, 0x41 bad argument, 0x42 out of memory, 0x4C not found, 0x4D Lua script
+// error, 0x4E other error. Until those were known only 0x40 had a name, and a refusal looked
+// like nothing at all.
+struct Ctrl49Ack
+{
+    std::uint8_t command = 0;
+    std::uint8_t status = 0;
+    bool ok() const noexcept { return status == 0x40; }
+};
+
+inline constexpr std::uint8_t kAckOk          = 0x40;
+inline constexpr std::uint8_t kAckBadArgument = 0x41;
+inline constexpr std::uint8_t kAckOutOfMemory = 0x42;
+inline constexpr std::uint8_t kAckNotFound    = 0x4C;
+inline constexpr std::uint8_t kAckScriptError = 0x4D;
+inline constexpr std::uint8_t kAckError       = 0x4E;
+
+// The acknowledgement in a complete frame, or nullopt for anything that is not a 02/3D.
+std::optional<Ctrl49Ack> parseAck (const Bytes& frame);
+
+// "OK", "bad argument", "out of memory", "not found", "Lua script error", "error", or
+// "status 0xNN" for a value the firmware was not seen to use.
+std::string ackStatusName (std::uint8_t status);
+
+// "create target", "bind Lua", "draw", "Lua call", ... for the type-02 commands CEditor sends,
+// "02/NN" otherwise.
+std::string displayCommandName (std::uint8_t command);
 
 } // namespace ceditor::ctrl49

@@ -22,8 +22,8 @@
 // SVG and CSS text metrics differ, which is true and would only ever cost a pixel — it reads like a
 // preference, and it is why "surely a declared conversion could allow text" kept coming up. The
 // real constraint is harder: the compiled SVG is drawn through an `<img>`, and an image document is
-// isolated. It cannot see the page's fonts — not @font-face faces the app loaded from a .cepanel's
-// stored fonts, and not reliably the system ones either. A caption in a custom face therefore
+// isolated. It cannot see the page's fonts — not the faces the app registered for imported fonts
+// (Settings, or those a panel carries: utils/documentFonts.js), and not reliably the system ones either. A caption in a custom face therefore
 // renders in a default face, silently, and looks like the font failed to load rather than like the
 // bake did something. Nothing about declaring the intent up front changes that; embedding the face
 // in every image would, and costs more than the DOM node it saves. This applies to the scenery

@@ -65,6 +65,20 @@ public:
     /** The file for a token, or a file that does not exist for anything unregistered. */
     juce::File resolve (const juce::String& token) const;
 
+    /** The URL the frontend loads a token from: absolute, at the WebView resource provider's
+        root, so it reaches the provider whichever origin served the page (a dev build's page
+        comes from Vite, and a relative route went there instead). The root is
+        juce::WebBrowserComponent::getResourceProviderRoot()'s value, spelled out here because
+        the service is also built without JUCE's web browser module. */
+    static juce::String routeUrl (const juce::String& token)
+    {
+       #if JUCE_WINDOWS || JUCE_ANDROID
+        return "https://juce.backend/plugin-snapshot/" + token;
+       #else
+        return "juce://juce.backend/plugin-snapshot/" + token;
+       #endif
+    }
+
 private:
     mutable juce::CriticalSection lock;
     juce::HashMap<juce::String, juce::String> pathsByToken;

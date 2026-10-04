@@ -50,11 +50,16 @@ export function computeResizedRect(startRect, handle, dx, dy, opts) {
   if (handle.includes('b')) { h += gain * dy; }
   if (handle.includes('t')) { h -= gain * dy; }
 
-  // Aspect ratio lock applies only on corner handles (2 chars). It works on
-  // the size alone — the anchor is applied below and holds either way.
-  if (opts.aspectLock && handle.length === 2) {
+  // Aspect ratio lock. On a corner the larger movement drives; on an edge the dragged axis does, and
+  // the other side grows about its own centre — until this, an edge handle ignored the lock even
+  // when the control's own Transform.aspectLock was on, which made the lock a corners-only promise.
+  // It works on the size alone; the anchor below holds either way.
+  const edgeAxis = handle.length === 1 ? ((handle === 'l' || handle === 'r') ? 'x' : 'y') : '';
+  if (opts.aspectLock) {
     const aspect = opts.aspectRatio ?? (startRect.w / startRect.h);
-    if (Math.abs(dx) > Math.abs(dy)) h = w / aspect;
+    if (edgeAxis === 'x') h = w / aspect;
+    else if (edgeAxis === 'y') w = h * aspect;
+    else if (Math.abs(dx) > Math.abs(dy)) h = w / aspect;
     else w = h * aspect;
   }
 
@@ -74,6 +79,9 @@ export function computeResizedRect(startRect, handle, dx, dy, opts) {
   } else {
     x = handle.includes('l') ? startRect.x + startRect.w - w : startRect.x;
     y = handle.includes('t') ? startRect.y + startRect.h - h : startRect.y;
+    // A locked edge drag changed the OTHER side too; it grows about that side's centre.
+    if (opts.aspectLock && edgeAxis === 'x') y = startRect.y + startRect.h / 2 - h / 2;
+    if (opts.aspectLock && edgeAxis === 'y') x = startRect.x + startRect.w / 2 - w / 2;
   }
 
   return { x, y, w, h };

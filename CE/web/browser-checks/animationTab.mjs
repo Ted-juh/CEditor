@@ -63,6 +63,7 @@ check('a target that animates nothing says so on the row', () => {
 check('and the two dead ones are the missing part and the text path', () => {
   assert.ok(dead.some((row) => /Text\.content/.test(row)), dead.join(' | '));
   assert.ok(dead.some((row) => /nosuchpart/.test(row)), dead.join(' | '));
+  assert.ok(!dead.some((row) => /Background\.Fill\.colour/.test(row)), dead.join(' | '));
 });
 
 const working = verdicts.filter((v) => !/does nothing/.test(v));
@@ -513,6 +514,121 @@ check('Debug shows the animation as it is stored, in the Console tab', () => {
   assert.deepEqual(JSON.parse(dock.text), echoStored);
   assert.deepEqual(request, { tab: 'console' });
 });
+
+// --- Reordering from the keyboard -------------------------------------------------------------
+
+const rowOrder = () => ev(() => [...document.querySelectorAll('.trow')].map((row) => row.textContent.replace(/\s+/g, ' ').trim()));
+// pressEcho, selected for the Debug check above, has one target; pressMotion has several.
+await ev(() => window.__anim.selectAnimation('pressMotion'));
+await settle();
+const beforeKeys = await rowOrder();
+await page.locator('.trow').first().focus();
+await page.keyboard.press('Alt+ArrowDown');
+await settle();
+const afterKeys = await rowOrder();
+const focusedRow = await ev(() => [...document.querySelectorAll('.trow')].indexOf(document.activeElement));
+check('Alt+Down moves the focused target one place down, and focus goes with it', () => {
+  assert.ok(beforeKeys.length >= 2, `rows: ${beforeKeys.join(' | ')}`);
+  assert.deepEqual(afterKeys.slice(0, 2), [beforeKeys[1], beforeKeys[0]], afterKeys.join(' | '));
+  assert.equal(focusedRow, 1);
+});
+await page.keyboard.press('Alt+ArrowUp');
+await settle();
+check('and Alt+Up puts it back', async () => {});
+assert.deepEqual(await rowOrder(), beforeKeys);
+
+// --- The sequence kind ------------------------------------------------------------------------
+// The third kind: a track per target along a time axis (utils/keyframeModel.js). Checked on an
+// animation of its own, so nothing above depends on what switching kind writes.
+
+await ev(() => window.__anim.typeNewName('seqDemo'));
+await settle();
+await ev(() => window.__anim.clickAdd());
+await settle();
+await ev(() => window.__anim.chooseChange('Scale'));
+await settle();
+await ev(() => window.__anim.add());
+await settle();
+await ev(() => window.__anim.chooseChange('Opacity'));
+await settle();
+await ev(() => window.__anim.add());
+await settle();
+assert.equal(await ev(() => window.__anim.selectedAnimation()), 'seqDemo');
+
+await ev(() => window.__anim.pickKind('sequence'));
+await page.waitForTimeout(500);
+const seeded = await ev(() => window.__anim.storedKeyframes('seqDemo'));
+const loopHold = await ev(() => window.__anim.storedLoopHold('seqDemo'));
+const canvases = await ev(() => window.__anim.timelineCanvases());
+const labels = await ev(() => window.__anim.trackLabels());
+check('switching to a sequence seeds each track with its authored value and draws the axis', () => {
+  assert.equal(seeded.length, 2, `tracks: ${JSON.stringify(seeded)}`);
+  assert.deepEqual(seeded[0].map(([t]) => t), [0], 'scale: one keyframe at 0');
+  assert.deepEqual(loopHold, { loop: false, hold: true, duration: 120 }, 'a length already long enough is kept');
+  assert.equal(canvases, 1, 'the track timeline is mounted');
+  assert.equal(labels.length, 2, labels.join(' | '));
+  assert.match(labels[0], /Scale/);
+});
+assert.equal(await ev(() => window.__anim.storedKind('seqDemo')), 'sequence');
+
+await ev(() => window.__anim.selectTrack(1));
+await page.waitForTimeout(200);
+await ev(() => window.__anim.addKeyframe());
+await page.waitForTimeout(400);
+const afterAdd = await ev(() => window.__anim.storedKeyframes('seqDemo'));
+const box = await ev(() => window.__anim.keyframeBox());
+check('a keyframe at the playhead lands on the selected track, holding the pose there, and is selected', () => {
+  assert.equal(afterAdd[1].length, 1, `opacity track: ${JSON.stringify(afterAdd[1])}`);
+  assert.deepEqual(afterAdd[1][0], [0, 1], 'at 0 ms, with the opacity the part has');
+  assert.equal(box, true, 'its editor is open');
+});
+const posed = await ev(() => window.__anim.overlay());
+check('the playhead poses the control on the canvas through the overlay store', () => {
+  assert.ok(posed, 'an overlay exists while the playhead is on a sequence');
+  assert.equal(posed[Object.keys(posed).find((k) => /opacity$/.test(k))], 1, JSON.stringify(posed));
+});
+await ev(() => window.__anim.deleteKeyframe());
+await page.waitForTimeout(400);
+assert.equal((await ev(() => window.__anim.storedKeyframes('seqDemo')))[1].length, 0, 'deleted');
+await ev(() => window.__anim.play());
+await page.waitForTimeout(250);
+const playingText = await ev(() => window.__anim.playheadText());
+check('play runs the playhead along the axis', () => {
+  assert.ok(/^\d+ ms/.test(playingText), playingText);
+  assert.ok(parseInt(playingText, 10) > 0, `playhead moved: ${playingText}`);
+});
+await ev(() => window.__anim.stop());
+await page.waitForTimeout(100);
+
+const options = await ev(() => window.__anim.changeOptions());
+check('for a sequence the Change list offers the control\'s value channel after the part properties', () => {
+  assert.ok(options.some((o) => /^Channel: Knob Value/.test(o)), options.join(' | '));
+});
+await ev(() => window.__anim.chooseChange('Channel: Knob Value'));
+await page.waitForTimeout(300);
+const channelWarning = await ev(() => window.__anim.addWarning());
+const pickerOff = await ev(() => window.__anim.partPickerDisabled());
+check('a channel is a whole path: the part picker steps aside and nothing warns', () => {
+  assert.equal(channelWarning, '', channelWarning);
+  assert.equal(pickerOff, true);
+});
+await ev(() => window.__anim.add());
+await page.waitForTimeout(400);
+const pathsNow = await ev(() => window.__anim.storedTargetPaths('seqDemo'));
+check('adding it writes the channel path and seeds its track from the channel value', async () => {});
+assert.ok(pathsNow.includes('ValueChannels.mainValue'), pathsNow.join(', '));
+assert.deepEqual((await ev(() => window.__anim.storedKeyframes('seqDemo'))).at(-1), [[0, 0.5]]);
+
+await ev(() => window.__anim.pickKind('transition'));
+await page.waitForTimeout(350);
+const deadAsTransition = await ev(() => window.__anim.deadRows());
+check('switching back keeps the tracks, takes the pose off, and says a channel needs a sequence', () => {
+  assert.ok(deadAsTransition.some((row) => /ValueChannels/.test(row)), deadAsTransition.join(' | '));
+});
+assert.equal((await ev(() => window.__anim.storedKeyframes('seqDemo')))[0].length, 1);
+assert.equal(await ev(() => window.__anim.overlay()), null, 'no pose once the animation is no longer a sequence');
+await ev(() => window.__anim.removeAnimation('seqDemo'));
+await settle();
 
 // --- The rules --------------------------------------------------------------------------------
 

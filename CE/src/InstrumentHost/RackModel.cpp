@@ -560,6 +560,8 @@ juce::var Performance::toVar() const
             p->setProperty ("morphAmount",    part.morphAmount);
         }
         p->setProperty ("microtuningEnabled", part.microtuningEnabled);
+        p->setProperty ("keyRoot",          part.keyRoot);
+        p->setProperty ("keyScale",         part.keyScale);
         p->setProperty ("outputPair",       part.outputPair);
         p->setProperty ("effects",          effectsToVar (part.effects));
         // The legacy blocks are mirrors now, not the source of truth: they carry the first
@@ -644,6 +646,8 @@ juce::var Performance::toVar() const
             s->setProperty ("inverted",    slot.binding.inverted);
             s->setProperty ("bipolar",     slot.binding.bipolar);
             s->setProperty ("toggle",      slot.binding.toggle);
+            if (slot.binding.steps >= 2)
+                s->setProperty ("steps",   slot.binding.steps);
             s->setProperty ("kind",        slot.kind);
             s->setProperty ("index",       slot.index);
             s->setProperty ("midiCc",      slot.midiCc);
@@ -651,6 +655,8 @@ juce::var Performance::toVar() const
             s->setProperty ("midiNote",    slot.midiNote);
             s->setProperty ("midiPickup",  slot.midiPickup);
             s->setProperty ("midiRelative", slot.midiRelative);
+            if (slot.midiRelativeFormat != 0)
+                s->setProperty ("midiRelativeFormat", slot.midiRelativeFormat);
             s->setProperty ("latched",     slot.latched);
             // Written only when they say something, so a page without layers or colours
             // reads exactly as it did before either existed.
@@ -676,6 +682,11 @@ juce::var Performance::toVar() const
         pg->setProperty ("name",   page.name);
         pg->setProperty ("generated", page.generated);
         pg->setProperty ("generatedForPartId", page.generatedForPartId);
+        if (page.presetRecordId.isNotEmpty())
+        {
+            pg->setProperty ("presetRecordId", page.presetRecordId);
+            pg->setProperty ("presetName", page.presetName);
+        }
         pg->setProperty ("slots",  slotVars);
         if (! padLayerVars.isEmpty())
             pg->setProperty ("padLayers", padLayerVars);
@@ -1151,6 +1162,23 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
             // the two slots its old settings describe, in the order the old code ran them —
             // the combined note-shaping block first, the arpeggiator after it.
             part.midiChain = perf::migrateLegacyEventChain (part.midiFx, part.arp);
+        }
+
+        if (p.hasProperty ("keyScale"))
+        {
+            part.keyRoot  = intOf (p, "keyRoot", 0, 0, 11);
+            part.keyScale = p.getProperty ("keyScale", "major").toString();
+        }
+        else
+        {
+            // Saved before the song key: the part's key is the scale its note shaping used,
+            // and the modules already in that key follow it from now on. Nothing sounds
+            // different; one change of key afterwards reaches all of them.
+            part.keyRoot  = part.midiFx.scaleRoot;
+            part.keyScale = part.midiFx.scaleType;
+            for (auto& slot : part.midiChain)
+                if (slot.fx.scaleType == part.keyScale && slot.fx.scaleRoot == part.keyRoot)
+                    slot.fx.followSongKey = true;
         }
 
         part.enabled    = (bool) p.getProperty ("enabled", true);
@@ -1647,6 +1675,8 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
             page.name = pg.getProperty ("name", {}).toString();
             page.generated = (bool) pg.getProperty ("generated", false);
             page.generatedForPartId = pg.getProperty ("generatedForPartId", {}).toString();
+            page.presetRecordId = pg.getProperty ("presetRecordId", {}).toString();
+            page.presetName = pg.getProperty ("presetName", {}).toString();
 
             juce::StringArray seenSlotIds;
             int legacyEncoders = 0;   // a slot with no kind is an encoder at its place among them
@@ -1686,11 +1716,13 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
                     slot.binding.inverted    = (bool) s.getProperty ("inverted", false);
                     slot.binding.bipolar     = (bool) s.getProperty ("bipolar", false);
                     slot.binding.toggle      = (bool) s.getProperty ("toggle", false);
+                    slot.binding.steps       = juce::jlimit (0, 128, (int) s.getProperty ("steps", 0));
                     slot.midiCc      = juce::jlimit (-1, 127, (int) s.getProperty ("midiCc", -1));
                     slot.midiChannel = juce::jlimit (0, 16, (int) s.getProperty ("midiChannel", 0));
                     slot.midiNote    = juce::jlimit (-1, 127, (int) s.getProperty ("midiNote", -1));
                     slot.midiPickup  = (bool) s.getProperty ("midiPickup", false);
                     slot.midiRelative = (bool) s.getProperty ("midiRelative", false);
+                    slot.midiRelativeFormat = juce::jlimit (0, 2, (int) s.getProperty ("midiRelativeFormat", 0));
                     slot.latched     = (bool) s.getProperty ("latched", false);
                     // Only pads and faders have layers; anything else claiming one is a hand
                     // edit, and reads as the single layer it can actually be.
@@ -1802,6 +1834,20 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
         return false;
     if (! perf::arrangementFromVar (stored.getProperty ("arrangement", {}), parsed.arrangement))
         return false;
+
+    // Songs own their sections now. A show-wide arrangement from before that belongs to the
+    // first song, if no song has sections of its own yet; with no songs it stays show-wide.
+    if (! parsed.arrangement.items.isEmpty() && ! parsed.setlist.items.isEmpty())
+    {
+        bool anySections = false;
+        for (const auto& song : parsed.setlist.items)
+            anySections = anySections || ! song.sections.items.isEmpty();
+        if (! anySections)
+        {
+            parsed.setlist.items.getReference (0).sections = parsed.arrangement;
+            parsed.arrangement = {};
+        }
+    }
 
     if (const auto* takeArray = stored.getProperty ("performanceTakes", {}).getArray())
     {

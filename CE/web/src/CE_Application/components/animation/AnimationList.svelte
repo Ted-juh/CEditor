@@ -68,7 +68,7 @@
       </span>
 
       <span class="meta">
-        {row.duration}ms
+        {row.duration}ms{#if row.kind === 'keyframes'}&nbsp;keyframes{:else if row.kind === 'sequence'}&nbsp;sequence{/if}
         {#if dead}
           <i class="bad" title={`${dead} of this animation's targets do nothing`}>
             <TriangleAlert size={9} aria-hidden="true" /> {dead}

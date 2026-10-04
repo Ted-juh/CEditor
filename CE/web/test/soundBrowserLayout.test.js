@@ -61,8 +61,15 @@ test('update results keep usable files, named programs and unavailable records d
   const result = normalizeHostLibrary({ updateFinished: true, scanReport: [{ name: 'Zebra3',
     count: 1355, files: 1355, programs: 0, unavailable: 2, unnamedPrograms: 128 }] });
   assert.equal(result.updateFinished, true);
-  assert.deepEqual(result.scanReport[0], { name: 'Zebra3', kind: '', count: 1355, files: 1355,
-    programs: 0, unavailable: 2, unnamedPrograms: 128, reason: '' });
+  assert.deepEqual(result.scanReport[0], { name: 'Zebra3', kind: '', ceId: '', count: 1355, files: 1355,
+    programs: 0, unavailable: 2, unnamedPrograms: 128, reason: '', candidate: null });
+  const found = normalizeHostLibrary({ scanReport: [{ name: 'Transfigure', ceId: 'VST3-T', count: 0,
+    candidate: { path: 'C:/Sugar Bytes/Transfigure', extension: 'sbtr', files: '262' } }],
+    stateFolders: [{ path: 'C:/Sugar Bytes/Transfigure', ceId: 'VST3-T', status: 'weird', count: 5 }, { path: '' }] });
+  assert.deepEqual(found.scanReport[0].candidate, { path: 'C:/Sugar Bytes/Transfigure', extension: 'sbtr', files: 262 },
+    'a folder found for a plug-in with no presets carries its format and file count');
+  assert.equal(found.stateFolders.length, 1, 'a folder with no path is dropped');
+  assert.equal(found.stateFolders[0].status, 'refused', 'an unknown verdict is not taken for a pass');
   assert.equal(normalizeHostLibrary({}).updateFinished, false);
   assert.deepEqual(normalizeLibraryLoad(null), { phase: 'idle', recordId: '', name: '', partId: '', message: '' });
 });

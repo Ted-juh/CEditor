@@ -665,12 +665,13 @@ export function importFonts() {
 }
 
 /** Request an image file browser dialog. C++ will emit 'imageBrowsed' on success. */
-export function browseImage(requestId) {
+export function browseImage(requestId, { patterns = '', title = '' } = {}) {
   if (!isJuceAvailable()) {
     console.warn('[bridge] No JUCE backend — browseImage ignored');
     return;
   }
-  window.__JUCE__.backend.emitEvent('browseImage', { requestId });
+  // `patterns` ("*.psd") narrows the picker for a caller that reads something other than an image.
+  window.__JUCE__.backend.emitEvent('browseImage', { requestId, ...(patterns ? { patterns } : {}), ...(title ? { title } : {}) });
 }
 
 /** Listen for 'imageBrowsed' events. Callback receives { requestId, filePath }. */
@@ -1097,6 +1098,22 @@ export function onInstrumentHostRandomModulatorActivity(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener(
     'instrumentHostRandomModulatorActivity', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** The Chords module playing ({ partId, chord, step, pads }): the set chord it last played,
+    the progression step that plays next, and a bit per sounding pad. */
+/** The MIDI modules' lights ({ partId, slots: { slotId: count } }): how many blocks each module
+    has changed something in; a count that moved means it just did. */
+export function onInstrumentHostModuleActivity(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostModuleActivity', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onInstrumentHostChordsLive(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostChordsLive', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 

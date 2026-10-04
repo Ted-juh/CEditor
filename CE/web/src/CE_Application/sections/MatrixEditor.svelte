@@ -1,10 +1,11 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { matrixRows, matrixCols, matrixAmounts, matrixIndex } from '../utils/matrixLayout.js';
+  import FieldList from '../properties/FieldList.svelte';
+  import { MATRIX_FIELDS } from '../models/inspectorFieldSets.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
-  import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
   import LogIn from 'lucide-svelte/icons/log-in';
@@ -24,7 +25,6 @@
     if (!core?.id) return;
     updateControlProperty(core.id, `Matrix.${prop}`, value);
   }
-  function toggle(prop) { set(prop, !(m?.[prop] === true)); }
   function num(v, f = 0) { const n = Number(v); return Number.isFinite(n) ? n : f; }
 
   // Resize the amounts array (row-major) when rows/cols change, preserving
@@ -76,32 +76,15 @@
 </script>
 
 {#if m}
-  <PropertySection title="Matrix" icon={Grid3x3}>
-    <PropertyCell label="Cell style" span={2} hint="How each cell shows its amount.">
-      <select class="val" value={m.cellStyle ?? 'bar'} onchange={(e) => set('cellStyle', e.target.value)}>
-        <option value="bar">Bar</option>
-        <option value="fill">Fill</option>
-        <option value="dot">Dot</option>
-      </select>
-    </PropertyCell>
-    <PropertyCell label="Bipolar" span={1} hint="Amounts range −1..1 (vs 0..1).">
-      <PropertyToggle value={m.bipolar !== false} onchange={() => set('bipolar', !(m.bipolar !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Editable" span={1} hint="Drag cells in preview.">
-      <PropertyToggle value={m.editable !== false} onchange={() => set('editable', !(m.editable !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Labels" span={1} hint="Show source/destination labels.">
-      <PropertyToggle value={m.showLabels !== false} onchange={() => set('showLabels', !(m.showLabels !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Values" span={1} hint="Print the amount in each cell.">
-      <PropertyToggle value={m.showValues === true} onchange={() => toggle('showValues')} />
-    </PropertyCell>
-    <PropertyCell label="Snap" span={1} compact hint="Cell amount snap step (0 = free).">
-      <NumberCell label="Snap" min={0} max={1} step={0.05} value={m.step ?? 0} defaultValue={0} onchange={(v) => set('step', Math.max(0, Math.min(1, v)))} />
-    </PropertyCell>
+  <!-- Ordinary fields are data (models/inspectorFieldSets.js); the Clear button is the editor's own. -->
+  {#snippet clear()}
     <PropertyCell label="Clear" span={1} hint="Reset all amounts to zero.">
       <button type="button" class="action-btn" onclick={clearAmounts}>Clear</button>
     </PropertyCell>
+  {/snippet}
+
+  <PropertySection title="Matrix" icon={Grid3x3}>
+    <FieldList fields={MATRIX_FIELDS} values={m} {set} slots={{ clear }} />
   </PropertySection>
 
   <PropertySection title="Sources" icon={LogIn}>

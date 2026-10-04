@@ -42,17 +42,23 @@ const text = (value) => String(value ?? '').trim();
  *
  * Content-addressed, so the same image referenced by three controls is stored once and a panel that
  * is packaged twice produces the same ids — which is what makes two packages of an unchanged panel
- * diffable. FNV-1a because it only has to be stable and well-spread, not cryptographic; the same
- * reasoning (and the same constants) as `guidFromName` in the QA generator.
+ * diffable.
+ *
+ * SHA-256, truncated to 64 bits. It used to be 32-bit FNV-1a, on the reasoning that an id only has
+ * to be stable and well-spread — but the packager DEDUPES on it (`byPath` below stores one blob per
+ * id), so two different pictures in one panel landing on the same 32 bits would have one of them
+ * silently replaced by the other, and at 32 bits that is a one-in-a-few-thousand chance for a panel
+ * with a hundred assets. At 64 bits it is not a chance anybody will meet, and the id stays short
+ * enough to read in a diff. Asynchronous because that is what the platform's digest is; the
+ * packager was already async. A package written with the old ids still opens: the opener reads the
+ * ids the package carries and never recomputes them.
  */
-export function assetIdFor(bytes, hint = '') {
-  let h = 0x811c9dc5;
+export async function assetIdFor(bytes, hint = '') {
   const data = typeof bytes === 'string' ? bytes : String(bytes ?? '');
-  for (let i = 0; i < data.length; i += 1) {
-    h = Math.imul(h ^ data.charCodeAt(i), 0x01000193) >>> 0;
-  }
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
+  const hex = [...new Uint8Array(digest, 0, 8)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
   const ext = (hint.match(/\.([a-z0-9]{1,5})$/i)?.[1] ?? '').toLowerCase();
-  return `a${h.toString(16).padStart(8, '0')}${ext ? `.${ext}` : ''}`;
+  return `a${hex}${ext ? `.${ext}` : ''}`;
 }
 
 /**
@@ -135,7 +141,7 @@ export async function createPanelPackage(panel, { readAsset, metadata = {}, now 
         missing.push(ref.path);
         byPath.set(ref.path, null);
       } else {
-        const id = assetIdFor(data, ref.path);
+        const id = await assetIdFor(data, ref.path);
         assets[id] = { id, data, originalPath: ref.path, bytes: data.length };
         byPath.set(ref.path, id);
       }

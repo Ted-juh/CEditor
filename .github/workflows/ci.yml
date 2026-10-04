@@ -12,8 +12,9 @@
 # The web bundle must be built BEFORE CMake configure: CMakeLists globs CE/web/dist into
 # PlayerWebData (the embedded player UI).
 #
-# Not covered yet (candidates for a follow-up job): the per-panel VST3 smoke export
-# (tools/scripts/export-panel-vst3.mjs) and the installer packaging scripts.
+# The player plug-in is built with the GAIA panel in it and put through the hosts' conformance
+# suites: pluginval for the VST3, clap-validator for the CLAP. docs/plugin-validation.md has what
+# the first runs found. Not covered yet: the installer packaging scripts.
 
 name: CI
 
@@ -30,7 +31,17 @@ concurrency:
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 90
+    # 120, not 90: a cold build (empty compiler cache) takes about an hour, and plug-in validation
+    # adds the clap-validator build and two conformance suites on top.
+    timeout-minutes: 120
+    # sccache keeps compiled objects in the GitHub Actions cache between runs, so a run recompiles
+    # only the translation units whose inputs changed — JUCE's modules, Lua and QuickJS are the bulk
+    # of a cold build and almost never change. It works with MSVC because Release objects carry
+    # their debug info inline (/Z7, see ce_enable_private_release_symbols in CMakeLists.txt); /Zi
+    # would write a shared PDB that sccache cannot cache. `sccache --show-stats` at the end says how
+    # many hits a run got.
+    env:
+      SCCACHE_GHA_ENABLED: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -45,9 +56,15 @@ jobs:
         working-directory: CE/web
         run: npm ci
 
+      # The spec reporter, not the TAP one a non-terminal gets by default: it ends with a list of the
+      # failing tests and their errors. With TAP a failure sits wherever it ran, among some 34,000
+      # lines of "ok", and the log's tail says only "fail 1" (run 291).
       - name: Web tests (node --test + script-export validation)
         working-directory: CE/web
-        run: npm run test:all
+        run: |
+          npm test -- --test-reporter=spec
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }   # a native failure does not stop a pwsh script
+          npm run test:script-exports
 
       - name: Build web bundle (required by CMake PlayerWebData glob)
         working-directory: CE/web
@@ -58,11 +75,64 @@ jobs:
         with:
           arch: x64
 
-      - name: Configure (scripting ON, dev-mode OFF)
-        run: cmake --preset native -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF
+      - name: Compiler cache (sccache)
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      # The plug-in is built with a real panel in it, so the validation below exercises the scripts
+      # too: the script-threading defects in docs/plugin-validation.md only showed with scripts
+      # loaded, and GAIA is the heaviest panel in the tree (230 scripts). It goes in through the
+      # one configure rather than a second build, because the panel path is a compile definition on
+      # the whole plug-in target. The saved .cepanel is completed first, exactly as the app does
+      # before an export; a saved file stores only what differs from the defaults, which the
+      # plug-in cannot fill back in. Forward slashes: the path becomes a C string literal.
+      - name: Prepare the GAIA panel for the plug-in
+        run: |
+          New-Item -ItemType Directory -Force build | Out-Null
+          node tools/scripts/prepare-export-panel.mjs "CE/panels/Roland GAIA SH-01.cepanel" build/gaia-export.cepanel
+          "CE_GAIA_PANEL=$(($env:GITHUB_WORKSPACE -replace '\\','/') + '/build/gaia-export.cepanel')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Configure (scripting ON, dev-mode OFF, GAIA panel in the plug-in)
+        run: cmake --preset native -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache "-DCE_VST_PANEL_PATH=$env:CE_GAIA_PANEL" "-DCE_VST_PRODUCT_NAME=GAIA Validate"
 
       - name: Build (Release, all targets)
         run: cmake --build --preset native-release
 
       - name: C++ tests (CTest)
         run: ctest --test-dir build/native -C Release --output-on-failure
+
+      # Pinned, so a new validator release cannot turn this red on its own. pluginval is its
+      # release binary; clap-validator is built from the commit of its 0.4.1 release, which needs
+      # Rust 1.95 or later, hence the update.
+      - name: Fetch plug-in validators
+        run: |
+          New-Item -ItemType Directory -Force tools/validators | Out-Null
+          Invoke-WebRequest https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip -OutFile $env:RUNNER_TEMP/pluginval.zip
+          Expand-Archive $env:RUNNER_TEMP/pluginval.zip -DestinationPath tools/validators -Force
+          rustup update stable --no-self-update
+          cargo +stable install --git https://github.com/free-audio/clap-validator --rev b2f1d9b79b1d264a5747f46707d72b1aa40a02ef --locked --root $env:RUNNER_TEMP/clap-validator
+          Copy-Item $env:RUNNER_TEMP/clap-validator/bin/clap-validator.exe tools/validators/
+
+      # --require: a validator that did not run fails the step rather than passing it. GUI tests are
+      # skipped; they open the WebView editor, which is not what this step checks.
+      - name: Validate the player plug-in (pluginval, clap-validator)
+        run: node tools/scripts/validate-plugins.mjs "build/native/CEditorPlayerVST_artefacts/Release/VST3/GAIA Validate.vst3" "build/native/CEditorPlayerVST_artefacts/Release/CLAP/GAIA Validate.clap" --require --skip-gui --report build/validation/report.json
+
+      - name: Upload the validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-validation
+          path: build/validation/
+          if-no-files-found: ignore
+
+      # always(), to show the hit rate of a build that failed — but only once sccache exists: a run
+      # that fails before the cache step would otherwise add a second, misleading error here.
+      - name: Compiler cache statistics
+        if: always()
+        run: |
+          if (-not (Get-Command sccache -ErrorAction SilentlyContinue)) { "sccache was not set up in this run."; exit 0 }
+          sccache --show-stats
+          # A cache key includes the compiler, so a new runner image (and with it a new cl.exe) is a
+          # cold cache. Printed beside the hit rate so a sudden 0% explains itself.
+          $cl = (Get-Command cl.exe -ErrorAction SilentlyContinue).Source
+          "Runner image $env:ImageOS $env:ImageVersion; cl.exe $(if ($cl) { (Get-FileHash $cl).Hash.Substring(0, 16) } else { 'not found' })"

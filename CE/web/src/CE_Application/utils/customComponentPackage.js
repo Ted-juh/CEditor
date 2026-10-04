@@ -597,11 +597,16 @@ export function validateCustomComponentPackage(control) {
   if (!Object.keys(sections.Parts?._children ?? {}).length) {
     issues.push('Component has no visual parts.');
   }
-  if (!Object.keys(values).length) {
+  // A channel is what behaviours, hit zones and bindings act on. A component with none of those is
+  // artwork — a plate, a legend block, a scale — which is a complete package without a value, and
+  // "Create Component from Selection" makes exactly that.
+  const interactive = Object.keys(behaviors).length || Object.keys(hitZones).length || Object.keys(bindings).length;
+  if (!Object.keys(values).length && interactive) {
     issues.push('Component has no value channels.');
   }
   if (!Object.keys(published.inputs ?? {}).some((name) => published.inputs[name]?.enabled !== false)
-    && !Object.keys(published.outputs ?? {}).some((name) => published.outputs[name]?.enabled !== false)) {
+    && !Object.keys(published.outputs ?? {}).some((name) => published.outputs[name]?.enabled !== false)
+    && (interactive || !Object.keys(published.editableProperties ?? {}).length)) {
     warnings.push('No published inputs or outputs are enabled.');
   }
   if (arpeggiator.enabled) {

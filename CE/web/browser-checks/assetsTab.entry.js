@@ -13,6 +13,7 @@ import AssetsTab from '../src/CE_Application/components/AssetsTab.svelte';
 import { panels, activePanelId, selectedComponentIds } from '../src/CE_Application/stores/panels.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { activateEditorTarget, editorTarget } from '../src/CE_Application/stores/editorTarget.js';
+import { undo, undoLabel } from '../src/CE_Application/stores/history.js';
 
 const CONTROL_ID = 'ctrl_as_1';
 
@@ -106,7 +107,21 @@ control._children.Assets.images.knobFace = {
   package: true,
 };
 
-panels.set([{ id: 'p1', name: 'Check', width: 640, height: 360, bgColour: 'FF1E1E1E', controls: [control] }]);
+// Uses, for the "Used by" list: a generator that names the clean strip, and — on ANOTHER control —
+// a copy of the knob face's source, the kind of use only a search of the whole panel finds.
+control._children.Generators._children.frames = {
+  _type: 'Generator', name: 'frames', type: 'filmstrip-frames', enabled: true, assetName: 'cleanStrip',
+};
+control._children.PublishedProperties = {
+  _type: 'PublishedProperties',
+  editableProperties: { strip: { path: 'Assets.filmstrips.cleanStrip.source', label: 'Strip', type: 'image', enabled: true } },
+};
+const neighbour = createControl('CustomComponent');
+neighbour._children.Core.id = 'ctrl_as_2';
+neighbour._children.Core.name = 'Small Knob';
+neighbour._children.Parts._children.face = { _type: 'Part', Background: { Fill: { imageSrc: control._children.Assets.images.knobFace.source } } };
+
+panels.set([{ id: 'p1', name: 'Check', width: 640, height: 360, bgColour: 'FF1E1E1E', controls: [control, neighbour] }]);
 activePanelId.set('p1');
 selectedComponentIds.set(new Set([CONTROL_ID]));
 activateEditorTarget('assets', CONTROL_ID);
@@ -170,6 +185,30 @@ window.__as = {
   },
   policy: () => ({ ...assets().packagePolicy }),
   names: () => ({ images: Object.keys(assets().images), filmstrips: Object.keys(assets().filmstrips) }),
+
+  tileNote: (name) => {
+    const tile = [...document.querySelectorAll('.tile')].find((t) => textOf(t.querySelector('.name')) === name);
+    return textOf(tile?.querySelector('.note'));
+  },
+  usedBy: () => textOf([...document.querySelectorAll('.settings .grp')].find((g) => textOf(g).startsWith('Used by'))),
+  uses: () => [...document.querySelectorAll('.settings .uses li')].map(textOf),
+  noUse: () => textOf(document.querySelector('.settings .nouse')),
+
+  status: () => textOf(document.querySelector('.status')),
+  rename: (name) => {
+    const input = document.querySelector('#asset-name');
+    if (!input) return false;
+    input.value = name;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  },
+  generatorAsset: (generator) => get(panels)[0].controls[0]._children.Generators._children[generator]?.assetName,
+  publishedPath: () => get(panels)[0].controls[0]._children.PublishedProperties?.editableProperties?.strip?.path,
+  neighbourImageSrc: () => get(panels)[0].controls[1]._children.Parts._children.face.Background.Fill.imageSrc,
+  assetSource: (kind, name) => assets()[kind === 'image' ? 'images' : 'filmstrips'][name]?.source ?? null,
+  assetSize: (name) => { const a = assets().images[name]; return a ? [a.width, a.height, a.sourceFileName] : null; },
+  pngBytes: (width, height) => makeImage({ width, height }).split(',')[1],
+  undo: () => { const label = undoLabel(); undo(); return label; },
 
   removeSelected: () => {
     [...document.querySelectorAll('.acts button')].find((b) => textOf(b) === 'Remove')?.click();

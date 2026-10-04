@@ -24,7 +24,7 @@
     projectOntoAxis as projectPointOntoAxis,
   } from '../utils/gradientAxisGeometry.js';
   import { deriveProxyGeometry, fitProxyBox, proxyShapeCSS, proxyShapeKind } from '../utils/gradientProxyGeometry.js';
-  import { placeMenu } from '../utils/menuPlacement.js';
+  import { floating } from '../utils/floatingUi.js';
   import { beginStopEdit, previewStopColour, commitStopEdit, cancelStopEdit } from '../utils/stopColourEdit.js';
   import { gradientShapeOverride } from '../stores/gradientProxyShape.js';
   import { gradientTarget } from '../stores/gradientTarget.js';
@@ -380,10 +380,11 @@
   // commits, exactly like a handle drag: the picture updates under the pointer,
   // the document gets one write at the end of the gesture rather than one per
   // frame.
-  let popoverLeft = $state(0);
-  let popoverTop = $state(0);
 
-  const POPOVER_SIZE = { width: 230, height: 250 };
+  // The stop's thumb the colour popover hangs off (utils/floatingUi.js): beside it, flipped away from a
+  // window edge, never clipped by the dock it sits in. It used to be clamped into the editor's own box
+  // with a guessed 230×250, so a tall dock clipped it and a short one pushed it over the stops.
+  let stopAnchor = $state(null);
 
   function stopEditorLabel(index) {
     return `Stop ${index + 1}`;
@@ -396,16 +397,7 @@
     if (!edit) return;
     if (onSelectStop) onSelectStop(index);
 
-    // Anchor on the thumb, in editor coordinates, then let the shared menu
-    // placement flip it away from whichever edge it would have hung over.
-    const point = stopThumbPoint(axisStart, axisEnd, internalStops[index].position);
-    const boxLeft = needsShapeContainer ? (editorWidth - shapeW) / 2 : 0;
-    const boxTop = needsShapeContainer ? (editorHeight - shapeH) / 2 : 0;
-    const anchorX = boxLeft + (point.x / 100) * (needsShapeContainer ? shapeW : editorWidth);
-    const anchorY = boxTop + (point.y / 100) * (needsShapeContainer ? shapeH : editorHeight);
-    const placed = placeMenu(anchorX + 10, anchorY + 10, POPOVER_SIZE, { width: editorWidth, height: editorHeight }, 4);
-    popoverLeft = placed.left;
-    popoverTop = placed.top;
+    stopAnchor = e?.currentTarget ?? editorEl;
     stopEdit = edit;
     stopEditOwner = gradientEditOwner();
   }
@@ -552,7 +544,7 @@
   {/if}
 
   {#if editingStopIndex !== null && internalStops[editingStopIndex]}
-    <div class="stop-popover-layer" style="left: {popoverLeft}px; top: {popoverTop}px">
+    <div class="stop-popover-layer" use:floating={{ anchor: stopAnchor, placement: 'bottom-start', offset: 10, padding: 4, fallbackPlacements: ['top-start', 'bottom-end', 'top-end', 'right-start', 'left-start'] }}>
       <StopColourPopover
         color={internalStops[editingStopIndex].color}
         label={stopEditorLabel(editingStopIndex)}
@@ -732,8 +724,8 @@
   }
 
   .stop-popover-layer {
-    position: absolute;
-    z-index: 10;
+    position: fixed;
+    z-index: 1000;
   }
 
   /* Says what the proxy IS, so "why is my preview that shape" never has to be

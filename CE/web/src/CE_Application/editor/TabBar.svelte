@@ -1,4 +1,5 @@
 <script>
+  import { tick } from 'svelte';
   import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, closePanel, panels, setActiveEditorTab, closeSettingsTab, closeInstrumentHostTab, closeDeviceProfileTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
   import { closeComponentDocument, createComponentDocument } from '../stores/componentWorkspace.js';
   import { closeScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile, scriptDocuments } from '../stores/scriptWorkspace.js';
@@ -9,7 +10,7 @@
   import { openComponentLibraryEntry, openDeviceProfileEntry, openRecentFile } from '../stores/recentFileActions.js';
   import { componentPickerEntries, deviceProfilePickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
   import { applyTabOrder, moveTabKey, pruneTabOrder, seedTabOrder, tabContextAvailability, tabKey, tabOverflowState, tabsToClose } from '../utils/tabStrip.js';
-  import { placeMenu } from '../utils/menuPlacement.js';
+  import { floating } from '../utils/floatingUi.js';
   import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
   import { canRevealFiles, revealFile } from '../bridge/revealFile.js';
   import WorkspacePicker from '../layout/WorkspacePicker.svelte';
@@ -143,32 +144,18 @@
   // --- Per-tab context menu (D8) --------------------------------------------------------------
   let tabMenu = $state(null);
   let tabMenuEl = $state(null);
-  let tabMenuPlaced = $state(null);
-
-  const viewportSize = () => ({
-    width: typeof window === 'undefined' ? 0 : window.innerWidth,
-    height: typeof window === 'undefined' ? 0 : window.innerHeight,
-  });
-
-  // Measure, then place — the same two-step the canvas context menu uses (utils/menuPlacement.js),
-  // because a right-click on the rightmost tab is the ordinary case, not the exotic one.
-  $effect(() => {
-    const at = tabMenu;
-    if (!at || !tabMenuEl) { tabMenuPlaced = null; return; }
-    const rect = tabMenuEl.getBoundingClientRect();
-    tabMenuPlaced = placeMenu(at.x, at.y, { width: rect.width, height: rect.height }, viewportSize());
-  });
+  // Placed by utils/floatingUi.js: a right-click on the rightmost tab is the ordinary case, not the
+  // exotic one.
+  const TAB_MENU_FALLBACKS = ['bottom-end', 'top-start', 'top-end'];
 
   function openTabMenu(event, tab, index) {
     event.preventDefault();
     closeTrays();
-    tabMenuPlaced = null;
     tabMenu = { tab, index, x: event.clientX, y: event.clientY };
   }
 
   function closeTabMenu() {
     tabMenu = null;
-    tabMenuPlaced = null;
   }
 
   let tabMenuAvailability = $derived(tabMenu
@@ -278,6 +265,19 @@
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       setActiveEditorTab(tab);
+      return;
+    }
+    // Ctrl+Shift+PageUp / PageDown moves the focused tab, as it does in a browser: the keyboard's
+    // way to do what dragging a tab does.
+    if (e.ctrlKey && e.shiftKey && (e.key === 'PageUp' || e.key === 'PageDown')) {
+      e.preventDefault();
+      const seeded = seedTabOrder(orderedTabs, tabOrder);
+      const key = tabKey(tab);
+      const neighbour = seeded[seeded.indexOf(key) + (e.key === 'PageUp' ? -1 : 1)];
+      if (!neighbour) return;
+      tabOrder = moveTabKey(seeded, key, neighbour);
+      // Moving the element drops its focus; keep it on the tab, so the next press moves it again.
+      tick().then(() => tabEls[key]?.focus());
     }
   }
 
@@ -411,7 +411,6 @@
             tab,
           }))}
           emptyText="No open tabs."
-          anchorStyle="right: 0; top: calc(100% + 6px);"
           onPick={(row) => { picker = ''; setActiveEditorTab(row.tab); }}
           onClose={() => { picker = ''; }}
         />
@@ -442,14 +441,14 @@
     </button>
 
     {#if tray === 'new'}
-      <div class="tray-menu" role="menu" aria-label="New document">
+      <div class="tray-menu" use:floating={{ anchor: 'parent', placement: 'bottom-end', offset: 6, fallbackPlacements: ['top-end'] }} role="menu" aria-label="New document">
         <button role="menuitem" onclick={() => runNew(openNewPanelDialog)}>Panel&hellip;</button>
         <button role="menuitem" onclick={() => runNew(createComponentTab)}>Custom Component</button>
         <button role="menuitem" onclick={() => runNew(createDeviceProfileTab)}>Device Profile Designer</button>
         <button role="menuitem" onclick={() => runNew(createScriptTab)}>Script Workspace</button>
       </div>
     {:else if tray === 'open'}
-      <div class="tray-menu" role="menu" aria-label="Open document">
+      <div class="tray-menu" use:floating={{ anchor: 'parent', placement: 'bottom-end', offset: 6, fallbackPlacements: ['top-end'] }} role="menu" aria-label="Open document">
         <button role="menuitem" onclick={() => runNew(openPanelFromFile)}>Panel&hellip;</button>
         <button role="menuitem" onclick={openSavedComponent}>Saved Custom Component&hellip;</button>
         <button role="menuitem" onclick={openSavedDeviceProfile}>Device Profile&hellip;</button>
@@ -510,7 +509,7 @@
     role="menu"
     aria-label="Tab actions"
     bind:this={tabMenuEl}
-    style="left:{tabMenuPlaced ? tabMenuPlaced.left : tabMenu.x}px; top:{tabMenuPlaced ? tabMenuPlaced.top : tabMenu.y}px; visibility:{tabMenuPlaced ? 'visible' : 'hidden'};"
+    use:floating={{ anchor: { x: tabMenu.x, y: tabMenu.y }, placement: 'bottom-start', fallbackPlacements: TAB_MENU_FALLBACKS }}
   >
     <button role="menuitem" onclick={() => { const tab = tabMenu.tab; closeTabMenu(); closeTab(tab); }}>Close</button>
     <button role="menuitem" disabled={!tabMenuAvailability.canCloseOthers} onclick={() => closeMany('others')}>Close Others</button>
@@ -745,10 +744,7 @@
   }
 
   .tray-menu {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    z-index: 30;
+    z-index: 1600;
     display: flex;
     flex-direction: column;
     min-width: 220px;

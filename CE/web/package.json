@@ -9,6 +9,8 @@
     "check": "svelte-check --config ./svelte.config.js --tsconfig ./jsconfig.json",
     "preview": "vite preview",
     "test": "node --import ./test/support/register-svelte.mjs --test",
+    "test:coverage": "node --import ./test/support/register-svelte.mjs --test --experimental-test-coverage --test-coverage-include=\"src/**\" --test-coverage-exclude=\"src/CE_Application/generated/**\"",
+    "lint": "eslint src",
     "test:script-exports": "node scripts/validate-script-exports.mjs",
     "test:text-dock": "node browser-checks/textDock.mjs",
     "test:effects-dock": "node browser-checks/effectsTab.mjs",
@@ -27,10 +29,18 @@
     "docs:manual": "node scripts/generate-scripting-manual.mjs",
     "docs:help": "node scripts/generate-help-bundle.mjs",
     "test:all": "npm test && npm run test:script-exports",
-    "test:browser": "vite build --config browser-checks/vite.config.mjs && node browser-checks/run.mjs && node browser-checks/textPlacement.mjs && node browser-checks/playerInbound.mjs && node browser-checks/learnChips.mjs && node browser-checks/effectsTab.mjs && node browser-checks/assetsTab.mjs && node browser-checks/screenTab.mjs && node browser-checks/apiTab.mjs && node browser-checks/libraryTab.mjs && node browser-checks/animationTab.mjs && node browser-checks/panelMotion.mjs && node browser-checks/designerTab.mjs && node browser-checks/dockOpeners.mjs && node browser-checks/propertyFilter.mjs && node browser-checks/panelStrip.mjs && node browser-checks/insertFlyout.mjs && node browser-checks/panelShot.mjs && node browser-checks/releaseWorkflow.mjs && node browser-checks/numberCellSelection.mjs && node browser-checks/displayGapReview.mjs && node browser-checks/ctrl49Screen.mjs"
+    "test:browser": "vite build --config browser-checks/vite.config.mjs && node browser-checks/run.mjs && node browser-checks/textPlacement.mjs && node browser-checks/playerInbound.mjs && node browser-checks/learnChips.mjs && node browser-checks/effectsTab.mjs && node browser-checks/assetsTab.mjs && node browser-checks/screenTab.mjs && node browser-checks/apiTab.mjs && node browser-checks/libraryTab.mjs && node browser-checks/sourceLink.mjs && node browser-checks/fromSelection.mjs && node browser-checks/animationTab.mjs && node browser-checks/panelMotion.mjs && node browser-checks/designerTab.mjs && node browser-checks/dockOpeners.mjs && node browser-checks/propertyFilter.mjs && node browser-checks/panelStrip.mjs && node browser-checks/insertFlyout.mjs && node browser-checks/panelShot.mjs && node browser-checks/releaseWorkflow.mjs && node browser-checks/numberCellSelection.mjs && node browser-checks/displayGapReview.mjs && node browser-checks/ctrl49Screen.mjs && node browser-checks/noteModules.mjs && node browser-checks/hostWorkspace.mjs && node browser-checks/performanceTools.mjs && node browser-checks/soundsPage.mjs && node browser-checks/stageScreen.mjs && node browser-checks/pluginPresets.mjs && node browser-checks/songsPage.mjs",
+    "gen:panel-validator": "node scripts/generate-panel-validator.mjs"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "ajv": "^8.20.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-svelte": "^3.23.0",
+    "fake-indexeddb": "^6.2.5",
+    "fast-check": "^4.10.2",
+    "globals": "^17.13.0",
     "playwright-core": "^1.62.1",
     "svelte": "^5.0.0",
     "svelte-check": "^4.7.6",
@@ -38,10 +48,23 @@
     "vite": "^6.0.0"
   },
   "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
     "acorn": "^8.17.0",
+    "ag-psd": "^30.2.0",
+    "animation-timeline-js": "^2.3.5",
+    "animejs": "^4.5.0",
+    "comlink": "^4.4.2",
+    "dexie": "^4.4.6",
+    "fflate": "^0.8.3",
+    "fontkit": "^2.0.4",
     "gifuct-js": "^2.1.2",
+    "harfbuzzjs": "^1.6.2",
     "luaparse": "^0.3.1",
     "lucide-svelte": "^1.0.1",
-    "wasmoon": "^1.16.0"
+    "paper": "^0.12.18",
+    "paperjs-offset": "^2.2.1",
+    "rbush": "^4.0.1",
+    "wasmoon": "^1.16.0",
+    "woff2-encoder": "^2.0.0"
   }
 }

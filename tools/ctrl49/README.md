@@ -33,8 +33,95 @@ Checks: `node --test test/ctrl49Preview.test.js` (payload bytes, and that every 
 broker calls exists in the page) and `node browser-checks/ctrl49Screen.mjs` (every scene runs
 the real page and draws; `CTRL49_SCREENSHOT=dir/` saves a PNG per scene).
 
-What the preview cannot tell you: the device's fonts (9/10 are approximated), colour depth, RAM
-for uploaded images, and redraw rate. Those need the keyboard.
+What the preview cannot tell you: the device's fonts (Aileron, asked for by weight, falls back
+to a system sans), colour depth, RAM for uploaded images, and redraw rate. Those need the keyboard.
+
+## What the firmware says
+
+Read statically on 2026-09-26 from the Akai ADVANCE Firmware Updater 1.0.10, whose firmware runs
+the same VIP display runtime as the CTRL49 (same Lua globals, same command families; our captured
+CTRL49 frames decode against its dispatcher). Nothing was run and nothing was sent to a device.
+It is not the CTRL49's own firmware, so each point is "very likely the same" until the keyboard
+shows it. The first one already has.
+
+**Images and tint (confirmed on the CTRL49).** `draw_image`'s colour applies only to an image that
+decodes to an 8-bit buffer: an 8-bit grey palette PNG (grey = coverage, no transparency), decoded
+with a colour. An RGBA PNG decodes to colour and is drawn as it is. `make_filmstrip.py` writes the
+tintable kind; the preview (`screenDrawApi.js`) follows the same rule. A large decode blocks the
+device while it runs, so decode big images after the splash is up, not in `init`.
+
+**Limits.** At most **1000 bytes** of payload per frame (`kMaxPayloadBytes`; `buildFrame` refuses
+more instead of building a frame the keyboard drops). Target, widget, canvas and decoded-buffer
+ids below **1024**. A text object keeps about **100 characters**; labels are capped at 90 so the
+nine strings of a `set_labels` call always fit one frame.
+
+**Replies.** Every type-02 command except 02/11 and 02/23 is acknowledged with 02/3D
+`[route][route][command][status]`. Status: `0x40` OK, `0x41` bad argument, `0x42` out of memory,
+`0x4C` not found, `0x4D` Lua script error, `0x4E` error. HoSTage shows a refusal on the CTRL49
+screen card, and the startup trace (`%APPDATA%\CEditor\ctrl49-trace.log`) names every reply.
+
+**Commands we had not named.** 02/31 creates an off-screen canvas, 02/32 selects or resizes one,
+02/33 decodes a PNG into one; 02/11 writes a control/colour state; 02/23 sets a device parameter.
+The canvas family is unused by CEditor (it redraws per frame) and is noted for later.
+
+**Lua functions.** The full registered set: `get_byte`, `print`, `mem_usage(selector)`,
+`clear_errors()` (clears the on-screen Lua error), `set_hook_enabled(id, on)`,
+`led_control_set_level(_midi)`, `lua_ifc_load_script`, `draw_rect`, `draw_image`, `decode_image`,
+`draw_text`, **`draw_system_text`** (earlier notes had it as `draw_system`),
+`lua_widget_make_dirty`, `asset_get_valid`, `text_data.new/set`. Hook 2 is MIDI notes: with
+`set_hook_enabled(2, 1)` the firmware calls the page's `note(args)` with the three MIDI bytes
+(status, note, velocity). The preview runtime implements all of these (`note()` fires the hook).
+
+**Text.** `text_data.set` reads `text, color, font, font_size, just_hor, just_ver, padding_hor,
+padding_ver, bk_color, border_color, border_width_left/top/right/bottom`. `padding_hor/ver` inset
+the justification box. `font` indexes sixteen Aileron faces in alphabetical order (0 Black …
+9 Regular, 10 SemiBold … 15 UltraLight Italic); `font_size` is a real point size.
+
+**Firmware update protocol.** The Advance updater sends its images as Akai SysEx `F0 47 00 2E 70
+… F7`. It is described here only so nobody mistakes it for something to try: it is a different
+device's protocol and must never be sent to the CTRL49.
+
+### Probe: does the CTRL49 carry images of its own?
+
+The ADVANCE's asset flash holds 512 tintable knob frames and other sprites, under asset types
+other than the 14/18 a host uploads. If the CTRL49 has them too, pages could draw them with no
+upload and no decode. `Start_CTRL49_Asset_Probe.cmd` finds out, read-only: its page
+(`CEditor_Asset_Probe.lua`) only asks `asset_get_valid(type, id)` for each type the ADVANCE
+uses (ids 0..600) and tries `draw_image` on the first few, plain and tinted orange. It writes
+nothing to the keyboard. Close HoSTage/CEditor, VIP and your DAW first; turn encoder 1 to step
+through the types that have images. Result: not yet run.
+
+### The VIP screen keyboards and their ids
+
+VIP's own device table (`VIP_x64.dll`, 2018) names exactly five keyboards with a VIP screen. The
+port names are the MIDI ports `VIP_x64.exe` looks for. Checked 2026-09-26.
+
+| Keyboard | VIP code | MIDI port VIP opens | USB VID:PID | SysEx header | Source |
+|---|---|---|---|---|---|
+| M-Audio CTRL49 | `CTL49` | `CTRL 49 USB` (VIP's string; the Windows port is `CTRL49 USB`) | `0763:3108` | `F0 00 01 05 31 08` | proven: this PC's USB history; the August USB captures |
+| Akai ADVANCE25 | `ADV25` | `ADVANCE25 USB PORT 1` | `09E8:002F` | `F0 47 00 2F …` | proven: Advance firmware |
+| Akai ADVANCE49 | `ADV49` | `ADVANCE49 USB PORT 1` | `09E8:002E` | `F0 47 00 2E …` | proven: Advance firmware |
+| Akai ADVANCE61 | `ADV61` | `ADVANCE61 USB PORT 1` | `09E8:0030` | `F0 47 00 30 …` | proven: Advance firmware |
+| Alesis VX49 | `VX49` | `VX49 USB Port 1` | `13B2:????` | `F0 00 00 0E …` ? | **unknown**: vendor id and SysEx maker are Alesis's registered ids, not evidence |
+
+How the Advance numbers are known: the firmware detects its model, then writes one value — `0x2F`
+(25), `0x2E` (49) or `0x30` (61) — into both the USB device descriptor's product id and the product
+byte of its SysEx. The `00 01 05`, `47` and `00 00 0E` makers are the MIDI manufacturer ids of
+M-Audio, Akai and Alesis; `0763`, `09E8` and `13B2` are their USB vendor ids.
+
+The CTRL49 driver (MAudioCTRL49 7.0.0.3505, `oem112.inf`) names four ports — `CTRL49 USB`,
+`CTRL49 MIDI`, `CTRL49 VIP`, `CTRL49 Mackie/HUI` — and publishes only three to Windows. `CTRL49 VIP`
+is the hidden one, which is why the display's input has to come through the private capture
+while that driver is installed.
+
+What is not known: anything about the VX49 beyond its name and port, and what the CTRL49's
+`31 08` after M-Audio's maker id encodes. VIP builds its headers at run time inside a packed
+binary, so they are not readable statically. The cheapest ways to fill the VX49 row: an Alesis
+VX49 firmware updater, analysed the way the Advance one was; or the Hardware Ids of a connected
+VX49 in Device Manager.
+
+The other controllers VIP supports (Akai MPK, Alesis V/VI, M-Audio Code/Oxygen) are plain MIDI
+maps in `C:\ProgramData\VIP\midimaps` with no screen, and are not part of this protocol.
 
 ## The product exe: Ctrl49Bridge (start here)
 

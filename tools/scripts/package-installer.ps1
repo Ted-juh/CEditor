@@ -201,8 +201,9 @@ function Build-And-Stage-Templates([string]$RepoRoot, [string]$StageDir, [string
     # payoff is that an install without Visual Studio can export at all, which it previously could
     # not by design.
     #
-    # One VST3 binary serves every panel. CLAP/LV2 still require per-panel compilation because
-    # their wrappers do not yet adopt a sidecar identity.
+    # One VST3, one CLAP and one LV2 binary serve every panel (CE/src/Export/Vst3SidecarIdentity.h,
+    # ClapSidecarIdentity.h, Lv2SidecarIdentity.h). An LV2 bundle's .ttl manifests carry its identity
+    # on disk; the exporter writes them again per export with juce_lv2_helper, staged below.
     $vcvars = Find-VcVars64
     $buildDir = Join-Path $RepoRoot "build\package\template"
     $templatesDir = Join-Path $StageDir "templates"
@@ -212,7 +213,7 @@ function Build-And-Stage-Templates([string]$RepoRoot, [string]$StageDir, [string
 
     Push-Location $RepoRoot
     try {
-        $cmd = "`"$vcvars`" && cmake -S . -B `"$buildDir`" -G `"Ninja Multi-Config`" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON -DCEDITOR_TEMPLATE_PLAYER=ON -DCE_VST_GENERIC_PLAYER=ON && cmake --build `"$buildDir`" --config $Configuration --target CEditorPlayerVST_VST3"
+        $cmd = "`"$vcvars`" && cmake -S . -B `"$buildDir`" -G `"Ninja Multi-Config`" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON -DCEDITOR_TEMPLATE_PLAYER=ON -DCE_VST_GENERIC_PLAYER=ON && cmake --build `"$buildDir`" --config $Configuration --target CEditorPlayerVST_VST3 CEditorPlayerVST_CLAP CEditorPlayerVST_LV2"
         cmd /c $cmd
 
         if ($LASTEXITCODE -ne 0) {
@@ -226,8 +227,8 @@ function Build-And-Stage-Templates([string]$RepoRoot, [string]$StageDir, [string
     # Copy the artefacts out by extension rather than by name: JUCE names them from
     # CE_VST_PRODUCT_NAME, and the exporter finds a template by extension anyway.
     $artefacts = Join-Path $buildDir "CEditorPlayerVST_artefacts\$Configuration"
-    # Only VST3 has the runtime identity hook required for copying a template safely.
-    foreach ($ext in @("vst3")) {
+    # Only these have the runtime identity hook required for copying a template safely.
+    foreach ($ext in @("vst3", "clap", "lv2")) {
         $formatDir = Join-Path $artefacts $ext.ToUpperInvariant()
         $bundles = @(Get-ChildItem -LiteralPath $formatDir -Filter "*.$ext")
         if ($bundles.Count -ne 1) {
@@ -265,6 +266,8 @@ function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
     $binDst = Join-Path $toolsDst "bin"
     New-Item -ItemType Directory -Path $binDst -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $RepoRoot "JUCE\bin\JUCE-8.0.7\juce_vst3_helper.exe") -Destination $binDst -Force
+    # The LV2 helper writes a copied template's manifests per export (export-panel-template.mjs).
+    Copy-Item -LiteralPath (Join-Path $RepoRoot "JUCE\bin\JUCE-8.0.7\juce_lv2_helper.exe") -Destination $binDst -Force
 
     # Toolchain provisioning scripts only: the top-level files (manifest.json, *.mjs, provision.cmd/.sh,
     # *.cmake, README). Get-ChildItem -File skips the provisioned binary subdirs (llvm-mingw/, dotnet/, ...).

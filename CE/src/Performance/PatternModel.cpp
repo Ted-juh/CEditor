@@ -99,16 +99,162 @@ const char* MidiFxSettings::chordTypeName (ChordType type) noexcept
         case ChordType::diatonic:            return "diatonic";
         case ChordType::diatonicSeventh:     return "diatonic 7th";
         case ChordType::keyChords:           return "custom keys";
+        case ChordType::minor:               return "minor";
+        case ChordType::major7:              return "maj7";
+        case ChordType::minor7:              return "m7";
+        case ChordType::sus2:                return "sus2";
+        case ChordType::sus4:                return "sus4";
+        case ChordType::sixth:               return "6";
+        case ChordType::add9:                return "add9";
+        case ChordType::ninth:               return "9";
+        case ChordType::diminished:          return "dim";
+        case ChordType::augmented:           return "aug";
+        case ChordType::halfDiminished:      return "m7b5";
     }
     return "off";
 }
 
 MidiFxSettings::ChordType MidiFxSettings::chordTypeFromName (const juce::String& name) noexcept
 {
-    for (int i = 0; i <= (int) ChordType::keyChords; ++i)
+    for (int i = 0; i <= (int) ChordType::halfDiminished; ++i)
         if (name == chordTypeName ((ChordType) i))
             return (ChordType) i;
     return ChordType::off;
+}
+
+juce::String MidiFxSettings::chordNameOf (const juce::Array<int>& notes)
+{
+    static const char* names[] { "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B" };
+    // Simplest first, so a plain triad is never called something exotic (as chordBuilder.js).
+    struct Named { std::initializer_list<int> intervals; const char* suffix; };
+    static const Named named[] {
+        { { 0, 4, 7 }, "" }, { { 0, 3, 7 }, "m" }, { { 0, 7 }, "5" }, { { 0, 4, 7, 10 }, "7" },
+        { { 0, 4, 7, 11 }, "maj7" }, { { 0, 3, 7, 10 }, "m7" }, { { 0, 2, 7 }, "sus2" },
+        { { 0, 5, 7 }, "sus4" }, { { 0, 4, 7, 9 }, "6" }, { { 0, 3, 7, 9 }, "m6" },
+        { { 0, 2, 4, 7 }, "add9" }, { { 0, 2, 3, 7 }, "madd9" }, { { 0, 2, 4, 7, 10 }, "9" },
+        { { 0, 2, 4, 7, 11 }, "maj9" }, { { 0, 2, 3, 7, 10 }, "m9" }, { { 0, 3, 6 }, "dim" },
+        { { 0, 4, 8 }, "aug" }, { { 0, 3, 6, 10 }, "m7b5" }, { { 0, 3, 6, 9 }, "dim7" },
+        { { 0, 5, 7, 10 }, "7sus4" }, { { 0, 3, 7, 11 }, "m(maj7)" },
+    };
+    if (notes.isEmpty())
+        return "-";
+    auto lowest = notes[0];
+    juce::uint16 classes = 0;
+    for (const auto note : notes)
+    {
+        lowest = juce::jmin (lowest, note);
+        classes |= (juce::uint16) (1 << (((note % 12) + 12) % 12));
+    }
+    const auto bass = ((lowest % 12) + 12) % 12;
+    if ((classes & (classes - 1)) == 0)
+        return names[bass];
+
+    const auto rotated = [classes] (int root)
+    {
+        juce::uint16 set = 0;
+        for (int c = 0; c < 12; ++c)
+            if ((classes & (1 << c)) != 0)
+                set |= (juce::uint16) (1 << ((c - root + 12) % 12));
+        return set;
+    };
+    for (int attempt = 0; attempt < 13; ++attempt)
+    {
+        const auto root = attempt == 0 ? bass : attempt - 1;
+        if ((attempt > 0 && root == bass) || (classes & (1 << root)) == 0)
+            continue;
+        const auto set = rotated (root);
+        for (const auto& n : named)
+        {
+            juce::uint16 wanted = 0;
+            for (const auto i : n.intervals)
+                wanted |= (juce::uint16) (1 << (i % 12));
+            if (wanted == set)
+                return juce::String (names[root]) + n.suffix
+                     + (root == bass ? juce::String() : "/" + juce::String (names[bass]));
+        }
+    }
+    juce::StringArray parts;
+    auto sorted = notes;
+    sorted.sort();
+    for (const auto note : sorted)
+        parts.addIfNotAlreadyThere (names[((note % 12) + 12) % 12]);
+    return parts.joinIntoString (".");
+}
+
+juce::String MidiFxSettings::setChordName (int index) const
+{
+    if (! juce::isPositiveAndBelow (index, chordSet.size()))
+        return {};
+    const auto& chord = chordSet.getReference (index);
+    return chord.name.isNotEmpty() ? chord.name : chordNameOf (chord.notes);
+}
+
+int MidiFxSettings::findOrAddSetChord (juce::Array<int> notes)
+{
+    notes.sort();
+    while (notes.size() > 6)
+        notes.removeLast();
+    for (int i = 0; i < chordSet.size(); ++i)
+        if (chordSet.getReference (i).notes == notes)
+            return i;
+    if (chordSet.size() >= maxSetChords || notes.isEmpty())
+        return -1;
+    SetChord chord;
+    chord.notes = std::move (notes);
+    chordSet.add (std::move (chord));
+    return chordSet.size() - 1;
+}
+
+void MidiFxSettings::mapKey (int key, int chordIndex)
+{
+    for (int i = keyMap.size(); --i >= 0;)
+        if (keyMap.getReference (i).key == key)
+            keyMap.remove (i);
+    if (juce::isPositiveAndBelow (key, 128) && juce::isPositiveAndBelow (chordIndex, chordSet.size()))
+        keyMap.add ({ key, chordIndex });
+}
+
+void MidiFxSettings::removeSetChord (int index)
+{
+    if (! juce::isPositiveAndBelow (index, chordSet.size()))
+        return;
+    chordSet.remove (index);
+    for (int i = keyMap.size(); --i >= 0;)
+    {
+        auto& mapping = keyMap.getReference (i);
+        if (mapping.chord == index)
+            keyMap.remove (i);
+        else if (mapping.chord > index)
+            --mapping.chord;
+    }
+    for (auto& pad : padMap)
+        pad = pad == index ? -1 : pad > index ? pad - 1 : pad;
+    for (int i = progression.size(); --i >= 0;)
+    {
+        auto& step = progression.getReference (i);
+        if (step == index)
+            progression.remove (i);
+        else if (step > index)
+            --step;
+    }
+}
+
+void MidiFxSettings::applyLegacyChord (ChordType type)
+{
+    if (type == ChordType::off)
+    {
+        chordFollow = false;
+    }
+    else if (type == ChordType::keyChords)
+    {
+        chordFollow = false;
+        chordKeyMap = true;
+    }
+    else
+    {
+        chord = type;
+        chordFollow = true;
+    }
 }
 
 const char* MidiFxSettings::chordVoicingName (ChordVoicing voicing) noexcept
@@ -164,6 +310,7 @@ const char* NoteModuleSettings::strumPatternName (StrumPattern pattern) noexcept
         case StrumPattern::outsideIn:  return "outside in";
         case StrumPattern::insideOut:  return "inside out";
         case StrumPattern::random:     return "random";
+        case StrumPattern::byVelocity: return "by velocity";
     }
     return "ascending";
 }
@@ -171,7 +318,7 @@ const char* NoteModuleSettings::strumPatternName (StrumPattern pattern) noexcept
 NoteModuleSettings::StrumPattern NoteModuleSettings::strumPatternFromName (
     const juce::String& name) noexcept
 {
-    for (int i = 0; i <= (int) StrumPattern::random; ++i)
+    for (int i = 0; i <= (int) StrumPattern::byVelocity; ++i)
         if (name == strumPatternName ((StrumPattern) i))
             return (StrumPattern) i;
     return StrumPattern::ascending;
@@ -1449,6 +1596,8 @@ juce::var setlistToVar (const Setlist& setlist)
         i->setProperty ("pageId",       item.pageId);
         i->setProperty ("notes",   item.notes);
         i->setProperty ("tempo",   item.tempo);
+        i->setProperty ("plannedSeconds", item.plannedSeconds);
+        i->setProperty ("sections", arrangementToVar (item.sections));
         itemVars.add (juce::var (i));
     }
 
@@ -1481,6 +1630,9 @@ bool setlistFromVar (const juce::var& stored, Setlist& out)
             item.pageId       = i.getProperty ("pageId", {}).toString();
             item.notes   = i.getProperty ("notes", {}).toString();
             item.tempo   = juce::jlimit (0.0, 300.0, (double) i.getProperty ("tempo", 0.0));
+            item.plannedSeconds = juce::jlimit (0, 3600, (int) i.getProperty ("plannedSeconds", 0));
+            if (! arrangementFromVar (i.getProperty ("sections", {}), item.sections))
+                return false;
             out.items.add (std::move (item));
         }
 
@@ -1554,6 +1706,20 @@ juce::var arpToVar (const ArpSettings& arp)
     a->setProperty ("octaves",           arp.octaves);
     a->setProperty ("latch",             arp.latch);
     a->setProperty ("constrainToScale",  arp.constrainToScale);
+    {
+        const auto list = [] (const juce::Array<int>& values)
+        {
+            juce::Array<juce::var> out;
+            for (const auto value : values)
+                out.add (value);
+            return juce::var (out);
+        };
+        a->setProperty ("ratchetPattern", list (arp.ratchetPattern));
+        a->setProperty ("tiePattern",     list (arp.tiePattern));
+        a->setProperty ("octavePattern",  list (arp.octavePattern));
+        a->setProperty ("chancePattern",  list (arp.chancePattern));
+        a->setProperty ("feel",           arp.feel);
+    }
     a->setProperty ("velocityPattern",   velocities);
     a->setProperty ("degreePattern",     degrees);
     a->setProperty ("patternSemitones",  arp.patternSemitones);
@@ -1574,6 +1740,22 @@ void arpFromVar (const juce::var& stored, ArpSettings& out)
     out.octaves          = intOf (stored, "octaves", 1, 1, 4);
     out.latch            = (bool) stored.getProperty ("latch", false);
     out.constrainToScale = (bool) stored.getProperty ("constrainToScale", false);
+    {
+        const auto read = [&stored] (const char* key, int low, int high, juce::Array<int>& into)
+        {
+            into.clear();
+            if (const auto* values = stored.getProperty (key, {}).getArray())
+                for (const auto& value : *values)
+                    if (into.size() < 32)
+                        into.add (juce::jlimit (low, high, (int) value));
+        };
+        read ("ratchetPattern", 1, 4, out.ratchetPattern);
+        read ("tiePattern", 0, 1, out.tiePattern);
+        read ("octavePattern", -2, 2, out.octavePattern);
+        read ("chancePattern", 0, 100, out.chancePattern);
+        const auto feel = stored.getProperty ("feel", "straight").toString();
+        out.feel = feel == "triplet" || feel == "dotted" ? feel : "straight";
+    }
 
     if (const auto* velocities = stored.getProperty ("velocityPattern", {}).getArray())
         for (const auto& velocity : *velocities)
@@ -1592,25 +1774,61 @@ juce::var midiFxToVar (const MidiFxSettings& fx)
     f->setProperty ("transposeMode",    fx.transposeMode);
     {
         juce::Array<juce::var> chords;
-        for (const auto& keyChord : fx.keyChords)
+        for (const auto& chord : fx.chordSet)
         {
-            juce::Array<juce::var> offsets;
-            for (const auto offset : keyChord.offsets)
-                offsets.add (offset);
-            auto* kc = new juce::DynamicObject();
-            kc->setProperty ("key", keyChord.key);
-            kc->setProperty ("offsets", offsets);
-            chords.add (juce::var (kc));
+            juce::Array<juce::var> notes;
+            for (const auto note : chord.notes)
+                notes.add (note);
+            auto* c = new juce::DynamicObject();
+            c->setProperty ("name", chord.name);
+            c->setProperty ("notes", notes);
+            c->setProperty ("root", chord.root);
+            c->setProperty ("quality", chord.quality);
+            c->setProperty ("inversion", chord.inversion);
+            c->setProperty ("voicing", chord.voicing);
+            c->setProperty ("bass", chord.bass);
+            chords.add (juce::var (c));
         }
-        f->setProperty ("keyChords", chords);
+        f->setProperty ("chordSet", chords);
+
+        juce::Array<juce::var> keys;
+        for (const auto& mapping : fx.keyMap)
+        {
+            auto* k = new juce::DynamicObject();
+            k->setProperty ("key", mapping.key);
+            k->setProperty ("chord", mapping.chord);
+            keys.add (juce::var (k));
+        }
+        f->setProperty ("keyMap", keys);
+
+        juce::Array<juce::var> pads, steps;
+        for (const auto pad : fx.padMap)
+            pads.add (pad);
+        for (const auto step : fx.progression)
+            steps.add (step);
+        f->setProperty ("padMap", pads);
+        f->setProperty ("progression", steps);
     }
+    f->setProperty ("chordPads",          fx.chordPads);
+    f->setProperty ("chordProgression",   fx.chordProgression);
+    f->setProperty ("progressionAdvance", fx.progressionAdvance);
+    f->setProperty ("progressionLow",     fx.progressionLow);
+    f->setProperty ("progressionHigh",    fx.progressionHigh);
     f->setProperty ("constrainToScale", fx.constrainToScale);
+    f->setProperty ("scaleFold",        fx.scaleFold);
+    f->setProperty ("followSongKey",    fx.followSongKey);
     f->setProperty ("scaleRoot",        fx.scaleRoot);
     f->setProperty ("scaleType",        fx.scaleType);
     f->setProperty ("chord",            MidiFxSettings::chordTypeName (fx.chord));
     f->setProperty ("chordInversion",   fx.chordInversion);
     f->setProperty ("chordVoicing",     MidiFxSettings::chordVoicingName (fx.chordVoicing));
     f->setProperty ("chordVoiceLeading", fx.chordVoiceLeading);
+    f->setProperty ("chordFollow",      fx.chordFollow);
+    f->setProperty ("chordFollowLow",   fx.chordFollowLow);
+    f->setProperty ("chordFollowHigh",  fx.chordFollowHigh);
+    f->setProperty ("chordBass",        fx.chordBass);
+    f->setProperty ("chordTopAccent",   fx.chordTopAccent);
+    f->setProperty ("chordKeyMap",      fx.chordKeyMap);
     f->setProperty ("velocityFixed",    fx.velocityFixed);
     f->setProperty ("velocityScale",    fx.velocityScale);
     f->setProperty ("responseProfileName", fx.responseProfileName);
@@ -1653,6 +1871,8 @@ void midiFxFromVar (const juce::var& stored, MidiFxSettings& out)
     if (out.transposeMode != "diatonic")
         out.transposeMode = "chromatic";
     out.constrainToScale = (bool) stored.getProperty ("constrainToScale", false);
+    out.scaleFold        = stored.getProperty ("scaleFold", "snap").toString() == "drop" ? "drop" : "snap";
+    out.followSongKey    = (bool) stored.getProperty ("followSongKey", false);
     out.scaleRoot        = intOf (stored, "scaleRoot", 0, 0, 11);
     out.scaleType        = stored.getProperty ("scaleType", "major").toString();
     out.chord            = MidiFxSettings::chordTypeFromName (stored.getProperty ("chord", {}).toString());
@@ -1660,6 +1880,26 @@ void midiFxFromVar (const juce::var& stored, MidiFxSettings& out)
     out.chordVoicing     = MidiFxSettings::chordVoicingFromName (
                               stored.getProperty ("chordVoicing", "close").toString());
     out.chordVoiceLeading = (bool) stored.getProperty ("chordVoiceLeading", false);
+    out.chordFollowLow   = intOf (stored, "chordFollowLow", 0, 0, 127);
+    out.chordFollowHigh  = intOf (stored, "chordFollowHigh", 127, 0, 127);
+    if (out.chordFollowLow > out.chordFollowHigh)
+        std::swap (out.chordFollowLow, out.chordFollowHigh);
+    out.chordBass        = (bool) stored.getProperty ("chordBass", false);
+    out.chordTopAccent   = intOf (stored, "chordTopAccent", 0, 0, 40);
+    if (stored.hasProperty ("chordFollow"))
+    {
+        out.chordFollow  = (bool) stored.getProperty ("chordFollow", true);
+        out.chordKeyMap  = (bool) stored.getProperty ("chordKeyMap", false);
+    }
+    else
+    {
+        // Saved before the layers: the one field said everything.
+        out.chordFollow = true;
+        out.chordKeyMap = false;
+        out.applyLegacyChord (out.chord);
+    }
+    if (out.chord == MidiFxSettings::ChordType::keyChords)
+        out.chord = MidiFxSettings::ChordType::triad;
     out.velocityFixed    = intOf (stored, "velocityFixed", 0, 0, 127);
     out.velocityScale    = floatOf (stored, "velocityScale", 1.0f, 0.1f, 2.0f);
     out.responseProfileName = stored.getProperty ("responseProfileName", {}).toString()
@@ -1707,20 +1947,69 @@ void midiFxFromVar (const juce::var& stored, MidiFxSettings& out)
             out.expressionCurveValues.add (juce::jlimit (0, 127, (int) value));
         }
 
+    out.chordSet.clear();
+    out.keyMap.clear();
+    if (const auto* chords = stored.getProperty ("chordSet", {}).getArray())
+        for (const auto& entry : *chords)
+        {
+            if (out.chordSet.size() >= MidiFxSettings::maxSetChords)
+                break;
+            MidiFxSettings::SetChord chord;
+            chord.name = entry.getProperty ("name", {}).toString().substring (0, 40);
+            if (const auto* notes = entry.getProperty ("notes", {}).getArray())
+                for (const auto& note : *notes)
+                    if (chord.notes.size() < 6)
+                        chord.notes.add (juce::jlimit (0, 127, (int) note));
+            chord.notes.sort();
+            chord.root = intOf (entry, "root", -1, -1, 127);
+            chord.quality = entry.getProperty ("quality", {}).toString();
+            chord.inversion = intOf (entry, "inversion", 0, 0, 3);
+            chord.voicing = entry.getProperty ("voicing", "close").toString();
+            chord.bass = (bool) entry.getProperty ("bass", false);
+            // An empty chord still holds its place: the key map counts by index.
+            out.chordSet.add (std::move (chord));
+        }
+    if (const auto* keys = stored.getProperty ("keyMap", {}).getArray())
+        for (const auto& entry : *keys)
+            out.mapKey (intOf (entry, "key", -1, -1, 127), intOf (entry, "chord", -1, -1, 1000));
+
+    // Pads keep their positions (an empty pad is -1, a pad past the set too); steps that
+    // point past the set are dropped, since a progression has no gaps.
+    out.padMap.clear();
+    out.progression.clear();
+    if (const auto* pads = stored.getProperty ("padMap", {}).getArray())
+        for (const auto& pad : *pads)
+            if (out.padMap.size() < MidiFxSettings::maxPads)
+                out.padMap.add (juce::isPositiveAndBelow ((int) pad, out.chordSet.size()) ? (int) pad : -1);
+    if (const auto* steps = stored.getProperty ("progression", {}).getArray())
+        for (const auto& step : *steps)
+            if (out.progression.size() < MidiFxSettings::maxProgression
+                && juce::isPositiveAndBelow ((int) step, out.chordSet.size()))
+                out.progression.add ((int) step);
+    out.chordPads = (bool) stored.getProperty ("chordPads", false);
+    out.chordProgression = (bool) stored.getProperty ("chordProgression", false);
+    out.progressionAdvance = stored.getProperty ("progressionAdvance", "key").toString() == "pedal"
+                               ? "pedal" : "key";
+    out.progressionLow  = intOf (stored, "progressionLow", 0, 0, 127);
+    out.progressionHigh = intOf (stored, "progressionHigh", 59, 0, 127);
+    if (out.progressionLow > out.progressionHigh)
+        std::swap (out.progressionLow, out.progressionHigh);
+
+    // Saved before the set: each learned key chord (offsets from its key) becomes a set
+    // chord of the notes it played, and the key points at it.
     if (const auto* chords = stored.getProperty ("keyChords", {}).getArray())
         for (const auto& entry : *chords)
         {
-            MidiFxSettings::KeyChord keyChord;
-            keyChord.key = juce::jlimit (0, 127, (int) entry.getProperty ("key", 60));
+            const auto key = juce::jlimit (0, 127, (int) entry.getProperty ("key", 60));
+            juce::Array<int> notes;
             if (const auto* offsets = entry.getProperty ("offsets", {}).getArray())
                 for (const auto& offset : *offsets)
-                {
-                    if (keyChord.offsets.size() >= 6)
-                        break;
-                    keyChord.offsets.add (juce::jlimit (-60, 60, (int) offset));
-                }
-            if (! keyChord.offsets.isEmpty())
-                out.keyChords.add (std::move (keyChord));
+                    notes.add (juce::jlimit (0, 127, key + juce::jlimit (-60, 60, (int) offset)));
+            if (notes.isEmpty())
+                continue;
+            const auto index = out.findOrAddSetChord (notes);
+            if (index >= 0)
+                out.mapKey (key, index);
         }
 }
 
@@ -1728,16 +2017,36 @@ juce::StringArray MidiSlot::types()
 {
     // Order is the order the UI offers them: the two that reorder or repeat what you play,
     // then the shapers, then the performance processors in the order somebody reaches for them.
-    return { "arp", "transpose", "scale", "chord", "velocity", "fx",
+    return { "arp", "key", "chord", "velocity", "fx",
              "echo", "strum", "humanize", "chance", "length", "latch", "mpe",
              "articulation" };
+}
+
+bool MidiSlot::isNoteModule (const juce::String& type)
+{
+    // The ones whose settings live in `mod` rather than `fx` or `arp`.
+    return juce::StringArray { "echo", "strum", "humanize", "chance", "length", "latch", "mpe",
+                               "articulation" }.contains (type);
+}
+
+juce::Array<MidiSlot> withSongKey (juce::Array<MidiSlot> chain, const juce::String& scaleType, int root)
+{
+    for (auto& slot : chain)
+        if (slot.fx.followSongKey)
+        {
+            slot.fx.scaleType = scaleType;
+            slot.fx.scaleRoot = juce::jlimit (0, 11, root);
+        }
+    return chain;
 }
 
 MidiSlot MidiSlot::create (const juce::String& type, const juce::String& slotId)
 {
     MidiSlot slot;
     slot.slotId = slotId;
-    slot.type = types().contains (type) ? type : "arp";
+    slot.type = types().contains (canonicalType (type)) ? canonicalType (type) : juce::String ("arp");
+    // A module added now reads the part's song key; one from before keeps its own scale.
+    slot.fx.followSongKey = true;
     // Defaults are already transparent: ArpSettings starts disabled, MidiFxSettings starts
     // at no transpose, no scale, no chord, unity velocity. An inserted module must not
     // change the sound by existing — it changes it when you set it up.
@@ -1751,20 +2060,38 @@ juce::var noteModuleToVar (const NoteModuleSettings& settings)
     m->setProperty ("echoStepBeats",   settings.echoStepBeats);
     m->setProperty ("echoFeedback",    settings.echoFeedback);
     m->setProperty ("echoTranspose",   settings.echoTranspose);
+    m->setProperty ("echoFeel",        settings.echoFeel);
+    m->setProperty ("echoScaleClimb",  settings.echoScaleClimb);
+    m->setProperty ("echoShorter",     settings.echoShorter);
+    m->setProperty ("echoFloor",       settings.echoFloor);
     m->setProperty ("strumBeats",      settings.strumBeats);
     m->setProperty ("strumDown",       settings.strumDown);
     m->setProperty ("strumPattern",    NoteModuleSettings::strumPatternName (settings.strumPattern));
     m->setProperty ("strumCurve",      settings.strumCurve);
     m->setProperty ("strumVelocityRamp", settings.strumVelocityRamp);
+    m->setProperty ("strumGuitar",     settings.strumGuitar);
+    m->setProperty ("strumHarderFaster", settings.strumHarderFaster);
+    m->setProperty ("strumRepeatPerBeat", settings.strumRepeatPerBeat);
+    m->setProperty ("humanizeLayBackBeats", settings.humanizeLayBackBeats);
+    m->setProperty ("humanizeSwing",   settings.humanizeSwing);
+    m->setProperty ("humanizeSwingGrid", settings.humanizeSwingGrid);
+    m->setProperty ("humanizeAccent",  settings.humanizeAccent);
+    m->setProperty ("humanizeFreeze",  settings.humanizeFreeze);
+    m->setProperty ("humanizeSeed",    settings.humanizeSeed);
     m->setProperty ("humanizeTimingBeats", settings.humanizeTimingBeats);
     m->setProperty ("humanizeVelocity",    settings.humanizeVelocity);
     m->setProperty ("humanizeGatePercent", settings.humanizeGatePercent);
     m->setProperty ("humanizePreserveChords", settings.humanizePreserveChords);
     m->setProperty ("humanizeProtectBeats", settings.humanizeProtectBeats);
     m->setProperty ("chance",          settings.chance);
+    m->setProperty ("chanceKeepDownbeats", settings.chanceKeepDownbeats);
+    m->setProperty ("chanceSoftFirst", settings.chanceSoftFirst);
     m->setProperty ("lengthBeats",     settings.lengthBeats);
     m->setProperty ("legato",          settings.legato);
     m->setProperty ("latchOn",         settings.latchOn);
+    m->setProperty ("lengthMode",      settings.lengthMode);
+    m->setProperty ("latchMode",       settings.latchMode);
+    m->setProperty ("latchPedalRelease", settings.latchPedalRelease);
     m->setProperty ("mpeEnabled",       settings.mpeEnabled);
     m->setProperty ("mpeInput",         settings.mpeInput);
     m->setProperty ("mpeOutput",        settings.mpeOutput);
@@ -1822,6 +2149,13 @@ void noteModuleFromVar (const juce::var& stored, NoteModuleSettings& out)
     out.echoStepBeats = doubleOf ("echoStepBeats", 0.5, 0.03125, 4.0);
     out.echoFeedback  = (float) doubleOf ("echoFeedback", 0.7, 0.1, 1.0);
     out.echoTranspose = intOf ("echoTranspose", 0, -12, 12);
+    {
+        const auto feel = stored.getProperty ("echoFeel", "straight").toString();
+        out.echoFeel = feel == "dotted" || feel == "triplet" ? feel : "straight";
+    }
+    out.echoScaleClimb = (bool) stored.getProperty ("echoScaleClimb", false);
+    out.echoShorter   = (bool) stored.getProperty ("echoShorter", false);
+    out.echoFloor     = intOf ("echoFloor", 1, 1, 127);
     out.strumBeats    = doubleOf ("strumBeats", 0.0, 0.0, 1.0);
     out.strumDown     = (bool) stored.getProperty ("strumDown", false);
     const auto storedPattern = stored.getProperty ("strumPattern", {}).toString();
@@ -1832,6 +2166,18 @@ void noteModuleFromVar (const juce::var& stored, NoteModuleSettings& out)
     out.strumDown     = out.strumPattern == NoteModuleSettings::StrumPattern::descending;
     out.strumCurve    = (float) doubleOf ("strumCurve", 0.0, -1.0, 1.0);
     out.strumVelocityRamp = intOf ("strumVelocityRamp", 0, -64, 64);
+    out.strumGuitar   = (bool) stored.getProperty ("strumGuitar", false);
+    out.strumHarderFaster = (bool) stored.getProperty ("strumHarderFaster", false);
+    {
+        const auto repeat = intOf ("strumRepeatPerBeat", 0, 0, 4);
+        out.strumRepeatPerBeat = repeat == 1 ? 0 : repeat;
+    }
+    out.humanizeLayBackBeats = doubleOf ("humanizeLayBackBeats", 0.0, 0.0, 0.125);
+    out.humanizeSwing = (float) doubleOf ("humanizeSwing", 0.0, 0.0, 0.75);
+    out.humanizeSwingGrid = doubleOf ("humanizeSwingGrid", 0.25, 0.25, 0.5) >= 0.375 ? 0.5 : 0.25;
+    out.humanizeAccent = intOf ("humanizeAccent", 0, 0, 40);
+    out.humanizeFreeze = (bool) stored.getProperty ("humanizeFreeze", false);
+    out.humanizeSeed = intOf ("humanizeSeed", 1, 1, 9999);
     out.humanizeTimingBeats = doubleOf ("humanizeTimingBeats", 0.0, 0.0, 0.25);
     out.humanizeVelocity    = intOf ("humanizeVelocity", 0, 0, 64);
     out.humanizeGatePercent = intOf ("humanizeGatePercent", 0, 0, 100);
@@ -1841,6 +2187,15 @@ void noteModuleFromVar (const juce::var& stored, NoteModuleSettings& out)
     out.lengthBeats   = doubleOf ("lengthBeats", 0.0, 0.0, 8.0);
     out.legato        = (bool) stored.getProperty ("legato", false);
     out.latchOn       = (bool) stored.getProperty ("latchOn", false);
+    out.chanceKeepDownbeats = (bool) stored.getProperty ("chanceKeepDownbeats", false);
+    out.chanceSoftFirst = (bool) stored.getProperty ("chanceSoftFirst", false);
+    {
+        const auto mode = stored.getProperty ("lengthMode", "fixed").toString();
+        out.lengthMode = mode == "at most" || mode == "at least" ? mode : "fixed";
+        const auto latch = stored.getProperty ("latchMode", "replace").toString();
+        out.latchMode = latch == "add" || latch == "toggle" ? latch : "replace";
+    }
+    out.latchPedalRelease = (bool) stored.getProperty ("latchPedalRelease", false);
     const juce::StringArray formats { "mpe", "poly aftertouch", "channel pressure", "cc" };
     const juce::StringArray axes { "pressure", "timbre", "pitch bend" };
     const juce::StringArray collapseModes { "latest", "highest", "average" };
@@ -1917,6 +2272,7 @@ juce::var midiSlotToVar (const MidiSlot& slot)
     s->setProperty ("slotId",   slot.slotId);
     s->setProperty ("type",     slot.type);
     s->setProperty ("bypassed", slot.bypassed);
+    s->setProperty ("amount",   slot.amount);
     s->setProperty ("arp",      arpToVar (slot.arp));
     s->setProperty ("fx",       midiFxToVar (slot.fx));
     s->setProperty ("mod",      noteModuleToVar (slot.mod));
@@ -1931,8 +2287,11 @@ void midiSlotFromVar (const juce::var& stored, MidiSlot& out)
 
     out.slotId   = stored.getProperty ("slotId", {}).toString();
     const auto type = stored.getProperty ("type", {}).toString();
-    out.type     = MidiSlot::types().contains (type) ? type : juce::String ("arp");
+    // Transpose and Scale became one Key module, which does both jobs with the same fields.
+    const auto migrated = MidiSlot::canonicalType (type);
+    out.type     = MidiSlot::types().contains (migrated) ? migrated : juce::String ("arp");
     out.bypassed = (bool) stored.getProperty ("bypassed", false);
+    out.amount   = juce::jlimit (0.0f, 1.0f, (float) (double) stored.getProperty ("amount", 1.0));
     arpFromVar (stored.getProperty ("arp", {}), out.arp);
     midiFxFromVar (stored.getProperty ("fx", {}), out.fx);
     noteModuleFromVar (stored.getProperty ("mod", {}), out.mod);

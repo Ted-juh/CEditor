@@ -40,6 +40,7 @@
   import ScriptNotifications from './CE_Application/layout/ScriptNotifications.svelte';
   import ScriptDialog from './CE_Application/layout/ScriptDialog.svelte';
   import NewPanelDialog from './CE_Application/layout/NewPanelDialog.svelte';
+  import HistoryWindow from './CE_Application/layout/HistoryWindow.svelte';
   import { openNewPanelDialog } from './CE_Application/stores/newPanelDialog.js';
   import { initPanelRuntime } from './CE_Application/scripting/panelRuntime.js';
   import { initHistory, undo, redo, flushHistory } from './CE_Application/stores/history.js';
@@ -281,6 +282,9 @@
   // Pane splitters: relative dragScrub, one CSS pixel per pixel of travel.
   // The panels sit right/below their handles, so leftward/upward drags widen
   // them; the axis is fixed by orientation — no direction settings, by design.
+  // The same action takes the keyboard once a splitter can be focused (they
+  // are tabbable separators): the arrows mirror the drag, 16 px a press, Shift
+  // finer and Ctrl coarser as on every scrub, Home / End to the limits.
   const propsResizeScrub = $derived({
     axis: 'x',
     tracking: 'relative',
@@ -291,6 +295,7 @@
     max: Math.max(MIN_PROPERTIES_PANEL_WIDTH, viewportWidth - 120),
     value: propertiesPanelWidth,
     manageCursor: false,
+    keyStep: 16,
     onChange: (v) => { propertiesPanelWidth = Math.round(v); },
     onDragStart: () => { isResizingProps = true; },
     onDragEnd: () => { isResizingProps = false; },
@@ -306,6 +311,7 @@
     max: 400,
     value: treePanelWidth,
     manageCursor: false,
+    keyStep: 16,
     onChange: (v) => { treePanelWidth = Math.round(v); },
     onDragStart: () => { isResizingTree = true; },
     onDragEnd: () => { isResizingTree = false; },
@@ -320,6 +326,7 @@
     max: maxDisplayPanelHeight(),
     value: displayPanelHeight,
     manageCursor: false,
+    keyStep: 16,
     onChange: (v) => { displayPanelHeight = Math.round(v); },
     // The drag itself is what marks the height as the user's. Set on start,
     // not on end, so a drag abandoned halfway still counts — they touched it,
@@ -329,7 +336,7 @@
   });
 
   function handleBeforeUnload() {
-    flushUnsavedSessionSnapshot();
+    flushUnsavedSessionSnapshot({ unloading: true });
   }
 
   function maybeLoadCustomComponentStressTest() {
@@ -418,15 +425,22 @@
           </div>
         </div>
         {#if effectiveShowTreePanel}
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div class="tree-resize-handle" role="separator" aria-orientation="vertical" class:active={isResizingTree} use:dragScrub={treeResizeScrub}></div>
+          <!-- A focusable separator with a value is a widget (ARIA window splitter); the linter reads it as static. -->
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+          <div class="tree-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize the component tree" tabindex="0"
+            aria-valuenow={treePanelWidth} aria-valuemin={treeResizeScrub.min} aria-valuemax={treeResizeScrub.max}
+            class:active={isResizingTree} use:dragScrub={treeResizeScrub}></div>
           <div class="tree-area" style="flex: 0 0 {treePanelWidth}px;">
             <ComponentTree />
           </div>
         {/if}
       </div>
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="display-resize-handle" role="separator" aria-orientation="horizontal" class:active={isResizingDisplay} use:dragScrub={displayResizeScrub} style="display: {effectiveShowDisplayPanel ? 'block' : 'none'}"></div>
+      <!-- A focusable separator with a value is a widget (ARIA window splitter); the linter reads it as static. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div class="display-resize-handle" role="separator" aria-orientation="horizontal" aria-label="Resize the display panel" tabindex="0"
+        aria-valuenow={displayPanelHeight} aria-valuemin={displayResizeScrub.min} aria-valuemax={displayResizeScrub.max}
+        class:active={isResizingDisplay} use:dragScrub={displayResizeScrub}
+        style="display: {effectiveShowDisplayPanel ? 'block' : 'none'}"></div>
       <div class="display-panel-area" style="flex: 0 0 {displayPanelBasis}; display: {effectiveShowDisplayPanel ? 'block' : 'none'}">
         <ErrorBoundary label="The display panel">
           <DisplayPanel onTabChange={handleDisplayTabChange} visible={effectiveShowDisplayPanel} />
@@ -435,8 +449,11 @@
     </div>
 
     {#if effectiveShowPropertiesPanel}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="resize-handle" role="separator" aria-orientation="vertical" class:active={isResizingProps} use:dragScrub={propsResizeScrub}></div>
+      <!-- A focusable separator with a value is a widget (ARIA window splitter); the linter reads it as static. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div class="resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize the properties panel" tabindex="0"
+        aria-valuenow={propertiesPanelWidth} aria-valuemin={propsResizeScrub.min} aria-valuemax={propsResizeScrub.max}
+        class:active={isResizingProps} use:dragScrub={propsResizeScrub}></div>
 
       <div class="properties-area">
         <ErrorBoundary label="The properties panel">
@@ -459,6 +476,7 @@
   <ScriptDialog />
 
   <NewPanelDialog />
+  <HistoryWindow />
 
   {#if showShortcuts}
     <ShortcutsOverlay show={showShortcuts} onclose={() => showShortcuts = false} />
@@ -519,6 +537,7 @@
     transition: background 0.15s;
   }
   .tree-resize-handle:hover,
+  .tree-resize-handle:focus-visible,
   .tree-resize-handle.active {
     background: #5B9BD5;
   }
@@ -530,6 +549,7 @@
     transition: background 0.15s;
   }
   .resize-handle:hover,
+  .resize-handle:focus-visible,
   .resize-handle.active {
     background: #5B9BD5;
   }
@@ -541,6 +561,7 @@
     transition: background 0.15s;
   }
   .display-resize-handle:hover,
+  .display-resize-handle:focus-visible,
   .display-resize-handle.active {
     background: #5B9BD5;
   }

@@ -1,5 +1,12 @@
+// customComponentLibrary.js — the author's saved components.
+//
+// Kept in IndexedDB (utils/browserDatabase.js) as one ordered record. It lived in localStorage,
+// where every entry's thumbnail and full component plan counted against the same ~5 MB as every
+// other preference, and a library of a few dozen components could fill it. A library an older
+// build left there is picked up on start and moved on the first save.
 import { writable, get } from 'svelte/store';
-import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
+import { readStoredJson, removeStoredValue, writeStoredJson } from '../utils/localStorageState.js';
+import { browserDatabase, readRecord, writeRecord } from '../utils/browserDatabase.js';
 import {
   createCustomComponentExportEnvelope,
   customComponentPackageId,
@@ -7,6 +14,7 @@ import {
 } from '../utils/customComponentPackage.js';
 
 const STORAGE_KEY = 'ce.customComponentLibrary.v1';
+const RECORD_KEY = 'componentLibrary';
 
 function normalizeEntries(value) {
   if (!Array.isArray(value)) return [];
@@ -73,15 +81,52 @@ function createEntry(envelope, savedAt = new Date().toISOString()) {
 }
 
 function createLibraryStore() {
+  // What an older build left in localStorage, shown at once; the database's copy replaces it as
+  // soon as it has been read (below).
   const store = writable(normalizeEntries(readStoredJson(STORAGE_KEY, [])));
+  let changedBeforeLoad = false;
+  let writes = Promise.resolve();
 
   function persist(entries) {
-    writeStoredJson(STORAGE_KEY, entries);
+    changedBeforeLoad = true;
+    if (!browserDatabase()) {
+      writeStoredJson(STORAGE_KEY, entries);
+      return entries;
+    }
+    // In order, one after another, each after the first read: a save made in the first moments
+    // after start-up must not be overwritten by the load, nor land before it.
+    writes = writes.then(() => ready).then(async () => {
+      if (await writeRecord(RECORD_KEY, entries)) removeStoredValue(STORAGE_KEY);
+      else writeStoredJson(STORAGE_KEY, entries);
+    });
     return entries;
   }
 
+  const ready = (async () => {
+    if (!browserDatabase()) return;
+    const stored = await readRecord(RECORD_KEY, null);
+    if (!Array.isArray(stored)) {
+      // Nothing in the database yet. A library an older build left in localStorage moves now, not
+      // at the next change to it — that could be never, and the space is wanted back.
+      const legacy = readStoredJson(STORAGE_KEY, null);
+      if (Array.isArray(legacy) && legacy.length && await writeRecord(RECORD_KEY, legacy)) removeStoredValue(STORAGE_KEY);
+      return;
+    }
+    const loaded = normalizeEntries(stored);
+    // Anything saved while the read was in flight stays, in front; the rest comes from the database.
+    store.update((current) => {
+      if (!changedBeforeLoad) return loaded;
+      const ids = new Set(current.map((entry) => entry.id));
+      return [...current, ...loaded.filter((entry) => !ids.has(entry.id))];
+    });
+  })();
+
   return {
     subscribe: store.subscribe,
+    /** Resolves once the library has been read from the database (immediately where there is none). */
+    ready: () => ready,
+    /** Tests only: resolves once every write so far has committed. */
+    settled: () => writes,
     saveControl(control, metadata = {}) {
       if (!control?._children?.Core?.id) return null;
       const envelope = createCustomComponentExportEnvelope(control, metadata);

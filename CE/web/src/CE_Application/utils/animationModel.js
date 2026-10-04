@@ -24,6 +24,8 @@ import {
   ROOT_BUCKETS,
   targetBuckets,
   readTrigger,
+  treeValueAtPath,
+  resolveInteractiveControl,
 } from './interactionRuntime.js';
 import { OVERSHOOTING_EASINGS, CUSTOM_EASING, SPRING_EASING, SPRING_DEFAULTS, CUSTOM_DEFAULT, readEasing, easeAt, cleanBezier } from './easing.js';
 import {
@@ -46,9 +48,19 @@ export const PANEL_EASING_OPTIONS = ['linear', 'outQuad', 'inOutQuad', 'outCubic
 /**
  * The animation kinds the runtime plays. A transition eases a property from one style to the next
  * when something changes. A keyframe animation runs a shape of its own — a pulse, a blink — while
- * its trigger holds, or once each time it fires (utils/keyframeAnimation.js).
+ * its trigger holds, or once each time it fires (utils/keyframeAnimation.js). A sequence is tracks
+ * along a time axis: every target has its own keyframes of { time, value, easing }, the values are
+ * driven rather than the element, and a value trigger scrubs it instead of firing it
+ * (utils/keyframeModel.js, played by utils/keyframePlayer.js).
+ *
+ * The last two were built apart, both under the name `keyframes`, and met in a merge. They are
+ * different things and both stay: `keyframes` is CSS playing a shape on one part, `sequence` is
+ * anime.js posing document values — which is what reaches a value channel or a filmstrip frame.
  */
-export const ANIMATION_KINDS = ['transition', 'keyframes'];
+export const ANIMATION_KINDS = ['transition', 'keyframes', 'sequence'];
+
+/** The kind whose targets are tracks. */
+export const SEQUENCE_KIND = 'sequence';
 
 export const TRIGGER_TYPES = ['stateChange', 'valueChange'];
 
@@ -208,6 +220,9 @@ export function describeAnimation(name, animation) {
     origin: trigger.origin,
     trigger,
     targets: Array.isArray(animation?.targets) ? animation.targets : [],
+    // Sequences only: play round again at the end, and keep the last frame while the state stays.
+    loop: animation?.loop === true,
+    hold: animation?.hold !== false,
     // Keyframe animations only: where they play, how often, which way, and their frames.
     part: keyframePart(animation),
     iterations: animation?.iterations === 'infinite' || animation?.iterations === Infinity
@@ -243,15 +258,122 @@ function keyframeTargetStatus(target, partNames) {
   return { works: true, animates: 'keyframes', buckets: [], part };
 }
 
+// --- Sequence tracks ---------------------------------------------------------
+// A sequence drives values, so it reaches two things no CSS can: a value channel, which bindings
+// and generators then follow, and a filmstrip part's frame.
+
+/** The buckets only a sequence can drive. The transition catalog has nothing for them. */
+export const SEQUENCE_ONLY_BUCKETS = ['channel', 'frame'];
+const CHANNEL_PATH = /^ValueChannels\.([^.]+)$/;
+const FRAME_TAIL = 'Image.frameIndex';
+
+/** 'channel' or 'frame' when the path is one only a sequence drives, else ''. */
+function sequenceOnlyBucket(path) {
+  const text = String(path ?? '').trim();
+  if (CHANNEL_PATH.test(text)) return 'channel';
+  if (text.startsWith('Parts.') && text.split('.').slice(2).join('.') === FRAME_TAIL) return 'frame';
+  return '';
+}
+
+/**
+ * A sequence track's status. A channel or a frame works here and nowhere else; every other path
+ * is a track over what a transition would ease, so the transition's own answer stands.
+ */
+export function sequenceTargetStatus(target, partNames = [], { triggerType = 'stateChange' } = {}) {
+  const path = String(target?.path ?? '').trim();
+  const channel = CHANNEL_PATH.exec(path);
+  if (channel) {
+    if (triggerType === 'valueChange' && channel[1] === 'mainValue') {
+      return { works: false, reason: 'feedback', animates: 'channel', detail: 'A sequence that follows the value cannot also drive it; it would chase itself.' };
+    }
+    return { works: true, animates: 'channel', buckets: ['channel'], part: '', channel: channel[1] };
+  }
+  if (sequenceOnlyBucket(path) === 'frame') {
+    const partName = path.split('.')[1];
+    if (partNames.length && !partNames.includes(partName)) {
+      return { works: false, reason: 'missing part', animates: 'frame', part: partName, detail: `This control has no part called "${partName}", so the animation is built for something that is not there.` };
+    }
+    return { works: true, animates: 'frame', buckets: ['frame'], part: partName };
+  }
+  return targetStatus(target, partNames);
+}
+
+/** A channel or frame target on an animation that is not a sequence: said plainly, not "dead path". */
+function sequenceOnlyStatus(target, kind) {
+  const bucket = sequenceOnlyBucket(target?.path);
+  if (!bucket) return null;
+  const what = bucket === 'channel' ? 'A value channel' : 'A filmstrip frame';
+  return { works: false, reason: 'sequence only', animates: bucket, detail: `${what} is driven by a sequence, not by a ${kind}: there is no CSS for a ${bucket === 'channel' ? 'value' : 'frame'}.` };
+}
+
+/** The parts a resolved control has, generator-made ones included. Empty when it cannot resolve. */
+export function resolvedPartsOf(control) {
+  if (!control?._children?.Parts) return {};
+  try {
+    return resolveInteractiveControl(control, {})?.control?._children?.Parts?._children ?? {};
+  } catch {
+    return control._children.Parts._children ?? {};
+  }
+}
+
+/**
+ * Everything the "Change" dropdown can offer for THIS control: the fixed part properties, and —
+ * for a sequence — one entry per value channel and one per filmstrip part. The channels come from
+ * the document; the filmstrip parts come from resolving the control, because a generator makes
+ * them and the document never holds them. Each extra entry carries its whole path
+ * (`scope: 'control'`), so the Part picker does not apply to it.
+ */
+export function offeredTargetsFor(control, kind = SEQUENCE_KIND) {
+  const out = OFFERED_PROPERTIES.map((entry) => ({ ...entry, scope: 'part' }));
+  if (kind !== SEQUENCE_KIND) return out;
+  const channels = control?._children?.ValueChannels?._children ?? {};
+  for (const [name, channel] of Object.entries(channels)) {
+    const type = String(channel?.type ?? 'float').toLowerCase();
+    if (['enum', 'text', 'note', 'array'].includes(type)) continue;
+    out.push({ path: `ValueChannels.${name}`, properties: ['channel'], label: `Channel: ${channel?.label || name}`, scope: 'control', channel: name });
+  }
+  for (const [name, part] of Object.entries(resolvedPartsOf(control))) {
+    if (String(part?._children?.Image?.mode ?? '') === 'filmstrip') {
+      out.push({ path: `Parts.${name}.${FRAME_TAIL}`, properties: ['frame'], label: `Frame: ${name}`, scope: 'control', part: name });
+    }
+  }
+  return out;
+}
+
+/** The value a path has on the control as authored — where a seeded sequence track starts. */
+export function baseValueAt(control, path) {
+  const text = String(path ?? '');
+  const channel = CHANNEL_PATH.exec(text);
+  if (channel) {
+    const node = control?._children?.ValueChannels?._children?.[channel[1]];
+    const value = Number(node?.currentValue ?? node?.defaultValue ?? node?.min ?? 0);
+    return Number.isFinite(value) ? value : 0;
+  }
+  let value = treeValueAtPath(control, text);
+  if (value === undefined && text.startsWith('Parts.')) {
+    // A generator-made part (a filmstrip's frame) exists only once the control is resolved.
+    const [, partName, ...rest] = text.split('.');
+    value = treeValueAtPath(resolvedPartsOf(control)?.[partName], rest.join('.'));
+  }
+  return value === undefined || value === null || typeof value === 'object' ? undefined : value;
+}
+
 /** Each target with its status attached, ready to list. */
 export function describeTargets(row, partNames = []) {
   const keyframes = row?.kind === 'keyframes';
+  const sequence = row?.kind === SEQUENCE_KIND;
+  const context = { triggerType: String(row?.triggerType ?? row?.trigger?.type ?? 'stateChange') };
+  const statusOf = (target) => {
+    if (keyframes) return keyframeTargetStatus(target, partNames);
+    if (sequence) return sequenceTargetStatus(target, partNames, context);
+    return sequenceOnlyStatus(target, String(row?.kind ?? 'transition')) ?? targetStatus(target, partNames);
+  };
   return (row?.targets ?? []).map((target, index) => ({
     index,
     target,
     path: String(target?.path ?? ''),
     properties: Array.isArray(target?.properties) ? target.properties : [],
-    status: keyframes ? keyframeTargetStatus(target, partNames) : targetStatus(target, partNames),
+    status: statusOf(target),
   }));
 }
 
@@ -373,10 +495,11 @@ function landings(row, partNames) {
  * Every pair of enabled transitions that tie for the same property of the same part.
  *
  * Returns `[{ winner, loser, places: [{ part, bucket }], why }]`, `winner` being the later of the
- * two — the one that plays. Keyframe animations do not take part: they do not use transitions.
+ * two — the one that plays. Keyframe animations and sequences do not take part: they do not use
+ * transitions.
  */
 export function findClashes(rows, partNames = []) {
-  const live = (rows ?? []).filter((row) => row?.enabled !== false && (row?.kind ?? 'transition') !== 'keyframes');
+  const live = (rows ?? []).filter((row) => row?.enabled !== false && !['keyframes', SEQUENCE_KIND].includes(row?.kind ?? 'transition'));
   const placed = live.map((row) => ({ row, at: landings(row, partNames), trigger: row.trigger ?? readTrigger(row.animation) }));
   const clashes = [];
   for (let i = 0; i < placed.length; i += 1) {
@@ -437,9 +560,28 @@ export function keyframeTargets(partName) {
  * "all the time"); and, if its duration is a quick transition's, a pulse's 600ms instead — a 120ms
  * loop is a flicker, not a pulse. To a transition: a trigger a transition answers, the frames kept.
  */
-export function kindPatch(row, kind) {
+export function kindPatch(row, kind, control = null) {
   const animation = row?.animation ?? {};
   const trigger = animation.trigger ?? {};
+  if (kind === SEQUENCE_KIND) {
+    // A length for the axis, hold on, and for every target with no track yet one keyframe at 0
+    // holding the value the control has as authored — so switching kind changes nothing on screen
+    // until a second keyframe is added. Tracks already there are kept, so a switch back finds them.
+    const type = TRIGGER_TYPES.includes(trigger.type) ? trigger.type : 'stateChange';
+    const patch = {
+      kind: SEQUENCE_KIND,
+      hold: typeof animation.hold === 'boolean' ? animation.hold : true,
+      loop: typeof animation.loop === 'boolean' ? animation.loop : false,
+      trigger: type === trigger.type ? { ...trigger } : { type: 'stateChange', from: ['*'], to: ['hover'], reverse: true },
+      targets: (Array.isArray(animation.targets) ? animation.targets : []).map((target) => {
+        if (Array.isArray(target?.keyframes) && target.keyframes.length) return target;
+        const base = control ? baseValueAt(control, target?.path) : undefined;
+        return { ...target, keyframes: base === undefined ? [] : [{ time: 0, value: base, easing: 'outQuad' }] };
+      }),
+    };
+    if (!(Number(animation.duration) >= 100)) patch.duration = 1000;
+    return patch;
+  }
   if (kind === 'keyframes') {
     const frames = cleanFrames(animation.frames);
     const type = KEYFRAME_TRIGGER_TYPES.includes(trigger.type) ? trigger.type : 'always';
@@ -529,7 +671,8 @@ export function moveTarget(targets, from, to) {
 export function buildTarget(partName, offered) {
   if (!offered) return null;
   return {
-    path: partName ? `Parts.${partName}.${offered.path}` : offered.path,
+    // A channel or a filmstrip frame carries its whole path; the Part picker does not apply.
+    path: partName && offered.scope !== 'control' ? `Parts.${partName}.${offered.path}` : offered.path,
     properties: [...offered.properties],
   };
 }
@@ -768,6 +911,7 @@ export function allAnimationFieldLabels() {
     'Animation', 'Kind', 'Duration', 'Delay', 'Easing', 'Custom curve', 'Spring', 'Damping', 'Bounce',
     'Trigger', 'From', 'To', 'Leaving', 'Origin', 'Source', 'Targets', 'Change',
     'Frames', 'Repeat', 'Times', 'Direction', 'Plays on', 'Every',
+    'Tracks', 'Length', 'Loop', 'Hold',
     'Presets', 'Stage', 'Play', 'Slow motion',
   ];
 }

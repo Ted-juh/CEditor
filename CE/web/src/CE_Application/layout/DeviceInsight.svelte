@@ -9,6 +9,7 @@
    *
    * Device bindings are single-selection only, so the zone hides on multi-select.
    */
+  import { floating } from '../utils/floatingUi.js';
   import { selectedControl, getSection, updateControlProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { openStandaloneDeviceProfileTab } from '../stores/panels.js';
@@ -93,8 +94,10 @@
   });
 
   let pickerOpen = $state(false);
-  function openPicker() {
+  let pickerAnchor = $state(null);
+  function openPicker(event) {
     ensureParams();
+    pickerAnchor = event?.currentTarget ?? null;
     pickerOpen = !pickerOpen;
   }
 
@@ -175,7 +178,7 @@
     {#if pickerOpen}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="dev-picker-backdrop" onmousedown={() => (pickerOpen = false)}></div>
-      <div class="dev-picker">
+      <div class="dev-picker" use:floating={{ anchor: pickerAnchor, placement: 'bottom-end', offset: 8, fallbackPlacements: ['top-end', 'bottom-start', 'top-start'] }}>
         <div class="dev-picker-head">{profileName || profileId || 'Device profile'}</div>
         {#if params.length === 0}
           <div class="dev-picker-empty">
@@ -357,9 +360,6 @@
   }
 
   .dev-picker {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 8px);
     z-index: 1401;
     width: 320px;
     max-height: 340px;

@@ -94,6 +94,13 @@ void testParsersAndDiscovery()
     check (nk && nk.sourceType == "nksf" && nk.instrument == "Massive X"
            && nk.componentState.getSize() == 16 && nk.name.startsWith ("Warm"), "NKS identity, UTF-8 metadata and unwrapped component state");
     check (readVendorPreset (fxp).componentState.getSize() == 16, "FXP strips its 60-byte VST2 wrapper");
+    check (readVendorPreset (fxp).category.isEmpty(), "a Vanguard name without a type code has no category");
+    const auto coded = root.getChildFile ("LD Clav Man.fxp");
+    coded.replaceWithData (data.getData(), data.getSize());
+    check (readVendorPreset (coded).category == "Lead", "a Vanguard type code names the category");
+    check (vanguardCategory ("TG Pulse") == "Trance gate" && vanguardCategory ("LDX Odd").isEmpty()
+             && vanguardCategory ("Leads") .isEmpty(), "only a known two-letter code counts");
+    coded.deleteFile();
     check (readVendorPreset (spire).sourceType == "spire", "Spire reads its parameter map");
     const auto catalog = fixtureCatalog();
     const auto records = discoverVendorPresets (catalog, { root, nks.getParentDirectory(), root });
@@ -103,9 +110,9 @@ void testParsersAndDiscovery()
     Library library;
     for (const auto& record : records) library.mergeVendorScan (record.sourceType, { record });
     const auto id = library.allRecords()[0].recordId;
-    library.find (id)->user.favourite = true;
-    library.find (id)->user.notes = "Keep this";
-    library.find (id)->user.tags.add ("Live set");
+    library.edit (id)->user.favourite = true;
+    library.edit (id)->user.notes = "Keep this";
+    library.edit (id)->user.tags.add ("Live set");
     const auto renamed = nks.getSiblingFile ("Renamed.nksf"); nks.moveFileTo (renamed);
     const auto updated = discoverVendorPresets (catalog, { root });
     for (const auto& source : { "nksf", "fxp", "spire" })
@@ -194,7 +201,7 @@ void testZebra3Presets()
     Library library;
     library.mergeVendorScan ("h2p", records);
     const auto id = library.allRecords()[0].recordId;
-    library.find (id)->user.favourite = true;
+    library.edit (id)->user.favourite = true;
     const auto renamed = preset.getSiblingFile ("Renamed Glass.h2p");
     preset.moveFileTo (renamed);
     library.mergeVendorScan ("h2p", discoverVendorPresets (catalog, { root }));

@@ -62,7 +62,7 @@
         <div class="row" class:off={!row.enabled || !allOn}>
           <span class="nm">{row.name}</span>
           <span class="ms">{row.duration}ms</span>
-          <span class="what">{row.kind === 'keyframes' ? 'keyframes' : 'transition'} · {triggerSummary(row)}</span>
+          <span class="what">{row.kind === 'keyframes' ? 'keyframes' : row.kind === 'sequence' ? 'sequence' : 'transition'} · {triggerSummary(row)}</span>
         </div>
       {/each}
       {#if !rows.length}<p class="none">No animations yet.</p>{/if}

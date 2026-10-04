@@ -112,7 +112,9 @@ try {
   await patch({ 'Background.Fill.solidEnabled': false, 'Background.Fill.imageEnabled': true,
     'Background.Fill.imageSrc': 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160"><circle cx="120" cy="80" r="60" fill="#805016"/></svg>') });
   await selectSurface('image');
-  const imagePoints = { corner: [27, 27], side: [83, 105] };
+  // Just outside the circle's lower-left edge (centre 120,80, radius 60; the clip adds 25 all round):
+  // clear of the label, which runs across the middle and hid the old probe at 83,105 under its text.
+  const imagePoints = { corner: [27, 27], side: [100, 150] };
   const imageBefore = await samples(imagePoints);
   await dock.locator('.looks').getByRole('radio', { name: 'Halo', exact: true }).click(); await settle();
   const imageAfter = await samples(imagePoints);

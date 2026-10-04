@@ -3,6 +3,10 @@
   import ArrowDown from 'lucide-svelte/icons/arrow-down';
   import ArrowUp from 'lucide-svelte/icons/arrow-up';
   import Copy from 'lucide-svelte/icons/copy';
+  import SquaresUnite from 'lucide-svelte/icons/squares-unite';
+  import SquaresSubtract from 'lucide-svelte/icons/squares-subtract';
+  import SquaresIntersect from 'lucide-svelte/icons/squares-intersect';
+  import SquaresExclude from 'lucide-svelte/icons/squares-exclude';
   import Eye from 'lucide-svelte/icons/eye';
   import EyeOff from 'lucide-svelte/icons/eye-off';
   import Lock from 'lucide-svelte/icons/lock';
@@ -67,6 +71,17 @@
   import CustomGeneratorsEditor from './CustomGeneratorsEditor.svelte';
   import CustomArpeggiatorEditor from './CustomArpeggiatorEditor.svelte';
   import CustomStateFilmstrip from './CustomStateFilmstrip.svelte';
+  import CustomContactSheet from './CustomContactSheet.svelte';
+  import SurfacePenTool from './SurfacePenTool.svelte';
+  import { hasCompoundPath, isPathPart, pathPartSpec } from '../utils/penPath.js';
+  import {
+    attachBooleanInputs, booleanShapeFor, booleanShapeRevision, booleanSpec, drawnPartEntries,
+    isBooleanGroup, isBooleanOperand, membershipRenamePatch, operandEntries, partsAfterOperandMove, partsAfterRemoval, planOperandMove, withGroupMembers,
+  } from '../utils/booleanGroups.js';
+  import SurfaceShapeTools from './SurfaceShapeTools.svelte';
+  import { frameMapper, groupForRender, groupFramePatch, withLayoutFrame } from '../utils/surfaceGroupFrames.js';
+  import { arcHandleStyle, arcPointerAngle, drawnCentre, followDrawn, moveSnapped, pivotPlacement, screenBounds } from '../utils/surfaceTransforms.js';
+  import { partTransform } from '../utils/bezierPath.js';
   import SurfaceToolStrip from './SurfaceToolStrip.svelte';
   import SurfaceBottomBar from './SurfaceBottomBar.svelte';
   import SurfacePalette from './SurfacePalette.svelte';
@@ -165,7 +180,13 @@
   let generators = $derived(getSection(control, 'Generators'));
   let states = $derived(getSection(control, 'States'));
   let renderControl = $derived.by(() => materializedCustomComponentSnapshot(control, previewSignals(preview)));
-  let parts = $derived(getSection(renderControl, 'Parts'));
+  // Combined shapes (utils/booleanGroups.js) are handed their operands as drawn. The snapshot is a
+  // fresh copy per derivation, so attaching writes into nothing shared.
+  let parts = $derived.by(() => {
+    const section = getSection(renderControl, 'Parts');
+    attachBooleanInputs(section?._children);
+    return section;
+  });
   let authoredParts = $derived(getSection(control, 'Parts'));
   let hitZones = $derived(getSection(renderControl, 'HitZones'));
   let authoredHitZones = $derived(getSection(control, 'HitZones'));
@@ -173,7 +194,12 @@
     Object.entries(parts?._children ?? {})
       .sort((left, right) => Number(left?.[1]?.zIndex ?? 0) - Number(right?.[1]?.zIndex ?? 0))
   );
-  let partEntries = $derived(allPartEntries.filter(([, part]) => part?.visible !== false));
+  // What the artboard draws: a combined shape stands in for its operands.
+  let partEntries = $derived(allPartEntries.filter(([, part]) => part?.visible !== false && !isBooleanOperand(part)));
+  let shapeTools = $state(null);
+  let shapeBusy = $state(false);
+  // Operands being edited are shown faintly where they are, so a hole can be seen while it is moved.
+  let selectedOperandEntries = $derived(allPartEntries.filter(([name, part]) => isBooleanOperand(part) && part?.visible !== false && selectedLayerSet.has(name)));
   let hitZoneEntries = $derived(
     Object.entries(hitZones?._children ?? {})
       .filter(([, zone]) => zone?.enabled !== false && zone?.visibleInEditor !== false)
@@ -287,13 +313,15 @@
   let generatedSourceEntries = $derived.by(() => buildGeneratedSourceEntries());
   let topLevelPartEntries = $derived(topDownPartEntries.filter(([, part]) => {
     const source = generatedSourceForNode(part);
-    return !kitIdFor(part) && (!source || !isGeneratedSourceCollapsed(source));
+    return !isBooleanOperand(part) && !kitIdFor(part) && (!source || !isGeneratedSourceCollapsed(source));
   }));
   let dockHitZoneEntries = $derived(hitZoneEntries.filter(([, zone]) => {
     const source = generatedSourceForNode(zone);
     return !source || !isGeneratedSourceCollapsed(source);
   }));
-  let overlayPartEntries = $derived(partEntries.filter(([name, part]) => !kitIdFor(part) || selectedLayerSet.has(name)));
+  let overlayPartEntries = $derived(allPartEntries.filter(([name, part]) => part?.visible !== false && (isBooleanOperand(part)
+    ? selectedLayerSet.has(name)
+    : (!kitIdFor(part) || selectedLayerSet.has(name)))));
   let selectedKitEntry = $derived(kitEntries.find((entry) => entry.id === selectedKit) ?? null);
   let selectedKitFrame = $derived.by(() => kitFrame(selectedKitEntry));
   let selectedPart = $derived(parts?._children?.[selectedLayer] ?? null);
@@ -312,13 +340,17 @@
     if (!measureEnabled || designerPreviewing) return [];
     if (activeSelectionKind !== 'layer' || selectedLayerNames.length !== 2) return [];
     const [frameA, frameB] = selectedLayerNames.map((name) => (
-      parts?._children?.[name] ? partFrame(parts._children[name]) : null
+      parts?._children?.[name] ? visualFrame(parts._children[name]) : null
     ));
     return measurementLinesBetween(frameA, frameB);
   });
   let selectedPartEditable = $derived(isEditablePart(selectedAuthoredPart));
   let selectedZoneEditable = $derived(isEditableZone(selectedAuthoredZone));
-  let selectedBackground = $derived(selectedAuthoredPart?._children?.Background ?? null);
+  // For a combined shape, the style shown and edited is its paint source's (see paintTargetFor).
+  let selectedStylePart = $derived(isBooleanGroup(selectedAuthoredPart)
+    ? (authoredParts?._children?.[booleanSpec(selectedAuthoredPart).paintFrom] ?? selectedAuthoredPart)
+    : selectedAuthoredPart);
+  let selectedBackground = $derived(selectedStylePart?._children?.Background ?? null);
   let selectedText = $derived(selectedAuthoredPart?._children?.Text ?? null);
   let selectedFill = $derived(selectedBackground?._children?.Fill ?? null);
   let selectedBorder = $derived(selectedBackground?._children?.Border ?? null);
@@ -362,6 +394,11 @@
   let inlineTextEditLayer = $state('');
   let inspectorTab = $state('object');
   let filmstripCollapsed = $state(false);
+  let contactSheetOpen = $state(false);
+  let penTool = $state(null);
+  // The one selected path part, when the Select tool is out: the Pen shows its points for editing.
+  let penEditPart = $derived(activeTool === 'select' && selectedLayerNames.length === 1 && (isPathPart(selectedPart) || hasCompoundPath(selectedPart))
+    ? { name: selectedLayer, part: selectedPart } : null);
   // Pane visibility toggles (mirrors the normal editor's bottom-left icons).
   let paletteCollapsed = $state(false);
   let dockHidden = $state(false);
@@ -516,6 +553,8 @@
     { id: 'text', label: 'Text', key: 'T' },
     // Lines & polygons (drawn as SVG vector shapes via shapeGeometry).
     { id: 'line', label: 'Line', key: 'L' },
+    // Any outline, point by point: SurfacePenTool.svelte and utils/penPath.js.
+    { id: 'pen', label: 'Pen', key: 'P' },
     { id: 'triangle', label: 'Triangle', key: '' },
     { id: 'rightTriangle', label: 'Right triangle', key: '' },
     { id: 'parallelogram', label: 'Parallelogram', key: '' },
@@ -536,7 +575,7 @@
   // Shortcut cheatsheet + glossary live in SurfaceHelpOverlay.svelte.
   const POLYGON_TOOL_IDS = ['triangle', 'rightTriangle', 'parallelogram', 'trapezoid', 'diamond', 'pentagon', 'hexagon', 'star', 'chevron', 'arrow', 'plus'];
   // "Lines & Polygons" palette section: line first, then the flat polygons.
-  const VECTOR_SHAPE_TOOL_IDS = ['line', ...POLYGON_TOOL_IDS];
+  const VECTOR_SHAPE_TOOL_IDS = ['pen', 'line', ...POLYGON_TOOL_IDS];
   // SHAPE_TOOL_IDS stays the 6 "Basic" shapes — it drives the bottom tool-strip's
   // Shape flyout. Lines/polygons are drawn directly from the left palette.
   const SHAPE_TOOL_IDS = new Set(['rectangle', 'roundedRectangle', 'ellipse', 'ring', 'arcTrack', 'capsule']);
@@ -685,6 +724,12 @@
     if (interaction?.type === 'zoneResize') return interaction?.handle ? `Zone resize ${interaction.handle.toUpperCase()}` : 'Zone resize';
     return '';
   });
+  // Above the path it edits, or below it when the path is too near the artboard's top: clamped into
+  // the artboard instead, it would sit over the path's top point handles and take their drags.
+  function pathToolbarTop(frame) {
+    return frame.top >= 32 ? frame.top - 30 : frame.top + frame.height + 6;
+  }
+
   let activeSelectionFrame = $derived.by(() => {
     if (activeSelectionKind === 'kit') return selectedKitFrame;
     if (activeSelectionKind === 'hitZone') return activeZoneFrame ?? selectedZoneFrame;
@@ -850,8 +895,20 @@
   }
 
   function partFrame(part) {
+    // A combined shape is where its outline is; its Layout box only records that, and lags an edit
+    // by as long as the outline takes to compute.
+    if (isBooleanGroup(part) && part?.meta?.booleanInputs) {
+      $booleanShapeRevision;
+      const bounds = booleanShapeFor(part, artboardWidth, artboardHeight).shape?.bounds;
+      if (bounds && bounds.width > 0 && bounds.height > 0) {
+        return { left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height };
+      }
+    }
     return partFrameBase(part, artboardWidth, artboardHeight);
   }
+
+  // What is drawn: a turned or scaled part's axis-aligned bounds (utils/surfaceTransforms.js).
+  const visualFrame = (part, frame = partFrame(part)) => screenBounds(part, frame, artboardWidth, artboardHeight);
 
   function canManagePartName(name) {
     return !!authoredParts?._children?.[name];
@@ -932,7 +989,7 @@
     if (!kit?.layerNames?.length) return null;
     return boundsForFrames(
       kit.layerNames
-        .map((name) => parts?._children?.[name] ? partFrame(parts._children[name]) : null)
+        .map((name) => parts?._children?.[name] ? visualFrame(parts._children[name]) : null)
         .filter(Boolean)
     );
   }
@@ -979,41 +1036,27 @@
   }
 
   function renderPartForFrame(name, part) {
-    const frame = activeLayerFrames?.[name] ?? (activeSelectionKind === 'layer' && name === selectedLayer ? activeFrame : null);
-    if (!frame) return part;
-    const layout = part?._children?.Layout ?? {};
-    return {
-      ...part,
-      _children: {
-        ...(part?._children ?? {}),
-        Layout: {
-          ...layout,
-          mode: 'absolute',
-          x: frame.left,
-          y: frame.top,
-          width: frame.width,
-          height: frame.height,
-          xUnit: 'px',
-          yUnit: 'px',
-          widthUnit: 'px',
-          heightUnit: 'px',
-          anchorX: 'left',
-          anchorY: 'top',
-          offsetX: 0,
-          offsetY: 0,
-        },
-      },
-    };
+    const frame = inFlightFrame(name);
+    if (isBooleanGroup(part)) {
+      // Moving or sizing a shape carries its operands; dragging one operand moves just that one.
+      return groupForRender(part, frame ? frameMapper(partFrame(part), frame) : null,
+        { renderPart: renderPartForFrame, frameOf: inFlightFrame, partFrame });
+    }
+    return frame ? withLayoutFrame(part, frame) : part;
+  }
+
+  function inFlightFrame(name) {
+    return activeLayerFrames?.[name] ?? (activeSelectionKind === 'layer' && name === selectedLayer ? activeFrame : null);
   }
 
   function nearestArcPivotTarget() {
     if (activeSelectionKind !== 'layer' || !selectedPart || !selectedFrame) return null;
-    const selectedCenter = frameCenter(selectedFrame);
+    const selectedCenter = drawnCentre(selectedPart, selectedFrame, artboardWidth, artboardHeight);
     const candidates = Object.entries(parts?._children ?? {})
       .filter(([name, part]) => name !== selectedLayer && part?.visible !== false && isArcCenterPart(part))
       .map(([name, part]) => {
         const frame = partFrame(part);
-        const center = frameCenter(frame);
+        const center = drawnCentre(part, frame, artboardWidth, artboardHeight);
         return {
           name,
           frame,
@@ -1035,7 +1078,8 @@
     const previewTransform = getSection(materialized, 'Transform') ?? transform ?? {};
     const previewWidth = Math.max(1, numberOr(previewTransform?.width, artboardWidth));
     const previewHeight = Math.max(1, numberOr(previewTransform?.height, artboardHeight));
-    const previewParts = Object.entries(getSection(materialized, 'Parts')?._children ?? {})
+    attachBooleanInputs(getSection(materialized, 'Parts')?._children);
+    const previewParts = drawnPartEntries(Object.entries(getSection(materialized, 'Parts')?._children ?? {}))
       .filter(([, part]) => part?.visible !== false)
       .sort((left, right) => Number(left?.[1]?.zIndex ?? 0) - Number(right?.[1]?.zIndex ?? 0));
     return {
@@ -1128,7 +1172,7 @@
     if (!selectedLayerNames.length) return null;
     return boundsForFrames(
       selectedLayerNames
-        .map((name) => activeLayerFrames?.[name] ?? (parts?._children?.[name] ? partFrame(parts._children[name]) : null))
+        .map((name) => (parts?._children?.[name] ? visualFrame(parts._children[name], activeLayerFrames?.[name]) : activeLayerFrames?.[name]))
         .filter(Boolean)
     );
   }
@@ -1241,6 +1285,29 @@
         }
         : {},
     });
+  }
+
+  /** A finished Pen drawing becomes a part: filled if closed, stroked if open. */
+  function createPenPart(points, closed) {
+    if (!core?.id) return;
+    const spec = pathPartSpec(points, closed);
+    const part = createPartNode(nextPartName('path'), {
+      kind: spec.kind, role: 'path', zIndex: authoredPartNames.length + 1, layout: spec.layout, meta: spec.meta,
+      sections: { Background: createBackground(closed ? 'FF5B9BD5' : '00000000', {
+        borderEnabled: true, borderColour: closed ? '55FFFFFF' : 'FF5B9BD5', borderThickness: closed ? 1 : 3, radius: 0,
+      }) },
+    });
+    localSelectedLayerNames = [part.name];
+    applyControlPatch(core.id, {
+      [`Parts.${part.name}`]: part,
+      'Designer.selectedLayer': part.name,
+      'Designer.selectedLayers': [part.name],
+      'Designer.selectedSurfaceKind': 'layer',
+      'Designer.selectedHitZone': '',
+    });
+    activeTool = 'select';
+    lastDrawCreatedAt = Date.now();
+    pulseSelection(`layer:${part.name}`);
   }
 
   function makeDrawnHitZone(rect, shape = 'rectangle') {
@@ -1752,7 +1819,7 @@
   function displayZoneFrame(zone) {
     if (!isFollowZone(zone)) return zoneFrame(zone);
     const resolved = customHitZoneRect(zone, { width: artboardWidth, height: artboardHeight }, parts?._children ?? null);
-    return { left: resolved.x, top: resolved.y, width: resolved.width, height: resolved.height };
+    return { left: resolved.x, top: resolved.y, width: resolved.width, height: resolved.height, turn: resolved.turn };
   }
 
   function hitZoneStyle(name, zone) {
@@ -1920,6 +1987,13 @@
   }
 
   function patchFromFrameForLayer(name, part, frame) {
+    if (isBooleanGroup(part) || isBooleanGroup(parts?._children?.[name])) {
+      // A combined shape's box is derived: moving or sizing it moves and sizes its operands.
+      return groupFramePatch(name, frame, {
+        authoredParts: authoredParts?._children, parts: parts?._children, partFrame, isEditable: isEditablePart,
+        patchFor: (leaf, authored, leafFrame) => patchFromFrameForLayerBase(leaf, authored, leafFrame, artboardWidth, artboardHeight),
+      });
+    }
     return patchFromFrameForLayerBase(name, part, frame, artboardWidth, artboardHeight);
   }
 
@@ -1953,29 +2027,43 @@
       for (const name of selectedLayerNames) setLayerPropertyFor(name, relativePath, value);
       return;
     }
-    updateControlProperty(core.id, `Parts.${selectedLayer}.${relativePath}`, value);
+    updateControlProperty(core.id, `Parts.${paintTargetFor(selectedLayer, relativePath)}.${relativePath}`, value);
   }
 
   function setLayerPropertyFor(name, relativePath, value) {
     if (!core?.id || !name || !relativePath || !isEditablePart(authoredParts?._children?.[name])) return;
-    updateControlProperty(core.id, `Parts.${name}.${relativePath}`, value);
+    updateControlProperty(core.id, `Parts.${paintTargetFor(name, relativePath)}.${relativePath}`, value);
+  }
+
+  // A combined shape paints with its paint source's fill, border and effects (booleanGroups.js), so
+  // restyling the shape restyles that operand — which is also what states and bindings on it change.
+  const PAINT_ROOTS = new Set(['Background', 'Effects', 'opacity']);
+  function paintTargetFor(name, relativePath) {
+    const part = authoredParts?._children?.[name];
+    if (!isBooleanGroup(part) || !PAINT_ROOTS.has(String(relativePath).split('.')[0])) return name;
+    return booleanSpec(part).paintFrom || name;
   }
 
   function setLayerLayoutProperty(relativePath, value) {
     if (!selectedPartEditable || !relativePath) return;
+    if (['pivotX', 'pivotY'].includes(relativePath) && selectedFrame) {
+      const pct = { pivotX: numberOr(selectedAuthoredPart?._children?.Layout?.pivotX, 50), pivotY: numberOr(selectedAuthoredPart?._children?.Layout?.pivotY, 50), [relativePath]: numberOr(value, 50) };
+      return placePivot(partTransform(selectedPart, artboardWidth, artboardHeight).toScreen({ x: selectedFrame.left + selectedFrame.width * pct.pivotX / 100, y: selectedFrame.top + selectedFrame.height * pct.pivotY / 100 }));
+    }
     updateControlProperty(core.id, `Parts.${selectedLayer}.Layout.${relativePath}`, value);
   }
 
   function setSelectedPivotToArcCenter() {
     if (!selectedPartEditable || !selectedLayer || !selectedFrame || !selectedArcPivotTarget) return;
-    const width = Math.max(1, numberOr(selectedFrame.width, 1));
-    const height = Math.max(1, numberOr(selectedFrame.height, 1));
-    const pivotX = ((selectedArcPivotTarget.center.x - selectedFrame.left) / width) * 100;
-    const pivotY = ((selectedArcPivotTarget.center.y - selectedFrame.top) / height) * 100;
-    applyLayerPatch({
-      [`Parts.${selectedLayer}.Layout.pivotX`]: roundLayoutValue(pivotX),
-      [`Parts.${selectedLayer}.Layout.pivotY`]: roundLayoutValue(pivotY),
-    });
+    placePivot(selectedArcPivotTarget.center);
+  }
+
+  // Move the pivot to a drawn point without moving the part (a pivot is a % of the box that the turn
+  // and scale act about, so the box shifts to compensate — utils/surfaceTransforms.js).
+  function placePivot(screenPoint) {
+    const placed = pivotPlacement(selectedPart, selectedFrame, screenPoint, artboardWidth, artboardHeight);
+    applyLayerPatch({ ...patchFromFrame(selectedAuthoredPart, placed.frame),
+      [`Parts.${selectedLayer}.Layout.pivotX`]: roundLayoutValue(placed.pivotX), [`Parts.${selectedLayer}.Layout.pivotY`]: roundLayoutValue(placed.pivotY) });
   }
 
   function setArtboardSize(path, value) {
@@ -2033,6 +2121,8 @@
     localSelectedLayerNames = nextSelection;
     applyControlPatch(core.id, {
       [`Parts.${nextName}`]: renamed,
+      // Combined shapes name their operands; the names follow.
+      ...membershipRenamePatch(authoredParts?._children, currentName, nextName),
       'Designer.selectedLayer': nextName,
       'Designer.selectedLayers': nextSelection,
       'Designer.selectedSurfaceKind': 'layer',
@@ -2049,6 +2139,25 @@
 
   function duplicateSelectedLayer() {
     if (!core?.id || !selectedAuthoredPart) return;
+    if (selectedLayerNames.some((name) => isBooleanGroup(authoredParts?._children?.[name]))) {
+      // Through the paste path, which carries a shape's operands and re-points them at the copies.
+      const result = buildPastePatch(
+        { parts: withGroupMembers(authoredParts?._children, selectedLayerNames).map((name) => authoredParts._children[name]), hitZones: [] },
+        Object.keys(authoredParts?._children ?? {}),
+        Object.keys(authoredHitZones?._children ?? {}),
+        maxLayerZIndex(),
+        8,
+      );
+      if (!result?.partNames?.length) return;
+      localSelectedLayerNames = result.partNames;
+      applyControlPatch(core.id, {
+        ...result.patch,
+        'Designer.selectedLayer': result.partNames[0],
+        'Designer.selectedLayers': result.partNames,
+        'Designer.selectedSurfaceKind': 'layer',
+      });
+      return;
+    }
     if (multiSelectionActive) {
       const patch = {};
       const nextSelection = [];
@@ -2160,6 +2269,19 @@
 
   function removeSelectedLayer() {
     if (!core?.id || !selectedLayer || !selectedAuthoredPart) return;
+    if (selectedLayerNames.some((name) => isBooleanGroup(authoredParts?._children?.[name]) || isBooleanOperand(authoredParts?._children?.[name]))) {
+      // A deleted shape takes its operands; a deleted operand leaves its shape. One write, one undo.
+      const nextParts = partsAfterRemoval(authoredParts?._children, selectedLayerNames);
+      const next = topDownPartEntries.find(([name, part]) => nextParts[name] && !isBooleanOperand(nextParts[name]) && part)?.[0] ?? '';
+      localSelectedLayerNames = next ? [next] : [];
+      applyControlPatch(core.id, {
+        'Parts._children': nextParts,
+        'Designer.selectedLayer': next,
+        'Designer.selectedLayers': next ? [next] : [],
+        'Designer.selectedSurfaceKind': 'layer',
+      });
+      return;
+    }
     if (multiSelectionActive) {
       const selected = new Set(selectedLayerNames);
       const next = topDownPartEntries.find(([name]) => !selected.has(name))?.[0] ?? '';
@@ -2215,6 +2337,16 @@
 
   function moveLayer(name, direction) {
     if (!core?.id || !name || !authoredParts?._children?.[name]) return;
+    if (isBooleanOperand(authoredParts._children[name])) {
+      // Inside a combined shape, order is the operands' order (which one is cut from, which paints).
+      applyControlPatch(core.id, {
+        'Parts._children': partsAfterOperandMove(authoredParts._children, name, direction),
+        'Designer.selectedLayer': name,
+        'Designer.selectedLayers': [name],
+        'Designer.selectedSurfaceKind': 'layer',
+      });
+      return;
+    }
     const stack = Object.entries(authoredParts?._children ?? {})
       .sort((left, right) => numberOr(left?.[1]?.zIndex, 0) - numberOr(right?.[1]?.zIndex, 0));
     const index = stack.findIndex(([entryName]) => entryName === name);
@@ -2257,6 +2389,7 @@
 
   function moveLayerTo(name, targetName) {
     if (!core?.id || !name || !targetName || name === targetName) return;
+    const operandMove = planOperandMove(authoredParts?._children, name, targetName); if (operandMove) return operandMove.parts ? applyControlPatch(core.id, { 'Parts._children': operandMove.parts }) : showDrawNotice(`Can't move ${name}: ${operandMove.reason}`);
     const stack = Object.entries(authoredParts?._children ?? {})
       .sort((left, right) => numberOr(left?.[1]?.zIndex, 0) - numberOr(right?.[1]?.zIndex, 0));
     const from = stack.findIndex(([entryName]) => entryName === name);
@@ -2340,14 +2473,15 @@
     }
 
     if (!selectedPartEditable || !selectedFrame || !selectedAuthoredPart) return;
-    const frame = { ...selectedFrame };
+    const drawn = visualFrame(selectedPart);
+    const frame = { ...drawn };
     if (mode === 'left') frame.left = 0;
     if (mode === 'centerX') frame.left = (artboardWidth - frame.width) / 2;
     if (mode === 'right') frame.left = artboardWidth - frame.width;
     if (mode === 'top') frame.top = 0;
     if (mode === 'centerY') frame.top = (artboardHeight - frame.height) / 2;
     if (mode === 'bottom') frame.top = artboardHeight - frame.height;
-    applyLayerPatch(patchFromFrame(selectedAuthoredPart, frame));
+    applyLayerPatch(patchFromFrame(selectedAuthoredPart, followDrawn(selectedFrame, drawn, frame)));
   }
 
   function moveSelectedLayersBy(dx, dy) {
@@ -2368,7 +2502,7 @@
     const excluded = new Set(excludedNames);
     const frames = partEntries
       .filter(([name]) => !excluded.has(name))
-      .map(([, part]) => partFrame(part));
+      .map(([, part]) => visualFrame(part));
     return smartSnapTargets(frames, artboardWidth, artboardHeight);
   }
 
@@ -2378,12 +2512,12 @@
     if (!core?.id || selectedLayerNames.length < 2) return;
     const entries = selectedEditableLayerEntries();
     const aligned = alignFramesWithinSelection(
-      entries.map(([name, , renderedPart]) => [name, partFrame(renderedPart)]),
+      entries.map(([name, , renderedPart]) => [name, visualFrame(renderedPart)]),
       mode
     );
     const patch = {};
-    for (const [name, authoredPart] of entries) {
-      const frame = aligned.get(name);
+    for (const [name, authoredPart, renderedPart] of entries) {
+      const frame = aligned.get(name) && followDrawn(partFrame(renderedPart), visualFrame(renderedPart), aligned.get(name));
       if (frame) Object.assign(patch, patchFromFrameForLayer(name, authoredPart, frame));
     }
     if (Object.keys(patch).length) applyControlPatch(core.id, patch);
@@ -2393,19 +2527,20 @@
     if (!core?.id || selectedLayerNames.length < 3) return;
     const entries = selectedEditableLayerEntries();
     const distributed = distributeFramesWithinSelection(
-      entries.map(([name, , renderedPart]) => [name, partFrame(renderedPart)]),
+      entries.map(([name, , renderedPart]) => [name, visualFrame(renderedPart)]),
       axis
     );
     const patch = {};
-    for (const [name, authoredPart] of entries) {
-      const frame = distributed.get(name);
+    for (const [name, authoredPart, renderedPart] of entries) {
+      const frame = distributed.get(name) && followDrawn(partFrame(renderedPart), visualFrame(renderedPart), distributed.get(name));
       if (frame) Object.assign(patch, patchFromFrameForLayer(name, authoredPart, frame));
     }
     if (Object.keys(patch).length) applyControlPatch(core.id, patch);
   }
 
   function copySelectedLayers() {
-    const copiedParts = selectedLayerNames
+    // A combined shape is copied with the operands it is made of.
+    const copiedParts = withGroupMembers(authoredParts?._children, selectedLayerNames)
       .map((name) => authoredParts?._children?.[name])
       .filter(Boolean);
     if (!copiedParts.length) return;
@@ -2583,8 +2718,9 @@
       handle,
       startMouse: { x: event.clientX, y: event.clientY },
       startFrame: selectedFrame,
-      // Rotation + pivot captured so resize can stay aligned to a rotated shape.
+      // Rotation, scale + pivot captured so resize can stay aligned to a turned or scaled shape.
       startRotation: numberOr(layout.rotation, 0),
+      startScale: Math.max(0.01, numberOr(layout.scale, 1)),
       pivotX: numberOr(layout.pivotX, 50) / 100,
       pivotY: numberOr(layout.pivotY, 50) / 100,
     };
@@ -2598,10 +2734,7 @@
     if (event.button !== 0 || !selectedPartEditable || !selectedFrame) return;
     event.stopPropagation();
     event.preventDefault();
-    const center = {
-      x: selectedFrame.left + selectedFrame.width / 2,
-      y: selectedFrame.top + selectedFrame.height / 2,
-    };
+    const center = partTransform(selectedPart, artboardWidth, artboardHeight).pivot;   // CSS turns about the pivot
     const artboardRect = event.currentTarget?.closest?.('.artboard')?.getBoundingClientRect?.();
     const pointer = artboardRect
       ? { x: (event.clientX - artboardRect.left) / surfaceZoom, y: (event.clientY - artboardRect.top) / surfaceZoom }
@@ -2627,7 +2760,7 @@
       name: selectedLayer,
       startAngle: numberOr(selectedArcMeta?.startAngle, -135),
       startSweep: numberOr(selectedArcMeta?.sweepAngle, 270),
-      frame: selectedFrame,
+      frame: selectedFrame, part: selectedPart, ccw: String(selectedArcMeta?.direction ?? 'cw').toLowerCase() === 'ccw',
     };
     window.addEventListener('mousemove', handleInteractionMove);
     window.addEventListener('mouseup', handleInteractionEnd);
@@ -2644,15 +2777,11 @@
         left: interaction.startFrame.left + dx,
         top: interaction.startFrame.top + dy,
       };
-      const gridded = snapFrame(raw, event);
-      if (smartSnapEnabled && !event.altKey) {
-        const snapped = applySmartSnap(raw, gridded, interaction.smartTargets);
-        activeFrame = snapped.frame;
-        activeSmartGuides = snapped.guides;
-      } else {
-        activeFrame = gridded;
-        activeSmartGuides = [];
-      }
+      // Snapped by what is drawn: a turned part's visible edges, not its layout box.
+      const snapped = moveSnapped(parts?._children?.[interaction.name], raw, artboardWidth, artboardHeight, (drawn) => (smartSnapEnabled && !event.altKey
+        ? applySmartSnap(drawn, snapFrame(drawn, event), interaction.smartTargets) : { frame: snapFrame(drawn, event), guides: [] }));
+      activeFrame = snapped.frame;
+      activeSmartGuides = snapped.guides;
       return;
     }
 
@@ -2704,16 +2833,17 @@
 
     if (interaction.type === 'resize') {
       const rotationDeg = interaction.startRotation || 0;
+      const scale = interaction.startScale || 1;
       const theta = (rotationDeg * Math.PI) / 180;
       const cos = Math.cos(theta);
       const sin = Math.sin(theta);
 
-      // Convert the screen-space drag into the shape's local (un-rotated) axes,
-      // so a handle resizes along the shape's own edges instead of the screen's.
+      // Convert the screen-space drag into the shape's local (un-rotated, un-scaled) axes, so a
+      // handle resizes along the shape's own edges and by the distance the pointer went on screen.
       const sdx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const sdy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
-      const dx = sdx * cos + sdy * sin;
-      const dy = -sdx * sin + sdy * cos;
+      const dx = (sdx * cos + sdy * sin) / scale;
+      const dy = (-sdx * sin + sdy * cos) / scale;
 
       const start = {
         x: interaction.startFrame.left,
@@ -2730,18 +2860,18 @@
         maxH: 0,
       });
 
-      if (Math.abs(rotationDeg) < 0.001) {
+      if (Math.abs(rotationDeg) < 0.001 && Math.abs(scale - 1) < 0.001) {
         activeFrame = snapFrame({ left: rect.x, top: rect.y, width: rect.w, height: rect.h }, event);
         return;
       }
 
-      // Rotation-aware placement: keep the anchored edge/corner fixed in world
-      // space while the size changes, so the shape doesn't swing off the cursor.
-      // The CSS rotation pivots about (pivotX%, pivotY%) of the box.
+      // Transform-aware placement: keep the anchored edge/corner fixed in world space while the size
+      // changes, so the shape doesn't swing off the cursor. The CSS `rotate() scale()` acts about
+      // (pivotX%, pivotY%) of the box, so a box point sits at pivot + scale·R(point − pivot).
       const handle = interaction.handle;
       const px = interaction.pivotX;
       const py = interaction.pivotY;
-      const rot = (vx, vy) => ({ x: vx * cos - vy * sin, y: vx * sin + vy * cos });
+      const rot = (vx, vy) => ({ x: scale * (vx * cos - vy * sin), y: scale * (vx * sin + vy * cos) });
       // Local position (from top-left) of the anchored edge/corner that stays put.
       const anchorLocal = (w, h) => ({
         x: handle.includes('r') ? 0 : handle.includes('l') ? w : w / 2,
@@ -2820,16 +2950,13 @@
       const artboardRect = artboard?.getBoundingClientRect?.();
       if (!artboardRect) return;
       const pointer = { x: (event.clientX - artboardRect.left) / surfaceZoom, y: (event.clientY - artboardRect.top) / surfaceZoom };
-      const center = {
-        x: interaction.frame.left + interaction.frame.width / 2,
-        y: interaction.frame.top + interaction.frame.height / 2,
-      };
-      let angle = Math.atan2(pointer.y - center.y, pointer.x - center.x) * (180 / Math.PI);
+      // In the arc's own compass angles (0° up, clockwise), through the part's turn.
+      let angle = arcPointerAngle(interaction.part, interaction.frame, pointer, artboardWidth, artboardHeight);
       if (event.shiftKey) angle = Math.round(angle / 15) * 15;
       if (interaction.handle === 'start') {
         updateControlProperty(core.id, `Parts.${interaction.name}.meta.arcTrack.startAngle`, normalizeRotation(angle));
       } else {
-        const sweep = normalizeRotation(angle - interaction.startAngle);
+        const sweep = normalizeRotation(interaction.ccw ? interaction.startAngle - angle : angle - interaction.startAngle);
         updateControlProperty(core.id, `Parts.${interaction.name}.meta.arcTrack.sweepAngle`, Math.max(1, Math.min(360, sweep || 360)));
       }
       return;
@@ -2936,7 +3063,7 @@
     event.stopPropagation();
     // Right-clicking a part that is not selected selects it first — otherwise the menu acts on
     // whatever happened to be selected before, which is the classic way to delete the wrong thing.
-    if (name && !isLayerSelected(name)) selectLayer(name, part, event);
+    if (name && !isLayerSelected(name)) selectLayer(name, event);
     contextMenuTarget = { screenX: event.clientX, screenY: event.clientY };
   }
 
@@ -3011,7 +3138,7 @@
       if (!band.additive) clearSurfaceSelection();
       return;
     }
-    const hits = partsInMarquee(topLevelPartEntries, rect, partFrame);
+    const hits = partsInMarquee(topLevelPartEntries, rect, (part) => visualFrame(part));
     const names = mergeMarqueeSelection(band.additive ? selectedLayerNames : [], hits, band.additive);
     if (names.length) commitLayerSelection(names, names[names.length - 1]);
     else if (!band.additive) clearSurfaceSelection();
@@ -3043,6 +3170,7 @@
 
   function beginDraw(event) {
     if (activeTool === 'select' || event.button !== 0) return false;
+    if (activeTool === 'pen') { penTool?.pointerDown(event); return true; }
     event.stopPropagation();
     event.preventDefault();
     const start = pointInArtboard(event);
@@ -3059,7 +3187,7 @@
   }
 
   function commitClickDraw(event) {
-    if (activeTool === 'select') return;
+    if (activeTool === 'select' || activeTool === 'pen') return;
     event.stopPropagation();
     event.preventDefault();
     if (Date.now() - lastDrawCreatedAt < 260) return;
@@ -3258,6 +3386,7 @@
 
   function handleSurfaceKeydown(event) {
     if (!surfaceKeyEventAllowed(event)) return;
+    if (penTool?.handleKeydown(event)) return;
     if (event.key === '?' && !(event.ctrlKey || event.metaKey || event.altKey)) {
       event.preventDefault();
       helpOverlayOpen = !helpOverlayOpen;
@@ -3556,6 +3685,35 @@
               />
             {/each}
 
+            {#if !designerPreviewing}
+              {#each selectedOperandEntries as [name, part] (name)}
+                <div class="boolean-operand-ghost" aria-hidden="true">
+                  <InteractivePartRenderer
+                    part={renderPartForFrame(name, part)}
+                    parentWidth={artboardWidth}
+                    parentHeight={artboardHeight}
+                  />
+                </div>
+              {/each}
+            {/if}
+
+            {#if !designerPreviewing}
+              <SurfacePenTool
+                bind:this={penTool}
+                active={activeTool === 'pen'}
+                artboardEl={surfaceArtboardEl}
+                {artboardWidth}
+                {artboardHeight}
+                zoom={surfaceZoom}
+                snapPoint={(point, event) => ({ x: snapValue(point.x, event), y: snapValue(point.y, event) })}
+                editPart={penEditPart}
+                onCreate={createPenPart}
+                onPatchPart={(name, patch) => core?.id && applyControlPatch(core.id,
+                  Object.fromEntries(Object.entries(patch).map(([path, value]) => [`Parts.${name}.${path}`, value])))}
+                onOutlineMouseDown={(event) => penEditPart && beginMove(penEditPart.name, penEditPart.part, event)}
+              />
+            {/if}
+
             {#if !designerPreviewing && arpeggiatorEnabled}
               <CustomArpeggiatorEditor
                 {arpeggiatorEnabled}
@@ -3600,20 +3758,20 @@
                       <span
                         class="arc-handle arc-start"
                         title="Drag arc start"
-                        style={arcPointStyle(selectedFrame, selectedArcMeta?.startAngle)}
+                        style={arcHandleStyle(selectedFrame, selectedArcMeta, selectedBorder, 'start')}
                         onmousedown={(event) => beginArcHandleDrag('start', event)}
                       ></span>
                       <span
                         class="arc-handle arc-end"
                         title="Drag arc end"
-                        style={arcPointStyle(selectedFrame, numberOr(selectedArcMeta?.startAngle, -135) + numberOr(selectedArcMeta?.sweepAngle, 270))}
+                        style={arcHandleStyle(selectedFrame, selectedArcMeta, selectedBorder, 'end')}
                         onmousedown={(event) => beginArcHandleDrag('end', event)}
                       ></span>
                     {/if}
                     {#each RESIZE_HANDLES as handle (handle.id)}
                       {#if !isTinyPart(name, part) || ['tl', 'tr', 'br', 'bl'].includes(handle.id)}
                         <span
-                          class="resize-handle"
+                          class="resize-handle" data-resize={handle.id}
                           style={`${handleStyle(handle.id)} cursor:${handle.cursor};`}
                           onmousedown={(event) => beginResize(handle.id, event)}
                         ></span>
@@ -3662,9 +3820,37 @@
                   <span class="align-divider"></span>
                   <button type="button" onclick={() => distributeSelectedLayers('x')} disabled={selectedLayerNames.length < 3} title="Distribute horizontally (3+ layers)">⇸</button>
                   <button type="button" onclick={() => distributeSelectedLayers('y')} disabled={selectedLayerNames.length < 3} title="Distribute vertically (3+ layers)">⇊</button>
+                  <span class="align-divider"></span>
+                  <button type="button" data-boolean="unite" onclick={() => shapeTools?.combine('unite')} disabled={shapeBusy} title="Unite: merge the shapes into one outline" aria-label="Unite"><SquaresUnite size={13} /></button>
+                  <button type="button" data-boolean="subtract" onclick={() => shapeTools?.combine('subtract')} disabled={shapeBusy} title="Subtract: cut the front shapes out of the back one" aria-label="Subtract"><SquaresSubtract size={13} /></button>
+                  <button type="button" data-boolean="intersect" onclick={() => shapeTools?.combine('intersect')} disabled={shapeBusy} title="Intersect: keep only where the shapes overlap" aria-label="Intersect"><SquaresIntersect size={13} /></button>
+                  <button type="button" data-boolean="exclude" onclick={() => shapeTools?.combine('exclude')} disabled={shapeBusy} title="Exclude: keep where they don't overlap" aria-label="Exclude"><SquaresExclude size={13} /></button>
                 </div>
               {/if}
             {/if}
+
+            <SurfaceShapeTools
+              bind:this={shapeTools}
+              bind:busy={shapeBusy}
+              controlId={core?.id ?? ''}
+              {control}
+              authoredParts={authoredParts?._children ?? {}}
+              parts={parts?._children ?? {}}
+              {selectedLayerNames}
+              {selectedLayer}
+              {selectedAuthoredPart}
+              {activeSelectionKind}
+              {penEditPart}
+              activeSelectionFrame={selectedPart && !multiSelectionActive ? visualFrame(selectedPart) : activeSelectionFrame}
+              {interaction}
+              {designerPreviewing}
+              {artboardWidth}
+              {artboardHeight}
+              toolbarTop={pathToolbarTop}
+              {stopSelectionAction}
+              onSelection={(names) => { localSelectedLayerNames = names; }}
+              onNotice={showDrawNotice}
+            />
 
             {#each partEntries as [name, part] (name)}
               {#if !designerPreviewing && inlineTextEditLayer === name && authoredParts?._children?.[name]?._children?.Text && isEditablePart(authoredParts?._children?.[name])}
@@ -3838,6 +4024,7 @@
             {moveLayer} {beginLayerDrag} {dropLayerOn}
             {addLayerAtCenter} {addHitZoneAtCenter} {editKitParts} {editGeneratedSource} {editGeneratorForLayer} {removeKitEntry}
             {renameLayer}
+            operandEntriesFor={(name) => operandEntries(parts?._children, name)}
           />
           {:else if dockTab === 'generators'}
             <div class="dock-generator-editor">
@@ -3956,7 +4143,11 @@
       {duplicateStateCard}
       {removeStateCard}
       {addQuickState}
+      onOpenContactSheet={() => { contactSheetOpen = true; }}
     />
+    {/if}
+    {#if contactSheetOpen}
+      <CustomContactSheet {control} {preview} onPickState={(name) => { selectStateCard(name); contactSheetOpen = false; }} onClose={() => { contactSheetOpen = false; }} />
     {/if}
 
     <SurfaceContextMenu
@@ -5251,6 +5442,14 @@
     color: rgba(250, 224, 120, 0.98);
     font-size: 10px;
     white-space: nowrap;
+  }
+
+  .boolean-operand-ghost {
+    position: absolute;
+    inset: 0;
+    opacity: 0.35;
+    pointer-events: none;
+    outline: none;
   }
 
   .align-toolbar {

@@ -778,7 +778,10 @@ private:
                     return false;
                 };
 
-                const auto onResourceListReceived = [this, iter, source, hasResource] (const PropertyExchangeResult& result)
+                // CEditor patch 5 (JUCE/VENDORED.md): the Visitor is a temporary that dies when
+                // tryRespond returns, and these callbacks run later, when the device's replies
+                // arrive. Capture the Impl it points at, which outlives them, not `this`.
+                const auto onResourceListReceived = [device = device, iter, source, hasResource] (const PropertyExchangeResult& result)
                 {
                     const auto validateResponse = [] (const PropertyExchangeResult& r)
                     {
@@ -788,7 +791,7 @@ private:
                                && parsed.status == 200;
                     };
 
-                    const auto allDone = [this, source]
+                    const auto allDone = [device, source]
                     {
                         device->listeners.call ([source] (auto& l) { l.propertyExchangeCapabilitiesReceived (source); });
                     };
@@ -812,7 +815,7 @@ private:
                         return;
                     };
 
-                    const auto getChannelList = [this, bodyAsObj, source, allDone, hasResource, onChannelListReceived]
+                    const auto getChannelList = [device, bodyAsObj, source, allDone, hasResource, onChannelListReceived]
                     {
                         if (hasResource (bodyAsObj, "ChannelList"))
                         {
@@ -901,7 +904,8 @@ private:
                 const auto typedHeader = PropertySubscriptionHeader::parseCondensed (jsonHeader);
                 const auto subscribeId = typedHeader.subscribeId;
 
-                const auto callback = [this, request, source, subscribeId] (const PropertyExchangeResult& result)
+                // CEditor patch 5: as above, for a subscription whose chunks arrive across calls.
+                const auto callback = [device = device, request, source, subscribeId] (const PropertyExchangeResult& result)
                 {
                     if (result.getError().has_value())
                         return;

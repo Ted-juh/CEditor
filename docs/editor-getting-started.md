@@ -57,7 +57,9 @@ and controller assignment. Seeing an outgoing message proves that CEditor produc
 that the instrument actually responds too.
 
 Turn Preview off to continue arranging and styling the panel. The Text, Effects and Screen
-tools act on the selection; the editor canvas shows the result.
+tools act on the selection; the editor canvas shows the result. To use two tools at once — Text
+beside Effects, say — Alt+click or right-click a tab in the bottom dock, or use the split button
+at the end of its tab strip. Colors, Gradient, Notepad, Viewer and Preview stay in the main pane.
 
 ## Save, share and export
 
@@ -69,10 +71,11 @@ Choose **Build → Export Plugin**. The Export properties show the action, ident
 build result. When copying an existing panel, choose whether this is an update of the same plugin
 or a new plugin with its own identity. A DAW uses this identity when reopening projects.
 
-The installed Windows exporter produces VST3 under **Documents/CEditor/Exports**, including
-Lua/JavaScript support and prepared TypeScript. Older panels with CLAP/LV2 selected still produce
-VST3; the build log explains the skipped formats. Other formats and additional native/Python
-runtimes need the compiling exporter, subject to its supported combinations.
+The installed Windows exporter produces VST3, CLAP and LV2 under **Documents/CEditor/Exports**,
+including Lua/JavaScript support and prepared TypeScript. A CLAP arrives as a folder holding the
+`.clap` and its panel, and an LV2 as its `.lv2` bundle with the panel inside: copy the whole folder
+into your CLAP folder or LV2 path. Additional native/Python runtimes need the compiling exporter,
+subject to its supported combinations.
 
 Add the exported VST3 to your DAW's plugin search path, rescan, load it and save/reopen a test
 project. Route MIDI in and out in the DAW. Incoming host MIDI reaches the panel's main device

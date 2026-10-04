@@ -237,7 +237,7 @@ int wmain (int argc, wchar_t** argv)
                 if (reducer.page() == performancePage)
                 {
                     const auto t = service.surfaceTransport();
-                    PerformanceTransportView transport { t.playing, t.tempo, t.bar, t.beat,
+                    PerformanceTransportView transport { t.playing, t.tempo, t.bar, t.beat, t.beatsPerBar,
                                                          t.externalClock, t.clockLost };
 
                     PerformanceClipViews clipViews {};

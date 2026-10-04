@@ -1349,9 +1349,20 @@ int runRealtimeMonitorTests()
                   << " stale runtime=" << runtimeSnapshots << " log snapshots=" << monitorSnapshots << '\n';
         return 1;
     }
-    juce::Thread::sleep (100);
-    juce::Timer::callPendingTimersSynchronously();
+    // The final snapshot leaves on the throttle's 60 Hz timer, which JUCE's timer thread has to mark
+    // due before callPendingTimersSynchronously runs it. A fixed 100 ms was enough in a plain build
+    // and never under AddressSanitizer (docs/design/checkers-run-2026-10-02.md), so poll for it, up
+    // to two seconds, rather than guess how long the timer thread needs.
     auto expected = service.getMonitorEvents();
+    for (int waited = 0; waited < 2000; waited += 10)
+    {
+        juce::Thread::sleep (10);
+        juce::Timer::callPendingTimersSynchronously();
+        expected = service.getMonitorEvents();
+        if (lastMonitor.getArray() != nullptr && expected.getArray() != nullptr
+            && lastMonitor.getArray()->size() == expected.getArray()->size())
+            break;
+    }
     if (lastMonitor.getArray() == nullptr || expected.getArray() == nullptr
         || lastMonitor.getArray()->size() != expected.getArray()->size())
     {

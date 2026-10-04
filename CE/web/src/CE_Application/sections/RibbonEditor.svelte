@@ -2,9 +2,9 @@
   import { getSection, updateControlProperty, applyControlPatch } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
-  import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import FieldList from '../properties/FieldList.svelte';
+  import { RIBBON_DISPLAY_FIELDS, RIBBON_FIELDS, RIBBON_RETURN_FIELDS } from '../models/inspectorFieldSets.js';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
-  import NumberCell from '../properties/NumberCell.svelte';
   import Ribbon from 'lucide-svelte/icons/ribbon';
   import IterationCcw from 'lucide-svelte/icons/iteration-ccw';
   import Monitor from 'lucide-svelte/icons/monitor';
@@ -18,7 +18,6 @@
     if (!core?.id) return;
     updateControlProperty(core.id, `Ribbon.${prop}`, value);
   }
-  function toggle(prop) { set(prop, !(r?.[prop] === true)); }
 
   // Quick presets — set the handful of fields that make a ribbon / pitch / mod.
   // Patch is a flat map of dot-paths → values.
@@ -36,7 +35,8 @@
 </script>
 
 {#if r}
-  <PropertySection title="Ribbon" icon={Ribbon}>
+  <!-- Ordinary fields are data (models/inspectorFieldSets.js); the presets, Label and Colours are the editor's own. -->
+  {#snippet presets()}
     <PropertyCell label="Preset" span={4} hint="Quick-set for the common hardware controllers.">
       <div class="presets">
         <button type="button" class="action-btn" onclick={() => applyPreset('ribbon')}>Touch ribbon</button>
@@ -44,67 +44,18 @@
         <button type="button" class="action-btn" onclick={() => applyPreset('mod')}>Mod wheel</button>
       </div>
     </PropertyCell>
-    <PropertyCell label="Style" span={2} hint="Flat touch strip or a 3-D wheel.">
-      <select class="val" value={r.style ?? 'ribbon'} onchange={(e) => set('style', e.target.value)}>
-        <option value="ribbon">Ribbon (strip)</option>
-        <option value="wheel">Wheel (flat)</option>
-        <option value="wheel3d">Wheel (realistic)</option>
-      </select>
-    </PropertyCell>
-    <PropertyCell label="Orientation" span={2} hint="Vertical or horizontal.">
-      <select class="val" value={r.orientation ?? 'vertical'} onchange={(e) => set('orientation', e.target.value)}>
-        <option value="vertical">Vertical</option>
-        <option value="horizontal">Horizontal</option>
-      </select>
-    </PropertyCell>
-    <PropertyCell label="Value" span={1} compact hint="Current / rest position (0–1).">
-      <NumberCell label="Val" min={0} max={1} step={0.01} value={r.value ?? 0.5} defaultValue={0.5} onchange={(v) => set('value', Math.max(0, Math.min(1, v)))} />
-    </PropertyCell>
-    <PropertyCell label="Bipolar" span={1} hint="Value port emits −1..1 (pitch bend).">
-      <PropertyToggle value={r.bipolar === true} onchange={() => toggle('bipolar')} />
-    </PropertyCell>
-    <PropertyCell label="Editable" span={1} hint="Touch/drag in preview.">
-      <PropertyToggle value={r.editable !== false} onchange={() => set('editable', !(r.editable !== false))} />
-    </PropertyCell>
+  {/snippet}
+
+  <PropertySection title="Ribbon" icon={Ribbon}>
+    <FieldList fields={RIBBON_FIELDS} values={r} {set} slots={{ presets }} />
   </PropertySection>
 
   <PropertySection title="Return to rest" icon={IterationCcw}>
-    <PropertyCell label="Mode" span={2} hint="What the value does on release. Centre = pitch wheel; None = latch (mod wheel / ribbon).">
-      <select class="val" value={r.returnMode ?? 'none'} onchange={(e) => set('returnMode', e.target.value)}>
-        <option value="none">None (latch)</option>
-        <option value="center">Centre</option>
-        <option value="min">Min</option>
-        <option value="max">Max</option>
-        <option value="rest">Rest value</option>
-      </select>
-    </PropertyCell>
-    {#if r.returnMode === 'rest'}
-      <PropertyCell label="Rest" span={1} compact hint="Rest value (0–1).">
-        <NumberCell label="Rest" min={0} max={1} step={0.01} value={r.returnValue ?? 0.5} defaultValue={0.5} onchange={(v) => set('returnValue', Math.max(0, Math.min(1, v)))} />
-      </PropertyCell>
-    {/if}
-    {#if String(r.returnMode ?? 'none') !== 'none'}
-      <NumberCell label="Time (ms)" min={0} max={5000} step={10} value={r.returnTime ?? 125} onchange={(v) => set('returnTime', Math.max(0, v))} />
-      <PropertyCell label="Curve" span={2} hint="Linear is the constant-speed walk these controls always had. Exp covers most of the distance early, which is what a real spring does.">
-        <select class="val" value={r.returnCurve ?? 'linear'} onchange={(e) => set('returnCurve', e.target.value)}>
-          <option value="linear">Linear</option>
-          <option value="exp">Spring (exp)</option>
-          <option value="ease">Ease</option>
-        </select>
-      </PropertyCell>
-    {/if}
-    <PropertyCell label="Snap" span={1} compact hint="Value snap step (0 = continuous).">
-      <NumberCell label="Snap" min={0} max={1} step={0.01} value={r.snap ?? 0} defaultValue={0} onchange={(v) => set('snap', Math.max(0, Math.min(1, v)))} />
-    </PropertyCell>
+    <FieldList fields={RIBBON_RETURN_FIELDS} values={r} {set} />
   </PropertySection>
 
   <PropertySection title="Display" icon={Monitor}>
-    <PropertyCell label="Touch glow" span={1} hint="Glow while held.">
-      <PropertyToggle value={r.showGlow !== false} onchange={() => set('showGlow', !(r.showGlow !== false))} />
-    </PropertyCell>
-    <PropertyCell label="Readout" span={1} hint="Show the numeric value.">
-      <PropertyToggle value={r.showValue === true} onchange={() => toggle('showValue')} />
-    </PropertyCell>
+    <FieldList fields={RIBBON_DISPLAY_FIELDS} values={r} {set} />
     <PropertyCell label="Label" span={4} hint="Caption under the strip/wheel.">
       <input class="val" type="text" value={r.label ?? ''} onchange={(e) => set('label', e.target.value)} />
     </PropertyCell>

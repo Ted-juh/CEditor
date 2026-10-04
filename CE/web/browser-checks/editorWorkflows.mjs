@@ -201,8 +201,8 @@ export async function runCreationPresets(page,out){
   const edited=await text();
   await props.locator('.preset-action-btn').getByText('Apply',{exact:true}).click();await flush();
   assert.deepEqual(await text(),saved);
-  await props.getByTitle('Undo',{exact:true}).click();assert.deepEqual(await text(),edited);
-  await props.getByTitle('Redo',{exact:true}).click();assert.deepEqual(await text(),saved);
+  await props.getByRole('button',{name:'Undo',exact:true}).click();assert.deepEqual(await text(),edited);
+  await props.getByRole('button',{name:'Redo',exact:true}).click();assert.deepEqual(await text(),saved);
   console.log('Recovery load:',await page.evaluate(()=>({openPanels:window.__acceptance.panels().length,expandedBytes:JSON.stringify(window.__acceptance.panels()).length,storedBytes:localStorage.getItem('ce.unsavedPanels')?.length??0})));
   await page.reload();await page.waitForFunction(()=>!!window.__acceptance?.panel());
   await page.locator(`.canvas-control[data-control-id="${id}"]`).click({force:true});
@@ -244,9 +244,9 @@ export async function runOptionalFields(page){
     assert.equal(JSON.stringify(await read()),before,`${label}: merely visiting a blank field does not edit the scene`);
     await field.fill(String(next));await field.press('Tab');await flush();
     assert.equal((await read()).Setlist.scenes[0][key],next,`${label}: explicit zero is preserved`);
-    await props.getByTitle('Undo',{exact:true}).click();
+    await props.getByRole('button',{name:'Undo',exact:true}).click();
     assert.equal(JSON.stringify(await read()),before,`${label}: one undo restores the edit without a phantom zero in the next field`);
-    await props.getByTitle('Redo',{exact:true}).click();
+    await props.getByRole('button',{name:'Redo',exact:true}).click();
     await field.fill('');await field.press('Enter');await flush();
     assert.equal((await read()).Setlist.scenes[0][key],null,`${label}: clearing means do not send`);
   }
@@ -262,7 +262,7 @@ export async function runOptionalFields(page){
   assert.equal((await read()).Recorder.syncToTransport,!original);
   assert.equal(await props.getByRole('textbox',{name:'Bars',exact:true}).isVisible(),!original);
   assert.equal(await props.getByRole('textbox',{name:'Len',exact:true}).isVisible(),original);
-  await props.getByTitle('Undo',{exact:true}).click();
+  await props.getByRole('button',{name:'Undo',exact:true}).click();
   assert.equal((await read()).Recorder.syncToTransport===true,original);
   console.log('PASS Recorder sync toggle, conditional bars/seconds fields and undo');
 }
@@ -299,7 +299,7 @@ export async function runEditorWorkflows(page,out){
   await page.mouse.move(box.x+box.width/2+40,box.y+box.height/2+30,{steps:8});await page.mouse.up();
   const moved=(await control(knob))._children.Transform;
   assert.equal(moved.x-beforeMove.x,40);assert.equal(moved.y-beforeMove.y,30);
-  await props.getByTitle('Undo',{exact:true}).click();assert.deepEqual((await control(knob))._children.Transform,beforeMove);
+  await props.getByRole('button',{name:'Undo',exact:true}).click();assert.deepEqual((await control(knob))._children.Transform,beforeMove);
   await node(knob).click();await page.keyboard.press('ArrowRight');await flush();
   assert.equal((await control(knob))._children.Transform.x,beforeMove.x+1);
   await page.keyboard.press('Control+z');assert.equal((await control(knob))._children.Transform.x,beforeMove.x);

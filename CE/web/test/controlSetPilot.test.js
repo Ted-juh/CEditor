@@ -677,3 +677,95 @@ test('the panel follows the set\'s colour only while it wears the default one', 
   assert.match(buildSolidStyle(authored), /#0000FF/);
   assert.match(buildSolidStyle({ ...createPanel(), controlSet: { id: 'graphite' } }), /#333333/, 'a colour-only set leaves the panel alone');
 });
+
+test('a pinned path is the author\'s even at its factory value: turning a set\'s hidden ticks back on sticks', async () => {
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { resolveControlFamily, pinnedWrite } = await import('../src/CE_Application/models/controlSetFamilies.js');
+  const set = getControlSet('graphite');
+  const slider = createControl('Slider');
+  assert.equal(resolveControlFamily(slider, set)._children.Behavior.showTicks, false, 'the default set draws sliders without ticks');
+
+  const patch = pinnedWrite(slider, 'Behavior.showTicks', true);
+  assert.deepEqual(patch, { 'Behavior.showTicks': true, 'Core.setOverrides': ['Behavior.showTicks'] });
+  slider._children.Core.setOverrides = patch['Core.setOverrides'];
+  const drawn = resolveControlFamily(slider, set);
+  assert.equal(drawn._children.Behavior.showTicks, true, 'the pin keeps the factory value the author chose');
+  assert.equal(drawn._children.Behavior.showMinMaxLabels, false, 'and only that path: the rest still follows the set');
+  assert.deepEqual(pinnedWrite(slider, 'Behavior.showTicks', false), { 'Behavior.showTicks': false }, 'a path already pinned is not listed twice');
+});
+
+test('every inspector write pins what the rule cannot see, and only that', async () => {
+  const { withSetPins, setPatchablePaths, resolveControlFamily } = await import('../src/CE_Application/models/controlSetFamilies.js');
+  const { updateControlProperty, updateSelectedProperty, updateInspectorControlProperty, applyControlPatch } = await import('../src/CE_Application/stores/controls.js');
+  const { selectedComponentIds } = await import('../src/CE_Application/stores/panels.js');
+
+  const label = createControl('Label');
+  assert.ok(setPatchablePaths('Label').has('Text.Font.letterSpacing'), 'a set can patch a label\'s tracking');
+  assert.ok(!setPatchablePaths('Label').has('Transform.x'), 'and no set patches where it sits');
+  assert.deepEqual(withSetPins(label, { 'Text.Font.letterSpacing': 0 })['Core.setOverrides'], ['Text.Font.letterSpacing'],
+    'the factory value, written on purpose, is pinned');
+  const patch = { 'Text.Font.letterSpacing': 2 };
+  assert.equal(withSetPins(label, patch), patch, 'any other value already wins, so nothing is pinned');
+  label._children.Core.setOverrides = ['Text.Font.letterSpacing'];
+  assert.deepEqual(withSetPins(label, patch)['Core.setOverrides'], [], 'and writing one unpins a pinned path');
+  const moved = { 'Transform.x': 40 };
+  assert.equal(withSetPins(createControl('Label'), moved), moved, 'a path no set patches is left alone');
+
+  // Through the store, as the inspector writes: a label in the default set, tracking typed back to 0.
+  const panel = openPanel();
+  const control = createControl('Label');
+  panels.update((list) => list.map((p) => (p.id === panel.id ? { ...p, controls: [control] } : p)));
+  const id = control._children.Core.id;
+  const stored = () => currentPanel().controls[0];
+  const drawnSpacing = () => resolveControlFamily(stored(), get(activeControlSet))._children.Text._children.Font.letterSpacing;
+  assert.notEqual(drawnSpacing(), 0, 'the default set gives a label its own tracking');
+  updateControlProperty(id, 'Text.Font.letterSpacing', 3);
+  assert.equal(stored()._children.Core.setOverrides, undefined, 'a non-default value needs no pin');
+  updateControlProperty(id, 'Text.Font.letterSpacing', 0);
+  assert.deepEqual(stored()._children.Core.setOverrides, ['Text.Font.letterSpacing']);
+  assert.equal(drawnSpacing(), 0, 'and the label is drawn with the tracking the author chose');
+
+  updateInspectorControlProperty(id, 'Text.Font.family', createControl('Label')._children.Text._children.Font.family);
+  assert.deepEqual(stored()._children.Core.setOverrides, ['Text.Font.letterSpacing', 'Text.Font.family'], 'the inspector path pins too');
+
+  selectedComponentIds.set(new Set([id]));
+  updateSelectedProperty('Text.Font.letterSpacing', 1);
+  assert.deepEqual(stored()._children.Core.setOverrides, ['Text.Font.family'], 'a multi-selection write keeps the pins in step');
+
+  applyControlPatch(id, { 'Text.Font.letterSpacing': 0 });
+  assert.deepEqual(stored()._children.Core.setOverrides, ['Text.Font.family'], 'a programmatic write (a preset, a reset) does not pin');
+  selectedComponentIds.set(new Set());
+});
+
+test('the inspector is shown what is drawn: the set\'s value where it decides one, colours as painted', async () => {
+  const { drawnForInspector, resolveControlFamily, setPatchablePaths, readControlPath } = await import('../src/CE_Application/models/controlSetFamilies.js');
+  const { collectTokenReferences, isTokenReference } = await import('../src/CE_Application/models/controlSets.js');
+  const graphite = getControlSet('graphite');
+
+  const slider = createControl('Slider');
+  assert.equal(slider._children.Behavior.showTicks, true, 'stored: the factory value');
+  assert.equal(drawnForInspector(slider, graphite)._children.Behavior.showTicks, false, 'shown: the ticks the set hides');
+  const label = createControl('Label');
+  const shownFont = drawnForInspector(label, graphite)._children.Text._children.Font;
+  const drawnFont = resolveControlFamily(label, graphite)._children.Text._children.Font;
+  assert.equal(shownFont.family, drawnFont.family);
+  assert.equal(shownFont.letterSpacing, drawnFont.letterSpacing);
+  assert.equal(drawnForInspector(slider, null), slider, 'no set: the control itself');
+
+  // Every built-in set, every family path: a colour field is never handed a reference the family
+  // wrote (it would show a fallback swatch), while the control's own references are left for the
+  // colour fields, which name the token.
+  for (const set of BUILT_IN_CONTROL_SETS) {
+    for (const type of ['Knob', 'Slider', 'Button', 'Label']) {
+      const control = createControl(type);
+      const own = collectTokenReferences(control);
+      const shown = drawnForInspector(control, set);
+      for (const path of setPatchablePaths(type)) {
+        const value = readControlPath(shown, path);
+        if (typeof value !== 'string' || !isTokenReference(value)) continue;
+        assert.equal(readControlPath(control, path), value, `${set.id} ${type} ${path}: ${value} was the family's, and should be a colour`);
+      }
+      assert.ok([...collectTokenReferences(shown)].every((token) => own.has(token)), `${set.id} ${type}: only the control's own references remain`);
+    }
+  }
+});

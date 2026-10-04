@@ -26,6 +26,7 @@
     duplicateStateCard = () => {},
     removeStateCard = () => {},
     addQuickState = () => {},
+    onOpenContactSheet = null,
   } = $props();
 
   function statePreviewStageStyle(entry) {
@@ -39,6 +40,9 @@
       <strong>States</strong>
       <span>{Math.max(1, statePreviewCards.length)}</span>
     </button>
+    {#if onOpenContactSheet && !filmstripCollapsed}
+      <button type="button" class="contact-sheet-btn" onclick={onOpenContactSheet} title="Every state at five sizes, with what breaks at each">Sizes…</button>
+    {/if}
   </div>
   <div class="state-chip-row">
     {#each statePreviewCards as entry (entry.name)}
@@ -201,6 +205,24 @@
     color: #D8E6EE;
     font-size: 11px;
     font-weight: 900;
+  }
+
+  .contact-sheet-btn {
+    margin: 0 8px 8px;
+    padding: 2px 4px;
+    border: 1px solid #31404A;
+    border-radius: 3px;
+    background: #10181E;
+    color: #9FB3C0;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .contact-sheet-btn:hover {
+    color: #D8E6EE;
+    border-color: #14B8A6;
   }
 
   .state-title strong,

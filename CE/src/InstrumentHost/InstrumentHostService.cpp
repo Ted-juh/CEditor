@@ -149,7 +149,7 @@ namespace
             "setPartMixer", "setReturnLevel", "setSendLevel", "setTempo",
             "sendMicrotuning",
             "setTimeSignature", "setTransportPosition", "setlistGo", "setlistNext",
-            "setlistPrev", "startArrangement", "stopArrangement",
+            "setlistPrev", "resetSetlistClock", "startArrangement", "stopArrangement",
             "stopAllClips", "stopClip", "transportContinue",
             "transportPlay", "transportStop", "walkPartPreset", "startMidiLoop",
             "finishMidiLoop", "cancelMidiLoop",
@@ -157,9 +157,13 @@ namespace
             "startPerformanceRecording", "finishPerformanceRecording",
             "cancelPerformanceRecording", "removePerformanceTake",
             "replayPerformanceTake", "stopPerformanceReplay", "surfacePerformanceEncoder",
-            "surfaceStepPad", "surfaceInput", "setSurfaceActive", "retryFailedProcessor", "dismissFailoverEvent",
+            "surfaceStepPad", "surfaceInput", "setSurfaceActive", "showControlPage",
+            "chordPad", "chordStep", "retryFailedProcessor", "dismissFailoverEvent",
 
-            // Escape/cancellation actions must never be trapped behind the lock.
+            // Escape/cancellation actions must never be trapped behind the lock. Closing a
+            // plug-in's editor changes nothing in the rig, and without it the × on an editor
+            // that a scene opened did nothing on stage.
+            "closeEditor",
             "cancelHardwarePatchCapture", "cancelKeyChordLearn",
             "cancelLearnControlSlotParameter", "cancelMidiLearn", "disarmCapture"
         };
@@ -191,7 +195,8 @@ namespace
             "removeScene", "renameScene", "captureScene", "setSceneOptions", "setSceneClip",
             "addSetlistItem", "removeSetlistItem", "moveSetlistItem", "setSetlistItem", "setSetlistOptions",
             "addArrangementItem", "removeArrangementItem", "setArrangementItem", "moveArrangementItem", "setArrangementOptions",
-            "setPresetAudition", "setPadLayers", "setPadActiveLayer", "setFaderLayers", "setFaderActiveLayer"
+            "setPresetAudition", "setPadLayers", "setPadActiveLayer", "setFaderLayers", "setFaderActiveLayer",
+            "setPartKey"
         };
         if (! edits.contains (cmd)) return {};
         juce::String label;
@@ -258,6 +263,27 @@ namespace
                     arp.degreePattern.add (juce::jlimit (-1, 63, (int) degree));
                 }
         }
+
+        // The lane's other rows, each clamped to what the engine plays.
+        const auto row = [&payload, &fields] (const char* key, int low, int high, juce::Array<int>& into)
+        {
+            if (! fields.hasProperty (key))
+                return;
+            into.clear();
+            if (const auto* values = payload[key].getArray())
+                for (const auto& value : *values)
+                    if (into.size() < perf::ArpEngine::maxPatternSteps)
+                        into.add (juce::jlimit (low, high, (int) value));
+        };
+        row ("ratchetPattern", 1, 4, arp.ratchetPattern);
+        row ("tiePattern", 0, 1, arp.tiePattern);
+        row ("octavePattern", -2, 2, arp.octavePattern);
+        row ("chancePattern", 0, 100, arp.chancePattern);
+        if (fields.hasProperty ("feel"))
+        {
+            const auto feel = payload["feel"].toString();
+            arp.feel = feel == "triplet" || feel == "dotted" ? feel : "straight";
+        }
     }
 
     /** The note-shaping fields, same contract. */
@@ -270,10 +296,62 @@ namespace
         if (fields.hasProperty ("constrainToScale")) fx.constrainToScale = (bool) payload["constrainToScale"];
         if (fields.hasProperty ("scaleRoot"))        fx.scaleRoot = juce::jlimit (0, 11, (int) payload["scaleRoot"]);
         if (fields.hasProperty ("scaleType"))        fx.scaleType = payload["scaleType"].toString();
-        if (fields.hasProperty ("chord"))            fx.chord = perf::MidiFxSettings::chordTypeFromName (payload["chord"].toString());
+        if (fields.hasProperty ("scaleFold"))        fx.scaleFold = payload["scaleFold"].toString() == "drop" ? "drop" : "snap";
+        if (fields.hasProperty ("followSongKey"))    fx.followSongKey = (bool) payload["followSongKey"];
+        if (fields.hasProperty ("chord"))
+        {
+            // Alone, "chord" still speaks its old one-field language (off / a shape /
+            // custom keys) — the part-level setter, control pages and panels all send it.
+            // Beside "chordFollow" it only picks the follow shape.
+            const auto type = perf::MidiFxSettings::chordTypeFromName (payload["chord"].toString());
+            if (! fields.hasProperty ("chordFollow"))
+                fx.applyLegacyChord (type);
+            else if (type != perf::MidiFxSettings::ChordType::off
+                     && type != perf::MidiFxSettings::ChordType::keyChords)
+                fx.chord = type;
+        }
+        if (fields.hasProperty ("chordFollow"))      fx.chordFollow = (bool) payload["chordFollow"];
+        if (fields.hasProperty ("chordFollowLow"))   fx.chordFollowLow = juce::jlimit (0, 127, (int) payload["chordFollowLow"]);
+        if (fields.hasProperty ("chordFollowHigh"))  fx.chordFollowHigh = juce::jlimit (0, 127, (int) payload["chordFollowHigh"]);
+        if (fx.chordFollowLow > fx.chordFollowHigh)
+            std::swap (fx.chordFollowLow, fx.chordFollowHigh);
         if (fields.hasProperty ("chordInversion"))   fx.chordInversion = juce::jlimit (0, 3, (int) payload["chordInversion"]);
         if (fields.hasProperty ("chordVoicing"))     fx.chordVoicing = perf::MidiFxSettings::chordVoicingFromName (payload["chordVoicing"].toString());
         if (fields.hasProperty ("chordVoiceLeading")) fx.chordVoiceLeading = (bool) payload["chordVoiceLeading"];
+        if (fields.hasProperty ("chordBass"))        fx.chordBass = (bool) payload["chordBass"];
+        if (fields.hasProperty ("chordTopAccent"))   fx.chordTopAccent = juce::jlimit (0, 40, (int) payload["chordTopAccent"]);
+        if (fields.hasProperty ("chordKeyMap"))      fx.chordKeyMap = (bool) payload["chordKeyMap"];
+        if (fields.hasProperty ("chordPads"))        fx.chordPads = (bool) payload["chordPads"];
+        if (fields.hasProperty ("chordProgression")) fx.chordProgression = (bool) payload["chordProgression"];
+        if (fields.hasProperty ("progressionAdvance"))
+            fx.progressionAdvance = payload["progressionAdvance"].toString() == "pedal" ? "pedal" : "key";
+        if (fields.hasProperty ("progressionLow"))   fx.progressionLow = juce::jlimit (0, 127, (int) payload["progressionLow"]);
+        if (fields.hasProperty ("progressionHigh"))  fx.progressionHigh = juce::jlimit (0, 127, (int) payload["progressionHigh"]);
+        if (fx.progressionLow > fx.progressionHigh)
+            std::swap (fx.progressionLow, fx.progressionHigh);
+        if (fields.hasProperty ("chordSet") || fields.hasProperty ("keyMap")
+            || fields.hasProperty ("padMap") || fields.hasProperty ("progression"))
+        {
+            // The set and the map arrive whole, and go through the same reader a saved
+            // Performance does, so a key pointing past the set is dropped the same way.
+            const auto current = perf::midiFxToVar (fx);
+            auto* both = new juce::DynamicObject();
+            both->setProperty ("chordFollow", fx.chordFollow);
+            both->setProperty ("chordSet", fields.hasProperty ("chordSet") ? payload["chordSet"]
+                                                                           : current["chordSet"]);
+            both->setProperty ("keyMap", fields.hasProperty ("keyMap") ? payload["keyMap"]
+                                                                       : current["keyMap"]);
+            both->setProperty ("padMap", fields.hasProperty ("padMap") ? payload["padMap"]
+                                                                       : current["padMap"]);
+            both->setProperty ("progression", fields.hasProperty ("progression") ? payload["progression"]
+                                                                                 : current["progression"]);
+            perf::MidiFxSettings parsed;
+            perf::midiFxFromVar (juce::var (both), parsed);
+            fx.chordSet = parsed.chordSet;
+            fx.keyMap = parsed.keyMap;
+            fx.padMap = parsed.padMap;
+            fx.progression = parsed.progression;
+        }
         if (fields.hasProperty ("velocityFixed"))    fx.velocityFixed = juce::jlimit (0, 127, (int) payload["velocityFixed"]);
         if (fields.hasProperty ("velocityScale"))    fx.velocityScale = juce::jlimit (0.1f, 2.0f, (float) (double) payload["velocityScale"]);
         if (fields.hasProperty ("responseProfileName"))
@@ -378,6 +456,19 @@ namespace
         }
         if (fields.hasProperty ("strumCurve"))     mod.strumCurve = juce::jlimit (-1.0f, 1.0f, (float) (double) payload["strumCurve"]);
         if (fields.hasProperty ("strumVelocityRamp")) mod.strumVelocityRamp = juce::jlimit (-64, 64, (int) payload["strumVelocityRamp"]);
+        if (fields.hasProperty ("strumGuitar"))    mod.strumGuitar = (bool) payload["strumGuitar"];
+        if (fields.hasProperty ("strumHarderFaster")) mod.strumHarderFaster = (bool) payload["strumHarderFaster"];
+        if (fields.hasProperty ("strumRepeatPerBeat"))
+        {
+            const auto repeat = juce::jlimit (0, 4, (int) payload["strumRepeatPerBeat"]);
+            mod.strumRepeatPerBeat = repeat == 1 ? 0 : repeat;
+        }
+        if (fields.hasProperty ("humanizeLayBackBeats")) mod.humanizeLayBackBeats = juce::jlimit (0.0, 0.125, (double) payload["humanizeLayBackBeats"]);
+        if (fields.hasProperty ("humanizeSwing"))  mod.humanizeSwing = juce::jlimit (0.0f, 0.75f, (float) (double) payload["humanizeSwing"]);
+        if (fields.hasProperty ("humanizeSwingGrid")) mod.humanizeSwingGrid = (double) payload["humanizeSwingGrid"] >= 0.375 ? 0.5 : 0.25;
+        if (fields.hasProperty ("humanizeAccent")) mod.humanizeAccent = juce::jlimit (0, 40, (int) payload["humanizeAccent"]);
+        if (fields.hasProperty ("humanizeFreeze")) mod.humanizeFreeze = (bool) payload["humanizeFreeze"];
+        if (fields.hasProperty ("humanizeSeed"))   mod.humanizeSeed = juce::jlimit (1, 9999, (int) payload["humanizeSeed"]);
         if (fields.hasProperty ("humanizeTimingBeats")) mod.humanizeTimingBeats = juce::jlimit (0.0, 0.25, (double) payload["humanizeTimingBeats"]);
         if (fields.hasProperty ("humanizeVelocity"))    mod.humanizeVelocity = juce::jlimit (0, 64, (int) payload["humanizeVelocity"]);
         if (fields.hasProperty ("humanizeGatePercent")) mod.humanizeGatePercent = juce::jlimit (0, 100, (int) payload["humanizeGatePercent"]);
@@ -387,6 +478,27 @@ namespace
         if (fields.hasProperty ("lengthBeats"))    mod.lengthBeats = juce::jlimit (0.0, 8.0, (double) payload["lengthBeats"]);
         if (fields.hasProperty ("legato"))         mod.legato = (bool) payload["legato"];
         if (fields.hasProperty ("latchOn"))        mod.latchOn = (bool) payload["latchOn"];
+        if (fields.hasProperty ("echoFeel"))
+        {
+            const auto feel = payload["echoFeel"].toString();
+            mod.echoFeel = feel == "dotted" || feel == "triplet" ? feel : "straight";
+        }
+        if (fields.hasProperty ("echoScaleClimb")) mod.echoScaleClimb = (bool) payload["echoScaleClimb"];
+        if (fields.hasProperty ("echoShorter"))    mod.echoShorter = (bool) payload["echoShorter"];
+        if (fields.hasProperty ("echoFloor"))      mod.echoFloor = juce::jlimit (1, 127, (int) payload["echoFloor"]);
+        if (fields.hasProperty ("chanceKeepDownbeats")) mod.chanceKeepDownbeats = (bool) payload["chanceKeepDownbeats"];
+        if (fields.hasProperty ("chanceSoftFirst")) mod.chanceSoftFirst = (bool) payload["chanceSoftFirst"];
+        if (fields.hasProperty ("lengthMode"))
+        {
+            const auto mode = payload["lengthMode"].toString();
+            mod.lengthMode = mode == "at most" || mode == "at least" ? mode : "fixed";
+        }
+        if (fields.hasProperty ("latchMode"))
+        {
+            const auto mode = payload["latchMode"].toString();
+            mod.latchMode = mode == "add" || mode == "toggle" ? mode : "replace";
+        }
+        if (fields.hasProperty ("latchPedalRelease")) mod.latchPedalRelease = (bool) payload["latchPedalRelease"];
         const juce::StringArray mpeFormats { "mpe", "poly aftertouch", "channel pressure", "cc" };
         const juce::StringArray mpeAxes { "pressure", "timbre", "pitch bend" };
         const juce::StringArray mpeCollapseModes { "latest", "highest", "average" };
@@ -482,6 +594,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         {
             stageLocked = true;
             stageUnlockStartedMs = 0.0;
+            // The stage screen is the whole window: a docked editor left open in Build would
+            // take half of it, and opening one is a Build action. Floating windows stay put.
+            hideEditor ({});
             emitState();
             return;
         }
@@ -641,9 +756,43 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (cmd == "surfacePerformanceEncoder")
     {
         nudgePerformanceEncoder (
-            (SurfaceEncoder) juce::jlimit (0, (int) SurfaceEncoder::velocity,
+            (SurfaceEncoder) juce::jlimit (0, (int) SurfaceEncoder::masterLevel,
                                             (int) payload.getProperty ("encoder", 0)),
             juce::jlimit (-127, 127, (int) payload.getProperty ("delta", 0)));
+        return;
+    }
+    if (cmd == "setControlPagePreset")
+    {
+        // Ties a page to the preset a part has loaded now ("show this page with Warm Pad"),
+        // or unties it when no part is given.
+        const auto pageId = payload.getProperty ("pageId", {}).toString();
+        if (rack.getPerformance().findPage (pageId) == nullptr)
+        {
+            emitError ("Unknown control page.");
+            return;
+        }
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto* part = partId.isNotEmpty() ? rack.getPerformance().findPart (partId) : nullptr;
+        if (partId.isNotEmpty() && (part == nullptr || part->lastPresetRecordId.isEmpty()))
+        {
+            emitError ("That part has no preset loaded to tie this page to.");
+            return;
+        }
+        rack.setPagePreset (pageId, part != nullptr ? part->lastPresetRecordId : juce::String(),
+                            part != nullptr ? part->lastPresetName : juce::String());
+        savePerformance();
+        emitState();
+        return;
+    }
+    if (cmd == "showControlPage")
+    {
+        // One shown page for everything: the keyboard (or its screen card) moves to it, the
+        // drawing follows, and learned knobs shared between pages drive this one.
+        const auto pageId = payload.getProperty ("pageId", {}).toString();
+        if (rack.getPerformance().findPage (pageId) == nullptr)
+            return;
+        currentSurfacePageId = pageId;
+        requestedSurfacePageId = pageId;
         return;
     }
     if (cmd == "setSurfaceActive")
@@ -1485,6 +1634,10 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             // or a knob can ride it, and this list is where both go shopping.
             if (part->hasMorph())
                 ids.add ("@morph");
+            // And each MIDI module's Amount, so a knob can ride "how much strum" live.
+            for (const auto& slot : part->midiChain)
+                if (perf::MidiSlot::hasAmount (slot.type))
+                    ids.add ("@amount:" + slot.slotId);
 
             for (const auto& id : ids)
             {
@@ -1493,7 +1646,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 obj->setProperty ("index",        -1);
                 obj->setProperty ("name",         virtualParameterName (partId, id));
                 obj->setProperty ("label",        juce::String());
-                obj->setProperty ("group",        id == "@morph" ? "Morph" : "Mixer");
+                obj->setProperty ("group",        id == "@morph" ? "Morph"
+                                                  : id.startsWith ("@amount:") ? "MIDI modules" : "Mixer");
                 obj->setProperty ("value",        virtualParameterValue (partId, id));
                 obj->setProperty ("text",         virtualParameterText (partId, id));
                 obj->setProperty ("defaultValue", virtualParameterDefault (id));
@@ -1911,14 +2065,17 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             if (fields->hasProperty ("inverted")) binding.inverted = (bool) payload["inverted"];
             if (fields->hasProperty ("bipolar"))  binding.bipolar  = (bool) payload["bipolar"];
             if (fields->hasProperty ("toggle"))   binding.toggle   = (bool) payload["toggle"];
+            if (fields->hasProperty ("steps"))    binding.steps    = juce::jlimit (0, 128, (int) payload["steps"]);
             if (fields->hasProperty ("label"))    binding.label    = payload["label"].toString().trim();
         }
 
         const bool pickup = (bool) payload.getProperty ("midiPickup", slot->midiPickup);
         const bool relative = (bool) payload.getProperty ("midiRelative", slot->midiRelative);
+        const int relativeFormat = juce::jlimit (0, 2, (int) payload.getProperty ("midiRelativeFormat",
+                                                                                 slot->midiRelativeFormat));
         const int colour = (int) payload.getProperty ("colour", slot->colour);
         rack.setSlotBinding (pageId, slotId, std::move (binding));
-        rack.setSlotMidiOptions (pageId, slotId, pickup, relative);
+        rack.setSlotMidiOptions (pageId, slotId, pickup, relative, relativeFormat);
         rack.setSlotColour (pageId, slotId, colour);
         midiPickups.erase ({ pageId, slotId });
         savePerformance();
@@ -4866,13 +5023,13 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                     perf::Lane added;
                     added.laneId = juce::Uuid().toDashedString();
                     added.type = perf::LaneType::parameter;
-                    added.name = "Lock — " + (isVirtualParameterId (parameterId)
+                    added.name = "Lock " + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94 ")) + (isVirtualParameterId (parameterId)
                                                   ? virtualParameterName (targetId, parameterId)
                                                   : parameterId);
                     if (const auto found = partParameters.find (targetId);
                         ! isVirtualParameterId (parameterId) && found != partParameters.end())
                         if (const auto* descriptor = found->second.inventory.find (parameterId))
-                            added.name = "Lock — " + descriptor->name;
+                            added.name = "Lock " + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94 ")) + descriptor->name;
                     added.targetId = targetId;
                     added.parameterId = parameterId;
                     added.targetCeId = targetClassCeId (targetId);
@@ -5363,7 +5520,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         if (cmd == "removeScene")
         {
             bool sceneIsArranged = false;
-            for (const auto& item : performance.arrangement.items)
+            for (const auto& item : playingArrangement().items)
                 sceneIsArranged = sceneIsArranged || item.sceneId == sceneId;
             if (sceneIsArranged && arrangementPlaying)
                 stopArrangementPlayback (true);
@@ -5375,9 +5532,15 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 if (performance.setlist.items.getReference (i).sceneId == sceneId)
                     performance.setlist.items.remove (i);
 
-            for (int i = performance.arrangement.items.size(); --i >= 0;)
-                if (performance.arrangement.items.getReference (i).sceneId == sceneId)
-                    performance.arrangement.items.remove (i);
+            const auto dropScene = [&sceneId] (perf::Arrangement& arrangement)
+            {
+                for (int i = arrangement.items.size(); --i >= 0;)
+                    if (arrangement.items.getReference (i).sceneId == sceneId)
+                        arrangement.items.remove (i);
+            };
+            dropScene (performance.arrangement);
+            for (auto& song : performance.setlist.items)
+                dropScene (song.sections);
 
             for (int i = 0; i < performance.scenes.size(); ++i)
                 if (performance.scenes.getReference (i).sceneId == sceneId)
@@ -5494,15 +5657,28 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
+        // The current song stays the current song when others move around it; removing it
+        // leaves no song current, and its sections stop with it.
+        const auto currentId = juce::isPositiveAndBelow (setlist.currentIndex, setlist.items.size())
+                                 ? setlist.items.getReference (setlist.currentIndex).itemId : juce::String();
+        const auto followCurrent = [&setlist, &currentId]
+        {
+            setlist.currentIndex = -1;
+            for (int i = 0; i < setlist.items.size(); ++i)
+                if (setlist.items.getReference (i).itemId == currentId) setlist.currentIndex = i;
+        };
         if (cmd == "removeSetlistItem")
         {
+            if (arrangementPlaying && setlist.items.getReference (index).itemId == currentId)
+                stopArrangementPlayback (false);
             setlist.items.remove (index);
-            setlist.currentIndex = juce::jlimit (-1, setlist.items.size() - 1, setlist.currentIndex);
+            followCurrent();
         }
         else if (cmd == "moveSetlistItem")
         {
             setlist.items.move (index, juce::jlimit (0, setlist.items.size() - 1,
                                                      (int) payload.getProperty ("index", index)));
+            followCurrent();
         }
         else if (const auto* fields = payload.getDynamicObject())
         {
@@ -5513,10 +5689,21 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             if (fields->hasProperty ("rackRecordId")) item.rackRecordId = payload["rackRecordId"].toString();
             if (fields->hasProperty ("pageId"))       item.pageId = payload["pageId"].toString();
             if (fields->hasProperty ("tempo"))   item.tempo = juce::jlimit (0.0, 300.0, (double) payload["tempo"]);
+            if (fields->hasProperty ("plannedSeconds"))
+                item.plannedSeconds = juce::jlimit (0, 3600, (int) payload["plannedSeconds"]);
         }
 
         savePerformance();
         refreshSetlistPreloads();
+        emitState();
+        return;
+    }
+
+    if (cmd == "resetSetlistClock")
+    {
+        // "Start counting from here": both clocks restart, the song stays where it is.
+        if (rack.getPerformance().setlist.currentIndex >= 0)
+            setlistStartedAtMs = setlistSongStartedAtMs = juce::Time::currentTimeMillis();
         emitState();
         return;
     }
@@ -5545,9 +5732,16 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         if (! requireFeature (licensing::Feature::scenesAndSetlists))
             return;
-        if (arrangementPlaying)
+        // "songId" names the song whose sections these are; without it, the show-wide one.
+        auto* target = arrangementFor (payload.getProperty ("songId", {}).toString());
+        if (target == nullptr)
         {
-            emitError ("Stop the arrangement before editing its order.");
+            emitError ("Unknown song.");
+            return;
+        }
+        if (arrangementPlaying && target == &playingArrangement())
+        {
+            emitError ("Stop the song's sections before editing them.");
             return;
         }
 
@@ -5567,7 +5761,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         if (item.name.isEmpty())
             item.name = scene->name;
         item.bars = juce::jlimit (1, 128, (int) payload.getProperty ("bars", 4));
-        performance.arrangement.items.add (std::move (item));
+        target->items.add (std::move (item));
         savePerformance();
         emitState();
         return;
@@ -5576,14 +5770,20 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (cmd == "removeArrangementItem" || cmd == "setArrangementItem"
         || cmd == "moveArrangementItem")
     {
-        if (arrangementPlaying)
+        auto* target = arrangementFor (payload.getProperty ("songId", {}).toString());
+        if (target == nullptr)
         {
-            emitError ("Stop the arrangement before editing its order.");
+            emitError ("Unknown song.");
+            return;
+        }
+        if (arrangementPlaying && target == &playingArrangement())
+        {
+            emitError ("Stop the song's sections before editing them.");
             return;
         }
 
         auto& performance = const_cast<Performance&> (rack.getPerformance());
-        auto& arrangement = performance.arrangement;
+        auto& arrangement = *target;
         const auto itemId = payload.getProperty ("itemId", {}).toString();
         int index = -1;
         for (int i = 0; i < arrangement.items.size(); ++i)
@@ -5631,7 +5831,13 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "setArrangementOptions")
     {
-        auto& arrangement = const_cast<Performance&> (rack.getPerformance()).arrangement;
+        auto* target = arrangementFor (payload.getProperty ("songId", {}).toString());
+        if (target == nullptr)
+        {
+            emitError ("Unknown song.");
+            return;
+        }
+        auto& arrangement = *target;
         if (const auto* fields = payload.getDynamicObject();
             fields != nullptr && fields->hasProperty ("loop"))
             arrangement.loop = (bool) payload["loop"];
@@ -5717,7 +5923,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         if (cmd == "addMidiSlot")
         {
-            const auto type = payload.getProperty ("type", {}).toString();
+            const auto type = perf::MidiSlot::canonicalType (payload.getProperty ("type", {}).toString());
             if (! perf::MidiSlot::types().contains (type))
             {
                 emitError ("Unknown MIDI module: " + type);
@@ -5735,6 +5941,14 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             // arpeggiator and chorder always did.
             minted.fx.scaleType = part->midiFx.scaleType;
             minted.fx.scaleRoot = part->midiFx.scaleRoot;
+            // A fresh Velocity module starts from the calibration of the keyboard that is
+            // connected, when one was saved for it.
+            if (type == "velocity")
+                if (const auto profile = responseProfileForPorts(); profile.isObject())
+                {
+                    applyMidiFxFields (minted.fx, profile, *profile.getDynamicObject());
+                    minted.fx.responseProfileName = profile.getProperty ("name", {}).toString();
+                }
             chain.add (std::move (minted));
         }
         else if (index < 0)
@@ -5761,9 +5975,22 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             auto& slot = chain.getReference (index);
             if (const auto* fields = payload.getDynamicObject())
             {
+                if (fields->hasProperty ("amount"))
+                    slot.amount = juce::jlimit (0.0f, 1.0f, (float) (double) payload["amount"]);
                 if (slot.type == "arp")
+                {
                     applyArpFields (slot.arp, payload, *fields);
-                else if (perf::MidiSlot::types().indexOf (slot.type) >= 6)
+                    // The arp's scale lives in its fx block (it folds into it), so the key
+                    // fields go there: which key it plays in, and whether that is the song key.
+                    for (const auto* key : { "followSongKey", "scaleType", "scaleRoot" })
+                        if (fields->hasProperty (key))
+                        {
+                            if (juce::String (key) == "followSongKey") slot.fx.followSongKey = (bool) payload[key];
+                            else if (juce::String (key) == "scaleType") slot.fx.scaleType = payload[key].toString();
+                            else slot.fx.scaleRoot = juce::jlimit (0, 11, (int) payload[key]);
+                        }
+                }
+                else if (perf::MidiSlot::isNoteModule (slot.type))
                     applyNoteModuleFields (slot.mod, payload, *fields);
                 else
                     applyMidiFxFields (slot.fx, payload, *fields);
@@ -6039,12 +6266,21 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         ensureLibrary();
         const auto query = libraryQueryFromVar (payload);
         const auto consumer = payload["consumer"].toString();
+        const auto offset = juce::jmax (0, (int) payload.getProperty ("offset", 0));
+        const auto limit = juce::jmax (0, (int) payload.getProperty ("limit", 0));
         // Background consumers (for example Setlist's rack picker) must not replace the
         // Sounds browser's remembered view. They receive the same payload, tagged so the web
         // store can route it to a separate cache.
         if (consumer.isEmpty())
+        {
+            // A first page starts the view over; a later one extends how far it reaches.
+            if (offset == 0)
+                libraryViewLimit = limit;
+            else if (libraryViewLimit > 0)
+                libraryViewLimit = limit > 0 ? juce::jmax (libraryViewLimit, offset + limit) : 0;
             libraryView = query;
-        emitLibrary (query, consumer);
+        }
+        emitLibrary (query, consumer, offset, limit);
         return;
     }
 
@@ -6406,7 +6642,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         if (requestedId.isEmpty())
             requestedId = part->lastPresetRecordId;
 
-        auto* target = library.find (requestedId);
+        const auto* target = library.find (requestedId);
         if (target == nullptr)
         {
             emitError ("Load a sound from the library first, or save this as a new one.");
@@ -6454,12 +6690,13 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         version.label = label;
         version.savedAtMs = juce::Time::currentTimeMillis();
         version.stateBlobBase64 = blob;
-        target->versions.add (std::move (version));
-        target->versions = pruneLibraryVersions (std::move (target->versions),
+        auto* saving = library.edit (target->recordId, LibraryChanges::state);
+        saving->versions.add (std::move (version));
+        saving->versions = pruneLibraryVersions (std::move (saving->versions),
                                                  juce::Time::currentTimeMillis());
         // The record's own state is the newest version — one current state, so nothing that
         // already reads a record has to learn about versions.
-        target->stateBlobBase64 = target->versions.getLast().stateBlobBase64;
+        saving->stateBlobBase64 = saving->versions.getLast().stateBlobBase64;
 
         saveLibrary();
         emitLibrary (libraryView);
@@ -6488,10 +6725,18 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
+        // Earlier versions' states stay on disk until one is used (LibraryVersion::stateLoaded).
+        const auto versionState = libraryStore.versionState (*record, *version);
+        if (versionState.isEmpty())
+        {
+            emitError ("That version's saved state could not be read from the library.");
+            return;
+        }
+
         const auto partId = versionTargetPart (payload);
         if (const auto* part = rack.getPerformance().findPart (partId); part != nullptr && part->hardware)
         {
-            rack.setHardwarePatch (partId, version->stateBlobBase64, record->name);
+            rack.setHardwarePatch (partId, versionState, record->name);
             queueHardwarePatchSend (partId);
             savePerformance();
             emitState();
@@ -6505,7 +6750,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
-        if (const auto refusal = applyStateBlob (*instrument, version->stateBlobBase64);
+        if (const auto refusal = applyStateBlob (*instrument, versionState);
             refusal.isNotEmpty())
         {
             emitError (refusal);
@@ -6546,7 +6791,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         if (const auto* v = findVersion (idA); v != nullptr)
         {
-            blobA = v->stateBlobBase64;
+            blobA = libraryStore.versionState (*record, *v);
             nameA = v->label.isNotEmpty() ? v->label : "an earlier save";
         }
         else if (const auto* origin = library.find (record->branchedFromRecordId); origin != nullptr)
@@ -6557,12 +6802,12 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         if (const auto* v = findVersion (idB); v != nullptr)
         {
-            blobB = v->stateBlobBase64;
+            blobB = libraryStore.versionState (*record, *v);
             nameB = v->label.isNotEmpty() ? v->label : "a later save";
         }
         else if (! record->versions.isEmpty())
         {
-            blobB = record->versions.getLast().stateBlobBase64;
+            blobB = libraryStore.versionState (*record, record->versions.getLast());
             nameB = "now";
         }
         else
@@ -6831,7 +7076,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (cmd == "setAuditionPhrase")
     {
         const auto mode = payload.getProperty ("phrase", {}).toString();
-        if (mode == "note" || mode == "chord" || mode == "recent")
+        if (mode == "phrase" || mode == "recent")
             auditionPhraseMode = mode;
         auditionBars = juce::jlimit (1, 16, (int) payload.getProperty ("bars", auditionBars));
         emitAudition (auditioningRecordId, "phrase");
@@ -6967,6 +7212,105 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             obj->setProperty ("path", directory);
             handleCommand (juce::var (obj));
         });
+        return;
+    }
+
+    if (cmd == "browseStateFolder")
+    {
+        if (options.pickDirectory == nullptr)
+        {
+            emitError ("A folder picker is not available in this build.");
+            return;
+        }
+        const auto ceId = payload.getProperty ("ceId", {}).toString();
+        options.pickDirectory ([this, aliveToken = alive, ceId] (const juce::String& directory)
+        {
+            if (! aliveToken->load() || directory.isEmpty())
+                return;
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("cmd", "addStateFolder");
+            obj->setProperty ("path", directory);
+            obj->setProperty ("ceId", ceId);
+            handleCommand (juce::var (obj));
+        });
+        return;
+    }
+
+    if (cmd == "addStateFolder")
+    {
+        ensureLibrary();
+        const auto path = payload.getProperty ("path", {}).toString().trim();
+        const auto ceId = payload.getProperty ("ceId", {}).toString();
+        if (! juce::File::isAbsolutePath (path) || ! juce::File (path).isDirectory())
+        {
+            emitError ("That preset folder does not exist.");
+            return;
+        }
+        const juce::File folder (path);
+        PluginClassRecord plugin;
+        {
+            const std::scoped_lock lock (catalogLock);
+            if (const auto* found = findClass (ceId)) plugin = *found;
+        }
+        if (plugin.ceId.isEmpty())
+        {
+            emitError ("Choose which plug-in these presets are for.");
+            return;
+        }
+        const auto extension = dominantPresetExtension (folder);
+        if (extension.isEmpty())
+        {
+            emitError ("There are no preset files in " + folder.getFileName() + ".");
+            return;
+        }
+        // Formats read by name need no test: the folder joins the ordinary preset folders.
+        if (isNamedVendorPresetFile (juce::File ("preset." + extension)))
+        {
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("cmd", "addLibraryPath");
+            obj->setProperty ("path", folder.getFullPathName());
+            handleCommand (juce::var (obj));
+            scanVstPresets();
+            return;
+        }
+        if (const auto existing = findStateFolder (folder.getFullPathName()); existing >= 0)
+            stateFolders.remove (existing);
+        StateFolder entry;
+        entry.path = folder.getFullPathName();
+        entry.ceId = plugin.ceId;
+        entry.pluginName = plugin.name;
+        entry.extension = extension;
+        entry.status = "checking";
+        entry.detail = "Test-loading two presets into " + plugin.name + "…";
+        stateFolders.add (entry);
+        saveStateFolders();
+        emitLibrary (libraryView);
+        verifyStateFolder (entry.path);
+        return;
+    }
+
+    if (cmd == "removeStateFolder")
+    {
+        ensureLibrary();
+        const auto index = findStateFolder (payload.getProperty ("path", {}).toString());
+        if (index < 0)
+        {
+            emitError ("That preset folder is not in the list.");
+            return;
+        }
+        // Its presets go with it: they were only ever this folder's files.
+        const auto scope = juce::File (stateFolders.getReference (index).path).getFullPathName()
+                         + juce::File::getSeparatorString();
+        juce::StringArray ids;
+        for (const auto& record : library.allRecords())
+            if (record.sourceType == "stateFile" && record.sourceLocator.startsWith (scope))
+                ids.add (record.recordId);
+        for (const auto& id : ids) library.removeRecord (id);
+        stateFolders.remove (index);
+        saveStateFolders();
+        saveLibrary();
+        refreshScanReportCounts();
+        emitLibrary (libraryView);
         return;
     }
 
@@ -7429,7 +7773,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         // The chorder's capture, one arm per chord: tap the key that should carry it,
         // play the chord, done — grouped by "pressed together until released together",
-        // heard through the same observer the other learns use.
+        // heard through the same observer the other learns use. The chord joins the
+        // module's set and the key is mapped to it.
         const auto partId = payload.getProperty ("partId", {}).toString();
         if (rack.getPerformance().findPart (partId) == nullptr)
         {
@@ -7439,6 +7784,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         chordLearn = {};
         chordLearn.armed = true;
         chordLearn.partId = partId;
+        chordLearn.slotId = payload.getProperty ("slotId", {}).toString();
         {
             const std::scoped_lock lock (midiActivityLock);
             pendingChordNotes.clear();
@@ -7456,6 +7802,147 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "saveModulePreset" || cmd == "removeModulePreset")
+    {
+        // A module's settings saved by name, per module type, beside the catalogue: a strum
+        // you like is a strum you like in every rack.
+        const auto type = perf::MidiSlot::canonicalType (payload.getProperty ("type", {}).toString());
+        const auto name = payload.getProperty ("name", {}).toString().trim().substring (0, 80);
+        if (! perf::MidiSlot::types().contains (type) || name.isEmpty())
+        {
+            emitError ("A module preset needs a module type and a name.");
+            return;
+        }
+        if (options.dataDirectory == juce::File())
+        {
+            emitError ("Module presets need a data folder, and this host has none.");
+            return;
+        }
+        const auto saved = updateSharedJsonObject (modulePresetsFile(), [&] (juce::DynamicObject& root)
+        {
+            juce::Array<juce::var> kept;
+            if (const auto* list = root.getProperty ("presets").getArray())
+                for (const auto& preset : *list)
+                    if (preset.getProperty ("type", {}).toString() != type
+                        || preset.getProperty ("name", {}).toString() != name)
+                        kept.add (preset);
+            if (cmd == "saveModulePreset")
+            {
+                auto* preset = new juce::DynamicObject();
+                preset->setProperty ("type", type);
+                preset->setProperty ("name", name);
+                preset->setProperty ("settings", payload.getProperty ("settings", {}));
+                kept.add (juce::var (preset));
+            }
+            root.setProperty ("presets", kept);
+        });
+        modulePresetsLoaded = false;
+        if (! saved)
+        {
+            emitError ("Could not write the module presets file.");
+            return;
+        }
+        emitState();
+        return;
+    }
+
+    if (cmd == "setPartKey")
+    {
+        // The part's song key. Every module that follows it hears the change at once; the
+        // ones with a key of their own keep theirs.
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        const auto scale = payload.getProperty ("scale", part->keyScale).toString();
+        if (! perf::scaleNames().contains (scale))
+        {
+            emitError ("Unknown scale: " + scale);
+            return;
+        }
+        rack.setPartKey (partId, (int) payload.getProperty ("root", part->keyRoot), scale);
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "saveResponseProfile" || cmd == "removeResponseProfile")
+    {
+        // A keyboard's velocity/expression calibration, kept by name beside the catalogue.
+        // Saving replaces a profile of the same name; the port hint is what makes a new
+        // Velocity module start from it when that keyboard is connected.
+        const auto name = payload.getProperty ("name", {}).toString().trim().substring (0, 80);
+        if (name.isEmpty())
+        {
+            emitError ("A response profile needs a name.");
+            return;
+        }
+        if (options.dataDirectory == juce::File())
+        {
+            emitError ("Response profiles need a data folder, and this host has none.");
+            return;
+        }
+        const auto saved = updateSharedJsonObject (responseProfilesFile(), [&] (juce::DynamicObject& root)
+        {
+            juce::Array<juce::var> kept;
+            if (const auto* list = root.getProperty ("profiles").getArray())
+                for (const auto& profile : *list)
+                    if (profile.getProperty ("name", {}).toString() != name)
+                        kept.add (profile);
+            if (cmd == "saveResponseProfile")
+            {
+                auto* profile = new juce::DynamicObject();
+                profile->setProperty ("name", name);
+                profile->setProperty ("portHint", payload.getProperty ("portHint", {}).toString().trim().substring (0, 80));
+                // Only the calibration travels: which keyboard it is, not what this part does
+                // with it (fixed velocity and the final scale stay per part).
+                for (const auto* key : { "velocityCurve", "velocityCurveValues", "velocityInputMin",
+                                         "velocityInputMax", "velocityOutputMin", "velocityOutputMax",
+                                         "expressionSource", "expressionCc", "expressionCurve",
+                                         "expressionCurveValues", "expressionInputMin", "expressionInputMax",
+                                         "expressionOutputMin", "expressionOutputMax" })
+                    if (payload.getDynamicObject() != nullptr && payload.getDynamicObject()->hasProperty (key))
+                        profile->setProperty (key, payload[key]);
+                kept.add (juce::var (profile));
+            }
+            root.setProperty ("profiles", kept);
+        });
+        responseProfilesLoaded = false;
+        responseProfilePortsAt = 0;
+        if (! saved)
+        {
+            emitError ("Could not write the response profiles file.");
+            return;
+        }
+        emitState();
+        return;
+    }
+
+    if (cmd == "chordPad" || cmd == "chordStep")
+    {
+        // Playing, not editing: a pad of a Chords module struck (velocity 0 lets it go), or
+        // its progression moved. Nothing is saved; the readout follows on the next drain.
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto slotId = payload.getProperty ("slotId", {}).toString();
+        if (rack.getPerformance().findPart (partId) == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        const auto* fields = payload.getDynamicObject();
+        if (cmd == "chordPad")
+            rack.triggerChordPad (partId, slotId, (int) payload.getProperty ("pad", 0),
+                                  (int) payload.getProperty ("velocity", 100));
+        else if (fields != nullptr && fields->hasProperty ("step"))
+            rack.moveChordProgression (partId, slotId, (int) payload.getProperty ("step", 0), true);
+        else
+            rack.moveChordProgression (partId, slotId, (int) payload.getProperty ("delta", 1), false);
+        return;
+    }
+
     if (cmd == "clearKeyChord")
     {
         const auto partId = payload.getProperty ("partId", {}).toString();
@@ -7466,11 +7953,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
         const auto key = (int) payload.getProperty ("key", -1);
-        auto fx = part->midiFx;
-        for (int i = fx.keyChords.size(); --i >= 0;)
-            if (fx.keyChords.getReference (i).key == key)
-                fx.keyChords.remove (i);
-        rack.setPartMidiFx (partId, fx);
+        // The key forgets its chord; the chord stays in the set for other keys and pads.
+        editChordModule (partId, payload.getProperty ("slotId", {}).toString(),
+                         [key] (perf::MidiFxSettings& fx) { fx.mapKey (key, -1); return true; });
         savePerformance();
         emitState();
         return;
@@ -8901,6 +9386,10 @@ bool InstrumentHostService::virtualParameterExists (const juce::String& targetId
         return performance.findPart (targetId)->hasMorph();
     if (parameterId.startsWith ("@send:"))
         return performance.findReturn (parameterId.substring (6)) != nullptr;
+    if (parameterId.startsWith ("@amount:"))
+        for (const auto& slot : performance.findPart (targetId)->midiChain)
+            if (slot.slotId == parameterId.substring (8))
+                return perf::MidiSlot::hasAmount (slot.type);
     return false;
 }
 
@@ -8923,6 +9412,13 @@ float InstrumentHostService::virtualParameterValue (const juce::String& targetId
         return (part->pan + 1.0f) * 0.5f;               // -1..+1 → 0..1
     if (parameterId == "@morph")
         return part->morphAmount;
+    if (parameterId.startsWith ("@amount:"))
+    {
+        for (const auto& slot : part->midiChain)
+            if (slot.slotId == parameterId.substring (8))
+                return slot.amount;
+        return 1.0f;
+    }
     if (parameterId.startsWith ("@send:"))
     {
         const auto returnId = parameterId.substring (6);
@@ -8937,7 +9433,7 @@ juce::String InstrumentHostService::virtualParameterText (const juce::String& ta
                                                           const juce::String& parameterId) const
 {
     const auto value = virtualParameterValue (targetId, parameterId);
-    if (parameterId == "@macro")
+    if (parameterId == "@macro" || parameterId.startsWith ("@amount:"))
         return juce::String (juce::roundToInt (value * 100.0f)) + "%";
     if (parameterId == "@morph")
     {
@@ -8979,12 +9475,20 @@ juce::String InstrumentHostService::virtualParameterName (const juce::String& ta
         const auto* part = rack.getPerformance().findPart (targetId);
         if (part == nullptr || ! part->hasMorph())
             return "Morph";
-        return "Morph — " + part->morphNameA + " ↔ " + part->morphNameB;
+        return "Morph " + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94 ")) + part->morphNameA + juce::String (juce::CharPointer_UTF8 (" \xe2\x86\x94 ")) + part->morphNameB;
+    }
+    if (parameterId.startsWith ("@amount:"))
+    {
+        if (const auto* part = rack.getPerformance().findPart (targetId))
+            for (const auto& slot : part->midiChain)
+                if (slot.slotId == parameterId.substring (8))
+                    return "Amount " + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94 ")) + slot.type.substring (0, 1).toUpperCase() + slot.type.substring (1);
+        return "Amount";
     }
     if (parameterId.startsWith ("@send:"))
     {
         const auto* chain = rack.getPerformance().findReturn (parameterId.substring (6));
-        return "Send — " + (chain != nullptr && chain->name.isNotEmpty() ? chain->name
+        return "Send " + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x94 ")) + (chain != nullptr && chain->name.isNotEmpty() ? chain->name
                                                                           : juce::String ("gone"));
     }
     return parameterId;
@@ -8996,6 +9500,8 @@ float InstrumentHostService::virtualParameterDefault (const juce::String& parame
         return 0.5f;    // unity
     if (parameterId == "@pan")
         return 0.5f;    // centre
+    if (parameterId.startsWith ("@amount:"))
+        return 1.0f;    // the module as set
     return 0.0f;        // sends, macros and morphs rest at zero (a morph at zero is A)
 }
 
@@ -9023,6 +9529,8 @@ void InstrumentHostService::setVirtualParameter (const juce::String& targetId,
         applyMorphAmount (targetId, value);
     else if (parameterId.startsWith ("@send:"))
         rack.setSendLevel (targetId, parameterId.substring (6), value * 2.0f);
+    else if (parameterId.startsWith ("@amount:"))
+        rack.setSlotAmount (targetId, parameterId.substring (8), value);
 }
 
 bool InstrumentHostService::validModulationSourceType (const juce::String& sourceType)
@@ -10041,6 +10549,9 @@ bool InstrumentHostService::targetParameterExists (const juce::String& targetId,
 
 void InstrumentHostService::writeMappedBinding (const ControlBinding& binding, float value01)
 {
+    // Stepped controls land only on their steps, whoever writes them: a knob, a slider on
+    // screen, a scene recall.
+    value01 = binding.snap (value01);
     const auto positioned = binding.inverted ? 1.0f - value01 : value01;
     const auto mapped = binding.rangeMin + positioned * (binding.rangeMax - binding.rangeMin);
 
@@ -10065,26 +10576,43 @@ void InstrumentHostService::ensureLibrary()
 
     options.dataDirectory.createDirectory();
 
-    // An index we could not read is NOT an empty index. Left alone, the first favourite or
-    // captured preset after a failed read would write that emptiness over the real file, so
-    // the original is moved aside first and only then is this fresh library allowed to save.
-    // If it cannot even be moved, saves stay blocked: refusing to save is recoverable, and
-    // overwriting somebody's entire curation is not.
-    if (library.loadFrom (libraryFile()) == Library::LoadResult::unreadable)
+    // A library we could not read is NOT an empty library. Left alone, the first favourite or
+    // captured preset after a failed read would write that emptiness over the real one, so the
+    // store moves the original aside first and only then starts a new one. If it cannot even be
+    // moved, nothing is opened and nothing is written: refusing to save is recoverable, and
+    // overwriting somebody's entire curation is not. (LibraryStore.h has the rest of the rules,
+    // and the one-time import of an older library.json.)
+    const auto opened = libraryStore.open (libraryFile(), legacyLibraryFile(), library);
+    switch (opened.result)
     {
-        if (const auto parked = quarantineUnreadableLibrary (libraryFile()); parked != juce::File())
-        {
-            library.allowSaves();
-            emitError ("The sound library index could not be read. It has been set aside as \""
-                       + parked.getFileName() + "\" and a new one started, so nothing in it was "
-                       "overwritten.");
-        }
-        else
-        {
-            emitError ("The sound library index could not be read, and could not be set aside "
-                       "either. Library changes will not be saved until \""
-                       + libraryFile().getFullPathName() + "\" is repaired or moved.");
-        }
+        case LibraryStore::OpenResult::opened:
+        case LibraryStore::OpenResult::created:
+        case LibraryStore::OpenResult::imported:
+            break;
+
+        case LibraryStore::OpenResult::unreadable:
+            if (opened.quarantined != juce::File())
+                emitError ("The sound library could not be read. It has been set aside as \""
+                           + opened.quarantined.getFileName() + "\" and a new one started, so "
+                           "nothing in it was overwritten.");
+            else
+                emitError ("The sound library could not be read, and could not be set aside "
+                           "either. Library changes will not be saved until \""
+                           + (libraryFile().existsAsFile() ? libraryFile() : legacyLibraryFile()).getFullPathName()
+                           + "\" is repaired or moved.");
+            break;
+
+        case LibraryStore::OpenResult::newerFormat:
+            emitError ("The sound library at \"" + libraryFile().getFullPathName() + "\" was written "
+                       "by a newer version of CEditor. It has been left exactly as it is, and changes "
+                       "made here will not be saved to it.");
+            break;
+
+        case LibraryStore::OpenResult::failed:
+            emitError ("The sound library at \"" + libraryFile().getFullPathName() + "\" could not "
+                       "be opened (" + opened.error + "). It has been left as it is, and changes made "
+                       "here will not be saved until CEditor is started again.");
+            break;
     }
 
     snapshots = std::make_unique<SnapshotStore> (snapshotDirectory());
@@ -10097,7 +10625,248 @@ void InstrumentHostService::ensureLibrary()
         if (const auto* arr = parsed.getProperty ("paths", {}).getArray())
             for (const auto& p : *arr)
                 libraryPaths.addIfNotAlreadyThere (p.toString());
+        if (const auto* folders = parsed.getProperty ("stateFolders", {}).getArray())
+            for (const auto& f : *folders)
+            {
+                StateFolder folder;
+                folder.path = f.getProperty ("path", {}).toString();
+                folder.ceId = f.getProperty ("ceId", {}).toString();
+                folder.pluginName = f.getProperty ("plugin", {}).toString();
+                folder.extension = f.getProperty ("extension", {}).toString();
+                folder.status = f.getProperty ("status", "refused").toString();
+                folder.detail = f.getProperty ("detail", {}).toString();
+                folder.count = (int) f.getProperty ("count", 0);
+                // A check interrupted by quitting never finished; it did not pass.
+                if (folder.status == "checking")
+                {
+                    folder.status = "refused";
+                    folder.detail = "The test load did not finish. Remove the folder and add it again.";
+                }
+                if (folder.path.isNotEmpty() && folder.ceId.isNotEmpty() && findStateFolder (folder.path) < 0)
+                    stateFolders.add (folder);
+            }
     }
+
+    // The last update's per-plug-in report, so the Library page is not blank after a restart.
+    if (const auto stored = juce::JSON::parse (libraryScanReportFile().loadFileAsString()); stored.isArray())
+        for (const auto& row : *stored.getArray())
+            if (row.isObject())
+            {
+                libraryScanReport.add (row);
+                if (const auto candidate = row.getProperty ("candidate", {}); candidate.isObject())
+                    presetCandidates[row.getProperty ("ceId", {}).toString()] = candidate;
+            }
+}
+
+void InstrumentHostService::refreshScanReportCounts()
+{
+    // The report's counts follow the library, so a folder added or removed shows at once.
+    for (auto& row : libraryScanReport)
+        if (auto* object = row.getDynamicObject())
+        {
+            const auto ceId = object->getProperty ("ceId").toString();
+            int count = 0, files = 0, programs = 0, unavailable = 0;
+            for (const auto& record : library.allRecords())
+                if (record.targetCeId == ceId
+                    && (isVendorPresetSource (record.sourceType) || record.sourceType == "programList"))
+                {
+                    if (record.missing) { ++unavailable; continue; }
+                    ++count;
+                    if (record.sourceType == "programList") ++programs; else ++files;
+                }
+            object->setProperty ("count", count);
+            object->setProperty ("files", files);
+            object->setProperty ("programs", programs);
+            object->setProperty ("unavailable", unavailable);
+            const auto candidate = presetCandidates.find (ceId);
+            object->setProperty ("candidate", count == 0 && candidate != presetCandidates.end()
+                                                ? candidate->second : juce::var());
+        }
+    juce::Array<juce::var> rows (libraryScanReport);
+    libraryScanReportFile().replaceWithText (juce::JSON::toString (juce::var (rows)));
+}
+
+int InstrumentHostService::findStateFolder (const juce::String& path) const
+{
+    for (int i = 0; i < stateFolders.size(); ++i)
+        if (juce::File (stateFolders.getReference (i).path) == juce::File (path))
+            return i;
+    return -1;
+}
+
+void InstrumentHostService::saveStateFolders()
+{
+    const auto saved = updateSharedJsonObject (libraryPathsFile(), [this] (juce::DynamicObject& root)
+    {
+        juce::Array<juce::var> values;
+        for (const auto& folder : stateFolders)
+        {
+            auto* f = new juce::DynamicObject();
+            f->setProperty ("path", folder.path);
+            f->setProperty ("ceId", folder.ceId);
+            f->setProperty ("plugin", folder.pluginName);
+            f->setProperty ("extension", folder.extension);
+            f->setProperty ("status", folder.status);
+            f->setProperty ("detail", folder.detail);
+            f->setProperty ("count", folder.count);
+            values.add (juce::var (f));
+        }
+        root.setProperty ("stateFolders", values);
+    });
+    if (! saved) emitError ("Could not save the preset folder list.");
+}
+
+void InstrumentHostService::indexStateFolder (int index, juce::Array<LibraryRecord> records)
+{
+    if (! juce::isPositiveAndBelow (index, stateFolders.size())) return;
+    auto& folder = stateFolders.getReference (index);
+    folder.count = records.size();
+    // Scoped to the folder, with its separator, so "Sugar" never claims "Sugar Bytes".
+    const auto scope = juce::File (folder.path).getFullPathName() + juce::File::getSeparatorString();
+    library.mergeVendorScan ("stateFile", std::move (records), scope);
+}
+
+void InstrumentHostService::verifyStateFolder (const juce::String& path)
+{
+    const auto index = findStateFolder (path);
+    if (index < 0) return;
+    const auto folder = stateFolders[index];
+    const auto conclude = [this, path] (const juce::String& status, const juce::String& detail)
+    {
+        const auto at = findStateFolder (path);
+        if (at < 0) return;
+        stateFolders.getReference (at).status = status;
+        stateFolders.getReference (at).detail = detail;
+        saveStateFolders();
+        saveLibrary();
+        refreshScanReportCounts();
+        emitLibrary (libraryView);
+    };
+
+    PluginClassRecord plugin;
+    juce::String refusal;
+    {
+        const std::scoped_lock lock (catalogLock);
+        const ModuleRecord* module = nullptr;
+        if (const auto* found = findClass (folder.ceId, &module); found != nullptr && module != nullptr)
+        {
+            plugin = *found;
+            if (const auto reason = module->unavailableReason(); reason.isNotEmpty()) refusal = reason;
+            else refusal = safeModeRefusal (module->path);
+        }
+        else refusal = "The plug-in is no longer in the catalogue.";
+    }
+    if (refusal.isNotEmpty()) { conclude ("refused", refusal); return; }
+    if (options.instantiate == nullptr || options.applyVstPreset == nullptr)
+    {
+        conclude ("refused", "Plug-ins cannot be test-loaded in this build.");
+        return;
+    }
+
+    // Two files that differ, so "two presets, two sounds" can be asked of them.
+    auto files = juce::File (folder.path).findChildFiles (juce::File::findFiles, true, "*." + folder.extension);
+    files.sort();
+    if (files.isEmpty()) { conclude ("refused", "There are no ." + folder.extension + " files in it."); return; }
+    const auto first = files.getFirst();
+    juce::File second;
+    const auto firstPrint = juce::SHA256 (first).toHexString();
+    for (int i = 1; i < juce::jmin (files.size(), 40) && second == juce::File(); ++i)
+        if (juce::SHA256 (files[i]).toHexString() != firstPrint) second = files[i];
+
+    options.instantiate (plugin.descriptionXml, options.sampleRate, options.blockSize,
+        [this, token = alive, path, plugin, first, second, conclude]
+        (std::unique_ptr<juce::AudioProcessor> processor, const juce::String& error)
+        {
+            if (! token->load()) return;
+            if (processor == nullptr)
+            {
+                conclude ("refused", plugin.name + " could not be opened to test the files"
+                                     + (error.isNotEmpty() ? ": " + error : juce::String (".")));
+                return;
+            }
+            try
+            {
+                // Prepared as a part would be: some plug-ins settle their parameter list only
+                // once they are ready to play, and a snapshot taken before that disagrees with
+                // the worker about how many parameters there are.
+                processor->prepareToPlay (options.sampleRate, options.blockSize);
+                const auto state = [&processor]
+                {
+                    juce::MemoryBlock block;
+                    processor->getStateInformation (block);
+                    return block;
+                };
+                const auto values = [&processor]
+                {
+                    juce::Array<float> out;
+                    for (auto* parameter : processor->getParameters()) out.add (parameter->getValue());
+                    return out;
+                };
+                const auto sameValues = [] (const juce::Array<float>& a, const juce::Array<float>& b)
+                {
+                    if (a.size() != b.size()) return false;
+                    for (int i = 0; i < a.size(); ++i)
+                        if (std::abs (a[i] - b[i]) > 1.0e-4f) return false;
+                    return true;
+                };
+                const auto initialState = state();
+                const auto initialValues = values();
+                if (! options.applyVstPreset (*processor, first))
+                {
+                    conclude ("refused", plugin.name + " refused " + first.getFileName() + ".");
+                    return;
+                }
+                const auto firstState = state();
+                const auto firstValues = values();
+                if (firstState == initialState && sameValues (firstValues, initialValues))
+                {
+                    conclude ("refused", "Loading " + first.getFileName() + " left " + plugin.name
+                                         + " as it was, so these are not its presets.");
+                    return;
+                }
+                if (second != juce::File())
+                {
+                    if (! options.applyVstPreset (*processor, second))
+                    {
+                        conclude ("refused", plugin.name + " refused " + second.getFileName() + ".");
+                        return;
+                    }
+                    const auto secondState = state();
+                    const auto secondValues = values();
+                    if (secondState == firstState && sameValues (secondValues, firstValues))
+                    {
+                        conclude ("refused", first.getFileName() + " and " + second.getFileName()
+                                             + " made the same sound, so " + plugin.name + " is not reading them.");
+                        return;
+                    }
+                    if (! options.applyVstPreset (*processor, first)
+                        || ! (state() == firstState || sameValues (values(), firstValues)))
+                    {
+                        conclude ("refused", "Loading " + first.getFileName() + " twice gave two different sounds.");
+                        return;
+                    }
+                }
+            }
+            catch (const std::exception& failure)
+            {
+                conclude ("refused", plugin.name + " failed while the files were being tested: "
+                                     + juce::String::fromUTF8 (failure.what()));
+                return;
+            }
+            catch (...)
+            {
+                conclude ("refused", plugin.name + " failed while the files were being tested.");
+                return;
+            }
+            processor->releaseResources();
+            processor.reset();
+
+            const auto at = findStateFolder (path);
+            if (at < 0) return;
+            const auto& current = stateFolders.getReference (at);
+            indexStateFolder (at, discoverStateFiles (juce::File (current.path), current.extension, plugin));
+            conclude ("ok", {});
+        });
 }
 
 juce::String InstrumentHostService::recordUnavailableReason (const LibraryRecord& record) const
@@ -10554,7 +11323,7 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
             if (finding.problem.isEmpty())
                 ++measured;
 
-            if (auto* record = library.find (finding.recordId))
+            if (auto* record = library.edit (finding.recordId, LibraryChanges::sonic))
             {
                 record->sonic = finding.profile;
                 // The bytes that were ATTEMPTED, whether or not they yielded anything. A preset
@@ -10598,6 +11367,39 @@ void InstrumentHostService::emitAudition (const juce::String& recordId, const ju
     options.emit ("instrumentHostAudition", juce::var (payload));
 }
 
+/** The audition phrase as (interval above the root, start in ms) pairs. One list for the load
+    audition and the browser's preview, so they cannot drift into two different tests. */
+static std::vector<std::pair<int, double>> auditionPhraseNotes (const PresetAuditionSettings& settings)
+{
+    std::vector<std::pair<int, double>> notes;
+    const auto stepMs = (double) settings.noteLengthMs + (double) settings.gapMs;
+
+    if (settings.phrase == "single")
+    {
+        notes.push_back ({ 0, 0.0 });
+    }
+    else if (settings.phrase == "chord")
+    {
+        for (const auto interval : { 0, 4, 7 })
+            notes.push_back ({ interval, 0.0 });
+    }
+    else if (settings.phrase == "scale")
+    {
+        static constexpr int intervals[] { 0, 2, 4, 5, 7, 9, 11, 12 };
+        for (int i = 0; i < (int) std::size (intervals); ++i)
+            notes.push_back ({ intervals[i], (double) i * stepMs });
+    }
+    else
+    {
+        // A short register-spanning phrase reveals attack, sustain and release without
+        // making somebody listen to a whole demo every time they press Down.
+        static constexpr int intervals[] { 0, 7, 12, 7, 4, 5, 0 };
+        for (int i = 0; i < (int) std::size (intervals); ++i)
+            notes.push_back ({ intervals[i], (double) i * stepMs });
+    }
+    return notes;
+}
+
 juce::Array<RecentNote> InstrumentHostService::auditionPhrase() const
 {
     juce::Array<RecentNote> out;
@@ -10612,18 +11414,17 @@ juce::Array<RecentNote> InstrumentHostService::auditionPhrase() const
         // which is what a browser with nothing to go on should do.
     }
 
-    if (auditionPhraseMode == "chord")
+    // Otherwise the audition settings: the same phrase, root, velocity and note lengths the
+    // load audition plays, so a preview and a load sound like the same test.
+    const auto& settings = rack.getPerformance().presetAudition;
+    const auto beatsPerMs = rack.getEngine().getTransport().getTempo() / 60000.0;
+    for (const auto& [interval, atMs] : auditionPhraseNotes (settings))
     {
-        for (const auto interval : { 0, 4, 7 })
-        {
-            out.add ({ 0.0, juce::MidiMessage::noteOn (1, 60 + interval, (juce::uint8) 100) });
-            out.add ({ 2.0, juce::MidiMessage::noteOff (1, 60 + interval) });
-        }
-        return out;
+        const auto note = juce::jlimit (0, 127, settings.rootNote + interval);
+        out.add ({ atMs * beatsPerMs,
+                   juce::MidiMessage::noteOn (1, note, (juce::uint8) juce::jlimit (1, 127, settings.velocity)) });
+        out.add ({ (atMs + settings.noteLengthMs) * beatsPerMs, juce::MidiMessage::noteOff (1, note) });
     }
-
-    out.add ({ 0.0, juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100) });
-    out.add ({ 1.5, juce::MidiMessage::noteOff (1, 60) });
     return out;
 }
 
@@ -10705,8 +11506,7 @@ void InstrumentHostService::handOffAudition (const juce::String& partId)
     emitAudition (auditioningRecordId, "live",
                   auditionPhraseMode == "recent" ? "Playing your last " + juce::String (auditionBars)
                                                      + " bars."
-                  : auditionPhraseMode == "chord" ? juce::String ("Playing a chord.")
-                                                  : juce::String ("Playing a note."));
+                                                 : juce::String ("Playing the audition phrase."));
     auditioningRecordId.clear();
 }
 
@@ -11042,34 +11842,56 @@ LibraryAvailability InstrumentHostService::libraryAvailability() const
     return [this] (const LibraryRecord& record) { return recordUnavailableReason (record).isEmpty(); };
 }
 
-bool InstrumentHostService::saveLibrary()
+LibraryStore::SyncReport InstrumentHostService::syncLibrary (bool readOthers)
 {
-    if (library.saveTo (libraryFile()))
+    const auto report = readOthers ? libraryStore.sync (library) : libraryStore.write (library);
+    if (report.ok())
     {
         libraryWriteErrorReported = false;
-        return true;
+        return report;
     }
 
     // Said once, not once per favourite: see libraryWriteErrorReported.
     if (libraryWriteErrorReported)
-        return false;
+        return report;
 
     libraryWriteErrorReported = true;
-    const auto failure = library.lastSaveFailure();
-    emitError (failure == Library::SaveFailure::unreadableSource
-                 ? juce::String ("Library changes are not being saved: the index at \"")
-                       + libraryFile().getFullPathName()
-                       + "\" could not be read at startup and has been left untouched."
-               : failure == Library::SaveFailure::changedExternally
-                 ? juce::String ("The sound library changed in another CEditor instance. "
-                                 "This instance did not overwrite those newer changes.")
-                       + (library.lastConflictCopy() != juce::File()
-                            ? " Its unsaved version was preserved at \""
-                                + library.lastConflictCopy().getFullPathName() + "\"."
-                            : juce::String())
-                 : juce::String ("Could not save the sound library index to \"")
-                       + libraryFile().getFullPathName() + "\".");
-    return false;
+    switch (report.result)
+    {
+        case LibraryStore::SyncResult::busy:
+            emitError ("The sound library is busy in another CEditor. Changes made here are kept, "
+                       "and will be saved as soon as it is free.");
+            break;
+        case LibraryStore::SyncResult::closed:
+            emitError ("Library changes are not being saved: the library at \""
+                       + libraryFile().getFullPathName() + "\" could not be opened when CEditor "
+                       "started, and has been left untouched.");
+            break;
+        case LibraryStore::SyncResult::failed:
+        case LibraryStore::SyncResult::synced:
+            emitError ("Could not save to the sound library at \"" + libraryFile().getFullPathName()
+                       + "\" (" + report.error + "). Changes made here are kept, and saving them "
+                       "will be tried again.");
+            break;
+    }
+    return report;
+}
+
+void InstrumentHostService::tickLibrarySync()
+{
+    if (! libraryLoaded || ! libraryStore.isOpen())
+        return;
+
+    const auto now = juce::Time::getMillisecondCounter();
+    if (now - lastLibrarySyncCheckMs < 1000)
+        return;
+    lastLibrarySyncCheckMs = now;
+
+    if (! library.hasPendingChanges() && ! libraryStore.othersHaveWritten())
+        return;
+
+    if (const auto report = syncLibrary (true); report.ok() && report.changedByOthers > 0)
+        emitLibrary (libraryView);
 }
 
 bool InstrumentHostService::saveCatalog()
@@ -11103,19 +11925,19 @@ juce::String InstrumentHostService::saveCapturedLibraryRecord (LibraryRecord rec
 {
     const auto name = record.name;
     const auto recordId = library.addCapturedRecord (std::move (record));
-    if (! library.saveTo (libraryFile()))
+    if (const auto report = libraryStore.write (library); ! report.ok())
     {
-        // A failed capture must not remain in memory and appear saved on a later refresh.
+        // A capture is confirmed only once it is on disk. It is not left pending like a
+        // favourite: "saved" would then be a claim that a crash before the next sync makes
+        // false. Taken back instead (the journal forgets it too), and said so.
         library.removeRecord (recordId);
-        emitError (library.lastSaveFailure() == Library::SaveFailure::changedExternally
-                     ? "Could not save \"" + name + "\" because the sound library changed "
-                       "in another CEditor instance. The newer index was left untouched."
-                       + (library.lastConflictCopy() != juce::File()
-                            ? " The unsaved version was preserved at \""
-                                + library.lastConflictCopy().getFullPathName() + "\"."
-                            : juce::String())
-                     : "Could not save \"" + name + "\" to the library. Could not write: "
-                         + libraryFile().getFullPathName());
+        emitError ("Could not save \"" + name + "\" to the sound library at \""
+                   + libraryFile().getFullPathName() + "\": "
+                   + (report.result == LibraryStore::SyncResult::busy
+                        ? juce::String ("it is busy in another CEditor. Try again in a moment.")
+                        : report.result == LibraryStore::SyncResult::closed
+                            ? juce::String ("it could not be opened when CEditor started.")
+                            : report.error + "."));
         return {};
     }
     if (options.emit != nullptr)
@@ -11127,7 +11949,8 @@ juce::String InstrumentHostService::saveCapturedLibraryRecord (LibraryRecord rec
     return recordId;
 }
 
-void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::String& consumer)
+void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::String& consumer,
+                                         int offset, int limit)
 {
     if (options.emit == nullptr)
         return;
@@ -11136,8 +11959,17 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::
     juce::Array<juce::var> recordVars;
     int presets = 0, racks = 0, chains = 0, missing = 0;
 
-    for (const auto* record : searchLibrary (library, query, isAvailable))
+    // The view the host re-sends on its own reaches as far as the page had asked.
+    if (consumer.isEmpty() && offset == 0 && limit == 0 && &query == &libraryView)
+        limit = libraryViewLimit;
+
+    const auto matches = searchLibrary (library, query, isAvailable);
+    const auto first = juce::jlimit (0, matches.size(), offset);
+    const auto last = limit > 0 ? juce::jmin (matches.size(), first + limit) : matches.size();
+
+    for (int index = first; index < last; ++index)
     {
+        const auto* record = matches.getUnchecked (index);
         const auto reason = recordUnavailableReason (*record);
 
         auto* r = new juce::DynamicObject();
@@ -11159,6 +11991,7 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::
         // Only ever true when the query asked for hidden rows, so the page can mark the folded
         // ones and offer to unfold them rather than showing them as ordinary sounds.
         r->setProperty ("hidden",       record->hidden);
+        r->setProperty ("addedAtMs",    (double) record->addedAtMs);
         r->setProperty ("loadCount",    record->loadCount);
         r->setProperty ("lastLoadedAtMs", (double) record->lastLoadedAtMs);
         r->setProperty ("auditionCount", record->auditionCount);
@@ -11186,7 +12019,8 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::
                 v->setProperty ("label",     version.label);
                 v->setProperty ("savedAtMs", (double) version.savedAtMs);
                 v->setProperty ("origin",    version.origin);
-                v->setProperty ("bytes",     (int) version.stateBlobBase64.length());
+                v->setProperty ("bytes",     version.stateLoaded ? (int) version.stateBlobBase64.length()
+                                                                 : version.stateLength);
                 versionVars.add (juce::var (v));
             }
             r->setProperty ("versions", versionVars);
@@ -11252,7 +12086,7 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::
     counts->setProperty ("racks",   racks);
     counts->setProperty ("chains",  chains);
     counts->setProperty ("missing", missing);
-    counts->setProperty ("matched", recordVars.size());
+    counts->setProperty ("matched", matches.size());
     counts->setProperty ("measured", [this] { int n = 0;
                                               for (const auto& r : library.allRecords())
                                                   if (r.sonic.measured) ++n;
@@ -11387,6 +12221,7 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::
 
     auto* root = new juce::DynamicObject();
     root->setProperty ("records", recordVars);
+    root->setProperty ("offset",  first);
     root->setProperty ("duplicates", duplicateVars);
     // `query` and `type` stay the flat strings the command surface has always echoed; `request`
     // is the whole query, so a page can restore its chips from the answer alone.
@@ -11405,6 +12240,20 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query, const juce::
     root->setProperty ("paths",   [this] { juce::Array<juce::var> a;
                                            for (const auto& p : libraryPaths) a.add (p);
                                            return a; }());
+    root->setProperty ("stateFolders", [this] { juce::Array<juce::var> a;
+        for (const auto& folder : stateFolders)
+        {
+            auto* f = new juce::DynamicObject();
+            f->setProperty ("path", folder.path);
+            f->setProperty ("ceId", folder.ceId);
+            f->setProperty ("plugin", folder.pluginName);
+            f->setProperty ("extension", folder.extension);
+            f->setProperty ("status", folder.status);
+            f->setProperty ("detail", folder.detail);
+            f->setProperty ("count", folder.count);
+            a.add (juce::var (f));
+        }
+        return a; }());
     options.emit ("instrumentHostLibrary", juce::var (root));
 }
 
@@ -11421,7 +12270,10 @@ void InstrumentHostService::scanVstPresets()
         const std::scoped_lock lock (catalogLock);
         snapshot = catalog;
     }
-    auto body = [this, token = alive, snapshot, paths = libraryPaths]() mutable
+    juce::Array<StateFolder> checkedFolders;
+    for (const auto& folder : stateFolders)
+        if (folder.status == "ok") checkedFolders.add (folder);
+    auto body = [this, token = alive, snapshot, paths = libraryPaths, checkedFolders]() mutable
     {
         const auto cancelled = [token] { return ! token->load(); };
         juce::Array<juce::File> vstRoots {
@@ -11434,10 +12286,41 @@ void InstrumentHostService::scanVstPresets()
             if (juce::File::isAbsolutePath (path)) vstRoots.add (juce::File (path));
         auto records = discoverVstPresetFiles (snapshot, vstRoots, cancelled);
         records.addArray (discoverVendorPresets (snapshot, vendorPresetRoots (snapshot, paths), cancelled));
+        // Checked preset folders are re-read, not re-tested: a file added since is the same
+        // format the test already accepted.
+        std::vector<std::pair<juce::String, juce::Array<LibraryRecord>>> folderRecords;
+        for (const auto& folder : checkedFolders)
+            for (const auto& plugin : presetCatalogueClasses (snapshot))
+                if (plugin.ceId == folder.ceId)
+                {
+                    folderRecords.emplace_back (folder.path, discoverStateFiles (juce::File (folder.path),
+                                                                                 folder.extension, plugin, cancelled));
+                    break;
+                }
+        // Plug-ins whose presets sit in a folder of their own, in a format read only by them.
+        juce::Array<juce::File> dataRoots {
+            juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+            juce::File::getSpecialLocation (juce::File::commonDocumentsDirectory),
+            juce::File::getSpecialLocation (juce::File::commonApplicationDataDirectory),
+            juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory),
+           #if JUCE_WINDOWS
+            juce::File::getSpecialLocation (juce::File::windowsLocalAppData),
+           #endif
+        };
+        std::map<juce::String, juce::var> candidates;
+        if (options.includeDefaultScanRoots)
+            for (const auto& plugin : presetCatalogueClasses (snapshot))
+                if (const auto found = findPresetCandidate (plugin, dataRoots); found.isObject())
+                    candidates[plugin.ceId] = found;
         if (cancelled()) return;
-        auto finish = [this, token, snapshot, records = std::move (records)]() mutable
+        auto finish = [this, token, snapshot, records = std::move (records),
+                       folderRecords = std::move (folderRecords), candidates = std::move (candidates)]() mutable
         {
             if (! token->load()) return;
+            presetCandidates = std::move (candidates);
+            for (auto& [path, found] : folderRecords)
+                indexStateFolder (findStateFolder (path), std::move (found));
+            saveStateFolders();
             for (const auto& source : { "vstpreset", "nksf", "fxp", "spire", "h2p" })
             {
                 juce::Array<LibraryRecord> matches;
@@ -11470,6 +12353,7 @@ void InstrumentHostService::scanCataloguePrograms (
     if (index >= classes->size())
     {
         saveLibrary();
+        refreshScanReportCounts();
         libraryScanBusy = false;
         libraryScanFinished = true;
         emitLibrary (libraryView);
@@ -11514,9 +12398,14 @@ void InstrumentHostService::scanCataloguePrograms (
         row->setProperty ("programs", programs);
         row->setProperty ("unavailable", unavailable);
         row->setProperty ("unnamedPrograms", unnamedPrograms);
+        row->setProperty ("ceId", plugin.ceId);
+        // Only a failure is a reason; a plug-in whose presets are in a format of its own is not
+        // broken, and the report says what can be done about it instead of flagging it.
         row->setProperty ("reason", error.isNotEmpty() ? error : ! instantiated
-            ? juce::String ("Plug-in could not be opened for program discovery") : count == 0
-            ? juce::String ("No presets found in supported files or named program lists. Add a preset folder; other formats may require the plug-in's own browser.") : juce::String());
+            ? juce::String ("Plug-in could not be opened for program discovery") : juce::String());
+        const auto candidate = presetCandidates.find (plugin.ceId);
+        row->setProperty ("candidate", count == 0 && candidate != presetCandidates.end()
+                                         ? candidate->second : juce::var());
         libraryScanReport.add (juce::var (row));
         emitLibrary (libraryView);
         scanCataloguePrograms (classes, index + 1);
@@ -11665,32 +12554,8 @@ void InstrumentHostService::startPresetAudition (const juce::String& partId, boo
         plan.push_back ({ atMs, note, settings.velocity, true });
         plan.push_back ({ atMs + (double) settings.noteLengthMs, note, 0, false });
     };
-    const auto stepMs = (double) settings.noteLengthMs + (double) settings.gapMs;
-
-    if (settings.phrase == "single")
-    {
-        addNote (0, 0.0);
-    }
-    else if (settings.phrase == "chord")
-    {
-        addNote (0, 0.0);
-        addNote (4, 0.0);
-        addNote (7, 0.0);
-    }
-    else if (settings.phrase == "scale")
-    {
-        static constexpr int intervals[] { 0, 2, 4, 5, 7, 9, 11, 12 };
-        for (int i = 0; i < (int) std::size (intervals); ++i)
-            addNote (intervals[i], (double) i * stepMs);
-    }
-    else
-    {
-        // A short register-spanning phrase reveals attack, sustain and release without
-        // making somebody listen to a whole demo every time they press Down.
-        static constexpr int intervals[] { 0, 7, 12, 7, 4, 5, 0 };
-        for (int i = 0; i < (int) std::size (intervals); ++i)
-            addNote (intervals[i], (double) i * stepMs);
-    }
+    for (const auto& [interval, atMs] : auditionPhraseNotes (settings))
+        addNote (interval, atMs);
 
     std::sort (plan.begin(), plan.end(), [] (const PresetAuditionEvent& a,
                                              const PresetAuditionEvent& b)
@@ -13061,6 +13926,106 @@ void InstrumentHostService::surfaceLayerChanged (const juce::String& pageId)
     emitState();
 }
 
+juce::String InstrumentHostService::surfaceChordsPart() const
+{
+    const auto padsOn = [this] (const juce::String& partId)
+    {
+        const auto live = rack.chordsLive (partId);
+        if (! live.present)
+            return false;
+        for (const auto chord : live.padChords)
+            if (chord >= 0)
+                return true;
+        return false;
+    };
+    const auto& performance = rack.getPerformance();
+    if (performance.focusedPartId.isNotEmpty() && padsOn (performance.focusedPartId))
+        return performance.focusedPartId;
+    for (const auto& part : performance.parts)
+        if (padsOn (part.partId))
+            return part.partId;
+    return {};
+}
+
+bool InstrumentHostService::padIsFree (const juce::String& pageId, int padIndex) const
+{
+    const auto* page = rack.getPerformance().findPage (pageId);
+    if (page == nullptr)
+        return false;
+    const auto* slot = page->findSurfaceSlot ("pad", padIndex, page->activePadLayer (padIndex));
+    return slot == nullptr || (slot->binding.isEmpty() && slot->midiCc < 0 && slot->midiNote < 0);
+}
+
+bool InstrumentHostService::pressSurfacePad (const juce::String& pageId, int padIndex, bool down,
+                                             int velocity, int bank)
+{
+    if (pressSurfaceControl (pageId, "pad", padIndex, down))
+        return true;
+    if (! padIsFree (pageId, padIndex) || ! juce::isPositiveAndBelow (padIndex - 1, 8))
+        return false;
+    auto& held = surfaceChordPadsHeld[(size_t) (padIndex - 1)];
+    if (! down)
+    {
+        if (held.first.isEmpty())
+            return false;
+        const auto released = rack.triggerChordPad (held.first, {}, held.second, 0);
+        held = {};
+        return released;
+    }
+    const auto partId = surfaceChordsPart();
+    if (partId.isEmpty())
+        return false;
+    held = { partId, juce::jlimit (0, 3, bank) * 8 + padIndex - 1 };
+    return rack.triggerChordPad (partId, {}, held.second, juce::jlimit (1, 127, velocity));
+}
+
+int InstrumentHostService::padLight (const juce::String& pageId, int padIndex, int bank) const
+{
+    if (padIsFree (pageId, padIndex) && juce::isPositiveAndBelow (padIndex - 1, 8))
+        if (const auto partId = surfaceChordsPart(); partId.isNotEmpty())
+        {
+            const auto live = rack.chordsLive (partId);
+            const auto pad = juce::jlimit (0, 3, bank) * 8 + padIndex - 1;
+            const auto chord = live.padChords[pad];
+            if (chord < 0)
+                return 0;
+            // A chord's colour is its root around the circle of fifths, so neighbouring keys
+            // get neighbouring colours and the same chord is the same colour on every pad.
+            auto root = 0;
+            if (const auto* part = rack.getPerformance().findPart (partId))
+                for (const auto& slot : part->midiChain)
+                    if (slot.type == "chord" && juce::isPositiveAndBelow (chord, slot.fx.chordSet.size()))
+                    {
+                        const auto& set = slot.fx.chordSet.getReference (chord);
+                        root = set.root >= 0 ? set.root : set.notes.isEmpty() ? 0 : set.notes[0];
+                        break;
+                    }
+            const auto hue = (float) (((root % 12) * 7) % 12) / 12.0f;
+            const auto sounding = (live.pads & (1u << pad)) != 0;
+            return (int) (juce::Colour::fromHSV (hue, 0.9f, sounding ? 1.0f : 0.3f, 1.0f).getARGB() & 0xFFFFFF);
+        }
+    return padLight (pageId, padIndex);
+}
+
+juce::String InstrumentHostService::surfaceChordTitle (int bank) const
+{
+    const auto partId = surfaceChordsPart();
+    if (partId.isEmpty())
+        return {};
+    const auto live = rack.chordsLive (partId);
+    const auto* part = rack.getPerformance().findPart (partId);
+    juce::String name;
+    if (part != nullptr && live.lastChord >= 0)
+        for (const auto& slot : part->midiChain)
+            if (slot.type == "chord")
+            {
+                name = slot.fx.setChordName (live.lastChord);
+                break;
+            }
+    return juce::String (" | ") + juce::String::charToString ((juce::juce_wchar) ('A' + juce::jlimit (0, 3, bank)))
+         + (name.isNotEmpty() ? " " + name : juce::String());
+}
+
 int InstrumentHostService::padLight (const juce::String& pageId, int padIndex) const
 {
     const auto* page = rack.getPerformance().findPage (pageId);
@@ -13149,8 +14114,9 @@ bool InstrumentHostService::nudgeControlSlot (const juce::String& pageId, const 
         return false;
     }
 
-    const auto position = juce::jlimit (0.0f, 1.0f,
-                                        slotPositionFor (b, current) + (float) delta / 127.0f);
+    const auto position = b.stepped()
+        ? b.stepBy (slotPositionFor (b, current), delta)
+        : juce::jlimit (0.0f, 1.0f, slotPositionFor (b, current) + (float) delta / 127.0f);
     writeMappedBinding (b, position);
     if (! handlingCommand)
     {
@@ -14608,6 +15574,7 @@ void InstrumentHostService::applyAutomationValue (const juce::String& targetId,
 
 void InstrumentHostService::applySceneState (const perf::Scene& scene)
 {
+    currentSceneId = scene.sceneId;
     // Boolean state remains a boundary action. Crossfading a mute or half-enabling a plug-in
     // has no useful meaning, whereas levels and normalized parameters can move coherently.
     sceneMorph = {};
@@ -14617,7 +15584,9 @@ void InstrumentHostService::applySceneState (const perf::Scene& scene)
         rack.setMute (slot.partId, slot.mute);
     }
 
-    if (scene.focusPartId.isNotEmpty() && rack.focusPart (scene.focusPartId))
+    // Recalling a scene focuses the part it was made on. In Build that also brings its editor
+    // up; on stage an editor opening over the set is the last thing wanted.
+    if (scene.focusPartId.isNotEmpty() && rack.focusPart (scene.focusPartId) && ! stageLocked)
         showEditorFor (scene.focusPartId);
 
     if (scene.pageId.isNotEmpty() && rack.getPerformance().findPage (scene.pageId) != nullptr)
@@ -14902,9 +15871,28 @@ bool InstrumentHostService::launchScene (const juce::String& sceneId)
     return scene != nullptr && queueSceneLaunch (sceneId, scene->launchQuantize) != 0;
 }
 
+const perf::Arrangement& InstrumentHostService::playingArrangement() const
+{
+    const auto& performance = rack.getPerformance();
+    if (juce::isPositiveAndBelow (performance.setlist.currentIndex, performance.setlist.items.size()))
+        return performance.setlist.items.getReference (performance.setlist.currentIndex).sections;
+    return performance.arrangement;
+}
+
+perf::Arrangement* InstrumentHostService::arrangementFor (const juce::String& songId)
+{
+    auto& performance = const_cast<Performance&> (rack.getPerformance());
+    if (songId.isEmpty())
+        return &performance.arrangement;
+    for (auto& song : performance.setlist.items)
+        if (song.itemId == songId)
+            return &song.sections;
+    return nullptr;
+}
+
 bool InstrumentHostService::startArrangementPlayback (int index)
 {
-    const auto& arrangement = rack.getPerformance().arrangement;
+    const auto& arrangement = playingArrangement();
     if (! juce::isPositiveAndBelow (index, arrangement.items.size()))
         return false;
 
@@ -14997,7 +15985,7 @@ void InstrumentHostService::tickArrangement()
     if (arrangementQueuedIndex >= 0 || arrangementCurrentIndex < 0)
         return;
 
-    const auto& arrangement = rack.getPerformance().arrangement;
+    const auto& arrangement = playingArrangement();
     if (! juce::isPositiveAndBelow (arrangementCurrentIndex, arrangement.items.size()))
     {
         stopArrangementPlayback (true);
@@ -15050,6 +16038,10 @@ bool InstrumentHostService::goToSetlistItem (int index)
     const auto item = currentSetlist.items.getReference (index);
     const auto previous = currentSetlist.currentIndex;
     pendingSetlistRecall = {};
+    // The sections that were playing belong to the song being left. Its clips are not cut:
+    // the new song's scene takes over on its own boundary.
+    if (arrangementPlaying)
+        stopArrangementPlayback (false);
 
     if (item.rackRecordId.isNotEmpty())
     {
@@ -15134,6 +16126,24 @@ bool InstrumentHostService::goToSetlistItem (int index)
             currentSurfacePageId = item.pageId;
             requestedSurfacePageId = item.pageId;
         }
+    }
+
+    // The stage's timers: this song starts now, and so does the set when this is its first
+    // song, either because nothing was on or because going to song 1 is starting the set
+    // over (a soundcheck or a rehearsal run is not part of the show's time).
+    const auto nowMs = juce::Time::currentTimeMillis();
+    setlistSongStartedAtMs = nowMs;
+    if (previous < 0 || index == 0 || setlistStartedAtMs == 0)
+        setlistStartedAtMs = nowMs;
+
+    // A song with sections plays them from the top while the transport runs; stopped, it
+    // waits on its first section's scene until Play.
+    if (! item.sections.items.isEmpty())
+    {
+        if (rack.getEngine().getTransport().isPlaying())
+            startArrangementPlayback (0);
+        else if (item.sceneId.isEmpty())
+            launchScene (item.sections.items.getFirst().sceneId);
     }
 
     auto* payload = new juce::DynamicObject();
@@ -15402,6 +16412,17 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     midiActivityValue = message.isController() ? message.getControllerValue()
                       : message.isNoteOn()     ? message.getVelocity() : 0;
     ++midiActivitySeq;
+    if (recentTouchCount < (int) recentTouch.size())
+    {
+        if (message.isNoteOn())
+            recentTouch[(size_t) recentTouchCount++] = { 0, message.getNoteNumber(), message.getVelocity() };
+        else if (message.isController())
+            recentTouch[(size_t) recentTouchCount++] = { 1, message.getControllerNumber(), message.getControllerValue() };
+        else if (message.isChannelPressure())
+            recentTouch[(size_t) recentTouchCount++] = { 2, 0, message.getChannelPressureValue() };
+        else if (message.isAftertouch())
+            recentTouch[(size_t) recentTouchCount++] = { 3, message.getNoteNumber(), message.getAfterTouchValue() };
+    }
 
     // Health bookkeeping, still under the lock: the judging is the controlling thread's.
     {
@@ -15477,9 +16498,13 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     {
         PendingCc event { message.getChannel(), message.getControllerNumber(),
                                 message.getControllerValue() };
-        event.relativeDelta = MidiPickup::relativeStep (event.value);
-        event.relativeMinimum = juce::jlimit (0, 127, event.relativeDelta);
-        event.relativeMaximum = juce::jlimit (0, 127, 127 + event.relativeDelta);
+        for (int f = 0; f < MidiPickup::relativeFormatCount; ++f)
+        {
+            const auto step = MidiPickup::relativeStep (event.value, (MidiPickup::RelativeFormat) f);
+            event.relativeDelta[(size_t) f] = step;
+            event.relativeMinimum[(size_t) f] = juce::jlimit (0, 127, step);
+            event.relativeMaximum[(size_t) f] = juce::jlimit (0, 127, 127 + step);
+        }
         event.minimum = event.maximum = event.value;
         for (auto& queued : pendingCcs)
             if (queued.note < 0 && queued.channel == event.channel && queued.cc == event.cc)
@@ -15487,14 +16512,83 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
                 queued.value = event.value;
                 queued.minimum = std::min (queued.minimum, event.value);
                 queued.maximum = std::max (queued.maximum, event.value);
-                queued.relativeDelta = juce::jlimit (-65536, 65536, queued.relativeDelta + event.relativeDelta);
-                queued.relativeMinimum = juce::jlimit (0, 127, queued.relativeMinimum + event.relativeDelta);
-                queued.relativeMaximum = juce::jlimit (0, 127, queued.relativeMaximum + event.relativeDelta);
+                for (size_t f = 0; f < queued.relativeDelta.size(); ++f)
+                {
+                    const auto step = event.relativeDelta[f];
+                    queued.relativeDelta[f] = juce::jlimit (-65536, 65536, queued.relativeDelta[f] + step);
+                    queued.relativeMinimum[f] = juce::jlimit (0, 127, queued.relativeMinimum[f] + step);
+                    queued.relativeMaximum[f] = juce::jlimit (0, 127, queued.relativeMaximum[f] + step);
+                }
                 return;
             }
         if (pendingCcs.size() < 64)
             pendingCcs.push_back (event);
     }
+}
+
+const juce::Array<juce::var>& InstrumentHostService::loadModulePresets() const
+{
+    if (! modulePresetsLoaded)
+    {
+        modulePresetsLoaded = true;
+        modulePresetsCache.clear();
+        if (options.dataDirectory != juce::File() && modulePresetsFile().existsAsFile())
+        {
+            const auto stored = juce::JSON::parse (modulePresetsFile().loadFileAsString());
+            if (const auto* list = stored.getProperty ("presets", {}).getArray())
+                modulePresetsCache = *list;
+        }
+    }
+    return modulePresetsCache;
+}
+
+const juce::Array<juce::var>& InstrumentHostService::loadResponseProfiles() const
+{
+    if (! responseProfilesLoaded)
+    {
+        responseProfilesLoaded = true;
+        responseProfilesCache.clear();
+        if (options.dataDirectory != juce::File() && responseProfilesFile().existsAsFile())
+        {
+            // Held in a named var: a pointer into a temporary's array would dangle.
+            const auto stored = juce::JSON::parse (responseProfilesFile().loadFileAsString());
+            if (const auto* list = stored.getProperty ("profiles", {}).getArray())
+                responseProfilesCache = *list;
+        }
+    }
+    return responseProfilesCache;
+}
+
+juce::var InstrumentHostService::responseProfileForPorts() const
+{
+    if (loadResponseProfiles().isEmpty())
+        return {};
+    const auto now = juce::Time::getMillisecondCounter();
+    if (responseProfilePortsAt == 0 || now - responseProfilePortsAt > 2000)
+    {
+        responseProfilePorts = midiPortNamesForProfiles != nullptr ? midiPortNamesForProfiles()
+                                                                   : currentMidiPortNames();
+        responseProfilePortsAt = juce::jmax ((juce::uint32) 1, now);
+    }
+    for (const auto& profile : loadResponseProfiles())
+    {
+        const auto hint = profile.getProperty ("portHint", {}).toString();
+        if (hint.isNotEmpty())
+            for (const auto& port : responseProfilePorts)
+                if (port.containsIgnoreCase (hint))
+                    return profile;
+    }
+    return {};
+}
+
+juce::StringArray InstrumentHostService::currentMidiPortNames()
+{
+    juce::StringArray names;
+    for (const auto& input : juce::MidiInput::getAvailableDevices())
+        names.addIfNotAlreadyThere (input.name);
+    for (const auto& output : juce::MidiOutput::getAvailableDevices())
+        names.addIfNotAlreadyThere (output.name);
+    return names;
 }
 
 void InstrumentHostService::emitSurfaceLayout (const juce::String& requestedProfileId)
@@ -15504,6 +16598,15 @@ void InstrumentHostService::emitSurfaceLayout (const juce::String& requestedProf
     const auto& registry = ctrl49::SurfaceProfileRegistry::instance();
     const ctrl49::SurfaceProfile* profile = requestedProfileId.isNotEmpty()
                                               ? registry.find (requestedProfileId) : nullptr;
+
+    // Unasked, the drawing is of what is plugged in: a profile whose port hints match a
+    // connected MIDI port. Before, it was simply the first profile registered, whatever the
+    // desk held.
+    const auto connectedPorts = midiPortNamesForProfiles != nullptr ? midiPortNamesForProfiles()
+                                                                    : currentMidiPortNames();
+    const ctrl49::SurfaceProfile* connected = registry.findForPorts (connectedPorts);
+    if (profile == nullptr && requestedProfileId.isEmpty())
+        profile = connected;
 
     if (profile == nullptr && requestedProfileId.isEmpty())
         for (const auto& id : registry.profileIds())
@@ -15531,6 +16634,8 @@ void InstrumentHostService::emitSurfaceLayout (const juce::String& requestedProf
         root->setProperty ("vendor",      useOwn ? juce::String ("Described by you")
                                                  : profile->vendor);
         root->setProperty ("aspect",      layout.aspect);
+        // Whether this drawing is of a controller that is plugged in right now.
+        root->setProperty ("connected",   ! useOwn && profile != nullptr && profile == connected);
         juce::Array<juce::var> controls;
         for (const auto& control : layout.controls)
         {
@@ -15792,16 +16897,20 @@ void InstrumentHostService::drainControllerEvents()
             const auto first = *firstPress;
             const auto isNote = first.note >= 0;
 
-            // One controller drives one slot: learning a controller that is already bound
-            // elsewhere moves it, because two slots silently riding one knob is a support call.
-            // The one exception is the other layers of the same pad: they are the same pad, only
-            // one of them answers at a time, and sharing its note is the point of them.
+            // One controller drives one slot PER PAGE: learning a controller already bound on
+            // this page moves it, because two slots silently riding one knob is a support call.
+            // On other pages it stays: the same knob meaning different things on different pages
+            // is what pages are for, and only the shown page answers it (the drain below).
+            // The one exception on this page is the other layers of the same pad: they are the
+            // same pad, only one answers at a time, and sharing its note is the point of them.
             const auto* learningPage = rack.getPerformance().findPage (pageId);
             const auto* learning = learningPage != nullptr ? learningPage->findSlot (slotId) : nullptr;
             for (const auto& page : rack.getPerformance().pages)
                 for (const auto& other : page.slots)
                 {
-                    if (page.pageId == pageId && other.slotId == slotId)
+                    if (page.pageId != pageId)
+                        continue;
+                    if (other.slotId == slotId)
                         continue;
                     if (page.pageId == pageId && learning != nullptr && learning->kind == "pad"
                         && other.kind == "pad" && other.index == learning->index)
@@ -15872,18 +16981,42 @@ void InstrumentHostService::drainControllerEvents()
     // momentary through the ordinary write.
     bool virtualWritten = false;
     bool latchChanged = false;
+    const auto answers = [] (const ControlPage& page, const ControlSlot& slot, const PendingCc& event)
+    {
+        const auto isNote = event.note >= 0;
+        if (isNote ? slot.midiNote != event.note : slot.midiCc != event.cc)
+            return false;
+        if (slot.midiChannel != 0 && slot.midiChannel != event.channel)
+            return false;
+        // A pad plays only the layer it is on: the same hardware note can be learned on
+        // every layer, and exactly one of them answers.
+        return page.isLive (slot);
+    };
+    const auto shownPage = hardwarePageId();
     for (const auto& event : events)
+    {
+        // The same knob learned on several pages drives only the page that is shown (on the
+        // keyboard, its screen card, or picked in the Controller view): a page is a set of
+        // assignments, and turning one knob should not move a parameter on a page you are not
+        // looking at. A binding learned on a single page answers from anywhere, as before.
+        int pagesAnswering = 0;
         for (const auto& page : rack.getPerformance().pages)
+            for (const auto& slot : page.slots)
+                if (answers (page, slot, event))
+                {
+                    ++pagesAnswering;
+                    break;
+                }
+        const auto onlyShown = pagesAnswering > 1;
+
+        for (const auto& page : rack.getPerformance().pages)
+        {
+            if (onlyShown && page.pageId != shownPage)
+                continue;
             for (const auto& slot : page.slots)
             {
                 const auto isNote = event.note >= 0;
-                if (isNote ? slot.midiNote != event.note : slot.midiCc != event.cc)
-                    continue;
-                if (slot.midiChannel != 0 && slot.midiChannel != event.channel)
-                    continue;
-                // A pad plays only the layer it is on: the same hardware note can be learned on
-                // every layer, and exactly one of them answers.
-                if (! page.isLive (slot))
+                if (! answers (page, slot, event))
                     continue;
                 if (slot.binding.isEmpty() || ! bindingResolves (slot.binding))
                     continue;
@@ -15905,10 +17038,14 @@ void InstrumentHostService::drainControllerEvents()
                 }
                 else if (slot.midiRelative)
                 {
-                    if (event.relativeDelta == 0 && event.relativeMinimum == 0 && event.relativeMaximum == 127) continue;
-                    normalised = juce::jlimit ((float) event.relativeMinimum / 127.0f,
-                        (float) event.relativeMaximum / 127.0f,
-                        controlBindingPosition (slot.binding) + (float) event.relativeDelta / 127.0f);
+                    const auto f = (size_t) juce::jlimit (0, 2, slot.midiRelativeFormat);
+                    if (event.relativeDelta[f] == 0 && event.relativeMinimum[f] == 0 && event.relativeMaximum[f] == 127) continue;
+                    if (slot.binding.stepped())
+                        normalised = slot.binding.stepBy (controlBindingPosition (slot.binding), event.relativeDelta[f]);
+                    else
+                    normalised = juce::jlimit ((float) event.relativeMinimum[f] / 127.0f,
+                        (float) event.relativeMaximum[f] / 127.0f,
+                        controlBindingPosition (slot.binding) + (float) event.relativeDelta[f] / 127.0f);
                 }
                 else if (slot.midiPickup && slot.binding.rangeMin != slot.binding.rangeMax)
                 {
@@ -15934,6 +17071,8 @@ void InstrumentHostService::drainControllerEvents()
                                       + positioned * (slot.binding.rangeMax - slot.binding.rangeMin));
                 virtualWritten = virtualWritten || isVirtualParameterId (slot.binding.parameterId);
             }
+        }
+    }
 
     // A virtual write changed the manifest (fader, send, macro): one save and one announce
     // per drain however many controllers moved — the contract the CTRL49 encoders set. A
@@ -15943,6 +17082,37 @@ void InstrumentHostService::drainControllerEvents()
         savePerformance();
         emitState();
     }
+}
+
+bool InstrumentHostService::editChordModule (const juce::String& partId, const juce::String& slotId,
+                                             const std::function<bool (perf::MidiFxSettings&)>& edit)
+{
+    // Which chord module: the named slot; unnamed, the part's first Chords slot; with none,
+    // the part-level block (the old chorder, which the "fx" slot mirrors).
+    const auto* part = rack.getPerformance().findPart (partId);
+    if (part == nullptr)
+        return false;
+
+    auto chain = part->midiChain;
+    int index = -1;
+    for (int i = 0; i < chain.size() && index < 0; ++i)
+        if (slotId.isNotEmpty() ? chain.getReference (i).slotId == slotId
+                                : chain.getReference (i).type == "chord")
+            index = i;
+
+    if (index >= 0)
+    {
+        if (! edit (chain.getReference (index).fx))
+            return false;
+        return rack.setPartMidiChain (partId, std::move (chain));
+    }
+    if (slotId.isNotEmpty())
+        return false;
+
+    auto fx = part->midiFx;
+    if (! edit (fx))
+        return false;
+    return rack.setPartMidiFx (partId, fx);
 }
 
 void InstrumentHostService::emitChordLearn (bool armed, const juce::String& stage, int key,
@@ -16010,27 +17180,29 @@ void InstrumentHostService::drainChordLearn()
             continue;
         }
 
-        // The chord itself. Capture as offsets from the target key, sorted, six voices max.
+        // The chord itself: its notes join the set (or find the identical chord already
+        // there), the key points at it, and the key-map layer switches on — learning a key
+        // chord and then not hearing it would be a strange reward.
         auto notes = chordLearn.groupNotes;
         notes.sort();
-        perf::MidiFxSettings::KeyChord captured;
-        captured.key = chordLearn.key;
-        for (const auto note : notes)
-        {
-            if (captured.offsets.size() >= perf::MidiFxChain::maxVoices)
-                break;
-            captured.offsets.add (juce::jlimit (-60, 60, note - chordLearn.key));
-        }
-
-        auto fx = part->midiFx;
-        for (int i = fx.keyChords.size(); --i >= 0;)
-            if (fx.keyChords.getReference (i).key == captured.key)
-                fx.keyChords.remove (i);
-        fx.keyChords.add (captured);
-        rack.setPartMidiFx (chordLearn.partId, fx);
-
+        while (notes.size() > perf::MidiFxChain::maxVoices)
+            notes.removeLast();
         const auto key = chordLearn.key;
-        const auto size = captured.offsets.size();
+        const auto learned = editChordModule (chordLearn.partId, chordLearn.slotId,
+            [&notes, key] (perf::MidiFxSettings& fx)
+            {
+                const auto index = fx.findOrAddSetChord (notes);
+                if (index < 0)
+                    return false;
+                fx.mapKey (key, index);
+                fx.chordKeyMap = true;
+                return true;
+            });
+        if (! learned)
+            emitError ("This chord set is full (" + juce::String (perf::MidiFxSettings::maxSetChords)
+                       + " chords) — remove one to learn another.");
+
+        const auto size = learned ? notes.size() : 0;
         chordLearn = {};
         chordLearnListening.store (false);
         savePerformance();
@@ -16186,8 +17358,57 @@ void InstrumentHostService::drainHardwarePatchSends()
         patchSends.pop_front();
 }
 
+void InstrumentHostService::followPresetPages()
+{
+    // Watches every part's loaded preset rather than hooking each of the ten ways one gets
+    // loaded (browser, walking, comparison, recall, capture...): a change is a change,
+    // wherever it came from. The first sighting of a part only records it, so opening a
+    // session does not jump the pages about.
+    const auto& performance = rack.getPerformance();
+    juce::String showPage;
+    bool leavePresetPage = false;
+    for (const auto& part : performance.parts)
+    {
+        auto [it, first] = seenPartPresets.try_emplace (part.partId, part.lastPresetRecordId);
+        if (first || it->second == part.lastPresetRecordId)
+            continue;
+        it->second = part.lastPresetRecordId;
+        if (part.lastPresetRecordId.isEmpty())
+            continue;
+        for (const auto& page : performance.pages)
+            if (page.presetRecordId == part.lastPresetRecordId)
+            {
+                showPage = page.pageId;
+                break;
+            }
+        if (showPage.isEmpty())
+            leavePresetPage = true;
+    }
+
+    if (showPage.isEmpty() && leavePresetPage)
+    {
+        // A preset without a page of its own: if a preset page is showing, it belongs to a
+        // sound that is no longer there, so go back to the first ordinary page.
+        const auto* shown = performance.findPage (hardwarePageId());
+        if (shown != nullptr && shown->presetRecordId.isNotEmpty())
+            for (const auto& page : performance.pages)
+                if (page.presetRecordId.isEmpty())
+                {
+                    showPage = page.pageId;
+                    break;
+                }
+    }
+
+    if (showPage.isNotEmpty() && showPage != currentSurfacePageId)
+    {
+        currentSurfacePageId = showPage;
+        requestedSurfacePageId = showPage;
+    }
+}
+
 void InstrumentHostService::drainParameterEvents()
 {
+    followPresetPages();
     drainProcessorFailures();
     tickAutomaticFailover();
     drainPerformanceRecordingMidi();
@@ -16205,6 +17426,7 @@ void InstrumentHostService::drainParameterEvents()
     tickMsegs();
     tickRandomModulators();
     tickMidiHealth();
+    tickLibrarySync();
 
     // A dedicated small packet, not a document/state push. Draining even when the browser
     // is hidden prevents old audio from flashing on reopening. The graph only accumulates
@@ -16232,8 +17454,15 @@ void InstrumentHostService::drainParameterEvents()
         juce::String device, text;
         int cc = -1, note = -1, channel = 0, value = 0;
         bool changed = false;
+        juce::Array<juce::var> touch;
         {
             const std::scoped_lock lock (midiActivityLock);
+            for (int i = 0; i < recentTouchCount; ++i)
+            {
+                const auto& t = recentTouch[(size_t) i];
+                touch.add (juce::Array<juce::var> { t.kind, t.a, t.b });
+            }
+            recentTouchCount = 0;
             if (midiActivitySeq != midiActivityEmittedSeq)
             {
                 midiActivityEmittedSeq = midiActivitySeq;
@@ -16257,6 +17486,9 @@ void InstrumentHostService::drainParameterEvents()
             obj->setProperty ("note", note);
             obj->setProperty ("channel", channel);
             obj->setProperty ("value", value);
+            // [kind, a, b] per touch since the last drain: 0 note-on (note, velocity),
+            // 1 controller (number, value), 2 channel pressure (-, value), 3 poly AT (note, value).
+            obj->setProperty ("touch", touch);
             options.emit ("instrumentHostMidiActivity", juce::var (obj));
         }
     }
@@ -16285,6 +17517,52 @@ void InstrumentHostService::drainParameterEvents()
             obj->setProperty ("partId", part.partId);
             obj->setProperty ("step", step);
             options.emit ("instrumentHostArpStep", juce::var (obj));
+        }
+
+    // The modules' lights: how many blocks each has changed something in. One small event per
+    // part when any count moved, so an idle chain costs nothing.
+    if (options.emit != nullptr)
+        for (const auto& part : rack.getPerformance().parts)
+        {
+            std::array<perf::MidiInsertRack::ModuleActivity, perf::MidiInsertRack::maxSlots> counts;
+            const auto n = rack.moduleActivity (part.partId, counts);
+            juce::String key;
+            for (int i = 0; i < n; ++i)
+                key << counts[(size_t) i].slotId << '=' << (juce::int64) counts[(size_t) i].count << ';';
+            auto& last = lastModuleActivityByPart[part.partId];
+            if (key == last)
+                continue;
+            last = key;
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("partId", part.partId);
+            auto* slots = new juce::DynamicObject();
+            for (int i = 0; i < n; ++i)
+                slots->setProperty (counts[(size_t) i].slotId, (juce::int64) counts[(size_t) i].count);
+            obj->setProperty ("slots", juce::var (slots));
+            options.emit ("instrumentHostModuleActivity", juce::var (obj));
+        }
+
+    // The Chords readout: what it last played from the set, the progression's next step and
+    // which pads sound — one small event on change, for the editor's lights.
+    if (options.emit != nullptr)
+        for (const auto& part : rack.getPerformance().parts)
+        {
+            const auto live = rack.chordsLive (part.partId);
+            if (! live.present)
+                continue;
+            const auto key = juce::String (live.lastChord) + ":" + juce::String (live.step)
+                           + ":" + juce::String ((juce::int64) live.pads);
+            auto& last = lastChordsLiveByPart[part.partId];
+            if (key == last)
+                continue;
+            last = key;
+
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("partId", part.partId);
+            obj->setProperty ("chord", live.lastChord);
+            obj->setProperty ("step", live.step);
+            obj->setProperty ("pads", (juce::int64) live.pads);
+            options.emit ("instrumentHostChordsLive", juce::var (obj));
         }
 
     // The hardware claim is a heartbeat, not a lock: an instance that dies stops writing and
@@ -16696,7 +17974,12 @@ juce::var InstrumentHostService::buildStatePayload()
                                      .publish (record.ceId, artworkFor (record));
                 token.isNotEmpty())
             {
-                obj->setProperty ("snapshotUrl", "/plugin-snapshot/" + token);
+                // Absolute, at the resource provider's own root. A relative route resolved
+                // against wherever the page came from: fine from the embedded bundle, but a dev
+                // build's page comes from Vite, which answered with index.html, and every tile
+                // showed its initials although the pictures were on disk and published. The
+                // provider root is intercepted whichever origin loaded the page.
+                obj->setProperty ("snapshotUrl", PluginSnapshotRegistry::routeUrl (token));
                 // Which of the three is showing, so the UI can offer "use its own picture
                 // again" only where there is one to go back to.
                 obj->setProperty ("artworkSource", artworkSourceFor (record));
@@ -16870,6 +18153,8 @@ juce::var InstrumentHostService::buildStatePayload()
                                          / rack.getSampleRate() * 1000.0);
         obj->setProperty ("arp",    perf::arpToVar (part.arp));
         obj->setProperty ("midiFx", perf::midiFxToVar (part.midiFx));
+        obj->setProperty ("keyRoot", part.keyRoot);
+        obj->setProperty ("keyScale", part.keyScale);
         {
             // The chain the UI actually edits. The legacy blocks above stay in the payload
             // because the part-level controls still read them — they are the first slot of
@@ -16914,6 +18199,7 @@ juce::var InstrumentHostService::buildStatePayload()
             s->setProperty ("midiNote",    slot.midiNote);
             s->setProperty ("midiPickup",  slot.midiPickup);
             s->setProperty ("midiRelative", slot.midiRelative);
+            s->setProperty ("midiRelativeFormat", slot.midiRelativeFormat);
             int pickupDirection = 0;
             if (auto it = midiPickups.find ({ page.pageId, slot.slotId });
                 it != midiPickups.end() && it->second.matches (slot) && resolved && slotIndex < liveSlots.size())
@@ -16922,6 +18208,7 @@ juce::var InstrumentHostService::buildStatePayload()
             s->setProperty ("kind",        slot.kind);
             s->setProperty ("index",       slot.index);
             s->setProperty ("toggle",      b.toggle);
+            s->setProperty ("steps",       b.steps);
             s->setProperty ("latched",     slot.latched);
             s->setProperty ("layer",       slot.layer);
             s->setProperty ("colour",      slot.colour);
@@ -16943,6 +18230,8 @@ juce::var InstrumentHostService::buildStatePayload()
         pg->setProperty ("pageId", page.pageId);
         pg->setProperty ("name",   page.name);
         pg->setProperty ("generated", page.generated);
+        pg->setProperty ("presetRecordId", page.presetRecordId);
+        pg->setProperty ("presetName", page.presetName);
         pg->setProperty ("slots",  slots);
         // Every pad with more than one layer, and the one it is playing. A pad that is not
         // listed has a single layer — the drawing's default, as it is the model's.
@@ -17343,6 +18632,10 @@ juce::var InstrumentHostService::buildStatePayload()
             floating.add (partId);
         root->setProperty ("floatingEditorPartIds", floating);
     }
+    root->setProperty ("responseProfiles", loadResponseProfiles());
+    root->setProperty ("modulePresets", loadModulePresets());
+    root->setProperty ("responseProfileForPorts",
+                       responseProfileForPorts().getProperty ("name", {}).toString());
     root->setProperty ("audio", juce::var (audio));
     root->setProperty ("rack", juce::var (rackObj));
     return juce::var (root);
@@ -17359,8 +18652,15 @@ InstrumentHostService::SurfaceTransport InstrumentHostService::surfaceTransport(
     view.tempo = transport.getTempo();
     double fraction = 0.0;
     transport.positionInBarsBeats (view.bar, view.beat, fraction);
+    view.beatsPerBar = transport.getTimeSignatureNumerator();
     view.externalClock = transport.isExternalClockEnabled();
     view.clockLost = transport.hasLostExternalClock();
+
+    const auto& performance = rack.getPerformance();
+    if (juce::isPositiveAndBelow (performance.setlist.currentIndex, performance.setlist.items.size()))
+        view.song = performance.setlist.items.getReference (performance.setlist.currentIndex).name;
+    if (const auto* scene = performance.findScene (currentSceneId))
+        view.scene = scene->name;
     return view;
 }
 
@@ -17508,6 +18808,18 @@ bool InstrumentHostService::nudgePerformanceEncoder (SurfaceEncoder encoder, int
         transport.setTempo (tempo);
         const_cast<Performance&> (rack.getPerformance()).transport.tempo = tempo;
         savePerformance();
+        emitState();
+        return true;
+    }
+
+    if (encoder == SurfaceEncoder::masterLevel)
+    {
+        // The eighth encoder: the whole rack's level, as a hardware master knob. 0..2 like
+        // the mixer's, so a full turn up from unity has somewhere to go.
+        // The rack directly: this nudge is already recorded above as itself, and going through
+        // setMasterLevel would record it a second time for replay.
+        rack.setMasterLevel (juce::jlimit (0.0f, 2.0f, rack.getPerformance().masterLevel + amount));
+        schedulePerformanceSave();
         emitState();
         return true;
     }
@@ -17898,6 +19210,20 @@ bool InstrumentHostService::ownsHardwareSurface() const
                  < hardwareSendFenceMs;
 }
 
+/** Whether a claim stamped `stamp` is someone's, judged at `now`.
+
+    Stale after the claim timeout: an instance that crashed must not hold the surface forever.
+    A stamp AHEAD of `now` is still live, up to a whole timeout ahead: a racing claimer can read
+    the clock a moment before the winner does, and a wall clock stepped back a little by NTP looks
+    the same. Treating any future stamp as garbage let a second instance take a live claim
+    (InstrumentHostServiceTests). Further ahead than that is a corrupt or forged file, and is
+    nobody's. */
+static bool hardwareClaimIsLive (juce::int64 stamp, juce::int64 now, juce::int64 timeoutMs)
+{
+    const auto age = now - stamp;
+    return age <= timeoutMs && age >= -timeoutMs;
+}
+
 juce::String InstrumentHostService::hardwareSurfaceOwner() const
 {
     if (ownsHardwareSurface())
@@ -17908,10 +19234,9 @@ juce::String InstrumentHostService::hardwareSurfaceOwner() const
     if (owner.isEmpty())
         return "nobody";
 
-    // A stale claim is nobody's: an instance that crashed must not hold the surface forever.
     const auto stamp = (juce::int64) stored.getProperty ("heartbeat", 0);
-    const auto age = juce::Time::currentTimeMillis() - stamp;
-    return age < 0 || age > hardwareClaimTimeoutMs ? "nobody" : "another instance";
+    return hardwareClaimIsLive (stamp, juce::Time::currentTimeMillis(), hardwareClaimTimeoutMs)
+               ? "another instance" : "nobody";
 }
 
 bool InstrumentHostService::claimHardwareSurface()
@@ -17920,15 +19245,18 @@ bool InstrumentHostService::claimHardwareSurface()
         return true;
 
     bool acquired = false;
-    const auto now = juce::Time::currentTimeMillis();
+    juce::int64 now = 0;
     options.dataDirectory.createDirectory();
     if (! withHardwareClaimLock (hardwareOwnerFile(), [&]
         {
+            // The clock is read under the lock, so claims are ordered: one read before waiting
+            // would be older than a heartbeat the winner wrote meanwhile.
+            now = juce::Time::currentTimeMillis();
             const auto stored = juce::JSON::parse (hardwareOwnerFile().loadFileAsString());
             const auto owner = stored.getProperty ("instanceId", {}).toString();
             const auto stamp = (juce::int64) stored.getProperty ("heartbeat", 0);
             if (owner.isNotEmpty() && owner != instanceId
-                 && now - stamp <= hardwareClaimTimeoutMs && stamp <= now)
+                 && hardwareClaimIsLive (stamp, now, hardwareClaimTimeoutMs))
                 return;
 
             auto* claim = new juce::DynamicObject();
@@ -18877,6 +20205,22 @@ juce::var InstrumentHostService::performancePayload() const
                                          && item.sceneId.isNotEmpty() && scene == nullptr);
         i->setProperty ("notes",     item.notes);
         i->setProperty ("tempo",     item.tempo);
+        i->setProperty ("plannedSeconds", item.plannedSeconds);
+        juce::Array<juce::var> sections;
+        for (const auto& section : item.sections.items)
+        {
+            const auto* sectionScene = performance.findScene (section.sceneId);
+            auto* sv = new juce::DynamicObject();
+            sv->setProperty ("itemId",    section.itemId);
+            sv->setProperty ("name",      section.name);
+            sv->setProperty ("sceneId",   section.sceneId);
+            sv->setProperty ("sceneName", sectionScene != nullptr ? sectionScene->name : juce::String());
+            sv->setProperty ("missing",   sectionScene == nullptr);
+            sv->setProperty ("bars",      section.bars);
+            sections.add (juce::var (sv));
+        }
+        i->setProperty ("sections",     sections);
+        i->setProperty ("sectionsLoop", item.sections.loop);
         setlistItems.add (juce::var (i));
     }
 
@@ -18884,6 +20228,8 @@ juce::var InstrumentHostService::performancePayload() const
     setlistObj->setProperty ("items",        setlistItems);
     setlistObj->setProperty ("currentIndex", performance.setlist.currentIndex);
     setlistObj->setProperty ("preloadAhead", performance.setlist.preloadAhead);
+    setlistObj->setProperty ("startedAtMs",     (double) setlistStartedAtMs);
+    setlistObj->setProperty ("songStartedAtMs", (double) setlistSongStartedAtMs);
     setlistObj->setProperty ("loadingIndex", pendingSetlistRecall.active
                                                ? pendingSetlistRecall.index : -1);
     juce::Array<juce::var> preloads;
@@ -18903,8 +20249,9 @@ juce::var InstrumentHostService::performancePayload() const
     }
     setlistObj->setProperty ("preloads", preloads);
 
+    const auto& playing = playingArrangement();
     juce::Array<juce::var> arrangementItems;
-    for (const auto& item : performance.arrangement.items)
+    for (const auto& item : playing.items)
     {
         const auto* scene = performance.findScene (item.sceneId);
         auto* i = new juce::DynamicObject();
@@ -18919,7 +20266,12 @@ juce::var InstrumentHostService::performancePayload() const
 
     auto* arrangementObj = new juce::DynamicObject();
     arrangementObj->setProperty ("items",        arrangementItems);
-    arrangementObj->setProperty ("loop",         performance.arrangement.loop);
+    arrangementObj->setProperty ("loop",         playing.loop);
+    // Whose sections these are: the current song's id, or "" for the show-wide arrangement.
+    arrangementObj->setProperty ("songId",       juce::isPositiveAndBelow (performance.setlist.currentIndex,
+                                                                           performance.setlist.items.size())
+                                                    ? performance.setlist.items.getReference (performance.setlist.currentIndex).itemId
+                                                    : juce::String());
     arrangementObj->setProperty ("playing",      arrangementPlaying);
     arrangementObj->setProperty ("currentIndex", arrangementCurrentIndex);
     arrangementObj->setProperty ("queuedIndex",  arrangementQueuedIndex);
@@ -18928,15 +20280,15 @@ juce::var InstrumentHostService::performancePayload() const
     auto arrangementBar = 0;
     if (arrangementPlaying
         && juce::isPositiveAndBelow (arrangementCurrentIndex,
-                                     performance.arrangement.items.size()))
+                                     playing.items.size()))
     {
-        const auto length = (double) performance.arrangement.items
+        const auto length = (double) playing.items
                               .getReference (arrangementCurrentIndex).bars
                             * transport.barLengthPpq();
         const auto elapsed = juce::jmax (0.0, transport.getPositionPpq()
                                                - arrangementItemStartPpq);
         arrangementProgress = length > 0.0 ? juce::jlimit (0.0, 1.0, elapsed / length) : 0.0;
-        arrangementBar = juce::jlimit (1, performance.arrangement.items
+        arrangementBar = juce::jlimit (1, playing.items
                                             .getReference (arrangementCurrentIndex).bars,
                                        1 + (int) std::floor (elapsed / transport.barLengthPpq()));
     }
@@ -19044,6 +20396,10 @@ juce::var InstrumentHostService::performancePayload() const
     root->setProperty ("scenes",    scenes);
     root->setProperty ("snapshotMorph", juce::var (snapshotMorph));
     root->setProperty ("setlist",   juce::var (setlistObj));
+    root->setProperty ("currentSceneId", rack.getPerformance().findScene (currentSceneId) != nullptr
+                                           ? currentSceneId : juce::String());
+    root->setProperty ("queuedSceneId", pendingScenes.empty() ? juce::String()
+                                                              : pendingScenes.rbegin()->second);
     root->setProperty ("arrangement", juce::var (arrangementObj));
     root->setProperty ("capture",   juce::var (capture));
     root->setProperty ("looper",    juce::var (looper));

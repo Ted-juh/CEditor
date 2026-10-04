@@ -313,6 +313,33 @@ control and keeps every deliberate edit; nothing is written into the document. I
 diff-against-defaults idea applied at draw time, copy-on-write like the token resolver, and it runs
 before the token pass because a family patch may write references. The build bakes both.
 
+**Pins: the author who chose the factory value.** The rule cannot tell an untouched property from one
+the author set back to its default on purpose. That was a dead end in practice: the default set
+draws sliders without ticks, `showTicks: true` is the factory value, so an author who turned ticks
+back on wrote exactly the value the set overrides, and the Ticks flag read "on" over a slider with
+none. `Core.setOverrides` lists the paths an author set on purpose (as the patch names them, with
+`Parts.<name>.` in front for a part), and the set leaves those alone whatever they hold.
+Every inspector write keeps the pins in step (`withSetPins`, applied in `stores/controls.js` by
+`updateControlProperty`, `updateSelectedProperty` and the state-aware inspector writers): writing a
+path a built-in set can patch back to its factory value pins it, and writing any other value there
+unpins it, since the rule already keeps that. Paths no set patches are never pinned, and a
+state-scoped edit belongs to the state. Programmatic writes — presets, resets, gestures, through
+`applyControlPatch` — do not pin unless they ask to (`{ pin: true }`, which the slider editors'
+multi-field writes do).
+
+**The inspector shows what is drawn** (`drawnForInspector`). Every appearance tab of the Properties
+panel (`panels/SectionRenderer.svelte`) and the Text, Effects and Screen docks are handed the control
+with its set's family patch applied, under the same rule the canvas draws by. So a field reads the
+set's value wherever the set decides it: the slider's Ticks flag is off under a set that hides
+ticks, and a label's Letter field reads the set's tracking. Colour token references that the family
+writes are resolved to the colour they paint, so a colour field shows the painted swatch rather than
+a fallback. References the control itself stores are left alone, because the colour fields already
+show those with the token's name. Tabs that edit structure (Core, States, Bindings, Reactions,
+Device, Animations) see the control as stored. Choosing the factory value where a set drew another
+is therefore an ordinary edit: the field shows the set's value, the author types the factory one,
+and the store pins it.
+`pinnedWrite(control, path, value)` pins unconditionally, for code that means it.
+
 **What the knob gained** to have something to patch: a `bodyCap` semantic part — a disc under the
 pointer, invisible by default so every existing knob keeps drawing its arc-and-dot — sized as a
 percentage of the track's diameter so one set fits every knob size; and a `kind` on `pointerCurrent`

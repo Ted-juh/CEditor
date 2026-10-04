@@ -86,6 +86,10 @@ const DEFAULT_SESSION = {
   activeCustomHitZone: '',
   hoveredCustomBehavior: '',
   hoveredCustomHitZone: '',
+  // Panel knobs carried by a component keep a focus flag EACH, as they did as controls
+  // (utils/sliderControlPart.js): which of its zones are focused, and which one has "DOM focus".
+  focusedCustomHitZones: [],
+  domFocusCustomHitZone: '',
 };
 
 export const interactionPreviewSessions = writable({});

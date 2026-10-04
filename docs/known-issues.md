@@ -30,10 +30,13 @@ and because each one will look like an oversight to the next person who finds it
 - **No `CONTRIBUTING` or `SECURITY`.** `LICENSE` — the one the review called out as mattering most,
   because without it nobody can legally use or contribute — is AGPLv3, decided deliberately and
   recorded in [license-decision.md](license-decision.md). The other two are unwritten.
-- **No `.prettierrc`, and no Prettier.** `.clang-format` and `.editorconfig` exist. Prettier is not
-  a dependency of this project and nothing runs it, so a config file would configure a tool that is
-  not there. If Prettier is ever adopted it needs one; until then this is closed by absence, not by
-  work.
+- **A `.prettierrc.json`, and no Prettier.** `.clang-format` and `.editorconfig` exist, and
+  `CE/web/.prettierrc.json` has since 2026-09-22. Prettier itself is not a dependency of this project
+  and nothing runs it, so the file configures a tool that is not there. What does run, since
+  2026-10-01, is `npm run lint`: ESLint with correctness rules only (an undefined name, a duplicate
+  key, unreachable code), not style. Its first run found three `ReferenceError`s behind buttons;
+  [lint-and-accessibility-2026-10-01.md](design/lint-and-accessibility-2026-10-01.md) has the
+  counts and the rules left off, each with its size.
 
 ---
 
@@ -198,7 +201,10 @@ a folder the next person also needs. The only native support the format required
 dialogs (`savePanelPackageAs`, `openPanelPackage`).
 
 The collector includes `panel.bgImage`, `panel.bgTexture`, nested control/part image, overlay and
-texture sources, and `Text.path` font references. Arbitrary files read by scripts are not collected.
+texture sources, and `Text.path` font references. Fonts imported in Settings that the panel's text
+names travel as `panel.fonts` (`utils/documentFonts.js`): the player and a recipient without those
+fonts register them on opening, and a font whose file cannot be read is reported missing like an
+image. Arbitrary files read by scripts are not collected.
 
 Two things are stripped on the way out, and both are the kind of leak nobody notices until it is
 in somebody else's hands: `filePath`, which is the author's name and folder layout, and
@@ -210,15 +216,138 @@ longer triggers a filesystem read. Invalid package shapes show a visible error, 
 current panel and do not open an extra tab. Tests also cover nested artwork and missing assets;
 the walkthrough is not evidence for every asset format or a second computer.
 
+## ~~A multi-channel custom component exports every channel with the FIRST channel's device binding~~ — CLOSED
+
+*(Found and fixed 2026-09-28. `exportParameters.js` now picks each channel's wire by the binding
+whose `port` is the channel's name, as the live editor does; a single public channel keeps "any
+binding drives it". `exportParametersChannelBindings.test.js` pins it.)*
+
+The bug: one device wire per control was spread onto every public channel, so two channels bound
+to two synth parameters exported two host lanes that both drove the first parameter, window-closed
+only. No QA sheet had a multi-channel component with bindings, so no existing export changed.
+
+**The display half is fixed too** (same day): the Parameter Editor listed one item per control, from
+its first binding. `utils/parameterStatus.js` `parameterEntries` now gives a component one item per
+bound channel; the first keeps the control's id, so the GAIA panel's 277 items are unchanged, and a
+further channel is `controlId::channel`. `parameterStatus.test.js` pins it.
+
+## ~~A custom component's variants are never applied~~ — CLOSED
+
+*(Found 2026-09-28 while building the States × sizes sheet; fixed 2026-09-29.
+`customComponentVariants.test.js` and `browser-checks/variants.mjs` pin it.)*
+
+The Variants tab defined named looks and each placed copy could pick one, but nothing that drew a
+component read either: picking a variant changed the document and nothing on screen. The built-in
+presets were broken too. They wrote `Parts.<name>.Transform.*`, which no part has (a part's scale
+and rotation are in its `Layout`), and `Designer.width`/`height`, which do not size a placed copy.
+They also fell back to guessed part names, and a patch to a path that does not exist was silently
+dropped.
+
+`resolveInteractiveControl` now applies the copy's variant before bindings and states. It is the
+one path the editor canvas, preview mode and the exported plug-in's player all draw through, so
+there was no C++ side to change. Patches on generator-made parts are retried after the generators
+run. A variant may change only how a component looks: its parts, and the root's Background, Text,
+Effects and Image. It may not change how the component behaves (hit testing reads the component's
+own hit zones, so a moved hit zone would draw in one place and respond in another) or its
+Transform, which belongs to whoever placed the copy. The Variants tab marks any override that is
+refused or that names a path the component does not have. The presets now target real parts only,
+and the Vertical preset is gone: rotating two parts about their own centres does not make a
+vertical layout.
+
 ## Compiler-free plugin export
 
-The installed exporter supports VST3. CLAP and LV2 templates are skipped because their wrappers
-still report a build-time identity; copying them per panel would create plugin collisions. Those
-formats remain available through the source-checkout compiling exporter. New panels select VST3
-only, and existing saved format choices are retained. Older panels with both formats selected
-still export VST3; the build log explains the skipped formats and the compiling-exporter route.
+The installed exporter supports VST3, CLAP and LV2. New panels select VST3 only; CLAP is on unless
+turned off and LV2 off unless turned on, as the compiling exporter reads them, and saved format
+choices are retained. An LV2's identity lives in its bundle's `.ttl` files as well as in the binary,
+so the exporter does not copy the template's: it puts the panel beside the copied binary and runs
+`juce_lv2_helper`, which has the plug-in write them again with the panel's URI and parameters. A
+template `.lv2` copied without its panel reports the template's own URI (`urn:ceditor:default`), not
+nothing as a CLAP does, because the template build generates its own manifests from the bare binary.
+
+A template VST3 carries two vendor strings. The class entry's (name, vendor, version) is filled
+from the panel at load by the sidecar hook, like the CLAP's descriptor. The factory's is baked in
+when the template is built (`Tedjuh`), and a JUCE-based host shows that one — CEditor's own scanner
+read `Tedjuh-inc` off a template until the build default was aligned. A panel that sets its own
+vendor in Export settings therefore shows it in a compiled export, in a template CLAP, and in the
+class entry of a template VST3, but a host that reads the factory vendor shows the template's. The
+identity a host keys on is unaffected.
+
+A CLAP is exported as a folder — `<Name>/<Name>.clap` beside its `panel.cepanel` and device profiles
+— because the CLAP folder is shared by every CLAP a user has and the panel must sit beside the
+module. Install the whole folder into the CLAP folder; hosts search it recursively. A `.clap` copied
+out on its own reports no plugins rather than an identity it does not have.
 
 The installed template includes Lua/JavaScript support (TypeScript is prepared by the existing
 export pipeline). It cannot bundle C++/C#/Java handlers or CPython. The compiling exporter currently
 bundles these extra runtimes only for VST3. A requested unsupported combination fails explicitly
 before replacing an export. A failed required handler build also fails the export.
+
+## ~~The player's script MIDI takes a lock on the audio thread~~ — CLOSED
+
+*(Found 2026-10-02 by RealtimeSanitizer; fixed 2026-10-03. The collector is gone:
+`Player/ScriptMidiOutQueue.h` over choc's `VariableSizeFIFO`, with a per-block byte budget.
+`tools/rtsan/run.sh` now reports nothing for CC or SysEx traffic, and `ScriptMidiOutQueueTests` pins
+the order, the budget and the full queue. choc needed three local patches, two of them for bugs of
+its own: `CE/thirdparty/choc/VENDORED.md`.)*
+
+The exported plug-in sends what a panel script queues (`sendCC`, NRPN, SysEx) through JUCE's
+`MidiMessageCollector`. Its `CriticalSection` is taken by the audio thread on every block and by the
+message thread while it appends, and appending can allocate, so the audio thread can wait behind an
+allocation. A burst of SysEx also grows the host's MIDI buffer inside the callback. The input
+direction already avoids both (`HostMidiInputQueue`); the output direction does not.
+
+`tools/rtsan/run.sh` reproduces it on Linux with clang 20: a lock and an unlock on 2,000 of 2,000
+blocks, and six reallocations under SysEx bursts. The fix proposed in
+[checkers-run-2026-10-02.md](design/checkers-run-2026-10-02.md) is choc's `VariableSizeFIFO` (ISC,
+header-only) with a per-block byte budget; as a drop-in in the same harness it reported nothing and
+cut the 99th-percentile callback time from about 16 µs to 6 µs. It changes where in the block
+script MIDI lands, which is why it is a change of its own and not a line in a review.
+
+## Keyboard shortcuts in a DAW while the exported editor has focus — scoped, not built
+
+*(Scoped 2026-10-01 from a review of webview-in-plug-in projects; nobody has reported it yet.)*
+
+While the plug-in's editor window has keyboard focus on Windows, every key goes to the page and
+none to the DAW: Space does not start the transport, and the host's own shortcuts are dead until the
+user clicks outside the editor. JUCE's WebView2 host (`juce_WebBrowserComponent_windows.cpp`)
+registers only `MoveFocusRequested`, for Tab traversal, and no `AcceleratorKeyPressed` handler, and
+the player (`PlayerHost.cpp`, `PluginProcessor.h`) adds no key handling of its own. A keyboard-first
+panel (a text field, the scripting console) does need the keys, so this is not simply "never take
+focus".
+
+What fixing it would take, when someone reports it:
+
+1. A vendored JUCE patch (the sixth) registering `add_AcceleratorKeyPressed` on the WebView2
+   controller. For a key the page has not claimed, mark it handled and post it to the plug-in
+   window's parent, which is the host's; a key the page has claimed passes through.
+2. "Claimed" comes from the page: a bridge message when an editable element gains or loses focus,
+   which the Svelte player can send from one `focusin`/`focusout` listener. Without it, pass
+   through the transport keys (Space, Enter, the arrows when nothing editable is focused) and keep
+   the rest.
+3. Linux (WebKitGTK) and macOS differ: X11 hosts generally receive keys the embedded view does not
+   consume, and WKWebView has its own first-responder chain. Scope each when there is a report.
+
+The wxp project (Rust, wry) carries parent-attachment and focus patches for exactly this situation
+and is the reference to diff against upstream wry when the work starts. iPlug2 does step 2 and
+nothing else: its Windows webview (`IPlug/Extras/WebView/IPlugWebView_win.cpp`) puts a `keydown`
+and a `keyup` listener on the page that forward the key to C++ through the bridge whenever the
+active element is not a text input (`docs/design/libraries-weighed-2026-10-01.md`).
+
+## ~~The GAIA panel's scripts, run window-closed in the plug-in~~ — CLOSED
+
+*(Logged 2026-09-30 as panel-script behaviour; both turned out to be defects in CEditor, fixed the
+same day. `exportDocument.test.js` and `PlayerScriptIntegrationTests` pin them.)*
+
+Seen in the player log while pluginval ran the GAIA panel as a plug-in:
+
+- **14,000 refused writes** to `recall_*.text.fill.colour` and `recall_*.core.tooltip`. Not the
+  scripts: the plug-in had been built from the saved `.cepanel`, which stores each control as a
+  difference from its defaults, and those two properties were at their defaults, so the plug-in
+  had no such paths. The command-line exporter had the same flaw, and worse: it derived the host
+  parameter list from the sparse controls, 5 parameters instead of 60 on QA-08. A saved document is
+  now completed first, with the editor's own export serialisation (`tools/scripts/lib/exportDocument.mjs`).
+  The refused writes went from 14,395 to none.
+- **The MIDI flood guard tripping at load.** Not the script either: the guard counted every
+  `set()` as a MIDI send, including a label's text and colours, which never send anything. Painting
+  the preset list spent the whole budget, and a bound control set in the rest of that second lost
+  its MIDI. Now only writes to bound paths count.

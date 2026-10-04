@@ -4,7 +4,7 @@ import { get } from 'svelte/store';
 import { createPanel, addPanel, panels, activePanel, restoreSessionFromPreferences } from '../src/CE_Application/stores/panels.js';
 import { autosaveEnabled, reopenLastSession, restoreUnsavedWork } from '../src/CE_Application/stores/runtimePreferences.js';
 
-test('recovered panels cannot collide with the next newly opened panel', (t) => {
+test('recovered panels cannot collide with the next newly opened panel', async (t) => {
   const originalStorage = globalThis.localStorage;
   const oldId = createPanel().id + 2;
   const values = new Map([
@@ -20,7 +20,7 @@ test('recovered panels cannot collide with the next newly opened panel', (t) => 
   autosaveEnabled.set(false);
   reopenLastSession.set(false);
   restoreUnsavedWork.set(true);
-  restoreSessionFromPreferences();
+  await restoreSessionFromPreferences();
 
   const recovered = get(activePanel);
   assert.equal(recovered.name, 'Recovered work');

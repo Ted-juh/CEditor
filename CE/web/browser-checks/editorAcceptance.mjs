@@ -170,8 +170,8 @@ try {
     await page.evaluate(()=>window.__acceptance.flush());
     await x.fill('99');await x.press('Enter');
     await page.evaluate(()=>window.__acceptance.flush());
-    await props.getByTitle('Undo',{exact:true}).click();assert.equal((await read()).x,-42);
-    await props.getByTitle('Redo',{exact:true}).click();assert.equal((await read()).x,99);
+    await props.getByRole('button',{name:'Undo',exact:true}).click();assert.equal((await read()).x,-42);
+    await props.getByRole('button',{name:'Redo',exact:true}).click();assert.equal((await read()).x,99);
     assert.deepEqual(errors,[]);
     console.log('PASS numeric cancel/commit, typed stepping, Shift stepping, finite values, precision and undo/redo');
     process.exitCode=0;
@@ -183,7 +183,15 @@ try {
   for (const [index,item] of items.entries()) {
     const record={type:item.type,tabs:[],errors:[]}; ledger.push(record);
     try {
-      await page.keyboard.press('Escape');
+      // Start every insert with NOTHING selected, as a user clearing the canvas would. A bare Escape
+      // did not: focus is still in the properties field typed into last, and Escape in a text field
+      // is the field's, not a deselect. So the Container inserted early stayed selected, and every
+      // later insert went INTO it (a deliberate feature: insert lands in the selected container),
+      // never reaching the top level this loop waits on — every type after it timed out.
+      // Escape from the canvas steps out one level at a time (child → parent → nothing).
+      await page.locator('.editor-wrapper').focus();
+      for(let step=0;step<4&&(await page.evaluate(()=>window.__acceptance.selection().length));step++)await page.keyboard.press('Escape');
+      assert.deepEqual(await page.evaluate(()=>window.__acceptance.selection()),[],'the canvas deselects before the next insert');
       await page.getByTitle('Search every component and saved package',{exact:true}).click();
       await page.getByRole('textbox',{name:'Search components',exact:true}).fill(item.type);
       await page.getByTitle(`Insert ${item.label} — or drag it onto the canvas`,{exact:true}).click();
@@ -239,7 +247,7 @@ try {
               const after=await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)),id);
               if(after===before){edit.result='unchanged; inspect constraint or non-document field';continue;}
               await page.evaluate(()=>window.__acceptance.flush());
-              await props.getByTitle('Undo',{exact:true}).click();
+              await props.getByRole('button',{name:'Undo',exact:true}).click();
               const restored=await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)),id);
               if(restored!==before){
                 await writeFile(join(out,`${item.type}-${title.replaceAll(' ','_')}-${fieldIndex}-before.json`),before);
@@ -263,7 +271,7 @@ try {
             const after=await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)),id);
             const edit={switchIndex,label:name,result:'unchanged'};tabRecord.edits.push(edit);
             if(after!==before){
-              await page.evaluate(()=>window.__acceptance.flush());await props.getByTitle('Undo',{exact:true}).click();
+              await page.evaluate(()=>window.__acceptance.flush());await props.getByRole('button',{name:'Undo',exact:true}).click();
               assert.equal(await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)),id),before,`${item.type}/${title}/${name}: undo restores boolean edit`);
               assert.deepEqual(await page.evaluate(()=>window.__acceptance.selection()),[id]);
               edit.result='changed and undo restored';
@@ -285,7 +293,7 @@ try {
               const after=await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)),id);
               const edit={fieldIndex,label:descriptor.label,attempt:next,result:after===before?'non-document choice':'changed and undo restored'};tabRecord.edits.push(edit);
               if(after!==before){
-                await page.evaluate(()=>window.__acceptance.flush());await props.getByTitle('Undo',{exact:true}).click();
+                await page.evaluate(()=>window.__acceptance.flush());await props.getByRole('button',{name:'Undo',exact:true}).click();
                 assert.equal(await page.evaluate(id=>JSON.stringify(window.__acceptance.panel().controls.find(c=>c._children.Core.id===id)),id),before,`${item.type}/${title}/${descriptor.label}/${next}: undo restores option change`);
               }else await field.selectOption(descriptor.value);
             }

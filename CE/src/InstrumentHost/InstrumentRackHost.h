@@ -275,6 +275,17 @@ public:
     bool setPartMidiChain (const juce::String& partId, juce::Array<perf::MidiSlot> chain);
     /** The arp's live pattern step for the UI playhead; -1 when idle or the part isn't live. */
     int arpLiveStep (const juce::String& partId) const;
+    /** The part's song key; every module following it takes the new scale at once. */
+    bool setPartKey (const juce::String& partId, int root, const juce::String& scale);
+    /** A part's Chords module (named, or the first): pad hits, progression steps, readout.
+        All false / not present when the part is not live. */
+    bool triggerChordPad (const juce::String& partId, const juce::String& slotId, int pad, int velocity);
+    bool moveChordProgression (const juce::String& partId, const juce::String& slotId, int value, bool absolute);
+    perf::MidiInsertRack::ChordsLive chordsLive (const juce::String& partId, const juce::String& slotId = {}) const;
+    int moduleActivity (const juce::String& partId,
+                        std::array<perf::MidiInsertRack::ModuleActivity, perf::MidiInsertRack::maxSlots>& out) const;
+    /** A module's Amount (0..1), which scales its main effect; pushed to the engine at once. */
+    bool setSlotAmount (const juce::String& partId, const juce::String& slotId, float amount);
 
     // -- macros (Stage 5) ---------------------------------------------------------------
     // Model-only, like pages: a macro is stored fan-out; the writes go through the service's
@@ -292,13 +303,15 @@ public:
     void adoptControlPage (ControlPage page)      { model.pages.add (std::move (page)); }
     bool removeControlPage (const juce::String& pageId);
     bool renameControlPage (const juce::String& pageId, const juce::String& name);
+    /** Ties a page to a preset (empty unties it); see ControlPage::presetRecordId. */
+    bool setPagePreset (const juce::String& pageId, const juce::String& recordId, const juce::String& name);
     /** Writes the slot's binding (an empty binding clears the slot). */
     bool setSlotBinding (const juce::String& pageId, const juce::String& slotId,
                          ControlBinding binding);
     /** Binds or clears the slot's learned MIDI controller. cc -1 clears; channel 0 = any. */
     bool setSlotMidi (const juce::String& pageId, const juce::String& slotId, int cc, int channel);
     bool setSlotMidiOptions (const juce::String& pageId, const juce::String& slotId,
-                            bool pickup, bool relative);
+                            bool pickup, bool relative, int relativeFormat = 0);
     /** Binds a note instead of a controller (a pad, or a key used as one). One controller per
         slot: this clears the controller binding, as setSlotMidi clears the note. */
     bool setSlotMidiNote (const juce::String& pageId, const juce::String& slotId, int note, int channel);

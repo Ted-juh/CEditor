@@ -101,10 +101,83 @@ try {
     return orange > 300;
   });
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the card ran the display page');
-  assert.match(await host.getByTestId('ctrl49-screen-status').innerText(), /No keyboard connected/);
+  assert.match(await host.getByTestId('ctrl49-screen-status').innerText(), /No CTRL49 connected — shown here only/);
   assert.match(await host.getByTestId('ctrl49-page').innerText(), /1\s*\/\s*1\s*Performance/,
     'a rack with no control pages shows the performance page, as the keyboard would');
   if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-card.png` });
+
+  // The rest of the firmware's Lua surface, through the real runtime: padding and the font table,
+  // draw_system_text, clear_errors, asset_get_valid, and the note hook (hook 2 calls note(args)).
+  const surface = await page.evaluate(async () => {
+    const { createCtrl49Screen } = await import('/src/CE_Application/screen/ctrl49Runtime.js');
+    const canvas = Object.assign(document.createElement('canvas'), { width: 480, height: 272 });
+    const lua = `
+      local T = text_data.new()
+      local heard = -1
+      function init(args)
+        text_data.set(T, { text = "PADDED", color = 0xFFFFFFFF, font = 2, font_size = 30,
+          just_hor = 0, just_ver = 0, padding_hor = 40, padding_ver = 20, bk_color = 0xFF203040,
+          border_color = 0xFFFF9408, border_width_left = 2, border_width_top = 2,
+          border_width_right = 2, border_width_bottom = 2 })
+        set_hook_enabled(2, 1)
+      end
+      function note(args) heard = get_byte(args, 1) end
+      function draw(args)
+        clear_errors()
+        draw_rect(0, 0, 480, 272, 0xFF000000)
+        draw_text(T, 0, 0, 480, 100)
+        draw_system_text(T)
+        if asset_get_valid(0x0200) then draw_rect(0, 260, 10, 10, 0xFF00FF00) end
+        if heard == 60 then draw_rect(470, 260, 10, 10, 0xFFFF0000) end
+      end`;
+    const screen = await createCtrl49Screen(canvas, { lua, assets: {} });
+    screen.call('init', []);
+    const listened = screen.note(0x90, 60, 100);
+    screen.call('draw', []);
+    const px = (x, y) => [...canvas.getContext('2d').getImageData(x, y, 1, 1).data];
+    screen.dispose();
+    return { listened, border: px(1, 50), fill: px(20, 50), inset: px(30, 10), heard: px(475, 265), noAsset: px(5, 265) };
+  });
+  // The real HoSTage page's performance extras: beat dots from bytes 9..11, and held notes from
+  // the note hook, drawn as a strip along the bottom.
+  const pagePath = fileURLToPath(new URL('../../../tools/ctrl49/Hostage_MultiKnob.lua', import.meta.url)).split('\\').join('/');
+  const perf = await page.evaluate(async (luaPath) => {
+    const { createCtrl49Screen } = await import('/src/CE_Application/screen/ctrl49Runtime.js');
+    const lua = (await import(`/@fs/${luaPath.replace(/^\//, '')}?raw`).catch(() => null))?.default;
+    if (!lua) return { skipped: true };
+    const canvas = Object.assign(document.createElement('canvas'), { width: 480, height: 272 });
+    const screen = await createCtrl49Screen(canvas, { lua, assets: {} });
+    const labels = [5, 62, 32, 49, 46, 49, 0, 0, 0, 0, 0, 0, 0, 0];   // "> 1.1" and no clips
+    const px = (x, y) => [...canvas.getContext('2d').getImageData(x, y, 1, 1).data].slice(0, 3);
+    screen.call('init', []);
+    screen.call('set_mode', [1]);
+    screen.call('set_labels', labels);
+    screen.call('set_values', [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 4]);   // performance, beat 1 of 4
+    const heard = screen.note(0x90, 60, 110);
+    screen.call('draw', []);
+    const beatOne = px(470 - 4 * 11 + 2, 15), beatTwo = px(470 - 3 * 11 + 2, 15);
+    const noteAt = px(Math.floor((60 - 36) * (480 / 61)) + 1, 260);
+    screen.note(0x80, 60, 0);
+    screen.call('set_values', [0, 0, 0, 0, 0, 0, 0, 0, 0]);         // a control page's nine bytes
+    screen.call('draw', []);
+    const noDotsOnControlPage = px(470 - 4 * 11 + 2, 15);
+    screen.dispose();
+    return { heard, beatOne, beatTwo, noteAt, noDotsOnControlPage };
+  }, pagePath);
+  assert.ok(!perf.skipped, 'the HoSTage page was loaded for the performance check');
+  {
+    assert.equal(perf.heard, true, 'the HoSTage page turns the note hook on');
+    assert.deepEqual(perf.beatOne, [255, 148, 8], 'beat one of the bar is lit orange');
+    assert.deepEqual(perf.beatTwo, [89, 98, 115], 'the other beats are dim');
+    assert.deepEqual(perf.noteAt, [255, 148, 8], 'a held note shows in the strip, orange when played hard');
+    assert.notDeepEqual(perf.noDotsOnControlPage, [89, 98, 115], 'a control page draws no beat dots');
+  }
+
+  assert.equal(surface.listened, true, 'a page that enabled hook 2 hears notes');
+  assert.deepEqual(surface.heard.slice(0, 3), [255, 0, 0], 'and its note() saw note 60');
+  assert.deepEqual(surface.border.slice(0, 3), [255, 148, 8], 'text borders draw in border_color');
+  assert.deepEqual(surface.fill.slice(0, 3), [32, 48, 64], 'bk_color fills the text box');
+  assert.deepEqual(surface.noAsset.slice(0, 3), [0, 0, 0], 'asset_get_valid is false for an asset never uploaded');
 
   assert.deepEqual(errors, [], 'no uncaught page errors');
   console.log('ctrl49Screen: every scene runs the embedded page and draws, in the preview and in HoSTage');

@@ -18,12 +18,22 @@
    * their frames. allAnimationFieldLabels() is there for the day the panel's rows do come out,
    * because the panel builds its search box from the rows it draws.
    *
+   * THIRD, THERE ARE TWO KINDS WITH KEYFRAMES IN THEM, and they are not the same thing. `keyframes`
+   * (utils/keyframeAnimation.js) is one list of frames played by CSS on one part: a pulse, a blink.
+   * `sequence` (utils/keyframeModel.js) is a track per target along a time axis, played by anime.js
+   * over the document's values — the only kind that reaches a value channel or a filmstrip frame,
+   * and the one a value trigger scrubs. They were built on two branches under one name; the merge
+   * kept both. The Frames editor belongs to the first, the track timeline to the second.
+   *
    * The Animation sections in Display and PixelDisplay are a different feature — playing a GIF or
    * sprite sheet on a dot-matrix screen — and have nothing to do with this one. The candidate list
    * grouped them by name.
    */
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import Plus from 'lucide-svelte/icons/plus';
+  import Play from 'lucide-svelte/icons/play';
+  import Square from 'lucide-svelte/icons/square';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
   import AnimationList from './animation/AnimationList.svelte';
   import TargetList from './animation/TargetList.svelte';
   import EasingCurve from './animation/EasingCurve.svelte';
@@ -32,6 +42,10 @@
   import BezierEditor from './animation/BezierEditor.svelte';
   import FramesEditor from './animation/FramesEditor.svelte';
   import Timeline from './animation/Timeline.svelte';
+  import KeyframeTimeline from './animation/KeyframeTimeline.svelte';
+  import * as anime from '../utils/animeTimeline.js';
+  import { addKeyframe, removeKeyframe, updateKeyframe, normalizeKeyframes, keyframesDuration, sampleKeyframes, isColourTarget } from '../utils/keyframeModel.js';
+  import { scrubKeyframes, clearKeyframeScrub, playKeyframesPreview } from '../utils/keyframePlayer.js';
   import { setDebugDock } from '../stores/debugDock.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { animationActivity } from '../stores/animationActivity.js';
@@ -68,6 +82,12 @@
     easingPatch,
     cleanSpring,
     ANIMATION_KINDS,
+    SEQUENCE_KIND,
+    EASING_NAMES,
+    offeredTargetsFor,
+    resolvedPartsOf,
+    baseValueAt,
+    sequenceTargetStatus,
     KEYFRAME_TRIGGER_TYPES,
     KEYFRAME_TRIGGER_LABELS,
     keyframeTargets,
@@ -107,7 +127,15 @@
   let selectedName = $derived(rows.some((row) => row.name === wantedName) ? wantedName : (rows[0]?.name ?? ''));
   let selected = $derived(rows.find((row) => row.name === selectedName) ?? null);
 
-  let targets = $derived(selected ? describeTargets(selected, partNames) : []);
+  let sequence = $derived(selected?.kind === SEQUENCE_KIND);
+  // For "does this part exist" on a sequence, generator-made parts count: a filmstrip's frame
+  // lives on one, and the document never holds it.
+  let knownPartNames = $derived(sequence ? [...new Set([...partNames, ...Object.keys(resolvedPartsOf(control))])] : partNames);
+  // What the Change dropdown offers: the part properties, and for a sequence the control's value
+  // channels and a frame track per filmstrip part.
+  let offered = $derived(offeredTargetsFor(control, selected?.kind));
+
+  let targets = $derived(selected ? describeTargets(selected, knownPartNames) : []);
   let deadCount = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames), 0));
 
   // Triggers name states by the control's own States keys; anything else never matches.
@@ -123,7 +151,12 @@
   let selectedClashes = $derived(selected ? clashesFor(selected.name, clashes) : []);
 
   let keyframes = $derived(selected?.kind === 'keyframes');
-  const KIND_LABELS = { transition: 'Transition', keyframes: 'Keyframes' };
+  const KIND_LABELS = { transition: 'Transition', keyframes: 'Keyframes', sequence: 'Sequence' };
+  const KIND_TITLES = {
+    transition: 'Eases between two styles when something changes',
+    keyframes: 'Plays a shape of its own on one part — a pulse, a blink — looping, on the beat, or from a script',
+    sequence: 'Tracks along a time axis, one per change, each with its own keyframes; a value trigger scrubs it',
+  };
 
   const ORIGIN_LABELS = { any: 'Any', user: 'Mine', external: 'Outside' };
   const ORIGIN_TITLES = {
@@ -139,9 +172,11 @@
   let newPart = $state('');
   let newProperty = $state(OFFERED_PROPERTIES[0].path);
   let partForAdd = $derived(newPart || partNames[0] || '');
-  let offeredForAdd = $derived(OFFERED_PROPERTIES.find((entry) => entry.path === newProperty) ?? OFFERED_PROPERTIES[0]);
+  let offeredForAdd = $derived(offered.find((entry) => entry.path === newProperty) ?? offered[0]);
   // Tell the user before they add it, not after.
-  let addStatus = $derived(targetStatus(buildTarget(partForAdd, offeredForAdd), partNames));
+  let addStatus = $derived(sequence
+    ? sequenceTargetStatus(buildTarget(partForAdd, offeredForAdd), knownPartNames, { triggerType: selected?.triggerType ?? 'stateChange' })
+    : targetStatus(buildTarget(partForAdd, offeredForAdd), partNames));
 
     // Arm from the selection only when NOTHING is armed — not merely when nothing of this kind is.
   // A target of another kind means another tab is being opened right now, and stealing it is how
@@ -192,10 +227,142 @@ onMount(() => {
     updateControlProperty(controlId, `Animations.${selectedName}.targets`, next);
   }
 
+  // --- Sequences: the time axis, the playhead on the canvas, and one keyframe at a time ----------
+
+  let axisLength = $derived(sequence ? keyframesDuration(selected.animation) : 0);
+  let tracks = $derived(sequence
+    ? targets.map((row) => ({ label: trackLabel(row), path: row.path, keyframes: normalizeKeyframes(row.target) }))
+    : []);
+  let playhead = $state(0);
+  let selectedKeyframe = $state(null); // { track, index }
+  let keyframeAt = $derived.by(() => {
+    if (!sequence || !selectedKeyframe) return null;
+    const target = selected.targets[selectedKeyframe.track];
+    const frames = target ? normalizeKeyframes(target) : [];
+    const keyframe = frames[selectedKeyframe.index];
+    return keyframe ? { ...selectedKeyframe, target, keyframe, colour: isColourTarget(target) } : null;
+  });
+  let playing = $state(false);
+  let stopPreview = null;
+
+  function trackLabel(row) {
+    const [, partName, ...rest] = row.path.startsWith('Parts.') ? row.path.split('.') : ['', '', row.path];
+    const whole = offered.find((entry) => entry.scope === 'control' && entry.path === row.path);
+    if (whole) return whole.label;
+    const entry = OFFERED_PROPERTIES.find((e) => e.path === rest.join('.')) ?? OFFERED_PROPERTIES.find((e) => e.path === row.path);
+    const what = entry?.label ?? rest.join('.') ?? row.path;
+    return partName ? `${partName} · ${what}` : what;
+  }
+
+  /** The canvas shows the pose at the playhead, in any view. */
+  function scrubTo(ms) {
+    playhead = Math.max(0, Math.round(ms));
+    if (controlId && selected && sequence) scrubKeyframes(controlId, selectedName, selected.animation, playhead);
+  }
+
+  function stopPlaying() {
+    stopPreview?.();
+    stopPreview = null;
+    playing = false;
+  }
+
+  function togglePlay() {
+    if (!controlId || !selected || !sequence) return;
+    if (playing) {
+      stopPlaying();
+      scrubTo(playhead);
+      return;
+    }
+    playing = true;
+    stopPreview = playKeyframesPreview(controlId, selectedName, selected.animation, {
+      ontime: (ms) => { playhead = Math.round(ms); },
+      ondone: () => { playing = false; stopPreview = null; },
+    });
+  }
+
+  function writeTrack(trackIndex, nextTarget) {
+    writeTargets(selected.targets.map((target, index) => (index === trackIndex ? nextTarget : target)));
+  }
+
+  /** A keyframe on the selected track at the playhead, holding whatever the pose there is. */
+  function addKeyframeAtPlayhead() {
+    if (!selected || !sequence) return;
+    const trackIndex = targetIndex >= 0 ? targetIndex : 0;
+    const target = selected.targets[trackIndex];
+    if (!target) return;
+    const pose = sampleKeyframes(anime, selected.animation, playhead);
+    const value = pose[target.path] ?? baseValueAt(control, target.path) ?? 0;
+    const next = addKeyframe(target, { time: playhead, value });
+    writeTrack(trackIndex, next);
+    selectedKeyframe = { track: trackIndex, index: normalizeKeyframes(next).findIndex((k) => k.time === playhead) };
+    rawTargetIndex = trackIndex;
+  }
+
+  function deleteSelectedKeyframe() {
+    if (!keyframeAt) return;
+    writeTrack(keyframeAt.track, removeKeyframe(keyframeAt.target, keyframeAt.index));
+    selectedKeyframe = null;
+  }
+
+  function patchSelectedKeyframe(patch) {
+    if (!keyframeAt) return;
+    const result = updateKeyframe(keyframeAt.target, keyframeAt.index, patch);
+    writeTrack(keyframeAt.track, result.target);
+    selectedKeyframe = result.index >= 0 ? { track: keyframeAt.track, index: result.index } : null;
+    if (patch.time != null) scrubTo(patch.time);
+  }
+
+  /** The timeline dragged some keyframes; each lands where it was dropped, as one store write. */
+  function moveKeyframes(moves) {
+    if (!selected) return;
+    const next = [...selected.targets];
+    let follow = null;
+    for (const move of moves) {
+      const target = next[move.track];
+      if (!target) continue;
+      const result = updateKeyframe(target, move.index, { time: move.time });
+      next[move.track] = result.target;
+      if (selectedKeyframe?.track === move.track && selectedKeyframe?.index === move.index) follow = { track: move.track, index: result.index };
+    }
+    writeTargets(next);
+    if (follow) selectedKeyframe = follow;
+  }
+
+  // While a sequence is open, the canvas shows its pose at the playhead — on arrival, after every
+  // edit (the scrub rebuilds when the definition changes), and as the playhead moves. Anything
+  // else open on the control takes the pose off again. While playing, the preview owns the
+  // overlay and this stays out of its way.
+  $effect(() => {
+    if (!controlId) return;
+    if (playing) return;
+    if (!sequence || !selected) {
+      clearKeyframeScrub(controlId);
+      return;
+    }
+    scrubKeyframes(controlId, selectedName, selected.animation, playhead);
+  });
+
+  // Another control, or the tab closing, takes the pose off the one before. This depends on the
+  // id alone, so it does not run (and clear what the effect above just posed) on every edit.
+  $effect(() => {
+    const id = controlId;
+    return () => {
+      stopPlaying();
+      if (id) clearKeyframeScrub(id);
+    };
+  });
+  onDestroy(() => { stopPlaying(); if (controlId) clearKeyframeScrub(controlId); });
+
   function add() {
     if (!selected) return;
     const target = buildTarget(partForAdd, offeredForAdd);
     if (!target) return;
+    // On a sequence a new track starts with one keyframe holding the authored value, as the kind
+    // switch seeds, so adding it changes nothing on screen until a second one.
+    if (sequence) {
+      const base = baseValueAt(control, target.path);
+      target.keyframes = base === undefined ? [] : [{ time: 0, value: base, easing: 'outQuad' }];
+    }
     writeTargets(addTarget(selected.targets, target));
     rawTargetIndex = selected.targets.length;
   }
@@ -428,21 +595,36 @@ onMount(() => {
           <div class="setbox">
             <div class="grp">Timing</div>
             <div class="r">
-              <span class="lab" title="A transition eases between two styles when something changes; keyframes play a shape of their own">Kind</span>
-              <Segmented options={ANIMATION_KINDS.map((value) => ({ value, label: KIND_LABELS[value] }))}
-                         value={keyframes ? 'keyframes' : 'transition'} ariaLabel="Kind"
-                         onchange={(value) => setProps(kindPatch(selected, value))} />
+              <span class="lab" title="A transition eases between two styles when something changes; keyframes play a shape of their own on one part; a sequence runs a track per change along a time axis">Kind</span>
+              <Segmented options={ANIMATION_KINDS.map((value) => ({ value, label: KIND_LABELS[value], title: KIND_TITLES[value] }))}
+                         value={ANIMATION_KINDS.includes(selected.kind) ? selected.kind : 'transition'} ariaLabel="Kind"
+                         onchange={(value) => { stopPlaying(); selectedKeyframe = null; setProps(kindPatch(selected, value, control)); }} />
             </div>
             <div class="r">
-              <label for="anim-dur">Duration</label>
-              <div class="cell"><NumberCell label="ms" value={selected.duration} min={0} step={10}
-                onchange={(value) => setProp('duration', Math.max(0, Math.round(value)))} /></div>
+              <label for="anim-dur">{sequence ? 'Length' : 'Duration'}</label>
+              <div class="cell"><NumberCell label="ms" value={sequence ? axisLength : selected.duration} min={sequence ? 100 : 0} step={10}
+                onchange={(value) => setProp('duration', Math.max(sequence ? 100 : 0, Math.round(value)))} /></div>
             </div>
-            <div class="r">
-              <label for="anim-delay">Delay</label>
-              <div class="cell"><NumberCell label="ms" value={selected.delay} min={0} step={10}
-                onchange={(value) => setProp('delay', Math.max(0, Math.round(value)))} /></div>
-            </div>
+            {#if sequence}
+              <div class="r">
+                <span class="lab">Loop</span>
+                <Segmented options={[{ value: 'off', label: 'Once' }, { value: 'on', label: 'Loop' }]}
+                           value={selected.loop ? 'on' : 'off'} ariaLabel="Loop"
+                           onchange={(value) => setProp('loop', value === 'on')} />
+              </div>
+              <div class="r">
+                <span class="lab" title="When it reaches the end while the state that started it is still there">After</span>
+                <Segmented options={[{ value: 'hold', label: 'Hold last' }, { value: 'return', label: 'Return' }]}
+                           value={selected.hold ? 'hold' : 'return'} ariaLabel="After"
+                           onchange={(value) => setProp('hold', value === 'hold')} />
+              </div>
+            {:else}
+              <div class="r">
+                <label for="anim-delay">Delay</label>
+                <div class="cell"><NumberCell label="ms" value={selected.delay} min={0} step={10}
+                  onchange={(value) => setProp('delay', Math.max(0, Math.round(value)))} /></div>
+              </div>
+            {/if}
 
             <div class="grp">Runs when</div>
             {#if keyframes}
@@ -536,12 +718,16 @@ onMount(() => {
                   <StateChips choices={stateChoices} value={selected.to} unknown={unknownTo} ariaLabel="To"
                               onchange={(next) => setProp('trigger.to', next)} />
                 </div>
-                <div class="r">
-                  <span class="lab" title="Play it backwards when a To state is left — how a hover lift settles">Leaving</span>
-                  <Segmented options={[{ value: false, label: 'Snap back' }, { value: true, label: 'Play back' }]}
-                             value={selected.reverse} ariaLabel="Also when leaving"
-                             onchange={(value) => setProp('trigger.reverse', value)} />
-                </div>
+                {#if sequence}
+                  <p class="hint">Plays from the start each time the control enters a To state. With Hold last, the final frame stays until that state is left.</p>
+                {:else}
+                  <div class="r">
+                    <span class="lab" title="Play it backwards when a To state is left — how a hover lift settles">Leaving</span>
+                    <Segmented options={[{ value: false, label: 'Snap back' }, { value: true, label: 'Play back' }]}
+                               value={selected.reverse} ariaLabel="Also when leaving"
+                               onchange={(value) => setProp('trigger.reverse', value)} />
+                  </div>
+                {/if}
                 {#if unknownStates.length}
                   <p class="warn unknownwarn">
                     <b>{unknownStates.length === 1 ? `“${unknownStates[0]}” is not a state` : `${unknownStates.length} names are not states`} of {controlName}.</b>
@@ -554,18 +740,26 @@ onMount(() => {
                   <input class="txt" id="anim-source" type="text" value={selected.source}
                          onchange={(event) => setProp('trigger.source', event.currentTarget.value)} />
                 </div>
-                <div class="r">
-                  <span class="lab">Origin</span>
-                  <Segmented options={VALUE_ORIGINS.map((value) => ({ value, label: ORIGIN_LABELS[value], title: ORIGIN_TITLES[value] }))}
-                             value={selected.origin} ariaLabel="Origin"
-                             onchange={(value) => setProp('trigger.origin', value)} />
-                </div>
+                {#if sequence}
+                  <p class="hint">Follows the value instead of playing: at 30% of its range the control shows the pose 30% along the axis.</p>
+                {:else}
+                  <div class="r">
+                    <span class="lab">Origin</span>
+                    <Segmented options={VALUE_ORIGINS.map((value) => ({ value, label: ORIGIN_LABELS[value], title: ORIGIN_TITLES[value] }))}
+                               value={selected.origin} ariaLabel="Origin"
+                               onchange={(value) => setProp('trigger.origin', value)} />
+                  </div>
+                {/if}
               {/if}
             {/if}
             {#each selectedClashes as clash (clash.other + clash.role)}
               <p class="warn clashwarn" class:wins={clash.role === 'wins'}>{clash.text}</p>
             {/each}
 
+            {#if sequence}
+            <div class="grp">Sequence</div>
+            <p class="note">A keyframe per diamond. Drag one along the axis; click it to set its time, value and the easing it arrives with. Besides what a transition can ease, a track can drive a value channel or a filmstrip's frame.</p>
+            {:else}
             <div class="grp">Easing</div>
             <div class="easings">
               {#each EASING_CHOICES as name (name)}
@@ -602,6 +796,7 @@ onMount(() => {
               <p class="hint">A script's ce.anim moves the same way with curve <code>"spring"</code>,
                 damping <code>{selected.curve.damping}</code> and frequency <code>{selected.curve.frequency}</code>.</p>
             {/if}
+            {/if}
           </div>
         </div>
 
@@ -624,8 +819,8 @@ onMount(() => {
             <p class="hint">Scale, turn, move and fade, and two colours: fill recolours a solid fill, a shape or a line; text, its text. A gradient or an image keeps its own colours.</p>
           {:else}
             <div class="colh">
-              Changes
-              <s>{targets.length} {targets.length === 1 ? 'target' : 'targets'}</s>
+              {sequence ? 'Tracks' : 'Changes'}
+              <s>{targets.length} {sequence ? (targets.length === 1 ? 'track' : 'tracks') : (targets.length === 1 ? 'target' : 'targets')}</s>
             </div>
             <TargetList
               rows={targets}
@@ -635,16 +830,67 @@ onMount(() => {
               onreorder={reorder}
             />
 
+            {#if sequence}
+              <div class="seq">
+                <div class="transport">
+                  <button type="button" class="mk" class:on={playing} onclick={togglePlay} title={playing ? 'Stop' : 'Play on the canvas'} aria-label={playing ? 'Stop' : 'Play'}>
+                    {#if playing}<Square size={10} />{:else}<Play size={10} />{/if}
+                  </button>
+                  <span class="time" aria-live="off">{playhead} ms <s>of {axisLength}</s></span>
+                  <button type="button" class="mk" disabled={!targets.length} onclick={addKeyframeAtPlayhead} title="Add a keyframe to the selected track at the playhead">
+                    <Plus size={10} /> Keyframe at {playhead} ms
+                  </button>
+                </div>
+                <KeyframeTimeline
+                  {tracks}
+                  duration={axisLength}
+                  time={playhead}
+                  selected={selectedKeyframe}
+                  ontime={scrubTo}
+                  onmove={moveKeyframes}
+                  onselect={(at) => { selectedKeyframe = at; if (at) rawTargetIndex = at.track; if (at) scrubTo(tracks[at.track]?.keyframes[at.index]?.time ?? playhead); }}
+                />
+                {#if keyframeAt}
+                  <div class="kfbox">
+                    <div class="r">
+                      <label for="kf-time">Time</label>
+                      <div class="cell"><NumberCell label="ms" value={keyframeAt.keyframe.time} min={0} step={10}
+                        onchange={(value) => patchSelectedKeyframe({ time: Math.max(0, Math.round(value)) })} /></div>
+                    </div>
+                    <div class="r">
+                      <label for="kf-value">Value</label>
+                      {#if keyframeAt.colour}
+                        <input class="txt" id="kf-value" type="text" value={keyframeAt.keyframe.value} aria-label="Colour, AARRGGBB"
+                               onchange={(event) => patchSelectedKeyframe({ value: event.currentTarget.value })} />
+                      {:else}
+                        <div class="cell"><NumberCell label="" value={keyframeAt.keyframe.value} step={1}
+                          onchange={(value) => patchSelectedKeyframe({ value })} /></div>
+                      {/if}
+                    </div>
+                    <div class="r">
+                      <label for="kf-easing">Arrives</label>
+                      <PropertySelect options={EASING_NAMES.map((name) => ({ value: name, label: name }))}
+                                      value={keyframeAt.keyframe.easing} ariaLabel="Easing into this keyframe"
+                                      onchange={(value) => patchSelectedKeyframe({ easing: value })} />
+                    </div>
+                    <button type="button" class="mk danger" onclick={deleteSelectedKeyframe}><Trash2 size={10} /> Delete keyframe</button>
+                  </div>
+                {:else if targets.length}
+                  <p class="note">Click a keyframe to edit it. The first keyframe on a track is where it starts; a track with one keyframe holds that value.</p>
+                {/if}
+              </div>
+            {/if}
+
             <div class="addbox">
               <div class="r">
                 <label for="anim-part">Part</label>
                 <PropertySelect options={partNames.map((name) => ({ value: name, label: name }))}
-                                value={partForAdd} ariaLabel="Part"
+                                value={partForAdd} ariaLabel="Part" disabled={offeredForAdd?.scope === 'control'}
                                 onchange={(value) => { newPart = value; }} />
               </div>
               <div class="r">
                 <label for="anim-what">Change</label>
-                <PropertySelect options={OFFERED_PROPERTIES.map((entry) => ({ value: entry.path, label: entry.label }))}
+                <PropertySelect options={offered.map((entry) => ({ value: entry.path, label: entry.label }))}
                                 value={newProperty} ariaLabel="What to change"
                                 onchange={(value) => { newProperty = value; }} />
               </div>
@@ -656,8 +902,8 @@ onMount(() => {
                 </p>
               {/if}
 
-              <button type="button" class="addbtn" disabled={!partNames.length} onclick={add}>
-                <Plus size={11} /> Add this change
+              <button type="button" class="addbtn" disabled={!partNames.length && offeredForAdd?.scope !== 'control'} onclick={add}>
+                <Plus size={11} /> {sequence ? 'Add this track' : 'Add this change'}
               </button>
             </div>
           {/if}
@@ -915,4 +1161,14 @@ onMount(() => {
     .cols { flex-wrap: wrap; }
     .targetcol { flex: 1 1 100%; }
   }
+
+  /* The sequence editor: transport, track timeline, and the selected keyframe's box. */
+  .note { margin: 6px 0 0; font-size: 10.5px; line-height: 1.4; color: #8E99A4; }
+  .seq { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .transport { display: flex; align-items: center; gap: 8px; }
+  .transport .time { font-size: 11px; color: #EAF5FF; font-variant-numeric: tabular-nums; }
+  .transport .time s { text-decoration: none; color: #6E7A86; margin-left: 4px; }
+  .mk.on { border-color: #F5B83D; color: #F5B83D; }
+  .mk.danger { align-self: flex-start; color: #E5A029; }
+  .kfbox { border: 1px solid #2A3038; border-radius: 4px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; background: #15181B; }
 </style>

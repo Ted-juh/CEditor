@@ -41,7 +41,11 @@ const outDir = path.join(repo, 'export-out');
 
 // Read the panel + its Export settings (Panel Properties → Export). These drive the plugin identity;
 // the CLI productName arg and built-in defaults are fallbacks (keeps the CLI and in-app paths aligned).
-const panelDoc = JSON.parse(readFileSync(panel, 'utf8'));
+// A saved .cepanel stores controls as differences from their defaults, which the plug-in cannot read
+// and from which the host parameter list comes out wrong (lib/exportDocument.mjs). The app hands this
+// script a complete document; a saved file passed by hand is completed here the same way.
+const panelDoc = await (await import('./lib/exportDocument.mjs'))
+  .completeExportDocument(JSON.parse(readFileSync(panel, 'utf8')), path.resolve(panel));
 const es = panelDoc.exportSettings ?? {};
 validateRuntimeFormats(panelDoc);
 // The fallback chain lives in panelIdentityInputs.js rather than here, because the template
@@ -321,9 +325,15 @@ mkdirSync(outDir, { recursive: true });
 const ep = await import(pathToFileURL(path.join(repo, 'CE/web/src/CE_Application/utils/exportParameters.js')).href);
 panelDoc.exportParameters = ep.deriveExportParameters(panelDoc);
 const bakedPanel = path.join(outDir, `${productName}.cepanel`);
-writeFileSync(bakedPanel, JSON.stringify(panelDoc, null, 2));
+// Compact: the plug-in parses this file in full at load (three times, as it happens) and nobody
+// reads it. Indented, GAIA's was 94 MB; compact it is 28 MB. The report below says where those go.
+writeFileSync(bakedPanel, JSON.stringify(panelDoc));
 const panelAbs = bakedPanel.replace(/\\/g, '/');
 console.log(`Baked ${panelDoc.exportParameters.length} parameters into ${bakedPanel}`);
+{
+  const { exportSizeReport, formatExportSizeReport } = await import('./lib/exportSizeReport.mjs');
+  for (const line of formatExportSizeReport(exportSizeReport(panelDoc))) console.log(line);
+}
 
 // 2. Build the web bundle (the self-contained UI embedded into the plugin). The bundle is
 //    PANEL-INDEPENDENT (the .cepanel is loaded at runtime, not baked into the JS), so we only rebuild
@@ -497,11 +507,29 @@ try {
       throw new Error(`LV2 artifact not found: ${builtLv2}`);
     }
   }
+  const exported = [];
   for (const staged of outputs) {
     const destination = path.join(outDir, path.basename(staged));
     rmSync(destination, { recursive: true, force: true });
     cpSync(staged, destination, { recursive: true });
     console.log(`EXPORTED: ${destination} (${mb(dirSize(destination))} MB)`);
+    exported.push(destination);
+  }
+
+  // Optional: run the hosts' conformance suites over what was just built (validate-plugins.mjs,
+  // docs/plugin-validation.md). Opt-in — pluginval takes minutes — via Export settings
+  // `validatePlugins: true` or CE_VALIDATE_EXPORT=1. A failure is reported loudly and does NOT undo
+  // the export: the files are good enough to load and look at, and the report says what to fix.
+  if (es.validatePlugins === true || process.env.CE_VALIDATE_EXPORT === '1') {
+    const { validatePlugins } = await import(pathToFileURL(path.join(repo, 'tools/scripts/validate-plugins.mjs')).href);
+    console.log('Validating the export (pluginval / clap-validator)...');
+    const results = validatePlugins(exported);
+    for (const result of results) {
+      const name = path.basename(result.plugin);
+      if (result.outcome === 'passed') console.log(`  ✓ ${name}: ${result.validator} passed`);
+      else if (result.outcome === 'not-run') console.log(`  - ${name}: not validated (${result.reason})`);
+      else console.warn(`  ✗ ${name}: ${result.validator} FAILED — run node tools/scripts/validate-plugins.mjs "${result.plugin}" for the details`);
+    }
   }
 } finally {
   try {

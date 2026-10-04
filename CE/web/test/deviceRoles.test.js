@@ -165,6 +165,11 @@ test('the GAIA panel names its device after the instrument', () => {
     ]),
     'bottom_pages.page',
     'patch_banks.page',
+    // The arpeggiator's one binding is on its arpEndStep port. Until each channel took ITS binding
+    // (exportParametersChannelBindings.test.js), all seven of its lanes carried it, so automating
+    // the note or the gate in the exported plugin moved the synth's arp end step.
+    ...['arpCurrentStep', 'arpStepCount', 'arpGate', 'arpNote', 'arpVelocity', 'arpPattern']
+      .map((channel) => `arp_pattern_grid.${channel}`),
   ]);
   assert.deepEqual(panel.requiredProfiles.map((e) => e.role), ['Roland GAIA SH-01']);
 });

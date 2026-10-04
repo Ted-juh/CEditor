@@ -4,7 +4,19 @@
  * are passed in by the caller.
  */
 
+import { rotatedRectBounds } from './transformMath.js';
+import { distanceCandidates, snapCandidates, spatialIndexFor, worthIndexing } from './controlSpatialIndex.js';
+
 const SNAP_THRESHOLD = 5;
+
+const ALL_X_EDGES = ['left', 'center', 'right'];
+const ALL_Y_EDGES = ['top', 'center', 'bottom'];
+
+/** What another control occupies on screen: its rotated footprint, not its unrotated box. */
+function footprintOf(transform) {
+  const box = { x: Number(transform.x) || 0, y: Number(transform.y) || 0, w: Number(transform.width) || 0, h: Number(transform.height) || 0 };
+  return rotatedRectBounds(box, transform.rotation);
+}
 
 /**
  * Find alignment snap guides against other controls + ruler guides.
@@ -22,23 +34,27 @@ const SNAP_THRESHOLD = 5;
  *                   panel-unit threshold is a 20-screen-px magnet at 400% and
  *                   barely one pixel at 25%.
  */
-export function findAlignmentSnap(rect, selfId, otherControls, rulerGuides, getSection, panelSize = null, threshold = SNAP_THRESHOLD) {
+export function findAlignmentSnap(rect, selfId, otherControls, rulerGuides, getSection, panelSize = null, threshold = SNAP_THRESHOLD, edges = null) {
   const { x, y, w, h } = rect;
   const result = { x, y, guides: [] };
   let xIsCenter = false;
   let yIsCenter = false;
 
-  // Our edges by axis
+  // Our edges by axis — all three unless the caller names which may snap. A resize names only the
+  // edges being dragged (snapResizeRect): snapping the far edge of a box being resized would move
+  // the box instead of resizing it.
+  const xAllowed = edges?.x ?? ALL_X_EDGES;
+  const yAllowed = edges?.y ?? ALL_Y_EDGES;
   const myXEdges = [
-    { offset: 0,     val: x },         // left
-    { offset: w / 2, val: x + w / 2 }, // centerX
-    { offset: w,     val: x + w },     // right
-  ];
+    { name: 'left', offset: 0,     val: x },
+    { name: 'center', offset: w / 2, val: x + w / 2 },
+    { name: 'right', offset: w,     val: x + w },
+  ].filter((edge) => xAllowed.includes(edge.name));
   const myYEdges = [
-    { offset: 0,     val: y },         // top
-    { offset: h / 2, val: y + h / 2 }, // centerY
-    { offset: h,     val: y + h },     // bottom
-  ];
+    { name: 'top', offset: 0,     val: y },
+    { name: 'center', offset: h / 2, val: y + h / 2 },
+    { name: 'bottom', offset: h,     val: y + h },
+  ].filter((edge) => yAllowed.includes(edge.name));
 
   let bestDx = threshold;
   let bestDy = threshold;
@@ -47,16 +63,20 @@ export function findAlignmentSnap(rect, selfId, otherControls, rulerGuides, getS
   let xGuidePos = null;
   let yGuidePos = null;
 
-  if (otherControls) {
-    for (const other of otherControls) {
+  // On a big panel, only the siblings with an edge inside the threshold of one of ours can win; the
+  // spatial index finds them without visiting the rest (controlSpatialIndex.js). Same loop, same order.
+  const snapPool = worthIndexing(otherControls)
+    ? snapCandidates(spatialIndexFor(otherControls, getSection), myXEdges.map((edge) => edge.val), myYEdges.map((edge) => edge.val), threshold)
+    : otherControls;
+
+  if (snapPool) {
+    for (const other of snapPool) {
       const otherCore = getSection(other, 'Core');
       const otherTransform = getSection(other, 'Transform');
       if (!otherTransform || otherCore?.id === selfId) continue;
 
-      const ox = otherTransform.x;
-      const oy = otherTransform.y;
-      const ow = otherTransform.width;
-      const oh = otherTransform.height;
+      // A rotated neighbour is lined up with by what you can see of it.
+      const { x: ox, y: oy, w: ow, h: oh } = footprintOf(otherTransform);
 
       const otherXEdges = [ox, ox + ow / 2, ox + ow];
       const otherYEdges = [oy, oy + oh / 2, oy + oh];
@@ -165,6 +185,71 @@ export function findAlignmentSnap(rect, selfId, otherControls, rulerGuides, getS
  *   panelSize     — { width, height }
  *   getSection    — (ctrl, name) => section
  */
+/**
+ * Snap a control being MOVED, by what is on screen. A rotated control's visible edges are its rotated
+ * footprint's; snapping its unrotated box lined up edges nobody can see. `snap(box)` is the caller's
+ * findAlignmentSnap; the footprint is snapped and the same shift applied to the control.
+ */
+export function snapMovingRect(rect, rotation, snap) {
+  const footprint = rotatedRectBounds(rect, rotation);
+  const snapped = snap(footprint);
+  return { x: rect.x + (snapped.x - footprint.x), y: rect.y + (snapped.y - footprint.y), guides: snapped.guides };
+}
+
+/**
+ * Snap a control being RESIZED: only the edges the handle drags may snap, and a snap changes the
+ * size, never the position of the edge held still. Before this, a resize snapped like a move — the
+ * whole box jumped so that SOME edge met the guide, so dragging a right edge to a neighbour could
+ * shove the box sideways instead of widening it.
+ *
+ *   handle   'l' | 'r' | 't' | 'b' | 'tl' | 'tr' | 'bl' | 'br'
+ *   snap     (rect, { x: [edge], y: [edge] }) => findAlignmentSnap result
+ *   opts     { aspectLock, aspectRatio, minW, minH } — with the aspect locked only one axis snaps,
+ *            and the other follows the ratio, so a snap cannot break it.
+ *
+ * Returns { x, y, w, h, guides }.
+ */
+export function snapResizeRect(rect, handle, snap, opts = {}) {
+  const xEdge = handle.includes('l') ? 'left' : handle.includes('r') ? 'right' : null;
+  const yEdge = handle.includes('t') ? 'top' : handle.includes('b') ? 'bottom' : null;
+  const found = snap(rect, { x: xEdge ? [xEdge] : [], y: yEdge ? [yEdge] : [] });
+  let vertical = found.guides.find((guide) => guide.type === 'vertical') ?? null;
+  let horizontal = found.guides.find((guide) => guide.type === 'horizontal') ?? null;
+  if (opts.aspectLock && vertical && horizontal) {
+    // One axis only: keep the nearer snap.
+    const dx = Math.abs(found.x - rect.x);
+    const dy = Math.abs(found.y - rect.y);
+    if (dx <= dy) horizontal = null; else vertical = null;
+  }
+
+  let { x, y, w, h } = rect;
+  const right = x + w;
+  const bottom = y + h;
+  if (vertical) {
+    if (xEdge === 'right') w = vertical.pos - x;
+    else { x = vertical.pos; w = right - x; }
+  }
+  if (horizontal) {
+    if (yEdge === 'bottom') h = horizontal.pos - y;
+    else { y = horizontal.pos; h = bottom - y; }
+  }
+  if (opts.aspectLock && (vertical || horizontal)) {
+    const ratio = opts.aspectRatio || (rect.w / Math.max(1, rect.h));
+    if (vertical) {
+      h = w / ratio;
+      if (yEdge === 'top') y = bottom - h;
+      else if (!yEdge) y = rect.y + rect.h / 2 - h / 2;
+    } else {
+      w = h * ratio;
+      if (xEdge === 'left') x = right - w;
+      else if (!xEdge) x = rect.x + rect.w / 2 - w / 2;
+    }
+  }
+  // A snap that would collapse the box below its minimum is no snap.
+  if (w < (opts.minW ?? 1) || h < (opts.minH ?? 1)) return { ...rect, guides: [] };
+  return { x, y, w, h, guides: [vertical, horizontal].filter(Boolean) };
+}
+
 export function computeDistances(rect, selfId, selectedIds, otherControls, panelSize, getSection) {
   const labels = [];
   if (!otherControls) return labels;
@@ -178,7 +263,9 @@ export function computeDistances(rect, selfId, selectedIds, otherControls, panel
   let nearestTop = null;
   let nearestBottom = null;
 
-  for (const other of otherControls) {
+  // Only a sibling in the rect's own rows or columns can be a nearest neighbour.
+  const pool = worthIndexing(otherControls) ? distanceCandidates(spatialIndexFor(otherControls, getSection), rect) : otherControls;
+  for (const other of pool) {
     const oc = getSection(other, 'Core');
     const ot = getSection(other, 'Transform');
     if (!ot || oc?.id === selfId) continue;

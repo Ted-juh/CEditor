@@ -3,6 +3,8 @@
 #include <juce_core/juce_core.h>
 
 #include <functional>
+#include <map>
+#include <set>
 
 // Library — Hostage's unified preset, instrument and rack library.
 //
@@ -20,6 +22,12 @@
 //
 // juce_core only, JSON through juce::var — the same tier and conventions as PluginCatalog,
 // for the same reason: everything here must be provable by a plain test executable.
+//
+// WHERE IT LIVES. This class is the library in memory, and every browse and search runs here.
+// It does not write itself anywhere: it keeps a journal of what changed (LibraryChanges, below),
+// and LibraryStore writes that journal to a SQLite database, a row at a time. The JSON form
+// (`toVar`, `loadFrom`, `saveTo`) is what the library used to be stored as; it is now read once,
+// to import an old library, and written only as an export.
 
 namespace ceditor::host
 {
@@ -63,6 +71,8 @@ struct SonicProfile
     int   latencySamples = 0;
 
     juce::Array<float> envelope;  // sonicEnvelopePoints peaks, 0..1 — the tile's waveform
+
+    bool operator== (const SonicProfile&) const = default;
 };
 
 /** One part of a captured rack, as it sounded when the rack was saved. Harvested from the
@@ -73,7 +83,14 @@ struct CapturedPart
 {
     juce::String partId, pluginCeId, pluginName, presetName;
     SonicProfile sonic;
+
+    bool operator== (const CapturedPart&) const = default;
 };
+
+/** A captured rack's parts in their stored form, shared by the JSON library and LibraryStore so
+    the two cannot drift apart. */
+juce::var capturedPartsToVar (const juce::Array<CapturedPart>& parts);
+juce::Array<CapturedPart> capturedPartsFromVar (const juce::var& stored);
 
 /** How far apart two sounds are, 0 (indistinguishable on these axes) to 1. Weighted, because the
     axes are not equally telling: brightness and attack are what somebody means by "like this
@@ -115,8 +132,18 @@ struct LibraryVersion
     juce::String versionId;         // minted once
     juce::String label;             // what you called it; empty for an unnamed save
     juce::int64 savedAtMs = 0;      // juce::Time::currentTimeMillis()
-    juce::String stateBlobBase64;   // the state itself
+    juce::String stateBlobBase64;   // the state itself, when `stateLoaded`
     bool origin = false;            // the state this record was branched from
+
+    // A library read from LibraryStore leaves earlier versions' states on disk: they are three of
+    // every four state blobs a captured sound carries, and they are read only when a version is
+    // applied or compared. Then `stateLoaded` is false, `stateBlobBase64` is empty, and the state
+    // comes from LibraryStore::versionState. `stateLength` is the length `stateBlobBase64` has when
+    // loaded, so a listing can say how big a save is without reading it.
+    bool stateLoaded = true;
+    int stateLength = 0;
+
+    bool operator== (const LibraryVersion&) const = default;
 };
 
 /** Applies the rule above, newest last. Pure and total: the same list in, the same list out. */
@@ -208,8 +235,13 @@ struct LibraryRecord
         juce::String notes;
         juce::StringArray tags;
         juce::StringArray collections;
+
+        bool operator== (const UserMetadata&) const = default;
     };
     UserMetadata user;
+
+    /** Field for field, exactly. What tells the store whether reading a row changed anything. */
+    bool operator== (const LibraryRecord&) const = default;
 };
 
 // -- browsing: facets, exclusion, and the queries a collection is made of -----------------------
@@ -281,6 +313,13 @@ struct LibraryQuery
     LibraryRange brightness, attack, tail, width, cost;
     bool measuredOnly = false;
 
+    // The order results come back in. Empty is library order. The others are "name",
+    // "instrument", "category", "rating", "recent" (last loaded), "loads", "added", and the
+    // measured "brightness", "attack", "tail" and "width". Sorting happens here rather than in
+    // the page because the page only ever holds one slice of a large result.
+    juce::String sort;
+    bool sortDescending = false;
+
     /** True when any measured axis is narrowed — what the browser gates its "unmeasured" notice
         on, and what tells the service the analysis is worth offering. */
     bool usesMeasurements() const
@@ -317,13 +356,78 @@ struct SmartCollection
     LibraryQuery query;
 };
 
+// -- what changed, for the store -----------------------------------------------------------------
+//
+// A click changes one field of one record, and the store should write exactly that: not the
+// record, and certainly not the library. So every mutator on Library notes WHAT it changed, in
+// groups that match the database's columns, and LibraryStore turns the journal into row updates.
+//
+// The groups are finest where two CEditor processes are likely to touch one record at once. The
+// standalone and the plug-in in a DAW share a library, and the case that matters is one of them
+// favouriting a sound while the other auditions it. The favourite is a `favourite` change, the
+// audition a usage delta, and neither writes over the other. Usage is kept as a DELTA for the same
+// reason: two processes each adding one must make two, which writing an absolute count cannot do.
+
+class LibraryStore;
+
+struct LibraryChanges
+{
+    enum Field : juce::uint32
+    {
+        created     = 1u << 0,   // the row is new: write all of it
+        identity    = 1u << 1,   // what the source says: type, names, locator, fingerprint, factory,
+                                 // the rack manifest, the class id, branchedFrom and addedAtMs
+        missing     = 1u << 2,
+        hidden      = 1u << 3,
+        sonic       = 1u << 4,   // the measurement, the fingerprint it was taken of, the refusal
+        state       = 1u << 5,   // the current state blob and every version
+        parts       = 1u << 6,
+        favourite   = 1u << 7,
+        rating      = 1u << 8,
+        notes       = 1u << 9,
+        tags        = 1u << 10,
+        collections = 1u << 11,
+
+        user       = favourite | rating | notes | tags | collections,
+        everything = identity | missing | hidden | sonic | state | parts | user
+    };
+
+    struct Usage
+    {
+        int loads = 0;
+        int auditions = 0;
+        juce::int64 lastLoadedAtMs = 0;
+    };
+
+    std::map<juce::String, juce::uint32> records;   // recordId -> Field bits
+    std::map<juce::String, Usage> usage;            // recordId -> counts to ADD
+    std::set<juce::String> removedRecords;
+    std::set<juce::String> smartCollections;        // added or replaced
+    std::set<juce::String> removedSmartCollections;
+
+    bool isEmpty() const;
+
+    /** Folds `later` in on top of this journal. The store uses it to put back a journal it could not
+        write beneath whatever changed while it was trying, so a busy database delays a change and
+        never drops it. */
+    void absorb (LibraryChanges later);
+};
+
 class Library
 {
 public:
     const juce::Array<LibraryRecord>& allRecords() const      { return records; }
 
-    LibraryRecord* find (const juce::String& recordId);
+    /** Read-only on purpose. A record is changed through the mutators below or through `edit`, so
+        that the journal hears about it: a change the journal never saw is never saved. */
     const LibraryRecord* find (const juce::String& recordId) const;
+
+    /** The record, to change in place. `fields` says what the caller is about to change (a
+        LibraryChanges::Field mask), and only that is written. The default is everything except the
+        usage counts, which is always correct and only costs a wider write; the counts move through
+        `noteRecordUsed` alone, because they are deltas. */
+    LibraryRecord* edit (const juce::String& recordId,
+                         juce::uint32 fields = LibraryChanges::everything);
 
     /** Adds a CEditor-captured record (user preset or rack capture): minted id, never
         touched by vendor rescans. Returns the new record id. */
@@ -372,54 +476,59 @@ public:
      *  action anywhere said to delete them. */
     enum class LoadResult { loaded, absent, unreadable };
 
-    /** Why the most recent save failed. `changedExternally` is deliberately distinct from an
-        I/O failure: another CEditor process saved after this instance loaded the index, so
-        overwriting it would silently discard that process's work. */
-    enum class SaveFailure { none, unreadableSource, lockUnavailable, changedExternally, writeFailed };
+    /** Why the most recent JSON save failed. `statesNotLoaded`: a version's state is still on disk
+        (see LibraryVersion::stateLoaded), and writing the JSON would write it as empty.
+        LibraryStore::loadVersionStates first. */
+    enum class SaveFailure { none, unreadableSource, statesNotLoaded, writeFailed };
 
-    /** Reads the index, replacing whatever this object held. An `unreadable` result BLOCKS
-        saving (see `savesBlocked`) so the unreadable file cannot be overwritten by the
-        emptiness that failing to read it produced. */
+    // -- the JSON form ---------------------------------------------------------------------------
+    //
+    // How the library was stored before LibraryStore, and still what an old library.json is
+    // imported from and what an export writes. The service never saves through these.
+
+    /** Reads a JSON library, replacing whatever this object held (the journal included: what
+        was read is what is stored). An `unreadable` result BLOCKS `saveTo` (see `savesBlocked`)
+        so the unreadable file cannot be overwritten by the emptiness that failing to read it
+        produced. */
     LoadResult loadFrom (const juce::File& file);
 
-    /** Writes the index, and answers whether the bytes landed. Refuses — returning false
-        without touching the file — while saves are blocked. */
+    /** Writes the JSON form, compact, atomically, and answers whether the bytes landed. Refuses,
+        returning false without touching the file, while saves are blocked. */
     bool saveTo (const juce::File& file) const;
 
     SaveFailure lastSaveFailure() const                      { return saveFailure; }
-    /** On an external-change conflict, the complete local candidate is preserved here when
-        possible so refusing the overwrite does not merely move the data loss into memory. */
-    juce::File lastConflictCopy() const                      { return conflictCopy; }
 
-    /** True when the last load found a file it could not read. Every save refuses until the
-        original has been dealt with and `allowSaves` says so. */
+    /** True when the last `loadFrom` found a file it could not read. */
     bool savesBlocked() const                                 { return saveBlocked; }
 
-    /** Lifts the block. The caller is saying the unreadable file is now safe to leave behind —
-        in practice that it has been moved aside by `quarantineUnreadableLibrary`, so starting
-        a fresh index loses nothing. */
-    void allowSaves()
-    {
-        saveBlocked = false;
-        // The caller has moved the unreadable source aside. The file's intentional absence is
-        // now our baseline, rather than an external deletion that a later save must refuse.
-        baselineFileExisted = false;
-        baselineText.clear();
-    }
+    /** Lifts the block, once the caller has moved the unreadable file aside
+        (`quarantineUnreadableLibrary`) so that writing a fresh one loses nothing. */
+    void allowSaves()                                         { saveBlocked = false; }
 
     juce::var toVar() const;
     static Library fromVar (const juce::var& stored);
 
+    // -- the journal -----------------------------------------------------------------------------
+
+    bool hasPendingChanges() const                            { return ! changes.isEmpty(); }
+    const LibraryChanges& pendingChanges() const              { return changes; }
+
+    /** Hands the journal over and starts a new one. */
+    LibraryChanges takePendingChanges();
+
+    /** Puts back a journal that could not be written, beneath anything changed since. */
+    void restorePendingChanges (LibraryChanges unwritten);
+
 private:
+    friend class LibraryStore;   // applies what other processes wrote without journalling it
+
+    void noteChanged (const juce::String& recordId, juce::uint32 fields);
+
     juce::Array<LibraryRecord> records;
     juce::Array<SmartCollection> smartCollections;
+    LibraryChanges changes;
     bool saveBlocked = false;
     mutable SaveFailure saveFailure = SaveFailure::none;
-    mutable bool hasFileBaseline = false;
-    mutable bool baselineFileExisted = false;
-    mutable juce::String baselinePath;
-    mutable juce::String baselineText;
-    mutable juce::File conflictCopy;
 };
 
 /** Moves an unreadable index aside, and returns where it went (or an empty File if it could
@@ -436,10 +545,17 @@ juce::Array<const LibraryRecord*> searchLibrary (const Library& library,
                                                  const juce::String& query,
                                                  const juce::String& type = {});
 
-/** Everything the query keeps, in library order. */
+/** Everything the query keeps, in the query's `sort` order (library order when it names none). */
 juce::Array<const LibraryRecord*> searchLibrary (const Library& library,
                                                  const LibraryQuery& query,
                                                  const LibraryAvailability& isAvailable = {});
+
+/** Puts results in the order `key` names (see LibraryQuery::sort), ascending unless
+    `descending`. Ties go by name, then library order. A record with no value for the key (never
+    loaded, never rated, no arrival time, not measured) goes last in either direction: an unknown
+    is not the smallest value, and "brightest first" should not open on sounds nobody has heard. */
+void sortLibraryResults (juce::Array<const LibraryRecord*>& results, const juce::String& key,
+                         bool descending);
 
 /** One sound in a family, as `recordFamily` found it. */
 struct FamilyNode

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <juce_core/juce_core.h>
 #include <map>
 #include "PartMidiRules.h"
@@ -125,6 +126,10 @@ struct RackPart
     // compose (see perf::MidiSlot). A part loaded from a pre-chain session gets the two
     // slots its old settings describe, so it opens sounding identical.
     juce::Array<perf::MidiSlot> midiChain;
+    // The part's song key: the modules that follow it (MidiFxSettings::followSongKey) take
+    // their scale from here when the chain is handed to the engine (perf::withSongKey).
+    int keyRoot = 0;                  // 0..11, C..B
+    juce::String keyScale = "major";
     bool enabled = true;
     bool mute = false;
     bool solo = false;
@@ -224,8 +229,30 @@ struct ControlBinding
         the control's position. What a pad wants for "filter open" or "reverb on": momentary
         by default (down is the top of the range, up is the bottom), latching with this. */
     bool toggle = false;
+    /** Stepped: 0 (or 1) is smooth; N >= 2 snaps the control to N evenly spaced positions
+        across its range, for a waveform selector or an on/off/auto switch. A relative encoder
+        then moves one step per detent, so a small turn is never rounded back to where it was. */
+    int steps = 0;
 
     bool isEmpty() const          { return parameterId.isEmpty(); }
+
+    bool stepped() const noexcept { return steps >= 2; }
+
+    /** A 0..1 control position snapped to this binding's steps (unchanged when smooth). */
+    float snap (float position) const noexcept
+    {
+        if (! stepped()) return position;
+        const auto last = (float) (steps - 1);
+        return std::round (juce::jlimit (0.0f, 1.0f, position) * last) / last;
+    }
+
+    /** The position `detents` steps away from `position`, clamped to the ends. */
+    float stepBy (float position, int detents) const noexcept
+    {
+        const auto last = steps - 1;
+        const auto index = juce::jlimit (0, last, (int) std::lround (juce::jlimit (0.0f, 1.0f, position) * (float) last) + detents);
+        return (float) index / (float) last;
+    }
 };
 
 struct ControlSlot
@@ -253,7 +280,9 @@ struct ControlSlot
     // controller per slot — binding a note clears the controller and the other way round.
     int midiNote = -1;
     bool midiPickup = false;     // opt-in soft takeover for learned absolute CCs
-    bool midiRelative = false;   // learned CC: 1 = increment, 127 = decrement
+    bool midiRelative = false;   // learned CC is a relative encoder, decoded by midiRelativeFormat
+    int midiRelativeFormat = 0;  // MidiPickup::RelativeFormat: 0 two's complement (1 = +1,
+                                 // 127 = -1), 1 offset binary (64 +/- n), 2 sign bit
     // The toggle's own memory, kept with the slot so a latched pad is still latched when the
     // session comes back rather than silently reset under a lit LED.
     bool latched = false;
@@ -286,6 +315,11 @@ struct ControlPage
     // registry produced them, so regenerating one part leaves another part's pages alone.
     bool generated = false;
     juce::String generatedForPartId;
+    /** A page made for one preset: loading that preset (on any part) shows this page, and
+        loading one without a page of its own goes back to an ordinary page. Empty is an
+        ordinary page. The name is kept for display, as the library may not be loaded. */
+    juce::String presetRecordId;
+    juce::String presetName;
 
     /** Mints a page with a fresh stable id and `numSlots` empty encoder slots ("s1".."sN",
         indexed 0..N-1). */

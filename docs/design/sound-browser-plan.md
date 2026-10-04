@@ -161,7 +161,8 @@ pinned by a test on both sides.
 a record dropped you back to the whole library while the chips on screen still claimed to be
 filtering. `libraryView` on the service holds the last query and every mutation replays it.
 
-**Smart collections are saved queries**, kept in `library.json` beside the records, run fresh on
+**Smart collections are saved queries**, kept in the library beside the records (then
+`library.json`, now a table in `library.db`), run fresh on
 every answer so each rail entry carries its own live count. Static collections — the
 `collections` list on a record's user block — were already in the model and had never been
 shown; the rail gathers them from the records rather than declaring them anywhere.

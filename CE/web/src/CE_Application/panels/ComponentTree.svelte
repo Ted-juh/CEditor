@@ -52,6 +52,7 @@
     selectionRoots,
   } from '../utils/containment.js';
   import { childPageId } from '../utils/tabContainerLayout.js';
+  import { floating } from '../utils/floatingUi.js';
 
   // Collapsed container ids (expanded by default), loaded per panel.
   let collapsedIds = $state(new Set());
@@ -490,14 +491,9 @@
     e.preventDefault();
     e.stopPropagation();
     if (!$selectedComponentIds.has(id)) selectComponent(id, false);
-    // Clamp so the menu never opens off-screen.
-    const MENU_W = 200;
-    const MENU_H = 330;
-    ctxMenu = {
-      x: Math.max(0, Math.min(e.clientX, window.innerWidth - MENU_W)),
-      y: Math.max(0, Math.min(e.clientY, window.innerHeight - MENU_H)),
-      id,
-    };
+    // Placed by utils/floatingUi.js from its measured size. It used to clamp against a guessed 200×330,
+    // so near the bottom it slid under the cursor instead of opening upward.
+    ctxMenu = { x: e.clientX, y: e.clientY, id };
   }
 
   function closeCtx() { ctxMenu = null; }
@@ -983,7 +979,7 @@
     role="menu"
     tabindex="-1"
     onkeydown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); closeCtx(); } }}
-    style="left:{ctxMenu.x}px; top:{ctxMenu.y}px;"
+    use:floating={{ anchor: { x: ctxMenu.x, y: ctxMenu.y }, placement: 'bottom-start', fallbackPlacements: ['bottom-end', 'top-start', 'top-end'] }}
   >
     {#if ctxSingle}
       <button class="ctx-item" role="menuitem" onclick={ctxRename}>Rename<span class="ctx-shortcut">F2</span></button>

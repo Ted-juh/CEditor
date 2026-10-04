@@ -87,6 +87,11 @@ function mapGeneratorHitZoneBounds(bounds, zoneBounds = {}) {
 }
 
 function addPart(parts, name, part, generatorName = '') {
+  // A part detached from its generator is the author's now (the designer's per-layer Detach, and a
+  // generated part combined into a shape, booleanGroups.js). Stamping it again would put it back
+  // under the generator's control and undo the edit that detached it.
+  const existing = parts[name];
+  if (existing && (existing.detachedFromGenerator || existing.meta?.detachedFromGenerator) && existing.generated !== true) return;
   parts[name] = {
     ...part,
     generated: true,

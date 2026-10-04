@@ -359,24 +359,6 @@ void makeSceneVariation (const Scene& source, char label, float amount,
                          Scene& out,
                          const SceneParameterIsContinuous& isContinuous = {});
 
-struct SetlistItem
-{
-    juce::String itemId;
-    juce::String name;               // song / performance name shown on stage
-    juce::String sceneId;            // the scene this item recalls
-    juce::String rackRecordId;       // optional full-rack Library capture for another song
-    juce::String pageId;             // CTRL49 control page recalled with the song
-    juce::String notes;              // what the player needs to read on stage
-    double tempo = 0.0;              // 0 = the scene's or the current tempo
-};
-
-struct Setlist
-{
-    juce::Array<SetlistItem> items;
-    int currentIndex = -1;          // -1 = nothing recalled yet
-    int preloadAhead = 1;            // 0=off, 1=next song, 2=next two songs
-};
-
 /** One block in the deliberately small song arranger. It sequences existing scenes for an
     integer number of bars; it does not duplicate clips or introduce a DAW-style timeline. */
 struct ArrangementItem
@@ -391,6 +373,28 @@ struct Arrangement
 {
     juce::Array<ArrangementItem> items;
     bool loop = false;
+};
+
+struct SetlistItem
+{
+    juce::String itemId;
+    juce::String name;               // song / performance name shown on stage
+    juce::String sceneId;            // the scene this item recalls
+    juce::String rackRecordId;       // optional full-rack Library capture for another song
+    juce::String pageId;             // CTRL49 control page recalled with the song
+    juce::String notes;              // what the player needs to read on stage
+    double tempo = 0.0;              // 0 = the scene's or the current tempo
+    int plannedSeconds = 0;          // how long the song should take on stage; 0 = not planned
+    // The song's own structure: its sections, each a scene held for a number of bars. Played
+    // on bar boundaries while this song is the current one; empty = the song stays on sceneId.
+    Arrangement sections;
+};
+
+struct Setlist
+{
+    juce::Array<SetlistItem> items;
+    int currentIndex = -1;          // -1 = nothing recalled yet
+    int preloadAhead = 1;            // 0=off, 1=next song, 2=next two songs
 };
 
 /** Per-part arpeggiator settings (§18.8.5). The arp is a mode over the shared engine, not a
@@ -418,6 +422,14 @@ struct ArpSettings
     bool patternSemitones = false;
     bool constrainToScale = false;
 
+    // The step lane's other rows, each cycled on its own length like the velocities (the UI
+    // keeps them all the lane's length). Empty means the plain behaviour for every step.
+    juce::Array<int> ratchetPattern;    // 1..4 hits inside the step
+    juce::Array<int> tiePattern;        // 1 = hold into the next step (legato), 0 = gate
+    juce::Array<int> octavePattern;     // -2..+2 octaves added to the step's note(s)
+    juce::Array<int> chancePattern;     // 0..100 % that the step plays at all
+    juce::String feel = "straight";     // straight | triplet (2/3 step) | dotted (1.5 step)
+
     static const char* modeName (Mode mode) noexcept;
     static Mode modeFromName (const juce::String& name) noexcept;
 };
@@ -427,31 +439,84 @@ struct ArpSettings
     path; four named, bounded operations. */
 struct MidiFxSettings
 {
+    // keyChords is the old "custom keys" mode, kept only so a stored name can be read and
+    // turned into the key-map layer; nothing sets it any more. New shapes append, so the
+    // stored numbers of the old ones never move.
     enum class ChordType { off = 0, powerFifth, triad, triadFirstInversion, seventh,
-                           octaveDouble, diatonic, diatonicSeventh, keyChords };
+                           octaveDouble, diatonic, diatonicSeventh, keyChords,
+                           minor, major7, minor7, sus2, sus4, sixth, add9, ninth,
+                           diminished, augmented, halfDiminished };
     enum class ChordVoicing { close = 0, open, drop2, wide };
     enum class ResponseCurve { linear = 0, soft, hard, sCurve, custom };
     static constexpr int responseCurvePoints = 9;
 
-    /** One learned chord: pressing `key` plays key+each offset (offset 0 = the key itself).
-        Captured by the learn flow — arm, tap the target key, play the chord — and only in
-        effect while the chord type is keyChords; unmapped keys then pass through plain. */
-    struct KeyChord
+    /** One chord in the module's set: the notes it plays, exactly. How the builder made it
+        (root, quality, inversion, voicing, bass) rides along so it can be edited again; a
+        learned chord has no quality and is just its notes. The key map, and later the pads
+        and the progression, point at these by index. */
+    struct SetChord
+    {
+        juce::String name;              // the user's own label; empty = named from the notes
+        juce::Array<int> notes;         // absolute MIDI notes, sorted, at most maxVoices
+        int root = -1;                  // builder root note, -1 for a learned chord
+        juce::String quality;           // builder shape name, empty for a learned chord
+        int inversion = 0;
+        juce::String voicing = "close";
+        bool bass = false;
+    };
+
+    /** A key of the key-map layer: pressing `key` plays chord `chord` of the set. */
+    struct KeyMapping
     {
         int key = 60;
-        juce::Array<int> offsets;
+        int chord = 0;
     };
+
+    static constexpr int maxSetChords = 32;
 
     int transpose = 0;              // semitones or scale steps, -48..48
     juce::String transposeMode = "chromatic"; // chromatic | diatonic
     bool constrainToScale = false;
+    juce::String scaleFold = "snap"; // what constraining does to a note outside the scale:
+                                     // snap = move it to the nearest scale note, drop = silence it
     int scaleRoot = 0;              // 0..11, C..B
     juce::String scaleType = "major";
-    ChordType chord = ChordType::off;
+    // Take the scale from the part's song key (RackPart::keyRoot/keyScale) instead of this
+    // module's own. On for a module added now; a module from before the song key keeps the
+    // scale it had (midiFxFromVar reads a missing field as false).
+    bool followSongKey = false;
+    // The Chords module: one set of chords and the layers that trigger them. A layer has its
+    // own on/off so switching it off keeps what it was set to.
+    //   Follow key — every key plays `chord` built on itself (the old chorder), inside
+    //                chordFollowLow..High; outside the range keys pass through plain.
+    //   Key map    — a mapped key plays its set chord exactly, and wins over everything.
+    //   Pads       — pad N of bank B plays set chord padMap[B*8+N], hit from the app or from
+    //                a CTRL49 pad that has nothing else to do on a control page.
+    //   Progression— keys in its range play the progression's chords in order: each press
+    //                the next one, or the sustain pedal steps and the keys play the current.
+    //                It wins over following.
+    ChordType chord = ChordType::off;   // the follow shape; off = following plays nothing extra
+    bool chordFollow = true;            // the layer's light: off keeps the shape but mutes it
+    int chordFollowLow = 0;
+    int chordFollowHigh = 127;
     int chordInversion = 0;         // 0 = root position, then rotate bottom voices upward
     ChordVoicing chordVoicing = ChordVoicing::close;
     bool chordVoiceLeading = false; // choose the nearest inversion/octave to the last chord
-    juce::Array<KeyChord> keyChords;
+    bool chordBass = false;         // follow: add the chord's root an octave below
+    int chordTopAccent = 0;         // 0..40, velocity added to the top voice of any chord
+    bool chordKeyMap = false;
+    juce::Array<SetChord> chordSet;
+    juce::Array<KeyMapping> keyMap;
+    bool chordPads = false;
+    juce::Array<int> padMap;            // maxPads set-chord indexes, -1 = an empty pad
+    bool chordProgression = false;
+    juce::Array<int> progression;       // set-chord indexes in playing order
+    juce::String progressionAdvance = "key";   // "key": each press plays the next step
+                                               // "pedal": the sustain pedal steps instead
+    int progressionLow = 0;
+    int progressionHigh = 59;           // below middle C: the left hand steps, the right is free
+    static constexpr int maxPads = 32;          // 8 pads x 4 banks, the CTRL49's own banks
+    static constexpr int maxProgression = 32;
     int velocityFixed = 0;          // 0 = keep played velocity, else 1..127
     float velocityScale = 1.0f;     // 0.1..2.0 applied before the fixed override
 
@@ -477,6 +542,26 @@ struct MidiFxSettings
     int expressionOutputMax = 127;
     juce::Array<int> expressionCurveValues;
 
+    /** The set chord that plays exactly `notes` (sorted, capped at six), added when none
+        does. -1 when the set is full. */
+    int findOrAddSetChord (juce::Array<int> notes);
+    /** Points `key` at set chord `chordIndex`, replacing what it pointed at; -1 unmaps it. */
+    void mapKey (int key, int chordIndex);
+    /** Removes set chord `index`: keys, pads and progression steps that played it let go of
+        it, and everything pointing further along is renumbered. */
+    void removeSetChord (int index);
+    /** The one-field meaning `chord` had before the layers: "off" switches following off,
+        "custom keys" means the key map alone, any shape means following with that shape.
+        What the part-level setter and old saves still speak. */
+    void applyLegacyChord (ChordType type);
+
+    /** A chord's name from its notes — "Cm7", "F/C", or the note names when it is no chord
+        we know. ASCII (b and #), because the CTRL49 screen is. chordBuilder.js is the
+        browser's copy and names the same notes the same way. */
+    static juce::String chordNameOf (const juce::Array<int>& notes);
+    /** The set chord's own label, else the name of its notes. */
+    juce::String setChordName (int index) const;
+
     static const char* chordTypeName (ChordType type) noexcept;
     static ChordType chordTypeFromName (const juce::String& name) noexcept;
     static const char* chordVoicingName (ChordVoicing voicing) noexcept;
@@ -496,7 +581,7 @@ struct MidiFxSettings
 struct NoteModuleSettings
 {
     enum class StrumPattern { ascending = 0, descending, alternate,
-                              outsideIn, insideOut, random };
+                              outsideIn, insideOut, random, byVelocity };
 
     /** One named articulation selected by an incoming trigger note. The output channel is
         zero when the message should follow the trigger channel; bank values are -1 when that
@@ -527,7 +612,11 @@ struct NoteModuleSettings
     int echoRepeats = 0;             // 0..8 repeats after the original
     double echoStepBeats = 0.5;      // 1/32 note .. 4 beats
     float echoFeedback = 0.7f;       // velocity multiplier per repeat, 0.1..1
-    int echoTranspose = 0;           // semitones added per repeat, -12..12
+    int echoTranspose = 0;           // semitones (or scale steps) added per repeat, -12..12
+    juce::String echoFeel = "straight";  // straight | dotted (1.5 x) | triplet (2/3 x)
+    bool echoScaleClimb = false;     // climb in steps of the part's scale, not semitones
+    bool echoShorter = false;        // each repeat three quarters as long as the one before
+    int echoFloor = 1;               // repeats stop getting quieter at this velocity, 1..127
 
     // Strum: a chord spread in pitch order. 0 = off, and off means the collection window is
     // skipped too — a strum of nothing must not cost the latency of one.
@@ -536,6 +625,9 @@ struct NoteModuleSettings
     StrumPattern strumPattern = StrumPattern::ascending;
     float strumCurve = 0.0f;         // -1 slow start, 0 even, +1 quick start
     int strumVelocityRamp = 0;       // velocity change from first to last note, -64..64
+    bool strumGuitar = false;        // re-voice each chord onto six strings before strumming
+    bool strumHarderFaster = false;  // a hard hit strums tighter, a soft one spreads out
+    int strumRepeatPerBeat = 0;      // 0 = off, else re-strum the held chord 2, 3 or 4 times a beat
 
     // Humanize: bounded jitter. Notes move LATER only — earlier would need the future.
     double humanizeTimingBeats = 0.0;
@@ -543,18 +635,35 @@ struct NoteModuleSettings
     int humanizeGatePercent = 0;     // +/- percentage of the played duration, 0..100
     bool humanizePreserveChords = false; // simultaneous notes share one timing offset
     bool humanizeProtectBeats = false;   // whole-beat attacks remain on the grid
+    double humanizeLayBackBeats = 0.0;   // a steady late feel on every note, 0..0.125 beat
+    float humanizeSwing = 0.0f;          // 0..0.75: how far the off-beat of the swing grid moves late
+    double humanizeSwingGrid = 0.25;     // 0.5 = swung eighths, 0.25 = swung sixteenths
+    int humanizeAccent = 0;              // velocity added to notes on the beat, 0..40
+    bool humanizeFreeze = false;         // the same notes in the same places vary the same way
+    int humanizeSeed = 1;                // which frozen roll, 1..9999
 
     // Chance: the probability a note passes at all. 1 = everything does.
     float chance = 1.0f;
+    bool chanceKeepDownbeats = false;   // a note on a whole beat always passes
+    bool chanceSoftFirst = false;       // soft notes are likelier to drop than loud ones
 
     // Length: a fixed note length, or hold each note until the next arrives. 0 and no legato
     // leaves the length you played alone.
     double lengthBeats = 0.0;
     bool legato = false;
+    // With a length: "fixed" plays every note exactly that long, "at most" cuts notes held
+    // longer and leaves shorter ones alone, "at least" stretches short taps and leaves longer
+    // notes alone. (A percentage of the played length cannot shorten a note live: its length
+    // is only known when the key comes up.)
+    juce::String lengthMode = "fixed";  // fixed | at most | at least
 
     // Latch: the only module that cannot be transparent by doing its job, so it has a switch
     // of its own and starts off.
     bool latchOn = false;
+    juce::String latchMode = "replace"; // replace: a new phrase replaces what is held
+                                        // add: new notes join it
+                                        // toggle: a held note played again lets go of it
+    bool latchPedalRelease = false;     // the sustain pedal lets go of everything held
 
     // MPE transformer: one chosen expression stream enters, one leaves. MPE uses the
     // standard member-channel axes (bend, CC74 timbre, channel pressure); non-MPE formats
@@ -595,11 +704,19 @@ struct NoteModuleSettings
 struct MidiSlot
 {
     juce::String slotId;
-    /** "arp" | "transpose" | "scale" | "chord" | "velocity" | "fx" (the combined legacy
-        block, which is what a pre-chain session migrates into) | "echo" | "strum" |
-        "humanize" | "chance" | "length" | "latch" | "mpe" | "articulation". */
+    /** "arp" | "key" | "chord" | "velocity" | "fx" (the combined legacy block, which is what
+        a pre-chain session migrates into) | "echo" | "strum" | "humanize" | "chance" |
+        "length" | "latch" | "mpe" | "articulation". "transpose" and "scale" read as "key". */
     juce::String type { "arp" };
     bool bypassed = false;
+    /** How much of its effect the module applies, 0..1: strum spread, the humanize amounts,
+        the echo repeats, how much chance thins. Scaled where the chain is built, so the
+        settings keep their values; a control-page knob rides it as "@amount:<slotId>". */
+    float amount = 1.0f;
+    static bool hasAmount (const juce::String& type)
+    {
+        return type == "strum" || type == "humanize" || type == "echo" || type == "chance";
+    }
     ArpSettings arp;
     MidiFxSettings fx;
     NoteModuleSettings mod;
@@ -609,12 +726,23 @@ struct MidiSlot
     /** A slot of `type` with its settings defaulted so it is audibly transparent until
         configured — an inserted module must never change the sound by existing. */
     static MidiSlot create (const juce::String& type, const juce::String& slotId);
+    /** True for the modules whose settings are `mod` (echo, strum, humanize, chance, length,
+        latch, mpe, articulation). */
+    static bool isNoteModule (const juce::String& type);
+    /** Old names still say what they mean: "transpose" and "scale" are the Key module now. */
+    static juce::String canonicalType (const juce::String& type)
+    {
+        return type == "transpose" || type == "scale" ? juce::String ("key") : type;
+    }
 };
 
 /** The two slots a pre-chain part's welded settings describe, in the order the old code
     ran them. Public because the migration is a fact worth testing directly. */
 juce::Array<MidiSlot> migrateLegacyEventChain (const MidiFxSettings& fx, const ArpSettings& arp);
 
+/** The chain with every module that follows the song key reading this scale and root. Done
+    where the chain reaches the engine, so the stored modules keep what they had of their own. */
+juce::Array<MidiSlot> withSongKey (juce::Array<MidiSlot> chain, const juce::String& scaleType, int root);
 juce::var noteModuleToVar (const NoteModuleSettings& settings);
 void noteModuleFromVar (const juce::var& stored, NoteModuleSettings& out);
 

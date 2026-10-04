@@ -86,11 +86,17 @@
             <button
               type="button"
               class:active={activeTool === tool.id}
-              title={tool.label}
+              title={tool.key ? `${tool.label} (${tool.key})` : tool.label}
               onclick={() => setActiveTool(tool.id)}
             >
               {#if tool.id === 'line'}
                 <span class="poly-glyph line-glyph"></span>
+              {:else if tool.id === 'pen'}
+                <!-- A pen nib: the Pen draws outlines point by point (SurfacePenTool.svelte). -->
+                <svg class="pen-glyph" viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M8 1.5 12.5 8 8 14.5 3.5 8Z M8 8V14.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+                  <circle cx="8" cy="7.2" r="1.3" fill="currentColor"/>
+                </svg>
               {:else}
                 <span class="poly-glyph" style={`clip-path:${clipPathForKind(tool.id)}`}></span>
               {/if}
@@ -424,6 +430,12 @@
     width: 16px;
     height: 16px;
     background: #DCEBFA;
+  }
+
+  .pen-glyph {
+    width: 16px;
+    height: 16px;
+    color: currentColor;
   }
 
   .line-glyph {

@@ -20,6 +20,8 @@
 // enum verb exists without an entry, and that the two tables with no util module to import from
 // (the LCD's scroll, the Pixel display's animation mode) match the `<select>` the editor renders.
 
+import { FIELD_SETS } from '../src/CE_Application/models/inspectorFieldSets.js';
+import { selectOptions } from '../src/CE_Application/utils/inspectorFields.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -119,6 +121,13 @@ test('beatUnit is a number, because the transport clamps any integer', () => {
 
 /* -------------------------------------- the two with no util module: pinned to the editor */
 
+/** The option values, in order, of a select that a section draws from data. */
+function fieldOptions(section, key) {
+  const field = FIELD_SETS[section].find((entry) => entry.key === key);
+  assert.ok(field, `${section} has no field ${key}`);
+  return selectOptions(field).map(([value]) => value);
+}
+
 /**
  * The option values of the picker bound to `field` in an editor — either a
  * `<select>` (options follow the anchoring `set('field'` in its onchange) or a
@@ -148,17 +157,20 @@ test('the LCD and Pixel tables match the picker the editor renders', () => {
   assert.deepEqual(LCD_CURSORS, editorOptions('DisplayEditor.svelte', 'cursor'));
   assert.deepEqual(PIXEL_ANIM_MODES, editorOptions('PixelDisplayEditor.svelte', 'animMode'));
 
-  // The coverage audit's crop, held the same way. Each is consumed by a renderer conditional
-  // rather than by a table any module exports, so the editor's own picker is the source of truth.
-  assert.deepEqual(CHORDPAD_LAYOUTS, editorOptions('ChordPadEditor.svelte', 'layout'));
-  assert.deepEqual(NOTERIBBON_ORIENTATIONS, editorOptions('NoteRibbonEditor.svelte', 'orientation'));
-  assert.deepEqual(NOTERIBBON_VELOCITY_SOURCES, editorOptions('NoteRibbonEditor.svelte', 'velocityFrom'));
-  assert.deepEqual(NOTERIBBON_MOD_AXES, editorOptions('NoteRibbonEditor.svelte', 'modAxis'));
-  assert.deepEqual(RIBBON_ORIENTATIONS, editorOptions('RibbonEditor.svelte', 'orientation'));
-  assert.deepEqual(RIBBON_STYLES, editorOptions('RibbonEditor.svelte', 'style'));
-  assert.deepEqual(CROSSFADER_ORIENTATIONS, editorOptions('CrossfaderEditor.svelte', 'orientation'));
-  assert.deepEqual(METER_ORIENTATIONS, editorOptions('MeterEditor.svelte', 'orientation'));
-  assert.deepEqual(MATRIX_CELL_STYLES, editorOptions('MatrixEditor.svelte', 'cellStyle'));
+  // The coverage audit's crop. Each is consumed by a renderer conditional rather than by a table
+  // any module exports, so the inspector's own picker is the source of truth. These sections' pickers
+  // are data now (models/inspectorFieldSets.js), so they are read from there rather than out of the
+  // .svelte source — same values, same order, no parsing.
+  assert.deepEqual(CHORDPAD_LAYOUTS, fieldOptions('ChordPad', 'layout'));
+  assert.deepEqual(NOTERIBBON_ORIENTATIONS, fieldOptions('NoteRibbon', 'orientation'));
+  assert.deepEqual(NOTERIBBON_VELOCITY_SOURCES, fieldOptions('NoteRibbon', 'velocityFrom'));
+  assert.deepEqual(NOTERIBBON_MOD_AXES, fieldOptions('NoteRibbon', 'modAxis'));
+  assert.deepEqual(RIBBON_ORIENTATIONS, fieldOptions('Ribbon', 'orientation'));
+  assert.deepEqual(RIBBON_STYLES, fieldOptions('Ribbon', 'style'));
+  assert.deepEqual(CROSSFADER_ORIENTATIONS, fieldOptions('Crossfader', 'orientation'));
+  assert.deepEqual(METER_ORIENTATIONS, fieldOptions('Meter', 'orientation'));
+  assert.deepEqual(MATRIX_CELL_STYLES, fieldOptions('Matrix', 'cellStyle'));
+  // The LCD and Pixel editors are still hand-written, and still parsed.
   assert.deepEqual(LCD_SCROLL_MODES, editorOptions('DisplayEditor.svelte', 'scrollMode'));
   assert.deepEqual(PIXEL_ANIM_MODES, editorOptions('DisplayEditor.svelte', 'animMode'),
     'the LCD and the Pixel display offer one animation vocabulary, so they share one table');

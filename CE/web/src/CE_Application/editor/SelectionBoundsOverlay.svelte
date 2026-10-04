@@ -24,7 +24,7 @@
   import { selectedComponentIds, multiDragDelta } from '../stores/panels.js';
   import { applyControlPatchesById } from '../stores/controls.js';
   import { pushSnapshot } from '../stores/history.js';
-  import { groupRotationPatches } from '../utils/groupTransform.js';
+  import { groupResizePatches, groupRotationPatches } from '../utils/groupTransform.js';
   import {
     angleFromCenter,
     clientToPanelPoint,
@@ -175,6 +175,7 @@
           id: node._children.Core.id,
           kind: 'descendant',
           local: { x: t.x, y: t.y, w: t.width, h: t.height },
+          rootId,
         });
       });
     }
@@ -218,31 +219,9 @@
     });
     transientBounds = rect;
 
-    const sx = startBounds.w ? rect.w / startBounds.w : 1;
-    const sy = startBounds.h ? rect.h / startBounds.h : 1;
-
-    const patches = new Map();
-    for (const m of members) {
-      if (m.kind === 'root') {
-        const startPanelX = m.local.x + m.parentOffset.x;
-        const startPanelY = m.local.y + m.parentOffset.y;
-        const newPanelX = rect.x + (startPanelX - startBounds.x) * sx;
-        const newPanelY = rect.y + (startPanelY - startBounds.y) * sy;
-        patches.set(m.id, {
-          'Transform.x': Math.round(newPanelX - m.parentOffset.x),
-          'Transform.y': Math.round(newPanelY - m.parentOffset.y),
-          'Transform.width': Math.max(1, Math.round(m.local.w * sx)),
-          'Transform.height': Math.max(1, Math.round(m.local.h * sy)),
-        });
-      } else {
-        patches.set(m.id, {
-          'Transform.x': Math.round(m.local.x * sx),
-          'Transform.y': Math.round(m.local.y * sy),
-          'Transform.width': Math.max(1, Math.round(m.local.w * sx)),
-          'Transform.height': Math.max(1, Math.round(m.local.h * sy)),
-        });
-      }
-    }
+    // utils/groupTransform.js: centres follow the box at any rotation; sizes scale in each member's
+    // own frame (swapped at 90°, uniform at odd angles) so a rotated member is not sheared.
+    const patches = groupResizePatches(members, startBounds, rect);
     const originalById = new Map(members.map((member) => [member.id, member.local]));
     resizeChanged = [...patches.entries()].some(([id, patch]) => {
       const original = originalById.get(id);

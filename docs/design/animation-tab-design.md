@@ -3,6 +3,11 @@
 Status: **built**, 2026-09-10; **overhauled** 2026-10-03 — triggers are real, keyframes, a stage, and
 the properties panel's rows are gone. See [The overhaul](#the-overhaul-2026-10-03) and
 [`animation-overhaul-handoff.md`](animation-overhaul-handoff.md), which has the detail phase by phase.
+**Merged with main 2026-10-04:** main had built its own colour bucket, a `spring` kind and a
+`keyframes` kind (2026-10-01) while this branch built the overhaul. The colour bucket and the spring
+are this branch's (a spring is an easing here, not a kind). Main's `keyframes` was a different thing
+from this branch's and is kept as a third kind, `sequence` — see
+[Two kinds with keyframes in them](#two-kinds-with-keyframes-in-them).
 
 Candidate 8 from [`display-panel-candidates.md`](display-panel-candidates.md). Drawn in
 [`animation-tab-mockups.html`](animation-tab-mockups.html).
@@ -42,6 +47,14 @@ first one is the reason.
 ## Four findings
 
 ### 1. Two of the seven properties on offer animate nothing
+
+> **Closed 2026-10-01.** `buildTransitionCatalog` has a `colour` bucket: `Background.Fill.colour`,
+> `Text.Fill.colour` and `Background.Border.colour` on a part, the first two on the root, and the
+> hints `colour`, `background-color` and `color`. The renderers write `background-color`, `color`
+> and `border-color` transitions for it. The panel's own hints are the CSS names it always wrote, so
+> a control saved before this animates now without being touched. A gradient fill still jumps:
+> there is no colour in it to tween. `animationModel.test.js` now pins the dead count at zero and
+> runs the colour target through the real runtime.
 
 The editor's "Property" dropdown has seven choices:
 
@@ -230,6 +243,40 @@ shape), and Kind is a real choice between two kinds that both play. Finding 2's 
 4. ~~`kind` is not edited here at all~~ — it is a real choice now, transition or keyframes.
 5. **Keyframes cannot animate colour or text yet** — the layers that paint a control's colour carry
    inline styles a keyframe on the control cannot reach.
+6. A third kind, `sequence`, came in from main (2026-10-04) — see below.
+
+## Two kinds with keyframes in them
+
+Two branches each added an animation kind called `keyframes` in the same week. They are not two
+attempts at one thing, so the merge kept both and renamed one.
+
+| | `keyframes` | `sequence` |
+|---|---|---|
+| What it is | One list of frames (`frames[] = { at: 0..1, scale, rotate, x, y, opacity, fill, text }`) played on one part or on the control | A track per target (`targets[].keyframes[] = { time, value, easing }`) along one time axis, with `duration` as its length |
+| Played by | CSS `@keyframes`, on the individual transform properties | anime.js over a plain object, read back as a patch map the resolver applies after the state patches |
+| Reaches | What CSS reaches: transform, opacity, a solid fill, text colour | Any value a transition can ease, plus a **value channel** and a **filmstrip frame** |
+| Triggers | always, state (loops while it holds, or once on entering), value (once per change), beat, script (`ce.anim.play`) | state (plays, and can hold its last frame while the state stays), value (**follows** the value: 30% of the range is 30% along the axis) |
+| Easing | One for the whole animation | One per keyframe, the curve it arrives with |
+| Edited with | The Frames editor, and Play on the stage | The track timeline with a playhead that poses the control on the canvas |
+| Code | `utils/keyframeAnimation.js` | `utils/keyframeModel.js`, `utils/keyframePlayer.js`, `stores/keyframeOverlays.js`, `components/animation/KeyframeTimeline.svelte` |
+
+The sequence's files and functions still say "keyframe", because a sequence is made of them; only
+the kind's name changed. `animation-libraries-2026-10-01.md` has the as-built notes for it, written
+when it was still called `keyframes`.
+
+Known rough edges of having both, left for a later pass: the sequence player is keyed by control
+id, so the tab's stage and the canvas share one player for the same control; a sequence is not
+reachable from `ce.anim.play`; and the presets make transitions and `keyframes`, never a sequence.
+
+   > **Closed 2026-10-01.** The second kind is `spring`: the damped oscillation `ce.anim.spring`
+   > draws, declared on the control. The runtime samples it into a CSS `linear()` timing function
+   > (33 stops; WebView2 and WebKitGTK take it, and a browser without it drops the declaration and
+   > the change jumps as it did before). `springEase` lives in `interactionRuntime.js` and the
+   > script runtime's `animationSpring` calls it, so the two trace one path, which the test holds.
+   > The tab has a Kind choice; a spring shows damping, frequency and its curve where a transition
+   > shows the easing row, and the properties panel's free text box is a select with the same two
+   > fields. Switching kind is one store write (`animationWithKind`): it fills in the spring's
+   > numbers and a 600 ms settle time, and leaves them in place on the way back.
 
 ## Notes
 

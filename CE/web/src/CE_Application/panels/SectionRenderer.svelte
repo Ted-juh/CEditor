@@ -9,6 +9,8 @@
    *   control     — $selectedControl (only used when contextMode is 'component')
    *   fallbackLabel — human label for the placeholder
   */
+  import { activeControlSet } from '../stores/controlSets.js';
+  import { drawnForInspector } from '../models/controlSetFamilies.js';
   import { setContext } from 'svelte';
   import { isStateScopableTabId } from '../utils/stateTargets.js';
   import { sectionEditorInstanceKey } from './sectionEditorKey.js';
@@ -33,20 +35,30 @@
     if (!isStateScopableTabId(tabId)) return control;
     return scopedControl ?? control;
   });
+  // Fields show what is drawn: where the panel's control set decides a value the control still
+  // holds at its factory default, the set's value (models/controlSetFamilies.js drawnForInspector).
+  // Writes still go to the document through the store, which pins an author's return to the
+  // factory value against the set. Tabs that edit structure rather than appearance see the control
+  // as stored.
+  let drawnControl = $derived(contextMode === 'component' && control ? drawnForInspector(control, $activeControlSet) : control);
+  let drawnEditorControl = $derived(
+    contextMode === 'component' && editorControl ? drawnForInspector(editorControl, $activeControlSet) : editorControl,
+  );
+
   let editorProps = $derived.by(() => {
     if (contextMode === 'panel') {
       return { tabId };
     }
 
     if (tabId === 'core') return { control };
-    if (tabId === 'behavior') return { control };
+    if (tabId === 'behavior') return { control: drawnControl };
     if (tabId === 'states') return { control };
     if (tabId === 'bindings') return { control };
     if (tabId === 'react') return { control };
     if (tabId === 'devicebindings') return { control };
     if (tabId === 'animations') return { control };
     if (tabId === 'segments') return { control, stateTargetKey };
-    return { control: editorControl };
+    return { control: drawnEditorControl };
   });
   // Identity only — see sectionEditorKey.js for what used to be in here and why it is not any
   // more. In short: the Text tab keyed on the text content, so every undo remounted a 2,455-line

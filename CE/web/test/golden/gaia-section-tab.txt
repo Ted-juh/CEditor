@@ -7,7 +7,9 @@
 1x font-size 11px
 1x font-style normal
 1x font-weight 700
+1x letter-spacing 1px
 1x line-height 1
 1x text-align center
-1x white-space nowrap
+1x white-space pre
+1x word-spacing 0px
 1x transform none

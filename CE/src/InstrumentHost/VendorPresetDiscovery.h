@@ -4,6 +4,7 @@
 #include "Library.h"
 #include "PluginCatalog.h"
 #include <juce_cryptography/juce_cryptography.h>
+#include <map>
 
 namespace ceditor::host
 {
@@ -16,6 +17,105 @@ inline juce::Array<PluginClassRecord> presetCatalogueClasses (const PluginCatalo
         if (classes[i].formatName != "VST3" || seen.contains (classes[i].ceId)) classes.remove (i);
         else seen.add (classes[i].ceId);
     return classes;
+}
+
+/** The extension a preset folder is made of: the commonest one among its files, leaving out
+    documents, pictures and installers that sit beside presets. Empty when there is none. */
+inline juce::String dominantPresetExtension (const juce::File& folder)
+{
+    static const juce::StringArray ignored { "txt", "pdf", "png", "jpg", "jpeg", "gif", "webp", "bmp",
+        "svg", "ico", "md", "html", "htm", "rtf", "doc", "docx", "ini", "log", "db", "url", "lnk",
+        "exe", "dll", "zip", "rar", "7z", "ds_store", "tmp", "bak" };
+    std::map<juce::String, int> counts;
+    for (const auto& entry : juce::RangedDirectoryIterator (folder, true, "*", juce::File::findFiles))
+    {
+        const auto extension = entry.getFile().getFileExtension().trimCharactersAtStart (".").toLowerCase();
+        if (extension.isNotEmpty() && ! ignored.contains (extension)) ++counts[extension];
+    }
+    juce::String best;
+    int most = 0;
+    for (const auto& [extension, count] : counts)
+        if (count > most) { best = extension; most = count; }
+    return best;
+}
+
+/** Every file of one extension under a preset folder, as presets for one plug-in. The folder a
+    file sits in, below the folder itself, is its category. */
+inline juce::Array<LibraryRecord> discoverStateFiles (const juce::File& folder, const juce::String& extension,
+                                                    const PluginClassRecord& plugin,
+                                                    std::function<bool()> cancelled = {})
+{
+    juce::Array<LibraryRecord> records;
+    if (! folder.isDirectory() || extension.isEmpty()) return records;
+    for (const auto& entry : juce::RangedDirectoryIterator (folder, true, "*." + extension, juce::File::findFiles))
+    {
+        if (cancelled != nullptr && cancelled()) return records;
+        const auto file = entry.getFile();
+        if (file.getSize() <= 0 || file.getSize() > 64 * 1024 * 1024) continue;
+        LibraryRecord record;
+        record.type = "preset";
+        record.sourceType = "stateFile";
+        record.factory = true;
+        record.sourceLocator = file.getFullPathName();
+        record.name = file.getFileNameWithoutExtension();
+        record.instrument = plugin.name;
+        record.manufacturer = plugin.vendor;
+        record.targetCeId = plugin.ceId;
+        if (file.getParentDirectory() != folder)
+            record.category = file.getParentDirectory().getFileName();
+        record.fingerprint = juce::SHA256 (file).toHexString();
+        records.add (std::move (record));
+    }
+    return records;
+}
+
+/** Where a plug-in keeps preset files HoSTage does not read by name, if anywhere obvious: a
+    folder named after the plug-in, directly under one of the usual data roots or under a folder
+    named after its vendor (Documents/Sugar Bytes/Transfigure, ProgramData/Roland Cloud/TB-303).
+    The answer is { path, extension, files }, or void when there is no such folder. */
+inline juce::var findPresetCandidate (const PluginClassRecord& plugin, const juce::Array<juce::File>& roots)
+{
+    const auto squash = [] (const juce::String& text)
+    { return text.toLowerCase().retainCharacters ("abcdefghijklmnopqrstuvwxyz0123456789"); };
+    const auto name = squash (plugin.name);
+    const auto vendor = squash (plugin.vendor);
+    if (name.length() < 2) return {};
+    juce::var best;
+    int bestFiles = 0;
+    const auto consider = [&] (const juce::File& folder)
+    {
+        const auto extension = dominantPresetExtension (folder);
+        if (extension.isEmpty() || isNamedVendorPresetFile (juce::File ("preset." + extension))) return;
+        int files = 0;
+        for (const auto& entry : juce::RangedDirectoryIterator (folder, true, "*." + extension, juce::File::findFiles))
+        {
+            juce::ignoreUnused (entry);
+            ++files;
+        }
+        if (files <= bestFiles) return;
+        auto* found = new juce::DynamicObject();
+        found->setProperty ("path", folder.getFullPathName());
+        found->setProperty ("extension", extension);
+        found->setProperty ("files", files);
+        best = juce::var (found);
+        bestFiles = files;
+    };
+    for (const auto& root : roots)
+    {
+        if (! root.isDirectory()) continue;
+        for (const auto& first : juce::RangedDirectoryIterator (root, false, "*", juce::File::findDirectories))
+        {
+            const auto folder = first.getFile();
+            const auto squashed = squash (folder.getFileName());
+            if (squashed == name) { consider (folder); continue; }
+            if (vendor.length() >= 3 && (squashed == vendor || squashed.startsWith (vendor) || vendor.startsWith (squashed))
+                && squashed.length() >= 3)
+                for (const auto& second : juce::RangedDirectoryIterator (folder, false, "*", juce::File::findDirectories))
+                    if (squash (second.getFile().getFileName()) == name)
+                        consider (second.getFile());
+        }
+    }
+    return best;
 }
 
 inline juce::Array<juce::File> vendorPresetRoots (const PluginCatalog& catalog,

@@ -9,12 +9,19 @@
   import { fileCache, loadFile } from '../../CE_Application/stores/fileCache.js';
   import { resolveStroke } from '../../CE_Application/utils/strokeResolver.js';
   import { fillShapeCSS, imageLayerStyle } from '../../CE_Application/utils/plainFillCSS.js';
+  import { outlineBorderBands, outlineBorderDepth, outlineBorderPaints, outlineFlowPieces, stopsColourAt } from '../../CE_Application/utils/outlineBorder.js';
 
   // `absorbFill` — the caller has already painted this fill as `background` on an element it was
   // going to render anyway (utils/plainFillCSS.js), so drawing it here as well would double it.
   // Only ever passed true when plainFillCSS returned a style, and that only happens when exactly
   // one layer is visible — which is why this drops the whole loop rather than skipping one entry.
-  let { background = null, width = 0, height = 0, absorbFill = false } = $props();
+  //
+  // `outline` — draw for an arbitrary shape instead of a box: `{ d, fillRule, insets }`, SVG path data in
+  // this box's px (a combined shape, a flattened path; utils/booleanGroups.js). Fill layers are clipped
+  // to it and the border is drawn as bands along it (utils/outlineBorder.js); Corners do not apply, the
+  // outline is the shape. `insets[depth]` is the outline pulled inward by `depth`, for dotted borders
+  // and fills clipped inside the border.
+  let { background = null, width = 0, height = 0, absorbFill = false, outline = null } = $props();
   const svgInstanceId = $props.id();
   const svgDefId = (localId) => `${svgInstanceId}-${localId}`;
 
@@ -94,9 +101,19 @@
     return Math.max(0, inset);
   }
 
+  const outlineKey = (depth) => String(Math.round(depth * 1000) / 1000);
+  const outlineClip = (d, rule = 'evenodd') => (d ? `clip-path: path(${rule}, '${d}');` : 'clip-path: inset(50%);');
+
   function fillLayerClipCSS(layerId) {
     const clipMode = fill?.[`${layerId}ClipMode`] ?? 'shape';
     if (clipMode === 'none') return '';
+    if (outline) {
+      if (clipMode === 'border-inner') {
+        const depth = outlineBorderDepth(border);
+        if (depth > 0) return outlineClip(outline.insets?.[outlineKey(depth)] ?? '');
+      }
+      return outlineClip(outline.d, outline.fillRule ?? 'evenodd');
+    }
     if (clipMode === 'border-inner') {
       return buildInsetFillClipPath(
         { tl: getCornerNorm('tl'), tr: getCornerNorm('tr'), br: getCornerNorm('br'), bl: getCornerNorm('bl') },
@@ -165,19 +182,19 @@
   // below exists for the borders that genuinely need it — per-side, dashed, gradient-filled,
   // chamfered, double — and this short-circuits the overwhelming majority that do not. See
   // utils/plainBorderCSS.js for why the two draw the identical band of pixels.
-  let cssBorder = $derived(hasBorder ? plainBorderCSS(border, corners, width, height) : null);
+  let cssBorder = $derived(hasBorder && !outline ? plainBorderCSS(border, corners, width, height) : null);
 
   // ============ BUILD SEGMENTS ============
 
   let outerSegments = $derived.by(() =>
-    hasBorder && !cssBorder
+    hasBorder && !cssBorder && !outline
       ? buildBorderSegments(width, height, border, corners).map((seg, idx) => ({ ...seg, _ring: 'outer', _flowId: `outer-${idx}` }))
       : []
   );
 
   // Inner border segments for double (same border, smaller box, translated)
   let innerSegments = $derived.by(() => {
-    if (!hasBorder || cssBorder) return [];
+    if (!hasBorder || cssBorder || outline) return [];
     const gap = getDoubleGap(border);
     if (gap <= 0) return [];
     const innerW = width - 2 * gap;
@@ -554,6 +571,44 @@
     return defs;
   });
 
+  // ============ BORDER ALONG AN OUTLINE ============
+
+  let outlineBands = $derived(outline && hasBorder ? outlineBorderBands(border) : []);
+  let outlinePaints = $derived(outlineBands.length ? outlineBorderPaints(border) : null);
+  let outlineGradientCoords = $derived(outlinePaints?.gradient ? gradientCoords(outlinePaints.gradient.angle, width, height) : null);
+  // Paints for a band, in the box border's order: its own (shaded) colour, then gradient, image, overlay.
+  // A gradient that follows the outline: the path sampled by the browser's own geometry, cut into
+  // short pieces each stroked in the colour of where it falls (utils/outlineBorder.js).
+  let outlineFlow = $derived.by(() => {
+    if (!outlinePaints?.gradient || outlinePaints.flow !== 'follow' || typeof document === 'undefined') return null;
+    const stops = gradStops(outlinePaints.gradient);
+    if (stops.length < 2) return null;
+    const probe = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    probe.setAttribute('d', outline.d);
+    let total = 0;
+    try { total = probe.getTotalLength(); } catch { return null; }
+    if (!(total > 0)) return null;
+    const step = Math.max(1.5, total / 900);
+    const points = [];
+    for (let at = 0; at < total; at += step) {
+      const p = probe.getPointAtLength(at);
+      points.push({ x: p.x, y: p.y });
+    }
+    return outlineFlowPieces(points, step * 1.5).map((piece) => ({ ...piece, colour: stopsColourAt(stops, piece.t) }));
+  });
+
+  function outlineBandPaints(band) {
+    const out = [];
+    if (outlinePaints?.solid) out.push(band.colour);
+    if (outlinePaints?.gradient) out.push(outlineFlow ? 'flow' : `url(#${svgDefId('ol-grad')})`);
+    if (outlinePaints?.image) out.push(`url(#${svgDefId('ol-img')})`);
+    if (outlinePaints?.overlay) out.push(`url(#${svgDefId('ol-ovr')})`);
+    return out;
+  }
+  // Which way an edge faces: the shape moved down-right by the band's width covers the band on the
+  // edges that face down and right, and leaves uncovered the ones facing up and left.
+  let outlineShift = $derived(outlineBands.reduce((max, band) => Math.max(max, band.to), 0));
+
   // For a given segment, return the list of fill mode IDs to render it with
   function segmentFills(seg) {
     const src = getSegmentFillSource(seg);
@@ -730,6 +785,75 @@
       </g>
     {/if}
 
+  </svg>
+{/if}
+
+<!-- Border along an outline (a combined shape) — bands measured inward from the outline -->
+{#if outlineBands.length > 0}
+  {@const pad = outlineShift + 2}
+  <svg class="bg-border" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <clipPath id={svgDefId('ol-inside')}>
+        <path d={outline.d} clip-rule={outline.fillRule ?? 'evenodd'} />
+      </clipPath>
+      <clipPath id={svgDefId('ol-shifted')}>
+        <path d={outline.d} clip-rule={outline.fillRule ?? 'evenodd'} transform="translate({outlineShift} {outlineShift})" />
+      </clipPath>
+      {#each outlineBands as band, i (i)}
+        {#if !band.dots}
+          <mask id={svgDefId(`ol-band-${i}`)} maskUnits="userSpaceOnUse" x={-pad} y={-pad} width={width + 2 * pad} height={height + 2 * pad}>
+            <g clip-path="url(#{svgDefId('ol-inside')})">
+              <g clip-path={band.facing === 'downRight' ? `url(#${svgDefId('ol-shifted')})` : undefined}>
+                <path d={outline.d} fill="none" stroke="white" stroke-width={band.to * 2} stroke-linejoin="round"
+                  stroke-dasharray={band.dasharray === 'none' ? undefined : band.dasharray} stroke-linecap={band.linecap} />
+                {#if band.from > 0}
+                  <path d={outline.d} fill="none" stroke="black" stroke-width={band.from * 2} stroke-linejoin="round" />
+                {/if}
+              </g>
+              {#if band.facing === 'upLeft'}
+                <path d={outline.d} fill="black" fill-rule={outline.fillRule ?? 'evenodd'} transform="translate({outlineShift} {outlineShift})" />
+              {/if}
+            </g>
+          </mask>
+        {/if}
+      {/each}
+      {#if outlinePaints?.gradient && outlineGradientCoords}
+        {@const stops = gradStops(outlinePaints.gradient)}
+        {#if stops.length >= 2}
+          <linearGradient id={svgDefId('ol-grad')} gradientUnits="userSpaceOnUse"
+            x1={outlineGradientCoords.x1} y1={outlineGradientCoords.y1} x2={outlineGradientCoords.x2} y2={outlineGradientCoords.y2}>
+            {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" />{/each}
+          </linearGradient>
+        {/if}
+      {/if}
+      {#if outlinePaints?.image}
+        <pattern id={svgDefId('ol-img')} patternUnits="userSpaceOnUse" width={width} height={height}>
+          <image href={resolvedFillSource(outlinePaints.image) ?? outlinePaints.image} width={width} height={height} preserveAspectRatio="xMidYMid slice" />
+        </pattern>
+      {/if}
+      {#if outlinePaints?.overlay}
+        <pattern id={svgDefId('ol-ovr')} patternUnits="userSpaceOnUse" width={width} height={height}>
+          <image href={resolvedFillSource(outlinePaints.overlay) ?? outlinePaints.overlay} width={width} height={height} preserveAspectRatio="xMidYMid slice" />
+        </pattern>
+      {/if}
+    </defs>
+    {#each outlineBands as band, i (i)}
+      {#each outlineBandPaints(band) as paint}
+        {#if band.dots}
+          <!-- Dots take the gradient across the shape: a dot is too small to show where along it falls. -->
+          <path d={outline.insets?.[outlineKey(band.dots.depth)] ?? ''} fill="none" stroke={paint === 'flow' ? `url(#${svgDefId('ol-grad')})` : paint} stroke-width={band.dots.radius * 2}
+            stroke-dasharray={band.dasharray} stroke-linecap="round" />
+        {:else if paint === 'flow'}
+          <g mask="url(#{svgDefId(`ol-band-${i}`)})" data-outline-flow>
+            {#each outlineFlow as piece, k (k)}
+              <line x1={piece.x1} y1={piece.y1} x2={piece.x2} y2={piece.y2} stroke={piece.colour} stroke-width={band.to * 2 + 2} stroke-linecap="square" />
+            {/each}
+          </g>
+        {:else}
+          <rect x={-pad} y={-pad} width={width + 2 * pad} height={height + 2 * pad} fill={paint} mask="url(#{svgDefId(`ol-band-${i}`)})" />
+        {/if}
+      {/each}
+    {/each}
   </svg>
 {/if}
 

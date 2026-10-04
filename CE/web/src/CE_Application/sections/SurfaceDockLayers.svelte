@@ -52,6 +52,8 @@
     editGeneratorForLayer = () => {},
     removeKitEntry = () => {},
     renameLayer = () => {},
+    // A combined shape's operands, front first ([name, part]) — shown indented under it.
+    operandEntriesFor = () => [],
   } = $props();
 
   /**
@@ -78,8 +80,10 @@
     !filtering ? generatedSourceEntries
       : generatedSourceEntries.filter((s) => hits(s.label ?? s.source) || (s.layerNames ?? []).some(hits))
   );
+  // A combined shape survives the filter when any part inside it matches, as a kit does.
+  const memberHits = (name) => operandEntriesFor(name).some(([member]) => hits(member) || memberHits(member));
   let shownParts = $derived(
-    !filtering ? topLevelPartEntries : topLevelPartEntries.filter(([name]) => hits(name))
+    !filtering ? topLevelPartEntries : topLevelPartEntries.filter(([name]) => hits(name) || memberHits(name))
   );
   let shownZones = $derived(
     !filtering ? dockHitZoneEntries : dockHitZoneEntries.filter(([name]) => hits(name))
@@ -111,6 +115,115 @@
     if (from && to && to !== from) renameLayer(from, to);
   }
 </script>
+
+{#snippet partRow(name, part, depth)}
+    <div
+      class="list-row"
+      class:boolean-operand={depth > 0}
+      style={depth > 0 ? `--operand-depth:${depth}` : undefined}
+      class:selected={isLayerSelected(name)}
+      class:primary={activeSelectionKind === 'layer' && selectedLayer === name}
+      class:generated={part?.generated === true || part?.meta?.generated === true}
+      class:hidden={part?.visible === false}
+      class:locked={part?.locked === true || part?.meta?.locked === true}
+      class:pulse={selectionPulseTarget === `layer:${name}`}
+      class:dragging={draggingLayerName === name}
+      role="group"
+      aria-label={`${name} layer controls`}
+      draggable="true"
+      title={`${name}: ${part?.kind ?? part?.role ?? 'part'}`}
+      ondragstart={(event) => beginLayerDrag(name, event)}
+      ondragend={() => { draggingLayerName = ''; }}
+      ondragover={(event) => event.preventDefault()}
+      ondrop={(event) => dropLayerOn(name, event)}
+  >
+    {#if renamingLayer === name}
+      <div class="row-main rename-main">
+        <span class="layer-thumb" aria-hidden="true">
+          <span class={`layer-thumb-shape ${layerKindClass(part)}`} style={layerThumbPartStyle(name, part)}>
+            {#if layerKind(part) === 'text'}T{/if}
+          </span>
+        </span>
+        <span class="row-text">
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            class="rename-input"
+            type="text"
+            autofocus
+            bind:value={renameDraft}
+            aria-label={`Rename ${name}`}
+            onclick={(event) => event.stopPropagation()}
+            onblur={commitRename}
+            onkeydown={(event) => {
+              event.stopPropagation();
+              if (event.key === 'Enter') event.currentTarget.blur();
+              else if (event.key === 'Escape') { renamingLayer = ''; event.currentTarget.blur(); }
+            }}
+          />
+          <em>{part?.visible === false ? 'hidden · ' : ''}{part?.locked === true || part?.meta?.locked === true ? 'locked · ' : ''}{layerKindLabel(part)}</em>
+        </span>
+        <span class="row-badge">{part?.generated === true || part?.meta?.generated === true ? 'GEN' : layerKindLabel(part)}</span>
+      </div>
+    {:else}
+      <button type="button" class="row-main" onclick={(event) => selectLayer(name, event)} ondblclick={() => beginRename(name)}>
+        <span class="layer-thumb" aria-hidden="true">
+          <span class={`layer-thumb-shape ${layerKindClass(part)}`} style={layerThumbPartStyle(name, part)}>
+            {#if layerKind(part) === 'text'}T{/if}
+          </span>
+        </span>
+        <span class="row-text">
+          <strong>{name}</strong>
+          <em>{part?.visible === false ? 'hidden · ' : ''}{part?.locked === true || part?.meta?.locked === true ? 'locked · ' : ''}{layerKindLabel(part)}</em>
+        </span>
+        <span class="row-badge">{part?.generated === true || part?.meta?.generated === true ? 'GEN' : layerKindLabel(part)}</span>
+      </button>
+    {/if}
+      <div class="row-actions">
+        {#if generatorNameForEntry(part)}
+          <button
+            type="button"
+            onclick={(event) => editGeneratorForLayer(name, part, event)}
+            title={`Edit ${generatorNameForEntry(part)} generator`}
+          >
+            Gen
+          </button>
+        {/if}
+        <button
+          type="button"
+          class:selected={selectedLayerSet.has(name)}
+          onclick={(event) => toggleLayerMultiSelection(name, event)}
+          title={selectedLayerSet.has(name) ? 'Remove from selection' : 'Add to selection'}
+          aria-label={selectedLayerSet.has(name) ? `Remove ${name} from selection` : `Add ${name} to selection`}
+        >
+          +
+        </button>
+        <button type="button" onclick={(event) => { event.stopPropagation(); moveLayer(name, 1); }} disabled={!canManagePartName(name)} title={canManagePartName(name) ? 'Bring forward' : 'Generated layer: edit the generator or detach first'}>
+          <ArrowUp size={12} aria-hidden="true" />
+        </button>
+        <button type="button" onclick={(event) => { event.stopPropagation(); moveLayer(name, -1); }} disabled={!canManagePartName(name)} title={canManagePartName(name) ? 'Send backward' : 'Generated layer: edit the generator or detach first'}>
+          <ArrowDown size={12} aria-hidden="true" />
+        </button>
+        <button type="button" onclick={(event) => toggleLayerVisibility(name, part, event)} disabled={!canManagePartName(name)} title={canManagePartName(name) ? (part?.visible === false ? 'Show layer' : 'Hide layer') : 'Generated layer: edit the generator or detach first'}>
+          {#if part?.visible === false}
+            <Eye size={12} aria-hidden="true" />
+          {:else}
+            <EyeOff size={12} aria-hidden="true" />
+          {/if}
+        </button>
+        <button type="button" onclick={(event) => toggleLayerLock(name, part, event)} disabled={!canManagePartName(name)} title={canManagePartName(name) ? (part?.locked === true || part?.meta?.locked === true ? 'Unlock layer' : 'Lock layer') : 'Generated layer: edit the generator or detach first'}>
+          {#if part?.locked === true || part?.meta?.locked === true}
+            <Unlock size={12} aria-hidden="true" />
+          {:else}
+            <Lock size={12} aria-hidden="true" />
+          {/if}
+        </button>
+      </div>
+    </div>
+  {#each operandEntriesFor(name) as [memberName, member] (memberName)}
+    {@render partRow(memberName, member, depth + 1)}
+  {/each}
+{/snippet}
+
 
   <div class="dock-add-strip" aria-label="Create layer">
     <button type="button" onclick={() => addLayerAtCenter('rectangle')} title="Add rectangle">
@@ -214,106 +327,7 @@
     </div>
   {/each}
   {#each shownParts as [name, part] (name)}
-    <div
-      class="list-row"
-      class:selected={isLayerSelected(name)}
-      class:primary={activeSelectionKind === 'layer' && selectedLayer === name}
-      class:generated={part?.generated === true || part?.meta?.generated === true}
-      class:hidden={part?.visible === false}
-      class:locked={part?.locked === true || part?.meta?.locked === true}
-      class:pulse={selectionPulseTarget === `layer:${name}`}
-      class:dragging={draggingLayerName === name}
-      role="group"
-      aria-label={`${name} layer controls`}
-      draggable="true"
-      title={`${name}: ${part?.kind ?? part?.role ?? 'part'}`}
-      ondragstart={(event) => beginLayerDrag(name, event)}
-      ondragend={() => { draggingLayerName = ''; }}
-      ondragover={(event) => event.preventDefault()}
-      ondrop={(event) => dropLayerOn(name, event)}
-  >
-    {#if renamingLayer === name}
-      <div class="row-main rename-main">
-        <span class="layer-thumb" aria-hidden="true">
-          <span class={`layer-thumb-shape ${layerKindClass(part)}`} style={layerThumbPartStyle(name, part)}>
-            {#if layerKind(part) === 'text'}T{/if}
-          </span>
-        </span>
-        <span class="row-text">
-          <!-- svelte-ignore a11y_autofocus -->
-          <input
-            class="rename-input"
-            type="text"
-            autofocus
-            bind:value={renameDraft}
-            aria-label={`Rename ${name}`}
-            onclick={(event) => event.stopPropagation()}
-            onblur={commitRename}
-            onkeydown={(event) => {
-              event.stopPropagation();
-              if (event.key === 'Enter') event.currentTarget.blur();
-              else if (event.key === 'Escape') { renamingLayer = ''; event.currentTarget.blur(); }
-            }}
-          />
-          <em>{part?.visible === false ? 'hidden · ' : ''}{part?.locked === true || part?.meta?.locked === true ? 'locked · ' : ''}{layerKindLabel(part)}</em>
-        </span>
-        <span class="row-badge">{part?.generated === true || part?.meta?.generated === true ? 'GEN' : layerKindLabel(part)}</span>
-      </div>
-    {:else}
-      <button type="button" class="row-main" onclick={(event) => selectLayer(name, event)} ondblclick={() => beginRename(name)}>
-        <span class="layer-thumb" aria-hidden="true">
-          <span class={`layer-thumb-shape ${layerKindClass(part)}`} style={layerThumbPartStyle(name, part)}>
-            {#if layerKind(part) === 'text'}T{/if}
-          </span>
-        </span>
-        <span class="row-text">
-          <strong>{name}</strong>
-          <em>{part?.visible === false ? 'hidden · ' : ''}{part?.locked === true || part?.meta?.locked === true ? 'locked · ' : ''}{layerKindLabel(part)}</em>
-        </span>
-        <span class="row-badge">{part?.generated === true || part?.meta?.generated === true ? 'GEN' : layerKindLabel(part)}</span>
-      </button>
-    {/if}
-      <div class="row-actions">
-        {#if generatorNameForEntry(part)}
-          <button
-            type="button"
-            onclick={(event) => editGeneratorForLayer(name, part, event)}
-            title={`Edit ${generatorNameForEntry(part)} generator`}
-          >
-            Gen
-          </button>
-        {/if}
-        <button
-          type="button"
-          class:selected={selectedLayerSet.has(name)}
-          onclick={(event) => toggleLayerMultiSelection(name, event)}
-          title={selectedLayerSet.has(name) ? 'Remove from selection' : 'Add to selection'}
-          aria-label={selectedLayerSet.has(name) ? `Remove ${name} from selection` : `Add ${name} to selection`}
-        >
-          +
-        </button>
-        <button type="button" onclick={(event) => { event.stopPropagation(); moveLayer(name, 1); }} disabled={!canManagePartName(name)} title={canManagePartName(name) ? 'Bring forward' : 'Generated layer: edit the generator or detach first'}>
-          <ArrowUp size={12} aria-hidden="true" />
-        </button>
-        <button type="button" onclick={(event) => { event.stopPropagation(); moveLayer(name, -1); }} disabled={!canManagePartName(name)} title={canManagePartName(name) ? 'Send backward' : 'Generated layer: edit the generator or detach first'}>
-          <ArrowDown size={12} aria-hidden="true" />
-        </button>
-        <button type="button" onclick={(event) => toggleLayerVisibility(name, part, event)} disabled={!canManagePartName(name)} title={canManagePartName(name) ? (part?.visible === false ? 'Show layer' : 'Hide layer') : 'Generated layer: edit the generator or detach first'}>
-          {#if part?.visible === false}
-            <Eye size={12} aria-hidden="true" />
-          {:else}
-            <EyeOff size={12} aria-hidden="true" />
-          {/if}
-        </button>
-        <button type="button" onclick={(event) => toggleLayerLock(name, part, event)} disabled={!canManagePartName(name)} title={canManagePartName(name) ? (part?.locked === true || part?.meta?.locked === true ? 'Unlock layer' : 'Lock layer') : 'Generated layer: edit the generator or detach first'}>
-          {#if part?.locked === true || part?.meta?.locked === true}
-            <Unlock size={12} aria-hidden="true" />
-          {:else}
-            <Lock size={12} aria-hidden="true" />
-          {/if}
-        </button>
-      </div>
-    </div>
+    {@render partRow(name, part, 0)}
   {/each}
   </div>
   <div class="list-header secondary">
@@ -350,6 +364,11 @@
   </div>
 
 <style>
+  .list-row.boolean-operand {
+    margin-left: calc(var(--operand-depth, 1) * 14px);
+    border-left: 2px solid rgba(20, 184, 166, 0.45);
+  }
+
 
   .list-header.secondary {
     position: static;

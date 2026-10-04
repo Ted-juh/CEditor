@@ -228,6 +228,8 @@ export function addScriptToDocument(documentId, script = {}) {
     target: String(script.target ?? '*'),
     enabled: script.enabled !== false,
     ...script,
+    // The `id` above keeps its place as the first key; this one makes sure the stored value wins.
+    // eslint-disable-next-line no-dupe-keys
     id,
   };
   updateScriptDocument(documentId, (document) => ({

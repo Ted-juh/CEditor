@@ -6,14 +6,15 @@
    * editor has `editor/CanvasContextMenu.svelte`, but that one is built on the panel model —
    * `selectedComponentIds`, `removeControl`, containers, `flatControls` — and none of that reaches
    * a part inside a component document. So this is a sibling rather than a reuse, sharing the one
-   * piece that genuinely is common: `placeMenu`, which keeps a menu opened near a window edge
-   * inside the window.
+   * piece that genuinely is common: the placement (utils/floatingUi.js), which keeps a menu opened near
+   * a window edge inside the window. It used to read `placed.x`/`placed.y` from a helper that returned
+   * `left`/`top`, so it was never placed at all.
    *
    * The items are the ones the review names — duplicate, z-order, lock/hide, delete,
    * make-interactive-from-part, jump-to-cluster — and every one of them is an action the surface
    * already had, reachable until now only from the dock or a keyboard shortcut.
    */
-  import { placeMenu } from '../utils/menuPlacement.js';
+  import { floating } from '../utils/floatingUi.js';
 
   // null when hidden; { screenX, screenY } when shown. The parent binds so the menu can close.
   let {
@@ -38,11 +39,9 @@
   } = $props();
 
   let menuEl = $state(null);
-  let placed = $state(null);
 
   function close() {
     target = null;
-    placed = null;
   }
 
   function run(action) {
@@ -50,16 +49,6 @@
     action();
   }
 
-  // Measure, then place. The height depends on which items this selection earns (Jump to
-  // generator and Edit kit come and go), so it cannot be a constant.
-  $effect(() => {
-    if (!target || !menuEl) { placed = null; return; }
-    const rect = menuEl.getBoundingClientRect();
-    const viewport = typeof window === 'undefined'
-      ? { width: 0, height: 0 }
-      : { width: window.innerWidth, height: window.innerHeight };
-    placed = placeMenu(target.screenX, target.screenY, { width: rect.width, height: rect.height }, viewport);
-  });
 </script>
 
 <svelte:window
@@ -68,13 +57,12 @@
 />
 
 {#if target}
-  <!-- Hidden until placed, so it never flashes at the pointer before the measurement lands. -->
   <div
     class="surface-context-menu"
     bind:this={menuEl}
     role="menu"
     tabindex="-1"
-    style={placed ? `left:${placed.x}px;top:${placed.y}px;` : 'left:-9999px;top:-9999px;'}
+    use:floating={{ anchor: { x: target.screenX, y: target.screenY }, placement: 'bottom-start', fallbackPlacements: ['bottom-end', 'top-start', 'top-end'] }}
   >
     {#if selectionLabel}
       <div class="scm-heading">{selectionLabel}</div>
