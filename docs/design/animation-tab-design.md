@@ -258,11 +258,62 @@ attempts at one thing, so the merge kept both and renamed one.
 | Triggers | always, state (loops while it holds, or once on entering), value (once per change), beat, script (`ce.anim.play`) | state (plays, and can hold its last frame while the state stays), value (**follows** the value: 30% of the range is 30% along the axis) |
 | Easing | One for the whole animation | One per keyframe, the curve it arrives with |
 | Edited with | The Frames editor, and Play on the stage | The track timeline with a playhead that poses the control on the canvas |
-| Code | `utils/keyframeAnimation.js` | `utils/keyframeModel.js`, `utils/keyframePlayer.js`, `stores/keyframeOverlays.js`, `components/animation/KeyframeTimeline.svelte` |
+| Code | `utils/keyframeAnimation.js` | `utils/keyframeModel.js`, `utils/keyframePlayer.js`, `stores/keyframeOverlays.js`, `components/animation/SequenceTimeline.svelte` |
 
 The sequence's files and functions still say "keyframe", because a sequence is made of them; only
 the kind's name changed. `animation-libraries-2026-10-01.md` has the as-built notes for it, written
 when it was still called `keyframes`.
+
+## The redesign (2026-10-04)
+
+The owner tried the merged tab in the app and called it what it was: "quite shitty, not user
+friendly, too small letters". The mockup that was agreed is the Design artifact "Animation tab
+redesign" (https://claude.ai/artifact/KzXiFQqaKvGVWxag9YERxp); this is what it settled.
+
+**The constraint that shapes it.** The tab lives in the Display dock, which is wide and short: it
+opens 420 px tall for this tab (`DISPLAY_DOCK_TAB_DEFAULT_HEIGHTS`), and the owner's window is
+1,700 to 2,000 px wide. The old layout stacked a stage, a target list, a timeline, a keyframe
+form and a second timeline under one another, so most of it was below the fold. The first mockup
+made the same mistake at 880 px tall and got "way too much scrolling to the bottom". The rule
+since: **the tab never scrolls; a list that can grow scrolls inside its own box.**
+
+**One band and a strip.**
+
+| Column | Holds |
+| --- | --- |
+| Animations | The control's name, the alarms, the list (two lines a row: name, then length, kind and trigger in words), New, and All on/off |
+| Settings | Kind across the top; Timing on the left, Runs when on the right |
+| Editor | By kind: a sequence's tracks and timeline, a transition's changes, a keyframe animation's frames |
+| Details | The keyframe in hand (Time, Value, the curve it arrives with), or the custom-curve and spring editors; a Preview switch puts the live control there instead |
+
+Under the band, a 78 px strip: every easing curve as a thumbnail, and the six presets as buttons.
+What an easing click sets depends on the kind, and the strip says which: "of this animation", or
+"into the selected keyframe" for a sequence (named curves only; a keyframe stores a name).
+
+**Type.** 13 to 14 px, nothing under 12; controls 30 px high. The shared `Segmented` and
+`NumberCell` took their sizes from constants; they read the panel's `--pp-field-*` tokens now (as
+`PropertySelect` already did), with the old sizes as defaults, and the tab sets them once.
+
+**The timeline is plain elements.** `SequenceTimeline.svelte` replaces the canvas library
+(animation-timeline-js, removed from package.json). Four of that library's defaults had to be
+patched from outside in one afternoon: the playhead won a drag over the keyframe under it, any
+click in a row moved the playhead, the wheel scrolled rows out of their own box, and on the
+owner's display it drew at about sixty percent of its box, over the fields below (never
+reproduced elsewhere). Rows of elements have none of those, take the tab's type sizes, and carry
+each track's name, warning and remove button on the row. The rules it keeps: the playhead moves
+from the ruler only, keyframes from the rows only, a double-click on a keyframe sends the playhead
+to it, nothing is written until a drag is released, times snap to 10 ms, the length ends nine
+tenths of the way across.
+
+**Many tracks.** Seven rows show at the 400 px dock height; more scroll inside the track box with
+the ruler pinned. "Add" sits in the track header, where it cannot scroll away; the row it opens
+(On, Change, Add this track) stays open until Done.
+
+**What went.** The strip that laid every animation on one axis (`Timeline.svelte`), and with it
+dragging a bar to retime: Delay and Duration are fields. Its arithmetic, `timelineOf` and
+`retime`, is still in `animationModel.js` with its tests, for the day an overview is wanted
+back. The stage is no longer a box that is always there; it is the Preview side of the Details
+column. "Use selection" and "Clear" are two icon buttons beside the control's name.
 
 Known rough edges of having both, left for a later pass: the sequence player is keyed by control
 id, so the tab's stage and the canvas share one player for the same control; a sequence is not

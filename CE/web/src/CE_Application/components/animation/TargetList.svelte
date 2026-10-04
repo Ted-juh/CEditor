@@ -117,7 +117,7 @@
 
       <span class="grip" role="presentation" title="Drag to reorder (Alt+Up / Alt+Down on a row)"
             onpointerdown={(event) => beginDrag(row.index, event)}>
-        <GripVertical size={10} aria-hidden="true" />
+        <GripVertical size={13} aria-hidden="true" />
       </span>
 
       <span class="what">
@@ -130,7 +130,7 @@
           {row.status.animates}
           {#if row.status.note}<i class="note" title={row.status.note}>solid only</i>{/if}
         {:else}
-          <TriangleAlert size={10} aria-hidden="true" /> does nothing
+          <TriangleAlert size={13} aria-hidden="true" /> does nothing
         {/if}
       </span>
 
@@ -139,7 +139,7 @@
       <button type="button" class="drop" title="Remove this target"
               aria-label={`Remove ${row.path}`}
               onclick={(event) => { event.stopPropagation(); onremove(row.index); }}>
-        <X size={10} />
+        <X size={13} />
       </button>
     </div>
   {/each}
@@ -150,94 +150,84 @@
 </div>
 
 <style>
-  .targets {
-    border: 1px solid #2E3540;
-    border-radius: 4px;
-    background: #12171A;
-    overflow: hidden;
-    outline: none;
-  }
+  .targets { outline: none; }
 
   .trow {
     position: relative;
     display: grid;
-    grid-template-columns: 12px minmax(0, 1fr) auto auto 18px;
+    grid-template-columns: 14px minmax(0, 1fr) auto auto 24px;
     align-items: center;
-    gap: 6px;
-    padding: 5px 6px;
-    border-bottom: 1px solid #1E242A;
-    font: 400 10px/1.3 'IBM Plex Mono', ui-monospace, monospace;
-    color: #B9C8D4;
+    gap: 8px;
+    min-height: 30px;
+    padding: 0 4px 0 6px;
+    border: 1px solid #232A31;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    background: #161B20;
+    font: 400 13px/1.3 'IBM Plex Sans', system-ui, sans-serif;
+    color: #E8EEF3;
     cursor: pointer;
     outline: none;
   }
-  .trow:last-child { border-bottom: 0; }
-  .trow:hover { background: #1A2126; }
-  .trow:focus-visible { box-shadow: inset 0 0 0 1px #5B9BD5; }
-  .trow.sel { background: #173449; box-shadow: inset 2px 0 0 #5B9BD5; }
-  .trow.bad { background: #221D12; box-shadow: inset 2px 0 0 #E5A029; }
-  .trow.bad.sel { background: #2A2417; box-shadow: inset 2px 0 0 #5B9BD5; }
-  .trow.dragging { background: #0B2320; }
+  .trow:hover { border-color: #3A434D; }
+  .trow:focus-visible { box-shadow: 0 0 0 2px #7CC4FF; }
+  .trow.sel { background: #173A5A; border-color: #5AA9E6; }
+  .trow.bad { background: #2E2410; border-color: #7A5C16; }
+  .trow.bad.sel { border-color: #5AA9E6; }
+  .trow.dragging { background: #10362F; }
 
   .dropline {
     position: absolute;
     left: 0;
     right: 0;
-    top: -1px;
+    top: -3px;
     height: 2px;
-    background: #14B8A6;
+    background: #3DDBB4;
     border-radius: 1px;
   }
 
-  .grip { color: #4B545C; display: flex; cursor: grab; touch-action: none; }
+  .grip { color: #8A96A3; display: flex; cursor: grab; touch-action: none; }
   .grip:active { cursor: grabbing; }
 
   .what { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .what b { color: #8FEDE3; font-weight: 600; }
-  .what i { font-style: normal; color: #C3D0DA; margin-left: 4px; }
+  .what b { color: #BFF3E6; font-weight: 600; }
+  .what i { font-style: normal; font-family: 'IBM Plex Mono', ui-monospace, monospace; color: #E8EEF3; margin-left: 5px; }
 
   .does {
     display: flex;
     align-items: center;
-    gap: 3px;
-    font: 400 8.5px/1 'IBM Plex Mono', ui-monospace, monospace;
-    color: #616C75;
+    gap: 5px;
+    font-size: 12px;
+    color: #AEB9C4;
     white-space: nowrap;
   }
-  .trow.bad .does { color: #E5A029; }
-  .does .note { font-style: normal; color: #4B545C; border: 1px solid #2A3038; border-radius: 2px; padding: 1px 3px; }
+  .trow.bad .does { color: #F6D58A; font-weight: 600; }
+  .does .note { font-style: normal; color: #AEB9C4; border: 1px solid #3A434D; border-radius: 4px; padding: 0 5px; }
 
-  .cost {
-    font: 500 7.5px/1 'IBM Plex Mono', ui-monospace, monospace;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 2px 4px;
-    border-radius: 2px;
-    color: #4B545C;
-  }
+  .cost { font-size: 12px; padding: 1px 6px; border-radius: 4px; color: #AEB9C4; }
   .cost:empty { padding: 0; }
-  .cost.paint { color: #C9A35A; border: 1px solid #4A3A1C; }
-  .cost.layout { color: #E07A6B; border: 1px solid #5C2E28; }
+  .cost.paint { color: #F6D58A; border: 1px solid #7A5C16; }
+  .cost.layout { color: #FFC9C9; border: 1px solid #8A3B3B; }
 
   .drop {
-    width: 18px;
-    height: 18px;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 0;
     border: 1px solid transparent;
-    border-radius: 3px;
+    border-radius: 5px;
     background: transparent;
-    color: #4B545C;
+    color: #8A96A3;
     cursor: pointer;
   }
-  .drop:hover { border-color: #5C3A3A; color: #D98C8C; }
+  .drop:hover { border-color: #8A3B3B; color: #FFC9C9; }
 
   .none {
     margin: 0;
-    padding: 14px 10px;
-    font: 400 10px/1.5 'IBM Plex Sans', system-ui, sans-serif;
-    color: #69737B;
+    padding: 6px 4px;
+    font: 400 13px/1.5 'IBM Plex Sans', system-ui, sans-serif;
+    color: #AEB9C4;
   }
 </style>

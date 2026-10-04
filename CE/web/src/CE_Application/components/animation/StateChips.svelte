@@ -46,30 +46,30 @@
     <button type="button" class="chip on bad" aria-pressed="true"
             title={`This control has no state called "${name}". Click to remove it.`}
             onclick={() => onchange(toggleTriggerState(value, name))}>
-      <TriangleAlert size={9} aria-hidden="true" /> {name}
+      <TriangleAlert size={12} aria-hidden="true" /> {name}
     </button>
   {/each}
 </div>
 
 <style>
-  .chips { display: flex; flex-wrap: wrap; gap: 3px; min-width: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
   .chip {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    height: 20px;
-    padding: 0 7px;
-    border: 1px solid #333B42;
-    border-radius: 10px;
-    background: #12171A;
-    color: #8A949C;
-    font: 500 9px/1 'IBM Plex Mono', ui-monospace, monospace;
+    gap: 4px;
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid #3A434D;
+    border-radius: 14px;
+    background: #12161A;
+    color: #AEB9C4;
+    font: 400 13px/1 'IBM Plex Sans', system-ui, sans-serif;
     cursor: pointer;
     white-space: nowrap;
   }
-  .chip:hover { border-color: #4A555E; color: #E8EEF5; }
-  .chip.on { border-color: #5B9BD5; background: #173449; color: #EAF5FF; }
+  .chip:hover { border-color: #5B6670; color: #E8EEF3; }
+  .chip.on { border-color: #5AA9E6; background: #173A5A; color: #FFFFFF; font-weight: 500; }
   .chip.any { font-style: italic; }
-  .chip.bad { border-color: #6B4A1E; background: #241d10; color: #F0D48A; }
-  .chip.bad:hover { border-color: #E5A029; }
+  .chip.bad { border-color: #7A5C16; background: #2E2410; color: #F6D58A; }
+  .chip.bad:hover { border-color: #C9A244; }
 </style>

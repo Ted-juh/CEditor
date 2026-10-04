@@ -113,8 +113,9 @@ export const AXIS_FILL = 0.9;
 
 /**
  * The ruler's scale for an animation of `duration` ms drawn `widthPx` wide: `stepVal` ms per
- * labelled tick and `stepPx` pixels between ticks, which is how animation-timeline-js takes a
- * scale (pixels per ms = stepPx / stepVal at zoom 1).
+ * labelled tick and `stepPx` pixels between ticks (pixels per ms = stepPx / stepVal). The shape is
+ * the one animation-timeline-js took a scale in; the timeline is plain elements now
+ * (components/animation/SequenceTimeline.svelte) and reads `stepVal` for its ticks.
  *
  * The axis FITS the animation: its length ends nine tenths of the way across, whatever the
  * length. It used to be a fixed 250 ms per 90 px, so a 120 ms sequence was a sliver at the left

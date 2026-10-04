@@ -33,7 +33,9 @@ await new Promise((resolve) => server.listen(0, resolve));
 
 const executablePath = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 1320, height: 560 } });
+// The dock this tab lives in is wide and short: the owner's is about 1760 px across, and the dock
+// opens 420 px tall for this tab, of which the tab strip takes some. The tab has to fit that.
+const page = await browser.newPage({ viewport: { width: 1760, height: 390 } });
 const failures = [];
 page.on('pageerror', (error) => failures.push(String(error)));
 page.on('console', (message) => {
@@ -49,6 +51,17 @@ await page.waitForTimeout(500);
 const check = (name, fn) => { fn(); console.log(`  ok  ${name}`); };
 const ev = (fn, arg) => page.evaluate(fn, arg);
 const settle = () => page.waitForTimeout(320);
+
+// --- The layout: one band and a strip, nothing below the fold ----------------------------------
+
+const fit = await ev(() => window.__anim.tabScrolls());
+const smallest = await ev(() => window.__anim.smallestText());
+check('the tab fits the dock: neither it nor the page scrolls', () => {
+  assert.deepEqual(fit, { tab: false, page: false });
+});
+check('and no text in it is under 12 px', () => {
+  assert.ok(smallest >= 12, `the smallest text is ${smallest}px`);
+});
 
 // --- The dead targets, which is why the tab exists --------------------------------------------
 
@@ -162,6 +175,12 @@ assert.equal(await ev(() => window.__anim.storedEasing('pressMotion')), 'inQuad'
 
 // --- Adding a change, with the warning before the click ---------------------------------------
 
+check('the row that asks what to add is closed until Add is pressed, and then stays open', async () => {});
+assert.equal(await ev(() => window.__anim.addOpen()), false);
+await ev(() => window.__anim.openAdd());
+await settle();
+assert.equal(await ev(() => window.__anim.addOpen()), true);
+
 await ev(() => window.__anim.chooseChange('Fill colour'));
 await page.waitForTimeout(300);
 const warning = await ev(() => window.__anim.addWarning());
@@ -239,6 +258,10 @@ check('selecting the other animation shows its own targets', () => {
 });
 
 // --- The stage: the control, live, with Play ----------------------------------------------------
+// It is the Preview side of the fourth column now, not a box that is always there.
+
+await ev(() => window.__anim.showSide('Preview'));
+await settle();
 
 check('the stage draws the armed control with the real renderer', async () => {});
 assert.equal(await ev(() => window.__anim.stageControls()), 1);
@@ -448,11 +471,10 @@ check('each working target says what it costs the browser, and a dead one says n
   assert.deepEqual(costs, ['cheap', 'paint', 'cheap', '', 'layout'], costs.join(' | '));
 });
 
-await ev(() => window.__anim.chooseSelect('Preset', 'hoverLift'));
-await settle();
-check('a preset says what it does before you add it', async () => {});
-assert.match(await ev(() => window.__anim.presetHint()), /Grows a little under the pointer/);
-await ev(() => window.__anim.addPreset());
+check('every preset is a button in the strip, and says what it does before you add it', async () => {});
+assert.deepEqual(await ev(() => window.__anim.presetLabels()), ['Hover lift', 'Press squish', 'Fade when disabled', 'Blink while on', 'Beat pulse', 'Value glide']);
+assert.match(await ev(() => window.__anim.presetHint('Hover lift')), /Grows a little under the pointer/);
+await ev(() => window.__anim.addPreset('Hover lift'));
 await settle();
 const lifted = await ev(() => window.__anim.storedAnimation('hoverLift'));
 const hoverState = await ev(() => window.__anim.storedState('Hover'));
@@ -466,40 +488,9 @@ assert.equal(await ev(() => window.__anim.selectedAnimation()), 'hoverLift', 'an
 await ev(() => window.__anim.removeAnimation('hoverLift'));
 await settle();
 
-// --- The timeline and Debug ------------------------------------------------------------------
-
-check('the timeline lays every animation on one axis, in the list\'s order', async () => {});
-assert.deepEqual(await ev(() => window.__anim.timelineNames()), await ev(() => window.__anim.storedNames()));
-assert.equal((await ev(() => window.__anim.timelineTicks()))[0], '0ms');
-
-const delayBefore = (await ev(() => window.__anim.storedAnimation('pressMotion'))).delay;
-await ev(() => window.__anim.nudge('pressMotion', 'ArrowRight', true));
-await settle();
-check('an arrow key on a bar moves its start, and writes the control', async () => {});
-assert.equal((await ev(() => window.__anim.storedAnimation('pressMotion'))).delay, delayBefore + 100);
-await ev(() => window.__anim.undo());
-await settle();
-assert.equal((await ev(() => window.__anim.storedAnimation('pressMotion'))).delay, delayBefore, 'one undo step');
-
-const bar = await ev(() => window.__anim.timelineBar('pressMotion'));
-const durationBefore = (await ev(() => window.__anim.storedAnimation('pressMotion'))).duration;
-// Drag the right edge a fifth of the track to the right.
-await page.mouse.move(bar.x + bar.width - 2, bar.y + bar.height / 2);
-await page.mouse.down();
-await page.mouse.move(bar.x + bar.width - 2 + bar.trackWidth / 10, bar.y + bar.height / 2, { steps: 4 });
-await page.mouse.move(bar.x + bar.width - 2 + bar.trackWidth / 5, bar.y + bar.height / 2, { steps: 4 });
-const storedMidDrag = (await ev(() => window.__anim.storedAnimation('pressMotion'))).duration;
-await page.mouse.up();
-await settle();
-const resized = await ev(() => window.__anim.storedAnimation('pressMotion'));
-check('dragging a bar\'s edge resizes it — written once, when it is let go', () => {
-  assert.equal(storedMidDrag, durationBefore, 'nothing is written while the pointer is still down');
-  assert.ok(resized.duration > durationBefore, `${durationBefore}ms became ${resized.duration}ms`);
-  assert.equal(resized.duration % 10, 0, 'snapped to the Duration box\'s step');
-  assert.equal(resized.delay, delayBefore, 'and the start stayed put');
-});
-await ev(() => window.__anim.undo());
-await settle();
+// --- Debug --------------------------------------------------------------------------------------
+// (The strip that laid every animation on one axis left the tab with the redesign; its arithmetic,
+// timelineOf and retime, keeps its tests in animationModel.test.js.)
 
 await ev(() => window.__anim.selectAnimation('pressEcho'));
 await settle();
@@ -589,13 +580,13 @@ await ev(() => window.__anim.pickKind('sequence'));
 await page.waitForTimeout(500);
 const seeded = await ev(() => window.__anim.storedKeyframes('seqDemo'));
 const loopHold = await ev(() => window.__anim.storedLoopHold('seqDemo'));
-const canvases = await ev(() => window.__anim.timelineCanvases());
+const timelines = await ev(() => window.__anim.trackTimelines());
 const labels = await ev(() => window.__anim.trackLabels());
 check('switching to a sequence seeds each track with its authored value and draws the axis', () => {
   assert.equal(seeded.length, 2, `tracks: ${JSON.stringify(seeded)}`);
   assert.deepEqual(seeded[0].map(([t]) => t), [0], 'scale: one keyframe at 0');
   assert.deepEqual(loopHold, { loop: false, hold: true, duration: 1000 }, 'a new animation\'s 120 ms becomes a second');
-  assert.equal(canvases, 1, 'the track timeline is mounted');
+  assert.equal(timelines, 1, 'the track timeline is mounted');
   assert.equal(labels.length, 2, labels.join(' | '));
   assert.match(labels[0], /Scale/);
 });
@@ -637,7 +628,10 @@ await page.waitForTimeout(100);
 const axis = await ev(() => window.__anim.axisRect());
 const xAt = (ms) => axis.x + 8 + (ms * (axis.width - 8) * 0.9) / 1000;
 const rulerY = axis.y + 16;            // the lower half of the ruler, not the orange cap
-const rowY = axis.y + 22 + 13;
+const lane = await ev(() => window.__anim.laneRect(0));
+const rowY = lane.y + lane.height / 2;
+assert.equal(Math.round(lane.x), Math.round(axis.x), 'a track\'s lane sits under the ruler');
+assert.equal(Math.round(lane.width), Math.round(axis.width));
 const playheadMs = async () => parseInt(await ev(() => window.__anim.playheadText()), 10);
 const PAST_DOUBLE_CLICK = 900;         // the library reads two presses within 400 ms as one double-click
 
@@ -700,7 +694,8 @@ await page.mouse.wheel(0, 240);
 await page.waitForTimeout(500);
 const axisAfterWheel = await ev(() => window.__anim.axisRect());
 const xAfterWheel = (ms) => axisAfterWheel.x + 8 + (ms * (axisAfterWheel.width - 8) * 0.9) / 1000;
-const rowAfterWheel = axisAfterWheel.y + 22 + 13;
+const laneAfterWheel = await ev(() => window.__anim.laneRect(0));
+const rowAfterWheel = laneAfterWheel.y + laneAfterWheel.height / 2;
 await page.mouse.click(xAfterWheel(landed), rowAfterWheel);
 await page.waitForTimeout(PAST_DOUBLE_CLICK);
 check('a wheel over the timeline does not scroll the keyframes out of their row', async () => {});
@@ -730,6 +725,21 @@ const pathsNow = await ev(() => window.__anim.storedTargetPaths('seqDemo'));
 check('adding it writes the channel path and seeds its track from the channel value', async () => {});
 assert.ok(pathsNow.includes('ValueChannels.mainValue'), pathsNow.join(', '));
 assert.deepEqual((await ev(() => window.__anim.storedKeyframes('seqDemo'))).at(-1), [[0, 0.5]]);
+
+// Many tracks: the list scrolls inside its own box, the ruler stays, and the tab does not move.
+for (const label of ['Rotation', 'Opacity', 'Fill colour', 'Text colour', 'Width', 'Height', 'X position']) {
+  await ev((l) => window.__anim.chooseChange(l), label);
+  await page.waitForTimeout(200);
+  await ev(() => window.__anim.add());
+  await page.waitForTimeout(250);
+}
+const many = await ev(() => window.__anim.trackScroll());
+check('with more tracks than fit, the track list scrolls inside its box and the ruler stays at the top', () => {
+  assert.ok(many.tracks >= 10, `tracks: ${many.tracks}`);
+  assert.equal(many.listScrolls, true, 'the rows are taller than their box');
+  assert.equal(many.rulerPinned, true, 'the ruler is still at the top of the box when the list is scrolled to its end');
+});
+assert.deepEqual(await ev(() => window.__anim.tabScrolls()), { tab: false, page: false }, 'and the tab itself still does not scroll');
 
 await ev(() => window.__anim.pickKind('transition'));
 await page.waitForTimeout(350);

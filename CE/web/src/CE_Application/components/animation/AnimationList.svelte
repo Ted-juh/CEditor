@@ -17,7 +17,7 @@
   import CircleHelp from 'lucide-svelte/icons/circle-question-mark';
   import Pencil from 'lucide-svelte/icons/pencil';
   import Trash2 from 'lucide-svelte/icons/trash-2';
-  import { deadTargetCount, unknownTriggerStates, clashesFor } from '../../utils/animationModel.js';
+  import { deadTargetCount, unknownTriggerStates, clashesFor, triggerSummary } from '../../utils/animationModel.js';
 
   let {
     rows = [],
@@ -68,20 +68,20 @@
       </span>
 
       <span class="meta">
-        {row.duration}ms{#if row.kind === 'keyframes'}&nbsp;keyframes{:else if row.kind === 'sequence'}&nbsp;sequence{/if}
+        <span class="sum" title={`${row.duration} ms ${row.kind}, ${triggerSummary(row)}`}>{row.duration}ms{row.kind === 'keyframes' ? ' keyframes' : row.kind === 'sequence' ? ' sequence' : ''}, {triggerSummary(row)}</span>
         {#if dead}
           <i class="bad" title={`${dead} of this animation's targets do nothing`}>
-            <TriangleAlert size={9} aria-hidden="true" /> {dead}
+            <TriangleAlert size={12} aria-hidden="true" /> {dead}
           </i>
         {/if}
         {#if unknown.length}
           <i class="bad unknown" title={`The trigger names ${unknown.map((name) => `"${name}"`).join(', ')}, which this control does not have`}>
-            <CircleHelp size={9} aria-hidden="true" /> {unknown.length}
+            <CircleHelp size={12} aria-hidden="true" /> {unknown.length}
           </i>
         {/if}
         {#if loses.length && row.enabled}
           <i class="bad clash" title={loses.map((clash) => clash.text).join('\n')}>
-            <Swords size={9} aria-hidden="true" /> {loses.length}
+            <Swords size={12} aria-hidden="true" /> {loses.length}
           </i>
         {/if}
       </span>
@@ -89,11 +89,11 @@
       <span class="rowtools">
         <button type="button" class="rt" title={`Rename ${row.name}`} aria-label={`Rename ${row.name}`}
                 onclick={(event) => { event.stopPropagation(); onrename(row.name); }}>
-          <Pencil size={9} />
+          <Pencil size={13} />
         </button>
         <button type="button" class="rt del" title={`Delete ${row.name}`} aria-label={`Delete ${row.name}`}
                 onclick={(event) => { event.stopPropagation(); onremove(row.name); }}>
-          <Trash2 size={9} />
+          <Trash2 size={13} />
         </button>
       </span>
     </div>
@@ -106,55 +106,61 @@
 
 <style>
   .list {
-    border: 1px solid #2E3540;
-    border-radius: 4px;
-    background: #12171A;
+    flex: 1;
+    min-height: 0;
+    border: 1px solid #2B323A;
+    border-radius: 8px;
+    background: #12161A;
     overflow: hidden auto;
-    max-height: 300px;
     outline: none;
+    scrollbar-color: #4A5560 #12161A;
   }
 
+  /* Two lines a row: the name, and under it how long, which kind and what starts it. */
   .arow {
     display: grid;
-    grid-template-columns: 10px minmax(0, 1fr) auto auto;
+    grid-template-columns: 12px minmax(0, 1fr) auto;
+    grid-template-areas: "dot nm tools" "dot meta tools";
     align-items: center;
-    gap: 6px;
-    padding: 5px 6px;
-    border-bottom: 1px solid #1E242A;
+    column-gap: 9px;
+    row-gap: 1px;
+    padding: 5px 6px 5px 10px;
+    border-bottom: 1px solid #232A31;
     cursor: pointer;
     outline: none;
   }
   .arow:last-child { border-bottom: 0; }
-  .arow:hover { background: #1A2126; }
-  .arow:focus-visible { box-shadow: inset 0 0 0 1px #5B9BD5; }
-  .arow.sel { background: #173449; box-shadow: inset 2px 0 0 #5B9BD5; }
-  .arow.off { opacity: 0.45; }
+  .arow:hover { background: #1A2026; }
+  .arow:focus-visible { box-shadow: inset 0 0 0 2px #7CC4FF; }
+  .arow.sel { background: #173A5A; box-shadow: inset 3px 0 0 #5AA9E6; }
+  .arow.off .nm, .arow.off .meta { opacity: 0.55; }
 
   .dot {
-    width: 9px;
-    height: 9px;
+    grid-area: dot;
+    width: 12px;
+    height: 12px;
     padding: 0;
     border-radius: 50%;
-    border: 1px solid #3A434A;
-    background: #2A2F33;
+    border: 1px solid #5B6670;
+    background: #2A3038;
     cursor: pointer;
   }
-  .dot.on { background: #14B8A6; border-color: #0E7C70; }
+  .dot.on { background: #3DDBB4; border-color: #2E7D6B; }
 
   .nm {
+    grid-area: nm;
     min-width: 0;
-    font: 500 10px/1.2 'IBM Plex Sans', system-ui, sans-serif;
-    color: #C3D0DA;
+    font: 500 14px/1.25 'IBM Plex Sans', system-ui, sans-serif;
+    color: #E8EEF3;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .arow.sel .nm { color: #EAF5FF; }
   .lamp {
     display: inline-block;
-    width: 6px;
-    height: 6px;
-    margin-right: 4px;
+    width: 8px;
+    height: 8px;
+    margin-right: 5px;
     border-radius: 50%;
     vertical-align: 1px;
     background: #F5C451;
@@ -168,35 +174,40 @@
   }
 
   .meta {
+    grid-area: meta;
     display: flex;
     align-items: center;
-    gap: 5px;
-    font: 400 8.5px/1 'IBM Plex Mono', ui-monospace, monospace;
-    color: #616C75;
+    gap: 7px;
+    min-width: 0;
+    font: 400 12px/1.25 'IBM Plex Sans', system-ui, sans-serif;
+    color: #AEB9C4;
     white-space: nowrap;
   }
+  .meta .sum { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .meta .bad {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 3px;
+    flex: none;
     font-style: normal;
-    color: #E5A029;
+    font-weight: 600;
+    color: #F6D58A;
   }
 
-  .rowtools { display: flex; gap: 2px; opacity: 0; }
+  .rowtools { grid-area: tools; display: flex; gap: 2px; opacity: 0; }
   .arow:hover .rowtools, .arow.sel .rowtools, .rowtools:focus-within { opacity: 1; }
   .rt {
-    width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
-    padding: 0; border: 1px solid transparent; border-radius: 3px; background: transparent;
-    color: #4B545C; cursor: pointer;
+    width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+    padding: 0; border: 1px solid transparent; border-radius: 5px; background: transparent;
+    color: #AEB9C4; cursor: pointer;
   }
-  .rt:hover { border-color: #4A555E; color: #E8EEF5; }
-  .rt.del:hover { border-color: #5C3A3A; color: #D98C8C; }
+  .rt:hover { border-color: #5B6670; color: #E8EEF3; }
+  .rt.del:hover { border-color: #8A3B3B; color: #FFC9C9; }
 
   .none {
     margin: 0;
-    padding: 14px 10px;
-    font: 400 10px/1.5 'IBM Plex Sans', system-ui, sans-serif;
-    color: #69737B;
+    padding: 12px;
+    font: 400 13px/1.5 'IBM Plex Sans', system-ui, sans-serif;
+    color: #AEB9C4;
   }
 </style>
