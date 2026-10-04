@@ -80,6 +80,16 @@
       selectionColor: '#8FEDE3',
       timelineStyle: { strokeColor: '#F5B83D', fillColor: '#F5B83D', width: 2, capStyle: { width: 10, height: 8, fillColor: '#F5B83D' } },
     }, buildModel());
+    // A KEYFRAME UNDER THE POINTER WINS THE DRAG. The library gives a press to the playhead before
+    // a keyframe when both are under it. Selecting a keyframe puts the playhead exactly on it, so
+    // the keyframe you had just selected could not be dragged — the playhead went instead, and a
+    // second try moved the keyframe, leaving the two at different times. The playhead is still
+    // dragged from the ruler, or from anywhere on a row that is not a keyframe.
+    const pickDraggable = timeline._findDraggableElement;
+    timeline._findDraggableElement = (elements, val = null) => {
+      const keyframes = (elements ?? []).filter((element) => element?.type === 'keyframe');
+      return pickDraggable(keyframes.length ? keyframes : elements, val);
+    };
     // The library labels the ruler in seconds with no unit. Ours say what they are.
     timeline._formatUnitsText = formatAxisLabel;
     fitAxis();

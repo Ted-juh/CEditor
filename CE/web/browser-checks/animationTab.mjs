@@ -630,6 +630,31 @@ check('play runs the playhead along the axis', () => {
 await ev(() => window.__anim.stop());
 await page.waitForTimeout(100);
 
+// A real drag, with the mouse. The ruler fits the length (axisScale): a 1 s sequence ends nine
+// tenths of the way across, eight pixels in from the left.
+const axis = await ev(() => window.__anim.axisRect());
+const xAt = (ms) => axis.x + 8 + (ms * (axis.width - 8) * 0.9) / 1000;
+const rowY = axis.y + 22 + 13;
+await page.mouse.click(xAt(0), rowY);
+// Longer than the library's double-click window, or the press below is the second click of one.
+await page.waitForTimeout(900);
+const beforeDrag = await ev(() => window.__anim.playheadText());
+await page.mouse.move(xAt(0), rowY);
+await page.mouse.down();
+await page.mouse.move(xAt(250), rowY, { steps: 5 });
+await page.mouse.move(xAt(500), rowY, { steps: 5 });
+await page.mouse.up();
+await page.waitForTimeout(400);
+const draggedTrack = (await ev(() => window.__anim.storedKeyframes('seqDemo')))[0];
+const afterDrag = await ev(() => window.__anim.playheadText());
+check('dragging a keyframe the playhead sits on moves the keyframe, and the playhead goes with it', () => {
+  assert.match(beforeDrag, /^0 ms/, 'clicking the keyframe put the playhead on it');
+  assert.equal(draggedTrack.length, 1, JSON.stringify(draggedTrack));
+  assert.ok(Math.abs(draggedTrack[0][0] - 500) <= 10, `the keyframe landed at ${draggedTrack[0][0]} ms`);
+  assert.equal(draggedTrack[0][0] % 10, 0, 'on the 10 ms snap');
+  assert.equal(parseInt(afterDrag, 10), draggedTrack[0][0], `playhead ${afterDrag}, keyframe ${draggedTrack[0][0]}`);
+});
+
 const options = await ev(() => window.__anim.changeOptions());
 check('for a sequence the Change list offers the control\'s value channel after the part properties', () => {
   assert.ok(options.some((o) => /^Channel: Knob Value/.test(o)), options.join(' | '));

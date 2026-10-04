@@ -150,6 +150,10 @@ window.__anim = {
   addKeyframe: () => { [...document.querySelectorAll('.transport .mk')].find((b) => /Keyframe at/.test(b.textContent))?.click(); },
   selectTrack: (index) => { document.querySelectorAll('.trow')[index]?.click(); },
   keyframeBox: () => !!document.querySelector('.kfbox'),
+  axisRect: () => {
+    const r = document.querySelector('.kft .axis')?.getBoundingClientRect();
+    return r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null;
+  },
   deleteKeyframe: () => { document.querySelector('.kfbox .danger')?.click(); },
   overlay: () => get(keyframeOverlays)[CONTROL_ID] ?? null,
   play: () => { document.querySelector('.transport .mk[aria-label="Play"]')?.click(); },

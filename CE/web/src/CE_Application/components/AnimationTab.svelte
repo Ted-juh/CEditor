@@ -329,15 +329,22 @@ onMount(() => {
     if (!selected) return;
     const next = [...selected.targets];
     let follow = null;
+    let followTime = null;
     for (const move of moves) {
       const target = next[move.track];
       if (!target) continue;
       const result = updateKeyframe(target, move.index, { time: move.time });
       next[move.track] = result.target;
-      if (selectedKeyframe?.track === move.track && selectedKeyframe?.index === move.index) follow = { track: move.track, index: result.index };
+      if (selectedKeyframe?.track === move.track && selectedKeyframe?.index === move.index) {
+        follow = { track: move.track, index: result.index };
+        followTime = result.target.keyframes?.[result.index]?.time ?? null;
+      }
     }
     writeTargets(next);
     if (follow) selectedKeyframe = follow;
+    // The playhead goes with the keyframe that was dragged, as it does when one is clicked: the
+    // canvas then shows the pose being edited, and Time and the playhead read the same.
+    if (followTime !== null) scrubTo(followTime);
   }
 
   // While a sequence is open, the canvas shows its pose at the playhead — on arrival, after every
