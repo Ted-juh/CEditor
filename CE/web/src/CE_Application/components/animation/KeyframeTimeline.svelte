@@ -35,6 +35,13 @@
   const where = new WeakMap(); // library keyframe object → { track, index }
   const LEFT_MARGIN = 8;
   let fittedTo = '';
+  let pinTop = null;
+
+  /** A plain wheel is not the timeline's: it scrolls the tab. Ctrl+wheel is the library's zoom. */
+  function leaveWheelToTheTab(event) {
+    if (event.ctrlKey || event.metaKey) return;
+    event.stopPropagation();
+  }
 
   // The ruler fits the animation's length to the width it has (utils/keyframeModel.js, axisScale).
   // Done on mount, when the length changes and when the tab is resized; a zoom the user sets with
@@ -80,6 +87,25 @@
       selectionColor: '#8FEDE3',
       timelineStyle: { strokeColor: '#F5B83D', fillColor: '#F5B83D', width: 2, capStyle: { width: 10, height: 8, fillColor: '#F5B83D' } },
     }, buildModel());
+    // THE ROWS DO NOT SCROLL UP AND DOWN. The library makes its scroll area a fifth taller than
+    // its rows and moves it on every turn of the wheel, so a wheel over the timeline slid the
+    // keyframes up out of view — in a box that is already exactly as tall as its rows — and the
+    // tab underneath could not be scrolled while the pointer was here. Vertical scrolling is off:
+    // the wheel is left to the tab (Ctrl+wheel still zooms the ruler), and the scroll area is
+    // held at the top if a drag near the edge pans it.
+    const scroller = timeline._scrollContainer;
+    if (scroller) {
+      scroller.style.overflowY = 'hidden';
+      scroller.style.overflowX = 'auto';
+      pinTop = () => { if (scroller.scrollTop !== 0) scroller.scrollTop = 0; };
+      scroller.addEventListener('scroll', pinTop);
+      // With no vertical scrollbar the canvas takes the whole width.
+      if (timeline._canvas) timeline._canvas.style.width = '100%';
+      timeline.rescale();
+    }
+    // Capture, so it runs before the library's own listener on the canvas.
+    host.addEventListener('wheel', leaveWheelToTheTab, { capture: true });
+
     // A KEYFRAME UNDER THE POINTER WINS THE DRAG. The library gives a press to the playhead before
     // a keyframe when both are under it. Selecting a keyframe puts the playhead exactly on it, so
     // the keyframe you had just selected could not be dragged — the playhead went instead, and a
@@ -117,7 +143,13 @@
     // so the empty "selected" the library sends after it is ignored. A press on empty track space
     // still deselects.
     let lastPress = '';
-    timeline.onMouseDown((event) => { lastPress = String(event.target?.type ?? ''); });
+    timeline.onMouseDown((event) => {
+      lastPress = String(event.target?.type ?? '');
+      // A press on the keyframe that is already selected changes no selection, so the library says
+      // nothing — and the playhead stayed wherever it was. It goes to the keyframe, as on a first click.
+      const pressed = lastPress === 'keyframe' ? where.get(event.target.keyframe) : null;
+      if (pressed && selected?.track === pressed.track && selected?.index === pressed.index) onselect(pressed);
+    });
     timeline.onSelected((event) => {
       if (settingModel) return;
       const first = event.selected?.[0];
@@ -149,6 +181,8 @@
   });
 
   onDestroy(() => {
+    host?.removeEventListener('wheel', leaveWheelToTheTab, { capture: true });
+    if (pinTop) timeline?._scrollContainer?.removeEventListener('scroll', pinTop);
     resizeWatch?.disconnect();
     resizeWatch = null;
     timeline?.dispose();
@@ -165,7 +199,7 @@
     {/each}
     {#if !tracks.length}<div class="none">No changes yet</div>{/if}
   </div>
-  <div class="axis" bind:this={host} style="height:{22 + Math.max(1, tracks.length) * (rowHeight + 2) + 14}px"></div>
+  <div class="axis" bind:this={host} style="height:{22 + Math.max(1, tracks.length) * (rowHeight + 2) + 18}px"></div>
 </div>
 
 <style>

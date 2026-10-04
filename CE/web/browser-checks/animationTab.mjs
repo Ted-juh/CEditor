@@ -655,6 +655,25 @@ check('dragging a keyframe the playhead sits on moves the keyframe, and the play
   assert.equal(parseInt(afterDrag, 10), draggedTrack[0][0], `playhead ${afterDrag}, keyframe ${draggedTrack[0][0]}`);
 });
 
+// The wheel over the timeline. It used to slide the rows up inside their own box, taking the
+// keyframes out of view; now it is the tab's, and the keyframe is where it was drawn.
+const landed = draggedTrack[0][0];
+await page.mouse.click(xAt(900), rowY);                 // empty track: nothing selected, playhead away
+await page.waitForTimeout(500);
+assert.equal(await ev(() => window.__anim.keyframeBox()), false, 'a press on empty track space deselects');
+await page.mouse.move(xAt(300), rowY);
+await page.mouse.wheel(0, 240);
+await page.waitForTimeout(500);
+const axisAfterWheel = await ev(() => window.__anim.axisRect());
+await page.mouse.click(axisAfterWheel.x + 8 + (landed * (axisAfterWheel.width - 8) * 0.9) / 1000, axisAfterWheel.y + 22 + 13);
+await page.waitForTimeout(500);
+const afterWheel = await ev(() => window.__anim.playheadText());
+const boxAfterWheel = await ev(() => window.__anim.keyframeBox());
+check('a wheel over the timeline does not scroll the keyframes out of their row', () => {
+  assert.equal(parseInt(afterWheel, 10), landed, `a click where the keyframe is drawn selected it: ${afterWheel}`);
+  assert.equal(boxAfterWheel, true, 'and its Time, Value and Arrives are open');
+});
+
 const options = await ev(() => window.__anim.changeOptions());
 check('for a sequence the Change list offers the control\'s value channel after the part properties', () => {
   assert.ok(options.some((o) => /^Channel: Knob Value/.test(o)), options.join(' | '));
