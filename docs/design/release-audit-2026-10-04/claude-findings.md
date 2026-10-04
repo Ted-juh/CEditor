@@ -101,8 +101,10 @@ service error. Related: About → "Open the release page" is a `target="_blank"`
 `WebViewHost.cpp` does not override `newWindowAttemptingToLoad`, so the link opens nothing; and "Check for Updates on
 Startup" only writes to the About overlay and the Console (`stores/updateChannel.js:35-53`) — no notice is raised,
 although the release notes and that file's own header say it tells you.
-**Evidence level.** observed-in-test — the live `releases/latest` reply and GitHub's 404/403 bodies fed to the app's
-own `readLatestRelease`/`updateCheckSummary`; the 4xx and new-window paths read in vendored JUCE.
+**Evidence level.** **observed-in-app** (Linux build of f37550c under Xvfb: Help → Check for Updates → About reads
+"The newest release is not named with a version number ("Alpha0.04")."), plus the live `releases/latest` reply and
+GitHub's 404/403 bodies fed to the app's own `readLatestRelease`/`updateCheckSummary`; the 4xx and new-window paths read
+in vendored JUCE.
 
 ### C-08 — A shared panel's JavaScript can read and write any file on the machine through the app's native bridge   (S1 · security · scripting / sharing)
 
@@ -299,7 +301,7 @@ opens it with no chooser. New Panel from Device Profile lists Test CC/NRPN/SysEx
 (15, 882 and 40 parameters) side by side.
 **Where.** `stores/deviceProfileStores.js:32, 39`; `stores/appSettingsSchema.js:231`;
 `stores/deviceProfileSession.js:266`; `layout/MenuBar.svelte:107-117`; `DeviceProfileService.cpp:600-615`.
-**Evidence level.** read-in-code (to be observed in the Linux app run).
+**Evidence level.** observed-in-app (the Linux build lists exactly these nine, test fixtures included).
 
 ### C-24 — Release notes, README and user docs quote numbers and formats the product no longer matches   (S4 · docs)
 
@@ -693,5 +695,83 @@ read-in-code.
 compile at export, as the manual says 30 lines later). Generated from `panelApi.js:90-125` via
 `generate-scripting-manual.mjs:100`. `panel-api-spec.md:300-307` still says the WebView never runs scripts.
 Read-in-code.
+
+### C-71 — File → New Panel from Device Profile says "No device profiles" the first time it is opened   (S3 · bug · first run — observed in the app)
+
+**Repro.** Launch; File → hover New Panel from Device Profile.
+**Observed.** First open (two minutes after launch): a single disabled row "No device profiles". Close and reopen the
+menu: nine profiles. A first-time user is told there are none.
+**Where.** `CE/web/src/CE_Application/layout/MenuBar.svelte:121-131` — `generateFromProfileItems()` calls
+`refreshDeviceProfiles()` (an async bridge request) and reads `get(deviceProfiles)` in the same tick. `openDeviceProfile()`
+(`:107-117`) has the same shape, so on first use File → Open Device Profile falls through to `importDeviceProfile()` (a
+file dialog) instead of opening a profile.
+**Evidence level.** observed-in-app (Linux build, screenshots `menu-file2.png` / `menu-file3.png` in the audit run).
+
+### C-72 — A panel generated from "Roland GAIA SH-01 (full)" labels every control with an internal id, and every default is the range minimum   (S3 · faulty · shipped profile data — observed in the app)
+
+**Repro.** File → New Panel from Device Profile → Roland GAIA SH-01 (full).
+**Observed.** 1,804 controls on a 1200×11270 canvas, labelled `patchLevel`, `tone1Switch`, `dBeamAssign`,
+`effectsDistortionSelect` — wrapped mid-word ("tone1Switc / h", "effectsDist / ortionSele / ct"); integer parameters
+read "0.00"; Patch Tempo reads "5.00 BPM". The profile has proper names ("Bank Select MSB") but **880 of 882**
+`display.shortLabel`s are the camelCase id, and the generator prefers `shortLabel` (`utils/autoPanel.js:86`). Its
+`default`s are the range minimum (Patch Level 0, Patch Tempo 5, range 5..300) — placeholders, not the device's
+defaults, so anything that sends "defaults" sends silence and 5 BPM.
+**Expected.** RELEASE-NOTES: "one bound control per parameter, grouped, with the real range, choices and label read off
+the profile".
+**Where.** `CE/profiles/test/roland-gaia-sh01.ceditor-device.json` (data); `utils/autoPanel.js:86` (label choice).
+**Evidence level.** observed-in-app; counts by script over the shipped profile.
+
+### C-73 — A generated Hostage product can never be licensed: every customer gets Free forever   (S2 · faulty · licensing — extends C-15)
+
+`CEditorLicenceTool keypair` says "Put this in the Host Project as licencePublicKey"; `build-host-product.mjs`'s
+`normalizeProject` drops the key (`:38-57`) and ships no manifest (`:169-221`); at run time the product reads
+`%APPDATA%\CEditorInstrumentHost\host-project.json`, which `ensureHostProject` creates with a random appId and no key
+(`InstrumentHostService.cpp:9145-9148, 19865-19879`; `HostRuntimeShell.cpp:18-19`, `HostPluginProcessor.cpp:145-146`).
+Every customer sees "This build carries no licence key"; a vendor's licence would be `wrongProduct` anyway; every
+generated product from any vendor shares that one directory, manifest and licence. `LicenceToolMain.cpp:15-17` and
+`licence-and-sunset-policy.md:38` say the key is built in. Build side observed-in-test; runtime read-in-code.
+
+### C-74 — The Free one-plug-in cap counts only finished loads: a recalled rack loads every part, and a removed instrument then cannot be put back   (S3 · bug · licensing / rack)
+
+`applyPerformance → loadModel` calls `requestInstrument` per part in a row; the check `loadedPartCount() >=
+maxLoadedParts` counts committed instruments only and the loader is asynchronous, so every part loads ("N of 1
+loaded"); unload one and loading anything back is refused. "Saving and recalling complete setups" is listed as never
+gated (`Entitlements.cpp:79`). `InstrumentHostService.cpp:8448-8459, 19934-19941, 8322-8324`;
+`InstrumentRackHost.cpp:1708-1715`. Read-in-code.
+
+### C-75 — "New Screen (CTRL49)" on the welcome screen opens a Screen Builder whose work goes nowhere   (U · unfinished · developer tool in the product)
+
+Save and Save As do nothing (`saveActiveEditorDocument` has no `screen` branch and falls through to `saveActivePanel()`
+with no panel — `stores/panels.js:1119-1132`): 0 bridge calls, still modified. The document is not in the session
+snapshot (lost on close or restart). "Export" is a read-only JSON box whose only reader (`Ctrl49Assignment.cpp`) is
+built into test/demo executables that are not installed. The default profile is a repo-relative test path
+(`../../CE/profiles/test/roland-gaia.ceditor-device.json`). The preview claims "the exact Lua page that ships to the
+CTRL49", but the app uploads `Hostage_MultiKnob.lua` (`ValueTreeBridgeHandlers.cpp:1949`). No user doc mentions it;
+design Phase 5 (`screen-builder-design.md:243`) never wired. Hostage's CTRL49 front panel itself is finished (Windows
+only). `EditorCanvas.svelte:824-827, 1180`; `stores/screenBuilder.js:42-55, 112-122`. Observed-in-test (store calls)
++ read. The tab-close half is C-10.
+
+### C-76 — The Edition tab sells "Script actions" as Pro, but nothing can call them in any edition   (U · unfinished · licensing)
+
+`InstrumentHostService::runScriptAction` (`:18934-18966`), the only consumer of `Feature::advancedScripting`, has no
+caller outside `CE/tests`. `Entitlements.cpp:24-30`, `LicencePanel.svelte:28-32`,
+`licence-and-sunset-policy.md:21`. Read-in-code (grep).
+
+### C-77 — Every user of the free AGPL editor is told "Newer builds: a paid upgrade"   (S4 · faulty · licensing UI)
+
+Unlicensed (everyone): `updatesIncluded()` is `state == licensed` → false → the Edition tab reads "Newer builds: a paid
+upgrade". The browser mock sets `updatesIncluded: true` (`instrumentHost.js:4693-4703`), hiding it in preview. Neither
+RELEASE-NOTES nor the policy page says so. Observed-in-test.
+
+### C-78 — Licensing docs say the public key is "built into" the product; it is read from a user-editable JSON file   (S4 · docs)
+
+Add `licencePublicKey` to `%APPDATA%\CEditor\instrument-host\host-project.json`, sign your own Pro or sunset licence, and
+it verifies (`InstrumentHostService.cpp:9130-9151, 19876-19879`). Under AGPLv3 not a security issue, and the page
+concedes the mechanism is no defence — but `licence-and-sunset-policy.md:37-38` states it wrongly. Read-in-code.
+
+### C-79 — Off Windows, Hostage says "No CTRL49 connected — plug it in and it connects by itself", though support is compiled out   (S4 · faulty)
+
+`Ctrl49WindowsEndpoints.cpp:236-242` returns nullptr off `_WIN32`; `stores/instrumentHost.js:536-552` renders the
+"plug it in" hint (`InstrumentHostView.svelte:832`). Minor while the release is Windows-only. Observed-in-test.
 
 ## Verification of the other's findings
