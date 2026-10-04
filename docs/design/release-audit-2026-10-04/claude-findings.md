@@ -606,7 +606,10 @@ editor/DAW". The native engines have one (QuickJS 2 s, `JsScriptEngine.cpp:2403-
 `LuaScriptEngine.cpp:2588-2611`; Python watchdog thread).
 **Where.** `panelRuntime.js:7296-7307` (JS/TS), `:7333-7405` (wasmoon), `:7556-7621` (C++/C#/Java interpreters),
 `:7815-7835`.
-**Evidence level.** observed-in-test (five languages through the real `runScript`).
+**Evidence level.** **observed-in-app** (Linux build): a copy of QA-01 with one panel JS script
+`function onPanelLoad() { while (true) {} }`; open it, press Preview → the window stops responding (the Help menu does
+not open), the WebKit web process sits at ~91 % CPU for 90 s with no watchdog recovery, and the app has to be killed.
+Also observed-in-test for JS, Lua, C++, C# and Java through the real `runScript`. **Codex: same check under WebView2.**
 
 ### C-58 — Lua preview: a script's `self`, `log`, `state` and helpers belong to whichever Lua script loaded last   (S2 · bug · preview ≠ export)
 
