@@ -925,4 +925,46 @@ tab; save/reopen byte-identical with identical re-measured motion; **the player 
 Preview** (hover lift rms 0 both, settle 599 vs 598 ms); drag and delete during Play; 0 rAF/s after every animation
 ends.
 
+### C-94 — Typing a large tick count into a Knob or Slider freezes the editor; 1,000,000 crashes it   (S1 · bug · inspector / slider renderer)
+
+**Repro.** Insert a Knob (or Slider) → properties **Slider** tab → Ticks & Labels: turn Ticks on → type into **Major
+Count** and press Enter.
+**Observed** (real inspector UI): 1,000 → fine (4,018 shapes). **100,000 → the page stops responding for 49 s, then
+draws 400,018 SVG nodes inside one Knob. 1,000,000 → blocked ~50 s, then the renderer process crashes** (the whole
+editor window, in the app). Minor = 20,000 on a Slider: 16 s freeze, 200,048 nodes. If autosave captures it, the next
+start may freeze again (not checked).
+**Expected.** Bounded like the matching fields on Macro, Looper, Router, Turing (`min={2} max={21}`);
+`utils/inspectorFields.js`: "a NumberCell clamps what is typed … to its own min..max".
+**Where.** `sections/SliderEditor.svelte:403` (Major: `min={2}`, no max; write `Math.max(2, …)`), `:406` (Minor: `min={0}`,
+no max) — Claude confirmed both; `utils/sliderGeometry.js:241-260` `buildSliderTickStops` loops `major × (minor+1)`
+uncapped.
+**Evidence level.** observed-in-app (browser, typed into the real field; screenshots kept). A typo of three extra zeros
+is enough.
+
+### C-95 — One malformed list field in a `.cepanel` passes the open-time validator and blanks the whole canvas   (S3 · faulty · panel loading)
+
+A real panel (Knob + Label) serialised, one Label field changed, opened through `deserializePanel → addPanel` (the
+File → Open path, `stores/panels.js:1412`): `Effects.Shadows.items = {}` → canvas shows "The canvas stopped rendering —
+… .filter is not a function", 0 controls drawn (the healthy Knob too); Try again fails; recovers only after switching
+panels. `Background.Fill.layerOrder = "solid"` → same. `DeviceBindings.bindings = {}` → `deserializePanel` throws, the
+exception escapes before the "Cannot open …" notice, and the user is told nothing. List entries of `null` take down the
+canvas (`Effects.Shadows.items=[null]`, `DrumPads.padForm=5`, `StepSequencer.cellForm=5`) or the properties panel
+(`DeviceBindings.bindings=[null]` on 7 types, `Meter.zones`, `Envelope.points`, `Display.fields/layouts`,
+`StepSequencer.tracks`, `Animations.*.targets={}`). None can be typed in the inspector — they come from a hand-edited
+or generated file, or a script's `set()`. `utils/panelDocumentSchema.js` exists to refuse exactly this;
+`ErrorBoundary` promises a bad control "takes down its own pane". Where: `CE_Panel/components/BackgroundRenderer.svelte:43-44`,
+`utils/surfaceEffects.js:64`, `utils/gaiaNoteChoiceMigration.js:8`, no try/catch at `stores/panels.js:1412`.
+Related: count fields with no upper bound hang or crash the renderer when a file or script sets 1e9 (`Meter.segments`,
+`Recorder.minSpan/gridDivisions`, `Joystick.gridDiv`, `Envelope.gridX/gridY`, `Display.rows/cols`,
+`Harmoniser.displaySpan`) — their inspector fields are clamped, so file/script only (same outcome as C-57).
+Observed-in-app (each case in a fresh page, screenshots kept).
+
+**Property sweep that held up:** 58 types, **28,895 property paths, 225,797 property × value writes**, each checked for
+page/console errors, error boundaries, vanished or zero-size controls, NaN/Infinity/`undefined`/`[object Object]` on
+screen, markup injection, render time and serialise round-trip. **0 markup-injection hits** — text renders as text
+everywhere. **0 NaN/undefined reach the screen from any value the UI can produce.** 0 values lost across
+serialise/deserialise (the schema correctly refuses a non-string `Core.name` / non-array `Scripts.scripts`). 725
+extreme writes × undo → redo → undo: 0 real failures. All 58 types with extreme values through save → reload →
+reopen: 0 losses. 10 of 225,797 writes took over 400 ms (worst 622 ms, apart from the 1e9 counts).
+
 ## Verification of the other's findings
