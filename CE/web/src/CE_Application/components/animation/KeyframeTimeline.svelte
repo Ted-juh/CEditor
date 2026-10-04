@@ -34,6 +34,7 @@
   let modelStale = false;
   const where = new WeakMap(); // library keyframe object → { track, index }
   const LEFT_MARGIN = 8;
+  const HEADER_HEIGHT = 22;   // the ruler: the strip of ms / s labels above the rows
   let fittedTo = '';
   let pinTop = null;
 
@@ -71,7 +72,7 @@
   onMount(() => {
     timeline = new Timeline({
       id: host,
-      headerHeight: 22,
+      headerHeight: HEADER_HEIGHT,
       rowsStyle: { height: rowHeight, marginBottom: 2 },
       stepVal: 250,       // replaced by fitAxis() as soon as the width is known
       stepPx: 90,
@@ -106,15 +107,24 @@
     // Capture, so it runs before the library's own listener on the canvas.
     host.addEventListener('wheel', leaveWheelToTheTab, { capture: true });
 
-    // A KEYFRAME UNDER THE POINTER WINS THE DRAG. The library gives a press to the playhead before
-    // a keyframe when both are under it. Selecting a keyframe puts the playhead exactly on it, so
-    // the keyframe you had just selected could not be dragged — the playhead went instead, and a
-    // second try moved the keyframe, leaving the two at different times. The playhead is still
-    // dragged from the ruler, or from anywhere on a row that is not a keyframe.
-    const pickDraggable = timeline._findDraggableElement;
-    timeline._findDraggableElement = (elements, val = null) => {
-      const keyframes = (elements ?? []).filter((element) => element?.type === 'keyframe');
-      return pickDraggable(keyframes.length ? keyframes : elements, val);
+    // THE PLAYHEAD BELONGS TO THE RULER, THE KEYFRAMES TO THE ROWS. The library mixes the two: a
+    // press anywhere on a row moves the playhead there, the playhead's line can be grabbed all the
+    // way down the rows, and where it crosses a keyframe it wins the drag. Trying to move a
+    // keyframe moved the playhead, and trying to click a keyframe dragged the playhead along. The
+    // owner asked for the two to be controllable separately, without interfering with each other:
+    //   - on the ruler, a press or a drag moves the playhead — anywhere along it, not only on the
+    //     orange cap;
+    //   - below the ruler the playhead is not there to be grabbed and nothing moves it: a press on
+    //     a keyframe selects it, a drag moves it, a press on empty track deselects;
+    //   - a double-click on a keyframe is the one way to send the playhead from a row, on purpose.
+    const inRuler = (pos) => Number(pos?.y) <= HEADER_HEIGHT;
+    const elementsAt = timeline.elementFromPoint;
+    timeline.elementFromPoint = (pos, clickRadius, onlyTypes) => {
+      const found = elementsAt(pos, clickRadius, onlyTypes);
+      if (!inRuler(pos)) return found.filter((element) => element?.type !== 'timeline');
+      return found.some((element) => element?.type === 'timeline')
+        ? found
+        : [...found, { val: timeline.getTime(), type: 'timeline' }];
     };
     // The library labels the ruler in seconds with no unit. Ours say what they are.
     timeline._formatUnitsText = formatAxisLabel;
@@ -124,8 +134,12 @@
     resizeWatch = new ResizeObserver(() => fitAxis());
     resizeWatch.observe(host);
 
+    // Where the press that is under way began. A click on a row ends, inside the library, with
+    // "deselect and set the time here"; only a press that began on the ruler may set the time.
+    let pressInRuler = false;
     timeline.onTimeChanged((event) => {
       if (settingModel || event.source === 'setTimeMethod') return;
+      if (event.source === 'user' && !pressInRuler) { event.preventDefault(); return; }
       ontime(Math.max(0, Math.round(event.val)));
     });
     timeline.onDragStarted(() => { dragging = true; });
@@ -139,16 +153,16 @@
       if (moves.length) onmove(moves);
       if (modelStale) applyModel();
     });
-    // A press on the ruler or the playhead moves time; it is not a request to drop the selection,
-    // so the empty "selected" the library sends after it is ignored. A press on empty track space
-    // still deselects.
+    // A press on the ruler moves time; it is not a request to drop the selection, so the empty
+    // "selected" the library sends after it is ignored. A press on empty track space deselects.
     let lastPress = '';
     timeline.onMouseDown((event) => {
       lastPress = String(event.target?.type ?? '');
-      // A press on the keyframe that is already selected changes no selection, so the library says
-      // nothing — and the playhead stayed wherever it was. It goes to the keyframe, as on a first click.
-      const pressed = lastPress === 'keyframe' ? where.get(event.target.keyframe) : null;
-      if (pressed && selected?.track === pressed.track && selected?.index === pressed.index) onselect(pressed);
+      pressInRuler = inRuler(event.pos);
+    });
+    timeline.onDoubleClick((event) => {
+      const keyframe = event.target?.keyframe ?? (event.elements ?? []).find((element) => element?.type === 'keyframe')?.keyframe;
+      if (keyframe) ontime(Math.max(0, Math.round(keyframe.val)));
     });
     timeline.onSelected((event) => {
       if (settingModel) return;

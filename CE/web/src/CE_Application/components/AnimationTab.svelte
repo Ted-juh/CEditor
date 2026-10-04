@@ -329,22 +329,16 @@ onMount(() => {
     if (!selected) return;
     const next = [...selected.targets];
     let follow = null;
-    let followTime = null;
     for (const move of moves) {
       const target = next[move.track];
       if (!target) continue;
       const result = updateKeyframe(target, move.index, { time: move.time });
       next[move.track] = result.target;
-      if (selectedKeyframe?.track === move.track && selectedKeyframe?.index === move.index) {
-        follow = { track: move.track, index: result.index };
-        followTime = result.target.keyframes?.[result.index]?.time ?? null;
-      }
+      if (selectedKeyframe?.track === move.track && selectedKeyframe?.index === move.index) follow = { track: move.track, index: result.index };
     }
     writeTargets(next);
+    // The selection follows the keyframe; the playhead does not. It moves from the ruler only.
     if (follow) selectedKeyframe = follow;
-    // The playhead goes with the keyframe that was dragged, as it does when one is clicked: the
-    // canvas then shows the pose being edited, and Time and the playhead read the same.
-    if (followTime !== null) scrubTo(followTime);
   }
 
   // While a sequence is open, the canvas shows its pose at the playhead — on arrival, after every
@@ -867,7 +861,7 @@ onMount(() => {
                   selected={selectedKeyframe}
                   ontime={scrubTo}
                   onmove={moveKeyframes}
-                  onselect={(at) => { selectedKeyframe = at; if (at) rawTargetIndex = at.track; if (at) scrubTo(tracks[at.track]?.keyframes[at.index]?.time ?? playhead); }}
+                  onselect={(at) => { selectedKeyframe = at; if (at) rawTargetIndex = at.track; }}
                 />
                 {#if keyframeAt}
                   <div class="kfbox">
@@ -895,7 +889,7 @@ onMount(() => {
                     <button type="button" class="mk danger" onclick={deleteSelectedKeyframe}><Trash2 size={10} /> Delete keyframe</button>
                   </div>
                 {:else if targets.length}
-                  <p class="note">Click a keyframe to edit it. The first keyframe on a track is where it starts; a track with one keyframe holds that value.</p>
+                  <p class="note">Click a keyframe to edit it, drag it to move it. The playhead moves from the ruler only; double-click a keyframe to send the playhead to it. The first keyframe on a track is where it starts; a track with one keyframe holds that value.</p>
                 {/if}
               </div>
             {/if}

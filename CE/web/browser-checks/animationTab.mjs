@@ -630,49 +630,74 @@ check('play runs the playhead along the axis', () => {
 await ev(() => window.__anim.stop());
 await page.waitForTimeout(100);
 
-// A real drag, with the mouse. The ruler fits the length (axisScale): a 1 s sequence ends nine
-// tenths of the way across, eight pixels in from the left.
+// The timeline with the real mouse. The ruler fits the length (axisScale): a 1 s sequence ends
+// nine tenths of the way across, eight pixels in from the left. The playhead is the ruler's and
+// the keyframes are the rows': neither moves the other. The owner asked for exactly that after a
+// press on a row kept dragging the playhead along, and a drag on a keyframe moved the playhead.
 const axis = await ev(() => window.__anim.axisRect());
 const xAt = (ms) => axis.x + 8 + (ms * (axis.width - 8) * 0.9) / 1000;
+const rulerY = axis.y + 16;            // the lower half of the ruler, not the orange cap
 const rowY = axis.y + 22 + 13;
+const playheadMs = async () => parseInt(await ev(() => window.__anim.playheadText()), 10);
+const PAST_DOUBLE_CLICK = 900;         // the library reads two presses within 400 ms as one double-click
+
+await page.mouse.click(xAt(300), rulerY);
+await page.waitForTimeout(PAST_DOUBLE_CLICK);
+const onRuler = await playheadMs();
+check('a press on the ruler moves the playhead, anywhere along it', () => {
+  assert.ok(Math.abs(onRuler - 300) <= 10, `playhead at ${onRuler} ms`);
+});
+
 await page.mouse.click(xAt(0), rowY);
-// Longer than the library's double-click window, or the press below is the second click of one.
-await page.waitForTimeout(900);
-const beforeDrag = await ev(() => window.__anim.playheadText());
+await page.waitForTimeout(PAST_DOUBLE_CLICK);
+check('a press on a keyframe selects it and leaves the playhead alone', async () => {});
+assert.equal(await ev(() => window.__anim.keyframeBox()), true);
+assert.equal(await playheadMs(), onRuler);
+
+// The case that started it: the playhead sitting on the keyframe that is being dragged.
+await page.mouse.click(xAt(0), rulerY);
+await page.waitForTimeout(PAST_DOUBLE_CLICK);
+assert.equal(await playheadMs(), 0);
 await page.mouse.move(xAt(0), rowY);
 await page.mouse.down();
 await page.mouse.move(xAt(250), rowY, { steps: 5 });
 await page.mouse.move(xAt(500), rowY, { steps: 5 });
 await page.mouse.up();
-await page.waitForTimeout(400);
+await page.waitForTimeout(PAST_DOUBLE_CLICK);
 const draggedTrack = (await ev(() => window.__anim.storedKeyframes('seqDemo')))[0];
-const afterDrag = await ev(() => window.__anim.playheadText());
-check('dragging a keyframe the playhead sits on moves the keyframe, and the playhead goes with it', () => {
-  assert.match(beforeDrag, /^0 ms/, 'clicking the keyframe put the playhead on it');
+const afterDrag = await playheadMs();
+check('dragging a keyframe the playhead sits on moves the keyframe, and the playhead stays', () => {
   assert.equal(draggedTrack.length, 1, JSON.stringify(draggedTrack));
   assert.ok(Math.abs(draggedTrack[0][0] - 500) <= 10, `the keyframe landed at ${draggedTrack[0][0]} ms`);
   assert.equal(draggedTrack[0][0] % 10, 0, 'on the 10 ms snap');
-  assert.equal(parseInt(afterDrag, 10), draggedTrack[0][0], `playhead ${afterDrag}, keyframe ${draggedTrack[0][0]}`);
+  assert.equal(afterDrag, 0, `the playhead moved to ${afterDrag} ms`);
 });
+const landed = draggedTrack[0][0];
+
+await page.mouse.click(xAt(900), rowY);
+await page.waitForTimeout(PAST_DOUBLE_CLICK);
+check('a press on empty track deselects, and the playhead does not come to it', async () => {});
+assert.equal(await ev(() => window.__anim.keyframeBox()), false);
+assert.equal(await playheadMs(), 0);
 
 // The wheel over the timeline. It used to slide the rows up inside their own box, taking the
 // keyframes out of view; now it is the tab's, and the keyframe is where it was drawn.
-const landed = draggedTrack[0][0];
-await page.mouse.click(xAt(900), rowY);                 // empty track: nothing selected, playhead away
-await page.waitForTimeout(500);
-assert.equal(await ev(() => window.__anim.keyframeBox()), false, 'a press on empty track space deselects');
 await page.mouse.move(xAt(300), rowY);
 await page.mouse.wheel(0, 240);
 await page.waitForTimeout(500);
 const axisAfterWheel = await ev(() => window.__anim.axisRect());
-await page.mouse.click(axisAfterWheel.x + 8 + (landed * (axisAfterWheel.width - 8) * 0.9) / 1000, axisAfterWheel.y + 22 + 13);
+const xAfterWheel = (ms) => axisAfterWheel.x + 8 + (ms * (axisAfterWheel.width - 8) * 0.9) / 1000;
+const rowAfterWheel = axisAfterWheel.y + 22 + 13;
+await page.mouse.click(xAfterWheel(landed), rowAfterWheel);
+await page.waitForTimeout(PAST_DOUBLE_CLICK);
+check('a wheel over the timeline does not scroll the keyframes out of their row', async () => {});
+assert.equal(await ev(() => window.__anim.keyframeBox()), true, 'a click where the keyframe is drawn selected it');
+assert.equal(await playheadMs(), 0);
+
+await page.mouse.dblclick(xAfterWheel(landed), rowAfterWheel);
 await page.waitForTimeout(500);
-const afterWheel = await ev(() => window.__anim.playheadText());
-const boxAfterWheel = await ev(() => window.__anim.keyframeBox());
-check('a wheel over the timeline does not scroll the keyframes out of their row', () => {
-  assert.equal(parseInt(afterWheel, 10), landed, `a click where the keyframe is drawn selected it: ${afterWheel}`);
-  assert.equal(boxAfterWheel, true, 'and its Time, Value and Arrives are open');
-});
+check('a double-click on a keyframe is the one way to send the playhead to it from a row', async () => {});
+assert.equal(await playheadMs(), landed);
 
 const options = await ev(() => window.__anim.changeOptions());
 check('for a sequence the Change list offers the control\'s value channel after the part properties', () => {
