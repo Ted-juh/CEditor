@@ -485,4 +485,100 @@ phrase for both. Read-in-code.
 `catalog = working; saveCatalog();` from a copy taken before the Retry (`:17880-17912`). Retry is not disabled while
 scanning (`ReliabilityPanel.svelte:381`). Read-in-code.
 
+### C-44 — A state-triggered sequence never plays on any shipped control (so Hold last, Loop and Return never do either)   (S2 · bug · animation — the newest code)
+
+**Repro.** Animation tab: add an animation to a Knob (default trigger `to: ['hover']`), switch Kind to Sequence, add a
+track; Preview (or the exported player) and hover.
+**Observed.** Runtime states on hover: `['Hover', 'ActiveHandleCurrent']`; sequence overlay: `null`. With lower-case
+states (what the tests feed): `{"Parts.bodyCap.Layout.rotation":54}`. The tab's chips, `newAnimationShape` and the
+starters write lower-case (`hover`, `pressed`, `lampon`); every built-in type and custom starter reports capitalised
+keys (`Hover`, `Pressed`, `LampOn`). The `default` chip never matches either.
+**Expected.** RELEASE-NOTES: a sequence can "hold its last frame while the state that started it stays";
+`animationModel.js` says triggers are "lower-cased ('Pressed' is 'pressed')"; transitions and keyframes lower-case both
+sides.
+**Where.** `CE/web/src/CE_Application/utils/keyframeModel.js:172` (`names()` trims, never lower-cases) and `:179-195`
+(`triggerFires`, `triggerHeld` compare exactly). The 179 animation tests pass because they feed lower-case states.
+**Evidence level.** observed-in-test (a real Knob through `resolveInteractiveControl` → `syncKeyframePlayer`); Claude
+confirmed the case-sensitive comparison.
+
+### C-45 — On a control with no parts, a sequence's Scale, Rotation and Opacity tracks say "works" and move nothing   (S2 · faulty · animation)
+
+Button and 8 other button/list types have no parts, so Add builds root paths `Layout.scale`, `Layout.rotation`,
+`opacity` — the row says `works=true`, the pose never reaches `Transform`/`Background` (only Fill colour does).
+`OFFERED_ROOT_PROPERTIES` (`Transform.scale/.rotation/.opacity`) is defined and never imported
+(`utils/animationModel.js:104`); `offeredTargetsFor` offers part paths only (`:326-327`); `sequenceTargetStatus` falls
+back to the transition's bucket check (`:298`). Affects Button, MomentaryButton, ToggleButton, RadioButtonGroup,
+CyclicButton, Combobox, Listbox, TimedButton, OneShotButton (and CustomComponent until a starter gives it parts).
+Observed-in-test.
+
+### C-46 — The sequence playhead and Play pose nothing in design view for built-in controls; the tab's stage never shows a sequence   (S3 · faulty · Animation tab)
+
+SSR render with the overlay `scrubKeyframes`/`playKeyframesPreview` publish (`opacity 0.25, rotate 33`): Button/Knob in
+design view and the AnimationStage → unposed; custom component on the design canvas and Button in Preview → posed. The
+design canvas resolves interactively only for custom components or a preview session (`CanvasControl.svelte:380-381`);
+the stage resolves without the overlay and hands it in as an override (`AnimationStage.svelte:49-50`,
+`InteractiveTestSurface.svelte:1857-1861`). RELEASE-NOTES: "a playhead that poses the control on the canvas, and Play".
+In Preview with a sequence selected, the scrub pose overrides the triggered motion. Observed-in-test.
+
+### C-47 — A colour track arriving with a back easing (inBack/outBack/inOutBack) flashes opaque black   (S3 · bug · animation)
+
+anime.js returns NaN for an overshooting colour channel; `rgbaToArgb` (`keyframeModel.js:73-84`) falls back to
+`'FF000000'`; "Keyframe at playhead" stores the black. FF2040C0 → FFC04020 with inBack: black from 100 to 200 ms.
+The easing list offers back curves for colour tracks (`:225-231`). Observed-in-test.
+
+### C-48 — Dragging several selected keyframes together writes the wrong values   (S3 · bug · Animation tab timeline)
+
+Track 100=10, 200=20, 600=60; drag the first two +300 ms → expected 400=10, 500=20; got 200=20, 500=10.
+`moveKeyframes` (`AnimationTab.svelte:316-330`) applies pre-drag indices one by one through `updateKeyframe`, which
+re-sorts after each (`keyframeModel.js:141-156`) and silently deletes a keyframe already at the destination time.
+Undoable. Observed-in-test.
+
+### C-49 — "default" never matches on a Knob or Slider: an animation From/To "default" never plays, and nothing warns   (S3 · faulty · animation triggers)
+
+`ActiveHandleCurrent` is active whenever a Knob/Slider rests, so the empty set that means "default" never occurs
+(`transitionSelection.js:48-54`, `keyframeAnimation.js` `stateHolds`, chips at `animationModel.js:401`). Button works.
+Observed-in-test.
+
+### C-50 — A sequence on the Value trigger ignores its Source field   (S3 · unfinished · animation)
+
+The tab shows Source (`AnimationTab.svelte:739-740`); the player always follows `signals.valueNormalized`
+(`CanvasControl.svelte:394`); neither `keyframePlayer.js` nor `keyframeModel.js` reads `trigger.source`. Transitions do
+honour it. Read-in-code.
+
+### C-51 — Sequences ignore reduced motion (the OS setting and Preview's switch)   (S3 · faulty · accessibility)
+
+`syncKeyframePlayer` receives only `enabled` (`CanvasControl.svelte:395-403`); no mention of reduced motion in either
+player file. Transitions and keyframes suppress (`:1684, :1716`); handoff phase 1 promised "reduced motion everywhere".
+Read-in-code.
+
+### C-52 — The timeline lets you drag a sequence's start, but the sequence never reads that delay   (S3 · faulty · animation)
+
+After dragging 400 ms the document holds `delay: 400` and the bar shows a wait; the pose 200 ms after the trigger is
+identical before and after. Every bar is draggable (`Timeline.svelte:106-113`); `timelineOf` draws `delay` for any kind
+(`animationModel.js:711-724`); the setting column hides Delay for sequences. Observed-in-test.
+
+### C-53 — A filmstrip frame track (a release-note headline) is counted as "1 target does nothing"   (S3 · faulty · animation)
+
+The row says works (`animates: frame`) and the track works (frameIndex 20 at value 0.5), but the tab header and the
+properties summary pass only the document's `partNames`, not generator-made parts (`AnimationTab.svelte:139`,
+`AnimationsEditor.svelte:42`). Observed-in-test.
+
+### C-54 — A keyframe animation played once by a script or by Play replays by itself when the control is drawn again   (S3 · bug · animation)
+
+`animationPlays` keeps the last sequence number per control for the session; a new `CanvasControl` starts with
+`playsNow = {}` (`CanvasControl.svelte:1709`) and then subscribes (`:1713`), reading the old number as a new request.
+Toggle Preview, switch page or tab, re-arm the stage → plays again. Observed-in-test.
+
+### C-55 — At low damping (which the editor allows) a spring snaps the last quarter of its travel in the final frame   (S3 · faulty · spring easing)
+
+Damping 1 / frequency 12: at 97.5 % of the duration the value is 0.756, then 1 — a 24 % jump. Damping 1–3 is inside
+`SPRING_LIMITS` (`animationModel.js:789`), whose comment says only values outside never settle. Affects CSS `linear()`
+and `ce.anim` alike (`utils/easing.js`). Observed-in-test.
+
+### C-56 — Animation polish   (S4)
+
+`ce.anim.play` on a sequence says `"<name>" is a transition…` (`panelRuntime.js:3771`); sequences never light the
+"just fired" lamps (`keyframePlayer.js` never calls `noteAnimationsFired`); `animation-tab-design.md:271-279` still
+says the second kind is `spring` and that `springEase` lives in `interactionRuntime.js`. Read-in-code.
+
 ## Verification of the other's findings
