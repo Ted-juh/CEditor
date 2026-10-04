@@ -784,4 +784,41 @@ concedes the mechanism is no defence — but `licence-and-sunset-policy.md:37-38
 `Ctrl49WindowsEndpoints.cpp:236-242` returns nullptr off `_WIN32`; `stores/instrumentHost.js:536-552` renders the
 "plug it in" hint (`InstrumentHostView.svelte:832`). Minor while the release is Windows-only. Observed-in-test.
 
+### C-80 — File → Close Program quits with unsaved changes and no prompt; edits from the last ~20 s are lost   (S2 · data loss — observed on Linux, Windows to verify)
+
+**Repro.** Open a saved panel, nudge a control (tab shows •), File → Close Program within a few seconds, relaunch.
+**Observed.** No unsaved-changes prompt; the app exits at once. On relaunch the panel reopens from disk — the control
+is back at x=28 (the edit had moved it to 31) and the tab is clean: the edit is gone. Repeating with a 35 s wait before
+quitting, the relaunch restores the edit and the tab reads "Unsaved changes" — so recovery works only once the
+Autosave Delay (20 s default) has elapsed; the quit itself does not flush the snapshot here.
+**Expected.** Closing tabs prompts (`confirmDiscardUnsaved`); quitting the program should either prompt or flush the
+recovery snapshot first (the code intends a `pagehide`/`beforeunload` flush).
+**Where.** `MainWindow.h:56`, `ValueTreeBridgeHandlers.cpp:506` (quit path, no unsaved check); recovery flush in
+`panelSessionPersistence.js`.
+**Evidence level.** observed-in-app (Linux/WebKitGTK). **Codex: please repeat on Windows (W3)** — whether WebView2 runs
+the page's unload flush before teardown decides whether this is S1 or Linux-only.
+
+### C-81 — On Linux, every non-ASCII character the page sends to the native side is double-encoded: saved panels come back as "Â·"   (S3 on this Windows-only release · S1 if Linux ships — observed in the app)
+
+**Repro.** Open `CE/qa/QA-04-scripting.cepanel` (266 "·" in its labels), Save As.
+**Observed.** The written file contains "Â·" for every one of the 266; reopened, labels read "onPointerUp Â·Â· control".
+Every save repeats it, so text degrades further each round trip. All page → native messages are affected (file
+saves, device-profile edits, script source, patch names).
+**Where.** Vendored JUCE `juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp:806-807`:
+`var (s)` on the UTF-8 `char*` from `jsc_value_to_string` — JUCE's `String(const char*)` reads it as Latin-1. The
+handler (`ValueTreeBridgeHandlers.cpp` savePanel → `writeTextAtomically`) then writes those code points as UTF-8.
+`String::fromUTF8 (s)` is the fix. CLAUDE.md records the opposite direction fixed as a vendored patch; this direction
+was not. WebView2 is a different path, so Windows is probably clean — **Codex: confirm a Windows save keeps "·"**.
+**Evidence level.** observed-in-app (byte counts on the saved files) + read in vendored JUCE.
+
+### C-82 — The `pluginPresets` browser check writes its screenshot to `C:/tmp/…`: off Windows it creates `CE/web/C:/tmp/` in the working tree   (S4 · dev)
+
+`CE/web/browser-checks/pluginPresets.mjs:55` defaults `PRESETS_SCREENSHOT` to `'C:/tmp/plugin-presets.png'`; it is in
+`npm run test:browser`. Observed (the run here left `CE/web/C:/tmp/plugin-presets.png`, since removed).
+
+### C-83 — At 1280 px the selection context bar draws "SCRIPTS · no logic attached · Script Editor" over the Box/Effects tabs   (S4 · layout)
+
+Observed in the app with a Label selected (window 1280×720): the scripts chip overlaps the Text/Fill/Border/Box/Effects
+tab row. Cosmetic.
+
 ## Verification of the other's findings
