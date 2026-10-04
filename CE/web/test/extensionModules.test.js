@@ -27,6 +27,8 @@ import {
   scriptApiForTesting, setRuntimeHost, resetExtensionCache,
 } from '../src/CE_Application/scripting/panelRuntime.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
+import { initialiseJavascriptSandbox } from '../src/CE_Application/scripting/scriptSandbox.js';
+await initialiseJavascriptSandbox();
 
 const here = dirname(fileURLToPath(import.meta.url));
 

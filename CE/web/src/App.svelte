@@ -1,4 +1,5 @@
 <script>
+  import ScriptTrustBanner from './CE_Application/components/ScriptTrustBanner.svelte';
   import { onMount } from 'svelte';
 
   let menuBarHeight = $state(28);
@@ -470,6 +471,7 @@
   <!-- ce.ui.notify() toasts. Mounted once at the root, and fixed-position, so a message survives
        whatever tab or panel is on screen when the script raises it. -->
   <ScriptNotifications />
+  <ScriptTrustBanner />
 
   <!-- ce.ui.dialog() modals. Root-mounted for the same reason, and above everything: a question
        that can be scrolled out of view is a script left waiting for an answer. -->

@@ -56,7 +56,7 @@ public:
 
         if (juce::WebBrowserComponent::areOptionsSupported (webViewOptions))
         {
-            webView = std::make_unique<juce::WebBrowserComponent> (webViewOptions);
+            webView = std::make_unique<ceditor::TrustedWebBrowser> (webViewOptions);
             addAndMakeVisible (*webView);
             webView->goToURL (hostRuntimeStartUrl());
         }

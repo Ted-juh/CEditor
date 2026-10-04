@@ -19,6 +19,7 @@ import {
 import { clog, cinfo, cwarn, cerror } from './console.js';
 import { notify } from './scriptUi.js';
 import { preparePanelForExport } from './panelExportPreparation.js';
+import { mayExportPanelCode } from '../scripting/scriptTrust.js';
 import {
   appendRunLine, beginRun, claimIdentity, finishRun, identityFor, newCopyPatch, exportIdentityPrompt,
 } from './exportRuns.js';
@@ -1168,6 +1169,10 @@ function ensureBuildListeners() {
 export function buildActivePanelVst3({ identityChoice = null } = {}) {
   let panel = get(activePanel);
   if (!panel) { cwarn('[vst3] No active panel to build.'); return false; }
+  if (!mayExportPanelCode(panel)) {
+    notify('Enable this panel’s scripts before exporting executable code.', { kind: 'warn' });
+    return false;
+  }
   if (buildInFlight) { cwarn('[vst3] A build is already running.'); return false; }
 
   ensureBuildListeners();

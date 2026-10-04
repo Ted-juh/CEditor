@@ -11,7 +11,7 @@ corruption. `.gitignore` now has an explicit exception and
 
 ## Local modifications
 
-Upstream JUCE is otherwise untouched. There are exactly five patches, and they are listed here because a
+Upstream JUCE is otherwise untouched. There are exactly six patches, and they are listed here because a
 patch inside a vendored tree is invisible in a diff against upstream and dies silently the day
 somebody drops in a new JUCE.
 
@@ -157,3 +157,18 @@ in the other patches' notes.
 **If you upgrade JUCE:** look for `[this,` in the property-exchange handlers of
 `LastListener::Visitor` in `juce_CIDevice.cpp`; the pin test fails while any of the four is back.
 
+### 6. Windows WebView native-message origin check
+
+**Pinned by:** `CE/web/test/vendoredJucePatches.test.js`.
+
+**File:** `include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp`
+
+**Guard:** none. CEditor's native bridge accepts messages only from the packaged resource-provider
+root or the explicitly configured development origin. `WebMessageReceived` reads `get_Source`
+and rejects other URLs before parsing or dispatching their native events. The URL prefix includes
+a slash boundary, so a hostname that merely starts with the allowed hostname is rejected.
+
+This complements `CE/src/TrustedWebBrowser.h`, which blocks navigation away from the application.
+Both protections must survive a JUCE update; reapply the source check before `handleNativeEvent`
+in the Windows `WebMessageReceived` callback. Other platforms retain the navigation protection;
+this message-source patch specifically covers WebView2 on Windows.
