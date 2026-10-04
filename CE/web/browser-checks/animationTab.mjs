@@ -594,7 +594,7 @@ const labels = await ev(() => window.__anim.trackLabels());
 check('switching to a sequence seeds each track with its authored value and draws the axis', () => {
   assert.equal(seeded.length, 2, `tracks: ${JSON.stringify(seeded)}`);
   assert.deepEqual(seeded[0].map(([t]) => t), [0], 'scale: one keyframe at 0');
-  assert.deepEqual(loopHold, { loop: false, hold: true, duration: 120 }, 'a length already long enough is kept');
+  assert.deepEqual(loopHold, { loop: false, hold: true, duration: 1000 }, 'a new animation\'s 120 ms becomes a second');
   assert.equal(canvases, 1, 'the track timeline is mounted');
   assert.equal(labels.length, 2, labels.join(' | '));
   assert.match(labels[0], /Scale/);

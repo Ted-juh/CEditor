@@ -85,8 +85,12 @@ test('switching to a sequence seeds every track with the value the control has, 
   const back = switched(next, 'transition', base);
   assert.equal(back.kind, 'transition');
   assert.deepEqual(switched(back, 'sequence', base).targets[0].keyframes, next.targets[0].keyframes);
+  // So does a new animation's 120 ms, which is what the owner got on first trying it: a sequence
+  // with an axis too short to put a second keyframe on.
+  assert.equal(switched({ ...animation, duration: 120 }, 'sequence', base).duration, 1000);
   // And a length someone set is left alone.
   assert.equal(switched({ ...animation, duration: 2400 }, 'sequence', base).duration, 2400);
+  assert.equal(switched({ ...animation, duration: 200 }, 'sequence', base).duration, 200);
 });
 
 test('a trigger a sequence does not answer becomes a state trigger', () => {

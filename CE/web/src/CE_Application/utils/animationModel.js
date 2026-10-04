@@ -576,7 +576,8 @@ export function kindPatch(row, kind, control = null) {
   const animation = row?.animation ?? {};
   const trigger = animation.trigger ?? {};
   if (kind === SEQUENCE_KIND) {
-    // A length for the axis, hold on, and for every target with no track yet one keyframe at 0
+    // A length for the axis (a transition's 120 ms is a blink, not a sequence: under 200 ms it
+    // becomes a second), hold on, and for every target with no track yet one keyframe at 0
     // holding the value the control has as authored — so switching kind changes nothing on screen
     // until a second keyframe is added. Tracks already there are kept, so a switch back finds them.
     const type = TRIGGER_TYPES.includes(trigger.type) ? trigger.type : 'stateChange';
@@ -591,7 +592,7 @@ export function kindPatch(row, kind, control = null) {
         return { ...target, keyframes: base === undefined ? [] : [{ time: 0, value: base, easing: 'outQuad' }] };
       }),
     };
-    if (!(Number(animation.duration) >= 100)) patch.duration = 1000;
+    if (!(Number(animation.duration) >= 200)) patch.duration = 1000;
     return patch;
   }
   if (kind === 'keyframes') {

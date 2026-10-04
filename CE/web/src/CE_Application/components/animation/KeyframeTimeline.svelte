@@ -10,7 +10,7 @@
    */
   import { onDestroy, onMount } from 'svelte';
   import { Timeline } from 'animation-timeline-js';
-  import { formatAxisLabel } from '../../utils/keyframeModel.js';
+  import { formatAxisLabel, axisScale } from '../../utils/keyframeModel.js';
 
   let {
     tracks = [],          // [{ label, keyframes: [{ time }] }]
@@ -25,6 +25,7 @@
 
   let host = $state(null);
   let timeline = null;
+  let resizeWatch = null;
   let settingModel = false;
   // While a keyframe is being dragged the library's model is the truth; replacing it mid-drag
   // leaves the drag holding a keyframe that no longer exists and drops it at the wrong time. The
@@ -32,6 +33,21 @@
   let dragging = false;
   let modelStale = false;
   const where = new WeakMap(); // library keyframe object → { track, index }
+  const LEFT_MARGIN = 8;
+  let fittedTo = '';
+
+  // The ruler fits the animation's length to the width it has (utils/keyframeModel.js, axisScale).
+  // Done on mount, when the length changes and when the tab is resized; a zoom the user sets with
+  // the wheel stays until one of those happens.
+  function fitAxis() {
+    if (!timeline || !host) return;
+    const width = host.clientWidth - LEFT_MARGIN;
+    if (!(width > 0)) return;
+    const key = `${duration}:${width}`;
+    if (key === fittedTo) return;
+    fittedTo = key;
+    timeline.setOptions({ ...axisScale(duration, width), zoom: 1 });
+  }
 
   function buildModel() {
     return {
@@ -50,13 +66,13 @@
       id: host,
       headerHeight: 22,
       rowsStyle: { height: rowHeight, marginBottom: 2 },
-      stepVal: 250,       // one labelled tick per 250 ms
+      stepVal: 250,       // replaced by fitAxis() as soon as the width is known
       stepPx: 90,
       stepSmallPx: 18,
       snapStep: 10,       // keyframes land on 10 ms
       zoomMin: 0.25,
       zoomMax: 8,
-      leftMargin: 8,
+      leftMargin: LEFT_MARGIN,
       fillColor: '#101316',
       headerFillColor: '#15181B',
       labelsColor: '#8E99A4',
@@ -66,8 +82,11 @@
     }, buildModel());
     // The library labels the ruler in seconds with no unit. Ours say what they are.
     timeline._formatUnitsText = formatAxisLabel;
+    fitAxis();
     timeline.setTime(time);
     timeline.redraw();
+    resizeWatch = new ResizeObserver(() => fitAxis());
+    resizeWatch.observe(host);
 
     timeline.onTimeChanged((event) => {
       if (settingModel || event.source === 'setTimeMethod') return;
@@ -115,10 +134,13 @@
     void tracks; void selected; void duration; void time;
     if (!timeline) return;
     if (dragging) { modelStale = true; return; }
+    fitAxis();
     applyModel();
   });
 
   onDestroy(() => {
+    resizeWatch?.disconnect();
+    resizeWatch = null;
     timeline?.dispose();
     timeline = null;
   });
