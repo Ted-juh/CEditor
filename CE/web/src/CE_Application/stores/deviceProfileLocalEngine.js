@@ -771,8 +771,8 @@ function localParseDumpWithDefinition(profile, dump, bytes = []) {
  * TWO IMPLEMENTATIONS, ON PURPOSE, and it is worth saying why rather than leaving it to be
  * discovered. The Player has a real DeviceProfileEngine in-process; the editor preview does not, and
  * a script running in the preview would otherwise get null where the exported plugin gives bytes.
- * That asymmetry is exactly what `scripting-runtime-gaps.md` exists to record, and this closes the
- * preview half of it.
+ * That asymmetry is exactly what `scripting-runtime-gaps.md` existed to record (a design note, deleted
+ * with the rest of CE_Application/docs in 2d436ba), and this closes the preview half of it.
  *
  * The two are kept honest the same way the parsers are: they share the profile shape, they share the
  * checksum table (`utils/checksums.js`, the same vocabulary `ce.midi.checksum` answers from), and

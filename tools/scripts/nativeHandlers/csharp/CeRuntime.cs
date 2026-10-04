@@ -2,14 +2,17 @@
 // layer and the [UnmanagedCallersOnly] entry points the host (NativeHandlerEngine) resolves by name.
 //
 // This is the C# mirror of NativeHandlerAbi.h (the flat C ABI) and cpp/ce_runtime.h (the user-facing
-// CeContext/CeEvent surface). It is compiled into ONE per-panel NativeAOT module named
-// `ce_handlers_csharp.<dll|dylib|so>` — exactly the file name NativeHandlerEngine::moduleFileName()
-// looks for next to the plugin binary.
+// CeContext/CeEvent surface). genCsharp.mjs compiles it with a panel's handlers into ce_managed.dll,
+// published self-contained with a CoreCLR; the module the host loads, `ce_handlers_csharp.<dll|dylib|so>`
+// (the name NativeHandlerEngine::moduleFileName() looks for), is the C shim CeHost.c, which boots that
+// CoreCLR through hostfxr and forwards to the entry points below. It was a NativeAOT module once, which
+// needs Microsoft's non-redistributable libraries on Windows — genCsharp.mjs has the why.
 //
-// BUILD-UNVERIFIED SCAFFOLD. No .NET AOT toolchain is available where this was authored. The struct
-// layouts below are hand-aligned to the C header; a reviewer MUST double-check the [FieldOffset]/sizes
-// against the C compiler's actual layout on a real build (see the "ABI-LAYOUT ASSUMPTIONS" notes at
-// the bottom of this file). Requires .NET 9/10 SDK + a native toolchain; build is per-OS (no cross-OS).
+// The struct layouts below are hand-aligned to the C header, and checked on real builds:
+// verify-csharp.mjs publishes this, builds the shim and dispatches through the flat ABI from C, and
+// validate-script-exports.mjs runs it against a recording host. Values arriving through the slots
+// appended after ABI 1 is what proves every offset before them. The "ABI-LAYOUT ASSUMPTIONS" notes at
+// the bottom record what the layout rests on, including the 32-bit case no build has checked.
 //
 // Memory rules honored here (from NativeHandlerAbi.h):
 //   - whoever allocates frees: a CeValue the HOST fills via get() is freed by us via vtable.free_value;
@@ -675,7 +678,7 @@ namespace Ce
     }
 
     // The generated registration partial calls into this so all entries are registered exactly once,
-    // lazily, on first init. (NativeAOT has no module initializer ordering guarantees we want to rely on.)
+    // lazily, on first init.
     internal static partial class GeneratedRegistration
     {
         // Implemented by the generated *.Registration.cs partial. If no handlers were generated, the
@@ -700,8 +703,8 @@ namespace Ce
         public static uint AbiVersion() => Abi.Version;
 
         // int ce_handler_init(const CeHostVtable* host, void** out_state)
-        // Called once on the message thread at plugin load. Cache the vtable. Touching managed state here
-        // forces NativeAOT runtime/GC bring-up deterministically (per the C# note in NativeHandlerAbi.h).
+        // Called once on the message thread at plugin load. Cache the vtable, and register the handlers,
+        // so their types load here rather than on the first dispatch.
         [UnmanagedCallersOnly(EntryPoint = "ce_handler_init", CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
         public static int Init(CeHostVtable* host, void** outState)
         {
@@ -712,8 +715,7 @@ namespace Ce
 
                 s_host = host; // marks "initialized"; NOT used by dispatch (see below)
 
-                // Populate the dispatch registry once (forces GC/type-system bring-up now, not on the
-                // first dispatch — deterministic, matches the design intent for C# AOT modules).
+                // Populate the dispatch registry once, at init rather than on the first dispatch.
                 if (!s_registered)
                 {
                     GeneratedRegistration.RegisterAll();
@@ -785,8 +787,8 @@ namespace Ce
         }
 
         // void ce_handler_shutdown(void* state)
-        // NativeAOT can't truly unload; the host keeps the module loaded for process lifetime. This just
-        // flushes handler state.
+        // The CoreCLR cannot be unloaded and started again, so the shim pins itself for the process
+        // lifetime (CeHost.c, ce_pin_self). This just flushes handler state.
         [UnmanagedCallersOnly(EntryPoint = "ce_handler_shutdown", CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
         public static void Shutdown(void* state)
         {
@@ -794,8 +796,8 @@ namespace Ce
             {
                 s_host = null;
                 // We intentionally keep the registry populated: a re-init reuses it (s_registered stays
-                // true only within a process; the static is reset only if the host reloads us, which AOT
-                // does not support anyway).
+                // true only within a process; the static is reset only if the host reloads us, which the
+                // pinned shim never lets happen).
             }
             catch
             {
