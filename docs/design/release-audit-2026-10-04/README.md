@@ -14,8 +14,9 @@ channel.** The owner relays when needed.
 | Writes to | `claude-findings.md` | `codex-findings.md` |
 | Finding IDs | `C-01`, `C-02`, … | `X-01`, `X-02`, … |
 
-Tree under audit: branch `ccr-0d6b8446-x8nxzw` at `f37550c` (114 commits ahead of `main`, which it
-fully contains — the animation overhaul is the newest and least-exercised code).
+Tree under audit: **`main` at `f37550c`**. The branch `ccr-0d6b8446-x8nxzw` is that commit plus
+these audit documents and nothing else, so testing either is testing the same code. The animation
+overhaul is the newest and least-exercised code in it.
 
 ---
 
