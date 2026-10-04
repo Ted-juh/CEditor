@@ -306,6 +306,15 @@ function sequenceOnlyStatus(target, kind) {
   return { works: false, reason: 'sequence only', animates: bucket, detail: `${what} is driven by a sequence, not by a ${kind}: there is no CSS for a ${bucket === 'channel' ? 'value' : 'frame'}.` };
 }
 
+/**
+ * The Part picker's entry for a change on the control rather than on one of its parts. A control
+ * with no parts of its own — a custom component not yet designed, one whose parts a generator
+ * makes — has nothing else to pick, and the runtime animates the control itself all the same
+ * (ROOT_PATH_BUCKETS). Not a part name: a part cannot be called this, the '@' is not a name
+ * character.
+ */
+export const CONTROL_ITSELF = '@control';
+
 /** The parts a resolved control has, generator-made ones included. Empty when it cannot resolve. */
 export function resolvedPartsOf(control) {
   if (!control?._children?.Parts) return {};
@@ -317,14 +326,17 @@ export function resolvedPartsOf(control) {
 }
 
 /**
- * Everything the "Change" dropdown can offer for THIS control: the fixed part properties, and —
- * for a sequence — one entry per value channel and one per filmstrip part. The channels come from
+ * Everything the "Change" dropdown can offer for THIS control: the fixed part properties — or, with
+ * `onControl`, the ones the control itself has (`scope: 'root'`, a whole path) — and, for a
+ * sequence, one entry per value channel and one per filmstrip part. The channels come from
  * the document; the filmstrip parts come from resolving the control, because a generator makes
  * them and the document never holds them. Each extra entry carries its whole path
  * (`scope: 'control'`), so the Part picker does not apply to it.
  */
-export function offeredTargetsFor(control, kind = SEQUENCE_KIND) {
-  const out = OFFERED_PROPERTIES.map((entry) => ({ ...entry, scope: 'part' }));
+export function offeredTargetsFor(control, kind = SEQUENCE_KIND, { onControl = false } = {}) {
+  const out = onControl
+    ? OFFERED_ROOT_PROPERTIES.map((entry) => ({ ...entry, scope: 'root' }))
+    : OFFERED_PROPERTIES.map((entry) => ({ ...entry, scope: 'part' }));
   if (kind !== SEQUENCE_KIND) return out;
   const channels = control?._children?.ValueChannels?._children ?? {};
   for (const [name, channel] of Object.entries(channels)) {
@@ -671,8 +683,11 @@ export function moveTarget(targets, from, to) {
 export function buildTarget(partName, offered) {
   if (!offered) return null;
   return {
-    // A channel or a filmstrip frame carries its whole path; the Part picker does not apply.
-    path: partName && offered.scope !== 'control' ? `Parts.${partName}.${offered.path}` : offered.path,
+    // A channel, a filmstrip frame, or a property of the control itself carries its whole path;
+    // the Part picker does not apply.
+    path: partName && partName !== CONTROL_ITSELF && offered.scope !== 'control' && offered.scope !== 'root'
+      ? `Parts.${partName}.${offered.path}`
+      : offered.path,
     properties: [...offered.properties],
   };
 }

@@ -190,3 +190,17 @@ test('switching to a sequence seeds a channel track from its value and a frame t
   assert.equal(baseValueAt(control, 'ValueChannels.mainValue'), 0.5);
   assert.equal(baseValueAt(control, 'Parts.nosuchpart.opacity'), undefined);
 });
+
+test('a sequence can track the control itself, beside its channels and frames', async () => {
+  const { OFFERED_ROOT_PROPERTIES, CONTROL_ITSELF } = await import('../src/CE_Application/utils/animationModel.js');
+  const control = filmstripStarter();
+  const offered = offeredTargetsFor(control, 'sequence', { onControl: true });
+  assert.deepEqual(offered.filter((e) => e.scope === 'root').map((e) => e.path), OFFERED_ROOT_PROPERTIES.map((e) => e.path));
+  assert.deepEqual(offered.filter((e) => e.scope === 'control').map((e) => e.path), ['ValueChannels.mainValue', 'Parts.filmstrip_knobFrames.Image.frameIndex']);
+  const rotation = buildTarget(CONTROL_ITSELF, offered.find((e) => e.path === 'Transform.rotation'));
+  assert.equal(sequenceTargetStatus(rotation, []).animates, 'transform');
+  assert.equal(typeof baseValueAt(control, 'Transform.rotation'), 'number', 'so a new track has a value to start from');
+  // The pose reaches the control through the same overlay a part track uses.
+  const { control: posed } = resolveInteractiveControl(control, { keyframeOverlay: { 'Transform.rotation': 17 } });
+  assert.equal(posed._children.Transform.rotation, 17);
+});

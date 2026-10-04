@@ -537,6 +537,36 @@ await settle();
 check('and Alt+Up puts it back', async () => {});
 assert.deepEqual(await rowOrder(), beforeKeys);
 
+// --- A change on the control itself ------------------------------------------------------------
+// The Part picker used to list parts and nothing else, so a control with no parts of its own had a
+// dead Add button and no way to animate at all. The control itself is a choice now.
+
+const partChoices = (await ev(() => window.__anim.addOptions()))[0];
+check('the Part picker ends with the control itself', () => {
+  assert.equal(partChoices.at(-1), 'The control itself', partChoices.join(' | '));
+});
+await ev(() => window.__anim.choosePart('The control itself'));
+await settle();
+const ownChoices = (await ev(() => window.__anim.addOptions()))[1];
+check('and the Change list becomes the control\'s own properties', () => {
+  assert.deepEqual(ownChoices.slice(0, 3), ['Scale', 'Rotation', 'Opacity'], ownChoices.join(' | '));
+  assert.ok(!ownChoices.includes('Width'), 'the panel owns a control\'s size');
+});
+const targetsBeforeOwn = await ev(() => window.__anim.storedTargets('pressMotion'));
+await ev(() => window.__anim.add());
+await settle();
+const targetsWithOwn = await ev(() => window.__anim.storedTargets('pressMotion'));
+check('adding it writes a path on the control, not on a part', () => {
+  assert.equal(targetsWithOwn.length, targetsBeforeOwn.length + 1);
+  assert.equal(targetsWithOwn.at(-1), 'Transform.scale');
+});
+assert.equal(await ev(() => window.__anim.addDisabledNow()), false);
+await ev(() => window.__anim.removeTarget(window.__anim.targetCount() - 1));
+await settle();
+assert.deepEqual(await ev(() => window.__anim.storedTargets('pressMotion')), targetsBeforeOwn);
+await ev(() => window.__anim.choosePart(window.__anim.firstPart()));
+await settle();
+
 // --- The sequence kind ------------------------------------------------------------------------
 // The third kind: a track per target along a time axis (utils/keyframeModel.js). Checked on an
 // animation of its own, so nothing above depends on what switching kind writes.

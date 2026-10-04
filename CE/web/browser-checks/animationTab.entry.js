@@ -181,6 +181,15 @@ window.__anim = {
   storedEasing: (name) => animation(name).easing,
 
   addOptions: () => [...document.querySelectorAll('.addbox select')].map((s) => [...s.options].map((o) => o.textContent.trim())),
+  choosePart: (label) => {
+    const select = document.querySelectorAll('.addbox select')[0];
+    const option = [...(select?.options ?? [])].find((o) => o.textContent.trim() === label);
+    if (!select || !option) return false;
+    select.value = option.value;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  },
+  addDisabledNow: () => document.querySelector('.addbtn')?.disabled === true,
   chooseChange: (label) => {
     const select = document.querySelectorAll('.addbox select')[1];
     const option = [...(select?.options ?? [])].find((o) => o.textContent.trim() === label);

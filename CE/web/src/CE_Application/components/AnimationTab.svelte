@@ -74,6 +74,8 @@
     moveTarget,
     buildTarget,
     OFFERED_PROPERTIES,
+    OFFERED_ROOT_PROPERTIES,
+    CONTROL_ITSELF,
     TRIGGER_TYPES,
     EASING_CHOICES,
     CUSTOM_EASING,
@@ -131,10 +133,6 @@
   // For "does this part exist" on a sequence, generator-made parts count: a filmstrip's frame
   // lives on one, and the document never holds it.
   let knownPartNames = $derived(sequence ? [...new Set([...partNames, ...Object.keys(resolvedPartsOf(control))])] : partNames);
-  // What the Change dropdown offers: the part properties, and for a sequence the control's value
-  // channels and a frame track per filmstrip part.
-  let offered = $derived(offeredTargetsFor(control, selected?.kind));
-
   let targets = $derived(selected ? describeTargets(selected, knownPartNames) : []);
   let deadCount = $derived(rows.reduce((sum, row) => sum + deadTargetCount(row, partNames), 0));
 
@@ -171,7 +169,18 @@
   // What the "add a target" row is set to.
   let newPart = $state('');
   let newProperty = $state(OFFERED_PROPERTIES[0].path);
-  let partForAdd = $derived(newPart || partNames[0] || '');
+  // A change lands on one of the control's parts or on the control itself. A control with no parts
+  // of its own has only the second — and until this was offered, the Add button was simply dead
+  // for it, with nothing to say why.
+  let onControl = $derived(newPart === CONTROL_ITSELF || !partNames.length);
+  let partForAdd = $derived(onControl ? '' : (newPart || partNames[0] || ''));
+  let partOptions = $derived([
+    ...partNames.map((name) => ({ value: name, label: name })),
+    { value: CONTROL_ITSELF, label: 'The control itself' },
+  ]);
+  // What the Change dropdown offers: the part's properties or the control's own, and for a
+  // sequence the control's value channels and a frame track per filmstrip part.
+  let offered = $derived(offeredTargetsFor(control, selected?.kind, { onControl }));
   let offeredForAdd = $derived(offered.find((entry) => entry.path === newProperty) ?? offered[0]);
   // Tell the user before they add it, not after.
   let addStatus = $derived(sequence
@@ -249,9 +258,12 @@ onMount(() => {
     const [, partName, ...rest] = row.path.startsWith('Parts.') ? row.path.split('.') : ['', '', row.path];
     const whole = offered.find((entry) => entry.scope === 'control' && entry.path === row.path);
     if (whole) return whole.label;
-    const entry = OFFERED_PROPERTIES.find((e) => e.path === rest.join('.')) ?? OFFERED_PROPERTIES.find((e) => e.path === row.path);
-    const what = entry?.label ?? rest.join('.') ?? row.path;
-    return partName ? `${partName} · ${what}` : what;
+    if (!partName) {
+      const own = OFFERED_ROOT_PROPERTIES.find((e) => e.path === row.path);
+      return own ? `Control · ${own.label}` : row.path;
+    }
+    const entry = OFFERED_PROPERTIES.find((e) => e.path === rest.join('.'));
+    return `${partName} · ${entry?.label ?? rest.join('.')}`;
   }
 
   /** The canvas shows the pose at the playhead, in any view. */
@@ -884,14 +896,14 @@ onMount(() => {
             <div class="addbox">
               <div class="r">
                 <label for="anim-part">Part</label>
-                <PropertySelect options={partNames.map((name) => ({ value: name, label: name }))}
-                                value={partForAdd} ariaLabel="Part" disabled={offeredForAdd?.scope === 'control'}
+                <PropertySelect options={partOptions}
+                                value={onControl ? CONTROL_ITSELF : partForAdd} ariaLabel="Part" disabled={offeredForAdd?.scope === 'control'}
                                 onchange={(value) => { newPart = value; }} />
               </div>
               <div class="r">
                 <label for="anim-what">Change</label>
                 <PropertySelect options={offered.map((entry) => ({ value: entry.path, label: entry.label }))}
-                                value={newProperty} ariaLabel="What to change"
+                                value={offeredForAdd?.path ?? newProperty} ariaLabel="What to change"
                                 onchange={(value) => { newProperty = value; }} />
               </div>
 
@@ -902,7 +914,7 @@ onMount(() => {
                 </p>
               {/if}
 
-              <button type="button" class="addbtn" disabled={!partNames.length && offeredForAdd?.scope !== 'control'} onclick={add}>
+              <button type="button" class="addbtn" disabled={!offeredForAdd} onclick={add}>
                 <Plus size={11} /> {sequence ? 'Add this track' : 'Add this change'}
               </button>
             </div>
