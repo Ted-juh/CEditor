@@ -152,7 +152,7 @@ test; C-34 and C-35 are code traces.
 | Player plug-in on Linux (VST3 / CLAP / LV2) under pluginval and clap-validator | in progress |
 
 Each reviewer also recorded what it checked and found sound — among them: failed saves are reported as failures;
-29 hostile `.cepanel` documents open cleanly or are refused; round-trips of all QA panels are byte-stable; the
+27 hostile `.cepanel` documents open cleanly or are refused; round-trips of all QA panels are byte-stable; the
 script-MIDI queue on the audio thread is lock-free; checksums match the manuals' examples; every Hostage command name
 the web side sends exists natively; host parameter ids stay stable across exports; the performance engine's own notes
 release correctly on stop, locate and panic. The full lists are in the reviewers' reports, summarised in the
