@@ -2,11 +2,13 @@
 #include "../src/DeviceProfile/DeviceProfileService.h"
 #include "../src/DeviceProfile/MidiCiSession.h"
 #include "../src/DeviceProfile/ProfileChecksums.h"
+#include "../src/Player/DumpCapturePolicy.h"
 
 #include <juce_midi_ci/juce_midi_ci.h>
 
 #include <algorithm>
 #include <deque>
+#include <map>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -482,6 +484,159 @@ int runDumpBuildTests (const juce::File& file)
             }
         }
     }
+
+    return failures;
+}
+
+/**
+ * The exported plugin's dump capture and restore policy — release audit 2026-10-04, C-11.
+ *
+ * WHAT WENT WRONG. The plugin saved every dump the profile declares, built from the APVTS alone, and
+ * kept any that built. The APVTS holds only the panel's exported parameters, and buildDumpMessage
+ * fills the rest with the definition's default byte — so a GAIA session stored the System block with
+ * all of it at 0 (Master Level 0: a silent synth) and "Send saved sound" sent it, before the values.
+ *
+ * WHAT IS ASSERTED, with the values shaped exactly as the plugin's `boundParameterValues` shapes
+ * them (doubles keyed by device parameter id): a panel that exports every Arpeggio Common control
+ * and three System ones gets Arpeggio Common captured and sent, and nothing at all for System, the
+ * arpeggio patterns or anything else it does not cover. And a session saved by an older export —
+ * one that DOES carry a zero-filled System block — does not get it sent either.
+ */
+int runDumpCapturePolicyTests (const juce::File& file)
+{
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromFile (file, error))
+    {
+        std::cerr << "[FAIL] dump capture: could not load " << file.getFileName() << ": " << error << "\n";
+        return 1;
+    }
+
+    const auto document = juce::JSON::parse (file.loadFileAsString());
+    std::map<juce::String, juce::var> parameters;
+    if (auto* list = document.getProperty ("parameters", {}).getArray())
+        for (const auto& p : *list)
+            parameters[p.getProperty ("id", {}).toString()] = p;
+
+    const auto mappedIds = [&document] (const juce::String& dumpId)
+    {
+        juce::StringArray ids;
+        if (auto* dumps = document.getProperty ("dumpDefinitions", {}).getArray())
+            for (const auto& d : *dumps)
+                if (d.getProperty ("id", {}).toString() == dumpId)
+                    if (auto* mappings = d.getProperty ("mappings", {}).getArray())
+                        for (const auto& m : *mappings)
+                            ids.addIfNotAlreadyThere (m.getProperty ("parameter", {}).toString());
+        return ids;
+    };
+
+    // A legal value that is NOT zero wherever the parameter allows it, so a byte the panel supplied
+    // cannot be mistaken for a byte the builder defaulted. A double, as the APVTS hands it over.
+    const auto nonZeroValue = [&parameters] (const juce::String& id) -> double
+    {
+        const auto& p = parameters[id];
+        if (auto* choices = p.getProperty ("choices", {}).getArray())
+            return choices->isEmpty() ? 0.0 : (double) choices->getLast().getProperty ("value", 0);
+        return (double) p.getProperty ("range", {}).getProperty ("max", 0);
+    };
+
+    auto failures = 0;
+    const auto fail = [&failures] (const juce::String& what)
+    {
+        std::cerr << "[FAIL] dump capture: " << what << "\n";
+        ++failures;
+    };
+
+    const auto arpIds = mappedIds ("arpeggioCommon");
+    const auto systemIds = mappedIds ("system");
+    if (arpIds.isEmpty() || systemIds.size() < 4)
+    {
+        std::cerr << "[FAIL] dump capture: the GAIA profile no longer has the dumps this test is about\n";
+        return 1;
+    }
+
+    auto* bound = new juce::DynamicObject();
+    for (const auto& id : arpIds)
+        bound->setProperty (id, nonZeroValue (id));
+    for (int i = 0; i < 3; ++i)                       // part of System, as a real panel might export
+        bound->setProperty (systemIds[i], nonZeroValue (systemIds[i]));
+    const juce::var values { bound };
+
+    // --- Capture -----------------------------------------------------------------------------------
+    const auto capture = ce::captureCompleteDumps (engine, values);
+    auto* captured = capture.captured.getDynamicObject();
+    const auto fullArp = engine.buildDumpMessage ("arpeggioCommon", values);
+
+    if (captured == nullptr || fullArp.hex.isEmpty()
+        || captured->getProperty ("arpeggioCommon").toString() != fullArp.hex)
+        fail ("a dump the panel binds completely was not captured as built");
+
+    if (captured != nullptr && captured->hasProperty ("system"))
+        fail ("System was captured with 3 of its " + juce::String (systemIds.size())
+              + " parameters supplied — the rest would be sent as 0");
+
+    if (captured != nullptr && captured->getProperties().size() != 1)
+    {
+        juce::StringArray names;
+        for (const auto& property : captured->getProperties())
+            names.add (property.name.toString());
+        fail ("expected exactly one dump captured, got " + juce::String (names.size()) + ": "
+              + names.joinIntoString (", "));
+    }
+
+    bool systemReported = false;
+    for (const auto& skipped : capture.skipped)
+        if (skipped.id == "system")
+            systemReported = skipped.missingParameters == systemIds.size() - 3;
+    if (! systemReported)
+        fail ("System was not reported as skipped with " + juce::String (systemIds.size() - 3)
+              + " parameters missing");
+
+    if (failures == 0)
+        std::cout << "[PASS] dump capture :: only a dump the panel covers completely is saved ("
+                  << capture.capturedCount << " captured, " << capture.skipped.size()
+                  << " partial ones skipped and reported)\n";
+
+    // --- Restore -----------------------------------------------------------------------------------
+    // What an older export stored: the partial System block, zero-filled, beside the good one, and
+    // a dump the profile has never heard of.
+    const auto failuresBeforeRestore = failures;
+    const auto zeroFilledSystem = engine.buildDumpMessage ("system", values);
+    if (! zeroFilledSystem.ok || zeroFilledSystem.unmappedParameters.isEmpty())
+        fail ("could not build the zero-filled System block an older session would carry");
+
+    auto* stored = new juce::DynamicObject();
+    stored->setProperty ("system", zeroFilledSystem.hex);
+    stored->setProperty ("arpeggioCommon", fullArp.hex);
+    stored->setProperty ("notInThisProfile", "F0 7D 00 F7");
+    const juce::var storedDumps { stored };
+
+    const auto plan = ce::planRestoredDumps (&engine, storedDumps, values);
+    if (plan.send.size() != 1 || plan.send.front().id != "arpeggioCommon")
+    {
+        juce::StringArray names;
+        for (const auto& dump : plan.send)
+            names.add (dump.id);
+        fail ("restore should send Arpeggio Common alone, would send: " + names.joinIntoString (", "));
+    }
+    else if (plan.send.front().bytes != ce::dumpBytesFromHex (fullArp.hex) || plan.send.front().bytes.isEmpty())
+    {
+        fail ("the stored Arpeggio Common bytes were not sent verbatim");
+    }
+
+    juce::StringArray dropped;
+    for (const auto& d : plan.dropped)
+        dropped.add (d.id);
+    if (! dropped.contains ("system") || ! dropped.contains ("notInThisProfile"))
+        fail ("a stored partial or unknown dump was not dropped by name (dropped: "
+              + dropped.joinIntoString (", ") + ")");
+
+    // No profile to check against: send nothing rather than whatever the project file holds.
+    if (! ce::planRestoredDumps (nullptr, storedDumps, values).send.empty())
+        fail ("with no profile, stored dumps were sent unchecked");
+
+    if (failures == failuresBeforeRestore)
+        std::cout << "[PASS] dump restore :: a stored zero-filled System block is dropped, a complete dump is sent verbatim\n";
 
     return failures;
 }
@@ -2313,6 +2468,7 @@ int main (int argc, char** argv)
     failures += runGaiaNoteChoiceTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runPatchDumpTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runDumpBuildTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
+    failures += runDumpCapturePolicyTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runPresetRecallTests (root);
 
     if (failures == 0)
