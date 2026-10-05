@@ -24,6 +24,7 @@ import { dirname, join } from 'node:path';
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const PROCESSOR = readFileSync(join(REPO, 'CE/src/Player/PluginProcessor.h'), 'utf8');
 const POLICY = readFileSync(join(REPO, 'CE/src/Player/DumpCapturePolicy.h'), 'utf8');
+const POLICY_RESTORE = readFileSync(join(REPO, 'CE/src/Player/RestorePolicy.h'), 'utf8');
 const HOST_H = readFileSync(join(REPO, 'CE/src/Player/PlayerHost.h'), 'utf8');
 const HOST_CPP = readFileSync(join(REPO, 'CE/src/Player/PlayerHost.cpp'), 'utf8');
 const PLAYER = readFileSync(join(REPO, 'CE/web/src/Player.svelte'), 'utf8');
@@ -108,7 +109,9 @@ test('the answer is persisted with the project, and only always/never are rememb
   // Saved with the project rather than globally: the decision was made about this session's patch
   // and this session's synth, and a different project is a different question.
   assert.match(PROCESSOR, /createNewChildElement \("RestoreAnswer"\)/);
-  assert.match(PROCESSOR, /getChildByName \("RestoreAnswer"\)/);
+  // Read back through readSessionRecall (RestorePolicy.h), which keeps only always/never too.
+  assert.match(PROCESSOR, /ce::readSessionRecall/);
+  assert.match(POLICY_RESTORE, /getChildByName \("RestoreAnswer"\)/);
   const answer = PROCESSOR.slice(PROCESSOR.indexOf('void answerRestorePrompt'));
   const body = answer.slice(0, answer.indexOf('\n    }\n'));
   assert.match(body, /if \(a != "always" && a != "never"\) return;[\s\S]*restoreAnswer = a;/,
@@ -255,11 +258,28 @@ test('setCurrentProgram sends nothing — the timer does', () => {
 
 test('a restored program index does not fire a program change', () => {
   // The restore push is about to put the whole patch back. A program change on top of it recalls a
-  // slot over the patch that was just restored — the wrong sound and the wrong order.
-  const load = PROCESSOR.slice(PROCESSOR.indexOf('getChildByName ("CurrentProgram")'),
-    PROCESSOR.indexOf('getChildByName ("CurrentProgram")') + 700);
-  assert.ok(!load.includes('programChangePending'), 'restoring the index must not queue a send');
-  assert.match(load, /currentProgram = index;/);
+  // slot over the patch that was just restored — the wrong sound and the wrong order. Restoring the
+  // index cancels a change the host queued before the state arrived; it never queues one.
+  const load = PROCESSOR.slice(PROCESSOR.indexOf('ce::readSessionRecall'),
+    PROCESSOR.indexOf('markSessionRestored();'));
+  assert.match(load, /currentProgram = recall\.program;/);
+  assert.ok(!load.includes('programChangePending.store (true)'), 'restoring the index must not queue a send');
+  assert.match(load, /programChangePending\.store \(false\);/);
+});
+
+test('a restored session replaces the answer and the program instead of keeping the old ones', () => {
+  // Release audit X-03. Saving omits both at their defaults, and the loader used to change them only
+  // when an element was present, so restoring an older state into a live instance kept a later
+  // "always" and pushed the patch at the synth unasked. RestorePolicyTests drives readSessionRecall;
+  // this pins that setStateInformation assigns its result unconditionally, in both state formats.
+  const load = PROCESSOR.slice(PROCESSOR.indexOf('void setStateInformation'),
+    PROCESSOR.indexOf('bool isBusesLayoutSupported'));
+  assert.ok(!/getChildByName \("RestoreAnswer"\)/.test(load), 'the answer must come from readSessionRecall, not a conditional read');
+  assert.ok(!/getChildByName \("CurrentProgram"\)/.test(load), 'the program must come from readSessionRecall, not a conditional read');
+  assert.match(load, /restoreAnswer = recall\.restoreAnswer;/);
+  const legacy = load.slice(load.indexOf('backward-compat: APVTS-only state'));
+  assert.match(legacy, /restoreAnswer = \{\};[\s\S]{0,80}currentProgram = 0;/,
+    'an APVTS-only state must reset the recall state too');
 });
 
 test('a captured patch is sent as itself; a name-only slot is recalled', () => {

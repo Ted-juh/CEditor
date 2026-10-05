@@ -215,6 +215,48 @@ void testEveryVerdictExplainsItself()
 
     check (allExplained, "no verdict comes back without a reason");
 }
+void testSessionRecallIsReplacedNotMerged()
+{
+    std::cout << "\nA restored session replaces the recall state" << std::endl;
+
+    // Release audit X-03: save a session at its defaults (program 0, nobody answered), move on to
+    // program 1 and answer "always", then restore the first save into the same instance. Saving omits
+    // both elements at their defaults, so the restore used to leave program 1 and "always" in place,
+    // and the next restore push went out unasked on the strength of a decision this session never made.
+    const auto parse = [] (const char* xml) { return juce::parseXML (juce::String (xml)); };
+
+    const auto initial = parse ("<CEDITOR_PLUGIN_STATE><DeviceMappings>{}</DeviceMappings></CEDITOR_PLUGIN_STATE>");
+    const auto later = parse ("<CEDITOR_PLUGIN_STATE><RestoreAnswer>always</RestoreAnswer>"
+                              "<CurrentProgram>1</CurrentProgram></CEDITOR_PLUGIN_STATE>");
+
+    const auto fromLater = ce::readSessionRecall (*later, 2);
+    check (fromLater.restoreAnswer == "always" && fromLater.program == 1, "the later session reads as saved");
+
+    const auto fromInitial = ce::readSessionRecall (*initial, 2);
+    check (fromInitial.restoreAnswer.isEmpty(), "an omitted answer is unanswered, not the previous session's");
+    check (fromInitial.program == 0, "an omitted program is program 0, not the previous session's");
+
+    // What that means for the push: the old state must ask, not send.
+    ce::RestoreSituation situation;
+    situation.deviceReady = true;
+    situation.windowOpen = true;
+    situation.rememberedAnswer = fromInitial.restoreAnswer;
+    check (ce::decideRestore (situation).action == ce::RestoreAction::Ask,
+           "restoring the unanswered state asks again instead of sending");
+
+    // A stale "never" was the mirror image: it silenced a restore that should have asked.
+    situation.rememberedAnswer = ce::readSessionRecall (*parse ("<CEDITOR_PLUGIN_STATE/>"), 2).restoreAnswer;
+    check (ce::decideRestore (situation).action == ce::RestoreAction::Ask, "nor does a stale never carry over");
+
+    // Values this code did not write read as the default, not as a guess.
+    const auto odd = parse ("<CEDITOR_PLUGIN_STATE><RestoreAnswer>yes please</RestoreAnswer>"
+                            "<CurrentProgram>7</CurrentProgram></CEDITOR_PLUGIN_STATE>");
+    const auto fromOdd = ce::readSessionRecall (*odd, 2);
+    check (fromOdd.restoreAnswer.isEmpty(), "an unrecognised answer is unanswered");
+    check (fromOdd.program == 0, "a program outside the bank is program 0");
+    check (ce::readSessionRecall (*parse ("<S><RestoreAnswer> Never </RestoreAnswer></S>"), 2).restoreAnswer == "never",
+           "case and whitespace do not matter");
+}
 } // namespace
 
 int main()
@@ -227,6 +269,7 @@ int main()
     testTheQuestion();
     testNothingToSend();
     testEveryVerdictExplainsItself();
+    testSessionRecallIsReplacedNotMerged();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;
     return failures == 0 ? 0 : 1;

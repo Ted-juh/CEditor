@@ -439,21 +439,19 @@ public:
                 apvts.replaceState (juce::ValueTree::fromXml (*apvtsXml));
             if (auto* dev = xml->getChildByName ("DeviceMappings"))
                 deviceService.importRoleMappings (juce::JSON::parse (dev->getAllSubText()));
-            if (auto* answer = xml->getChildByName ("RestoreAnswer"))
-                restoreAnswer = answer->getAllSubText().trim();
+            // The answer and the program are this session's, replaced wholesale — absent means
+            // unanswered and program 0, not "whatever the instance had" (RestorePolicy.h, X-03).
+            // Set WITHOUT sending the program: the restore push is about to run and will put the
+            // whole patch back; a program change on top of it would recall a slot over the top of
+            // the patch that was just restored, which is the wrong sound and the wrong order. A
+            // change the host asked for before this state arrived goes with the state it preceded.
+            const auto recall = ce::readSessionRecall (*xml, ce::hostProgramCount (programBank));
+            restoreAnswer = recall.restoreAnswer;
+            currentProgram = recall.program;
+            programChangePending.store (false);
             restoredDumps = juce::var();
             if (auto* dumps = xml->getChildByName ("DeviceDumps"))
                 restoredDumps = juce::JSON::parse (dumps->getAllSubText());
-            if (auto* program = xml->getChildByName ("CurrentProgram"))
-            {
-                const int index = program->getAllSubText().trim().getIntValue();
-                // Set WITHOUT sending. The restore push is about to run and will put the whole
-                // patch back; a program change on top of it would recall a slot over the top of
-                // the patch that was just restored, which is the wrong sound and the wrong order.
-                if (juce::isPositiveAndBelow (index, ce::hostProgramCount (programBank)))
-                    currentProgram = index;
-            }
-
             markSessionRestored();
 
             // ARM THE RESTORE PUSH — do not send here. This call can arrive before the ports are
@@ -485,6 +483,10 @@ public:
         }
         else if (xml->hasTagName (apvts.state.getType())) // backward-compat: APVTS-only state
         {
+            // A state from before recall existed answered nothing and selected nothing.
+            restoreAnswer = {};
+            currentProgram = 0;
+            programChangePending.store (false);
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
             markSessionRestored();
         }
