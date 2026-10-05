@@ -130,7 +130,8 @@ def background():
     bg = Image.alpha_composite(bg, glow.filter(ImageFilter.GaussianBlur(40)))
     for sx, sy in ((6, 6), (468, 6), (6, 260), (468, 260)):      # screws
         ImageDraw.Draw(bg).ellipse((sx, sy, sx + 6, sy + 6), fill=(60, 66, 76, 255), outline=(20, 22, 26, 255))
-    bg.convert('RGB').save(path('lab_bg.png'), optimize=True)
+    # Opaque, but RGBA: the format confirmed on the CTRL49. An RGB PNG has never drawn there.
+    bg.convert('RGB').convert('RGBA').save(path('lab_bg.png'), optimize=True)
 
 
 # --- full-colour pieces ---------------------------------------------------------------------
@@ -278,13 +279,14 @@ def gif_to_strip(gif, out, width=None):
 
 def stress_block():
     """256x1024 decodes to 1 MB whatever the PNG weighs. Bands of colour, so a crop of it on the
-    screen shows that it decoded, and regular, so the PNG stays small to upload."""
-    im = Image.new('RGB', (256, 1024))
+    screen shows that it decoded, and regular, so the PNG stays small to upload. RGBA, the format
+    confirmed on the CTRL49: the first build's RGB blocks never showed there."""
+    im = Image.new('RGBA', (256, 1024))
     d = ImageDraw.Draw(im)
     for band in range(32):
         hue = band * 11 % 32
         d.rectangle((0, band * 32, 255, band * 32 + 31),
-                    fill=(80 + hue * 5, 120 + (hue * 3) % 100, 200 - hue * 4))
+                    fill=(80 + hue * 5, 120 + (hue * 3) % 100, 200 - hue * 4, 255))
     im.save(path('stress_block.png'), optimize=True)
 
 

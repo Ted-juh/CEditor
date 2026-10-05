@@ -452,10 +452,27 @@ ADSR extremes, and checks source crops, screen bounds, text widths and image reu
 pages on the keyboard, including CUE, LAYERS, SOUNDCHECK, DISCOVER and CHANGES, then the mockups' stress test, with what to
 write down at each step. The measurements below are the older, open ones.
 
+**Measured on the CTRL49, 2026-10-05** (the screen lab's Stress page, one kind of call at a time,
+at 9 redraws a second, until the bar under the header stopped gliding):
+
+| Call | Stutters at, per redraw | Per second |
+|---|---|---|
+| `draw_rect` (16 x 10) | 880 | about 7,900 |
+| `draw_image`, a 26 x 14 sprite | 504 | about 4,500 |
+| `draw_text` | 124 (still smooth; the knob stops at 127) | about 1,100 |
+| redraws a second, empty page | still smooth at 30 | |
+
+Sprites are the budget that binds: the full mockups ask for about 4,100-4,200 calls a second, the
+slim ones about 2,000. Seven full-screen blits a redraw stayed smooth, but that run used an RGB
+`lab_bg.png` and may have drawn nothing; and no memory block ever showed, because
+`stress_block.png` was RGB too, a format never seen to draw on the keyboard (RGBA and 8-bit
+palette PNGs are). Both are RGBA now, and each block decodes to the id after its upload, as every
+page that has drawn does. Full-screen blits and image memory are to be measured again.
+
 - **RAM / object budget** — how many/large filmstrips fit in device RAM before upload or
-  decode fails. Escalate PNG uploads until the screen stops updating.
+  decode fails. The Stress page's E5 decodes 1 MB blocks, up to 8.
 - **Redraw-rate budget** — how fast `draw` calls can go before the link stutters (bounds
-  smooth meters/animation).
+  smooth meters/animation). Measured per kind of call above; mixed pages are the mockups' test.
 - **Color depth** — whether gradients band on the panel (bake dithering if so).
 
 Each is observed on the physical screen; the tooling above is the starting point.

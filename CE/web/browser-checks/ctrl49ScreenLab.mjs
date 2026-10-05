@@ -79,6 +79,14 @@ try {
   });
   assert.equal(stress.rect >= 160 && stress.text >= 20, true, 'the stress page draws the asked-for load');
   assert.equal(stress.image, 96 + 1 + 3, 'sprites, the full-screen blit and one swatch per decoded block');
+  // Each swatch shows its block's band of colour: the block decoded to the id after its upload,
+  // and the swatch draws that id (an unpaired id draws nothing, which on the keyboard reads as a
+  // block that never decoded).
+  const swatches = await page.evaluate(() => [0, 1, 2].map((b) =>
+    Array.from(document.getElementById('screen').getContext('2d').getImageData(16 + b * 30 + 13, 249, 1, 1).data.slice(0, 3))));
+  const bands = [[80, 120, 200], [140, 156, 152], [200, 192, 104]];
+  swatches.forEach((rgb, b) => assert.ok(rgb.every((v, i) => Math.abs(v - bands[b][i]) <= 2),
+    `memory block ${b} shows its colour (${rgb} against ${bands[b]})`));
   await shot('stress');
   console.log(`  stress     ${stress.rect} rects, ${stress.image} images, ${stress.text} texts`);
 

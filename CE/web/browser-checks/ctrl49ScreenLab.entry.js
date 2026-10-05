@@ -62,7 +62,7 @@ const assets = {
   576: await load(machinedPanels), 578: await load(machinedKnobs), 580: await load(machinedParts),
 };
 const block = await load(stressBlock);
-for (let i = 0; i < 8; i++) assets[0x0250 + i] = block;
+for (let i = 0; i < 8; i++) assets[0x0250 + 2 * i] = block;   // each decoded to the id after it
 
 async function page(source, strict = false, pageAssets = assets) {
   const api = new ScreenDrawApi(document.getElementById('screen').getContext('2d'), pageAssets);

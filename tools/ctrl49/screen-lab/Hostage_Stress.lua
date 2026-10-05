@@ -20,8 +20,12 @@ local SPR = { pad = { 0, 0, 100, 78 }, padrim = { 101, 0, 100, 78 }, cap = { 202
 
 local FLAT, FLAT_PNG = 0x0221, 0x0220
 local BG, BG_PNG     = 0x0231, 0x0230
-local BLOCK_PNG      = 0x0250          -- 0x0250..0x0257, one per 1 MB block
-local BLOCK          = 0x0260          -- decoded as 0x0260..0x0267
+-- One per 1 MB block: uploaded as 0x0250, 0x0252, ... 0x025E, each decoded to the id after it,
+-- the pairing every page that has drawn on the keyboard uses. The blocks are RGBA, the format
+-- confirmed there (the first build's were RGB and never showed).
+local BLOCK_PNG      = 0x0250
+local function block_png (b) return BLOCK_PNG + b * 2 end
+local function block (b) return BLOCK_PNG + b * 2 + 1 end
 
 local BLACK, WHITE, GREY, ORANGE = 0xFF07090D, 0xFFFFFFFF, 0xFFAAB2BF, 0xFFFF9408
 local COLOURS = { 0xFF2F6FDF, 0xFF3FBF7F, 0xFFDF5F3F, 0xFFBF3FBF, 0xFFDFBF3F, 0xFF3FBFDF }
@@ -68,7 +72,7 @@ function draw (args)
     -- Memory: decode one more block per redraw until the asked-for count is reached. There is
     -- no way to free one, so the count only ever goes up.
     if decoded < work.mem and decoded < 8 then
-        decode_image(14, BLOCK_PNG + decoded, 18, BLOCK + decoded, WHITE)
+        decode_image(14, block_png(decoded), 18, block(decoded), WHITE)
         decoded = decoded + 1
     end
 
@@ -93,7 +97,7 @@ function draw (args)
 
     -- The memory swatches: a crop of every block decoded so far, from a different band each.
     for b = 0, decoded - 1 do
-        draw_image(18, BLOCK + b, 16 + b * 30, 236, 0, b * 128, 26, 26, WHITE)
+        draw_image(18, block(b), 16 + b * 30, 236, 0, b * 128, 26, 26, WHITE)
     end
 
     -- The HUD last, so it is always on top and always readable.

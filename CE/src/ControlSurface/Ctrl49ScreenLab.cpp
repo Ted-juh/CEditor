@@ -348,7 +348,7 @@ int wmain (int argc, wchar_t** argv)
         {
             const auto block = readFile (labDir / "stress_block.png");
             for (int i = 0; i < lab::kStressMemoryBlocks; ++i)
-                assets.push_back ({ (std::uint16_t) (0x0250 + i), block });
+                assets.push_back ({ (std::uint16_t) (0x0250 + 2 * i), block });   // decoded to the id after
         }
         else
         {
