@@ -466,6 +466,15 @@ Sprites are the budget that binds: the full mockups ask for about 4,100-4,200 ca
 slim ones about 2,000. Seven full-screen blits a redraw (an RGBA `lab_bg.png`, 480 x 272 each)
 stayed smooth.
 
+**The feature mockups and Red Lead, same day.** All four mockup builds and Red Lead 1997 loaded
+and ran smoothly, every page, with no refusal from the keyboard: every Lua call and every draw
+was answered ok, and every redraw asked for went out (10 or 15 a second). The largest script was
+Rig full's 58 KB, the most decoded image memory Red Lead's 4,502 KiB, the busiest redraws about
+280 calls at 15 a second (Motion, Effects) and Red Lead's Envelope at about 420 (some 6,300
+calls a second, mixed rectangles, sprites and text; more than the sprite-only figure above, so
+mixed pages cost less than sprites alone). Upload and startup took 2.8-4.6 s. HoSTage's page
+script (40.6 KB, 10 redraws a second) is well inside all of it.
+
 **Image memory.** Eight 1 MB blocks decoded on top of the page's own, with no refusal and no
 watchdog: `mem_usage(0)` went from 12,263,424 to 20,783,104, up 8.1 MB. So at least 8 MB of
 decoded images fit beside a page, and `mem_usage(0)` counts them. None of the eight could be

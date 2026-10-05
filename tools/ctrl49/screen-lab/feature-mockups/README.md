@@ -285,6 +285,12 @@ will tell us. The two memory numbers update every 15 redraws.
   move, and how long before the screen follows. Effects does the most Lua of all every redraw (it
   runs the whole chain over four seconds of signal), so watch whether it keeps up.
 
+**Result on the CTRL49, 2026-10-05.** All four loaded and stayed smooth on every page at their
+rates, with no refusal: the script limit is above 58 KB (Rig full), image memory above 4.2 MB
+decoded (Features full), and about 280 calls a redraw at 15 a second is within budget. Red Lead's
+Envelope (about 420 calls at 15) was smooth too. The table below is what a failure would have
+meant; none happened.
+
 **Reading the result.**
 
 | Slim | Full | What it says |

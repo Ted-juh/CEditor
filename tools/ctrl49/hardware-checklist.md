@@ -24,10 +24,10 @@ is at the bottom.
 
 - [ ] The card says **Showing on the keyboard too**, and the keyboard shows the same page.
       If it says anything else, stop here: **write down** the card's text and its red line, if any.
-- [ ] The page script HoSTage uploads is 40.6 KB now (it was 9 KB before these pages), larger
-      than the slim stress builds in section 2. If the keyboard shows HoSTage's knobs at all, it
-      took it. If it shows a Lua error or the stock screen comes back, **write down** exactly what
-      it says: that is the limit, and section 2 then says how far under it to go.
+- [ ] The page script HoSTage uploads is 40.6 KB now (it was 9 KB before these pages). The
+      stress test in section 2 has run (2026-10-05): the 58 KB Rig full build loaded and ran,
+      so this should too. If it shows a Lua error or the stock screen comes back instead,
+      **write down** exactly what it says.
 - [ ] Page Left / Right on the keyboard walks the control pages and the performance page, and
       the card follows.
 
@@ -123,6 +123,10 @@ is at the bottom.
       **Write down** that line exactly.
 
 ## 2. The screen lab's mockups: how much the keyboard takes
+
+**Done, 2026-10-05.** All four builds and Red Lead loaded and ran smoothly with no refusal; the
+results are in the [README](README.md#still-requires-hardware-open-phase-3-measurements). The
+steps stay here for a different unit or firmware.
 
 Close CEditor first. The full procedure, and what each number means, is
 [Stress testing them on the keyboard](screen-lab/feature-mockups/README.md#stress-testing-them-on-the-keyboard).
