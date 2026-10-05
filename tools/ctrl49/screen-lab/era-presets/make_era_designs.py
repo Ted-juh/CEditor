@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Six CTRL49 screen-lab designs from six eras of synthesizer, flat to skeuomorphic.
+"""Ten CTRL49 screen-lab designs, flat to skeuomorphic: four ideas of flat, then six eras of
+synthesizer.
 
     python make_era_designs.py            # every design
     python make_era_designs.py walnut-1971 test-bench-1958
@@ -552,6 +553,554 @@ class Theme:
         raise NotImplementedError
 
 
+# --- the flat four: four ideas of flat, each with no gradient and no glow ------------------------------
+
+def knob_index(cx):
+    """Which of the Controls page's four knobs a seat at cx belongs to."""
+    return KNOB_X.index(int(cx) - 40)
+
+
+def outline(img, box, colour, width=1):
+    x, y, w, h = box
+    rect(img, (x, y, w, width), colour)
+    rect(img, (x, y + h - width, w, width), colour)
+    rect(img, (x, y, width, h), colour)
+    rect(img, (x + w - width, y, width, h), colour)
+
+
+def coverage_arc(d, s, cx, cy, r, width, a0, a1):
+    """A round-capped arc of coverage from angle a0 to a1 (degrees clockwise from twelve)."""
+    if a1 - a0 < 0.5:
+        return
+    d.arc(((cx - r - width / 2) * s, (cy - r - width / 2) * s, (cx + r + width / 2) * s, (cy + r + width / 2) * s),
+          a0 - 90, a1 - 90, fill=255, width=int(width * s))
+    for a in (a0, a1):
+        x, y = pol(cx * s, cy * s, r * s, a)
+        d.ellipse((x - width / 2 * s, y - width / 2 * s, x + width / 2 * s, y + width / 2 * s), fill=255)
+
+
+def flat_piano(fill, black, edge, right=None):
+    """The roll's side keyboard, flat: white rows of one colour, black keys as bars from the left,
+    white keys parted at the middle of a black key and between E and F, B and C."""
+    h = ROLL_STRIP_ROWS * ROLL_ROW_H
+    im = new(ROLL_PIANO_W, h, fill)
+    for i in range(ROLL_STRIP_ROWS):
+        pc, y = roll_pc(i), i * ROLL_ROW_H
+        if pc in BLACK_PCS:
+            rect(im, (27, y + ROLL_ROW_H // 2, ROLL_PIANO_W - 27, 1), edge)
+            rect(im, (0, y + 1, 26, ROLL_ROW_H - 2), black)
+        if pc in (5, 0):
+            rect(im, (0, y + ROLL_ROW_H - 1, ROLL_PIANO_W, 1), edge)
+    rect(im, (ROLL_PIANO_W - 1, 0, 1, h), right or edge)
+    return im
+
+
+# 2012: tiles. Black, a solid colour tile behind each knob, white type, nothing rounded.
+class MetroTiles(Theme):
+    slug, name = 'metro-tiles-2012', 'Metro Tiles 2012'
+    tintable = True
+    palette = dict(bg='#111111', card='#1D1D1D', raised='#2C2C2C', text='#FFFFFF', grey='#9A9A9A',
+                   cyan='#1BA1E2', magenta='#D80073', lime='#8CBF26', orange='#F09609',
+                   grid='#262626', grid_strong='#343434')
+    TILES = ['#1BA1E2', '#D80073', '#8CBF26', '#F09609']
+
+    def roll_theme(self):
+        """The arpeggiator's colours: notes by velocity, the one playing, the cursor."""
+        return dict(note='#1BA1E2', note_hi='#5CC0EE', note_soft='#11648C', note_soft_hi='#1A86BA',
+                    note_loud='#D80073', note_loud_hi='#F04DA0', note_play='#8CBF26', note_play_hi='#B5DE6A',
+                    cursor='#F09609', ghost='#9A9A9A', beyond='#0A0A0A', key_label='#7A7A7A', off='#3A3A3A',
+                    track_dark='#111111', track_fill='#2C2C2C', track_light='#111111')
+
+    def lua_theme(self):
+        P = self.P
+        return dict(
+            title=P['text'], head=P['grey'], label=P['grey'], value=P['text'], accent=P['orange'],
+            dim='#6A6A6A', foot='#6A6A6A', dot_on=P['text'], dot_off='#3A3A3A',
+            filter_line=P['text'], filter_fill='#0E5A80', filter_fill_how='rect',
+            env_line=P['text'], env_fill='#0E5A80', env_fill_how='rect', env_glow=False,
+            line_thick=2, snap=False,
+            playhead=P['lime'], bar=P['cyan'],
+            knob_tint=['#FFFFFF'] * 4,
+            load_bg=P['bg'], load_text=P['text'], load_dim=P['grey'], load_track=P['raised'], load_bar=P['cyan'],
+            fonts=dict(title=(7, 18), head=(9, 11), label=(9, 9), value=(7, 15), big=(7, 26), foot=(9, 9), small=(9, 9)),
+        )
+
+    def surface(self, page):
+        return new(W, H, self.P['bg'])
+
+    def header(self, img):
+        pass
+
+    def footer(self, img):
+        pass
+
+    def display(self, img, box):
+        rect(img, box, self.P['card'])
+
+    def track(self, img, box):
+        rect(img, box, self.P['raised'])
+
+    def ticks(self, img, x, y0, y1, n, colour=None, length=5, unity=None):
+        Theme.ticks(self, img, x, y0, y1, n, '#3A3A3A', length, unity)
+
+    def divider(self, img, x, y0, y1):
+        pass
+
+    def meter_bg(self, img, x, y):
+        rect(img, (x, y, 8, METER_H), self.P['grid'])
+
+    def seat(self, img, cx, cy):
+        tile = self.TILES[knob_index(cx)]
+        rect(img, (int(cx) - 42, int(cy) - 42, 84, 84), tile)
+        m = mask(W, H, lambda d, s: coverage_arc(d, s, cx, cy, 34, 4, -150, 150))
+        put(img, paint(m, mix(tile, (0, 0, 0), 0.3)))
+
+    def knob(self, deg):
+        """White when tinted white: the value arc and a pointer, on the tile the panel draws."""
+        m = Image.new('L', (80 * SS, 80 * SS), 0)
+        d = ImageDraw.Draw(m)
+        coverage_arc(d, SS, 40, 40, 34, 4, -150, deg)
+        p0, p1 = pol(40 * SS, 40 * SS, 10 * SS, deg), pol(40 * SS, 40 * SS, 24 * SS, deg)
+        d.line([p0, p1], fill=255, width=int(5 * SS))
+        x, y = pol(40, 40, 34, deg)
+        d.rectangle(((x - 4) * SS, (y - 4) * SS, (x + 4) * SS, (y + 4) * SS), fill=255)
+        return m.resize((80, 80), LANCZOS)
+
+    def roll_colours(self):
+        return dict(white='#181818', black='#121212', row='#0C0C0C', octave='#3A3A3A', step='#202020', beat='#2E2E2E')
+
+    def roll_piano(self):
+        return flat_piano('#E8E8E8', '#111111', '#9A9A9A')
+
+    def roll_key(self, colour, w, h, black):
+        return new(w, h, colour)
+
+    def vcap(self):
+        im = new(34, 40)
+        rect(im, (2, 16, 30, 8), self.P['text'])
+        return im
+
+    def hcap(self):
+        im = new(22, 28)
+        rect(im, (7, 4, 8, 20), self.P['text'])
+        return im
+
+    def meter(self, lit=True):
+        im = new(8, METER_H, self.P['lime'])
+        rect(im, (0, 0, 8, 22), self.P['magenta'])
+        return im
+
+    def glow(self):
+        im = new(12, 12)
+        rect(im, (4, 4, 4, 4), self.P['text'])
+        return im
+
+    def handle(self):
+        im = new(14, 14)
+        rect(im, (3, 3, 8, 8), self.P['text'])
+        return im
+
+    def peak(self):
+        im = new(8, 3)
+        rect(im, (0, 0, 8, 2), self.P['text'])
+        return im
+
+    def fill(self):
+        return new(4, 136, '#0E5A80')
+
+
+# 2020: a dark software synth. Navy cards, thin coloured arcs, rounded, no shadows.
+class Midnight(Theme):
+    slug, name = 'midnight-2020', 'Midnight 2020'
+    tintable = True
+    palette = dict(bg='#0F1424', card='#171D33', raised='#232B48', text='#E6E9F5', dim='#6B7393',
+                   violet='#8B7CFF', teal='#2DD4BF', pink='#FF5C93', amber='#FFB547',
+                   grid='#1F2742', grid_strong='#2B3456')
+
+    def roll_theme(self):
+        """The arpeggiator's colours: notes by velocity, the one playing, the cursor."""
+        return dict(note='#8B7CFF', note_hi='#B3A9FF', note_soft='#4D4590', note_soft_hi='#6B62B8',
+                    note_loud='#FF5C93', note_loud_hi='#FF9DBC', note_play='#2DD4BF', note_play_hi='#8EF0E2',
+                    cursor='#FFB547', ghost='#9AA3C2', beyond='#0B0F1C', key_label='#6B7393', off='#2B3456',
+                    track_dark='#0F1424', track_fill='#232B48', track_light='#0F1424')
+
+    def lua_theme(self):
+        P = self.P
+        return dict(
+            title=P['text'], head=P['dim'], label='#8890B0', value=P['text'], accent=P['amber'],
+            dim='#565E7E', foot='#565E7E', dot_on=P['violet'], dot_off=P['raised'],
+            filter_line=P['violet'], filter_fill='#2A2560', filter_fill_how='rect',
+            env_line=P['violet'], env_fill='#2A2560', env_fill_how='rect', env_glow=False,
+            line_thick=2, snap=False,
+            playhead=P['teal'], bar=P['violet'],
+            knob_tint=[P['violet'], P['teal'], P['pink'], P['amber']],
+            load_bg=P['bg'], load_text=P['text'], load_dim=P['dim'], load_track=P['raised'], load_bar=P['violet'],
+            fonts=dict(title=(10, 15), head=(9, 11), label=(10, 9), value=(9, 14), big=(10, 24), foot=(9, 9), small=(10, 9)),
+        )
+
+    def surface(self, page):
+        return new(W, H, self.P['bg'])
+
+    def header(self, img):
+        rrect(img, (5, 8, 4, 14), 2, self.P['violet'])
+
+    def footer(self, img):
+        pass
+
+    def display(self, img, box):
+        rrect(img, box, 8, self.P['card'])
+
+    def track(self, img, box):
+        x, y, w, h = box
+        rrect(img, box, min(w, h) // 2, self.P['raised'])
+
+    def ticks(self, img, x, y0, y1, n, colour=None, length=5, unity=None):
+        Theme.ticks(self, img, x, y0, y1, n, self.P['grid_strong'], length, unity)
+
+    def divider(self, img, x, y0, y1):
+        pass
+
+    def meter_bg(self, img, x, y):
+        rrect(img, (x, y, 8, METER_H), 3, self.P['raised'])
+
+    def seat(self, img, cx, cy):
+        disc(img, cx, cy, 22, self.P['raised'])
+        m = mask(W, H, lambda d, s: coverage_arc(d, s, cx, cy, 31, 5, -150, 150))
+        put(img, paint(m, self.P['raised']))
+
+    def knob(self, deg):
+        """Coverage the device tints per knob: the value arc and a pointer."""
+        m = Image.new('L', (80 * SS, 80 * SS), 0)
+        d = ImageDraw.Draw(m)
+        coverage_arc(d, SS, 40, 40, 31, 5, -150, deg)
+        p0, p1 = pol(40 * SS, 40 * SS, 8 * SS, deg), pol(40 * SS, 40 * SS, 17 * SS, deg)
+        d.line([p0, p1], fill=255, width=int(3 * SS))
+        for q in (p0, p1):
+            d.ellipse((q[0] - 1.5 * SS, q[1] - 1.5 * SS, q[0] + 1.5 * SS, q[1] + 1.5 * SS), fill=255)
+        return m.resize((80, 80), LANCZOS)
+
+    def roll_colours(self):
+        return dict(white='#151B2E', black='#111627', row='#0D1220', octave='#2E3757', step='#1B2238', beat='#252D4A')
+
+    def roll_piano(self):
+        return flat_piano('#D5D9E8', '#161A2B', '#A3A9C0')
+
+    def roll_key(self, colour, w, h, black):
+        return new(w, h, colour)
+
+    def vcap(self):
+        im = new(34, 40)
+        rrect(im, (3, 15, 28, 10), 5, self.P['text'])
+        return im
+
+    def hcap(self):
+        im = new(22, 28)
+        rrect(im, (6, 4, 10, 20), 5, self.P['text'])
+        return im
+
+    def meter(self, lit=True):
+        im = new(8, METER_H)
+        rrect(im, (0, 0, 8, METER_H), 3, self.P['teal'])
+        rect(im, (0, 14, 8, 16), self.P['amber'])
+        rrect(im, (0, 0, 8, 16), 3, self.P['pink'])
+        return im
+
+    def glow(self):
+        im = new(12, 12)
+        disc(im, 6, 6, 2.5, self.P['violet'])
+        return im
+
+    def handle(self):
+        im = new(14, 14)
+        disc(im, 7, 7, 5.5, self.P['violet'])
+        disc(im, 7, 7, 3, self.P['text'])
+        return im
+
+    def peak(self):
+        im = new(8, 3)
+        rrect(im, (0, 0, 8, 2), 1, self.P['text'])
+        return im
+
+    def fill(self):
+        return new(4, 136, '#2A2560')
+
+
+# 1965: a drawing. White line on drafting blue over a fine grid; fills are hatched, not shaded.
+class Blueprint(Theme):
+    slug, name = 'blueprint-1965', 'Blueprint 1965'
+    tintable = True
+    palette = dict(bg='#1E4C8A', fine='#245596', coarse='#2F62A3', ink='#E8F1FF', ink2='#9FC1EC', ink3='#5F8BC4',
+                   deep='#183F74', red='#FF6B6B', yellow='#FFD54A', grid='#2E62A3', grid_strong='#4A7DBA')
+
+    def roll_theme(self):
+        """The arpeggiator's colours: notes by velocity, the one playing, the cursor."""
+        return dict(note='#D6E6FA', note_hi='#FFFFFF', note_soft='#7FA5D6', note_soft_hi='#A9C6EA',
+                    note_loud='#FFFFFF', note_loud_hi='#FFD54A', note_play='#FF6B6B', note_play_hi='#FFB0B0',
+                    cursor='#FFD54A', ghost='#9FC1EC', beyond='#183F74', key_label='#C9DCF5', off='#3568A9',
+                    track_dark='#5F8BC4', track_fill='#183F74', track_light='#5F8BC4')
+
+    def lua_theme(self):
+        P = self.P
+        return dict(
+            title=P['ink'], head=P['ink2'], label=P['ink2'], value=P['ink'], accent=P['yellow'],
+            dim=P['ink3'], foot=P['ink2'], dot_on=P['ink'], dot_off='#3568A9',
+            filter_line=P['ink'], filter_fill=P['ink3'], filter_fill_how='sprite',
+            env_line=P['ink'], env_fill=P['ink3'], env_fill_how='sprite', env_glow=False,
+            line_thick=2, snap=False,
+            playhead=P['red'], bar=P['ink2'],
+            knob_tint=[P['ink']] * 4,
+            load_bg=P['bg'], load_text=P['ink'], load_dim=P['ink2'], load_track=P['deep'], load_bar=P['ink'],
+            fonts=dict(title=(9, 15), head=(9, 11), label=(9, 9), value=(9, 14), big=(7, 26), foot=(9, 9), small=(9, 9)),
+        )
+
+    def surface(self, page):
+        P = self.P
+        img = new(W, H, P['bg'])
+        for x in range(0, W, 8):
+            rect(img, (x, 0, 1, H), P['coarse'] if x % 40 == 0 else P['fine'])
+        for y in range(0, H, 8):
+            rect(img, (0, y, W, 1), P['coarse'] if y % 40 == 0 else P['fine'])
+        return img
+
+    def header(self, img):
+        rect(img, (14, 28, 452, 1), self.P['ink2'])
+        rect(img, (14, 30, 452, 1), self.P['ink2'])
+
+    def footer(self, img):
+        rect(img, (14, 249, 452, 1), self.P['ink3'])
+
+    def display(self, img, box):
+        rect(img, box, self.P['deep'])
+        outline(img, box, self.P['ink2'])
+
+    def track(self, img, box):
+        rect(img, box, self.P['deep'])
+        outline(img, box, self.P['ink3'])
+
+    def ticks(self, img, x, y0, y1, n, colour=None, length=5, unity=None):
+        Theme.ticks(self, img, x, y0, y1, n, self.P['ink3'], length, unity)
+
+    def divider(self, img, x, y0, y1):
+        for y in range(y0, y1, 5):
+            rect(img, (x, y, 1, 2), self.P['ink3'])
+
+    def meter_bg(self, img, x, y):
+        rect(img, (x - 1, y - 1, 10, METER_H + 2), self.P['deep'])
+        outline(img, (x - 1, y - 1, 10, METER_H + 2), self.P['ink3'])
+
+    def seat(self, img, cx, cy):
+        dash = mask(W, H, lambda d, s: [coverage_arc(d, s, cx, cy, 31, 1.6, a, a + 6) for a in range(-150, 150, 12)])
+        put(img, paint(dash, self.P['ink3']))
+        self.scale(img, cx, cy, 35.5, 39, self.P['ink2'], majors=11, width=1.2)
+
+    def knob(self, deg):
+        """Coverage tinted with the ink: a circle, a pointer, a centre, and the value drawn on the
+        dashed track the panel holds."""
+        m = Image.new('L', (80 * SS, 80 * SS), 0)
+        d = ImageDraw.Draw(m)
+        s = SS
+        d.ellipse((15 * s, 15 * s, 65 * s, 65 * s), outline=255, width=int(2 * s))
+        d.line([pol(40 * s, 40 * s, 0, deg), pol(40 * s, 40 * s, 23 * s, deg)], fill=255, width=int(2 * s))
+        d.ellipse((37 * s, 37 * s, 43 * s, 43 * s), fill=255)
+        coverage_arc(d, s, 40, 40, 31, 2, -150, deg)
+        d.line([pol(40 * s, 40 * s, 28 * s, deg), pol(40 * s, 40 * s, 34 * s, deg)], fill=255, width=int(2 * s))
+        return m.resize((80, 80), LANCZOS)
+
+    def roll_colours(self):
+        return dict(white='#1E4C8A', black='#1A4479', row='#2A5B9B', octave='#6F98CF', step='#2A5B9B', beat='#4A7DBA')
+
+    def roll_piano(self):
+        return flat_piano('#24569A', '#9FC1EC', '#5F8BC4', right='#9FC1EC')
+
+    def roll_key(self, colour, w, h, black):
+        return new(w, h, colour)
+
+    def vcap(self):
+        im = new(34, 40)
+        rect(im, (3, 14, 28, 12), self.P['deep'])
+        outline(im, (3, 14, 28, 12), self.P['ink'])
+        rect(im, (6, 19, 22, 2), self.P['ink'])
+        return im
+
+    def hcap(self):
+        im = new(22, 28)
+        rect(im, (6, 4, 10, 20), self.P['deep'])
+        outline(im, (6, 4, 10, 20), self.P['ink'])
+        rect(im, (10, 7, 2, 14), self.P['ink'])
+        return im
+
+    def hatch(self, w, h, colour, period=4):
+        im = new(w, h)
+        px = im.load()
+        c = C(colour)
+        for y in range(h):
+            for x in range(w):
+                if (x + y) % period == 0:
+                    px[x, y] = c
+        return im
+
+    def meter(self, lit=True):
+        im = self.hatch(8, METER_H, self.P['ink2'], 3)
+        rect(im, (0, 0, 1, METER_H), self.P['ink'])
+        rect(im, (7, 0, 1, METER_H), self.P['ink'])
+        return im
+
+    def glow(self):
+        im = new(12, 12)
+        disc(im, 6, 6, 2, self.P['ink'])
+        return im
+
+    def handle(self):
+        im = new(14, 14)
+        disc(im, 7, 7, 5.5, self.P['ink'])
+        disc(im, 7, 7, 4, self.P['deep'])
+        return im
+
+    def peak(self):
+        im = new(8, 3)
+        rect(im, (0, 0, 8, 2), self.P['yellow'])
+        return im
+
+    def fill(self):
+        return self.hatch(4, 136, self.P['ink3'])
+
+
+# 2023: brutalist. Cream, thick black outlines, hard black shadows with no blur, loud flat colour.
+class NeoBrutal(Theme):
+    slug, name = 'neo-brutal-2023', 'Neo Brutal 2023'
+    palette = dict(bg='#FFF1D0', ink='#111111', paper='#FFFFFF', yellow='#FFD23F', pink='#FF6FB5', hot='#E8317F',
+                   blue='#3D7BFF', green='#2BD99F', grid='#E7DCC2', grid_strong='#CDBF9E', muted='#5A503F')
+
+    def roll_theme(self):
+        """The arpeggiator's colours: notes by velocity, the one playing, the cursor. Every note's
+        top edge is ink, a border in one line."""
+        return dict(note='#3D7BFF', note_hi='#111111', note_soft='#9DB8FF', note_soft_hi='#111111',
+                    note_loud='#FF6FB5', note_loud_hi='#111111', note_play='#FFD23F', note_play_hi='#111111',
+                    cursor='#111111', ghost='#111111', beyond='#E9DFC6', key_label='#7A6F5A', off='#C9BE9F',
+                    track_dark='#111111', track_fill='#FFFFFF', track_light='#111111', key_play='#FFD23F', key_cur='#FF6FB5')
+
+    def lua_theme(self):
+        P = self.P
+        return dict(
+            title=P['ink'], head=P['ink'], label=P['muted'], value=P['ink'], accent=P['hot'],
+            dim='#9A8F78', foot=P['muted'], dot_on=P['ink'], dot_off='#D6CAA8',
+            filter_line=P['ink'], filter_fill=P['pink'], filter_fill_how='rect',
+            env_line=P['ink'], env_fill=P['pink'], env_fill_how='rect', env_glow=False,
+            line_thick=3, snap=False,
+            playhead=P['hot'], bar=P['blue'],
+            knob_tint=['#FFFFFF'] * 4,
+            load_bg=P['yellow'], load_text=P['ink'], load_dim=P['muted'], load_track=P['ink'], load_bar=P['hot'],
+            fonts=dict(title=(0, 16), head=(0, 11), label=(0, 9), value=(2, 14), big=(0, 26), foot=(2, 9), small=(0, 9)),
+        )
+
+    def box(self, img, box, fill, border=2, shadow=4):
+        x, y, w, h = box
+        rect(img, (x + shadow, y + shadow, w, h), self.P['ink'])
+        rect(img, box, self.P['ink'])
+        rect(img, (x + border, y + border, w - 2 * border, h - 2 * border), fill)
+
+    def surface(self, page):
+        return new(W, H, self.P['bg'])
+
+    def header(self, img):
+        self.box(img, (6, 3, 122, 24), self.P['yellow'], 2, 3)
+
+    def footer(self, img):
+        pass                        # the boxes carry the weight; a rule here would meet their shadows
+
+    def display(self, img, box):
+        self.box(img, box, self.P['paper'])
+
+    def roll_frame(self, img):
+        self.box(img, ROLL_FRAME, self.P['paper'], 2, 3)
+
+    def track(self, img, box):
+        rect(img, box, self.P['ink'])
+        x, y, w, h = box
+        if w > 2 and h > 2:
+            rect(img, (x + 1, y + 1, w - 2, h - 2), self.P['paper'])
+
+    def ticks(self, img, x, y0, y1, n, colour=None, length=5, unity=None):
+        Theme.ticks(self, img, x, y0, y1, n, self.P['ink'], length, unity)
+
+    def divider(self, img, x, y0, y1):
+        pass
+
+    def meter_bg(self, img, x, y):
+        self.box(img, (x - 2, y - 2, 12, METER_H + 4), self.P['paper'], 2, 3)
+
+    def seat(self, img, cx, cy):
+        P = self.P
+        for r, c, dx in ((39, P['ink'], 3), (39, P['ink'], 0), (37, P['paper'], 0), (31, P['ink'], 0), (29, P['bg'], 0)):
+            disc(img, cx + dx, cy + dx, r, c)
+
+    def knob(self, deg):
+        im = new(80, 80)
+        P = self.P
+        m = mask(80, 80, lambda d, s: coverage_arc(d, s, 40, 40, 34, 4, -150, deg))
+        put(im, paint(m, P['pink']))
+        cap = mask(80, 80, lambda d, s: d.line([pol(40 * s, 40 * s, 30.5 * s, deg), pol(40 * s, 40 * s, 37.5 * s, deg)],
+                                                fill=255, width=int(2 * s)))
+        put(im, paint(cap, P['ink']))
+        disc(im, 43, 43, 22, P['ink'])
+        disc(im, 40, 40, 22, P['ink'])
+        disc(im, 40, 40, 19, P['paper'])
+        line = mask(80, 80, lambda d, s: (d.line([pol(40 * s, 40 * s, 0, deg), pol(40 * s, 40 * s, 16 * s, deg)], fill=255, width=int(4 * s)),
+                                          d.ellipse([q - 2 * s for q in pol(40 * s, 40 * s, 16 * s, deg)] +
+                                                    [q + 2 * s for q in pol(40 * s, 40 * s, 16 * s, deg)], fill=255)))
+        put(im, paint(line, P['ink']))
+        disc(im, 40, 40, 4, P['ink'])
+        return im
+
+    def roll_colours(self):
+        return dict(white='#FFFFFF', black='#F4EEE0', row='#ECE4D2', octave='#9A8F78', step='#ECE4D2', beat='#CDBF9E')
+
+    def roll_piano(self):
+        return flat_piano('#FFFFFF', '#111111', '#9A8F78', right='#111111')
+
+    def roll_key(self, colour, w, h, black):
+        return new(w, h, colour)
+
+    def vcap(self):
+        im = new(34, 40)
+        self.box(im, (3, 12, 26, 14), self.P['yellow'], 2, 3)
+        rect(im, (6, 18, 20, 2), self.P['ink'])
+        return im
+
+    def hcap(self):
+        im = new(22, 28)
+        self.box(im, (4, 3, 12, 20), self.P['yellow'], 2, 3)
+        rect(im, (9, 6, 2, 14), self.P['ink'])
+        return im
+
+    def meter(self, lit=True):
+        im = new(8, METER_H, self.P['green'])
+        rect(im, (0, 0, 8, 28), self.P['pink'])
+        for y in range(7, METER_H, 8):
+            rect(im, (0, y, 8, 1), self.P['ink'])
+        return im
+
+    def glow(self):
+        im = new(12, 12)
+        disc(im, 6, 6, 2.5, self.P['ink'])
+        return im
+
+    def handle(self):
+        im = new(14, 14)
+        disc(im, 8, 8, 5.5, self.P['ink'])
+        disc(im, 7, 7, 5.5, self.P['ink'])
+        disc(im, 7, 7, 3.5, self.P['paper'])
+        return im
+
+    def peak(self):
+        im = new(8, 3)
+        rect(im, (0, 0, 8, 2), self.P['ink'])
+        return im
+
+    def fill(self):
+        return new(4, 136, self.P['pink'])
+
+
 # --- 2011: flat --------------------------------------------------------------------------------------
 
 class SwissFlat(Theme):
@@ -565,7 +1114,7 @@ class SwissFlat(Theme):
         """The arpeggiator's colours: notes by velocity, the one playing, the cursor."""
         return dict(note='#2F5BEA', note_hi='#7D99F2', note_soft='#9DB2F5', note_soft_hi='#C7D3FA',
                     note_loud='#1A3DB8', note_loud_hi='#5A79E0', note_play='#FF6A13', note_play_hi='#FFAB7A',
-                    cursor='#151515', ghost='#8C8B86', beyond='#E4E3DD', key_label='#8C8B86',
+                    cursor='#151515', ghost='#8C8B86', beyond='#E4E3DD', key_label='#8C8B86', off='#CFCEC8',
                     track_dark='#CFCEC8', track_fill='#DEDDD7', track_light='#F8F7F3')
 
     def lua_theme(self):
@@ -704,7 +1253,7 @@ class DotMatrix(Theme):
         """The arpeggiator's colours: notes by velocity, the one playing, the cursor."""
         return dict(note='#56653A', note_hi='#56653A', note_soft='#7C8C52', note_soft_hi='#7C8C52',
                     note_loud='#1E2913', note_loud_hi='#1E2913', note_play='#0B1205', note_play_hi='#BCCB82',
-                    cursor='#1E2913', ghost='#56653A', beyond='#9DAE62', key_label='#56653A',
+                    cursor='#1E2913', ghost='#56653A', beyond='#9DAE62', key_label='#56653A', off='#93A358',
                     track_dark='#93A358', track_fill='#9AAA5E', track_light='#BCCB82')
 
     def lua_theme(self):
@@ -874,7 +1423,7 @@ class RedLead(Theme):
         """The arpeggiator's colours: notes by velocity, the one playing, the cursor."""
         return dict(note='#E8352B', note_hi='#FF9088', note_soft='#9A2A24', note_soft_hi='#C85048',
                     note_loud='#FF6A5A', note_loud_hi='#FFC2BA', note_play='#FFE7E2', note_play_hi='#FFFFFF',
-                    cursor='#FFD447', ghost='#FFFFFF', beyond='#0A0405', key_label='#8A7F78',
+                    cursor='#FFD447', ghost='#FFFFFF', beyond='#0A0405', key_label='#8A7F78', off='#B83A3F',
                     key_play='#FF3B2F', key_cur='#FFC400',
                     track_dark='#5E0A0E', track_fill='#1A0809', track_light='#E35A5E')
 
@@ -953,7 +1502,7 @@ class RhythmBox(Theme):
         """The arpeggiator's colours: notes by velocity, the one playing, the cursor."""
         return dict(note='#F07F1A', note_hi='#FFB36B', note_soft='#A5561A', note_soft_hi='#D9823A',
                     note_loud='#E8342C', note_loud_hi='#FF8A80', note_play='#F2C514', note_play_hi='#FFF0A0',
-                    cursor='#F07F1A', ghost='#EDE6CF', beyond='#0F0F10', key_label='#6A6052',
+                    cursor='#F07F1A', ghost='#EDE6CF', beyond='#0F0F10', key_label='#6A6052', off='#4A4A4C',
                     track_dark='#151516', track_fill='#0E0E0F', track_light='#4C4C50')
 
     def lua_theme(self):
@@ -1042,7 +1591,7 @@ class Walnut(Theme):
         """The arpeggiator's colours: notes by velocity, the one playing, the cursor."""
         return dict(note='#E89A3C', note_hi='#FFD08A', note_soft='#8F5E26', note_soft_hi='#B8823F',
                     note_loud='#FFC46B', note_loud_hi='#FFE6B8', note_play='#FFF1C9', note_play_hi='#FFFFFF',
-                    cursor='#F2F2F2', ghost='#BDBDBD', beyond='#050403', key_label='#7A6A50',
+                    cursor='#F2F2F2', ghost='#BDBDBD', beyond='#050403', key_label='#7A6A50', off='#3A3A3A',
                     key_play='#FFB347', key_cur='#B86A2A',
                     track_dark='#050505', track_fill='#060606', track_light='#6A6C6E')
 
@@ -1154,7 +1703,7 @@ class TestBench(Theme):
         """The arpeggiator's colours: notes by velocity, the one playing, the cursor."""
         return dict(note='#4FD46E', note_hi='#B8FFC8', note_soft='#2A7A40', note_soft_hi='#4FA866',
                     note_loud='#8DFFA4', note_loud_hi='#E0FFE8', note_play='#F2FFF4', note_play_hi='#FFFFFF',
-                    cursor='#FFB04A', ghost='#EDE4C8', beyond='#020503', key_label='#7A6E50',
+                    cursor='#FFB04A', ghost='#EDE4C8', beyond='#020503', key_label='#7A6E50', off='#3E4840',
                     key_play='#3FCF66', key_cur='#FFB04A',
                     track_dark='#2E3630', track_fill='#141815', track_light='#87958A')
 
@@ -1277,7 +1826,7 @@ class TestBench(Theme):
         return im
 
 
-THEMES = [SwissFlat, DotMatrix, RedLead, RhythmBox, Walnut, TestBench]
+THEMES = [MetroTiles, Midnight, SwissFlat, Blueprint, NeoBrutal, DotMatrix, RedLead, RhythmBox, Walnut, TestBench]
 
 # --- assembling a design -------------------------------------------------------------------------------
 

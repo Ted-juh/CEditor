@@ -40,7 +40,8 @@ const SPECS = {
   },
 };
 // The designs this check expects, and their kind. Adding one is deliberate: add it here too.
-const EXPECTED = { 'dot-matrix-1983': 'era', 'red-lead-1997': 'era', 'rhythm-box-1980': 'era',
+const EXPECTED = { 'blueprint-1965': 'era', 'dot-matrix-1983': 'era', 'metro-tiles-2012': 'era',
+  'midnight-2020': 'era', 'neo-brutal-2023': 'era', 'red-lead-1997': 'era', 'rhythm-box-1980': 'era',
   'swiss-flat-2011': 'era', 'test-bench-1958': 'era', 'walnut-1971': 'era' };
 const MEMORY_CEILING = 8 * 1024 * 1024;     // the preset loader's software guard, not a device limit
 const MAX_CALLS = 600;
@@ -131,6 +132,15 @@ for (const name of names) {
   assert.equal(lua.replace(block, ''), templates[spec.template].replace(block, ''),
     `${name}: Skin.lua is ${spec.template} with only its GENERATED block changed (regenerate, do not hand-edit)`);
   assert.equal(Number(lua.match(/\bfps = (\d+)/)[1]), fps, `${name}: the Lua clock counts the manifest's fps`);
+  // Every theme colour and layout value the template reads is in this design's GENERATED block:
+  // a missing one is nil on the device (the preview would quietly draw it white).
+  for (const [table, used] of [['T', templates[spec.template]], ['L', templates[spec.template]]]) {
+    const needed = new Set([...used.matchAll(new RegExp(`\\b${table}\\.(\\w+)`, 'g'))].map((m) => m[1]));
+    const block = lua.match(new RegExp(`local ${table} = \\{([\\s\\S]*?)\\n\\}`))[1];
+    const given = new Set([...block.matchAll(/^\s+(\w+) = /gm)].map((m) => m[1]));
+    const missing = [...needed].filter((k) => !given.has(k));
+    assert.deepEqual(missing, [], `${name}: ${table} gives every key ${spec.template} reads`);
+  }
   const luaDefaults = lua.match(/\bdefaults = \{ (.*) \},\n/)[1];
   assert.equal(luaDefaults, defaults.map((d) => `{ ${d.values.join(', ')} }`).join(', '), `${name}: the Lua knows the manifest's starting values`);
   manifests[name] = { defaults, memory, spec };

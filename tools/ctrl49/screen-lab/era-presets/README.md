@@ -1,27 +1,40 @@
 # CTRL49 era designs
 
-Six screen-lab presets from six eras of synthesizer design, from flat to skeuomorphic. Each one
+Ten screen-lab presets, from flat to skeuomorphic: four ideas of flat, then six eras of
+synthesizer design. Each one
 has five pages: the three the first designs had (Controls, Mixer, Envelope) and an
 **arpeggiator** on two more, a pattern on a piano roll (Arp Edit, Arp Play). They are native
 screen-lab presets loaded by `Ctrl49ScreenLab.exe preset`, not synth patches, Screen Builder
 assignments or a HoSTage theme. The lab makes no sound and sends no parameters; the meters and
 the arpeggiator are a moving picture driven by the frame counter.
 
-**Status: software checks only.** None of the six has been on a CTRL49 yet. They need the
+**Status: software checks only.** None of the ten has been on a CTRL49 yet. They need the
 preset mode of `Ctrl49ScreenLab.exe`, which lives in a working copy that is not in this
 repository yet; the `Ctrl49ScreenLab.cpp` committed here has only `showcase` and `stress`.
 
 | | Design | Folder | Look | Knobs | Upload | Decoded |
 |---|---|---|---|---|---|---|
-| flat | Swiss Flat 2011 | `swiss-flat-2011` | off-white, black rules, four colour-coded knobs | tinted grey coverage | 65 KB | 3,302 KiB * |
+| flat | Metro Tiles 2012 | `metro-tiles-2012` | black, a solid colour tile behind each knob, white type, nothing rounded | tinted grey coverage | 71 KB | 3,302 KiB * |
+| | Midnight 2020 | `midnight-2020` | a dark software synth: navy cards, thin coloured arcs, rounded | tinted grey coverage | 62 KB | 3,302 KiB * |
+| | Swiss Flat 2011 | `swiss-flat-2011` | off-white, black rules, four colour-coded knobs | tinted grey coverage | 65 KB | 3,302 KiB * |
+| | Blueprint 1965 | `blueprint-1965` | white line drawing on drafting blue, a fine grid, hatched fills | tinted grey coverage | 71 KB | 3,302 KiB * |
+| | Neo Brutal 2023 | `neo-brutal-2023` | cream, thick black outlines, hard shadows with no blur, loud flat colour | outlined, a pink value band | 125 KB | 4,502 KiB |
 | | Dot Matrix 1983 | `dot-matrix-1983` | a backlit monochrome LCD, ghost segments, pixel art | pixel dot rings | 131 KB | 4,502 KiB |
 | | Red Lead 1997 | `red-lead-1997` | red powder-coat, smoked windows, LED ladders | rubber, LED rings | 185 KB | 4,502 KiB |
 | | Rhythm Box 1980 | `rhythm-box-1980` | charcoal plastic, the four-colour stripe | cream caps, ribbed skirts | 380 KB | 4,502 KiB |
 | | Walnut 1971 | `walnut-1971` | black panel, walnut cheeks, aluminium bezels, amber lamps | fluted, aluminium caps | 379 KB | 4,502 KiB |
 | skeuo | Test Bench 1958 | `test-bench-1958` | hammertone enamel, screws, green CRTs, neon bargraphs | Bakelite chicken-heads | 377 KB | 4,502 KiB |
 
-\* Its knob strip decodes to one byte a pixel. Counted conservatively, at four bytes a pixel for
-every image as the check counts, it is 4,502 KiB like the others.
+\* The knob strip decodes to one byte a pixel: these designs' knobs are one shape the keyboard
+tints per knob, and colour comes from the panel behind them (Metro's tiles, Midnight's dark
+discs, Blueprint's dashed scales). Counted conservatively, at four bytes a pixel for every image
+as the check counts, it is 4,502 KiB like the others.
+
+The four flat designs share one rule: no gradient, no glow, no blur. What they differ in is what
+flat means. Metro's flat is colour: solid tiles and white type. Midnight's is the dark software
+synth: one surface and a thin coloured arc for each value. Blueprint's is line: everything a
+stroke, every fill a hatch. Neo Brutal's is weight: black outlines and shadows offset without
+softening, flat however heavy they look.
 
 `Start_CTRL49_Era_Designs.cmd` (in `tools/ctrl49`) asks which one and runs it. Every folder holds
 `preview-<n>-<page>.png` — its pages rendered by the real Lua through the firmware shim.
@@ -118,7 +131,7 @@ block in each `Skin.lua`.
 ## Making and checking them
 
 ```bash
-python tools/ctrl49/screen-lab/era-presets/make_era_designs.py          # all six, about 20 s
+python tools/ctrl49/screen-lab/era-presets/make_era_designs.py          # all ten, about 25 s
 python tools/ctrl49/screen-lab/era-presets/make_era_designs.py walnut-1971
 
 cd CE/web
@@ -151,9 +164,10 @@ the launcher and pick a design. Wait for the upload and the three decode steps, 
 encoders and walk the pages. Worth writing down:
 
 - whether the upload or a decode brings the stock screen back (the watchdog): the larger
-  uploads are Rhythm Box, Walnut and Test Bench, the decoded total is 4.4 MiB for all but Swiss
-  Flat;
-- whether Swiss Flat's four knobs come out in four colours;
+  uploads are Rhythm Box, Walnut and Test Bench, the decoded total is 4.4 MiB for the designs
+  with colour knobs and 3.2 MiB for the tinted ones;
+- whether the tinted knobs come out in their colours (Swiss Flat's and Midnight's four, Metro's
+  white, Blueprint's ink);
 - whether the arpeggiator's playhead moves evenly at 15 redraws a second (lower `fps` in the
   manifest and in `make_era_designs.py` together if not: the clock counts it);
 - the busiest page for redraw: Envelope on the glowing designs, about 400 calls;

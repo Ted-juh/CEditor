@@ -1,4 +1,4 @@
--- CTRL49 screen lab: the era designs. One renderer for six skins, five pages each:
+-- CTRL49 screen lab: the era designs. One renderer for ten skins, five pages each:
 --   0 CONTROLS     E1-E4  cutoff, resonance, drive, mix, over a filter response curve
 --   1 MIXER        E1-E8  eight channel faders with demo meters
 --   2 ENVELOPE     E1-E4  attack, decay, sustain, release; the curve comes from the host
@@ -81,6 +81,7 @@ local T = {
     note_play_hi = 0xFFFFF0A0,
     note_soft = 0xFFA5561A,
     note_soft_hi = 0xFFD9823A,
+    off = 0xFF4A4A4C,
     playhead = 0xFFD7262A,
     snap = false,
     title = 0xFFEDE6CF,
