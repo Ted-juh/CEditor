@@ -108,7 +108,7 @@ in vendored JUCE.
 
 ### C-08 — A shared panel's JavaScript can read and write any file on the machine through the app's native bridge   (S1 · security · scripting / sharing)
 
-**Fixed** on `ccr-0d6b8446-x8nxzw` in `0b5c5eb`. Panels opened from a file or a package keep their scripts off until the user clicks **Run scripts** on a banner. Trust is remembered per script content and is never inferred from the file. Scripts written in the editor are never gated. This is the stop-gap the treatment above proposed; the isolated-frame sandbox and the path allow-list are still open.
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `d8c3072`. Panels opened from a file or a package keep their scripts off until the user clicks **Run scripts** on a banner. Trust is remembered per script content and is never inferred from the file. Scripts written in the editor are never gated. This is the stop-gap the treatment above proposed; the isolated-frame sandbox and the path allow-list are still open.
 
 **Repro.** A `.cepanel` or `.cepanelpkg` whose JS script contains, at top level,
 `window.__JUCE__.backend.emitEvent('savePanel', { panelId:'0', filePath:'<Startup folder>/x.bat', data:'…' })`.
@@ -165,7 +165,7 @@ never clear.
 
 ### C-11 — "Send saved sound" overwrites every dump parameter the panel does not export with 0 — including the synth's System block   (S1 · faulty · Total Recall)
 
-**Fixed** on `ccr-0d6b8446-x8nxzw` in `7dc6e59`, `457aa3d`. Total Recall stores and sends only dumps the panel covers completely. It never captures or restores a dump addressed to a stored-memory slot, and it re-checks stored dumps against today's profile before sending (`CE/src/Player/DumpCapturePolicy.h`).
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `e77e782`, `f447292`. Total Recall stores and sends only dumps the panel covers completely. It never captures or restores a dump addressed to a stored-memory slot, and it re-checks stored dumps against today's profile before sending (`CE/src/Player/DumpCapturePolicy.h`).
 
 **Repro.** A panel bound (default role `mainSynth`) to a profile with `dumpDefinitions` — e.g. `roland-gaia-sh01`,
 26 dumps. Export, save a DAW project, reopen, press **Send saved sound** (or policy `restoreHardware: always`).
@@ -336,7 +336,7 @@ opens it with no chooser. New Panel from Device Profile lists Test CC/NRPN/SysEx
 
 ### C-25 — AN1x profile: Scene 2 and Free-EG tracks 2–4 in every dump read and write the Scene 1 / track 1 parameters   (S1 · bug · device profiles / DPD emitter)
 
-**Fixed** on `ccr-0d6b8446-x8nxzw` in `cc22d5e`. One id rule (`legacyParamId`) for both the parameter list and the dump mappings. The AN1x profile is regenerated, and a test checks every shipped dump mapping.
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `7d95b05`. One id rule (`legacyParamId`) for both the parameter list and the dump mappings. The AN1x profile is regenerated, and a test checks every shipped dump mapping.
 
 **Repro.** Parse an AN1x Scene 2 bulk dump with Poly Mode = Legato; build a Scene 2 dump with Scene 1 poly, Scene 2 mono.
 **Observed.** The Scene 2 dump sets `scPolyMode` (Scene 1, address 10 10 00) and leaves `scene2.scPolyMode` undefined;
@@ -422,7 +422,7 @@ payload size, so it cannot build. Observed-in-test.
 
 ### C-34 — Closing the Hostage plug-in while Library → Listen is measuring crashes the DAW   (S1 · bug · Hostage VST3 — if that product ships)
 
-**Fixed** on `ccr-0d6b8446-x8nxzw` in `70cdf3b`. The final closure checks the `alive` token. The auditioner's waits on the control thread give up when the service goes, which also fixes a hang on close that came before the crash.
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `8644737`. The final closure checks the `alive` token. The auditioner's waits on the control thread give up when the service goes, which also fixes a hang on close that came before the crash.
 
 **Repro.** CEHostVST3: Library → Listen (`analyseLibrary`); while it runs, remove the plug-in or close the project.
 **Observed.** `~InstrumentHostService` joins `analysisThread` (`InstrumentHostService.cpp:123-125`); the thread's last
@@ -435,7 +435,7 @@ does not.
 
 ### C-35 — A failed preset load leaves the part named and saved as the new plug-in, holding the old plug-in's state   (S1 · bug · Hostage session persistence)
 
-**Fixed** on `ccr-0d6b8446-x8nxzw` in `ec44716`. The part's identity and state change only when the load commits. A failed or superseded load leaves the part as it was. This also fixes C-38.
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `7ca84ec`. The part's identity and state change only when the load commits. A failed or superseded load leaves the part as it was. This also fixes C-38.
 
 **Repro.** Part has plug-in A; load a library preset of plug-in B (`loadLibraryRecord`, `auditionRecord`,
 `walkPartPreset`) and let the load fail (worker crash in construction, 15 s handshake timeout on a licence dialog or a
@@ -469,7 +469,7 @@ case (`InstrumentHostServiceTests.cpp:3517-3521`). Read-in-code.
 
 ### C-38 — Picking another preset while a new plug-in is still loading applies it to the old plug-in; the first pick wins   (S2 · bug · Hostage library load)
 
-**Fixed** on `ccr-0d6b8446-x8nxzw` in `ec44716`. Fixed together with C-35. While a different plug-in is loading into a part, a preset is never applied in place, and the last pick wins.
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `7ca84ec`. Fixed together with C-35. While a different plug-in is loading into a part, a preset is never applied in place, and the last pick wins.
 
 After B1's prime the part claims B while A is live, so B2 counts as `sameClassLoaded` (`InstrumentHostService.cpp:12891`)
 and is applied to A (a vendor `.vstpreset` is refused "The plug-in refused this preset"; a program number selects on A;
@@ -609,7 +609,7 @@ says the second kind is `spring` and that `springEase` lives in `interactionRunt
 
 ### C-57 — One infinite loop in any preview script freezes the editor (or the plug-in's open window) with no recovery   (S1 · bug · scripting runtime)
 
-**Fixed** on `ccr-0d6b8446-x8nxzw` in `70d3298`. Preview scripts in all seven languages are instrumented with a loop guard. A script that holds the thread for more than 2 s is stopped and stays stopped until it is edited or run again.
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `5441609`. Preview scripts in all seven languages are instrumented with a loop guard. A script that holds the thread for more than 2 s is stopped and stays stopped until it is edited or run again.
 
 **Repro.** A handler, or JS top-level code, containing `while (true) {}`; Preview.
 **Observed.** JS, Lua (real wasmoon), C++, C# and Java previews never return; a 500 ms timer in the same process never

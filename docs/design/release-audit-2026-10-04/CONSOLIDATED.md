@@ -30,15 +30,15 @@ nine S1s, seven are demonstrated in the app or a test; C-34 and C-35 are code tr
 
 | ID | What happens | Smallest safe treatment | Fixed |
 | --- | --- | --- | --- |
-| C-08 | Opening a shared panel and pressing Preview runs its JavaScript with the page's own globals, including the native file bridge — a panel can read or write any file. Reproduced in the app. | Give the native file handlers a path allow-list (only paths the user picked in a dialog, plus the app's own folders), and run panel JS without access to `window.__JUCE__`. Until then, ask before running scripts in a panel opened from a file. | `0b5c5eb` (the prompt; sandbox open) |
+| C-08 | Opening a shared panel and pressing Preview runs its JavaScript with the page's own globals, including the native file bridge — a panel can read or write any file. Reproduced in the app. | Give the native file handlers a path allow-list (only paths the user picked in a dialog, plus the app's own folders), and run panel JS without access to `window.__JUCE__`. Until then, ask before running scripts in a panel opened from a file. | `d8c3072` (the prompt; sandbox open) |
 | C-09 | Save As, then one Undo, re-points the tab at the original file; the next Save overwrites it. Reproduced in the app. | Leave `filePath` and `name` out of the undo snapshot (`stores/history.js:319`). One line. | `062c877` |
-| C-11 | "Send saved sound" (Total Recall) sends every dump the profile declares, zero-filled where the panel binds nothing — GAIA System block to 0, AN1x user voice/pattern memory overwritten. Found by two reviewers independently. | Send only dumps whose bytes all come from a real capture; until a device capture exists, do not send dumps at all. | `7dc6e59, 457aa3d` |
-| C-25 | The AN1x profile's Scene 2 and FEG tracks 2–4 dump mappings point at the Scene 1 / track 1 parameters; every instanced profile the Designer saves has the same flaw. | Keep the instance prefix in the emitter's dump mappings (`CE/dpd/emit-legacy-core.mjs:88`) and regenerate the AN1x profile. | `cc22d5e` |
-| C-57 | One endless loop in any preview script hangs the editor for good; no watchdog. Reproduced in the app. | Run preview scripts in a Worker the page can terminate, or give the interpreters an instruction budget like the native engines already have. | `70d3298` |
-| C-34 | Closing the Hostage plug-in while Library → Listen runs crashes the DAW (use after free). Applies only if the Hostage VST3 product ships. | Guard the closure with the `alive` token the preset scan already uses. | `70cdf3b` |
+| C-11 | "Send saved sound" (Total Recall) sends every dump the profile declares, zero-filled where the panel binds nothing — GAIA System block to 0, AN1x user voice/pattern memory overwritten. Found by two reviewers independently. | Send only dumps whose bytes all come from a real capture; until a device capture exists, do not send dumps at all. | `e77e782, f447292` |
+| C-25 | The AN1x profile's Scene 2 and FEG tracks 2–4 dump mappings point at the Scene 1 / track 1 parameters; every instanced profile the Designer saves has the same flaw. | Keep the instance prefix in the emitter's dump mappings (`CE/dpd/emit-legacy-core.mjs:88`) and regenerate the AN1x profile. | `7d95b05` |
+| C-57 | One endless loop in any preview script hangs the editor for good; no watchdog. Reproduced in the app. | Run preview scripts in a Worker the page can terminate, or give the interpreters an instruction budget like the native engines already have. | `5441609` |
+| C-34 | Closing the Hostage plug-in while Library → Listen runs crashes the DAW (use after free). Applies only if the Hostage VST3 product ships. | Guard the closure with the `alive` token the preset scan already uses. | `8644737` |
 | C-94 | Typing a large tick count on a Knob or Slider (100,000) freezes the editor for ~50 s; 1,000,000 crashes it. Reproduced in the app. | Give Major/Minor Count a maximum (the sibling fields use 21) and cap `buildSliderTickStops`. | `db847b0` |
 | C-96 | A Python script that saves a dict setting leaves the panel impossible to save — even after the script is deleted. Reproduced in the app. | Convert Python values at the API boundary (`panelRuntime.js:7448`); this one change also fixes C-97–C-99. | `3c3c772` |
-| C-35 | A failed preset load leaves the part named as the new plug-in while the old one plays; the next save writes the old plug-in's state under the new one's identity. | Change the part's identity only when the load commits, or restore it on failure. | `ec44716` |
+| C-35 | A failed preset load leaves the part named as the new plug-in while the old one plays; the next save writes the old plug-in's state under the new one's identity. | Change the part's identity only when the load commits, or restore it on failure. | `7ca84ec` |
 
 ## The work, grouped — for planning the fixes
 
@@ -66,13 +66,13 @@ nine S1s, seven are demonstrated in the app or a test; C-34 and C-35 are code tr
 
 | ID | Sev | Area | Finding | Evidence | Fixed | Codex |
 | --- | --- | --- | --- | --- | --- | --- |
-| [C-08](claude-findings.md) | S1 | scripting / sharing | A shared panel's JavaScript can read and write any file on the machine through the app's native bridge | in the app | `0b5c5eb` | pending |
+| [C-08](claude-findings.md) | S1 | scripting / sharing | A shared panel's JavaScript can read and write any file on the machine through the app's native bridge | in the app | `d8c3072` | pending |
 | [C-09](claude-findings.md) | S1 | save / undo | Save As, then one Undo, silently points the tab back at the ORIGINAL file; the next Save overwrites it | in the app | `062c877` | pending |
-| [C-11](claude-findings.md) | S1 | Total Recall | "Send saved sound" overwrites every dump parameter the panel does not export with 0 — including the synth's System block | in a test | `7dc6e59, 457aa3d` | pending |
-| [C-25](claude-findings.md) | S1 | device profiles / DPD emitter | AN1x profile: Scene 2 and Free-EG tracks 2–4 in every dump read and write the Scene 1 / track 1 parameters | in a test | `cc22d5e` | pending |
-| [C-34](claude-findings.md) | S1 | Hostage VST3 — if that product ships | Closing the Hostage plug-in while Library → Listen is measuring crashes the DAW | in a test | `70cdf3b` | pending |
-| [C-35](claude-findings.md) | S1 | Hostage session persistence | A failed preset load leaves the part named and saved as the new plug-in, holding the old plug-in's state | in a test | `ec44716` | pending |
-| [C-57](claude-findings.md) | S1 | scripting runtime | One infinite loop in any preview script freezes the editor (or the plug-in's open window) with no recovery | in the app | `70d3298` | pending |
+| [C-11](claude-findings.md) | S1 | Total Recall | "Send saved sound" overwrites every dump parameter the panel does not export with 0 — including the synth's System block | in a test | `e77e782, f447292` | pending |
+| [C-25](claude-findings.md) | S1 | device profiles / DPD emitter | AN1x profile: Scene 2 and Free-EG tracks 2–4 in every dump read and write the Scene 1 / track 1 parameters | in a test | `7d95b05` | pending |
+| [C-34](claude-findings.md) | S1 | Hostage VST3 — if that product ships | Closing the Hostage plug-in while Library → Listen is measuring crashes the DAW | in a test | `8644737` | pending |
+| [C-35](claude-findings.md) | S1 | Hostage session persistence | A failed preset load leaves the part named and saved as the new plug-in, holding the old plug-in's state | in a test | `7ca84ec` | pending |
+| [C-57](claude-findings.md) | S1 | scripting runtime | One infinite loop in any preview script freezes the editor (or the plug-in's open window) with no recovery | in the app | `5441609` | pending |
 | [C-94](claude-findings.md) | S1 | inspector / slider renderer | Typing a large tick count into a Knob or Slider freezes the editor; 1,000,000 crashes it | in the app | `db847b0` | pending |
 | [C-96](claude-findings.md) | S1 | Python preview | Python: a script that saves a dict setting leaves the panel impossible to save, even after the script is removed | in the app | `3c3c772` | pending |
 | [C-01](claude-findings.md) | S2 | Hostage transport | With external MIDI clock on, every sequencer/arp step fires 3–4 times and swung steps never play | in a test |  | pending |
@@ -90,7 +90,7 @@ nine S1s, seven are demonstrated in the app or a test; C-34 and C-35 are code tr
 | [C-29](claude-findings.md) | S2 | scripting / device service | `ce.device.setVariable` / `setTiming` report success but the sending engine never sees them | in a test |  | pending |
 | [C-36](claude-findings.md) | S2 | Hostage audition | The browse audition's phrase arrives as one block of notes: nothing is heard | in a test |  | pending |
 | [C-37](claude-findings.md) | S2 | Hostage audition | Auditioning a preset of a different plug-in plays the phrase on the OLD plug-in, then nothing on the new one | read in code |  | pending |
-| [C-38](claude-findings.md) | S2 | Hostage library load | Picking another preset while a new plug-in is still loading applies it to the old plug-in; the first pick wins | read in code | `ec44716` | pending |
+| [C-38](claude-findings.md) | S2 | Hostage library load | Picking another preset while a new plug-in is still loading applies it to the old plug-in; the first pick wins | read in code | `7ca84ec` | pending |
 | [C-44](claude-findings.md) | S2 | animation — the newest code | A state-triggered sequence never plays on any shipped control (so Hold last, Loop and Return never do either) | in a test |  | pending |
 | [C-45](claude-findings.md) | S2 | animation | On a control with no parts, a sequence's Scale, Rotation and Opacity tracks say "works" and move nothing | in a test |  | pending |
 | [C-58](claude-findings.md) | S2 | preview ≠ export | Lua preview: a script's `self`, `log`, `state` and helpers belong to whichever Lua script loaded last | in a test |  | pending |
