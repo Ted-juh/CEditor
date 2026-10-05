@@ -316,7 +316,10 @@ function snapshotOf(context) {
   }
   const panel = get(panels).find((p) => p.id === context.id);
   if (!panel) return null;
-  const { id, modified, bgImage, bgTexture, viewer, ...data } = panel;
+  // `filePath` is where the document lives, not what it says. Undo used to carry it: Save As then
+  // one undo pointed the tab back at the file the user had just saved away from, and the next
+  // Save overwrote it. Restore keeps the live path, because the snapshot no longer has one.
+  const { id, modified, filePath, bgImage, bgTexture, viewer, ...data } = panel;
   // Which note is open is view state, like the active viewer image above. Keep the notes in
   // history, but do not turn tab navigation into a document edit or rewind it with an unrelated
   // undo.
@@ -612,6 +615,22 @@ function clearPending() {
   lastChangeAt = 0;
 }
 
+/**
+ * Did a save just rename the document, and change nothing else?
+ *
+ * Save As names the panel after its new file and clears `modified` in one store write. That is a
+ * fact about the file, not an edit: recorded as one, a single undo renamed the tab back to the old
+ * file's name while it now writes to the new file. So a change that leaves the document clean and
+ * touches nothing but `name` becomes the new baseline instead of an undo step. A rename typed in
+ * the panel's own Name field marks the panel modified, so it is still undoable.
+ */
+function isSaveRename(context, snapshot) {
+  if (context?.registered || context?.kind === 'component') return false;
+  if (!documentIsClean(context) || lastSnapshot == null) return false;
+  if (snapshot?.name === lastSnapshot?.name) return false;
+  return sameSnapshot({ ...snapshot, name: null }, { ...lastSnapshot, name: null }, context);
+}
+
 function commitSnapshot(context, snapshotOverride, selectionOverride) {
   if (isRestoring || suppressed) return;
   clearPending();
@@ -629,7 +648,16 @@ function commitSnapshot(context, snapshotOverride, selectionOverride) {
   // yet. A baseline from a different context can't be diffed against — it
   // becomes the new baseline instead of a bogus undo entry.
   if (baselineKey === contextKey(context) && sameSnapshot(snapshot, lastSnapshot, context)) return;
-  if (lastSnapshot == null || baselineKey !== contextKey(context)) {
+  const saveRename = isSaveRename(context, snapshot);
+  if (saveRename) {
+    // Every step in this document's history now belongs to the renamed file, so undoing past the
+    // save must not hand the old name back.
+    const history = getHistory(contextKey(context));
+    const renamed = (entry) => ({ ...entry, snapshot: { ...entry.snapshot, name: snapshot.name } });
+    history.undoStack = history.undoStack.map(renamed);
+    history.redoStack = history.redoStack.map(renamed);
+  }
+  if (lastSnapshot == null || baselineKey !== contextKey(context) || saveRename) {
     lastSnapshot = snapshot;
     lastSelection = selection;
     baselineKey = contextKey(context);
