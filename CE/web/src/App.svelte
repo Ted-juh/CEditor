@@ -38,6 +38,8 @@
   import { initScriptConsoleBridge } from './CE_Application/stores/scriptConsole.js';
   import { initScriptModules } from './CE_Application/stores/scriptModules.js';
   import ScriptNotifications from './CE_Application/layout/ScriptNotifications.svelte';
+  import ScriptTrustBanner from './CE_Application/layout/ScriptTrustBanner.svelte';
+  import { initScriptTrust } from './CE_Application/stores/scriptTrust.js';
   import ScriptDialog from './CE_Application/layout/ScriptDialog.svelte';
   import NewPanelDialog from './CE_Application/layout/NewPanelDialog.svelte';
   import HistoryWindow from './CE_Application/layout/HistoryWindow.svelte';
@@ -89,6 +91,7 @@
     initConsoleBridge();
     initScriptConsoleBridge();
     initScriptModules();   // installed ce.ext.* modules, before any script can reach for one
+    initScriptTrust();     // before the runtime: scripts from an opened panel wait to be trusted
     initPanelRuntime();
     syncPerfDebugToNative();
     startPerfDebugStallWatch();   // both sides watch, so a frozen window says which side froze
@@ -470,6 +473,9 @@
   <!-- ce.ui.notify() toasts. Mounted once at the root, and fixed-position, so a message survives
        whatever tab or panel is on screen when the script raises it. -->
   <ScriptNotifications />
+
+  <!-- Asks once before an opened or shared panel's scripts run (stores/scriptTrust.js). -->
+  <ScriptTrustBanner />
 
   <!-- ce.ui.dialog() modals. Root-mounted for the same reason, and above everything: a question
        that can be scrolled out of view is a script left waiting for an answer. -->

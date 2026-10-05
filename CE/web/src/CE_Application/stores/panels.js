@@ -37,6 +37,7 @@ import { equalityWritable } from '../utils/equalityStore.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
 import { controlSetForPanel } from '../models/controlSets.js';
 import { createPanel, deserializePanel, panelOpenReport, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
+import { markScriptsForeign } from './scriptTrust.js';
 import {
   getProjectDeviceSessionSnapshot,
   requestProjectDeviceSessionRestore,
@@ -1409,7 +1410,8 @@ export function initPanelBridge() {
 
     const openTimer = createPerfDebugTimer(`panel open ${label}`);
     const deserializeTimer = createPerfDebugTimer(`panel deserialize ${label}`);
-    const panel = deserializePanel(panelData, filePath, payload.name);
+    // Scripts that came in with the file wait for the author's say-so (stores/scriptTrust.js).
+    const panel = markScriptsForeign(deserializePanel(panelData, filePath, payload.name));
     if (!panel) {
       if (filePath) pendingOpenPanelFiles.delete(filePath);
       deserializeTimer('failed');

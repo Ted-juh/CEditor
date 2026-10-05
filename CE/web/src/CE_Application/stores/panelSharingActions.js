@@ -23,6 +23,7 @@ import {
 import { addPanel, activePanel } from './panels.js';
 import { cerror, cinfo, cwarn } from './console.js';
 import { deserializePanel, panelOpenReport, serializePanel } from './panelModel.js';
+import { markScriptsForeign } from './scriptTrust.js';
 import { openSharedPanel, packagePanelForSharing, panelPackageFile } from './panelSharing.js';
 import { notify } from './scriptUi.js';
 
@@ -158,7 +159,8 @@ export async function openPackageText(text, fallbackName = '') {
   }
 
   const name = String(envelope?.metadata?.name ?? '').trim() || fallbackName || 'Shared Panel';
-  const panel = deserializePanel(JSON.stringify(opened.panel), null, name);
+  // A package is somebody else's panel: its scripts wait for the author's say-so (stores/scriptTrust.js).
+  const panel = markScriptsForeign(deserializePanel(JSON.stringify(opened.panel), null, name));
   if (!panel) {
     notify(`Cannot open "${name}": ${panelOpenReport().error ?? 'the package does not hold a valid panel'}.`, { kind: 'error', duration: 0 });
     return null;

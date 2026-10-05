@@ -89,6 +89,7 @@ import { compileJava, invokeJava } from './javaPreview.js';
 import { ensureTs, transpileTs } from './tsService.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
+import { forgetDeclinedScripts, scriptsAllowed } from '../stores/scriptTrust.js';
 import { GUARD_NAME, PYTHON_WATCHDOG_PRELUDE, instrumentJs, instrumentLua, isScriptTimeLimit, scriptLoopGuard } from './scriptWatchdog.js';
 import { applySplitScriptAction } from '../utils/splitZoneLayout.js';
 import { phraseScriptPatch } from '../utils/phraseLayout.js';
@@ -7957,10 +7958,17 @@ function scriptsForPanel(panel) {
   if (host) return host.scripts ?? [];
   const pid = panel?.id;
   if (pid == null) return [];
-  if (live.editOverride && String(live.editOverride.panelId) === String(pid)) return live.editOverride.scripts;
-  const doc = get(scriptDocuments).find((d) => String(d.panelId) === String(pid));
-  if (doc) return (doc.scripts ?? []).filter(isSourceScript);
-  return (panel.scripts ?? []).filter(isSourceScript);
+  // A panel that arrived from a file or a package runs its scripts only once this computer trusts
+  // the code it arrived with: they reach the native bridge, and must not run because Preview was
+  // pressed (release audit C-08; stores/scriptTrust.js). Edits do not lift the gate — only the
+  // author's "Run scripts" does — and scripts written here were never gated.
+  let scripts;
+  if (live.editOverride && String(live.editOverride.panelId) === String(pid)) scripts = live.editOverride.scripts;
+  else {
+    const doc = get(scriptDocuments).find((d) => String(d.panelId) === String(pid));
+    scripts = ((doc ? doc.scripts : panel.scripts) ?? []).filter(isSourceScript);
+  }
+  return scriptsAllowed(panel, scripts) ? scripts : [];
 }
 
 /** Source scripts for the active panel, including those embedded in the saved panel. */
@@ -8404,6 +8412,7 @@ function onPreviewSessionsChanged(sessions) {
 
 function onPreviewModeChanged(on) {
   if (live.enabledGlobal && on && !live.prevPreviewOn) {
+    forgetDeclinedScripts();               // pressing Preview again is asking again
     seedSessionSnapshot();                 // don't fire interaction events for the live snapshot
     const key = String(live.activePanelId ?? '');
     const firstTime = !live.readyFired.has(key);
