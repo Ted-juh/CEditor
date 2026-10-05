@@ -8,6 +8,17 @@ import { hexToBytes } from './codecs.mjs';
 import { assembleDump } from './dumps.mjs';
 
 const flat = (rid) => rid.replace(/^[^.]+\./, '');
+// The one id a resolved parameter goes by in the legacy profile — in its `parameters` entry AND in
+// every dump mapping that names it. Instance 0 keeps its flat id (every existing panel and test binds
+// `scMixVco1`, not `scene1.scMixVco1`); later instances keep the resolved prefix, which is what makes
+// them distinct ids at all.
+//
+// Two places used to decide this separately and disagreed: the parameter list kept `scene2.` and the
+// dump mappings flattened it. So the AN1x's Scene 2 dump named no Scene 2 parameter — all 111 of its
+// mappings read into and wrote from Scene 1 — and the voiceCommon dump mapped Free-EG tracks 2-4 onto
+// track 1, four offsets to one id. A Scene 2 read moved Scene 1's controls, and every built dump wrote
+// Scene 1's values into Scene 2. One helper, so the two cannot drift again.
+export const legacyParamId = (p) => (p.instance > 0 ? p.resolvedId : flat(p.resolvedId));
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : undefined);
 const toBytes = (hex) => (hex ? String(hex).trim().split(/\s+/) : []);
 
@@ -85,7 +96,7 @@ export function buildDumpDefinitions(resolved) {
     def.mappings = (d.layout ?? []).map((e) => {
       const p = paramMap[e.param];
       const codec = legacyDumpCodec(e.codec, note);
-      return { parameter: p ? flat(p.resolvedId) : e.param, offset: e.offset, ...(codec ? { codec } : {}) };
+      return { parameter: p ? legacyParamId(p) : e.param, offset: e.offset, ...(codec ? { codec } : {}) };
     });
     if (d.requestShape) def.requestRecipe = d.requestShape;
     return def;
@@ -141,14 +152,13 @@ export function templateVariables(resolved) {
 }
 
 function legacyParam(p) {
-  // Instance 0 keeps its flat id — every existing panel and test binds `scMixVco1`, not
-  // `scene1.scMixVco1`. Later instances keep the resolved prefix, which is what makes them distinct
-  // ids at all; their names carry the instance too, because "Mixer VCO1 Level" twice in a parameter
-  // list answers no question anyone is asking.
+  // The id follows legacyParamId (instance 0 flat, later instances prefixed) — the same rule the dump
+  // mappings use. Later instances' names carry the instance too, because "Mixer VCO1 Level" twice in
+  // a parameter list answers no question anyone is asking.
   const instanced = p.instance > 0;
   const isText = p.valueType === 'text';
   const out = {
-    id: instanced ? p.resolvedId : flat(p.resolvedId),
+    id: legacyParamId(p),
     name: instanced ? `${p.name} (${p.scopeLabel ?? cap(p.scope)} ${p.instance + 1})` : p.name,
     group: p.group,
     type: p.valueType === 'enum' ? 'choice' : isText ? 'text' : 'integer',
