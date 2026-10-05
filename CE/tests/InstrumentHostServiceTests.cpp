@@ -4914,6 +4914,210 @@ void testCtrl49AppScreen()
     check (broker.currentPage() == 4, "and anything that is not a control change is dropped");
 }
 
+void testCtrl49StagePages()
+{
+    std::cout << "\nthe CTRL49's stage pages: SOUNDCHECK and LAYERS, asked for and then driven" << std::endl;
+
+    using ceditor::ctrl49::Ctrl49SurfaceBroker;
+
+    const auto dir = freshDataDir ("surface-stage-pages");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("addPart");
+    for (const auto* name : { "Glass Harbour", "Salt Road", "Night Bus" })
+        h.cmd ("addSetlistItem", { { "name", name } });
+
+    double fakeNow = 0.0;
+    Ctrl49SurfaceBroker::Options options;
+    options.discover = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+    options.emit = [&h] (const juce::String& name, const juce::var& payload)
+    {
+        h.emits.entries.push_back ({ name, payload });
+    };
+    options.pageLua = { 't' };
+    options.now = [&fakeNow] { return fakeNow; };
+    Ctrl49SurfaceBroker broker (*h.service, options);
+
+    const auto tickPast = [&]
+    {
+        fakeNow += 150.0;
+        broker.tick();
+    };
+    const auto press = [&] (int cc, int value)
+    {
+        juce::Array<juce::var> data { 0xB0, cc, value };
+        h.cmd ("surfaceInput", { { "data", juce::var (data) } });
+    };
+    const auto walkTo = [&] (int page)
+    {
+        for (int i = 0; i < broker.pages().count && broker.currentPage() != page; ++i)
+        {
+            press (broker.currentPage() < page ? 40 : 39, 127);
+            tickPast();
+        }
+        return broker.currentPage() == page;
+    };
+    const auto screen = [&h] { return h.emits.last ("instrumentHostSurfaceScreen"); };
+    const auto payload = [&screen]
+    {
+        std::vector<int> bytes;
+        if (const auto* s = screen())
+            if (const auto* array = s->getProperty ("payload", {}).getArray())
+                for (const auto& b : *array)
+                    bytes.push_back ((int) b);
+        return bytes;
+    };
+    // A byte of a payload, or -1 past its end: a short payload fails a check rather than the run.
+    const auto at = [] (const std::vector<int>& b, std::size_t i) { return i < b.size() ? b[i] : -1; };
+    const auto screenSays = [&screen] (const char* key)
+    {
+        const auto* s = screen();
+        return s != nullptr ? s->getProperty (key, {}) : juce::var();
+    };
+    const auto zone = [&h] (int part) { return h.service->getRackHost().getPerformance().parts.getReference (part).midi; };
+
+    tickPast();
+    check (broker.pages().layers < 0 && broker.pages().soundcheck < 0
+             && broker.pages().count == broker.pages().performance + 1,
+           "neither page is on the surface until it is asked for");
+
+    h.cmd ("layersOnSurface", { { "on", true } });
+    h.cmd ("soundcheckOnSurface", { { "on", true } });
+    const auto layout = broker.pages();
+    check (layout.layers == layout.performance + 1 && layout.soundcheck == layout.performance + 2
+             && layout.count == layout.performance + 3,
+           "asked for, they follow the performance page: LAYERS, then SOUNDCHECK");
+    const auto surfacePages = h.emits.lastState()->getProperty ("surfacePages", {});
+    check ((bool) surfacePages.getProperty ("layers", false) && (bool) surfacePages.getProperty ("soundcheck", false),
+           "and the app's state says which are on");
+
+    // -- LAYERS ---------------------------------------------------------------------------------
+    check (walkTo (layout.layers), "Page Right walks on to LAYERS");
+    auto bytes = payload();
+    check (screenSays ("pageKind").toString() == "layers"
+             && screenSays ("call").toString() == "set_layers"
+             && screenSays ("labels").size() == 0,
+           "the app is sent one set_layers payload in place of the knob page's two");
+    int focused = 0;
+    for (int i = 0; i < h.service->getRackHost().getPerformance().parts.size(); ++i)
+        if (h.service->getRackHost().getPerformance().parts.getReference (i).partId
+              == h.service->getRackHost().getPerformance().focusedPartId)
+            focused = i;
+    check (bytes.size() > 5 && at (bytes, 0) == 2 && at (bytes, 2) == 2 && at (bytes, 3) == focused,
+           "both parts, the rack's focused part picked to start with");
+    check (at (bytes, 5) == 0 && at (bytes, 6) == 127 && at (bytes, 9) == 64 && at (bytes, 10) == (1 | 4),
+           "a fresh part plays every key unmoved, and from the keyboard");
+
+    h.service->noteMidiActivity ("Keys", juce::MidiMessage::noteOn (1, 60, (juce::uint8) 90));
+    tickPast();
+    bytes = payload();
+    check (bytes.size() >= 3 && at (bytes, bytes.size() - 3) == 1 && at (bytes, bytes.size() - 2) == 60 && at (bytes, bytes.size() - 1) == 90,
+           "a note held on the keys is drawn, with how hard it was played");
+    h.service->noteMidiActivity ("Keys", juce::MidiMessage::noteOff (1, 60));
+    tickPast();
+    check (at (payload(), payload().size() - 1) == 0, "and let go of, it is not");
+
+    for (int i = 0; i < 4; ++i)
+        press (11, 127);                       // E1 back past the first part
+    tickPast();
+    check (at (payload(), 3) == 0, "E1 picks the part, stopping at the first");
+
+    press (12, 3);                             // E2: lowest key up three
+    press (13, 127);                           // E3: highest key down one...
+    press (13, 127);                           // ...twice
+    press (14, 127);                           // E4: transpose down one
+    press (15, 9);                             // E5: lowest velocity up nine
+    press (16, 127);                           // E6: highest velocity down one
+    tickPast();
+    const auto edited = zone (0);
+    check (edited.keyLow == 3 && edited.keyHigh == 125 && edited.transpose == -1
+             && edited.velocityLow == 10 && edited.velocityHigh == 126,
+           "E2-E6 turn the part's lowest key, highest key, transpose and velocity range");
+    bytes = payload();
+    check (at (bytes, 5) == 3 && at (bytes, 6) == 125 && at (bytes, 9) == 63, "and the page shows the zone it now has");
+    check (zone (1).keyLow == 0 && zone (1).keyHigh == 127, "the other part is left alone");
+
+    press (12, 100);
+    press (12, 100);
+    tickPast();
+    check (zone (0).keyLow == zone (0).keyHigh, "a lowest key turned past the highest stops on it");
+
+    h.cmd ("setPartMidiRules", { { "partId", h.service->getRackHost().getPerformance().parts.getReference (0).partId },
+                                 { "keyLow", 0 }, { "keyHigh", 127 } });
+    h.cmd ("setStageLock", { { "enabled", true } });
+    h.emits.clear();
+    press (12, 5);
+    tickPast();
+    check (zone (0).keyLow == 0 && h.emits.lastError().isNotEmpty(),
+           "under Stage Lock the zone stays put, refused aloud as the app's zone editor is");
+    check (broker.currentPage() == layout.layers, "while the page itself stays up to read");
+    h.cmd ("beginStageUnlock");                // Build, held, as a player unlocks it
+    juce::Thread::sleep (950);
+    h.cmd ("setStageLock", { { "enabled", false } });
+    check (! h.service->isStageLocked(), "and Build, held, unlocks it again");
+
+    // -- SOUNDCHECK -----------------------------------------------------------------------------
+    check (walkTo (layout.soundcheck), "and on to SOUNDCHECK");
+    bytes = payload();
+    check (screenSays ("pageKind").toString() == "soundcheck"
+             && screenSays ("call").toString() == "set_check",
+           "which is one set_check payload");
+    check (bytes.size() > 8 && at (bytes, 0) == 3 && at (bytes, 7) == 0 && at (bytes, 5) + at (bytes, 6) == 3,
+           "the whole set is listed, and turning the page on checked it");
+    check (bytes.size() > 25 && at (bytes, 8) == (h.service->surfaceSoundcheck()[0].problems.isEmpty() ? 1 : 2)
+             && at (bytes, 11) == 13 && std::string (bytes.begin() + 12, bytes.begin() + 25) == "Glass Harbour",
+           "each song with its check's verdict and its name");
+
+    press (11, 1);
+    tickPast();
+    check (at (payload(), 3) == 1, "E1 walks the set");
+    press (11, 60);
+    tickPast();
+    check (at (payload(), 3) == 2, "and stops at the last song");
+
+    h.cmd ("addSetlistItem", { { "name", "Encore" } });
+    tickPast();
+    check (at (payload(), 0) == 4 && at (payload(), 7) == 1, "a song added since is listed as not checked");
+    press (18, 1);                             // E8
+    tickPast();
+    check (at (payload(), 7) == 0, "until E8 checks the set again");
+
+    h.cmd ("addSetlistItem", { { "name", "Second encore" } });
+    press (18, 1);
+    tickPast();
+    check (at (payload(), 7) == 1, "a turn is many detents: it checks once a second at most");
+    fakeNow += 1000.0;
+    press (18, 1);
+    tickPast();
+    check (at (payload(), 7) == 0, "and a second later it checks again");
+
+    // Off again while it is up: the surface steps back to a page that exists.
+    h.cmd ("soundcheckOnSurface", { { "on", false } });
+    tickPast();
+    check (broker.pages().soundcheck < 0 && broker.currentPage() < broker.pages().count
+             && screenSays ("pageKind").toString() == "layers",
+           "turning SOUNDCHECK off while it is up leaves the surface on the page before it");
+    h.cmd ("layersOnSurface", { { "on", false } });
+    tickPast();
+    check (screenSays ("pageKind").toString() == "performance"
+             && screenSays ("values").size() == 12,
+           "and with LAYERS off too, the performance page is sent whole again");
+
+    // Without the setlist feature there is no set to check, and no page to check it on.
+    const auto freeDir = freshDataDir ("surface-stage-pages-free");
+    seedCatalog (freeDir);
+    Harness unpaid (freeDir, {}, {}, licensing::Edition::free);
+    unpaid.cmd ("getState");
+    unpaid.cmd ("soundcheckOnSurface", { { "on", true } });
+    check (! unpaid.service->soundcheckOnSurface() && unpaid.emits.lastError().isNotEmpty(),
+           "an edition without setlists refuses SOUNDCHECK, aloud");
+    unpaid.cmd ("layersOnSurface", { { "on", true } });
+    check (unpaid.service->layersOnSurface(), "while LAYERS, which only shows the rack, is there for anyone");
+}
+
 void testCtrl49Broker()
 {
     std::cout << "\nthe CTRL49 broker: the hardware path in the app, not in a demo" << std::endl;
@@ -5292,6 +5496,67 @@ void testCtrl49Broker()
         const auto* status = h.emits.last ("instrumentHostSurface");
         check (status != nullptr && (int) status->getProperty ("pageIndex", -1) == 5,
                "the sixth page is one the Stage view is told about, like any other");
+    }
+
+    // The stage pages over the cable. What the app's screen is sent is what the keyboard is sent,
+    // as one Lua call, once; and the knob page it came from is sent whole when it comes back,
+    // because the page on the keyboard switched kind on that call.
+    {
+        using ceditor::ctrl49::Ctrl49Session;
+        using ceditor::ctrl49::buildLuaCall;
+        const auto framesFrom = [&fake] (std::size_t from, const ceditor::ctrl49::Bytes& frame)
+        {
+            const std::scoped_lock scoped (fake.lock);
+            return (int) std::count (fake.frames.begin() + (long) std::min (from, fake.frames.size()),
+                                     fake.frames.end(), frame);
+        };
+        const auto frameCount = [&fake]
+        {
+            const std::scoped_lock scoped (fake.lock);
+            return fake.frames.size();
+        };
+        const auto shown = [&h] (const char* key)
+        {
+            ceditor::ctrl49::Bytes bytes;
+            if (const auto* screen = h.emits.last ("instrumentHostSurfaceScreen"))
+                if (const auto* array = screen->getProperty (key, {}).getArray())
+                    for (const auto& b : *array)
+                        bytes.push_back ((std::uint8_t) (int) b);
+            return bytes;
+        };
+
+        check (broker.state() == Ctrl49SurfaceBroker::State::connected, "the keyboard is there");
+        h.cmd ("layersOnSurface", { { "on", true } });
+        broker.tick();
+        for (int i = 0; i < broker.pages().count && broker.currentPage() != broker.pages().layers; ++i)
+        {
+            fake.feed (0xB0, 40, 127);         // Page Right
+            broker.tick();
+        }
+        fakeNow += 150.0;
+        broker.tick();
+        const auto layers = shown ("payload");
+        const auto layersCall = buildLuaCall (Ctrl49Session::kTarget, "set_layers", layers);
+        check (broker.currentPage() == broker.pages().layers && ! layers.empty()
+                 && framesFrom (0, layersCall) == 1,
+               "LAYERS reaches the keyboard as one set_layers call, carrying the app's bytes");
+        fakeNow += 150.0;
+        broker.tick();
+        check (framesFrom (0, layersCall) == 1, "and a page that has not changed is not sent again");
+
+        const auto before = frameCount();
+        fake.feed (0xB0, 39, 127);             // Page Left, back to the performance page
+        broker.tick();
+        fakeNow += 150.0;
+        broker.tick();
+        const auto labels = shown ("labels"), values = shown ("values");
+        check (! labels.empty()
+                 && framesFrom (before, buildLuaCall (Ctrl49Session::kTarget, "set_labels", labels)) == 1
+                 && framesFrom (before, buildLuaCall (Ctrl49Session::kTarget, "set_values", values)) == 1,
+               "the performance page is sent whole when the keys come back to it");
+
+        h.cmd ("layersOnSurface", { { "on", false } });
+        broker.tick();
     }
 
     // Closing the editor's HoSTage tab hands the keyboard back then, not when the program exits;
@@ -14022,6 +14287,7 @@ int main (int argc, char* argv[])
     testGroupBuses();
     testCtrl49Broker();
     testCtrl49AppScreen();
+    testCtrl49StagePages();
     testCtrl49DiscoveryReasons();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();

@@ -423,10 +423,11 @@ local function draw_layers()
             local band = colour
             if not playable(p) then band = DARK end
             draw_rect(x0, y + 14, x1 + w1 - x0, 3, band)
+            -- a note it answers is a white notch in its band, below the name rather than over it
             for n, v in pairs(sounding) do
                 if answers(p, n, v) then
                     local kx, kw = key_x(n)
-                    draw_rect(kx, y + 2, kw, 12, colour)
+                    draw_rect(kx, y + 12, kw, 6, WHITE)
                 end
             end
         end

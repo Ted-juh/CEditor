@@ -114,6 +114,10 @@
 //      modulation cable. A missing recordIdA is the preset the part last loaded. The blend is
 //      by parameter, read through the plug-in, and the pair persists with the session.)
 //   browseOnSurface {on?} | browseTurn {encoder,delta} | browsePad {pad}
+//   soundcheckOnSurface {on?} | layersOnSurface {on?}
+//     (the CTRL49's two stage pages, off until asked for like the browser: the setlist checked
+//      before the show, and every part's zone over the keys. Turning SOUNDCHECK on runs the
+//      setlist's reference check, so the page opens on fresh results.)
 //     (the library on the hardware: nothing here names a device — a surface arrives as its
 //      capabilities and the browser is built to fit it, or is told what it cannot do.)
 //   similarSounds {recordId,count?} | rackSubstitutes {recordId}
@@ -757,6 +761,29 @@ public:
     std::vector<surface::BrowseEntry> browseResults() const;
     bool browsingOnSurface() const               { return surfaceBrowsing; }
     surface::BrowseCursor browsePosition() const { return browseCursor; }
+
+    // -- the CTRL49's stage pages (Ctrl49StagePages.h) --------------------------------------
+    // Each is a page the surface has only once it is asked for, like the browser.
+    bool soundcheckOnSurface() const             { return surfaceSoundcheckPage; }
+    bool layersOnSurface() const                 { return surfaceLayersPage; }
+
+    struct SurfaceSoundcheckSong
+    {
+        juce::String name;
+        bool checked = false;         // the reference check has run for it
+        juce::String basis;           // what it was checked against
+        juce::StringArray problems;   // what the check found, as the check words it
+        bool measured = false;
+        double rmsDb = -120.0;        // the measured average level, dBFS
+        double peakDb = -120.0;
+        double seconds = 0.0;         // how long it was measured
+    };
+    /** The setlist in order with what its soundcheck holds for each song, the song being
+        measured read live. Empty without the setlist feature. */
+    juce::Array<SurfaceSoundcheckSong> surfaceSoundcheck();
+    /** The notes held on the MIDI inputs now, as they were played: note number and velocity, one
+        entry a note whichever input or channel holds it, lowest first. */
+    std::vector<std::pair<int, int>> surfaceHeldNotes();
 
     bool ownsHardwareSurface() const;
     /** Claims the surface for this instance, taking it from an instance whose heartbeat has
@@ -1477,6 +1504,8 @@ private:
     // becomes a browser under somebody's hands is a surface that stopped doing what they had
     // it doing.
     bool surfaceBrowsing = false;
+    bool surfaceSoundcheckPage = false;
+    bool surfaceLayersPage = false;
     surface::BrowseCursor browseCursor;
     const double freeRunEpoch = juce::Time::getMillisecondCounterHiRes() * 0.001;
     // What the browser is currently looking at. Every mutation re-emits THIS rather than an
@@ -1794,6 +1823,8 @@ private:
         juce::int64 messages = 0;
         bool listed = false;                     // the system has named it at least once
         std::map<int, double> heldNotes;         // (channel << 8 | note) → note-on time
+        std::map<int, int> heldVelocities;       // the same key → its note-on velocity, for the
+                                                 // CTRL49's LAYERS page (surfaceHeldNotes)
         struct Controller
         {
             int lastValue = -1;

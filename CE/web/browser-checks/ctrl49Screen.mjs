@@ -51,6 +51,8 @@ try {
     control: ['init', 'set_mode', 'set_labels', 'set_values', 'draw'],
     performance: ['init', 'set_mode', 'set_labels', 'set_values', 'draw'],
     browse: ['init', 'set_mode', 'set_labels', 'set_values', 'draw'],
+    layers: ['init', 'set_mode', 'set_layers', 'draw'],
+    soundcheck: ['init', 'set_mode', 'set_check', 'draw'],
     custom: ['init', 'set_mode', 'set_labels', 'set_values', 'draw'],
   };
   const drawn = {};
@@ -105,6 +107,59 @@ try {
   assert.match(await host.getByTestId('ctrl49-page').innerText(), /1\s*\/\s*1\s*Performance/,
     'a rack with no control pages shows the performance page, as the keyboard would');
   if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-card.png` });
+
+  // The two stage pages are not there until asked for, and then follow the performance page.
+  const canvasLit = () => host.evaluate(() => {
+    const c = document.querySelector('[data-testid=ctrl49-screen-canvas]');
+    const { data } = c.getContext('2d').getImageData(0, 0, c.width, c.height);
+    let lit = 0;
+    for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] > 120) lit++;
+    return lit;
+  });
+  const pageLabel = () => host.getByTestId('ctrl49-page').innerText();
+  assert.equal(await host.getByTestId('ctrl49-layers-toggle').getAttribute('aria-pressed'), 'false', 'Layers starts off');
+  await host.getByTestId('ctrl49-layers-toggle').click();
+  // The stand-in is the Free edition, which has no setlists to check, so SOUNDCHECK is offered
+  // and refused in one place: the switch says why it is off. The licence a paid edition would
+  // carry is then put into the store, as the native side reports one it has verified.
+  const soundcheckToggle = host.getByTestId('ctrl49-soundcheck-toggle');
+  assert.equal(await soundcheckToggle.isDisabled(), true, 'without setlists, SOUNDCHECK cannot be turned on');
+  assert.equal(await soundcheckToggle.getAttribute('title'), 'Needs scenes and setlists');
+  await host.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostState.update((s) => ({ ...s, licence: { ...s.licence,
+      features: s.licence.features.map((f) => ({ ...f, allowed: true })) } }));
+  });
+  await soundcheckToggle.click();
+  await host.waitForFunction(() => /1\s*\/\s*3/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  const performanceLit = await canvasLit();
+  await host.getByTestId('ctrl49-page-right').click();
+  await host.waitForFunction(() => /Layers/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  assert.match(await pageLabel(), /2\s*\/\s*3\s*Layers/, 'Page Right walks on to LAYERS once it is on');
+  assert.match(await host.getByTestId('ctrl49-hint').innerText(), /Encoder 1 picks the part/);
+  assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_layers');
+  await host.waitForFunction((before) => {
+    const c = document.querySelector('[data-testid=ctrl49-screen-canvas]');
+    const { data } = c.getContext('2d').getImageData(0, 0, c.width, c.height);
+    let lit = 0;
+    for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] > 120) lit++;
+    return lit > 2000 && lit !== before;
+  }, performanceLit);
+  const encoderOne = card.locator('.encoder').first();
+  assert.equal(await encoderOne.locator('.label').innerText(), 'Part', 'encoder 1 is named for what it does here');
+  if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-layers.png` });
+
+  await host.getByTestId('ctrl49-page-right').click();
+  await host.waitForFunction(() => /Soundcheck/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  assert.match(await pageLabel(), /3\s*\/\s*3\s*Soundcheck/, 'and on to SOUNDCHECK');
+  assert.equal(await card.locator('.encoder').nth(7).locator('.label').innerText(), 'Check again');
+  assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_check');
+  assert.ok(await canvasLit() > 2000, 'and draws something');
+  if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-soundcheck.png` });
+
+  await host.getByTestId('ctrl49-soundcheck-toggle').click();
+  await host.getByTestId('ctrl49-layers-toggle').click();
+  await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
 
   // The rest of the firmware's Lua surface, through the real runtime: padding and the font table,
   // draw_system_text, clear_errors, asset_get_valid, and the note hook (hook 2 calls note(args)).

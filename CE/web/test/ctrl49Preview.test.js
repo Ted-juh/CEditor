@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import {
   rackLabelPayload, rackStatePayload, performanceTitle, performanceLabelPayload,
   performanceStatePayload, browseSlotViews, soundcheckPayload, soundcheckLevelByte, layersPayload,
+  readSoundcheckPayload, readLayersPayload,
 } from '../src/CE_Application/screen/ctrl49Payloads.js';
 import { parseCalls } from '../src/ctrl49Preview/callScript.js';
 
@@ -108,6 +109,43 @@ test('layers: the golden the C++ test pins', () => {
   ]);
 });
 
+// The screen card labels the encoders beside the screen from the same bytes the page draws, so
+// reading them back has to give the view they were built from.
+test('stage pages read back as the views they were built from', () => {
+  const check = readSoundcheckPayload(soundcheckPayload({
+    songs: [
+      { name: 'Glass Harbour', checked: true, problems: 0, measured: true, rmsDb: -18.4, peakDb: -3.2 },
+      { name: 'Salt Road', checked: true, problems: 2 },
+      { name: 'Night Bus', checked: false },
+    ],
+    selected: 1, current: 0, basis: 'Current rig at check time',
+    problems: ['MIDI output unavailable: USB MIDI 2', 'Drifter: plug-in file is missing'],
+  }));
+  assert.equal(check.count, 3);
+  assert.equal(check.selected, 1);
+  assert.equal(check.current, 0, 'the song on stage, back to zero-based');
+  assert.deepEqual(check.songs.map((s) => [s.name, s.status, s.level, s.problems]),
+    [['Glass Harbour', 'ready', 43, 0], ['Salt Road', 'problems', 0, 2], ['Night Bus', 'unchecked', 0, 0]]);
+  assert.equal(check.basis, 'Current rig at check time');
+  assert.equal(check.problemCount, 2);
+  assert.deepEqual(check.problemLines, ['MIDI output unavailable: USB MIDI 2', 'Drifter: plug-in file is missing']);
+  assert.equal(readSoundcheckPayload([]).count, 0, 'no bytes read as an empty set, not a throw');
+
+  const layers = readLayersPayload(layersPayload({
+    parts: [
+      { name: 'Sub Bass', keyLow: 36, keyHigh: 54, velocityLow: 1, velocityHigh: 127, transpose: 0 },
+      { name: 'Brass', keyLow: 60, keyHigh: 84, velocityLow: 100, velocityHigh: 127, transpose: -12, muted: true, fromKeyboard: false },
+    ],
+    focused: 1,
+    held: [{ note: 48, velocity: 90 }],
+  }));
+  assert.equal(layers.focused, 1);
+  assert.deepEqual(layers.parts[1], { index: 1, name: 'Brass', keyLow: 60, keyHigh: 84, velocityLow: 100,
+    velocityHigh: 127, transpose: -12, enabled: true, muted: true, fromKeyboard: false });
+  assert.deepEqual(layers.held, [{ note: 48, velocity: 90 }]);
+  assert.deepEqual(readLayersPayload([]).parts, []);
+});
+
 test('custom calls: bytes, length-prefixed strings, raw strings, comments', () => {
   assert.deepEqual(parseCalls('-- a comment\n\nset_mode 2\nset_values 1, 0x7f 10\nset_text s"ab" "c"'), [
     { name: 'set_mode', bytes: [2] },
@@ -161,6 +199,9 @@ test('every function the broker calls is one the page defines', () => {
   const broker = read('../../src/ControlSurface/Ctrl49SurfaceBroker.cpp');
   const called = new Set([...broker.matchAll(/callLua \("([a-z_]+)"/g)].map((m) => m[1]));
   assert.ok(called.size >= 2, 'the broker calls into the page');
-  for (const name of [...called, 'init', 'set_mode', 'draw'])
+  // A stage page's call is named once and sent through a variable (callLua (stageCall, ...)).
+  const stage = [...broker.matchAll(/stageCall = "([a-z_]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(stage.sort(), ['set_check', 'set_layers'], 'both stage pages name their call');
+  for (const name of [...called, ...stage, 'init', 'set_mode', 'draw'])
     assert.match(lua, new RegExp(`^function ${name}\\(`, 'm'), `${name} is defined`);
 });

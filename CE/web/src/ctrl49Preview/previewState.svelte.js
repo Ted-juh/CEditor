@@ -39,6 +39,34 @@ export const preview = $state({
     columns: 12,
   },
 
+  // The two stage pages (Ctrl49StagePages.h): the rack's zones over the keys, and the set checked.
+  layers: {
+    focused: 1,
+    held: '43 70, 64 112, 67 96',
+    parts: [
+      { name: 'Sub Bass', keyLow: 24, keyHigh: 54, velocityLow: 1, velocityHigh: 127, transpose: 0 },
+      { name: 'Glass Pad', keyLow: 48, keyHigh: 96, velocityLow: 1, velocityHigh: 127, transpose: 12 },
+      { name: 'Brass Stabs', keyLow: 60, keyHigh: 84, velocityLow: 100, velocityHigh: 127, transpose: -12 },
+      { name: 'Choir', keyLow: 55, keyHigh: 96, velocityLow: 1, velocityHigh: 127, transpose: 0, muted: true },
+      { name: 'Arp Lead', keyLow: 0, keyHigh: 127, velocityLow: 1, velocityHigh: 127, transpose: 0, fromKeyboard: false },
+    ],
+  },
+
+  soundcheck: {
+    selected: 1,
+    current: 0,
+    basis: 'Current rig at check time',
+    seconds: 42,
+    songs: [
+      { name: 'Glass Harbour', checked: true, problems: [], measured: true, rmsDb: -18.4, peakDb: -3.2 },
+      { name: 'Salt Road', checked: true, problems: ['MIDI output unavailable: USB MIDI 2', 'Drifter: plug-in file is missing'],
+        measured: true, rmsDb: -22.0, peakDb: -6.5 },
+      { name: 'Night Bus', checked: false, problems: [] },
+      { name: 'Paper Lanterns', checked: true, problems: [], measured: true, rmsDb: -14.1, peakDb: -1.0 },
+      { name: 'Encore', checked: true, problems: [] },
+    ],
+  },
+
   // A new mode starts here: set_mode's byte, then whatever calls the page takes, before draw().
   custom: {
     mode: 1,

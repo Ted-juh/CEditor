@@ -1,6 +1,9 @@
 #include "Ctrl49SurfaceBroker.h"
 #include "Ctrl49RackDisplay.h"
 #include "Ctrl49PerformanceDisplay.h"
+#include "Ctrl49StagePages.h"
+
+#include <algorithm>
 
 namespace ceditor::ctrl49
 {
@@ -202,6 +205,7 @@ void Ctrl49SurfaceBroker::disconnect (const juce::String& why, State next)
 
     service.releaseHardwareSurface();
     lastLabels.clear();
+    lastStage.clear();
     lastState.clear();
     triedPageGeneration = false;
     lastAttemptMs = options.now();
@@ -351,6 +355,7 @@ void Ctrl49SurfaceBroker::tick()
             // paints the device in full.
             lastLabels.clear();
             lastState.clear();
+            lastStage.clear();
             forgetPadState();
             enter (State::connected, endpoints->description);
             lastDisplayMs = 0.0;   // paint immediately
@@ -423,8 +428,11 @@ Ctrl49SurfaceBroker::Pages Ctrl49SurfaceBroker::pages() const
     // computer and Page Right simply never arrived at it.
     layout.control = service.getRackHost().getPerformance().pages.size();
     layout.performance = layout.control;
-    layout.browse = service.browsingOnSurface() ? layout.performance + 1 : -1;
-    layout.count = layout.browse >= 0 ? layout.browse + 1 : layout.performance + 1;
+    auto next = layout.performance + 1;
+    layout.layers = service.layersOnSurface() ? next++ : -1;
+    layout.soundcheck = service.soundcheckOnSurface() ? next++ : -1;
+    layout.browse = service.browsingOnSurface() ? next++ : -1;
+    layout.count = next;
     return layout;
 }
 
@@ -449,6 +457,7 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
                 {
                     lastLabels.clear();
                     lastState.clear();
+                    lastStage.clear();
                     emitStatus();
                 }
                 break;
@@ -456,6 +465,10 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
 
     service.noteSurfacePage (reducer.page() < controlPages
         ? performance.pages.getReference (reducer.page()).pageId : juce::String());
+
+    // LAYERS edits a part's zone by turning; the turns of one pump are summed and sent as one
+    // edit, so a fast turn is one save of the rack rather than one a detent.
+    std::array<int, 8> zoneTurns {};
 
     // One reading for both sources: the app's screen sends what the cable sends, so nothing
     // below knows or cares which it was.
@@ -567,7 +580,33 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
                 service.handleCommand (juce::var (payload));
             }
         }
-        else if (controlPages > 0 && action->encoderMoved)
+        else if (reducer.page() == layout.soundcheck)
+        {
+            // E1 walks the setlist. E8 checks it again, through the command surface so the
+            // edition and the stage lock see it as they see the app's Check button; a turn is
+            // many detents, so it checks once a second at most.
+            if (action->encoderMoved && action->encoderSlot == 0)
+                soundcheckSong = juce::jlimit (0, juce::jmax (0, performance.setlist.items.size() - 1),
+                                               soundcheckSong + action->encoderDelta);
+            else if (action->encoderMoved && action->encoderSlot == 7 && options.now() - lastCheckMs >= 1000.0)
+            {
+                lastCheckMs = options.now();
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("cmd", "checkSetlistSoundcheck");
+                service.handleCommand (juce::var (payload));
+            }
+        }
+        else if (reducer.page() == layout.layers)
+        {
+            // E1 picks the part; E2-E6 turn its lowest key, highest key, transpose, lowest and
+            // highest velocity (summed, then sent once below).
+            if (action->encoderMoved && action->encoderSlot == 0)
+                layersPart = juce::jlimit (0, juce::jmax (0, performance.parts.size() - 1),
+                                           layersPart + action->encoderDelta);
+            else if (action->encoderMoved && action->encoderSlot >= 1 && action->encoderSlot <= 5)
+                zoneTurns[(std::size_t) action->encoderSlot] += action->encoderDelta;
+        }
+        else if (controlPages > 0 && reducer.page() < controlPages && action->encoderMoved)
         {
             const auto& page = performance.pages.getReference (reducer.page());
             service.nudgeControlSlot (page.pageId,
@@ -592,6 +631,29 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
     if (fromHardware)
         for (auto message = endpoints->dequeueInput(); message; message = endpoints->dequeueInput())
             handle (message->data(), message->size());
+
+    if (reducer.page() == layout.layers && layersPart >= 0 && layersPart < performance.parts.size()
+        && std::any_of (zoneTurns.begin(), zoneTurns.end(), [] (int turn) { return turn != 0; }))
+    {
+        // Through the command surface, as the app's zone editor sends it: the stage lock refuses
+        // it there, and the rack is saved there.
+        const auto& part = performance.parts.getReference (layersPart);
+        auto rules = part.midi;
+        rules.keyLow = juce::jlimit (0, rules.keyHigh, rules.keyLow + zoneTurns[1]);
+        rules.keyHigh = juce::jlimit (rules.keyLow, 127, rules.keyHigh + zoneTurns[2]);
+        rules.transpose = juce::jlimit (-48, 48, rules.transpose + zoneTurns[3]);
+        rules.velocityLow = juce::jlimit (1, rules.velocityHigh, rules.velocityLow + zoneTurns[4]);
+        rules.velocityHigh = juce::jlimit (rules.velocityLow, 127, rules.velocityHigh + zoneTurns[5]);
+        auto* payload = new juce::DynamicObject();
+        payload->setProperty ("cmd", "setPartMidiRules");
+        payload->setProperty ("partId", part.partId);
+        payload->setProperty ("keyLow", rules.keyLow);
+        payload->setProperty ("keyHigh", rules.keyHigh);
+        payload->setProperty ("transpose", rules.transpose);
+        payload->setProperty ("velocityLow", rules.velocityLow);
+        payload->setProperty ("velocityHigh", rules.velocityHigh);
+        service.handleCommand (juce::var (payload));
+    }
 
     // A held button steps its pad to the next layer once it has been held long enough. The
     // buttons sit one above each pad and are numbered as the pads are, 1..8.
@@ -648,7 +710,8 @@ void Ctrl49SurfaceBroker::paintPads()
     }
 }
 
-void Ctrl49SurfaceBroker::emitScreen (const Bytes& labels, const Bytes& state) const
+void Ctrl49SurfaceBroker::emitScreen (const Bytes& labels, const Bytes& state,
+                                      const std::string& stageCall, const Bytes& stage) const
 {
     if (options.emit == nullptr)
         return;
@@ -665,10 +728,15 @@ void Ctrl49SurfaceBroker::emitScreen (const Bytes& labels, const Bytes& state) c
     auto* obj = new juce::DynamicObject();
     obj->setProperty ("labels", toArray (labels));
     obj->setProperty ("values", toArray (state));
+    // A stage page is one call with one payload (set_layers, set_check) instead of the two.
+    obj->setProperty ("call", juce::String (stageCall));
+    obj->setProperty ("payload", toArray (stage));
     obj->setProperty ("pageIndex", reducer.page());
     obj->setProperty ("pageCount", layout.count);
     obj->setProperty ("pageKind", reducer.page() == layout.browse        ? "browse"
                                 : reducer.page() == layout.performance   ? "performance"
+                                : reducer.page() == layout.layers        ? "layers"
+                                : reducer.page() == layout.soundcheck    ? "soundcheck"
                                                                          : "control");
     // Which control page it is, so the app can set a slot by typing its value.
     const auto& performance = service.getRackHost().getPerformance();
@@ -687,9 +755,70 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     const auto controlPages = layout.control;
     const auto performancePage = layout.performance;
 
-    Bytes labels, state;
+    Bytes labels, state, stage;
+    std::string stageCall;
 
-    if (reducer.page() == layout.browse)
+    if (reducer.page() == layout.soundcheck)
+    {
+        // What the app's soundcheck holds, song by song: checked or not, what the check found,
+        // the measured level. E1 moves through the set; it starts on the song on stage.
+        const auto songs = service.surfaceSoundcheck();
+        const auto current = performance.setlist.currentIndex;
+        if (soundcheckSong < 0)
+            soundcheckSong = juce::jmax (0, current);
+        soundcheckSong = juce::jlimit (0, juce::jmax (0, songs.size() - 1), soundcheckSong);
+
+        SoundcheckView view;
+        for (const auto& song : songs)
+            view.songs.push_back ({ song.name.toStdString(), song.checked, song.problems.size(),
+                                    song.measured, song.rmsDb, song.peakDb });
+        view.selected = soundcheckSong;
+        view.current = current;
+        if (! songs.isEmpty())
+        {
+            const auto& song = songs.getReference (soundcheckSong);
+            view.basis = song.basis.toStdString();
+            for (const auto& problem : song.problems)
+                view.problems.push_back (problem.toStdString());
+            view.seconds = song.seconds;
+        }
+        stage = buildSoundcheckPayload (view);
+        stageCall = "set_check";
+    }
+    else if (reducer.page() == layout.layers)
+    {
+        // Every part's zone over the keys, and the notes held now. E1 moves through the parts;
+        // it starts on the rack's focused part.
+        const auto& parts = performance.parts;
+        if (layersPart < 0)
+        {
+            layersPart = 0;
+            for (int i = 0; i < parts.size(); ++i)
+                if (parts.getReference (i).partId == performance.focusedPartId)
+                    layersPart = i;
+        }
+        layersPart = juce::jlimit (0, juce::jmax (0, parts.size() - 1), layersPart);
+
+        LayersView view;
+        for (int i = 0; i < parts.size(); ++i)
+        {
+            const auto& part = parts.getReference (i);
+            // A part has no name of its own: its sound, else its plug-in, else its port.
+            const auto name = part.lastPresetName.isNotEmpty() ? part.lastPresetName
+                            : part.pluginName.isNotEmpty()     ? part.pluginName
+                            : part.midiOutputName.isNotEmpty() ? part.midiOutputName
+                                                               : "Part " + juce::String (i + 1);
+            view.parts.push_back ({ name.toStdString(), part.midi.keyLow, part.midi.keyHigh,
+                                    part.midi.velocityLow, part.midi.velocityHigh, part.midi.transpose,
+                                    part.enabled, part.mute, part.midiSourcePartId.isEmpty() });
+        }
+        view.focused = layersPart;
+        for (const auto& [note, velocity] : service.surfaceHeldNotes())
+            view.held.push_back ({ note, velocity });
+        stage = buildLayersPayload (view);
+        stageCall = "set_layers";
+    }
+    else if (reducer.page() == layout.browse)
     {
         // No new wire format and no new page on the device: a row of results is eight labels
         // and eight knob positions, which is what this page already draws. See browseSlotViews.
@@ -734,7 +863,7 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
         labels = buildPerformanceLabelPayload (transport, clipViews);
         state = buildPerformanceStatePayload (reducer.activeSlot(), clipViews, transport);
     }
-    else if (controlPages > 0)
+    else if (controlPages > 0 && reducer.page() < controlPages)
     {
         const auto& page = performance.pages.getReference (reducer.page());
         const auto slots = service.surfaceSlots (page.pageId);
@@ -755,15 +884,31 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     // Only bytes that changed travel — the display link is slow and redraws flicker.
     if (toHardware && session != nullptr)
     {
-        if (! labels.empty() && labels != lastLabels)
+        if (! stage.empty())
         {
-            session->callLua ("set_labels", labels, false);
-            lastLabels = labels;
+            if (stage != lastStage || stageCall != lastStageCall)
+            {
+                session->callLua (stageCall, stage, true);
+                lastStage = stage;
+                lastStageCall = stageCall;
+                lastLabels.clear();      // the knob page is sent whole when it comes back
+                lastState.clear();
+            }
         }
-        if (! state.empty() && state != lastState)
+        else
         {
-            session->callLua ("set_values", state, true);
-            lastState = state;
+            if (! labels.empty() && labels != lastLabels)
+            {
+                session->callLua ("set_labels", labels, false);
+                lastLabels = labels;
+                lastStage.clear();
+            }
+            if (! state.empty() && state != lastState)
+            {
+                session->callLua ("set_values", state, true);
+                lastState = state;
+                lastStage.clear();
+            }
         }
     }
 
@@ -773,13 +918,16 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     // A keyboard arriving or leaving changes nothing on the page, but it changes what the app
     // says about it — so that alone is a reason to send.
     const auto onKeyboard = currentState == State::connected;
-    if (! labels.empty() && ! state.empty()
-        && (labels != shownLabels || state != shownState || onKeyboard != shownOnKeyboard))
+    const auto knobPage = ! labels.empty() && ! state.empty();
+    if ((knobPage && (labels != shownLabels || state != shownState || onKeyboard != shownOnKeyboard
+                      || ! shownStage.empty()))
+        || (! stage.empty() && (stage != shownStage || onKeyboard != shownOnKeyboard)))
     {
         shownOnKeyboard = onKeyboard;
-        emitScreen (labels, state);
+        emitScreen (labels, state, stageCall, stage);
         shownLabels = std::move (labels);
         shownState = std::move (state);
+        shownStage = std::move (stage);
     }
 }
 

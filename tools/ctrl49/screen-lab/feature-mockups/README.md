@@ -19,6 +19,14 @@ Each comes in two sizes, full and slim, for the stress test: see
 run in the preset mode of `Ctrl49ScreenLab.exe`. `Start_CTRL49_Feature_Mockups.cmd` (in
 `tools/ctrl49`) asks which one and runs it.
 
+**Two of them are real now.** Layers and Soundcheck are HoSTage pages on the keyboard, drawn by
+`Hostage_MultiKnob.lua` from what the rack and the set already hold: see
+[the stage pages](../../README.md#the-stage-pages-layers-and-soundcheck). They kept what the
+mockups showed and lost what nothing measures yet. Layers has the bands, the notes answered and
+the zone on E2-E6, but not the layer groups' crossfades or the ghost outline. Soundcheck has
+each song's verdict, its problems and its measured level, but not load times or a suggested fix.
+The mockups stay as the picture of where both could go.
+
 ## HoSTage Features
 
 | Page | Shows | E1 | E2 | E3 | E4 | E5 | E6-E8 |

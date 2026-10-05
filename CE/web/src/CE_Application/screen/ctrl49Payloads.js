@@ -214,3 +214,54 @@ export function layersPayload(view) {
   for (const { note, velocity } of held) out.push(clampTo(note, 0, 127), clampTo(velocity, 0, 127));
   return out;
 }
+
+// --- reading them back ----------------------------------------------------------------------------
+// The app's screen card labels its encoders from the bytes it draws, as it does for a knob page,
+// so the strip beside the screen can never disagree with the screen. Short or malformed bytes
+// read as an empty page rather than throwing.
+
+function reader(bytes) {
+  let at = 0;
+  const byte = () => (at < bytes.length ? bytes[at++] : 0);
+  const text = () => {
+    const length = byte();
+    const out = String.fromCharCode(...bytes.slice(at, at + length));
+    at += length;
+    return out;
+  };
+  return { byte, text };
+}
+
+/** The set_layers payload as a view: the parts drawn (from `first`), the focused one, held notes. */
+export function readLayersPayload(bytes = []) {
+  const r = reader(bytes);
+  const count = r.byte(), first = r.byte(), rows = r.byte(), focused = r.byte(), firstKey = r.byte();
+  const parts = [];
+  for (let i = 0; i < rows; i++) {
+    const [keyLow, keyHigh, velocityLow, velocityHigh, transpose, flags] = [r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte()];
+    parts.push({ index: first + i, name: r.text(), keyLow, keyHigh, velocityLow, velocityHigh, transpose: transpose - 64,
+                 enabled: (flags & 1) !== 0, muted: (flags & 2) !== 0, fromKeyboard: (flags & 4) !== 0 });
+  }
+  const held = [];
+  for (let i = 0, n = r.byte(); i < n; i++) held.push({ note: r.byte(), velocity: r.byte() });
+  return { count, first, focused, firstKey, parts, held };
+}
+
+/** The set_check payload as a view: the songs listed (from `first`) and the selected one in full. */
+export function readSoundcheckPayload(bytes = []) {
+  const r = reader(bytes);
+  const [count, first, rows, selected, current, ready, problems, unchecked] =
+    [r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte()];
+  const songs = [];
+  for (let i = 0; i < rows; i++) {
+    const [status, level, issues] = [r.byte(), r.byte(), r.byte()];
+    songs.push({ index: first + i, status: ['unchecked', 'ready', 'problems'][status] ?? 'unchecked', level, problems: issues, name: r.text() });
+  }
+  const basis = r.text();
+  const total = r.byte();
+  const lines = [];
+  for (let i = 0, n = r.byte(); i < n; i++) lines.push(r.text());
+  const [peak, rms, seconds] = [r.byte(), r.byte(), r.byte()];
+  return { count, first, selected, current: current - 1, ready, problems, unchecked, songs, basis,
+           problemCount: total, problemLines: lines, peak, rms, seconds };
+}

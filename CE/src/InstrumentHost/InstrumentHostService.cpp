@@ -6297,6 +6297,24 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "soundcheckOnSurface" || cmd == "layersOnSurface")
+    {
+        // Off until asked for, like the browser page: a keyboard that grows a page under somebody's
+        // hands is one that stopped doing what they had it doing.
+        const bool soundcheck = cmd == "soundcheckOnSurface";
+        auto& flag = soundcheck ? surfaceSoundcheckPage : surfaceLayersPage;
+        const bool wanted = payload.getDynamicObject() != nullptr
+                              && payload.getDynamicObject()->hasProperty ("on")
+                            ? (bool) payload["on"] : ! flag;
+        if (soundcheck && wanted && ! requireFeature (licensing::Feature::scenesAndSetlists))
+            return;
+        flag = wanted;
+        if (soundcheck && wanted)
+            checkSetlistSoundcheck();   // the page opens on fresh results
+        emitState();
+        return;
+    }
+
     if (cmd == "browseTurn")
     {
         ensureLibrary();
@@ -13203,6 +13221,59 @@ void InstrumentHostService::tickSoundcheck()
     emitState();
 }
 
+juce::Array<InstrumentHostService::SurfaceSoundcheckSong> InstrumentHostService::surfaceSoundcheck()
+{
+    juce::Array<SurfaceSoundcheckSong> songs;
+    if (! entitlements().allows (licensing::Feature::scenesAndSetlists))
+        return songs;
+    const auto decibels = [] (double linear) { return linear > 1.0e-6 ? 20.0 * std::log10 (linear) : -120.0; };
+    const auto& items = rack.getPerformance().setlist.items;
+    for (int i = 0; i < items.size(); ++i)
+    {
+        const auto& item = items.getReference (i);
+        SurfaceSoundcheckSong song;
+        song.name = item.name.isNotEmpty() ? item.name : "Song " + juce::String (i + 1);
+        if (const auto found = soundcheckEntries.find (item.itemId); found != soundcheckEntries.end())
+        {
+            const auto& result = found->second;
+            song.checked = result.checkedAt > 0;
+            song.basis = result.basis;
+            song.problems = result.issues;
+            // The song being measured is read live, as the app's soundcheck reads it.
+            const auto& level = item.itemId == soundcheckItemId ? soundcheckReading : result.level;
+            song.measured = level.samples > 0 && ! level.invalid;
+            if (song.measured)
+            {
+                song.rmsDb = decibels (std::sqrt (level.energy / (double) level.samples));
+                song.peakDb = decibels ((double) level.peak);
+                song.seconds = level.seconds;
+            }
+        }
+        songs.add (song);
+    }
+    return songs;
+}
+
+std::vector<std::pair<int, int>> InstrumentHostService::surfaceHeldNotes()
+{
+    std::map<int, int> notes;
+    {
+        const std::scoped_lock lock (midiActivityLock);
+        for (const auto& [device, health] : midiInputHealth)
+        {
+            juce::ignoreUnused (device);
+            for (const auto& [key, since] : health.heldNotes)
+            {
+                juce::ignoreUnused (since);
+                const auto velocity = health.heldVelocities.find (key);
+                auto& held = notes[key & 0xff];
+                held = juce::jmax (held, velocity != health.heldVelocities.end() ? velocity->second : 100);
+            }
+        }
+    }
+    return { notes.begin(), notes.end() };
+}
+
 juce::var InstrumentHostService::soundcheckPayload()
 {
     auto* root = new juce::DynamicObject();
@@ -16434,7 +16505,10 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
         const auto channel = message.getChannel();
 
         if (message.isNoteOn())
+        {
             health.heldNotes[(channel << 8) | message.getNoteNumber()] = nowMs;
+            health.heldVelocities[(channel << 8) | message.getNoteNumber()] = message.getVelocity();
+        }
         else if (message.isNoteOff())
             health.heldNotes.erase ((channel << 8) | message.getNoteNumber());
         else if (message.isAllNotesOff() || message.isAllSoundOff())
@@ -18605,6 +18679,12 @@ juce::var InstrumentHostService::buildStatePayload()
     }());
     root->setProperty ("performance", performancePayload());
     root->setProperty ("soundcheck", soundcheckPayload());
+    {
+        auto* surfacePages = new juce::DynamicObject();
+        surfacePages->setProperty ("soundcheck", surfaceSoundcheckPage);
+        surfacePages->setProperty ("layers", surfaceLayersPage);
+        root->setProperty ("surfacePages", juce::var (surfacePages));
+    }
     root->setProperty ("product", productPayload());
     root->setProperty ("reliability", reliabilityPayload());
     root->setProperty ("licence", licencePayload());

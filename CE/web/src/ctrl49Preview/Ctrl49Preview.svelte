@@ -16,6 +16,7 @@
   import { createCtrl49Screen } from '../CE_Application/screen/ctrl49Runtime.js';
   import {
     rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload, browseSlotViews,
+    layersPayload, soundcheckPayload,
   } from '../CE_Application/screen/ctrl49Payloads.js';
   import { parseCalls } from './callScript.js';
   import { preview } from './previewState.svelte.js';
@@ -28,6 +29,8 @@
     { id: 'control', label: 'Control page' },
     { id: 'performance', label: 'Performance' },
     { id: 'browse', label: 'Browser' },
+    { id: 'layers', label: 'Layers' },
+    { id: 'soundcheck', label: 'Soundcheck' },
     { id: 'custom', label: 'Custom calls' },
   ];
 
@@ -77,6 +80,25 @@
           { name: 'set_mode', bytes: [1] },
           { name: 'set_labels', bytes: rackLabelPayload(p.browse.title, views) },
           { name: 'set_values', bytes: rackStatePayload(p.browse.cursor, views) },
+        ];
+      }
+      case 'layers': {
+        // "note velocity, note velocity": the notes held, as the host sends them.
+        const held = p.layers.held.split(',').map((pair) => pair.trim().split(/\s+/).map(Number))
+          .filter(([note, velocity]) => Number.isFinite(note) && Number.isFinite(velocity))
+          .map(([note, velocity]) => ({ note, velocity }));
+        return [
+          { name: 'set_mode', bytes: [1] },
+          { name: 'set_layers', bytes: layersPayload({ parts: p.layers.parts, focused: p.layers.focused, held }) },
+        ];
+      }
+      case 'soundcheck': {
+        const songs = p.soundcheck.songs.map((s) => ({ ...s, problems: s.problems.length }));
+        const song = p.soundcheck.songs[p.soundcheck.selected];
+        return [
+          { name: 'set_mode', bytes: [1] },
+          { name: 'set_check', bytes: soundcheckPayload({ songs, selected: p.soundcheck.selected, current: p.soundcheck.current,
+            basis: p.soundcheck.basis, problems: song?.problems ?? [], seconds: p.soundcheck.seconds }) },
         ];
       }
       default:
@@ -212,6 +234,44 @@
       <label class="field">Results, one per line (start with ! for one that cannot load)
         <textarea rows="9" bind:value={preview.browse.names}></textarea></label>
 
+    {:else if preview.scene === 'layers'}
+      <div class="row">
+        <label class="field small">Part the encoders edit <input type="number" min="0" max={preview.layers.parts.length - 1}
+               value={preview.layers.focused} onfocus={selectAll}
+               oninput={(e) => (preview.layers.focused = int(e.currentTarget.value, 0, preview.layers.parts.length - 1))} /></label>
+        <label class="field">Notes held: note velocity, ... <input type="text" bind:value={preview.layers.held} onfocus={selectAll} /></label>
+      </div>
+      <div class="grid zones">
+        <span>Part</span><span>Low</span><span>High</span><span>Vel low</span><span>Vel high</span><span>Transpose</span>
+        {#each preview.layers.parts as part, i}
+          <input type="text" bind:value={part.name} onfocus={selectAll} aria-label={`Part ${i + 1} name`} />
+          {#each ['keyLow', 'keyHigh', 'velocityLow', 'velocityHigh'] as key}
+            <input type="number" min="0" max="127" value={part[key]} onfocus={selectAll} aria-label={`Part ${i + 1} ${key}`}
+                   oninput={(e) => (part[key] = int(e.currentTarget.value, 0, 127))} />
+          {/each}
+          <input type="number" min="-48" max="48" value={part.transpose} onfocus={selectAll} aria-label={`Part ${i + 1} transpose`}
+                 oninput={(e) => (part.transpose = int(e.currentTarget.value, -48, 48))} />
+        {/each}
+      </div>
+
+    {:else if preview.scene === 'soundcheck'}
+      <div class="row">
+        <label class="field small">Song shown <input type="number" min="0" max={preview.soundcheck.songs.length - 1}
+               value={preview.soundcheck.selected} onfocus={selectAll}
+               oninput={(e) => (preview.soundcheck.selected = int(e.currentTarget.value, 0, preview.soundcheck.songs.length - 1))} /></label>
+        <label class="field small">Song on stage <input type="number" min="-1" max={preview.soundcheck.songs.length - 1}
+               value={preview.soundcheck.current} onfocus={selectAll}
+               oninput={(e) => (preview.soundcheck.current = int(e.currentTarget.value, -1, preview.soundcheck.songs.length - 1))} /></label>
+      </div>
+      <div class="grid songs">
+        <span>Song</span><span>Checked</span><span>Problems</span>
+        {#each preview.soundcheck.songs as song, i}
+          <input type="text" bind:value={song.name} onfocus={selectAll} aria-label={`Song ${i + 1} name`} />
+          <button type="button" class="flag" class:on={song.checked} onclick={() => (song.checked = !song.checked)}>{song.checked ? 'yes' : 'no'}</button>
+          <span class="count">{song.problems.length}</span>
+        {/each}
+      </div>
+
     {:else}
       <label class="field small">Mode byte for set_mode <input type="number" min="0" max="255" value={preview.custom.mode} onfocus={selectAll}
              oninput={(e) => (preview.custom.mode = int(e.currentTarget.value, 0, 255))} /></label>
@@ -249,6 +309,9 @@
   .field.small input { width: 80px; }
   .grid { display: grid; gap: 4px 6px; align-items: center; font-size: 12px; color: #7d8898; }
   .slots, .clips { grid-template-columns: 34px 1fr 72px 52px 52px; }
+  .zones { grid-template-columns: 1fr repeat(5, 62px); }
+  .songs { grid-template-columns: 1fr 52px 62px; }
+  .count { text-align: center; color: #d7dde6; }
   .slot-no { padding: 4px 0; }
   .flag { padding: 4px 0; font-size: 12px; }
   textarea { resize: vertical; }

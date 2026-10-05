@@ -134,16 +134,20 @@ public:
     int currentPage() const noexcept    { return reducer.page(); }
 
     /** Where the pages are. The control pages come first, then the performance page, then the
-        browser (Sound Browser Stage F) — last because it is the one you go to deliberately
-        rather than the one you play from, and Page Right walks towards it.
+        two stage pages (LAYERS, SOUNDCHECK: Ctrl49StagePages.h), then the browser (Sound Browser
+        Stage F) — last because it is the one you go to deliberately rather than the one you
+        play from, and Page Right walks towards it.
 
-        The browser page is only THERE when the library says browsing is on. A surface that
-        quietly grew an extra page under somebody's hands is a surface that stopped doing what
-        they had it doing, which is the same rule the browsing flag itself follows. */
+        The stage pages and the browser are only THERE when they have been asked for
+        (layersOnSurface, soundcheckOnSurface, browsingOnSurface). A surface that quietly grew
+        an extra page under somebody's hands is a surface that stopped doing what they had it
+        doing, which is the same rule each flag itself follows. */
     struct Pages
     {
         int control = 0;       // pages [0, control)
         int performance = 0;
+        int layers = -1;       // -1 when the page is off
+        int soundcheck = -1;
         int browse = -1;       // -1 when browsing is off, which is most of the time
         int count = 1;
     };
@@ -162,7 +166,8 @@ private:
     void disconnect (const juce::String& why, State next);
     void pumpInput (bool fromHardware);
     void refreshDisplay (bool toHardware);
-    void emitScreen (const Bytes& labels, const Bytes& state) const;
+    void emitScreen (const Bytes& labels, const Bytes& state, const std::string& stageCall,
+                     const Bytes& stage) const;
     void paintPads();
     void forgetPadState();
 
@@ -192,6 +197,17 @@ private:
     int movingSlot = -1;
     Bytes lastLabels, lastState;             // last sent to the keyboard
     Bytes shownLabels, shownState;           // last emitted to the app's screen
+    // The stage pages are one call each (set_layers, set_check) rather than the knob pages'
+    // set_labels + set_values. Sending one kind clears the other's cache: the page on the
+    // keyboard switches kind on the call, so a knob page left unchanged while a stage page was
+    // up still has to be sent whole when it comes back.
+    Bytes lastStage, shownStage;
+    std::string lastStageCall;
+    // The stage pages' own cursors: the song SOUNDCHECK shows in full and the part LAYERS edits.
+    // -1 until first shown, when they start on the song on stage and the rack's focused part.
+    int soundcheckSong = -1;
+    int layersPart = -1;
+    double lastCheckMs = -1.0e12;            // E8 on SOUNDCHECK re-checks, at most once a second
     bool shownOnKeyboard = false;
     juce::String deviceError;                // the keyboard's last refusal, by name
     int deviceRefusals = 0;

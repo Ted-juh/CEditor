@@ -9,16 +9,25 @@
    * Left/Right, the eight encoders (drag or scroll on a knob, or the steppers), the encoder
    * switches (click a knob) and the pads. The keyboard, when there is one, follows along.
    *
+   * Two stage pages can follow the performance page once asked for here — LAYERS (every part's
+   * zone over the keys) and SOUNDCHECK (the set, checked) — each drawn by one call (set_layers,
+   * set_check) where a knob page takes two. Their encoders are labelled from the same bytes.
+   *
    * The page and its images are loaded on demand, so a build that cannot reach them (a test
    * harness serving only CE/web) loses this card and nothing else.
    */
   import { onDestroy } from 'svelte';
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
-  import { ctrl49Screen, hostSurface, surfaceInput, setControlSlotValue, surfaceStatusText } from '../stores/instrumentHost.js';
+  import { ctrl49Screen, hostSurface, hostState, surfaceInput, setControlSlotValue, surfaceStatusText,
+           layersOnSurface, soundcheckOnSurface } from '../stores/instrumentHost.js';
   import { createCtrl49Screen } from '../screen/ctrl49Runtime.js';
+  import { readLayersPayload, readSoundcheckPayload } from '../screen/ctrl49Payloads.js';
 
-  const KIND = { control: 'Controls', performance: 'Performance', browse: 'Sound browser' };
+  const KIND = { control: 'Controls', performance: 'Performance', browse: 'Sound browser',
+                 layers: 'Layers', soundcheck: 'Soundcheck' };
+  const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const noteName = (n) => `${NOTE_NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
   const DRAG_STEP = 4;                   // pixels of drag per encoder detent
 
   let canvas = $state();
@@ -49,7 +58,9 @@
 
   // The splash while the keyboard is starting up, as the keyboard itself shows it, and before the
   // broker has said anything at all.
-  const splash = $derived(!$ctrl49Screen.received || $ctrl49Screen.labels.length === 0
+  const stage = $derived($ctrl49Screen.call !== '');
+  const splash = $derived(!$ctrl49Screen.received
+                          || (stage ? $ctrl49Screen.payload.length === 0 : $ctrl49Screen.labels.length === 0)
                           || $hostSurface.state === 'connecting');
 
   $effect(() => {
@@ -62,8 +73,12 @@
         runtime.call('set_mode', [0]);
       } else {
         runtime.call('set_mode', [1]);
-        runtime.call('set_labels', screen.labels);
-        runtime.call('set_values', screen.values);
+        if (screen.call) {
+          runtime.call(screen.call, screen.payload);
+        } else {
+          runtime.call('set_labels', screen.labels);
+          runtime.call('set_values', screen.values);
+        }
       }
       runtime.call('draw', []);
       failure = '';
@@ -72,9 +87,39 @@
     }
   });
 
+  // What the encoders do on a stage page, read back out of the payload the page draws: the
+  // focused part's zone on LAYERS, the song on SOUNDCHECK. An encoder the page does not use is
+  // left blank, and its steppers off.
+  function stageSlots({ pageKind, payload }) {
+    const unused = { label: '', text: '', unused: true };
+    if (pageKind === 'layers') {
+      const view = readLayersPayload(payload);
+      const part = view.parts.find((p) => p.index === view.focused);
+      if (!part) return Array.from({ length: 8 }, () => unused);
+      const sign = (n) => (n > 0 ? `+${n}` : String(n));
+      return [
+        { label: 'Part', text: part.name || `Part ${part.index + 1}` },
+        { label: 'Lowest key', text: noteName(part.keyLow) },
+        { label: 'Highest key', text: noteName(part.keyHigh) },
+        { label: 'Transpose', text: sign(part.transpose) },
+        { label: 'Lowest velocity', text: String(part.velocityLow) },
+        { label: 'Highest velocity', text: String(part.velocityHigh) },
+        unused, unused,
+      ];
+    }
+    const view = readSoundcheckPayload(payload);
+    return [
+      { label: 'Song', text: view.count ? `${view.selected + 1} / ${view.count}` : 'No songs' },
+      unused, unused, unused, unused, unused, unused,
+      { label: 'Check again',
+        text: !view.count ? 'Nothing to check' : view.unchecked ? `${view.unchecked} not checked` : 'Checked' },
+    ];
+  }
+
   // The eight labels and values, read back out of the same payloads the page draws:
   // set_labels [titleLen][title][8 x [len][label]], set_values [active][v0..v7].
   const slots = $derived.by(() => {
+    if (stage) return stageSlots($ctrl49Screen);
     const { labels, values } = $ctrl49Screen;
     const out = [];
     let at = 1 + (labels[0] ?? 0);
@@ -82,7 +127,7 @@
       const length = labels[at] ?? 0;
       const label = String.fromCharCode(...labels.slice(at + 1, at + 1 + length));
       at += 1 + length;
-      out.push({ label, value: values[1 + i] ?? 0 });
+      out.push({ label, value: values[1 + i] ?? 0, text: String(values[1 + i] ?? 0), unused: false });
     }
     return out;
   });
@@ -91,6 +136,7 @@
   // Which knob is under the pointer, in the page's own 480x272 coordinates (knob_pos in the Lua:
   // four columns 118 px apart from x 31, two rows from y 32 and 150, each knob 64 px plus label).
   function slotAt(event) {
+    if (stage) return -1;                // a stage page draws no knobs to grab
     const box = canvas.getBoundingClientRect();
     const x = ((event.clientX - box.left) * 480) / box.width;
     const y = ((event.clientY - box.top) * 272) / box.height;
@@ -171,7 +217,7 @@
     const { slot, moved } = valueDrag;
     valueDrag = null;
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    if (!moved) editingSlot = slot;
+    if (!moved && !stage) editingSlot = slot;
   }
 
   const focusAndSelect = (node) => { node.focus(); node.select(); };
@@ -204,6 +250,15 @@
   const surfaceStatus = $derived(surfaceStatusText($hostSurface));
   const status = $derived($hostSurface.state === 'connected' ? 'Showing on the keyboard too'
                           : `${surfaceStatus.short} — shown here only`);
+
+  // The stage pages are off until asked for; SOUNDCHECK needs the setlists the edition may not have.
+  const pagesOn = $derived($hostState.surfacePages ?? { layers: false, soundcheck: false });
+  const setlists = $derived(($hostState.licence?.features ?? [])
+    .find((f) => f.feature === 'scenesAndSetlists')?.allowed !== false);
+  const HINT = {
+    layers: 'Encoder 1 picks the part; 2–6 set its lowest and highest key, transpose and velocity range.',
+    soundcheck: 'Encoder 1 walks the set; encoder 8 checks it again.',
+  };
 </script>
 
 <section class="ctrl49-screen" data-testid="ctrl49-screen-card" aria-label="CTRL49 screen">
@@ -232,30 +287,46 @@
                 onclick={() => surfaceInput(40, 127)}><ChevronRight size={16} /></button>
       </div>
 
+      <div class="stage-pages" role="group" aria-label="Stage pages on the keyboard">
+        <span class="group-label">After Performance</span>
+        <button type="button" aria-pressed={pagesOn.layers} class:on={pagesOn.layers} data-testid="ctrl49-layers-toggle"
+                title="Every part's zone over the keys, and the notes you hold"
+                onclick={() => layersOnSurface(!pagesOn.layers)}>Layers</button>
+        <button type="button" aria-pressed={pagesOn.soundcheck} class:on={pagesOn.soundcheck} data-testid="ctrl49-soundcheck-toggle"
+                disabled={!setlists && !pagesOn.soundcheck}
+                title={setlists ? 'The set, checked before the show: what is ready and what is not' : 'Needs scenes and setlists'}
+                onclick={() => soundcheckOnSurface(!pagesOn.soundcheck)}>Soundcheck</button>
+      </div>
+
       <div class="encoders" role="group" aria-label="Encoders">
         {#each slots as s, slot}
-          <div class="encoder" class:active={!splash && activeSlot === slot} class:hover={hoverSlot === slot}>
+          <div class="encoder" class:active={!splash && !stage && activeSlot === slot} class:hover={hoverSlot === slot}
+               class:unused={s.unused}>
             <span class="label" title={s.label || `Encoder ${slot + 1}`}>{s.label || `Encoder ${slot + 1}`}</span>
             <div class="stepper">
-              <button type="button" aria-label={`Encoder ${slot + 1} down`} title="Turn down"
+              <button type="button" aria-label={`Encoder ${slot + 1} down`} title="Turn down" disabled={s.unused}
                       onclick={() => turn(slot, -1)}>−</button>
-              {#if editingSlot === slot}
+              {#if editingSlot === slot && !stage}
                 <input type="text" inputmode="numeric" class="value" value={s.value} use:focusAndSelect
                        aria-label={`Encoder ${slot + 1} value`} data-testid={`ctrl49-encoder-${slot + 1}-input`}
                        onkeydown={(e) => { if (e.key === 'Enter') commitValue(slot, e.currentTarget.value); if (e.key === 'Escape') editingSlot = -1; }}
                        onblur={(e) => { if (editingSlot === slot) commitValue(slot, e.currentTarget.value); }} />
               {:else}
-                <span class="value" role="spinbutton" tabindex="0" aria-valuemin="0" aria-valuemax="127"
-                      aria-valuenow={s.value} aria-label={`Encoder ${slot + 1} value — drag, or click to type`}
-                      title="Drag up or down, or click to type" data-testid={`ctrl49-encoder-${slot + 1}-value`}
+                <span class="value" role="spinbutton" tabindex="0" aria-valuemin={stage ? undefined : 0}
+                      aria-valuemax={stage ? undefined : 127} aria-valuenow={stage ? undefined : s.value}
+                      aria-valuetext={stage ? s.text : undefined}
+                      aria-label={stage ? `Encoder ${slot + 1}, ${s.label || 'unused'} — drag to turn`
+                                        : `Encoder ${slot + 1} value — drag, or click to type`}
+                      title={stage ? 'Drag up or down to turn' : 'Drag up or down, or click to type'}
+                      data-testid={`ctrl49-encoder-${slot + 1}-value`}
                       onpointerdown={(e) => valueDown(e, slot)} onpointermove={valueMove} onpointerup={valueUp}
                       onkeydown={(e) => {
-                        if (e.key === 'Enter') editingSlot = slot;
+                        if (e.key === 'Enter' && !stage) editingSlot = slot;
                         else if (e.key === 'ArrowUp') { turn(slot, 1); e.preventDefault(); }
                         else if (e.key === 'ArrowDown') { turn(slot, -1); e.preventDefault(); }
-                      }}>{s.value}</span>
+                      }}>{s.text}</span>
               {/if}
-              <button type="button" aria-label={`Encoder ${slot + 1} up`} title="Turn up"
+              <button type="button" aria-label={`Encoder ${slot + 1} up`} title="Turn up" disabled={s.unused}
                       data-testid={`ctrl49-encoder-${slot + 1}-up`} onclick={() => turn(slot, 1)}>+</button>
             </div>
           </div>
@@ -265,11 +336,13 @@
       <span class="group-label">Pads</span>
       <div class="pads" role="group" aria-label="Pads">
         {#each Array(8) as _, index}
-          <button type="button" class="pad" title={`Pad ${index + 1}`} onclick={() => pad(index)}>{index + 1}</button>
+          <button type="button" class="pad" title={stage ? 'The pads do nothing on this page' : `Pad ${index + 1}`}
+                  disabled={stage} onclick={() => pad(index)}>{index + 1}</button>
         {/each}
       </div>
 
-      <p class="hint">Drag or scroll on a knob on the screen to turn it; click it to select it.</p>
+      <p class="hint" data-testid="ctrl49-hint">{HINT[$ctrl49Screen.pageKind]
+        ?? 'Drag or scroll on a knob on the screen to turn it; click it to select it.'}</p>
     </div>
   </div>
 
@@ -335,6 +408,15 @@
   span.value:focus-visible { outline: 2px solid var(--host-accent, #ff9408); outline-offset: 1px; }
   .group-label { font-size: 11px; color: var(--host-text-dim, #8791a0); margin-bottom: -4px; }
   .pad { min-height: 34px; padding: 0; }
+  .stage-pages { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .stage-pages .group-label { margin: 0 4px 0 0; }
+  /* A light on each switch, lit when the page is on the keyboard. */
+  .stage-pages button::before { content: ''; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: var(--host-line, #2d343e); }
+  .stage-pages button.on { border-color: var(--host-accent, #ff9408); background: var(--host-accent-surface, #2a2116); }
+  .stage-pages button.on::before { background: var(--host-accent, #ff9408); }
+  button:disabled { opacity: .4; cursor: default; }
+  button:disabled:hover { border-color: var(--host-line, #2d343e); }
+  .encoder.unused .label { opacity: .4; }
   .hint { margin: 0; font-size: 11px; color: var(--host-text-dim, #8791a0); }
   .failure { margin: 0; font-size: 12px; color: #ffb4b4; }
 </style>
