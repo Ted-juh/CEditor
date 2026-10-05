@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <condition_variable>
 #include <cstdint>
@@ -108,6 +109,9 @@ InstrumentHostService::~InstrumentHostService()
     if (performanceSavePending.exchange (false))
         savePerformance();
     *alive = false;
+    // Told now rather than just before the join below: everything in between is time the
+    // auditioner would otherwise spend starting on the next plug-in for a service that is going.
+    analysisStopRequested = true;
     if (options.editorWindows.closeAll != nullptr)
         options.editorWindows.closeAll();
     // Hand the hardware back on the way out: a claim outliving its owner is what the heartbeat
@@ -11110,6 +11114,14 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
     // onControlThread, and the only shared things are the two atomics and the emit hook.
     std::vector<AnalysisFinding> findings;
 
+    // The service can be destroyed while this runs — the plug-in removed from the DAW, the
+    // project closed in the middle of Listen. The destructor joins this thread, but what this
+    // thread has POSTED is not joined: in the plug-in, onControlThread is a bare callAsync, and
+    // the DAW's message loop runs the closure after the service is freed. So nothing posted
+    // from here touches `this` without asking the token first, which is what the library
+    // scan's `finish` has always done.
+    const auto token = alive;
+
     const auto marshal = [this] (std::function<void()> work)
     {
         if (options.onControlThread != nullptr)
@@ -11118,30 +11130,59 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
             work();
     };
 
-    // The same, but the caller waits. Applying a preset to a VST3 is a CONTROLLER operation,
-    // and JUCE marshals it to the message thread — so calling it from here and rendering
-    // immediately renders the state that was there BEFORE. That is not a hypothetical: against
-    // a real plug-in every preset was measured with the previous preset's sound, one whole
-    // render behind, and every number was plausible. The stub could never show it, because a
-    // plain AudioProcessor applies its state where it is asked.
-    const auto marshalAndWait = [&marshal] (std::function<void()> work)
+    // Waiting on the control thread from here has the mirror-image problem. The destructor
+    // runs ON the control thread and blocks in the join, so whatever this thread is waiting
+    // for there cannot be delivered until it gives up: closing the plug-in mid-Listen hung
+    // before it could crash. A wait therefore gives up when the token goes, and only then —
+    // a late answer finds `abandoned` set under the same lock and touches nothing it was given.
+    struct ControlThreadWait
     {
         std::mutex mutex;
         std::condition_variable ready;
-        bool done = false;
+        bool done = false;        // the control thread answered
+        bool abandoned = false;   // this thread stopped waiting; a late answer must do nothing
+    };
 
-        marshal ([&]
+    const auto waitForControlThread = [token] (ControlThreadWait& wait)
+    {
+        std::unique_lock lock (wait.mutex);
+        while (! wait.done)
         {
-            work();
+            if (! token->load())
             {
-                const std::scoped_lock lock (mutex);
-                done = true;
+                wait.abandoned = true;
+                return false;
             }
-            ready.notify_all();
+            wait.ready.wait_for (lock, std::chrono::milliseconds (20));
+        }
+        return true;
+    };
+
+    // The same as marshal, but the caller waits. Applying a preset to a VST3 is a CONTROLLER
+    // operation, and JUCE marshals it to the message thread — so calling it from here and
+    // rendering immediately renders the state that was there BEFORE. That is not a
+    // hypothetical: against a real plug-in every preset was measured with the previous
+    // preset's sound, one whole render behind, and every number was plausible. The stub could
+    // never show it, because a plain AudioProcessor applies its state where it is asked.
+    // False when the service went away first and `work` never ran.
+    const auto marshalAndWait = [&marshal, &waitForControlThread, token] (std::function<void()> work)
+    {
+        auto wait = std::make_shared<ControlThreadWait>();
+
+        marshal ([wait, token, work = std::move (work)]
+        {
+            {
+                // `work` holds references into the waiting thread's stack and calls into the
+                // service, so it runs only while that thread is provably still waiting.
+                const std::scoped_lock lock (wait->mutex);
+                if (! wait->abandoned && token->load())
+                    work();
+                wait->done = true;
+            }
+            wait->ready.notify_all();
         });
 
-        std::unique_lock lock (mutex);
-        ready.wait (lock, [&done] { return done; });
+        return waitForControlThread (*wait);
     };
 
     ProbeSpec spec;
@@ -11238,29 +11279,44 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
         // message thread in the app — and this thread waits for it rather than making one.
         std::unique_ptr<juce::AudioProcessor> instrument;
         juce::String instantiationError;
-        {
-            std::mutex mutex;
-            std::condition_variable ready;
-            bool answered = false;
 
-            if (options.instantiate == nullptr)
+        if (options.instantiate == nullptr)
+        {
+            instantiationError = "no instantiator";
+        }
+        else
+        {
+            // The live worker's handshake answers on the message thread, so this is the same
+            // wait as marshalAndWait's and gives up the same way. An instance that arrives
+            // after this thread stopped waiting stays in `answer` and goes with the callback,
+            // on the thread that delivered it.
+            struct Instantiation : ControlThreadWait
             {
-                instantiationError = "no instantiator";
+                std::unique_ptr<juce::AudioProcessor> made;
+                juce::String error;
+            };
+            auto answer = std::make_shared<Instantiation>();
+
+            options.instantiate (job.descriptionXml, spec.sampleRate, spec.blockSize,
+                [answer] (std::unique_ptr<juce::AudioProcessor> made, const juce::String& error)
+                {
+                    {
+                        const std::scoped_lock lock (answer->mutex);
+                        answer->made = std::move (made);
+                        answer->error = error;
+                        answer->done = true;
+                    }
+                    answer->ready.notify_all();
+                });
+
+            if (waitForControlThread (*answer))
+            {
+                instrument = std::move (answer->made);
+                instantiationError = answer->error;
             }
             else
             {
-                options.instantiate (job.descriptionXml, spec.sampleRate, spec.blockSize,
-                    [&] (std::unique_ptr<juce::AudioProcessor> made, const juce::String& error)
-                    {
-                        const std::scoped_lock lock (mutex);
-                        instrument = std::move (made);
-                        instantiationError = error;
-                        answered = true;
-                        ready.notify_all();
-                    });
-
-                std::unique_lock lock (mutex);
-                ready.wait (lock, [&answered] { return answered; });
+                instantiationError = "stopped";
             }
         }
 
@@ -11294,7 +11350,8 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
             asRecord.stateBlobBase64 = preset.stateBlobBase64;
 
             juce::String refusal;
-            marshalAndWait ([&] { refusal = applyRecordState (processor, asRecord); });
+            if (! marshalAndWait ([&] { refusal = applyRecordState (processor, asRecord); }))
+                return juce::String ("stopped");
             return refusal;
         };
 
@@ -11315,8 +11372,14 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
 
     const auto cancelled = analysisStopRequested.load();
 
-    marshal ([this, findings = std::move (findings), done, total, cancelled]
+    marshal ([this, token, findings = std::move (findings), done, total, cancelled]
     {
+        // Run whenever the control thread gets to it, which in the plug-in can be after the
+        // service that posted it is gone. The findings go with it: a record without its stamp
+        // is simply measured again by the next run.
+        if (! token->load())
+            return;
+
         int measured = 0;
         for (const auto& finding : findings)
         {

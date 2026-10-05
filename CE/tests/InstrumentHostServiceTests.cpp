@@ -13983,6 +13983,146 @@ void testMixerMeterEvents()
                "stopped audio drains silence instead of replaying an old peak");
 }
 
+// C-34. The auditioner's last act is a closure posted to the control thread, and in the plug-in
+// that is a bare callAsync: the DAW's message loop runs it whenever it gets there, which can be
+// after the plug-in was removed and the service freed. The closure edits the library, saves it,
+// sweeps the snapshots and emits — all through `this`.
+void testAuditionerClosureOutlivesTheService()
+{
+    std::cout << "\nthe auditioner's last word, delivered after the plug-in is gone" << std::endl;
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = { { "Init", 0.50f }, { "Bright", 0.90f } };
+
+    const auto dir = freshDataDir ("audition-after-close");
+    seedCatalog (dir);
+
+    // The control thread, held back: what the run posts waits here as it would in a message
+    // queue, until the test plays the message loop.
+    std::vector<std::function<void()>> controlQueue;
+    bool holdControlThread = false;
+    Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+    {
+        o.onControlThread = [&] (std::function<void()> work)
+        {
+            if (holdControlThread)
+                controlQueue.push_back (std::move (work));
+            else
+                work();
+        };
+    });
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+
+    // The plug-in will not load for the auditioner, so the run goes straight to its end
+    // without waiting on the control thread once — and its end is the closure.
+    h.failInstantiation = true;
+    holdControlThread = true;
+    h.cmd ("analyseLibrary");
+    check (controlQueue.size() == 1, "the run's findings are posted to the control thread, not applied");
+
+    // The plug-in is removed. The service's memory is scribbled over after its destructor, as
+    // an allocator reusing it would: a closure that still reads through `this` then follows a
+    // non-canonical pointer and crashes here every time, instead of reading stale bytes that
+    // happen to look right and passing.
+    static_assert (alignof (InstrumentHostService) <= alignof (std::max_align_t));
+    auto* freed = h.service.release();
+    freed->~InstrumentHostService();
+    std::memset (static_cast<void*> (freed), 0xA5, sizeof (InstrumentHostService));
+
+    const auto emitted = h.emits.entries.size();
+    for (auto& work : controlQueue)
+        work();
+    controlQueue.clear();
+    ::operator delete (static_cast<void*> (freed));
+
+    check (h.emits.entries.size() == emitted,
+           "and run afterwards, the closure finds the service gone and touches nothing");
+}
+
+// C-34, the other half. Without a worker the auditioner waits on the control thread twice per
+// plug-in — for the instance, and for each preset to be applied. The destructor runs ON that
+// thread and joins the auditioner, so neither wait could ever be answered: removing the
+// plug-in mid-Listen hung the DAW before anything got the chance to crash it.
+void testClosingWhileTheAuditionerWaits()
+{
+    std::cout << "\nclosing while the auditioner waits on the control thread" << std::endl;
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = { { "Init", 0.50f }, { "Bright", 0.90f } };
+
+    const auto dir = freshDataDir ("audition-close-while-waiting");
+    seedCatalog (dir);
+
+    std::mutex queueLock;
+    std::vector<std::function<void()>> controlQueue;
+    std::atomic<bool> holdControlThread { false };
+    std::mutex emitLock;
+    Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+    {
+        // The service's own thread, which its destructor joins — the product's arrangement.
+        o.analysisExecutor = nullptr;
+        o.onControlThread = [&] (std::function<void()> work)
+        {
+            if (! holdControlThread)
+            {
+                work();
+                return;
+            }
+            const std::scoped_lock lock (queueLock);
+            controlQueue.push_back (std::move (work));
+        };
+        // The auditioner reports progress from its own thread.
+        o.emit = [emit = o.emit, &emitLock] (const juce::String& name, const juce::var& payload)
+        {
+            const std::scoped_lock lock (emitLock);
+            emit (name, payload);
+        };
+    });
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+
+    const auto queued = [&]
+    {
+        const std::scoped_lock lock (queueLock);
+        return controlQueue.size();
+    };
+
+    holdControlThread = true;
+    h.cmd ("analyseLibrary");
+    for (int i = 0; i < 500 && queued() == 0; ++i)
+        std::this_thread::sleep_for (std::chrono::milliseconds (10));
+    check (queued() == 1, "the auditioner is waiting for its first preset to be applied");
+
+    // Close it. Nothing in the queue runs until the destructor returns — on the message
+    // thread that is simply true; here the test does not play the loop until then.
+    std::atomic<bool> closed { false };
+    std::thread closer ([&] { h.service.reset(); closed = true; });
+    for (int i = 0; i < 500 && ! closed; ++i)
+        std::this_thread::sleep_for (std::chrono::milliseconds (10));
+    check (closed, "the service closes rather than waiting for a closure it is itself holding up");
+    if (! closed)
+    {
+        // A deadlocked thread can be neither joined nor detached safely; there is no
+        // continuing from here.
+        std::cout << "\nFAILURES: deadlocked on close" << std::endl;
+        std::_Exit (1);
+    }
+    closer.join();
+
+    // Now the message loop gets its turn, and everything the run posted finds the service gone.
+    std::vector<std::function<void()>> late;
+    {
+        const std::scoped_lock lock (queueLock);
+        late.swap (controlQueue);
+    }
+    for (auto& work : late)
+        work();
+    check (late.size() >= 2,
+           "what was posted after the close — the instance handed back, the findings — runs "
+           "afterwards without reaching into the freed service");
+}
+
 int main (int argc, char* argv[])
 {
     if (argc != 2)
@@ -14113,6 +14253,8 @@ int main (int argc, char* argv[])
     testAutomaticFailoverStopsImmediateCrashLoop();
     testAutomaticEffectFailover();
     testHostProject();
+    testAuditionerClosureOutlivesTheService();
+    testClosingWhileTheAuditionerWaits();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)
         .getChildFile ("ceditor-host-service-tests").deleteRecursively();
