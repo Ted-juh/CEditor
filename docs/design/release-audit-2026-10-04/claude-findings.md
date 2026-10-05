@@ -1065,4 +1065,70 @@ Java (`B0 4A 40`). Script Editor edit → save → Preview takes effect without 
 manual's examples (failures above). Leads not reduced: Pyodide died twice mid-matrix ("memory access out of bounds",
 then every later Python script fails until reload) after ~13–28 interleaved loads — not reproduced in isolation.
 
+### C-108 — At the app's default 1280×720 window the Presets footer squeezes the Background/Text/Effects field area to 88–126 px — and to 0 px once a preset is selected   (S2 · bug · properties layout)
+
+Panel 668 px tall (Label and Momentary Button alike): Background 126 px of fields / 428 px footer; **Text 88 / 466**
+(1,437 px of Text content scrolls through an 88 px slot); Effects 126 / 428; Border, Icon 164 / 390. Saving and
+selecting a card preset adds the Debug section (a 10-row textarea): footer 658 px, **field area 0 px**, the card title
+gone, the footer clipped — the Background colour field can no longer be clicked ("card-footer intercepts pointer
+events"). `panels/TabContentArea.svelte:194` (`.card-footer { flex-shrink: 0 }`, no cap);
+`properties/PresetFooter.svelte:372` (`rows="10"`); Presets starts expanded. Workaround: collapse Presets, Description
+and Debug by hand. Observed-in-app (measured `clientHeight`, screenshots).
+
+### C-109 — In design view a Knob or Slider is always drawn at its minimum, whatever Cur/Min/Max say, while its readout shows the real value; a Toggle with "Default On" is drawn off   (S3 · bug · design canvas)
+
+Knob `defaultCurrentValue` 0.1 and 0.9: pointer at the −135° minimum both times while the readout says "0.90"; in
+Preview it moves correctly. Slider thumb at x=24 for both (45 / 215 in Preview). Max 1 → 2 through the UI: identical
+pixels. Toggle Default On: model `true`, drawn off in design, on in Preview. `editor/SliderFamilyRenderer.svelte:219` —
+with no runtime, `current` falls back to `0` instead of the authored default (Claude confirmed). Observed-in-app.
+
+### C-110 — Meter and Progress Bar: the Text tab's Text, Case, Script, Multiline, Flow, offsets and spacing change the document and nothing on screen   (S3 · faulty · inspector)
+
+With readout and caption visible, setting Text "hello", Case uppercase, Offset X 30, Letter spacing 8: drawn text stays
+`"level 1"`. Of the Text tab only Font family, Size and Colour act; ~35 other field/option operations do nothing.
+`editor/MeterRenderer.svelte:60-63` reads only `Font.family`, `Font.size`, `Fill.colour` (Claude confirmed). Not in
+residual-issues §1. Observed-in-app.
+
+### C-111 — Container, Group/Frame, Tabbed Container and Scroll Area show a "Grid" tab whose only content is "Component: Grid"   (S3 · unfinished · inspector)
+
+`PropertiesPanel.svelte:230` offers the tab for any control with a `Grid` section; `panels/sectionEditorLoaders.js` has no
+editor for it, so `SectionRenderer.svelte:142` renders the fallback. Observed-in-app (0 fields on all four types).
+
+### C-112 — Nine "Control design" fields on a new Knob (Size %, Depth %, Divisions, Readout, Face, Housing, Ink, Legends, Indicator) do nothing until a Form is picked, and nothing says so   (S3 · faulty · Core tab)
+
+With Form "Follow set" (the default) all nine change nothing; after Atlas wheel / Kiln pottery / Arcade joystick they
+act. Same on every type with anatomy forms. `sections/CoreEditor.svelte:75` gates on `anatomyOptions(type).length`, not
+an active form; `editor/CanvasControl.svelte:289` draws anatomy only when `anatomyForm()` is set. Observed-in-app.
+
+### C-113 — Multi-selection gives no sign that two controls are selected, and the key control's Slider tab writes slider-only keys into the other   (S4 · faulty · multi-select)
+
+Button + Knob selected: header "CORE / Knob_…", no "2 selected"; of 56 edits 45 wrote both, and Slider-tab edits wrote
+Min/Max/Step/Sweep/tick settings into the Button's Behavior, creating keys it never had (`circularDragMode`,
+`displayMin`, `displayMax`). No visible damage; undo restores both. `sections/SliderEditor.svelte:63`
+(`updateSelectedProperty` for every field). Observed-in-app.
+
+### C-114 — Behavior tab: Knob/Slider/Range/Number show "Type: momentary" with Subtype and Fire On that do nothing; Return to rest on text/list/radio types; blank selects   (S4 · faulty · inspector)
+
+`BehaviorEditor.svelte:73-84` (`inferButtonType` defaults to 'momentary'); the range types ignore them
+(`previewDeviceBindings.js:19,27` needs `family==='trigger'`). Knob Slider-tab Direction shows blank (model `ltr`,
+options cw/ccw); Listbox Behavior Subtype blank; one Range Bindings select blank. Observed-in-app.
+
+### C-115 — Small input-handling defects   (S4 · bug · inspector)
+
+Radio Button Group → Whole Item: typing "12Q" stores 12 but the field keeps showing "12Q". Toggle Button → Value rows:
+the Send cell stores typed text as a string (`"64"`, and accepts `"abc"`); an internal value "true" is stored as the
+string beside the On row's boolean. Envelope → Nodes: the first node's Segment curve changes nothing on the canvas;
+typing a node's X past its neighbour re-sorts the rows, so the field now shows another node's value. Observed-in-app.
+
+**Runtime evidence added:** C-83 is worse than cosmetic — with a Knob or Button selected at 1280×720 the context bar
+stacks to ~370–480 px and draws over the X/Y/W/H fields, pushing the canvas below the fold.
+
+**Inspector that held up:** 39 types + the Panel at 1280×720, **357 tabs, 3,012 fields, 4,927 operations through the
+real UI — 0 page errors, 0 console errors. 4,455 of 4,455 model-changing edits undone with Ctrl+Z restored both the
+model and the field's displayed value.** Escape-then-Tab never commits (362 cases); "abc" is rejected; no NaN or
+`undefined` in any field; 891 collapse/expand round trips; 79 UI edits across 8 types all survive save/reopen; colour
+chooser, card presets and Export identity validation work. Not swept (restarts): Mod Matrix, Orbit, Looper, Router,
+Timbre, Turing, Kinetic, Constellation, Constraint, Ribbon Keyboard, Phrase, Recorder, Harmoniser, Zone Splitter,
+Setlist, Transport, Panic.
+
 ## Verification of the other's findings
