@@ -29,28 +29,48 @@ Adding a new kind of page:
    with a byte test, and the same builder in `ctrl49Payloads.js` with a scene in the preview.
 3. Give it a page in `Ctrl49SurfaceBroker`: `pages()`, `pumpInput()`, `refreshDisplay()`.
 
-### The stage pages: LAYERS, SOUNDCHECK and DISCOVER
+### The stage pages: CUE, LAYERS, SOUNDCHECK, DISCOVER and CHANGES
 
-Three pages that are not knob pages, mocked up first in `screen-lab/feature-mockups`
-(hostage-rig) and now real: two a player reads on stage, and one to go to between songs. Like the
-browser, none is on the keyboard until it is asked for — the **Layers**, **Soundcheck** and
-**Discover** switches on the app's CTRL49 screen card (`layersOnSurface`, `soundcheckOnSurface`,
-`discoverOnSurface`) — and then they follow the performance page in that order. Each is one call
-with one payload (`set_layers`, `set_check`, `set_discover`; `CE/src/ControlSurface/Ctrl49StagePages.h`
-has the byte layouts) where a knob page takes two.
+Five pages that are not knob pages, mocked up first in `screen-lab/feature-mockups` and now
+real: three a player reads on stage, two to go to between songs. Like the browser, none is on the
+keyboard until it is asked for — the **Cue**, **Layers**, **Soundcheck**, **Discover** and
+**Changes** switches on the app's CTRL49 screen card (`cueOnSurface`, `layersOnSurface`,
+`soundcheckOnSurface`, `discoverOnSurface`, `changesOnSurface`) — and then they follow the
+performance page in that order. Each is one call with one payload (`set_cue`, `set_layers`,
+`set_check`, `set_discover`, `set_changes`; `CE/src/ControlSurface/Ctrl49StagePages.h` has the
+byte layouts) where a knob page takes two. CUE is the mockups' Stage page, renamed because "stage
+pages" already names this group.
 
-| Page | Shows | Encoders |
+| Page | Shows | Encoders and pads |
 | --- | --- | --- |
-| LAYERS | every part's key zone over 49 keys, its velocity range and transpose, muted parts and parts fed by another part; the notes held now, on the zones that answer them | E1 picks the part, E2-E6 turn its lowest key, highest key, transpose, lowest and highest velocity |
-| SOUNDCHECK | the set: each song ready, with problems, or not checked, and its measured level; the selected song's problems in the check's own words | E1 walks the set, E8 checks it again (once a second at most) |
+| CUE | the song on stage, N of M, and its tempo; the section playing with its bar and the bars left (or the song's notes when it has no sections); the song's clock against the time planned, and the set's; what comes next and how much of its rig has preloaded | E1 picks a song, pad 1 goes to it; Shift + Page still steps the set from any page |
+| LAYERS | every part's key zone over 49 keys, its velocity range and transpose, muted parts and parts fed by another part; layer groups (`L1 V`: group 1 by velocity) with each member's share and crossfades drawn as LayerRouter weighs them; the notes held now, on the zones that would sound them | E1 picks the part, E2-E6 turn its lowest key, highest key, transpose, lowest and highest velocity |
+| SOUNDCHECK | the set: each song ready, with problems, or not checked, its measured level and how long it took to load when last recalled (slow ones marked); the selected song's problems in the check's own words, and whether it loaded preloaded | E1 walks the set, E8 checks it again (once a second at most) |
 | DISCOVER | what you own and have never opened, nearest first to what you load (`unplayedLikeHabits`), eight at a time; a map of brightness against attack with YOU (the load-weighted centre) and the sounds you load most; the selected sound's likeness and which of your regulars it is nearest | E1 picks, E2 reaches eight further, E3 keeps the list to one kind, E4 keeps the sound as a favourite (clockwise) or lets it go; pad N auditions row N |
+| CHANGES | the focused part's sound against a save of it: each parameter that moved, from what to what; which save, and when | E1 listens anywhere between the save and now, E2 picks a change, E3 puts it back (the other way takes it back, one a turn), E4 walks back through the saves to the original |
 
-A zone edit goes through `setPartMidiRules`, a re-check through `checkSetlistSoundcheck`, a keep
-through `setLibraryUserMetadata` and an audition through `auditionRecord`: the commands the app's
-own buttons send, so Stage Lock refuses the edits there and the edition decides whether there is
-a set to check (SOUNDCHECK needs scenes and setlists; LAYERS and DISCOVER are for anyone).
-DISCOVER says when it has too little to go on (fewer than five measured sounds ever loaded)
-rather than guessing, and reads the library at most every two seconds while it is up.
+A zone edit goes through `setPartMidiRules`, a re-check through `checkSetlistSoundcheck`, a
+song change through `setlistGo`, a keep through `setLibraryUserMetadata`, an audition through
+`auditionRecord` and a change put back through `setParameter`: the commands the app's own
+buttons send, so Stage Lock refuses the edits there and the edition decides whether there is a
+set (CUE and SOUNDCHECK need scenes and setlists; the other three are for anyone). DISCOVER says
+when it has too little to go on (fewer than five measured sounds ever loaded) rather than
+guessing, and reads the library at most every two seconds while it is up.
+
+CHANGES reads a save as `diffVersions` does — it puts the save on the plug-in, reads every
+parameter, and puts back what was there — once per save, then keeps it. Listening is a
+parameter blend, as `morphVersions` is: anything else done to the rig (a save, a load, a
+parameter set, leaving the page) first puts back exactly what was there, so a save never
+captures the blend.
+
+A song's load time runs from `setlistGo` to the last processor of its rig being ready, and is
+kept beside its soundcheck. Over five seconds without preloading reads as slow, with "turn
+preload on" when the setlist preloads nothing.
+
+**The page script has grown with them.** `Hostage_MultiKnob.lua` was 9 KB on `main` and is
+40.6 KB with all five, more than the slim stress builds (30-39 KB) that the mockups use to find
+the keyboard's limit. [`hardware-checklist.md`](hardware-checklist.md) is how to find out
+whether it fits.
 
 Checks: `node --test test/ctrl49Preview.test.js` (payload bytes, and that every function the
 broker calls exists in the page) and `node browser-checks/ctrl49Screen.mjs` (every scene runs
@@ -375,7 +395,7 @@ rewrites the pages' sprite tables; the PNGs are committed, so running the lab ne
 ## Still requires hardware (open Phase-3 measurements)
 
 [`hardware-checklist.md`](hardware-checklist.md) is the list to take to a CTRL49 now: HoSTage's
-pages on the keyboard, including LAYERS, SOUNDCHECK and DISCOVER, then the mockups' stress test, with what to
+pages on the keyboard, including CUE, LAYERS, SOUNDCHECK, DISCOVER and CHANGES, then the mockups' stress test, with what to
 write down at each step. The measurements below are the older, open ones.
 
 - **RAM / object budget** — how many/large filmstrips fit in device RAM before upload or

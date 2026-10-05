@@ -54,6 +54,8 @@ try {
     layers: ['init', 'set_mode', 'set_layers', 'draw'],
     soundcheck: ['init', 'set_mode', 'set_check', 'draw'],
     discover: ['init', 'set_mode', 'set_discover', 'draw'],
+    cue: ['init', 'set_mode', 'set_cue', 'draw'],
+    changes: ['init', 'set_mode', 'set_changes', 'draw'],
     custom: ['init', 'set_mode', 'set_labels', 'set_values', 'draw'],
   };
   const drawn = {};
@@ -180,6 +182,26 @@ try {
   await host.waitForFunction(() => document.querySelectorAll('[data-testid=ctrl49-screen-card] .encoder .value')[2].innerText === 'Pad');
   if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-discover.png` });
   await host.getByTestId('ctrl49-discover-toggle').click();
+  await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+
+  // CUE: the setlist read mid-show (the licence above allows setlists). Encoder 1 is the pick.
+  await host.getByTestId('ctrl49-cue-toggle').click();
+  await host.getByTestId('ctrl49-page-right').click();
+  await host.waitForFunction(() => /2\s*\/\s*2\s*Cue/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_cue');
+  assert.equal(await encoderOne.locator('.label').innerText(), 'Pick a song');
+  assert.ok(await canvasLit() > 2000, 'and draws something');
+  if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-cue.png` });
+  await host.getByTestId('ctrl49-cue-toggle').click();
+  await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+
+  // CHANGES: the preview has no plug-in to read changes through, and the page says so.
+  await host.getByTestId('ctrl49-changes-toggle').click();
+  await host.getByTestId('ctrl49-page-right').click();
+  await host.waitForFunction(() => /2\s*\/\s*2\s*Changes/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_changes');
+  assert.ok(await canvasLit() > 1000, 'and draws why there is nothing to compare');
+  await host.getByTestId('ctrl49-changes-toggle').click();
   await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
 
   // The rest of the firmware's Lua surface, through the real runtime: padding and the font table,

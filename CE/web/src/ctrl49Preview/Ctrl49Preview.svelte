@@ -16,7 +16,7 @@
   import { createCtrl49Screen } from '../CE_Application/screen/ctrl49Runtime.js';
   import {
     rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload, browseSlotViews,
-    layersPayload, soundcheckPayload, discoverPayload,
+    layersPayload, soundcheckPayload, discoverPayload, cuePayload, changesPayload,
   } from '../CE_Application/screen/ctrl49Payloads.js';
   import { parseCalls } from './callScript.js';
   import { preview } from './previewState.svelte.js';
@@ -32,6 +32,8 @@
     { id: 'layers', label: 'Layers' },
     { id: 'soundcheck', label: 'Soundcheck' },
     { id: 'discover', label: 'Discover' },
+    { id: 'cue', label: 'Cue' },
+    { id: 'changes', label: 'Changes' },
     { id: 'custom', label: 'Custom calls' },
   ];
 
@@ -99,7 +101,21 @@
         return [
           { name: 'set_mode', bytes: [1] },
           { name: 'set_check', bytes: soundcheckPayload({ songs, selected: p.soundcheck.selected, current: p.soundcheck.current,
-            basis: p.soundcheck.basis, problems: song?.problems ?? [], seconds: p.soundcheck.seconds }) },
+            basis: p.soundcheck.basis, problems: song?.problems ?? [], seconds: p.soundcheck.seconds,
+            preloadOff: p.soundcheck.preloadOff }) },
+        ];
+      }
+      case 'changes':
+        return [
+          { name: 'set_mode', bytes: [1] },
+          { name: 'set_changes', bytes: changesPayload(p.changes) },
+        ];
+      case 'cue': {
+        const v = p.cue.view;
+        return [
+          { name: 'set_mode', bytes: [1] },
+          { name: 'set_cue', bytes: cuePayload({ ...v, section: p.cue.sections ? v.section : '',
+                                                 picked: p.cue.picked ? v.picked : v.current }) },
         ];
       }
       case 'discover':
@@ -276,6 +292,39 @@
           <button type="button" class="flag" class:on={song.checked} onclick={() => (song.checked = !song.checked)}>{song.checked ? 'yes' : 'no'}</button>
           <span class="count">{song.problems.length}</span>
         {/each}
+      </div>
+
+    {:else if preview.scene === 'changes'}
+      <div class="row wrap">
+        {#each [['A problem', 0], ['Nothing changed', 1], ['Changed', 2]] as [label, state]}
+          <button type="button" class="flag" class:on={preview.changes.state === state}
+                  onclick={() => (preview.changes.state = state)}>{label}</button>
+        {/each}
+      </div>
+      <div class="row wrap">
+        <label class="field small">Listen % <input type="number" min="0" max="100" value={preview.changes.listen} onfocus={selectAll}
+               oninput={(e) => (preview.changes.listen = int(e.currentTarget.value, 0, 100))} /></label>
+        <label class="field small">Selected <input type="number" min="0" value={preview.changes.selected} onfocus={selectAll}
+               oninput={(e) => (preview.changes.selected = int(e.currentTarget.value, 0, preview.changes.rows.length - 1))} /></label>
+        <label class="field small">Put back <input type="number" min="0" value={preview.changes.putBack} onfocus={selectAll}
+               oninput={(e) => (preview.changes.putBack = int(e.currentTarget.value, 0, 255))} /></label>
+        <label class="field">Against <input type="text" bind:value={preview.changes.against} onfocus={selectAll} /></label>
+      </div>
+
+    {:else if preview.scene === 'cue'}
+      {@const v = preview.cue.view}
+      <div class="row wrap">
+        <button type="button" class="flag" class:on={preview.cue.sections} onclick={() => (preview.cue.sections = !preview.cue.sections)}>Sections playing</button>
+        <button type="button" class="flag" class:on={preview.cue.picked} onclick={() => (preview.cue.picked = !preview.cue.picked)}>E1 picked a song</button>
+        <button type="button" class="flag" class:on={v.loading} onclick={() => (v.loading = !v.loading)}>Loading</button>
+      </div>
+      <div class="row wrap">
+        <label class="field">Song <input type="text" bind:value={v.song} onfocus={selectAll} /></label>
+        <label class="field small">Tempo <input type="number" value={v.tempo} onfocus={selectAll} oninput={(e) => (v.tempo = Number(e.currentTarget.value) || 0)} /></label>
+        <label class="field small">Song s <input type="number" min="0" value={v.songSeconds} onfocus={selectAll} oninput={(e) => (v.songSeconds = int(e.currentTarget.value, 0, 65535))} /></label>
+        <label class="field small">Planned s <input type="number" min="0" value={v.plannedSeconds} onfocus={selectAll} oninput={(e) => (v.plannedSeconds = int(e.currentTarget.value, 0, 65535))} /></label>
+        <label class="field small">Bar <input type="number" min="1" value={v.sectionBar} onfocus={selectAll} oninput={(e) => (v.sectionBar = int(e.currentTarget.value, 1, 255))} /></label>
+        <label class="field small">Next ready % <input type="number" min="-1" max="100" value={v.nextReady} onfocus={selectAll} oninput={(e) => (v.nextReady = int(e.currentTarget.value, -1, 100))} /></label>
       </div>
 
     {:else if preview.scene === 'discover'}

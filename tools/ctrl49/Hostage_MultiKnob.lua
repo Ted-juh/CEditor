@@ -32,8 +32,9 @@ local values = { 0, 0, 0, 0, 0, 0, 0, 0 }
 -- The performance page's extras, read from set_values bytes 9..11 (a control page sends nine
 -- bytes, so they read 0 there and nothing extra is drawn): page kind, the beat in the bar
 -- (1-based, 0 when stopped) and beats per bar. The pages that are not knob pages set their own
--- kind when the host sends them (set_check: 2, set_layers: 3, set_discover: 4); set_values sets it
--- back to a knob page.
+-- kind when the host sends them (set_check: 2, set_layers: 3, set_discover: 4, set_cue: 5,
+-- set_changes: 6);
+-- set_values sets it back to a knob page.
 local page_kind = 0
 local beat = 0
 local beats_per_bar = 4
@@ -59,6 +60,9 @@ local ROWTXT = text_data.new()     -- the stage pages: list rows, left
 local ROWNUM = text_data.new()     -- and right
 local SMALL  = text_data.new()     -- detail lines
 local HEAD   = text_data.new()     -- a song or part name, larger
+local CUEBIG = text_data.new()     -- CUE: the section playing
+local CUENUM = text_data.new()     -- CUE: bars left, or the song's clock
+local CUER   = text_data.new()     -- CUE: the tempo, right-aligned
 
 local function configure_text()
     text_data.set(TITLE, {
@@ -104,6 +108,9 @@ local function configure_text()
     plain(ROWNUM, 11, 2)
     plain(SMALL, 11, 0)
     plain(HEAD, 17, 0, 10)
+    plain(CUEBIG, 30, 0, 10)
+    plain(CUENUM, 40, 1, 10)
+    plain(CUER, 17, 2, 10)
 end
 
 -- The knob filmstrip decodes to 64 x 8192 pixels, about 2 MB, and the keyboard does nothing else
@@ -271,8 +278,9 @@ function set_check(args)
     i = 8
     check.list = {}
     for r = 1, check.rows do
-        local row = { status = get_byte(args, i), level = get_byte(args, i + 1), problems = get_byte(args, i + 2) }
-        row.name, i = read_string(args, i + 3)
+        local row = { status = get_byte(args, i), level = get_byte(args, i + 1), problems = get_byte(args, i + 2),
+                      load = get_byte(args, i + 3) }
+        row.name, i = read_string(args, i + 4)
         check.list[r] = row
     end
     check.basis, i = read_string(args, i)
@@ -280,7 +288,15 @@ function set_check(args)
     check.lines = {}
     for l = 1, n do check.lines[l], i = read_string(args, i) end
     check.peak = get_byte(args, i); check.rms = get_byte(args, i + 1); check.seconds = get_byte(args, i + 2)
+    check.flags = get_byte(args, i + 3)
     page_kind = 2
+end
+
+-- A load byte as words: tenths of a second, 0 never recalled, 255 gave up waiting.
+local SLOW_LOAD = 51           -- 5.0 s: slow enough that preloading it matters
+local function load_text(b)
+    if b == 255 then return "GAVE UP" end
+    return string.format("%.1fs", (b - 1) / 10)
 end
 
 local function level_text(b)
@@ -317,7 +333,12 @@ local function draw_check()
         local c = WHITE
         if row.status == 0 then c = GREY end
         if index + 1 == check.current then c = ORANGE end
-        say(ROWTXT, row.name, c, 28, y, 150, 18)
+        say(ROWTXT, row.name, c, 28, y, 124, 18)
+        if row.load > 0 then
+            local lc = DIM
+            if row.load >= SLOW_LOAD then lc = WARN end
+            say(ROWNUM, load_text(row.load), lc, 150, y, 32, 18)
+        end
         -- the measured level, so a song much louder than the rest stands out
         if row.level > 0 then
             draw_rect(186, y + 8, 48, 2, DARK)
@@ -347,6 +368,18 @@ local function draw_check()
             level = "LEVEL " .. level_text(check.rms) .. "   PEAK " .. level_text(check.peak) .. "   " .. tostring(check.seconds) .. " S"
         end
         say(SMALL, level, GREY, 256, 214, 218, 16)
+        -- how long it took to load when last recalled, and what to do when that is slow
+        local load, lc = "NOT RECALLED YET", GREY
+        if sel.load == 255 then load, lc = "GAVE UP WAITING FOR IT TO LOAD", WARN
+        elseif sel.load > 0 then
+            load = "LOADED IN " .. load_text(sel.load)
+            if check.flags % 2 == 1 then load = load .. ", PRELOADED"
+            elseif sel.load >= SLOW_LOAD then
+                lc = WARN
+                if math.floor(check.flags / 2) % 2 == 1 then load = load .. ": TURN PRELOAD ON" end
+            end
+        end
+        say(SMALL, load, lc, 256, 232, 218, 16)
     end
     say(SMALL, "E1 SONG   E8 CHECKS AGAIN", DARK, 12, 250, 300, 16)
 end
@@ -364,8 +397,11 @@ function set_layers(args)
     layers.parts = {}
     for r = 1, layers.rows do
         local p = { lo = get_byte(args, i), hi = get_byte(args, i + 1), vlo = get_byte(args, i + 2),
-                    vhi = get_byte(args, i + 3), tr = get_byte(args, i + 4) - 64, flags = get_byte(args, i + 5) }
-        p.name, i = read_string(args, i + 6)
+                    vhi = get_byte(args, i + 3), tr = get_byte(args, i + 4) - 64, flags = get_byte(args, i + 5),
+                    group = get_byte(args, i + 6), source = get_byte(args, i + 7) % 16,
+                    alloc = math.floor(get_byte(args, i + 7) / 16), llo = get_byte(args, i + 8),
+                    lhi = get_byte(args, i + 9), fade = get_byte(args, i + 10) }
+        p.name, i = read_string(args, i + 11)
         layers.parts[r] = p
     end
     layers.held = {}
@@ -398,9 +434,25 @@ local function playable(p)
     return p.flags % 2 == 1 and math.floor(p.flags / 2) % 2 == 0 and math.floor(p.flags / 4) % 2 == 1
 end
 
-local function answers(p, n, v)
-    return playable(p) and n >= p.lo and n <= p.hi and v >= p.vlo and v <= p.vhi
+-- A part's weight in its layer group for a source value 0-127, as LayerRouter::memberWeight
+-- reckons it: full inside its share, ramping over the crossfade either side of each end.
+local function layer_weight(p, value)
+    local x, low, high, fade = value / 127, p.llo / 127, math.max(p.llo, p.lhi) / 127, p.fade / 127
+    if fade <= 0 then if x >= low and x <= high then return 1 end return 0 end
+    local lower, upper = 1, 1
+    if low > 0 then lower = math.max(0, math.min(1, (x - (low - fade)) / (2 * fade))) end
+    if high < 1 then upper = math.max(0, math.min(1, ((high + fade) - x) / (2 * fade))) end
+    return math.min(lower, upper)
 end
+
+local function answers(p, n, v)
+    if not (playable(p) and n >= p.lo and n <= p.hi and v >= p.vlo and v <= p.vhi) then return false end
+    if p.group > 0 and p.source == 0 then return layer_weight(p, v) > 0 end
+    if p.group > 0 and p.source == 1 then return layer_weight(p, n) > 0 end
+    return true
+end
+
+local LAYER_SOURCE = { "V", "K", "CC", "X", "M" }
 
 local function draw_layers()
     -- what is sounding: the host's notes, and the note hook's where the keyboard has one
@@ -424,7 +476,19 @@ local function draw_layers()
         if p.lo <= p.hi then
             local band = colour
             if not playable(p) then band = DARK end
-            draw_rect(x0, y + 14, x1 + w1 - x0, 3, band)
+            if p.group > 0 and p.source == 1 then
+                -- a key layer: the band follows its weight, key by key, so a crossfade is a ramp
+                for n = math.max(p.lo, layers.key), math.min(p.hi, layers.key + 48) do
+                    local w = layer_weight(p, n)
+                    if w > 0 and not is_black(n % 12) then
+                        local kx, kw = key_x(n)
+                        local h = 1 + math.floor(w * 4 + 0.5)
+                        draw_rect(kx, y + 17 - h, kw, h, band)
+                    end
+                end
+            else
+                draw_rect(x0, y + 14, x1 + w1 - x0, 3, band)
+            end
             -- a note it answers is a white notch in its band, below the name rather than over it
             for n, v in pairs(sounding) do
                 if answers(p, n, v) then
@@ -447,9 +511,27 @@ local function draw_layers()
             c = WHITE
             outline(KX - 2, y - 1, 29 * KW + 3, 20, ORANGE)
         end
-        local tx = x0 + 3
-        if tx > KX + 29 * KW - 200 then tx = KX + 29 * KW - 200 end
-        say(SMALL, text, c, tx, y, 196, 14)
+        local tx, room = x0 + 3, 196
+        if p.group > 0 then
+            -- its group at the right end: "L1 V" and, for anything but keys, a gauge of its
+            -- share of the source (velocity, a controller, a macro) with the ramps drawn in
+            local right = KX + 29 * KW - 4
+            local tag = "L" .. tostring(p.group) .. " " .. (LAYER_SOURCE[p.source + 1] or "")
+            if p.alloc == 1 then tag = tag .. " RR" elseif p.alloc == 2 then tag = tag .. " LB" end
+            room = 146
+            if p.source ~= 1 then
+                for k = 0, 31 do
+                    local h = math.floor(layer_weight(p, k * 127 / 31) * 9 + 0.5)
+                    if h > 0 then draw_rect(right - 64 + k * 2, y + 11 - h, 2, h, colour) end
+                end
+                draw_rect(right - 64, y + 11, 64, 1, DARK)
+                say(ROWNUM, tag, c, right - 120, y, 52, 14)
+            else
+                say(ROWNUM, tag, c, right - 56, y, 56, 14)
+            end
+        end
+        if tx > KX + 29 * KW - 54 - room then tx = KX + 29 * KW - 54 - room end
+        say(SMALL, text, c, tx, y, room, 14)
     end
     -- the keys, lit in the colour of the first part that answers each (grey when none does)
     for pass = 1, 2 do
@@ -472,6 +554,185 @@ local function draw_layers()
         end
     end
     say(SMALL, "E1 PART  E2 LOW  E3 HIGH  E4 TRANSPOSE  E5 VEL LOW  E6 VEL HIGH", DARK, 12, 250, 460, 16)
+end
+
+-- CUE: set_cue (Ctrl49StagePages.h has the bytes). The setlist's cue screen: the song on stage
+-- and its tempo, the section playing with the bars left in it (or the song's notes, when it has
+-- no sections), its clock against the time planned, and what comes next. E1 picks another song
+-- and pad 1 goes to it.
+local cue = { songs = 0, current = 0, picked = 0, loading = 0, song_s = 0, set_s = 0, planned = 0, tempo = 0,
+              bar = 0, bars = 0, ready = 255, song = "", section = "", next_section = "", next_song = "",
+              picked_song = "", notes = {} }
+
+function set_cue(args)
+    local function two(i) return get_byte(args, i) + 256 * get_byte(args, i + 1) end
+    cue.songs = get_byte(args, 0); cue.current = get_byte(args, 1); cue.picked = get_byte(args, 2)
+    cue.loading = get_byte(args, 3); cue.song_s = two(4); cue.set_s = two(6); cue.planned = two(8)
+    cue.tempo = two(10) / 10; cue.bar = get_byte(args, 12); cue.bars = get_byte(args, 13)
+    cue.ready = get_byte(args, 14)
+    local i = 15
+    cue.song, i = read_string(args, i)
+    cue.section, i = read_string(args, i)
+    cue.next_section, i = read_string(args, i)
+    cue.next_song, i = read_string(args, i)
+    cue.picked_song, i = read_string(args, i)
+    cue.notes = {}
+    local n = get_byte(args, i); i = i + 1
+    for k = 1, n do cue.notes[k], i = read_string(args, i) end
+    page_kind = 5
+end
+
+local function clock(s)
+    if s >= 3600 then return string.format("%d:%02d:%02d", math.floor(s / 3600), math.floor(s / 60) % 60, s % 60) end
+    return string.format("%d:%02d", math.floor(s / 60), s % 60)
+end
+
+local function draw_cue()
+    local accent = PART_COLOURS[3]
+    title_bar("CUE", cue.set_s > 0 and ("SET " .. clock(cue.set_s)) or "")
+    if cue.current == 0 then
+        say(HEAD, "NO SONG ON STAGE YET", WHITE, 12, 70, 456, 24)
+        say(SMALL, "E1 picks a song, pad 1 goes to it; Shift + Page steps the set.", GREY, 12, 100, 456, 16)
+        if cue.picked > 0 then say(ROWTXT, "GO TO: " .. cue.picked_song .. "   PAD 1 GOES", ORANGE, 12, 190, 456, 18) end
+        return
+    end
+    say(SMALL, "SONG " .. tostring(cue.current) .. " OF " .. tostring(cue.songs), GREY, 12, 30, 200, 16)
+    say(HEAD, cue.song, WHITE, 12, 46, 330, 26)
+    if cue.tempo > 0 then say(CUER, string.format("%g BPM", cue.tempo), WHITE, 300, 46, 168, 26) end
+    -- the section, or the notes when the song has none
+    draw_rect(8, 80, 310, 88, ROW)
+    draw_rect(324, 80, 148, 88, ROW)
+    if cue.loading == 1 then
+        say(HEAD, "LOADING THE SONG...", WARN, 18, 112, 290, 24)
+    elseif cue.bars > 0 then
+        say(CUEBIG, cue.section, accent, 18, 84, 290, 40)
+        say(SMALL, "BAR " .. tostring(cue.bar) .. " OF " .. tostring(cue.bars), GREY, 18, 128, 200, 16)
+        local w = math.floor(272 / math.min(cue.bars, 16))
+        for b = 1, math.min(cue.bars, 16) do
+            local c = DARK
+            if b <= cue.bar then c = accent end
+            draw_rect(18 + (b - 1) * w, 150, w - 4, 8, c)
+        end
+    elseif #cue.notes > 0 then
+        for l = 1, #cue.notes do say(ROWTXT, cue.notes[l], WHITE, 18, 86 + (l - 1) * 24, 290, 20) end
+    else
+        say(SMALL, "NO SECTIONS OR NOTES FOR THIS SONG", DIM, 18, 116, 290, 16)
+    end
+    -- bars left, or the song's clock against the time planned for it
+    if cue.bars > 0 and cue.loading == 0 then
+        say(SMALL, "BARS LEFT", GREY, 324, 86, 148, 14)
+        say(CUENUM, tostring(cue.bars - cue.bar + 1), accent, 324, 104, 148, 50)
+    else
+        local over = cue.planned > 0 and cue.song_s > cue.planned
+        local c = WHITE
+        if over then c = WARN end
+        say(SMALL, "SONG TIME", GREY, 324, 86, 148, 14)
+        say(CUENUM, clock(cue.song_s), c, 324, 104, 148, 50)
+        if cue.planned > 0 then say(SMALL, "OF " .. clock(cue.planned) .. " PLANNED", GREY, 330, 150, 140, 14) end
+    end
+    -- what comes next, or the song E1 has picked to go to
+    draw_rect(8, 174, 464, 52, ROW)
+    if cue.picked > 0 then
+        say(SMALL, "GO TO", ORANGE, 18, 178, 200, 14)
+        say(HEAD, cue.picked_song, WHITE, 18, 194, 300, 24)
+        say(ROWNUM, "PAD 1 GOES", ORANGE, 330, 196, 132, 18)
+    else
+        say(SMALL, "NEXT", GREY, 18, 178, 200, 14)
+        local upcoming = cue.next_section
+        if upcoming == "" then upcoming = cue.next_song end
+        if upcoming == "" then upcoming = "END OF THE SET" end
+        say(HEAD, upcoming, WHITE, 18, 194, 220, 24)
+        if cue.next_section ~= "" and cue.next_song ~= "" then say(ROWTXT, cue.next_song, GREY, 240, 196, 120, 20) end
+        if cue.ready ~= 255 and cue.next_song ~= "" then
+            local label = "READY"
+            if cue.ready < 100 then label = "LOADING " .. tostring(cue.ready) .. "%" end
+            say(SMALL, label, GREY, 370, 186, 96, 14)
+            draw_rect(370, 206, 92, 3, DARK)
+            draw_rect(370, 206, math.floor(cue.ready * 92 / 100), 3, READY)
+        end
+    end
+    if cue.bars > 0 and #cue.notes > 0 then say(SMALL, cue.notes[1], GREY, 12, 230, 456, 16) end
+    say(SMALL, "E1 PICKS A SONG   PAD 1 GOES TO IT   SHIFT + PAGE STEPS THE SET", DARK, 12, 250, 456, 16)
+end
+
+-- CHANGES: set_changes (Ctrl49StagePages.h has the bytes). The focused part's sound against a
+-- save of it: each parameter that moved, from what to what, with a bar showing both. E1 listens
+-- anywhere between the save and now, E2 picks a change, E3 puts it back, E4 walks back.
+local chg = { state = 0, count = 0, first = 0, rows = 0, selected = 0, total = 0, listen = 100, back = 0,
+              saves = 0, put_back = 0, sound = "", against = "", when = "", problem = "", list = {} }
+
+function set_changes(args)
+    chg.state = get_byte(args, 0); chg.count = get_byte(args, 1); chg.first = get_byte(args, 2)
+    chg.rows = get_byte(args, 3); chg.selected = get_byte(args, 4)
+    chg.total = get_byte(args, 5) + 256 * get_byte(args, 6); chg.listen = get_byte(args, 7)
+    chg.back = get_byte(args, 8); chg.saves = get_byte(args, 9); chg.put_back = get_byte(args, 10)
+    local i = 11
+    chg.sound, i = read_string(args, i)
+    chg.against, i = read_string(args, i)
+    chg.when, i = read_string(args, i)
+    chg.problem, i = read_string(args, i)
+    chg.list = {}
+    for r = 1, chg.rows do
+        local row = { saved = get_byte(args, i), now = get_byte(args, i + 1) }
+        row.name, i = read_string(args, i + 2)
+        row.saved_text, i = read_string(args, i)
+        row.now_text, i = read_string(args, i)
+        chg.list[r] = row
+    end
+    page_kind = 6
+end
+
+local function draw_changes()
+    local right = "NOTHING CHANGED"
+    if chg.state == 0 then right = ""
+    elseif chg.state == 2 then right = tostring(chg.count) .. " OF " .. tostring(chg.total) .. " CHANGED" end
+    title_bar("CHANGES", right)
+    local footer = "E1 LISTEN   E2 CHANGE   E3 PUT BACK   E4 WALK BACK"
+    if chg.state == 0 then
+        say(HEAD, "NOTHING TO COMPARE", WHITE, 12, 70, 456, 24)
+        say(SMALL, chg.problem, GREY, 12, 100, 456, 16)
+        say(SMALL, footer, DARK, 12, 250, 456, 16)
+        return
+    end
+    say(HEAD, chg.sound, WHITE, 12, 30, 330, 24)
+    local against = "AGAINST " .. chg.against
+    if chg.when ~= "" then against = against .. ", " .. chg.when end
+    say(SMALL, against, GREY, 12, 54, 330, 16)
+    if chg.saves > 1 then say(ROWNUM, "SAVE " .. tostring(chg.back + 1) .. " OF " .. tostring(chg.saves), GREY, 340, 54, 128, 16) end
+    -- where the part is playing between the save and now
+    local accent = PART_COLOURS[2]
+    say(SMALL, "SAVED", GREY, 12, 74, 44, 14)
+    say(ROWNUM, "NOW", GREY, 424, 74, 44, 14)
+    draw_rect(60, 81, 360, 2, DARK)
+    draw_rect(60, 81, math.floor(chg.listen * 360 / 100), 2, accent)
+    draw_rect(60 + math.floor(chg.listen * 356 / 100), 76, 4, 12, WHITE)
+    if chg.state == 1 then
+        say(HEAD, "NOTHING CHANGED SINCE THIS SAVE", WHITE, 12, 120, 456, 24)
+        if chg.saves > 1 then say(SMALL, "E4 walks back to older saves.", GREY, 12, 150, 456, 16) end
+    end
+    for r = 1, chg.rows do
+        local row = chg.list[r]
+        local index = chg.first + r - 1
+        local y = 94 + (r - 1) * 19
+        local c = GREY
+        if index == chg.selected then
+            draw_rect(6, y, 468, 18, ROW)
+            c = WHITE
+        end
+        say(ROWTXT, row.name, c, 12, y, 158, 18)
+        say(ROWNUM, row.saved_text, GREY, 170, y, 80, 18)
+        say(ROWTXT, ">", DIM, 254, y, 10, 18)
+        say(ROWTXT, row.now_text, c, 266, y, 80, 18)
+        -- the saved value and the value now, on one bar
+        draw_rect(352, y + 8, 116, 2, DARK)
+        draw_rect(352 + math.floor(row.saved * 112 / 100), y + 4, 3, 10, GREY)
+        draw_rect(352 + math.floor(row.now * 112 / 100), y + 4, 3, 10, accent)
+    end
+    if chg.put_back > 0 then
+        say(ROWNUM, tostring(chg.put_back) .. " PUT BACK: E3 LEFT TAKES BACK", GREY, 200, 250, 268, 16)
+        footer = "E1 LISTEN  E2 CHANGE  E3 PUT BACK"
+    end
+    say(SMALL, footer, DARK, 12, 250, 456, 16)
 end
 
 -- DISCOVER: set_discover (Ctrl49StagePages.h has the bytes). What you own and have never opened,
@@ -617,6 +878,14 @@ function draw(args)
     end
     if page_kind == 4 then
         draw_discover()
+        return
+    end
+    if page_kind == 5 then
+        draw_cue()
+        return
+    end
+    if page_kind == 6 then
+        draw_changes()
         return
     end
 

@@ -58,7 +58,8 @@ import {
 } from '../bridge/bridge.js';
 import { stageCommandAllowed } from '../utils/stageLock.js';
 import { rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload,
-         soundcheckPayload, layersPayload, discoverPayload, discoverFirstRow } from '../screen/ctrl49Payloads.js';
+         soundcheckPayload, layersPayload, discoverPayload, discoverFirstRow, cuePayload,
+         changesPayload } from '../screen/ctrl49Payloads.js';
 import { receiveHostMeters, resetHostMeters } from './hostMeters.js';
 import {
   RESPONSE_CURVES, normalizeResponseCurvePoints,
@@ -299,7 +300,8 @@ export function emptySurfaceScreen() {
 
 // A stage page is one call with one payload instead of a knob page's set_labels + set_values.
 // Only these two: the name is a function the page runs, so nothing else is let through.
-export const SURFACE_STAGE_CALLS = { layers: 'set_layers', soundcheck: 'set_check', discover: 'set_discover' };
+export const SURFACE_STAGE_CALLS = { layers: 'set_layers', soundcheck: 'set_check', discover: 'set_discover', cue: 'set_cue',
+                                     changes: 'set_changes' };
 
 export function normalizeSurfaceScreen(payload) {
   const bytes = (list) => (Array.isArray(list) ? list : [])
@@ -312,7 +314,8 @@ export function normalizeSurfaceScreen(payload) {
     payload: bytes(payload?.payload),
     pageIndex: Math.max(0, Math.min(count - 1, Math.trunc(Number(payload?.pageIndex ?? 0) || 0))),
     pageCount: count,
-    pageKind: ['control', 'performance', 'browse', 'layers', 'soundcheck', 'discover'].includes(payload?.pageKind)
+    pageKind: ['control', 'performance', 'browse', 'layers', 'soundcheck', 'discover', 'cue', 'changes']
+      .includes(payload?.pageKind)
       ? payload.pageKind : 'control',
     pageId: String(payload?.pageId ?? ''),
     onKeyboard: payload?.onKeyboard === true,
@@ -342,11 +345,11 @@ export const surfaceInput = (cc, value) =>
 // nudging its slot. Built with the same payload builders the C++ uses, so the screen still draws.
 // The mock does not keep slot values (setControlSlotValue only drives its parameter view), so
 // the stand-in remembers where it turned each knob.
-const mockSurfaceCursor = writable({ page: 0, active: 0, turned: {}, song: -1, part: -1, sound: 0, kind: '' });
+const mockSurfaceCursor = writable({ page: 0, active: 0, turned: {}, song: -1, part: -1, sound: 0, kind: '', picked: -1 });
 
 /** The stage pages the mock's surface has, in the broker's order: after the performance page. */
 function mockStagePages(state) {
-  return ['layers', 'soundcheck', 'discover'].filter((kind) => state?.surfacePages?.[kind] === true);
+  return ['cue', 'layers', 'soundcheck', 'discover', 'changes'].filter((kind) => state?.surfacePages?.[kind] === true);
 }
 
 const clampStage = (value, low, high) => Math.max(low, Math.min(high, Math.trunc(Number(value) || 0)));
@@ -366,7 +369,8 @@ function mockSoundcheckSongs(state) {
       name: item.name || `Song ${i + 1}`, checked: (entry?.checkedAt ?? 0) > 0,
       problems: entry?.issues?.length ?? 0, issues: entry?.issues ?? [], basis: entry?.basis ?? '',
       measured: entry?.measured === true, rmsDb: db(entry?.rms ?? 0), peakDb: db(entry?.peak ?? 0),
-      seconds: entry?.seconds ?? 0,
+      seconds: entry?.seconds ?? 0, loadSeconds: entry?.loadSeconds ?? -1,
+      loadTimedOut: entry?.loadTimedOut === true, preloaded: entry?.loadPreloaded === true,
     };
   });
 }
@@ -413,7 +417,30 @@ function mockDiscover(cursor, library) {
   };
 }
 
+// CUE over the demo setlist. The demo keeps no clocks, so the song's time reads 0.
+function mockCueScreen(state, cursor) {
+  const setlist = state?.performance?.setlist ?? { items: [], currentIndex: -1 };
+  const name = (i) => setlist.items[i]?.name || `Song ${i + 1}`;
+  const current = setlist.currentIndex ?? -1;
+  const item = setlist.items[current];
+  const picked = (cursor.picked ?? -1) >= 0 ? cursor.picked : current;
+  return { call: SURFACE_STAGE_CALLS.cue, payload: cuePayload({
+    songs: setlist.items.length, current, picked, song: item ? name(current) : '',
+    tempo: Number(state?.performance?.transport?.tempo ?? 0) || 0, plannedSeconds: item?.plannedSeconds ?? 0,
+    notes: String(item?.notes ?? '').split('\n').map((l) => l.trim()).filter(Boolean),
+    nextSong: current >= 0 && current + 1 < setlist.items.length ? name(current + 1) : '',
+    pickedSong: picked !== current && picked >= 0 ? name(picked) : '',
+  }) };
+}
+
 function mockStageScreen(kind, state, cursor, library) {
+  if (kind === 'cue') return mockCueScreen(state, cursor);
+  if (kind === 'changes') {
+    // Changes are read through the plug-in, which only HoSTage has: the demo says so rather than
+    // making some up.
+    return { call: SURFACE_STAGE_CALLS.changes, payload: changesPayload({
+      state: 0, problemText: 'HoSTage reads changes through the plug-in; this preview has none.' }) };
+  }
   if (kind === 'discover') {
     const d = mockDiscover(cursor, library);
     const selected = d.sounds[d.selected];
@@ -425,11 +452,26 @@ function mockStageScreen(kind, state, cursor, library) {
   }
   if (kind === 'layers') {
     const parts = state?.rack?.parts ?? [];
+    // Each part's layer group, as the broker finds it: the first enabled group that holds it.
+    const groups = state?.rack?.layerGroups ?? [];
+    const layerOf = (partId) => {
+      for (let g = 0; g < groups.length; g++) {
+        const member = groups[g].enabled ? groups[g].members.find((m) => m.partId === partId) : null;
+        if (member) return {
+          group: g + 1, source: ['velocity', 'key', 'cc', 'expression', 'macro'].indexOf(groups[g].source),
+          allocation: ['all', 'roundRobin', 'leastBusy'].indexOf(groups[g].allocation),
+          layerLow: Math.round(member.minimum * 127), layerHigh: Math.round(member.maximum * 127),
+          layerFade: Math.round(member.crossfade * 127),
+        };
+      }
+      return {};
+    };
     return { call: SURFACE_STAGE_CALLS.layers, payload: layersPayload({
       parts: parts.map((p, i) => ({
         name: p.presetName || p.pluginName || `Part ${i + 1}`, keyLow: p.keyLow, keyHigh: p.keyHigh,
         velocityLow: p.velocityLow, velocityHigh: p.velocityHigh, transpose: p.transpose,
         enabled: p.enabled !== false, muted: p.mute === true, fromKeyboard: !p.midiSourcePartId,
+        ...layerOf(p.partId),
       })),
       focused: mockLayersFocus(state, cursor),
     }) };
@@ -440,6 +482,7 @@ function mockStageScreen(kind, state, cursor, library) {
   return { call: SURFACE_STAGE_CALLS.soundcheck, payload: soundcheckPayload({
     songs, selected, current: state?.performance?.setlist?.currentIndex ?? -1,
     basis: song?.basis ?? '', problems: song?.issues ?? [], seconds: song?.seconds ?? 0,
+    preloadOff: (state?.performance?.setlist?.preloadAhead ?? 1) === 0,
   }) };
 }
 
@@ -474,6 +517,14 @@ export function mockSurfaceScreen(state, cursor, library) {
 // its zone (lowest key, highest key, transpose, lowest and highest velocity); SOUNDCHECK E1
 // walks the set and E8 checks it again.
 function mockStageTurn(kind, state, cursor, encoder, delta) {
+  if (kind === 'cue') {
+    const setlist = state?.performance?.setlist ?? { items: [], currentIndex: -1 };
+    if (encoder !== 0 || setlist.items.length === 0) return;
+    const from = (cursor.picked ?? -1) >= 0 ? cursor.picked : setlist.currentIndex ?? -1;
+    const picked = clampStage(from + delta, 0, setlist.items.length - 1);
+    mockSurfaceCursor.set({ ...cursor, active: 0, picked: picked === setlist.currentIndex ? -1 : picked });
+    return;
+  }
   if (kind === 'discover') {
     const d = mockDiscover(cursor, get(hostLibrary));
     const last = Math.max(0, d.sounds.length - 1);
@@ -523,7 +574,11 @@ function mockSurfaceInput(data) {
   const stage = mockStagePages(state);
   const pageCount = controlPages + 1 + stage.length;
   const cursor = get(mockSurfaceCursor);
-  if (cc >= 1 && cc <= 8 && value > 0 && stage[cursor.page - controlPages - 1] === 'discover') {
+  if (cc === 1 && value > 0 && stage[cursor.page - controlPages - 1] === 'cue' && (cursor.picked ?? -1) >= 0) {
+    // Pad 1 goes to the song E1 picked, as setlistGo does on the keyboard.
+    mockSurfaceCursor.set({ ...cursor, picked: -1 });
+    send({ cmd: 'setlistGo', index: cursor.picked });
+  } else if (cc >= 1 && cc <= 8 && value > 0 && stage[cursor.page - controlPages - 1] === 'discover') {
     // A pad auditions the sound in its row, as on the keyboard.
     const d = mockDiscover(cursor, get(hostLibrary));
     const row = d.sounds[discoverFirstRow(d.sounds.length, d.selected) + cc - 1];
@@ -551,6 +606,15 @@ function mockSurfaceInput(data) {
     }
   }
 }
+
+// When pages go away (a control page removed, a stage page turned off) the stand-in's cursor
+// comes back onto a page that exists, as the broker's does (Ctrl49Reducer::setPageCount): later
+// Page presses then step from there rather than from a page that is no longer counted.
+hostState.subscribe((state) => {
+  const count = (state?.rack?.pages?.length ?? 0) + 1 + mockStagePages(state).length;
+  const cursor = get(mockSurfaceCursor);
+  if (cursor.page > count - 1) mockSurfaceCursor.set({ ...cursor, page: count - 1, active: 0 });
+});
 
 /** What the app's CTRL49 screen draws: the broker's bytes in the application, the stand-in
     everywhere else. */
@@ -2148,7 +2212,7 @@ export function emptyHostState() {
     performance: emptyPerformance(),
     soundcheck: normalizeSoundcheck(),
     // The CTRL49's pages beyond the knobs: on the keyboard only once asked for, like the browser.
-    surfacePages: { soundcheck: false, layers: false, discover: false },
+    surfacePages: { soundcheck: false, layers: false, discover: false, cue: false, changes: false },
     product: emptyProduct(),
     reliability: emptyReliability(),
     licence: emptyLicence(),
@@ -2487,6 +2551,11 @@ export function normalizeSoundcheck(payload = {}) {
         && typeof row?.rms === 'number' && Number.isFinite(row.rms) && row.rms >= 0,
       measuredAt: nonnegative(row?.measuredAt), peak: nonnegative(row?.peak), rms: nonnegative(row?.rms),
       seconds: nonnegative(row?.seconds), error: String(row?.error ?? ''),
+      // How long the song took to load when last recalled (-1: not recalled yet), whether its
+      // rig was preloaded then, and whether the recall gave up waiting.
+      loadSeconds: Number.isFinite(Number(row?.loadSeconds)) && Number(row.loadSeconds) >= 0 ? Number(row.loadSeconds) : -1,
+      loadPreloaded: row?.loadPreloaded === true, loadTimedOut: row?.loadTimedOut === true,
+      loadedAt: nonnegative(row?.loadedAt),
     })).filter(row => row.itemId),
   };
 }
@@ -2502,6 +2571,12 @@ export const soundcheckOnSurface = (on) =>
   send(on === undefined ? { cmd: 'soundcheckOnSurface' } : { cmd: 'soundcheckOnSurface', on });
 export const layersOnSurface = (on) =>
   send(on === undefined ? { cmd: 'layersOnSurface' } : { cmd: 'layersOnSurface', on });
+/** CUE on the CTRL49: the setlist read mid-show; E1 picks a song and pad 1 goes to it. */
+export const cueOnSurface = (on) =>
+  send(on === undefined ? { cmd: 'cueOnSurface' } : { cmd: 'cueOnSurface', on });
+/** CHANGES on the CTRL49: the focused part's sound against its saves, heard and put back. */
+export const changesOnSurface = (on) =>
+  send(on === undefined ? { cmd: 'changesOnSurface' } : { cmd: 'changesOnSurface', on });
 /** DISCOVER on the CTRL49: what you own and have never opened, nearest to what you load. */
 export const discoverOnSurface = (on) =>
   send(on === undefined ? { cmd: 'discoverOnSurface' } : { cmd: 'discoverOnSurface', on });
@@ -4420,7 +4495,8 @@ export function normalizeHostState(payload) {
     reliability: normalizeReliability(p.reliability),
     soundcheck: normalizeSoundcheck(p.soundcheck),
     surfacePages: { soundcheck: p.surfacePages?.soundcheck === true, layers: p.surfacePages?.layers === true,
-                    discover: p.surfacePages?.discover === true },
+                    discover: p.surfacePages?.discover === true, cue: p.surfacePages?.cue === true,
+                    changes: p.surfacePages?.changes === true },
     licence: normalizeLicence(p.licence),
     rack: {
       performanceId: String(rack.performanceId ?? ''),
@@ -5667,8 +5743,10 @@ export function applyMockCommand(state, payload) {
         if (payload[key] !== undefined) target[key] = payload[key];
     return next;
   }
-  if (cmd === 'soundcheckOnSurface' || cmd === 'layersOnSurface' || cmd === 'discoverOnSurface') {
-    const key = cmd === 'soundcheckOnSurface' ? 'soundcheck' : cmd === 'layersOnSurface' ? 'layers' : 'discover';
+  if (cmd === 'soundcheckOnSurface' || cmd === 'layersOnSurface' || cmd === 'discoverOnSurface' || cmd === 'cueOnSurface'
+      || cmd === 'changesOnSurface') {
+    const key = { soundcheckOnSurface: 'soundcheck', layersOnSurface: 'layers', discoverOnSurface: 'discover',
+                  cueOnSurface: 'cue', changesOnSurface: 'changes' }[cmd];
     next.surfacePages[key] = payload.on === undefined ? !next.surfacePages[key] : payload.on === true;
     if (key === 'soundcheck' && next.surfacePages.soundcheck) return applyMockCommand(next, { cmd: 'checkSetlistSoundcheck' });
     return next;

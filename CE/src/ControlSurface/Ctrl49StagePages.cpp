@@ -37,6 +37,15 @@ std::uint8_t soundcheckLevelByte (bool measured, double db)
     return byte (1 + (int) std::lround (std::clamp (db, -60.0, 0.0) + 60.0), 1, 61);
 }
 
+std::uint8_t soundcheckLoadByte (double seconds, bool timedOut)
+{
+    if (seconds < 0.0 || ! std::isfinite (seconds))
+        return 0;
+    if (timedOut)
+        return 255;
+    return byte (1 + (int) std::lround (seconds * 10.0), 1, 254);
+}
+
 int soundcheckFirstRow (int songs, int selected)
 {
     if (songs <= kSoundcheckRows)
@@ -75,6 +84,7 @@ Bytes buildSoundcheckPayload (const SoundcheckView& view)
         out.push_back (! song.checked ? 0 : (song.problems > 0 ? 2 : 1));
         out.push_back (soundcheckLevelByte (song.measured, song.rmsDb));
         out.push_back (byte (song.problems));
+        out.push_back (soundcheckLoadByte (song.loadSeconds, song.loadTimedOut));
         appendString (out, song.name, kSoundcheckNameChars);
     }
 
@@ -90,6 +100,7 @@ Bytes buildSoundcheckPayload (const SoundcheckView& view)
     out.push_back (soundcheckLevelByte (measured, song != nullptr ? song->peakDb : 0.0));
     out.push_back (soundcheckLevelByte (measured, song != nullptr ? song->rmsDb : 0.0));
     out.push_back (byte (measured ? (int) std::lround (view.seconds) : 0));
+    out.push_back ((std::uint8_t) ((song != nullptr && song->preloaded ? 1 : 0) | (view.preloadOff ? 2 : 0)));
     return out;
 }
 
@@ -125,6 +136,11 @@ Bytes buildLayersPayload (const LayersView& view)
         out.push_back (byte (part.velocityHigh, 0, 127));
         out.push_back (byte (part.transpose + 64, 0, 127));
         out.push_back ((std::uint8_t) ((part.enabled ? 1 : 0) | (part.muted ? 2 : 0) | (part.fromKeyboard ? 4 : 0)));
+        out.push_back (byte (part.group));
+        out.push_back (byte (std::clamp (part.source, 0, 4) + 16 * std::clamp (part.allocation, 0, 2)));
+        out.push_back (byte (part.layerLow, 0, 127));
+        out.push_back (byte (part.layerHigh, 0, 127));
+        out.push_back (byte (part.layerFade, 0, 64));
         appendString (out, part.name, kLayersNameChars);
     }
 
@@ -134,6 +150,81 @@ Bytes buildLayersPayload (const LayersView& view)
     {
         out.push_back (byte (view.held[(std::size_t) i].note, 0, 127));
         out.push_back (byte (view.held[(std::size_t) i].velocity, 0, 127));
+    }
+    return out;
+}
+
+// --- CUE ------------------------------------------------------------------------------------------
+
+Bytes buildCuePayload (const CueView& view)
+{
+    const auto twoBytes = [] (Bytes& out, int value)
+    {
+        const auto v = std::clamp (value, 0, 65535);
+        out.push_back ((std::uint8_t) (v & 0xFF));
+        out.push_back ((std::uint8_t) (v >> 8));
+    };
+    const auto inSet = [&view] (int index) { return index >= 0 && index < view.songs ? index + 1 : 0; };
+
+    Bytes out;
+    out.push_back (byte (view.songs));
+    out.push_back (byte (inSet (view.current)));
+    out.push_back (byte (view.picked == view.current ? 0 : inSet (view.picked)));
+    out.push_back (view.loading ? 1 : 0);
+    twoBytes (out, view.songSeconds);
+    twoBytes (out, view.setSeconds);
+    twoBytes (out, view.plannedSeconds);
+    twoBytes (out, (int) std::lround (view.tempo * 10.0));
+    const auto sectionBars = view.section.empty() ? 0 : std::clamp (view.sectionBars, 0, 255);
+    out.push_back (byte (sectionBars == 0 ? 0 : std::clamp (view.sectionBar, 1, sectionBars)));
+    out.push_back (byte (sectionBars));
+    out.push_back (view.nextReady < 0 ? 255 : byte (view.nextReady, 0, 100));
+    appendString (out, view.song, kSoundcheckNameChars);
+    appendString (out, view.section, 16);
+    appendString (out, view.nextSection, 16);
+    appendString (out, view.nextSong, kSoundcheckNameChars);
+    appendString (out, view.picked == view.current ? std::string() : view.pickedSong, kSoundcheckNameChars);
+    const auto lines = std::min ((int) view.notes.size(), kCueNoteLines);
+    out.push_back (byte (lines));
+    for (int i = 0; i < lines; ++i)
+        appendString (out, view.notes[(std::size_t) i], kCueNoteChars, true);
+    return out;
+}
+
+// --- CHANGES --------------------------------------------------------------------------------------
+
+Bytes buildChangesPayload (const ChangesView& view)
+{
+    const int count = (int) view.rows.size();
+    const int selected = count == 0 ? 0 : std::clamp (view.selected, 0, count - 1);
+    const int first = count <= kChangesRows ? 0 : std::clamp (selected - kChangesRows / 2 + 1, 0, count - kChangesRows);
+    const int rows = std::min (kChangesRows, count - first);
+    const auto total = std::clamp (view.total, 0, 65535);
+
+    Bytes out;
+    out.push_back ((std::uint8_t) view.state);
+    out.push_back (byte (count));
+    out.push_back (byte (first));
+    out.push_back (byte (rows));
+    out.push_back (byte (selected));
+    out.push_back ((std::uint8_t) (total & 0xFF));
+    out.push_back ((std::uint8_t) (total >> 8));
+    out.push_back (byte (view.listen, 0, 100));
+    out.push_back (byte (view.back));
+    out.push_back (byte (view.saves));
+    out.push_back (byte (view.putBack));
+    appendString (out, view.sound, kSoundcheckNameChars);
+    appendString (out, view.against, kSoundcheckNameChars);
+    appendString (out, view.when, 16);
+    appendString (out, view.problemText, kCueNoteChars, true);
+    for (int i = first; i < first + rows; ++i)
+    {
+        const auto& row = view.rows[(std::size_t) i];
+        out.push_back (byte (row.saved, 0, 100));
+        out.push_back (byte (row.now, 0, 100));
+        appendString (out, row.name, kLayersNameChars);
+        appendString (out, row.savedText, 10);
+        appendString (out, row.nowText, 10);
     }
     return out;
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeSoundcheck, normalizeHostState } from '../src/CE_Application/stores/instrumentHost.js';
-import { soundcheckDb, soundcheckReferenceStatus } from '../src/CE_Application/utils/setlistSoundcheck.js';
+import { soundcheckDb, soundcheckReferenceStatus, soundcheckLoad } from '../src/CE_Application/utils/setlistSoundcheck.js';
 
 test('soundcheck distinguishes no measurement, silence, and overload', () => {
   assert.equal(soundcheckDb(0, false), '—');
@@ -30,6 +30,17 @@ test('soundcheck normalizer rejects invalid readings but preserves genuine silen
 test('live measurement and earlier failed-attempt details survive state normalization', () => {
   const soundcheck = { activeItemId: 'song', currentItemId: 'song', blockedReason: '', entries: [
     { itemId: 'song', checkedAt: 12, basis: 'Rig A', issues: ['Missing output'], measured: true,
-      measuredAt: 10, peak: 1.2, rms: 0.3, seconds: 8, error: 'No buffers received' }] };
+      measuredAt: 10, peak: 1.2, rms: 0.3, seconds: 8, error: 'No buffers received',
+      loadSeconds: 6.4, loadPreloaded: false, loadTimedOut: false, loadedAt: 20 }] };
   assert.deepEqual(normalizeHostState({ soundcheck }).soundcheck, soundcheck);
+});
+test('a song load time: not recalled yet, how long, and whether it is slow enough to preload', () => {
+  assert.deepEqual(soundcheckLoad(undefined), { text: '—', slow: false });
+  assert.deepEqual(soundcheckLoad({ loadSeconds: -1 }), { text: '—', slow: false });
+  assert.deepEqual(soundcheckLoad({ loadSeconds: 2.04 }), { text: '2.0s', slow: false });
+  assert.deepEqual(soundcheckLoad({ loadSeconds: 7.8 }), { text: '7.8s', slow: true });
+  assert.equal(soundcheckLoad({ loadSeconds: 7.8, loadPreloaded: true }).slow, false, 'a preloaded song is not slow on stage');
+  assert.deepEqual(soundcheckLoad({ loadSeconds: 15, loadTimedOut: true }), { text: 'gave up', slow: true });
+  const row = normalizeSoundcheck({ entries: [{ itemId: 'a' }, { itemId: 'b', loadSeconds: 'x' }] }).entries;
+  assert.deepEqual(row.map((r) => r.loadSeconds), [-1, -1], 'a song never recalled has no load time, not zero');
 });

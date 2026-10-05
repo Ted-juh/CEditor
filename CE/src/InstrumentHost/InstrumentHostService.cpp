@@ -579,6 +579,11 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (outermostCommand)
         recordPerformanceAction (payload);
 
+    // Listening on the CHANGES page is an audition: anything else done to the rig first puts
+    // back what was there, so a save, a parameter set or a load never captures the blend.
+    if (changesListen.active && cmd != "surfaceInput" && ! cmd.startsWith ("get"))
+        stopChangesListen();
+
     if (cmd == "getState")
     {
         if (! sessionRestored)
@@ -6297,17 +6302,21 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
-    if (cmd == "soundcheckOnSurface" || cmd == "layersOnSurface" || cmd == "discoverOnSurface")
+    if (cmd == "soundcheckOnSurface" || cmd == "layersOnSurface" || cmd == "discoverOnSurface"
+        || cmd == "cueOnSurface" || cmd == "changesOnSurface")
     {
         // Off until asked for, like the browser page: a keyboard that grows a page under somebody's
         // hands is one that stopped doing what they had it doing.
         const bool soundcheck = cmd == "soundcheckOnSurface";
         auto& flag = soundcheck ? surfaceSoundcheckPage
-                   : cmd == "layersOnSurface" ? surfaceLayersPage : surfaceDiscoverPage;
+                   : cmd == "layersOnSurface" ? surfaceLayersPage
+                   : cmd == "cueOnSurface" ? surfaceCuePage
+                   : cmd == "changesOnSurface" ? surfaceChangesPage : surfaceDiscoverPage;
         const bool wanted = payload.getDynamicObject() != nullptr
                               && payload.getDynamicObject()->hasProperty ("on")
                             ? (bool) payload["on"] : ! flag;
-        if (soundcheck && wanted && ! requireFeature (licensing::Feature::scenesAndSetlists))
+        if ((soundcheck || cmd == "cueOnSurface") && wanted
+            && ! requireFeature (licensing::Feature::scenesAndSetlists))
             return;
         flag = wanted;
         if (soundcheck && wanted)
@@ -13222,6 +13231,270 @@ void InstrumentHostService::tickSoundcheck()
     emitState();
 }
 
+juce::Array<InstrumentHostService::ChangesTarget>
+InstrumentHostService::changesTargets (const LibraryRecord& record) const
+{
+    // Newest save first, then the sound it was branched from: the order E4 walks back in.
+    juce::Array<ChangesTarget> targets;
+    for (int i = record.versions.size() - 1; i >= 0; --i)
+    {
+        const auto& version = record.versions.getReference (i);
+        ChangesTarget target;
+        target.key = record.recordId + "/" + version.versionId;
+        target.name = version.label.isNotEmpty() ? version.label
+                    : version.origin ? juce::String ("the original")
+                    : i == record.versions.size() - 1 ? juce::String ("your last save")
+                                                      : juce::String ("an earlier save");
+        target.savedAtMs = version.savedAtMs;
+        target.version = i;
+        targets.add (target);
+    }
+    if (const auto* origin = library.find (record.branchedFromRecordId); origin != nullptr)
+        targets.add ({ origin->recordId + "/origin", origin->name + " (factory)", 0, -1, origin->stateBlobBase64 });
+    else if (record.versions.isEmpty() && record.stateBlobBase64.isNotEmpty())
+        targets.add ({ record.recordId + "/loaded", "the sound as loaded", 0, -1, record.stateBlobBase64 });
+    return targets;
+}
+
+const juce::Array<InstrumentHostService::ParameterReading>*
+InstrumentHostService::changesSaved (const juce::String& partId, juce::AudioProcessor& instrument,
+                                     const LibraryRecord& record, const ChangesTarget& target)
+{
+    // Keyed by the instrument as well: a plug-in loaded again reads its saves afresh.
+    const auto key = partId + "|" + juce::String::toHexString ((juce::pointer_sized_int) &instrument) + "|" + target.key;
+    if (const auto found = changesSavedReadings.find (key); found != changesSavedReadings.end())
+        return &found->second;
+    if (changesListen.active)
+        return nullptr;
+
+    const auto blob = target.version >= 0 && target.version < record.versions.size()
+                        ? libraryStore.versionState (record, record.versions.getReference (target.version))
+                        : target.blob;
+    if (blob.isEmpty())
+        return nullptr;
+
+    // As diffVersions reads a save: put it on the plug-in, read it, put back what was there.
+    juce::MemoryBlock before;
+    instrument.getStateInformation (before);
+    const auto refusal = applyStateBlob (instrument, blob);
+    const auto readings = refusal.isEmpty() ? readParameters (instrument) : juce::Array<ParameterReading>();
+    instrument.setStateInformation (before.getData(), (int) before.getSize());
+    if (refusal.isNotEmpty())
+        return nullptr;
+
+    if (changesSavedReadings.size() > 32)
+        changesSavedReadings.clear();
+    return &(changesSavedReadings[key] = readings);
+}
+
+void InstrumentHostService::stopChangesListen()
+{
+    if (! changesListen.active)
+        return;
+    if (auto* instrument = rack.getInstrument (changesListen.partId))
+        instrument->setStateInformation (changesListen.nowState.getData(), (int) changesListen.nowState.getSize());
+    changesListen = {};
+}
+
+InstrumentHostService::SurfaceChanges InstrumentHostService::surfaceChanges (int back)
+{
+    SurfaceChanges out;
+    const auto partId = rack.getPerformance().focusedPartId;
+    const auto* part = rack.getPerformance().findPart (partId);
+    if (part == nullptr)
+    {
+        out.problem = "Focus a part to see what changed in its sound.";
+        return out;
+    }
+    if (changesListen.active && changesListen.partId != partId)
+        stopChangesListen();
+    out.partId = partId;
+    if (part->hardware)
+    {
+        out.problem = "A hardware part's patch is compared in the app, byte by byte.";
+        return out;
+    }
+    auto* instrument = rack.getInstrument (partId);
+    if (instrument == nullptr)
+    {
+        out.problem = "This part has no instrument loaded.";
+        return out;
+    }
+    ensureLibrary();
+    const auto* record = library.find (part->lastPresetRecordId);
+    out.sound = record != nullptr ? record->name
+              : part->lastPresetName.isNotEmpty() ? part->lastPresetName : part->pluginName;
+    if (record == nullptr)
+    {
+        out.problem = "Load a sound from the library: its saves are what this compares against.";
+        return out;
+    }
+    const auto targets = changesTargets (*record);
+    if (targets.isEmpty())
+    {
+        out.problem = "This sound has nothing saved to compare against yet.";
+        return out;
+    }
+    out.saves = targets.size();
+    out.back = juce::jlimit (0, out.saves - 1, back);
+    const auto& target = targets.getReference (out.back);
+    out.against = target.name;
+    out.savedAtMs = target.savedAtMs;
+    const auto* saved = changesSaved (partId, *instrument, *record, target);
+    if (saved == nullptr)
+    {
+        out.problem = changesListen.active ? "Stop listening (E1 to NOW) to read another save."
+                                           : "The plug-in could not read that save back.";
+        return out;
+    }
+
+    // Now, or what was there before listening began: the blend would read as changes otherwise.
+    const auto now = changesListen.active ? changesListen.now : readParameters (*instrument);
+    std::map<juce::String, const ParameterReading*> byId;
+    for (const auto& reading : now)
+        byId[reading.definitionId] = &reading;
+    for (const auto& was : *saved)
+    {
+        const auto found = byId.find (was.definitionId);
+        if (found == byId.end())
+            continue;
+        ++out.total;
+        if (! juce::approximatelyEqual (was.value, found->second->value))
+            out.changed.add ({ was.definitionId, was.name, was.text, found->second->text, was.value, found->second->value });
+    }
+    out.listen = changesListen.active ? changesListen.amount : 1.0f;
+    return out;
+}
+
+void InstrumentHostService::surfaceChangesListen (int back, float amount)
+{
+    amount = juce::jlimit (0.0f, 1.0f, amount);
+    if (amount >= 1.0f)
+    {
+        stopChangesListen();
+        return;
+    }
+    const auto partId = rack.getPerformance().focusedPartId;
+    const auto* part = rack.getPerformance().findPart (partId);
+    auto* instrument = rack.getInstrument (partId);
+    const auto* record = part != nullptr ? library.find (part->lastPresetRecordId) : nullptr;
+    if (instrument == nullptr || record == nullptr || (changesListen.active && changesListen.partId != partId))
+        return;
+    const auto targets = changesTargets (*record);
+    if (targets.isEmpty())
+        return;
+    const auto* saved = changesSaved (partId, *instrument, *record,
+                                      targets.getReference (juce::jlimit (0, targets.size() - 1, back)));
+    if (saved == nullptr)
+        return;
+
+    if (! changesListen.active)
+    {
+        changesListen.active = true;
+        changesListen.partId = partId;
+        instrument->getStateInformation (changesListen.nowState);
+        changesListen.now = readParameters (*instrument);
+    }
+
+    // Between the two, on the parameters the plug-in exposes, as morphVersions blends.
+    std::map<juce::String, float> nowById;
+    for (const auto& reading : changesListen.now)
+        nowById[reading.definitionId] = reading.value;
+    const auto inventory = describeParameters (*instrument);
+    const auto& parameters = instrument->getParameters();
+    for (const auto& was : *saved)
+    {
+        const auto found = nowById.find (was.definitionId);
+        const auto* descriptor = inventory.find (was.definitionId);
+        if (found != nowById.end() && descriptor != nullptr && juce::isPositiveAndBelow (descriptor->index, parameters.size()))
+            parameters[descriptor->index]->setValueNotifyingHost (was.value + amount * (found->second - was.value));
+    }
+    changesListen.amount = amount;
+}
+
+InstrumentHostService::SurfaceCue InstrumentHostService::surfaceCue()
+{
+    SurfaceCue out;
+    if (! entitlements().allows (licensing::Feature::scenesAndSetlists))
+        return out;
+
+    const auto& setlist = rack.getPerformance().setlist;
+    const auto nameOf = [&setlist] (int i)
+    {
+        const auto& item = setlist.items.getReference (i);
+        return item.name.isNotEmpty() ? item.name : "Song " + juce::String (i + 1);
+    };
+    out.songs = setlist.items.size();
+    for (int i = 0; i < out.songs; ++i)
+        out.names.add (nameOf (i));
+    out.current = juce::isPositiveAndBelow (setlist.currentIndex, out.songs) ? setlist.currentIndex : -1;
+    out.tempo = surfaceTransport().tempo;
+    const auto now = juce::Time::currentTimeMillis();
+    if (setlistStartedAtMs > 0)
+        out.setSeconds = (int) ((now - setlistStartedAtMs) / 1000);
+    if (out.current < 0)
+        return out;
+
+    const auto& item = setlist.items.getReference (out.current);
+    out.loading = pendingSetlistRecall.active && pendingSetlistRecall.index == out.current;
+    out.song = nameOf (out.current);
+    out.plannedSeconds = item.plannedSeconds;
+    if (setlistSongStartedAtMs > 0)
+        out.songSeconds = (int) ((now - setlistSongStartedAtMs) / 1000);
+    for (const auto& line : juce::StringArray::fromLines (item.notes))
+        if (line.trim().isNotEmpty())
+            out.notes.add (line.trim());
+
+    // The section playing, counted as the state counts it (bar 1 of the section's bars).
+    const auto& sections = playingArrangement();
+    if (arrangementPlaying && juce::isPositiveAndBelow (arrangementCurrentIndex, sections.items.size()))
+    {
+        const auto& transport = rack.getEngine().getTransport();
+        const auto& section = sections.items.getReference (arrangementCurrentIndex);
+        out.section = section.name;
+        out.sectionBars = section.bars;
+        const auto elapsed = juce::jmax (0.0, transport.getPositionPpq() - arrangementItemStartPpq);
+        out.sectionBar = juce::jlimit (1, juce::jmax (1, section.bars),
+                                       1 + (int) std::floor (elapsed / transport.barLengthPpq()));
+        const auto next = arrangementQueuedIndex >= 0 ? arrangementQueuedIndex
+                        : arrangementCurrentIndex + 1 < sections.items.size() ? arrangementCurrentIndex + 1
+                        : sections.loop ? 0 : -1;
+        if (juce::isPositiveAndBelow (next, sections.items.size()))
+            out.nextSection = sections.items.getReference (next).name;
+    }
+
+    // The next song, and how much of its rig is warm when it has one to warm.
+    if (out.current + 1 < out.songs)
+    {
+        out.nextSong = nameOf (out.current + 1);
+        const auto& next = setlist.items.getReference (out.current + 1);
+        if (next.rackRecordId.isNotEmpty() && setlist.preloadAhead > 0)
+        {
+            out.nextReady = 0;
+            if (const auto warm = setlistPreloads.find (next.rackRecordId); warm != setlistPreloads.end()
+                && warm->second.total > 0)
+                out.nextReady = juce::jlimit (0, 100, (warm->second.ready + warm->second.failed) * 100 / warm->second.total);
+        }
+    }
+    return out;
+}
+
+void InstrumentHostService::noteSongLoaded (const juce::String& itemId, double seconds, bool preloaded, bool timedOut)
+{
+    if (itemId.isEmpty())
+        return;
+    auto& entry = soundcheckEntries[itemId];
+    entry.loadSeconds = juce::jmax (0.0, seconds);
+    entry.loadPreloaded = preloaded;
+    entry.loadTimedOut = timedOut;
+    entry.loadedAt = juce::Time::currentTimeMillis();
+}
+
+bool InstrumentHostService::setlistPreloadsAhead() const
+{
+    return rack.getPerformance().setlist.preloadAhead > 0;
+}
+
 juce::Array<InstrumentHostService::SurfaceSoundcheckSong> InstrumentHostService::surfaceSoundcheck()
 {
     juce::Array<SurfaceSoundcheckSong> songs;
@@ -13237,6 +13510,9 @@ juce::Array<InstrumentHostService::SurfaceSoundcheckSong> InstrumentHostService:
         if (const auto found = soundcheckEntries.find (item.itemId); found != soundcheckEntries.end())
         {
             const auto& result = found->second;
+            song.loadSeconds = result.loadSeconds;
+            song.loadPreloaded = result.loadPreloaded;
+            song.loadTimedOut = result.loadTimedOut;
             song.checked = result.checkedAt > 0;
             song.basis = result.basis;
             song.problems = result.issues;
@@ -13381,6 +13657,10 @@ juce::var InstrumentHostService::soundcheckPayload()
         row->setProperty ("rms", measured ? std::sqrt (level.energy / (double) level.samples) : 0.0);
         row->setProperty ("seconds", level.seconds);
         row->setProperty ("error", result.measurementError);
+        row->setProperty ("loadSeconds", result.loadSeconds);
+        row->setProperty ("loadPreloaded", result.loadPreloaded);
+        row->setProperty ("loadTimedOut", result.loadTimedOut);
+        row->setProperty ("loadedAt", (double) result.loadedAt);
         entries.add (juce::var (row));
     }
     for (auto it = soundcheckEntries.begin(); it != soundcheckEntries.end();)
@@ -13686,6 +13966,8 @@ void InstrumentHostService::tickPendingSetlistRecall()
 
     const auto recall = pendingSetlistRecall;
     pendingSetlistRecall = {};
+    noteSongLoaded (recall.itemId, (juce::Time::getMillisecondCounterHiRes() - recall.loadStartedMs) / 1000.0,
+                    recall.preloaded, timedOut && ! rackProcessorsReady());
     if (recall.sceneId.isNotEmpty() && ! launchScene (recall.sceneId))
         emitError ("The song loaded, but its requested scene is no longer available.");
     if (recall.pageId.isNotEmpty())
@@ -16186,6 +16468,9 @@ bool InstrumentHostService::goToSetlistItem (int index)
     const auto item = currentSetlist.items.getReference (index);
     const auto previous = currentSetlist.currentIndex;
     pendingSetlistRecall = {};
+    // A song's load time runs from here to its last processor being ready (noteSongLoaded).
+    const auto recallStartedMs = juce::Time::getMillisecondCounterHiRes();
+    bool preloaded = false;
     // The sections that were playing belong to the song being left. Its clips are not cut:
     // the new song's scene takes over on its own boundary.
     if (arrangementPlaying)
@@ -16213,6 +16498,8 @@ bool InstrumentHostService::goToSetlistItem (int index)
         restored.setlist = std::move (retainedSetlist);
         restored.performanceTakes = rack.getPerformance().performanceTakes;
 
+        if (const auto warm = setlistPreloads.find (item.rackRecordId); warm != setlistPreloads.end())
+            preloaded = warm->second.total > 0 && warm->second.ready + warm->second.failed >= warm->second.total;
         consumingSetlistPreloadRecordId = item.rackRecordId;
         applyPerformance (std::move (restored));
         consumingSetlistPreloadRecordId.clear();
@@ -16246,6 +16533,8 @@ bool InstrumentHostService::goToSetlistItem (int index)
             pendingSetlistRecall.pageId = item.pageId;
             pendingSetlistRecall.tempo = item.tempo;
             pendingSetlistRecall.startedMs = juce::Time::getMillisecondCounterHiRes();
+            pendingSetlistRecall.loadStartedMs = recallStartedMs;
+            pendingSetlistRecall.preloaded = preloaded;
         }
     }
     else
@@ -16283,6 +16572,11 @@ bool InstrumentHostService::goToSetlistItem (int index)
     setlistSongStartedAtMs = nowMs;
     if (previous < 0 || index == 0 || setlistStartedAtMs == 0)
         setlistStartedAtMs = nowMs;
+    // Ready already (a scene, or a warm rig): that is its load time. Otherwise it is measured
+    // when the recall completes (tickPendingSetlistRecall).
+    if (! pendingSetlistRecall.active)
+        noteSongLoaded (item.itemId, (juce::Time::getMillisecondCounterHiRes() - recallStartedMs) / 1000.0,
+                        preloaded, false);
 
     // A song with sections plays them from the top while the transport runs; stopped, it
     // waits on its first section's scene until Play.
@@ -18761,6 +19055,8 @@ juce::var InstrumentHostService::buildStatePayload()
         surfacePages->setProperty ("soundcheck", surfaceSoundcheckPage);
         surfacePages->setProperty ("layers", surfaceLayersPage);
         surfacePages->setProperty ("discover", surfaceDiscoverPage);
+        surfacePages->setProperty ("cue", surfaceCuePage);
+        surfacePages->setProperty ("changes", surfaceChangesPage);
         root->setProperty ("surfacePages", juce::var (surfacePages));
     }
     root->setProperty ("product", productPayload());

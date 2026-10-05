@@ -7,7 +7,8 @@ import fs from 'node:fs';
 import {
   rackLabelPayload, rackStatePayload, performanceTitle, performanceLabelPayload,
   performanceStatePayload, browseSlotViews, soundcheckPayload, soundcheckLevelByte, layersPayload,
-  readSoundcheckPayload, readLayersPayload, discoverPayload, readDiscoverPayload,
+  readSoundcheckPayload, readLayersPayload, discoverPayload, readDiscoverPayload, cuePayload, readCuePayload,
+  changesPayload, readChangesPayload,
 } from '../src/CE_Application/screen/ctrl49Payloads.js';
 import { parseCalls } from '../src/ctrl49Preview/callScript.js';
 
@@ -68,45 +69,85 @@ test('browse: the cursor row takes a full knob, long names end in a dot', () => 
 test('soundcheck: the golden the C++ test pins', () => {
   const bytes = soundcheckPayload({
     songs: [
-      { name: 'Glass Harbour', checked: true, problems: 0, measured: true, rmsDb: -18.4, peakDb: -3.2 },
+      { name: 'Glass Harbour', checked: true, problems: 0, measured: true, rmsDb: -18.4, peakDb: -3.2, loadSeconds: 2.3 },
       { name: 'Salt Road', checked: true, problems: 2 },
-      { name: 'Night Bus', checked: false },
+      { name: 'Night Bus', checked: false, loadSeconds: 0 },
     ],
-    selected: 1, current: 0, basis: 'Current rig at check time',
+    selected: 1, current: 0, basis: 'Current rig at check time', preloadOff: true,
     problems: ['MIDI output unavailable: USB MIDI 2', 'Drifter: plug-in file is missing'],
   });
   assert.deepEqual(bytes, [
     3, 0, 3, 1, 1, 1, 1, 1,
-    1, 43, 0, 13, ...ascii('Glass Harbour'),
-    2, 0, 2, 9, ...ascii('Salt Road'),
-    0, 0, 0, 9, ...ascii('Night Bus'),
+    1, 43, 0, 24, 13, ...ascii('Glass Harbour'),
+    2, 0, 2, 0, 9, ...ascii('Salt Road'),
+    0, 0, 0, 1, 9, ...ascii('Night Bus'),
     25, ...ascii('Current rig at check time'),
     2, 2,
     35, ...ascii('MIDI output unavailable: USB MIDI 2'),
     32, ...ascii('Drifter: plug-in file is missing'),
-    0, 0, 0,
+    0, 0, 0, 2,
   ]);
   assert.equal(soundcheckLevelByte(true, 0), 61);
   assert.equal(soundcheckLevelByte(false, -10), 0, 'not measured is 0, whatever the number');
   const long = soundcheckPayload({ songs: [{ name: 'S', checked: true, problems: 1 }], problems: ['x'.repeat(80)] });
-  assert.deepEqual(long.slice(-48, -3).slice(-4), [...ascii('x'), ...ascii('...')], 'a long problem ends in "..."');
+  assert.deepEqual(long.slice(-49, -4).slice(-4), [...ascii('x'), ...ascii('...')], 'a long problem ends in "..."');
 });
 
 test('layers: the golden the C++ test pins', () => {
   const bytes = layersPayload({
     parts: [
       { name: 'Sub Bass', keyLow: 36, keyHigh: 54, velocityLow: 1, velocityHigh: 127, transpose: 0 },
-      { name: 'Brass', keyLow: 60, keyHigh: 84, velocityLow: 100, velocityHigh: 127, transpose: -12, muted: true, fromKeyboard: false },
+      { name: 'Brass', keyLow: 60, keyHigh: 84, velocityLow: 100, velocityHigh: 127, transpose: -12, muted: true, fromKeyboard: false,
+        group: 1, source: 0, allocation: 0, layerLow: 80, layerHigh: 127, layerFade: 13 },
     ],
     focused: 1,
     held: [{ note: 48, velocity: 90 }, { note: 72, velocity: 112 }],
   });
   assert.deepEqual(bytes, [
     2, 0, 2, 1, 36,
-    36, 54, 1, 127, 64, 5, 8, ...ascii('Sub Bass'),
-    60, 84, 100, 127, 52, 3, 5, ...ascii('Brass'),
+    36, 54, 1, 127, 64, 5, 0, 0, 0, 127, 0, 8, ...ascii('Sub Bass'),
+    60, 84, 100, 127, 52, 3, 1, 0, 80, 127, 13, 5, ...ascii('Brass'),
     2, 48, 90, 72, 112,
   ]);
+});
+
+test('changes: the golden the C++ test pins', () => {
+  const str = (t) => [t.length, ...ascii(t)];
+  const view = {
+    state: 2, selected: 1, total: 300, listen: 100, back: 0, saves: 3, putBack: 1,
+    sound: 'Glass Pad', against: 'your last save', when: '05 Oct 18:42',
+    rows: [{ name: 'Cutoff', savedText: '2.1 kHz', nowText: '4.8 kHz', saved: 40, now: 62 },
+           { name: 'Resonance', savedText: '12 %', nowText: '30 %', saved: 12, now: 30 }],
+  };
+  assert.deepEqual(changesPayload(view), [
+    2, 2, 0, 2, 1, 44, 1, 100, 0, 3, 1,
+    ...str('Glass Pad'), ...str('your last save'), ...str('05 Oct 18:42'), 0,
+    40, 62, ...str('Cutoff'), ...str('2.1 kHz'), ...str('4.8 kHz'),
+    12, 30, ...str('Resonance'), ...str('12 %'), ...str('30 %'),
+  ]);
+  const back = readChangesPayload(changesPayload(view));
+  assert.deepEqual([back.state, back.total, back.saves, back.putBack], ['changed', 300, 3, 1]);
+  assert.deepEqual(back.rows[1], { index: 1, saved: 12, now: 30, name: 'Resonance', savedText: '12 %', nowText: '30 %' });
+  assert.equal(readChangesPayload([]).state, 'problem');
+});
+
+test('cue: the golden the C++ test pins', () => {
+  const str = (t) => [t.length, ...ascii(t)];
+  const view = {
+    songs: 6, current: 1, picked: 2, song: 'Night Bus', tempo: 124, songSeconds: 252, setSeconds: 2282,
+    plannedSeconds: 300, notes: ['Capo 2. Long intro.', 'Watch the drummer'], section: 'Bridge', sectionBar: 1,
+    sectionBars: 4, nextSection: 'Chorus', nextSong: 'Glass Harbour', nextReady: 30, pickedSong: 'Glass Harbour',
+  };
+  assert.deepEqual(cuePayload(view), [
+    6, 2, 3, 0, 252, 0, 234, 8, 44, 1, 216, 4, 1, 4, 30,
+    ...str('Night Bus'), ...str('Bridge'), ...str('Chorus'), ...str('Glass Harbour'), ...str('Glass Harbour'),
+    2, ...str('Capo 2. Long intro.'), ...str('Watch the drummer'),
+  ]);
+  const back = readCuePayload(cuePayload(view));
+  assert.deepEqual([back.current, back.picked, back.tempo, back.setSeconds, back.nextReady], [1, 2, 124, 2282, 30]);
+  assert.deepEqual(back.notes, view.notes);
+  assert.equal(cuePayload({}).length, 21, 'no setlist is still a payload');
+  assert.equal(readCuePayload(cuePayload({ ...view, picked: 1 })).pickedSong, '', 'picking the song on stage is no pick');
 });
 
 test('discover: the golden the C++ test pins', () => {
@@ -165,14 +206,16 @@ test('stage pages read back as the views they were built from', () => {
   const layers = readLayersPayload(layersPayload({
     parts: [
       { name: 'Sub Bass', keyLow: 36, keyHigh: 54, velocityLow: 1, velocityHigh: 127, transpose: 0 },
-      { name: 'Brass', keyLow: 60, keyHigh: 84, velocityLow: 100, velocityHigh: 127, transpose: -12, muted: true, fromKeyboard: false },
+      { name: 'Brass', keyLow: 60, keyHigh: 84, velocityLow: 100, velocityHigh: 127, transpose: -12, muted: true, fromKeyboard: false,
+        group: 2, source: 1, allocation: 1, layerLow: 30, layerHigh: 90, layerFade: 6 },
     ],
     focused: 1,
     held: [{ note: 48, velocity: 90 }],
   }));
   assert.equal(layers.focused, 1);
   assert.deepEqual(layers.parts[1], { index: 1, name: 'Brass', keyLow: 60, keyHigh: 84, velocityLow: 100,
-    velocityHigh: 127, transpose: -12, enabled: true, muted: true, fromKeyboard: false });
+    velocityHigh: 127, transpose: -12, enabled: true, muted: true, fromKeyboard: false,
+    group: 2, source: 1, allocation: 1, layerLow: 30, layerHigh: 90, layerFade: 6 });
   assert.deepEqual(layers.held, [{ note: 48, velocity: 90 }]);
   assert.deepEqual(readLayersPayload([]).parts, []);
 });
@@ -233,7 +276,8 @@ test('every function the broker calls is one the page defines', () => {
   // A page beyond the knobs names its call once and sends it through a variable
   // (callLua (stageCall, ...)).
   const stage = [...broker.matchAll(/stageCall = "([a-z_]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(stage.sort(), ['set_check', 'set_discover', 'set_layers'], 'each page beyond the knobs names its call');
+  assert.deepEqual(stage.sort(), ['set_changes', 'set_check', 'set_cue', 'set_discover', 'set_layers'],
+    'each page beyond the knobs names its call');
   for (const name of [...called, ...stage, 'init', 'set_mode', 'draw'])
     assert.match(lua, new RegExp(`^function ${name}\\(`, 'm'), `${name} is defined`);
 });

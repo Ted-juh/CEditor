@@ -24,8 +24,25 @@ is at the bottom.
 
 - [ ] The card says **Showing on the keyboard too**, and the keyboard shows the same page.
       If it says anything else, stop here: **write down** the card's text and its red line, if any.
+- [ ] The page script HoSTage uploads is 40.6 KB now (it was 9 KB before these pages), larger
+      than the slim stress builds in section 2. If the keyboard shows HoSTage's knobs at all, it
+      took it. If it shows a Lua error or the stock screen comes back, **write down** exactly what
+      it says: that is the limit, and section 2 then says how far under it to go.
 - [ ] Page Left / Right on the keyboard walks the control pages and the performance page, and
       the card follows.
+
+**Cue.** Have a setlist of a few songs, one with sections and notes.
+
+- [ ] Turn on **Cue**. Page Right from the performance page arrives at CUE first.
+- [ ] Before the set starts it says NO SONG ON STAGE YET. E1 picks song 1 (GO TO at the bottom,
+      pad 1 lit); pad 1 goes to it, in the app too.
+- [ ] On a song: SONG N OF M, its name and tempo; its notes when it has no sections, with its
+      clock against the time planned (red when over); the set's clock in the title.
+- [ ] Start its sections: the section name, BAR N OF M filling in, the bars left counting down, and
+      NEXT naming the next section.
+- [ ] NEXT names the next song, with LOADING n% / READY when it preloads a rig.
+- [ ] **Write down:** whether the clocks keep time against a watch over a whole song, and how far
+      behind the bar the page runs at your tempo.
 
 **Layers.** Have at least two parts with different zones (a split is the clearest).
 
@@ -40,6 +57,9 @@ is at the bottom.
       key, E4 the transpose, E5 / E6 the velocity range. The app's zone editor shows the same.
 - [ ] One fast turn of E2 is one Undo in the app, not one Undo a detent (edits to the same part
       less than 0.6 s apart are one step).
+- [ ] Make a layer group of two parts by velocity, with a crossfade. Each member shows `L1 V` and
+      a gauge of its share, ramping at the crossfade. Play soft then hard: the notches move from
+      one part to the other. A key layer ramps in its band instead.
 - [ ] With Stage Lock on, turning E2 changes nothing and the app says why. The page stays up.
 - [ ] **Write down:** how long Page Right takes to draw LAYERS, and whether held notes keep up
       with fast playing. Notes played on the CTRL49 itself light at once (the page hears them);
@@ -55,13 +75,17 @@ is at the bottom.
 - [ ] Add a song in the app: it shows as not checked. E8 checks the set again and it changes.
 - [ ] Measure a song in the app's Soundcheck: its level appears as a bar in its row and in dB on
       the right.
+- [ ] Go to a few songs, one with a captured rig. Each then shows how long it took to load, in its
+      row and in the app's Soundcheck ("Load"). One over five seconds that was not preloaded is red,
+      and with preloading off the page says TURN PRELOAD ON.
+- [ ] **Write down:** the load times of your heaviest rigs, preloaded and not.
 - [ ] **Write down:** anything cut off or overlapping. The page is 480 x 272 and the names stop
       at 24 characters.
 
 **Discover.** Needs a library with at least five measured sounds you have loaded (the Sounds page's
 "What you play" says how many).
 
-- [ ] Turn on **Discover**. Page Right arrives at DISCOVER after the other two. With too little
+- [ ] Turn on **Discover**. Page Right arrives at DISCOVER after SOUNDCHECK. With too little
       loaded it says NOT ENOUGH TO GO ON and how many of five it has; that is correct, not a fault.
 - [ ] The title counts what you have never opened, the same number as the Sounds page's
       "Never loaded". The list is nearest first, with a bar for how like what you load each is.
@@ -74,6 +98,20 @@ is at the bottom.
       past the end of the list.
 - [ ] **Write down:** how long the page takes to appear and to follow E1 on a big library (it
       reads the whole library when it opens and every two seconds), and the never-opened count.
+
+**Changes.** Load a sound of your own from the library, save it, then turn a few knobs.
+
+- [ ] Turn on **Changes**. With a sound not from the library it says why there is nothing to
+      compare; that is correct.
+- [ ] With your sound: its name, AGAINST your last save and when, and each parameter you moved,
+      saved value > value now, with both on a bar. The title counts them.
+- [ ] E1 down plays the save, E1 back up plays now, and in between is in between. Leave the page
+      while listening: the sound is exactly as you left it.
+- [ ] E2 picks a change; E3 puts it back (it leaves the list), E3 the other way takes it back.
+- [ ] E4 walks back to older saves, by name, down to the oldest (or to the factory sound it was
+      branched from).
+- [ ] **Write down:** how long the first look at a save takes on your biggest plug-in (it reads
+      the save through the plug-in once), and whether listening is smooth or stepped.
 
 **Leaving them.**
 

@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import {
   emptyHostState, normalizeHostState, applyMockCommand, normalizeSurfaceScreen, mockSurfaceScreen,
 } from '../src/CE_Application/stores/instrumentHost.js';
-import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload } from '../src/CE_Application/screen/ctrl49Payloads.js';
+import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload, readCuePayload, readChangesPayload } from '../src/CE_Application/screen/ctrl49Payloads.js';
 
 const cursor = (page, more = {}) => ({ page, active: 0, turned: {}, song: -1, part: -1, sound: 0, kind: '', ...more });
 
@@ -32,10 +32,10 @@ function rig() {
 }
 
 test('both pages are off until asked for, and a payload without them reads as off', () => {
-  assert.deepEqual(emptyHostState().surfacePages, { soundcheck: false, layers: false, discover: false });
-  assert.deepEqual(normalizeHostState({}).surfacePages, { soundcheck: false, layers: false, discover: false });
-  assert.deepEqual(normalizeHostState({ surfacePages: { soundcheck: true, layers: 'yes', discover: true } }).surfacePages,
-    { soundcheck: true, layers: false, discover: true }, 'only a real true turns a page on');
+  assert.deepEqual(emptyHostState().surfacePages, { soundcheck: false, layers: false, discover: false, cue: false, changes: false });
+  assert.deepEqual(normalizeHostState({}).surfacePages, { soundcheck: false, layers: false, discover: false, cue: false, changes: false });
+  assert.deepEqual(normalizeHostState({ surfacePages: { soundcheck: true, layers: 'yes', discover: true, cue: 1 } }).surfacePages,
+    { soundcheck: true, layers: false, discover: true, cue: false, changes: false }, 'only a real true turns a page on');
 });
 
 test('the screen payload carries one stage call, and only one of the two known ones', () => {
@@ -52,7 +52,8 @@ test('the screen payload carries one stage call, and only one of the two known o
 test('turning the pages on in the stand-in adds them after the performance page, LAYERS first', () => {
   let state = applyMockCommand(rig(), { cmd: 'soundcheckOnSurface', on: true });
   state = applyMockCommand(state, { cmd: 'layersOnSurface' });
-  assert.deepEqual(state.surfacePages, { soundcheck: true, layers: true, discover: false }, 'on, and flipped with no "on"');
+  assert.deepEqual(state.surfacePages, { soundcheck: true, layers: true, discover: false, cue: false, changes: false },
+    'on, and flipped with no "on"');
 
   const performance = mockSurfaceScreen(state, cursor(1));
   assert.equal(performance.pageKind, 'performance');
@@ -108,4 +109,30 @@ test('DISCOVER in the stand-in: after the other two, over the demo library', () 
 
   state = applyMockCommand(state, { cmd: 'layersOnSurface', on: true });
   assert.equal(mockSurfaceScreen(state, cursor(3)).pageKind, 'discover', 'LAYERS comes first when both are on');
+});
+
+test('CUE in the stand-in: first after the performance page, the song on stage and a pick', () => {
+  let state = applyMockCommand(rig(), { cmd: 'setSetlistItem', itemId: 's2', notes: 'Capo 2\n\nWatch the drummer', plannedSeconds: 300 });
+  state = applyMockCommand(state, { cmd: 'cueOnSurface', on: true });
+  state = applyMockCommand(state, { cmd: 'layersOnSurface', on: true });
+  const screen = mockSurfaceScreen(state, cursor(2));
+  assert.equal(screen.pageKind, 'cue', 'CUE comes before LAYERS');
+  assert.equal(screen.call, 'set_cue');
+  let view = readCuePayload(screen.payload);
+  assert.deepEqual([view.songs, view.current, view.song, view.nextSong], [3, 1, 'Ballad', 'Closer']);
+  view = readCuePayload(mockSurfaceScreen(state, cursor(2, { picked: 2 })).payload);
+  assert.deepEqual([view.picked, view.pickedSong], [2, 'Closer'], 'a pick names the song pad 1 would go to');
+  view = readCuePayload(mockSurfaceScreen(state, cursor(2, { picked: 1 })).payload);
+  assert.equal(view.pickedSong, '', 'picking the song on stage is no pick');
+  assert.equal(mockSurfaceScreen(state, cursor(3)).pageKind, 'layers');
+});
+
+test('CHANGES in the stand-in says it has no plug-in to read, rather than inventing changes', () => {
+  const state = applyMockCommand(rig(), { cmd: 'changesOnSurface', on: true });
+  const screen = mockSurfaceScreen(state, cursor(2));
+  assert.equal(screen.pageKind, 'changes');
+  assert.equal(screen.call, 'set_changes');
+  const view = readChangesPayload(screen.payload);
+  assert.equal(view.state, 'problem');
+  assert.match(view.problemText, /plug-in/);
 });

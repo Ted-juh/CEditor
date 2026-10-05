@@ -134,21 +134,24 @@ public:
     int currentPage() const noexcept    { return reducer.page(); }
 
     /** Where the pages are. The control pages come first, then the performance page, then the
-        two stage pages (LAYERS, SOUNDCHECK: Ctrl49StagePages.h), then DISCOVER and the browser
+        stage pages (CUE, LAYERS, SOUNDCHECK: Ctrl49StagePages.h), then DISCOVER, CHANGES and the browser
         (Sound Browser Stage F) — last because they are the ones you go to deliberately rather
         than the ones you play from, and Page Right walks towards them.
 
         The pages after the performance page are only THERE when they have been asked for
-        (layersOnSurface, soundcheckOnSurface, discoverOnSurface, browsingOnSurface). A surface that quietly grew
+        (cueOnSurface, layersOnSurface, soundcheckOnSurface, discoverOnSurface, changesOnSurface,
+        browsingOnSurface). A surface that quietly grew
         an extra page under somebody's hands is a surface that stopped doing what they had it
         doing, which is the same rule each flag itself follows. */
     struct Pages
     {
         int control = 0;       // pages [0, control)
         int performance = 0;
-        int layers = -1;       // -1 when the page is off
+        int cue = -1;          // -1 when the page is off
+        int layers = -1;
         int soundcheck = -1;
         int discover = -1;
+        int changes = -1;
         int browse = -1;       // -1 when browsing is off, which is most of the time
         int count = 1;
     };
@@ -212,6 +215,18 @@ private:
     // DISCOVER's cursor and the kind it keeps to, and what it last read from the library. A read
     // walks the whole library, so it is kept for two seconds, or until a turn changes what it
     // should hold; the pads and E4 act on the sounds the screen is showing, which are these.
+    int cuePicked = -1;                      // CUE: the song E1 has picked; -1 = the one on stage
+    // CHANGES: the change picked, the save compared against (0 = the latest), where E1 has the
+    // part playing between that save and now, and the changes put back here, newest last, with
+    // the value each had, so E3 the other way can take them back. Read as DISCOVER is read.
+    int changesSelected = 0;
+    int changesBack = 0;
+    float changesListen = 1.0f;
+    std::vector<std::pair<juce::String, float>> changesPutBack;
+    host::InstrumentHostService::SurfaceChanges changesRead;
+    double changesReadMs = -1.0e12;
+    double changesPutBackMs = -1.0e12;
+    bool changesStale = true;
     int discoverSelected = 0;
     juce::String discoverKind;
     host::InstrumentHostService::SurfaceDiscover discoverRead;

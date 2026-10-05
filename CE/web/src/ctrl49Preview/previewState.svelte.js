@@ -45,9 +45,15 @@ export const preview = $state({
     held: '43 70, 64 112, 67 96',
     parts: [
       { name: 'Sub Bass', keyLow: 24, keyHigh: 54, velocityLow: 1, velocityHigh: 127, transpose: 0 },
-      { name: 'Glass Pad', keyLow: 48, keyHigh: 96, velocityLow: 1, velocityHigh: 127, transpose: 12 },
+      // Glass Pad and Strings share layer group 1 by velocity, crossfading around 75.
+      { name: 'Glass Pad', keyLow: 48, keyHigh: 96, velocityLow: 1, velocityHigh: 127, transpose: 12,
+        group: 1, source: 0, layerLow: 0, layerHigh: 70, layerFade: 12 },
+      { name: 'Strings', keyLow: 48, keyHigh: 96, velocityLow: 1, velocityHigh: 127, transpose: 0,
+        group: 1, source: 0, layerLow: 80, layerHigh: 127, layerFade: 12 },
       { name: 'Brass Stabs', keyLow: 60, keyHigh: 84, velocityLow: 100, velocityHigh: 127, transpose: -12 },
-      { name: 'Choir', keyLow: 55, keyHigh: 96, velocityLow: 1, velocityHigh: 127, transpose: 0, muted: true },
+      // A key layer: its band ramps in over the crossfade rather than stopping at a key.
+      { name: 'Choir', keyLow: 55, keyHigh: 96, velocityLow: 1, velocityHigh: 127, transpose: 0,
+        group: 2, source: 1, layerLow: 72, layerHigh: 127, layerFade: 6 },
       { name: 'Arp Lead', keyLow: 0, keyHigh: 127, velocityLow: 1, velocityHigh: 127, transpose: 0, fromKeyboard: false },
     ],
   },
@@ -57,14 +63,43 @@ export const preview = $state({
     current: 0,
     basis: 'Current rig at check time',
     seconds: 42,
+    preloadOff: true,
     songs: [
-      { name: 'Glass Harbour', checked: true, problems: [], measured: true, rmsDb: -18.4, peakDb: -3.2 },
+      { name: 'Glass Harbour', checked: true, problems: [], measured: true, rmsDb: -18.4, peakDb: -3.2, loadSeconds: 0.4 },
       { name: 'Salt Road', checked: true, problems: ['MIDI output unavailable: USB MIDI 2', 'Drifter: plug-in file is missing'],
-        measured: true, rmsDb: -22.0, peakDb: -6.5 },
+        measured: true, rmsDb: -22.0, peakDb: -6.5, loadSeconds: 7.8 },
       { name: 'Night Bus', checked: false, problems: [] },
-      { name: 'Paper Lanterns', checked: true, problems: [], measured: true, rmsDb: -14.1, peakDb: -1.0 },
+      { name: 'Paper Lanterns', checked: true, problems: [], measured: true, rmsDb: -14.1, peakDb: -1.0, loadSeconds: 2.1,
+        preloaded: true },
       { name: 'Encore', checked: true, problems: [] },
     ],
+  },
+
+  // The focused part's sound against a save of it (state: 0 a problem, 1 nothing changed, 2 changed).
+  changes: {
+    state: 2, selected: 1, total: 312, listen: 100, back: 0, saves: 3, putBack: 0,
+    sound: 'Glass Pad', against: 'your last save', when: '05 Oct 18:42',
+    problemText: 'Load a sound from the library to compare against its save.',
+    rows: [
+      { name: 'Cutoff', savedText: '2.1 kHz', nowText: '4.8 kHz', saved: 40, now: 62 },
+      { name: 'Resonance', savedText: '12 %', nowText: '30 %', saved: 12, now: 30 },
+      { name: 'Env Amount', savedText: '+20', nowText: '+45', saved: 60, now: 72 },
+      { name: 'Attack', savedText: '4 ms', nowText: '120 ms', saved: 5, now: 38 },
+      { name: 'Chorus Mix', savedText: 'Off', nowText: '35 %', saved: 0, now: 35 },
+      { name: 'Drive', savedText: '0.0 dB', nowText: '3.5 dB', saved: 0, now: 18 },
+    ],
+  },
+
+  // The setlist's cue screen. `sections` off shows the song's notes and its clock instead.
+  cue: {
+    sections: true,
+    picked: false,
+    view: {
+      songs: 6, current: 1, picked: 2, song: 'Night Bus', tempo: 124, songSeconds: 252, setSeconds: 2282,
+      plannedSeconds: 300, notes: ['Capo 2. Long intro.', 'Watch the drummer for the stop.'],
+      section: 'Bridge', sectionBar: 1, sectionBars: 4, nextSection: 'Chorus', nextSong: 'Glass Harbour',
+      nextReady: 30, pickedSong: 'Paper Lanterns',
+    },
   },
 
   // What you own and have never opened, nearest to what you load (state: 0 not enough to go on,

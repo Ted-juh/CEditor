@@ -29,9 +29,10 @@ std::string text (const c49::Bytes& b, std::size_t at)
 c49::SoundcheckView goldenSoundcheck()
 {
     c49::SoundcheckView view;
-    view.songs = { { "Glass Harbour", true, 0, true, -18.4, -3.2 },
+    view.songs = { { "Glass Harbour", true, 0, true, -18.4, -3.2, 2.3 },
                    { "Salt Road", true, 2, false, -120.0, -120.0 },
-                   { "Night Bus", false, 0, false, -120.0, -120.0 } };
+                   { "Night Bus", false, 0, false, -120.0, -120.0, 0.0 } };
+    view.preloadOff = true;
     view.selected = 1;
     view.current = 0;
     view.basis = "Current rig at check time";
@@ -43,7 +44,7 @@ c49::LayersView goldenLayers()
 {
     c49::LayersView view;
     view.parts = { { "Sub Bass", 36, 54, 1, 127, 0, true, false, true },
-                   { "Brass", 60, 84, 100, 127, -12, true, true, false } };
+                   { "Brass", 60, 84, 100, 127, -12, true, true, false, 1, 0, 0, 80, 127, 13 } };
     view.focused = 1;
     view.held = { { 48, 90 }, { 72, 112 } };
     return view;
@@ -51,16 +52,16 @@ c49::LayersView goldenLayers()
 
 const c49::Bytes kGoldenSoundcheck {
     3, 0, 3, 1, 1, 1, 1, 1,
-    1, 43, 0, 13, 'G', 'l', 'a', 's', 's', ' ', 'H', 'a', 'r', 'b', 'o', 'u', 'r',
-    2, 0, 2, 9, 'S', 'a', 'l', 't', ' ', 'R', 'o', 'a', 'd',
-    0, 0, 0, 9, 'N', 'i', 'g', 'h', 't', ' ', 'B', 'u', 's',
+    1, 43, 0, 24, 13, 'G', 'l', 'a', 's', 's', ' ', 'H', 'a', 'r', 'b', 'o', 'u', 'r',
+    2, 0, 2, 0, 9, 'S', 'a', 'l', 't', ' ', 'R', 'o', 'a', 'd',
+    0, 0, 0, 1, 9, 'N', 'i', 'g', 'h', 't', ' ', 'B', 'u', 's',
     25, 'C', 'u', 'r', 'r', 'e', 'n', 't', ' ', 'r', 'i', 'g', ' ', 'a', 't', ' ', 'c', 'h', 'e', 'c', 'k', ' ', 't', 'i', 'm', 'e',
     2, 2,
     35, 'M', 'I', 'D', 'I', ' ', 'o', 'u', 't', 'p', 'u', 't', ' ', 'u', 'n', 'a', 'v', 'a', 'i', 'l', 'a', 'b', 'l', 'e', ':', ' ',
         'U', 'S', 'B', ' ', 'M', 'I', 'D', 'I', ' ', '2',
     32, 'D', 'r', 'i', 'f', 't', 'e', 'r', ':', ' ', 'p', 'l', 'u', 'g', '-', 'i', 'n', ' ', 'f', 'i', 'l', 'e', ' ',
         'i', 's', ' ', 'm', 'i', 's', 's', 'i', 'n', 'g',
-    0, 0, 0 };
+    0, 0, 0, 2 };
 
 c49::DiscoverView goldenDiscover()
 {
@@ -100,10 +101,76 @@ c49::Bytes goldenDiscoverBytes()
     return b;
 }
 
+c49::CueView goldenCue()
+{
+    c49::CueView view;
+    view.songs = 6;
+    view.current = 1;
+    view.picked = 2;
+    view.song = "Night Bus";
+    view.tempo = 124.0;
+    view.songSeconds = 252;
+    view.setSeconds = 2282;
+    view.plannedSeconds = 300;
+    view.notes = { "Capo 2. Long intro.", "Watch the drummer" };
+    view.section = "Bridge";
+    view.sectionBar = 1;
+    view.sectionBars = 4;
+    view.nextSection = "Chorus";
+    view.nextSong = "Glass Harbour";
+    view.nextReady = 30;
+    view.pickedSong = "Glass Harbour";
+    return view;
+}
+
+c49::Bytes goldenCueBytes()
+{
+    // 252 s, 2282 s (8 * 256 + 234), 300 s (256 + 44), 124.0 BPM as 1240 (4 * 256 + 216)
+    c49::Bytes b { 6, 2, 3, 0, 252, 0, 234, 8, 44, 1, 216, 4, 1, 4, 30 };
+    put (b, "Night Bus");
+    put (b, "Bridge");
+    put (b, "Chorus");
+    put (b, "Glass Harbour");
+    put (b, "Glass Harbour");
+    b.push_back (2);
+    put (b, "Capo 2. Long intro.");
+    put (b, "Watch the drummer");
+    return b;
+}
+
+c49::ChangesView goldenChanges()
+{
+    c49::ChangesView view;
+    view.state = c49::ChangesView::changed;
+    view.rows = { { "Cutoff", "2.1 kHz", "4.8 kHz", 40, 62 }, { "Resonance", "12 %", "30 %", 12, 30 } };
+    view.selected = 1;
+    view.total = 300;
+    view.listen = 100;
+    view.back = 0;
+    view.saves = 3;
+    view.putBack = 1;
+    view.sound = "Glass Pad";
+    view.against = "your last save";
+    view.when = "05 Oct 18:42";
+    return view;
+}
+
+c49::Bytes goldenChangesBytes()
+{
+    c49::Bytes b { 2, 2, 0, 2, 1, 44, 1, 100, 0, 3, 1 };   // 300 = 256 + 44
+    put (b, "Glass Pad");
+    put (b, "your last save");
+    put (b, "05 Oct 18:42");
+    put (b, "");
+    b.insert (b.end(), { 40, 62 });  put (b, "Cutoff");  put (b, "2.1 kHz");  put (b, "4.8 kHz");
+    b.insert (b.end(), { 12, 30 });  put (b, "Resonance");  put (b, "12 %");  put (b, "30 %");
+    return b;
+}
+
 const c49::Bytes kGoldenLayers {
     2, 0, 2, 1, 36,
-    36, 54, 1, 127, 64, 5, 8, 'S', 'u', 'b', ' ', 'B', 'a', 's', 's',
-    60, 84, 100, 127, 52, 3, 5, 'B', 'r', 'a', 's', 's',
+    36, 54, 1, 127, 64, 5, 0, 0, 0, 127, 0, 8, 'S', 'u', 'b', ' ', 'B', 'a', 's', 's',
+    60, 84, 100, 127, 52, 3, 1, 0, 80, 127, 13, 5, 'B', 'r', 'a', 's', 's',
     2, 48, 90, 72, 112 };
 } // namespace
 
@@ -131,7 +198,11 @@ int main()
         check (c49::buildSoundcheckPayload (many)[1] == 30, "and the last ten when the last song is selected");
         many.selected = 99;
         check (c49::buildSoundcheckPayload (many)[3] == 39, "a selection past the end is the last song");
-        check (c49::buildSoundcheckPayload (c49::SoundcheckView {}).size() == 14 && c49::buildSoundcheckPayload (c49::SoundcheckView {})[0] == 0,
+        check (c49::soundcheckLoadByte (-1.0, false) == 0 && c49::soundcheckLoadByte (0.0, false) == 1
+                 && c49::soundcheckLoadByte (2.34, false) == 24 && c49::soundcheckLoadByte (90.0, false) == 254
+                 && c49::soundcheckLoadByte (16.0, true) == 255,
+               "a load time is one byte: tenths of a second, 0 for never, 255 for gave up");
+        check (c49::buildSoundcheckPayload (c49::SoundcheckView {}).size() == 15 && c49::buildSoundcheckPayload (c49::SoundcheckView {})[0] == 0,
                "an empty setlist still makes a payload the page reads");
 
         c49::SoundcheckView wordy = goldenSoundcheck();
@@ -143,8 +214,8 @@ int main()
         std::size_t at = 8;
         for (int r = 0; r < 3; ++r)
         {
-            namesCut = namesCut && cut[at + 3] <= c49::kSoundcheckNameChars;
-            at += 4 + cut[at + 3];
+            namesCut = namesCut && cut[at + 4] <= c49::kSoundcheckNameChars;
+            at += 5 + cut[at + 4];
         }
         at += 1 + cut[at];
         check (cut[at] == 6 && cut[at + 1] == c49::kSoundcheckProblemLines, "six problems: the count says six, four are sent");
@@ -154,14 +225,16 @@ int main()
         c49::SoundcheckView odd = goldenSoundcheck();
         odd.songs[0].name = "Caf\xC3\xA9";
         const auto ascii = c49::buildSoundcheckPayload (odd);
-        check (ascii[11] == 5 && ascii[15] == '?' && ascii[16] == '?', "anything not ASCII is sent as '?'");
+        check (ascii[12] == 5 && ascii[16] == '?' && ascii[17] == '?', "anything not ASCII is sent as '?'");
     }
 
     {   // --- LAYERS ---------------------------------------------------------------------------
         const auto bytes = c49::buildLayersPayload (goldenLayers());
         check (bytes == kGoldenLayers, "the layers payload is the golden the app's test also asserts");
-        check (bytes[10] == (1 | 4) && bytes[25] == (1 | 2), "flags: enabled 1, muted 2, from the keyboard 4");
-        check (bytes[24] == 64 - 12, "transpose is sent with 64 added");
+        check (bytes[10] == (1 | 4) && bytes[30] == (1 | 2), "flags: enabled 1, muted 2, from the keyboard 4");
+        check (bytes[29] == 64 - 12, "transpose is sent with 64 added");
+        check (bytes[11] == 0 && bytes[31] == 1 && bytes[33] == 80 && bytes[35] == 13,
+               "a part in a layer group carries its group, its share of the source and its crossfade");
 
         c49::LayersView many;
         for (int i = 0; i < 12; ++i)
@@ -174,7 +247,7 @@ int main()
         check (c49::buildLayersPayload (many)[1] == 0, "from the top when the first is focused");
 
         c49::LayersView wild;
-        wild.parts = { { "X", -5, 300, 0, 200, 99, false, false, false } };
+        wild.parts = { { "X", -5, 300, 0, 200, 99, false, false, false, 3, 9, 7, -1, 300, 90 } };
         for (int n = 0; n < 30; ++n)
             wild.held.push_back ({ 40 + n, 100 });
         wild.firstKey = 120;
@@ -182,8 +255,59 @@ int main()
         check (clamped[4] == 127 - 48, "the 49 keys drawn always fit 0-127");
         check (clamped[5] == 0 && clamped[6] == 127 && clamped[8] == 127 && clamped[9] == 127 && clamped[10] == 0,
                "keys, velocities and transpose are clamped; a disabled part has no flags");
-        check (clamped[13] == c49::kLayersHeldNotes && clamped.size() == 14u + 2u * c49::kLayersHeldNotes,
+        check (clamped[12] == 4 + 16 * 2 && clamped[13] == 0 && clamped[14] == 127 && clamped[15] == 64,
+               "a layer's source, sharing, range and crossfade are clamped too");
+        check (clamped[18] == c49::kLayersHeldNotes && clamped.size() == 19u + 2u * c49::kLayersHeldNotes,
                "at most sixteen held notes are sent");
+    }
+
+    {   // --- CHANGES --------------------------------------------------------------------------
+        check (c49::buildChangesPayload (goldenChanges()) == goldenChangesBytes(),
+               "the changes payload is the golden the app's test also asserts");
+
+        c49::ChangesView many = goldenChanges();
+        many.rows.clear();
+        for (int i = 0; i < 20; ++i)
+            many.rows.push_back ({ "P" + std::to_string (i), "a", "b", 0, 100 });
+        many.selected = 15;
+        const auto scrolled = c49::buildChangesPayload (many);
+        check (scrolled[1] == 20 && scrolled[2] == 12 && scrolled[3] == c49::kChangesRows,
+               "a long list of changes scrolls with the selection, eight at a time");
+
+        c49::ChangesView problem;
+        problem.problemText = "Load a sound from the library to compare against its save.";
+        const auto refused = c49::buildChangesPayload (problem);
+        check (refused[0] == 0 && refused[3] == 0 && refused.size() < 64, "a problem is a page that says why, and no rows");
+
+        c49::ChangesView wordy = goldenChanges();
+        wordy.rows[0].savedText = "a very long value text";
+        const auto cut = c49::buildChangesPayload (wordy);
+        check (cut.size() < c49::kMaxPayloadBytes, "the page fits a frame");
+    }
+
+    {   // --- CUE ------------------------------------------------------------------------------
+        check (c49::buildCuePayload (goldenCue()) == goldenCueBytes(), "the cue payload is the golden the app's test also asserts");
+
+        c49::CueView same = goldenCue();
+        same.picked = same.current;
+        const auto here = c49::buildCuePayload (same);
+        // header 15, then song 1+9, section 1+6, next section 1+6, next song 1+13: the pick at 53
+        check (here[2] == 0 && here[53] == 0,
+               "picking the song already on stage is no pick at all");
+
+        c49::CueView none;
+        const auto empty = c49::buildCuePayload (none);
+        check (empty[0] == 0 && empty[1] == 0 && empty[12] == 0 && empty[13] == 0 && empty[14] == 255
+                 && empty.size() == 21,
+               "with no setlist the page is still sent: no song, no section, nothing to preload");
+
+        c49::CueView long_ = goldenCue();
+        long_.songSeconds = 99999;
+        long_.sectionBar = 9;
+        long_.notes = { std::string (60, 'n'), "b", "c", "d" };
+        const auto cut = c49::buildCuePayload (long_);
+        check (cut[4] == 0xFF && cut[5] == 0xFF && cut[12] == 4, "clocks stop at 65535 s, the bar at the section's last");
+        check (cut.size() < c49::kMaxPayloadBytes, "and the page fits a frame");
     }
 
     {   // --- DISCOVER -------------------------------------------------------------------------

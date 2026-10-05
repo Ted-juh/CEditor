@@ -9,10 +9,12 @@
    * Left/Right, the eight encoders (drag or scroll on a knob, or the steppers), the encoder
    * switches (click a knob) and the pads. The keyboard, when there is one, follows along.
    *
-   * Three more pages can follow the performance page once asked for here — LAYERS (every part's
-   * zone over the keys), SOUNDCHECK (the set, checked) and DISCOVER (what you own and have never
-   * opened, nearest to what you load) — each drawn by one call (set_layers, set_check,
-   * set_discover) where a knob page takes two. Their encoders are labelled from the same bytes.
+   * Five more pages can follow the performance page once asked for here — CUE (the setlist read
+   * mid-show), LAYERS (every part's zone over the keys), SOUNDCHECK (the set, checked), DISCOVER
+   * (what you own and have never opened, nearest to what you load) and CHANGES (the focused
+   * part's sound against its saves) — each drawn by one call (set_cue, set_layers, set_check,
+   * set_discover, set_changes) where a knob page takes two. Their encoders are labelled from the
+   * same bytes.
    *
    * The page and its images are loaded on demand, so a build that cannot reach them (a test
    * harness serving only CE/web) loses this card and nothing else.
@@ -21,12 +23,12 @@
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import { ctrl49Screen, hostSurface, hostState, surfaceInput, setControlSlotValue, surfaceStatusText,
-           layersOnSurface, soundcheckOnSurface, discoverOnSurface } from '../stores/instrumentHost.js';
+           layersOnSurface, soundcheckOnSurface, discoverOnSurface, cueOnSurface, changesOnSurface } from '../stores/instrumentHost.js';
   import { createCtrl49Screen } from '../screen/ctrl49Runtime.js';
-  import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload } from '../screen/ctrl49Payloads.js';
+  import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload, readCuePayload, readChangesPayload } from '../screen/ctrl49Payloads.js';
 
   const KIND = { control: 'Controls', performance: 'Performance', browse: 'Sound browser',
-                 layers: 'Layers', soundcheck: 'Soundcheck', discover: 'Discover' };
+                 layers: 'Layers', soundcheck: 'Soundcheck', discover: 'Discover', cue: 'Cue', changes: 'Changes' };
   const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const noteName = (n) => `${NOTE_NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
   const DRAG_STEP = 4;                   // pixels of drag per encoder detent
@@ -107,6 +109,23 @@
         { label: 'Highest velocity', text: String(part.velocityHigh) },
         unused, unused,
       ];
+    }
+    if (pageKind === 'changes') {
+      const view = readChangesPayload(payload);
+      if (view.state === 'problem') return Array.from({ length: 8 }, () => unused);
+      return [
+        { label: 'Listen', text: view.listen >= 100 ? 'Now' : view.listen === 0 ? 'The save' : `${view.listen}% of the way` },
+        { label: 'Change', text: view.count ? `${view.selected + 1} / ${view.count}` : 'Nothing changed', unused: !view.count },
+        { label: 'Put back', text: view.putBack ? `${view.putBack} put back` : 'Turn to put back', unused: !view.count && !view.putBack },
+        { label: 'Walk back', text: `Save ${view.back + 1} of ${view.saves}`, unused: view.saves < 2 },
+        unused, unused, unused, unused,
+      ];
+    }
+    if (pageKind === 'cue') {
+      const view = readCuePayload(payload);
+      const text = view.pickedSong ? `Go to ${view.pickedSong}`
+        : view.current >= 0 ? `On stage: ${view.current + 1} / ${view.songs}` : view.songs ? 'Nothing on stage' : 'No setlist';
+      return [{ label: 'Pick a song', text, unused: view.songs === 0 }, unused, unused, unused, unused, unused, unused, unused];
     }
     if (pageKind === 'discover') {
       const view = readDiscoverPayload(payload);
@@ -265,14 +284,18 @@
                           : `${surfaceStatus.short} — shown here only`);
 
   // The stage pages are off until asked for; SOUNDCHECK needs the setlists the edition may not have.
-  const pagesOn = $derived($hostState.surfacePages ?? { layers: false, soundcheck: false, discover: false });
-  // The pads do nothing on LAYERS and SOUNDCHECK; on DISCOVER each auditions the row beside it.
-  const padsIdle = $derived(stage && $ctrl49Screen.pageKind !== 'discover');
+  const pagesOn = $derived($hostState.surfacePages ?? { layers: false, soundcheck: false, discover: false, cue: false, changes: false });
+  // The pads do nothing on LAYERS and SOUNDCHECK; on DISCOVER each auditions the row beside it,
+  // and on CUE pad 1 goes to the song E1 picked.
+  const cuePick = $derived($ctrl49Screen.pageKind === 'cue' && readCuePayload($ctrl49Screen.payload).pickedSong !== '');
+  const padIdle = (index) => stage && !($ctrl49Screen.pageKind === 'discover' || (cuePick && index === 0));
   const setlists = $derived(($hostState.licence?.features ?? [])
     .find((f) => f.feature === 'scenesAndSetlists')?.allowed !== false);
   const HINT = {
     layers: 'Encoder 1 picks the part; 2–6 set its lowest and highest key, transpose and velocity range.',
     soundcheck: 'Encoder 1 walks the set; encoder 8 checks it again.',
+    cue: 'Encoder 1 picks a song; pad 1 goes to it. Shift + Page steps the set from any page.',
+    changes: 'Encoder 1 listens between the save and now, 2 picks a change, 3 puts it back (the other way takes it back), 4 walks back through the saves.',
     discover: 'Encoder 1 picks, 2 reaches further, 3 keeps to one kind, 4 keeps a sound as a favourite. Pad N plays row N.',
   };
 </script>
@@ -305,6 +328,10 @@
 
       <div class="stage-pages" role="group" aria-label="Stage pages on the keyboard">
         <span class="group-label">After Performance</span>
+        <button type="button" aria-pressed={pagesOn.cue} class:on={pagesOn.cue} data-testid="ctrl49-cue-toggle"
+                disabled={!setlists && !pagesOn.cue}
+                title={setlists ? 'The setlist read mid-show: the song, its section, its clock, what is next' : 'Needs scenes and setlists'}
+                onclick={() => cueOnSurface(!pagesOn.cue)}>Cue</button>
         <button type="button" aria-pressed={pagesOn.layers} class:on={pagesOn.layers} data-testid="ctrl49-layers-toggle"
                 title="Every part's zone over the keys, and the notes you hold"
                 onclick={() => layersOnSurface(!pagesOn.layers)}>Layers</button>
@@ -315,6 +342,9 @@
         <button type="button" aria-pressed={pagesOn.discover} class:on={pagesOn.discover} data-testid="ctrl49-discover-toggle"
                 title="What you own and have never opened, nearest to what you keep loading"
                 onclick={() => discoverOnSurface(!pagesOn.discover)}>Discover</button>
+        <button type="button" aria-pressed={pagesOn.changes} class:on={pagesOn.changes} data-testid="ctrl49-changes-toggle"
+                title="The focused part's sound against its saves: what moved, heard and put back"
+                onclick={() => changesOnSurface(!pagesOn.changes)}>Changes</button>
       </div>
 
       <div class="encoders" role="group" aria-label="Encoders">
@@ -355,9 +385,10 @@
       <span class="group-label">Pads</span>
       <div class="pads" role="group" aria-label="Pads">
         {#each Array(8) as _, index}
-          <button type="button" class="pad" disabled={padsIdle}
-                  title={padsIdle ? 'The pads do nothing on this page'
-                         : $ctrl49Screen.pageKind === 'discover' ? `Audition row ${index + 1}` : `Pad ${index + 1}`}
+          <button type="button" class="pad" disabled={padIdle(index)}
+                  title={padIdle(index) ? 'The pads do nothing on this page'
+                         : $ctrl49Screen.pageKind === 'discover' ? `Audition row ${index + 1}`
+                         : $ctrl49Screen.pageKind === 'cue' ? 'Go to the song encoder 1 picked' : `Pad ${index + 1}`}
                   onclick={() => pad(index)}>{index + 1}</button>
         {/each}
       </div>

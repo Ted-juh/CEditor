@@ -4,12 +4,13 @@
   import TriangleAlert from 'lucide-svelte/icons/triangle-alert';
   import Plug from 'lucide-svelte/icons/plug';
   import Info from 'lucide-svelte/icons/info';
-  import { soundcheckDb, soundcheckReferenceStatus } from '../utils/setlistSoundcheck.js';
+  import { soundcheckDb, soundcheckReferenceStatus, soundcheckLoad } from '../utils/setlistSoundcheck.js';
 
   let { item, soundcheck, onMeasure, onStop } = $props();
   let expanded = $state(false);
   let entry = $derived(soundcheck.entries.find(row => row.itemId === item.itemId));
   let status = $derived(soundcheckReferenceStatus(entry));
+  let load = $derived(soundcheckLoad(entry));
   let active = $derived(soundcheck.activeItemId === item.itemId);
   let current = $derived(soundcheck.currentItemId === item.itemId);
   let blocked = $derived(!current ? 'Select this song before measuring.'
@@ -35,6 +36,9 @@
     <b data-testid="soundcheck-average">{soundcheckDb(entry?.rms, entry?.measured)}</b>
   </span>
   <span class="duration">{entry?.seconds > 0 ? `${entry.seconds.toFixed(1)}s` : '—'}</span>
+  <span class="reading" title="How long its rig took to load the last time it was recalled">Load
+    <b class:clip={load.slow} data-testid="soundcheck-load">{load.text}</b>
+  </span>
   <button type="button" class="measure" disabled={!active && !!blocked}
     title={active ? 'Finish this passage' : blocked || 'Play a comparable passage; stops after 2 minutes.'}
     onclick={() => active ? onStop() : onMeasure(item.itemId)}>{active ? 'Stop' : 'Measure'}</button>
@@ -49,6 +53,9 @@
     {#each entry?.issues ?? [] as issue}<div class="warning">{issue}</div>{/each}
     {#if entry?.error}<div class="warning">{entry.error}</div>{/if}
     <div>Measured: {active ? 'Recording passage…' : when(entry?.measuredAt)} · Main output 1/2 · Peak / RMS average in dBFS.</div>
+    <div data-testid="soundcheck-load-detail">Loaded: {entry?.loadSeconds >= 0 || entry?.loadTimedOut
+      ? `${entry.loadTimedOut ? 'gave up waiting' : `in ${load.text}`}${entry.loadPreloaded ? ', preloaded' : ''} · ${when(entry.loadedAt)}`
+      : 'not recalled yet'}{load.slow ? ' · Slow: preloading the next song has it ready before you go to it.' : ''}</div>
     <div>Checks and readings are session snapshots. Recheck after rig changes; adjust in Mixer and remeasure using a comparable passage.</div>
   </div>
 {/if}

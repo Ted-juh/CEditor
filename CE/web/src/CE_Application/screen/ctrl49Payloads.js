@@ -134,6 +134,13 @@ export function soundcheckLevelByte(measured, db) {
   return clampTo(1 + Math.round(Math.max(-60, Math.min(0, db)) + 60), 1, 61);
 }
 
+/** soundcheckLoadByte: 0 never recalled, 1-254 tenths of a second (0.0-25.3 s), 255 gave up. */
+export function soundcheckLoadByte(seconds, timedOut) {
+  if (!(seconds >= 0) || !Number.isFinite(seconds)) return 0;
+  if (timedOut) return 255;
+  return clampTo(1 + Math.round(seconds * 10), 1, 254);
+}
+
 /** soundcheckFirstRow: the selected song kept in view, centred where it can be. */
 export function soundcheckFirstRow(songs, selected) {
   if (songs <= SOUNDCHECK_ROWS) return 0;
@@ -143,8 +150,9 @@ export function soundcheckFirstRow(songs, selected) {
 /**
  * buildSoundcheckPayload.
  * @param {{ songs?: { name?: string, checked?: boolean, problems?: number, measured?: boolean,
- *   rmsDb?: number, peakDb?: number }[], selected?: number, current?: number, basis?: string,
- *   problems?: string[], seconds?: number }} view
+ *   rmsDb?: number, peakDb?: number, loadSeconds?: number, loadTimedOut?: boolean, preloaded?: boolean }[],
+ *   selected?: number, current?: number, basis?: string, problems?: string[], seconds?: number,
+ *   preloadOff?: boolean }} view
  */
 export function soundcheckPayload(view) {
   const songs = view.songs ?? [];
@@ -167,6 +175,7 @@ export function soundcheckPayload(view) {
     out.push(!song.checked ? 0 : (song.problems ?? 0) > 0 ? 2 : 1);
     out.push(soundcheckLevelByte(song.measured, song.rmsDb));
     out.push(clampTo(song.problems ?? 0, 0, 255));
+    out.push(soundcheckLoadByte(song.loadSeconds ?? -1, song.loadTimedOut === true));
     appendCut(out, song.name, 24);
   }
   appendCut(out, view.basis, 32, true);
@@ -176,7 +185,8 @@ export function soundcheckPayload(view) {
   const song = count > 0 ? songs[selected] : null;
   const measured = Boolean(song?.measured);
   out.push(soundcheckLevelByte(measured, song?.peakDb), soundcheckLevelByte(measured, song?.rmsDb),
-    measured ? clampTo(Math.round(view.seconds ?? 0), 0, 255) : 0);
+    measured ? clampTo(Math.round(view.seconds ?? 0), 0, 255) : 0,
+    (song?.preloaded ? 1 : 0) | (view.preloadOff ? 2 : 0));
   return out;
 }
 
@@ -190,7 +200,8 @@ export function layersFirstRow(parts, focused) {
  * buildLayersPayload.
  * @param {{ parts?: { name?: string, keyLow?: number, keyHigh?: number, velocityLow?: number,
  *   velocityHigh?: number, transpose?: number, enabled?: boolean, muted?: boolean,
- *   fromKeyboard?: boolean }[], focused?: number, firstKey?: number,
+ *   fromKeyboard?: boolean, group?: number, source?: number, allocation?: number, layerLow?: number,
+ *   layerHigh?: number, layerFade?: number }[], focused?: number, firstKey?: number,
  *   held?: { note: number, velocity: number }[] }} view
  */
 export function layersPayload(view) {
@@ -206,12 +217,77 @@ export function layersPayload(view) {
     out.push(clampTo(part.keyLow ?? 0, 0, 127), clampTo(part.keyHigh ?? 127, 0, 127),
       clampTo(part.velocityLow ?? 1, 0, 127), clampTo(part.velocityHigh ?? 127, 0, 127),
       clampTo((part.transpose ?? 0) + 64, 0, 127),
-      (part.enabled !== false ? 1 : 0) | (part.muted ? 2 : 0) | (part.fromKeyboard !== false ? 4 : 0));
+      (part.enabled !== false ? 1 : 0) | (part.muted ? 2 : 0) | (part.fromKeyboard !== false ? 4 : 0),
+      clampTo(part.group ?? 0, 0, 255), clampTo(part.source ?? 0, 0, 4) + 16 * clampTo(part.allocation ?? 0, 0, 2),
+      clampTo(part.layerLow ?? 0, 0, 127), clampTo(part.layerHigh ?? 127, 0, 127), clampTo(part.layerFade ?? 0, 0, 64));
     appendCut(out, part.name, 20);
   }
   const held = (view.held ?? []).slice(0, LAYERS_HELD_NOTES);
   out.push(held.length);
   for (const { note, velocity } of held) out.push(clampTo(note, 0, 127), clampTo(velocity, 0, 127));
+  return out;
+}
+
+/**
+ * buildCuePayload: the setlist's cue screen. Two-byte numbers are low byte first, stopping at 65535.
+ * @param {{ songs?: number, current?: number, picked?: number, loading?: boolean, song?: string, tempo?: number,
+ *   songSeconds?: number, setSeconds?: number, plannedSeconds?: number, notes?: string[], section?: string,
+ *   sectionBar?: number, sectionBars?: number, nextSection?: string, nextSong?: string, nextReady?: number,
+ *   pickedSong?: string }} view
+ */
+export function cuePayload(view) {
+  const songs = view.songs ?? 0;
+  const current = view.current ?? -1;
+  const picked = view.picked ?? -1;
+  const inSet = (index) => (index >= 0 && index < songs ? index + 1 : 0);
+  const two = (out, value) => { const v = clampTo(value, 0, 65535); out.push(v & 0xff, v >> 8); };
+  const out = [clampTo(songs, 0, 255), inSet(current), picked === current ? 0 : inSet(picked), view.loading ? 1 : 0];
+  two(out, view.songSeconds ?? 0);
+  two(out, view.setSeconds ?? 0);
+  two(out, view.plannedSeconds ?? 0);
+  two(out, Math.round((view.tempo ?? 0) * 10));
+  const bars = view.section ? clampTo(view.sectionBars ?? 0, 0, 255) : 0;
+  out.push(bars === 0 ? 0 : clampTo(view.sectionBar ?? 1, 1, bars), bars,
+    (view.nextReady ?? -1) < 0 ? 255 : clampTo(view.nextReady, 0, 100));
+  appendCut(out, view.song, 24);
+  appendCut(out, view.section, 16);
+  appendCut(out, view.nextSection, 16);
+  appendCut(out, view.nextSong, 24);
+  appendCut(out, picked === current ? '' : view.pickedSong, 24);
+  const lines = (view.notes ?? []).slice(0, 3);
+  out.push(lines.length);
+  for (const line of lines) appendCut(out, line, 44, true);
+  return out;
+}
+
+export const CHANGES_ROWS = 8;
+
+/**
+ * buildChangesPayload: the focused part's sound against a save of it. State 0 problem, 1 unchanged, 2 changed.
+ * @param {{ state?: number, rows?: { name?: string, savedText?: string, nowText?: string, saved?: number,
+ *   now?: number }[], selected?: number, total?: number, listen?: number, back?: number, saves?: number,
+ *   putBack?: number, sound?: string, against?: string, when?: string, problemText?: string }} view
+ */
+export function changesPayload(view) {
+  const rows = view.rows ?? [];
+  const count = rows.length;
+  const selected = count === 0 ? 0 : clampTo(view.selected ?? 0, 0, count - 1);
+  const first = count <= CHANGES_ROWS ? 0 : clampTo(selected - CHANGES_ROWS / 2 + 1, 0, count - CHANGES_ROWS);
+  const shown = Math.min(CHANGES_ROWS, count - first);
+  const total = clampTo(view.total ?? 0, 0, 65535);
+  const out = [clampTo(view.state ?? 0, 0, 2), clampTo(count, 0, 255), clampTo(first, 0, 255), clampTo(shown, 0, 255),
+    clampTo(selected, 0, 255), total & 0xff, total >> 8, clampTo(view.listen ?? 100, 0, 100),
+    clampTo(view.back ?? 0, 0, 255), clampTo(view.saves ?? 0, 0, 255), clampTo(view.putBack ?? 0, 0, 255)];
+  appendCut(out, view.sound, 24);
+  appendCut(out, view.against, 24);
+  appendCut(out, view.when, 16);
+  appendCut(out, view.problemText, 44, true);
+  for (const row of rows.slice(first, first + shown)) {
+    out.push(clampTo(row.saved ?? 0, 0, 100), clampTo(row.now ?? 0, 0, 100));
+    appendCut(out, row.name, 20);
+    appendCut(out, row.savedText, 10);
+    appendCut(out, row.nowText, 10);
+  }
   return out;
 }
 
@@ -283,8 +359,10 @@ export function readLayersPayload(bytes = []) {
   const parts = [];
   for (let i = 0; i < rows; i++) {
     const [keyLow, keyHigh, velocityLow, velocityHigh, transpose, flags] = [r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte()];
+    const [group, how, layerLow, layerHigh, layerFade] = [r.byte(), r.byte(), r.byte(), r.byte(), r.byte()];
     parts.push({ index: first + i, name: r.text(), keyLow, keyHigh, velocityLow, velocityHigh, transpose: transpose - 64,
-                 enabled: (flags & 1) !== 0, muted: (flags & 2) !== 0, fromKeyboard: (flags & 4) !== 0 });
+                 enabled: (flags & 1) !== 0, muted: (flags & 2) !== 0, fromKeyboard: (flags & 4) !== 0,
+                 group, source: how % 16, allocation: Math.floor(how / 16), layerLow, layerHigh, layerFade });
   }
   const held = [];
   for (let i = 0, n = r.byte(); i < n; i++) held.push({ note: r.byte(), velocity: r.byte() });
@@ -298,16 +376,18 @@ export function readSoundcheckPayload(bytes = []) {
     [r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte()];
   const songs = [];
   for (let i = 0; i < rows; i++) {
-    const [status, level, issues] = [r.byte(), r.byte(), r.byte()];
-    songs.push({ index: first + i, status: ['unchecked', 'ready', 'problems'][status] ?? 'unchecked', level, problems: issues, name: r.text() });
+    const [status, level, issues, load] = [r.byte(), r.byte(), r.byte(), r.byte()];
+    songs.push({ index: first + i, status: ['unchecked', 'ready', 'problems'][status] ?? 'unchecked', level, problems: issues,
+                 loadSeconds: load === 0 ? -1 : load === 255 ? null : (load - 1) / 10, loadTimedOut: load === 255, name: r.text() });
   }
   const basis = r.text();
   const total = r.byte();
   const lines = [];
   for (let i = 0, n = r.byte(); i < n; i++) lines.push(r.text());
-  const [peak, rms, seconds] = [r.byte(), r.byte(), r.byte()];
+  const [peak, rms, seconds, flags] = [r.byte(), r.byte(), r.byte(), r.byte()];
   return { count, first, selected, current: current - 1, ready, problems, unchecked, songs, basis,
-           problemCount: total, problemLines: lines, peak, rms, seconds };
+           problemCount: total, problemLines: lines, peak, rms, seconds,
+           preloaded: (flags & 1) !== 0, preloadOff: (flags & 2) !== 0 };
 }
 
 /** The set_discover payload as a view: the sounds listed (from `first`), the map, the selected one. */
@@ -329,4 +409,34 @@ export function readDiscoverPayload(bytes = []) {
   for (let i = 0, n = r.byte(); i < n; i++) regulars.push({ x: r.byte(), y: r.byte() });
   return { state: ['notEnough', 'suggestions', 'nothingNew'][state] ?? 'notEnough', count, first, selected,
            neverOpened: low + 256 * high, regularsCounted, kind, centre, sounds, likeName, likeLoads, regulars };
+}
+
+/** The set_cue payload as a view. */
+export function readCuePayload(bytes = []) {
+  const r = reader(bytes);
+  const two = () => r.byte() + 256 * r.byte();
+  const [songs, current, picked, loading] = [r.byte(), r.byte(), r.byte(), r.byte()];
+  const [songSeconds, setSeconds, plannedSeconds, tempo] = [two(), two(), two(), two() / 10];
+  const [sectionBar, sectionBars, ready] = [r.byte(), r.byte(), r.byte()];
+  const [song, section, nextSection, nextSong, pickedSong] = [r.text(), r.text(), r.text(), r.text(), r.text()];
+  const notes = [];
+  for (let i = 0, n = r.byte(); i < n; i++) notes.push(r.text());
+  return { songs, current: current - 1, picked: picked - 1, loading: loading !== 0, songSeconds, setSeconds,
+           plannedSeconds, tempo, sectionBar, sectionBars, nextReady: ready === 255 ? -1 : ready,
+           song, section, nextSection, nextSong, pickedSong, notes };
+}
+
+/** The set_changes payload as a view: the changes shown (from `first`) and the save they are against. */
+export function readChangesPayload(bytes = []) {
+  const r = reader(bytes);
+  const [state, count, first, rows, selected, low, high, listen, back, saves, putBack] =
+    [r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte()];
+  const [sound, against, when, problemText] = [r.text(), r.text(), r.text(), r.text()];
+  const changes = [];
+  for (let i = 0; i < rows; i++) {
+    const [saved, now] = [r.byte(), r.byte()];
+    changes.push({ index: first + i, saved, now, name: r.text(), savedText: r.text(), nowText: r.text() });
+  }
+  return { state: ['problem', 'unchanged', 'changed'][state] ?? 'problem', count, first, selected,
+           total: low + 256 * high, listen, back, saves, putBack, sound, against, when, problemText, rows: changes };
 }

@@ -5059,6 +5059,23 @@ void testCtrl49StagePages()
     h.cmd ("setStageLock", { { "enabled", false } });
     check (! h.service->isStageLocked(), "and Build, held, unlocks it again");
 
+    // A layer group: both parts share each note by velocity, the first taking the lower half
+    // with a crossfade either side. The page is told the group, the source and the share.
+    h.cmd ("addLayerGroup", { { "name", "Split" } });
+    const auto groupId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("layerGroups", {})[0]
+                           .getProperty ("layerGroupId", {}).toString();
+    h.cmd ("setLayerMember", { { "layerGroupId", groupId },
+                                { "partId", h.service->getRackHost().getPerformance().parts.getReference (0).partId },
+                                { "minimum", 0.0 }, { "maximum", 0.5 }, { "crossfade", 0.1 } });
+    tickPast();
+    bytes = payload();
+    check (at (bytes, 11) == 1 && at (bytes, 12) == 0 && at (bytes, 13) == 0 && at (bytes, 14) == 64
+             && at (bytes, 15) == 13,
+           "a part in a layer group is sent its group, the source (velocity) and its share, in 0-127");
+    h.cmd ("setLayerGroup", { { "layerGroupId", groupId }, { "allocation", "roundRobin" }, { "source", "key" } });
+    tickPast();
+    check (at (payload(), 12) == 1 + 16 * 1, "and a group that splits by key and takes turns says so");
+
     // -- SOUNDCHECK -----------------------------------------------------------------------------
     check (walkTo (layout.soundcheck), "and on to SOUNDCHECK");
     bytes = payload();
@@ -5067,9 +5084,10 @@ void testCtrl49StagePages()
            "which is one set_check payload");
     check (bytes.size() > 8 && at (bytes, 0) == 3 && at (bytes, 7) == 0 && at (bytes, 5) + at (bytes, 6) == 3,
            "the whole set is listed, and turning the page on checked it");
-    check (bytes.size() > 25 && at (bytes, 8) == (h.service->surfaceSoundcheck()[0].problems.isEmpty() ? 1 : 2)
-             && at (bytes, 11) == 13 && std::string (bytes.begin() + 12, bytes.begin() + 25) == "Glass Harbour",
-           "each song with its check's verdict and its name");
+    check (bytes.size() > 26 && at (bytes, 8) == (h.service->surfaceSoundcheck()[0].problems.isEmpty() ? 1 : 2)
+             && at (bytes, 11) == 0 && at (bytes, 12) == 13
+             && std::string (bytes.begin() + 13, bytes.begin() + 26) == "Glass Harbour",
+           "each song with its check's verdict, its load time (none yet) and its name");
 
     press (11, 1);
     tickPast();
@@ -5116,6 +5134,249 @@ void testCtrl49StagePages()
            "an edition without setlists refuses SOUNDCHECK, aloud");
     unpaid.cmd ("layersOnSurface", { { "on", true } });
     check (unpaid.service->layersOnSurface(), "while LAYERS, which only shows the rack, is there for anyone");
+}
+
+void testCtrl49Changes()
+{
+    std::cout << "\nthe CTRL49's CHANGES page: the sound against its saves, heard and put back" << std::endl;
+
+    using ceditor::ctrl49::Ctrl49SurfaceBroker;
+
+    const auto dir = freshDataDir ("surface-changes");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    auto* stub = h.lastStub;
+
+    double fakeNow = 0.0;
+    Ctrl49SurfaceBroker::Options options;
+    options.discover = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+    options.emit = [&h] (const juce::String& name, const juce::var& payload)
+    {
+        h.emits.entries.push_back ({ name, payload });
+    };
+    options.pageLua = { 't' };
+    options.now = [&fakeNow] { return fakeNow; };
+    Ctrl49SurfaceBroker broker (*h.service, options);
+
+    const auto tickPast = [&] { fakeNow += 600.0; broker.tick(); };
+    const auto press = [&] (int cc, int value)
+    {
+        juce::Array<juce::var> data { 0xB0, cc, value };
+        h.cmd ("surfaceInput", { { "data", juce::var (data) } });
+    };
+    const auto state = [&h]
+    {
+        const auto* screen = h.emits.last ("instrumentHostSurfaceScreen");
+        const auto* bytes = screen != nullptr ? screen->getProperty ("payload", {}).getArray() : nullptr;
+        return bytes != nullptr && ! bytes->isEmpty() ? (int) (*bytes)[0] : -1;
+    };
+    const auto near = [] (float a, float b) { return std::abs (a - b) < 0.01f; };
+
+    h.cmd ("changesOnSurface", { { "on", true } });
+    check (broker.pages().changes == broker.pages().performance + 1, "asked for, CHANGES is on the surface");
+    for (int i = 0; i < broker.pages().count && broker.currentPage() != broker.pages().changes; ++i)
+    {
+        press (40, 127);
+        tickPast();
+    }
+    const auto* screen = h.emits.last ("instrumentHostSurfaceScreen");
+    check (screen != nullptr && screen->getProperty ("pageKind", {}).toString() == "changes"
+             && screen->getProperty ("call", {}).toString() == "set_changes",
+           "Page Right walks to it, one set_changes payload");
+    check (state() == 0 && h.service->surfaceChanges (0).problem.contains ("library"),
+           "a sound that is not in the library has nothing to compare against, and the page says so");
+
+    // A sound of our own with two saves: cutoff 0.25 ("darker"), then 0.8. It plays at 0.6 now.
+    h.cmd ("saveUserPreset", { { "partId", partId }, { "name", "Mine" } });
+    juce::String mineId;
+    {
+        const auto stored = storedLibrary (dir);
+        for (const auto& record : stored.allRecords())
+            if (record.name == "Mine")
+                mineId = record.recordId;
+    }
+    stub->cutoff->setValueNotifyingHost (0.25f);
+    h.cmd ("commitVersion", { { "recordId", mineId }, { "label", "darker" } });
+    stub->cutoff->setValueNotifyingHost (0.8f);
+    h.cmd ("commitVersion", { { "recordId", mineId } });
+    stub->cutoff->setValueNotifyingHost (0.6f);
+    tickPast();
+
+    auto read = h.service->surfaceChanges (0);
+    check (read.problem.isEmpty() && read.sound == "Mine" && read.saves == 2 && read.against == "your last save",
+           "against your last save, of two");
+    check (read.changed.size() == 1 && near (read.changed[0].saved, 0.8f) && near (read.changed[0].now, 0.6f)
+             && read.total > 1,
+           "the one parameter that moved since, from what to what, out of all it compared");
+    check (state() == 2, "and the page says something changed");
+    check (near (stub->cutoff->get(), 0.6f), "reading the save left the sound as it was");
+
+    press (14, 1);                                  // E4: walk back to the save before
+    tickPast();
+    read = h.service->surfaceChanges (1);
+    check (read.against == "darker" && near (read.changed[0].saved, 0.25f),
+           "E4 walks back to the older save, by its name");
+    press (14, 127);
+    tickPast();
+
+    // E1 listens: all the way to the save, half way back, and leaving the page puts it back.
+    for (int i = 0; i < 10; ++i)
+        press (11, 127);
+    tickPast();
+    check (near (stub->cutoff->get(), 0.8f), "E1 all the way down plays the save");
+    for (int i = 0; i < 5; ++i)
+        press (11, 1);
+    tickPast();
+    check (near (stub->cutoff->get(), 0.7f), "half way back is half way between, parameter by parameter");
+    check (h.service->surfaceChanges (0).changed.size() == 1, "while listening the changes are still the changes");
+    press (39, 127);                                // Page Left: off the page
+    tickPast();
+    check (near (stub->cutoff->get(), 0.6f), "leaving the page puts back exactly what was there");
+    press (40, 127);
+    tickPast();
+
+    for (int i = 0; i < 3; ++i)
+        press (11, 127);
+    tickPast();
+    h.cmd ("getState");
+    check (! near (stub->cutoff->get(), 0.6f), "reading the state does not stop listening");
+    h.cmd ("transportStop");
+    check (near (stub->cutoff->get(), 0.6f), "but any other command puts the sound back first");
+    tickPast();
+
+    // E3 puts the selected change back, and the other way takes it back.
+    press (13, 1);
+    tickPast();
+    check (near (stub->cutoff->get(), 0.8f) && state() == 1,
+           "E3 puts the change back: the sound is the save again, nothing changed");
+    fakeNow += 500.0;
+    press (13, 127);
+    tickPast();
+    check (near (stub->cutoff->get(), 0.6f) && state() == 2, "and the other way takes it back");
+}
+
+void testCtrl49Cue()
+{
+    std::cout << "\nthe CTRL49's CUE page: the setlist read mid-show, and a song picked and gone to" << std::endl;
+
+    using ceditor::ctrl49::Ctrl49SurfaceBroker;
+
+    const auto dir = freshDataDir ("surface-cue");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addScene", { { "name", "Main" } });
+    const auto sceneId = h.emits.lastState()->getProperty ("performance", {}).getProperty ("scenes", {})[0]
+                           .getProperty ("sceneId", {}).toString();
+    for (const auto* name : { "Opener", "Night Bus", "Closer" })
+        h.cmd ("addSetlistItem", { { "sceneId", sceneId }, { "name", name } });
+    const auto items = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {})
+                         .getProperty ("items", {});
+    h.cmd ("setSetlistItem", { { "itemId", items[1].getProperty ("itemId", {}) }, { "tempo", 124.0 },
+                               { "plannedSeconds", 300 }, { "notes", "Capo 2.\n\nWatch the drummer" } });
+
+    double fakeNow = 0.0;
+    Ctrl49SurfaceBroker::Options options;
+    options.discover = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+    options.emit = [&h] (const juce::String& name, const juce::var& payload)
+    {
+        h.emits.entries.push_back ({ name, payload });
+    };
+    options.pageLua = { 't' };
+    options.now = [&fakeNow] { return fakeNow; };
+    Ctrl49SurfaceBroker broker (*h.service, options);
+
+    const auto tickPast = [&] { fakeNow += 150.0; broker.tick(); };
+    const auto press = [&] (int cc, int value)
+    {
+        juce::Array<juce::var> data { 0xB0, cc, value };
+        h.cmd ("surfaceInput", { { "data", juce::var (data) } });
+    };
+    const auto payload = [&h]
+    {
+        std::vector<int> bytes;
+        if (const auto* screen = h.emits.last ("instrumentHostSurfaceScreen"))
+            if (const auto* array = screen->getProperty ("payload", {}).getArray())
+                for (const auto& b : *array)
+                    bytes.push_back ((int) b);
+        return bytes;
+    };
+    const auto at = [] (const std::vector<int>& b, std::size_t i) { return i < b.size() ? b[i] : -1; };
+    const auto currentIndex = [&h]
+    {
+        return (int) h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {})
+                       .getProperty ("currentIndex", -1);
+    };
+
+    h.cmd ("layersOnSurface", { { "on", true } });
+    h.cmd ("cueOnSurface", { { "on", true } });
+    check (broker.pages().cue == broker.pages().performance + 1 && broker.pages().layers == broker.pages().cue + 1,
+           "asked for, CUE comes straight after the performance page, before LAYERS");
+    for (int i = 0; i < broker.pages().count && broker.currentPage() != broker.pages().cue; ++i)
+    {
+        press (40, 127);
+        tickPast();
+    }
+    const auto* screen = h.emits.last ("instrumentHostSurfaceScreen");
+    check (screen != nullptr && screen->getProperty ("pageKind", {}).toString() == "cue"
+             && screen->getProperty ("call", {}).toString() == "set_cue",
+           "Page Right walks to it, one set_cue payload");
+    check (at (payload(), 0) == 3 && at (payload(), 1) == 0,
+           "three songs in the set, and none on stage before the set starts");
+
+    press (11, 1);                                  // E1: pick the first song
+    tickPast();
+    check (at (payload(), 2) == 1 && currentIndex() == -1, "E1 picks a song without going to it");
+    press (11, 1);                                  // the second
+    tickPast();
+    press (1, 100);                                 // pad 1 goes
+    press (1, 0);
+    tickPast();
+    auto bytes = payload();
+    check (currentIndex() == 1 && at (bytes, 1) == 2 && at (bytes, 2) == 0,
+           "pad 1 goes to the picked song, and the pick is spent");
+    check (at (bytes, 8) + 256 * at (bytes, 9) == 300 && at (bytes, 10) + 256 * at (bytes, 11) == 1240,
+           "the page has its planned five minutes and its 124 BPM");
+    check (at (bytes, 13) == 0 && at (bytes, 14) == 255, "no sections playing, and the next song has no rig to preload");
+    const auto read = h.service->surfaceCue();
+    check (read.song == "Night Bus" && read.nextSong == "Closer"
+             && read.notes == juce::StringArray { "Capo 2.", "Watch the drummer" },
+           "its notes come a line each, blank ones dropped, and the next song is named");
+
+    press (11, 1);                                  // pick the next song, then turn back to this one
+    press (11, 127);
+    tickPast();
+    check (at (payload(), 2) == 0, "turning back to the song on stage is no pick at all");
+    press (1, 100);
+    press (1, 0);
+    tickPast();
+    check (currentIndex() == 1, "so pad 1 goes nowhere");
+
+    // A song's sections: the one playing and the bar it is on, as the state counts them.
+    const auto songId = items[1].getProperty ("itemId", {}).toString();
+    h.cmd ("addArrangementItem", { { "songId", songId }, { "sceneId", sceneId }, { "name", "Bridge" }, { "bars", 4 } });
+    h.cmd ("addArrangementItem", { { "songId", songId }, { "sceneId", sceneId }, { "name", "Chorus" } });
+    h.cmd ("startArrangement", { { "index", 0 } });
+    tickPast();
+    const auto withSections = h.service->surfaceCue();
+    check (withSections.section == "Bridge" && withSections.sectionBar == 1 && withSections.sectionBars == 4
+             && withSections.nextSection == "Chorus",
+           "with its sections playing, the page shows the section, bar 1 of 4, and the next one");
+    check (at (payload(), 12) == 1 && at (payload(), 13) == 4, "and sends them");
+    h.cmd ("stopArrangement");
+
+    // Without the setlist feature there is no set to cue.
+    const auto freeDir = freshDataDir ("surface-cue-free");
+    seedCatalog (freeDir);
+    Harness unpaid (freeDir, {}, {}, licensing::Edition::free);
+    unpaid.cmd ("getState");
+    unpaid.cmd ("cueOnSurface", { { "on", true } });
+    check (! unpaid.service->cueOnSurface() && unpaid.emits.lastError().isNotEmpty(),
+           "an edition without setlists refuses CUE, aloud");
 }
 
 void testCtrl49Discover()
@@ -12612,6 +12873,27 @@ void testLibrary()
                  && h.emits.lastState()->getProperty ("rack", {})
                       .getProperty ("parts", {}).size() == 3,
                "advancing swaps to the captured song by consuming the warm pool, not reloading it");
+
+        // Each recall is timed, for SOUNDCHECK: from setlistGo to the song's rig being ready.
+        const auto loadOf = [&h, &setlistState] (int index)
+        {
+            const auto itemId = setlistState.getProperty ("items", {})[index].getProperty ("itemId", {}).toString();
+            for (const auto& entry : *h.emits.lastState()->getProperty ("soundcheck", {}).getProperty ("entries", {}).getArray())
+                if (entry.getProperty ("itemId", {}).toString() == itemId)
+                    return entry;
+            return juce::var();
+        };
+        const auto scene = loadOf (0), captured = loadOf (1);
+        check ((double) scene.getProperty ("loadSeconds", -1.0) >= 0.0
+                 && ! (bool) scene.getProperty ("loadPreloaded", true),
+               "a recalled song keeps how long it took to be ready; a scene loads nothing ahead");
+        check ((double) captured.getProperty ("loadSeconds", -1.0) >= 0.0
+                 && (bool) captured.getProperty ("loadPreloaded", false)
+                 && ! (bool) captured.getProperty ("loadTimedOut", true)
+                 && (double) captured.getProperty ("loadedAt", 0.0) > 0.0,
+               "and a captured rig taken from the warm pool says it was preloaded");
+        check ((double) captured.getProperty ("checkedAt", -1.0) == 0.0,
+               "a load time is not a reference check: the song still reads as not checked");
     }
 
     {
@@ -14516,6 +14798,8 @@ int main (int argc, char* argv[])
     testCtrl49AppScreen();
     testCtrl49StagePages();
     testCtrl49Discover();
+    testCtrl49Cue();
+    testCtrl49Changes();
     testCtrl49DiscoveryReasons();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();

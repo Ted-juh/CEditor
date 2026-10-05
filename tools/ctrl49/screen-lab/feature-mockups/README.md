@@ -19,15 +19,18 @@ Each comes in two sizes, full and slim, for the stress test: see
 run in the preset mode of `Ctrl49ScreenLab.exe`. `Start_CTRL49_Feature_Mockups.cmd` (in
 `tools/ctrl49`) asks which one and runs it.
 
-**Three of them are real now.** Layers, Soundcheck and Discover are HoSTage pages on the
-keyboard, drawn by `Hostage_MultiKnob.lua` from what the rack, the set and the library already
-hold: see [the stage pages](../../README.md#the-stage-pages-layers-soundcheck-and-discover). They
-kept what the mockups showed and lost what nothing measures yet. Layers has the bands, the notes
-answered and the zone on E2-E6, but not the layer groups' crossfades or the ghost outline.
-Soundcheck has each song's verdict, its problems and its measured level, but not load times or a
-suggested fix. Discover has the list, the map, the kind and the keep, with pads that audition;
-its map shows the sounds you load most rather than the whole library, which would not fit a
-frame. The mockups stay as the picture of where all three could go.
+**Five of them are real now.** Layers, Soundcheck, Discover and Changes from the rig, and Stage
+from the features (called CUE there), are HoSTage pages on the keyboard, drawn by
+`Hostage_MultiKnob.lua` from what the rack, the set and the library already hold: see
+[the stage pages](../../README.md#the-stage-pages-cue-layers-soundcheck-discover-and-changes).
+They kept what the mockups showed and lost what nothing measures yet. Layers has the bands, the
+layer groups and their crossfades, the notes answered and the zone on E2-E6, but not the ghost
+outline. Soundcheck has each song's verdict, its problems, its level and its load time, but not a
+suggested fix beyond preloading. Discover has the list, the map, the kind and the keep; its map
+shows the sounds you load most rather than the whole library, which would not fit a frame.
+Changes has the list, listening, putting back and walking back, but compares parameters, not the
+plug-in's whole state. CUE has the song, sections, clocks and what comes next, but not a failover
+banner. The mockups stay as the picture of where they could go.
 
 ## HoSTage Features
 

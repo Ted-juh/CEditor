@@ -429,9 +429,11 @@ Ctrl49SurfaceBroker::Pages Ctrl49SurfaceBroker::pages() const
     layout.control = service.getRackHost().getPerformance().pages.size();
     layout.performance = layout.control;
     auto next = layout.performance + 1;
+    layout.cue = service.cueOnSurface() ? next++ : -1;
     layout.layers = service.layersOnSurface() ? next++ : -1;
     layout.soundcheck = service.soundcheckOnSurface() ? next++ : -1;
     layout.discover = service.discoverOnSurface() ? next++ : -1;
+    layout.changes = service.changesOnSurface() ? next++ : -1;
     layout.browse = service.browsingOnSurface() ? next++ : -1;
     layout.count = next;
     return layout;
@@ -447,6 +449,12 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
     reducer.setPageCount (layout.count);
     if (pageBeforeCountChange != reducer.page())
         emitStatus();
+    // Listening on CHANGES is only while the page is up: off it, the part plays as it is.
+    if (changesListen < 1.0f && reducer.page() != layout.changes)
+    {
+        service.surfaceChangesListen (changesBack, 1.0f);
+        changesListen = 1.0f;
+    }
 
     // Scene/setlist page recall is intentionally consumed once. It moves the hardware to
     // the requested layout, then gets out of the way so the player's next Page press wins.
@@ -522,6 +530,12 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
                 ? performance.pages.getReference (reducer.page()).pageId : juce::String());
             switchDownAt.fill (-1.0);   // a hold does not carry over to another page's pads
             discoverStale = true;       // DISCOVER opens on what the library holds now
+            changesStale = true;
+            if (changesListen < 1.0f)   // and CHANGES stops listening when it is left
+            {
+                service.surfaceChangesListen (changesBack, 1.0f);
+                changesListen = 1.0f;
+            }
         }
 
         if (action->switchChanged && action->switchSlot >= 0 && action->switchSlot < 8)
@@ -595,6 +609,85 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
                 lastCheckMs = options.now();
                 auto* payload = new juce::DynamicObject();
                 payload->setProperty ("cmd", "checkSetlistSoundcheck");
+                service.handleCommand (juce::var (payload));
+            }
+        }
+        else if (reducer.page() == layout.changes)
+        {
+            // E1 listens between the save and now, E2 picks a change, E3 puts it back (one at a
+            // time, a turn being many detents) or the other way takes the last one back, E4 walks
+            // back through the saves. Putting back is setParameter, as the app's own knob is.
+            const auto& rows = changesRead.changed;
+            if (action->encoderMoved && action->encoderSlot == 0 && changesRead.problem.isEmpty())
+            {
+                changesListen = juce::jlimit (0.0f, 1.0f, changesListen + 0.1f * (float) action->encoderDelta);
+                if (changesListen > 0.95f)
+                    changesListen = 1.0f;
+                service.surfaceChangesListen (changesBack, changesListen);
+                changesStale = true;
+            }
+            else if (action->encoderMoved && action->encoderSlot == 1)
+                changesSelected = juce::jlimit (0, juce::jmax (0, rows.size() - 1), changesSelected + action->encoderDelta);
+            else if (action->encoderMoved && action->encoderSlot == 2 && options.now() - changesPutBackMs >= 400.0)
+            {
+                const auto setParameter = [this] (const juce::String& id, float value)
+                {
+                    auto* payload = new juce::DynamicObject();
+                    payload->setProperty ("cmd", "setParameter");
+                    payload->setProperty ("partId", changesRead.partId);
+                    payload->setProperty ("id", id);
+                    payload->setProperty ("value", value);
+                    service.handleCommand (juce::var (payload));
+                };
+                changesPutBackMs = options.now();
+                changesListen = 1.0f;   // setParameter puts back what listening changed first
+                if (action->encoderDelta > 0 && juce::isPositiveAndBelow (changesSelected, rows.size()))
+                {
+                    const auto& row = rows.getReference (changesSelected);
+                    changesPutBack.emplace_back (row.id, row.now);
+                    setParameter (row.id, row.saved);
+                }
+                else if (action->encoderDelta < 0 && ! changesPutBack.empty())
+                {
+                    const auto [id, value] = changesPutBack.back();
+                    changesPutBack.pop_back();
+                    setParameter (id, value);
+                }
+                changesStale = true;
+            }
+            else if (action->encoderMoved && action->encoderSlot == 3)
+            {
+                const auto back = juce::jlimit (0, juce::jmax (0, changesRead.saves - 1), changesBack + action->encoderDelta);
+                if (back != changesBack)
+                {
+                    service.surfaceChangesListen (changesBack, 1.0f);
+                    changesListen = 1.0f;
+                    changesBack = back;
+                    changesSelected = 0;
+                    changesStale = true;
+                }
+            }
+        }
+        else if (reducer.page() == layout.cue)
+        {
+            // E1 picks a song to go to; pad 1 goes there, through setlistGo as the app's Go does,
+            // so the edition sees it. Shift + Page still steps the set from any page.
+            const auto& setlist = performance.setlist;
+            if (action->encoderMoved && action->encoderSlot == 0 && ! setlist.items.isEmpty())
+            {
+                // From the song on stage, or from before the first when the set has not started,
+                // so the first detent picks song 1.
+                const auto from = cuePicked >= 0 ? cuePicked : setlist.currentIndex;
+                cuePicked = juce::jlimit (0, setlist.items.size() - 1, from + action->encoderDelta);
+                if (cuePicked == setlist.currentIndex)
+                    cuePicked = -1;
+            }
+            else if (action->padChanged && action->pad == 1 && action->velocity > 0 && cuePicked >= 0)
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("cmd", "setlistGo");
+                payload->setProperty ("index", cuePicked);
+                cuePicked = -1;
                 service.handleCommand (juce::var (payload));
             }
         }
@@ -738,7 +831,8 @@ void Ctrl49SurfaceBroker::paintPads()
     // On a control page each pad shows its active layer and its state (padLight). The performance
     // and browse pages keep the stock orange they have always had here, because they give the
     // pads meanings of their own. On LAYERS and SOUNDCHECK the pads do nothing, so they are dark;
-    // on DISCOVER a pad is lit while there is a row beside it to audition.
+    // on DISCOVER a pad is lit while there is a row beside it to audition, and on CUE pad 1 is lit
+    // while E1 has picked a song for it to go to.
     const auto& performance = service.getRackHost().getPerformance();
     const auto page = reducer.page();
     const auto layout = pages();
@@ -749,7 +843,8 @@ void Ctrl49SurfaceBroker::paintPads()
     {
         const auto rgb = onControlPage ? service.padLight (performance.pages.getReference (page).pageId, pad,
                                                            reducer.padBank())
-                       : page == layout.layers || page == layout.soundcheck ? 0
+                       : page == layout.layers || page == layout.soundcheck || page == layout.changes ? 0
+                       : page == layout.cue ? (pad == 1 && cuePicked >= 0 ? 0xFFA500 : 0)
                        : page == layout.discover ? (pad <= discoverRows ? 0xFFA500 : 0)
                                                  : 0xFFA500;
         auto& painted = paintedPads[(std::size_t) (pad - 1)];
@@ -795,6 +890,8 @@ void Ctrl49SurfaceBroker::emitScreen (const Bytes& labels, const Bytes& state,
                                 : reducer.page() == layout.layers        ? "layers"
                                 : reducer.page() == layout.soundcheck    ? "soundcheck"
                                 : reducer.page() == layout.discover      ? "discover"
+                                : reducer.page() == layout.cue           ? "cue"
+                                : reducer.page() == layout.changes       ? "changes"
                                                                          : "control");
     // Which control page it is, so the app can set a slot by typing its value.
     const auto& performance = service.getRackHost().getPerformance();
@@ -829,7 +926,9 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
         SoundcheckView view;
         for (const auto& song : songs)
             view.songs.push_back ({ song.name.toStdString(), song.checked, song.problems.size(),
-                                    song.measured, song.rmsDb, song.peakDb });
+                                    song.measured, song.rmsDb, song.peakDb,
+                                    song.loadSeconds, song.loadTimedOut, song.loadPreloaded });
+        view.preloadOff = ! service.setlistPreloadsAhead();
         view.selected = soundcheckSong;
         view.current = current;
         if (! songs.isEmpty())
@@ -842,6 +941,66 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
         }
         stage = buildSoundcheckPayload (view);
         stageCall = "set_check";
+    }
+    else if (reducer.page() == layout.changes)
+    {
+        // Read twice a second, or when a turn changed it: reading now walks every parameter.
+        if (changesStale || options.now() - changesReadMs >= 500.0)
+        {
+            changesRead = service.surfaceChanges (changesBack);
+            changesReadMs = options.now();
+            changesStale = false;
+            changesBack = changesRead.back;
+        }
+        const auto& read = changesRead;
+        changesSelected = juce::jlimit (0, juce::jmax (0, read.changed.size() - 1), changesSelected);
+        const auto percent = [] (float v) { return juce::roundToInt (juce::jlimit (0.0f, 1.0f, v) * 100.0f); };
+        ChangesView view;
+        view.state = read.problem.isNotEmpty() ? ChangesView::problem
+                   : read.changed.isEmpty() ? ChangesView::unchanged : ChangesView::changed;
+        for (const auto& row : read.changed)
+            view.rows.push_back ({ row.name.toStdString(), row.savedText.toStdString(), row.nowText.toStdString(),
+                                   percent (row.saved), percent (row.now) });
+        view.selected = changesSelected;
+        view.total = read.total;
+        view.listen = percent (read.listen);
+        view.back = read.back;
+        view.saves = read.saves;
+        view.putBack = (int) changesPutBack.size();
+        view.sound = read.sound.toStdString();
+        view.against = read.against.toStdString();
+        view.when = read.savedAtMs > 0 ? juce::Time (read.savedAtMs).formatted ("%d %b %H:%M").toStdString() : std::string();
+        view.problemText = read.problem.toStdString();
+        stage = buildChangesPayload (view);
+        stageCall = "set_changes";
+    }
+    else if (reducer.page() == layout.cue)
+    {
+        const auto read = service.surfaceCue();
+        if (cuePicked >= read.songs)
+            cuePicked = -1;
+        CueView view;
+        view.songs = read.songs;
+        view.current = read.current;
+        view.picked = cuePicked >= 0 ? cuePicked : read.current;
+        view.loading = read.loading;
+        view.song = read.song.toStdString();
+        view.tempo = read.tempo;
+        view.songSeconds = read.songSeconds;
+        view.setSeconds = read.setSeconds;
+        view.plannedSeconds = read.plannedSeconds;
+        for (const auto& line : read.notes)
+            view.notes.push_back (line.toStdString());
+        view.section = read.section.toStdString();
+        view.sectionBar = read.sectionBar;
+        view.sectionBars = read.sectionBars;
+        view.nextSection = read.nextSection.toStdString();
+        view.nextSong = read.nextSong.toStdString();
+        view.nextReady = read.nextReady;
+        if (cuePicked >= 0)
+            view.pickedSong = read.names[cuePicked].toStdString();
+        stage = buildCuePayload (view);
+        stageCall = "set_cue";
     }
     else if (reducer.page() == layout.discover)
     {
@@ -910,9 +1069,29 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
                             : part.pluginName.isNotEmpty()     ? part.pluginName
                             : part.midiOutputName.isNotEmpty() ? part.midiOutputName
                                                                : "Part " + juce::String (i + 1);
-            view.parts.push_back ({ name.toStdString(), part.midi.keyLow, part.midi.keyHigh,
-                                    part.midi.velocityLow, part.midi.velocityHigh, part.midi.transpose,
-                                    part.enabled, part.mute, part.midiSourcePartId.isEmpty() });
+            LayersPartView row { name.toStdString(), part.midi.keyLow, part.midi.keyHigh,
+                                 part.midi.velocityLow, part.midi.velocityHigh, part.midi.transpose,
+                                 part.enabled, part.mute, part.midiSourcePartId.isEmpty() };
+            // Its layer group, if an enabled one holds it: what it reads and its share of it.
+            for (int g = 0; g < performance.layerGroups.size() && row.group == 0; ++g)
+            {
+                const auto& group = performance.layerGroups.getReference (g);
+                if (! group.enabled)
+                    continue;
+                for (const auto& member : group.members)
+                    if (member.partId == part.partId)
+                    {
+                        static const juce::StringArray sources { "velocity", "key", "cc", "expression", "macro" };
+                        static const juce::StringArray allocations { "all", "roundRobin", "leastBusy" };
+                        row.group = g + 1;
+                        row.source = juce::jmax (0, sources.indexOf (group.source));
+                        row.allocation = juce::jmax (0, allocations.indexOf (group.allocation));
+                        row.layerLow = juce::roundToInt (member.minimum * 127.0f);
+                        row.layerHigh = juce::roundToInt (member.maximum * 127.0f);
+                        row.layerFade = juce::roundToInt (member.crossfade * 127.0f);
+                    }
+            }
+            view.parts.push_back (row);
         }
         view.focused = layersPart;
         for (const auto& [note, velocity] : service.surfaceHeldNotes())

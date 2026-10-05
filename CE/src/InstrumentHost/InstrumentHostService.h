@@ -114,7 +114,8 @@
 //      modulation cable. A missing recordIdA is the preset the part last loaded. The blend is
 //      by parameter, read through the plug-in, and the pair persists with the session.)
 //   browseOnSurface {on?} | browseTurn {encoder,delta} | browsePad {pad}
-//   soundcheckOnSurface {on?} | layersOnSurface {on?} | discoverOnSurface {on?}
+//   cueOnSurface {on?} | soundcheckOnSurface {on?} | layersOnSurface {on?} | discoverOnSurface {on?}
+//   | changesOnSurface {on?}
 //     (the CTRL49's pages beyond the knobs, off until asked for like the browser: the setlist
 //      checked before the show, every part's zone over the keys, and what you own and have never
 //      opened nearest to what you load. Turning SOUNDCHECK on runs the setlist's reference check,
@@ -768,6 +769,50 @@ public:
     bool soundcheckOnSurface() const             { return surfaceSoundcheckPage; }
     bool layersOnSurface() const                 { return surfaceLayersPage; }
     bool discoverOnSurface() const               { return surfaceDiscoverPage; }
+    bool cueOnSurface() const                    { return surfaceCuePage; }
+    bool changesOnSurface() const                { return surfaceChangesPage; }
+
+    /** The setlist's cue screen for the CTRL49 (CUE): the song on stage, its clocks, the section
+        playing and what comes next. Empty (no songs) without the setlist feature. */
+    struct SurfaceCue
+    {
+        int songs = 0, current = -1;
+        bool loading = false;
+        juce::String song;
+        double tempo = 0.0;
+        int songSeconds = 0, setSeconds = 0, plannedSeconds = 0;
+        juce::StringArray notes;          // a line each, blank lines dropped
+        juce::String section, nextSection;
+        int sectionBar = 0, sectionBars = 0;
+        juce::String nextSong;
+        int nextReady = -1;               // the next song's rig preloaded, 0-100; -1 = nothing to preload
+        juce::StringArray names;          // every song's name, for E1's pick
+    };
+    SurfaceCue surfaceCue();
+
+    /** The CTRL49's CHANGES page: the focused part's live parameters against a save of its
+        sound. `back` 0 is the latest save, then older ones, then the sound it branched from (or,
+        never saved, the sound as loaded). Reading a save applies it to the plug-in and puts back
+        what was there, as diffVersions does, so each save is read once and kept. */
+    struct SurfaceChangeRow
+    {
+        juce::String id, name, savedText, nowText;   // id: the parameter's definitionId
+        float saved = 0.0f, now = 0.0f;              // normalised
+    };
+    struct SurfaceChanges
+    {
+        juce::String problem;          // why there is nothing to compare; empty when there is
+        juce::String partId, sound, against;
+        juce::int64 savedAtMs = 0;
+        int saves = 0, back = 0, total = 0;
+        float listen = 1.0f;           // where between the save (0) and now (1) the part plays
+        juce::Array<SurfaceChangeRow> changed;
+    };
+    SurfaceChanges surfaceChanges (int back);
+    /** Plays the focused part `amount` of the way from save `back` (0) to how it is now (1), on
+        its parameters, as morphVersions blends. 1 puts back exactly what was there, and so does
+        any command other than reading or the surface's own input. */
+    void surfaceChangesListen (int back, float amount);
 
     struct SurfaceSoundcheckSong
     {
@@ -779,7 +824,11 @@ public:
         double rmsDb = -120.0;        // the measured average level, dBFS
         double peakDb = -120.0;
         double seconds = 0.0;         // how long it was measured
+        double loadSeconds = -1.0;    // how long it took to load when last recalled; -1 = not yet
+        bool loadPreloaded = false, loadTimedOut = false;
     };
+    /** Whether the setlist preloads ahead at all: a slow song is a problem only when it is off. */
+    bool setlistPreloadsAhead() const;
     /** The setlist in order with what its soundcheck holds for each song, the song being
         measured read live. Empty without the setlist feature. */
     juce::Array<SurfaceSoundcheckSong> surfaceSoundcheck();
@@ -995,6 +1044,7 @@ private:
     };
 
     juce::Array<AnalysisTask> analysisBacklog (bool remeasureEverything) const;
+
     /** Plays a record's snapshot immediately if there is one. Returns what happened, for the
         event the browser draws its indicator from: "snapshot", "live" (nothing stored, so the
         plug-in is the only route) or "silent". */
@@ -1021,6 +1071,30 @@ private:
     /** Every host-visible parameter's normalised value and its text, in descriptor order. */
     struct ParameterReading { juce::String definitionId, name, text; float value = 0.0f; };
     static juce::Array<ParameterReading> readParameters (juce::AudioProcessor& instrument);
+
+    // -- CHANGES (surfaceChanges) --------------------------------------------------------------
+    struct ChangesTarget
+    {
+        juce::String key, name;
+        juce::int64 savedAtMs = 0;
+        int version = -1;              // its index in the record's versions; -1 = `blob`
+        juce::String blob;
+    };
+    juce::Array<ChangesTarget> changesTargets (const LibraryRecord& record) const;
+    /** A save's parameters as the plug-in reads them, read once and then kept. nullptr when the
+        plug-in refuses the state, or while listening (reading would disturb what is heard). */
+    const juce::Array<ParameterReading>* changesSaved (const juce::String& partId, juce::AudioProcessor& instrument,
+                                                        const LibraryRecord& record, const ChangesTarget& target);
+    void stopChangesListen();
+    std::map<juce::String, juce::Array<ParameterReading>> changesSavedReadings;
+    struct ChangesListen
+    {
+        bool active = false;
+        juce::String partId;
+        juce::MemoryBlock nowState;              // exactly what was there, put back at the end
+        juce::Array<ParameterReading> now;       // and its parameters, the "now" end of the blend
+        float amount = 1.0f;
+    } changesListen;
     /** The part a version command acts on: the one named, else the focused one. */
     juce::String versionTargetPart (const juce::var& payload) const;
 
@@ -1432,7 +1506,14 @@ private:
         juce::String basis, measurementError;
         juce::int64 checkedAt = 0, measuredAt = 0;
         SoundcheckMeter::Reading level;
+        // How long its rig took to be ready the last time it was recalled, from setlistGo to
+        // the last processor loaded: -1 until it has been recalled. Whether the rig was warm
+        // (preloaded) then, and whether the recall gave up waiting (the 15 s timeout).
+        double loadSeconds = -1.0;
+        bool loadPreloaded = false, loadTimedOut = false;
+        juce::int64 loadedAt = 0;
     };
+    void noteSongLoaded (const juce::String& itemId, double seconds, bool preloaded, bool timedOut);
     std::map<juce::String, SoundcheckEntry> soundcheckEntries;
     juce::String soundcheckItemId;
     uint64_t soundcheckToken = 0;
@@ -1533,6 +1614,8 @@ private:
     bool surfaceSoundcheckPage = false;
     bool surfaceLayersPage = false;
     bool surfaceDiscoverPage = false;
+    bool surfaceCuePage = false;
+    bool surfaceChangesPage = false;
     surface::BrowseCursor browseCursor;
     const double freeRunEpoch = juce::Time::getMillisecondCounterHiRes() * 0.001;
     // What the browser is currently looking at. Every mutation re-emits THIS rather than an
@@ -1649,6 +1732,8 @@ private:
         juce::String itemId, sceneId, pageId;
         double tempo = 0.0;
         double startedMs = 0.0;
+        double loadStartedMs = 0.0;     // before the rack was applied: what a load time counts from
+        bool preloaded = false;         // the song's rig was warm when it was recalled
     } pendingSetlistRecall;
     // The stage's clocks, in wall-clock milliseconds: when the set began (the first song of a
     // run) and when the current song did. Kept for the session only; a restart is a new set.
