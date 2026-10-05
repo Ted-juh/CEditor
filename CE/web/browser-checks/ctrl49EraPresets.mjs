@@ -8,6 +8,7 @@
 //
 //   CTRL49_ERA_SHOTS=<dir>   writes a 480x272 PNG of every page of every design there
 //   CTRL49_ERA_PREVIEWS=1    writes them into each design folder as preview-<n>-<page>.png
+//   CTRL49_ERA_ONLY=<a,b>    renders only those designs (every manifest is still checked)
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +23,7 @@ const repo = path.resolve(here, '../../..');
 const lab = path.join(repo, 'tools/ctrl49/screen-lab');
 const shots = process.env.CTRL49_ERA_SHOTS;
 const previews = process.env.CTRL49_ERA_PREVIEWS === '1';
+const only = process.env.CTRL49_ERA_ONLY ? process.env.CTRL49_ERA_ONLY.split(',') : null;
 if (shots) fs.mkdirSync(shots, { recursive: true });
 
 // The kind of design: the folder its designs and template live in, the generated tables every key
@@ -52,15 +54,89 @@ const SPECS = {
       [1, [127, 127, 127, 127, 127, 127, 127, 127]], [1, [0, 0, 0, 0, 0, 0, 0, 0]],
       [2, [127, 0, 127, 127, 64, 64, 64, 64]], [2, [127, 127, 0, 0, 64, 64, 64, 64]],
       [3, [127, 64, 64, 64, 64, 64, 64, 64]], [4, [127, 127, 64, 64, 64, 64, 64, 64]], [4, [60, 90, 64, 64, 64, 64, 64, 64]]],
-    // moments worth a picture of their own: [page, frame, values, name]
+    // moments worth a picture of their own, on a fresh copy: [page, frame, values, name]
     moments: [[2, 50, [56, 0, 80, 0, 70, 64, 64, 64], 'kept'], [3, 450, [24, 64, 64, 64, 64, 64, 64, 64], 'failover'],
       [0, 37, [20, 30, 64, 40, 90, 64, 64, 64], 'dark-sound'], [0, 37, [118, 120, 30, 0, 64, 64, 64, 64], 'bright-sound']],
+    // The pages answer their encoders: E5 on CAPTURE keeps the box and says so once; the atlas's
+    // box finds more sounds the bigger it is, and lists eight; the chord page names the chord the
+    // progression holds at that moment, in the key E1 and E2 chose.
+    async answers({ fresh, at, D }) {
+      await fresh();
+      const inBox = (texts) => Number(texts.find((t) => t.endsWith(' IN BOX')).split(' ')[0]);
+      const out = {};
+      await at(2, D[2]);
+      out.kept = (await at(2, turned(D[2], { 4: 70 }))).find((t) => t.startsWith('KEPT')) ?? null;
+      out.notKept = (await at(2, turned(D[2], { 4: 70 }), 200)).some((t) => t.startsWith('KEPT'));
+      const small = await at(0, turned(D[0], { 2: 0 })), big = await at(0, turned(D[0], { 2: 127 }));
+      out.boxGrows = inBox(big) > inBox(small);
+      out.listed = big.filter((t) => /^[A-Z][a-z]+ [A-Z][a-z]+ \d+$/.test(t)).length;
+      const chords = await at(4, D[4]), k = chords.indexOf('KEY');
+      out.chord = chords.slice(k - 2, k);
+      out.key = chords[k + 1] ?? null;
+      return [out, { kept: 'KEPT 8 BARS AS LOOP A,  QUANTISED 1/16', notKept: false, boxGrows: true, listed: 8,
+        chord: ['Am7', 'i7   TONIC'], key: 'A MINOR' }];
+    },
+  },
+  rig: {
+    root: 'feature-mockups', tables: ['T', 'L', 'S', 'D'],
+    template: 'RigSkin.lua', pages: ['layers', 'effects', 'soundcheck', 'discover', 'changes'], envelope: null,
+    atlases: { 'panels.png': [480, 816], 'tint.png': [128, 64], 'parts.png': [480, 544] },
+    moving: [[0, [0, 20, 40, 60, 80], 3], [1, [0, 4, 8, 12, 16], 4], [3, [0, 4, 8, 12, 16], 2]],
+    // every part at its widest and narrowest, every slot at full and none, the song with the most
+    // parts, the furthest reach of every kind, every change half heard
+    busiest: [[0, [0, 0, 127, 127, 0, 127, 64, 64]], [0, [127, 127, 0, 0, 127, 0, 64, 64]],
+      [1, [0, 127, 127, 127, 127, 64, 64, 64]], [1, [127, 0, 0, 0, 0, 64, 64, 64]], [1, [64, 127, 0, 127, 0, 64, 64, 64]],
+      [2, [64, 127, 64, 64, 64, 64, 64, 64]], [3, [0, 127, 0, 64, 64, 64, 64, 64]], [3, [127, 0, 127, 64, 64, 64, 64, 64]],
+      [4, [64, 127, 64, 0, 64, 64, 64, 64]]],
+    moments: [[0, 37, [0, 50, 127, 64, 0, 127, 64, 64], 'bass'], [0, 38, [64, 50, 127, 64, 0, 127, 64, 64], null],
+      [1, 37, [90, 62, 70, 60, 45, 64, 64, 64], 'delay'],
+      [2, 10, [64, 70, 70, 64, 64, 64, 64, 64], null], [2, 40, [64, 70, 70, 64, 64, 64, 64, 64], 'checking'],
+      [3, 37, [0, 0, 90, 64, 64, 64, 64, 64], 'strings'], [4, 37, [64, 30, 64, 30, 64, 64, 64, 64], 'half-way']],
+    // The pages answer their encoders. LAYERS: an encoder takes a range over only once it reaches
+    // it, then carries it; the split is named. EFFECTS: E6 bypasses the slot and back. SOUNDCHECK:
+    // the set's verdict, the problem and what to do, and E3 checks again. DISCOVER: eight listed,
+    // and E3 keeps them to one kind; E4 keeps one. CHANGES: the count follows the history, and E3
+    // undoes one change.
+    async answers({ fresh, at, D }) {
+      await fresh();
+      const after = (texts, label) => texts[texts.indexOf(label) + 1];
+      const out = {};
+      const start = await at(0, D[0]);
+      out.split = start[1].split('   ')[0];
+      const part1 = await at(0, turned(D[0], { 0: 0 }));
+      out.part = after(part1, 'PART');
+      out.low = [after(part1, 'LOW')];
+      out.low.push(after(await at(0, turned(D[0], { 0: 0, 1: 100 })), 'LOW'));
+      out.low.push(after(await at(0, turned(D[0], { 0: 0, 1: 0 })), 'LOW'));
+      out.low.push(after(await at(0, turned(D[0], { 0: 0, 1: 10 })), 'LOW'));
+      const fx = await at(1, D[1]);
+      out.slot = fx.includes('2  BUS COMP') && !fx.includes('BYPASSED');
+      out.bypass = [(await at(1, turned(D[1], { 5: 70 }))).includes('BYPASSED'), (await at(1, turned(D[1], { 5: 75 }))).includes('BYPASSED')];
+      const check = await at(2, D[2]);
+      out.verdict = ['8 READY', '2 TO LOOK AT', '2 WILL NOT PLAY'].every((t) => check.includes(t));
+      out.problem = [check.includes('MIDI PORT USB MIDI 2 IS GONE'), check.includes('PLUG IT IN, OR PICK ANOTHER PORT')];
+      out.again = [(await at(2, turned(D[2], { 2: 70 }), 100)).includes('CHECKING 1 OF 12'),
+        (await at(2, turned(D[2], { 2: 70 }), 200)).includes('2 WILL NOT PLAY')];
+      const names = (texts) => texts.filter((t) => /^[A-Z][a-z]+ [A-Z][A-Za-z]+ \d+$/.test(t));
+      out.listed = names(await at(3, D[3])).length;
+      out.pads = names(await at(3, turned(D[3], { 2: 20 }))).map((t) => t.split(' ')[1]);
+      out.kept = (await at(3, turned(D[3], { 2: 20, 3: 70 }))).some((t) => t.startsWith('KEPT ') && t.endsWith(' IN FAVOURITES'));
+      out.changes = [(await at(4, D[4]))[1], (await at(4, turned(D[4], { 3: 30 })))[1], (await at(4, turned(D[4], { 3: 127 })))[1]];
+      const undone = await at(4, turned(D[4], { 2: 70 }));
+      out.undo = [undone[1], undone.some((t) => t.startsWith('UNDONE, BACK TO'))];
+      return [out, { split: 'SPLIT AT G3', part: '1 / 5', low: ['C2', 'C2', 'C2', 'E2'], slot: true, bypass: [true, false],
+        verdict: true, problem: [true, true], again: [true, true], listed: 8, pads: Array(8).fill('Pad'), kept: true,
+        changes: ['9 CHANGES SINCE SAVED', '8 CHANGES SINCE SAVED', 'NOTHING CHANGED'], undo: ['8 CHANGES SINCE SAVED', true] }];
+    },
   },
 };
+// The values a page was given, with some encoders turned.
+const turned = (values, changes) => Object.assign(values.slice(), changes);
 // The designs this check expects, and their kind. Adding one is deliberate: add it here too.
 const EXPECTED = { 'blueprint-1965': 'era', 'dot-matrix-1983': 'era', 'metro-tiles-2012': 'era',
   'midnight-2020': 'era', 'neo-brutal-2023': 'era', 'red-lead-1997': 'era', 'rhythm-box-1980': 'era',
-  'swiss-flat-2011': 'era', 'test-bench-1958': 'era', 'walnut-1971': 'era', 'hostage-features': 'feature' };
+  'swiss-flat-2011': 'era', 'test-bench-1958': 'era', 'walnut-1971': 'era', 'hostage-features': 'feature',
+  'hostage-rig': 'rig' };
 const MEMORY_CEILING = 8 * 1024 * 1024;     // the preset loader's software guard, not a device limit
 const MAX_CALLS = 600;
 
@@ -91,9 +167,11 @@ const block = /-- BEGIN GENERATED[\s\S]*?-- END GENERATED/;
 const templates = {};
 const folders = {};
 for (const spec of Object.values(SPECS)) {
-  const root = path.join(lab, spec.root);
-  templates[spec.template] = fs.readFileSync(path.join(root, spec.template), 'utf8');
+  templates[spec.template] = fs.readFileSync(path.join(lab, spec.root, spec.template), 'utf8');
   luaparse.parse(templates[spec.template], { luaVersion: '5.2' });
+}
+for (const dir of new Set(Object.values(SPECS).map((spec) => spec.root))) {
+  const root = path.join(lab, dir);
   for (const n of fs.readdirSync(root)) {
     if (!fs.existsSync(path.join(root, n, 'Design.ctrl49preset'))) continue;
     assert.ok(!folders[n], `${n}: one design of that name`);
@@ -197,6 +275,18 @@ try {
   assert.deepEqual(await page.evaluate(() => window.era.envelope(32, 64, 80, 40)), golden,
     'the preview builds the same envelope bytes the tool sends');
 
+  // A fresh copy of a design, loaded and in mode 1, for the answers and moments; at() turns its
+  // encoders on a page at a frame and returns the texts it drew.
+  const fresh = (name) => page.evaluate(async (name) => {
+    window.f = await window.era.design(name);
+    for (let i = 0; i < 4; i++) window.f.draw();
+    window.f.call('set_mode', [1]);
+  }, name);
+  const at = (p, values, frame = 37) => page.evaluate(({ p, values, frame }) => {
+    window.f.call('set_frame', window.era.frame(p, frame, values, 0));
+    return window.f.draw().texts;
+  }, { p, values, frame });
+
   const save = async (name, file) => {
     if (!shots && !previews) return;
     const data = Buffer.from((await page.evaluate(() => window.era.pixels())).split(',')[1], 'base64');
@@ -204,7 +294,9 @@ try {
     if (previews && file.match(/^\d-/)) fs.writeFileSync(path.join(folders[name], `preview-${file}.png`), data);
   };
 
-  for (const name of names) {
+  const rendered = only ? names.filter((name) => only.includes(name)) : names;
+  assert.ok(rendered.length > 0, 'CTRL49_ERA_ONLY names a design');
+  for (const name of rendered) {
     const { defaults, spec } = manifests[name];
     const pages = spec.pages;
     const D = defaults.map((d) => d.values);
@@ -298,35 +390,15 @@ try {
         `${name}: E2 picks a step's note up only once it reaches it; an empty step takes it at once`);
     }
 
-    if (spec.moments) {
-      // The feature pages answer their encoders: E5 on CAPTURE keeps the box and says so; the
-      // atlas's box finds more sounds the bigger it is, and lists eight; the chord page names the
-      // chord the progression holds at that moment, in the key E1 and E2 chose.
-      const said = await page.evaluate(async ({ name, D }) => {
-        const d = await window.era.design(name), era = window.era;
-        for (let i = 0; i < 4; i++) d.draw();
-        d.call('set_mode', [1]);
-        const at = (p, values, frame = 37) => { d.call('set_frame', era.frame(p, frame, values, 0)); return d.draw().texts; };
-        const inBox = (texts) => Number(texts.find((t) => t.endsWith(' IN BOX')).split(' ')[0]);
-        const out = {};
-        at(2, D[2]);
-        out.kept = at(2, Object.assign(D[2].slice(), { 4: 70 })).find((t) => t.startsWith('KEPT')) ?? null;
-        out.notKept = at(2, Object.assign(D[2].slice(), { 4: 70 }), 200).some((t) => t.startsWith('KEPT'));
-        const small = at(0, Object.assign(D[0].slice(), { 2: 0 })), big = at(0, Object.assign(D[0].slice(), { 2: 127 }));
-        out.boxGrows = inBox(big) > inBox(small);
-        out.listed = big.filter((t) => /^[A-Z][a-z]+ [A-Z][a-z]+ \d+$/.test(t)).length;
-        const chords = at(4, D[4]), k = chords.indexOf('KEY');
-        out.chord = chords.slice(k - 2, k);
-        out.key = chords[k + 1] ?? null;
-        return out;
-      }, { name, D });
-      assert.deepEqual(said, { kept: 'KEPT 8 BARS AS LOOP A,  QUANTISED 1/16', notKept: false, boxGrows: true, listed: 8, chord: ['Am7', 'i7   TONIC'], key: 'A MINOR' },
-        `${name}: CAPTURE keeps on E5, the atlas box queries, CHORDS names the key`);
+    if (spec.answers) {
+      const [said, expected] = await spec.answers({ fresh: () => fresh(name), at, D });
+      assert.deepEqual(said, expected, `${name}: the pages answer their encoders the way they say they do`);
+      await fresh(name);
       for (const [p, f, values, label] of spec.moments) {
-        await page.evaluate(({ p, f, values }) => { window.d.call('set_frame', window.era.frame(p, f, values, 0)); window.d.draw(); }, { p, f, values });
-        await save(name, `${p + 1}-${pages[p]}-${label}`);
+        await at(p, values, f);
+        if (label) await save(name, `${p + 1}-${pages[p]}-${label}`);
       }
-      assert.deepEqual(await page.evaluate(() => window.d.problems()), [], `${name}: the moments draw inside the screen`);
+      assert.deepEqual(await page.evaluate(() => window.f.problems()), [], `${name}: the moments draw inside the screen`);
     }
 
     const decodes = await page.evaluate(() => window.d.draw().decode);
@@ -334,5 +406,5 @@ try {
     console.log(`  ${name.padEnd(20)} ${summary.join(', ')} calls; busiest ${sweep.most} (${sweep.where}); moves ${JSON.stringify(moves)}`);
   }
   assert.deepEqual(errors, []);
-  console.log(`CTRL49 era design checks passed: ${names.length} manifests, ${names.length} Lua 5.2 pages, every page at every encoder position.`);
+  console.log(`CTRL49 era design checks passed: ${names.length} manifests, ${rendered.length} designs rendered, every page at every encoder position.`);
 } finally { await browser.close(); await server.close(); }

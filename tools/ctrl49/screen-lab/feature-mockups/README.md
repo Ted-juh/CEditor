@@ -1,15 +1,22 @@
 # HoSTage feature mockups
 
-One screen-lab preset, five pages, five things the CTRL49's screen could show in HoSTage that a
-host on hardware does not usually show. They are in the Midnight 2020 look (see
+Two screen-lab presets, five pages each: ten things the CTRL49's screen could show in HoSTage that
+a host on hardware does not usually show. Both are in the Midnight 2020 look (see
 [`../era-presets`](../era-presets/README.md)) so that what changes is the idea, not the style.
 Like the era designs they are native screen-lab presets loaded by `Ctrl49ScreenLab.exe preset`,
-not HoSTage pages. The lab has no library, no modulation, no MIDI and no setlist, so every page
-fakes its data from the frame counter and from tables the generator wrote into the Lua.
+not HoSTage pages. The lab has no library, no rack, no MIDI and no setlist, so every page fakes
+its data from the frame counter and from tables the generator wrote into the Lua.
 
-**Status: software checks only.** Not yet run on a CTRL49. Like the era designs, this needs the
-preset mode of `Ctrl49ScreenLab.exe`, which is not in this repository yet.
-`Start_CTRL49_Feature_Mockups.cmd` (in `tools/ctrl49`) runs it.
+| Preset | Folder | Pages | Made by |
+|---|---|---|---|
+| HoSTage Features | `hostage-features` | Sound Atlas, Motion, Capture, Stage, Chords | `make_feature_mockups.py`, `FeatureSkin.lua` |
+| HoSTage Rig | `hostage-rig` | Layers, Effects, Soundcheck, Discover, Changes | `make_rig_mockups.py`, `RigSkin.lua` |
+
+**Status: software checks only.** Neither has run on a CTRL49 yet. Like the era designs, they
+need the preset mode of `Ctrl49ScreenLab.exe`, which is not in this repository yet.
+`Start_CTRL49_Feature_Mockups.cmd` (in `tools/ctrl49`) asks which one and runs it.
+
+## HoSTage Features
 
 | Page | Shows | E1 | E2 | E3 | E4 | E5 | E6-E8 |
 |---|---|---|---|---|---|---|---|
@@ -23,7 +30,7 @@ preset mode of `Ctrl49ScreenLab.exe`, which is not in this repository yet.
 Four of them show one moment each: `1-atlas-dark-sound` and `1-atlas-bright-sound` (the same
 page in two colours), `3-capture-kept` (just after E5), `4-stage-failover` (a plug-in restarted).
 
-## The sound's colour
+### The sound's colour
 
 The whole screen takes the colour of the sound picked on the atlas, from its measured
 brightness: dark sounds warm (amber, coral), bright ones cold (violet, teal). Pick a different
@@ -33,7 +40,7 @@ coverage sprite in `tint.png` that the keyboard tints as it draws it, so recolou
 nothing: no second set of images, nothing uploaded again. It is the one idea that spans all five
 pages, and it tells you which sound you are on before you read a word.
 
-## What each page is, and what HoSTage already has for it
+### What each page is, and what HoSTage already has for it
 
 None of these starts from nothing. Each one draws something HoSTage already knows; the mockup
 shows what it would look like on the keyboard.
@@ -86,7 +93,7 @@ and the eight pads with the likeliest next chord ringed. HoSTage would send the 
 
 Every one of those messages fits the 1,000-byte payload the screen's calls already live under.
 
-## Assets
+### Its assets
 
 | File | Size | PNG id | Buffer | Holds |
 |---|---|---|---|---|
@@ -99,40 +106,129 @@ counts, or about 2,960 KiB if `tint.png` decodes to one byte a pixel, as the tin
 is expected to. The largest single decode is `tint.png`: 1.66 MB at four bytes a pixel (the era
 designs' knob strips are 1.64 MB), 0.41 MB at one.
 
-## Making and checking it
+## HoSTage Rig
+
+| Page | Shows | E1 | E2 | E3 | E4 | E5 | E6 |
+|---|---|---|---|---|---|---|---|
+| Layers | every part's key range over the 49 keys, and which parts answer the notes played | part | lowest key | highest key | transpose | lowest velocity | highest velocity |
+| Effects | the part's effects, each measured by what it does to the sound | slot | the slot's four controls | | | | bypass (turn) |
+| Soundcheck | the setlist checked before the show: ready, worth a look, will not play | song | part | check again (turn) | | | |
+| Discover | what you own and have never opened, nearest to what you keep loading | pick | reach further | kind | keep (turn) | | |
+| Changes | the sound against its saved version: A/B, undo one change, the history | listen, saved to now | change | undo it (turn) | walk back | | |
+
+`hostage-rig/preview-*.png` are its pages, and five moments: `1-layers-bass` (another part
+picked: the screen turns amber, and its range waits for E2 and E3 to reach it), `2-effects-delay`,
+`3-soundcheck-checking` (the check running), `4-discover-strings` (one kind only) and
+`5-changes-half-way` (three edits back, listening half way between saved and now).
+
+**The part's colour.** Here the screen takes the colour of the part picked on Layers, which is
+its sound's colour on the first preset's atlas: amber for the sub bass, violet for the pad, teal
+for the bell.
+
+**Editing with absolute encoders.** The host keeps each encoder's absolute position, so on the
+pages that edit something per part or per slot (Layers, Effects) an encoder takes a value over
+only once it reaches it, like a fader without a motor; until then the value stays and its cell
+shows it dim, and on Layers a ghost outline shows where E2 or E3 is. HoSTage itself reports each
+turn as a relative step (`encoderDelta`), so it would not need this.
+
+### What each page is, and what HoSTage already has for it
+
+**Layers.** A part's zone is already a key range, a velocity range and a transpose
+(`PartMidiRules.h`: `keyLow/High`, `velocityLow/High`, `transpose`), and layer groups share one
+note decision with velocity or key crossfades (`LayerGroup` in `RackModel.h`). What nobody shows
+is the whole keyboard at once: a band per part over the keys, the split drawn where one part ends
+and the next begins, how deep the layers go, and, as you play, a light under each part that
+answers each note (and grey keys where nothing does, so a dead zone is visible). HoSTage would
+send the parts' ranges when they change (a few bytes a part) and the notes sounding each frame.
+
+**Effects.** The insert chain is HoSTage's own (`EffectSlot`, `effects` per part, bus and master
+in `RackModel.h`), so HoSTage sees what goes into every slot and what comes out. That is enough
+to say what any plug-in is doing without knowing what it is: how much louder or quieter it makes
+the part (gain), brighter or darker (tone), how far it brings the loudest moments down towards
+the rest (squash), how much wider (width), and how long it rings on (tail). Each card shows the
+five as bars and names the one that matters; a slot that changes nothing says so. The selected
+slot shows its spectrum and its level over four seconds, in and out. Measuring is new: it would
+mean metering before and after each slot. The mockup works the five out from a simulated signal
+and the slot's controls (an EQ, a compressor with make-up gain, a chorus, an echo, a plate).
+
+**Soundcheck.** The check already exists without a screen: `soundcheckReferences` in
+`SetlistSoundcheck.h` walks a setlist item's parts and reports a missing plug-in or a MIDI output
+that is not there, and a plug-in's saved state carries a hash checked on load (`stateBlobHash`).
+The page runs it over the whole set, song by song, and says what to do: plug the cable in, play a
+state saved by an older version once, preload a slow plug-in, or use the nearest sound you have
+(`nearestSounds` again, which `Library.h` already describes as "the substitute for a plug-in you
+no longer have"). Load times are the one new measurement.
+
+**Discover.** `unplayedLikeHabits` in `Library.h` is this page: "Here are twenty you have never
+opened that sound like the ones you keep loading". `habitualProfile` is the halo marked YOU on
+the map, the average of what you load weighted by how often. Each suggestion says which of your
+regulars it is like and how often you load that one. E4 keeps one as a favourite
+(`setLibraryUserMetadata {favourite}`). The mockup's map shows 720 invented sounds of the 11,903,
+sorted by the generator; HoSTage would send the eight on show.
+
+**Changes.** Every save of a sound is kept as a version (`commitVersion`, `diffVersions`,
+`morphVersions` in `InstrumentHostService.h`), so "what changed since I saved" is a diff HoSTage
+can already take, and listening anywhere between saved and now is `morphVersions`. Undoing one
+change puts that parameter back to its saved value; walking back through the history is the
+edit history (`restoreEditHistory`). The page shows each changed parameter as the saved value (a
+tick), the value now, and what you are hearing (the bar) as E1 moves from A to B.
+
+### Its assets
+
+| File | Size | PNG id | Buffer | Holds |
+|---|---|---|---|---|
+| `panels.png` | 480 x 816 | 576 | 577 | the Layers (with the keyboard), Effects and Soundcheck backgrounds |
+| `tint.png` | 128 x 64 | 578 | 579 | 8-bit grey coverage: dots, rings, the three check marks, a star, the lit keys |
+| `parts.png` | 480 x 544 | 580 | 581 | the Discover (with its map) and Changes backgrounds |
+
+Uploads total about 36 KB; decoded, 2,582 KiB at four bytes a pixel. `Skin.lua` is 58 KB, the
+largest yet: the invented set, library and history are written into it.
+
+## Making and checking them
 
 ```bash
 python tools/ctrl49/screen-lab/feature-mockups/make_feature_mockups.py
+python tools/ctrl49/screen-lab/feature-mockups/make_rig_mockups.py
 
 cd CE/web
-npm run test:screen-eras                                    # CTRL49_ERA_PREVIEWS=1 rewrites the previews
+npm run test:screen-eras                    # CTRL49_ERA_PREVIEWS=1 rewrites the previews
+CTRL49_ERA_ONLY=hostage-rig npm run test:screen-eras        # one design, quicker
 ```
 
-`make_feature_mockups.py` needs Pillow, and borrows its drawing helpers and the Midnight palette
-from `../era-presets/make_era_designs.py`. It writes the folder's three atlases, its manifest,
-and its `Skin.lua`: `FeatureSkin.lua` with the `GENERATED` block (theme, layout, sprite crops and
-the invented data) replaced. Behaviour belongs in `FeatureSkin.lua`; never hand-edit `Skin.lua`.
+Both generators need Pillow. `make_feature_mockups.py` borrows its drawing helpers and the
+Midnight palette from `../era-presets/make_era_designs.py`, and `make_rig_mockups.py` borrows
+them from `make_feature_mockups.py`. Each writes its folder's three atlases, its manifest, and its
+`Skin.lua`: the template with the `GENERATED` block (theme, layout, sprite crops and the invented
+data) replaced. Behaviour belongs in the templates; never hand-edit a `Skin.lua`.
 
-The era designs' check covers this design too, with the same rules (the manifest, Lua 5.2, the
-template outside the generated block, every key the template reads given, every encoder of every
-page through all 128 positions, every call on the screen and inside its atlas, every text inside
-its box, at most 600 calls a redraw, the atlases decoded once, the pages that should move
-moving). It also checks that E5 on Capture keeps the box and says so once, that a bigger atlas
-box finds more sounds and the list shows eight, and that Chords names the chord and the key.
-The busiest page is Motion, about 270 calls.
+The era designs' check covers both, with the same rules (the manifest, Lua 5.2, the template
+outside the generated block, every key the template reads given, every encoder of every page
+through all 128 positions, every call on the screen and inside its atlas, every text inside its
+box, at most 600 calls a redraw, the atlases decoded once, the pages that should move moving).
+It also checks that each page answers its encoders the way it says it does. On the first preset:
+E5 on Capture keeps the box and says so once, a bigger atlas box finds more sounds and the list
+shows eight, Chords names the chord and the key. On the second: Layers names the split, and E2
+takes a part's lowest key over only once it reaches it, then carries it; E6 bypasses an effect
+and brings it back; Soundcheck gives the set's verdict, the problem and the fix, and E3 runs it
+again; Discover lists eight and E3 keeps them to one kind; Changes counts what changed as E4
+walks back, and E3 undoes one. The busiest pages are Motion and Effects, about 280 calls.
 
-## Trying it on the keyboard
+## Trying them on the keyboard
 
 As for the era designs: close HoSTage / CEditor, VIP and the DAW, connect the CTRL49, run the
 launcher. Worth writing down:
 
-- whether `Skin.lua` loads at all: at 46 KB it is the largest page the lab has sent (the era
-  designs are 33 KB). The invented library is most of the difference; `library()` in the
-  generator makes fewer sounds if it is too much;
+- whether each `Skin.lua` loads at all: at 46 KB and 58 KB they are the largest pages the lab has
+  sent (the era designs are 33 KB). The invented data is most of the difference; the generators
+  make fewer sounds if it is too much;
 - whether Aileron Light (face 7) draws the bars-left numeral. Every earlier page used faces 9
   and 10 only;
 - how long the atlas takes to answer a crosshair move: the first draw after one searches all
   1,200 sounds in Lua;
 - whether the colour follows the sound everywhere (pick a sound on the atlas with E4, then walk
   the pages), and whether a tinted dot on the Motion knobs reads as "now" against the arc;
-- whether the beat at the screen's edge reads from a distance, and whether it is too much.
+- whether the beat at the screen's edge reads from a distance, and whether it is too much;
+- whether the Layers bands and their lights read at arm's length, and whether picking a range up
+  with E2-E6 feels natural or needs the host's relative turns;
+- how long Effects takes to redraw: it runs five slots over 118 columns of simulated signal
+  every frame.
