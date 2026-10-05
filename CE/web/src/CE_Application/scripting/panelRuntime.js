@@ -7431,6 +7431,42 @@ async function getPyodideEngine() {
   return pyodidePromise;
 }
 
+/**
+ * The panel API as Python should see it.
+ *
+ * Pyodide hands a Python dict, list or callable to a JavaScript function as a BORROWED proxy, which it
+ * destroys the moment the call returns. Anything the API keeps — a saved setting, a callback for
+ * after()/on()/watch(), an options object it reads later — was dead by the time it was used: a dict
+ * saved with saveSetting() made the panel impossible to save at all, every callback threw "This
+ * borrowed proxy was automatically destroyed", and options and lists arrived empty (release audit
+ * C-96, C-97, C-99, C-59). So every function is wrapped: dicts, lists, tuples and sets are converted
+ * to plain JavaScript before the call, and a callable is copied into a proxy that outlives it.
+ *
+ * Exported for the test, which drives it with a stand-in for Pyodide's proxy class.
+ */
+export function apiForPython(api, PyProxy) {
+  const isPyProxy = (value) => PyProxy != null && value instanceof PyProxy;
+  const fromPython = (value) => {
+    if (!isPyProxy(value)) return value;
+    if (typeof value === 'function') return value.copy();
+    return value.toJs({ dict_converter: Object.fromEntries });
+  };
+  const wrapped = new WeakMap();
+  const wrap = (value) => {
+    if (typeof value === 'function') {
+      if (!wrapped.has(value)) wrapped.set(value, function pythonCall(...args) { return value.apply(this, args.map(fromPython)); });
+      return wrapped.get(value);
+    }
+    if (value == null || typeof value !== 'object' || Array.isArray(value) || isPyProxy(value)) return value;
+    if (wrapped.has(value)) return wrapped.get(value);
+    const out = {};
+    wrapped.set(value, out);
+    for (const [key, entry] of Object.entries(value)) out[key] = wrap(entry);
+    return out;
+  };
+  return wrap(api);
+}
+
 /** Execute a Python script's source and return its declared handlers (async). */
 async function loadHandlersPython(script) {
   let py;
@@ -7445,7 +7481,10 @@ async function loadHandlersPython(script) {
     // Fresh namespace per run, seeded with the panel API + helpers as Python globals, so the source
     // can call set()/get()/sendCC()/log()/clamp()/scale()/… directly. Each defined handler is read
     // back out as a callable; JS payloads auto-convert (numbers → int/float, objects → attr access).
-    const ns = py.toPy(api);
+    // One level deep: the names become Python globals, and `ce` stays a JavaScript object, so
+    // `ce.midi.sendCC(...)` resolves by attribute the way the exported plug-in's `ce` namespace does.
+    // Converting it all the way turned `ce` into a dict and every `ce.*` call into AttributeError (C-98).
+    const ns = py.toPy(apiForPython(api, py.ffi?.PyProxy), { depth: 1 });
     py.runPython(script.source, { globals: ns });
     const handlers = {};
     for (const name of probeNames(script)) {
