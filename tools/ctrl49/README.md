@@ -469,11 +469,13 @@ stayed smooth.
 **Image memory.** Eight 1 MB blocks decoded on top of the page's own, with no refusal and no
 watchdog: `mem_usage(0)` went from 12,263,424 to 20,783,104, up 8.1 MB. So at least 8 MB of
 decoded images fit beside a page, and `mem_usage(0)` counts them. None of the eight could be
-drawn, though. That build uploaded the block eight times and drew each one in the same redraw
-that decoded it; the pages that draw decode last and draw later, from fewer uploads. The Stress
-page now does the same (one upload, decoded per block as the last thing in a redraw, drawn a
-second later). Whether its swatches then show is the next run's question: all eight showing
-means the same-redraw draw was the trouble, the first few showing marks an object limit.
+drawn, though, in three builds: RGB blocks, RGBA blocks from eight uploads drawn in the redraw
+that decoded them, and RGBA blocks from one upload decoded last and drawn a second later (the
+way Machined Metal decodes, which does draw). The swatches are therefore not a measure on this
+keyboard; `mem_usage(0)` is. Why these blocks decode and do not draw is open. What they still
+differ in from every image that draws is the image itself: 256 x 1024 of flat colour bands,
+which deflates 430 to 1. That is to be found without the keyboard before anyone is asked to run
+the page again.
 
 - **RAM / object budget** — how many/large filmstrips fit in device RAM before upload or
   decode fails. The Stress page's E5 decodes 1 MB blocks, up to 8.
