@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 
-import { runScript, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { runScript, scriptApiForTesting, approveCurrentPanelScripts } from '../src/CE_Application/scripting/panelRuntime.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import {
   activeEditorTab, activePanelId, panels,
@@ -126,6 +126,7 @@ test('a callback batches automatically and rename-then-lookup stays synchronous'
     };
     let publications = -1;
     const unsubscribe = panels.subscribe(() => { publications += 1; });
+    approveCurrentPanelScripts(script);
     try { await runScript(script, 'onCustom'); } finally { unsubscribe(); }
 
     assert.equal(publications, 1);

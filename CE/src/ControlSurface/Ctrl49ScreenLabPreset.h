@@ -1,18 +1,24 @@
 // Ctrl49ScreenLabPreset — the screen lab's preset mode: a set of pages designed elsewhere, as a
 // folder holding a manifest, a Lua page and its PNGs, loaded and run on the keyboard.
 //
-// The designs in tools/ctrl49/screen-lab/era-presets and feature-mockups are presets. The
-// manifest (Design.ctrl49preset) is INI:
+// The designs in tools/ctrl49/screen-lab/era-presets, feature-mockups, design-presets and
+// machined-metal are presets. The manifest (Design.ctrl49preset, MachinedMetal.ctrl49preset) is
+// INI:
 //
-//   [Preset]  version=1, name, width=480, height=272, lua=<file>, pages=1..6,
-//             envelopePage=<one of the pages>, fps=5..30, assets=<how many>
-//   [AssetN]  id=0..1023 (not the page's own 0x0101), file=<a PNG beside the manifest>
+//   [Preset]  version=1, name, width=480, height=272, lua=<file of 1..65536 bytes>, pages=1..6,
+//             envelopePage=<one of the pages, or -1 for none>, fps=5..30,
+//             assets=1..8
+//   [AssetN]  id=512..1023, file=<a PNG beside the manifest, at most 8192 px a side>
 //   [PageN]   title, encoders=1..8, e1..e8=0..127 (where each encoder starts on that page)
+//
+// Encoders past a page's count do nothing on it. Asset ids start at 512 so they stay clear of
+// the session's own objects (the page is 0x0101).
 //
 // The page is sent what the showcase is sent: set_mode, set_frame (buildShowcaseFrame's bytes)
 // every redraw at the manifest's rate, and set_envelope (buildEnvelope from E1-E4) whenever those
-// change on the envelope page. CE/web/browser-checks/ctrl49EraPresets.mjs holds every committed
-// design to these same rules and renders it from the same bytes; keep the two in step.
+// change on the envelope page. CE/web/browser-checks/ctrl49EraPresets.mjs holds the era designs
+// and feature mockups to these same rules and renders them from the same bytes, and
+// ctrl49ScreenLab.mjs renders design-presets and Machined Metal; keep them in step.
 //
 // Pure std. parsePreset reads text and nothing else; loadPreset adds the files beside the
 // manifest (the Lua, and each PNG's size for the memory guard), so the test runs the tool's own
@@ -42,7 +48,10 @@ inline constexpr int kPresetHeight = 272;
 inline constexpr int kPresetMaxPages = 6;            // what buildShowcaseFrame's page byte reaches
 inline constexpr int kPresetMinFps = 5;
 inline constexpr int kPresetMaxFps = 30;
-inline constexpr int kPresetLuaObjectId = 0x0101;    // the session's own id for the page
+inline constexpr int kPresetMinAssetId = 512;       // clear of the session's own (0x0101 is the page)
+inline constexpr int kPresetMaxAssets = 8;
+inline constexpr std::size_t kPresetMaxLuaBytes = 65536;
+inline constexpr int kPresetMaxPngSide = 8192;
 // A software guard on what the PNGs decode to, counted at four bytes a pixel. It is not the
 // device's limit, which nobody has measured; it stops a design nobody meant to be that large.
 inline constexpr std::size_t kPresetMemoryGuard = 8u * 1024u * 1024u;
@@ -174,8 +183,8 @@ inline PresetResult parsePreset (std::string_view text)
     else
         preset.pages = *pages;
     const auto envelope = number (head, "envelopePage");
-    if (! envelope || *envelope < 0 || (preset.pages > 0 && *envelope >= preset.pages))
-        errors.push_back ("envelopePage must be one of the pages (0 to pages - 1)");
+    if (! envelope || *envelope < -1 || (preset.pages > 0 && *envelope >= preset.pages))
+        errors.push_back ("envelopePage must be one of the pages (0 to pages - 1), or -1 for none");
     else
         preset.envelopePage = *envelope;
     const auto fps = number (head, "fps");
@@ -187,9 +196,9 @@ inline PresetResult parsePreset (std::string_view text)
         errors.push_back ("lua must name a file beside the manifest");
 
     const auto assets = number (head, "assets");
-    if (! assets || *assets < 0 || *assets > 64)
-        errors.push_back ("assets must be a count, 0-64");
-    for (int i = 0; assets && i < *assets && i <= 64; ++i)
+    if (! assets || *assets < 1 || *assets > kPresetMaxAssets)
+        errors.push_back ("assets must be 1-8");
+    for (int i = 0; assets && i < *assets && i < kPresetMaxAssets; ++i)
     {
         const auto section = sections.find ("Asset" + std::to_string (i));
         if (section == sections.end())
@@ -200,8 +209,8 @@ inline PresetResult parsePreset (std::string_view text)
         PresetAsset asset;
         const auto id = number (section->second, "id");
         asset.file = value (section->second, "file");
-        if (! id || *id < 0 || *id > kMaxObjectTableId || *id == kPresetLuaObjectId)
-            errors.push_back ("[Asset" + std::to_string (i) + "] id must be 0-1023, and not the page's own 257");
+        if (! id || *id < kPresetMinAssetId || *id > kMaxObjectTableId)
+            errors.push_back ("[Asset" + std::to_string (i) + "] id must be 512-1023");
         else
         {
             for (const auto& other : preset.assets)
@@ -308,7 +317,11 @@ inline LoadedPreset loadPreset (const std::filesystem::path& manifest)
     auto preset = *parsed.preset;
     const auto folder = manifest.parent_path();
     if (const auto lua = read (folder / preset.lua))
+    {
         loaded.lua = *lua;
+        if (lua->empty() || lua->size() > kPresetMaxLuaBytes)
+            loaded.errors.push_back ("lua: " + preset.lua + " must be 1-65536 bytes, not " + std::to_string (lua->size()));
+    }
     else
         loaded.errors.push_back ("lua: " + preset.lua + " is not beside the manifest");
     for (auto& asset : preset.assets)
@@ -323,6 +336,12 @@ inline LoadedPreset loadPreset (const std::filesystem::path& manifest)
         if (! size)
         {
             loaded.errors.push_back (asset.file + " is not a PNG");
+            continue;
+        }
+        if (size->first < 1 || size->second < 1 || size->first > kPresetMaxPngSide || size->second > kPresetMaxPngSide)
+        {
+            loaded.errors.push_back (asset.file + " is " + std::to_string (size->first) + " x "
+                                     + std::to_string (size->second) + ", outside 1-8192 a side");
             continue;
         }
         asset.width = size->first;

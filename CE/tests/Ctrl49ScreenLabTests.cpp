@@ -8,6 +8,7 @@
 #include "ControlSurface/Ctrl49ScreenLabPreset.h"
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -169,12 +170,17 @@ int main()
         refuses ("pages=2", "pages=7", "pages must be 1-6");
         refuses ("pages=2", "pages=0", "pages must be 1-6");
         refuses ("envelopePage=1", "envelopePage=2", "envelopePage");
+        refuses ("envelopePage=1", "envelopePage=-2", "envelopePage");
+        check (broken ("envelopePage=1", "envelopePage=-1").preset.has_value(), "envelopePage=-1 is a preset with no envelope page");
         refuses ("fps=15", "fps=4", "fps must be 5-30");
         refuses ("fps=15", "fps=31", "fps must be 5-30");
         refuses ("lua=Skin.lua", "lua=../Skin.lua", "beside the manifest");
         refuses ("lua=Skin.lua", "lua=sub/Skin.lua", "beside the manifest");
-        refuses ("id=576", "id=1024", "0-1023");
-        refuses ("id=576", "id=257", "page's own");
+        refuses ("id=576", "id=1024", "512-1023");
+        refuses ("id=576", "id=511", "512-1023");
+        refuses ("id=576", "id=257", "512-1023");
+        refuses ("assets=1", "assets=0", "assets must be 1-8");
+        refuses ("assets=1", "assets=9", "assets must be 1-8");
         refuses ("file=panels.png", "file=art\\panels.png", "beside the manifest");
         refuses ("assets=1", "assets=2", "[Asset1] is missing");
         refuses ("encoders=4", "encoders=9", "encoders must be 1-8");
@@ -199,6 +205,42 @@ int main()
         header[1] = 'X';
         check (! lab::pngSize (header), "and something that is not a PNG has none");
 
+        // The files beside a manifest: the Lua's size and each PNG's sides are held to the rules.
+        const auto folder = std::filesystem::temp_directory_path() / "ctrl49-preset-files-test";
+        std::filesystem::remove_all (folder);
+        std::filesystem::create_directories (folder);
+        const auto write = [&folder] (const std::string& name, const ceditor::ctrl49::Bytes& bytes)
+        {
+            std::ofstream (folder / name, std::ios::binary).write ((const char*) bytes.data(), (std::streamsize) bytes.size());
+        };
+        const auto manifest = folder / "Design.ctrl49preset";
+        {
+            std::ofstream (manifest) << "[Preset]\nversion=1\nname=Files\nwidth=480\nheight=272\nlua=Skin.lua\npages=1\n"
+                                        "envelopePage=-1\nfps=10\nassets=1\n[Asset0]\nid=576\nfile=panels.png\n"
+                                        "[Page0]\ntitle=One\nencoders=8\ne1=0\ne2=0\ne3=0\ne4=0\ne5=0\ne6=0\ne7=0\ne8=0\n";
+        }
+        const auto saysSo = [] (const lab::LoadedPreset& loaded, const std::string& why)
+        {
+            for (const auto& error : loaded.errors)
+                if (error.find (why) != std::string::npos)
+                    return ! loaded.preset;
+            return false;
+        };
+        auto png = header;
+        png[1] = 'P';
+        write ("panels.png", png);
+        write ("Skin.lua", ceditor::ctrl49::Bytes (100, 'x'));
+        check (lab::loadPreset (manifest).preset.has_value(), "a small Lua and a PNG beside the manifest load");
+        write ("Skin.lua", {});
+        check (saysSo (lab::loadPreset (manifest), "1-65536 bytes"), "an empty Lua is refused");
+        write ("Skin.lua", ceditor::ctrl49::Bytes (65537, 'x'));
+        check (saysSo (lab::loadPreset (manifest), "1-65536 bytes"), "and so is one over 64 KiB");
+        write ("Skin.lua", ceditor::ctrl49::Bytes (65536, 'x'));
+        png[16] = 0; png[17] = 0; png[18] = 0x23; png[19] = 0x29;     // 9001 px wide
+        write ("panels.png", png);
+        check (saysSo (lab::loadPreset (manifest), "outside 1-8192"), "a PNG over 8192 px a side is refused");
+        std::filesystem::remove_all (folder);
+
         lab::Preset preset;
         preset.assets.push_back ({ 576, "a.png", 480, 816 });
         preset.assets.push_back ({ 578, "b.png", 80, 5120 });
@@ -207,28 +249,26 @@ int main()
     }
 
     {   // --- preset mode: every committed design ---------------------------------------------
-        // The tool's own loader over the folders the browser check renders: a design that the
+        // The tool's own loader over the folders the browser checks render: a design that a
         // check passes and the tool would refuse (or the other way round) fails here.
         int designs = 0, loads = 0;
-        for (const auto* folder : { "era-presets", "feature-mockups" })
+        const auto tryLoad = [&] (const std::filesystem::path& manifest)
         {
-            const auto root = std::filesystem::path (CTRL49_LAB_DIR) / folder;
-            for (const auto& entry : std::filesystem::directory_iterator (root))
-            {
-                const auto manifest = entry.path() / "Design.ctrl49preset";
-                if (! std::filesystem::exists (manifest))
-                    continue;
-                ++designs;
-                const auto loaded = lab::loadPreset (manifest);
-                if (loaded.preset && ! loaded.lua.empty() && loaded.pngs.size() == loaded.preset->assets.size())
-                    ++loads;
-                else
-                    for (const auto& error : loaded.errors)
-                        std::cout << "        " << entry.path().filename().string() << ": " << error << std::endl;
-            }
-        }
-        check (designs >= 14, "the screen lab holds the era designs and the feature mockups ("
-                                 + std::to_string (designs) + " designs)");
+            ++designs;
+            const auto loaded = lab::loadPreset (manifest);
+            if (loaded.preset && ! loaded.lua.empty() && loaded.pngs.size() == loaded.preset->assets.size())
+                ++loads;
+            else
+                for (const auto& error : loaded.errors)
+                    std::cout << "        " << manifest.parent_path().filename().string() << ": " << error << std::endl;
+        };
+        for (const auto* folder : { "era-presets", "feature-mockups", "design-presets" })
+            for (const auto& entry : std::filesystem::directory_iterator (std::filesystem::path (CTRL49_LAB_DIR) / folder))
+                if (const auto manifest = entry.path() / "Design.ctrl49preset"; std::filesystem::exists (manifest))
+                    tryLoad (manifest);
+        tryLoad (std::filesystem::path (CTRL49_LAB_DIR) / "machined-metal/MachinedMetal.ctrl49preset");
+        check (designs >= 18, "the screen lab holds the era designs, the feature mockups, the design presets and "
+                                 "Machined Metal (" + std::to_string (designs) + " designs)");
         check (loads == designs, "and the preset mode loads every one, its Lua and its PNGs");
 
         const auto rig = lab::loadPreset (std::filesystem::path (CTRL49_LAB_DIR) / "feature-mockups/hostage-rig/Design.ctrl49preset");

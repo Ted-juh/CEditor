@@ -126,7 +126,10 @@ test('an LV2 is exported as its own bundle, binary renamed, panel beside it, man
 
     const bundle = path.join(outDir, 'Validation.lv2');
     assert.deepEqual(result.written, [bundle]);
-    assert.equal(readFileSync(record, 'utf8').trim().replace(/^"|"$/g, ''), path.join(bundle, 'libValidation.so'), 'the helper ran over the renamed binary');
+    const helperBinary = readFileSync(record, 'utf8').trim().replace(/^"|"$/g, '');
+    assert.equal(path.basename(helperBinary), 'libValidation.so', 'the helper ran over the renamed binary');
+    assert.equal(path.basename(path.dirname(helperBinary)), 'Validation.lv2');
+    assert.ok(path.relative(outDir, helperBinary).startsWith('.ceditor-export-'), 'validation completed in staging before replacement');
     assert.deepEqual(readdirSync(bundle).filter((f) => !f.startsWith('CE')).sort(), ['dsp.ttl', 'libValidation.so', 'manifest.ttl', 'panel.cepanel', 'ui.ttl']);
     assert.equal(readFileSync(path.join(bundle, 'manifest.ttl'), 'utf8').trim(), 'written', 'the template\'s own manifest did not survive');
     assert.equal(JSON.parse(readFileSync(path.join(bundle, 'panel.cepanel'), 'utf8')).panelGuid, 'validation-guid');

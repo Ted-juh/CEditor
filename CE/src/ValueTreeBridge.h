@@ -1,4 +1,5 @@
 #pragma once
+#include "NativeFileAccess.h"
 
 #include <juce_data_structures/juce_data_structures.h>
 #include <juce_gui_extra/juce_gui_extra.h>
@@ -135,6 +136,7 @@ private:
     bool perfDebugEnabled = false;
 
     AppSettings* appSettings = nullptr;
+    ceditor::NativeFileAccess fileAccess;
     std::unique_ptr<juce::FileChooser> fileChooser;
     // Active/last in-app VST3 build, held as its Timer base so this header needn't see the concrete
     // VstBuildJob (it lives in the handlers .cpp). Timer has a virtual destructor, so deleting

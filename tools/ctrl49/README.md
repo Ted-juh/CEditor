@@ -334,12 +334,15 @@ Ctrl49ScreenLab.exe preset   <manifest> --check          # the manifest and its 
 ```
 
 **Preset mode** runs a design made elsewhere: a folder with a manifest (`Design.ctrl49preset`),
-a Lua page and its PNGs. `screen-lab/era-presets` and `screen-lab/feature-mockups` are such
-designs, with launchers of their own (`Start_CTRL49_Era_Designs.cmd`,
-`Start_CTRL49_Feature_Mockups.cmd`). The manifest's rules, and what the page is sent each redraw,
-are at the top of `CE/src/ControlSurface/Ctrl49ScreenLabPreset.h`; the `Ctrl49ScreenLab` ctest
-loads every committed design with the tool's own loader, and `npm run test:screen-eras` renders
-them. In every mode the console prints each command the keyboard refuses as it happens (out of
+a Lua page and its PNGs. `screen-lab/era-presets`, `screen-lab/feature-mockups`,
+`screen-lab/design-presets` and `screen-lab/machined-metal` are such designs, the first two and
+the last with launchers of their own (`Start_CTRL49_Era_Designs.cmd`,
+`Start_CTRL49_Feature_Mockups.cmd`, `Start_CTRL49_Machined_Metal.cmd`). The manifest's rules
+(Lua of at most 64 KiB, one to eight PNGs with ids 512-1023, at most 8192 px a side, 8 MiB
+decoded), and what the page is sent each redraw, are at the top of
+`CE/src/ControlSurface/Ctrl49ScreenLabPreset.h`; the `Ctrl49ScreenLab` ctest loads every
+committed design with the tool's own loader, and `npm run test:screen-eras` and
+`npm run test:screen-lab` render them. In every mode the console prints each command the keyboard refuses as it happens (out of
 memory, a Lua script error, ...); preset mode also counts the keyboard's answers after the upload
 and every ten seconds, beside the redraws a second that actually went out.
 
@@ -391,6 +394,57 @@ Everything the tool sends is built in `CE/src/ControlSurface/Ctrl49ScreenLab.h` 
 editor's draw-API shim from the same bytes (`CTRL49_LAB_SHOTS=<dir>` writes PNGs of them), so a
 page can be worked on without the keyboard. `python make_lab_assets.py` rebuilds the PNGs and
 rewrites the pages' sprite tables; the PNGs are committed, so running the lab needs no Python.
+
+## Machined Metal preset (480 x 272)
+
+`Start_CTRL49_Machined_Metal.cmd` runs the compact skeuomorphic preset. Close other CTRL49
+owners first. **Page Left / Right** selects Controls, Mixer, or Amp Envelope. **E1-E4** operate
+the four knob/envelope parameters; **E1-E8** operate mixer faders. Values persist across page
+changes for the session. Mixer meters are animated demonstration data, not audio measurements.
+The hardware's linear Mackie faders are not opened by this test; use the encoders. Ctrl+C stops
+the host and lets the keyboard watchdog restore the stock screen.
+
+```
+Ctrl49ScreenLab.exe preset screen-lab/machined-metal/MachinedMetal.ctrl49preset
+Ctrl49ScreenLab.exe preset screen-lab/machined-metal/MachinedMetal.ctrl49preset --check
+```
+
+The reusable `.ctrl49preset` is an INI manifest consumed by the lab host, not a synthesizer
+patch or an assignment JSON. It declares the Lua page, PNG object IDs, page count, encoder
+counts, initial values and redraw rate. Its companion Lua implements the existing `set_frame`
+and `set_envelope` payloads. This does not replace HoSTage's standard renderer or add a theme
+importer to Screen Builder. Keep the manifest, Lua and three PNGs together when copying it.
+
+The skin uses one 64-frame 80px knob filmstrip, three native-size backgrounds in an atlas and
+small translated slider/meter sprites. All three PNGs total 3,210 KiB at RGBA decode depth;
+the page stages their decoding after the loading screen and reuses them across page changes.
+`fps=15` is the initial test rate; lower it to `10` or `5` in the preset for a slow unit.
+`--check` validates the manifest, files, PNG headers and conservative decoded-image budget
+without opening MIDI. Real font appearance, device decode latency and sustained redraw rate
+still need the CTRL49. `python screen-lab/machined-metal/make_assets.py` regenerates the assets
+(Pillow required). `npm run test:screen-lab` checks the actual Lua at min/mid/max values,
+sprite bounds, text widths, decode reuse and meter animation, and can capture native PNGs.
+
+### Three additional design presets
+
+`screen-lab/design-presets/` contains three further skins, each with Controls, Mixer and
+Amp Envelope pages and the same encoder mapping as Machined Metal:
+
+- **Neon Glass**: cyan illuminated rings, glass-faced knobs, angular recessed panels.
+- **Studio 1978**: brushed aluminium, navy enamel header, blue knobs and ivory fader caps.
+- **Bakelite 1936**: molded brown cabinet, scalloped rotary knobs, brass trim and parchment scope.
+
+Run `Ctrl49ScreenLab.exe preset <skin-folder>/Design.ctrl49preset`, or use the packaged
+launchers. They reuse the existing executable, payloads, staged loading, 15 Hz redraw rate
+and 3,210 KiB decoded image budget. One preset is loaded per hardware session. Machined
+Metal has now been confirmed responsive by the user on the physical CTRL49; these new skins
+have passed preview/native manifest validation and still await their own hardware test.
+
+`python screen-lab/design-presets/make_designs.py` regenerates all three from the original
+Machined Metal renderer and manifest. No manual edits to generated `Skin.lua` files: make
+shared behavior changes in `machined-metal/MachinedMetal.lua` and rerun the generator.
+The browser check renders all nine new pages at all 128 control positions, including mixed
+ADSR extremes, and checks source crops, screen bounds, text widths and image reuse.
 
 ## Still requires hardware (open Phase-3 measurements)
 

@@ -144,12 +144,53 @@ window.__anim = {
   storedTargetPaths: (name) => animation(name).targets.map((t) => t.path),
   storedKeyframes: (name) => animation(name).targets.map((t) => (t.keyframes ?? []).map((k) => [k.time, k.value])),
   storedLoopHold: (name) => ({ loop: animation(name).loop, hold: animation(name).hold, duration: animation(name).duration }),
-  timelineCanvases: () => document.querySelectorAll('.kft canvas').length,
-  trackLabels: () => [...document.querySelectorAll('.kft .lbl')].map(textOf),
+  trackTimelines: () => document.querySelectorAll('.seqtl').length,
+  trackLabels: () => [...document.querySelectorAll('.seqtl .tl-track .lbl')].map(textOf),
   playheadText: () => textOf(document.querySelector('.transport .time')),
   addKeyframe: () => { [...document.querySelectorAll('.transport .mk')].find((b) => /Keyframe at/.test(b.textContent))?.click(); },
-  selectTrack: (index) => { document.querySelectorAll('.trow')[index]?.click(); },
+  selectTrack: (index) => { document.querySelectorAll('.seqtl .tl-track .tl-name')[index]?.click(); },
   keyframeBox: () => !!document.querySelector('.kfbox'),
+  selectedKeyframeText: () => textOf(document.querySelector('.transport .kfat')),
+  keyframeTimeCell: () => document.querySelector('.kfbox input')?.value ?? '',
+  /** The ruler (the playhead's strip), and one track's lane (its keyframes' strip). Same x and width. */
+  axisRect: () => {
+    const r = document.querySelector('.seqtl .tl-ruler')?.getBoundingClientRect();
+    return r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null;
+  },
+  laneRect: (index) => {
+    const r = document.querySelectorAll('.seqtl .tl-lane')[index]?.getBoundingClientRect();
+    return r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null;
+  },
+  /** The track list: whether it is taller than its box, and whether the ruler stays at the top when it is scrolled. */
+  trackScroll: () => {
+    const box = document.querySelector('.seqtl .tl-scroll');
+    const ruler = document.querySelector('.seqtl .tl-ruler');
+    if (!box || !ruler) return null;
+    const listScrolls = box.scrollHeight > box.clientHeight + 1;
+    box.scrollTop = box.scrollHeight;
+    const rulerPinned = Math.abs(ruler.getBoundingClientRect().top - box.getBoundingClientRect().top) < 2;
+    box.scrollTop = 0;
+    return { tracks: document.querySelectorAll('.seqtl .tl-track').length, listScrolls, rulerPinned };
+  },
+  /** Whether anything in the tab scrolls the tab itself, rather than a list inside it. */
+  tabScrolls: () => {
+    const tab = document.querySelector('.anim-tab');
+    return { tab: tab.scrollHeight > tab.clientHeight + 1, page: document.documentElement.scrollHeight > window.innerHeight + 1 };
+  },
+  smallestText: () => {
+    let smallest = 99;
+    for (const el of document.querySelectorAll('.anim-tab *')) {
+      if (el.closest('.stage')) continue;
+      if (![...el.childNodes].some((node) => node.nodeType === 3 && node.textContent.trim())) continue;
+      smallest = Math.min(smallest, parseFloat(getComputedStyle(el).fontSize));
+    }
+    return smallest;
+  },
+  /** The fourth column: Details or Preview. */
+  showSide: (label) => { [...document.querySelectorAll('.segmented[aria-label="Side panel"] button')].find((b) => textOf(b) === label)?.click(); },
+  /** The row that asks what to add is closed until Add is pressed, and then stays open. */
+  openAdd: () => { if (!document.querySelector('.addbox')) document.querySelector('.addtoggle')?.click(); },
+  addOpen: () => !!document.querySelector('.addbox'),
   deleteKeyframe: () => { document.querySelector('.kfbox .danger')?.click(); },
   overlay: () => get(keyframeOverlays)[CONTROL_ID] ?? null,
   play: () => { document.querySelector('.transport .mk[aria-label="Play"]')?.click(); },
@@ -163,7 +204,7 @@ window.__anim = {
   activeEasing: () => textOf(document.querySelector('.easing.on span')),
   storedAnimation: (name) => JSON.parse(JSON.stringify(animation(name))),
   bezierEditor: () => !!document.querySelector('.bezier svg'),
-  springCells: () => [...document.querySelectorAll('.setbox .r .lab')].map(textOf).filter((t) => t === 'Damping' || t === 'Bounce'),
+  springCells: () => [...document.querySelectorAll('.curvebox .r .lab')].map(textOf).filter((t) => t === 'Damping' || t === 'Bounce'),
   /** Drag the second bezier handle by (dx, dy) screen pixels, as a person would. */
   dragHandle: async (dx, dy) => {
     const handle = document.querySelector('.bezier .handle.h2');
@@ -181,6 +222,15 @@ window.__anim = {
   storedEasing: (name) => animation(name).easing,
 
   addOptions: () => [...document.querySelectorAll('.addbox select')].map((s) => [...s.options].map((o) => o.textContent.trim())),
+  choosePart: (label) => {
+    const select = document.querySelectorAll('.addbox select')[0];
+    const option = [...(select?.options ?? [])].find((o) => o.textContent.trim() === label);
+    if (!select || !option) return false;
+    select.value = option.value;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  },
+  addDisabledNow: () => document.querySelector('.addbtn')?.disabled === true,
   chooseChange: (label) => {
     const select = document.querySelectorAll('.addbox select')[1];
     const option = [...(select?.options ?? [])].find((o) => o.textContent.trim() === label);
@@ -295,31 +345,16 @@ window.__anim = {
 
   // --- presets and costs --------------------------------------------------------------
   costTags: () => [...document.querySelectorAll('.trow .cost')].map(textOf),
-  presetHint: () => textOf(document.querySelector('.presets .hint')),
-  addPreset: () => {
-    const btn = [...document.querySelectorAll('.presets .mk')].find((b) => textOf(b) === 'Add');
+  presetLabels: () => [...document.querySelectorAll('.presets .preset')].map(textOf),
+  presetHint: (label) => [...document.querySelectorAll('.presets .preset')].find((b) => textOf(b) === label)?.getAttribute('title') ?? '',
+  addPreset: (label) => {
+    const btn = [...document.querySelectorAll('.presets .preset')].find((b) => textOf(b) === label);
     btn?.click();
     return !!btn;
   },
-  presetReport: () => textOf(document.querySelector('.presets .report')),
+  presetReport: () => textOf(document.querySelector('.strip .report')),
   storedState: (key) => JSON.parse(JSON.stringify(live()._children.States._children[key] ?? null)),
 
-  /** The timeline: its rows, and where one bar sits on screen. */
-  timelineNames: () => [...document.querySelectorAll('.tl-row:not(.tl-axis) .tl-nm')].map(textOf),
-  timelineTicks: () => [...document.querySelectorAll('.tl-axis .tl-tick')].map(textOf),
-  timelineBar: (name) => {
-    const row = [...document.querySelectorAll('.tl-row:not(.tl-axis)')].find((r) => textOf(r.querySelector('.tl-nm')) === name);
-    const bar = row?.querySelector('.tl-bar');
-    if (!bar) return null;
-    bar.scrollIntoView({ block: 'center' });
-    const rect = bar.getBoundingClientRect();
-    const track = row.querySelector('.tl-track').getBoundingClientRect();
-    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, trackWidth: track.width, label: textOf(bar.querySelector('.tl-len')) };
-  },
-  nudge: (name, key, shiftKey = false) => {
-    const row = [...document.querySelectorAll('.tl-row:not(.tl-axis)')].find((r) => textOf(r.querySelector('.tl-nm')) === name);
-    row?.querySelector('.tl-bar')?.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true }));
-  },
   clickDebug: () => document.querySelector('.dbg')?.click(),
   debugDock: () => get(debugDockState),
   tabRequest: () => get(displayTabRequest),

@@ -1,4 +1,5 @@
 #include "WebViewHost.h"
+#include "TrustedWebBrowser.h"
 
 #include "InstrumentHost/PluginCatalog.h"
 #include "PngResourceValidation.h"
@@ -272,7 +273,8 @@ std::optional<juce::WebBrowserComponent::Resource> provideFrontendResource (cons
     auto relativePath = path == "/" ? "index.html"
                                     : path.fromFirstOccurrenceOf ("/", false, false);
 
-    if (relativePath.contains (".."))
+    if (relativePath.contains ("..") || relativePath.containsChar ('\\')
+        || relativePath.containsChar (':') || relativePath.startsWithChar ('/'))
         return std::nullopt;
 
     auto requestedFile = distFolder.getChildFile (relativePath);
@@ -306,10 +308,10 @@ juce::String makeFrontendLoadErrorMessage (const juce::String& errorInfo)
            + getFrontendDistFolder().getFullPathName();
 }
 
-class CEditorWebBrowserComponent final : public juce::WebBrowserComponent
+class CEditorWebBrowserComponent final : public ceditor::TrustedWebBrowser
 {
 public:
-    using juce::WebBrowserComponent::WebBrowserComponent;
+    using ceditor::TrustedWebBrowser::TrustedWebBrowser;
 
     std::function<void (const juce::String&)> onPageFinishedLoading;
     std::function<void (const juce::String&)> onNetworkError;

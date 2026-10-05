@@ -85,8 +85,12 @@ test('switching to a sequence seeds every track with the value the control has, 
   const back = switched(next, 'transition', base);
   assert.equal(back.kind, 'transition');
   assert.deepEqual(switched(back, 'sequence', base).targets[0].keyframes, next.targets[0].keyframes);
+  // So does a new animation's 120 ms, which is what the owner got on first trying it: a sequence
+  // with an axis too short to put a second keyframe on.
+  assert.equal(switched({ ...animation, duration: 120 }, 'sequence', base).duration, 1000);
   // And a length someone set is left alone.
   assert.equal(switched({ ...animation, duration: 2400 }, 'sequence', base).duration, 2400);
+  assert.equal(switched({ ...animation, duration: 200 }, 'sequence', base).duration, 200);
 });
 
 test('a trigger a sequence does not answer becomes a state trigger', () => {
@@ -189,4 +193,18 @@ test('switching to a sequence seeds a channel track from its value and a frame t
   assert.deepEqual(next.targets[1].keyframes, [{ time: 0, value: 4, easing: 'outQuad' }], 'frame 4 of 8 at value 0.5');
   assert.equal(baseValueAt(control, 'ValueChannels.mainValue'), 0.5);
   assert.equal(baseValueAt(control, 'Parts.nosuchpart.opacity'), undefined);
+});
+
+test('a sequence can track the control itself, beside its channels and frames', async () => {
+  const { OFFERED_ROOT_PROPERTIES, CONTROL_ITSELF } = await import('../src/CE_Application/utils/animationModel.js');
+  const control = filmstripStarter();
+  const offered = offeredTargetsFor(control, 'sequence', { onControl: true });
+  assert.deepEqual(offered.filter((e) => e.scope === 'root').map((e) => e.path), OFFERED_ROOT_PROPERTIES.map((e) => e.path));
+  assert.deepEqual(offered.filter((e) => e.scope === 'control').map((e) => e.path), ['ValueChannels.mainValue', 'Parts.filmstrip_knobFrames.Image.frameIndex']);
+  const rotation = buildTarget(CONTROL_ITSELF, offered.find((e) => e.path === 'Transform.rotation'));
+  assert.equal(sequenceTargetStatus(rotation, []).animates, 'transform');
+  assert.equal(typeof baseValueAt(control, 'Transform.rotation'), 'number', 'so a new track has a value to start from');
+  // The pose reaches the control through the same overlay a part track uses.
+  const { control: posed } = resolveInteractiveControl(control, { keyframeOverlay: { 'Transform.rotation': 17 } });
+  assert.equal(posed._children.Transform.rotation, 17);
 });

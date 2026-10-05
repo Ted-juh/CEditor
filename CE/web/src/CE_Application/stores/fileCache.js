@@ -1,6 +1,7 @@
 import { writable, get } from 'svelte/store';
-import { requestFileData, onFileData, isJuceAvailable } from '../bridge/bridge.js';
+import { requestFileData, onFileData, onImageBrowsed, onPanelOpened, onFontsImported, isJuceAvailable } from '../bridge/bridge.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
+import { notify } from './scriptUi.js';
 
 /**
  * Cache of file path → data URL mappings.
@@ -11,6 +12,7 @@ export const fileCache = writable({});
 let requestCounter = 0;
 const pendingRequests = new Map();
 let listenerRegistered = false;
+const deniedFiles = new Set();
 
 function fileLabel(filePath) {
   const parts = String(filePath ?? '').split(/[\\/]/).filter(Boolean);
@@ -38,12 +40,21 @@ function estimateDataUrlBytes(dataUrl) {
 function ensureListener() {
   if (listenerRegistered) return;
   listenerRegistered = true;
+  onImageBrowsed(({ filePath }) => { deniedFiles.delete(filePath); loadFile(filePath); });
+  onPanelOpened(() => deniedFiles.clear());
+  onFontsImported(() => deniedFiles.clear());
 
   onFileData((result) => {
     const { requestId, data } = result;
     const pending = pendingRequests.get(requestId);
     if (pending?.filePath) {
       pendingRequests.delete(requestId);
+      if (result.error) {
+        deniedFiles.add(pending.filePath);
+        pending.stopTimer?.('access denied');
+        notify(`${fileLabel(pending.filePath)}: ${result.error}`, { kind: 'error' });
+        return;
+      }
       fileCache.update(cache => ({ ...cache, [pending.filePath]: data }));
       const byteSize = Number(result?.byteSize) || estimateDataUrlBytes(data);
       pending.stopTimer?.(
@@ -59,6 +70,7 @@ function ensureListener() {
  */
 export function loadFile(filePath) {
   if (!filePath) return;
+  if (deniedFiles.has(filePath)) return;
 
   const cache = get(fileCache);
   if (cache[filePath]) return; // Already loaded

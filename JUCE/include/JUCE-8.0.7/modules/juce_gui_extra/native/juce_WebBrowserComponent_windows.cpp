@@ -914,6 +914,13 @@ private:
             webView->add_WebMessageReceived (Callback<ICoreWebView2WebMessageReceivedEventHandler> (
                                                  [this] (ICoreWebView2*, ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT
                                                  {
+                                                     // CEditor: only packaged UI / explicitly configured dev origin
+                                                     // may invoke native events, including after a redirect.
+                                                     const auto source = callMethodWithLpwstrResult (args, &ICoreWebView2WebMessageReceivedEventArgs::get_Source).value_or ("");
+                                                     const auto allowed = owner.impl->options.getAllowedOrigin();
+                                                     if (! source.startsWith (WebBrowserComponent::getResourceProviderRoot())
+                                                         && (! allowed || (source != *allowed && ! source.startsWith (*allowed + "/"))))
+                                                         return S_OK;
                                                      if (const auto str = callMethodWithLpwstrResult (args, &ICoreWebView2WebMessageReceivedEventArgs::TryGetWebMessageAsString))
                                                          owner.impl->handleNativeEvent (JSON::fromString (*str));
 

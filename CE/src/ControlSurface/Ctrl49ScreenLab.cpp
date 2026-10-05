@@ -7,8 +7,9 @@
 //   Ctrl49ScreenLab stress   <screen-lab dir>   E1-E6 raise the drawing load until the screen
 //                                               stutters or the watchdog gives up; the console
 //                                               prints the load that did it
-//   Ctrl49ScreenLab preset   <manifest>         a design from era-presets or feature-mockups:
-//                                               its pages, their encoders, at its own rate
+//   Ctrl49ScreenLab preset   <manifest>         a design (era-presets, feature-mockups,
+//                                               design-presets, machined-metal): its pages,
+//                                               their encoders, at its own rate
 //   Ctrl49ScreenLab preset   <manifest> --check the manifest's rules, its files and its memory
 //                                               guard, without the keyboard
 //
@@ -88,7 +89,7 @@ double millisecondsSince (Clock::time_point start)
 int usage()
 {
     std::printf ("usage: Ctrl49ScreenLab showcase|stress <tools\\ctrl49\\screen-lab folder> [--no-upload-keepalive]\n"
-                 "       Ctrl49ScreenLab preset <Design.ctrl49preset> [--check] [--no-upload-keepalive]\n");
+                 "       Ctrl49ScreenLab preset <name.ctrl49preset> [--check] [--no-upload-keepalive]\n");
     return 2;
 }
 
@@ -193,6 +194,9 @@ int runPreset (const std::filesystem::path& manifest, bool checkOnly, bool uploa
         Ctrl49SessionOptions options;
         options.log = logLine;
         options.keepaliveEveryUploadFrames = uploadKeepalive ? 48 : 0;
+        // A preset decodes its atlases one per draw behind the loading screen; 1.8 s is what
+        // Machined Metal was run on the keyboard with.
+        options.loadingMilliseconds = 1800;
         Ctrl49Session session (output, loaded.lua, assets, options);
         logLine ("Uploading the page and " + std::to_string (assets.size()) + " PNGs"
                  + (uploadKeepalive ? ", keeping the watchdog fed..." : ", with no keepalives..."));
@@ -209,7 +213,10 @@ int runPreset (const std::filesystem::path& manifest, bool checkOnly, bool uploa
         int page = 0, lastEncoder = 0, frame = 0;
         std::uint8_t padsLit = 0;
         std::array<int, 4> sentEnvelope { -1, -1, -1, -1 };
+        // Page Left / Right (and the mode buttons) through the reducer, bounded to the preset's
+        // pages; Shift + Page is the setlist's, not a page turn.
         Ctrl49Reducer reducer;
+        reducer.setPageCount (preset.pages);
         const auto interval = std::chrono::milliseconds (1000 / preset.fps);
         auto nextRedraw = Clock::now();
         auto windowStart = Clock::now();
@@ -231,16 +238,18 @@ int runPreset (const std::filesystem::path& manifest, bool checkOnly, bool uploa
             for (auto message = input.dequeue(); message; message = input.dequeue())
             {
                 const auto& bytes = *message;
-                if (bytes.size() >= 3 && (bytes[0] & 0xF0) == 0xB0 && bytes[2] == 127
-                    && (bytes[1] == 39 || bytes[1] == 40))
-                {
-                    page = (page + (bytes[1] == 40 ? 1 : preset.pages - 1)) % preset.pages;
-                    logLine ("Page: " + preset.pageList[(std::size_t) page].title);
-                }
                 const auto action = reducer.process (bytes.data(), bytes.size());
                 if (! action)
                     continue;
-                if (action->encoderMoved && action->encoderSlot >= 0 && action->encoderSlot < 8)
+                if (action->pageChanged)
+                {
+                    page = reducer.page();
+                    lastEncoder = 0;
+                    logLine ("Page: " + preset.pageList[(std::size_t) page].title);
+                }
+                // A page answers only the encoders its manifest gives it.
+                if (action->encoderMoved && action->encoderSlot >= 0
+                    && action->encoderSlot < preset.pageList[(std::size_t) page].encoders)
                 {
                     auto& value = encoders[(std::size_t) page][(std::size_t) action->encoderSlot];
                     value = std::clamp (value + action->encoderDelta, 0, 127);

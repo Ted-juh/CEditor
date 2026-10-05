@@ -9,6 +9,7 @@
 // CONTROL's own so a drawing scales with it, and nothing drawn is ever persisted.
 
 import test from 'node:test';
+import { initialiseJavascriptSandbox } from '../src/CE_Application/scripting/scriptSandbox.js';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 import { render } from 'svelte/server';
@@ -164,6 +165,7 @@ test('redraw runs onDraw, and the style resets each pass', async () => {
   // builds, and activeScripts() reads host.scripts rather than digging into the document.
   setRuntimeHost({ panel, scripts: panel.scripts });
   try {
+    await initialiseJavascriptSandbox();
     const api = scriptApiForTesting('screen', 'redraw-caller');
     // A leftover style from an earlier draw must not bleed into the next pass, or a drawing
     // changes depending on what happened to run before it.

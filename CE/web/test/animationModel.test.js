@@ -733,3 +733,36 @@ test('Debug sends the animation as it is stored, under the control and name it l
   assert.equal(payload.source, `knob1:${row.name}`);
   assert.deepEqual(JSON.parse(payload.text), knob._children.Animations._children[row.name]);
 });
+
+// --- A change on the control itself -----------------------------------------
+// The tab's Part picker listed parts and nothing else. A control with no parts of its own — a
+// custom component nobody has designed yet — then had a dead Add button and no way to animate,
+// though the runtime has always animated the control itself (ROOT_PATH_BUCKETS). Found by the
+// owner on the first step of trying the tab in the app, 2026-10-04.
+
+test('a control with no parts can be animated: the control itself is offered, and every choice works', async () => {
+  const { OFFERED_ROOT_PROPERTIES, CONTROL_ITSELF, offeredTargetsFor } = await import('../src/CE_Application/utils/animationModel.js');
+  const bare = createControl('CustomComponent');
+  const own = offeredTargetsFor(bare, 'transition', { onControl: true });
+  assert.deepEqual(own.map((entry) => entry.label), OFFERED_ROOT_PROPERTIES.map((entry) => entry.label));
+  assert.ok(own.every((entry) => entry.scope === 'root'));
+  for (const entry of own) {
+    const target = buildTarget(CONTROL_ITSELF, entry);
+    assert.equal(target.path, entry.path, 'a whole path: no Parts. prefix');
+    const status = targetStatus(target, []);
+    assert.equal(status.works, true, `${entry.label}: ${status.detail}`);
+    assert.equal(status.part, '');
+    // And the runtime agrees: the timing lands in the control's own bucket.
+    bare._children.Animations = { _type: 'Animations', _children: { test: {
+      kind: 'transition', enabled: true, duration: 200, delay: 0, easing: 'outQuad',
+      trigger: { type: 'stateChange', from: ['*'], to: ['hover'] }, targets: [target],
+    } } };
+    const { runtime } = resolveInteractiveControl(bare, {});
+    assert.ok(runtime.transitions.rootTransitions.get(status.animates), `${entry.label} fills the control's ${status.animates} bucket`);
+  }
+  // A part name never turns a control property into a part path, whatever the picker last held.
+  assert.equal(buildTarget('label', own[0]).path, 'Transform.scale');
+  // The part list is unchanged when a part is picked, and a part cannot be called the sentinel.
+  assert.ok(offeredTargetsFor(bare, 'transition').every((entry) => entry.scope === 'part'));
+  assert.equal(cleanAnimationName(CONTROL_ITSELF).includes('@'), false);
+});

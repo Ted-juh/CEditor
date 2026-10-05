@@ -6,7 +6,8 @@
 // distinct VST3 FUID (the Ctrlr fix), even for identically-named panels.
 //
 // Usage: node export-panel-vst3.mjs <panel.cepanel> <guid> [productName]
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
+import { exportFileName, assertExportChild, validateBuildIdentity, runCmake, visualStudioEnvironment } from './lib/exportSecurity.mjs';
 import { existsSync, mkdirSync, mkdtempSync, cpSync, rmSync, readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
@@ -55,7 +56,8 @@ validateRuntimeFormats(panelDoc);
 const { productName, vendor, version, manufacturerCode: mfrCode } =
   identityInputsFromPanel(panelDoc, path.basename(panel), { productName: productNameArg });
 const id = deriveIdentity(guid, productName, vendor, mfrCode, version);
-const outputName = productName.replace(/[\\/:*?"<>|]/g, '_').trim() || 'CEditor Panel';
+const outputName = exportFileName(productName);
+validateBuildIdentity({ productName, vendor, version, manufacturerCode: mfrCode });
 console.log('Export identity:', id);
 
 // --- Python runtime inclusion (Export settings → Scripting Runtime) ---
@@ -324,7 +326,7 @@ mkdirSync(outDir, { recursive: true });
 
 const ep = await import(pathToFileURL(path.join(repo, 'CE/web/src/CE_Application/utils/exportParameters.js')).href);
 panelDoc.exportParameters = ep.deriveExportParameters(panelDoc);
-const bakedPanel = path.join(outDir, `${productName}.cepanel`);
+const bakedPanel = assertExportChild(outDir, path.join(outDir, `${outputName}.cepanel`));
 // Compact: the plug-in parses this file in full at load (three times, as it happens) and nobody
 // reads it. Indented, GAIA's was 94 MB; compact it is 28 MB. The report below says where those go.
 writeFileSync(bakedPanel, JSON.stringify(panelDoc));
@@ -360,7 +362,7 @@ function findVcvars() {
   const vswhere = path.join(pf86, 'Microsoft Visual Studio', 'Installer', 'vswhere.exe');
   try {
     if (existsSync(vswhere)) {
-      const installPath = execSync(`"${vswhere}" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`, { encoding: 'utf8' }).trim();
+      const installPath = execFileSync(vswhere, ['-latest', '-products', '*', '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', '-property', 'installationPath'], { encoding: 'utf8' }).trim();
       const c = installPath && path.join(installPath, 'VC', 'Auxiliary', 'Build', 'vcvars64.bat');
       if (c && existsSync(c)) return c;
     }
@@ -395,17 +397,17 @@ console.log(`LV2 format: ${exportLv2 ? `BUILD (uri ${lv2Uri})` : 'skip (Export s
 // can never be configured ON and then not built, which produces a silent "artifact not found".
 const formatTargets = ['CEditorPlayerVST_VST3',
   ...(exportClap ? ['CEditorPlayerVST_CLAP'] : []),
-  ...(exportLv2 ? ['CEditorPlayerVST_LV2'] : [])].join(' ');
+  ...(exportLv2 ? ['CEditorPlayerVST_LV2'] : [])];
 
 // Common CMake cache vars (identity + feature flags), generator-agnostic.
-const cacheVars = `-DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON`
-  + ` -DCEDITOR_PYTHON=${embedPython ? 'ON' : 'OFF'}`
-  + ` -DCEDITOR_NATIVE_HANDLERS=${compileNative ? 'ON' : 'OFF'}`
-  + ` -DCEDITOR_CLAP=${exportClap ? 'ON' : 'OFF'} "-DCE_CLAP_ID=${id.clapId}"`
-  + ` -DCEDITOR_LV2=${exportLv2 ? 'ON' : 'OFF'} "-DCE_LV2_URI=${lv2Uri}"`
-  + ` -DCE_VST_PLUGIN_CODE=${id.pluginCode} "-DCE_VST_PRODUCT_NAME=${productName}"`
-  + ` "-DCE_VST_COMPANY_NAME=${vendor}" -DCE_VST_MFR_CODE=${mfrCode} "-DCE_VST_VERSION=${version}"`
-  + ` "-DCE_VST_PANEL_PATH=${panelAbs}"`;
+const cacheVars = ['-DCEDITOR_DEV_MODE=OFF', '-DCEDITOR_SCRIPTING=ON',
+  `-DCEDITOR_PYTHON=${embedPython ? 'ON' : 'OFF'}`,
+  `-DCEDITOR_NATIVE_HANDLERS=${compileNative ? 'ON' : 'OFF'}`,
+  `-DCEDITOR_CLAP=${exportClap ? 'ON' : 'OFF'}`, `-DCE_CLAP_ID=${id.clapId}`,
+  `-DCEDITOR_LV2=${exportLv2 ? 'ON' : 'OFF'}`, `-DCE_LV2_URI=${lv2Uri}`,
+  `-DCE_VST_PLUGIN_CODE=${id.pluginCode}`, `-DCE_VST_PRODUCT_NAME=${productName}`,
+  `-DCE_VST_COMPANY_NAME=${vendor}`, `-DCE_VST_MFR_CODE=${mfrCode}`,
+  `-DCE_VST_VERSION=${version}`, `-DCE_VST_PANEL_PATH=${panelAbs}`];
 
 // Pick the build backend: a system Visual Studio if present (default, fully battle-tested), else the
 // bundled self-contained LLVM-MinGW (the "done at install" path — no VS required). EXPERIMENTAL on the
@@ -420,20 +422,21 @@ const previousDevMode = existsSync(cacheFile)
 let runBuild, runRestore;
 if (vcvars) {
   console.log('Build backend: Visual Studio —', vcvars);
-  const cfg = `cmake -S "${repo}" -B "${build}" ${cacheVars}`;
-  const bld = `cmake --build "${build}" --target ${formatTargets} --config Release`;
-  runBuild = () => execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && ${cfg} >nul && ${bld}"`, { stdio: 'inherit' });
-  runRestore = () => execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && cmake -S \"${repo}\" -B \"${build}\" -DCEDITOR_DEV_MODE=${previousDevMode} >nul"`, { stdio: 'inherit' });
+  const env = visualStudioEnvironment(vcvars);
+  runBuild = () => {
+    runCmake(['-S', repo, '-B', build, ...cacheVars], { env });
+    runCmake(['--build', build, '--target', ...formatTargets, '--config', 'Release'], { env });
+  };
+  runRestore = () => runCmake(['-S', repo, '-B', build, `-DCEDITOR_DEV_MODE=${previousDevMode}`], { env });
 } else if (mingw) {
   const ninja = ninjaExe();
   if (!ninja) throw new Error('Ninja not found — run: node tools/toolchains/provision.mjs ninja');
   console.log('Build backend: bundled LLVM-MinGW (no Visual Studio) —', mingw, '[EXPERIMENTAL]');
   const tcFile = path.join(repo, 'tools/toolchains/llvm-mingw-win.cmake');
-  const cfg = `cmake -S "${repo}" -B "${build}" -G Ninja -DCMAKE_MAKE_PROGRAM="${ninja}"`
-    + ` -DCMAKE_TOOLCHAIN_FILE="${tcFile}" -DCE_LLVM_MINGW_DIR="${mingw}" -DCMAKE_BUILD_TYPE=Release ${cacheVars}`;
-  const bld = `cmake --build "${build}" --target ${formatTargets}`;
-  runBuild = () => { execSync(cfg, { stdio: 'inherit' }); execSync(bld, { stdio: 'inherit' }); };
-  runRestore = () => execSync(`cmake -S "${repo}" -B "${build}" -DCEDITOR_DEV_MODE=${previousDevMode}`, { stdio: 'inherit' });
+  const cfg = ['-S', repo, '-B', build, '-G', 'Ninja', `-DCMAKE_MAKE_PROGRAM=${ninja}`,
+    `-DCMAKE_TOOLCHAIN_FILE=${tcFile}`, `-DCE_LLVM_MINGW_DIR=${mingw}`, '-DCMAKE_BUILD_TYPE=Release', ...cacheVars];
+  runBuild = () => { runCmake(cfg); runCmake(['--build', build, '--target', ...formatTargets]); };
+  runRestore = () => runCmake(['-S', repo, '-B', build, `-DCEDITOR_DEV_MODE=${previousDevMode}`]);
 } else {
   throw new Error('No C++ build toolchain found. Install Visual Studio (Desktop C++) OR run: node tools/toolchains/provision.mjs llvm-mingw ninja');
 }
@@ -510,6 +513,7 @@ try {
   const exported = [];
   for (const staged of outputs) {
     const destination = path.join(outDir, path.basename(staged));
+    assertExportChild(outDir, destination);
     rmSync(destination, { recursive: true, force: true });
     cpSync(staged, destination, { recursive: true });
     console.log(`EXPORTED: ${destination} (${mb(dirSize(destination))} MB)`);
@@ -533,7 +537,7 @@ try {
   }
 } finally {
   try {
-    if (path.dirname(stageRoot) !== outDir) throw new Error('Export staging directory escaped its output folder');
+    assertExportChild(outDir, stageRoot);
     rmSync(stageRoot, { recursive: true, force: true });
   } finally {
     // Preserve the user's prior mode; a release checkout must not switch to a dev-server build.

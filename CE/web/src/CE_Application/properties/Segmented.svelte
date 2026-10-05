@@ -32,7 +32,9 @@
 <style>
   .segmented {
     display: flex;
-    height: 26px;
+    /* On the panel tokens, like the other fields: a surface that wants larger controls (the
+       Animation tab) sets them once and every field follows. The defaults are what they were. */
+    height: var(--pp-field-height, 26px);
     flex: 1;
     min-width: 0;
     border: 1px solid #333;
@@ -48,7 +50,7 @@
     border-right: 1px solid #262626;
     background: transparent;
     color: #888;
-    font-size: 10px;
+    font-size: var(--pp-segment-font, 10px);
     font-family: inherit;
     cursor: pointer;
     padding: 0 2px;

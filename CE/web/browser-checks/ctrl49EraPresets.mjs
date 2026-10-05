@@ -202,10 +202,13 @@ for (const name of names) {
   const pages = int(p.pages), fps = int(p.fps), count = int(p.assets);
   assert.ok(pages >= 1 && pages <= 6, `${name}: 1-6 pages`);
   assert.equal(pages, spec.pages.length, `${name}: ${spec.pages.length} pages`);
-  assert.ok(int(p.envelopePage) >= 0 && int(p.envelopePage) < pages, `${name}: envelopePage is a page`);
+  assert.ok(int(p.envelopePage) >= -1 && int(p.envelopePage) < pages, `${name}: envelopePage is a page, or -1`);
   assert.ok(fps >= 5 && fps <= 30, `${name}: fps 5-30`);
   const beside = (f) => f && !/[\\/]|\.\./.test(f) && fs.existsSync(path.join(dir, f));
   assert.ok(beside(p.lua), `${name}: the Lua is a file beside the manifest`);
+  const luaBytes = fs.statSync(path.join(dir, p.lua)).size;
+  assert.ok(luaBytes >= 1 && luaBytes <= 65536, `${name}: the Lua is 1-65536 bytes (${luaBytes})`);
+  assert.ok(count >= 1 && count <= 8, `${name}: 1-8 assets`);
 
   const ids = new Set();
   let memory = 0;
@@ -213,7 +216,7 @@ for (const name of names) {
     const a = m[`Asset${i}`];
     assert.ok(a, `${name}: [Asset${i}]`);
     const id = int(a.id);
-    assert.ok(id >= 0 && id < 1024 && !ids.has(id), `${name}: asset ${i} id ${a.id} is unique and below 1024`);
+    assert.ok(id >= 512 && id < 1024 && !ids.has(id), `${name}: asset ${i} id ${a.id} is unique and 512-1023`);
     ids.add(id);
     assert.ok(beside(a.file), `${name}: asset ${a.file} is a file beside the manifest`);
     const info = png(path.join(dir, a.file));
