@@ -2,9 +2,8 @@
 // rules the screen lab's preset loader enforces, its Lua is Lua 5.2 and is its template with only
 // its GENERATED block changed, and every page renders through the firmware shim from payloads
 // shaped as Ctrl49ScreenLab.h builds them — at every encoder position, inside the screen and the
-// atlases, decoding each atlas exactly once, and moving where it should. Two kinds of design:
-// the six era skins (EraSkin.lua, five pages) and the piano-roll arpeggiator (RollSkin.lua, two),
-// whose pick-up editing is checked too.
+// atlases, decoding each atlas exactly once, and moving where it should; and the arpeggiator's
+// piano roll edits a pattern the way it says it does.
 //
 //   CTRL49_ERA_SHOTS=<dir>   writes a 480x272 PNG of every page of every design there
 //   CTRL49_ERA_PREVIEWS=1    writes them into each design folder as preview-<n>-<page>.png
@@ -24,30 +23,25 @@ const shots = process.env.CTRL49_ERA_SHOTS;
 const previews = process.env.CTRL49_ERA_PREVIEWS === '1';
 if (shots) fs.mkdirSync(shots, { recursive: true });
 
-// The two kinds of design: their template, the atlases their crops assume, their pages, what
-// must move with the frame counter alone ([page, frames, least distinct pictures]), and the
-// visits that make each redraw busiest ([page, values] in order, every one drawn).
+// The kind of design: its template, the atlases its crops assume, its pages, what must move
+// with the frame counter alone ([page, frames, least distinct pictures]), the arpeggiator's edit
+// page, and the visits that make a redraw busiest ([page, values] in order, every one drawn).
 const SPECS = {
   era: {
-    template: 'EraSkin.lua', pages: ['controls', 'mixer', 'envelope', 'sequencer', 'arpeggiator'], envelope: 2,
-    atlases: { 'panels.png': [480, 816], 'knobs.png': [80, 5120], 'parts.png': [480, 724] },
+    template: 'EraSkin.lua', pages: ['controls', 'mixer', 'envelope', 'arp-edit', 'arp-play'], envelope: 2,
+    atlases: { 'panels.png': [480, 816], 'knobs.png': [80, 5120], 'parts.png': [480, 732] },
     moving: [[1, [300, 301, 302, 303], 4], [3, [0, 4, 8, 12, 16], 4], [4, [0, 4, 8, 12, 16], 4]],
-    busiest: [0, 40, 80, 100, 127].map((mode) => [4, [mode, 127, 127, 127, 127, 127, 72, 0]]),
-  },
-  roll: {
-    template: 'RollSkin.lua', pages: ['edit', 'play'], envelope: 1,
-    atlases: { 'panels.png': [480, 544], 'roll.png': [456, 280], 'parts.png': [80, 20] },
-    moving: [[0, [0, 4, 8, 12, 16], 4], [1, [0, 4, 8, 12, 16], 4]],
-    // the longest pattern, every gate and octave at the top, then the scroll, key and rate at
-    // their ends, and the cursor on the last step
-    busiest: [[1, [127, 0, 0, 127, 127, 127, 64, 64]], [1, [127, 127, 127, 0, 0, 0, 64, 64]],
-      [0, [0, 0, 127, 127, 0, 127, 127, 127]], [0, [127, 127, 0, 0, 127, 0, 0, 0]],
-      [1, [127, 80, 127, 127, 64, 0, 64, 64]], [0, [64, 64, 64, 64, 52, 64, 72, 60]]],
+    editPage: 3,
+    // the arpeggiator: the longest pattern with every gate and octave at the top, then the
+    // scroll, key and rate at their ends, the cursor on the last step, and back
+    busiest: [[4, [127, 0, 0, 127, 127, 127, 64, 64]], [4, [127, 127, 127, 0, 0, 0, 64, 64]],
+      [3, [0, 0, 127, 127, 0, 127, 127, 127]], [3, [127, 127, 0, 0, 127, 0, 0, 0]],
+      [4, [127, 80, 127, 127, 64, 0, 64, 64]], [3, [64, 64, 64, 64, 52, 64, 72, 60]]],
   },
 };
 // The designs this check expects, and their kind. Adding one is deliberate: add it here too.
 const EXPECTED = { 'dot-matrix-1983': 'era', 'red-lead-1997': 'era', 'rhythm-box-1980': 'era',
-  'rhythm-box-1980-roll': 'roll', 'swiss-flat-2011': 'era', 'test-bench-1958': 'era', 'walnut-1971': 'era' };
+  'swiss-flat-2011': 'era', 'test-bench-1958': 'era', 'walnut-1971': 'era' };
 const MEMORY_CEILING = 8 * 1024 * 1024;     // the preset loader's software guard, not a device limit
 const MAX_CALLS = 600;
 
@@ -239,16 +233,16 @@ try {
       assert.ok(moves[pages[p]] >= least, `${name}: ${pages[p]} moves with the clock (${moves[pages[p]]} pictures in ${frames.length})`);
     }
 
-    if (EXPECTED[name] === 'roll') {
+    {
       // Editing: on a fresh copy, step 1 holds C3 and E2 sits on C4. Turning E2 away from C3
       // leaves the step alone (a ghost shows where E2 is); once E2 reaches C3 it picks the note up
       // and carries it. An empty step takes E2's note at once. E4 to OFF empties a step.
-      const edits = await page.evaluate(async ({ D }) => {
-        const d = await window.era.design('rhythm-box-1980-roll'), era = window.era;
+      const edits = await page.evaluate(async ({ name, D, p }) => {
+        const d = await window.era.design(name), era = window.era;
         for (let i = 0; i < 4; i++) d.draw();
         d.call('set_mode', [1]);
-        const e = D[0].slice();
-        const at = (changes) => { Object.assign(e, changes); d.call('set_frame', era.frame(0, 50, e, 1)); return d.draw().texts; };
+        const e = D[p].slice();
+        const at = (changes) => { Object.assign(e, changes); d.call('set_frame', era.frame(p, 50, e, 1)); return d.draw().texts; };
         const note = (texts) => texts[texts.indexOf('NOTE') + 1];
         const v = (n) => (n - 28) * 2;                          // E2's value for note n
         const out = { start: note(at({})) };
@@ -259,7 +253,7 @@ try {
         out.placed = note(at({ 1: v(55) }));                     // so E2 places G3 at once
         out.offed = note(at({ 3: 0 }));                          // E4 to OFF: the step is empty
         return out;
-      }, { D });
+      }, { name, D, p: spec.editPage });
       assert.deepEqual(edits, { start: 'C3', away: 'C3', reached: 'C3', carried: 'D3', emptyStep: '--', placed: 'G3', offed: '--' },
         `${name}: E2 picks a step's note up only once it reaches it; an empty step takes it at once`);
     }

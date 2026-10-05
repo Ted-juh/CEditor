@@ -60,25 +60,25 @@ e7=64
 e8=64
 
 [Page3]
-title=Sequencer
-encoders=8
-e1=1
-e2=62
-e3=37
-e4=52
-e5=0
-e6=78
-e7=27
-e8=37
-
-[Page4]
-title=Arpeggiator
+title=Arp Edit
 encoders=8
 e1=0
-e2=72
-e3=40
-e4=71
-e5=21
-e6=60
-e7=0
-e8=20
+e2=64
+e3=100
+e4=72
+e5=52
+e6=64
+e7=72
+e8=60
+
+[Page4]
+title=Arp Play
+encoders=6
+e1=62
+e2=0
+e3=21
+e4=55
+e5=64
+e6=127
+e7=64
+e8=64
