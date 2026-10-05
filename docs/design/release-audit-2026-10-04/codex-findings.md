@@ -13,11 +13,11 @@ Only this findings file is edited in Git. Harnesses, temporary fixtures and full
 | W1 — clean build | `npm ci` and production `npm run build` passed. Fresh `cmake --preset native -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF`, then `cmake --build --preset native-release --parallel 4 -- -k 0` passed. **38/38 CTest cases passed**, 0 failed, 55.47 seconds (`--output-on-failure --timeout 120`). The quoted 34 is stale; native Python is OFF and its optional test is not included. `evidence/build.log`. No MSVC compiler warning/error was found; configure warns about the deliberately panel-less generic player and the vendored Lua CMake minimum. |
 | W2 — installer | **Not exercised.** Fresh install, upgrade, first-run defaults/WebView2, SmartScreen and uninstall residue need an attended installer/native UI session. The currently installed security-hardened app is a different revision and is not evidence for this audit tree. No downgrade or uninstall was performed. The correct build stamp for the source tested here is `3c3c7721`, not the README's old `f37550c`. |
 | W3 — dialogs/recovery | **Not exercised.** Native New/Open/Save/Save As/Share/malformed-package dialogs and crash recovery remain D3 gaps. The assignment specifically says never to repeat that gate unattended. A store-level Save As regression is checked under C-09; that is not native-dialog acceptance. |
-| W4 — export | Template build/export/worker checks pending. Installed-app GUI export, DAW window open/close/reopen, automation recording and saved-host-project reopen remain untested. CLI/staged-template checks will be identified separately. |
-| W5 — Hostage | Native scanner/live-worker checks pending. Real UI instrument selection, audible playback, preset/program browsing and worker-failure notification remain untested. |
+| W4 — export | **Partial, staged compiler-free exports.** All three template formats built from the audited source. Original Studio White starter: VST3/LV2 export fail X-04, CLAP succeeds. QA-09: all three export, VST3 validates, CLAP fails X-06, LV2 fails X-05. An ASCII-named starter copy exports all three; VST3 and CLAP validate, LV2 still fails. Both working VST3s complete real scanner/worker processing and state round-trip (64 blocks, 25 / 16 parameters, 3,072 / 2,499 state bytes). `export-check.log`, `validation.json`, `smoke-0.log`, `smoke-1.log`. These use freshly built staging templates, not the installed app. Installed-app GUI export, DAW window open/close/reopen, automation recording and saved-host-project reopen remain untested. |
+| W5 — Hostage | **Partial, real Vanguard VST3.** Isolated scan, launch, 64 processing blocks and a 71,574-byte state round-trip pass; 2,213 parameters, one reported program. A scratch extension of the smoke harness terminates only its own worker: `running=0 detected=1 parentAlive=1`, with the expected worker-failure exception. The deterministic CTest also confirms the rack keeps a healthy part running while reporting a failed worker. `smoke-2.log`, `worker-probe.log`. Measured Vanguard audio peak was zero, so no sound-generation pass is claimed. Real UI instrument selection, audible playback, preset/program browsing and the on-screen worker-failure notice remain untested. |
 | W6 — MIDI | **Partial, actual virtual-port bytes.** A native harness uses this revision's `DeviceProfileService`, maps role `auditVirtual` to `CEditor Test Out`, sets `test-cc-synth/filter.cutoff=64`, and receives **`B0 4A 40`** on the matching WinMM input. `evidence/device-probe.log`, `midi-ports.json`. No physical device was sent data. This does not cover control gestures, Ports/Routes/Snapshots rendering or Total Recall timing on hardware. |
 | W7 — animation | **WebView2 visual gate not exercised.** Runtime/model probes confirm C-44 and C-88 below; they do not establish pixels, timeline dragging, spring easing, filmstrip movement or the exported plug-in window. |
-| W8 — backend | Reviewed Player state/restore/MIDI paths, export identities, Hostage async loading/analysis/worker boundaries, scripting execution/lifetime, DeviceProfile dump/role/port paths, bridge handlers and WebView resource/navigation code. New findings X-01–X-03 below, plus independent verification of the relevant C findings. This is a targeted review, not a claim that every backend line is defect-free. |
+| W8 — backend | Reviewed Player state/restore/MIDI paths, export identities, Hostage async loading/analysis/worker boundaries, scripting execution/lifetime, DeviceProfile dump/role/port paths, bridge handlers and WebView resource/navigation code. Findings X-01–X-06 below, plus independent verification of the relevant C findings. This is a targeted review, not a claim that every backend line is defect-free. |
 | W9 — independent verification | Every S1/S2 heading in Claude's file at the tested revision has a verdict below. Tests use the actual source, not a reimplementation, except where explicitly called code review. Unrepeated visual/performance claims remain unverified rather than being promoted by a green unit suite. |
 
 ## Findings
@@ -30,7 +30,7 @@ Only this findings file is edited in Git. Harnesses, temporary fixtures and full
 
 **Expected.** An export must stay below its output directory and must not delete unrelated files. Reject dot-only/reserved names and verify the canonical destination before cleanup. This is more severe than C-18's loss of a previous export and C-20's same-name overwrite.
 
-**Where.** `tools/scripts/export-panel-template.mjs:214` permits `..` through `safeName`; `:253-255` joins it as the CLAP root and calls recursive `rmSync` on the parent. **Already addressed in local main's security work; absent from this branch.**
+**Where.** `tools/scripts/export-panel-template.mjs:210` permits `..` through `safeName`; `:252-256` joins it as the CLAP root and calls recursive `rmSync` on the parent. **Already addressed in local main's security work; absent from this branch.**
 
 **Evidence level.** observed-in-test on Windows; only a disposable sentinel was deleted.
 
@@ -57,6 +57,42 @@ Only this findings file is edited in Git. Harnesses, temporary fixtures and full
 **Where.** `CE/src/Player/PluginProcessor.h:380-386` omits defaults on save; `:435-447` fails to reset them on load; `:924-925` consumes the retained answer. Reset defaults before parsing, and handle any pending program-change request consistently.
 
 **Evidence level.** observed-in-test on Windows for retained state; read-in-code for the resulting automatic-send decision. No hardware dump was transmitted.
+
+### X-04 — The shipped Unicode-named starter fails VST3/LV2 export on this Windows Node runtime (S1 · export broken · Windows packaging)
+
+**Repro.** Compiler-free export of `CE/panels/Control set starters/studio-white.cepanel` without renaming it, using freshly built templates and Node 24.14.1. Its product name is `Studio White — starter`. Run `evidence/export-check.mjs`. Independently run `unicode-probe.mjs` with both system Node and the installed `tools/node/node.exe` (both v24.14.1).
+
+**Observed.** VST3 and LV2 fail `ENOENT` reading the expected bundle. `fs.cpSync` creates `Studio White â€” starter.vst3` instead of the requested `Studio White — starter.vst3`. The minimal probe confirms `mkdirSync('mkdir-\u2014')` preserves the character while recursive `cpSync(...,'copy-\u2014')` creates `copy-â€”`; the intended child does not exist. CLAP's single-file copy succeeds. An ASCII-name copy of the same panel exports all three formats.
+
+**Expected.** Shipped starter names and valid Unicode file paths must export. Packaging copies the build machine's Node executable, so this is also present in the currently installed bundled runtime; it is not confined to the audit's shell.
+
+**Where.** `tools/scripts/export-panel-template.mjs:256` recursive `cpSync`; `tools/scripts/package-installer.ps1`, `Stage-NodeRuntime`. Minimal reproduction localizes the corruption below the exporter, in this Windows Node runtime's directory copy behavior. The precise Node implementation cause/version range is not established. Qualify the bundled runtime with a Unicode-path check or use a verified copy path.
+
+**Evidence level.** observed-in-test on Windows, real templates and both runtime executables. No installer GUI assertion is implied. `export-check.log`, `unicode-probe.mjs`.
+
+### X-05 — Windows LV2 exports report success but have empty URIs and cannot load (S1 · export broken · LV2)
+
+**Repro.** Build with `CEDITOR_TEMPLATE_PLAYER=ON`, export QA-09 and the ASCII-renamed Studio White starter as LV2, then run `validate-plugins.mjs <bundle.lv2> --skip-gui --strictness 5 --require` with the available Windows pluginval.
+
+**Observed.** Export exits successfully and reports generated Turtle files. Both `manifest.ttl` files use **`<> a lv2:Plugin`** and `<:UI>`; `dsp.ttl` uses `@prefix plug: <:>` and empty `doap:name`/vendor. Calling the stress DLL's actual `lv2_descriptor(0)` independently also returns an empty URI. pluginval finds a manifest-relative file URI and fails cold/warm instantiation: `No plugin <file:///.../manifest.ttl> in <...dll>` / `Unable to create juce::AudioPluginInstance`. The generic build's manifest is empty-URI too.
+
+**Expected.** A generated LV2 has a stable, nonempty URI such as `urn:ceditor:com.tedjuh.custom-component-stress-rig.af5eafd0`, matching its descriptor, and loads in an LV2 host. Export must not claim success merely because `.ttl` files exist.
+
+**Where.** Empty identity is observed at the runtime LV2 descriptor and Turtle writer; exact initialization cause **unknown**. Relevant boundary: `CE/src/Export/Lv2SidecarIdentity.h:83-87`, vendored `juce_audio_plugin_client_LV2.cpp:108,927,1464`. `tools/scripts/export-panel-template.mjs:153-172` accepts generated file presence without checking identity. This is a Windows result and does not dispute Claude's Linux LV2 pass.
+
+**Evidence level.** observed-in-test on Windows. `validation.json` / `validation.log`, generated manifests under the `exports.json` run directory, `lv2-descriptor.txt` (empty URI).
+
+### X-06 — QA-09's CLAP fails parameter text round-trip validation (S3 · host parameter formatting · CLAP)
+
+**Repro.** Export `QA-09-custom-stress.cepanel` to CLAP and run the Windows `clap-validator` through `validate-plugins.mjs`.
+
+**Observed.** `param-conversions` fails for **Bipolar Horizontal Scale**, parameter ID 3109257221: `0.7676767676767676` → text `0.5353535` → value `0.7676767110824585` → text `0.5353534`. 32 checks pass, 10 are not applicable, one fails. Both Studio White CLAPs pass 33 checks. All CLAPs emit the already-known nonfatal random-state warning.
+
+**Expected.** Formatting/parsing a parameter value stabilizes to the same text. The last digit changes on round trip, violating the validator's host-conversion check. This is a small formatting/precision defect, not evidence that audio processing or every CLAP export is broken.
+
+**Where.** Conversion boundary: `CE/thirdparty/clap-juce-extensions/src/wrapper/clap-juce-wrapper.cpp:1446-1479`, using the default `AudioParameterFloat` format/parser constructed at `CE/src/Player/PanelParameters.h:162-167`. Exact rounding fix not established in this audit.
+
+**Evidence level.** observed-in-test on Windows. `validation.json` contains the full failure details.
 
 ## Verification of the other's findings
 
@@ -119,5 +155,8 @@ Supplemental S3 requests: C-06's port/channel note-off migration was not exercis
 - Run JS probes from `CE/web` with `node --import ./test/support/register-svelte.mjs <probe.mjs>`. The loader is needed for the repo's extensionless/Svelte/WASM imports. Runtime probes change cwd to `node_modules` for Wasmoon's test-loader URL and use a parent-controlled timeout for the loop probe.
 - `node --import ./test/support/register-svelte.mjs --test test/historySaveAsIdentity.test.js test/pythonApiBoundary.test.js`: **7 passed, 0 failed**. The Python tests use borrowed-proxy stand-ins; their scope is explicitly limited above.
 
-_In progress: finishing native test totals and staged export/live-worker checks. The unperformed attended gates will remain visible in the final coverage table._
+Additional export evidence: template configuration `CEDITOR_TEMPLATE_PLAYER=ON`, `CE_VST_GENERIC_PLAYER=ON`, opt-in `CEDITOR_REAL_VST_SMOKE=ON`; `template-build.log`. No product sources changed. Template configure occurred at docs-only commit `8e576f02`, whose product source is identical to `3c3c7721`. pluginval ran at strictness 5 **with GUI tests skipped**; neither its passes nor the worker smoke mean a DAW window or host project was exercised.
 
+## Done
+
+Completed the locally executable W1–W9 audit against product source **3c3c7721** on Windows, 5 October 2026. Clean MSVC Release build and **38/38 native tests passed**; six X findings recorded, including code-reviewed lifetime risk X-02. This is **not a release sign-off**: confirmed export/restore/security defects remain, and the attended installer/native-dialog/WebView2/DAW and physical-hardware checks listed above were not performed. Only this findings file is committed/pushed to the assigned branch.
