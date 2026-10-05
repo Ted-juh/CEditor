@@ -16,11 +16,12 @@
 // The compiling exporter is untouched and stays the default. This is the path for a machine that
 // has no build environment, which after this is most of them.
 
-import { existsSync, mkdirSync, cpSync, rmSync, readFileSync, writeFileSync, readdirSync, statSync, renameSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, cpSync, rmSync, readFileSync, writeFileSync, readdirSync, statSync, renameSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validateTemplateScripting } from './exportValidation.mjs';
+import { exportFileName, assertExportChild } from './lib/exportSecurity.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -207,7 +208,7 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
   // The plugin file name is the product name, sanitized the way a file name has to be. The IDENTITY
   // does not come from it -- that is derived from the GUID inside the document -- so renaming an
   // exported plugin cannot change what a host thinks it is.
-  const safeName = productName.replace(/[\\/:*?"<>|]/g, '_').trim() || 'CEditor Panel';
+  const safeName = exportFileName(productName);
 
   log(`Template export: ${safeName}`);
   log(`  identity: pluginCode=${identity.pluginCode} auSubtype=${identity.auSubtype}`);
@@ -249,72 +250,98 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
     }
 
     // What the export is: the bundle itself, or for CLAP the folder that holds the plugin.
-    const root = format.folder ? path.join(outDir, safeName) : path.join(outDir, safeName + format.ext);
-    const dest = format.folder ? path.join(root, safeName + format.ext) : root;
-    rmSync(root, { recursive: true, force: true });
-    mkdirSync(path.dirname(dest), { recursive: true });
-    cpSync(template, dest, { recursive: format.bundle });
+    const output = format.folder ? path.join(outDir, safeName) : path.join(outDir, safeName + format.ext);
+    assertExportChild(outDir, output);
+    const staging = mkdtempSync(path.join(outDir, '.ceditor-export-'));
+    try {
+      const root = path.join(staging, path.basename(output));
+      const dest = format.folder ? path.join(root, safeName + format.ext) : root;
+      mkdirSync(path.dirname(dest), { recursive: true });
+      cpSync(template, dest, { recursive: format.bundle });
 
-    // A VST3 loader derives the module's name from its enclosing bundle's: Contents/<arch>-win/<Name>.vst3
-    // on Windows, Contents/<arch>-linux/<Name>.so on Linux. Renaming only the outer directory makes an
-    // otherwise valid template unloadable. Keyed on the architecture folders, not on the platform this
-    // runs on, so a Linux template exported anywhere loads too.
-    if (format.id === 'vst3') {
-      const contents = path.join(dest, 'Contents');
-      const moduleExt = { '-win': '.vst3', '-linux': '.so' };
-      for (const architecture of readdirSync(contents)) {
-        const suffix = Object.keys(moduleExt).find((s) => architecture.endsWith(s));
-        if (!suffix) continue;
-        const binDir = path.join(contents, architecture);
-        const binaries = readdirSync(binDir).filter((name) => name.toLowerCase().endsWith(moduleExt[suffix]));
-        if (binaries.length !== 1) throw new Error(`Expected one VST3 binary in ${binDir}. Reinstall the player template.`);
-        const target = path.join(binDir, safeName + moduleExt[suffix]);
-        if (path.join(binDir, binaries[0]) !== target) renameSync(path.join(binDir, binaries[0]), target);
+      // A VST3 loader derives the module's name from its enclosing bundle's: Contents/<arch>-win/<Name>.vst3
+      // on Windows, Contents/<arch>-linux/<Name>.so on Linux. Renaming only the outer directory makes an
+      // otherwise valid template unloadable. Keyed on the architecture folders, not on the platform this
+      // runs on, so a Linux template exported anywhere loads too.
+      if (format.id === 'vst3') {
+        const contents = path.join(dest, 'Contents');
+        const moduleExt = { '-win': '.vst3', '-linux': '.so' };
+        for (const architecture of readdirSync(contents)) {
+          const suffix = Object.keys(moduleExt).find((s) => architecture.endsWith(s));
+          if (!suffix) continue;
+          const binDir = path.join(contents, architecture);
+          const binaries = readdirSync(binDir).filter((name) => name.toLowerCase().endsWith(moduleExt[suffix]));
+          if (binaries.length !== 1) throw new Error(`Expected one VST3 binary in ${binDir}. Reinstall the player template.`);
+          const target = path.join(binDir, safeName + moduleExt[suffix]);
+          if (path.join(binDir, binaries[0]) !== target) renameSync(path.join(binDir, binaries[0]), target);
+        }
+      }
+
+      // An LV2's binary is named for the bundle too (libName.so, Name.dll); the manifests the helper
+      // writes name it, so it is renamed before they are. The template's own manifests go: they
+      // describe the template, and a stale one beside a fresh one is two plug-ins in one bundle.
+      if (format.id === 'lv2') {
+        for (const stale of readdirSync(dest).filter((f) => f.toLowerCase().endsWith('.ttl'))) rmSync(path.join(dest, stale));
+        const binaries = readdirSync(dest).filter((name) => /\.(so|dll)$/i.test(name));
+        if (binaries.length !== 1) throw new Error(`Expected one LV2 binary in ${dest}. Reinstall the player template.`);
+        const extension = path.extname(binaries[0]).toLowerCase();
+        const target = path.join(dest, extension === '.so' ? `lib${safeName}.so` : `${safeName}${extension}`);
+        if (path.join(dest, binaries[0]) !== target) renameSync(path.join(dest, binaries[0]), target);
+      }
+
+      const panelDir = format.panelDir(dest);
+      mkdirSync(panelDir, { recursive: true });
+
+      // Exactly one .cepanel where the plugin looks, always. A template shipped with a sample panel
+      // inside it, or an earlier export copied over, would leave two — and the loader refuses two
+      // rather than guessing, so the plugin would silently fall back to its built-in identity.
+      for (const stale of readdirSync(panelDir).filter((f) => f.toLowerCase().endsWith('.cepanel'))) {
+        rmSync(path.join(panelDir, stale));
+      }
+      // Compact: the plug-in parses it in full at load and nobody reads it. GAIA's indented panel was
+      // 94 MB where the compact one is 28 MB, and the load parses it three times.
+      writeFileSync(path.join(panelDir, 'panel.cepanel'), JSON.stringify(panelDoc));
+
+      // The native MIDI service needs its codecs on a machine without CEditor's checkout. It looks
+      // in the module's directory and the one above (DeviceProfileServiceInternal.h, sourceRoot):
+      // Contents for a VST3, whose module sits in Contents/<arch>; the export's folder for a CLAP.
+      const profiles = path.join(REPO, 'CE/profiles/test');
+      if (existsSync(profiles)) {
+        if (format.id === 'vst3') cpSync(profiles, path.join(dest, 'Contents/CE/profiles/test'), { recursive: true });
+        if (format.id === 'clap' || format.id === 'lv2') cpSync(profiles, path.join(root, 'CE/profiles/test'), { recursive: true });
+      }
+
+      if (format.id === 'vst3') fixVst3Manifest(dest, helperExe, log);
+      if (format.id === 'lv2') writeLv2Manifests(dest, lv2Helper, log);
+
+      const size = format.bundle || format.folder ? dirSize(root) : statSync(root).size;
+      // Finish copying and validating before touching an existing export. Keep a
+      // backup until the completed bundle has taken its place.
+      assertExportChild(outDir, output);
+      const backup = path.join(staging, 'previous');
+      if (existsSync(output)) renameSync(output, backup);
+      try { renameSync(root, output); } catch (error) {
+        if (existsSync(backup)) {
+          try { renameSync(backup, output); } catch (restoreError) {
+            // Never remove the only remaining copy if restoration itself failed.
+            throw new Error(`Export failed; previous export retained at ${backup}: ${restoreError.message}`, { cause: error });
+          }
+        }
+        throw error;
+      }
+      assertExportChild(staging, backup);
+      rmSync(backup, { recursive: true, force: true });
+      log(`  ${format.id}: ${path.relative(REPO, output)} (${(size / 1048576).toFixed(1)} MB)`);
+      if (format.folder) log(`  ${format.id}: install the whole "${safeName}" folder into your CLAP folder; the plugin needs the panel beside it.`);
+      if (format.id === 'lv2') log(`  ${format.id}: install the whole "${safeName}.lv2" folder into your LV2 path; the plugin needs the panel beside it.`);
+      written.push(output);
+    } finally {
+      // A failed rollback leaves its backup for recovery.
+      if (!existsSync(path.join(staging, 'previous'))) {
+        assertExportChild(outDir, staging);
+        rmSync(staging, { recursive: true, force: true });
       }
     }
-
-    // An LV2's binary is named for the bundle too (libName.so, Name.dll); the manifests the helper
-    // writes name it, so it is renamed before they are. The template's own manifests go: they
-    // describe the template, and a stale one beside a fresh one is two plug-ins in one bundle.
-    if (format.id === 'lv2') {
-      for (const stale of readdirSync(dest).filter((f) => f.toLowerCase().endsWith('.ttl'))) rmSync(path.join(dest, stale));
-      const binaries = readdirSync(dest).filter((name) => /\.(so|dll)$/i.test(name));
-      if (binaries.length !== 1) throw new Error(`Expected one LV2 binary in ${dest}. Reinstall the player template.`);
-      const extension = path.extname(binaries[0]).toLowerCase();
-      const target = path.join(dest, extension === '.so' ? `lib${safeName}.so` : `${safeName}${extension}`);
-      if (path.join(dest, binaries[0]) !== target) renameSync(path.join(dest, binaries[0]), target);
-    }
-
-    const panelDir = format.panelDir(dest);
-    mkdirSync(panelDir, { recursive: true });
-
-    // Exactly one .cepanel where the plugin looks, always. A template shipped with a sample panel
-    // inside it, or an earlier export copied over, would leave two — and the loader refuses two
-    // rather than guessing, so the plugin would silently fall back to its built-in identity.
-    for (const stale of readdirSync(panelDir).filter((f) => f.toLowerCase().endsWith('.cepanel'))) {
-      rmSync(path.join(panelDir, stale));
-    }
-    // Compact: the plug-in parses it in full at load and nobody reads it. GAIA's indented panel was
-    // 94 MB where the compact one is 28 MB, and the load parses it three times.
-    writeFileSync(path.join(panelDir, 'panel.cepanel'), JSON.stringify(panelDoc));
-
-    // The native MIDI service needs its codecs on a machine without CEditor's checkout. It looks
-    // in the module's directory and the one above (DeviceProfileServiceInternal.h, sourceRoot):
-    // Contents for a VST3, whose module sits in Contents/<arch>; the export's folder for a CLAP.
-    const profiles = path.join(REPO, 'CE/profiles/test');
-    if (existsSync(profiles)) {
-      if (format.id === 'vst3') cpSync(profiles, path.join(dest, 'Contents/CE/profiles/test'), { recursive: true });
-      if (format.id === 'clap' || format.id === 'lv2') cpSync(profiles, path.join(root, 'CE/profiles/test'), { recursive: true });
-    }
-
-    if (format.id === 'vst3') fixVst3Manifest(dest, helperExe, log);
-    if (format.id === 'lv2') writeLv2Manifests(dest, lv2Helper, log);
-
-    const size = format.bundle || format.folder ? dirSize(root) : statSync(root).size;
-    log(`  ${format.id}: ${path.relative(REPO, root)} (${(size / 1048576).toFixed(1)} MB)`);
-    if (format.folder) log(`  ${format.id}: install the whole "${safeName}" folder into your CLAP folder; the plugin needs the panel beside it.`);
-    if (format.id === 'lv2') log(`  ${format.id}: install the whole "${safeName}.lv2" folder into your LV2 path; the plugin needs the panel beside it.`);
-    written.push(root);
   }
 
   if (written.length === 0) {

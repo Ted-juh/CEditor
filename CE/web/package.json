@@ -49,9 +49,9 @@
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",
+    "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
     "acorn": "^8.17.0",
     "ag-psd": "^30.2.0",
-    "animation-timeline-js": "^2.3.5",
     "animejs": "^4.5.0",
     "comlink": "^4.4.2",
     "dexie": "^4.4.6",
@@ -63,7 +63,9 @@
     "lucide-svelte": "^1.0.1",
     "paper": "^0.12.18",
     "paperjs-offset": "^2.2.1",
+    "quickjs-emscripten-core": "0.32.0",
     "rbush": "^4.0.1",
+    "ses": "2.3.0",
     "wasmoon": "^1.16.0",
     "woff2-encoder": "^2.0.0"
   }

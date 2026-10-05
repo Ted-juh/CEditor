@@ -79,7 +79,7 @@
       <button type="button" class="drop" title="Remove this frame" aria-label={`Remove frame ${index + 1}`}
               disabled={frames.length <= 1}
               onclick={() => onchange(removeFrame(frames, index))}>
-        <X size={10} />
+        <X size={13} />
       </button>
       <div class="colours">
         {#each COLOURS as colour (colour.key)}{@render colourCell(frame, index, colour)}{/each}
@@ -87,12 +87,12 @@
     </div>
   {/each}
   <button type="button" class="addframe" onclick={() => onchange(addFrame(frames))}>
-    <Plus size={11} /> Add a frame
+    <Plus size={13} /> Add a frame
   </button>
 </div>
 
 <style>
-  .frames { border: 1px solid #333; border-radius: 4px; background: #1A1D20; padding: 8px; }
+  .frames { border: 0; background: transparent; padding: 0; }
   .strip {
     position: relative;
     height: 10px;
@@ -112,26 +112,24 @@
   }
   .head, .frow {
     display: grid;
-    grid-template-columns: 62px repeat(5, minmax(0, 1fr)) 18px;
-    gap: 3px;
+    grid-template-columns: 84px repeat(5, minmax(0, 1fr)) 24px;
+    gap: 5px;
     align-items: center;
   }
   .head span {
-    font: 600 7.5px/1 'IBM Plex Mono', ui-monospace, monospace;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #4B545C;
-    padding: 0 2px 3px;
+    font: 400 12px/1 'IBM Plex Sans', system-ui, sans-serif;
+    color: #AEB9C4;
+    padding: 0 2px 4px;
   }
   .frow { margin-top: 3px; padding-bottom: 3px; border-bottom: 1px solid #23282D; }
   .colours { grid-column: 2 / -2; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .ccell { min-width: 0; display: flex; align-items: center; gap: 4px; }
   .chead {
-    font: 600 7.5px/1 'IBM Plex Mono', ui-monospace, monospace;
-    letter-spacing: 0.1em; text-transform: uppercase; color: #4B545C; width: 26px; flex: none;
+    font: 400 12px/1 'IBM Plex Sans', system-ui, sans-serif;
+    color: #AEB9C4; width: 34px; flex: none;
   }
   .swatch {
-    width: 16px; height: 16px; flex: none; padding: 0; border: 1px solid #3A4148; border-radius: 3px;
+    width: 22px; height: 22px; flex: none; padding: 0; border: 1px solid #3A434D; border-radius: 4px;
     background: transparent; cursor: pointer;
   }
   .swatch::-webkit-color-swatch-wrapper { padding: 0; }
@@ -140,23 +138,23 @@
   .swatch.empty { background: linear-gradient(135deg, transparent 45%, #D98C8C 45%, #D98C8C 55%, transparent 55%); }
   .swatch.empty::-webkit-color-swatch { opacity: 0; }
   .hex {
-    min-width: 0; flex: 1; height: 18px; box-sizing: border-box; padding: 0 4px;
-    border: 1px solid #2E3439; border-radius: 3px; background: #121517; color: #C3D0DA;
-    font: 400 9px/1 'IBM Plex Mono', ui-monospace, monospace;
+    min-width: 0; flex: 1; height: 26px; box-sizing: border-box; padding: 0 6px;
+    border: 1px solid #3A434D; border-radius: 5px; background: #12161A; color: #E8EEF3;
+    font: 400 12px/1 'IBM Plex Mono', ui-monospace, monospace;
   }
   .hex:focus { outline: none; border-color: #14B8A6; }
   .cell { min-width: 0; display: flex; }
   .drop {
-    width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
-    padding: 0; border: 1px solid transparent; border-radius: 3px; background: transparent;
-    color: #4B545C; cursor: pointer;
+    width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+    padding: 0; border: 1px solid transparent; border-radius: 5px; background: transparent;
+    color: #8A96A3; cursor: pointer;
   }
   .drop:hover:not(:disabled) { border-color: #5C3A3A; color: #D98C8C; }
   .drop:disabled { opacity: 0.3; cursor: default; }
   .addframe {
     width: 100%; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 4px;
-    border: 1px solid #0E7C70; background: #0B2320; color: #8FEDE3;
-    font: 600 9px/1 'IBM Plex Sans', system-ui, sans-serif; padding: 6px; border-radius: 3px; cursor: pointer;
+    border: 1px solid #2E7D6B; background: #10362F; color: #BFF3E6;
+    font: 500 13px/1 'IBM Plex Sans', system-ui, sans-serif; height: 30px; padding: 0 12px; border-radius: 6px; cursor: pointer;
   }
   .addframe:hover { border-color: #14B8A6; color: #C9FFF8; }
 </style>

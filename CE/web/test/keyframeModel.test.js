@@ -26,7 +26,26 @@ import {
   buildKeyframeTimeline,
   sampleKeyframes,
   formatAxisLabel,
+  axisScale,
+  AXIS_FILL,
 } from '../src/CE_Application/utils/keyframeModel.js';
+
+test('the ruler fits the animation: its length ends nine tenths of the way across, on round ticks', () => {
+  // The scale was fixed at 250 ms per 90 px, so a 120 ms sequence sat in the first 43 px of a
+  // ruler that ran to two seconds. Pixels per ms is stepPx / stepVal.
+  for (const [duration, width] of [[120, 880], [1000, 880], [1000, 300], [4000, 1200], [60000, 900], [10, 500]]) {
+    const { stepVal, stepPx } = axisScale(duration, width);
+    const endPx = duration * (stepPx / stepVal);
+    assert.ok(Math.abs(endPx - width * AXIS_FILL) < 0.001, `${duration} ms on ${width} px ends at ${endPx}`);
+    assert.ok(stepPx >= 90 - 0.001 && stepPx <= 250, `${duration} ms on ${width} px: a label every ${stepPx} px`);
+    const mantissa = stepVal / 10 ** Math.floor(Math.log10(stepVal));
+    assert.ok([1, 2, 2.5, 5].includes(Number(mantissa.toFixed(6))), `${stepVal} ms is not a round tick`);
+  }
+  assert.deepEqual(axisScale(1000, 1000), { stepVal: 100, stepPx: 90 });
+  // Nonsense in, something drawable out.
+  assert.ok(axisScale(0, 0).stepPx > 0);
+  assert.ok(axisScale(NaN, -5).stepVal > 0);
+});
 import { syncKeyframePlayer, disposeKeyframePlayer, scrubKeyframes, clearKeyframeScrub, useAnime, keyframePlayerFor } from '../src/CE_Application/utils/keyframePlayer.js';
 import { keyframeOverlays } from '../src/CE_Application/stores/keyframeOverlays.js';
 import { EASING_BEZIERS } from '../src/CE_Application/utils/animationModel.js';

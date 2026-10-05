@@ -1,4 +1,5 @@
-import { scriptLoopGuard } from './scriptWatchdog.js';
+import { withPreviewBudget, previewStep, PreviewLimitError, previewAllocation } from './previewBudget.js';
+
 // javaPreview.js — interpreter for the Java *behavior-handler subset*, so Java scripts run live in
 // the WebView preview (real Java would compile to a native export). Same design as cppPreview/
 // csharpPreview, with Java idioms: -> lambdas, enhanced for (`for (T x : coll)`), method-style
@@ -403,10 +404,11 @@ function applyBin(op, a, b) {
 }
 
 function makeLambda(node, env) {
-  return (...args) => { const fenv = new Env(env); node.params.forEach((p, i) => fenv.define(p, args[i])); if (node.body.expr) return evalNode(node.body.expr, fenv); try { for (const s of node.body.block) execStmt(s, fenv); } catch (e) { if (e instanceof ReturnSignal) return e.value; throw e; } };
+  return (...args) => withPreviewBudget(() => { const fenv = new Env(env); node.params.forEach((p, i) => fenv.define(p, args[i])); if (node.body.expr) return evalNode(node.body.expr, fenv); try { for (const s of node.body.block) execStmt(s, fenv); } catch (e) { if (e instanceof ReturnSignal) return e.value; throw e; } });
 }
 
 function evalNode(node, env) {
+  previewStep();
   switch (node.type) {
     case 'num': return node.value;
     case 'str': return node.value;
@@ -418,7 +420,7 @@ function evalNode(node, env) {
       throw new Error(`'${node.name}' is not defined`);
     }
     case 'array': return node.elems.map((e) => evalNode(e, env));
-    case 'arrayNew': return new Array(Math.max(0, (node.len ? evalNode(node.len, env) : 0) | 0)).fill(0);
+    case 'arrayNew': return new Array(previewAllocation(node.len ? evalNode(node.len, env) : 0)).fill(0);
     case 'seq': { let v; for (const e of node.list) v = evalNode(e, env); return v; }
     case 'lambda': return makeLambda(node, env);
     case 'instanceof': return evalNode(node.left, env) != null;
@@ -468,7 +470,7 @@ function instantiate(def, args, env) {
 }
 
 function execStmt(node, env) {
-  scriptLoopGuard();   // the preview watchdog: an endless loop stops instead of hanging the editor (C-57)
+  previewStep();
   switch (node.type) {
     case 'empty': return;
     case 'exprStmt': evalNode(node.expr, env); return;
@@ -484,7 +486,7 @@ function execStmt(node, env) {
     case 'throw': throw new JavaThrow(node.expr ? evalNode(node.expr, env) : undefined);
     case 'try': {
       try { execStmt(node.block, new Env(env)); }
-      catch (e) { if (e instanceof ReturnSignal || e === BREAK || e === CONTINUE) { if (node.fin) execStmt(node.fin, new Env(env)); throw e; } if (node.catches.length) { const c = node.catches[0]; const inner = new Env(env); inner.define(c.param ?? '__exc', e instanceof JavaThrow ? e.value : { getMessage: () => String(e?.message ?? e), message: String(e?.message ?? e) }); execStmt(c.body, inner); } else if (!node.fin) throw e; }
+      catch (e) { if (e instanceof PreviewLimitError || e instanceof ReturnSignal || e === BREAK || e === CONTINUE) { if (node.fin) execStmt(node.fin, new Env(env)); throw e; } if (node.catches.length) { const c = node.catches[0]; const inner = new Env(env); inner.define(c.param ?? '__exc', e instanceof JavaThrow ? e.value : { getMessage: () => String(e?.message ?? e), message: String(e?.message ?? e) }); execStmt(c.body, inner); } else if (!node.fin) throw e; }
       if (node.fin) execStmt(node.fin, new Env(env));
       return;
     }
@@ -582,7 +584,8 @@ function extractGlobals(toks, program) {
 
 const SYSTEM = (print) => ({ out: { println: (...a) => print(a.map(jStr).join('')), print: (...a) => print(a.map(jStr).join('')), printf: (fmt, ...a) => print(jStr(fmt)) }, err: { println: (...a) => print(a.map(jStr).join('')), print: (...a) => print(a.map(jStr).join('')) } });
 
-function runBody(body, params, program, thisObj, args) {
+function runBody(...args) { return withPreviewBudget(() => runBodyWithinBudget(...args)); }
+function runBodyWithinBudget(body, params, program, thisObj, args) {
   const env = new Env(null);
   const print = program?.print ?? (() => {});
   env.define('__program', program ?? null);
@@ -715,6 +718,10 @@ export function contextReadErrors(fn) {
 /* --------------------------------------------------------------------------- public */
 
 export function compileJava(source) {
+  if (String(source ?? '').length > 1024 * 1024) return { handlers: new Map(), diagnostics: ['Script source limit exceeded'] };
+  return withPreviewBudget(() => compileJavaWithinBudget(source));
+}
+function compileJavaWithinBudget(source) {
   const diagnostics = []; const handlers = new Map();
   const program = { funcs: new Map(), classes: new Map(), enums: new Map(), globals: new Map(), print: null };
   let toks;

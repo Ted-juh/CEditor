@@ -302,9 +302,7 @@ function panelNameFromPath(filePath) {
  *   something the exporter has to remember.
  */
 export function serializePanel(panel, options = {}) {
-  // `scriptsAwaitingTrust` is this editor's note about where the scripts came from, not part of the
-  // document: a file never vouches for itself (stores/scriptTrust.js).
-  const { id, modified, scriptsAwaitingTrust, ...data } = panel;
+  const { id, modified, ...data } = panel;
   const elide = options.elide !== false;
   // Generated controls come out first (they are regenerated on load), then what remains is
   // written as a diff against each type's defaults — unless this document is leaving the editor.

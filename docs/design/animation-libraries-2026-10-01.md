@@ -149,7 +149,11 @@ where a state's own patch lands. A keyframes animation builds no CSS transition,
 what is already eased. anime.js is a dynamic import: the player chunk every export carries did not
 grow, and a panel with no keyframes never loads it.
 
-**The tab.** `animation-timeline-js` sits under the Changes list, one row per target, with the
+> **Replaced 2026-10-04.** The timeline is no longer `animation-timeline-js`. It is plain elements,
+> `components/animation/SequenceTimeline.svelte`, and the library is out of package.json;
+> `animation-tab-design.md` ("The redesign") says why. What follows is the tab as first built.
+
+**The tab.** `animation-timeline-js` sat under the Changes list, one row per target, with the
 labels in a column of the tab's own. Drag a keyframe and the drop is one store write for every
 keyframe moved (and one undo step); click one and a box edits its time, value (a number cell, or
 the hex of a colour) and the easing it arrives with; *Keyframe at N ms* adds one to the selected

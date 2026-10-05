@@ -319,7 +319,7 @@ function snapshotOf(context) {
   // `filePath` is where the document lives, not what it says. Undo used to carry it: Save As then
   // one undo pointed the tab back at the file the user had just saved away from, and the next
   // Save overwrote it. Restore keeps the live path, because the snapshot no longer has one.
-  const { id, modified, filePath, bgImage, bgTexture, viewer, scriptsAwaitingTrust, ...data } = panel;
+  const { id, modified, filePath, bgImage, bgTexture, viewer, ...data } = panel;
   // Which note is open is view state, like the active viewer image above. Keep the notes in
   // history, but do not turn tab navigation into a document edit or rewind it with an unrelated
   // undo.

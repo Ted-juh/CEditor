@@ -19,6 +19,7 @@ import {
 import { clog, cinfo, cwarn, cerror } from './console.js';
 import { notify } from './scriptUi.js';
 import { preparePanelForExport } from './panelExportPreparation.js';
+import { mayExportPanelCode } from '../scripting/scriptTrust.js';
 import {
   appendRunLine, beginRun, claimIdentity, finishRun, identityFor, newCopyPatch, exportIdentityPrompt,
 } from './exportRuns.js';
@@ -37,7 +38,6 @@ import { equalityWritable } from '../utils/equalityStore.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
 import { controlSetForPanel } from '../models/controlSets.js';
 import { createPanel, deserializePanel, panelOpenReport, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
-import { markScriptsForeign } from './scriptTrust.js';
 import {
   getProjectDeviceSessionSnapshot,
   requestProjectDeviceSessionRestore,
@@ -1169,6 +1169,10 @@ function ensureBuildListeners() {
 export function buildActivePanelVst3({ identityChoice = null } = {}) {
   let panel = get(activePanel);
   if (!panel) { cwarn('[vst3] No active panel to build.'); return false; }
+  if (!mayExportPanelCode(panel)) {
+    notify('Enable this panel’s scripts before exporting executable code.', { kind: 'warn' });
+    return false;
+  }
   if (buildInFlight) { cwarn('[vst3] A build is already running.'); return false; }
 
   ensureBuildListeners();
@@ -1410,8 +1414,7 @@ export function initPanelBridge() {
 
     const openTimer = createPerfDebugTimer(`panel open ${label}`);
     const deserializeTimer = createPerfDebugTimer(`panel deserialize ${label}`);
-    // Scripts that came in with the file wait for the author's say-so (stores/scriptTrust.js).
-    const panel = markScriptsForeign(deserializePanel(panelData, filePath, payload.name));
+    const panel = deserializePanel(panelData, filePath, payload.name);
     if (!panel) {
       if (filePath) pendingOpenPanelFiles.delete(filePath);
       deserializeTimer('failed');

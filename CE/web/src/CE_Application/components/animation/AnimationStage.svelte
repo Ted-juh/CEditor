@@ -95,7 +95,7 @@
             title={playing ? 'Stop' : plan?.ok ? (plan.request ? `Play ${row?.name ?? ''} now` : `Play ${row?.name ?? ''}: ${plan.steps.map((step) => step.label).join(' → ')}`) : (plan?.reason ?? 'Select an animation')}
             aria-label={playing ? 'Stop' : 'Play'}
             onclick={() => (playing ? stop() : play())}>
-      {#if playing}<Square size={10} />{:else}<Play size={10} />{/if}
+      {#if playing}<Square size={13} />{:else}<Play size={13} />{/if}
       {playing ? 'Stop' : 'Play'}
     </button>
     <button type="button" class="slow" class:on={slow} aria-pressed={slow}
@@ -125,41 +125,36 @@
 </div>
 
 <style>
-  .stage-box {
-    border: 1px solid #333;
-    border-radius: 4px;
-    background: #1A1D20;
-    padding: 6px 8px 8px;
-    margin-bottom: 8px;
-  }
-  .stage-tools { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+  .stage-box { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .stage-tools { display: flex; align-items: center; gap: 6px; }
   .play, .slow {
-    display: inline-flex; align-items: center; gap: 4px;
-    height: 22px; padding: 0 8px;
-    border: 1px solid #333B42; border-radius: 3px; background: #12171A;
-    color: #9AA6AE; font: 600 9px/1 'IBM Plex Sans', system-ui, sans-serif; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 30px; padding: 0 12px;
+    border: 1px solid #3A434D; border-radius: 6px; background: #1E2328;
+    color: #E8EEF3; font: 500 13px/1 'IBM Plex Sans', system-ui, sans-serif; cursor: pointer;
   }
-  .play { border-color: #0E7C70; background: #0B2320; color: #8FEDE3; }
-  .play:hover:not(:disabled) { border-color: #14B8A6; color: #C9FFF8; }
-  .play:disabled { opacity: 0.35; cursor: default; }
-  .slow.on { border-color: #5B9BD5; background: #173449; color: #EAF5FF; }
+  .play { border-color: #2E7D6B; background: #10362F; color: #BFF3E6; }
+  .play:hover:not(:disabled) { border-color: #3DDBB4; }
+  .play:disabled { opacity: 0.45; cursor: default; }
+  .slow.on { border-color: #5AA9E6; background: #173A5A; color: #FFFFFF; }
   .steplabel {
     margin-left: auto;
-    font: 500 9px/1 'IBM Plex Mono', ui-monospace, monospace;
-    color: #8FEDE3;
+    font: 400 12px/1 'IBM Plex Mono', ui-monospace, monospace;
+    color: #BFF3E6;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .stage {
     position: relative;
-    height: 132px;
-    border-radius: 3px;
+    height: 150px;
+    border: 1px solid #2B323A;
+    border-radius: 8px;
     background:
       linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px) 0 0 / 14px 14px,
       linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px) 0 0 / 14px 14px,
-      #0C0F12;
+      #0B0E10;
     overflow: hidden;
   }
-  .why { margin: 6px 0 0; font: 400 9px/1.4 'IBM Plex Sans', system-ui, sans-serif; color: #8A949C; }
+  .why { margin: 0; font: 400 12px/1.4 'IBM Plex Sans', system-ui, sans-serif; color: #AEB9C4; }
 </style>

@@ -1,4 +1,5 @@
 #pragma once
+#include "TrustedWebBrowser.h"
 
 #include <cstring>
 #include <optional>

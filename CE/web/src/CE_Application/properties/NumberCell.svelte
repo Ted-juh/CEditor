@@ -208,7 +208,7 @@
     position: relative;
     display: flex;
     align-items: center;
-    font-size: 9px;
+    font-size: var(--pp-field-label-font, 9px);
     color: #5B9BD5;
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -229,8 +229,8 @@
     min-width: 0;
     border: none;
     background: transparent;
-    color: #DDD;
-    font-size: 11px;
+    color: var(--pp-field-fg, #DDD);
+    font-size: var(--pp-field-font, 11px);
     text-align: right;
     padding: 0 4px;
     font-family: inherit;
@@ -243,7 +243,7 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    width: 12px;
+    width: var(--pp-field-steps, 12px);
     flex-shrink: 0;
     border-left: 1px solid #262626;
   }

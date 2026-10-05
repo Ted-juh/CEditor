@@ -63,22 +63,20 @@ const withVars = SHIPPED.find((p) => p.profile.variables?.deviceId !== undefined
 
 test('repeated script reads parse a profile once and edits invalidate it', () => {
   withDevice(withVars, (d, profile) => {
-    const first = JSON.stringify({ ...profile, variables: { deviceId: 43 }, description: 'parse-cache-test' });
-    const second = JSON.stringify({ ...profile, variables: { deviceId: 44 }, description: 'parse-cache-edited' });
+    const first = JSON.stringify({ ...profile, variables: { deviceId: 43, cacheProbe: { value: 1 } }, description: 'parse-cache-test' });
+    const second = JSON.stringify({ ...profile, variables: { deviceId: 44, cacheProbe: { value: 2 } }, description: 'parse-cache-edited' });
     profileSources.set({ [profile.id]: { source: first } });
-    const parse = JSON.parse;
-    let parses = 0;
-    JSON.parse = function(text, ...rest) {
-      if (text === first || text === second) parses++;
-      return parse.call(this, text, ...rest);
-    };
-    try {
-      for (let i = 0; i < 20; i++) assert.equal(d.variables().deviceId, 43);
-      assert.equal(parses, 1);
-      profileSources.set({ [profile.id]: { source: second } });
-      assert.equal(d.variables().deviceId, 44);
-      assert.equal(parses, 2);
-    } finally { JSON.parse = parse; }
+    // SES intentionally freezes JSON.parse. Observe reuse of the parsed nested
+    // object instead of monkey-patching a security-critical intrinsic.
+    const cached = d.variables().cacheProbe;
+    for (let i = 0; i < 20; i++) {
+      assert.equal(d.variables().deviceId, 43);
+      assert.equal(d.variables().cacheProbe, cached);
+    }
+    profileSources.set({ [profile.id]: { source: second } });
+    assert.equal(d.variables().deviceId, 44);
+    assert.notEqual(d.variables().cacheProbe, cached);
+    assert.equal(d.variables().cacheProbe.value, 2);
   });
 });
 

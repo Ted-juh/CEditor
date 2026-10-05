@@ -1,4 +1,5 @@
-import { scriptLoopGuard } from './scriptWatchdog.js';
+import { withPreviewBudget, previewStep, PreviewLimitError, previewAllocation } from './previewBudget.js';
+
 // cppPreview.js — a small interpreter for the C++ *behavior-handler subset*.
 //
 // True C++ is compiled into the exported plugin. This interpreter runs the subset that panel
@@ -712,14 +713,14 @@ function declDefault(d, env) {
   }
   if (d.ctorArgs) {
     const a = d.ctorArgs.map((x) => evalNode(x, env));
-    if (d.typeName === 'vector' || d.typeName === 'array') return new Array(Math.max(0, (a[0] ?? 0) | 0)).fill(a.length >= 2 ? a[1] : 0);
-    if (d.typeName === 'string') return a.length >= 2 ? String.fromCharCode(a[1]).repeat(Math.max(0, a[0] | 0)) : String(a[0] ?? '');
+    if (d.typeName === 'vector' || d.typeName === 'array') return new Array(previewAllocation(a[0] ?? 0)).fill(a.length >= 2 ? a[1] : 0);
+    if (d.typeName === 'string') return a.length >= 2 ? String.fromCharCode(a[1]).repeat(previewAllocation(a[0])) : String(a[0] ?? '');
     if (d.typeName === 'pair') return { first: a[0] ?? 0, second: a[1] ?? 0 };
     const prog = env.get('__program');
     if (prog?.structs?.has(d.typeName)) return constructStruct(prog.structs.get(d.typeName), env);
     return a.length === 1 ? convertForDecl(d, a[0]) : 0; // int x(5)
   }
-  if (d.isArray) return new Array(Math.max(0, (d.arrayLen ? evalNode(d.arrayLen, env) : 0) | 0)).fill(0);
+  if (d.isArray) return new Array(previewAllocation(d.arrayLen ? evalNode(d.arrayLen, env) : 0)).fill(0);
   const prog = env.get('__program');
   if (prog && prog.structs && prog.structs.has(d.typeName)) return constructStruct(prog.structs.get(d.typeName), env);
   if (d.typeName === 'map' || d.typeName === 'unordered_map') return new Map();
@@ -769,7 +770,7 @@ function containerMethod(obj, name) {
       case 'clear': return () => { obj.length = 0; };
       case 'begin': case 'cbegin': return () => new CppIter(obj, 0);
       case 'end': case 'cend': return () => new CppIter(obj, obj.length);
-      case 'resize': return (n) => { obj.length = n | 0; for (let i = 0; i < obj.length; i++) if (obj[i] === undefined) obj[i] = 0; };
+      case 'resize': return (n) => { obj.length = previewAllocation(n); for (let i = 0; i < obj.length; i++) if (obj[i] === undefined) obj[i] = 0; };
     }
   } else if (typeof obj === 'string') {
     switch (name) {
@@ -835,6 +836,7 @@ function applyBin(op, a, b) {
 }
 
 function evalNode(node, env) {
+  previewStep();
   switch (node.type) {
     case 'num': return node.value;
     case 'str': return node.value;
@@ -849,12 +851,12 @@ function evalNode(node, env) {
     case 'seq': { let v; for (const e of node.list) v = evalNode(e, env); return v; }
     case 'lambda': {
       const captured = env;
-      return (...args) => {
+      return (...args) => withPreviewBudget(() => {
         const fenv = new Env(captured);
         node.params.forEach((p, i) => fenv.define(p, convertTo(node.paramTypes[i], args[i]), node.paramTypes[i]));
         try { for (const s of node.body) execStmt(s, fenv); }
         catch (e) { if (e instanceof ReturnSignal) return convertTo(node.retType, e.value); if (e === BREAK || e === CONTINUE) return undefined; throw e; }
-      };
+      });
     }
     case 'member': {
       const o = evalNode(node.obj, env);
@@ -902,7 +904,7 @@ function evalNode(node, env) {
 }
 
 function execStmt(node, env) {
-  scriptLoopGuard();   // the preview watchdog: an endless loop stops instead of hanging the editor (C-57)
+  previewStep();
   switch (node.type) {
     case 'empty': return;
     case 'exprStmt': evalNode(node.expr, env); return;
@@ -964,7 +966,7 @@ function execStmt(node, env) {
     case 'try': {
       try { execStmt(node.block, new Env(env)); }
       catch (e) {
-        if (e instanceof ReturnSignal || e === BREAK || e === CONTINUE || !node.catches.length) throw e;
+        if (e instanceof PreviewLimitError || e instanceof ReturnSignal || e === BREAK || e === CONTINUE || !node.catches.length) throw e;
         const c = node.catches[0]; const inner = new Env(env);
         inner.define(c.param ?? '__exc', e instanceof CppThrow ? e.value : { what: () => String(e?.message ?? e) });
         execStmt(c.body, inner);
@@ -981,6 +983,10 @@ function execStmt(node, env) {
 
 /** Parse a C++ source into runnable handler functions. → { handlers: Map<name, fnNode>, diagnostics } */
 export function compileCpp(source) {
+  if (String(source ?? '').length > 1024 * 1024) return { handlers: new Map(), diagnostics: ['Script source limit exceeded'] };
+  return withPreviewBudget(() => compileCppWithinBudget(source));
+}
+function compileCppWithinBudget(source) {
   const diagnostics = [];
   const handlers = new Map();
   const program = { funcs: new Map(), structs: new Map(), enums: new Map(), globals: new Map(), globalTypes: new Map(), print: null };
@@ -1016,7 +1022,8 @@ export function compileCpp(source) {
  *  receives anything written via std::cout / printf. Helper functions in the same source are
  *  callable (and may recurse). */
 // Core runner: build a scope (program funcs + enums, optional `this`), bind params, execute.
-function runBody(body, params, program, thisObj, args, paramTypes = [], retType = null) {
+function runBody(...args) { return withPreviewBudget(() => runBodyWithinBudget(...args)); }
+function runBodyWithinBudget(body, params, program, thisObj, args, paramTypes = [], retType = null) {
   const env = new Env(null);
   env.define('__program', program ?? null);
   env.define('__print', program?.print ?? (() => {}));

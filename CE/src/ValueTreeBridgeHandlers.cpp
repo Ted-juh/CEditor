@@ -448,6 +448,22 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
     // Point the Node toolchain scripts at a per-user, writable provisioning dir before any node spawn.
     setToolchainDirEnv();
 
+    // Only paths already remembered by this host may reopen without a chooser.
+    if (appSettings != nullptr)
+    {
+        for (const auto& path : appSettings->getOpenPanelPaths())
+            if (juce::File::isAbsolutePath (path)) fileAccess.grantDocument (juce::File (path));
+        for (const auto& path : appSettings->getOpenScriptWorkspacePaths())
+            if (juce::File::isAbsolutePath (path)) fileAccess.grantDocument (juce::File (path));
+        auto fonts = appSettings->getAppSettingsData().getProperty ("fonts", {});
+        if (const auto* list = fonts.getArray())
+            for (const auto& font : *list)
+            {
+                auto path = font.getProperty ("filePath", "").toString();
+                if (juce::File::isAbsolutePath (path)) fileAccess.grantRead (juce::File (path));
+            }
+    }
+
     deviceProfileService.setEventCallback ([this] (const juce::String& eventName, const juce::var& payload)
     {
         juce::MessageManager::callAsync ([this, eventName, payload]()
@@ -539,6 +555,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                             return;
 
                         auto file = result.withFileExtension ("cepanel");
+                        fileAccess.grantDocument (file);
 
                         auto* obj = new juce::DynamicObject();
                         obj->setProperty ("panelId", panelId);
@@ -568,6 +585,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 auto filePath = obj->getProperty ("filePath").toString();
                 auto jsonData = obj->getProperty ("data").toString();
 
+                if (! juce::File::isAbsolutePath (filePath)) return;
                 juce::File file (filePath);
 
                 auto* resp = new juce::DynamicObject();
@@ -575,7 +593,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 resp->setProperty ("filePath", filePath);
                 // A read-only file, a full disk or a folder that went away all used to look
                 // exactly like a save here, and the dirty dot cleared on all three.
-                resp->setProperty ("ok", ceditor::writeTextAtomically (file, jsonData));
+                resp->setProperty ("ok", fileAccess.canWrite (file) && ceditor::writeTextAtomically (file, jsonData));
 
                 browser->emitEventIfBrowserIsVisible ("panelSaved", juce::var (resp));
             });
@@ -612,6 +630,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
 
                         emitPerfDebug ("openPanel chooser selected " + perfFileLabel (result.getFullPathName())
                                        + " after " + juce::String (callbackElapsedMs, 1) + "ms");
+                        fileAccess.grantDocument (result);
                         auto* obj = new juce::DynamicObject();
                         obj->setProperty ("filePath", result.getFullPathName());
                         obj->setProperty ("name", result.getFileNameWithoutExtension());
@@ -640,9 +659,11 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                     return;
 
                 auto filePath = payloadObj->getProperty ("filePath").toString();
+                if (! juce::File::isAbsolutePath (filePath)) return;
                 juce::File file (filePath);
                 auto requestStartMs = juce::Time::getMillisecondCounterHiRes();
                 emitPerfDebug ("openPanelFile received " + perfFileLabel (filePath));
+                if (! fileAccess.canRead (file)) return;
 
                 if (! file.existsAsFile())
                 {
@@ -747,6 +768,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                         obj->setProperty ("name", result.getFileNameWithoutExtension());
                         obj->setProperty ("byteSize", (juce::int64) result.getSize());
 
+                        fileAccess.grantRead (result);
                         browser->emitEventIfBrowserIsVisible ("panelPackageOpened", juce::var (obj));
                     });
             });
@@ -867,6 +889,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                             return;
 
                         auto file = result.withFileExtension ("cescript.json");
+                        fileAccess.grantDocument (file);
 
                         auto* obj = new juce::DynamicObject();
                         obj->setProperty ("documentId", documentId);
@@ -893,13 +916,14 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 auto filePath = obj->getProperty ("filePath").toString();
                 auto jsonData = obj->getProperty ("data").toString();
 
+                if (! juce::File::isAbsolutePath (filePath)) return;
                 juce::File file (filePath);
 
                 auto* resp = new juce::DynamicObject();
                 resp->setProperty ("documentId", documentId);
                 resp->setProperty ("filePath", filePath);
                 resp->setProperty ("name", file.getFileNameWithoutExtension().replace (".cescript", ""));
-                resp->setProperty ("ok", ceditor::writeTextAtomically (file, jsonData));
+                resp->setProperty ("ok", fileAccess.canWrite (file) && ceditor::writeTextAtomically (file, jsonData));
 
                 browser->emitEventIfBrowserIsVisible ("scriptWorkspaceSaved", juce::var (resp));
             });
@@ -931,6 +955,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                         obj->setProperty ("byteSize", (juce::int64) result.getSize());
                         obj->setProperty ("data", result.loadFileAsString());
 
+                        fileAccess.grantDocument (result);
                         browser->emitEventIfBrowserIsVisible ("scriptWorkspaceOpened", juce::var (obj));
                     });
             });
@@ -947,7 +972,10 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                     return;
 
                 auto filePath = payloadObj->getProperty ("filePath").toString();
+                if (! juce::File::isAbsolutePath (filePath)) return;
                 juce::File file (filePath);
+
+                if (! fileAccess.canRead (file)) return;
 
                 if (! file.existsAsFile())
                     return;
@@ -973,7 +1001,10 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                     return;
 
                 auto filePath = payloadObj->getProperty ("filePath").toString();
+                if (! juce::File::isAbsolutePath (filePath)) return;
                 juce::File file (filePath);
+
+                if (! fileAccess.canRead (file)) return;
 
                 if (! file.existsAsFile())
                     return;
@@ -1001,7 +1032,16 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 auto requestId = payloadObj->getProperty ("requestId").toString();
                 auto filePath = payloadObj->getProperty ("filePath").toString();
 
+                if (! juce::File::isAbsolutePath (filePath)) return;
                 juce::File file (filePath);
+                if (! fileAccess.canRead (file))
+                {
+                    auto* denied = new juce::DynamicObject();
+                    denied->setProperty ("requestId", requestId);
+                    denied->setProperty ("error", "File access denied. Select this file using Open or Browse first.");
+                    browser->emitEventIfBrowserIsVisible ("fileData", juce::var (denied));
+                    return;
+                }
                 if (! file.existsAsFile())
                 {
                     emitPerfDebug ("requestFileData missing file " + filePath);
@@ -1178,6 +1218,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                         obj->setProperty ("requestId", requestId);
                         obj->setProperty ("filePath", result.getFullPathName());
 
+                        fileAccess.grantRead (result);
                         browser->emitEventIfBrowserIsVisible ("imageBrowsed", juce::var (obj));
                     });
             });
@@ -1503,6 +1544,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                             obj->setProperty ("fileName", fileName);
                             obj->setProperty ("family", file.getFileNameWithoutExtension());
                             obj->setProperty ("supportsWeight", supportsWeight);
+                            fileAccess.grantRead (file);
                             importedFonts.add (juce::var (obj));
                         }
 

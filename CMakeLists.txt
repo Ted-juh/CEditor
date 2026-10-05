@@ -960,6 +960,12 @@ target_link_libraries(CEditorUpdateCheckTests PRIVATE
 add_test(NAME UpdateCheck COMMAND CEditorUpdateCheckTests)
 ce_configure_test(CEditorUpdateCheckTests)
 
+add_executable(CEditorNativeFileAccessTests "${CE_ROOT}/tests/NativeFileAccessTests.cpp")
+target_include_directories(CEditorNativeFileAccessTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorNativeFileAccessTests PRIVATE juce::juce_core)
+add_test(NAME NativeFileAccess COMMAND CEditorNativeFileAccessTests)
+ce_configure_test(CEditorNativeFileAccessTests)
+
 # --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
 # Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.
 # Design record: docs/design/screen-builder-design.md.

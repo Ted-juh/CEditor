@@ -29,6 +29,18 @@ const WRAPPER = join(
 
 const REAPPLY = 'Re-apply it — JUCE/VENDORED.md documents the patch and why it exists.';
 
+test('Windows native messages remain restricted to the packaged or configured origin', () => {
+  const source = readFileSync(join(repoRoot,
+    'JUCE/include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp'), 'utf8');
+  const callback = source.slice(source.indexOf('webView->add_WebMessageReceived'));
+  const dispatch = callback.indexOf('owner.impl->handleNativeEvent');
+  assert.ok(dispatch > 0);
+  const guard = callback.slice(0, dispatch);
+  for (const check of ['get_Source', 'getResourceProviderRoot()', 'getAllowedOrigin()',
+    'source != *allowed', 'source.startsWith (*allowed + "/")', 'return S_OK;'])
+    assert.ok(guard.includes(check), `Missing origin guard ${check}. ${REAPPLY}`);
+});
+
 test('the vendored JUCE VST3 wrapper still carries the sidecar-identity patch', () => {
   assert.ok(existsSync(WRAPPER), `the vendored JUCE VST3 wrapper is missing: ${WRAPPER}`);
   const source = readFileSync(WRAPPER, 'utf8');
@@ -172,4 +184,3 @@ test('JUCE/VENDORED.md records the MIDI-CI patch', () => {
   assert.ok(text.includes('juce_CIDevice.cpp') && text.includes('stack-use-after-return'),
     'VENDORED.md must name the MIDI-CI file and the defect');
 });
-

@@ -101,6 +101,35 @@ export function formatAxisLabel(ms) {
   return `${Number((n / 1000).toFixed(2))} s`;
 }
 
+/** The smallest of 1, 2, 2.5 or 5 times a power of ten that is at least `ms`. */
+function niceStep(ms) {
+  const power = 10 ** Math.floor(Math.log10(Math.max(1, ms)));
+  for (const step of [1, 2, 2.5, 5, 10]) if (step * power >= ms) return step * power;
+  return 10 * power;
+}
+
+/** How much of the ruler's width the animation's own length takes; the rest is room to drag past it. */
+export const AXIS_FILL = 0.9;
+
+/**
+ * The ruler's scale for an animation of `duration` ms drawn `widthPx` wide: `stepVal` ms per
+ * labelled tick and `stepPx` pixels between ticks (pixels per ms = stepPx / stepVal). The shape is
+ * the one animation-timeline-js took a scale in; the timeline is plain elements now
+ * (components/animation/SequenceTimeline.svelte) and reads `stepVal` for its ticks.
+ *
+ * The axis FITS the animation: its length ends nine tenths of the way across, whatever the
+ * length. It used to be a fixed 250 ms per 90 px, so a 120 ms sequence was a sliver at the left
+ * edge of a ruler that ran to two seconds, with every keyframe on top of the next and nothing to
+ * say where the animation ended.
+ */
+export function axisScale(duration, widthPx) {
+  const length = Math.max(10, Number(duration) || KEYFRAME_DEFAULTS.duration);
+  const usable = Math.max(100, (Number(widthPx) || 0) * AXIS_FILL);
+  // About one label every 90 px, on a round number of milliseconds.
+  const stepVal = niceStep((length * 90) / usable);
+  return { stepVal, stepPx: (usable * stepVal) / length };
+}
+
 // --- Tracks -------------------------------------------------------------------------------------
 
 const clampTime = (time) => Math.max(0, Math.round(Number(time) || 0));

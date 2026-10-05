@@ -18,6 +18,9 @@
 // else. Bind nothing panelApi.js doesn't declare, and declare nothing you don't bind.
 
 import { get } from 'svelte/store';
+import { runBoundedLuaSource } from './boundedLua.js';
+import { evaluatePanelSource, ensureScriptSandbox, disposeJavascriptSandboxes } from './scriptSandbox.js';
+import { executionFingerprint, isExecutionApproved, isNativeExecutionApproved, approveExecution, scriptExecutionStatus, setExportApprovalCheck } from './scriptTrust.js';
 import { panels, scriptRuntimePanelId, updatePanel } from '../stores/panels.js';
 import { sanitizeControlName } from '../utils/controlNames.js';
 import {
@@ -89,8 +92,7 @@ import { compileJava, invokeJava } from './javaPreview.js';
 import { ensureTs, transpileTs } from './tsService.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
-import { forgetDeclinedScripts, scriptsAllowed } from '../stores/scriptTrust.js';
-import { GUARD_NAME, PYTHON_WATCHDOG_PRELUDE, instrumentJs, instrumentLua, isScriptTimeLimit, scriptLoopGuard } from './scriptWatchdog.js';
+import { GUARD_NAME, PYTHON_WATCHDOG_PRELUDE, isScriptTimeLimit, scriptLoopGuard } from './scriptWatchdog.js';
 import { applySplitScriptAction } from '../utils/splitZoneLayout.js';
 import { phraseScriptPatch } from '../utils/phraseLayout.js';
 import { recorderScriptPatch } from '../utils/noteRecorderLayout.js';
@@ -159,6 +161,7 @@ import {
 // its scripts, and control value I/O from here instead of the editor stores — so the SAME runtime
 // runs scripts in the shipped plugin. null = editor mode (resolve from panels / scriptDocuments).
 let host = null;
+let executionEpoch = 0;
 
 // A script callback often paints many document fields as one logical operation. Publishing every
 // field separately makes every panels-store subscriber repeat its work, even though Svelte cannot
@@ -6674,7 +6677,7 @@ function decodeJson(text) {
 }
 
 // @module -
-function buildApi(ownerName, scriptId = '') {
+function buildApi(ownerName, scriptId = '', guardExecution = false) {
   const self = {
     set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v, typeof form === 'string' ? form : ''),
     get: (p, form) => getValue(ownerName ? `${ownerName}.${p}` : p, form),
@@ -7045,7 +7048,15 @@ function buildApi(ownerName, scriptId = '') {
   // Installed third-party modules (ce.ext.*) contribute their members to the SAME flat surface a
   // built-in module does, before anything is gated — so they are gated, namespaced and discovered
   // by exactly the same code, with no separate path to keep in step.
-  installExtensionMembers(api);
+  const epoch = executionEpoch;
+  const wrapFunctions = (object) => Object.fromEntries(Object.entries(object).map(([key, value]) => [key,
+    typeof value === 'function' ? (...args) => {
+      if (epoch !== executionEpoch) throw new Error('Script approval expired; enable the current code before running it.');
+      return value(...args);
+    } : value && typeof value === 'object' && key !== 'state' ? wrapFunctions(value) : value]));
+  // Also guard capabilities handed to extension code, before evaluating it.
+  if (guardExecution) Object.assign(api, wrapFunctions(api));
+  installExtensionMembers(api, scriptId);
 
   // Modules the panel has not enabled become explaining stubs, before `ce` is assembled from the
   // flat surface — so the namespaced spelling and the flat alias are gated identically.
@@ -7057,7 +7068,7 @@ function buildApi(ownerName, scriptId = '') {
   // panelApi.js — the C++ engines get the same layout from a generated block, since a prelude
   // embedded as a string literal cannot import anything.
   api.ce = buildModuleNamespace(api, enabled);
-  return api;
+  return guardExecution ? wrapFunctions(api) : api;
 }
 
 /**
@@ -7152,17 +7163,16 @@ function buildModuleNamespace(flat, enabled = null) {
 
 /* ------------------------------------------------------- installed third-party modules */
 // An installed ce.ext.* module ships JavaScript for this runtime. It is evaluated exactly the way
-// a user's JS script is — `new Function` with the panel API bound as arguments — because it IS the
-// same trust level: both are code the person using the editor chose to run. Nothing here is a
-// sandbox and nothing here pretends to be one.
+// a user's JS script is — an isolated SES compartment endowed with the panel API.
+// Module source is included in the session approval fingerprint.
 //
 // The compiled factory is cached per id@version, so a module is parsed once and only re-invoked to
 // re-bind the API (which differs per script: `self`, the script's own `state`).
 
 const extensionFactories = new Map();   // "id@version" -> { factory, keys } | null
 
-function extensionFactory(ext, apiKeys) {
-  const cacheKey = `${ext.id}@${ext.version}`;
+function extensionFactory(ext, apiKeys, owner) {
+  const cacheKey = `${ext.id}@${ext.version}:${owner}`;
   const cached = extensionFactories.get(cacheKey);
   if (cached !== undefined && cached?.keys === apiKeys) return cached;
 
@@ -7172,11 +7182,9 @@ function extensionFactory(ext, apiKeys) {
 
   // Collect exactly the members the manifest declares. A module that promises a member and does
   // not define it hands back undefined, which is reported below rather than silently skipped.
-  const probe = names
-    .map((n) => `${JSON.stringify(n)}: (typeof ${n} !== 'undefined' ? ${n} : undefined)`)
-    .join(',');
   try {
-    const entry = { factory: new Function(...apiKeys.split(','), `${source}\n;return {${probe}};`), keys: apiKeys };
+    const entry = { factory: (...values) => evaluatePanelSource(source,
+      Object.fromEntries(apiKeys.split(',').map((key, index) => [key, values[index]])), names, { owner }), keys: apiKeys };
     extensionFactories.set(cacheKey, entry);
     return entry;
   } catch (e) {
@@ -7187,26 +7195,29 @@ function extensionFactory(ext, apiKeys) {
 }
 
 /** Drop the compiled cache — after an install, an uninstall, or an upgrade. */
-export function resetExtensionCache() { extensionFactories.clear(); }
+export function resetExtensionCache() {
+  extensionFactories.clear();
+  if (!ensurePanelExecutionApproved()) resetScriptState();
+}
 
 /**
  * Run every installed module's JavaScript and merge what it defines into the flat surface.
  * A module that throws, will not parse, or does not define what it promised is REPORTED and
  * skipped — never half-installed, and never fatal to the rest of the panel.
  */
-function installExtensionMembers(flat) {
+function installExtensionMembers(flat, owner) {
   const extensions = registeredExtensions();
   if (!extensions.length) return;
 
   const apiKeys = Object.keys(flat).join(',');
   for (const ext of extensions) {
-    const entry = extensionFactory(ext, apiKeys);
+    const entry = extensionFactory(ext, apiKeys, owner);
     if (!entry) continue;
     let produced = null;
     try {
       produced = entry.factory(...Object.keys(flat).map((k) => flat[k]));
     } catch (e) {
-      addScriptTrace('error', '', `[module ${ext.id}] load error: ${e?.message ?? e}`);
+      addScriptTrace('error', '', `[module ${ext.id}] ${e instanceof SyntaxError || e?.name === 'SyntaxError' ? 'will not parse' : 'load error'}: ${e?.message ?? e}`);
       continue;
     }
     for (const member of ext.members ?? []) {
@@ -7296,13 +7307,8 @@ function ownerOf(script) {
 
 /** Run JS source with the panel API bound and collect its declared handlers (sync). */
 function runJsSource(source, scriptId, api, names) {
-  const probe = names.map((n) => `${JSON.stringify(n)}: (typeof ${n} !== 'undefined' ? ${n} : undefined)`).join(',');
-  // Every loop body calls the watchdog, so an endless loop stops after the time limit instead of
-  // hanging the editor (C-57). Inserted on the same line: error line numbers do not move.
-  const body = `${instrumentJs(source)}\n;return {${probe}};`;
   try {
-    const factory = new Function(GUARD_NAME, ...Object.keys(api), body);
-    return factory(scriptLoopGuard, ...Object.values(api)) || {};
+    return evaluatePanelSource(source, api, names, { owner: scriptId, onError: error => reportScriptError(scriptId, error) });
   } catch (e) {
     reportScriptLoadError(scriptId, `load error: ${e?.message ?? e}`);
     return null;
@@ -7311,16 +7317,17 @@ function runJsSource(source, scriptId, api, names) {
 
 /** Execute a JS script's source and return its declared handlers (sync). */
 function loadHandlersJs(script) {
-  return runJsSource(script.source, script.id, buildApi(ownerOf(script), script.id), probeNames(script));
+  return runJsSource(script.source, script.id, buildApi(ownerOf(script), script.id, true), probeNames(script));
 }
 
 /** TypeScript: prefer the JS the editor already transpiled (what the C++ host ships), else
     transpile on the fly via the lazy compiler. Both run through the JS path. */
 async function loadHandlersTs(script) {
-  const api = buildApi(ownerOf(script), script.id);
+  const api = buildApi(ownerOf(script), script.id, true);
   if (typeof script.compiledJs === 'string' && script.compiledJs.length)
     return runJsSource(script.compiledJs, script.id, api, probeNames(script));
   const ts = await ensureTs();
+  if (!ensurePanelExecutionApproved(script)) return null;
   if (!ts) { reportScriptLoadError(script.id, 'TypeScript compiler unavailable (offline?)'); return null; }
   const js = transpileTs(script.source);
   if (js == null) { reportScriptLoadError(script.id, 'TypeScript transpile failed'); return null; }
@@ -7338,7 +7345,11 @@ async function getLuaEngine() {
   if (!luaEnginePromise) {
     luaEnginePromise = (async () => {
       const { LuaFactory } = await import('wasmoon');
-      return new LuaFactory(luaWasmUrl).createEngine();
+      const lua = await new LuaFactory(luaWasmUrl).createEngine({ functionTimeout: 250, traceAllocations: true });
+      lua.global.setMemoryMax(64 * 1024 * 1024);
+      // Guest code must not remove the instruction hook or regain debug via require.
+      lua.doStringSync('debug = nil; package.loaded.debug = nil; package.preload.debug = nil');
+      return lua;
     })();
   }
   return luaEnginePromise;
@@ -7384,24 +7395,24 @@ async function loadHandlersLua(script) {
   let lua;
   try {
     lua = await getLuaEngine();
+    if (!ensurePanelExecutionApproved(script)) return null;
   } catch (e) {
     reportScriptLoadError(script.id, `Lua engine failed to start: ${e?.message ?? e}`);
     return null;
   }
-  const api = buildApi(ownerOf(script), script.id);
+  const api = buildApi(ownerOf(script), script.id, true);
   try {
     for (const [k, v] of Object.entries(api)) {
       if (typeof v === 'function') lua.global.set(k, nilSafe(v));
       else if (k === 'ce') lua.global.set(k, nilSafeNamespace(v));
       else lua.global.set(k, v);          // `state` and friends keep their identity
     }
-    lua.global.set(GUARD_NAME, scriptLoopGuard);
     // Clear any handlers left in globals by a previous run, eval the source, then collect this
     // run's handlers into a table the JS side can call.
     const names = probeNames(script);
     const clear = names.map((n) => `${n}=nil`).join(';');
     const collect = names.map((n) => `${n}=${n}`).join(',');
-    const handlers = await lua.doString(`${clear}\n${instrumentLua(script.source)}\nreturn {${collect}}`);
+    const handlers = runBoundedLuaSource(lua, `${clear}\n${script.source}\nreturn {${collect}}`);
     return handlers || {};
   } catch (e) {
     reportScriptLoadError(script.id, `load error: ${e?.message ?? e}`);
@@ -7417,20 +7428,48 @@ async function loadHandlersLua(script) {
 // always-on native core is Lua+JS; embedded CPython is the optional third window-closed engine.
 
 let pyodidePromise = null;
+/**
+ * Where Pyodide is loaded from: a realm of its own.
+ *
+ * The script sandbox locks the page's realm down (SES lockdown, scriptSandbox.js) before any panel
+ * code runs, and that freezes the built-ins Pyodide extends while it loads, so Pyodide loaded into
+ * the page failed with "Cannot add property sig, object is not extensible", and every Python preview
+ * with it, since the security pass. A hidden same-origin iframe is a separate realm with its own
+ * built-ins that lockdown never touched. This is not a sandbox and does not claim to be one: Python
+ * already needs its own approval, as trusted code (scriptTrust.js), and the page's realm stays locked.
+ *
+ * Off the page (the unit tests) there is no document, and whoever runs the runtime supplies
+ * globalThis.loadPyodide. Exported for the test that pins the realm.
+ */
+export async function pyodideLoader(CDN) {
+  if (typeof document === 'undefined') return globalThis.loadPyodide;
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.tabIndex = -1;
+  frame.style.display = 'none';
+  document.body.appendChild(frame);
+  const realm = frame.contentWindow;
+  await new Promise((resolve, reject) => {
+    const s = realm.document.createElement('script');
+    s.src = CDN + 'pyodide.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('could not load pyodide.js (offline?)'));
+    realm.document.head.appendChild(s);
+  });
+  return realm.loadPyodide;
+}
+
 async function getPyodideEngine() {
   if (!pyodidePromise) {
     pyodidePromise = (async () => {
       const CDN = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
-      if (!globalThis.loadPyodide) {
-        await new Promise((resolve, reject) => {
-          const s = document.createElement('script');
-          s.src = CDN + 'pyodide.js';
-          s.onload = resolve;
-          s.onerror = () => reject(new Error('could not load pyodide.js (offline?)'));
-          document.head.appendChild(s);
-        });
-      }
-      const py = await globalThis.loadPyodide({ indexURL: CDN });
+      const loadPyodide = await pyodideLoader(CDN);
+      if (typeof loadPyodide !== 'function') throw new Error('no Pyodide loader');
+      // Do not expose the privileged WebView global through Python's `import js`.
+      // CPython/native exported handlers remain trusted code, not an OS sandbox.
+      const py = await loadPyodide({ indexURL: CDN, jsglobals: Object.create(null) });
+      // Python is the one preview engine with no execution bound of its own (QuickJS, Wasmoon and
+      // the interpreters' shared budget cover the rest), so its loops carry the watchdog (C-57).
       py.runPython(PYTHON_WATCHDOG_PRELUDE);
       return py;
     })();
@@ -7479,11 +7518,12 @@ async function loadHandlersPython(script) {
   let py;
   try {
     py = await getPyodideEngine();
+    if (!ensurePanelExecutionApproved(script)) return null;
   } catch (e) {
     reportScriptLoadError(script.id, `Pyodide failed to load: ${e?.message ?? e}`);
     return null;
   }
-  const api = buildApi(ownerOf(script), script.id);
+  const api = buildApi(ownerOf(script), script.id, true);
   try {
     // Fresh namespace per run, seeded with the panel API + helpers as Python globals, so the source
     // can call set()/get()/sendCC()/log()/clamp()/scale()/… directly. Each defined handler is read
@@ -7600,7 +7640,7 @@ export function previewEventFor(language, payload) {
 }
 
 function loadHandlersCpp(script) {
-  const api = buildApi(ownerOf(script), script.id);
+  const api = buildApi(ownerOf(script), script.id, true);
   const ctx = previewContextFor('cpp', api);
   const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
   const { handlers: parsed, diagnostics } = compileCpp(script.source);
@@ -7612,7 +7652,7 @@ function loadHandlersCpp(script) {
     out[name] = (payload) => {
       const event = previewEventFor('cpp', payload);
       try { return invokeCpp(fnNode, [ctx, event], { print }); }
-      catch (e) { if (isScriptTimeLimit(e)) reportScriptError(script.id, e); else addScriptTrace('error', script.id, `C++ preview runtime error: ${e?.message ?? e}`); }
+      catch (e) { addScriptTrace('error', script.id, `C++ preview runtime error: ${e?.message ?? e}`); }
     };
   }
   return out;
@@ -7623,7 +7663,7 @@ function loadHandlersCpp(script) {
 // panel API in both C# (PascalCase) and lower-case spellings; handler names match camelCase
 // (the skeleton) or PascalCase (idiomatic C#).
 function loadHandlersCsharp(script) {
-  const api = buildApi(ownerOf(script), script.id);
+  const api = buildApi(ownerOf(script), script.id, true);
   const ctx = previewContextFor('csharp', api);
   const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
   const { handlers: parsed, diagnostics } = compileCsharp(script.source);
@@ -7635,7 +7675,7 @@ function loadHandlersCsharp(script) {
     const fire = (payload) => {
       const event = previewEventFor('csharp', payload);
       try { return invokeCsharp(fnNode, [ctx, event], { print }); }
-      catch (e) { if (isScriptTimeLimit(e)) reportScriptError(script.id, e); else addScriptTrace('error', script.id, `C# preview runtime error: ${e?.message ?? e}`); }
+      catch (e) { addScriptTrace('error', script.id, `C# preview runtime error: ${e?.message ?? e}`); }
     };
     out[name] = fire;
     const lower = name.charAt(0).toLowerCase() + name.slice(1); // OnValueChanged → onValueChanged
@@ -7647,7 +7687,7 @@ function loadHandlersCsharp(script) {
 /* ----------------------------------------------------------------------- Java executor */
 // Interpreted preview of the Java behavior-handler subset (javaPreview.js).
 function loadHandlersJava(script) {
-  const api = buildApi(ownerOf(script), script.id);
+  const api = buildApi(ownerOf(script), script.id, true);
   const ctx = previewContextFor('java', api);
   const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
   const { handlers: parsed, diagnostics } = compileJava(script.source);
@@ -7659,7 +7699,7 @@ function loadHandlersJava(script) {
     out[name] = (payload) => {
       const event = previewEventFor('java', payload);
       try { return invokeJava(fnNode, [ctx, event], { print }); }
-      catch (e) { if (isScriptTimeLimit(e)) reportScriptError(script.id, e); else addScriptTrace('error', script.id, `Java preview runtime error: ${e?.message ?? e}`); }
+      catch (e) { addScriptTrace('error', script.id, `Java preview runtime error: ${e?.message ?? e}`); }
     };
   }
   return out;
@@ -7785,15 +7825,21 @@ function stopScript(scriptId) {
 }
 
 async function handlersFor(script) {
+  if (!ensurePanelExecutionApproved(script)) return null;
+  await ensureScriptSandbox();
+  if (!ensurePanelExecutionApproved(script)) return null;
+  const epoch = executionEpoch;
   const key = cacheKey(script);
   if (stoppedScripts.get(script.id) === key) return null;
   stoppedScripts.delete(script.id);
   const hit = handlerCache.get(script.id);
   if (hit && hit.key === key) return hit.handlers;
+  disposeJavascriptSandboxes(script.id);
   clearListeners(script.id);
   clearReactive(script.id);
   clearMidiFiltersFor(script.id);
   const handlers = await getHandlers(script);
+  if (epoch !== executionEpoch || !ensurePanelExecutionApproved(script)) return null;
   // The script record is kept alongside its handlers because the cache IS the loaded set: at
   // teardown the panel it belonged to may already have been switched away from, so the declared
   // event has to come from here rather than from whatever is active by then.
@@ -7841,7 +7887,7 @@ export function destroyLoadedScripts() {
 
   for (const entry of loaded) {
     const s = entry?.script;
-    if (!s || s.enabled === false || s.event !== 'onPanelDestroy') continue;
+    if (!s || s.enabled === false || s.event !== 'onPanelDestroy' || !ensurePanelExecutionApproved(s)) continue;
     const fn = entry.handlers?.onPanelDestroy;
     if (typeof fn !== 'function') continue;
     // Synchronous on purpose: a page unload will not wait for a promise, and a teardown hook that
@@ -7861,6 +7907,12 @@ export function destroyLoadedScripts() {
 
 /** Drop all cached handlers, listeners and timers — the script set or the panel changed. */
 function resetScriptState() {
+  executionEpoch += 1;
+  disposeJavascriptSandboxes();
+  if (luaEnginePromise) {
+    luaEnginePromise.then(lua => lua.global.close(), () => {});
+    luaEnginePromise = null;
+  }
   handlerCache.clear();
   listeners.length = 0;
   watchers.length = 0;
@@ -7905,6 +7957,7 @@ async function invokeHandler(script, hook = null, payload = undefined) {
  * usually the thing being debugged. Event dispatch takes the cached path instead.
  */
 export async function runScript(script, hook = null, payload = undefined) {
+  disposeJavascriptSandboxes(script.id);
   handlerCache.delete(script.id);
   stoppedScripts.delete(script.id);   // pressing Run is asking to try again, stopped or not
   return invokeHandler(script, hook, payload);
@@ -7958,17 +8011,10 @@ function scriptsForPanel(panel) {
   if (host) return host.scripts ?? [];
   const pid = panel?.id;
   if (pid == null) return [];
-  // A panel that arrived from a file or a package runs its scripts only once this computer trusts
-  // the code it arrived with: they reach the native bridge, and must not run because Preview was
-  // pressed (release audit C-08; stores/scriptTrust.js). Edits do not lift the gate — only the
-  // author's "Run scripts" does — and scripts written here were never gated.
-  let scripts;
-  if (live.editOverride && String(live.editOverride.panelId) === String(pid)) scripts = live.editOverride.scripts;
-  else {
-    const doc = get(scriptDocuments).find((d) => String(d.panelId) === String(pid));
-    scripts = ((doc ? doc.scripts : panel.scripts) ?? []).filter(isSourceScript);
-  }
-  return scriptsAllowed(panel, scripts) ? scripts : [];
+  if (live.editOverride && String(live.editOverride.panelId) === String(pid)) return live.editOverride.scripts;
+  const doc = get(scriptDocuments).find((d) => String(d.panelId) === String(pid));
+  if (doc) return (doc.scripts ?? []).filter(isSourceScript);
+  return (panel.scripts ?? []).filter(isSourceScript);
 }
 
 /** Source scripts for the active panel, including those embedded in the saved panel. */
@@ -7977,6 +8023,52 @@ function activeScripts() {
   // made ordinary preview silently ignore every embedded onPanelLoad/onClick handler.
   // Use the same precedence as exports: live override, bound workspace, panel document.
   return scriptsForPanel(livePanel());
+}
+
+let pendingApprovalScript = null;
+function executionRequest(extraScript = null) {
+  const panel = livePanel();
+  const scripts = activeScripts();
+  const effective = extraScript
+    ? [...scripts.filter(s => s.id !== extraScript.id), extraScript] : [...scripts];
+  // Canonical order makes explicit Run and event dispatch use the same approval.
+  effective.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  const embedded = flatControls(panel?.controls ?? []).flatMap(c => c?._children?.Scripts?.scripts ?? []);
+  const all = [...effective, ...embedded];
+  const extensions = [...registeredExtensions(), ...(panel?.scripting?.extensions ?? [])];
+  const languages = all.filter(s => s.enabled !== false && isSourceScript(s)).map(s => String(s.language).toLowerCase());
+  const hasPython = languages.some(l => ['python', 'py'].includes(l));
+  const hasNative = hasPython || languages.some(l => ['cpp', 'c++', 'csharp', 'cs', 'c#', 'java'].includes(l))
+    || extensions.some(e => typeof e.prelude?.python === 'string' && e.prelude.python.trim());
+  return { key: String(panel?.id ?? 'script-workspace'), name: panel?.name ?? 'this panel',
+    hasPython, hasNative,
+    hasCode: all.some(s => s.enabled !== false && isSourceScript(s)) || extensions.length > 0,
+    fingerprint: executionFingerprint(all, extensions) };
+}
+
+export function ensurePanelExecutionApproved(extraScript = null, forExport = false) {
+  // A shipped plug-in is already an executable the user installed; its native
+  // engine runs the same code window-closed. The editor must never infer trust
+  // from fields supplied by an imported document.
+  if (host) return true;
+  const request = executionRequest(extraScript);
+  const nativeRequired = request.hasPython || (forExport && request.hasNative);
+  const allowed = !request.hasCode || (isExecutionApproved(request.key, request.fingerprint)
+    && (!nativeRequired || isNativeExecutionApproved(request.key, request.fingerprint)));
+  if (!allowed) pendingApprovalScript = extraScript;
+  scriptExecutionStatus.set({ blocked: !allowed, name: request.name, hasNative: request.hasNative, nativeRequired });
+  return allowed;
+}
+
+export function approveCurrentPanelScripts(extraScript = pendingApprovalScript, { allowNative = false } = {}) {
+  const request = executionRequest(extraScript);
+  approveExecution(request.key, request.fingerprint, allowNative);
+  pendingApprovalScript = null;
+  if (!ensurePanelExecutionApproved(extraScript)) return;
+  if (live.inited && get(previewModeEnabled) === true) {
+    live.prevPreviewOn = false;
+    onPreviewModeChanged(true);
+  }
 }
 
 /**
@@ -8088,6 +8180,7 @@ function drainInteractionEvents() {
 
 async function dispatchEvents(events, { inbound = false } = {}) {
   if (!events.length) return;
+  if (!ensurePanelExecutionApproved()) { resetScriptState(); return; }
   const scripts = activeScripts();
   live.dispatching = true;
   if (inbound) origin.inboundDepth += 1;
@@ -8134,6 +8227,7 @@ async function dispatchEvents(events, { inbound = false } = {}) {
 
 function onPanelsChanged() {
   if (live.dispatching) return;            // re-entry from our own set() — ignore
+  if (!ensurePanelExecutionApproved()) { resetScriptState(); snapshotValues(); return; }
   const panel = livePanel();
   if (!panel) return;
   if (!live.enabledGlobal) { snapshotValues(); return; }   // keep snapshot fresh while paused
@@ -8411,8 +8505,11 @@ function onPreviewSessionsChanged(sessions) {
 /* --- source 3: preview mode flag (lifecycle) --- */
 
 function onPreviewModeChanged(on) {
+  if (on && !ensurePanelExecutionApproved()) {
+    live.prevPreviewOn = false;
+    return;
+  }
   if (live.enabledGlobal && on && !live.prevPreviewOn) {
-    forgetDeclinedScripts();               // pressing Preview again is asking again
     seedSessionSnapshot();                 // don't fire interaction events for the live snapshot
     const key = String(live.activePanelId ?? '');
     const firstTime = !live.readyFired.has(key);
@@ -8677,6 +8774,7 @@ function onDeviceRuntimeStateChanged(state) {
 export function initPanelRuntime() {
   if (live.inited) return;
   live.inited = true;
+  setExportApprovalCheck(panel => String(panel?.id) === String(livePanel()?.id) && ensurePanelExecutionApproved(null, true));
   live.activePanelId = get(scriptRuntimePanelId);
   live.prevPreviewOn = get(previewModeEnabled) === true;
   snapshotValues();
@@ -8690,8 +8788,12 @@ export function initPanelRuntime() {
     resetScriptState();        // another panel's scripts, listeners and timers are not ours
     snapshotValues();          // switching panels shouldn't fire spurious changes
     seedSessionSnapshot();
+    ensurePanelExecutionApproved();
   }));
   live.unsubs.push(panels.subscribe(() => onPanelsChanged()));
+  live.unsubs.push(scriptDocuments.subscribe(() => {
+    if (!ensurePanelExecutionApproved()) resetScriptState();
+  }));
   live.unsubs.push(panelPreviewSessions.subscribe((s) => onPreviewSessionsChanged(s)));
   live.unsubs.push(previewModeEnabled.subscribe((on) => onPreviewModeChanged(on === true)));
   live.unsubs.push(onDumpMessageParsed((payload) => onDumpParsed(payload)));
@@ -8726,6 +8828,7 @@ export function setLiveScripts(scripts, panelId = null) {
   // survives the swap are caught by the cache key; a script that disappears is not, and its
   // listeners would go on firing for a script the panel no longer has.
   resetScriptState();
+  ensurePanelExecutionApproved();
 }
 
 /**

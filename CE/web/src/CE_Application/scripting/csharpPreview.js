@@ -1,4 +1,5 @@
-import { scriptLoopGuard } from './scriptWatchdog.js';
+import { withPreviewBudget, previewStep, PreviewLimitError, previewAllocation } from './previewBudget.js';
+
 // csharpPreview.js — interpreter for the C# *behavior-handler subset*, so C# scripts run live in
 // the WebView preview (the real C# would be compiled into a native export). Mirrors cppPreview's
 // design, adapted to C# idioms: var, foreach, => lambdas, string interpolation $"…", List/Dictionary
@@ -454,15 +455,16 @@ function applyBin(op, a, b) {
 }
 
 function makeLambda(node, env) {
-  return (...args) => {
+  return (...args) => withPreviewBudget(() => {
     const fenv = new Env(env);
     node.params.forEach((p, i) => fenv.define(p, args[i]));
     if (node.body.expr) return evalNode(node.body.expr, fenv);
     try { for (const s of node.body.block) execStmt(s, fenv); } catch (e) { if (e instanceof ReturnSignal) return e.value; throw e; }
-  };
+  });
 }
 
 function evalNode(node, env) {
+  previewStep();
   switch (node.type) {
     case 'num': return node.value;
     case 'str': return node.value;
@@ -475,7 +477,7 @@ function evalNode(node, env) {
       throw new Error(`'${node.name}' is not defined`);
     }
     case 'array': return node.elems.map((e) => evalNode(e, env));
-    case 'arrayNew': return new Array(Math.max(0, (node.len ? evalNode(node.len, env) : 0) | 0)).fill(0);
+    case 'arrayNew': return new Array(previewAllocation(node.len ? evalNode(node.len, env) : 0)).fill(0);
     case 'seq': { let v; for (const e of node.list) v = evalNode(e, env); return v; }
     case 'lambda': return makeLambda(node, env);
     case 'interp': return node.parts.map((p) => csStr(evalNode(p, env))).join('');
@@ -531,7 +533,7 @@ function instantiate(def, args, env) {
 }
 
 function execStmt(node, env) {
-  scriptLoopGuard();   // the preview watchdog: an endless loop stops instead of hanging the editor (C-57)
+  previewStep();
   switch (node.type) {
     case 'empty': return;
     case 'exprStmt': evalNode(node.expr, env); return;
@@ -553,7 +555,7 @@ function execStmt(node, env) {
     case 'try': {
       try { execStmt(node.block, new Env(env)); }
       catch (e) {
-        if (e instanceof ReturnSignal || e === BREAK || e === CONTINUE) { if (node.fin) execStmt(node.fin, new Env(env)); throw e; }
+        if (e instanceof PreviewLimitError || e instanceof ReturnSignal || e === BREAK || e === CONTINUE) { if (node.fin) execStmt(node.fin, new Env(env)); throw e; }
         if (node.catches.length) { const c = node.catches[0]; const inner = new Env(env); inner.define(c.param ?? '__exc', e instanceof CsThrow ? e.value : { Message: String(e?.message ?? e) }); execStmt(c.body, inner); }
         else if (!node.fin) throw e;
       }
@@ -662,7 +664,8 @@ function extractGlobals(toks, program) {
   return globals;
 }
 
-function runBody(body, params, program, thisObj, args) {
+function runBody(...args) { return withPreviewBudget(() => runBodyWithinBudget(...args)); }
+function runBodyWithinBudget(body, params, program, thisObj, args) {
   const env = new Env(null);
   env.define('__program', program ?? null);
   env.define('__print', program?.print ?? (() => {}));
@@ -683,6 +686,10 @@ function runBody(body, params, program, thisObj, args) {
 /* --------------------------------------------------------------------------- public */
 
 export function compileCsharp(source) {
+  if (String(source ?? '').length > 1024 * 1024) return { handlers: new Map(), diagnostics: ['Script source limit exceeded'] };
+  return withPreviewBudget(() => compileCsharpWithinBudget(source));
+}
+function compileCsharpWithinBudget(source) {
   const diagnostics = []; const handlers = new Map();
   const program = { funcs: new Map(), classes: new Map(), enums: new Map(), globals: new Map(), print: null };
   let toks;

@@ -1,4 +1,5 @@
 #include "PlayerHost.h"
+#include "TrustedWebBrowser.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
 #include "BinaryData.h" // PlayerWebData — the embedded web bundle (player.html + assets)
 
@@ -98,10 +99,10 @@ std::optional<juce::WebBrowserComponent::Resource> providePlayerResource (const 
     return std::nullopt;
 }
 
-class PlayerWebBrowserComponent final : public juce::WebBrowserComponent
+class PlayerWebBrowserComponent final : public ceditor::TrustedWebBrowser
 {
 public:
-    using juce::WebBrowserComponent::WebBrowserComponent;
+    using ceditor::TrustedWebBrowser::TrustedWebBrowser;
     std::function<void (const juce::String&)> onNetworkError;
 
     bool pageLoadHadNetworkError (const juce::String& errorInfo) override
