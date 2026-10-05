@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Five HoSTage features as one CTRL49 screen-lab preset, in the Midnight 2020 style:
 
-    python make_feature_mockups.py
+    python make_feature_mockups.py              # both sizes
+    python make_feature_mockups.py slim         # one of them: full or slim
 
   0 SOUND ATLAS  the library as a map, brightness across and attack up; a box is a query
   1 MOTION       modulation you can watch: where a parameter is set, and where it is now
@@ -10,6 +11,11 @@
   4 CHORDS       the chord held, its place in the key, the next chords on the pads
 
 and the colour of the screen is the colour of the sound picked on the atlas.
+
+It is made in two sizes for the stress test (PROFILES): full, and slim, which is smaller in every
+way that might find the keyboard's limit - the script (comments out, a quarter of the library),
+the draw calls (wider graph columns), the image memory (32 knob frames) and the frame rate. The
+slim one goes to hostage-features-slim/.
 
 hostage-features/ gets what the screen lab's preset mode loads:
 
@@ -47,13 +53,19 @@ P = dict(Midnight.palette)
 
 # --- the contract with the host and with FeatureSkin.lua -----------------------------------------------
 
-FPS = 15
 PAGES = ['Sound Atlas', 'Motion', 'Capture', 'Stage', 'Chords']
 TITLES = ['SOUND ATLAS', 'MODULATION', 'CAPTURE', 'STAGE', 'CHORDS']
 ENCODERS = [5, 8, 5, 1, 2]
 ASSETS = [(576, 'panels.png'), (578, 'tint.png'), (580, 'parts.png')]
-KNOB, KNOB_FRAMES = 80, 64
-TINT_H = KNOB * KNOB_FRAMES + 64
+KNOB = 80
+
+# The two sizes. Each line is one of the things the stress test is after: the frame rate, the knob
+# strip's frames (image memory), the library's size (script size, Lua memory and the search), the
+# graph columns' width (draw calls), and whether the script keeps its comments and indentation.
+PROFILES = {
+    'full': dict(suffix='', name='', fps=15, knob_frames=64, sounds=1200, scope_step=2, mini_group=1, minify=False),
+    'slim': dict(suffix='-slim', name=' Slim', fps=10, knob_frames=32, sounds=300, scope_step=4, mini_group=2, minify=True),
+}
 
 DEFAULTS = [
     [70, 92, 40, 16, 40, 64, 64, 64],           # ATLAS: crosshair, box, the second nearest, morph
@@ -74,10 +86,10 @@ PADS = (190, 44)
 CELL_BAR_Y = 239
 
 LAYOUT = {
-    'pages': len(PAGES), 'fps': FPS, 'defaults': DEFAULTS,
+    'pages': len(PAGES), 'defaults': DEFAULTS,
     'bg': [[577, 0], [577, 272], [577, 544], [581, 0], [581, 272]],
-    'title': [18, 5, 250, 20], 'head': [170, 5, 296, 20], 'foot': [14, 254, 380, 16],
-    'dots': [410, 260, 12, 8, 4], 'bar': [6, 8, 4, 14],
+    'title': [18, 5, 250, 20], 'head': [170, 5, 296, 20], 'foot': [14, 254, 286, 16],
+    'dots': [410, 260, 12, 8, 4], 'bar': [6, 8, 4, 14], 'diag': [300, 255, 104, 12],
     'cell_label_y': 210, 'cell_value_y': 221, 'cell_bar_y': CELL_BAR_Y,
     'map': list(MAP), 'list': list(LIST),
     'knob_x': KNOB_X, 'knob_y': KNOB_Y, 'knob_label_y': 34, 'knob_value_y': 126,
@@ -86,18 +98,32 @@ LAYOUT = {
     'kb': list(KB), 'pads': list(PADS),
 }
 
-SPRITE_Y = KNOB * KNOB_FRAMES
-SPRITES = {
-    'ring': (0, SPRITE_Y, 9, 9), 'ring_big': (10, SPRITE_Y, 15, 15), 'dot': (26, SPRITE_Y, 5, 5),
-    'dot_big': (32, SPRITE_Y, 9, 9), 'puck': (42, SPRITE_Y, 11, 11), 'rec': (54, SPRITE_Y, 8, 8),
-    'key_c': (0, SPRITE_Y + 16, 19, WHITE_H), 'key_d': (20, SPRITE_Y + 16, 19, WHITE_H),
-    'key_e': (40, SPRITE_Y + 16, 19, WHITE_H), 'key_black': (60, SPRITE_Y + 16, BLACK_W, BLACK_H),
-}
+
+
+def layout(prof):
+    return dict(LAYOUT, fps=prof['fps'], knob_frames=prof['knob_frames'], scope_step=prof['scope_step'],
+                mini_group=prof['mini_group'])
+
+
+def sprites(frames):
+    """The coverage sprites, under the knob strip's last frame."""
+    y = KNOB * frames
+    return {
+        'ring': (0, y, 9, 9), 'ring_big': (10, y, 15, 15), 'dot': (26, y, 5, 5),
+        'dot_big': (32, y, 9, 9), 'puck': (42, y, 11, 11), 'rec': (54, y, 8, 8),
+        'key_c': (0, y + 16, 19, WHITE_H), 'key_d': (20, y + 16, 19, WHITE_H),
+        'key_e': (40, y + 16, 19, WHITE_H), 'key_black': (60, y + 16, BLACK_W, BLACK_H),
+    }
+
+
+def tint_height(frames):
+    return KNOB * frames + 64
+
 
 ROLES = {   # text role: (font, size), horizontal justification (0 left, 1 centre, 2 right)
     'title': ((10, 15), 0), 'head': ((9, 11), 2), 'foot': ((9, 9), 0), 'name': ((10, 18), 1),
     'label': ((10, 9), 1), 'cell': ((9, 13), 1), 'small': ((10, 9), 1), 'value': ((9, 14), 1),
-    'tag': ((9, 10), 0), 'scope': ((9, 9), 0), 'tagr': ((9, 10), 2), 'line': ((9, 14), 0), 'banner': ((10, 13), 1),
+    'tag': ((9, 10), 0), 'scope': ((9, 9), 0), 'diag': ((9, 8), 2), 'tagr': ((9, 10), 2), 'line': ((9, 14), 0), 'banner': ((10, 13), 1),
     'song': ((10, 20), 0), 'bpm': ((9, 20), 2), 'section': ((10, 40), 0), 'huge': ((7, 60), 1),
     'next': ((10, 18), 0), 'big': ((10, 48), 0), 'key': ((10, 16), 1), 'pad': ((10, 12), 1),
 }
@@ -126,12 +152,13 @@ ADJECTIVES = ['Warm', 'Glassy', 'Dusty', 'Bright', 'Hollow', 'Soft', 'Gritty', '
               'Velvet', 'Broken', 'Lush', 'Thin', 'Wide', 'Cold']
 
 
-def library():
+def library(count=1200):
+    """The invented library, `count` sounds in the same proportions (1,200 in full)."""
     rng = random.Random(49)
     sounds = []
     for cat, x, y, sx, sy, n in CLUSTERS:
         k = CATEGORIES.index(cat)
-        for _ in range(n):
+        for _ in range(round(n * count / 1200)):
             if x is None:
                 px, py = rng.uniform(250, 3900), rng.uniform(200, 3950)
             else:
@@ -241,8 +268,8 @@ PAD_DEGREES = [
 ]
 
 
-def data():
-    sounds = library()
+def data(prof):
+    sounds = library(prof['sounds'])
     sine = [int(round(127 * math.sin(2 * math.pi * i / 64))) for i in range(64)]
     return {
         'alphabet': ALPHABET, 'atlas': encode(sounds), 'count': len(sounds), 'ramp': RAMP,
@@ -413,16 +440,16 @@ def black_key():
     return mask(BLACK_W, BLACK_H, lambda d, s: d.rounded_rectangle((1 * s, 0, (BLACK_W - 1) * s - 1, (BLACK_H - 1) * s - 1), 1.5 * s, fill=255))
 
 
-def tint_atlas():
-    strip = Image.new('L', (KNOB, TINT_H), 0)
-    for f in range(KNOB_FRAMES):
-        strip.paste(knob(-150 + 300 * f / (KNOB_FRAMES - 1)), (0, f * KNOB))
+def tint_atlas(frames):
+    strip = Image.new('L', (KNOB, tint_height(frames)), 0)
+    for f in range(frames):
+        strip.paste(knob(-150 + 300 * f / (frames - 1)), (0, f * KNOB))
     pieces = {'ring': ring(9, 3.4, 1.5), 'ring_big': ring(15, 6.0, 2.0), 'dot': dot(5, 2.2),
               'dot_big': dot(9, 3.8), 'puck': puck(), 'rec': dot(8, 3.6),
               'key_c': lit_key(False, True), 'key_d': lit_key(True, True), 'key_e': lit_key(True, False),
               'key_black': black_key()}
     for name, im in pieces.items():
-        x, y, w, h = SPRITES[name]
+        x, y, w, h = sprites(frames)[name]
         assert im.size == (w, h), (name, im.size, (w, h))
         strip.paste(im, (x, y))
     # the format the CTRL49 tints: 8-bit palette of 256 greys, index = grey = coverage
@@ -459,32 +486,105 @@ def lua_table(name, d):
     return '\n'.join(lines)
 
 
-def skin_lua(D):
+GENERATED = re.compile(r'-- BEGIN GENERATED.*?-- END GENERATED', re.S)
+
+
+def strip_lua(code):
+    """Lua without its comments, indentation and blank lines. Strings are copied as they are."""
+    out, i, n = [], 0, len(code)
+    while i < n:
+        c = code[i]
+        long = re.match(r'\[(=*)\[', code[i:i + 64]) if c == '[' else None
+        if c in '"\'':
+            j = i + 1
+            while code[j] != c:
+                j += 2 if code[j] == '\\' else 1
+            out.append(code[i:j + 1])
+            i = j + 1
+        elif code.startswith('--', i):
+            m = re.match(r'--\[(=*)\[', code[i:i + 64])
+            if m:
+                i = code.index(']' + m.group(1) + ']', i) + len(m.group(1)) + 2
+            else:
+                j = code.find('\n', i)
+                i = n if j < 0 else j
+        elif c == '[' and long:
+            end = code.index(']' + long.group(1) + ']', i) + len(long.group(1)) + 2
+            out.append(code[i:end])
+            i = end
+        else:
+            out.append(c)
+            i += 1
+    lines = [line.strip() for line in ''.join(out).split('\n')]
+    return squeeze_lua('\n'.join(line for line in lines if line))
+
+
+SYMBOLS = set('=,(){}[]+-*/<>%#~;:')
+
+
+def squeeze_lua(code):
+    """Drops the spaces beside operators and brackets (`a = b + 1` -> `a=b+1`), outside strings.
+    Two spaces it keeps: between two minus signs (`- -1` would become a comment) and between a
+    digit and a dot (`1 ..` would become a malformed number). The check parses the result and
+    compares it with the template as code, so a squeeze that changed a token would fail there."""
+    out, i, n = [], 0, len(code)
+    while i < n:
+        c = code[i]
+        if c in '"\'':
+            j = i + 1
+            while code[j] != c:
+                j += 2 if code[j] == '\\' else 1
+            out.append(code[i:j + 1])
+            i = j + 1
+            continue
+        if c == ' ':
+            prev = out[-1][-1] if out else ''
+            nxt = code[i + 1] if i + 1 < n else ''
+            near = prev in SYMBOLS or nxt in SYMBOLS or prev == '.' or nxt == '.'
+            keep = (prev == '-' and nxt == '-') or (prev.isdigit() and nxt == '.') or (prev == '.' and nxt.isdigit())
+            if near and not keep:
+                i += 1
+                continue
+        out.append(c)
+        i += 1
+    return ''.join(out)
+
+
+def minify_lua(source):
+    """The same script with its comments and indentation taken out, for the slim builds: the size
+    of the script is one of the things under test. The GENERATED block is kept as it is, so the
+    check can still read it; the check compares the rest with the template as code, not as text."""
+    m = GENERATED.search(source)
+    return strip_lua(source[:m.start()]) + '\n' + m.group(0) + '\n' + strip_lua(source[m.end():]) + '\n'
+
+
+def skin_lua(D, prof):
     theme = dict(THEME)
-    theme['name'] = NAME.upper()
+    theme['name'] = (NAME + prof['name']).upper()
     theme['titles'] = TITLES
     theme['roles'] = sorted(ROLES)
     theme['fonts'] = {k: list(f) for k, (f, _) in ROLES.items()}
     theme['aligns'] = {k: a for k, (_, a) in ROLES.items()}
     block = '\n'.join([
         '-- BEGIN GENERATED (make_feature_mockups.py writes this block)',
-        '-- %s. Generated: edit make_feature_mockups.py and FeatureSkin.lua, then regenerate.' % NAME,
-        lua_table('T', theme), lua_table('L', LAYOUT),
-        lua_table('S', {k: list(v) for k, v in SPRITES.items()}),
+        '-- %s. Generated: edit make_feature_mockups.py and FeatureSkin.lua, then regenerate.' % (NAME + prof['name']),
+        lua_table('T', theme), lua_table('L', layout(prof)),
+        lua_table('S', {k: list(v) for k, v in sprites(prof['knob_frames']).items()}),
         lua_table('D', D),
         '-- END GENERATED'])
     template = open(TEMPLATE, encoding='utf-8').read()
-    pattern = re.compile(r'-- BEGIN GENERATED.*?-- END GENERATED', re.S)
-    assert len(pattern.findall(template)) == 1, 'FeatureSkin.lua must hold exactly one GENERATED block'
-    return pattern.sub(lambda _: block, template)
+    assert len(GENERATED.findall(template)) == 1, 'FeatureSkin.lua must hold exactly one GENERATED block'
+    lua = GENERATED.sub(lambda _: block, template)
+    return minify_lua(lua) if prof['minify'] else lua
 
 
-def manifest():
-    out = ['; %s - a CTRL49 screen-lab preset. Generated by make_feature_mockups.py.' % NAME,
+def manifest(prof):
+    name = NAME + prof['name']
+    out = ['; %s - a CTRL49 screen-lab preset. Generated by make_feature_mockups.py.' % name,
            '; Run: Ctrl49ScreenLab.exe preset "<this file>"   (--check validates without MIDI)',
            '; The skin draws no envelope; envelopePage only has to name a page.',
-           '[Preset]', 'version=1', 'name=%s' % NAME, 'width=%d' % W, 'height=%d' % H,
-           'lua=Skin.lua', 'pages=%d' % len(PAGES), 'envelopePage=1', 'fps=%d' % FPS,
+           '[Preset]', 'version=1', 'name=%s' % name, 'width=%d' % W, 'height=%d' % H,
+           'lua=Skin.lua', 'pages=%d' % len(PAGES), 'envelopePage=1', 'fps=%d' % prof['fps'],
            'assets=%d' % len(ASSETS), '']
     for i, (ident, name) in enumerate(ASSETS):
         out += ['[Asset%d]' % i, 'id=%d' % ident, 'file=%s' % name, '']
@@ -495,26 +595,40 @@ def manifest():
     return '\n'.join(out)
 
 
-def main():
-    folder = os.path.join(HERE, SLUG)
+def build(prof):
+    folder = os.path.join(HERE, SLUG + prof['suffix'])
     os.makedirs(folder, exist_ok=True)
-    D, sounds = data()
+    D, sounds = data(prof)
     panels = new(W, 3 * H)
     for p, im in enumerate([atlas_bg(sounds), motion_bg(), capture_bg()]):
         panels.paste(im, (0, p * H))
     panels.save(os.path.join(folder, 'panels.png'), optimize=True)
-    tint_atlas().save(os.path.join(folder, 'tint.png'))
+    tint_atlas(prof['knob_frames']).save(os.path.join(folder, 'tint.png'))
     parts = new(W, 2 * H)
     for p, im in enumerate([stage_bg(), chords_bg()]):
         parts.paste(im, (0, p * H))
     parts.save(os.path.join(folder, 'parts.png'), optimize=True)
     with open(os.path.join(folder, 'Skin.lua'), 'w', encoding='utf-8', newline='\n') as f:
-        f.write(skin_lua(D))
+        f.write(skin_lua(D, prof))
     with open(os.path.join(folder, 'Design.ctrl49preset'), 'w', encoding='ascii', newline='') as f:
-        f.write(manifest())
-    kib = (W * 3 * H + KNOB * TINT_H + W * 2 * H) * 4 / 1024
-    print('%-18s %s  decoded about %d KiB (as RGBA)' % (SLUG, folder, kib))
+        f.write(manifest(prof))
+    report(folder, KNOB * tint_height(prof['knob_frames']))
+
+
+def report(folder, tint_pixels):
+    """What a design asks of the keyboard: its script, its uploads, its decoded images."""
+    lua = os.path.getsize(os.path.join(folder, 'Skin.lua'))
+    upload = sum(os.path.getsize(os.path.join(folder, f)) for f in ('panels.png', 'tint.png', 'parts.png'))
+    rgba = (W * 3 * H + tint_pixels + W * 2 * H) * 4
+    grey = (W * 3 * H + W * 2 * H) * 4 + tint_pixels
+    print('%-22s Skin.lua %3d KB, uploads %3d KB, decoded %d KiB (%d KiB if tint.png is one byte a pixel)'
+          % (os.path.basename(folder), lua // 1000, upload // 1000, rgba // 1024, grey // 1024))
+
+
+def main(argv):
+    for name in argv or list(PROFILES):
+        build(PROFILES[name])
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])

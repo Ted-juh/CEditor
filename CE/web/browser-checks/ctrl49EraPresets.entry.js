@@ -127,8 +127,12 @@ async function design(name) {
     function get_byte(a, i) local b = string.byte(a, i + 1); if b == nil then return 0 else return b end end
     function __invoke(name, t) local s = ""; for i = 1, #t do s = s .. string.char(t[i]) end; _G[name](s) end`);
   const invoke = lua.global.get('__invoke');
+  // A page may show what the keyboard is being asked to do (draw calls, Lua memory); in a
+  // preview those would be the browser's numbers, so pages hide them while this is set.
+  lua.global.set('CTRL49_PREVIEW', true);
   invoke('init', []);
   return {
+    preview(on) { lua.global.set('CTRL49_PREVIEW', on); },
     call(fn, bytes) { invoke(fn, bytes); },
     // A redraw's call counts, and every text it drew, in order.
     draw() {

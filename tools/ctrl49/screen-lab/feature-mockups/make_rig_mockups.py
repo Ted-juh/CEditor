@@ -2,7 +2,8 @@
 """Five more HoSTage pages, about the rig, as one CTRL49 screen-lab preset in the Midnight 2020
 style:
 
-    python make_rig_mockups.py
+    python make_rig_mockups.py                  # both sizes
+    python make_rig_mockups.py slim             # one of them: full or slim
 
   0 LAYERS      which sound is where: every part's key range over the 49 keys, and who answers
   1 EFFECTS     what every effect is doing, measured from its input and output
@@ -11,6 +12,10 @@ style:
   4 CHANGES     the sound against its saved version, A/B, undo one change, the edit history
 
 and the colour of the screen is the colour of the part picked on LAYERS.
+
+Like the first preset it comes in two sizes for the stress test (PROFILES): full, and slim
+(hostage-rig-slim/), with the script stripped of comments, a quarter of the library, half the
+graph columns on Effects and 10 redraws a second instead of 15.
 
 hostage-rig/ gets what the screen lab's preset mode loads:
 
@@ -36,16 +41,21 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from make_feature_mockups import (ALPHABET, CATEGORIES, ADJECTIVES, P, RAMP, H, W, blur, card,  # noqa: E402
-                                  cell_tracks, disc, dot, lua_table, mask, mix, new, paint, put,
-                                  rect, ring, rrect)
+from make_feature_mockups import (ALPHABET, CATEGORIES, ADJECTIVES, GENERATED, P, RAMP, H, W, blur,  # noqa: E402
+                                  card, cell_tracks, disc, dot, lua_table, mask, minify_lua, mix, new,
+                                  paint, put, rect, report, ring, rrect)
 
 TEMPLATE = os.path.join(HERE, 'RigSkin.lua')
 SLUG, NAME = 'hostage-rig', 'HoSTage Rig'
 
 # --- the contract with the host and with RigSkin.lua ---------------------------------------------------
 
-FPS = 15
+# The two sizes: the frame rate, the library's size (script, Lua memory), the Effects graphs'
+# column steps (draw calls), and whether the script keeps its comments and indentation.
+PROFILES = {
+    'full': dict(suffix='', name='', fps=15, never=720, spec_step=1, time_step=1, minify=False),
+    'slim': dict(suffix='-slim', name=' Slim', fps=10, never=180, spec_step=2, time_step=2, minify=True),
+}
 PAGES = ['Layers', 'Effects', 'Soundcheck', 'Discover', 'Changes']
 TITLES = ['LAYERS', 'EFFECTS', 'SOUNDCHECK', 'DISCOVER', 'CHANGES']
 ENCODERS = [6, 6, 3, 4, 4]
@@ -111,10 +121,10 @@ DEFAULTS = [
 ]
 
 LAYOUT = {
-    'pages': len(PAGES), 'fps': FPS, 'defaults': DEFAULTS,
+    'pages': len(PAGES), 'defaults': DEFAULTS,
     'bg': [[577, 0], [577, 272], [577, 544], [581, 0], [581, 272]],
-    'title': [18, 5, 250, 20], 'head': [170, 5, 296, 20], 'foot': [14, 254, 380, 16],
-    'dots': [410, 260, 12, 8, 4], 'bar': [6, 8, 4, 14],
+    'title': [18, 5, 250, 20], 'head': [170, 5, 296, 20], 'foot': [14, 254, 286, 16],
+    'dots': [410, 260, 12, 8, 4], 'bar': [6, 8, 4, 14], 'diag': [300, 255, 104, 12],
     'cell_label_y': 210, 'cell_value_y': 221, 'cell_bar_y': CELL_BAR_Y,
     'rows': list(ROWS), 'kb': list(KB),
     'cards': list(CARDS), 'card_mid': CARD_MID, 'spec': list(SPEC), 'time': list(TIME), 'meas': list(MEAS),
@@ -134,7 +144,7 @@ ROLES = {   # text role: (font, size), horizontal justification (0 left, 1 centr
     'title': ((10, 15), 0), 'head': ((9, 11), 2), 'foot': ((9, 9), 0), 'name': ((10, 18), 1),
     'label': ((10, 9), 1), 'label9': ((10, 9), 0), 'cell': ((9, 13), 1), 'small': ((10, 9), 1),
     'tag': ((9, 10), 0), 'tag9': ((9, 9), 0), 'tagr': ((9, 10), 2), 'tagr9': ((9, 9), 2),
-    'banner': ((10, 13), 1), 'song': ((10, 17), 0), 'pad': ((10, 15), 1),
+    'banner': ((10, 13), 1), 'song': ((10, 17), 0), 'pad': ((10, 15), 1), 'diag': ((9, 8), 2),
 }
 
 THEME = dict(
@@ -219,12 +229,14 @@ PLAYED = [(1900, 3100, 'WARM KEYS 16', 41), (1700, 1150, 'VELVET PAD 3', 37), (2
 NEVER_TOTAL = 11903
 
 
-def never():
+def never(count=720):
+    """The never-opened sounds, `count` of them in the same proportions, nearest to your taste
+    first, and the taste: the load-weighted average of what you play."""
     rng = random.Random(73)
     sounds = []
     for cat, x, y, sx, sy, n in NEVER_CLUSTERS:
         k = CATEGORIES.index(cat)
-        for _ in range(n):
+        for _ in range(round(n * count / 720)):
             if x is None:
                 px, py = rng.uniform(250, 3900), rng.uniform(200, 3950)
             else:
@@ -250,8 +262,8 @@ PARAMS = [  # name, how it reads, its saved value (0-127)
 HISTORY = [[1, 82], [2, 40], [1, 92], [4, 60], [5, 40], [3, 96], [6, 28], [7, 57], [8, 92], [2, 53], [9, 30], [1, 88]]
 
 
-def data():
-    sounds, taste = never()
+def data(prof):
+    sounds, taste = never(prof['never'])
     far = max(math.hypot(x - taste[0], y - taste[1]) for x, y, _, _ in sounds)
     return {
         'notes': ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'],
@@ -437,32 +449,34 @@ def tint_atlas():
 
 # --- the Lua and the manifest -------------------------------------------------------------------------
 
-def skin_lua(D):
+def skin_lua(D, prof):
     theme = dict(THEME)
-    theme['name'] = NAME.upper()
+    theme['name'] = (NAME + prof['name']).upper()
     theme['titles'] = TITLES
     theme['roles'] = sorted(ROLES)
     theme['fonts'] = {k: list(f) for k, (f, _) in ROLES.items()}
     theme['aligns'] = {k: a for k, (_, a) in ROLES.items()}
     block = '\n'.join([
         '-- BEGIN GENERATED (make_rig_mockups.py writes this block)',
-        '-- %s. Generated: edit make_rig_mockups.py and RigSkin.lua, then regenerate.' % NAME,
-        lua_table('T', theme), lua_table('L', LAYOUT),
+        '-- %s. Generated: edit make_rig_mockups.py and RigSkin.lua, then regenerate.' % (NAME + prof['name']),
+        lua_table('T', theme),
+        lua_table('L', dict(LAYOUT, fps=prof['fps'], spec_step=prof['spec_step'], time_step=prof['time_step'])),
         lua_table('S', {k: list(v) for k, v in SPRITES.items()}),
         lua_table('D', D),
         '-- END GENERATED'])
     template = open(TEMPLATE, encoding='utf-8').read()
-    pattern = re.compile(r'-- BEGIN GENERATED.*?-- END GENERATED', re.S)
-    assert len(pattern.findall(template)) == 1, 'RigSkin.lua must hold exactly one GENERATED block'
-    return pattern.sub(lambda _: block, template)
+    assert len(GENERATED.findall(template)) == 1, 'RigSkin.lua must hold exactly one GENERATED block'
+    lua = GENERATED.sub(lambda _: block, template)
+    return minify_lua(lua) if prof['minify'] else lua
 
 
-def manifest():
-    out = ['; %s - a CTRL49 screen-lab preset. Generated by make_rig_mockups.py.' % NAME,
+def manifest(prof):
+    name = NAME + prof['name']
+    out = ['; %s - a CTRL49 screen-lab preset. Generated by make_rig_mockups.py.' % name,
            '; Run: Ctrl49ScreenLab.exe preset "<this file>"   (--check validates without MIDI)',
            '; The skin draws no envelope; envelopePage only has to name a page.',
-           '[Preset]', 'version=1', 'name=%s' % NAME, 'width=%d' % W, 'height=%d' % H,
-           'lua=Skin.lua', 'pages=%d' % len(PAGES), 'envelopePage=1', 'fps=%d' % FPS,
+           '[Preset]', 'version=1', 'name=%s' % name, 'width=%d' % W, 'height=%d' % H,
+           'lua=Skin.lua', 'pages=%d' % len(PAGES), 'envelopePage=1', 'fps=%d' % prof['fps'],
            'assets=%d' % len(ASSETS), '']
     for i, (ident, name) in enumerate(ASSETS):
         out += ['[Asset%d]' % i, 'id=%d' % ident, 'file=%s' % name, '']
@@ -473,10 +487,10 @@ def manifest():
     return '\n'.join(out)
 
 
-def main():
-    folder = os.path.join(HERE, SLUG)
+def build(prof):
+    folder = os.path.join(HERE, SLUG + prof['suffix'])
     os.makedirs(folder, exist_ok=True)
-    D, sounds, taste = data()
+    D, sounds, taste = data(prof)
     panels = new(W, 3 * H)
     for p, im in enumerate([layers_bg(), effects_bg(), soundcheck_bg()]):
         panels.paste(im, (0, p * H))
@@ -487,12 +501,16 @@ def main():
         parts.paste(im, (0, p * H))
     parts.save(os.path.join(folder, 'parts.png'), optimize=True)
     with open(os.path.join(folder, 'Skin.lua'), 'w', encoding='utf-8', newline='\n') as f:
-        f.write(skin_lua(D))
+        f.write(skin_lua(D, prof))
     with open(os.path.join(folder, 'Design.ctrl49preset'), 'w', encoding='ascii', newline='') as f:
-        f.write(manifest())
-    kib = (W * 3 * H + TINT_W * TINT_H + W * 2 * H) * 4 / 1024
-    print('%-18s %s  decoded about %d KiB (as RGBA)' % (SLUG, folder, kib))
+        f.write(manifest(prof))
+    report(folder, TINT_W * TINT_H)
+
+
+def main(argv):
+    for name in argv or list(PROFILES):
+        build(PROFILES[name])
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])

@@ -343,7 +343,7 @@ local function draw_motion ()
         local s = source(k, t)
         local now = clamp(base + depth * 63 * s, 0, 127)
         local colour = D.source_colours[k]
-        draw_image(BUF, TINT, x, L.knob_y, 0, floor(base * 63 / 127 + 0.5) * 80, 80, 80, T.knob)
+        draw_image(BUF, TINT, x, L.knob_y, 0, floor(base * (L.knob_frames - 1) / 127 + 0.5) * 80, 80, 80, T.knob)
         -- the trail from where it is set to where the source has pushed it
         for j = 1, 5 do ring_at(cx, cy, base + (now - base) * j / 6, "dot", colour, 2) end
         ring_at(cx, cy, now, "dot_big", colour, 4)
@@ -355,7 +355,8 @@ local function draw_motion ()
         say(X.scope, SOURCES[k] .. "  " .. SHAPES[k], colour, sxo + 6, syo + 3, sw - 12, 11)
         local mid = syo + 15 + floor((sh - 20) / 2)
         local amp = floor((sh - 22) / 2)
-        local cols = floor((sw - 12) / 2)
+        local step = L.scope_step          -- pixels a column: 2 in full, wider when slimmed
+        local cols = floor((sw - 12) / step)
         local phase
         if k == 1 then phase = t * 0.5 - floor(t * 0.5)
         elseif k == 4 then phase = 1
@@ -366,13 +367,13 @@ local function draw_motion ()
             elseif k == 1 then v = sine(c / cols)
             elseif k == 2 then v = source(2, 4 * c / cols)
             else v = source(3, 4 * c / cols) * 2 - 1 end
-            draw_rect(sxo + 6 + c * 2, mid - floor(v * amp), 2, 2, D.source_dims[k])
+            draw_rect(sxo + 6 + c * step, mid - floor(v * amp), step, 2, D.source_dims[k])
         end
         local pc = clamp(floor(phase * cols), 0, cols - 1)
         local pv = s
         if k == 3 then pv = s * 2 - 1 end
-        draw_rect(sxo + 6 + pc * 2, syo + 15, 1, sh - 20, colour)
-        tint("dot_big", sxo + 6 + pc * 2 - 4, mid - floor(pv * amp) - 4, colour)
+        draw_rect(sxo + 6 + pc * step, syo + 15, 1, sh - 20, colour)
+        tint("dot_big", sxo + 6 + pc * step - 4, mid - floor(pv * amp) - 4, colour)
     end
     local depths = {}
     for k = 1, 4 do
@@ -474,16 +475,22 @@ local function draw_capture ()
     if x_of(selStart) < rx then say(X.tag, "+" .. whole(floor((rx - x_of(selStart)) / (ppb * 4)) + 1) .. " BARS", accent, rx + 2, ry + rh - 13, 60, 11) end
     draw_rect(right, ry, 2, rh, T.now)
     if frame % 16 < 10 then tint("rec", right - 12, ry + 3, T.rec) end
-    -- two minutes at a glance: a column a bar, the visible stretch and the box marked
+    -- two minutes at a glance: a column a bar (or L.mini_group bars when slimmed), the visible
+    -- stretch and the box marked
     local mx, my, mw, mh = L.minimap[1], L.minimap[2], L.minimap[3], L.minimap[4]
-    for j = 0, 59 do
-        local b = nowBar - 59 + j
-        local x = mx + floor(j * mw / 60)
-        local w = floor((j + 1) * mw / 60) - floor(j * mw / 60) - 1
-        local h = clamp(floor(bar_count(b) * (mh - 4) / 13), 1, mh - 4)
-        local c = T.mini
-        if b >= firstBar then c = T.mini_visible end
-        if b * 4 >= selStart and b * 4 < selEnd then c = accent end
+    local g = L.mini_group
+    local n = floor(60 / g)
+    for j = 0, n - 1 do
+        local count, c = 0, T.mini
+        for q = 0, g - 1 do
+            local b = nowBar - 59 + j * g + q
+            count = count + bar_count(b)
+            if b >= firstBar and c == T.mini then c = T.mini_visible end
+            if b * 4 >= selStart and b * 4 < selEnd then c = accent end
+        end
+        local x = mx + floor(j * mw / n)
+        local w = floor((j + 1) * mw / n) - floor(j * mw / n) - 1
+        local h = clamp(floor(count * (mh - 4) / (13 * g)), 1, mh - 4)
         draw_rect(x, my + mh - 2 - h, w, h, c)
     end
     -- E5 keeps: a turn of it files the box as a loop
@@ -650,6 +657,32 @@ local function draw_chords ()
     end
 end
 
+-- --- what the keyboard is being asked to do ------------------------------------------------------
+
+-- For the stress test, in the corner beside the page dots: the draw calls this redraw made, the
+-- Lua heap in KB (collectgarbage), and the firmware's own mem_usage(0) where it has one. The
+-- preview hides it (CTRL49_PREVIEW): its numbers would be the browser's, not the keyboard's.
+local calls, heap, device = 0, -1, -1
+local function counting (f)
+    return function (...)
+        calls = calls + 1
+        return f(...)
+    end
+end
+local function diagnostics ()
+    if CTRL49_PREVIEW then return end
+    if draws % 15 == 0 or heap < 0 then
+        if type(collectgarbage) == "function" then heap = collectgarbage("count") end
+        if type(mem_usage) == "function" and type(pcall) == "function" then
+            local ok, v = pcall(mem_usage, 0)
+            if ok and type(v) == "number" then device = v end
+        end
+    end
+    local s = whole(calls) .. "   " .. whole(heap) .. "K"
+    if device >= 0 then s = s .. "   " .. whole(device) end
+    say(X.diag, s, T.dim, L.diag[1], L.diag[2], L.diag[3], L.diag[4])
+end
+
 -- --- what the host sends -------------------------------------------------------------------------
 
 function init (args)
@@ -663,6 +696,7 @@ function init (args)
         for i = 1, 8 do seen[p][i] = L.defaults[p][i] end
     end
     for i = 1, 8 do enc[i] = seen[1][i] end
+    draw_rect, draw_image, draw_text = counting(draw_rect), counting(draw_image), counting(draw_text)
     ready = true
 end
 
@@ -721,5 +755,7 @@ function draw (args)
         loading()
         return
     end
+    calls = 0
     PAGES[page + 1]()
+    diagnostics()
 end

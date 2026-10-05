@@ -46,7 +46,8 @@ const SPECS = {
   feature: {
     root: 'feature-mockups', tables: ['T', 'L', 'S', 'D'],
     template: 'FeatureSkin.lua', pages: ['atlas', 'motion', 'capture', 'stage', 'chords'], envelope: null,
-    atlases: { 'panels.png': [480, 816], 'tint.png': [80, 5184], 'parts.png': [480, 544] },
+    // the slim build's knob strip has 32 frames, not 64
+    atlases: { 'panels.png': [480, 816], 'tint.png': [[80, 5184], [80, 2624]], 'parts.png': [480, 544] },
     moving: [[1, [0, 4, 8, 12, 16], 4], [2, [0, 4, 8, 12, 16], 4], [3, [0, 4, 8, 12, 16], 3], [4, [0, 4, 8, 12, 16], 4]],
     // the atlas with the biggest box in the crowd, every source at full depth either way, sixteen
     // bars kept, the last song, every key and scale's widest chords
@@ -60,7 +61,7 @@ const SPECS = {
     // The pages answer their encoders: E5 on CAPTURE keeps the box and says so once; the atlas's
     // box finds more sounds the bigger it is, and lists eight; the chord page names the chord the
     // progression holds at that moment, in the key E1 and E2 chose.
-    async answers({ fresh, at, D }) {
+    async answers({ fresh, at, D, fps }) {
       await fresh();
       const inBox = (texts) => Number(texts.find((t) => t.endsWith(' IN BOX')).split(' ')[0]);
       const out = {};
@@ -69,8 +70,8 @@ const SPECS = {
       out.notKept = (await at(2, turned(D[2], { 4: 70 }), 200)).some((t) => t.startsWith('KEPT'));
       const small = await at(0, turned(D[0], { 2: 0 })), big = await at(0, turned(D[0], { 2: 127 }));
       out.boxGrows = inBox(big) > inBox(small);
-      out.listed = big.filter((t) => /^[A-Z][a-z]+ [A-Z][a-z]+ \d+$/.test(t)).length;
-      const chords = await at(4, D[4]), k = chords.indexOf('KEY');
+      out.listed = big.filter((t) => /^[A-Z][a-z]+ [A-Z][A-Za-z]+ \d+$/.test(t)).length;
+      const chords = await at(4, D[4], fps), k = chords.indexOf('KEY');      // one second in: bar 1
       out.chord = chords.slice(k - 2, k);
       out.key = chords[k + 1] ?? null;
       return [out, { kept: 'KEPT 8 BARS AS LOOP A,  QUANTISED 1/16', notKept: false, boxGrows: true, listed: 8,
@@ -81,7 +82,9 @@ const SPECS = {
     root: 'feature-mockups', tables: ['T', 'L', 'S', 'D'],
     template: 'RigSkin.lua', pages: ['layers', 'effects', 'soundcheck', 'discover', 'changes'], envelope: null,
     atlases: { 'panels.png': [480, 816], 'tint.png': [128, 64], 'parts.png': [480, 544] },
-    moving: [[0, [0, 20, 40, 60, 80], 3], [1, [0, 4, 8, 12, 16], 4], [3, [0, 4, 8, 12, 16], 2]],
+    // (Discover after frame 30: the sweep's last turn of E4 keeps a sound, and its banner covers
+    // the map until then)
+    moving: [[0, [0, 20, 40, 60, 80], 3], [1, [0, 4, 8, 12, 16], 4], [3, [40, 44, 48, 52, 56], 2]],
     // every part at its widest and narrowest, every slot at full and none, the song with the most
     // parts, the furthest reach of every kind, every change half heard
     busiest: [[0, [0, 0, 127, 127, 0, 127, 64, 64]], [0, [127, 127, 0, 0, 127, 0, 64, 64]],
@@ -136,7 +139,7 @@ const turned = (values, changes) => Object.assign(values.slice(), changes);
 const EXPECTED = { 'blueprint-1965': 'era', 'dot-matrix-1983': 'era', 'metro-tiles-2012': 'era',
   'midnight-2020': 'era', 'neo-brutal-2023': 'era', 'red-lead-1997': 'era', 'rhythm-box-1980': 'era',
   'swiss-flat-2011': 'era', 'test-bench-1958': 'era', 'walnut-1971': 'era', 'hostage-features': 'feature',
-  'hostage-rig': 'rig' };
+  'hostage-features-slim': 'feature', 'hostage-rig': 'rig', 'hostage-rig-slim': 'rig' };
 const MEMORY_CEILING = 8 * 1024 * 1024;     // the preset loader's software guard, not a device limit
 const MAX_CALLS = 600;
 
@@ -164,6 +167,7 @@ function png(file) {
 }
 
 const block = /-- BEGIN GENERATED[\s\S]*?-- END GENERATED/;
+const code = (text) => JSON.stringify(luaparse.parse(text.replace(block, ''), { luaVersion: '5.2', comments: false }));
 const templates = {};
 const folders = {};
 for (const spec of Object.values(SPECS)) {
@@ -213,7 +217,8 @@ for (const name of names) {
     ids.add(id);
     assert.ok(beside(a.file), `${name}: asset ${a.file} is a file beside the manifest`);
     const info = png(path.join(dir, a.file));
-    assert.deepEqual([info.width, info.height], spec.atlases[a.file], `${name}: ${a.file} has the size the crops assume`);
+    const sizes = Array.isArray(spec.atlases[a.file][0]) ? spec.atlases[a.file] : [spec.atlases[a.file]];
+    assert.ok(sizes.some(([w, h]) => w === info.width && h === info.height), `${name}: ${a.file} (${info.width} x ${info.height}) has a size the crops assume`);
     memory += info.width * info.height * 4;
   }
   assert.ok(memory <= MEMORY_CEILING, `${name}: ${memory} bytes decoded is within the 8 MiB guard`);
@@ -235,7 +240,9 @@ for (const name of names) {
 
   const lua = fs.readFileSync(path.join(dir, p.lua), 'utf8');
   luaparse.parse(lua, { luaVersion: '5.2' });
-  assert.equal(lua.replace(block, ''), templates[spec.template].replace(block, ''),
+  // Compared as code, not text: a slim build is its template with the comments, indentation and
+  // the spaces beside operators taken out, and must parse to the same program.
+  assert.equal(code(lua), code(templates[spec.template]),
     `${name}: Skin.lua is ${spec.template} with only its GENERATED block changed (regenerate, do not hand-edit)`);
   assert.equal(Number(lua.match(/\bfps = (\d+)/)[1]), fps, `${name}: the Lua clock counts the manifest's fps`);
   // Every theme colour, layout value (and, where the template has them, sprite and data value) the
@@ -251,7 +258,7 @@ for (const name of names) {
   }
   const luaDefaults = lua.match(/\bdefaults = \{ (.*) \},\n/)[1];
   assert.equal(luaDefaults, defaults.map((d) => `{ ${d.values.join(', ')} }`).join(', '), `${name}: the Lua knows the manifest's starting values`);
-  manifests[name] = { defaults, memory, spec };
+  manifests[name] = { defaults, memory, spec, fps };
   console.log(`  ${name.padEnd(20)} manifest ok, ${Math.round(memory / 1024)} KiB decoded (conservative)`);
 }
 
@@ -322,9 +329,11 @@ try {
 
     // Every encoder through all 128 positions on every page, the others at their defaults; on
     // an envelope page the host sends a new envelope with each move, so this does too. Then the
-    // ADSR corners, the busiest visits over a run of frames, and the frame counter's wrap.
+    // ADSR corners, the busiest visits over a run of frames, and the frame counter's wrap. A page
+    // that shows its own numbers (draw calls, Lua memory) shows them here, so they are checked too.
     const sweep = await page.evaluate(({ D, enc, envelope, busiest }) => {
       const d = window.d, era = window.era;
+      d.preview(false);
       let most = 0, where = '';
       const draw = (p, values, last, frame = 200) => {
         if (p === envelope) d.call('set_envelope', era.envelope(...values.slice(0, 4)));
@@ -349,6 +358,7 @@ try {
       }
       for (const f of [0, 1, 255, 256, 65535]) for (let p = 0; p < D.length; p++) draw(p, D[p], 7, f);
       for (let p = 0; p < D.length; p++) draw(p, D[p], 0);       // back to the starting values
+      d.preview(true);
       return { most, where, problems: d.problems() };
     }, { D, enc: defaults.map((d) => d.encoders), envelope: spec.envelope, busiest: spec.busiest });
     assert.deepEqual(sweep.problems, [], `${name}: every call inside the screen, the atlases and its text box`);
@@ -391,7 +401,7 @@ try {
     }
 
     if (spec.answers) {
-      const [said, expected] = await spec.answers({ fresh: () => fresh(name), at, D });
+      const [said, expected] = await spec.answers({ fresh: () => fresh(name), at, D, fps: manifests[name].fps });
       assert.deepEqual(said, expected, `${name}: the pages answer their encoders the way they say they do`);
       await fresh(name);
       for (const [p, f, values, label] of spec.moments) {

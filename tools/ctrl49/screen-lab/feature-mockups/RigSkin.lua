@@ -265,7 +265,7 @@ local function draw_layers ()
     elseif splits > 1 then head = whole(splits) .. " SPLITS" end
     head = head .. "   " .. whole(deepest) .. " DEEP"
     if #notes > 0 then head = head .. "   VEL " .. whole(notes[#notes][4]) end
-    chrome(T.titles[1], head, "PLAY: THE ROWS LIGHT FOR THE PARTS THAT ANSWER   E1 PICKS THE PART")
+    chrome(T.titles[1], head, "PLAY: EVERY PART THAT ANSWERS LIGHTS UP   E1 PART")
     -- a line at every split, through the rows down to the keys
     for n = 37, 84 do
         local ends, starts = false, false
@@ -536,7 +536,7 @@ local function draw_effects ()
         if k == sel then inSel, outSel, specIn, specOut = trace, out, spec, after end
         trace, spec = out, after
     end
-    chrome(T.titles[2], fp.name .. "   " .. whole(#slots) .. " EFFECTS", "EVERY PLUG-IN MEASURED BY WHAT IT DOES TO THE SOUND")
+    chrome(T.titles[2], fp.name .. "   " .. whole(#slots) .. " EFFECTS", "EVERY PLUG-IN MEASURED BY WHAT IT DOES")
     -- the cards: five measurements each, as bars from a centre line
     local cx, cy, step, cw, ch = L.cards[1], L.cards[2], L.cards[3], L.cards[4], L.cards[5]
     for k = 1, #slots do
@@ -572,20 +572,23 @@ local function draw_effects ()
     local function spec_y (db) return sy + sh - 1 - clamp(floor((db + 60) * sh / 60), 0, sh - 1) end
     say(X.tag9, "TONE   IN (GREY), OUT", T.label, sx, sy - 16, sw, 12)
     say(X.tag9, "LEVEL   LAST 4 SECONDS", T.label, L.time[1], L.time[2] - 16, L.time[3], 12)
-    for band = 1, SPEC_N do
+    -- every band in full; every L.spec_step-th, wider, when slimmed (and the level likewise)
+    local step = L.spec_step
+    for band = 1, SPEC_N, step do
         local x = sx + (band - 1) * 4
         local yi = spec_y(specIn[band])
-        draw_rect(x, yi, 3, sy + sh - yi, T.spec_in)
-        draw_rect(x, spec_y(specOut[band]), 3, 2, accent)
+        draw_rect(x, yi, 4 * step - 1, sy + sh - yi, T.spec_in)
+        draw_rect(x, spec_y(specOut[band]), 4 * step - 1, 2, accent)
     end
     local tx, ty, th = L.time[1], L.time[2], L.time[4]
     local function time_y (db) return ty + th - 1 - clamp(floor((db + 48) * th / 48), 0, th - 1) end
     local n = #inSel
-    for j = 1, TIME_N do
-        local x = tx + (j - 1) * 2
+    step = L.time_step
+    for j = step, TIME_N, step do
+        local x = tx + (j - step) * 2
         local yi = time_y(inSel[n - TIME_N + j])
-        draw_rect(x, yi, 2, ty + th - yi, T.spec_in)
-        draw_rect(x, time_y(outSel[n - TIME_N + j]), 2, 2, accent)
+        draw_rect(x, yi, 2 * step, ty + th - yi, T.spec_in)
+        draw_rect(x, time_y(outSel[n - TIME_N + j]), 2 * step, 2, accent)
     end
     local m = M[sel]
     for j = 1, 5 do
@@ -787,7 +790,7 @@ local function draw_discover ()
     local e = seen[P_DISCOVER + 1]
     local l, kind = listing(e)
     local pick = clamp(floor(e[1] * 8 / 128) + 1, 1, 8)
-    chrome(T.titles[4], thousands(D.never_total) .. " NEVER OPENED", "THE NEAREST TO WHAT YOU KEEP LOADING   PADS AUDITION")
+    chrome(T.titles[4], thousands(D.never_total) .. " NEVER OPENED", "NEAREST TO WHAT YOU LOAD   PADS AUDITION")
     -- the map: everything never opened (faint), what you play (white) and your taste (the halo)
     -- are in the background; the eight on show are ringed, the one picked large
     local tx, ty = dmap_x(D.taste[1]), dmap_y(D.taste[2])
@@ -897,7 +900,7 @@ local function draw_changes ()
     local head = whole(count) .. " CHANGES SINCE SAVED"
     if count == 1 then head = "1 CHANGE SINCE SAVED" end
     if count == 0 then head = "NOTHING CHANGED" end
-    chrome(T.titles[5], head, "E1 LISTENS: SAVED (A) TO NOW (B)   E3 UNDOES ONE CHANGE")
+    chrome(T.titles[5], head, "E1 SAVED (A) TO NOW (B)   E3 UNDOES ONE")
     say(X.song, fp.name, T.title, 16, 34, 300, 22)
     say(X.tag9, D.saved_at, T.dim, 16, 56, 300, 12)
     -- A and B, and where between them you are listening
@@ -962,6 +965,32 @@ local function draw_changes ()
           { listen, #out > 0 and (whole(row) .. " / " .. whole(#out)) or "-", "TURN", hist })
 end
 
+-- --- what the keyboard is being asked to do ------------------------------------------------------
+
+-- For the stress test, in the corner beside the page dots: the draw calls this redraw made, the
+-- Lua heap in KB (collectgarbage), and the firmware's own mem_usage(0) where it has one. The
+-- preview hides it (CTRL49_PREVIEW): its numbers would be the browser's, not the keyboard's.
+local calls, heap, device = 0, -1, -1
+local function counting (f)
+    return function (...)
+        calls = calls + 1
+        return f(...)
+    end
+end
+local function diagnostics ()
+    if CTRL49_PREVIEW then return end
+    if draws % 15 == 0 or heap < 0 then
+        if type(collectgarbage) == "function" then heap = collectgarbage("count") end
+        if type(mem_usage) == "function" and type(pcall) == "function" then
+            local ok, v = pcall(mem_usage, 0)
+            if ok and type(v) == "number" then device = v end
+        end
+    end
+    local s = whole(calls) .. "   " .. whole(heap) .. "K"
+    if device >= 0 then s = s .. "   " .. whole(device) end
+    say(X.diag, s, T.dim, L.diag[1], L.diag[2], L.diag[3], L.diag[4])
+end
+
 -- --- what the host sends -------------------------------------------------------------------------
 
 local TURN = { turn_layers, turn_effects, turn_check, turn_discover, turn_changes }
@@ -986,6 +1015,7 @@ function init (args)
         for i = 1, 8 do seen[p][i] = L.defaults[p][i] end
     end
     for i = 1, 8 do enc[i] = seen[1][i] end
+    draw_rect, draw_image, draw_text = counting(draw_rect), counting(draw_image), counting(draw_text)
     ready = true
 end
 
@@ -1042,5 +1072,7 @@ function draw (args)
         loading()
         return
     end
+    calls = 0
     PAGES[page + 1]()
+    diagnostics()
 end

@@ -29,7 +29,7 @@
 -- BEGIN GENERATED (make_feature_mockups.py writes this block)
 -- HoSTage Features. Generated: edit make_feature_mockups.py and FeatureSkin.lua, then regenerate.
 local T = {
-    aligns = { banner = 1, big = 0, bpm = 2, cell = 1, foot = 0, head = 2, huge = 1, key = 1, label = 1, line = 0, name = 1, next = 0, pad = 1, scope = 0, section = 0, small = 1, song = 0, tag = 0, tagr = 2, title = 0, value = 1 },
+    aligns = { banner = 1, big = 0, bpm = 2, cell = 1, diag = 2, foot = 0, head = 2, huge = 1, key = 1, label = 1, line = 0, name = 1, next = 0, pad = 1, scope = 0, section = 0, small = 1, song = 0, tag = 0, tagr = 2, title = 0, value = 1 },
     axis = 0xFF565E7E,
     bar = 0xFF4A5378,
     bar_line = 0xFF2B3456,
@@ -37,7 +37,7 @@ local T = {
     cross = 0xFF2B3456,
     dim = 0xFF565E7E,
     dot_off = 0xFF232B48,
-    fonts = { banner = { 10, 13 }, big = { 10, 48 }, bpm = { 9, 20 }, cell = { 9, 13 }, foot = { 9, 9 }, head = { 9, 11 }, huge = { 7, 60 }, key = { 10, 16 }, label = { 10, 9 }, line = { 9, 14 }, name = { 10, 18 }, next = { 10, 18 }, pad = { 10, 12 }, scope = { 9, 9 }, section = { 10, 40 }, small = { 10, 9 }, song = { 10, 20 }, tag = { 9, 10 }, tagr = { 9, 10 }, title = { 10, 15 }, value = { 9, 14 } },
+    fonts = { banner = { 10, 13 }, big = { 10, 48 }, bpm = { 9, 20 }, cell = { 9, 13 }, diag = { 9, 8 }, foot = { 9, 9 }, head = { 9, 11 }, huge = { 7, 60 }, key = { 10, 16 }, label = { 10, 9 }, line = { 9, 14 }, name = { 10, 18 }, next = { 10, 18 }, pad = { 10, 12 }, scope = { 9, 9 }, section = { 10, 40 }, small = { 10, 9 }, song = { 10, 20 }, tag = { 9, 10 }, tagr = { 9, 10 }, title = { 10, 15 }, value = { 9, 14 } },
     foot = 0xFF565E7E,
     head = 0xFF6B7393,
     knob = 0xFF4A5378,
@@ -57,7 +57,7 @@ local T = {
     ready = 0xFF2DD4BF,
     rec = 0xFFFF4D6A,
     ring = 0xFF9AA3C2,
-    roles = { "banner", "big", "bpm", "cell", "foot", "head", "huge", "key", "label", "line", "name", "next", "pad", "scope", "section", "small", "song", "tag", "tagr", "title", "value" },
+    roles = { "banner", "big", "bpm", "cell", "diag", "foot", "head", "huge", "key", "label", "line", "name", "next", "pad", "scope", "section", "small", "song", "tag", "tagr", "title", "value" },
     scale_mark = 0xFF6B7393,
     title = 0xFFE6E9F5,
     titles = { "SOUND ATLAS", "MODULATION", "CAPTURE", "STAGE", "CHORDS" },
@@ -72,23 +72,27 @@ local L = {
     cell_label_y = 210,
     cell_value_y = 221,
     defaults = { { 70, 92, 40, 16, 40, 64, 64, 64 }, { 72, 40, 64, 64, 96, 84, 100, 40 }, { 56, 0, 80, 0, 64, 64, 64, 64 }, { 24, 64, 64, 64, 64, 64, 64, 64 }, { 100, 40, 64, 64, 64, 64, 64, 64 } },
+    diag = { 300, 255, 104, 12 },
     dots = { 410, 260, 12, 8, 4 },
-    foot = { 14, 254, 380, 16 },
+    foot = { 14, 254, 286, 16 },
     fps = 15,
     head = { 170, 5, 296, 20 },
     kb = { 30, 134, 20 },
+    knob_frames = 64,
     knob_label_y = 34,
     knob_value_y = 126,
     knob_x = { 26, 146, 266, 386 },
     knob_y = 46,
     list = { 290, 36, 180, 21 },
     map = { 16, 36, 262, 168 },
+    mini_group = 1,
     minimap = { 8, 176, 464, 28 },
     pads = { 190, 44 },
     pages = 5,
     roll = { 8, 34, 464, 136 },
     roll_beat_px = 13,
     scope = { 156, 104, 50 },
+    scope_step = 2,
     scope_x = { 8, 128, 248, 368 },
     title = { 18, 5, 250, 20 },
 }
@@ -445,7 +449,7 @@ local function draw_motion ()
         local s = source(k, t)
         local now = clamp(base + depth * 63 * s, 0, 127)
         local colour = D.source_colours[k]
-        draw_image(BUF, TINT, x, L.knob_y, 0, floor(base * 63 / 127 + 0.5) * 80, 80, 80, T.knob)
+        draw_image(BUF, TINT, x, L.knob_y, 0, floor(base * (L.knob_frames - 1) / 127 + 0.5) * 80, 80, 80, T.knob)
         -- the trail from where it is set to where the source has pushed it
         for j = 1, 5 do ring_at(cx, cy, base + (now - base) * j / 6, "dot", colour, 2) end
         ring_at(cx, cy, now, "dot_big", colour, 4)
@@ -457,7 +461,8 @@ local function draw_motion ()
         say(X.scope, SOURCES[k] .. "  " .. SHAPES[k], colour, sxo + 6, syo + 3, sw - 12, 11)
         local mid = syo + 15 + floor((sh - 20) / 2)
         local amp = floor((sh - 22) / 2)
-        local cols = floor((sw - 12) / 2)
+        local step = L.scope_step          -- pixels a column: 2 in full, wider when slimmed
+        local cols = floor((sw - 12) / step)
         local phase
         if k == 1 then phase = t * 0.5 - floor(t * 0.5)
         elseif k == 4 then phase = 1
@@ -468,13 +473,13 @@ local function draw_motion ()
             elseif k == 1 then v = sine(c / cols)
             elseif k == 2 then v = source(2, 4 * c / cols)
             else v = source(3, 4 * c / cols) * 2 - 1 end
-            draw_rect(sxo + 6 + c * 2, mid - floor(v * amp), 2, 2, D.source_dims[k])
+            draw_rect(sxo + 6 + c * step, mid - floor(v * amp), step, 2, D.source_dims[k])
         end
         local pc = clamp(floor(phase * cols), 0, cols - 1)
         local pv = s
         if k == 3 then pv = s * 2 - 1 end
-        draw_rect(sxo + 6 + pc * 2, syo + 15, 1, sh - 20, colour)
-        tint("dot_big", sxo + 6 + pc * 2 - 4, mid - floor(pv * amp) - 4, colour)
+        draw_rect(sxo + 6 + pc * step, syo + 15, 1, sh - 20, colour)
+        tint("dot_big", sxo + 6 + pc * step - 4, mid - floor(pv * amp) - 4, colour)
     end
     local depths = {}
     for k = 1, 4 do
@@ -576,16 +581,22 @@ local function draw_capture ()
     if x_of(selStart) < rx then say(X.tag, "+" .. whole(floor((rx - x_of(selStart)) / (ppb * 4)) + 1) .. " BARS", accent, rx + 2, ry + rh - 13, 60, 11) end
     draw_rect(right, ry, 2, rh, T.now)
     if frame % 16 < 10 then tint("rec", right - 12, ry + 3, T.rec) end
-    -- two minutes at a glance: a column a bar, the visible stretch and the box marked
+    -- two minutes at a glance: a column a bar (or L.mini_group bars when slimmed), the visible
+    -- stretch and the box marked
     local mx, my, mw, mh = L.minimap[1], L.minimap[2], L.minimap[3], L.minimap[4]
-    for j = 0, 59 do
-        local b = nowBar - 59 + j
-        local x = mx + floor(j * mw / 60)
-        local w = floor((j + 1) * mw / 60) - floor(j * mw / 60) - 1
-        local h = clamp(floor(bar_count(b) * (mh - 4) / 13), 1, mh - 4)
-        local c = T.mini
-        if b >= firstBar then c = T.mini_visible end
-        if b * 4 >= selStart and b * 4 < selEnd then c = accent end
+    local g = L.mini_group
+    local n = floor(60 / g)
+    for j = 0, n - 1 do
+        local count, c = 0, T.mini
+        for q = 0, g - 1 do
+            local b = nowBar - 59 + j * g + q
+            count = count + bar_count(b)
+            if b >= firstBar and c == T.mini then c = T.mini_visible end
+            if b * 4 >= selStart and b * 4 < selEnd then c = accent end
+        end
+        local x = mx + floor(j * mw / n)
+        local w = floor((j + 1) * mw / n) - floor(j * mw / n) - 1
+        local h = clamp(floor(count * (mh - 4) / (13 * g)), 1, mh - 4)
         draw_rect(x, my + mh - 2 - h, w, h, c)
     end
     -- E5 keeps: a turn of it files the box as a loop
@@ -752,6 +763,32 @@ local function draw_chords ()
     end
 end
 
+-- --- what the keyboard is being asked to do ------------------------------------------------------
+
+-- For the stress test, in the corner beside the page dots: the draw calls this redraw made, the
+-- Lua heap in KB (collectgarbage), and the firmware's own mem_usage(0) where it has one. The
+-- preview hides it (CTRL49_PREVIEW): its numbers would be the browser's, not the keyboard's.
+local calls, heap, device = 0, -1, -1
+local function counting (f)
+    return function (...)
+        calls = calls + 1
+        return f(...)
+    end
+end
+local function diagnostics ()
+    if CTRL49_PREVIEW then return end
+    if draws % 15 == 0 or heap < 0 then
+        if type(collectgarbage) == "function" then heap = collectgarbage("count") end
+        if type(mem_usage) == "function" and type(pcall) == "function" then
+            local ok, v = pcall(mem_usage, 0)
+            if ok and type(v) == "number" then device = v end
+        end
+    end
+    local s = whole(calls) .. "   " .. whole(heap) .. "K"
+    if device >= 0 then s = s .. "   " .. whole(device) end
+    say(X.diag, s, T.dim, L.diag[1], L.diag[2], L.diag[3], L.diag[4])
+end
+
 -- --- what the host sends -------------------------------------------------------------------------
 
 function init (args)
@@ -765,6 +802,7 @@ function init (args)
         for i = 1, 8 do seen[p][i] = L.defaults[p][i] end
     end
     for i = 1, 8 do enc[i] = seen[1][i] end
+    draw_rect, draw_image, draw_text = counting(draw_rect), counting(draw_image), counting(draw_text)
     ready = true
 end
 
@@ -823,5 +861,7 @@ function draw (args)
         loading()
         return
     end
+    calls = 0
     PAGES[page + 1]()
+    diagnostics()
 end
