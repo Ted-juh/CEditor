@@ -23,6 +23,7 @@ import { dirname, join } from 'node:path';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const PROCESSOR = readFileSync(join(REPO, 'CE/src/Player/PluginProcessor.h'), 'utf8');
+const POLICY = readFileSync(join(REPO, 'CE/src/Player/DumpCapturePolicy.h'), 'utf8');
 const HOST_H = readFileSync(join(REPO, 'CE/src/Player/PlayerHost.h'), 'utf8');
 const HOST_CPP = readFileSync(join(REPO, 'CE/src/Player/PlayerHost.cpp'), 'utf8');
 const PLAYER = readFileSync(join(REPO, 'CE/web/src/Player.svelte'), 'utf8');
@@ -215,10 +216,14 @@ test('capture is throttled and skipped when the patch has not moved', () => {
 
 test('dumps are sent in the profile\'s declared order', () => {
   // A device with a common block and per-part blocks wants the common block first, and the profile
-  // author is the only one who knows which is which.
+  // author is the only one who knows which is which. The plan lives in DumpCapturePolicy.h, which
+  // walks the profile's ids rather than the stored dumps (release audit C-11).
   const send = PROCESSOR.slice(PROCESSOR.indexOf('int sendRestoredDumps'),
     PROCESSOR.indexOf('void runRestorePush'));
-  assert.match(send, /dumpDefinitionIds\(\)/, 'the send order does not come from the profile');
+  assert.match(send, /ce::planRestoredDumps/, 'the restore does not go through the shared plan');
+  const plan = POLICY.slice(POLICY.indexOf('inline RestoredDumpPlan planRestoredDumps'));
+  assert.match(plan, /engine->dumpDefinitionIds\(\)[\s\S]{0,80}for \(const auto& id : declared\)/,
+    'the send order does not come from the profile');
 });
 
 test('one unbuildable dump does not cost the others', () => {
@@ -226,8 +231,13 @@ test('one unbuildable dump does not cost the others', () => {
   // would lose the block that would have worked.
   const refresh = PROCESSOR.slice(PROCESSOR.indexOf('void refreshCapturedDumps'),
     PROCESSOR.indexOf('int sendRestoredDumps'));
-  assert.match(refresh, /if \(result\.ok && result\.hex\.isNotEmpty\(\)\)/,
+  assert.match(refresh, /ce::captureCompleteDumps/, 'the capture does not go through the shared policy');
+  const capture = POLICY.slice(POLICY.indexOf('inline DumpCapture captureCompleteDumps'),
+    POLICY.indexOf('inline RestoredDumpPlan planRestoredDumps'));
+  assert.match(capture, /if \(isCompleteDump \(result\)\)[\s\S]{0,160}else[\s\S]{0,40}capture\.skipped\.add/,
     'a failed dump must be skipped, not fatal');
+  assert.ok(!/\breturn\b/.test(capture.slice(capture.indexOf('for (const auto& id'), capture.lastIndexOf('return capture;'))),
+    'one dump must not end the capture for the rest');
 });
 
 // --- S4: host-visible programs ----------------------------------------------------------------
