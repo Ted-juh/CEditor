@@ -238,9 +238,24 @@ export function describeSliderSelection(behavior = null, normalizedValues = {}) 
   };
 }
 
+/**
+ * How many ticks a slider family control may draw. Every tick is an SVG node, and the counts had no
+ * upper bound: 100,000 major ticks froze the editor for a minute and 1,000,000 crashed it (release
+ * audit C-94). 129 major stops is every step of a 7-bit MIDI value plus the end; the largest count in
+ * any shipped panel or control set is 25. The inspector fields use the same limits, and this builder
+ * applies them again because a file or a script can write the counts without going through a field.
+ */
+export const SLIDER_TICK_LIMITS = Object.freeze({ majorMin: 2, majorMax: 129, minorMin: 0, minorMax: 16 });
+
+export function clampSliderTickCount(kind, value, fallback) {
+  const min = kind === 'major' ? SLIDER_TICK_LIMITS.majorMin : SLIDER_TICK_LIMITS.minorMin;
+  const max = kind === 'major' ? SLIDER_TICK_LIMITS.majorMax : SLIDER_TICK_LIMITS.minorMax;
+  return clamp(Math.round(numberOr(value, fallback)), min, max);
+}
+
 export function buildSliderTickStops(behavior = null) {
-  const majorCount = Math.max(2, Math.round(numberOr(behavior?.majorTickCount, 11)));
-  const minorCount = Math.max(0, Math.round(numberOr(behavior?.minorTickCount, 0)));
+  const majorCount = clampSliderTickCount('major', behavior?.majorTickCount, 11);
+  const minorCount = clampSliderTickCount('minor', behavior?.minorTickCount, 0);
   const major = [];
   const minor = [];
 
