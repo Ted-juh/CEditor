@@ -38,17 +38,20 @@ pages, and it tells you which sound you are on before you read a word.
 None of these starts from nothing. Each one draws something HoSTage already knows; the mockup
 shows what it would look like on the keyboard.
 
-**Sound Atlas.** The auditioner already measures every sound it plays.
+**Sound Atlas.** This is the app's Sounds map (`sections/sounds/SoundsMap.svelte`) brought to
+the keyboard. The auditioner already measures every sound it plays:
 `CE/src/InstrumentHost/SonicProbe.h` takes brightness as a spectral centroid and attack as the
-time to nine-tenths of the peak, and those two numbers are the map's axes. Here 1,200 invented
+time to nine-tenths of the peak, and the app's map already plots those two, takes a dragged box
+as a search, and walks to the nearest sound by ear (`nearestSounds` in `Library.h`). Here 1,200 invented
 sounds sit in clusters (pads slow and mid, plucks fast and bright, basses dark), five characters
 each in `Skin.lua`, and the map is baked into `panels.png`. HoSTage would draw the map from the
 library itself and upload it as one image when the library changes, then send the eight nearest
 (name, colour, a 15-column thumbprint of the level over the first second) each time the
 crosshair moves. The page searches the library in Lua only because the lab has no host. The box
 is a library query (how many sounds sit in it); the pads would audition the eight nearest.
-Morphing (E5) is the most speculative part: it only means something between two programs of the
-same plug-in.
+Morphing (E5) exists too: a part can already sit between two records of its plug-in (the
+`@morph` address, set from the map with Shift-click); E5 would ride it. Between two different
+plug-ins it means nothing, so the page should only offer it among same-plug-in neighbours.
 
 **Motion.** The rack already has MIDI LFOs and a looping breakpoint MSEG (`RackModel.h`). What
 nobody shows is the result: the arc is where you set the parameter, and the trail and dot are
@@ -69,8 +72,9 @@ full rigs) and restarts a processor that throws (`setAutomaticFailover`); both a
 `InstrumentHostService.h`. The cue screen is where you see that happen: song, tempo, section,
 bars left, the beat (the screen's edge flashes, the downbeat in the sound's colour), the next
 section's sound and whether it is warm yet, and a banner when a plug-in had to restart. The
-song's form (intro, verse, chorus, with their lengths) is new: a setlist item today has a name,
-notes, a tempo, a scene and a page, not sections.
+song's form exists as the arrangement, an ordered, bar-counted chain of named scenes
+(`setArrangementItem {name, sceneId, bars}`): section and bars left come from there. What is
+new is tying an arrangement to a setlist item, so the cue screen knows each song's form.
 
 **Chords.** The chorder already plays a chord per pad (`padChords` in `MidiInsertRack.h`), and
 a CTRL49 pad with nothing else on it already plays the focused part's Chords pads
