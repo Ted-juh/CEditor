@@ -14123,6 +14123,147 @@ void testClosingWhileTheAuditionerWaits()
            "afterwards without reaching into the freed service");
 }
 
+// C-35, and C-38 with it. A library preset of another plug-in is a LOAD, and until that load
+// commits the part is still the plug-in that is playing: in its name, in what it saves, and in
+// where the next pick goes. The part used to take the new plug-in's identity before the load
+// was even started; a load that then failed left it named as the new plug-in with the old one
+// playing, and every save after that wrote the old plug-in's state under the new identity —
+// which the next start fed to the new plug-in.
+void testFailedPresetLoadKeepsThePart()
+{
+    std::cout << "\na preset load that never commits leaves the part as it was" << std::endl;
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = {};
+
+    const auto patchIn = [] (const juce::var& blob)
+    {
+        juce::MemoryOutputStream decoded;
+        if (! juce::Base64::convertFromBase64 (decoded, blob.toString()) || decoded.getDataSize() < 4)
+            return -1;
+        juce::MemoryInputStream stream (decoded.getData(), decoded.getDataSize(), false);
+        return stream.readInt();
+    };
+
+    const auto dir = freshDataDir ("preset-load-failure");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+
+    const auto recordNamed = [&h] (const juce::String& name)
+    {
+        h.cmd ("getLibrary");
+        for (const auto& r : *h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).getArray())
+            if (r.getProperty ("name", {}).toString() == name)
+                return r.getProperty ("recordId", {}).toString();
+        return juce::String();
+    };
+
+    // Two user presets of the Other synth and one of the Good synth, captured from live ones.
+    const auto capture = [&] (const juce::String& ceId, int patch, const juce::String& name)
+    {
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", ceId } });
+        h.lastStub->patch = patch;
+        h.cmd ("saveUserPreset", { { "partId", partId }, { "name", name } });
+        return recordNamed (name);
+    };
+    const auto other42 = capture ("VST3-other-synth", 42, "Other 42");
+    const auto other43 = capture ("VST3-other-synth", 43, "Other 43");
+    const auto good5   = capture ("VST3-good-synth",  5,  "Good 5");
+    check (other42.isNotEmpty() && other43.isNotEmpty() && good5.isNotEmpty(),
+           "three user presets across two plug-ins");
+
+    // The part is the Good synth, tweaked by hand: that tweak is the user's work.
+    auto* playing = h.lastStub;
+    playing->patch = 7;
+
+    const auto savedPart = [&h] { return h.service->captureStateVar().getProperty ("parts", {})[0]; };
+    const auto live = [&h, &partId]
+    {
+        return dynamic_cast<StubSynthProcessor*> (h.service->getRackHost().getInstrument (partId));
+    };
+    // Finishes the i-th deferred construction, if there is one: a pick that was wrongly applied
+    // in place never asked for an instance, and the checks below say so rather than crash.
+    const auto construct = [&h] (size_t i)
+    {
+        if (i < h.deferred.size())
+            h.deferred[i] (std::make_unique<StubSynthProcessor>(), {});
+    };
+
+    h.deferCallbacks = true;
+    h.cmd ("loadLibraryRecord", { { "recordId", other42 }, { "action", "replace" }, { "partId", partId } });
+    check (h.deferred.size() == 1, "the Other synth is being constructed");
+
+    // The DAW's getStateInformation does not wait for a load to finish.
+    const auto during = savedPart();
+    check (during.getProperty ("pluginCeId", {}).toString() == "VST3-good-synth"
+             && patchIn (during.getProperty ("stateBlob", {})) == 7,
+           "while it loads, a save writes the Good synth that is playing, with its own state");
+
+    h.deferred.back() (nullptr, "the worker died in construction");
+    h.deferred.clear();
+
+    const auto after = savedPart();
+    check (after.getProperty ("pluginCeId", {}).toString() == "VST3-good-synth"
+             && after.getProperty ("pluginName", {}).toString() == "Good Synth",
+           "after the failure the part is still named as the Good synth");
+    check (patchIn (after.getProperty ("stateBlob", {})) == 7,
+           "and saves the Good synth's state, tweak included, under the Good synth's name");
+    check (after.getProperty ("lastPresetName", {}).toString() != "Other 42",
+           "nor does it claim the preset that never arrived");
+    check (live() == playing && playing->patch == 7, "the Good synth plays on untouched");
+
+    // What the next start does with that save: the plug-in it names, with the state it holds.
+    {
+        const auto dir2 = freshDataDir ("preset-load-failure-reopen");
+        seedTwoSynthCatalog (dir2);
+        Harness reopened (dir2);
+        reopened.cmd ("getState");
+        auto session = h.service->captureStateVar();
+        reopened.service->restoreFromVar (session);
+        check (reopened.lastDescriptionXml.contains ("Good Synth")
+                 && reopened.lastStub != nullptr && reopened.lastStub->patch == 7,
+               "the next start loads the Good synth with the Good synth's state");
+    }
+
+    // C-38: a second pick while the first is still loading. The part is not yet the Other
+    // synth, so the second preset is not applied to the Good synth in place — it loads, and
+    // it supersedes the first.
+    h.cmd ("loadLibraryRecord", { { "recordId", other42 }, { "action", "replace" }, { "partId", partId } });
+    h.cmd ("loadLibraryRecord", { { "recordId", other43 }, { "action", "replace" }, { "partId", partId } });
+    check (h.deferred.size() == 2 && playing->patch == 7,
+           "a second pick during the load is a load of its own, and the Good synth is not touched");
+    construct (0);
+    check (live() == playing, "the first load, superseded, does not commit");
+    construct (1);
+    h.deferred.clear();
+    check (live() != nullptr && live() != playing && live()->patch == 43
+             && savedPart().getProperty ("pluginCeId", {}).toString() == "VST3-other-synth"
+             && savedPart().getProperty ("lastPresetName", {}).toString() == "Other 43",
+           "the last pick wins: the Other synth on Other 43, named so");
+
+    // And the mirror: a preset of the plug-in still playing, picked while another is loading,
+    // is not applied to the instrument that load is about to replace.
+    h.deferCallbacks = false;
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    playing = h.lastStub;
+    playing->patch = 7;
+    h.deferCallbacks = true;
+    h.cmd ("loadLibraryRecord", { { "recordId", other42 }, { "action", "replace" }, { "partId", partId } });
+    h.cmd ("loadLibraryRecord", { { "recordId", good5 }, { "action", "replace" }, { "partId", partId } });
+    check (h.deferred.size() == 2 && playing->patch == 7,
+           "a Good preset picked while the Other synth loads is a load too");
+    construct (0);
+    construct (1);
+    h.deferred.clear();
+    h.deferCallbacks = false;
+    check (live() != nullptr && live()->patch == 5
+             && savedPart().getProperty ("pluginCeId", {}).toString() == "VST3-good-synth"
+             && savedPart().getProperty ("lastPresetName", {}).toString() == "Good 5",
+           "and it is what the part ends up on, rather than being overwritten by the Other synth");
+}
+
 int main (int argc, char* argv[])
 {
     if (argc != 2)
@@ -14255,6 +14396,7 @@ int main (int argc, char* argv[])
     testHostProject();
     testAuditionerClosureOutlivesTheService();
     testClosingWhileTheAuditionerWaits();
+    testFailedPresetLoadKeepsThePart();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)
         .getChildFile ("ceditor-host-service-tests").deleteRecursively();

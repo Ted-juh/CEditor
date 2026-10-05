@@ -1288,21 +1288,6 @@ int InstrumentRackHost::graphLatencySamples() const
     return graph.getLatencySamples();
 }
 
-bool InstrumentRackHost::primePartState (const juce::String& partId, const ClassInfo& info,
-                                         const juce::String& stateBlobBase64)
-{
-    auto* part = model.findPart (partId);
-    if (part == nullptr)
-        return false;
-
-    part->pluginCeId       = info.ceId;
-    part->pluginModulePath = info.modulePath;
-    part->pluginName       = info.name;
-    part->pluginVendor     = info.vendor;
-    part->stateBlobBase64  = stateBlobBase64;
-    return true;
-}
-
 juce::String InstrumentRackHost::addMacro (const juce::String& name)
 {
     Macro macro;
@@ -1716,7 +1701,8 @@ int InstrumentRackHost::beginLoad (const juce::String& partId)
 
 bool InstrumentRackHost::commitLoad (const juce::String& partId, int generation,
                                      std::unique_ptr<juce::AudioProcessor> instrument,
-                                     const ClassInfo& info)
+                                     const ClassInfo& info,
+                                     std::optional<juce::String> primedState)
 {
     auto* part = model.findPart (partId);
     auto* lp = findLive (partId);
@@ -1731,18 +1717,26 @@ bool InstrumentRackHost::commitLoad (const juce::String& partId, int generation,
     instrument = std::make_unique<GuardedPluginProcessor> (std::move (instrument), false);
 
     // Restore before insertion, and only into the same class identity — state blobs do not
-    // transfer between different instruments.
-    if (info.ceId == part->pluginCeId && part->stateBlobBase64.isNotEmpty())
+    // transfer between different instruments. A primed state was chosen FOR this class, so
+    // it is restored whatever the part held before.
+    const auto restore = primedState.has_value() ? *primedState
+                       : info.ceId == part->pluginCeId ? part->stateBlobBase64
+                                                       : juce::String();
+    if (restore.isNotEmpty())
     {
         juce::MemoryOutputStream decoded;
-        if (juce::Base64::convertFromBase64 (decoded, part->stateBlobBase64))
+        if (juce::Base64::convertFromBase64 (decoded, restore))
             instrument->setStateInformation (decoded.getData(), (int) decoded.getDataSize());
     }
 
     if (static_cast<GuardedPluginProcessor*> (instrument.get())->isDisabled())
         return false;
 
-    if (info.ceId != part->pluginCeId)
+    // Nothing in the document changes before this point: a load that is refused above, or
+    // never gets here, leaves the part exactly as it was.
+    if (primedState.has_value())
+        part->stateBlobBase64 = *primedState;
+    else if (info.ceId != part->pluginCeId)
         part->stateBlobBase64 = {};
 
     // Replacement: the old destination is going away, so its tracked notes are forgotten,

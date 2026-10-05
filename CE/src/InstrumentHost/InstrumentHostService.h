@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <thread>
 #include <utility>
@@ -901,11 +902,14 @@ private:
 
     /** Runs the load transaction for a part: begin ticket, instantiate, commit; on success
         `afterCommit` runs with the live instrument before anything is announced — the
-        vendor-preset apply rides there. */
+        vendor-preset apply rides there. `primedState` is a library preset's state, handed
+        to the commit (InstrumentRackHost::commitLoad) rather than written into the part
+        first, so a load that never commits leaves the part as it was. */
     void requestInstrument (const juce::String& partId, const juce::String& ceId,
                             std::function<void (juce::AudioProcessor&)> afterCommit = {},
                             std::function<void (bool, const juce::String&)> completion = {},
-                            bool failoverAttempt = false);
+                            bool failoverAttempt = false,
+                            std::optional<juce::String> primedState = std::nullopt);
 
     void runScanNow();
     void restoreSessionImpl (bool includePerformance);
@@ -1451,6 +1455,10 @@ private:
     HostEditHistory editHistory;
     bool restoringEditHistory = false;
     int historyPendingLoads = 0;
+    // partId -> the generation of its instrument load still being constructed. While one is,
+    // the part's live instrument is on its way out, so a preset picked meanwhile must not be
+    // applied to it in place: it loads through the transaction and supersedes the first.
+    std::map<juce::String, int> instrumentLoadsInFlight;
     bool historyRestorationPending = false;
     juce::StringArray historyUnloadedParts;
     // Stage Lock is deliberately session-only: reopening the application must not strand the

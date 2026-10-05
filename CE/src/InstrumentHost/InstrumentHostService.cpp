@@ -8418,7 +8418,8 @@ void InstrumentHostService::applyPerformance (Performance&& performance)
 void InstrumentHostService::requestInstrument (const juce::String& partId, const juce::String& ceId,
                                                std::function<void (juce::AudioProcessor&)> afterCommit,
                                                std::function<void (bool, const juce::String&)> completion,
-                                               bool failoverAttempt)
+                                               bool failoverAttempt,
+                                               std::optional<juce::String> primedState)
 {
     juce::String descriptionXml, refusal;
     ClassInfoForCommit info;
@@ -8504,9 +8505,10 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
 
     if (! restoringEditHistory) editHistory.clear();
     ++historyPendingLoads;
+    instrumentLoadsInFlight[partId] = generation;
     emitState();
     auto finishLoad =
-        [this, aliveToken = alive, partId, generation, info,
+        [this, aliveToken = alive, partId, generation, info, primedState = std::move (primedState),
          afterCommit = std::move (afterCommit), completion = std::move (completion)]
         (std::unique_ptr<juce::AudioProcessor> instrument, const juce::String& error,
          bool completedInstantiation)
@@ -8514,6 +8516,9 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
             if (! aliveToken->load())
                 return;
             --historyPendingLoads;
+            if (const auto inFlight = instrumentLoadsInFlight.find (partId);
+                inFlight != instrumentLoadsInFlight.end() && inFlight->second == generation)
+                instrumentLoadsInFlight.erase (inFlight);
             const auto historyLoad = restoringEditHistory || historyRestorationPending;
             const juce::ScopeGuard finishHistoryLoad { [this, historyLoad]
             {
@@ -8545,7 +8550,8 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
             const bool editorWasHere = editorTargetIds.contains (partId);
 
             if (! rack.commitLoad (partId, generation, std::move (instrument),
-                                   { info.ceId, info.modulePath, info.name, info.vendor }))
+                                   { info.ceId, info.modulePath, info.name, info.vendor },
+                                   primedState))
             {
                 // Superseded by a newer selection, or the part left in the meantime — the
                 // rack host's ticket refused it, which is the designed outcome, not a fault.
@@ -12951,9 +12957,12 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record,
         return;
     }
 
+    // Not while another load is on its way to this part: the live instrument is the one about
+    // to be replaced, and applying a preset to it would be undone by that commit.
     const auto sameClassLoaded = part != nullptr
                               && rack.getInstrument (partId) != nullptr
-                              && part->pluginCeId == record.targetCeId;
+                              && part->pluginCeId == record.targetCeId
+                              && ! instrumentLoadsInFlight.contains (partId);
 
     const auto applyVendorPreset = [this, record, failed] (juce::AudioProcessor& instrument) -> bool
     {
@@ -12985,56 +12994,53 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record,
         return;
     }
 
-    // The full path: prime the part's document with the preset's identity (and state, for
-    // captured presets), then run the one load transaction — commit restores the primed
-    // blob, and a vendor preset applies right after commit through afterCommit.
-    InstrumentRackHost::ClassInfo info;
+    // The full path: the one load transaction, carrying the preset's state (for captured
+    // presets; none for the rest, which start from the plug-in's defaults) to the commit, and a
+    // vendor preset or program applied right after it through afterCommit.
+    //
+    // Nothing is written into the part before that commit. The part's document says what is
+    // playing, and until the commit that is still the old instrument: a load that fails — a
+    // worker that dies in construction, a handshake timeout, safe mode — must leave the part
+    // named, and saved, as the plug-in that is actually there.
     {
         const std::scoped_lock lock (catalogLock);
         const ModuleRecord* module = nullptr;
-        const auto* classRecord = findClass (record.targetCeId, &module);
-        if (classRecord == nullptr || module == nullptr)
+        if (findClass (record.targetCeId, &module) == nullptr || module == nullptr)
         {
             failed ("Instrument not in the catalogue: " + record.targetCeId);
             return;
         }
-        info = { classRecord->ceId, module->path, classRecord->name, classRecord->vendor };
     }
 
-    rack.primePartState (partId, info,
-                         record.sourceType == "userState" ? record.stateBlobBase64 : juce::String());
-    if (! isVendorPresetSource (record.sourceType))
-        rack.setPartLastPreset (partId, record.recordId, record.name);
-    else
-        rack.setPartLastPreset (partId, {}, {});
+    const auto primedState = record.sourceType == "userState" ? record.stateBlobBase64
+                                                              : juce::String();
 
-    if (isVendorPresetSource (record.sourceType))
+    if (isVendorPresetSource (record.sourceType) || record.sourceType == "programList")
         requestInstrument (partId, record.targetCeId,
                            [this, partId, record, applyVendorPreset, afterLoaded = std::move (afterLoaded)]
                            (juce::AudioProcessor& instrument)
                            {
+                               // The part's place in the walk moves only once the preset
+                               // actually applied; a refused one leaves the new plug-in on its
+                               // defaults, which is no preset at all.
                                if (applyVendorPreset (instrument))
                                {
                                    rack.setPartLastPreset (partId, record.recordId, record.name);
                                    if (afterLoaded != nullptr) afterLoaded();
                                }
-                           }, completion);
-    else if (record.sourceType == "programList")
-        requestInstrument (partId, record.targetCeId,
-                           [this, record, failed,
-                            afterLoaded = std::move (afterLoaded)] (juce::AudioProcessor& instrument)
-                           {
-                               if (const auto error = applyRecordState (instrument, record); error.isNotEmpty())
-                                   failed (error);
-                               else if (afterLoaded != nullptr) afterLoaded();
-                           }, completion);
+                               else
+                               {
+                                   rack.setPartLastPreset (partId, {}, {});
+                               }
+                           }, completion, false, primedState);
     else
         requestInstrument (partId, record.targetCeId,
-                           [afterLoaded = std::move (afterLoaded)] (juce::AudioProcessor&)
+                           [this, partId, record, afterLoaded = std::move (afterLoaded)] (juce::AudioProcessor&)
                            {
+                               rack.setPartLastPreset (partId, record.recordId, record.name);
                                if (afterLoaded != nullptr)
                                    afterLoaded();
-                           }, completion);
+                           }, completion, false, primedState);
 }
 
 void InstrumentHostService::loadChainRecord (const LibraryRecord& record, const juce::String& partId)
@@ -13058,20 +13064,17 @@ void InstrumentHostService::loadChainRecord (const LibraryRecord& record, const 
     // The instrument is resolved BEFORE anything is torn down. A chain whose instrument is
     // gone must leave the part exactly as it was — half a chain over the previous sound is
     // worse than a refusal, because it looks like it worked.
-    ClassInfoForCommit instrumentInfo;
     if (source.pluginCeId.isNotEmpty())
     {
         const std::scoped_lock lock (catalogLock);
         const ModuleRecord* module = nullptr;
-        const auto* classRecord = findClass (source.pluginCeId, &module);
-        if (classRecord == nullptr || module == nullptr)
+        if (findClass (source.pluginCeId, &module) == nullptr || module == nullptr)
         {
             emitError ("Requires " + (source.pluginName.isNotEmpty() ? source.pluginName
                                                                      : source.pluginCeId)
                        + ", which is not in the catalogue.");
             return;
         }
-        instrumentInfo = { classRecord->ceId, module->path, classRecord->name, classRecord->vendor };
     }
 
     // The part's own identity, place and mix stay: dropping a chain onto part 3 must not
@@ -13120,15 +13123,12 @@ void InstrumentHostService::loadChainRecord (const LibraryRecord& record, const 
         requestEffect (effectId, slot.pluginCeId);
     }
 
-    // The instrument last, through the one load transaction: its commit restores the primed
-    // blob, so the captured sound arrives with the captured chain already around it.
+    // The instrument last, through the one load transaction: its commit restores the captured
+    // blob, so the captured sound arrives with the captured chain already around it. The blob
+    // rides with the load rather than being written into the part first, so an instrument
+    // that never arrives leaves the part named as the one still playing.
     if (source.pluginCeId.isNotEmpty())
-    {
-        rack.primePartState (partId, { instrumentInfo.ceId, instrumentInfo.modulePath,
-                                       instrumentInfo.name, instrumentInfo.vendor },
-                             source.stateBlobBase64);
-        requestInstrument (partId, source.pluginCeId);
-    }
+        requestInstrument (partId, source.pluginCeId, {}, {}, false, source.stateBlobBase64);
 
     savePerformance();
     emitState();
