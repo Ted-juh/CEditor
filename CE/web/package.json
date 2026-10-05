@@ -17,6 +17,7 @@
     "test:shape-effects": "node browser-checks/shapeEffects.mjs",
     "test:screen-dock": "node browser-checks/screenTab.mjs",
     "test:screen-lab": "node browser-checks/ctrl49ScreenLab.mjs",
+    "test:screen-eras": "node browser-checks/ctrl49EraPresets.mjs",
     "test:screen-animation": "node browser-checks/screenAnimation.mjs",
     "test:display-gap": "node browser-checks/displayGapReview.mjs",
     "test:panel-motion": "node browser-checks/panelMotion.mjs",
