@@ -1,4 +1,4 @@
-// Ctrl49StagePagesTests — the SOUNDCHECK and LAYERS payloads (Ctrl49StagePages.h). No keyboard:
+// Ctrl49StagePagesTests — the SOUNDCHECK, LAYERS and DISCOVER payloads (Ctrl49StagePages.h). No keyboard:
 // the byte layouts, the scrolling windows, the limits, and one golden payload for each page that
 // CE/web/test/ctrl49Preview.test.js asserts too, so the app's screen card draws exactly the bytes
 // the keyboard is sent.
@@ -61,6 +61,44 @@ const c49::Bytes kGoldenSoundcheck {
     32, 'D', 'r', 'i', 'f', 't', 'e', 'r', ':', ' ', 'p', 'l', 'u', 'g', '-', 'i', 'n', ' ', 'f', 'i', 'l', 'e', ' ',
         'i', 's', ' ', 'm', 'i', 's', 's', 'i', 'n', 'g',
     0, 0, 0 };
+
+c49::DiscoverView goldenDiscover()
+{
+    c49::DiscoverView view;
+    view.state = c49::DiscoverView::suggestions;
+    view.sounds = { { "Gritty Strings 62", "Nebula", { 62, 30 }, 87, false },
+                    { "Hollow Strings 61", "Nebula", { 40, 70 }, 85, true },
+                    { "Bright Strings 12", "Brasswork", { 75, 12 }, 71, false } };
+    view.neverOpened = 11903;
+    view.regularsCounted = 14;
+    view.kind = "Strings";
+    view.centre = { 55, 40 };
+    view.likeName = "Lush Pad 19";
+    view.likeLoads = 11;
+    view.regulars = { { 50, 35 }, { 60, 45 } };
+    return view;
+}
+
+// [length][ASCII], for the goldens below that carry more text than is readable as characters.
+void put (c49::Bytes& out, const std::string& s)
+{
+    out.push_back ((std::uint8_t) s.size());
+    out.insert (out.end(), s.begin(), s.end());
+}
+
+c49::Bytes goldenDiscoverBytes()
+{
+    c49::Bytes b { 1, 3, 0, 3, 0, 127, 46, 14 };
+    put (b, "Strings");
+    b.insert (b.end(), { 55, 40 });
+    b.insert (b.end(), { 62, 30, 87, 0 });  put (b, "Gritty Strings 62");  put (b, "Nebula");
+    b.insert (b.end(), { 40, 70, 85, 1 });  put (b, "Hollow Strings 61");  put (b, "Nebula");
+    b.insert (b.end(), { 75, 12, 71, 0 });  put (b, "Bright Strings 12");  put (b, "Brasswork");
+    put (b, "Lush Pad 19");
+    b.push_back (11);
+    b.insert (b.end(), { 2, 50, 35, 60, 45 });
+    return b;
+}
 
 const c49::Bytes kGoldenLayers {
     2, 0, 2, 1, 36,
@@ -146,6 +184,46 @@ int main()
                "keys, velocities and transpose are clamped; a disabled part has no flags");
         check (clamped[13] == c49::kLayersHeldNotes && clamped.size() == 14u + 2u * c49::kLayersHeldNotes,
                "at most sixteen held notes are sent");
+    }
+
+    {   // --- DISCOVER -------------------------------------------------------------------------
+        const auto bytes = c49::buildDiscoverPayload (goldenDiscover());
+        check (bytes == goldenDiscoverBytes(), "the discover payload is the golden the app's test also asserts");
+        check (bytes[5] + 256 * bytes[6] == 11903, "the count of sounds never opened takes two bytes, low first");
+
+        c49::DiscoverView many;
+        many.state = c49::DiscoverView::suggestions;
+        for (int i = 0; i < 30; ++i)
+            many.sounds.push_back ({ "Sound " + std::to_string (i + 1), "Synth", { i, 100 - i }, 90 - i, false });
+        many.selected = 13;
+        const auto paged = c49::buildDiscoverPayload (many);
+        check (paged[2] == 8 && paged[3] == c49::kDiscoverRows && paged[4] == 13,
+               "the list pages by eight, so pad N is always row N of what is shown");
+        many.selected = 29;
+        const auto last = c49::buildDiscoverPayload (many);
+        check (last[2] == 24 && last[3] == 6, "and the last page holds what is left");
+
+        c49::DiscoverView wild = goldenDiscover();
+        wild.neverOpened = 200000;
+        wild.centre = { -10, 400 };
+        wild.sounds[0].percent = 140;
+        wild.kind = "A kind with a long name";
+        for (int i = 0; i < 80; ++i)
+            wild.regulars.push_back ({ i, i });
+        const auto clamped = c49::buildDiscoverPayload (wild);
+        check (clamped[5] == 0xFF && clamped[6] == 0xFF, "never opened stops at 65535");
+        check (clamped[8] == c49::kDiscoverKindChars, "a kind stops at twelve characters");
+        const auto centreAt = 9 + c49::kDiscoverKindChars;
+        check (clamped[centreAt] == 0 && clamped[centreAt + 1] == 100 && clamped[centreAt + 4] == 100,
+               "map points and percentages are kept to 0-100");
+        check (clamped[clamped.size() - 1 - 2 * c49::kDiscoverRegulars] == c49::kDiscoverRegulars
+                 && clamped.size() < c49::kMaxPayloadBytes,
+               "at most 48 points of what you load, and the whole page inside one frame");
+
+        c49::DiscoverView none;
+        const auto empty = c49::buildDiscoverPayload (none);
+        check (empty[0] == 0 && empty[1] == 0 && empty[3] == 0 && empty.size() == 14,
+               "with nothing to go on the page is still sent, saying so");
     }
 
     std::cout << "-------------------" << std::endl;

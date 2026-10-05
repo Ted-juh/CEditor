@@ -31,6 +31,7 @@ is at the bottom.
 
 - [ ] Turn on **Layers** on the card (the switch's light comes on). Page Right from the
       performance page arrives at LAYERS, on the keyboard and on the card.
+- [ ] The pads go dark: they do nothing on LAYERS or SOUNDCHECK.
 - [ ] One band per part, over the keys where it plays. The part E1 has picked is outlined; it
       starts on the part HoSTage has focused.
 - [ ] Hold a few notes: each lights its key in the colour of a part that plays it, and puts a
@@ -57,10 +58,27 @@ is at the bottom.
 - [ ] **Write down:** anything cut off or overlapping. The page is 480 x 272 and the names stop
       at 24 characters.
 
+**Discover.** Needs a library with at least five measured sounds you have loaded (the Sounds page's
+"What you play" says how many).
+
+- [ ] Turn on **Discover**. Page Right arrives at DISCOVER after the other two. With too little
+      loaded it says NOT ENOUGH TO GO ON and how many of five it has; that is correct, not a fault.
+- [ ] The title counts what you have never opened, the same number as the Sounds page's
+      "Never loaded". The list is nearest first, with a bar for how like what you load each is.
+- [ ] On the map: grey dots (what you load most), YOU, the eight listed in purple, the selected
+      one in white. E1 moves the white one; E2 jumps eight further down.
+- [ ] E3 keeps the list to one kind and says which in the footer; turning back reaches ALL.
+- [ ] E4 clockwise marks the selected sound kept (an orange square) and it is a favourite in the
+      app; counter-clockwise lets it go.
+- [ ] Pad 1-8 auditions the row with that number. A pad is lit while its row has a sound, dark
+      past the end of the list.
+- [ ] **Write down:** how long the page takes to appear and to follow E1 on a big library (it
+      reads the whole library when it opens and every two seconds), and the never-opened count.
+
 **Leaving them.**
 
 - [ ] Page Left back to the performance page: it is drawn whole, with nothing left of the stage
-      page behind it.
+      page behind it, and the pads light up again.
 - [ ] Turn a page off while it is on screen: the keyboard lands on a page that still exists and
       draws it whole, never a blank or half-drawn one.
 - [ ] If the keyboard refuses anything, the card shows a red line, "The keyboard refused ...".

@@ -16,7 +16,7 @@
   import { createCtrl49Screen } from '../CE_Application/screen/ctrl49Runtime.js';
   import {
     rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload, browseSlotViews,
-    layersPayload, soundcheckPayload,
+    layersPayload, soundcheckPayload, discoverPayload,
   } from '../CE_Application/screen/ctrl49Payloads.js';
   import { parseCalls } from './callScript.js';
   import { preview } from './previewState.svelte.js';
@@ -31,6 +31,7 @@
     { id: 'browse', label: 'Browser' },
     { id: 'layers', label: 'Layers' },
     { id: 'soundcheck', label: 'Soundcheck' },
+    { id: 'discover', label: 'Discover' },
     { id: 'custom', label: 'Custom calls' },
   ];
 
@@ -101,6 +102,11 @@
             basis: p.soundcheck.basis, problems: song?.problems ?? [], seconds: p.soundcheck.seconds }) },
         ];
       }
+      case 'discover':
+        return [
+          { name: 'set_mode', bytes: [1] },
+          { name: 'set_discover', bytes: discoverPayload(p.discover) },
+        ];
       default:
         return [{ name: 'set_mode', bytes: [p.custom.mode & 0xff] }, ...parseCalls(p.custom.calls)];
     }
@@ -269,6 +275,31 @@
           <input type="text" bind:value={song.name} onfocus={selectAll} aria-label={`Song ${i + 1} name`} />
           <button type="button" class="flag" class:on={song.checked} onclick={() => (song.checked = !song.checked)}>{song.checked ? 'yes' : 'no'}</button>
           <span class="count">{song.problems.length}</span>
+        {/each}
+      </div>
+
+    {:else if preview.scene === 'discover'}
+      <div class="row wrap">
+        {#each [['Not enough to go on', 0], ['Suggestions', 1], ['Nothing new', 2]] as [label, state]}
+          <button type="button" class="flag" class:on={preview.discover.state === state}
+                  onclick={() => (preview.discover.state = state)}>{label}</button>
+        {/each}
+      </div>
+      <div class="row">
+        <label class="field small">Selected <input type="number" min="0" max={preview.discover.sounds.length - 1}
+               value={preview.discover.selected} onfocus={selectAll}
+               oninput={(e) => (preview.discover.selected = int(e.currentTarget.value, 0, preview.discover.sounds.length - 1))} /></label>
+        <label class="field small">Kind <input type="text" bind:value={preview.discover.kind} onfocus={selectAll} /></label>
+        <label class="field small">Never opened <input type="number" min="0" value={preview.discover.neverOpened} onfocus={selectAll}
+               oninput={(e) => (preview.discover.neverOpened = int(e.currentTarget.value, 0, 65535))} /></label>
+      </div>
+      <div class="grid songs">
+        <span>Sound</span><span>Kept</span><span>Like %</span>
+        {#each preview.discover.sounds as sound, i}
+          <input type="text" bind:value={sound.name} onfocus={selectAll} aria-label={`Sound ${i + 1} name`} />
+          <button type="button" class="flag" class:on={sound.kept} onclick={() => (sound.kept = !sound.kept)}>{sound.kept ? 'yes' : 'no'}</button>
+          <input type="number" min="0" max="100" value={sound.percent} onfocus={selectAll} aria-label={`Sound ${i + 1} percent`}
+                 oninput={(e) => (sound.percent = int(e.currentTarget.value, 0, 100))} />
         {/each}
       </div>
 

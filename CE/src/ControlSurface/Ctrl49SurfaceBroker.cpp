@@ -431,6 +431,7 @@ Ctrl49SurfaceBroker::Pages Ctrl49SurfaceBroker::pages() const
     auto next = layout.performance + 1;
     layout.layers = service.layersOnSurface() ? next++ : -1;
     layout.soundcheck = service.soundcheckOnSurface() ? next++ : -1;
+    layout.discover = service.discoverOnSurface() ? next++ : -1;
     layout.browse = service.browsingOnSurface() ? next++ : -1;
     layout.count = next;
     return layout;
@@ -520,6 +521,7 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
             service.noteSurfacePage (reducer.page() < controlPages
                 ? performance.pages.getReference (reducer.page()).pageId : juce::String());
             switchDownAt.fill (-1.0);   // a hold does not carry over to another page's pads
+            discoverStale = true;       // DISCOVER opens on what the library holds now
         }
 
         if (action->switchChanged && action->switchSlot >= 0 && action->switchSlot < 8)
@@ -594,6 +596,56 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
                 auto* payload = new juce::DynamicObject();
                 payload->setProperty ("cmd", "checkSetlistSoundcheck");
                 service.handleCommand (juce::var (payload));
+            }
+        }
+        else if (reducer.page() == layout.discover)
+        {
+            // E1 picks, E2 reaches further down the list (eight at a time: further from what you
+            // load), E3 keeps it to one kind, E4 keeps the sound as a favourite (clockwise) or
+            // lets it go. A pad auditions the row under it. Through the command surface, as the
+            // Sounds page sends them.
+            const auto& sounds = discoverRead.sounds;
+            const auto last = juce::jmax (0, sounds.size() - 1);
+            if (action->encoderMoved && action->encoderSlot == 0)
+                discoverSelected = juce::jlimit (0, last, discoverSelected + action->encoderDelta);
+            else if (action->encoderMoved && action->encoderSlot == 1)
+                discoverSelected = juce::jlimit (0, last, discoverSelected + kDiscoverRows * action->encoderDelta);
+            else if (action->encoderMoved && action->encoderSlot == 2)
+            {
+                const auto& kinds = discoverRead.kinds;
+                const auto at = juce::jlimit (0, kinds.size(), kinds.indexOf (discoverKind) + 1 + action->encoderDelta);
+                const auto kind = at == 0 ? juce::String() : kinds[at - 1];
+                if (kind != discoverKind)
+                {
+                    discoverKind = kind;
+                    discoverSelected = 0;
+                    discoverStale = true;
+                }
+            }
+            else if (action->encoderMoved && action->encoderSlot == 3 && discoverSelected < sounds.size())
+            {
+                const auto keep = action->encoderDelta > 0;
+                if (sounds.getReference (discoverSelected).kept != keep)
+                {
+                    auto* payload = new juce::DynamicObject();
+                    payload->setProperty ("cmd", "setLibraryUserMetadata");
+                    payload->setProperty ("recordId", sounds.getReference (discoverSelected).recordId);
+                    payload->setProperty ("favourite", keep);
+                    service.handleCommand (juce::var (payload));
+                    discoverRead.sounds.getReference (discoverSelected).kept = keep;   // until the next read
+                    discoverStale = true;
+                }
+            }
+            else if (action->padChanged && action->pad >= 1 && action->velocity > 0)
+            {
+                const auto row = discoverFirstRow (sounds.size(), discoverSelected) + action->pad - 1;
+                if (row < sounds.size())
+                {
+                    auto* payload = new juce::DynamicObject();
+                    payload->setProperty ("cmd", "auditionRecord");
+                    payload->setProperty ("recordId", sounds.getReference (row).recordId);
+                    service.handleCommand (juce::var (payload));
+                }
             }
         }
         else if (reducer.page() == layout.layers)
@@ -683,18 +735,23 @@ void Ctrl49SurfaceBroker::paintPads()
     if (session == nullptr)
         return;
 
-    // On a control page each pad shows its active layer and its state (padLight). Everywhere
-    // else the pads keep the stock orange they have always had here, because the performance
-    // and browse pages give them meanings of their own.
+    // On a control page each pad shows its active layer and its state (padLight). The performance
+    // and browse pages keep the stock orange they have always had here, because they give the
+    // pads meanings of their own. On LAYERS and SOUNDCHECK the pads do nothing, so they are dark;
+    // on DISCOVER a pad is lit while there is a row beside it to audition.
     const auto& performance = service.getRackHost().getPerformance();
     const auto page = reducer.page();
-    const auto onControlPage = page < pages().control;
+    const auto layout = pages();
+    const auto onControlPage = page < layout.control;
+    const auto discoverRows = juce::jmin (kDiscoverRows, discoverRead.sounds.size()
+                                                         - discoverFirstRow (discoverRead.sounds.size(), discoverSelected));
     for (int pad = 1; pad <= 8; ++pad)
     {
-        const auto rgb = onControlPage
-                           ? service.padLight (performance.pages.getReference (page).pageId, pad,
-                                               reducer.padBank())
-                           : 0xFFA500;
+        const auto rgb = onControlPage ? service.padLight (performance.pages.getReference (page).pageId, pad,
+                                                           reducer.padBank())
+                       : page == layout.layers || page == layout.soundcheck ? 0
+                       : page == layout.discover ? (pad <= discoverRows ? 0xFFA500 : 0)
+                                                 : 0xFFA500;
         auto& painted = paintedPads[(std::size_t) (pad - 1)];
         if (painted == rgb)
             continue;
@@ -737,6 +794,7 @@ void Ctrl49SurfaceBroker::emitScreen (const Bytes& labels, const Bytes& state,
                                 : reducer.page() == layout.performance   ? "performance"
                                 : reducer.page() == layout.layers        ? "layers"
                                 : reducer.page() == layout.soundcheck    ? "soundcheck"
+                                : reducer.page() == layout.discover      ? "discover"
                                                                          : "control");
     // Which control page it is, so the app can set a slot by typing its value.
     const auto& performance = service.getRackHost().getPerformance();
@@ -784,6 +842,50 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
         }
         stage = buildSoundcheckPayload (view);
         stageCall = "set_check";
+    }
+    else if (reducer.page() == layout.discover)
+    {
+        // Read again when a turn changed what it should hold, else every two seconds: loads and
+        // measurements elsewhere change it, but not from one redraw to the next.
+        if (discoverStale || options.now() - discoverReadMs >= 2000.0)
+        {
+            discoverRead = service.surfaceDiscover (discoverKind, 48);
+            discoverReadMs = options.now();
+            discoverStale = false;
+            if (discoverKind.isNotEmpty() && ! discoverRead.kinds.contains (discoverKind))
+            {
+                discoverKind = {};                 // that kind has nothing left: back to all
+                discoverRead = service.surfaceDiscover (discoverKind, 48);
+            }
+        }
+        const auto& read = discoverRead;
+        discoverSelected = juce::jlimit (0, juce::jmax (0, read.sounds.size() - 1), discoverSelected);
+
+        const auto at = [] (float brightness, float attack)
+        {
+            return DiscoverPoint { juce::roundToInt (brightness * 100.0f), juce::roundToInt (attack * 100.0f) };
+        };
+        DiscoverView view;
+        view.state = ! read.enough ? DiscoverView::notEnough
+                   : read.sounds.isEmpty() ? DiscoverView::nothingNew : DiscoverView::suggestions;
+        for (const auto& sound : read.sounds)
+            view.sounds.push_back ({ sound.name.toStdString(), sound.instrument.toStdString(),
+                                     at (sound.brightness, sound.attack), sound.percent, sound.kept });
+        view.selected = discoverSelected;
+        view.neverOpened = read.neverOpened;
+        view.regularsCounted = read.regularsCounted;
+        view.kind = discoverKind.toUpperCase().toStdString();
+        view.centre = at (read.centreBrightness, read.centreAttack);
+        for (const auto& [brightness, attack] : read.regulars)
+            view.regulars.push_back (at (brightness, attack));
+        if (! read.sounds.isEmpty())
+        {
+            const auto& sound = read.sounds.getReference (discoverSelected);
+            view.likeName = sound.likeName.toStdString();
+            view.likeLoads = sound.likeLoads;
+        }
+        stage = buildDiscoverPayload (view);
+        stageCall = "set_discover";
     }
     else if (reducer.page() == layout.layers)
     {

@@ -6297,12 +6297,13 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
-    if (cmd == "soundcheckOnSurface" || cmd == "layersOnSurface")
+    if (cmd == "soundcheckOnSurface" || cmd == "layersOnSurface" || cmd == "discoverOnSurface")
     {
         // Off until asked for, like the browser page: a keyboard that grows a page under somebody's
         // hands is one that stopped doing what they had it doing.
         const bool soundcheck = cmd == "soundcheckOnSurface";
-        auto& flag = soundcheck ? surfaceSoundcheckPage : surfaceLayersPage;
+        auto& flag = soundcheck ? surfaceSoundcheckPage
+                   : cmd == "layersOnSurface" ? surfaceLayersPage : surfaceDiscoverPage;
         const bool wanted = payload.getDynamicObject() != nullptr
                               && payload.getDynamicObject()->hasProperty ("on")
                             ? (bool) payload["on"] : ! flag;
@@ -13274,6 +13275,82 @@ std::vector<std::pair<int, int>> InstrumentHostService::surfaceHeldNotes()
     return { notes.begin(), notes.end() };
 }
 
+InstrumentHostService::SurfaceDiscover InstrumentHostService::surfaceDiscover (const juce::String& kind, int count)
+{
+    ensureLibrary();
+    SurfaceDiscover out;
+
+    // What you load, and how much of the library you never have: the same two counts the Sounds
+    // page gives, so the keyboard and the app cannot disagree about either.
+    juce::Array<const LibraryRecord*> loaded;
+    for (const auto& record : library.allRecords())
+    {
+        if (record.hidden)
+            continue;
+        if (record.loadCount <= 0)
+            ++out.neverOpened;
+        else if (record.sonic.measured && ! record.sonic.silent)
+            loaded.add (&record);
+    }
+    out.regularsCounted = loaded.size();
+    std::stable_sort (loaded.begin(), loaded.end(),
+                      [] (const LibraryRecord* a, const LibraryRecord* b) { return a->loadCount > b->loadCount; });
+    for (int i = 0; i < juce::jmin (loaded.size(), 48); ++i)
+        out.regulars.add ({ loaded[i]->sonic.brightness, loaded[i]->sonic.attack });
+
+    const auto centre = habitualProfile (library);
+    out.enough = centre.measured;
+    if (! out.enough)
+        return out;   // not enough to go on is the answer, and the page says so
+    out.centreBrightness = centre.brightness;
+    out.centreAttack = centre.attack;
+
+    // The kinds come from a longer list than the page shows, so keeping to one still finds some.
+    const auto matches = unplayedLikeHabits (library, 200, libraryAvailability());
+    std::map<juce::String, int> kindCounts;
+    for (const auto& match : matches)
+        if (match.record->category.isNotEmpty())
+            ++kindCounts[match.record->category];
+    std::vector<std::pair<juce::String, int>> kinds (kindCounts.begin(), kindCounts.end());
+    std::stable_sort (kinds.begin(), kinds.end(), [] (const auto& a, const auto& b) { return a.second > b.second; });
+    for (const auto& [name, n] : kinds)
+    {
+        juce::ignoreUnused (n);
+        if (out.kinds.size() < 12)
+            out.kinds.add (name);
+    }
+
+    for (const auto& match : matches)
+    {
+        if (out.sounds.size() >= count)
+            break;
+        const auto& record = *match.record;
+        if (kind.isNotEmpty() && record.category != kind)
+            continue;
+        SurfaceDiscoverSound sound;
+        sound.recordId = record.recordId;
+        sound.name = record.name;
+        sound.instrument = record.instrument;
+        sound.category = record.category;
+        sound.brightness = record.sonic.brightness;
+        sound.attack = record.sonic.attack;
+        sound.percent = juce::roundToInt (100.0f * (1.0f - match.distance));
+        sound.kept = record.user.favourite;
+        // Which of your regulars it is like: the recommendation says what it is built on, so it
+        // can be argued with.
+        auto nearest = 2.0f;
+        for (const auto* regular : loaded)
+            if (const auto d = sonicDistance (regular->sonic, record.sonic); d < nearest)
+            {
+                nearest = d;
+                sound.likeName = regular->name;
+                sound.likeLoads = regular->loadCount;
+            }
+        out.sounds.add (sound);
+    }
+    return out;
+}
+
 juce::var InstrumentHostService::soundcheckPayload()
 {
     auto* root = new juce::DynamicObject();
@@ -18683,6 +18760,7 @@ juce::var InstrumentHostService::buildStatePayload()
         auto* surfacePages = new juce::DynamicObject();
         surfacePages->setProperty ("soundcheck", surfaceSoundcheckPage);
         surfacePages->setProperty ("layers", surfaceLayersPage);
+        surfacePages->setProperty ("discover", surfaceDiscoverPage);
         root->setProperty ("surfacePages", juce::var (surfacePages));
     }
     root->setProperty ("product", productPayload());

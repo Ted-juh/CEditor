@@ -138,4 +138,58 @@ Bytes buildLayersPayload (const LayersView& view)
     return out;
 }
 
+// --- DISCOVER -------------------------------------------------------------------------------------
+
+int discoverFirstRow (int sounds, int selected)
+{
+    if (sounds <= kDiscoverRows)
+        return 0;
+    return std::clamp (selected / kDiscoverRows * kDiscoverRows, 0, sounds - 1);
+}
+
+Bytes buildDiscoverPayload (const DiscoverView& view)
+{
+    const int count = (int) view.sounds.size();
+    const int selected = count == 0 ? 0 : std::clamp (view.selected, 0, count - 1);
+    const int first = discoverFirstRow (count, selected);
+    const int rows = std::min (kDiscoverRows, count - first);
+    const auto point = [] (Bytes& out, const DiscoverPoint& p)
+    {
+        out.push_back (byte (p.x, 0, 100));
+        out.push_back (byte (p.y, 0, 100));
+    };
+
+    Bytes out;
+    out.push_back ((std::uint8_t) view.state);
+    out.push_back (byte (count));
+    out.push_back (byte (first));
+    out.push_back (byte (rows));
+    out.push_back (byte (selected));
+    const auto neverOpened = std::clamp (view.neverOpened, 0, 65535);
+    out.push_back ((std::uint8_t) (neverOpened & 0xFF));
+    out.push_back ((std::uint8_t) (neverOpened >> 8));
+    out.push_back (byte (view.regularsCounted));
+    appendString (out, view.kind, kDiscoverKindChars);
+    point (out, view.centre);
+
+    for (int i = first; i < first + rows; ++i)
+    {
+        const auto& sound = view.sounds[(std::size_t) i];
+        point (out, sound.at);
+        out.push_back (byte (sound.percent, 0, 100));
+        out.push_back (sound.kept ? 1 : 0);
+        appendString (out, sound.name, kDiscoverNameChars);
+        appendString (out, sound.instrument, kDiscoverInstrumentChars);
+    }
+
+    appendString (out, view.likeName, kDiscoverNameChars);
+    out.push_back (byte (view.likeLoads));
+
+    const auto points = std::min ((int) view.regulars.size(), kDiscoverRegulars);
+    out.push_back (byte (points));
+    for (int i = 0; i < points; ++i)
+        point (out, view.regulars[(std::size_t) i]);
+    return out;
+}
+
 } // namespace ceditor::ctrl49

@@ -134,12 +134,12 @@ public:
     int currentPage() const noexcept    { return reducer.page(); }
 
     /** Where the pages are. The control pages come first, then the performance page, then the
-        two stage pages (LAYERS, SOUNDCHECK: Ctrl49StagePages.h), then the browser (Sound Browser
-        Stage F) — last because it is the one you go to deliberately rather than the one you
-        play from, and Page Right walks towards it.
+        two stage pages (LAYERS, SOUNDCHECK: Ctrl49StagePages.h), then DISCOVER and the browser
+        (Sound Browser Stage F) — last because they are the ones you go to deliberately rather
+        than the ones you play from, and Page Right walks towards them.
 
-        The stage pages and the browser are only THERE when they have been asked for
-        (layersOnSurface, soundcheckOnSurface, browsingOnSurface). A surface that quietly grew
+        The pages after the performance page are only THERE when they have been asked for
+        (layersOnSurface, soundcheckOnSurface, discoverOnSurface, browsingOnSurface). A surface that quietly grew
         an extra page under somebody's hands is a surface that stopped doing what they had it
         doing, which is the same rule each flag itself follows. */
     struct Pages
@@ -148,6 +148,7 @@ public:
         int performance = 0;
         int layers = -1;       // -1 when the page is off
         int soundcheck = -1;
+        int discover = -1;
         int browse = -1;       // -1 when browsing is off, which is most of the time
         int count = 1;
     };
@@ -208,6 +209,14 @@ private:
     int soundcheckSong = -1;
     int layersPart = -1;
     double lastCheckMs = -1.0e12;            // E8 on SOUNDCHECK re-checks, at most once a second
+    // DISCOVER's cursor and the kind it keeps to, and what it last read from the library. A read
+    // walks the whole library, so it is kept for two seconds, or until a turn changes what it
+    // should hold; the pads and E4 act on the sounds the screen is showing, which are these.
+    int discoverSelected = 0;
+    juce::String discoverKind;
+    host::InstrumentHostService::SurfaceDiscover discoverRead;
+    double discoverReadMs = -1.0e12;
+    bool discoverStale = true;
     bool shownOnKeyboard = false;
     juce::String deviceError;                // the keyboard's last refusal, by name
     int deviceRefusals = 0;

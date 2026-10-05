@@ -67,6 +67,34 @@ export const preview = $state({
     ],
   },
 
+  // What you own and have never opened, nearest to what you load (state: 0 not enough to go on,
+  // 1 suggestions, 2 nothing new). Points are brightness across, attack up, 0-100.
+  discover: {
+    state: 1,
+    selected: 1,
+    neverOpened: 11903,
+    regularsCounted: 14,
+    kind: '',
+    centre: { x: 46, y: 52 },
+    likeName: 'Lush Pad 19',
+    likeLoads: 11,
+    sounds: [
+      { name: 'Wide Pad 68', instrument: 'Nebula', at: { x: 44, y: 58 }, percent: 91 },
+      { name: 'Gritty Strings 62', instrument: 'Nebula', at: { x: 55, y: 49 }, percent: 89, kept: true },
+      { name: 'Thin FX 19', instrument: 'Nebula', at: { x: 38, y: 44 }, percent: 86 },
+      { name: 'Soft FX 13', instrument: 'Nebula', at: { x: 52, y: 63 }, percent: 84 },
+      { name: 'Lush Brass 6', instrument: 'Brasswork', at: { x: 61, y: 40 }, percent: 80 },
+      { name: 'Hollow Strings 61', instrument: 'Stringfield', at: { x: 35, y: 61 }, percent: 78 },
+      { name: 'Broken Keys 54', instrument: 'Keys 73', at: { x: 58, y: 30 }, percent: 75 },
+      { name: 'Bright Strings 12', instrument: 'Nebula', at: { x: 70, y: 52 }, percent: 71 },
+      { name: 'Glass Bells 3', instrument: 'Nebula', at: { x: 80, y: 22 }, percent: 66 },
+    ],
+    regulars: Array.from({ length: 40 }, (_, i) => ({
+      x: Math.round(46 + 22 * Math.sin(i * 2.4) * ((i % 7) / 7)),
+      y: Math.round(52 + 22 * Math.cos(i * 2.4) * ((i % 5) / 5)),
+    })),
+  },
+
   // A new mode starts here: set_mode's byte, then whatever calls the page takes, before draw().
   custom: {
     mode: 1,

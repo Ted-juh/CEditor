@@ -114,10 +114,11 @@
 //      modulation cable. A missing recordIdA is the preset the part last loaded. The blend is
 //      by parameter, read through the plug-in, and the pair persists with the session.)
 //   browseOnSurface {on?} | browseTurn {encoder,delta} | browsePad {pad}
-//   soundcheckOnSurface {on?} | layersOnSurface {on?}
-//     (the CTRL49's two stage pages, off until asked for like the browser: the setlist checked
-//      before the show, and every part's zone over the keys. Turning SOUNDCHECK on runs the
-//      setlist's reference check, so the page opens on fresh results.)
+//   soundcheckOnSurface {on?} | layersOnSurface {on?} | discoverOnSurface {on?}
+//     (the CTRL49's pages beyond the knobs, off until asked for like the browser: the setlist
+//      checked before the show, every part's zone over the keys, and what you own and have never
+//      opened nearest to what you load. Turning SOUNDCHECK on runs the setlist's reference check,
+//      so the page opens on fresh results.)
 //     (the library on the hardware: nothing here names a device — a surface arrives as its
 //      capabilities and the browser is built to fit it, or is told what it cannot do.)
 //   similarSounds {recordId,count?} | rackSubstitutes {recordId}
@@ -766,6 +767,7 @@ public:
     // Each is a page the surface has only once it is asked for, like the browser.
     bool soundcheckOnSurface() const             { return surfaceSoundcheckPage; }
     bool layersOnSurface() const                 { return surfaceLayersPage; }
+    bool discoverOnSurface() const               { return surfaceDiscoverPage; }
 
     struct SurfaceSoundcheckSong
     {
@@ -784,6 +786,30 @@ public:
     /** The notes held on the MIDI inputs now, as they were played: note number and velocity, one
         entry a note whichever input or channel holds it, lowest first. */
     std::vector<std::pair<int, int>> surfaceHeldNotes();
+
+    struct SurfaceDiscoverSound
+    {
+        juce::String recordId, name, instrument, category;
+        float brightness = 0, attack = 0;   // where it sits on the map, 0..1 (SonicProfile)
+        int percent = 0;                    // how like what you load, as the app words it
+        bool kept = false;                  // a favourite
+        juce::String likeName;              // the sound you load that it is nearest
+        int likeLoads = 0;                  // and how often you have loaded that one
+    };
+    struct SurfaceDiscover
+    {
+        bool enough = false;                // habitualProfile had enough to go on
+        juce::Array<SurfaceDiscoverSound> sounds;   // never opened, nearest first, kept to the kind
+        juce::StringArray kinds;            // the categories among the suggestions, most first
+        float centreBrightness = 0, centreAttack = 0;
+        juce::Array<std::pair<float, float>> regulars;   // brightness, attack of what you load most
+        int neverOpened = 0;                // the library's count, as the Sounds page gives it
+        int regularsCounted = 0;            // measured sounds you have loaded: the centre's basis
+    };
+    /** What you own and have never opened, nearest first to what you load (unplayedLikeHabits),
+        with the map around it: for the CTRL49's DISCOVER page. `kind` keeps the list to one
+        category; empty is every kind. */
+    SurfaceDiscover surfaceDiscover (const juce::String& kind, int count);
 
     bool ownsHardwareSurface() const;
     /** Claims the surface for this instance, taking it from an instance whose heartbeat has
@@ -1506,6 +1532,7 @@ private:
     bool surfaceBrowsing = false;
     bool surfaceSoundcheckPage = false;
     bool surfaceLayersPage = false;
+    bool surfaceDiscoverPage = false;
     surface::BrowseCursor browseCursor;
     const double freeRunEpoch = juce::Time::getMillisecondCounterHiRes() * 0.001;
     // What the browser is currently looking at. Every mutation re-emits THIS rather than an

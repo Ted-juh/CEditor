@@ -215,6 +215,50 @@ export function layersPayload(view) {
   return out;
 }
 
+export const DISCOVER_ROWS = 8;
+export const DISCOVER_REGULARS = 48;
+
+/** discoverFirstRow: the window pages by eight, so pad N is always row N of what is shown. */
+export function discoverFirstRow(sounds, selected) {
+  if (sounds <= DISCOVER_ROWS) return 0;
+  return Math.max(0, Math.min(sounds - 1, Math.floor(selected / DISCOVER_ROWS) * DISCOVER_ROWS));
+}
+
+/**
+ * buildDiscoverPayload. State 0 is "not enough to go on", 1 suggestions, 2 nothing new.
+ * @param {{ state?: number, sounds?: { name?: string, instrument?: string, at?: { x: number, y: number },
+ *   percent?: number, kept?: boolean }[], selected?: number, neverOpened?: number, regularsCounted?: number,
+ *   kind?: string, centre?: { x: number, y: number }, regulars?: { x: number, y: number }[],
+ *   likeName?: string, likeLoads?: number }} view
+ */
+export function discoverPayload(view) {
+  const sounds = view.sounds ?? [];
+  const count = sounds.length;
+  const selected = count === 0 ? 0 : clampTo(view.selected ?? 0, 0, count - 1);
+  const first = discoverFirstRow(count, selected);
+  const rows = Math.min(DISCOVER_ROWS, count - first);
+  const point = (out, p) => out.push(clampTo(p?.x ?? 0, 0, 100), clampTo(p?.y ?? 0, 0, 100));
+  const never = clampTo(view.neverOpened ?? 0, 0, 65535);
+  const out = [clampTo(view.state ?? 0, 0, 2), clampTo(count, 0, 255), clampTo(first, 0, 255),
+    clampTo(rows, 0, 255), clampTo(selected, 0, 255), never & 0xff, never >> 8,
+    clampTo(view.regularsCounted ?? 0, 0, 255)];
+  appendCut(out, view.kind, 12);
+  point(out, view.centre);
+  for (let i = first; i < first + rows; i++) {
+    const sound = sounds[i];
+    point(out, sound.at);
+    out.push(clampTo(sound.percent ?? 0, 0, 100), sound.kept ? 1 : 0);
+    appendCut(out, sound.name, 24);
+    appendCut(out, sound.instrument, 16);
+  }
+  appendCut(out, view.likeName, 24);
+  out.push(clampTo(view.likeLoads ?? 0, 0, 255));
+  const regulars = (view.regulars ?? []).slice(0, DISCOVER_REGULARS);
+  out.push(regulars.length);
+  for (const p of regulars) point(out, p);
+  return out;
+}
+
 // --- reading them back ----------------------------------------------------------------------------
 // The app's screen card labels its encoders from the bytes it draws, as it does for a knob page,
 // so the strip beside the screen can never disagree with the screen. Short or malformed bytes
@@ -264,4 +308,25 @@ export function readSoundcheckPayload(bytes = []) {
   const [peak, rms, seconds] = [r.byte(), r.byte(), r.byte()];
   return { count, first, selected, current: current - 1, ready, problems, unchecked, songs, basis,
            problemCount: total, problemLines: lines, peak, rms, seconds };
+}
+
+/** The set_discover payload as a view: the sounds listed (from `first`), the map, the selected one. */
+export function readDiscoverPayload(bytes = []) {
+  const r = reader(bytes);
+  const [state, count, first, rows, selected, low, high, regularsCounted] =
+    [r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte(), r.byte()];
+  const kind = r.text();
+  const centre = { x: r.byte(), y: r.byte() };
+  const sounds = [];
+  for (let i = 0; i < rows; i++) {
+    const at = { x: r.byte(), y: r.byte() };
+    const [percent, kept] = [r.byte(), r.byte()];
+    sounds.push({ index: first + i, at, percent, kept: kept !== 0, name: r.text(), instrument: r.text() });
+  }
+  const likeName = r.text();
+  const likeLoads = r.byte();
+  const regulars = [];
+  for (let i = 0, n = r.byte(); i < n; i++) regulars.push({ x: r.byte(), y: r.byte() });
+  return { state: ['notEnough', 'suggestions', 'nothingNew'][state] ?? 'notEnough', count, first, selected,
+           neverOpened: low + 256 * high, regularsCounted, kind, centre, sounds, likeName, likeLoads, regulars };
 }

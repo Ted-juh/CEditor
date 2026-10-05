@@ -20,6 +20,7 @@ local WARN   = 0xFFFF4D6A
 -- A colour per part on LAYERS, by its place in the rack.
 local PART_COLOURS = { 0xFFFF9408, 0xFF2DD4BF, 0xFF8B7CFF, 0xFFFF5C93,
                        0xFFFFB547, 0xFF5B9BFF, 0xFF7BD88F, 0xFFE6E9F5 }
+local SUGGEST = 0xFF8B7CFF   -- DISCOVER: a sound you have never opened
 
 local initialized = false
 local mode = 0
@@ -30,8 +31,9 @@ local values = { 0, 0, 0, 0, 0, 0, 0, 0 }
 
 -- The performance page's extras, read from set_values bytes 9..11 (a control page sends nine
 -- bytes, so they read 0 there and nothing extra is drawn): page kind, the beat in the bar
--- (1-based, 0 when stopped) and beats per bar. The two stage pages set their own kind when the
--- host sends them (set_check: 2, set_layers: 3); set_values sets it back to a knob page.
+-- (1-based, 0 when stopped) and beats per bar. The pages that are not knob pages set their own
+-- kind when the host sends them (set_check: 2, set_layers: 3, set_discover: 4); set_values sets it
+-- back to a knob page.
 local page_kind = 0
 local beat = 0
 local beats_per_bar = 4
@@ -472,6 +474,128 @@ local function draw_layers()
     say(SMALL, "E1 PART  E2 LOW  E3 HIGH  E4 TRANSPOSE  E5 VEL LOW  E6 VEL HIGH", DARK, 12, 250, 460, 16)
 end
 
+-- DISCOVER: set_discover (Ctrl49StagePages.h has the bytes). What you own and have never opened,
+-- nearest first to what you keep loading. On the left the map, brightness across and attack up:
+-- grey dots are the sounds you load most, YOU is their centre weighted by how often, and the
+-- suggestions listed are lit. On the right the list, eight at a time, pad N auditioning row N.
+local disc = { state = 0, count = 0, first = 0, rows = 0, selected = 0, never = 0, from = 0, kind = "",
+               cx = 0, cy = 0, list = {}, like = "", like_loads = 0, points = {} }
+
+function set_discover(args)
+    disc.state = get_byte(args, 0); disc.count = get_byte(args, 1); disc.first = get_byte(args, 2)
+    disc.rows = get_byte(args, 3); disc.selected = get_byte(args, 4)
+    disc.never = get_byte(args, 5) + 256 * get_byte(args, 6); disc.from = get_byte(args, 7)
+    local i = 8
+    disc.kind, i = read_string(args, i)
+    disc.cx = get_byte(args, i); disc.cy = get_byte(args, i + 1); i = i + 2
+    disc.list = {}
+    for r = 1, disc.rows do
+        local row = { x = get_byte(args, i), y = get_byte(args, i + 1), percent = get_byte(args, i + 2),
+                      kept = get_byte(args, i + 3) ~= 0 }
+        row.name, i = read_string(args, i + 4)
+        row.instrument, i = read_string(args, i)
+        disc.list[r] = row
+    end
+    disc.like, i = read_string(args, i)
+    disc.like_loads = get_byte(args, i); i = i + 1
+    local n = get_byte(args, i); i = i + 1
+    disc.points = {}
+    for k = 1, n do disc.points[k] = { get_byte(args, i), get_byte(args, i + 1) }; i = i + 2 end
+    page_kind = 4
+end
+
+local function thousands(n)
+    local s = tostring(n)
+    local out = ""
+    while #s > 3 do out = "," .. s:sub(-3) .. out; s = s:sub(1, -4) end
+    return s .. out
+end
+
+local MAP_X, MAP_Y, MAP_S = 12, 34, 168
+local function map_xy(x, y) return MAP_X + math.floor(x * MAP_S / 100), MAP_Y + MAP_S - math.floor(y * MAP_S / 100) end
+
+local function draw_discover()
+    local right = thousands(disc.never) .. " NEVER OPENED"
+    title_bar("DISCOVER", right)
+    -- the map
+    outline(MAP_X - 4, MAP_Y - 4, MAP_S + 9, MAP_S + 9, ROW)
+    say(SMALL, "SLOW", DIM, MAP_X, MAP_Y - 2, 60, 14)
+    say(SMALL, "BRIGHT", DIM, MAP_X + MAP_S - 60, MAP_Y + MAP_S - 14, 60, 14)
+    for k = 1, #disc.points do
+        local px, py = map_xy(disc.points[k][1], disc.points[k][2])
+        draw_rect(px - 1, py - 1, 3, 3, DARK)
+    end
+    local sel = disc.list[disc.selected - disc.first + 1]
+    if disc.state == 1 then
+        for r = 1, disc.rows do
+            local row = disc.list[r]
+            local px, py = map_xy(row.x, row.y)
+            draw_rect(px - 2, py - 2, 5, 5, SUGGEST)
+        end
+        if sel ~= nil then
+            local px, py = map_xy(sel.x, sel.y)
+            draw_rect(px - 3, py - 3, 7, 7, WHITE)
+        end
+        -- YOU last, so no dot covers where your taste sits
+        local yx, yy = map_xy(disc.cx, disc.cy)
+        outline(yx - 7, yy - 7, 15, 15, ORANGE)
+        draw_rect(yx - 14, yy + 9, 29, 13, BLACK)
+        say(SMALL, "YOU", ORANGE, yx - 20, yy + 8, 40, 14)
+    end
+    -- the list, or why there is none
+    local footer = "E1 PICK  E2 REACH  E3 KIND  E4 KEEP  PADS AUDITION"
+    if disc.state == 0 then
+        say(HEAD, "NOT ENOUGH TO GO ON", WHITE, 196, 70, 276, 24)
+        say(SMALL, "Load a few more sounds and this can tell", GREY, 196, 100, 276, 16)
+        say(SMALL, "you what you'd like: " .. tostring(disc.from) .. " of 5 so far.", GREY, 196, 118, 276, 16)
+        say(SMALL, footer, DARK, 12, 250, 460, 16)
+        return
+    end
+    if disc.state == 2 or disc.rows == 0 then
+        say(HEAD, "NOTHING NEW TO SUGGEST", WHITE, 196, 70, 276, 24)
+        if disc.kind ~= "" then
+            say(SMALL, "No " .. disc.kind .. " you have not opened: E3 for another kind.", GREY, 196, 100, 276, 16)
+        else
+            say(SMALL, "Every measured sound has been opened, or", GREY, 196, 100, 276, 16)
+            say(SMALL, "nothing unopened is measured yet.", GREY, 196, 118, 276, 16)
+        end
+        say(SMALL, footer, DARK, 12, 250, 460, 16)
+        return
+    end
+    for r = 1, disc.rows do
+        local row = disc.list[r]
+        local index = disc.first + r - 1
+        local y = 32 + (r - 1) * 19
+        if index == disc.selected then draw_rect(192, y, 282, 18, ROW) end
+        say(ROWNUM, tostring(r), DIM, 192, y, 14, 18)
+        if row.kept then draw_rect(211, y + 6, 6, 6, ORANGE) end
+        local c = GREY
+        if index == disc.selected then c = WHITE end
+        say(ROWTXT, row.name, c, 222, y, 150, 18)
+        say(ROWNUM, row.instrument, DIM, 330, y, 98, 18)
+        draw_rect(434, y + 8, 34, 2, DARK)
+        draw_rect(434, y + 7, math.floor(row.percent * 34 / 100), 4, SUGGEST)
+    end
+    draw_rect(192, 188, 282, 1, ROW)
+    if sel ~= nil then
+        local where = sel.name
+        if sel.instrument ~= "" then where = where .. "  IN " .. sel.instrument end
+        say(ROWTXT, where, WHITE, 192, 192, 282, 18)
+        local like = tostring(sel.percent) .. "% LIKE WHAT YOU LOAD"
+        if sel.kept then like = like .. ", KEPT" end
+        say(SMALL, like, GREY, 192, 210, 282, 16)
+        if disc.like ~= "" then
+            local times = " TIMES"
+            if disc.like_loads == 1 then times = " TIME" end
+            say(SMALL, "NEAREST " .. disc.like .. ", LOADED " .. tostring(disc.like_loads) .. times, GREY, 192, 226, 282, 16)
+        end
+    end
+    local kind = "ALL"
+    if disc.kind ~= "" then kind = disc.kind end
+    say(SMALL, "E1 PICK  E2 REACH  E3 " .. kind .. "  E4 KEEP  PADS AUDITION", DARK, 12, 250, 460, 16)
+    say(ROWNUM, tostring(disc.selected + 1) .. " / " .. tostring(disc.count), DIM, 372, 250, 100, 16)
+end
+
 function draw(args)
     if not initialized then init("") end
 
@@ -489,6 +613,10 @@ function draw(args)
     end
     if page_kind == 3 then
         draw_layers()
+        return
+    end
+    if page_kind == 4 then
+        draw_discover()
         return
     end
 

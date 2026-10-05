@@ -1,12 +1,14 @@
-// Ctrl49StagePages — the payloads for two HoSTage pages on the CTRL49 screen that a player reads
-// on stage rather than turns knobs on: SOUNDCHECK (the setlist checked before the show) and
-// LAYERS (which part sounds where on the keyboard).
+// Ctrl49StagePages — the payloads for the HoSTage pages on the CTRL49 screen that are not knob
+// pages: SOUNDCHECK (the setlist checked before the show) and LAYERS (which part sounds where on
+// the keyboard), which a player reads on stage, and DISCOVER (what you own and have never opened,
+// nearest to what you keep loading), which you go to between songs.
 //
-// Both were mocked up first in tools/ctrl49/screen-lab/feature-mockups (hostage-rig), from the
-// data HoSTage already holds: the setlist's reference checks and measured levels, and each
-// part's key and velocity zone. The broker fills the views below; Hostage_MultiKnob.lua draws
-// them (set_check, set_layers). The same builders exist in ctrl49Payloads.js for the app's
-// screen card, and a byte test on each side keeps the two the same.
+// All three were mocked up first in tools/ctrl49/screen-lab/feature-mockups (hostage-rig), from
+// data HoSTage already holds: the setlist's reference checks and measured levels, each part's key
+// and velocity zone, and the library's load counts and measured sounds. The broker fills the views
+// below; Hostage_MultiKnob.lua draws them (set_check, set_layers, set_discover). The same builders
+// exist in ctrl49Payloads.js for the app's screen card, and a byte test on each side keeps the two
+// the same.
 //
 // Pure std, no I/O, no JUCE — same tier as the other display payloads, testable everywhere.
 
@@ -107,5 +109,60 @@ int layersFirstRow (int parts, int focused);
       then [notes held][note][velocity]...
     Keys and velocities are clamped to 0-127, transpose to -64..+63. */
 Bytes buildLayersPayload (const LayersView& view);
+
+// --- DISCOVER -------------------------------------------------------------------------------------
+//
+// The map is the library's own two measured axes: brightness across, attack up, each 0-100. On it
+// go the centre of what you load (YOU, the load-weighted average), the sounds you load most, and
+// the suggestions.
+
+struct DiscoverPoint
+{
+    int x = 0;     // brightness, 0 dark .. 100 bright
+    int y = 0;     // attack, 0 instant .. 100 slow
+};
+
+struct DiscoverSoundView
+{
+    std::string name;
+    std::string instrument;      // the plug-in it is for
+    DiscoverPoint at;
+    int percent = 0;             // how like what you load: 100 * (1 - distance), as the app says it
+    bool kept = false;           // a favourite
+};
+
+struct DiscoverView
+{
+    enum State { notEnough = 0, suggestions = 1, nothingNew = 2 };
+    State state = notEnough;                 // too few loads to have a taste; or nothing to suggest
+    std::vector<DiscoverSoundView> sounds;   // nearest first, already kept to `kind`
+    int selected = 0;
+    int neverOpened = 0;                     // records never loaded, in the whole library
+    int regularsCounted = 0;                 // the sounds whose loads make the centre
+    std::string kind;                        // the category the list is kept to; empty = all
+    DiscoverPoint centre;
+    std::vector<DiscoverPoint> regulars;     // what you load most, for the map
+    std::string likeName;                    // the sound you load that the selected one is nearest
+    int likeLoads = 0;                       // and how often you have loaded it
+};
+
+inline constexpr int kDiscoverRows = 8;              // listed at once; pad N auditions row N
+inline constexpr int kDiscoverRegulars = 48;         // points of what you load, on the map
+inline constexpr std::size_t kDiscoverNameChars = 24;
+inline constexpr std::size_t kDiscoverInstrumentChars = 16;
+inline constexpr std::size_t kDiscoverKindChars = 12;
+
+/** The first sound listed: the window pages by eight, so pad N is always row N of what is shown. */
+int discoverFirstRow (int sounds, int selected);
+
+/** set_discover payload:
+      [0] state (0 not enough to go on, 1 suggestions, 2 nothing new)   [1] sounds   [2] first row
+      [3] rows that follow   [4] selected   [5][6] never opened, low byte first (stops at 65535)
+      [7] sounds the centre is made from (stops at 255)   then [kind]   [centre x][centre y]
+      then each row: [x][y][percent][kept][name][instrument]
+      then the selected sound: [like name][like loads, stops at 255]
+      then [points][x][y]... of what you load most
+    Strings are [length][ASCII] as on the other pages; x and y are 0-100. */
+Bytes buildDiscoverPayload (const DiscoverView& view);
 
 } // namespace ceditor::ctrl49

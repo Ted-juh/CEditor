@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import {
   rackLabelPayload, rackStatePayload, performanceTitle, performanceLabelPayload,
   performanceStatePayload, browseSlotViews, soundcheckPayload, soundcheckLevelByte, layersPayload,
-  readSoundcheckPayload, readLayersPayload,
+  readSoundcheckPayload, readLayersPayload, discoverPayload, readDiscoverPayload,
 } from '../src/CE_Application/screen/ctrl49Payloads.js';
 import { parseCalls } from '../src/ctrl49Preview/callScript.js';
 
@@ -109,6 +109,37 @@ test('layers: the golden the C++ test pins', () => {
   ]);
 });
 
+test('discover: the golden the C++ test pins', () => {
+  const str = (t) => [t.length, ...ascii(t)];
+  const view = {
+    state: 1,
+    sounds: [
+      { name: 'Gritty Strings 62', instrument: 'Nebula', at: { x: 62, y: 30 }, percent: 87 },
+      { name: 'Hollow Strings 61', instrument: 'Nebula', at: { x: 40, y: 70 }, percent: 85, kept: true },
+      { name: 'Bright Strings 12', instrument: 'Brasswork', at: { x: 75, y: 12 }, percent: 71 },
+    ],
+    neverOpened: 11903, regularsCounted: 14, kind: 'Strings', centre: { x: 55, y: 40 },
+    likeName: 'Lush Pad 19', likeLoads: 11, regulars: [{ x: 50, y: 35 }, { x: 60, y: 45 }],
+  };
+  assert.deepEqual(discoverPayload(view), [
+    1, 3, 0, 3, 0, 127, 46, 14, ...str('Strings'), 55, 40,
+    62, 30, 87, 0, ...str('Gritty Strings 62'), ...str('Nebula'),
+    40, 70, 85, 1, ...str('Hollow Strings 61'), ...str('Nebula'),
+    75, 12, 71, 0, ...str('Bright Strings 12'), ...str('Brasswork'),
+    ...str('Lush Pad 19'), 11,
+    2, 50, 35, 60, 45,
+  ]);
+  const back = readDiscoverPayload(discoverPayload(view));
+  assert.equal(back.state, 'suggestions');
+  assert.equal(back.neverOpened, 11903);
+  assert.deepEqual(back.sounds[1], { index: 1, at: { x: 40, y: 70 }, percent: 85, kept: true,
+    name: 'Hollow Strings 61', instrument: 'Nebula' });
+  assert.deepEqual([back.likeName, back.likeLoads, back.regulars.length], ['Lush Pad 19', 11, 2]);
+  const paged = discoverPayload({ state: 1, selected: 13, sounds: Array.from({ length: 30 }, (_, i) => ({ name: `S${i}` })) });
+  assert.deepEqual(paged.slice(2, 5), [8, 8, 13], 'the list pages by eight');
+  assert.equal(discoverPayload({}).length, 14, 'nothing to go on is still a payload');
+});
+
 // The screen card labels the encoders beside the screen from the same bytes the page draws, so
 // reading them back has to give the view they were built from.
 test('stage pages read back as the views they were built from', () => {
@@ -199,9 +230,10 @@ test('every function the broker calls is one the page defines', () => {
   const broker = read('../../src/ControlSurface/Ctrl49SurfaceBroker.cpp');
   const called = new Set([...broker.matchAll(/callLua \("([a-z_]+)"/g)].map((m) => m[1]));
   assert.ok(called.size >= 2, 'the broker calls into the page');
-  // A stage page's call is named once and sent through a variable (callLua (stageCall, ...)).
+  // A page beyond the knobs names its call once and sends it through a variable
+  // (callLua (stageCall, ...)).
   const stage = [...broker.matchAll(/stageCall = "([a-z_]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(stage.sort(), ['set_check', 'set_layers'], 'both stage pages name their call');
+  assert.deepEqual(stage.sort(), ['set_check', 'set_discover', 'set_layers'], 'each page beyond the knobs names its call');
   for (const name of [...called, ...stage, 'init', 'set_mode', 'draw'])
     assert.match(lua, new RegExp(`^function ${name}\\(`, 'm'), `${name} is defined`);
 });

@@ -19,13 +19,15 @@ Each comes in two sizes, full and slim, for the stress test: see
 run in the preset mode of `Ctrl49ScreenLab.exe`. `Start_CTRL49_Feature_Mockups.cmd` (in
 `tools/ctrl49`) asks which one and runs it.
 
-**Two of them are real now.** Layers and Soundcheck are HoSTage pages on the keyboard, drawn by
-`Hostage_MultiKnob.lua` from what the rack and the set already hold: see
-[the stage pages](../../README.md#the-stage-pages-layers-and-soundcheck). They kept what the
-mockups showed and lost what nothing measures yet. Layers has the bands, the notes answered and
-the zone on E2-E6, but not the layer groups' crossfades or the ghost outline. Soundcheck has
-each song's verdict, its problems and its measured level, but not load times or a suggested fix.
-The mockups stay as the picture of where both could go.
+**Three of them are real now.** Layers, Soundcheck and Discover are HoSTage pages on the
+keyboard, drawn by `Hostage_MultiKnob.lua` from what the rack, the set and the library already
+hold: see [the stage pages](../../README.md#the-stage-pages-layers-soundcheck-and-discover). They
+kept what the mockups showed and lost what nothing measures yet. Layers has the bands, the notes
+answered and the zone on E2-E6, but not the layer groups' crossfades or the ghost outline.
+Soundcheck has each song's verdict, its problems and its measured level, but not load times or a
+suggested fix. Discover has the list, the map, the kind and the keep, with pads that audition;
+its map shows the sounds you load most rather than the whole library, which would not fit a
+frame. The mockups stay as the picture of where all three could go.
 
 ## HoSTage Features
 

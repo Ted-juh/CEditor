@@ -1,7 +1,8 @@
-// ctrl49StagePages.test.js — the CTRL49's two stage pages, SOUNDCHECK and LAYERS, in the app's
-// store: the state that says which are on, the screen payload as the broker sends it, and the
+// ctrl49StagePages.test.js — the CTRL49's pages beyond the knobs, SOUNDCHECK, LAYERS and DISCOVER,
+// in the app's store: the state that says which are on, the screen payload as the broker sends it, and the
 // stand-in surface the app runs without the native host. The broker side is pinned in
-// InstrumentHostServiceTests (testCtrl49StagePages); this mirrors what it promises.
+// InstrumentHostServiceTests (testCtrl49StagePages, testCtrl49Discover); this mirrors what it
+// promises.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,9 +10,9 @@ import assert from 'node:assert/strict';
 import {
   emptyHostState, normalizeHostState, applyMockCommand, normalizeSurfaceScreen, mockSurfaceScreen,
 } from '../src/CE_Application/stores/instrumentHost.js';
-import { readLayersPayload, readSoundcheckPayload } from '../src/CE_Application/screen/ctrl49Payloads.js';
+import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload } from '../src/CE_Application/screen/ctrl49Payloads.js';
 
-const cursor = (page) => ({ page, active: 0, turned: {}, song: -1, part: -1 });
+const cursor = (page, more = {}) => ({ page, active: 0, turned: {}, song: -1, part: -1, sound: 0, kind: '', ...more });
 
 function rig() {
   let state = normalizeHostState({
@@ -31,10 +32,10 @@ function rig() {
 }
 
 test('both pages are off until asked for, and a payload without them reads as off', () => {
-  assert.deepEqual(emptyHostState().surfacePages, { soundcheck: false, layers: false });
-  assert.deepEqual(normalizeHostState({}).surfacePages, { soundcheck: false, layers: false });
-  assert.deepEqual(normalizeHostState({ surfacePages: { soundcheck: true, layers: 'yes' } }).surfacePages,
-    { soundcheck: true, layers: false }, 'only a real true turns a page on');
+  assert.deepEqual(emptyHostState().surfacePages, { soundcheck: false, layers: false, discover: false });
+  assert.deepEqual(normalizeHostState({}).surfacePages, { soundcheck: false, layers: false, discover: false });
+  assert.deepEqual(normalizeHostState({ surfacePages: { soundcheck: true, layers: 'yes', discover: true } }).surfacePages,
+    { soundcheck: true, layers: false, discover: true }, 'only a real true turns a page on');
 });
 
 test('the screen payload carries one stage call, and only one of the two known ones', () => {
@@ -51,7 +52,7 @@ test('the screen payload carries one stage call, and only one of the two known o
 test('turning the pages on in the stand-in adds them after the performance page, LAYERS first', () => {
   let state = applyMockCommand(rig(), { cmd: 'soundcheckOnSurface', on: true });
   state = applyMockCommand(state, { cmd: 'layersOnSurface' });
-  assert.deepEqual(state.surfacePages, { soundcheck: true, layers: true }, 'on, and flipped with no "on"');
+  assert.deepEqual(state.surfacePages, { soundcheck: true, layers: true, discover: false }, 'on, and flipped with no "on"');
 
   const performance = mockSurfaceScreen(state, cursor(1));
   assert.equal(performance.pageKind, 'performance');
@@ -87,4 +88,24 @@ test('a zone edit from the stage page is the same command the zone editor sends'
 test('Stage Lock refuses turning a page on, as the host does', () => {
   const locked = applyMockCommand(rig(), { cmd: 'setStageLock', enabled: true });
   assert.equal(applyMockCommand(locked, { cmd: 'layersOnSurface', on: true }).surfacePages.layers, false);
+});
+
+test('DISCOVER in the stand-in: after the other two, over the demo library', () => {
+  let state = applyMockCommand(rig(), { cmd: 'discoverOnSurface', on: true });
+  assert.equal(state.surfacePages.discover, true);
+  const screen = mockSurfaceScreen(state, cursor(2));
+  assert.equal(screen.pageKind, 'discover', 'one control page, performance, then DISCOVER');
+  assert.equal(screen.call, 'set_discover');
+  const view = readDiscoverPayload(screen.payload);
+  assert.equal(view.state, 'suggestions', 'the demo library has enough played to have a taste');
+  assert.ok(view.count > 0 && view.sounds.every((s) => s.percent > 0 && s.percent <= 100));
+  assert.ok(view.neverOpened >= view.count, 'what is suggested is some of what was never opened');
+  assert.ok(view.regulars.length >= 5, 'the map shows what is played');
+  assert.ok(view.likeName !== '', 'and the selected sound says which of them it is like');
+
+  const kept = readDiscoverPayload(mockSurfaceScreen(state, cursor(2), { records: [{ recordId: 'lib-12', favourite: true }] }).payload);
+  assert.equal(kept.sounds.find((s) => s.name === 'Deep Hall')?.kept, true, 'a favourite the Sounds page holds shows as kept');
+
+  state = applyMockCommand(state, { cmd: 'layersOnSurface', on: true });
+  assert.equal(mockSurfaceScreen(state, cursor(3)).pageKind, 'discover', 'LAYERS comes first when both are on');
 });

@@ -17,7 +17,7 @@ npm run dev            # then open http://localhost:5173/ctrl49.html
 The preview runs **this file**, not a copy, in wasmoon against the firmware draw-API shim, fed
 with payloads built the way the C++ builds them (`CE/web/src/CE_Application/screen/ctrl49Payloads.js`).
 Save the `.lua` and the screen redraws, keeping what you typed. The scenes are the pages the
-broker drives: splash (mode 0), control page, performance, browser, layers, soundcheck. **Custom calls** takes any
+broker drives: splash (mode 0), control page, performance, browser, layers, soundcheck, discover. **Custom calls** takes any
 call list (`set_values 1 64 0x7f`, `set_labels s"TITLE" s"one"`) so a new mode can be drawn
 before any C++ exists for it. The bytes of every call are listed under the screen.
 
@@ -29,23 +29,28 @@ Adding a new kind of page:
    with a byte test, and the same builder in `ctrl49Payloads.js` with a scene in the preview.
 3. Give it a page in `Ctrl49SurfaceBroker`: `pages()`, `pumpInput()`, `refreshDisplay()`.
 
-### The stage pages: LAYERS and SOUNDCHECK
+### The stage pages: LAYERS, SOUNDCHECK and DISCOVER
 
-Two pages a player reads on stage rather than turns knobs on, mocked up first in
-`screen-lab/feature-mockups` (hostage-rig) and now real. Like the browser, neither is on the
-keyboard until it is asked for — the **Layers** and **Soundcheck** switches on the app's CTRL49
-screen card (`layersOnSurface` / `soundcheckOnSurface`) — and then they follow the performance
-page, LAYERS first. Each is one call with one payload (`set_layers`, `set_check`;
-`CE/src/ControlSurface/Ctrl49StagePages.h` has the byte layouts) where a knob page takes two.
+Three pages that are not knob pages, mocked up first in `screen-lab/feature-mockups`
+(hostage-rig) and now real: two a player reads on stage, and one to go to between songs. Like the
+browser, none is on the keyboard until it is asked for — the **Layers**, **Soundcheck** and
+**Discover** switches on the app's CTRL49 screen card (`layersOnSurface`, `soundcheckOnSurface`,
+`discoverOnSurface`) — and then they follow the performance page in that order. Each is one call
+with one payload (`set_layers`, `set_check`, `set_discover`; `CE/src/ControlSurface/Ctrl49StagePages.h`
+has the byte layouts) where a knob page takes two.
 
 | Page | Shows | Encoders |
 | --- | --- | --- |
 | LAYERS | every part's key zone over 49 keys, its velocity range and transpose, muted parts and parts fed by another part; the notes held now, on the zones that answer them | E1 picks the part, E2-E6 turn its lowest key, highest key, transpose, lowest and highest velocity |
 | SOUNDCHECK | the set: each song ready, with problems, or not checked, and its measured level; the selected song's problems in the check's own words | E1 walks the set, E8 checks it again (once a second at most) |
+| DISCOVER | what you own and have never opened, nearest first to what you load (`unplayedLikeHabits`), eight at a time; a map of brightness against attack with YOU (the load-weighted centre) and the sounds you load most; the selected sound's likeness and which of your regulars it is nearest | E1 picks, E2 reaches eight further, E3 keeps the list to one kind, E4 keeps the sound as a favourite (clockwise) or lets it go; pad N auditions row N |
 
-A zone edit goes through `setPartMidiRules` and a re-check through `checkSetlistSoundcheck`, the
-commands the app's own buttons send, so Stage Lock refuses them there and the edition decides
-whether there is a set to check (SOUNDCHECK needs scenes and setlists; LAYERS is for anyone).
+A zone edit goes through `setPartMidiRules`, a re-check through `checkSetlistSoundcheck`, a keep
+through `setLibraryUserMetadata` and an audition through `auditionRecord`: the commands the app's
+own buttons send, so Stage Lock refuses the edits there and the edition decides whether there is
+a set to check (SOUNDCHECK needs scenes and setlists; LAYERS and DISCOVER are for anyone).
+DISCOVER says when it has too little to go on (fewer than five measured sounds ever loaded)
+rather than guessing, and reads the library at most every two seconds while it is up.
 
 Checks: `node --test test/ctrl49Preview.test.js` (payload bytes, and that every function the
 broker calls exists in the page) and `node browser-checks/ctrl49Screen.mjs` (every scene runs
@@ -370,7 +375,7 @@ rewrites the pages' sprite tables; the PNGs are committed, so running the lab ne
 ## Still requires hardware (open Phase-3 measurements)
 
 [`hardware-checklist.md`](hardware-checklist.md) is the list to take to a CTRL49 now: HoSTage's
-pages on the keyboard, including LAYERS and SOUNDCHECK, then the mockups' stress test, with what to
+pages on the keyboard, including LAYERS, SOUNDCHECK and DISCOVER, then the mockups' stress test, with what to
 write down at each step. The measurements below are the older, open ones.
 
 - **RAM / object budget** — how many/large filmstrips fit in device RAM before upload or

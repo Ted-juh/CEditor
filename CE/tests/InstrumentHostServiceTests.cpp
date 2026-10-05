@@ -5118,6 +5118,209 @@ void testCtrl49StagePages()
     check (unpaid.service->layersOnSurface(), "while LAYERS, which only shows the rack, is there for anyone");
 }
 
+void testCtrl49Discover()
+{
+    std::cout << "\nthe CTRL49's DISCOVER page: what you own and never opened, from the keys" << std::endl;
+
+    using ceditor::ctrl49::Ctrl49SurfaceBroker;
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+
+    // A library with a taste in it: six dark, long sounds that get played, and four never opened
+    // — two dark pads and a dark string near the habit, one bright lead far from it.
+    const auto seed = [] (const juce::File& dir, int played)
+    {
+        Library library;
+        const auto add = [&library] (const juce::String& name, const juce::String& category,
+                                     float brightness, float attack)
+        {
+            LibraryRecord record;
+            record.type = "preset";
+            record.sourceType = "userState";
+            record.name = name;
+            record.category = category;
+            record.instrument = "Good Synth";
+            record.targetCeId = "VST3-good-synth";
+            record.stateBlobBase64 = "AAAA";
+            const auto id = library.addCapturedRecord (record);
+            auto* edited = library.edit (id);
+            edited->sonic.measured = true;
+            edited->sonic.brightness = brightness;
+            edited->sonic.attack = attack;
+            edited->sonic.tail = 0.8f;
+            return id;
+        };
+        for (int i = 0; i < 6; ++i)
+        {
+            const auto id = add ("Regular " + juce::String (i + 1), "Pad", 0.20f + 0.02f * (float) i, 0.60f);
+            for (int n = 0; n < (i < played ? i + 1 : 0); ++n)
+                library.noteRecordUsed (id, false, 1000 + n);
+        }
+        add ("Dark Pad 2", "Pad", 0.24f, 0.62f);
+        add ("Dark Pad 3", "Pad", 0.27f, 0.58f);
+        add ("Dark Strings", "Strings", 0.22f, 0.66f);
+        add ("Bright Lead", "Lead", 0.90f, 0.05f);
+        library.saveTo (dir.getChildFile ("library.json"));
+    };
+
+    const auto dir = freshDataDir ("surface-discover");
+    seedCatalog (dir);
+    seed (dir, 6);
+    Harness h (dir);
+    h.cmd ("getState");
+
+    double fakeNow = 0.0;
+    Ctrl49SurfaceBroker::Options options;
+    options.discover = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+    options.emit = [&h] (const juce::String& name, const juce::var& payload)
+    {
+        h.emits.entries.push_back ({ name, payload });
+    };
+    options.pageLua = { 't' };
+    options.now = [&fakeNow] { return fakeNow; };
+    Ctrl49SurfaceBroker broker (*h.service, options);
+
+    const auto tickPast = [&] { fakeNow += 150.0; broker.tick(); };
+    const auto press = [&] (int cc, int value)
+    {
+        juce::Array<juce::var> data { 0xB0, cc, value };
+        h.cmd ("surfaceInput", { { "data", juce::var (data) } });
+    };
+    const auto payload = [&h]
+    {
+        std::vector<int> bytes;
+        if (const auto* screen = h.emits.last ("instrumentHostSurfaceScreen"))
+            if (const auto* array = screen->getProperty ("payload", {}).getArray())
+                for (const auto& b : *array)
+                    bytes.push_back ((int) b);
+        return bytes;
+    };
+    const auto at = [] (const std::vector<int>& b, std::size_t i) { return i < b.size() ? b[i] : -1; };
+    // The parts of a set_discover payload a test reads: the kind, and each row's kept flag and name.
+    struct Row { bool kept; std::string name; };
+    const auto read = [&at] (const std::vector<int>& b, std::string& kind)
+    {
+        std::vector<Row> rows;
+        if (b.size() < 14) return rows;
+        std::size_t i = 8;
+        const auto text = [&b, &i, &at]
+        {
+            std::string out;
+            const auto n = (std::size_t) juce::jmax (0, at (b, i));
+            for (std::size_t k = 0; k < n; ++k) out += (char) at (b, i + 1 + k);
+            i += 1 + n;
+            return out;
+        };
+        kind = text();
+        i += 2;                                     // the centre
+        for (int r = 0; r < at (b, 3); ++r)
+        {
+            const auto kept = at (b, i + 3) == 1;
+            i += 4;
+            const auto name = text();
+            text();                                 // the instrument
+            rows.push_back ({ kept, name });
+        }
+        return rows;
+    };
+    const auto kindString = [&payload, &read] { std::string kind; read (payload(), kind); return kind; };
+
+    tickPast();
+    check (broker.pages().discover < 0, "DISCOVER is not on the surface until it is asked for");
+    h.cmd ("discoverOnSurface", { { "on", true } });
+    check (broker.pages().discover == broker.pages().performance + 1
+             && (bool) h.emits.lastState()->getProperty ("surfacePages", {}).getProperty ("discover", false),
+           "asked for, it follows the performance page, and the state says it is on");
+    for (int i = 0; i < broker.pages().count && broker.currentPage() != broker.pages().discover; ++i)
+    {
+        press (40, 127);
+        tickPast();
+    }
+    const auto* screen = h.emits.last ("instrumentHostSurfaceScreen");
+    check (broker.currentPage() == broker.pages().discover && screen != nullptr
+             && screen->getProperty ("pageKind", {}).toString() == "discover"
+             && screen->getProperty ("call", {}).toString() == "set_discover",
+           "Page Right walks to it, and the app is sent one set_discover payload");
+
+    auto bytes = payload();
+    std::string kind;
+    auto rows = read (bytes, kind);
+    check (at (bytes, 0) == 1 && at (bytes, 1) == 4 && at (bytes, 5) == 4 && at (bytes, 7) == 6,
+           "four never opened, all four suggested, from the six sounds that are played");
+    // The centre is weighted by loads: brightness about 0.27, attack 0.6, so Dark Pad 3 is nearest.
+    check (rows.size() == 4 && rows[0].name == "Dark Pad 3" && rows[3].name == "Bright Lead",
+           "nearest to what you play first, and the one like nothing you play last");
+    check (kind.empty(), "every kind, to start with");
+
+    press (13, 1);                                  // E3: keep it to one kind
+    tickPast();
+    bytes = payload();
+    rows = read (bytes, kind);
+    check (kind == "PAD" && rows.size() == 2 && rows[0].name == "Dark Pad 3" && rows[1].name == "Dark Pad 2",
+           "E3 keeps the list to one kind, the commonest among the suggestions first");
+    press (13, 1);
+    tickPast();
+    check (kindString() != "PAD" && ! kindString().empty(), "and turns on to the next");
+    press (13, 127);
+    press (13, 127);
+    tickPast();
+    check (kindString().empty() && at (payload(), 1) == 4, "and back to every kind");
+
+    press (11, 1);                                  // E1
+    tickPast();
+    check (at (payload(), 4) == 1, "E1 picks the next sound");
+    press (12, 1);                                  // E2: reach eight further
+    tickPast();
+    check (at (payload(), 4) == 3, "E2 reaches further down the list, stopping at the end");
+
+    // E4 keeps the sound as a favourite, and lets it go.
+    // The library is held in a local: iterating storedLibrary (dir).allRecords() directly would
+    // walk a temporary that is gone before the loop body runs.
+    const auto favourite = [&dir] (const juce::String& name)
+    {
+        const auto library = storedLibrary (dir);
+        for (const auto& record : library.allRecords())
+            if (record.name == name) return record.user.favourite;
+        return false;
+    };
+    press (14, 1);
+    tickPast();
+    rows = read (payload(), kind);
+    check (favourite ("Bright Lead") && rows.size() == 4 && rows[3].kept,
+           "E4 clockwise keeps the selected sound as a favourite, and the page marks it");
+    press (14, 127);
+    tickPast();
+    check (! favourite ("Bright Lead") && ! read (payload(), kind)[3].kept, "and counter-clockwise lets it go");
+
+    h.emits.clear();
+    press (2, 100);                                 // pad 2: the second row
+    tickPast();
+    const auto* audition = h.emits.last ("instrumentHostAudition");
+    juce::String secondRow;
+    const auto stored = storedLibrary (dir);
+    for (const auto& record : stored.allRecords())
+        if (record.name == "Dark Pad 2") secondRow = record.recordId;
+    check (audition != nullptr && audition->getProperty ("recordId", {}).toString() == secondRow,
+           "a pad auditions the sound in the row beside its number: pad 2, the second");
+
+    h.cmd ("discoverOnSurface", { { "on", false } });
+    tickPast();
+    check (broker.pages().discover < 0 && broker.currentPage() < broker.pages().count,
+           "and off again, the surface steps back onto a page that exists");
+
+    // Too few sounds played to have a taste: the page says so rather than guessing.
+    {
+        const auto fewDir = freshDataDir ("surface-discover-few");
+        seedCatalog (fewDir);
+        seed (fewDir, 2);
+        Harness few (fewDir);
+        few.cmd ("getState");
+        const auto read = few.service->surfaceDiscover ({}, 48);
+        check (! read.enough && read.sounds.isEmpty() && read.regularsCounted == 2 && read.neverOpened == 8,
+               "with two sounds played there is not enough to go on, and nothing is suggested");
+    }
+}
+
 void testCtrl49Broker()
 {
     std::cout << "\nthe CTRL49 broker: the hardware path in the app, not in a demo" << std::endl;
@@ -5526,6 +5729,7 @@ void testCtrl49Broker()
         };
 
         check (broker.state() == Ctrl49SurfaceBroker::State::connected, "the keyboard is there");
+        const auto beforeLayers = frameCount();
         h.cmd ("layersOnSurface", { { "on", true } });
         broker.tick();
         for (int i = 0; i < broker.pages().count && broker.currentPage() != broker.pages().layers; ++i)
@@ -5543,6 +5747,8 @@ void testCtrl49Broker()
         fakeNow += 150.0;
         broker.tick();
         check (framesFrom (0, layersCall) == 1, "and a page that has not changed is not sent again");
+        check (framesFrom (beforeLayers, ceditor::ctrl49::buildPadRgb (1, 0, 0, 0)) == 1,
+               "its pads go dark, because they do nothing there");
 
         const auto before = frameCount();
         fake.feed (0xB0, 39, 127);             // Page Left, back to the performance page
@@ -5554,8 +5760,29 @@ void testCtrl49Broker()
                  && framesFrom (before, buildLuaCall (Ctrl49Session::kTarget, "set_labels", labels)) == 1
                  && framesFrom (before, buildLuaCall (Ctrl49Session::kTarget, "set_values", values)) == 1,
                "the performance page is sent whole when the keys come back to it");
+        check (framesFrom (before, ceditor::ctrl49::buildPadRgb (1, 0xFF, 0xA5, 0x00)) == 1,
+               "and its pads are lit again for the clips");
 
+        // DISCOVER over a library with no taste in it yet: nothing listed, so nothing for a pad to
+        // audition, and the pads say so by staying dark.
         h.cmd ("layersOnSurface", { { "on", false } });
+        h.cmd ("discoverOnSurface", { { "on", true } });
+        broker.tick();
+        const auto beforeDiscover = frameCount();
+        for (int i = 0; i < broker.pages().count && broker.currentPage() != broker.pages().discover; ++i)
+        {
+            fake.feed (0xB0, 40, 127);
+            broker.tick();
+        }
+        fakeNow += 150.0;
+        broker.tick();
+        const auto discover = shown ("payload");
+        check (broker.currentPage() == broker.pages().discover && ! discover.empty() && discover[0] == 0
+                 && framesFrom (beforeDiscover, buildLuaCall (Ctrl49Session::kTarget, "set_discover", discover)) == 1,
+               "DISCOVER reaches the keyboard as one set_discover call, saying there is not enough to go on");
+        check (framesFrom (beforeDiscover, ceditor::ctrl49::buildPadRgb (1, 0, 0, 0)) == 1,
+               "and with nothing listed its pads are dark");
+        h.cmd ("discoverOnSurface", { { "on", false } });
         broker.tick();
     }
 
@@ -14288,6 +14515,7 @@ int main (int argc, char* argv[])
     testCtrl49Broker();
     testCtrl49AppScreen();
     testCtrl49StagePages();
+    testCtrl49Discover();
     testCtrl49DiscoveryReasons();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();

@@ -53,6 +53,7 @@ try {
     browse: ['init', 'set_mode', 'set_labels', 'set_values', 'draw'],
     layers: ['init', 'set_mode', 'set_layers', 'draw'],
     soundcheck: ['init', 'set_mode', 'set_check', 'draw'],
+    discover: ['init', 'set_mode', 'set_discover', 'draw'],
     custom: ['init', 'set_mode', 'set_labels', 'set_values', 'draw'],
   };
   const drawn = {};
@@ -159,6 +160,26 @@ try {
 
   await host.getByTestId('ctrl49-soundcheck-toggle').click();
   await host.getByTestId('ctrl49-layers-toggle').click();
+  await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+
+  // DISCOVER: the demo library has a taste in it, so the page lists what it would suggest, and
+  // its pads are live (each auditions its row) where the other two pages' are not.
+  await host.getByTestId('ctrl49-discover-toggle').click();
+  await host.getByTestId('ctrl49-page-right').click();
+  await host.waitForFunction(() => /2\s*\/\s*2\s*Discover/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_discover');
+  assert.equal(await encoderOne.locator('.label').innerText(), 'Pick');
+  assert.match(await encoderOne.locator('.value').innerText(), /^1 \/ \d+$/, 'and says where in the list it is');
+  const firstPad = card.locator('.pad').first();
+  assert.equal(await firstPad.isDisabled(), false, 'on DISCOVER the pads play');
+  assert.equal(await firstPad.getAttribute('title'), 'Audition row 1');
+  // The demo library has one sound never opened, a pad: E3 keeps the list to its kind.
+  const kindValue = card.locator('.encoder').nth(2).locator('.value');
+  assert.equal(await kindValue.innerText(), 'Every kind');
+  await card.locator('.encoder').nth(2).getByRole('button', { name: 'Encoder 3 up' }).click();
+  await host.waitForFunction(() => document.querySelectorAll('[data-testid=ctrl49-screen-card] .encoder .value')[2].innerText === 'Pad');
+  if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-discover.png` });
+  await host.getByTestId('ctrl49-discover-toggle').click();
   await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
 
   // The rest of the firmware's Lua surface, through the real runtime: padding and the font table,
