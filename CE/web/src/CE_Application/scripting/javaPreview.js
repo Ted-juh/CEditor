@@ -1,3 +1,4 @@
+import { scriptLoopGuard } from './scriptWatchdog.js';
 // javaPreview.js — interpreter for the Java *behavior-handler subset*, so Java scripts run live in
 // the WebView preview (real Java would compile to a native export). Same design as cppPreview/
 // csharpPreview, with Java idioms: -> lambdas, enhanced for (`for (T x : coll)`), method-style
@@ -467,6 +468,7 @@ function instantiate(def, args, env) {
 }
 
 function execStmt(node, env) {
+  scriptLoopGuard();   // the preview watchdog: an endless loop stops instead of hanging the editor (C-57)
   switch (node.type) {
     case 'empty': return;
     case 'exprStmt': evalNode(node.expr, env); return;

@@ -1,3 +1,4 @@
+import { scriptLoopGuard } from './scriptWatchdog.js';
 // cppPreview.js — a small interpreter for the C++ *behavior-handler subset*.
 //
 // True C++ is compiled into the exported plugin. This interpreter runs the subset that panel
@@ -901,6 +902,7 @@ function evalNode(node, env) {
 }
 
 function execStmt(node, env) {
+  scriptLoopGuard();   // the preview watchdog: an endless loop stops instead of hanging the editor (C-57)
   switch (node.type) {
     case 'empty': return;
     case 'exprStmt': evalNode(node.expr, env); return;

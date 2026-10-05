@@ -89,6 +89,7 @@ import { compileJava, invokeJava } from './javaPreview.js';
 import { ensureTs, transpileTs } from './tsService.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
+import { GUARD_NAME, PYTHON_WATCHDOG_PRELUDE, instrumentJs, instrumentLua, isScriptTimeLimit, scriptLoopGuard } from './scriptWatchdog.js';
 import { applySplitScriptAction } from '../utils/splitZoneLayout.js';
 import { phraseScriptPatch } from '../utils/phraseLayout.js';
 import { recorderScriptPatch } from '../utils/noteRecorderLayout.js';
@@ -7295,10 +7296,12 @@ function ownerOf(script) {
 /** Run JS source with the panel API bound and collect its declared handlers (sync). */
 function runJsSource(source, scriptId, api, names) {
   const probe = names.map((n) => `${JSON.stringify(n)}: (typeof ${n} !== 'undefined' ? ${n} : undefined)`).join(',');
-  const body = `${source}\n;return {${probe}};`;
+  // Every loop body calls the watchdog, so an endless loop stops after the time limit instead of
+  // hanging the editor (C-57). Inserted on the same line: error line numbers do not move.
+  const body = `${instrumentJs(source)}\n;return {${probe}};`;
   try {
-    const factory = new Function(...Object.keys(api), body);
-    return factory(...Object.values(api)) || {};
+    const factory = new Function(GUARD_NAME, ...Object.keys(api), body);
+    return factory(scriptLoopGuard, ...Object.values(api)) || {};
   } catch (e) {
     reportScriptLoadError(scriptId, `load error: ${e?.message ?? e}`);
     return null;
@@ -7391,12 +7394,13 @@ async function loadHandlersLua(script) {
       else if (k === 'ce') lua.global.set(k, nilSafeNamespace(v));
       else lua.global.set(k, v);          // `state` and friends keep their identity
     }
+    lua.global.set(GUARD_NAME, scriptLoopGuard);
     // Clear any handlers left in globals by a previous run, eval the source, then collect this
     // run's handlers into a table the JS side can call.
     const names = probeNames(script);
     const clear = names.map((n) => `${n}=nil`).join(';');
     const collect = names.map((n) => `${n}=${n}`).join(',');
-    const handlers = await lua.doString(`${clear}\n${script.source}\nreturn {${collect}}`);
+    const handlers = await lua.doString(`${clear}\n${instrumentLua(script.source)}\nreturn {${collect}}`);
     return handlers || {};
   } catch (e) {
     reportScriptLoadError(script.id, `load error: ${e?.message ?? e}`);
@@ -7425,7 +7429,9 @@ async function getPyodideEngine() {
           document.head.appendChild(s);
         });
       }
-      return globalThis.loadPyodide({ indexURL: CDN });
+      const py = await globalThis.loadPyodide({ indexURL: CDN });
+      py.runPython(PYTHON_WATCHDOG_PRELUDE);
+      return py;
     })();
   }
   return pyodidePromise;
@@ -7484,8 +7490,8 @@ async function loadHandlersPython(script) {
     // One level deep: the names become Python globals, and `ce` stays a JavaScript object, so
     // `ce.midi.sendCC(...)` resolves by attribute the way the exported plug-in's `ce` namespace does.
     // Converting it all the way turned `ce` into a dict and every `ce.*` call into AttributeError (C-98).
-    const ns = py.toPy(apiForPython(api, py.ffi?.PyProxy), { depth: 1 });
-    py.runPython(script.source, { globals: ns });
+    const ns = py.toPy(apiForPython({ ...api, [GUARD_NAME]: scriptLoopGuard }, py.ffi?.PyProxy), { depth: 1 });
+    py.globals.get('__ce_exec')(script.source, ns);
     const handlers = {};
     for (const name of probeNames(script)) {
       const fn = ns.get(name);
@@ -7605,7 +7611,7 @@ function loadHandlersCpp(script) {
     out[name] = (payload) => {
       const event = previewEventFor('cpp', payload);
       try { return invokeCpp(fnNode, [ctx, event], { print }); }
-      catch (e) { addScriptTrace('error', script.id, `C++ preview runtime error: ${e?.message ?? e}`); }
+      catch (e) { if (isScriptTimeLimit(e)) reportScriptError(script.id, e); else addScriptTrace('error', script.id, `C++ preview runtime error: ${e?.message ?? e}`); }
     };
   }
   return out;
@@ -7628,7 +7634,7 @@ function loadHandlersCsharp(script) {
     const fire = (payload) => {
       const event = previewEventFor('csharp', payload);
       try { return invokeCsharp(fnNode, [ctx, event], { print }); }
-      catch (e) { addScriptTrace('error', script.id, `C# preview runtime error: ${e?.message ?? e}`); }
+      catch (e) { if (isScriptTimeLimit(e)) reportScriptError(script.id, e); else addScriptTrace('error', script.id, `C# preview runtime error: ${e?.message ?? e}`); }
     };
     out[name] = fire;
     const lower = name.charAt(0).toLowerCase() + name.slice(1); // OnValueChanged → onValueChanged
@@ -7652,7 +7658,7 @@ function loadHandlersJava(script) {
     out[name] = (payload) => {
       const event = previewEventFor('java', payload);
       try { return invokeJava(fnNode, [ctx, event], { print }); }
-      catch (e) { addScriptTrace('error', script.id, `Java preview runtime error: ${e?.message ?? e}`); }
+      catch (e) { if (isScriptTimeLimit(e)) reportScriptError(script.id, e); else addScriptTrace('error', script.id, `Java preview runtime error: ${e?.message ?? e}`); }
     };
   }
   return out;
@@ -7730,6 +7736,7 @@ function reportScriptLoadError(scriptId, message) {
 // Report a thrown error as an error line plus a few call-stack frames (when available),
 // so the console shows the exception AND where it came from.
 function reportScriptError(scriptId, e) {
+  if (isScriptTimeLimit(e)) stopScript(scriptId);
   const msg = e?.message ?? String(e);
   addScriptTrace('error', scriptId, msg);
   dispatchErrorHook(scriptId, msg, 'dispatch');
@@ -7760,8 +7767,26 @@ function cacheKey(script) {
 /** Load (or reuse) a script's handlers. Re-loading replaces the script's on(…) listeners and its
     watch/compute/intercept rules and actions — an edit must not leave the previous version's rules
     running beside the new ones. */
+/**
+ * Scripts the watchdog stopped, by id, with the source they were stopped in. A stopped script loads
+ * nothing and its listeners are gone, so an endless loop in onValueChanged costs one stall rather
+ * than one per knob movement. Editing the script changes its key and runs it again.
+ */
+const stoppedScripts = new Map();
+
+function stopScript(scriptId) {
+  const loaded = handlerCache.get(scriptId);
+  if (!loaded || stoppedScripts.get(scriptId) === loaded.key) return;
+  stoppedScripts.set(scriptId, loaded.key);
+  clearListeners(scriptId);
+  clearReactive(scriptId);
+  clearMidiFiltersFor(scriptId);
+}
+
 async function handlersFor(script) {
   const key = cacheKey(script);
+  if (stoppedScripts.get(script.id) === key) return null;
+  stoppedScripts.delete(script.id);
   const hit = handlerCache.get(script.id);
   if (hit && hit.key === key) return hit.handlers;
   clearListeners(script.id);
@@ -7880,6 +7905,7 @@ async function invokeHandler(script, hook = null, payload = undefined) {
  */
 export async function runScript(script, hook = null, payload = undefined) {
   handlerCache.delete(script.id);
+  stoppedScripts.delete(script.id);   // pressing Run is asking to try again, stopped or not
   return invokeHandler(script, hook, payload);
 }
 

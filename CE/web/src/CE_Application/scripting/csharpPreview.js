@@ -1,3 +1,4 @@
+import { scriptLoopGuard } from './scriptWatchdog.js';
 // csharpPreview.js — interpreter for the C# *behavior-handler subset*, so C# scripts run live in
 // the WebView preview (the real C# would be compiled into a native export). Mirrors cppPreview's
 // design, adapted to C# idioms: var, foreach, => lambdas, string interpolation $"…", List/Dictionary
@@ -530,6 +531,7 @@ function instantiate(def, args, env) {
 }
 
 function execStmt(node, env) {
+  scriptLoopGuard();   // the preview watchdog: an endless loop stops instead of hanging the editor (C-57)
   switch (node.type) {
     case 'empty': return;
     case 'exprStmt': evalNode(node.expr, env); return;
