@@ -369,6 +369,10 @@ rewrites the pages' sprite tables; the PNGs are committed, so running the lab ne
 
 ## Still requires hardware (open Phase-3 measurements)
 
+[`hardware-checklist.md`](hardware-checklist.md) is the list to take to a CTRL49 now: HoSTage's
+pages on the keyboard, including LAYERS and SOUNDCHECK, then the mockups' stress test, with what to
+write down at each step. The measurements below are the older, open ones.
+
 - **RAM / object budget** — how many/large filmstrips fit in device RAM before upload or
   decode fails. Escalate PNG uploads until the screen stops updating.
 - **Redraw-rate budget** — how fast `draw` calls can go before the link stutters (bounds
