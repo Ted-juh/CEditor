@@ -108,6 +108,8 @@ in vendored JUCE.
 
 ### C-08 — A shared panel's JavaScript can read and write any file on the machine through the app's native bridge   (S1 · security · scripting / sharing)
 
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `0b5c5eb`. Panels opened from a file or a package keep their scripts off until the user clicks **Run scripts** on a banner. Trust is remembered per script content and is never inferred from the file. Scripts written in the editor are never gated. This is the stop-gap the treatment above proposed; the isolated-frame sandbox and the path allow-list are still open.
+
 **Repro.** A `.cepanel` or `.cepanelpkg` whose JS script contains, at top level,
 `window.__JUCE__.backend.emitEvent('savePanel', { panelId:'0', filePath:'<Startup folder>/x.bat', data:'…' })`.
 File → Open Shared Panel… (or Open Panel), then press **Preview** — or export it / load it in the Player, which run
@@ -135,6 +137,8 @@ Claude confirmed the executor and the unrestricted native handler by reading the
 
 ### C-09 — Save As, then one Undo, silently points the tab back at the ORIGINAL file; the next Save overwrites it   (S1 · data loss · save / undo)
 
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `062c877`. `filePath` and `name` are out of the undo snapshot, and Save As renames the existing undo entries.
+
 **Repro.** Open `master.cepanel`, edit, File → Save As → `variant.cepanel`, press Ctrl+Z once, press Ctrl+S.
 **Observed.** After Save As: `{ filePath: '/docs/B.cepanel', name: 'B', modified: false }`. After one undo:
 `{ filePath: '/docs/A.cepanel', name: 'Original', modified: true }` — the tab label flips back too. Ctrl+S then
@@ -160,6 +164,8 @@ never clear.
 **Evidence level.** observed-in-test (store test) + read-in-code.
 
 ### C-11 — "Send saved sound" overwrites every dump parameter the panel does not export with 0 — including the synth's System block   (S1 · faulty · Total Recall)
+
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `7dc6e59`, `457aa3d`. Total Recall stores and sends only dumps the panel covers completely. It never captures or restores a dump addressed to a stored-memory slot, and it re-checks stored dumps against today's profile before sending (`CE/src/Player/DumpCapturePolicy.h`).
 
 **Repro.** A panel bound (default role `mainSynth`) to a profile with `dumpDefinitions` — e.g. `roland-gaia-sh01`,
 26 dumps. Export, save a DAW project, reopen, press **Send saved sound** (or policy `restoreHardware: always`).
@@ -330,6 +336,8 @@ opens it with no chooser. New Panel from Device Profile lists Test CC/NRPN/SysEx
 
 ### C-25 — AN1x profile: Scene 2 and Free-EG tracks 2–4 in every dump read and write the Scene 1 / track 1 parameters   (S1 · bug · device profiles / DPD emitter)
 
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `cc22d5e`. One id rule (`legacyParamId`) for both the parameter list and the dump mappings. The AN1x profile is regenerated, and a test checks every shipped dump mapping.
+
 **Repro.** Parse an AN1x Scene 2 bulk dump with Poly Mode = Legato; build a Scene 2 dump with Scene 1 poly, Scene 2 mono.
 **Observed.** The Scene 2 dump sets `scPolyMode` (Scene 1, address 10 10 00) and leaves `scene2.scPolyMode` undefined;
 the built Scene 2 payload carries Scene 1's value. Claude's own count over
@@ -414,6 +422,8 @@ payload size, so it cannot build. Observed-in-test.
 
 ### C-34 — Closing the Hostage plug-in while Library → Listen is measuring crashes the DAW   (S1 · bug · Hostage VST3 — if that product ships)
 
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `70cdf3b`. The final closure checks the `alive` token. The auditioner's waits on the control thread give up when the service goes, which also fixes a hang on close that came before the crash.
+
 **Repro.** CEHostVST3: Library → Listen (`analyseLibrary`); while it runs, remove the plug-in or close the project.
 **Observed.** `~InstrumentHostService` joins `analysisThread` (`InstrumentHostService.cpp:123-125`); the thread's last
 act posts a closure capturing `this` (`:11318-11351` — `library.edit`, `saveLibrary`, `snapshots->sweep`,
@@ -424,6 +434,8 @@ does not.
 **Evidence level.** read-in-code; Claude confirmed the `this` capture and the unguarded `callAsync`.
 
 ### C-35 — A failed preset load leaves the part named and saved as the new plug-in, holding the old plug-in's state   (S1 · bug · Hostage session persistence)
+
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `ec44716`. The part's identity and state change only when the load commits. A failed or superseded load leaves the part as it was. This also fixes C-38.
 
 **Repro.** Part has plug-in A; load a library preset of plug-in B (`loadLibraryRecord`, `auditionRecord`,
 `walkPartPreset`) and let the load fail (worker crash in construction, 15 s handshake timeout on a licence dialog or a
@@ -456,6 +468,8 @@ returns A (`InstrumentHostService.cpp:7058-7062`; the old node goes only in `com
 case (`InstrumentHostServiceTests.cpp:3517-3521`). Read-in-code.
 
 ### C-38 — Picking another preset while a new plug-in is still loading applies it to the old plug-in; the first pick wins   (S2 · bug · Hostage library load)
+
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `ec44716`. Fixed together with C-35. While a different plug-in is loading into a part, a preset is never applied in place, and the last pick wins.
 
 After B1's prime the part claims B while A is live, so B2 counts as `sameClassLoaded` (`InstrumentHostService.cpp:12891`)
 and is applied to A (a vendor `.vstpreset` is refused "The plug-in refused this preset"; a program number selects on A;
@@ -594,6 +608,8 @@ and `ce.anim` alike (`utils/easing.js`). Observed-in-test.
 says the second kind is `spring` and that `springEase` lives in `interactionRuntime.js`. Read-in-code.
 
 ### C-57 — One infinite loop in any preview script freezes the editor (or the plug-in's open window) with no recovery   (S1 · bug · scripting runtime)
+
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `70d3298`. Preview scripts in all seven languages are instrumented with a loop guard. A script that holds the thread for more than 2 s is stopped and stays stopped until it is edited or run again.
 
 **Repro.** A handler, or JS top-level code, containing `while (true) {}`; Preview.
 **Observed.** JS, Lua (real wasmoon), C++, C# and Java previews never return; a 500 ms timer in the same process never
@@ -927,6 +943,8 @@ ends.
 
 ### C-94 — Typing a large tick count into a Knob or Slider freezes the editor; 1,000,000 crashes it   (S1 · bug · inspector / slider renderer)
 
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `db847b0`. Major/Minor Count have maximums (129 and 16), and `buildSliderTickStops` clamps whatever reaches it.
+
 **Repro.** Insert a Knob (or Slider) → properties **Slider** tab → Ticks & Labels: turn Ticks on → type into **Major
 Count** and press Enter.
 **Observed** (real inspector UI): 1,000 → fine (4,018 shapes). **100,000 → the page stops responding for 49 s, then
@@ -969,6 +987,8 @@ reopen: 0 losses. 10 of 225,797 writes took over 400 ms (worst 622 ms, apart fro
 
 ### C-96 — Python: a script that saves a dict setting leaves the panel impossible to save, even after the script is removed   (S1 · data loss · Python preview)
 
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `3c3c772`. Python values are converted at the API boundary: dicts, lists, callbacks and the `ce` namespace (also fixes C-97, C-98 and C-99).
+
 **Repro.** Panel Python script `def onPanelLoad(_=None): saveSetting("lastPatch", {"name": "Bass", "cutoff": 64})`;
 Preview on, off; delete the script; Ctrl+S.
 **Observed.** No save event is emitted; two page errors "This borrowed proxy was automatically destroyed at the end of a
@@ -982,6 +1002,8 @@ boundary closes all of them.
 
 ### C-97 — Python: every callback handed to the API is dead by the time it should run   (S2 · bug · Python preview)
 
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `3c3c772`. Fixed together with C-96.
+
 `on(…, fn)`, `after`, `watch`, `compute`, `intercept`, `defineAction` + `run`, `uiDialog`, `interceptMidiOut`: JS, TS and
 Lua each produce the same 11 callback lines (intercept clamps to 0.3, `run` returns 7, the dialog appears); Python
 produces 10× "borrowed proxy … destroyed", `run` returns null, and the dialog never appears (its callback fires at once
@@ -989,12 +1011,16 @@ with no choice). Same root cause as C-96. Observed-in-app.
 
 ### C-98 — Python: `ce.*` does not exist — every namespaced call raises AttributeError in Preview, and works in the plug-in   (S2 · bug · preview ≠ export)
 
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `3c3c772`. Fixed together with C-96.
+
 All 15 tested members (`ce.panel.create`, `ce.midi.sendCC`, `ce.ui.notify`, `ce.components.arp.pattern` …):
 `AttributeError: 'dict' object has no attribute 'panel'`. JS and Lua work. The manual teaches `ce.*` throughout; the
 native engine builds `ce` as a `SimpleNamespace` (`PythonScriptEngine.cpp:2960-2984`). `py.toPy(api)` deep-converts
 `api.ce` to a dict. Observed-in-app.
 
 ### C-99 — Python: options objects arrive empty — names, queries and specs are silently ignored   (S2 · bug · Python preview)
+
+**Fixed** on `ccr-0d6b8446-x8nxzw` in `3c3c772`. Fixed together with C-96.
 
 | Call | JavaScript | Python |
 | --- | --- | --- |
