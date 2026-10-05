@@ -1,5 +1,5 @@
 // Runs every era design (tools/ctrl49/screen-lab/era-presets/*/Skin.lua) against the firmware
-// draw-API shim with its own three atlases, fed with payloads shaped as Ctrl49ScreenLab.h builds
+// draw-API shim with the atlases its manifest uploads, fed with payloads shaped as Ctrl49ScreenLab.h builds
 // them. Every call the page makes is checked as it is made: rectangles and images on the
 // 480x272 screen, crops inside the decoded atlas, text inside its box, buffers decoded before
 // use. Folders are found by glob, so a seventh design is checked without touching this file.
@@ -9,8 +9,17 @@ import { ScreenDrawApi, AILERON_FACES } from '../src/CE_Application/screen/scree
 
 const skins = import.meta.glob('../../../tools/ctrl49/screen-lab/era-presets/*/Skin.lua',
   { query: '?raw', import: 'default', eager: true });
-const pngs = import.meta.glob('../../../tools/ctrl49/screen-lab/era-presets/*/{panels,knobs,parts}.png',
+const manifests = import.meta.glob('../../../tools/ctrl49/screen-lab/era-presets/*/Design.ctrl49preset',
+  { query: '?raw', import: 'default', eager: true });
+const pngs = import.meta.glob('../../../tools/ctrl49/screen-lab/era-presets/*/*.png',
   { query: '?url', import: 'default', eager: true });
+
+// The uploads a manifest names: { id: file } from its [AssetN] sections.
+function uploads(text) {
+  const out = {};
+  for (const m of text.matchAll(/\[Asset\d+\]\s*id=(\d+)\s*file=(\S+)/g)) out[Number(m[1])] = m[2];
+  return out;
+}
 
 // As ctrl49Runtime loads them: a grey or palette PNG is a coverage mask the device can tint.
 async function load(url) {
@@ -57,11 +66,10 @@ const measure = document.createElement('canvas').getContext('2d');
 
 async function design(name) {
   const base = `../../../tools/ctrl49/screen-lab/era-presets/${name}/`;
-  const assets = {
-    576: await load(pngs[`${base}panels.png`]),
-    578: await load(pngs[`${base}knobs.png`]),
-    580: await load(pngs[`${base}parts.png`]),
-  };
+  const assets = {};
+  for (const [id, file] of Object.entries(uploads(manifests[`${base}Design.ctrl49preset`]))) {
+    assets[id] = await load(pngs[`${base}${file}`]);
+  }
   const api = new ScreenDrawApi(ctx, assets);
   const calls = { rect: 0, text: 0, image: 0, decode: 0 };
   const problems = [];

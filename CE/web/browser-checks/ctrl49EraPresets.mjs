@@ -1,8 +1,9 @@
 // CTRL49 era designs (tools/ctrl49/screen-lab/era-presets): every design's manifest obeys the
-// rules the screen lab's preset loader enforces, its Lua is Lua 5.2 and is the template with only
+// rules the screen lab's preset loader enforces, its Lua is Lua 5.2 and is its template with only
 // its GENERATED block changed, and every page renders through the firmware shim from payloads
 // shaped as Ctrl49ScreenLab.h builds them — at every encoder position, inside the screen and the
-// atlases, decoding each atlas exactly once, and moving where it should.
+// atlases, decoding each atlas exactly once, and moving where it should. Two kinds of design:
+// the six era skins (EraSkin.lua, five pages) and the arpeggiator mockup (ArpSkin.lua, six).
 //
 //   CTRL49_ERA_SHOTS=<dir>   writes a 480x272 PNG of every page of every design there
 //   CTRL49_ERA_PREVIEWS=1    writes them into each design folder as preview-<n>-<page>.png
@@ -22,11 +23,33 @@ const shots = process.env.CTRL49_ERA_SHOTS;
 const previews = process.env.CTRL49_ERA_PREVIEWS === '1';
 if (shots) fs.mkdirSync(shots, { recursive: true });
 
-// The designs this check expects. Adding one is deliberate: add it here too.
-const EXPECTED = ['dot-matrix-1983', 'red-lead-1997', 'rhythm-box-1980', 'swiss-flat-2011', 'test-bench-1958', 'walnut-1971'];
-const PAGE_NAMES = ['controls', 'mixer', 'envelope', 'sequencer', 'arpeggiator'];
-// What EraSkin.lua's crops assume of each atlas.
-const ATLAS_SIZE = { 'panels.png': [480, 816], 'knobs.png': [80, 5120], 'parts.png': [480, 724] };
+// The two kinds of design: their template, the atlases their crops assume, their pages, what
+// must move with the frame counter alone ([page, frames, least distinct pictures]), and the
+// visits that make each redraw busiest ([page, values] in order, every one drawn).
+const x4 = Array(8).fill(104), chordSteps = Array(8).fill(120);
+const SPECS = {
+  era: {
+    template: 'EraSkin.lua', pages: ['controls', 'mixer', 'envelope', 'sequencer', 'arpeggiator'], envelope: 2,
+    atlases: { 'panels.png': [480, 816], 'knobs.png': [80, 5120], 'parts.png': [480, 724] },
+    moving: [[1, [300, 301, 302, 303], 4], [3, [0, 4, 8, 12, 16], 4], [4, [0, 4, 8, 12, 16], 4]],
+    busiest: [0, 40, 80, 100, 127].map((mode) => [4, [mode, 127, 127, 127, 127, 127, 72, 0]]),
+  },
+  arp: {
+    template: 'ArpSkin.lua', pages: ['play', 'motion', 'steps', 'velocity', 'octave', 'chance'], envelope: null,
+    atlases: { 'panels.png': [480, 816], 'lanes.png': [480, 816], 'parts.png': [480, 150] },
+    moving: [[0, [0, 4, 8, 12, 16], 4], [1, [0, 4, 8, 12, 16], 3], [2, [0, 4, 8, 12, 16], 3]],
+    // ratchets everywhere, then chords on every step; each lane at its extremes; the widest
+    // walk (four octaves interleaved, repeated four times, 6/9 chords) in every mode
+    busiest: [[2, x4], [4, [0, 127, 0, 127, 0, 127, 0, 127]], [5, Array(8).fill(127)],
+      [1, [96, 127, 127, 127, 127, 127, 127, 127]],
+      ...[0, 22, 44, 66, 88, 106, 127].map((mode) => [0, [mode, 127, 127, 127, 127, 127, 127, 127]]),
+      [2, chordSteps], [0, [127, 127, 127, 127, 127, 127, 127, 127]], [1, [127, 127, 127, 127, 127, 127, 127, 127]],
+      [5, Array(8).fill(40)], [0, [100, 60, 127, 30, 127, 0, 127, 64]], [1, [0, 0, 127, 127, 127, 127, 127, 127]]],
+  },
+};
+// The designs this check expects, and their kind. Adding one is deliberate: add it here too.
+const EXPECTED = { 'dot-matrix-1983': 'era', 'red-lead-1997': 'era', 'rhythm-box-1980': 'era',
+  'rhythm-box-1980-arp': 'arp', 'swiss-flat-2011': 'era', 'test-bench-1958': 'era', 'walnut-1971': 'era' };
 const MEMORY_CEILING = 8 * 1024 * 1024;     // the preset loader's software guard, not a device limit
 const MAX_CALLS = 600;
 
@@ -53,16 +76,20 @@ function png(file) {
   return { width: b.readUInt32BE(16), height: b.readUInt32BE(20), colourType: b[25] };
 }
 
-const template = fs.readFileSync(path.join(root, 'EraSkin.lua'), 'utf8');
 const block = /-- BEGIN GENERATED[\s\S]*?-- END GENERATED/;
-luaparse.parse(template, { luaVersion: '5.2' });
+const templates = {};
+for (const spec of Object.values(SPECS)) {
+  templates[spec.template] = fs.readFileSync(path.join(root, spec.template), 'utf8');
+  luaparse.parse(templates[spec.template], { luaVersion: '5.2' });
+}
 
 const names = fs.readdirSync(root).filter((n) => fs.existsSync(path.join(root, n, 'Design.ctrl49preset'))).sort();
-assert.deepEqual(names, EXPECTED, 'the design folders are the six expected');
+assert.deepEqual(names, Object.keys(EXPECTED).sort(), 'the design folders are the ones expected');
 
 const manifests = {};
 for (const name of names) {
   const dir = path.join(root, name);
+  const spec = SPECS[EXPECTED[name]];
   const m = ini(fs.readFileSync(path.join(dir, 'Design.ctrl49preset'), 'latin1'));
   const p = m.Preset;
   assert.ok(p, `${name}: [Preset]`);
@@ -71,7 +98,7 @@ for (const name of names) {
   assert.equal(int(p.height), 272, `${name}: height`);
   const pages = int(p.pages), fps = int(p.fps), count = int(p.assets);
   assert.ok(pages >= 1 && pages <= 6, `${name}: 1-6 pages`);
-  assert.equal(pages, 5, `${name}: the era designs have five pages`);
+  assert.equal(pages, spec.pages.length, `${name}: ${spec.pages.length} pages`);
   assert.ok(int(p.envelopePage) >= 0 && int(p.envelopePage) < pages, `${name}: envelopePage is a page`);
   assert.ok(fps >= 5 && fps <= 30, `${name}: fps 5-30`);
   const beside = (f) => f && !/[\\/]|\.\./.test(f) && fs.existsSync(path.join(dir, f));
@@ -87,7 +114,7 @@ for (const name of names) {
     ids.add(id);
     assert.ok(beside(a.file), `${name}: asset ${a.file} is a file beside the manifest`);
     const info = png(path.join(dir, a.file));
-    assert.deepEqual([info.width, info.height], ATLAS_SIZE[a.file], `${name}: ${a.file} has the size the crops assume`);
+    assert.deepEqual([info.width, info.height], spec.atlases[a.file], `${name}: ${a.file} has the size the crops assume`);
     memory += info.width * info.height * 4;
   }
   assert.ok(memory <= MEMORY_CEILING, `${name}: ${memory} bytes decoded is within the 8 MiB guard`);
@@ -109,13 +136,13 @@ for (const name of names) {
 
   const lua = fs.readFileSync(path.join(dir, p.lua), 'utf8');
   luaparse.parse(lua, { luaVersion: '5.2' });
-  assert.equal(lua.replace(block, ''), template.replace(block, ''),
-    `${name}: Skin.lua is EraSkin.lua with only its GENERATED block changed (regenerate, do not hand-edit)`);
+  assert.equal(lua.replace(block, ''), templates[spec.template].replace(block, ''),
+    `${name}: Skin.lua is ${spec.template} with only its GENERATED block changed (regenerate, do not hand-edit)`);
   assert.equal(Number(lua.match(/\bfps = (\d+)/)[1]), fps, `${name}: the Lua clock counts the manifest's fps`);
   const luaDefaults = lua.match(/\bdefaults = \{ (.*) \},\n/)[1];
   assert.equal(luaDefaults, defaults.map((d) => `{ ${d.values.join(', ')} }`).join(', '), `${name}: the Lua knows the manifest's starting values`);
-  manifests[name] = { defaults, memory, knobsTintable: png(path.join(dir, 'knobs.png')).colourType === 3 };
-  console.log(`  ${name.padEnd(16)} manifest ok, ${Math.round(memory / 1024)} KiB decoded (conservative)`);
+  manifests[name] = { defaults, memory, spec };
+  console.log(`  ${name.padEnd(20)} manifest ok, ${Math.round(memory / 1024)} KiB decoded (conservative)`);
 }
 
 // --- rendering ----------------------------------------------------------------------------------------
@@ -134,7 +161,7 @@ try {
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/ctrl49EraPresets.html`);
   await page.waitForFunction(() => window.ready === true, null, { timeout: 60000 });
-  assert.deepEqual(await page.evaluate(() => window.era.names), EXPECTED, 'the preview finds the same six designs');
+  assert.deepEqual(await page.evaluate(() => window.era.names), names, 'the preview finds the same designs');
   assert.deepEqual(await page.evaluate(() => window.era.envelope(32, 64, 80, 40)), golden,
     'the preview builds the same envelope bytes the tool sends');
 
@@ -146,7 +173,8 @@ try {
   };
 
   for (const name of names) {
-    const { defaults } = manifests[name];
+    const { defaults, spec } = manifests[name];
+    const pages = spec.pages;
     const D = defaults.map((d) => d.values);
     await page.evaluate(async (name) => { window.d = await window.era.design(name); }, name);
 
@@ -156,30 +184,31 @@ try {
     await save(name, 'loading');
 
     // Each page at the manifest's starting values, E1 the last moved.
-    await page.evaluate((env) => { window.d.call('set_mode', [1]); window.d.call('set_envelope', window.era.envelope(...env)); }, D[2].slice(0, 4));
+    await page.evaluate((env) => { window.d.call('set_mode', [1]); if (env) window.d.call('set_envelope', window.era.envelope(...env)); },
+      spec.envelope === null ? null : D[spec.envelope].slice(0, 4));
     const summary = [];
-    for (let p = 0; p < 5; p++) {
+    for (let p = 0; p < pages.length; p++) {
       const calls = await page.evaluate(({ p, enc }) => { window.d.call('set_frame', window.era.frame(p, 37, enc, 0)); return window.d.draw(); }, { p, enc: D[p] });
       const colours = await page.evaluate(() => window.era.colours());
-      assert.ok(calls.total > 10, `${name} ${PAGE_NAMES[p]} draws`);
-      assert.ok(colours > 12, `${name} ${PAGE_NAMES[p]} is a picture, not a flat fill (${colours} colours)`);
-      await save(name, `${p + 1}-${PAGE_NAMES[p]}`);
-      summary.push(`${PAGE_NAMES[p].slice(0, 3)} ${calls.total}`);
+      assert.ok(calls.total > 10, `${name} ${pages[p]} draws`);
+      assert.ok(colours > 12, `${name} ${pages[p]} is a picture, not a flat fill (${colours} colours)`);
+      await save(name, `${p + 1}-${pages[p]}`);
+      summary.push(`${pages[p].slice(0, 3)} ${calls.total}`);
     }
 
     // Every encoder through all 128 positions on every page, the others at their defaults; on
-    // the envelope page the host sends a new envelope with each move, so this does too. Then
-    // the ADSR corners, and the arpeggiator at its busiest.
-    const sweep = await page.evaluate(({ D, enc }) => {
+    // an envelope page the host sends a new envelope with each move, so this does too. Then the
+    // ADSR corners, the busiest visits over a run of frames, and the frame counter's wrap.
+    const sweep = await page.evaluate(({ D, enc, envelope, busiest }) => {
       const d = window.d, era = window.era;
       let most = 0, where = '';
       const draw = (p, values, last, frame = 200) => {
-        if (p === 2) d.call('set_envelope', era.envelope(...values.slice(0, 4)));
+        if (p === envelope) d.call('set_envelope', era.envelope(...values.slice(0, 4)));
         d.call('set_frame', era.frame(p, frame, values, last));
         const c = d.draw();
         if (c.total > most) { most = c.total; where = `page ${p} ${values.join(',')}`; }
       };
-      for (let p = 0; p < 5; p++) {
+      for (let p = 0; p < D.length; p++) {
         for (let e = 0; e < enc[p]; e++) {
           for (let v = 0; v <= 127; v++) {
             const values = D[p].slice();
@@ -188,31 +217,34 @@ try {
           }
         }
       }
-      for (let k = 0; k < 16; k++) draw(2, [k & 1, k & 2, k & 4, k & 8].map((b) => (b ? 127 : 0)).concat([64, 64, 64, 64]), k % 4);
-      for (const mode of [0, 40, 80, 100, 127]) {
-        for (let f = 0; f < 64; f += 3) draw(4, [mode, 127, 127, 127, 127, 127, 72, 0], 0, f);
+      if (envelope !== null) {
+        for (let k = 0; k < 16; k++) draw(envelope, [k & 1, k & 2, k & 4, k & 8].map((b) => (b ? 127 : 0)).concat([64, 64, 64, 64]), k % 4);
       }
-      for (const f of [0, 1, 255, 256, 65535]) for (let p = 0; p < 5; p++) draw(p, D[p], 7, f);
+      for (const [p, values] of busiest) {
+        for (let f = 0; f < 64; f += 3) draw(p, values, 0, f);
+      }
+      for (const f of [0, 1, 255, 256, 65535]) for (let p = 0; p < D.length; p++) draw(p, D[p], 7, f);
+      for (let p = 0; p < D.length; p++) draw(p, D[p], 0);       // back to the starting values
       return { most, where, problems: d.problems() };
-    }, { D, enc: defaults.map((d) => d.encoders) });
+    }, { D, enc: defaults.map((d) => d.encoders), envelope: spec.envelope, busiest: spec.busiest });
     assert.deepEqual(sweep.problems, [], `${name}: every call inside the screen, the atlases and its text box`);
     assert.ok(sweep.most < MAX_CALLS, `${name}: at most ${sweep.most} draw calls per redraw (${sweep.where})`);
 
-    // Things that move with the frame counter alone: the meters, the sequencer's playhead, the
-    // arpeggiator. Fifteen frames is a second at the manifest's rate.
-    const moves = await page.evaluate(({ D }) => {
-      const d = window.d, era = window.era;
-      const run = (p, frames) => new Set(frames.map((f) => { d.call('set_frame', era.frame(p, f, D[p], 0)); d.draw(); return era.pixels(); })).size;
-      return { mixer: run(1, [300, 301, 302, 303]), sequencer: run(3, [0, 4, 8, 12, 16]), arpeggiator: run(4, [0, 4, 8, 12, 16]) };
-    }, { D });
-    assert.equal(moves.mixer, 4, `${name}: the mixer's meters move every frame`);
-    assert.ok(moves.sequencer >= 4, `${name}: the sequencer's playhead walks (${moves.sequencer} pictures in 5)`);
-    assert.ok(moves.arpeggiator >= 4, `${name}: the arpeggiator plays (${moves.arpeggiator} pictures in 5)`);
+    // Things that move with the frame counter alone. Fifteen frames is a second at the
+    // manifest's rate.
+    const moves = {};
+    for (const [p, frames, least] of spec.moving) {
+      moves[pages[p]] = await page.evaluate(({ p, frames, values }) => {
+        const d = window.d, era = window.era;
+        return new Set(frames.map((f) => { d.call('set_frame', era.frame(p, f, values, 0)); d.draw(); return era.pixels(); })).size;
+      }, { p, frames, values: D[p] });
+      assert.ok(moves[pages[p]] >= least, `${name}: ${pages[p]} moves with the clock (${moves[pages[p]]} pictures in ${frames.length})`);
+    }
 
     const decodes = await page.evaluate(() => window.d.draw().decode);
     assert.equal(decodes, 3, `${name}: the three atlases are decoded once, whatever is drawn after`);
-    console.log(`  ${name.padEnd(16)} ${summary.join(', ')} calls; busiest ${sweep.most} (${sweep.where}); moves ${JSON.stringify(moves)}`);
+    console.log(`  ${name.padEnd(20)} ${summary.join(', ')} calls; busiest ${sweep.most} (${sweep.where}); moves ${JSON.stringify(moves)}`);
   }
   assert.deepEqual(errors, []);
-  console.log('CTRL49 era design checks passed: six manifests, six Lua 5.2 pages, five pages each at every encoder position.');
+  console.log(`CTRL49 era design checks passed: ${names.length} manifests, ${names.length} Lua 5.2 pages, every page at every encoder position.`);
 } finally { await browser.close(); await server.close(); }
