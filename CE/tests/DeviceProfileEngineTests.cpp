@@ -488,6 +488,46 @@ int runDumpBuildTests (const juce::File& file)
     return failures;
 }
 
+/** The parts of a profile document the dump-policy tests read directly. */
+struct DumpTestProfile
+{
+    explicit DumpTestProfile (const juce::File& file)
+        : document (juce::JSON::parse (file.loadFileAsString()))
+    {
+        if (auto* list = document.getProperty ("parameters", {}).getArray())
+            for (const auto& p : *list)
+                parameters[p.getProperty ("id", {}).toString()] = p;
+    }
+
+    /** The distinct parameters a dump's mappings cover. */
+    juce::StringArray mappedIds (const juce::String& dumpId) const
+    {
+        juce::StringArray ids;
+        if (auto* dumps = document.getProperty ("dumpDefinitions", {}).getArray())
+            for (const auto& d : *dumps)
+                if (d.getProperty ("id", {}).toString() == dumpId)
+                    if (auto* mappings = d.getProperty ("mappings", {}).getArray())
+                        for (const auto& m : *mappings)
+                            ids.addIfNotAlreadyThere (m.getProperty ("parameter", {}).toString());
+        return ids;
+    }
+
+    // A legal value that is NOT zero wherever the parameter allows it, so a byte the panel supplied
+    // cannot be mistaken for a byte the builder defaulted. A double, as the APVTS hands it over.
+    double nonZeroValue (const juce::String& id) const
+    {
+        const auto it = parameters.find (id);
+        if (it == parameters.end()) return 0.0;
+        const auto& p = it->second;
+        if (auto* choices = p.getProperty ("choices", {}).getArray())
+            return choices->isEmpty() ? 0.0 : (double) choices->getLast().getProperty ("value", 0);
+        return (double) p.getProperty ("range", {}).getProperty ("max", 0);
+    }
+
+    juce::var document;
+    std::map<juce::String, juce::var> parameters;
+};
+
 /**
  * The exported plugin's dump capture and restore policy — release audit 2026-10-04, C-11.
  *
@@ -512,33 +552,9 @@ int runDumpCapturePolicyTests (const juce::File& file)
         return 1;
     }
 
-    const auto document = juce::JSON::parse (file.loadFileAsString());
-    std::map<juce::String, juce::var> parameters;
-    if (auto* list = document.getProperty ("parameters", {}).getArray())
-        for (const auto& p : *list)
-            parameters[p.getProperty ("id", {}).toString()] = p;
-
-    const auto mappedIds = [&document] (const juce::String& dumpId)
-    {
-        juce::StringArray ids;
-        if (auto* dumps = document.getProperty ("dumpDefinitions", {}).getArray())
-            for (const auto& d : *dumps)
-                if (d.getProperty ("id", {}).toString() == dumpId)
-                    if (auto* mappings = d.getProperty ("mappings", {}).getArray())
-                        for (const auto& m : *mappings)
-                            ids.addIfNotAlreadyThere (m.getProperty ("parameter", {}).toString());
-        return ids;
-    };
-
-    // A legal value that is NOT zero wherever the parameter allows it, so a byte the panel supplied
-    // cannot be mistaken for a byte the builder defaulted. A double, as the APVTS hands it over.
-    const auto nonZeroValue = [&parameters] (const juce::String& id) -> double
-    {
-        const auto& p = parameters[id];
-        if (auto* choices = p.getProperty ("choices", {}).getArray())
-            return choices->isEmpty() ? 0.0 : (double) choices->getLast().getProperty ("value", 0);
-        return (double) p.getProperty ("range", {}).getProperty ("max", 0);
-    };
+    const DumpTestProfile profile (file);
+    const auto mappedIds = [&profile] (const juce::String& dumpId) { return profile.mappedIds (dumpId); };
+    const auto nonZeroValue = [&profile] (const juce::String& id) { return profile.nonZeroValue (id); };
 
     auto failures = 0;
     const auto fail = [&failures] (const juce::String& what)
@@ -638,6 +654,106 @@ int runDumpCapturePolicyTests (const juce::File& file)
     if (failures == failuresBeforeRestore)
         std::cout << "[PASS] dump restore :: a stored zero-filled System block is dropped, a complete dump is sent verbatim\n";
 
+    return failures;
+}
+
+/**
+ * Total Recall never writes the synth's stored memory, even with a complete dump (C-11 follow-up).
+ *
+ * The AN1x `userPattern` bulk carries exactly the 70 parameters of the edit-buffer `stepSeq`, so a
+ * panel that exports the whole step sequencer makes it COMPLETE. Completeness alone would capture it,
+ * and the restore would write User Pattern 1, because the dump is addressed by `$slot` (default 0).
+ * The rule is about how the profile declares the dump (a preset-slot variable in its address or in
+ * the request that fetches it), not about its id. The GAIA, whose dumps are addressed by `$deviceId`
+ * only, must lose nothing to it.
+ */
+int runDumpMemorySlotTests (const juce::File& an1xFile, const juce::File& gaiaFile)
+{
+    auto failures = 0;
+    const auto fail = [&failures] (const juce::String& what)
+    {
+        std::cerr << "[FAIL] dump memory: " << what << "\n";
+        ++failures;
+    };
+
+    ceditor::device::DeviceProfileEngine an1x;
+    juce::String error;
+    if (! an1x.loadFromFile (an1xFile, error))
+    {
+        std::cerr << "[FAIL] dump memory: could not load " << an1xFile.getFileName() << ": " << error << "\n";
+        return 1;
+    }
+    const DumpTestProfile profile (an1xFile);
+
+    // Classification, from the profile's own declarations.
+    for (const auto& id : an1x.dumpDefinitionIds())
+    {
+        const bool memory = ! ce::memorySlotVariables (an1x, id).isEmpty();
+        const bool expected = id == "userVoice" || id == "userPattern";
+        if (memory != expected)
+            fail ("\"" + id + "\" classified as " + (memory ? "stored memory" : "edit buffer"));
+    }
+    if (! ce::memorySlotVariables (an1x, "userPattern").contains ("slot"))
+        fail ("userPattern's $slot address was not found");
+
+    // A panel exporting the whole step sequencer: every parameter of stepSeq, hence of userPattern.
+    auto* bound = new juce::DynamicObject();
+    for (const auto& id : profile.mappedIds ("stepSeq"))
+        bound->setProperty (id, profile.nonZeroValue (id));
+    const juce::var values { bound };
+
+    const auto userPattern = an1x.buildDumpMessage ("userPattern", values);
+    const auto stepSeq = an1x.buildDumpMessage ("stepSeq", values);
+    if (profile.mappedIds ("stepSeq").size() != 70 || ! ce::isCompleteDump (userPattern) || ! ce::isCompleteDump (stepSeq))
+    {
+        std::cerr << "[FAIL] dump memory: precondition: 70 step-sequencer values should make both stepSeq and "
+                     "userPattern complete (" << userPattern.error << stepSeq.error << ")\n";
+        return failures + 1;
+    }
+
+    const auto capture = ce::captureCompleteDumps (an1x, values);
+    auto* captured = capture.captured.getDynamicObject();
+    if (captured == nullptr || captured->getProperty ("stepSeq").toString() != stepSeq.hex)
+        fail ("the complete edit-buffer stepSeq dump was not captured");
+    if (captured != nullptr && captured->hasProperty ("userPattern"))
+        fail ("userPattern was captured: restoring it writes User Pattern " + juce::String (1));
+    if (captured != nullptr && captured->hasProperty ("userVoice"))
+        fail ("userVoice was captured");
+
+    bool reported = false;
+    for (const auto& skipped : capture.skipped)
+        if (skipped.id == "userPattern")
+            reported = skipped.reason.contains ("$slot");
+    if (! reported)
+        fail ("userPattern was not reported as skipped for its $slot address");
+
+    // A stored copy, as a session from before this rule would hold it, is not sent.
+    auto* stored = new juce::DynamicObject();
+    stored->setProperty ("stepSeq", stepSeq.hex);
+    stored->setProperty ("userPattern", userPattern.hex);
+    const auto plan = ce::planRestoredDumps (&an1x, juce::var (stored), values);
+    juce::StringArray sent;
+    for (const auto& dump : plan.send)
+        sent.add (dump.id);
+    if (sent != juce::StringArray { "stepSeq" })
+        fail ("restore should send stepSeq alone, would send: " + sent.joinIntoString (", "));
+    bool dropped = false;
+    for (const auto& d : plan.dropped)
+        dropped = dropped || d.id == "userPattern";
+    if (! dropped)
+        fail ("a stored userPattern was not dropped by name");
+
+    // The GAIA addresses nothing by slot: no dump of it may be lost to this rule.
+    ceditor::device::DeviceProfileEngine gaia;
+    if (! gaia.loadFromFile (gaiaFile, error))
+        return failures + 1;
+    for (const auto& id : gaia.dumpDefinitionIds())
+        if (! ce::memorySlotVariables (gaia, id).isEmpty())
+            fail ("GAIA \"" + id + "\" classified as stored memory");
+
+    if (failures == 0)
+        std::cout << "[PASS] dump memory :: a complete AN1x userPattern ($slot) is neither captured nor restored; "
+                     "stepSeq and the GAIA's dumps are unaffected\n";
     return failures;
 }
 
@@ -2469,6 +2585,8 @@ int main (int argc, char** argv)
     failures += runPatchDumpTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runDumpBuildTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runDumpCapturePolicyTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
+    failures += runDumpMemorySlotTests (root.getChildFile ("yamaha-an1x-dpd.ceditor-device.json"),
+                                        root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runPresetRecallTests (root);
 
     if (failures == 0)

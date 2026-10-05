@@ -30,6 +30,17 @@
 // send the zeros this rule exists to prevent. A stored dump is sent only if the current profile
 // declares it and the current panel would capture it whole; anything else is dropped, by name.
 //
+// SECOND RULE: Total Recall never writes the synth's stored memory. Completeness is not enough on
+// its own. The AN1x `userPattern` bulk carries exactly the 70 parameters of the edit-buffer
+// `stepSeq`, so a panel exporting the whole step sequencer makes it complete. It is addressed by
+// `$slot`, though (`F0 43 00 5C 00 46 01 $slot 00 ...`), and sending it writes User Pattern 1. A
+// dump is a STORED-MEMORY dump when its address uses a variable the profile names preset slots with:
+// any `$slot`/`$program`/`$bankMsb`/`$bankLsb` or declared `slotVariable` in the dump's matcher, or in
+// the template of a request that fetches it (DeviceProfileEngine::dumpAddressVariables and
+// presetSlotVariables). Such a dump is never captured and never restored, complete or not. The
+// rule is about how the profile declares the dump, not about its id, so it holds for any profile
+// that declares one the same way. A session restores the sound the synth is playing, not its library.
+//
 // The engine's own zero-fill is deliberately left alone. `ce.device.buildDump` is a script asking
 // for exactly that, and `unmappedParameters` is how it is told. What changes is the plugin's policy
 // about what to keep.
@@ -47,6 +58,26 @@ struct SkippedDump
     int missingParameters = 0;   ///< distinct parameters the panel does not supply; 0 if skipped for another reason
     juce::String reason;
 };
+
+/**
+ * The preset-slot variables this dump's address uses, e.g. { "slot" } for the AN1x `userPattern`.
+ * Empty for a dump that addresses the edit buffer. Non-empty means it writes stored memory.
+ */
+inline juce::StringArray memorySlotVariables (const ceditor::device::DeviceProfileEngine& engine, const juce::String& dumpId)
+{
+    const auto slotNames = engine.presetSlotVariables();
+    juce::StringArray used;
+    for (const auto& name : engine.dumpAddressVariables (dumpId))
+        if (slotNames.contains (name))
+            used.add (name);
+    return used;
+}
+
+inline juce::String describeMemoryDump (const juce::StringArray& slotVariables)
+{
+    return "it is addressed by $" + slotVariables.joinIntoString (", $")
+         + ", a stored-memory slot, and restoring it would overwrite a patch saved in the synth";
+}
 
 /** Every parameter the dump's mappings cover was supplied, and it built. */
 inline bool isCompleteDump (const ceditor::device::DumpBuildResult& result)
@@ -88,7 +119,10 @@ struct DumpCapture
     int capturedCount = 0;
 };
 
-/** What a session may store: every declared dump the bound values cover completely. */
+/**
+ * What a session may store: every declared dump the bound values cover completely, except one
+ * addressed to stored memory.
+ */
 inline DumpCapture captureCompleteDumps (const ceditor::device::DeviceProfileEngine& engine, const juce::var& values)
 {
     DumpCapture capture;
@@ -97,6 +131,12 @@ inline DumpCapture captureCompleteDumps (const ceditor::device::DeviceProfileEng
 
     for (const auto& id : engine.dumpDefinitionIds())
     {
+        if (const auto slots = memorySlotVariables (engine, id); ! slots.isEmpty())
+        {
+            capture.skipped.add ({ id, 0, describeMemoryDump (slots) });
+            continue;
+        }
+
         const auto result = engine.buildDumpMessage (id, values);
         if (isCompleteDump (result))
         {
@@ -152,6 +192,12 @@ inline RestoredDumpPlan planRestoredDumps (const ceditor::device::DeviceProfileE
     {
         const auto hex = storedObject->getProperty (id).toString();
         if (hex.isEmpty()) continue;
+
+        if (const auto slots = memorySlotVariables (*engine, id); ! slots.isEmpty())
+        {
+            plan.dropped.add ({ id, 0, describeMemoryDump (slots) });
+            continue;
+        }
 
         const auto rebuilt = engine->buildDumpMessage (id, values);
         if (! isCompleteDump (rebuilt))
