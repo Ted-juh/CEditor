@@ -1,6 +1,6 @@
 @echo off
 REM Double-click launcher for the era designs (screen-lab\era-presets): six skins of five pages
-REM (Controls, Mixer, Envelope, Sequencer, Arpeggiator), and a full arpeggiator on six. Needs a
+REM (Controls, Mixer, Envelope, Sequencer, Arpeggiator), and a piano-roll arpeggiator. Needs a
 REM Ctrl49ScreenLab.exe with the preset mode, beside this file or built under build\native.
 REM Connect the CTRL49 and close VIP, your DAW and HoSTage / CEditor first (only one program can
 REM own the screen).
@@ -26,7 +26,7 @@ echo   3  Red Lead 1997      red virtual analogue, LED rings
 echo   4  Rhythm Box 1980    drum-machine plastic, coloured step keys
 echo   5  Walnut 1971        black panel, walnut cheeks, fluted knobs
 echo   6  Test Bench 1958    hammertone enamel, a CRT, chicken-head knobs
-echo   7  Arpeggiator        a full arpeggiator on six pages, in Rhythm Box 1980
+echo   7  Arpeggiator        a pattern arpeggiator as a piano roll, in Rhythm Box 1980
 choice /c 1234567 /n /m "Which design? [1-7] "
 set "DESIGN=swiss-flat-2011"
 if errorlevel 2 set "DESIGN=dot-matrix-1983"
@@ -34,7 +34,7 @@ if errorlevel 3 set "DESIGN=red-lead-1997"
 if errorlevel 4 set "DESIGN=rhythm-box-1980"
 if errorlevel 5 set "DESIGN=walnut-1971"
 if errorlevel 6 set "DESIGN=test-bench-1958"
-if errorlevel 7 set "DESIGN=rhythm-box-1980-arp"
+if errorlevel 7 set "DESIGN=rhythm-box-1980-roll"
 
 echo.
 echo Page ^< ^> walks the pages. Ctrl+C stops.

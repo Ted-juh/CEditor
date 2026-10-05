@@ -23,8 +23,8 @@ repository yet; the `Ctrl49ScreenLab.cpp` committed here has only `showcase` and
 \* Its knob strip decodes to one byte a pixel. Counted conservatively, at four bytes a pixel for
 every image as the check counts, it is 4,488 KiB like the others.
 
-A seventh folder, `rhythm-box-1980-arp`, is not a skin but an instrument: a
-[full arpeggiator](#the-arpeggiator-mockup) on six pages, in the Rhythm Box 1980 design.
+A seventh folder, `rhythm-box-1980-roll`, is not a skin but an instrument: a
+[pattern arpeggiator as a piano roll](#the-arpeggiator-mockup), in the Rhythm Box 1980 design.
 
 `Start_CTRL49_Era_Designs.cmd` (in `tools/ctrl49`) asks which one and runs it. Every folder holds
 `preview-<n>-<page>.png` — its pages rendered by the real Lua through the firmware shim.
@@ -106,67 +106,62 @@ each `Skin.lua`.
 
 ## The arpeggiator mockup
 
-The five-page designs share their Arpeggiator page with a sequencer, on one clock, with a
-handful of settings. `rhythm-box-1980-arp` is what a complete arpeggiator looks like on this
-screen instead: six pages, all of them the arpeggiator, Page < > walking them. It is a mockup —
-the lab still makes no sound — but every page is live: turn an encoder and the pattern, the roll,
-the contour and the keyboard follow.
+`rhythm-box-1980-roll` is a pattern arpeggiator laid out as a piano roll, in the Rhythm Box 1980
+design. On the left is a keyboard on its side, one row a semitone, sixteen rows at a time,
+scrolled up and down. To its right are sixteen steps, one bar, with the step numbers above.
+The view turns to the bar the playhead is in; while you edit, it shows the bar the cursor is
+in. A pattern is up to 64 steps (four bars). It is a mockup, and the lab still makes no sound,
+but it is live: the pattern plays, the keys light as their notes sound, and every encoder
+edits it.
 
 | Page | E1 | E2 | E3 | E4 | E5 | E6 | E7 | E8 |
 |---|---|---|---|---|---|---|---|---|
-| PLAY | mode | rate | octaves | gate | swing | tempo | chord | root |
-| MOTION | octave order | repeat | transpose | inversion | length | accent | random | reset |
-| STEPS | step 1 type | step 2 | step 3 | step 4 | step 5 | step 6 | step 7 | step 8 |
-| VELOCITY | step 1 velocity | ... | | | | | | step 8 |
-| OCTAVE | step 1 octave | ... | | | | | | step 8 |
-| CHANCE | step 1 chance | ... | | | | | | step 8 |
+| EDIT | step (the cursor) | note | velocity | length | scroll | key | rate | tempo |
+| PLAY | pattern length | direction | swing | gate | octave | follow | | |
 
-- **Modes (12):** up, down, up/down, down/up, up+down (ends repeated), converge, diverge, pinky
-  (every note answered by the top one), thumb (by the bottom one), order (as played), random,
-  chord.
-- **Rates (12):** 1/2, 1/4 dotted, 1/4, 1/4 triplet, through to 1/32 triplet.
-- **Octaves:** 1-4, walked up, down, up-down, or interleaved (each note through every octave
-  before the next).
-- **Repeat** plays each note 1-4 times. **Transpose** moves the whole walk ±12. **Inversion**
-  lifts the chord's lowest notes an octave.
-- **Random** swaps that share of the notes for another from the walk. **Reset** restarts the
-  walk and the pattern every 1, 2 or 4 bars.
-- **The step pattern**, 1-8 steps long (MOTION's length), has four lanes:
-  - *type:* rest, note, accent, tie (the note before carries on), ratchet ×2/×3/×4, or chord
-    (all held notes at once);
-  - *velocity*, with MOTION's accent added on accented steps;
-  - *octave*, -2 to +2;
-  - *chance*, the probability the step plays at all.
-- **How a step plays:** the walk moves on one note on every note, accent or ratchet step, so
-  rests, ties and chord steps leave it where it was, and a pattern of five notes over a
-  twelve-note walk drifts against it the way a real arpeggiator does.
-- **Encoder N is step N on every lane page,** so a column of the screen is a column of the
-  keyboard.
+- **A step** holds one note: its pitch, velocity, and a length from a quarter of a step to four
+  steps, or off. On EDIT, E1 moves the cursor (its column outlined) and E2-E4 edit the step
+  under it.
+- **Editing picks a value up, like a motorless fader.** The host keeps each encoder's absolute
+  position and stops it at 0 and 127, so an encoder cannot simply nudge whichever step the
+  cursor is on. E2, E3 and E4 leave the step alone until they reach its value, then carry it.
+  Until E2 has picked the note up, a ghost outline in the cursor's column shows where E2 is.
+  An empty step takes E2's note, or E4's length, at once, so placing a note is: cursor there,
+  turn E2. E4 to OFF empties a step.
+- **What you see is what plays:** KEY transposes the whole pattern, as a held key would; PLAY's
+  octave moves it by octaves; the gate stretches every length. The grid and the keyboard show
+  the result, so a row and the key beside it are always the same note.
+- **Notes above or below the sixteen rows** show as a mark on the grid's top or bottom edge.
+- **Playback:** forwards, backwards, there and back, or at random, at any of the CTRL49's eight
+  divisions (1/4 to 1/32T), with swing. Steps past the pattern's length are shaded off.
+- **Colour:** velocity sets a note's colour (soft, normal, loud); the note sounding now, and its
+  key, are lit yellow; the cursor's note is orange on the keyboard.
 
-PLAY is the performance view. It shows a three-octave keyboard with the chord lit and the
-sounding note brighter, and a NOW readout (note, velocity, step type, place in the pattern).
-Below them is a roll of the next sixteen steps that combines every lane: height is pitch,
-thickness velocity, width gate. A tie joins its neighbour, a ratchet splits its step, an
-accent is red, a chord step cream, a missed chance a dim ghost. MOTION draws the walk itself,
-thirty-two notes of it as a contour, with a tick where the cycle starts again.
+The keyboard and the grid are baked as two strips of 28 semitone rows that start on a B. The
+picture repeats every octave, so a single crop of each draws any scroll position. A redraw is
+under 90 draw calls. About 1.5 MiB decoded, 49 KB to upload.
 
-What it does not do: hear keys. E7 and E8 choose a chord and a root to stand in for the held
-notes. In HoSTage the keys held on the CTRL49 would replace them, the host would own the clock
-(here the frame counter is the only clock, so a 1/32 at 120 BPM is quicker than the redraws),
-and latch/hold would sit on a button. The CTRL49's eight time-division buttons are its rate
-row, and its eight pads are the obvious step toggles.
+What it does not do, and HoSTage would:
+- **Own the pattern.** The lab has nowhere else to keep it, so it lives in the page and starts
+  again from the generated one on restart.
+- **Edit with relative turns.** The reducer already reports each turn (`encoderDelta`), so
+  there would be no pick-up.
+- **Take the key from the keys held,** not from an encoder.
+- **Run the clock.** Here the frame counter is the only clock, so a 1/32 at 120 BPM goes by
+  quicker than the redraws.
 
-Six backgrounds ride in two 480 x 816 atlases (`panels.png`: PLAY, MOTION, STEPS; `lanes.png`:
-VELOCITY, OCTAVE, CHANCE), the size Machined Metal proved, and there is no knob strip — the eight
-encoders are the knobs. 3.3 MiB decoded, 162 KB to upload. The manifest names PLAY as its
-envelope page because the loader wants one; the page ignores `set_envelope`.
+The CTRL49's eight pads would be natural note toggles for the eight steps nearest the cursor.
+The manifest names PLAY as its envelope page because the loader wants one; the page ignores
+`set_envelope`.
+
+The lane-page arpeggiator that came before this one is in the history (commit 5d72504).
 
 ## Making and checking them
 
 ```bash
 python tools/ctrl49/screen-lab/era-presets/make_era_designs.py          # all six, about 20 s
 python tools/ctrl49/screen-lab/era-presets/make_era_designs.py walnut-1971
-python tools/ctrl49/screen-lab/era-presets/make_arp_mockup.py           # the arpeggiator mockup
+python tools/ctrl49/screen-lab/era-presets/make_roll_mockup.py          # the arpeggiator mockup
 
 cd CE/web
 npm run test:screen-eras                                    # CTRL49_ERA_PREVIEWS=1 rewrites the previews
@@ -176,16 +171,17 @@ npm run test:screen-eras                                    # CTRL49_ERA_PREVIEW
 folder's three atlases, its manifest, and its `Skin.lua`, which is `EraSkin.lua` with one block
 — `GENERATED`, holding the theme, the layout and the sprite crops — replaced. Behaviour belongs
 in `EraSkin.lua`; never hand-edit a `Skin.lua`, the check fails if anything outside that block
-differs from the template. `make_arp_mockup.py` does the same for the mockup from `ArpSkin.lua`,
-with the Rhythm Box materials from `make_era_designs.py`.
+differs from the template. `make_roll_mockup.py` does the same for the mockup from
+`RollSkin.lua`, with the Rhythm Box materials from `make_era_designs.py`.
 
 The check (`browser-checks/ctrl49EraPresets.mjs`) holds each manifest to the loader's rules
 (version, 480 x 272, 1-6 pages, 5-30 fps, encoder counts, values 0-127, unique ids below 1024,
 companion files beside the manifest, PNG signature and size, the 8 MiB guard), parses every Lua
 as 5.2, then runs each design in wasmoon against the firmware draw-API shim: every encoder of
-every page through all 128 positions, the ADSR corners, the arpeggiator at its busiest (for the
-mockup: ratchets, then chords, on every step, and the widest walk in every mode), the frame
-counter's wrap. Every rectangle and image must land on the screen, every crop inside its
+every page through all 128 positions, the ADSR corners, the arpeggiator at its busiest, the
+frame counter's wrap. For the mockup it also edits a pattern and checks the pick-up: E2 leaves
+a step's note alone until it reaches it, then carries it, and an empty step takes a note at
+once. Every rectangle and image must land on the screen, every crop inside its
 atlas, every text inside its box; the three atlases must be decoded once; the meters, the
 playhead and the arpeggiator must move. It does not run the loader itself — on Windows,
 `Ctrl49ScreenLab.exe preset <manifest> --check` does that — and the preview's fonts are not the
@@ -204,5 +200,6 @@ encoders and walk the pages. Worth writing down:
   (lower `fps` in the manifest and in `make_era_designs.py` together if not: the clock counts it);
 - the busiest pages for redraw: Envelope on the glowing designs, and the arpeggiator in chord
   mode at four octaves;
-- on the arpeggiator mockup, whether six pages are too many to walk with Page < >, and whether
-  the roll and the NOW readout read at arm's length.
+- on the arpeggiator mockup, whether sixteen rows of 10 px read at arm's length (the rows and
+  their height are two numbers in `make_roll_mockup.py`), and whether picking up with E2-E4
+  feels natural or needs the host's relative turns.

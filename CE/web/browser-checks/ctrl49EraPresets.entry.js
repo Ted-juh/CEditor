@@ -72,6 +72,7 @@ async function design(name) {
   }
   const api = new ScreenDrawApi(ctx, assets);
   const calls = { rect: 0, text: 0, image: 0, decode: 0 };
+  let said = [];
   const problems = [];
   const decodedSize = new Map();
   const texts = new Map();
@@ -108,6 +109,7 @@ async function design(name) {
     calls.text++;
     const t = texts.get(h);
     if (!whole(x, y, w, hh) || !onScreen(x, y, w, hh)) report(`text "${t?.text}" box ${x},${y} ${w}x${hh} off the screen`);
+    if (t) said.push(String(t.text));
     if (t && t.text) {
       const face = AILERON_FACES[t.font] ?? AILERON_FACES[9];
       measure.font = `${face.italic ? 'italic ' : ''}${face.weight} ${t.font_size}px Aileron, "Segoe UI", system-ui, sans-serif`;
@@ -125,10 +127,12 @@ async function design(name) {
   invoke('init', []);
   return {
     call(fn, bytes) { invoke(fn, bytes); },
+    // A redraw's call counts, and every text it drew, in order.
     draw() {
       for (const k of ['rect', 'text', 'image']) calls[k] = 0;
+      said = [];
       invoke('draw', []);
-      return { ...calls, total: calls.rect + calls.text + calls.image };
+      return { ...calls, total: calls.rect + calls.text + calls.image, texts: said };
     },
     problems: () => problems.splice(0),
   };

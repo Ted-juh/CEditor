@@ -411,7 +411,8 @@ class Theme:
                 put(img, self.black_key('off'), x, KB_Y)
 
     # -- keys, the same pictures for the baked keyboard and the sprites ------------------------------
-    def white_key(self, state, w=KB_WHITE - 1, h=KB_WHITE_H):
+    def white_key(self, state):
+        w, h = KB_WHITE - 1, KB_WHITE_H
         top, bot = self.P['ivory_top'], self.P['ivory']
         if state != 'off':
             c = self.P['key_lit' if state == 'lit' else 'key_play']
@@ -423,7 +424,8 @@ class Theme:
         rect(im, (w - 1, 0, 1, h - 3), mix(bot, (0, 0, 0), 0.18))
         return im
 
-    def black_key(self, state, w=KB_BLACK, h=KB_BLACK_H):
+    def black_key(self, state):
+        w, h = KB_BLACK, KB_BLACK_H
         top, bot = self.P['ebony_top'], self.P['ebony']
         if state != 'off':
             c = self.P['key_lit' if state == 'lit' else 'key_play']
