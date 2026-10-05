@@ -82,6 +82,87 @@ try {
   await shot('stress');
   console.log(`  stress     ${stress.rect} rects, ${stress.image} images, ${stress.text} texts`);
 
+  // The preset's actual Lua and PNGs, at native resolution. Strict runner checks every
+  // screen rectangle, sprite crop and text width, including extreme control positions.
+  await page.evaluate(() => {
+    document.getElementById('screen').style.cssText = 'width:480px;height:272px;display:block';
+    for (let n = 0; n < 5; n++) window.lab.machined.draw();
+    window.lab.machined.call('set_mode', [1]);
+  });
+  const presetValues = [[63,41,23,83,64,64,64,64], [99,88,109,78,120,92,106,99], [34,76,86,90,64,64,64,64]];
+  for (let p = 0; p < 3; p++) {
+    const pictures = [];
+    for (const v of [0, 64, 127]) {
+      pictures.push(await page.evaluate(({p,v}) => {
+        const lab = window.lab;
+        lab.machined.call('set_envelope', lab.envelope(v,v,v,v));
+        lab.machined.call('set_frame', lab.showcaseFrame(p,300,Array(8).fill(v),p===1?7:3,0,0,0,0));
+        lab.machined.draw();
+        return document.getElementById('screen').toDataURL();
+      }, {p,v}));
+    }
+    assert.equal(new Set(pictures).size,3,`preset page ${p}: controls change pixels at min/mid/max`);
+    const budget = await page.evaluate(({p,values}) => {
+      const lab = window.lab;
+      lab.machined.call('set_envelope',lab.envelope(...values.slice(0,4)));
+      lab.machined.call('set_frame',lab.showcaseFrame(p,300,values,p===1?2:0,0,0,0,0));
+      return lab.machined.draw();
+    }, {p,values:presetValues[p]});
+    assert.equal(budget.decode,3,'only three images decoded, once each across page switches');
+    assert.ok(budget.rect+budget.text+budget.image<600,'bounded work per redraw');
+    await shot(`machined-${p+1}-${['controls','mixer','envelope'][p]}`);
+    console.log(`  machined ${p+1} ${JSON.stringify(budget)}; extreme values, crops and labels pass`);
+  }
+  const meterFrames = await page.evaluate(() => {
+    const lab=window.lab;
+    return [300,311].map(f=>{
+      lab.machined.call('set_frame',lab.showcaseFrame(1,f,Array(8).fill(100),2,0,0,0,0));
+      lab.machined.draw(); return document.getElementById('screen').toDataURL();
+    });
+  });
+  assert.notEqual(meterFrames[0],meterFrames[1],'demo meters animate while fader values stay fixed');
+  const designs = await page.evaluate(() => Object.keys(window.lab.designs).sort());
+  assert.deepEqual(designs, ['bakelite-1936','neon-glass','studio-1978']);
+  for (const name of designs) {
+    await page.evaluate(name => {
+      const skin=window.lab.designs[name];
+      for(let n=0;n<5;n++) skin.draw();
+      skin.call('set_mode',[1]);
+    },name);
+    for(let p=0;p<3;p++) {
+      const samples = await page.evaluate(({name,p})=>{
+        const lab=window.lab, skin=lab.designs[name], images=[];
+        // Sweep all 128 positions, covering every filmstrip crop and mixed ADSR slopes.
+        for(let v=0;v<128;v++) {
+          const values=[v,127-v,v,127-v,v,127-v,v,127-v];
+          skin.call('set_envelope',lab.envelope(...values.slice(0,4)));
+          skin.call('set_frame',lab.showcaseFrame(p,300,values,p===1?v%8:v%4,0,0,0,0));
+          skin.draw();
+          if(v===0||v===64||v===127) images.push(document.getElementById('screen').toDataURL());
+        }
+        return images;
+      },{name,p});
+      assert.equal(new Set(samples).size,3,`${name} page ${p} moves through its range`);
+      const budget=await page.evaluate(({name,p,values})=>{
+        const lab=window.lab,skin=lab.designs[name];
+        skin.call('set_envelope',lab.envelope(...values.slice(0,4)));
+        skin.call('set_frame',lab.showcaseFrame(p,300,values,p===1?2:0,0,0,0,0));
+        return skin.draw();
+      },{name,p,values:presetValues[p]});
+      assert.equal(budget.decode,3,`${name} retains exactly three decoded assets`);
+      assert.ok(budget.rect+budget.text+budget.image<600,`${name} redraw stays in budget`);
+      await shot(`${name}-${p+1}-${['controls','mixer','envelope'][p]}`);
+    }
+    const meters=await page.evaluate(name=>{
+      const lab=window.lab,skin=lab.designs[name];
+      return [300,311].map(f=>{
+        skin.call('set_frame',lab.showcaseFrame(1,f,Array(8).fill(100),0,0,0,0,0));
+        skin.draw(); return document.getElementById('screen').toDataURL();
+      });
+    },name);
+    assert.notEqual(meters[0],meters[1],`${name} meters animate`);
+    console.log(`  ${name}: three pages, all 128 positions, sprite/text bounds, decode reuse, animated meters PASS`);
+  }
   assert.deepEqual(errors, []);
-  console.log('CTRL49 screen lab checks passed: payload ports match the C++ golden, all seven pages render, the animation moves.');
+  console.log('CTRL49 screen lab checks passed: golden payload, seven original pages, twelve preset pages, animation and bounds.');
 } finally { await browser.close(); await server.close(); }

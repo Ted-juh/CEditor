@@ -13,6 +13,10 @@ import vuNeedle from '../../../tools/ctrl49/screen-lab/vu_needle.png?url';
 import stressBlock from '../../../tools/ctrl49/screen-lab/stress_block.png?url';
 import logoStrip from '../../../tools/ctrl49/screen-lab/logo_strip.png?url';
 import spinnerStrip from '../../../tools/ctrl49/screen-lab/spinner_strip.png?url';
+import machinedLua from '../../../tools/ctrl49/screen-lab/machined-metal/MachinedMetal.lua?raw';
+import machinedPanels from '../../../tools/ctrl49/screen-lab/machined-metal/panels.png?url';
+import machinedKnobs from '../../../tools/ctrl49/screen-lab/machined-metal/knobs.png?url';
+import machinedParts from '../../../tools/ctrl49/screen-lab/machined-metal/parts.png?url';
 
 const load = async (url) => createImageBitmap(await (await fetch(url)).blob());
 
@@ -55,17 +59,41 @@ const assets = {
   0x0220: await load(surfaceAtlas), 0x0230: await load(labBg), 0x0232: await load(richAtlas),
   0x0234: await load(vuFace), 0x0236: await load(vuNeedle),
   0x0238: await load(logoStrip), 0x023a: await load(spinnerStrip),
+  576: await load(machinedPanels), 578: await load(machinedKnobs), 580: await load(machinedParts),
 };
 const block = await load(stressBlock);
 for (let i = 0; i < 8; i++) assets[0x0250 + i] = block;
 
-async function page(source) {
-  const api = new ScreenDrawApi(document.getElementById('screen').getContext('2d'), assets);
+async function page(source, strict = false, pageAssets = assets) {
+  const api = new ScreenDrawApi(document.getElementById('screen').getContext('2d'), pageAssets);
   const calls = { rect: 0, text: 0, image: 0, decode: 0 };
   const lua = await new LuaFactory(luaWasmUrl).createEngine();
-  lua.global.set('draw_rect', (...a) => { calls.rect++; api.draw_rect(...a); });
-  lua.global.set('draw_text', (...a) => { calls.text++; api.draw_text(...a); });
-  lua.global.set('draw_image', (...a) => { calls.image++; api.draw_image(...a); });
+  const bounds = (x, y, w, h) => {
+    if (strict && (x < 0 || y < 0 || w <= 0 || h <= 0 || x+w > 480 || y+h > 272))
+      throw new Error(`Out-of-screen draw: ${x},${y},${w},${h}`);
+  };
+  lua.global.set('draw_rect', (...a) => { bounds(...a); calls.rect++; api.draw_rect(...a); });
+  lua.global.set('draw_text', (handle, x, y, w, h) => {
+    bounds(x, y, w, h);
+    if (strict) {
+      const t = api.textObjects[handle-1];
+      api.ctx.save(); api.ctx.font = `600 ${t.font_size}px "Segoe UI", sans-serif`;
+      const width = api.ctx.measureText(t.text).width;
+      api.ctx.restore();
+      if (width > w) throw new Error(`Clipped label: ${t.text} (${width} > ${w})`);
+    }
+    calls.text++; api.draw_text(handle, x, y, w, h);
+  });
+  lua.global.set('draw_image', (...a) => {
+    const [type, id, x, y, sx, sy, w, h] = a;
+    bounds(x, y, w, h);
+    if (strict) {
+      const image = type === 18 ? api.decoded.get(id)?.image : pageAssets[id];
+      if (!image || sx < 0 || sy < 0 || sx+w > image.width || sy+h > image.height)
+        throw new Error(`Invalid sprite crop: ${id} ${sx},${sy},${w},${h}`);
+    }
+    calls.image++; api.draw_image(...a);
+  });
   lua.global.set('decode_image', (...a) => { calls.decode++; api.decode_image(...a); });
   lua.global.set('text_data', { new: () => api.text_data_new(), set: (h, p) => { api.text_data_set(h, p); } });
   await lua.doString(source);
@@ -82,10 +110,24 @@ async function page(source) {
   };
 }
 
+const skinSources = import.meta.glob('../../../tools/ctrl49/screen-lab/design-presets/*/Skin.lua',
+  { query: '?raw', import: 'default', eager: true });
+const skinImages = import.meta.glob('../../../tools/ctrl49/screen-lab/design-presets/*/*.png',
+  { query: '?url', import: 'default', eager: true });
+const designs = {};
+for (const [file, source] of Object.entries(skinSources)) {
+  const base = file.slice(0, file.lastIndexOf('/') + 1);
+  const name = base.split('/').at(-2);
+  const images = await Promise.all(['panels.png', 'knobs.png', 'parts.png'].map(n => load(skinImages[base+n])));
+  designs[name] = await page(source, true, {576: images[0], 578: images[1], 580: images[2]});
+}
+
 window.lab = {
+  designs,
   envelope, showcaseFrame,
   showcase: await page(showcaseLua),
   stress: await page(stressLua),
+  machined: await page(machinedLua, true),
   // How many distinct colours the screen shows: a page that failed to draw is one flat colour.
   colours() {
     const d = document.getElementById('screen').getContext('2d').getImageData(0, 0, 480, 272).data;
