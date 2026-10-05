@@ -74,14 +74,15 @@ try {
     const lab = window.lab;
     const frame = [10, 12, 20, 1, 3, 9, 0, 42];      // 160 rects, 96 sprites, 20 texts, 1 full, 3 MB
     let calls;
-    for (let i = 0; i < 4; i++) { lab.stress.call('set_load', frame); calls = lab.stress.draw(); }
+    // Three blocks, one decoded per redraw, each drawn from nine redraws after its decode.
+    for (let i = 0; i < 13; i++) { lab.stress.call('set_load', frame); calls = lab.stress.draw(); }
     return calls;
   });
   assert.equal(stress.rect >= 160 && stress.text >= 20, true, 'the stress page draws the asked-for load');
   assert.equal(stress.image, 96 + 1 + 3, 'sprites, the full-screen blit and one swatch per decoded block');
-  // Each swatch shows its block's band of colour: the block decoded to the id after its upload,
-  // and the swatch draws that id (an unpaired id draws nothing, which on the keyboard reads as a
-  // block that never decoded).
+  // Each swatch shows its block's band of colour: the swatch draws the buffer its block was
+  // decoded into (a wrong id draws nothing, which on the keyboard reads as a block that never
+  // decoded).
   const swatches = await page.evaluate(() => [0, 1, 2].map((b) =>
     Array.from(document.getElementById('screen').getContext('2d').getImageData(16 + b * 30 + 13, 249, 1, 1).data.slice(0, 3))));
   const bands = [[80, 120, 200], [140, 156, 152], [200, 192, 104]];

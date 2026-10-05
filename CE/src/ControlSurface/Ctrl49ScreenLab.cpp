@@ -346,9 +346,8 @@ int wmain (int argc, wchar_t** argv)
         assets.push_back ({ 0x0230, readFile (labDir / "lab_bg.png") });
         if (stress)
         {
-            const auto block = readFile (labDir / "stress_block.png");
-            for (int i = 0; i < lab::kStressMemoryBlocks; ++i)
-                assets.push_back ({ (std::uint16_t) (0x0250 + 2 * i), block });   // decoded to the id after
+            // One upload, decoded once per 1 MB block (as many as lab::kStressMemoryBlocks).
+            assets.push_back ({ 0x0250, readFile (labDir / "stress_block.png") });
         }
         else
         {

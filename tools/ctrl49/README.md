@@ -463,11 +463,17 @@ at 9 redraws a second, until the bar under the header stopped gliding):
 | redraws a second, empty page | still smooth at 30 | |
 
 Sprites are the budget that binds: the full mockups ask for about 4,100-4,200 calls a second, the
-slim ones about 2,000. Seven full-screen blits a redraw stayed smooth, but that run used an RGB
-`lab_bg.png` and may have drawn nothing; and no memory block ever showed, because
-`stress_block.png` was RGB too, a format never seen to draw on the keyboard (RGBA and 8-bit
-palette PNGs are). Both are RGBA now, and each block decodes to the id after its upload, as every
-page that has drawn does. Full-screen blits and image memory are to be measured again.
+slim ones about 2,000. Seven full-screen blits a redraw (an RGBA `lab_bg.png`, 480 x 272 each)
+stayed smooth.
+
+**Image memory.** Eight 1 MB blocks decoded on top of the page's own, with no refusal and no
+watchdog: `mem_usage(0)` went from 12,263,424 to 20,783,104, up 8.1 MB. So at least 8 MB of
+decoded images fit beside a page, and `mem_usage(0)` counts them. None of the eight could be
+drawn, though. That build uploaded the block eight times and drew each one in the same redraw
+that decoded it; the pages that draw decode last and draw later, from fewer uploads. The Stress
+page now does the same (one upload, decoded per block as the last thing in a redraw, drawn a
+second later). Whether its swatches then show is the next run's question: all eight showing
+means the same-redraw draw was the trouble, the first few showing marks an object limit.
 
 - **RAM / object budget** — how many/large filmstrips fit in device RAM before upload or
   decode fails. The Stress page's E5 decodes 1 MB blocks, up to 8.
