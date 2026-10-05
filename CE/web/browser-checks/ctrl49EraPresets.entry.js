@@ -1,18 +1,21 @@
-// Runs every era design (tools/ctrl49/screen-lab/era-presets/*/Skin.lua) against the firmware
-// draw-API shim with the atlases its manifest uploads, fed with payloads shaped as Ctrl49ScreenLab.h builds
-// them. Every call the page makes is checked as it is made: rectangles and images on the
-// 480x272 screen, crops inside the decoded atlas, text inside its box, buffers decoded before
-// use. Folders are found by glob, so a seventh design is checked without touching this file.
+// Runs every era design (tools/ctrl49/screen-lab/era-presets/*/Skin.lua) and the HoSTage feature
+// mockups (screen-lab/feature-mockups/*/Skin.lua) against the firmware draw-API shim with the
+// atlases its manifest uploads, fed with payloads shaped as Ctrl49ScreenLab.h builds them. Every
+// call the page makes is checked as it is made: rectangles and images on the 480x272 screen, crops
+// inside the decoded atlas, text inside its box, buffers decoded before use. Folders are found by
+// glob, so another design is checked without touching this file.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
 import { LuaFactory } from 'wasmoon';
 import { ScreenDrawApi, AILERON_FACES } from '../src/CE_Application/screen/screenDrawApi.js';
 
-const skins = import.meta.glob('../../../tools/ctrl49/screen-lab/era-presets/*/Skin.lua',
-  { query: '?raw', import: 'default', eager: true });
-const manifests = import.meta.glob('../../../tools/ctrl49/screen-lab/era-presets/*/Design.ctrl49preset',
-  { query: '?raw', import: 'default', eager: true });
-const pngs = import.meta.glob('../../../tools/ctrl49/screen-lab/era-presets/*/*.png',
-  { query: '?url', import: 'default', eager: true });
+const skins = import.meta.glob(['../../../tools/ctrl49/screen-lab/era-presets/*/Skin.lua',
+  '../../../tools/ctrl49/screen-lab/feature-mockups/*/Skin.lua'], { query: '?raw', import: 'default', eager: true });
+const manifests = import.meta.glob(['../../../tools/ctrl49/screen-lab/era-presets/*/Design.ctrl49preset',
+  '../../../tools/ctrl49/screen-lab/feature-mockups/*/Design.ctrl49preset'], { query: '?raw', import: 'default', eager: true });
+const pngs = import.meta.glob(['../../../tools/ctrl49/screen-lab/era-presets/*/*.png',
+  '../../../tools/ctrl49/screen-lab/feature-mockups/*/*.png'], { query: '?url', import: 'default', eager: true });
+// Each design's folder, by its name (names are unique across the two roots).
+const folders = Object.fromEntries(Object.keys(skins).map((k) => [k.split('/').at(-2), k.slice(0, -'Skin.lua'.length)]));
 
 // The uploads a manifest names: { id: file } from its [AssetN] sections.
 function uploads(text) {
@@ -65,7 +68,7 @@ const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const measure = document.createElement('canvas').getContext('2d');
 
 async function design(name) {
-  const base = `../../../tools/ctrl49/screen-lab/era-presets/${name}/`;
+  const base = folders[name];
   const assets = {};
   for (const [id, file] of Object.entries(uploads(manifests[`${base}Design.ctrl49preset`]))) {
     assets[id] = await load(pngs[`${base}${file}`]);
@@ -139,7 +142,7 @@ async function design(name) {
 }
 
 window.era = {
-  names: Object.keys(skins).map((k) => k.split('/').at(-2)).sort(),
+  names: Object.keys(folders).sort(),
   envelope, frame, design,
   // A picture, not a flat fill: how many distinct colours the screen shows.
   colours() {

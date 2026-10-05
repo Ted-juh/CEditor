@@ -1,9 +1,10 @@
-// CTRL49 era designs (tools/ctrl49/screen-lab/era-presets): every design's manifest obeys the
-// rules the screen lab's preset loader enforces, its Lua is Lua 5.2 and is its template with only
-// its GENERATED block changed, and every page renders through the firmware shim from payloads
-// shaped as Ctrl49ScreenLab.h builds them — at every encoder position, inside the screen and the
-// atlases, decoding each atlas exactly once, and moving where it should; and the arpeggiator's
-// piano roll edits a pattern the way it says it does.
+// CTRL49 era designs (tools/ctrl49/screen-lab/era-presets) and HoSTage feature mockups
+// (screen-lab/feature-mockups): every design's manifest obeys the rules the screen lab's preset
+// loader enforces, its Lua is Lua 5.2 and is its template with only its GENERATED block changed,
+// and every page renders through the firmware shim from payloads shaped as Ctrl49ScreenLab.h
+// builds them — at every encoder position, inside the screen and the atlases, decoding each atlas
+// exactly once, and moving where it should; the arpeggiator's piano roll edits a pattern the way
+// it says it does, and the feature pages answer their encoders the way they say they do.
 //
 //   CTRL49_ERA_SHOTS=<dir>   writes a 480x272 PNG of every page of every design there
 //   CTRL49_ERA_PREVIEWS=1    writes them into each design folder as preview-<n>-<page>.png
@@ -18,16 +19,18 @@ import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const repo = path.resolve(here, '../../..');
-const root = path.join(repo, 'tools/ctrl49/screen-lab/era-presets');
+const lab = path.join(repo, 'tools/ctrl49/screen-lab');
 const shots = process.env.CTRL49_ERA_SHOTS;
 const previews = process.env.CTRL49_ERA_PREVIEWS === '1';
 if (shots) fs.mkdirSync(shots, { recursive: true });
 
-// The kind of design: its template, the atlases its crops assume, its pages, what must move
-// with the frame counter alone ([page, frames, least distinct pictures]), the arpeggiator's edit
-// page, and the visits that make a redraw busiest ([page, values] in order, every one drawn).
+// The kind of design: the folder its designs and template live in, the generated tables every key
+// of which the template reads must be given, the atlases its crops assume, its pages, what must
+// move with the frame counter alone ([page, frames, least distinct pictures]), the arpeggiator's
+// edit page, and the visits that make a redraw busiest ([page, values] in order, every one drawn).
 const SPECS = {
   era: {
+    root: 'era-presets', tables: ['T', 'L'],
     template: 'EraSkin.lua', pages: ['controls', 'mixer', 'envelope', 'arp-edit', 'arp-play'], envelope: 2,
     atlases: { 'panels.png': [480, 816], 'knobs.png': [80, 5120], 'parts.png': [480, 732] },
     moving: [[1, [300, 301, 302, 303], 4], [3, [0, 4, 8, 12, 16], 4], [4, [0, 4, 8, 12, 16], 4]],
@@ -38,11 +41,26 @@ const SPECS = {
       [3, [0, 0, 127, 127, 0, 127, 127, 127]], [3, [127, 127, 0, 0, 127, 0, 0, 0]],
       [4, [127, 80, 127, 127, 64, 0, 64, 64]], [3, [64, 64, 64, 64, 52, 64, 72, 60]]],
   },
+  feature: {
+    root: 'feature-mockups', tables: ['T', 'L', 'S', 'D'],
+    template: 'FeatureSkin.lua', pages: ['atlas', 'motion', 'capture', 'stage', 'chords'], envelope: null,
+    atlases: { 'panels.png': [480, 816], 'tint.png': [80, 5184], 'parts.png': [480, 544] },
+    moving: [[1, [0, 4, 8, 12, 16], 4], [2, [0, 4, 8, 12, 16], 4], [3, [0, 4, 8, 12, 16], 3], [4, [0, 4, 8, 12, 16], 4]],
+    // the atlas with the biggest box in the crowd, every source at full depth either way, sixteen
+    // bars kept, the last song, every key and scale's widest chords
+    busiest: [[0, [70, 110, 127, 127, 127, 64, 64, 64]], [0, [20, 20, 127, 0, 0, 64, 64, 64]],
+      [1, [127, 127, 127, 127, 127, 127, 127, 127]], [1, [0, 0, 0, 0, 0, 0, 0, 0]],
+      [2, [127, 0, 127, 127, 64, 64, 64, 64]], [2, [127, 127, 0, 0, 64, 64, 64, 64]],
+      [3, [127, 64, 64, 64, 64, 64, 64, 64]], [4, [127, 127, 64, 64, 64, 64, 64, 64]], [4, [60, 90, 64, 64, 64, 64, 64, 64]]],
+    // moments worth a picture of their own: [page, frame, values, name]
+    moments: [[2, 50, [56, 0, 80, 0, 70, 64, 64, 64], 'kept'], [3, 450, [24, 64, 64, 64, 64, 64, 64, 64], 'failover'],
+      [0, 37, [20, 30, 64, 40, 90, 64, 64, 64], 'dark-sound'], [0, 37, [118, 120, 30, 0, 64, 64, 64, 64], 'bright-sound']],
+  },
 };
 // The designs this check expects, and their kind. Adding one is deliberate: add it here too.
 const EXPECTED = { 'blueprint-1965': 'era', 'dot-matrix-1983': 'era', 'metro-tiles-2012': 'era',
   'midnight-2020': 'era', 'neo-brutal-2023': 'era', 'red-lead-1997': 'era', 'rhythm-box-1980': 'era',
-  'swiss-flat-2011': 'era', 'test-bench-1958': 'era', 'walnut-1971': 'era' };
+  'swiss-flat-2011': 'era', 'test-bench-1958': 'era', 'walnut-1971': 'era', 'hostage-features': 'feature' };
 const MEMORY_CEILING = 8 * 1024 * 1024;     // the preset loader's software guard, not a device limit
 const MAX_CALLS = 600;
 
@@ -71,17 +89,27 @@ function png(file) {
 
 const block = /-- BEGIN GENERATED[\s\S]*?-- END GENERATED/;
 const templates = {};
+const folders = {};
 for (const spec of Object.values(SPECS)) {
+  const root = path.join(lab, spec.root);
   templates[spec.template] = fs.readFileSync(path.join(root, spec.template), 'utf8');
   luaparse.parse(templates[spec.template], { luaVersion: '5.2' });
+  for (const n of fs.readdirSync(root)) {
+    if (!fs.existsSync(path.join(root, n, 'Design.ctrl49preset'))) continue;
+    assert.ok(!folders[n], `${n}: one design of that name`);
+    folders[n] = path.join(root, n);
+  }
 }
 
-const names = fs.readdirSync(root).filter((n) => fs.existsSync(path.join(root, n, 'Design.ctrl49preset'))).sort();
+const names = Object.keys(folders).sort();
 assert.deepEqual(names, Object.keys(EXPECTED).sort(), 'the design folders are the ones expected');
+for (const name of names) {
+  assert.equal(path.basename(path.dirname(folders[name])), SPECS[EXPECTED[name]].root, `${name}: lives in ${SPECS[EXPECTED[name]].root}`);
+}
 
 const manifests = {};
 for (const name of names) {
-  const dir = path.join(root, name);
+  const dir = folders[name];
   const spec = SPECS[EXPECTED[name]];
   const m = ini(fs.readFileSync(path.join(dir, 'Design.ctrl49preset'), 'latin1'));
   const p = m.Preset;
@@ -132,12 +160,14 @@ for (const name of names) {
   assert.equal(lua.replace(block, ''), templates[spec.template].replace(block, ''),
     `${name}: Skin.lua is ${spec.template} with only its GENERATED block changed (regenerate, do not hand-edit)`);
   assert.equal(Number(lua.match(/\bfps = (\d+)/)[1]), fps, `${name}: the Lua clock counts the manifest's fps`);
-  // Every theme colour and layout value the template reads is in this design's GENERATED block:
-  // a missing one is nil on the device (the preview would quietly draw it white).
-  for (const [table, used] of [['T', templates[spec.template]], ['L', templates[spec.template]]]) {
+  // Every theme colour, layout value (and, where the template has them, sprite and data value) the
+  // template reads is in this design's GENERATED block: a missing one is nil on the device (the
+  // preview would quietly draw it white).
+  for (const table of spec.tables) {
+    const used = templates[spec.template].replace(block, '');
     const needed = new Set([...used.matchAll(new RegExp(`\\b${table}\\.(\\w+)`, 'g'))].map((m) => m[1]));
-    const block = lua.match(new RegExp(`local ${table} = \\{([\\s\\S]*?)\\n\\}`))[1];
-    const given = new Set([...block.matchAll(/^\s+(\w+) = /gm)].map((m) => m[1]));
+    const body = lua.match(new RegExp(`local ${table} = \\{([\\s\\S]*?)\\n\\}`))[1];
+    const given = new Set([...body.matchAll(/^\s+(\w+) = /gm)].map((m) => m[1]));
     const missing = [...needed].filter((k) => !given.has(k));
     assert.deepEqual(missing, [], `${name}: ${table} gives every key ${spec.template} reads`);
   }
@@ -171,7 +201,7 @@ try {
     if (!shots && !previews) return;
     const data = Buffer.from((await page.evaluate(() => window.era.pixels())).split(',')[1], 'base64');
     if (shots) fs.writeFileSync(path.join(shots, `${name}-${file}.png`), data);
-    if (previews && file.match(/^\d-/)) fs.writeFileSync(path.join(root, name, `preview-${file}.png`), data);
+    if (previews && file.match(/^\d-/)) fs.writeFileSync(path.join(folders[name], `preview-${file}.png`), data);
   };
 
   for (const name of names) {
@@ -243,7 +273,7 @@ try {
       assert.ok(moves[pages[p]] >= least, `${name}: ${pages[p]} moves with the clock (${moves[pages[p]]} pictures in ${frames.length})`);
     }
 
-    {
+    if (spec.editPage !== undefined) {
       // Editing: on a fresh copy, step 1 holds C3 and E2 sits on C4. Turning E2 away from C3
       // leaves the step alone (a ghost shows where E2 is); once E2 reaches C3 it picks the note up
       // and carries it. An empty step takes E2's note at once. E4 to OFF empties a step.
@@ -266,6 +296,37 @@ try {
       }, { name, D, p: spec.editPage });
       assert.deepEqual(edits, { start: 'C3', away: 'C3', reached: 'C3', carried: 'D3', emptyStep: '--', placed: 'G3', offed: '--' },
         `${name}: E2 picks a step's note up only once it reaches it; an empty step takes it at once`);
+    }
+
+    if (spec.moments) {
+      // The feature pages answer their encoders: E5 on CAPTURE keeps the box and says so; the
+      // atlas's box finds more sounds the bigger it is, and lists eight; the chord page names the
+      // chord the progression holds at that moment, in the key E1 and E2 chose.
+      const said = await page.evaluate(async ({ name, D }) => {
+        const d = await window.era.design(name), era = window.era;
+        for (let i = 0; i < 4; i++) d.draw();
+        d.call('set_mode', [1]);
+        const at = (p, values, frame = 37) => { d.call('set_frame', era.frame(p, frame, values, 0)); return d.draw().texts; };
+        const inBox = (texts) => Number(texts.find((t) => t.endsWith(' IN BOX')).split(' ')[0]);
+        const out = {};
+        at(2, D[2]);
+        out.kept = at(2, Object.assign(D[2].slice(), { 4: 70 })).find((t) => t.startsWith('KEPT')) ?? null;
+        out.notKept = at(2, Object.assign(D[2].slice(), { 4: 70 }), 200).some((t) => t.startsWith('KEPT'));
+        const small = at(0, Object.assign(D[0].slice(), { 2: 0 })), big = at(0, Object.assign(D[0].slice(), { 2: 127 }));
+        out.boxGrows = inBox(big) > inBox(small);
+        out.listed = big.filter((t) => /^[A-Z][a-z]+ [A-Z][a-z]+ \d+$/.test(t)).length;
+        const chords = at(4, D[4]), k = chords.indexOf('KEY');
+        out.chord = chords.slice(k - 2, k);
+        out.key = chords[k + 1] ?? null;
+        return out;
+      }, { name, D });
+      assert.deepEqual(said, { kept: 'KEPT 8 BARS AS LOOP A,  QUANTISED 1/16', notKept: false, boxGrows: true, listed: 8, chord: ['Am7', 'i7   TONIC'], key: 'A MINOR' },
+        `${name}: CAPTURE keeps on E5, the atlas box queries, CHORDS names the key`);
+      for (const [p, f, values, label] of spec.moments) {
+        await page.evaluate(({ p, f, values }) => { window.d.call('set_frame', window.era.frame(p, f, values, 0)); window.d.draw(); }, { p, f, values });
+        await save(name, `${p + 1}-${pages[p]}-${label}`);
+      }
+      assert.deepEqual(await page.evaluate(() => window.d.problems()), [], `${name}: the moments draw inside the screen`);
     }
 
     const decodes = await page.evaluate(() => window.d.draw().decode);
