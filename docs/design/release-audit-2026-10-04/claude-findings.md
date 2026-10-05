@@ -108,7 +108,7 @@ in vendored JUCE.
 
 ### C-08 — A shared panel's JavaScript can read and write any file on the machine through the app's native bridge   (S1 · security · scripting / sharing)
 
-**Fixed** on `ccr-0d6b8446-x8nxzw` in `d8c3072`. Panels opened from a file or a package keep their scripts off until the user clicks **Run scripts** on a banner. Trust is remembered per script content and is never inferred from the file. Scripts written in the editor are never gated. This is the stop-gap the treatment above proposed; the isolated-frame sandbox and the path allow-list are still open.
+**Fixed** by the owner's security pass (`38eb191`, merged in `46d306c`). Scripts need approval, which is held in memory per session and bound to the code. JavaScript runs in QuickJS behind SES. The host keeps a file allow-list and fences navigation. This branch's own stop-gap prompt (`d8c3072`) was dropped in the merge in favour of it.
 
 **Repro.** A `.cepanel` or `.cepanelpkg` whose JS script contains, at top level,
 `window.__JUCE__.backend.emitEvent('savePanel', { panelId:'0', filePath:'<Startup folder>/x.bat', data:'…' })`.
@@ -609,6 +609,8 @@ says the second kind is `spring` and that `springEase` lives in `interactionRunt
 
 ### C-57 — One infinite loop in any preview script freezes the editor (or the plug-in's open window) with no recovery   (S1 · bug · scripting runtime)
 
+**Fixed.** JavaScript, Lua and the C++/C#/Java interpreters are bounded by the owner's security pass (`38eb191`: QuickJS interrupt, Wasmoon timeout, shared interpreter budget). Python, which that pass left unbounded, is bounded by this branch's loop guard (`5441609`, kept in the merge `46d306c`). `scriptWatchdog.test.js` runs an endless loop in all six languages.
+
 **Fixed** on `ccr-0d6b8446-x8nxzw` in `5441609`. Preview scripts in all seven languages are instrumented with a loop guard. A script that holds the thread for more than 2 s is stopped and stays stopped until it is edited or run again.
 
 **Repro.** A handler, or JS top-level code, containing `while (true) {}`; Preview.
@@ -863,6 +865,23 @@ failure. Observed (Linux build, GAIA panel, clap-validator built from source).
 `juce_lv2_helper` loads the plug-in to write its `.ttl` files; the plug-in starts GTK, and with no `DISPLAY` the link
 step fails ("cannot open display"). With `DISPLAY=:99` (Xvfb) it builds. CLAUDE.md's "Validating the plug-in" recipe
 runs the build without one. Observed.
+
+### C-116 — Python preview does not run at all after the security pass: Pyodide cannot load into the locked-down page   (S1 · bug · Python preview)
+
+**Fixed** in `46d306c` (the merge). Pyodide now loads in a hidden same-origin iframe, a realm of its own. The page realm stays locked.
+
+**Repro.** On `local-main-security` (`08fb6ee`) alone, in the editor in Chromium, with Pyodide 0.26.4 served locally: approve a panel
+with a Python script and run it. Every Python script reports `Pyodide failed to load: Cannot add property sig, object is not
+extensible`, while JavaScript in the same panel runs.
+
+**Cause.** `handlersFor` calls `ensureScriptSandbox()` before any script loads, and that calls SES `lockdown()`, which freezes
+the page realm's intrinsics. Pyodide is loaded lazily on the first Python script, which is always after lockdown, and its
+Emscripten glue adds properties to frozen functions.
+
+**Evidence.** In the app (browser): the failure on the security branch alone, then Python working after the fix, with a
+normal script, an endless loop stopped after about 2 s, and C-96's dict, `ce.*` and deferred-callback cases. In a test,
+`scriptWatchdog.test.js` pins the separate realm in a case that runs everywhere, and runs the real Python path when
+`CE_PYODIDE_DIR` points at an unpacked Pyodide.
 
 ## Wave 2 — runtime testing in the live app
 

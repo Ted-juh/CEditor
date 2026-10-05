@@ -5,10 +5,11 @@
 > scripting), each with repro, cause and evidence in `claude-findings.md`. Tree under test: `main` @ `f37550c`.
 >
 > **Codex's half is in** (`codex-findings.md`, summarised below): six X findings, five of them S1. X-02 and X-03 are
-> fixed here; X-01 is reported fixed on the owner's unpushed local `main`; X-04 and X-05 are Windows-only and open.
+> fixed here; X-01 is fixed by the owner's security pass, now merged; X-04 and X-05 are Windows-only and open.
 >
 > **Fixes, 2026-10-05:** all nine S1 blockers are fixed on `ccr-0d6b8446-x8nxzw`, along with C-38 and C-97–C-99 (13
-> findings). Each fix has a test that fails without it. Verified on Linux: the full web suite, all 36 C++ test targets
+> findings). Each fix has a test that fails without it. The owner's security pass is merged (`46d306c`); it is now the
+> fix for C-08 and most of C-57. One S1 it introduced, C-116 (Python preview could not load), is fixed in that merge. Verified on Linux: the full web suite, all 36 C++ test targets
 > with scripting on, and the app and player plug-in building and linking. **Not verified:** MSVC and the
 > `#if JUCE_WINDOWS` branches (C-34, C-35 and C-11 touch C++), and the Hostage fixes against a real plug-in on
 > Windows. That is Codex's side. C-08's fix is a trust prompt, not a sandbox, so the sandbox and the native-handler
@@ -16,14 +17,14 @@
 
 ## Verdict
 
-**Not ready for a formal release.** Of the fourteen S1s, eleven are fixed on this branch: Claude's nine, plus X-02 and
-X-03. X-01 is reported fixed on the owner's unpushed `main`. A beta is reasonable once three things happen: X-04 and
-X-05 (Windows export) are fixed, a Windows build confirms the rest, and this branch is reconciled with that `main`.
+**Not ready for a formal release.** Of the fifteen S1s (Claude's nine plus C-116, and Codex's five), thirteen are fixed
+on this branch. Only X-04 and X-05 are open, both in Windows export. A beta is reasonable once those two are fixed and
+a Windows build confirms the rest.
 The 35 S2s are the remaining gap to a final release.
 
 | | S1 | S2 | S3 | Unfinished | S4 | Total |
 | --- | --- | --- | --- | --- | --- | --- |
-| Claude | 9 | 35 | 49 | 3 | 19 | 115 |
+| Claude | 10 | 35 | 49 | 3 | 19 | 116 |
 | Codex | 5 | — | 1 | — | — | 6 |
 
 Evidence: 35 findings reproduced **in the running app** (the Linux build, or the real UI in Chromium),
@@ -34,11 +35,11 @@ nine S1s, seven are demonstrated in the app or a test; C-34 and C-35 are code tr
 
 | ID | What happens | Smallest safe treatment | Fixed |
 | --- | --- | --- | --- |
-| C-08 | Opening a shared panel and pressing Preview runs its JavaScript with the page's own globals, including the native file bridge — a panel can read or write any file. Reproduced in the app. | Give the native file handlers a path allow-list (only paths the user picked in a dialog, plus the app's own folders), and run panel JS without access to `window.__JUCE__`. Until then, ask before running scripts in a panel opened from a file. | `d8c3072` (the prompt; sandbox open) |
+| C-08 | Opening a shared panel and pressing Preview runs its JavaScript with the page's own globals, including the native file bridge — a panel can read or write any file. Reproduced in the app. | Give the native file handlers a path allow-list (only paths the user picked in a dialog, plus the app's own folders), and run panel JS without access to `window.__JUCE__`. Until then, ask before running scripts in a panel opened from a file. | `38eb191` (owner's security pass, merged `46d306c`) |
 | C-09 | Save As, then one Undo, re-points the tab at the original file; the next Save overwrites it. Reproduced in the app. | Leave `filePath` and `name` out of the undo snapshot (`stores/history.js:319`). One line. | `062c877` |
 | C-11 | "Send saved sound" (Total Recall) sends every dump the profile declares, zero-filled where the panel binds nothing — GAIA System block to 0, AN1x user voice/pattern memory overwritten. Found by two reviewers independently. | Send only dumps whose bytes all come from a real capture; until a device capture exists, do not send dumps at all. | `e77e782, f447292` |
 | C-25 | The AN1x profile's Scene 2 and FEG tracks 2–4 dump mappings point at the Scene 1 / track 1 parameters; every instanced profile the Designer saves has the same flaw. | Keep the instance prefix in the emitter's dump mappings (`CE/dpd/emit-legacy-core.mjs:88`) and regenerate the AN1x profile. | `7d95b05` |
-| C-57 | One endless loop in any preview script hangs the editor for good; no watchdog. Reproduced in the app. | Run preview scripts in a Worker the page can terminate, or give the interpreters an instruction budget like the native engines already have. | `5441609` |
+| C-57 | One endless loop in any preview script hangs the editor for good; no watchdog. Reproduced in the app. | Run preview scripts in a Worker the page can terminate, or give the interpreters an instruction budget like the native engines already have. | `38eb191` + `5441609` (Python) |
 | C-34 | Closing the Hostage plug-in while Library → Listen runs crashes the DAW (use after free). Applies only if the Hostage VST3 product ships. | Guard the closure with the `alive` token the preset scan already uses. | `8644737` |
 | C-94 | Typing a large tick count on a Knob or Slider (100,000) freezes the editor for ~50 s; 1,000,000 crashes it. Reproduced in the app. | Give Major/Minor Count a maximum (the sibling fields use 21) and cap `buildSliderTickStops`. | `db847b0` |
 | C-96 | A Python script that saves a dict setting leaves the panel impossible to save — even after the script is deleted. Reproduced in the app. | Convert Python values at the API boundary (`panelRuntime.js:7448`); this one change also fixes C-97–C-99. | `3c3c772` |
@@ -48,7 +49,7 @@ nine S1s, seven are demonstrated in the app or a test; C-34 and C-35 are code tr
 
 | ID | Sev | What happens | Status |
 | --- | --- | --- | --- |
-| X-01 | S1 | A CLAP export named `..` deletes files above the export folder. | Not on this branch. Codex reports it fixed in the owner's local `main` (`08fb6eef`), which is not pushed. |
+| X-01 | S1 | A CLAP export named `..` deletes files above the export folder. | **Fixed** by the owner's security pass (`38eb191`, `exportSecurity.mjs`), merged in `46d306c`. |
 | X-02 | S1 | Work the Player posts to the message thread can run after the Player or its device service is gone. | **Fixed** `b941e15`. The device bridge holds a weak reference and the panel load uses a SafePointer. With the old bridge, an AddressSanitizer harness reports heap-use-after-free; with the fix it reports nothing. |
 | X-03 | S1 | Restoring an older state keeps a later "always send" answer and program, so the patch is pushed to the synth unasked. | **Fixed** `3d834cf` (`readSessionRecall`, where absent means the default). Checked against the built VST3 on Linux: the old build keeps "always" and the fixed build drops it. |
 | X-04 | S1 | Windows: the starter's non-ASCII name breaks VST3/LV2 export (the folder copy in `cpSync` garbles the name). | Open. Windows only. |
@@ -58,9 +59,9 @@ nine S1s, seven are demonstrated in the app or a test; C-34 and C-35 are code tr
 Codex's verdicts on Claude's findings are in `codex-findings.md`. It confirmed every S1 it could reach. It found
 C-09, C-94 and C-96 to C-99 already fixed at `3c3c772`, and it argues that C-108 is S3, not S2.
 
-**Before merging this branch:** the owner's local `main` (`08fb6eef`) carries security work that this branch has
-never seen. According to Codex, that includes a script-loop watchdog and shared-panel script protection, which
-overlap C-57 and C-08 here. Reconcile the two before either is merged over the other.
+**Reconciled.** The owner's local `main` was pushed as `local-main-security` and merged in `46d306c`. Where the two
+overlapped on C-08 and C-57, the security pass is kept; this branch kept its Python loop guard, the one gap. The merge
+also fixes C-116: Python preview did not run at all under the security pass's SES lockdown.
 
 ## The work, grouped — for planning the fixes
 
@@ -88,13 +89,13 @@ overlap C-57 and C-08 here. Reconcile the two before either is merged over the o
 
 | ID | Sev | Area | Finding | Evidence | Fixed | Codex |
 | --- | --- | --- | --- | --- | --- | --- |
-| [C-08](claude-findings.md) | S1 | scripting / sharing | A shared panel's JavaScript can read and write any file on the machine through the app's native bridge | in the app | `d8c3072` | pending |
+| [C-08](claude-findings.md) | S1 | scripting / sharing | A shared panel's JavaScript can read and write any file on the machine through the app's native bridge | in the app | `38eb191` | pending |
 | [C-09](claude-findings.md) | S1 | save / undo | Save As, then one Undo, silently points the tab back at the ORIGINAL file; the next Save overwrites it | in the app | `062c877` | pending |
 | [C-11](claude-findings.md) | S1 | Total Recall | "Send saved sound" overwrites every dump parameter the panel does not export with 0 — including the synth's System block | in a test | `e77e782, f447292` | pending |
 | [C-25](claude-findings.md) | S1 | device profiles / DPD emitter | AN1x profile: Scene 2 and Free-EG tracks 2–4 in every dump read and write the Scene 1 / track 1 parameters | in a test | `7d95b05` | pending |
 | [C-34](claude-findings.md) | S1 | Hostage VST3 — if that product ships | Closing the Hostage plug-in while Library → Listen is measuring crashes the DAW | in a test | `8644737` | pending |
 | [C-35](claude-findings.md) | S1 | Hostage session persistence | A failed preset load leaves the part named and saved as the new plug-in, holding the old plug-in's state | in a test | `7ca84ec` | pending |
-| [C-57](claude-findings.md) | S1 | scripting runtime | One infinite loop in any preview script freezes the editor (or the plug-in's open window) with no recovery | in the app | `5441609` | pending |
+| [C-57](claude-findings.md) | S1 | scripting runtime | One infinite loop in any preview script freezes the editor (or the plug-in's open window) with no recovery | in the app | `38eb191`, `5441609` | pending |
 | [C-94](claude-findings.md) | S1 | inspector / slider renderer | Typing a large tick count into a Knob or Slider freezes the editor; 1,000,000 crashes it | in the app | `db847b0` | pending |
 | [C-96](claude-findings.md) | S1 | Python preview | Python: a script that saves a dict setting leaves the panel impossible to save, even after the script is removed | in the app | `3c3c772` | pending |
 | [C-01](claude-findings.md) | S2 | Hostage transport | With external MIDI clock on, every sequencer/arp step fires 3–4 times and swung steps never play | in a test |  | pending |
@@ -203,6 +204,7 @@ overlap C-57 and C-08 here. Reconcile the two before either is merged over the o
 | [C-113](claude-findings.md) | S4 | multi-select | Multi-selection gives no sign that two controls are selected, and the key control's Slider tab writes slider-only keys into the other | in the app |  | pending |
 | [C-114](claude-findings.md) | S4 | inspector | Behavior tab: Knob/Slider/Range/Number show "Type: momentary" with Subtype and Fire On that do nothing; Return to rest on text/list/radio types; blank selects | in the app |  | pending |
 | [C-115](claude-findings.md) | S4 | inspector | Small input-handling defects | in the app |  | pending |
+| [C-116](claude-findings.md) | S1 | Python preview | Python preview does not run at all after the security pass: Pyodide cannot load into the locked-down page | in the app | `46d306c` | — |
 
 ## What was tested and held up
 
