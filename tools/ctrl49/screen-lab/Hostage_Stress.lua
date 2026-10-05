@@ -32,7 +32,8 @@ local COLOURS = { 0xFF2F6FDF, 0xFF3FBF7F, 0xFFDF5F3F, 0xFFBF3FBF, 0xFFDFBF3F, 0x
 
 local work = { rects = 0, sprites = 0, texts = 0, full = 0, mem = 0, fps = 0, frame = 0 }
 local decoded = 0
-local HUD, HUD2, BIGNUM, TXT
+local HUD, HUD2, BIGNUM, TXT, DIAG
+local diag, redraws = "", 0
 local initialized = false
 
 local function textbox (font, size, hor, colour)
@@ -49,6 +50,7 @@ function init (args)
     HUD2 = textbox(9, 11, 0, GREY)
     BIGNUM = textbox(10, 20, 2, WHITE)
     TXT = textbox(9, 10, 0, GREY)
+    DIAG = textbox(9, 11, 2, GREY)
     decode_image(14, FLAT_PNG, 18, FLAT, WHITE)
     decode_image(14, BG_PNG, 18, BG, WHITE)
     initialized = true
@@ -64,6 +66,26 @@ function set_load (args)
     work.mem     = get_byte(args, 4)
     work.fps     = get_byte(args, 5)
     work.frame   = get_byte(args, 6) * 256 + get_byte(args, 7)
+end
+
+local function guarded (f, ...)
+    if type(f) ~= "function" or type(pcall) ~= "function" then return nil end
+    local ok, v = pcall(f, ...)
+    if ok then return v end
+    return nil
+end
+
+local function diagnostics ()
+    local valid, known = 0, true
+    for b = 0, 7 do
+        local v = guarded(asset_get_valid, block_png(b))
+        if v == nil then known = false elseif v == true or (type(v) == "number" and v ~= 0) then valid = valid + 1 end
+    end
+    local heap = guarded(collectgarbage, "count")
+    local dev = guarded(mem_usage, 0)
+    return "PNG " .. (known and (valid .. "/8") or "?")
+        .. "  DEV " .. (type(dev) == "number" and tostring(dev) or "?")
+        .. "  LUA " .. (type(heap) == "number" and tostring(heap - heap % 1) or "?")
 end
 
 function draw (args)
@@ -115,4 +137,12 @@ function draw (args)
     draw_text(BIGNUM, 380, 4, 90, 22)
     draw_rect(0, 40, 480, 3, 0xFF1C222B)
     draw_rect((work.frame * 8) % 440, 40, 40, 3, ORANGE)
+
+    -- Bottom right, beside the swatches: what the firmware says, for when a block does not show.
+    -- PNG n/8 is how many block uploads asset_get_valid accepts; DEV is mem_usage(0); LUA the
+    -- Lua heap in KB. Every call is guarded: a firmware without one shows "?" instead of an error.
+    if redraws % 15 == 0 then diag = diagnostics() end
+    redraws = redraws + 1
+    text_data.set(DIAG, { text = diag })
+    draw_text(DIAG, 262, 238, 210, 24)
 end
