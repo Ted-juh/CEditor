@@ -8,17 +8,23 @@ juce::WebBrowserComponent::Options withDeviceRuntimeEvents (
     DeviceProfileService& service,
     DeviceEmitFn emit)
 {
-    auto* svc = &service;
+    // Weak, not a raw pointer: the request is POSTED, and the service can be gone by the time it
+    // runs. A standalone Player owns its service and a plug-in's processor owns the other, and
+    // closing either one with a request still queued used to run the handler on freed memory
+    // (release audit X-02). The weak reference is read and cleared on the message thread, which
+    // is where both the post runs and the service is destroyed.
+    juce::WeakReference<DeviceProfileService> weak (&service);
 
     // Run a handler on the message thread, then emit. Mirrors the editor bridge's
     // callAsync pattern so service access stays on a single thread.
-    auto on = [svc, emit] (auto handler)
+    auto on = [weak, emit] (auto handler)
     {
-        return [svc, emit, handler] (const juce::var& payload)
+        return [weak, emit, handler] (const juce::var& payload)
         {
-            juce::MessageManager::callAsync ([svc, emit, handler, payload]()
+            juce::MessageManager::callAsync ([weak, emit, handler, payload]()
             {
-                handler (*svc, emit, payload);
+                if (auto* svc = weak.get())
+                    handler (*svc, emit, payload);
             });
         };
     };

@@ -28,6 +28,7 @@ const POLICY_RESTORE = readFileSync(join(REPO, 'CE/src/Player/RestorePolicy.h'),
 const HOST_H = readFileSync(join(REPO, 'CE/src/Player/PlayerHost.h'), 'utf8');
 const HOST_CPP = readFileSync(join(REPO, 'CE/src/Player/PlayerHost.cpp'), 'utf8');
 const PLAYER = readFileSync(join(REPO, 'CE/web/src/Player.svelte'), 'utf8');
+const DEVICE_BRIDGE = readFileSync(join(REPO, 'CE/src/DeviceProfile/DeviceRuntimeBridge.cpp'), 'utf8');
 
 test('setStateInformation arms the restore and does not send', () => {
   // The core constraint: that call arrives before the ports are open, before prepareToPlay, and on
@@ -313,4 +314,22 @@ test('the Player asks in a bar, and "not now" answers nothing', () => {
   assert.match(PLAYER, /answerRestore\(''\)/, 'there is no "not now" that sends nothing');
   assert.match(PLAYER, /if \(backend && answer\) backend\.emitEvent\('restoreAnswer'/,
     '"not now" must not reach the processor');
+});
+
+// --- Lifetime: work posted from the Player's WebView ------------------------------------------
+
+test('nothing the Player posts to the message thread holds a raw pointer to what can close first', () => {
+  // Release audit X-02. A posted closure runs whenever the message loop gets to it, and the Player
+  // window, a standalone Player's own device service, or a plug-in's whole processor can be gone by
+  // then. Both paths below dereferenced freed memory in that order: the device bridge's handler ran
+  // on the destroyed service (AddressSanitizer: heap-use-after-free, measured off-tree with the real
+  // bridge and service), and playerReady loaded a panel into a destroyed host.
+  assert.ok(!/callAsync \(\[[^\]]*\bthis\b/.test(HOST_CPP), 'PlayerHost posts a closure that captures `this`');
+  assert.match(HOST_CPP, /"playerReady", \[safe = juce::Component::SafePointer<PlayerHost> \(this\)\]/);
+  assert.match(HOST_CPP, /if \(safe != nullptr\) safe->loadPanelIntoWebView\(\);/);
+
+  assert.ok(!/auto\* svc = &service;/.test(DEVICE_BRIDGE), 'the device bridge must not post a raw service pointer');
+  assert.match(DEVICE_BRIDGE, /juce::WeakReference<DeviceProfileService> weak \(&service\);/);
+  assert.match(DEVICE_BRIDGE, /callAsync \(\[weak, emit, handler, payload\]\(\)\s*\{\s*if \(auto\* svc = weak\.get\(\)\)/,
+    'a posted device request must check the service is still there');
 });
