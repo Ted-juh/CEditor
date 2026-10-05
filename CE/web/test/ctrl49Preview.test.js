@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   rackLabelPayload, rackStatePayload, performanceTitle, performanceLabelPayload,
-  performanceStatePayload, browseSlotViews,
+  performanceStatePayload, browseSlotViews, soundcheckPayload, soundcheckLevelByte, layersPayload,
 } from '../src/CE_Application/screen/ctrl49Payloads.js';
 import { parseCalls } from '../src/ctrl49Preview/callScript.js';
 
@@ -60,6 +60,52 @@ test('browse: the cursor row takes a full knob, long names end in a dot', () => 
     { label: 'Lost Lead', assigned: true, resolved: false, position: 0 },
   ]);
   assert.equal(views[3].assigned, false, 'past the end of the list is empty');
+});
+
+// The same views and the same bytes as kGoldenSoundcheck and kGoldenLayers in
+// CE/tests/Ctrl49StagePagesTests.cpp: change one, change the other.
+test('soundcheck: the golden the C++ test pins', () => {
+  const bytes = soundcheckPayload({
+    songs: [
+      { name: 'Glass Harbour', checked: true, problems: 0, measured: true, rmsDb: -18.4, peakDb: -3.2 },
+      { name: 'Salt Road', checked: true, problems: 2 },
+      { name: 'Night Bus', checked: false },
+    ],
+    selected: 1, current: 0, basis: 'Current rig at check time',
+    problems: ['MIDI output unavailable: USB MIDI 2', 'Drifter: plug-in file is missing'],
+  });
+  assert.deepEqual(bytes, [
+    3, 0, 3, 1, 1, 1, 1, 1,
+    1, 43, 0, 13, ...ascii('Glass Harbour'),
+    2, 0, 2, 9, ...ascii('Salt Road'),
+    0, 0, 0, 9, ...ascii('Night Bus'),
+    25, ...ascii('Current rig at check time'),
+    2, 2,
+    35, ...ascii('MIDI output unavailable: USB MIDI 2'),
+    32, ...ascii('Drifter: plug-in file is missing'),
+    0, 0, 0,
+  ]);
+  assert.equal(soundcheckLevelByte(true, 0), 61);
+  assert.equal(soundcheckLevelByte(false, -10), 0, 'not measured is 0, whatever the number');
+  const long = soundcheckPayload({ songs: [{ name: 'S', checked: true, problems: 1 }], problems: ['x'.repeat(80)] });
+  assert.deepEqual(long.slice(-48, -3).slice(-4), [...ascii('x'), ...ascii('...')], 'a long problem ends in "..."');
+});
+
+test('layers: the golden the C++ test pins', () => {
+  const bytes = layersPayload({
+    parts: [
+      { name: 'Sub Bass', keyLow: 36, keyHigh: 54, velocityLow: 1, velocityHigh: 127, transpose: 0 },
+      { name: 'Brass', keyLow: 60, keyHigh: 84, velocityLow: 100, velocityHigh: 127, transpose: -12, muted: true, fromKeyboard: false },
+    ],
+    focused: 1,
+    held: [{ note: 48, velocity: 90 }, { note: 72, velocity: 112 }],
+  });
+  assert.deepEqual(bytes, [
+    2, 0, 2, 1, 36,
+    36, 54, 1, 127, 64, 5, 8, ...ascii('Sub Bass'),
+    60, 84, 100, 127, 52, 3, 5, ...ascii('Brass'),
+    2, 48, 90, 72, 112,
+  ]);
 });
 
 test('custom calls: bytes, length-prefixed strings, raw strings, comments', () => {

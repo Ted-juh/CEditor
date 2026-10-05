@@ -1016,6 +1016,16 @@ target_compile_definitions(CEditorCtrl49ScreenLabTests PRIVATE
 add_test(NAME Ctrl49ScreenLab COMMAND CEditorCtrl49ScreenLabTests)
 ce_configure_test(CEditorCtrl49ScreenLabTests)
 
+# CTRL49 stage pages (Ctrl49StagePages.h): the SOUNDCHECK and LAYERS payloads, byte for byte the
+# ones ctrl49Payloads.js builds for the app's screen card. Pure std.
+add_executable(CEditorCtrl49StagePagesTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49StagePages.cpp"
+    "${CE_ROOT}/tests/Ctrl49StagePagesTests.cpp"
+)
+target_include_directories(CEditorCtrl49StagePagesTests PRIVATE "${CE_ROOT}/src")
+add_test(NAME Ctrl49StagePages COMMAND CEditorCtrl49StagePagesTests)
+ce_configure_test(CEditorCtrl49StagePagesTests)
+
 # CTRL49 rack surface display payloads + the reducer's normalized control events (Stage 3).
 # Pure std like the protocol tests; the payload shapes follow contracts proven on hardware.
 add_executable(CEditorCtrl49RackDisplayTests

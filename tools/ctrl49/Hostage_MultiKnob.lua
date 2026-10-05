@@ -14,6 +14,12 @@ local WHITE  = 0xFFFFFFFF
 local GREY   = 0xFFAAB2BF
 local DIM    = 0xFF5A6B82
 local DARK   = 0xFF596273
+local ROW    = 0xFF161B24     -- a selected row, a key range's track
+local READY  = 0xFF2DD4BF
+local WARN   = 0xFFFF4D6A
+-- A colour per part on LAYERS, by its place in the rack.
+local PART_COLOURS = { 0xFFFF9408, 0xFF2DD4BF, 0xFF8B7CFF, 0xFFFF5C93,
+                       0xFFFFB547, 0xFF5B9BFF, 0xFF7BD88F, 0xFFE6E9F5 }
 
 local initialized = false
 local mode = 0
@@ -24,7 +30,8 @@ local values = { 0, 0, 0, 0, 0, 0, 0, 0 }
 
 -- The performance page's extras, read from set_values bytes 9..11 (a control page sends nine
 -- bytes, so they read 0 there and nothing extra is drawn): page kind, the beat in the bar
--- (1-based, 0 when stopped) and beats per bar.
+-- (1-based, 0 when stopped) and beats per bar. The two stage pages set their own kind when the
+-- host sends them (set_check: 2, set_layers: 3); set_values sets it back to a knob page.
 local page_kind = 0
 local beat = 0
 local beats_per_bar = 4
@@ -46,6 +53,10 @@ local VAL   = text_data.new()
 local LBL   = text_data.new()
 local SPLASH = text_data.new()
 local WORDMARK = text_data.new()
+local ROWTXT = text_data.new()     -- the stage pages: list rows, left
+local ROWNUM = text_data.new()     -- and right
+local SMALL  = text_data.new()     -- detail lines
+local HEAD   = text_data.new()     -- a song or part name, larger
 
 local function configure_text()
     text_data.set(TITLE, {
@@ -79,6 +90,18 @@ local function configure_text()
         border_width_top = 0, border_width_bottom = 0,
         border_width_left = 0, border_width_right = 0
     })
+    local function plain(t, size, hor, font)
+        text_data.set(t, {
+            text = "", color = WHITE, font = font or 9, font_size = size,
+            just_ver = 1, just_hor = hor, bk_color = 0x00000000,
+            border_width_top = 0, border_width_bottom = 0,
+            border_width_left = 0, border_width_right = 0
+        })
+    end
+    plain(ROWTXT, 12, 0)
+    plain(ROWNUM, 11, 2)
+    plain(SMALL, 11, 0)
+    plain(HEAD, 17, 0, 10)
 end
 
 -- The knob filmstrip decodes to 64 x 8192 pixels, about 2 MB, and the keyboard does nothing else
@@ -114,7 +137,7 @@ function note(args)
     if on and held[number] == nil then held_count = held_count + 1 end
     if (not on) and held[number] ~= nil then held_count = held_count - 1 end
     if on then held[number] = velocity else held[number] = nil end
-    if page_kind == 1 and pcall and lua_widget_make_dirty then pcall(lua_widget_make_dirty, WID) end
+    if (page_kind == 1 or page_kind == 3) and pcall and lua_widget_make_dirty then pcall(lua_widget_make_dirty, WID) end
 end
 
 function set_mode(args)
@@ -139,6 +162,7 @@ function set_values(args)
         values[slot] = get_byte(args, slot)
     end
     page_kind = get_byte(args, 9)
+    if page_kind > 1 then page_kind = 0 end
     beat = get_byte(args, 10)
     beats_per_bar = get_byte(args, 11)
     if beats_per_bar < 1 then beats_per_bar = 4 end
@@ -205,6 +229,248 @@ local function draw_splash()
     draw_rect(192, 222, 48, 2, ORANGE)
 end
 
+-- --- the stage pages ------------------------------------------------------------------------------
+
+-- Reads a [length][ASCII] string at byte i (0-based); returns it and the byte after it.
+local function read_string(args, i)
+    local n = get_byte(args, i)
+    return args:sub(i + 2, i + 1 + n), i + 1 + n
+end
+
+local function say(t, text, colour, x, y, w, h)
+    text_data.set(t, { text = text, color = colour })
+    draw_text(t, x, y, w, h)
+end
+
+local function outline(x, y, w, h, colour)
+    draw_rect(x, y, w, 1, colour)
+    draw_rect(x, y + h - 1, w, 1, colour)
+    draw_rect(x, y, 1, h, colour)
+    draw_rect(x + w - 1, y, 1, h, colour)
+end
+
+local function title_bar(text, right)
+    text_data.set(TITLE, { text = text, color = WHITE })
+    draw_text(TITLE, 0, 5, 480, 22)
+    if right ~= "" then say(ROWNUM, right, GREY, 240, 6, 232, 20) end
+end
+
+-- SOUNDCHECK: set_check (Ctrl49StagePages.h has the bytes). The setlist on the left, each song
+-- ready, with problems, or not checked yet, and its measured level; the selected song on the
+-- right: what it was checked against, its problems as the check words them, its level.
+local check = { count = 0, first = 0, rows = 0, selected = 0, current = 0, ready = 0, problems = 0,
+                unchecked = 0, list = {}, basis = "", total = 0, lines = {}, peak = 0, rms = 0, seconds = 0 }
+
+function set_check(args)
+    local i = 0
+    check.count = get_byte(args, 0); check.first = get_byte(args, 1); check.rows = get_byte(args, 2)
+    check.selected = get_byte(args, 3); check.current = get_byte(args, 4)
+    check.ready = get_byte(args, 5); check.problems = get_byte(args, 6); check.unchecked = get_byte(args, 7)
+    i = 8
+    check.list = {}
+    for r = 1, check.rows do
+        local row = { status = get_byte(args, i), level = get_byte(args, i + 1), problems = get_byte(args, i + 2) }
+        row.name, i = read_string(args, i + 3)
+        check.list[r] = row
+    end
+    check.basis, i = read_string(args, i)
+    check.total = get_byte(args, i); local n = get_byte(args, i + 1); i = i + 2
+    check.lines = {}
+    for l = 1, n do check.lines[l], i = read_string(args, i) end
+    check.peak = get_byte(args, i); check.rms = get_byte(args, i + 1); check.seconds = get_byte(args, i + 2)
+    page_kind = 2
+end
+
+local function level_text(b)
+    if b == 0 then return "-" end
+    return tostring(b - 61) .. " dB"
+end
+
+local function draw_check()
+    local head = "NOTHING CHECKED YET"
+    if check.count == 0 then head = "NO SETLIST"
+    elseif check.problems > 0 then head = tostring(check.problems) .. " OF " .. tostring(check.count) .. " WITH PROBLEMS"
+    elseif check.unchecked == 0 then head = "ALL " .. tostring(check.count) .. " READY" end
+    title_bar("SOUNDCHECK", head)
+    -- the summary
+    local words = { { check.ready, " READY", READY }, { check.problems, " WITH PROBLEMS", WARN },
+                    { check.unchecked, " NOT CHECKED", DIM } }
+    for k = 1, 3 do
+        local x = 12 + (k - 1) * 156
+        draw_rect(x, 37, 8, 8, words[k][3])
+        local c = GREY
+        if words[k][1] > 0 then c = WHITE end
+        say(ROWTXT, tostring(words[k][1]) .. words[k][2], c, x + 14, 32, 140, 18)
+    end
+    draw_rect(0, 53, 480, 1, ROW)
+    -- the setlist
+    for r = 1, check.rows do
+        local row = check.list[r]
+        local index = check.first + r - 1
+        local y = 58 + (r - 1) * 19
+        if index == check.selected then draw_rect(6, y, 236, 18, ROW) end
+        local mark = DIM
+        if row.status == 1 then mark = READY elseif row.status == 2 then mark = WARN end
+        draw_rect(12, y + 5, 8, 8, mark)
+        local c = WHITE
+        if row.status == 0 then c = GREY end
+        if index + 1 == check.current then c = ORANGE end
+        say(ROWTXT, row.name, c, 28, y, 150, 18)
+        -- the measured level, so a song much louder than the rest stands out
+        if row.level > 0 then
+            draw_rect(186, y + 8, 48, 2, DARK)
+            draw_rect(186, y + 7, math.floor(row.level * 48 / 61), 4, GREY)
+        end
+    end
+    draw_rect(247, 58, 1, 190, ROW)
+    -- the selected song
+    local sel = check.list[check.selected - check.first + 1]
+    if sel ~= nil then
+        say(HEAD, sel.name, WHITE, 256, 56, 218, 24)
+        local status = "NOT CHECKED YET"
+        if sel.status == 1 then status = "READY" elseif sel.status == 2 then
+            status = tostring(check.total) .. " PROBLEM"
+            if check.total ~= 1 then status = status .. "S" end
+        end
+        local sc = DIM
+        if sel.status == 1 then sc = READY elseif sel.status == 2 then sc = WARN end
+        say(ROWTXT, status, sc, 256, 82, 218, 18)
+        if check.basis ~= "" then say(SMALL, "CHECKED AGAINST " .. check.basis, GREY, 256, 100, 218, 16) end
+        for l = 1, #check.lines do say(SMALL, check.lines[l], WHITE, 256, 120 + (l - 1) * 18, 218, 16) end
+        if check.total > #check.lines then
+            say(SMALL, "AND " .. tostring(check.total - #check.lines) .. " MORE IN THE APP", GREY, 256, 120 + #check.lines * 18, 218, 16)
+        end
+        local level = "LEVEL NOT MEASURED"
+        if check.rms > 0 then
+            level = "LEVEL " .. level_text(check.rms) .. "   PEAK " .. level_text(check.peak) .. "   " .. tostring(check.seconds) .. " S"
+        end
+        say(SMALL, level, GREY, 256, 214, 218, 16)
+    end
+    say(SMALL, "E1 SONG   E8 CHECKS AGAIN", DARK, 12, 250, 300, 16)
+end
+
+-- LAYERS: set_layers (Ctrl49StagePages.h). Every part's key range as a band over the 49 keys,
+-- its velocity range and transpose, and as notes are played a light under every part that
+-- answers each one. The notes come from the host, and from this page's own note hook where the
+-- keyboard has one.
+local layers = { count = 0, first = 0, rows = 0, focused = 0, key = 36, parts = {}, held = {} }
+
+function set_layers(args)
+    layers.count = get_byte(args, 0); layers.first = get_byte(args, 1); layers.rows = get_byte(args, 2)
+    layers.focused = get_byte(args, 3); layers.key = get_byte(args, 4)
+    local i = 5
+    layers.parts = {}
+    for r = 1, layers.rows do
+        local p = { lo = get_byte(args, i), hi = get_byte(args, i + 1), vlo = get_byte(args, i + 2),
+                    vhi = get_byte(args, i + 3), tr = get_byte(args, i + 4) - 64, flags = get_byte(args, i + 5) }
+        p.name, i = read_string(args, i + 6)
+        layers.parts[r] = p
+    end
+    layers.held = {}
+    local n = get_byte(args, i); i = i + 1
+    for k = 1, n do
+        layers.held[get_byte(args, i)] = get_byte(args, i + 1)
+        i = i + 2
+    end
+    page_kind = 3
+end
+
+local WHITE_OF = { 0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6 }
+local NAMES = { "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B" }
+local function is_black(pc) return pc == 1 or pc == 3 or pc == 6 or pc == 8 or pc == 10 end
+local function note_name(n) return NAMES[n % 12 + 1] .. tostring(math.floor(n / 12) - 1) end
+local KX, KY, KW = 8, 196, 16           -- 29 white keys of 16 px, 48 tall
+
+-- Where key n is drawn and how wide; keys left or right of the 49 are pinned to the ends.
+local function key_x(n)
+    local first = layers.key
+    if n < first then return KX, 2 end
+    if n > first + 48 then return KX + 29 * KW - 2, 2 end
+    local w = math.floor((n - first) / 12) * 7 + WHITE_OF[(n - first) % 12 + 1]
+    if is_black(n % 12) then return KX + (w + 1) * KW - 5, 10 end
+    return KX + w * KW, KW - 1
+end
+
+-- A part the keys can reach: enabled, not muted, and taking its MIDI from the keyboard.
+local function playable(p)
+    return p.flags % 2 == 1 and math.floor(p.flags / 2) % 2 == 0 and math.floor(p.flags / 4) % 2 == 1
+end
+
+local function answers(p, n, v)
+    return playable(p) and n >= p.lo and n <= p.hi and v >= p.vlo and v <= p.vhi
+end
+
+local function draw_layers()
+    -- what is sounding: the host's notes, and the note hook's where the keyboard has one
+    local sounding = {}
+    for n, v in pairs(layers.held) do sounding[n] = v end
+    for n, v in pairs(held) do sounding[n] = v end
+    local focus = layers.parts[layers.focused - layers.first + 1]
+    local right = ""
+    if focus ~= nil then
+        right = focus.name .. "  " .. note_name(focus.lo) .. "-" .. note_name(focus.hi)
+    end
+    title_bar("LAYERS", right)
+    -- one row a part: its range over the keys, lit where it answers a note being played
+    for r = 1, layers.rows do
+        local p = layers.parts[r]
+        local y = 32 + (r - 1) * 20
+        local colour = PART_COLOURS[(layers.first + r - 1) % 8 + 1]
+        draw_rect(KX, y, 29 * KW - 1, 18, ROW)
+        local x0 = key_x(p.lo)
+        local x1, w1 = key_x(p.hi)
+        if p.lo <= p.hi then
+            local band = colour
+            if not playable(p) then band = DARK end
+            draw_rect(x0, y + 14, x1 + w1 - x0, 3, band)
+            for n, v in pairs(sounding) do
+                if answers(p, n, v) then
+                    local kx, kw = key_x(n)
+                    draw_rect(kx, y + 2, kw, 12, colour)
+                end
+            end
+        end
+        local text = p.name
+        if p.vlo > 1 or p.vhi < 127 then text = text .. "  VEL " .. tostring(p.vlo) .. "-" .. tostring(p.vhi) end
+        if p.tr ~= 0 then
+            local t = tostring(p.tr)
+            if p.tr > 0 then t = "+" .. t end
+            text = text .. "  " .. t
+        end
+        if math.floor(p.flags / 2) % 2 == 1 then text = text .. "  MUTED" end
+        if math.floor(p.flags / 4) % 2 == 0 then text = text .. "  FROM A PART" end
+        local c = GREY
+        if layers.first + r - 1 == layers.focused then
+            c = WHITE
+            outline(KX - 2, y - 1, 29 * KW + 3, 20, ORANGE)
+        end
+        local tx = x0 + 3
+        if tx > KX + 29 * KW - 200 then tx = KX + 29 * KW - 200 end
+        say(SMALL, text, c, tx, y, 196, 14)
+    end
+    -- the keys, lit in the colour of the first part that answers each (grey when none does)
+    for pass = 1, 2 do
+        for k = 0, 48 do
+            local n = layers.key + k
+            local black = is_black(n % 12)
+            if (pass == 1 and not black) or (pass == 2 and black) then
+                local x, w = key_x(n)
+                local v = sounding[n]
+                local c = 0xFFC9CEE0
+                if black then c = 0xFF161A2B end
+                if v ~= nil then
+                    c = DIM
+                    for r = layers.rows, 1, -1 do
+                        if answers(layers.parts[r], n, v) then c = PART_COLOURS[(layers.first + r - 1) % 8 + 1] end
+                    end
+                end
+                if black then draw_rect(x, KY, w, 30, c) else draw_rect(x, KY, w, 48, c) end
+            end
+        end
+    end
+    say(SMALL, "E1 PART  E2 LOW  E3 HIGH  E4 TRANSPOSE  E5 VEL LOW  E6 VEL HIGH", DARK, 12, 250, 460, 16)
+end
+
 function draw(args)
     if not initialized then init("") end
 
@@ -213,6 +479,15 @@ function draw(args)
 
     if mode == 0 then
         draw_splash()
+        return
+    end
+
+    if page_kind == 2 then
+        draw_check()
+        return
+    end
+    if page_kind == 3 then
+        draw_layers()
         return
     end
 
