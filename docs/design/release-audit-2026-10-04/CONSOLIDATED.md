@@ -2,8 +2,10 @@
 
 > **Status, 2026-10-05:** Claude's half is complete — **115 findings** in two waves (wave 1: code review, the Linux app
 > and the test suites; wave 2: runtime testing in the live app — every property, the inspector, animations and
-> scripting), each with repro, cause and evidence in `claude-findings.md`. **Codex's half (Windows) has not been
-> pushed yet.** Tree: `main` @ `f37550c`.
+> scripting), each with repro, cause and evidence in `claude-findings.md`. Tree under test: `main` @ `f37550c`.
+>
+> **Codex's half is in** (`codex-findings.md`, summarised below): six X findings, five of them S1. X-02 and X-03 are
+> fixed here; X-01 is reported fixed on the owner's unpushed local `main`; X-04 and X-05 are Windows-only and open.
 >
 > **Fixes, 2026-10-05:** all nine S1 blockers are fixed on `ccr-0d6b8446-x8nxzw`, along with C-38 and C-97–C-99 (13
 > findings). Each fix has a test that fails without it. Verified on Linux: the full web suite, all 36 C++ test targets
@@ -14,13 +16,15 @@
 
 ## Verdict
 
-**Not ready for a formal release.** A beta is reasonable now that the nine S1 findings below are fixed, provided a
-Windows build confirms them. The 35 S2s are the remaining gap to a final release.
+**Not ready for a formal release.** Of the fourteen S1s, eleven are fixed on this branch: Claude's nine, plus X-02 and
+X-03. X-01 is reported fixed on the owner's unpushed `main`. A beta is reasonable once three things happen: X-04 and
+X-05 (Windows export) are fixed, a Windows build confirms the rest, and this branch is reconciled with that `main`.
+The 35 S2s are the remaining gap to a final release.
 
 | | S1 | S2 | S3 | Unfinished | S4 | Total |
 | --- | --- | --- | --- | --- | --- | --- |
 | Claude | 9 | 35 | 49 | 3 | 19 | 115 |
-| Codex | — | — | — | — | — | pending |
+| Codex | 5 | — | 1 | — | — | 6 |
 
 Evidence: 35 findings reproduced **in the running app** (the Linux build, or the real UI in Chromium),
 55 **demonstrated by a test or harness** run against the repo's own code, 25 **traced in code**. Of the
@@ -39,6 +43,24 @@ nine S1s, seven are demonstrated in the app or a test; C-34 and C-35 are code tr
 | C-94 | Typing a large tick count on a Knob or Slider (100,000) freezes the editor for ~50 s; 1,000,000 crashes it. Reproduced in the app. | Give Major/Minor Count a maximum (the sibling fields use 21) and cap `buildSliderTickStops`. | `db847b0` |
 | C-96 | A Python script that saves a dict setting leaves the panel impossible to save — even after the script is deleted. Reproduced in the app. | Convert Python values at the API boundary (`panelRuntime.js:7448`); this one change also fixes C-97–C-99. | `3c3c772` |
 | C-35 | A failed preset load leaves the part named as the new plug-in while the old one plays; the next save writes the old plug-in's state under the new one's identity. | Change the part's identity only when the load commits, or restore it on failure. | `7ca84ec` |
+
+## Codex's findings (Windows, at `3c3c772`) — see `codex-findings.md`
+
+| ID | Sev | What happens | Status |
+| --- | --- | --- | --- |
+| X-01 | S1 | A CLAP export named `..` deletes files above the export folder. | Not on this branch. Codex reports it fixed in the owner's local `main` (`08fb6eef`), which is not pushed. |
+| X-02 | S1 | Work the Player posts to the message thread can run after the Player or its device service is gone. | **Fixed** `b941e15`. The device bridge holds a weak reference and the panel load uses a SafePointer. With the old bridge, an AddressSanitizer harness reports heap-use-after-free; with the fix it reports nothing. |
+| X-03 | S1 | Restoring an older state keeps a later "always send" answer and program, so the patch is pushed to the synth unasked. | **Fixed** `3d834cf` (`readSessionRecall`, where absent means the default). Checked against the built VST3 on Linux: the old build keeps "always" and the fixed build drops it. |
+| X-04 | S1 | Windows: the starter's non-ASCII name breaks VST3/LV2 export (the folder copy in `cpSync` garbles the name). | Open. Windows only. |
+| X-05 | S1 | Windows: LV2 exports report success but have an empty URI and do not load. | Open. Windows only. The cause is not yet established. |
+| X-06 | S3 | QA-09's CLAP fails clap-validator's parameter text round trip by one digit. | Open. |
+
+Codex's verdicts on Claude's findings are in `codex-findings.md`. It confirmed every S1 it could reach. It found
+C-09, C-94 and C-96 to C-99 already fixed at `3c3c772`, and it argues that C-108 is S3, not S2.
+
+**Before merging this branch:** the owner's local `main` (`08fb6eef`) carries security work that this branch has
+never seen. According to Codex, that includes a script-loop watchdog and shared-panel script protection, which
+overlap C-57 and C-08 here. Reconcile the two before either is merged over the other.
 
 ## The work, grouped — for planning the fixes
 
