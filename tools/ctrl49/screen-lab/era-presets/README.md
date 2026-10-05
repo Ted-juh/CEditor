@@ -8,9 +8,9 @@ screen-lab presets loaded by `Ctrl49ScreenLab.exe preset`, not synth patches, Sc
 assignments or a HoSTage theme. The lab makes no sound and sends no parameters; the meters and
 the arpeggiator are a moving picture driven by the frame counter.
 
-**Status: software checks only.** None of the ten has been on a CTRL49 yet. They need the
-preset mode of `Ctrl49ScreenLab.exe`, which lives in a working copy that is not in this
-repository yet; the `Ctrl49ScreenLab.cpp` committed here has only `showcase` and `stress`.
+**Status: software checks only.** None of the ten has been on a CTRL49 yet. They run in the
+preset mode of `Ctrl49ScreenLab.exe` (`Ctrl49ScreenLab preset <Design.ctrl49preset>`), which
+checks the manifest, uploads the page and its PNGs, and prints anything the keyboard refuses.
 
 | | Design | Folder | Look | Knobs | Upload | Decoded |
 |---|---|---|---|---|---|---|

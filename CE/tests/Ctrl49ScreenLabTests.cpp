@@ -1,10 +1,13 @@
-// Ctrl49ScreenLabTests — what the CTRL49 screen lab sends its two pages (Ctrl49ScreenLab.h).
-// No keyboard: the payloads' shapes, the maths the device cannot do, and one golden envelope
-// that the browser preview (CE/web/browser-checks/ctrl49ScreenLab.mjs) asserts too, so the
-// preview renders exactly the bytes the tool sends.
+// Ctrl49ScreenLabTests — what the CTRL49 screen lab sends its pages (Ctrl49ScreenLab.h), and how
+// its preset mode loads a design (Ctrl49ScreenLabPreset.h). No keyboard: the payloads' shapes,
+// the maths the device cannot do, one golden envelope that the browser preview
+// (CE/web/browser-checks/ctrl49ScreenLab.mjs) asserts too, so the preview renders exactly the
+// bytes the tool sends, and the preset loader's rules, run over every committed design.
 
 #include "ControlSurface/Ctrl49ScreenLab.h"
+#include "ControlSurface/Ctrl49ScreenLabPreset.h"
 
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -119,6 +122,121 @@ int main()
         check (lab::describe (load).find ("2032 rects") != std::string::npos
                  && lab::describe (load).find ("95460 draw calls/s") != std::string::npos,
                "and the console line says what the screen was asked for");
+    }
+
+    {   // --- preset mode: the manifest's rules -------------------------------------------------
+        const std::string good =
+            "; a comment\n[Preset]\nversion=1\nname=Test\nwidth=480\nheight=272\nlua=Skin.lua\npages=2\n"
+            "envelopePage=1\nfps=15\nassets=1\n\n[Asset0]\nid=576\nfile=panels.png\n\n"
+            "[Page0]\ntitle=One\nencoders=4\ne1=1\ne2=2\ne3=3\ne4=4\ne5=5\ne6=6\ne7=7\ne8=127\n"
+            "[Page1]\ntitle=Two\nencoders=8\ne1=0\ne2=0\ne3=0\ne4=0\ne5=0\ne6=0\ne7=0\ne8=0\n";
+        const auto parsed = lab::parsePreset (good);
+        check (parsed.preset && parsed.errors.empty(), "a manifest that keeps every rule loads");
+        check (parsed.preset && parsed.preset->name == "Test" && parsed.preset->pages == 2
+                 && parsed.preset->envelopePage == 1 && parsed.preset->fps == 15 && parsed.preset->lua == "Skin.lua",
+               "with its name, pages, envelope page, rate and page");
+        check (parsed.preset && parsed.preset->assets.size() == 1 && parsed.preset->assets[0].id == 576
+                 && parsed.preset->assets[0].file == "panels.png",
+               "its assets");
+        check (parsed.preset && parsed.preset->pageList[0].title == "One" && parsed.preset->pageList[0].encoders == 4
+                 && parsed.preset->pageList[0].values[0] == 1 && parsed.preset->pageList[0].values[7] == 127,
+               "and each page's title, encoder count and where its encoders start");
+
+        std::string crlf;
+        for (const char c : good)
+            crlf += c == '\n' ? std::string ("\r\n") : std::string (1, c);
+        check (lab::parsePreset (crlf).preset.has_value(), "Windows line endings read the same");
+
+        const auto broken = [&good] (const std::string& from, const std::string& to)
+        {
+            auto text = good;
+            text.replace (text.find (from), from.size(), to);
+            return lab::parsePreset (text);
+        };
+        const auto refuses = [&] (const std::string& from, const std::string& to, const std::string& why)
+        {
+            const auto result = broken (from, to);
+            bool named = false;
+            for (const auto& error : result.errors)
+                named = named || error.find (why) != std::string::npos;
+            auto label = "refused: " + from + " -> " + (to.empty() ? std::string ("nothing") : to);
+            if (const auto newline = label.find ('\n'); newline != std::string::npos)
+                label.erase (newline, 1);
+            check (! result.preset && named, label + " (" + why + ")");
+        };
+        refuses ("version=1", "version=2", "version");
+        refuses ("width=480", "width=320", "480 x 272");
+        refuses ("pages=2", "pages=7", "pages must be 1-6");
+        refuses ("pages=2", "pages=0", "pages must be 1-6");
+        refuses ("envelopePage=1", "envelopePage=2", "envelopePage");
+        refuses ("fps=15", "fps=4", "fps must be 5-30");
+        refuses ("fps=15", "fps=31", "fps must be 5-30");
+        refuses ("lua=Skin.lua", "lua=../Skin.lua", "beside the manifest");
+        refuses ("lua=Skin.lua", "lua=sub/Skin.lua", "beside the manifest");
+        refuses ("id=576", "id=1024", "0-1023");
+        refuses ("id=576", "id=257", "page's own");
+        refuses ("file=panels.png", "file=art\\panels.png", "beside the manifest");
+        refuses ("assets=1", "assets=2", "[Asset1] is missing");
+        refuses ("encoders=4", "encoders=9", "encoders must be 1-8");
+        refuses ("e8=127", "e8=128", "e8 must be 0-127");
+        refuses ("e8=127\n", "", "e8 must be 0-127");
+        refuses ("[Page1]", "[Page9]", "[Page1] is missing");
+        refuses ("name=Test", "name Test", "unreadable line");
+        check (lab::parsePreset ("nothing here").errors.size() >= 1 && ! lab::parsePreset ("[Other]\n").preset,
+               "and text with no [Preset] is not a preset");
+
+        auto twice = good;
+        twice.replace (twice.find ("assets=1"), 8, "assets=2");
+        twice.replace (twice.find ("[Page0]"), 7, "[Asset1]\nid=576\nfile=other.png\n[Page0]");
+        check (! lab::parsePreset (twice).preset, "two assets cannot share an id");
+    }
+
+    {   // --- preset mode: PNGs and memory ---------------------------------------------------
+        ceditor::ctrl49::Bytes header { 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 'I', 'H', 'D', 'R',
+                                        0, 0, 0x01, 0xE0, 0, 0, 0x03, 0x30 };
+        const auto size = lab::pngSize (header);
+        check (size && size->first == 480 && size->second == 816, "a PNG's size comes from its header");
+        header[1] = 'X';
+        check (! lab::pngSize (header), "and something that is not a PNG has none");
+
+        lab::Preset preset;
+        preset.assets.push_back ({ 576, "a.png", 480, 816 });
+        preset.assets.push_back ({ 578, "b.png", 80, 5120 });
+        check (lab::presetDecodedBytes (preset) == (480u * 816u + 80u * 5120u) * 4u,
+               "decoded memory is counted at four bytes a pixel");
+    }
+
+    {   // --- preset mode: every committed design ---------------------------------------------
+        // The tool's own loader over the folders the browser check renders: a design that the
+        // check passes and the tool would refuse (or the other way round) fails here.
+        int designs = 0, loads = 0;
+        for (const auto* folder : { "era-presets", "feature-mockups" })
+        {
+            const auto root = std::filesystem::path (CTRL49_LAB_DIR) / folder;
+            for (const auto& entry : std::filesystem::directory_iterator (root))
+            {
+                const auto manifest = entry.path() / "Design.ctrl49preset";
+                if (! std::filesystem::exists (manifest))
+                    continue;
+                ++designs;
+                const auto loaded = lab::loadPreset (manifest);
+                if (loaded.preset && ! loaded.lua.empty() && loaded.pngs.size() == loaded.preset->assets.size())
+                    ++loads;
+                else
+                    for (const auto& error : loaded.errors)
+                        std::cout << "        " << entry.path().filename().string() << ": " << error << std::endl;
+            }
+        }
+        check (designs >= 14, "the screen lab holds the era designs and the feature mockups ("
+                                 + std::to_string (designs) + " designs)");
+        check (loads == designs, "and the preset mode loads every one, its Lua and its PNGs");
+
+        const auto rig = lab::loadPreset (std::filesystem::path (CTRL49_LAB_DIR) / "feature-mockups/hostage-rig/Design.ctrl49preset");
+        check (rig.preset && rig.preset->pages == 5 && rig.preset->assets.size() == 3
+                 && lab::describe (*rig.preset, rig.lua.size(), 0).find ("5 pages at 15 redraws/s") != std::string::npos,
+               "the console line says what a design will ask of the keyboard");
+        check (lab::loadPreset (std::filesystem::path (CTRL49_LAB_DIR) / "no-such/Design.ctrl49preset").errors.size() == 1,
+               "and a manifest that is not there says so");
     }
 
     std::cout << "-------------------" << std::endl;

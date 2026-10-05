@@ -16,8 +16,8 @@ Each comes in two sizes, full and slim, for the stress test: see
 [Stress testing them on the keyboard](#stress-testing-them-on-the-keyboard).
 
 **Status: software checks only.** Neither has run on a CTRL49 yet. Like the era designs, they
-need the preset mode of `Ctrl49ScreenLab.exe`, which is not in this repository yet.
-`Start_CTRL49_Feature_Mockups.cmd` (in `tools/ctrl49`) asks which one and runs it.
+run in the preset mode of `Ctrl49ScreenLab.exe`. `Start_CTRL49_Feature_Mockups.cmd` (in
+`tools/ctrl49`) asks which one and runs it.
 
 ## HoSTage Features
 
@@ -257,9 +257,11 @@ will tell us. The two memory numbers update every 15 redraws.
 **On each, write down:**
 
 - **Did it load?** The upload of `Skin.lua` and the PNGs, then the loading screen counting the
-  three decodes to 3 / 3. A Lua error shows on the keyboard's own screen; the stock screen coming
-  back is the watchdog. If your build of the lab prints the keyboard's replies, `0x42` is out of
-  memory and `0x4D` a Lua script error (the committed lab does not read them).
+  three decodes to 3 / 3. The console prints every command the keyboard refuses as it happens
+  ("The keyboard refused Lua call: out of memory", "... Lua script error"), counts its answers
+  after the upload, and again every ten seconds with how many redraws a second actually went
+  out. A Lua error also shows on the keyboard's own screen; the stock screen coming back is the
+  watchdog.
 - **The readout on every page**, at rest and while turning encoders: draw calls, Lua KB and the
   firmware number. The highest Lua KB after walking all five pages is the one that counts (the
   pages read their libraries the first time they need them).

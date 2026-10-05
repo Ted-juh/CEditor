@@ -995,8 +995,9 @@ target_include_directories(CEditorCtrl49ReducerTests PRIVATE
 add_test(NAME Ctrl49Reducer COMMAND CEditorCtrl49ReducerTests)
 ce_configure_test(CEditorCtrl49ReducerTests)
 
-# CTRL49 screen lab payloads (Ctrl49ScreenLab.h): what the lab tool sends its pages, checked
-# where no keyboard is needed. Header-only, pure std.
+# CTRL49 screen lab payloads (Ctrl49ScreenLab.h) and its preset loader (Ctrl49ScreenLabPreset.h):
+# what the lab tool sends its pages, and how it loads a design, checked where no keyboard is
+# needed. Header-only, pure std.
 add_executable(CEditorCtrl49ScreenLabTests
     "${CE_ROOT}/tests/Ctrl49ScreenLabTests.cpp"
 )
@@ -1005,6 +1006,11 @@ target_compile_features(CEditorCtrl49ScreenLabTests PRIVATE cxx_std_23)
 
 target_include_directories(CEditorCtrl49ScreenLabTests PRIVATE
     "${CE_ROOT}/src"
+)
+
+# The preset loader's test reads every committed design in the screen lab.
+target_compile_definitions(CEditorCtrl49ScreenLabTests PRIVATE
+    CTRL49_LAB_DIR="${CMAKE_SOURCE_DIR}/tools/ctrl49/screen-lab"
 )
 
 add_test(NAME Ctrl49ScreenLab COMMAND CEditorCtrl49ScreenLabTests)

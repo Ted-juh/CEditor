@@ -286,7 +286,19 @@ tools/ctrl49/Start_CTRL49_Screen_Lab.cmd                 # asks: 1 showcase, 2 s
 # or:
 Ctrl49ScreenLab.exe showcase tools/ctrl49/screen-lab
 Ctrl49ScreenLab.exe stress   tools/ctrl49/screen-lab
+Ctrl49ScreenLab.exe preset   tools/ctrl49/screen-lab/era-presets/walnut-1971/Design.ctrl49preset
+Ctrl49ScreenLab.exe preset   <manifest> --check          # the manifest and its files, no keyboard
 ```
+
+**Preset mode** runs a design made elsewhere: a folder with a manifest (`Design.ctrl49preset`),
+a Lua page and its PNGs. `screen-lab/era-presets` and `screen-lab/feature-mockups` are such
+designs, with launchers of their own (`Start_CTRL49_Era_Designs.cmd`,
+`Start_CTRL49_Feature_Mockups.cmd`). The manifest's rules, and what the page is sent each redraw,
+are at the top of `CE/src/ControlSurface/Ctrl49ScreenLabPreset.h`; the `Ctrl49ScreenLab` ctest
+loads every committed design with the tool's own loader, and `npm run test:screen-eras` renders
+them. In every mode the console prints each command the keyboard refuses as it happens (out of
+memory, a Lua script error, ...); preset mode also counts the keyboard's answers after the upload
+and every ten seconds, beside the redraws a second that actually went out.
 
 Close VIP, your DAW and HoSTage / CEditor first: only one program can own the screen.
 
