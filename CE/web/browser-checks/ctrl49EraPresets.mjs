@@ -55,7 +55,8 @@ const SPECS = {
       [1, [127, 127, 127, 127, 127, 127, 127, 127]], [1, [0, 0, 0, 0, 0, 0, 0, 0]],
       [2, [127, 0, 127, 127, 64, 64, 64, 64]], [2, [127, 127, 0, 0, 64, 64, 64, 64]],
       [3, [127, 64, 64, 64, 64, 64, 64, 64]], [4, [127, 127, 64, 64, 64, 64, 64, 64]], [4, [60, 90, 64, 64, 64, 64, 64, 64]]],
-    // moments worth a picture of their own, on a fresh copy: [page, frame, values, name]
+    // moments worth a picture of their own, on a fresh copy: [page, frame, values, name, the
+    // encoder moved last (E1 when not given)]
     moments: [[2, 50, [56, 0, 80, 0, 70, 64, 64, 64], 'kept'], [3, 450, [24, 64, 64, 64, 64, 64, 64, 64], 'failover'],
       [0, 37, [20, 30, 64, 40, 90, 64, 64, 64], 'dark-sound'], [0, 37, [118, 120, 30, 0, 64, 64, 64, 64], 'bright-sound']],
     // The pages answer their encoders: E5 on CAPTURE keeps the box and says so once; the atlas's
@@ -132,6 +133,46 @@ const SPECS = {
         changes: ['9 CHANGES SINCE SAVED', '8 CHANGES SINCE SAVED', 'NOTHING CHANGED'], undo: ['8 CHANGES SINCE SAVED', true] }];
     },
   },
+  live: {
+    root: 'feature-mockups', tables: ['T', 'L', 'S', 'D'],
+    template: 'LiveSkin.lua', pages: ['live', 'section', 'labels', 'meters'], envelope: null,
+    atlases: { 'panels.png': [480, 544], 'tint.png': [480, 1032], 'parts.png': [480, 544] },
+    // the arp's playhead and the keys, the beat on the stage view, the meters
+    moving: [[0, [0, 2, 4, 6, 8], 3], [2, [0, 10, 20, 30, 40], 2], [3, [0, 4, 8, 12, 16], 4]],
+    // the fastest rate in every mode with every step ratcheted, every control at both ends, every
+    // song at its first and last bar, every fader up and down
+    busiest: [[0, [0, 127, 127, 127, 127, 127, 127, 127]], [0, [127, 127, 0, 127, 0, 0, 127, 0]],
+      [0, [60, 127, 64, 127, 64, 64, 127, 60]], [1, [127, 127, 127, 127, 127, 127, 127, 127]], [1, [0, 0, 0, 0, 0, 0, 0, 0]],
+      [2, [127, 127, 0, 64, 64, 64, 64, 64]], [2, [60, 0, 127, 64, 64, 64, 64, 64]],
+      [3, [127, 127, 127, 127, 127, 127, 64, 64]], [3, [0, 0, 0, 0, 0, 0, 64, 64]]],
+    // (SECTION: cutoff turned up from where the scan took the picture; the turned control's tag)
+    moments: [[0, 37, [4, 100, 52, 0, 127, 60, 64, 120], 'chord'], [1, 37, [16, 0, 118, 40, 30, 90, 100, 64], null, 2],
+      [1, 38, [16, 0, 118, 40, 30, 90, 100, 64], 'cutoff', 2],
+      [2, 37, [88, 70, 0, 64, 64, 64, 64, 64], 'accents'], [2, 37, [100, 20, 127, 64, 64, 64, 64, 64], 'amber'],
+      [3, 37, [127, 127, 127, 120, 120, 127, 64, 64], 'clipping']],
+    // The pages answer their encoders. LIVE: E8 changes the arp's mode; a step's velocity is taken
+    // over only once E2 reaches it, then carried. SECTION: the control the scan did not find is in
+    // the strip; the turned control says its name and value. LABELS: not one word of firmware
+    // text, on any song. METERS: the fader reads in dB, off at the bottom.
+    async answers({ fresh, at, D }) {
+      await fresh();
+      const after = (texts, label) => texts[texts.indexOf(label) + 1];
+      const out = {};
+      out.mode = [(await at(0, D[0]))[1].includes('ARP UP 1/16'), (await at(0, turned(D[0], { 7: 127 })))[1].includes('ARP CHORD')];
+      out.step = after(await at(0, turned(D[0], { 0: 20 })), 'STEP');
+      out.vel = [];
+      for (const v of [100, 90, 70, 80]) out.vel.push(after(await at(0, turned(D[0], { 0: 20, 1: v })), 'VELOCITY'));
+      const sec = await at(1, D[1]);
+      out.strip = sec.includes('KEY TRACK') && sec.includes('NOT ON ITS GUI, BY NAME ONLY');
+      out.tag = (await at(1, turned(D[1], { 0: 127 }))).includes('TYPE  HP');
+      out.words = [(await at(2, D[2])).length, (await at(2, turned(D[2], { 0: 88, 2: 127 }))).length];
+      out.fader = [];
+      // (the strip says BASS too: the cell is the last one)
+      for (const v of [104, 0, 127]) { const t = await at(3, turned(D[3], { 0: v })); out.fader.push(t[t.lastIndexOf('BASS') + 1]); }
+      return [out, { mode: [true, true], step: '3 / 16', vel: ['76', '76', '70', '80'], strip: true, tag: true,
+        words: [0, 0], fader: ['0.0 dB', 'OFF', '+6.0 dB'] }];
+    },
+  },
 };
 // The values a page was given, with some encoders turned.
 const turned = (values, changes) => Object.assign(values.slice(), changes);
@@ -139,7 +180,7 @@ const turned = (values, changes) => Object.assign(values.slice(), changes);
 const EXPECTED = { 'blueprint-1965': 'era', 'dot-matrix-1983': 'era', 'metro-tiles-2012': 'era',
   'midnight-2020': 'era', 'neo-brutal-2023': 'era', 'red-lead-1997': 'era', 'rhythm-box-1980': 'era',
   'swiss-flat-2011': 'era', 'test-bench-1958': 'era', 'walnut-1971': 'era', 'hostage-features': 'feature',
-  'hostage-features-slim': 'feature', 'hostage-rig': 'rig', 'hostage-rig-slim': 'rig' };
+  'hostage-features-slim': 'feature', 'hostage-rig': 'rig', 'hostage-rig-slim': 'rig', 'hostage-live': 'live' };
 const MEMORY_CEILING = 8 * 1024 * 1024;     // the preset loader's software guard, not a device limit
 const MAX_CALLS = 600;
 
@@ -292,10 +333,10 @@ try {
     for (let i = 0; i < 4; i++) window.f.draw();
     window.f.call('set_mode', [1]);
   }, name);
-  const at = (p, values, frame = 37) => page.evaluate(({ p, values, frame }) => {
-    window.f.call('set_frame', window.era.frame(p, frame, values, 0));
+  const at = (p, values, frame = 37, last = 0) => page.evaluate(({ p, values, frame, last }) => {
+    window.f.call('set_frame', window.era.frame(p, frame, values, last));
     return window.f.draw().texts;
-  }, { p, values, frame });
+  }, { p, values, frame, last });
 
   const save = async (name, file) => {
     if (!shots && !previews) return;
@@ -407,8 +448,8 @@ try {
       const [said, expected] = await spec.answers({ fresh: () => fresh(name), at, D, fps: manifests[name].fps });
       assert.deepEqual(said, expected, `${name}: the pages answer their encoders the way they say they do`);
       await fresh(name);
-      for (const [p, f, values, label] of spec.moments) {
-        await at(p, values, f);
+      for (const [p, f, values, label, last] of spec.moments) {
+        await at(p, values, f, last);
         if (label) await save(name, `${p + 1}-${pages[p]}-${label}`);
       }
       assert.deepEqual(await page.evaluate(() => window.f.problems()), [], `${name}: the moments draw inside the screen`);

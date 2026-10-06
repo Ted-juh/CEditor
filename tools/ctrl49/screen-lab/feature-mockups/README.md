@@ -1,7 +1,7 @@
 # HoSTage feature mockups
 
-Two screen-lab presets, five pages each: ten things the CTRL49's screen could show in HoSTage that
-a host on hardware does not usually show. Both are in the Midnight 2020 look (see
+Three screen-lab presets: fourteen things the CTRL49's screen could show in HoSTage that a host
+on hardware does not usually show. All three are in the Midnight 2020 look (see
 [`../era-presets`](../era-presets/README.md)) so that what changes is the idea, not the style.
 Like the era designs they are native screen-lab presets loaded by `Ctrl49ScreenLab.exe preset`,
 not HoSTage pages. The lab has no library, no rack, no MIDI and no setlist, so every page fakes
@@ -11,11 +11,14 @@ its data from the frame counter and from tables the generator wrote into the Lua
 |---|---|---|---|
 | HoSTage Features | `hostage-features`, `hostage-features-slim` | Sound Atlas, Motion, Capture, Stage, Chords | `make_feature_mockups.py`, `FeatureSkin.lua` |
 | HoSTage Rig | `hostage-rig`, `hostage-rig-slim` | Layers, Effects, Soundcheck, Discover, Changes | `make_rig_mockups.py`, `RigSkin.lua` |
+| HoSTage Live | `hostage-live` | Live, Section, Labels, Meters | `make_live_mockups.py`, `LiveSkin.lua` |
 
-Each comes in two sizes, full and slim, for the stress test: see
-[Stress testing them on the keyboard](#stress-testing-them-on-the-keyboard).
+The first two come in two sizes, full and slim, for the stress test: see
+[Stress testing them on the keyboard](#stress-testing-them-on-the-keyboard). The third was made
+after that test and comes in one size, well inside what it measured.
 
-**Status: software checks only.** Neither has run on a CTRL49 yet. Like the era designs, they
+**Status:** Features and Rig ran on a CTRL49 on 2026-10-05 (the stress test below); Live has had
+software checks only. Like the era designs, they
 run in the preset mode of `Ctrl49ScreenLab.exe`. `Start_CTRL49_Feature_Mockups.cmd` (in
 `tools/ctrl49`) asks which one and runs it.
 
@@ -200,25 +203,99 @@ tick), the value now, and what you are hearing (the bar) as E1 moves from A to B
 Uploads total about 36 KB; decoded, 2,582 KiB at four bytes a pixel. `Skin.lua` is 59 KB, the
 largest yet: the invented set, library and history are written into it.
 
+## HoSTage Live
+
+| Page | Shows | E1 | E2 | E3 | E4 | E5 | E6 | E7 | E8 |
+|---|---|---|---|---|---|---|---|---|---|
+| Live | the 49 keys with every part's zone, the keys held, the notes the arpeggiator plays from them, and the arp's sixteen steps with a playhead | step | its velocity (0: a rest) | its octave | its ratchets | its chance | gate | rate | mode |
+| Section | one section of a plug-in's own window, cut out by the [panel scan](../../../../docs/design/ctrl49-panel-scan.md), an overlay on every control | control 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+| Labels | the stage view in large type: every word a picture HoSTage drew, no firmware text | song | bar | colours | | | | | |
+| Meters | every part's level, left and right, peak hold, clip, the fader; the master and its last six seconds | fader 1 | 2 | 3 | 4 | 5 | master | | |
+
+`hostage-live/preview-*.png` are its pages, and five moments: `1-live-chord` (the arp in chord
+mode, every note of the chord marked), `2-section-cutoff` (CUTOFF turned up: see the plug-in's
+pointer below), `3-labels-accents` (a song whose name the firmware's fonts cannot write),
+`3-labels-amber` (every word recoloured) and `4-meters-clipping` (every fader at the top).
+
+These four push the screen in the directions the measurements left room in: rectangles and
+sprites (5x headroom), images (8 MB decoded went fine), and away from the one tight budget, text.
+The busiest redraw is Meters at about 165 calls; Labels draws 38 and not one of them is text.
+
+### What each page is, and what HoSTage already has for it
+
+**Live.** The arpeggiator is per part (`ArpSettings` in `CE/src/Performance/PatternModel.h`), and
+the step lane is already there in full: velocities, octaves, ratchets, chance, ties, each cycled
+on the lane's length, and the engine reports the step that last sounded "for the UI playhead"
+(`ArpEngine::patternStep`). The page puts that lane on the keyboard with the keys under it: the
+zones (as on Layers), the keys you hold in the colour of the part that plays them, and, marked,
+the notes the arp plays from them at that moment. HoSTage would send the lane when it changes
+(16 steps, 4 bytes each), and each frame the step, the held keys and the arp's keys (49 bits
+each, 15 bytes in all). The pads would turn steps on and off (the lab sends no pads). The mockup
+has five of the engine's eight modes, and holds C, Am, F and G with the left hand.
+
+**Section.** The second half of the panel scan: one section per page, its picture uploaded once,
+the overlays drawn by the keyboard. The picture here is an invented plug-in's filter section,
+painted at the size the scan would scale it to, with its own lettering (Liberation Sans, so it
+reads as somebody else's GUI). The controls are numbered in the scan's reading order, so CTRL49
+knob 1 is the top-left control; the one the scan found by name only (KEY TRACK) has a cell in the
+strip under the picture. **What the mockup shows on purpose:** the picture is a photograph, so
+the plug-in's own painted pointer stays where it was when the scan took it, and only the ring is
+live (`preview-2-section-cutoff.png`). Two ways out, both for the next step: the scan already
+photographs every knob at both ends and the middle, so it could keep the knob's own pictures as
+a small filmstrip and the page would draw the plug-in's own knob turning; or the page paints the
+knob's cap over in its own colour and draws a pointer. The first is the better picture, the
+second the smaller upload.
+
+**Labels.** The text budget is the tight one (Discover and Changes use about a third of it), and
+the firmware's fonts come in a few sizes and only the letters they have. Here every word is a
+grey coverage sprite in `tint.png`, drawn with the app's own typeface (Barlow Semi Condensed,
+from `CE/web/src/assets/fonts`) and tinted as the keyboard draws it, so recolouring a word is free
+(E3) and any letter the app can draw is fine (`Über den Fluss`, `Café Minuit`). HoSTage would
+render the set's words when the set changes and upload them once: song names in two sizes, each
+song's tempo and key, the section names, the digits. The whole `tint.png`, words, rings and
+keys together, is 37 KB. The
+same atlas could carry the words of every other page, which would take their text to zero too.
+
+**Meters.** The rack already meters every part after its inserts and fader
+(`InstrumentRackHost::drainMeters`, sent to the app as `instrumentHostMeters` at the UI rate),
+and taps the master after its fader for the soundcheck (`soundcheckMeter`). HoSTage would send
+twelve bytes a frame: each part's left and right peak, and the master's. Peak hold, clip and the
+master's history the page can keep itself; the mockup works them out from the frame counter
+because the preview jumps between frames. The levels are simulated from the rig's playing (the
+same loop as Layers), each part with its own fall-off.
+
+### Its assets
+
+| File | Size | PNG id | Buffer | Holds |
+|---|---|---|---|---|
+| `panels.png` | 480 x 544 | 576 | 577 | the Live and Meters backgrounds |
+| `tint.png` | 480 x 1032 | 578 | 579 | 8-bit grey coverage: 32 frames of a knob's ring (y 0), dots, a badge and the lit keys (y 320), every word of Labels (y 370) |
+| `parts.png` | 480 x 544 | 580 | 581 | the Section background (the plug-in's picture) and the Labels background |
+
+Uploads total about 94 KB; decoded, 3,975 KiB at four bytes a pixel, under the 4.5 MB that ran
+on the keyboard. `Skin.lua` is 42 KB.
+
 ## Making and checking them
 
 ```bash
 python tools/ctrl49/screen-lab/feature-mockups/make_feature_mockups.py        # full and slim
 python tools/ctrl49/screen-lab/feature-mockups/make_rig_mockups.py slim       # or just one size
+python tools/ctrl49/screen-lab/feature-mockups/make_live_mockups.py           # one size
 
 cd CE/web
 npm run test:screen-eras                    # CTRL49_ERA_PREVIEWS=1 rewrites the previews
 CTRL49_ERA_ONLY=hostage-rig npm run test:screen-eras        # one design, quicker
 ```
 
-Both generators need Pillow. `make_feature_mockups.py` borrows its drawing helpers and the
+The generators need Pillow. `make_feature_mockups.py` borrows its drawing helpers and the
 Midnight palette from `../era-presets/make_era_designs.py`, and `make_rig_mockups.py` borrows
-them from `make_feature_mockups.py`. Each writes its folder's three atlases, its manifest, and its
+them from `make_feature_mockups.py`; `make_live_mockups.py` borrows from both, and draws its
+words with the app's fonts in `CE/web/src/assets/fonts`. Each writes its folder's three atlases, its manifest, and its
 `Skin.lua`: the template with the `GENERATED` block (theme, layout, sprite crops and the invented
 data) replaced. Behaviour belongs in the templates; never hand-edit a `Skin.lua`. Each prints what
 the design asks of the keyboard: its script, its uploads and its decoded images.
 
-The era designs' check covers both, with the same rules (the manifest, Lua 5.2, the template
+The era designs' check covers all three, with the same rules (the manifest, Lua 5.2, the template
 outside the generated block, every key the template reads given, every encoder of every page
 through all 128 positions, every call on the screen and inside its atlas, every text inside its
 box, at most 600 calls a redraw, the atlases decoded once, the pages that should move moving).
@@ -228,7 +305,10 @@ shows eight, Chords names the chord and the key. On the second: Layers names the
 takes a part's lowest key over only once it reaches it, then carries it; E6 bypasses an effect
 and brings it back; Soundcheck gives the set's verdict, the problem and the fix, and E3 runs it
 again; Discover lists eight and E3 keeps them to one kind; Changes counts what changed as E4
-walks back, and E3 undoes one. The busiest pages are Motion and Effects, about 280 calls in
+walks back, and E3 undoes one. On the third: E8 changes the arp's mode, and E2 takes a step's
+velocity over only once it reaches it; Section puts the control the scan did not find in the
+strip and names the control turned last with its value; Labels draws no firmware text on any
+song; a Meters fader reads in dB, off at the bottom. The busiest pages are Motion and Effects, about 280 calls in
 full and 180-195 slim. A slim `Skin.lua` is compared with its template as parsed code, not as
 text, so stripping it can never change what it does without the check failing; and the corner
 readout is drawn and held to its box during the sweep, though the previews leave it out.

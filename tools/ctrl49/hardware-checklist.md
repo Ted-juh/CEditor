@@ -161,6 +161,28 @@ last. When the prompt comes back, `notepad %TEMP%\size-log.txt`. The last line i
 - [ ] If the keyboard's own screen does not come back afterwards, switch it off and on: an
       oversized script lives only in its memory.
 
+## 4. HoSTage Live: four more mockups
+
+Close CEditor, VIP and your DAW first. Double-click `tools\ctrl49\Start_CTRL49_Feature_Mockups.cmd`
+and press **5** (HoSTage Live). Page Left / Right walks the four pages. What each should look like
+is in `tools\ctrl49\screen-lab\feature-mockups\hostage-live\preview-*.png`.
+
+- [ ] **Live.** The step cards at the top: one is outlined and moves along with the beat. Keys
+      under the coloured zone bands light up (amber, violet), and one or more teal keys with a dark
+      dot are the arp's notes. Turn knob 8 (the rightmost of the eight round knobs) right: the
+      top line changes from ARP UP to ARP CHORD, and three keys at once get the dot.
+- [ ] **Section.** A plug-in's FILTER panel with purple rings around four knobs, numbered 1-8.
+      Turn knob 3: the ring around CUTOFF follows, and a tag CUTOFF with a value appears above it.
+      The plug-in's own white pointer does not move: that is expected (see the README).
+- [ ] **Labels.** A large song name, a section card with a big number, a coloured bar of the
+      song's sections. Turn knob 1: the song changes (song 9 is "Über den Fluss", with the dots
+      on the U). Turn knob 3 all the way right: every word turns amber.
+- [ ] **Meters.** Six level meters moving. Turn knobs 1-5 all the way right: red clip lamps
+      light above some of the meters.
+- [ ] **Write down**: whether it loaded (3 / 3), any line starting "The keyboard refused", whether
+      the moving parts are smooth, whether the words on Labels look sharp or blurred, and the
+      corner readout (draw calls, Lua KB) on Meters.
+
 ## What to send back
 
 The **Write down** lines, the console lines copied as text, and a photo of any page that looks

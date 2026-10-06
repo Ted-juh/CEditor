@@ -109,6 +109,11 @@ again**; they ran it five times.
    plug-ins (steps below) and judges `scan.png` and `pages\*.png`. Next after that: a Lua page
    that shows one section (background image + overlays), and HoSTage keeping the scan per class
    id, inside the worker process.
+7. **HoSTage Live mockups** (`screen-lab/feature-mockups/hostage-live`, README there): Live (the
+   keys and the arp's step lane), Section (the panel scan's page, with the plug-in's frozen
+   pointer shown on purpose), Labels (every word a picture: no firmware text) and Meters.
+   Software-checked; on the keyboard via `Start_CTRL49_Feature_Mockups.cmd`, choice 5
+   (hardware checklist section 4). The owner picks which become real pages.
 
 ### The owner's steps for the tests (give them exactly like this)
 
