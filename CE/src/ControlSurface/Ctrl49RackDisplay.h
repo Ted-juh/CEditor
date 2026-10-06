@@ -29,9 +29,14 @@ struct RackSlotView
     int position = 0;         // 0..127 knob position (the binding's mapped position)
     bool assigned = false;
     bool resolved = false;
+    std::string valueText;    // the plug-in's own formatted value ("2.40 kHz"); empty: none
 };
 
 using RackSlotViews = std::array<RackSlotView, 8>;
+
+/** The most of a value's text a knob shows: "-12.0 dB", "2.40 kHz", "Sawtooth" fit; more would
+    run over the ring. */
+inline constexpr std::size_t kMaxValueCharacters = 12;
 
 /** set_labels payload: [titleLen][title][ 8x [labelLen][label] ]. Non-ASCII bytes become
     '?', every string caps at kMaxLabelCharacters, an unassigned slot shows an empty label. */
@@ -42,6 +47,18 @@ Bytes buildRackLabelPayload (const std::string& title, const RackSlotViews& slot
     Values come from the slot positions; the switch flags light unresolved-but-assigned
     slots. The pad/velocity/division bytes are zeroed — the rack page does not use them. */
 Bytes buildRackStatePayload (int activeSlot, const RackSlotViews& slots);
+
+/** A control page's set_values: the nine bytes above, and then what the page shows besides
+    the knobs, which Hostage_MultiKnob.lua reads when the payload is longer than twelve bytes:
+
+      [9] 0, a control page   [10] 0  [11] 4  (the performance page's beat bytes, unused here)
+      [12] this page's number, 1-based   [13] how many control pages there are
+      then 8 x [length][text]: each slot's value as the plug-in writes it, ASCII ('?' for any
+      other byte), at most kMaxValueCharacters, empty for a slot with nothing assigned.
+
+    The longest is 14 + 8 x 13 = 118 bytes. A page that does not know the extension reads the
+    first nine bytes as before. */
+Bytes buildRackStatePayload (int activeSlot, const RackSlotViews& slots, int pageNumber, int pageCount);
 
 /** The library browser as this page's eight slots (Sound Browser Stage F).
 

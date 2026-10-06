@@ -4,6 +4,7 @@
 //
 //   set_labels  [titleLen][title][ 8 x [labelLen][label] ]   ASCII, '?' for anything else, 90 cap
 //   set_values  [activeSlot][v0..v7]                          each 0..127
+//               a control page then adds [0][0][4][page][pages] 8 x [len][value text]
 
 const encoder = new TextEncoder();
 
@@ -13,9 +14,9 @@ export const MAX_LABEL_CHARACTERS = 90;
 
 // appendString in Ctrl49RackDisplay.cpp / Ctrl49PerformanceDisplay.cpp: the std::string is UTF-8,
 // and every byte at or above 0x80 becomes '?' — so "é" is two question marks, as on the device.
-function appendString(out, text) {
+function appendString(out, text, cap = MAX_LABEL_CHARACTERS) {
   const bytes = encoder.encode(String(text ?? ''));
-  const length = Math.min(MAX_LABEL_CHARACTERS, bytes.length);
+  const length = Math.min(cap, bytes.length);
   out.push(length);
   for (let i = 0; i < length; i++) out.push(bytes[i] < 0x80 ? bytes[i] : 0x3f);
 }
@@ -35,11 +36,35 @@ export function rackLabelPayload(title, slots) {
   return out;
 }
 
-/** buildRackStatePayload: the active slot, then each slot's 0..127 position. */
-export function rackStatePayload(activeSlot, slots) {
+// kMaxValueCharacters in Ctrl49RackDisplay.h: the most of a value's text a knob shows.
+export const MAX_VALUE_CHARACTERS = 12;
+
+/** buildRackStatePayload: the active slot, then each slot's 0..127 position. With a page
+    ({ number, count }, a control page), the overload that adds what the page shows besides the
+    knobs: [9] 0 [10] 0 [11] 4, [12] the page's number, [13] how many, then each assigned slot's
+    valueText as [len][ASCII], at most MAX_VALUE_CHARACTERS. */
+export function rackStatePayload(activeSlot, slots, page) {
   const out = [clamp127(activeSlot)];
   for (let i = 0; i < 8; i++) out.push(clamp127(slots[i]?.position ?? 0));
+  if (page) {
+    out.push(0, 0, 4, clamp127(page.number), clamp127(page.count));
+    for (let i = 0; i < 8; i++) appendString(out, slots[i]?.assigned ? slots[i]?.valueText : '', MAX_VALUE_CHARACTERS);
+  }
   return out;
+}
+
+/** The extension of a control page's set_values read back: { page, pages, texts } (texts: the
+    eight values as the plug-in writes them), or null for the plain nine bytes. */
+export function readRackStateExtension(values) {
+  if (!Array.isArray(values) || values.length <= 13) return null;
+  const texts = [];
+  let at = 14;
+  for (let i = 0; i < 8; i++) {
+    const length = values[at] ?? 0;
+    texts.push(String.fromCharCode(...values.slice(at + 1, at + 1 + length)));
+    at += 1 + length;
+  }
+  return { page: values[12], pages: values[13], texts };
 }
 
 /** buildPerformanceTitle: "> 3.2 120 EXT" — ASCII marks for play/stop, whole-number tempo. */

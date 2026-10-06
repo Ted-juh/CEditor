@@ -29,6 +29,29 @@ Adding a new kind of page:
    with a byte test, and the same builder in `ctrl49Payloads.js` with a scene in the preview.
 3. Give it a page in `Ctrl49SurfaceBroker`: `pages()`, `pumpInput()`, `refreshDisplay()`.
 
+### The knob pages: values, symbols, the bottom strip, easing
+
+- **Values as the plug-in writes them.** A control page's `set_values` carries, after its nine
+  bytes, the page's number and count and each knob's value as the plug-in formats it
+  (`buildRackStatePayload` with a page, `Ctrl49RackDisplay.h`; `rackStatePayload` in JS, the same
+  bytes): "2.40 kHz" in the ring instead of 88, smaller when it is longer. A page that ignores the
+  extension still reads the first nine bytes. A slot the plug-in gave no text shows its position.
+- **Symbols, not characters.** The keyboard's text is ASCII, so the host marks states with
+  characters: "> 3.2 122" playing, "*clip" running, ">clip" waiting, "!label" not connected. The
+  page draws a play or stop triangle, a lit or hollow dot, a warning sign in their place. The
+  symbols sit under the logo in `hostage_logo.png` (now 440 x 100; `make_symbols.py` adds them and
+  keeps the logo pixel for pixel), so they cost no upload of their own, and are tinted as drawn.
+- **Empty knobs** (no label, no value) are a faint ring with no number.
+- **The bottom strip** on a control page: the knob turned last, larger, and PAGE n / m.
+- **Easing.** A ring that jumps (a page change, a preset) sweeps over a few redraws; turning a
+  knob stays immediate. It needs the keyboard to redraw when the page asks
+  (`lua_widget_make_dirty`), and the page finds that out rather than assuming it: it asks on its
+  first few draws, and only a redraw that arrives with nothing new from the host proves it. On a
+  keyboard where it never does, rings are drawn at their value at once, never left half way.
+- **DISCOVER's map** draws round dots, and YOU's word clear of its ring.
+
+`CE/web/test/ctrl49KnobPage.test.js` runs the page in Lua and checks each of these.
+
 ### The stage pages: CUE, LAYERS, SOUNDCHECK, DISCOVER and CHANGES
 
 Five pages that are not knob pages, mocked up first in `screen-lab/feature-mockups` and now
@@ -68,7 +91,7 @@ kept beside its soundcheck. Over five seconds without preloading reads as slow, 
 preload on" when the setlist preloads nothing.
 
 **The page script has grown with them.** `Hostage_MultiKnob.lua` was 9 KB on `main` and is
-40.6 KB with all five, more than the slim stress builds (30-39 KB) that the mockups use to find
+40.6 KB with all five (47 KB with the knob page work above), more than the slim stress builds (30-39 KB) that the mockups use to find
 the keyboard's limit. [`hardware-checklist.md`](hardware-checklist.md) is how to find out
 whether it fits.
 
@@ -510,7 +533,7 @@ Rig full's 58 KB, the most decoded image memory Red Lead's 4,502 KiB, the busies
 280 calls at 15 a second (Motion, Effects) and Red Lead's Envelope at about 420 (some 6,300
 calls a second, mixed rectangles, sprites and text; more than the sprite-only figure above, so
 mixed pages cost less than sprites alone). Upload and startup took 2.8-4.6 s. HoSTage's page
-script (40.6 KB, 10 redraws a second) is well inside all of it.
+script (47 KB, 10 redraws a second) is well inside all of it.
 
 **The largest page script: `Ctrl49ScreenLab size`.** 58 KB is only the largest tried. The
 protocol carries an object's size in 28 bits, so the limit is the keyboard's memory. The size

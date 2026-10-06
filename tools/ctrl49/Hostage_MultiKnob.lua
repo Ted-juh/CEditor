@@ -21,6 +21,15 @@ local WARN   = 0xFFFF4D6A
 local PART_COLOURS = { 0xFFFF9408, 0xFF2DD4BF, 0xFF8B7CFF, 0xFFFF5C93,
                        0xFFFFB547, 0xFF5B9BFF, 0xFF7BD88F, 0xFFE6E9F5 }
 local SUGGEST = 0xFF8B7CFF   -- DISCOVER: a sound you have never opened
+local EMPTY  = 0xFF1A202A    -- a knob with nothing on it: its ring, barely there
+
+-- The symbols under the logo in hostage_logo.png (make_symbols.py draws them there, and has the
+-- same crops): grey coverage, so each is drawn in any colour. The keyboard's text is ASCII, so
+-- the host marks states with characters ("> 3.2 122", "*clip", ">clip", "!label"); the page
+-- draws these in their place.
+local SYM = { play = { 0, 84, 11, 12 }, stop = { 14, 85, 10, 10 }, run = { 28, 85, 10, 10 },
+              wait = { 42, 85, 10, 10 }, warn = { 56, 84, 13, 12 }, dot5 = { 72, 86, 5, 5 },
+              dot7 = { 80, 85, 7, 7 }, ring11 = { 90, 84, 11, 11 }, ring17 = { 104, 82, 17, 17 } }
 
 local initialized = false
 local mode = 0
@@ -28,6 +37,17 @@ local title = "HOSTAGE"
 local active = 0
 local labels = { "", "", "", "", "", "", "", "" }
 local values = { 0, 0, 0, 0, 0, 0, 0, 0 }
+-- A control page also sends each value as the plug-in writes it ("2.40 kHz") and which page of
+-- how many it is (set_values past byte 12); nil when the host did not, and the page shows the
+-- 0-127 positions as before.
+local value_texts = nil
+local page_number, page_count = 0, 0
+-- What each ring shows, which eases towards the value when it jumps (a page change, a preset
+-- loaded) if the keyboard redraws when asked (lua_widget_make_dirty): see ease().
+local shown = { 0, 0, 0, 0, 0, 0, 0, 0 }
+local fresh = false          -- the host sent something since the last draw
+local asked = false          -- this page asked for a redraw at the end of the last draw
+local redraws_on_ask = false -- and a draw came with nothing new: asking works on this keyboard
 
 -- The performance page's extras, read from set_values bytes 9..11 (a control page sends nine
 -- bytes, so they read 0 there and nothing extra is drawn): page kind, the beat in the bar
@@ -63,6 +83,9 @@ local HEAD   = text_data.new()     -- a song or part name, larger
 local CUEBIG = text_data.new()     -- CUE: the section playing
 local CUENUM = text_data.new()     -- CUE: bars left, or the song's clock
 local CUER   = text_data.new()     -- CUE: the tempo, right-aligned
+local VALM   = text_data.new()     -- a knob's value when it is a longer text
+local VALS   = text_data.new()     -- and when it is longer still
+local STRIP  = text_data.new()     -- the bottom strip: the knob turned last, larger
 
 local function configure_text()
     text_data.set(TITLE, {
@@ -111,6 +134,9 @@ local function configure_text()
     plain(CUEBIG, 30, 0, 10)
     plain(CUENUM, 40, 1, 10)
     plain(CUER, 17, 2, 10)
+    plain(VALM, 14, 1, 10)
+    plain(VALS, 11, 1, 10)
+    plain(STRIP, 16, 0, 10)
 end
 
 -- The knob filmstrip decodes to 64 x 8192 pixels, about 2 MB, and the keyboard does nothing else
@@ -154,8 +180,15 @@ function set_mode(args)
     if mode ~= 0 then ensure_knobs() end
 end
 
+-- Reads a [length][ASCII] string at byte i (0-based); returns it and the byte after it.
+local function read_string(args, i)
+    local n = get_byte(args, i)
+    return args:sub(i + 2, i + 1 + n), i + 1 + n
+end
+
 -- args is a Lua string (see VIP's set_text pattern): get_byte is 0-based, :sub is 1-based.
 function set_labels(args)
+    fresh = true
     local i = 0
     local titleLen = get_byte(args, i); i = i + 1
     title = args:sub(i + 1, i + titleLen); i = i + titleLen
@@ -166,6 +199,7 @@ function set_labels(args)
 end
 
 function set_values(args)
+    fresh = true
     active = get_byte(args, 0)
     for slot = 1, 8 do
         values[slot] = get_byte(args, slot)
@@ -176,6 +210,16 @@ function set_values(args)
     beats_per_bar = get_byte(args, 11)
     if beats_per_bar < 1 then beats_per_bar = 4 end
     if beats_per_bar > 16 then beats_per_bar = 16 end
+    -- a control page's extension (Ctrl49RackDisplay.h): the page number, then each value's text
+    value_texts = nil
+    page_number, page_count = 0, 0
+    if #args > 13 then
+        page_number = get_byte(args, 12)
+        page_count = get_byte(args, 13)
+        value_texts = {}
+        local i = 14
+        for slot = 1, 8 do value_texts[slot], i = read_string(args, i) end
+    end
 end
 
 -- Beat dots at the right of the title: one per beat in the bar, the current one lit.
@@ -240,12 +284,6 @@ end
 
 -- --- the stage pages ------------------------------------------------------------------------------
 
--- Reads a [length][ASCII] string at byte i (0-based); returns it and the byte after it.
-local function read_string(args, i)
-    local n = get_byte(args, i)
-    return args:sub(i + 2, i + 1 + n), i + 1 + n
-end
-
 local function say(t, text, colour, x, y, w, h)
     text_data.set(t, { text = text, color = colour })
     draw_text(t, x, y, w, h)
@@ -256,6 +294,12 @@ local function outline(x, y, w, h, colour)
     draw_rect(x, y + h - 1, w, 1, colour)
     draw_rect(x, y, 1, h, colour)
     draw_rect(x + w - 1, y, 1, h, colour)
+end
+
+-- A symbol from under the logo (SYM), in a colour.
+local function symbol(name, x, y, colour)
+    local s = SYM[name]
+    draw_image(18, LOGO_DECODED_ID, x, y, s[1], s[2], s[3], s[4], colour)
 end
 
 local function title_bar(text, right)
@@ -784,24 +828,28 @@ local function draw_discover()
     say(SMALL, "BRIGHT", DIM, MAP_X + MAP_S - 60, MAP_Y + MAP_S - 14, 60, 14)
     for k = 1, #disc.points do
         local px, py = map_xy(disc.points[k][1], disc.points[k][2])
-        draw_rect(px - 1, py - 1, 3, 3, DARK)
+        symbol("dot5", px - 2, py - 2, DARK)
     end
     local sel = disc.list[disc.selected - disc.first + 1]
     if disc.state == 1 then
         for r = 1, disc.rows do
             local row = disc.list[r]
             local px, py = map_xy(row.x, row.y)
-            draw_rect(px - 2, py - 2, 5, 5, SUGGEST)
+            symbol("dot7", px - 3, py - 3, SUGGEST)
         end
         if sel ~= nil then
             local px, py = map_xy(sel.x, sel.y)
-            draw_rect(px - 3, py - 3, 7, 7, WHITE)
+            symbol("ring11", px - 5, py - 5, WHITE)
+            symbol("dot5", px - 2, py - 2, WHITE)
         end
-        -- YOU last, so no dot covers where your taste sits
+        -- YOU last, so no dot covers where your taste sits; its word clear of its ring, under it,
+        -- or over it near the map's bottom edge
         local yx, yy = map_xy(disc.cx, disc.cy)
-        outline(yx - 7, yy - 7, 15, 15, ORANGE)
-        draw_rect(yx - 14, yy + 9, 29, 13, BLACK)
-        say(SMALL, "YOU", ORANGE, yx - 20, yy + 8, 40, 14)
+        symbol("ring17", yx - 8, yy - 8, ORANGE)
+        local ly = yy + 11
+        if ly + 14 > MAP_Y + MAP_S then ly = yy - 25 end
+        draw_rect(yx - 14, ly + 1, 29, 12, BLACK)
+        say(SMALL, "YOU", ORANGE, yx - 20, ly, 40, 14)
     end
     -- the list, or why there is none
     local footer = "E1 PICK  E2 REACH  E3 KIND  E4 KEEP  PADS AUDITION"
@@ -857,8 +905,116 @@ local function draw_discover()
     say(ROWNUM, tostring(disc.selected + 1) .. " / " .. tostring(disc.count), DIM, 372, 250, 100, 16)
 end
 
+-- --- the knob pages -------------------------------------------------------------------------------
+
+-- A label's state mark, taken off: "!" a control that is not connected (a control page), "*" a
+-- clip running and ">" one waiting (the performance page). Returns the name and its symbol.
+local function unmark(label)
+    local c = label:sub(1, 1)
+    if page_kind == 0 and c == "!" then return label:sub(2), "warn" end
+    if page_kind == 1 and c == "*" then return label:sub(2), "run" end
+    if page_kind == 1 and c == ">" then return label:sub(2), "wait" end
+    return label, nil
+end
+
+-- Easing. A ring that jumps further than EASE_FROM (a page change, a preset loaded) moves half way
+-- each redraw instead, so it sweeps rather than snaps; turning a knob moves it less than that, so
+-- turning stays immediate. It needs the keyboard to redraw when the page asks it to
+-- (lua_widget_make_dirty), and that is found out, not assumed: the page asks on its first few
+-- knob draws, and only a draw that then comes with nothing new from the host proves it. Until
+-- then, and on a keyboard where it never does, every ring is drawn at its value at once, so none
+-- is ever left half way.
+local EASE_FROM = 8
+local probes = 0
+local function ease()
+    local moving = false
+    for slot = 1, 8 do
+        local d = values[slot] - shown[slot]
+        if redraws_on_ask and (d > EASE_FROM or d < -EASE_FROM) then
+            shown[slot] = shown[slot] + math.floor(d / 2 + 0.5)
+            moving = true
+        else
+            shown[slot] = values[slot]
+        end
+    end
+    return moving
+end
+
+local function ask_redraw()
+    if pcall and lua_widget_make_dirty then asked = pcall(lua_widget_make_dirty, WID) end
+end
+
+-- What a knob shows in its ring: the plug-in's text when the host sent it, else the position.
+local function value_text(slot)
+    local text = ""
+    if value_texts ~= nil then text = value_texts[slot] end
+    if text == "" then text = tostring(values[slot]) end
+    return text
+end
+
+local function draw_knobs(came_with_news)
+    ensure_knobs()
+    if asked and not came_with_news then redraws_on_ask = true end
+    asked = false
+    local moving = ease()
+
+    -- the title; on the performance page, play or stop drawn in place of "> " or "# "
+    local t = title
+    if page_kind == 1 then
+        local mark = t:sub(1, 2)
+        if mark == "> " then symbol("play", 14, 9, READY); t = t:sub(3)
+        elseif mark == "# " then symbol("stop", 14, 10, GREY); t = t:sub(3) end
+    end
+    text_data.set(TITLE, { text = t, color = WHITE })
+    draw_text(TITLE, 0, 5, 480, 22)
+
+    for slot = 1, 8 do
+        local x, y = knob_pos(slot)
+        local name, mark = unmark(labels[slot])
+        local is_active = (slot - 1) == active
+        local sent = ""
+        if value_texts ~= nil then sent = value_texts[slot] end
+        if name == "" and sent == "" and values[slot] == 0 then
+            -- nothing on this knob: its ring, barely there, and no number
+            draw_image(18, KNOB_DECODED_ID, x, y, 0, 0, FRAME, FRAME, EMPTY)
+        else
+            draw_image(18, KNOB_DECODED_ID, x, y, 0, FRAME * shown[slot], FRAME, FRAME, is_active and ORANGE or DIM)
+            local text = value_text(slot)
+            local box = VAL
+            if #text > 6 then box = VALS elseif #text > 3 then box = VALM end
+            text_data.set(box, { text = text, color = is_active and WHITE or GREY })
+            draw_text(box, x - 4, y + 20, 72, 26)
+            text_data.set(LBL, { text = name, color = is_active and WHITE or DARK })
+            draw_text(LBL, x - 8, y + 66, 80, 14)
+            if mark == "warn" then symbol("warn", x + 52, y, WARN)
+            elseif mark == "run" then symbol("run", x + 54, y + 1, READY)
+            elseif mark == "wait" then symbol("wait", x + 54, y + 1, WHITE) end
+        end
+    end
+
+    -- a control page's bottom strip: the knob turned last, larger, and which page this is
+    if page_kind == 0 and page_number > 0 then
+        draw_rect(16, 238, 448, 1, ROW)
+        local name = unmark(labels[active + 1] or "")
+        if name ~= "" then say(STRIP, name .. "   " .. value_text(active + 1), WHITE, 16, 242, 324, 24) end
+        say(ROWNUM, "PAGE " .. tostring(page_number) .. " / " .. tostring(page_count), DIM, 344, 244, 120, 20)
+    end
+
+    if page_kind == 1 then
+        draw_beats()
+        draw_held_notes()
+    end
+
+    if moving or (not redraws_on_ask and probes < 5) then
+        probes = probes + 1
+        ask_redraw()
+    end
+end
+
 function draw(args)
     if not initialized then init("") end
+    local came_with_news = fresh
+    fresh = false
 
     draw_rect(0, 0, 480, 272, BLACK)
     draw_rect(0, 0, 480, 3, ORANGE)
@@ -889,27 +1045,5 @@ function draw(args)
         return
     end
 
-    ensure_knobs()
-    text_data.set(TITLE, { text = title, color = WHITE })
-    draw_text(TITLE, 0, 5, 480, 22)
-
-    for slot = 1, 8 do
-        local x, y = knob_pos(slot)
-        local v = values[slot]
-        local is_active = (slot - 1) == active
-        local tint = is_active and ORANGE or DIM
-
-        draw_image(18, KNOB_DECODED_ID, x, y, 0, FRAME * v, FRAME, FRAME, tint)
-
-        text_data.set(VAL, { text = tostring(v), color = is_active and WHITE or GREY })
-        draw_text(VAL, x, y + 20, 64, 26)
-
-        text_data.set(LBL, { text = labels[slot], color = is_active and WHITE or DARK })
-        draw_text(LBL, x - 8, y + 66, 80, 14)
-    end
-
-    if page_kind == 1 then
-        draw_beats()
-        draw_held_notes()
-    end
+    draw_knobs(came_with_news)
 end

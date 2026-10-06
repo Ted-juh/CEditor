@@ -496,9 +496,10 @@ export function mockSurfaceScreen(state, cursor, library) {
     const slots = (page.slots ?? []).slice(0, 8).map((slot) => ({
       label: slot.displayName,
       position: Math.round((cursor.turned[`${page.pageId}/${slot.slotId}`] ?? slot.value ?? 0) * 127),
-      assigned: slot.assigned, resolved: slot.resolved,
+      assigned: slot.assigned, resolved: slot.resolved, valueText: slot.valueText ?? '',
     }));
-    return { labels: rackLabelPayload(page.name, slots), values: rackStatePayload(cursor.active, slots),
+    return { labels: rackLabelPayload(page.name, slots),
+             values: rackStatePayload(cursor.active, slots, { number: pageIndex + 1, count: pages.length }),
              call: '', payload: [], pageIndex, pageCount, pageKind: 'control', pageId: page.pageId,
              onKeyboard: false, received: true };
   }

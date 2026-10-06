@@ -11,9 +11,13 @@ export const preview = $state({
   control: {
     title: 'Diva Filter',
     active: 0,
+    page: 2,
+    pages: 5,
     slots: [
-      slot('Cutoff', 88), slot('Resonance', 34), slot('Env Amt', 64), slot('Key Track', 100),
-      slot('Drive', 12), slot('Filter Type', 0, { resolved: false }), slot('', 0, { assigned: false }), slot('HP Cutoff', 20),
+      slot('Cutoff', 88, { valueText: '2.40 kHz' }), slot('Resonance', 34, { valueText: '27 %' }),
+      slot('Env Amt', 64, { valueText: '+0.6' }), slot('Key Track', 100, { valueText: '79 %' }),
+      slot('Drive', 12, { valueText: '1.2 dB' }), slot('Filter Type', 0, { resolved: false, valueText: '' }),
+      slot('', 0, { assigned: false, valueText: '' }), slot('HP Cutoff', 20, { valueText: '42 Hz' }),
     ],
   },
 

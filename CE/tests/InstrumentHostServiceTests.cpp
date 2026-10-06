@@ -4858,9 +4858,11 @@ void testCtrl49AppScreen()
              && ! (bool) screen->getProperty ("onKeyboard", true)
              && (int) screen->getProperty ("pageCount", 0) == 6
              && screen->getProperty ("pageKind", {}).toString() == "control"
-             && screen->getProperty ("values", {}).size() == 9
+             && screen->getProperty ("values", {}).size() >= 14 + 8
+             && (int) screen->getProperty ("values", {})[12] == 1
              && screen->getProperty ("labels", {}).size() > 9,
-           "the app is still sent the page, in the bytes the keyboard would get");
+           "the app is still sent the page, in the bytes the keyboard would get: a control page's "
+           "nine bytes, then which page it is and each knob's value as the plug-in writes it");
 
     const auto cutoffBefore = synth->cutoff->get();
     for (int i = 0; i < 10; ++i)

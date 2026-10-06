@@ -62,7 +62,9 @@ try {
   for (const [scene, calls] of Object.entries(scenes)) {
     await page.locator(`[data-scene=${scene}]`).click();
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
-    await page.waitForFunction((n) => document.querySelectorAll('[data-testid=ctrl49-sent] .call').length === n, calls.length);
+    // Wait for this scene's calls, not just as many calls: two scenes can send the same number.
+    await page.waitForFunction((want) => [...document.querySelectorAll('[data-testid=ctrl49-sent] .call b')]
+      .map((b) => b.innerText).join() === want, calls.join()).catch(() => {});
     assert.deepEqual(await sentCalls(), calls, `${scene}: the calls the host makes, in its order`);
     assert.equal(await page.getByTestId('ctrl49-error').count(), 0, `${scene}: the page ran without a Lua error`);
     drawn[scene] = await measure();

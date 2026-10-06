@@ -70,6 +70,34 @@ int main()
     check (state[0] == 1, "the active slot leads");
     check (state[1] == 127 && state[2] == 0, "positions follow immediately, clamped");
 
+    {   // --- a control page's extension: the plug-in's values and the page number ------------
+        // Shared with CE/web/test/ctrl49Preview.test.js (rackStatePayload with a page): the
+        // app's preview builds these same bytes.
+        RackSlotViews views {};
+        views[0] = { "Cut", 127, true, true, "2.40 kHz" };
+        views[1] = { "Res", 0, true, false, "35 %" };
+        views[2] = { "", 64, false, false, "ignored" };
+        const auto ext = buildRackStatePayload (1, views, 2, 5);
+        const Bytes golden { 1, 127, 0, 64, 0, 0, 0, 0, 0,   0, 0, 4,   2, 5,
+                             8, '2', '.', '4', '0', ' ', 'k', 'H', 'z',   4, '3', '5', ' ', '%',
+                             0, 0, 0, 0, 0, 0 };
+        check (ext == golden, "the control page's set_values: nine bytes, kind, beat bytes, page 2 of 5, "
+                              "then each value as the plug-in writes it; an unassigned slot's is empty");
+        check (Bytes (ext.begin(), ext.begin() + 9) == buildRackStatePayload (1, views),
+               "its first nine bytes are the plain payload, so an older page still reads them");
+
+        views[0].valueText = "12345678901234567";
+        views[1].valueText = "500 \xC2\xB5s";
+        const auto capped = buildRackStatePayload (0, views, 1, 1);
+        check (capped[14] == kMaxValueCharacters, "a value's text caps at twelve characters");
+        const std::string micro (capped.begin() + 15 + 12 + 1, capped.begin() + 15 + 12 + 1 + capped[15 + 12]);
+        check (micro == "500 ??s", "and any byte that is not ASCII becomes '?', as in the labels");
+        RackSlotViews longest {};
+        for (auto& s : longest) s = { "x", 0, true, true, std::string (40, 'v') };
+        check (buildLuaCall (2, "set_values", buildRackStatePayload (7, longest, 127, 127)).size() - 11 <= kMaxPayloadBytes,
+               "the longest control page payload fits the device's frame");
+    }
+
     const auto marked = buildRackLabelPayload ("t", slots);
     // [1]['t'][len]... — slot 2's label (index 1) carries the unresolved mark.
     std::size_t cursor = 2;                              // past title len+body

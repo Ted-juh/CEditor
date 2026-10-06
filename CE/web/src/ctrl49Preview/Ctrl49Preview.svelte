@@ -48,7 +48,7 @@
     let cancelled = false;
     let made = null;
     error = '';
-    createCtrl49Screen(canvas, { lua: pageLua, assets: ASSETS })
+    createCtrl49Screen(canvas, { lua: pageLua, assets: ASSETS, redrawOnAsk: true })
       .then((s) => { if (cancelled) s.dispose(); else { made = s; screen = s; } })
       .catch((e) => { if (!cancelled) error = `Lua: ${e.message ?? e}`; });
     return () => { cancelled = true; made?.dispose(); screen = null; };
@@ -66,14 +66,15 @@
         return [
           { name: 'set_mode', bytes: [1] },
           { name: 'set_labels', bytes: rackLabelPayload(p.control.title, slots) },
-          { name: 'set_values', bytes: rackStatePayload(p.control.active, slots) },
+          { name: 'set_values', bytes: rackStatePayload(p.control.active, slots, { number: p.control.page, count: p.control.pages }) },
         ];
       }
       case 'performance':
         return [
           { name: 'set_mode', bytes: [1] },
           { name: 'set_labels', bytes: performanceLabelPayload(p.performance.transport, p.performance.clips) },
-          { name: 'set_values', bytes: performanceStatePayload(p.performance.active, p.performance.clips) },
+          // with the transport, as the broker sends it: the page then knows it is the performance page
+          { name: 'set_values', bytes: performanceStatePayload(p.performance.active, p.performance.clips, p.performance.transport) },
         ];
       case 'browse': {
         const rows = p.browse.names.split(/\r?\n/).filter((n) => n.trim()).slice(0, 8)
@@ -207,14 +208,22 @@
     {:else if preview.scene === 'control'}
       <label class="field">Page name
         <input type="text" bind:value={preview.control.title} onfocus={selectAll} /></label>
+      <div class="row wrap">
+        <label class="field small">Page <input type="number" min="1" value={preview.control.page} onfocus={selectAll}
+          oninput={(e) => (preview.control.page = int(e.currentTarget.value, 1, 127))} /></label>
+        <label class="field small">of <input type="number" min="1" value={preview.control.pages} onfocus={selectAll}
+          oninput={(e) => (preview.control.pages = int(e.currentTarget.value, 1, 127))} /></label>
+      </div>
       <div class="grid slots">
-        <span></span><span>Label</span><span>Value</span><span>Bound</span><span>Found</span>
+        <span></span><span>Label</span><span>Value</span><span>Shown as</span><span>Bound</span><span>Found</span>
         {#each preview.control.slots as s, i}
           <button type="button" class="slot-no" class:on={preview.control.active === i}
                   title="Make this the active encoder" onclick={() => (preview.control.active = i)}>{i + 1}</button>
           <input type="text" bind:value={s.label} onfocus={selectAll} aria-label={`Slot ${i + 1} label`} />
           <input type="number" min="0" max="127" value={s.position} onfocus={selectAll}
                  aria-label={`Slot ${i + 1} value`} oninput={(e) => (s.position = int(e.currentTarget.value, 0, 127))} />
+          <input type="text" bind:value={s.valueText} onfocus={selectAll} aria-label={`Slot ${i + 1} shown as`}
+                 title="The value as the plug-in writes it; empty shows the 0-127 position" />
           <button type="button" class="flag" class:on={s.assigned} onclick={() => (s.assigned = !s.assigned)}
                   title="Unbound slots show no label">{s.assigned ? 'yes' : 'no'}</button>
           <button type="button" class="flag" class:on={s.resolved} onclick={() => (s.resolved = !s.resolved)}
@@ -388,7 +397,8 @@
   .field { display: flex; flex-direction: column; gap: 4px; color: #9aa4b2; font-size: 12px; }
   .field.small input { width: 80px; }
   .grid { display: grid; gap: 4px 6px; align-items: center; font-size: 12px; color: #7d8898; }
-  .slots, .clips { grid-template-columns: 34px 1fr 72px 52px 52px; }
+  .slots { grid-template-columns: 34px 1fr 64px 1fr 52px 52px; }
+  .clips { grid-template-columns: 34px 1fr 72px 52px 52px; }
   .zones { grid-template-columns: 1fr repeat(5, 62px); }
   .songs { grid-template-columns: 1fr 52px 62px; }
   .count { text-align: center; color: #d7dde6; }

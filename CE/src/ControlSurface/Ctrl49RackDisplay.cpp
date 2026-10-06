@@ -5,9 +5,9 @@ namespace ceditor::ctrl49
 
 namespace
 {
-    void appendString (Bytes& out, const std::string& s)
+    void appendString (Bytes& out, const std::string& s, std::size_t cap = kMaxLabelCharacters)
     {
-        const auto length = s.size() > kMaxLabelCharacters ? kMaxLabelCharacters : s.size();
+        const auto length = s.size() > cap ? cap : s.size();
         out.push_back (static_cast<std::uint8_t> (length));
         for (std::size_t i = 0; i < length; ++i)
         {
@@ -45,6 +45,19 @@ Bytes buildRackStatePayload (int activeSlot, const RackSlotViews& slots)
     result[0] = static_cast<std::uint8_t> (clamp127 (activeSlot));
     for (std::size_t slot = 0; slot < slots.size() && slot < 8; ++slot)
         result[1 + slot] = static_cast<std::uint8_t> (clamp127 (slots[slot].position));
+    return result;
+}
+
+Bytes buildRackStatePayload (int activeSlot, const RackSlotViews& slots, int pageNumber, int pageCount)
+{
+    auto result = buildRackStatePayload (activeSlot, slots);
+    result.push_back (0);       // [9] a control page
+    result.push_back (0);       // [10] [11] the performance page's beat and beats per bar
+    result.push_back (4);
+    result.push_back (static_cast<std::uint8_t> (clamp127 (pageNumber)));
+    result.push_back (static_cast<std::uint8_t> (clamp127 (pageCount)));
+    for (const auto& slot : slots)
+        appendString (result, slot.assigned ? slot.valueText : std::string(), kMaxValueCharacters);
     return result;
 }
 

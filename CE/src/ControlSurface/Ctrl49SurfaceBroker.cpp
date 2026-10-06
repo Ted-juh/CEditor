@@ -1154,12 +1154,14 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
             const auto& s = slots.getReference (i);
             views[(std::size_t) i] = { s.displayName.toStdString(),
                                        (int) std::lround (s.position * 127.0f),
-                                       s.assigned, s.resolved };
+                                       s.assigned, s.resolved, s.valueText.toStdString() };
         }
 
         labels = buildRackLabelPayload ((page.name + service.surfaceChordTitle (reducer.padBank()))
                                             .toStdString(), views);
-        state = buildRackStatePayload (reducer.activeSlot(), views);
+        // With each knob's value as the plug-in writes it, and which page of how many: the page
+        // shows "2.40 kHz" rather than 88, and the page number in its bottom strip.
+        state = buildRackStatePayload (reducer.activeSlot(), views, reducer.page() + 1, controlPages);
     }
 
     // Only bytes that changed travel — the display link is slow and redraws flicker.

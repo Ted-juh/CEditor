@@ -8,7 +8,7 @@ import {
   rackLabelPayload, rackStatePayload, performanceTitle, performanceLabelPayload,
   performanceStatePayload, browseSlotViews, soundcheckPayload, soundcheckLevelByte, layersPayload,
   readSoundcheckPayload, readLayersPayload, discoverPayload, readDiscoverPayload, cuePayload, readCuePayload,
-  changesPayload, readChangesPayload,
+  changesPayload, readChangesPayload, readRackStateExtension,
 } from '../src/CE_Application/screen/ctrl49Payloads.js';
 import { parseCalls } from '../src/ctrl49Preview/callScript.js';
 
@@ -36,6 +36,19 @@ test('rack labels: title first, then eight length-prefixed labels, ASCII only', 
 test('rack state: the nine bytes the knob page reads', () => {
   const bytes = rackStatePayload(2, [{ position: 64 }, { position: 200 }, { position: -4 }]);
   assert.deepEqual(bytes, [2, 64, 127, 0, 0, 0, 0, 0, 0]);
+});
+
+test('rack state on a control page: the values as the plug-in writes them, and the page number', () => {
+  // The golden in CE/tests/Ctrl49RackDisplayTests.cpp: the C++ builds these same bytes.
+  const slots = [{ position: 127, assigned: true, resolved: true, valueText: '2.40 kHz' },
+    { position: 0, assigned: true, resolved: false, valueText: '35 %' },
+    { position: 64, assigned: false, valueText: 'ignored' }];
+  assert.deepEqual(rackStatePayload(1, slots, { number: 2, count: 5 }),
+    [1, 127, 0, 64, 0, 0, 0, 0, 0, 0, 0, 4, 2, 5, 8, ...ascii('2.40 kHz'), 4, ...ascii('35 %'), 0, 0, 0, 0, 0, 0]);
+  const capped = rackStatePayload(0, [{ assigned: true, valueText: '12345678901234567' }, { assigned: true, valueText: '500 µs' }],
+    { number: 1, count: 1 });
+  assert.equal(capped[14], 12, 'a value caps at twelve characters');
+  assert.deepEqual(capped.slice(27, 35), [7, ...ascii('500 ??s')], 'and any other byte becomes ?');
 });
 
 test('performance: ASCII transport title, clip marks, phase as knob', () => {
@@ -280,4 +293,11 @@ test('every function the broker calls is one the page defines', () => {
     'each page beyond the knobs names its call');
   for (const name of [...called, ...stage, 'init', 'set_mode', 'draw'])
     assert.match(lua, new RegExp(`^function ${name}\\(`, 'm'), `${name} is defined`);
+});
+
+test('a control page\'s extension reads back: the page and the values as written', () => {
+  const slots = [{ position: 10, assigned: true, valueText: '2.40 kHz' }, { position: 0, assigned: false, valueText: 'x' }];
+  assert.deepEqual(readRackStateExtension(rackStatePayload(0, slots, { number: 3, count: 4 })),
+    { page: 3, pages: 4, texts: ['2.40 kHz', '', '', '', '', '', '', ''] });
+  assert.equal(readRackStateExtension(rackStatePayload(0, slots)), null, 'the plain nine bytes have none');
 });

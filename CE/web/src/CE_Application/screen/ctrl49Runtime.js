@@ -44,12 +44,15 @@ const HELPERS = `
 /**
  * Run a display page on a canvas (must be 480x272).
  * @param {HTMLCanvasElement} canvas
- * @param {{ lua: string, assets?: Record<number, string> }} page  Lua source, and the uploaded
- *        PNG objects as { objectId: url } — the same ids the host uploads before binding.
+ * @param {{ lua: string, assets?: Record<number, string>, redrawOnAsk?: boolean }} page  Lua
+ *        source, and the uploaded PNG objects as { objectId: url } — the same ids the host
+ *        uploads before binding. With redrawOnAsk, lua_widget_make_dirty does what it does on the
+ *        keyboard: the page is drawn again shortly after (once, however often it asks). Without
+ *        it a page is drawn only when the caller says, so a picture is taken of one exact frame.
  * @returns {Promise<{ call(name: string, bytes?: number[]): void, dispose(): void }>}
  *          `call` throws with Lua's own message when the page errors.
  */
-export async function createCtrl49Screen(canvas, { lua: source, assets = {} }) {
+export async function createCtrl49Screen(canvas, { lua: source, assets = {}, redrawOnAsk = false }) {
   const ctx = canvas.getContext('2d');
   const entries = Object.entries(assets);
   const [images, engine] = await Promise.all([
@@ -72,7 +75,16 @@ export async function createCtrl49Screen(canvas, { lua: source, assets = {} }) {
   });
   engine.global.set('led_control_set_level_midi', () => {});
   engine.global.set('led_control_set_level', () => {});
-  engine.global.set('lua_widget_make_dirty', () => {});
+  let redrawTimer = null;
+  let disposed = false;
+  engine.global.set('lua_widget_make_dirty', () => {
+    if (!redrawOnAsk || redrawTimer !== null || disposed) return;
+    redrawTimer = setTimeout(() => {
+      redrawTimer = null;
+      if (disposed) return;
+      try { engine.global.get('__invoke')('draw', []); } catch { /* the caller's next call reports it */ }
+    }, 40);
+  });
 
   // The rest of the firmware's Lua surface (the full registered list, read from the Akai ADVANCE
   // 1.0.10 firmware, which runs the same VIP runtime), so a page that uses them runs here too.
@@ -111,6 +123,8 @@ export async function createCtrl49Screen(canvas, { lua: source, assets = {} }) {
       return true;
     },
     dispose() {
+      disposed = true;
+      if (redrawTimer !== null) clearTimeout(redrawTimer);
       try { engine.global.close(); } catch { /* best effort */ }
     },
   };

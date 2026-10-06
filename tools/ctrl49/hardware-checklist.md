@@ -24,7 +24,7 @@ is at the bottom.
 
 - [ ] The card says **Showing on the keyboard too**, and the keyboard shows the same page.
       If it says anything else, stop here: **write down** the card's text and its red line, if any.
-- [ ] The page script HoSTage uploads is 40.6 KB now (it was 9 KB before these pages). The
+- [ ] The page script HoSTage uploads is 47 KB now (it was 9 KB before these pages). The
       stress test in section 2 has run (2026-10-05): the 58 KB Rig full build loaded and ran,
       so this should too. If it shows a Lua error or the stock screen comes back instead,
       **write down** exactly what it says.
@@ -193,6 +193,22 @@ press Page Right twice to AMP ENVELOPE, and turn knobs 1-4 (attack, decay, susta
 - [ ] **Write down** anything that looks wrong (gaps, a dark fringe along the line, a line that
       looks dotted), with a photo if you can, and any "The keyboard refused" line.
 - [ ] Optional: `Start_CTRL49_Era_Designs.cmd`, Midnight 2020, page 3: the filled envelope.
+
+## 6. The knob pages
+
+Start `build\native\CEditor_artefacts\Release\CEditor.exe`, File > Hostage..., with a part that has
+a plug-in loaded and a control page assigned to it. On the keyboard:
+
+- [ ] Each knob shows the plug-in's own value ("2.40 kHz", "27 %", "Saw"), not a number 0-127.
+      Turn knob 1: the value changes with it.
+- [ ] At the bottom: the knob turned last, larger, with its value, and PAGE n / m on the right.
+- [ ] A knob with nothing on it is a faint ring with no number.
+- [ ] Page Right to the performance page: a play triangle or stop square at the top left instead
+      of ">" or "#"; a running clip has a green dot, a waiting one a hollow ring, and no "*" or ">".
+- [ ] Page Left / Right between two control pages: do the rings sweep to their new values over a
+      moment, or jump at once? Either is fine; **write down** which.
+- [ ] DISCOVER (switch it on in the CTRL49 card): round dots on the map, YOU under its ring.
+- [ ] **Write down** anything cut off, any "The keyboard refused" line.
 
 ## What to send back
 

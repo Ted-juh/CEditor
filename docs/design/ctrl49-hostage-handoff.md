@@ -41,7 +41,7 @@ order. Each is one Lua call with one payload.
 | `CE/src/ControlSurface/Ctrl49StagePages.{h,cpp}` | the payload builders; byte goldens shared with JS |
 | `CE/src/ControlSurface/Ctrl49SurfaceBroker.{h,cpp}` | page order, cursors, encoder/pad handling, pad lights |
 | `CE/src/InstrumentHost/InstrumentHostService.{h,cpp}` | the service commands (`cueOnSurface` etc.), surfacePages state, load-time measuring |
-| `tools/ctrl49/Hostage_MultiKnob.lua` | the page script the keyboard runs (40.6 KB; was 9 KB on `main`) |
+| `tools/ctrl49/Hostage_MultiKnob.lua` | the page script the keyboard runs (47 KB; was 9 KB on `main`) |
 | `CE/web/src/CE_Application/screen/ctrl49Payloads.js` | the same payloads in JS, and readers |
 | `CE/web/src/CE_Application/sections/Ctrl49ScreenCard.svelte` | the app's CTRL49 card and its switches |
 | `CE/web/src/ctrl49Preview/` | the browser preview (`npm run dev`, `/ctrl49.html`), a scene per page |
@@ -114,6 +114,10 @@ again**; they ran it five times.
    pointer shown on purpose), Labels (every word a picture: no firmware text) and Meters.
    Software-checked; on the keyboard via `Start_CTRL49_Feature_Mockups.cmd`, choice 5
    (hardware checklist section 4). The owner picks which become real pages.
+8. **Smooth envelope** (`screen-lab/smooth_curve.py`) in the era designs, Machined Metal and the
+   design presets: checklist section 5. **Knob page polish** (values as the plug-in writes them,
+   symbols for the ASCII marks, empty knobs, the bottom strip, easing, DISCOVER's dots):
+   checklist section 6, README "The knob pages".
 
 ### The owner's steps for the tests (give them exactly like this)
 

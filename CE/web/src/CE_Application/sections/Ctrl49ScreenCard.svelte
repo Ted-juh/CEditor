@@ -25,7 +25,8 @@
   import { ctrl49Screen, hostSurface, hostState, surfaceInput, setControlSlotValue, surfaceStatusText,
            layersOnSurface, soundcheckOnSurface, discoverOnSurface, cueOnSurface, changesOnSurface } from '../stores/instrumentHost.js';
   import { createCtrl49Screen } from '../screen/ctrl49Runtime.js';
-  import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload, readCuePayload, readChangesPayload } from '../screen/ctrl49Payloads.js';
+  import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload, readCuePayload, readChangesPayload,
+           readRackStateExtension } from '../screen/ctrl49Payloads.js';
 
   const KIND = { control: 'Controls', performance: 'Performance', browse: 'Sound browser',
                  layers: 'Layers', soundcheck: 'Soundcheck', discover: 'Discover', cue: 'Cue', changes: 'Changes' };
@@ -50,7 +51,8 @@
         import('../../../../../tools/ctrl49/hostage_logo.png?url'),
       ]);
       // The object ids the broker uploads them under before binding the page.
-      return createCtrl49Screen(canvas, { lua: lua.default, assets: { 0x0200: strip.default, 0x0210: logo.default } });
+      return createCtrl49Screen(canvas, { lua: lua.default, assets: { 0x0200: strip.default, 0x0210: logo.default },
+                                          redrawOnAsk: true });
     })()
       .then((s) => { if (cancelled) s.dispose(); else { made = s; runtime = s; } })
       .catch((e) => { if (!cancelled) failure = `The screen could not be drawn: ${e?.message ?? e}`; });
@@ -149,17 +151,19 @@
   }
 
   // The eight labels and values, read back out of the same payloads the page draws:
-  // set_labels [titleLen][title][8 x [len][label]], set_values [active][v0..v7].
+  // set_labels [titleLen][title][8 x [len][label]], set_values [active][v0..v7], and on a
+  // control page each value as the plug-in writes it after that.
   const slots = $derived.by(() => {
     if (stage) return stageSlots($ctrl49Screen);
     const { labels, values } = $ctrl49Screen;
+    const written = readRackStateExtension(values)?.texts;
     const out = [];
     let at = 1 + (labels[0] ?? 0);
     for (let i = 0; i < 8; i++) {
       const length = labels[at] ?? 0;
       const label = String.fromCharCode(...labels.slice(at + 1, at + 1 + length));
       at += 1 + length;
-      out.push({ label, value: values[1 + i] ?? 0, text: String(values[1 + i] ?? 0), unused: false });
+      out.push({ label, value: values[1 + i] ?? 0, text: written?.[i] || String(values[1 + i] ?? 0), unused: false });
     }
     return out;
   });
