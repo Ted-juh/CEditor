@@ -7,6 +7,12 @@ Skin.lua files are standalone on-device pages; the common renderer remains autho
 from pathlib import Path
 import math
 from PIL import Image, ImageDraw, ImageFilter
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'machined-metal'))
+import smooth_curve  # noqa: E402  (the envelope's anti-aliased line pieces)
+from make_assets import SEG_AT, SEG_CENTRE, SEG_D, SEG_PER_ROW, SEG_THICK  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 BASE = HERE.parent / 'machined-metal'
@@ -235,6 +241,7 @@ def parts(kind,t):
     fill=(222,197,143) if kind=='bakelite-1936' else (13,37,42)
     d.ellipse((97,1,108,12),fill=fill,outline=rgba(t['curve']),width=2)
     d.ellipse((101,5,104,8),fill=rgba(t['curve']))
+    smooth_curve.paste_family(im, *SEG_AT, SEG_D, SEG_THICK, t['curve'], SEG_CENTRE, per_row=SEG_PER_ROW)
     return im
 
 

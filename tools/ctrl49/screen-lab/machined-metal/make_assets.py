@@ -7,10 +7,19 @@ Pixels are authored at their final 480x272 screen coordinates, not a resized moc
 from pathlib import Path
 import math
 from PIL import Image, ImageDraw, ImageFilter
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import smooth_curve  # noqa: E402  (the envelope's anti-aliased line pieces)
 
 HERE = Path(__file__).resolve().parent
 W, H, FRAME, FRAMES = 480, 272, 80, 64
 AMBER = (255, 183, 62, 255)
+MINT = (156, 255, 208)
+# The envelope's line pieces (smooth_curve.py), for MachinedMetal.lua's SEG_D, SEG_M, SEG_ROW: a
+# 2 px line centred 1 px below the sample row (where the old 1 px slivers centred it), 13 pieces
+# to a row in the empty left of parts.png from y 40.
+SEG_D, SEG_THICK, SEG_CENTRE, SEG_PER_ROW, SEG_AT = 24, 2, 1, 13, (0, 40)
 
 
 def metal(w, h, top=46, bottom=23):
@@ -167,6 +176,7 @@ def parts():
     hd.ellipse((1,1,12,12),fill=(15,81,57,255),outline=(143,255,195,255),width=2)
     hd.ellipse((5,5,8,8),fill=(184,255,219,255))
     im.paste(handle,(96,0))
+    smooth_curve.paste_family(im, *SEG_AT, SEG_D, SEG_THICK, MINT, SEG_CENTRE, per_row=SEG_PER_ROW)
     return im
 
 

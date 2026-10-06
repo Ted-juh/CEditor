@@ -83,6 +83,7 @@ local T = {
     note_soft_hi = 0xFF4FA866,
     off = 0xFF3E4840,
     playhead = 0xFF9DFFB0,
+    seg = { 186, 24, 54, 24, 5, 2 },
     snap = false,
     title = 0xFFEDE4C8,
     titles = { "CONTROLS", "MIXER", "ENVELOPE", "ARP EDIT", "ARP PLAY" },
@@ -325,6 +326,109 @@ local function area (x0, base, cols, n, how, colour)
     end
 end
 
+-- --- the smooth curve (smooth_curve.py) ---------------------------------------------------------
+--
+-- The column heights are 4 px apart. Each column of the curve is one pre-rendered, anti-aliased
+-- piece of line for its slope (T.seg: x, the lines' row, the wedges' row, the steepest slope D,
+-- the pieces' pitch, their margin), so the line is smooth instead of a staircase. A flat run is one
+-- rectangle; a column steeper than D is near enough vertical for 1 px slivers. Under it, a wedge
+-- piece fills up to the line and a rectangle the rest, or, for a gradient fill, 1-2 px crops of the
+-- gradient whose steps the line covers.
+
+local function height (cols, n, i)
+    if i > n then return cols[n] end
+    return cols[i]
+end
+
+local function piece (row, dy, x, top, tall)
+    local s = T.seg
+    draw_image(BUF, PARTS, x, top, s[1] + (dy + s[4]) * s[5], row, 4, tall, WHITE)
+end
+
+-- The bottom `h` rows of the gradient fill, `w` px wide.
+local function gradient (x, base, w, h)
+    local f = S.fill
+    if h > 0 then draw_image(BUF, PARTS, x, base - h, f[1], f[2] + f[4] - h, w, h, WHITE) end
+end
+
+local function smooth_area (x0, base, cols, n, how, colour)
+    local s = T.seg
+    local c = 1
+    while c <= n do
+        local x = x0 + (c - 1) * 4
+        local h0, h1 = height(cols, n, c), height(cols, n, c + 1)
+        local y0, y1 = base - h0, base - h1
+        local dy = y1 - y0
+        if dy == 0 then
+            local k = c
+            while k < n and height(cols, n, k + 2) == h0 do k = k + 1 end
+            local w = (k - c + 1) * 4
+            if how == "sprite" then
+                for j = 0, k - c do gradient(x + j * 4, base, 4, h0) end
+            elseif h0 > 0 then
+                draw_rect(x, y0, w, h0, colour)
+            end
+            c = k + 1
+        else
+            local low = y0
+            if y1 > low then low = y1 end
+            if how == "sprite" then
+                -- 1 px crops where it is steep, 2 px where it is gentle: the line covers the steps
+                local step = 2
+                if dy > 8 or dy < -8 then step = 1 end
+                for j = 0, 4 - step, step do
+                    gradient(x + j, base, step, base - (y0 + floor(dy * (j + step / 2) / 4 + 0.5)))
+                end
+            else
+                if base > low then draw_rect(x, low, 4, base - low, colour) end
+                if dy <= s[4] and dy >= -s[4] then
+                    local top = y0
+                    if y1 < top then top = y1 end
+                    piece(s[3], dy, x, top - s[6], (low - top) + s[6])
+                else
+                    for j = 0, 3 do
+                        local ya = y0 + floor(dy * (j + 0.5) / 4 + 0.5)
+                        if base > ya then draw_rect(x + j, ya, 1, base - ya, colour) end
+                    end
+                end
+            end
+            c = c + 1
+        end
+    end
+end
+
+local function smooth_trace (x0, base, cols, n, colour, thick)
+    local s = T.seg
+    local c = 1
+    while c <= n do
+        local x = x0 + (c - 1) * 4
+        local h0 = height(cols, n, c)
+        local y0, y1 = base - h0, base - height(cols, n, c + 1)
+        local dy = y1 - y0
+        if dy == 0 then
+            local k = c
+            while k < n and height(cols, n, k + 2) == h0 do k = k + 1 end
+            draw_rect(x, y0 + 1 - thick, (k - c + 1) * 4, thick, colour)
+            c = k + 1
+        else
+            local top = y0
+            if y1 < top then top = y1 end
+            if dy <= s[4] and dy >= -s[4] then
+                local tall = dy
+                if tall < 0 then tall = -tall end
+                piece(s[2], dy, x, top - s[6], tall + 2 * s[6])
+            else
+                for j = 0, 3 do
+                    local ya, yb = y0 + floor(dy * j / 4), y0 + floor(dy * (j + 1) / 4)
+                    if yb < ya then ya, yb = yb, ya end
+                    draw_rect(x + j, ya + 1 - thick, 1, yb - ya + thick, colour)
+                end
+            end
+            c = c + 1
+        end
+    end
+end
+
 -- --- the loading screen ----------------------------------------------------------------------------
 
 local function loading ()
@@ -479,23 +583,33 @@ local function draw_envelope ()
     local n = #cols
     local x0, base = L.env[1], L.env[2]
     if n > 0 then
-        if T.env_fill then area(x0, base, cols, n, T.env_fill_how, T.env_fill) end
+        -- (a design that snaps its curve to a coarse grid wants the steps: it keeps them)
+        if T.env_fill then
+            if T.snap then area(x0, base, cols, n, T.env_fill_how, T.env_fill)
+            else smooth_area(x0, base, cols, n, T.env_fill_how, T.env_fill) end
+        end
         if T.env_glow then
+            -- the stepped curve glows at each step's middle, the smooth one on its points
+            local dx = -4
+            if not T.snap then dx = -6 end
             for c = 1, n do
                 local h = cols[c]
                 if T.snap then h = h - h % 2 end
-                part("glow", x0 + (c - 1) * 4 - 4, base - h - 6)
+                part("glow", x0 + (c - 1) * 4 + dx, base - h - 6)
                 if c < n then
                     local d = cols[c + 1] - h
                     if d < 0 then d = -d end
                     local extra = floor(d / 14)                     -- a steep stretch glows along its length
                     for k = 1, extra do
-                        part("glow", x0 + (c - 1) * 4 - 2, base - h - 6 - floor((cols[c + 1] - h) * k / (extra + 1)))
+                        local along = -2
+                        if not T.snap then along = dx + floor(4 * k / (extra + 1)) end
+                        part("glow", x0 + (c - 1) * 4 + along, base - h - 6 - floor((cols[c + 1] - h) * k / (extra + 1)))
                     end
                 end
             end
         end
-        trace(x0, base, cols, n, T.env_line, T.line_thick, T.snap)
+        if T.snap then trace(x0, base, cols, n, T.env_line, T.line_thick, T.snap)
+        else smooth_trace(x0, base, cols, n, T.env_line, T.line_thick) end
         local marks = { { env.a, cols[env.a + 1] }, { env.d, env.sus }, { env.r, env.sus } }
         for i = 1, 3 do
             part("handle", x0 + marks[i][1] * 4 - 5, base - marks[i][2] - 7)

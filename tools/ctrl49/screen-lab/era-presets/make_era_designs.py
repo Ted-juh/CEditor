@@ -11,7 +11,8 @@ Each design folder gets exactly what the screen lab's preset mode loads:
   Skin.lua             EraSkin.lua with this design's GENERATED block (theme, layout, crops)
   panels.png           480 x 816   the Controls, Mixer and Envelope backgrounds, stacked
   knobs.png            80 x 5120   64 knob frames, value 0..127 -> frame floor(v*63/127 + 0.5)
-  parts.png            480 x 732   sprites in the top 180 rows; the arpeggiator's piano-roll
+  parts.png            480 x 732   sprites in the top 180 rows (the envelope's smooth pieces at
+                                   x 186, y 24: see ../smooth_curve.py); the arpeggiator's piano-roll
                                    grid (416 wide) and keyboard (40 wide) at y 180, 28 semitone
                                    rows that repeat every octave; its background at y 460
 
@@ -30,6 +31,9 @@ import sys
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+import smooth_curve  # noqa: E402  (the envelope's anti-aliased pieces, shared with Machined Metal)
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(HERE, 'EraSkin.lua')
 SS = 4                      # shapes are drawn 4x and downsampled, so every edge anti-aliases
@@ -46,6 +50,9 @@ ENCODERS = [4, 8, 4, 8, 6]
 ASSETS = [(576, 'panels.png'), (578, 'knobs.png'), (580, 'parts.png')]
 KNOB, KNOB_FRAMES = 80, 64
 PARTS_TOP = 180             # sprite rows at the top of parts.png; the piano roll follows
+# The envelope's smooth pieces (smooth_curve.py): a line piece and a wedge for every slope of a
+# 4 px column from -SEG_D to SEG_D px, in the empty top-right of parts.png.
+SEG_X, SEG_Y, SEG_D = 186, 24, 24
 
 # The arpeggiator's piano roll: a keyboard on its side, sixteen semitone rows of 10 px, beside
 # sixteen steps of 26 px. The grid and the keyboard are baked as strips of 28 rows starting on a
@@ -1859,6 +1866,17 @@ def background(th, page):
     return img.convert('RGBA')
 
 
+def seg_wedge_y(thick):
+    return SEG_Y + smooth_curve.grid(SEG_D, thick, 1 - thick / 2)[2] + 2
+
+
+def seg_layout(thick):
+    """What EraSkin.lua needs to crop the pieces: x, the lines' y, the wedges' y, D, pitch, margin."""
+    centre = 1 - thick / 2
+    return [SEG_X, SEG_Y, seg_wedge_y(thick), SEG_D, smooth_curve.grid(SEG_D, thick, centre)[1],
+            smooth_curve.margin(thick, centre)]
+
+
 def parts_atlas(th):
     atlas = new(W, PARTS_H)
     roll = th.roll_theme()
@@ -1873,6 +1891,11 @@ def parts_atlas(th):
         x, y, w, h = SPRITES[name]
         assert im.size == (w, h), (th.slug, name, im.size, (w, h))
         atlas.paste(im, (x, y))
+    t = th.lua_theme()
+    thick, centre = t['line_thick'], 1 - t['line_thick'] / 2
+    smooth_curve.paste_family(atlas, SEG_X, SEG_Y, SEG_D, thick, C(t['env_line']), centre)
+    smooth_curve.paste_family(atlas, SEG_X, seg_wedge_y(thick), SEG_D, thick, C(t['env_fill'] or t['env_line']),
+                              centre, wedges=True)
     atlas.paste(th.roll_grid(), (0, ROLL_STRIP_Y))
     atlas.paste(th.roll_piano(), (ROLL_GRID_W, ROLL_STRIP_Y))
     atlas.paste(background(th, 3), (0, ROLL_BG_Y))
@@ -1926,6 +1949,7 @@ def skin_lua(th):
         theme['f_' + k] = list(f)
     theme['name'] = th.name.upper()
     theme['titles'] = [p.upper() for p in PAGES]
+    theme['seg'] = seg_layout(theme['line_thick'])
     block = '\n'.join([
         '-- BEGIN GENERATED (make_era_designs.py writes this block per design)',
         '-- %s. Generated: edit make_era_designs.py and EraSkin.lua, then regenerate.' % th.name,

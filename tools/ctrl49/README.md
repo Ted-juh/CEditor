@@ -425,6 +425,19 @@ still need the CTRL49. `python screen-lab/machined-metal/make_assets.py` regener
 (Pillow required). `npm run test:screen-lab` checks the actual Lua at min/mid/max values,
 sprite bounds, text widths, decode reuse and meter animation, and can capture native PNGs.
 
+**A smooth envelope.** The screen has no lines and no anti-aliasing, only rectangles and image
+crops, and the host sends the envelope as heights 4 px apart. Drawn a rectangle a column, it was
+a staircase (the ten era designs); drawn in 1 px slivers, its edges were hard (Machined Metal and
+the three design presets). Now every 4 px column of the curve is one pre-rendered anti-aliased
+piece for its slope, from `screen-lab/smooth_curve.py`, baked into the empty corner of each
+design's `parts.png` in the curve's colour: 49 pieces, one for every slope from 24 px down to
+24 px up. A flat run is one rectangle, and a column steeper than that (a fast attack) keeps
+1 px slivers, which look right on a near-vertical line. Under a filled curve, a wedge piece fills
+up to the line. It costs fewer draw calls, not more: Machined Metal's envelope went from about
+500 calls a redraw to about 140, Midnight's from 283 to 171. Rhythm Box 1980 snaps its curve to
+a coarse grid on purpose and keeps its steps. The pieces are RGBA with soft edges, the same kind
+of image as the glow the keyboard already draws.
+
 ### Three additional design presets
 
 `screen-lab/design-presets/` contains three further skins, each with Controls, Mixer and

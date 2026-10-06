@@ -183,6 +183,17 @@ is in `tools\ctrl49\screen-lab\feature-mockups\hostage-live\preview-*.png`.
       the moving parts are smooth, whether the words on Labels look sharp or blurred, and the
       corner readout (draw calls, Lua KB) on Meters.
 
+## 5. The smooth envelope
+
+Close CEditor, VIP and your DAW first. Double-click `tools\ctrl49\Start_CTRL49_Machined_Metal.cmd`,
+press Page Right twice to AMP ENVELOPE, and turn knobs 1-4 (attack, decay, sustain, release).
+
+- [ ] The green curve is one smooth line with soft edges, no staircase and no gaps, at every
+      setting; a very short attack is a near-vertical line.
+- [ ] **Write down** anything that looks wrong (gaps, a dark fringe along the line, a line that
+      looks dotted), with a photo if you can, and any "The keyboard refused" line.
+- [ ] Optional: `Start_CTRL49_Era_Designs.cmd`, Midnight 2020, page 3: the filled envelope.
+
 ## What to send back
 
 The **Write down** lines, the console lines copied as text, and a photo of any page that looks

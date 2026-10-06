@@ -3,6 +3,7 @@
 -- Reusable skin: 3 panel backgrounds, a 64-frame 80px knob and one small moving-parts atlas.
 local WHITE, INK, DIM, AMBER, MINT = 0xFF1C262B, 0xFFB4B9B3, 0xFF405053, 0xFF7B2B13, 0xFFBFFF8C
 local PANELS, KNOBS, PARTS = 577, 579, 581
+local SEG_D, SEG_M, SEG_ROW = 24, 3, 30   -- the envelope's smooth pieces (see draw_envelope)
 local page, frame, focus, mode, decoded = 0, 0, 0, 0, 0
 local values = {63,41,23,83,64,64,64,64}
 local cols, marks, texts = {}, {0,0,0,0}, {"12 ms","248 ms","68 %","684 ms"}
@@ -103,18 +104,40 @@ local function draw_mixer()
 end
 local function draw_envelope()
     if #cols>0 then
-        -- Reconstruct a continuous line from the host's 4px-spaced samples. Small rectangles
-        -- bridge steep segments; atlas glow adds depth without a full-screen animated strip.
-        for c=1,109 do
+        -- A continuous line from the host's 4px-spaced samples: each 4px column is one
+        -- pre-rendered anti-aliased piece for its slope (smooth_curve.py: SEG_D slopes either
+        -- way, 13 to a row of parts.png at y 40), a flat run one rectangle, and a column steeper
+        -- than SEG_D 1px slivers. Atlas glow adds depth without a full-screen animated strip.
+        local c=1
+        while c<=109 do
             local a,b=cols[c],cols[c+1]
-            for s=0,3 do
-                local lo=floor(a+(b-a)*s/4)
-                local hi=floor(a+(b-a)*(s+1)/4)
-                if lo>hi then lo,hi=hi,lo end
-                draw_rect(20+(c-1)*4+s,190-hi,1,hi-lo+2,MINT)
+            local x=20+(c-1)*4
+            if a==b then
+                local k=c
+                while k<109 and cols[k+2]==a do k=k+1 end
+                draw_rect(x,190-a,(k-c+1)*4,2,MINT)
+                c=k+1
+            else
+                local dy=a-b
+                if dy>=-SEG_D and dy<=SEG_D then
+                    local i=dy+SEG_D
+                    local top=190-a
+                    if b>a then top=190-b end
+                    local tall=dy
+                    if tall<0 then tall=-tall end
+                    part((i%13)*5,40+floor(i/13)*SEG_ROW,4,tall+2*SEG_M,x,top-SEG_M)
+                else
+                    for s=0,3 do
+                        local lo=floor(a+(b-a)*s/4)
+                        local hi=floor(a+(b-a)*(s+1)/4)
+                        if lo>hi then lo,hi=hi,lo end
+                        draw_rect(x+s,190-hi,1,hi-lo+2,MINT)
+                    end
+                end
+                c=c+1
             end
-            if c%2==0 then part(80,0,12,12,14+(c-1)*4,184-a) end
         end
+        for g=2,109,2 do part(80,0,12,12,14+(g-1)*4,184-cols[g]) end
         for m=1,3 do
             local c=marks[m]+1
             if c>110 then c=110 end
