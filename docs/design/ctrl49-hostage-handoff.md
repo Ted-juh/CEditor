@@ -24,28 +24,29 @@ Paste the section [Prompt for Claude Code](#prompt-for-claude-code) to start the
 - **Two hardware tests are waiting for the owner** (they are away from the PC). Both are in the
   hardware checklist:
   1. **Script size** (section 3): `Ctrl49ScreenLab size`, one command, runs by itself.
-  2. **HoSTage's five pages on the keyboard** (section 1): Cue, Layers, Soundcheck, Discover,
-     Changes.
+  2. **HoSTage's pages on the keyboard** (sections 1 and 6): Cue, Live, Layers, Meters,
+     Soundcheck, Discover, Changes, and the knob pages.
+  Since then sections 7 (the stress page's blocks) and 8 (the upload probe) were added.
 
 ---
 
 ## What is on the branch
 
-**Five real HoSTage pages on the CTRL49** — CUE, LAYERS, SOUNDCHECK, DISCOVER, CHANGES. Each is
-off until switched on in the app (File > Hostage..., Controller tab, CTRL49 card at the bottom:
-switches Cue, Layers, Soundcheck, Discover, Changes), then follows the performance page in that
-order. Each is one Lua call with one payload.
+**Seven real HoSTage pages on the CTRL49** — CUE, LIVE, LAYERS, METERS, SOUNDCHECK, DISCOVER,
+CHANGES. Each is off until switched on in the app (File > Hostage..., Controller tab, CTRL49 card
+at the bottom: switches Cue, Live, Layers, Meters, Soundcheck, Discover, Changes), then follows the
+performance page in that order. Each is one Lua call with one payload.
 
 | Where | What |
 |---|---|
 | `CE/src/ControlSurface/Ctrl49StagePages.{h,cpp}` | the payload builders; byte goldens shared with JS |
 | `CE/src/ControlSurface/Ctrl49SurfaceBroker.{h,cpp}` | page order, cursors, encoder/pad handling, pad lights |
 | `CE/src/InstrumentHost/InstrumentHostService.{h,cpp}` | the service commands (`cueOnSurface` etc.), surfacePages state, load-time measuring |
-| `tools/ctrl49/Hostage_MultiKnob.lua` | the page script the keyboard runs (47 KB; was 9 KB on `main`) |
+| `tools/ctrl49/Hostage_MultiKnob.lua` | the page script the keyboard runs (62 KB, uploaded stripped as 42 KB by `Ctrl49LuaStrip.h`; was 9 KB on `main`) |
 | `CE/web/src/CE_Application/screen/ctrl49Payloads.js` | the same payloads in JS, and readers |
 | `CE/web/src/CE_Application/sections/Ctrl49ScreenCard.svelte` | the app's CTRL49 card and its switches |
 | `CE/web/src/ctrl49Preview/` | the browser preview (`npm run dev`, `/ctrl49.html`), a scene per page |
-| `CE/tests/InstrumentHostServiceTests.cpp` | `testCtrl49StagePages`, `testCtrl49Discover`, `testCtrl49Cue`, `testCtrl49Changes`, broker-over-fake-cable checks |
+| `CE/tests/InstrumentHostServiceTests.cpp` | `testCtrl49StagePages`, `testCtrl49Live`, `testCtrl49Meters`, `testCtrl49Discover`, `testCtrl49Cue`, `testCtrl49Changes`, broker-over-fake-cable checks |
 
 **The screen lab** (`Ctrl49ScreenLab.exe`, Windows only; `CE/src/ControlSurface/Ctrl49ScreenLab.cpp`):
 
@@ -109,15 +110,26 @@ again**; they ran it five times.
    plug-ins (steps below) and judges `scan.png` and `pages\*.png`. Next after that: a Lua page
    that shows one section (background image + overlays), and HoSTage keeping the scan per class
    id, inside the worker process.
-7. **HoSTage Live mockups** (`screen-lab/feature-mockups/hostage-live`, README there): Live (the
-   keys and the arp's step lane), Section (the panel scan's page, with the plug-in's frozen
-   pointer shown on purpose), Labels (every word a picture: no firmware text) and Meters.
-   Software-checked; on the keyboard via `Start_CTRL49_Feature_Mockups.cmd`, choice 5
-   (hardware checklist section 4). The owner picks which become real pages.
+7. **HoSTage Live mockups** (`screen-lab/feature-mockups/hostage-live`, README there). The owner
+   decided (2026-10-06): all four, where they suit HoSTage; Section paints over the plug-in's cap.
+   - **LIVE and METERS are real pages** (switches Live and Meters on the CTRL49 card;
+     `testCtrl49Live`, `testCtrl49Meters`; checklist section 6). LIVE reads the arp's notes from
+     `ArpEngine::takeNotes` (new: lock-free bits the audio thread sets) and edits the lane through
+     `setPartArp`; METERS takes the levels the app is sent, the loudest kept between redraws.
+   - **SECTION** paints over each knob's cap (mockup done; the scan records `cap`/`pointer`
+     colours). It and **LABELS** wait on the upload probe (`Ctrl49ScreenLab upload`, checklist
+     section 8: does a picture uploaded while a page runs draw, and how fast) and on the panel scan
+     run on real plug-ins. Then: the scan in the worker, its results kept per plug-in, the picture
+     uploaded when its part comes up (`Ctrl49Session::uploadPng` exists and is tested).
 8. **Smooth envelope** (`screen-lab/smooth_curve.py`) in the era designs, Machined Metal and the
    design presets: checklist section 5. **Knob page polish** (values as the plug-in writes them,
    symbols for the ASCII marks, empty knobs, the bottom strip, easing, DISCOVER's dots):
-   checklist section 6, README "The knob pages".
+   checklist section 6, README "The knob pages". The browser's rings no longer show 127/0.
+9. **The page script goes up stripped** (`Ctrl49LuaStrip.h`): 62 KB in the repo, 42 KB uploaded.
+10. **The stress page's memory blocks** never drew on the keyboard. Offline: the PNG is valid
+    (lodepng, stb_image, miniz all read it). The page now decodes a flat and a textured block,
+    early and late, so one run says why (checklist section 7). The upload probe's rows answer the
+    "late decode" half too.
 
 ### The owner's steps for the tests (give them exactly like this)
 

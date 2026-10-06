@@ -93,6 +93,29 @@ try {
     else assert.ok(rgb[0] > 120 && rgb[0] > rgb[1] + 40 && rgb[1] > rgb[2], `textured block ${b} shows orange (${rgb})`);
   }
   await shot('stress');
+
+  // The upload probe: six pictures arrive after startup, each decoded and shown in its row.
+  const upload = await page.evaluate(() => {
+    const lab = window.lab;
+    const ids = [0x0300, 0x0302, 0x0304, 0x0306, 0x0308, 0x030a];
+    let calls;
+    for (let i = 0; i < 6; i++) {
+      lab.upload.call('set_frame', [0, i + 1]);
+      lab.upload.call('show', [i, ids[i] >> 8, ids[i] & 0xff, 0, 8 * (i + 1), 1, 0]);
+      calls = lab.upload.draw();
+    }
+    return calls;
+  });
+  assert.equal(upload.image, 6, 'a piece of each uploaded picture, one a row');
+  assert.equal(upload.decode, 6, 'each decoded once, when it arrived');
+  const pieces = await page.evaluate(() => [0, 1, 2, 3, 4, 5].map((slot) => {
+    const d = document.getElementById('screen').getContext('2d').getImageData(230, 44 + slot * 37 + 2, 120, 30).data;
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 4) lit += d[i] + d[i + 1] + d[i + 2] > 120 ? 1 : 0;
+    return lit;
+  }));
+  pieces.forEach((lit, slot) => assert.ok(lit > 50, `row ${slot + 1} shows its picture (${lit} lit pixels)`));
+  await shot('upload');
   console.log(`  stress     ${stress.rect} rects, ${stress.image} images, ${stress.text} texts`);
 
   // The preset's actual Lua and PNGs, at native resolution. Strict runner checks every

@@ -223,6 +223,12 @@ The busiest redraw is Meters at about 165 calls; Labels draws 38 and not one of 
 
 ### What each page is, and what HoSTage already has for it
 
+**Where they went.** LIVE and METERS are real HoSTage pages now (`tools/ctrl49/README.md`, "The
+stage pages"): the same layouts, fed by the rack. SECTION is decided (it paints over the
+plug-in's own pointer, below) and waits, with LABELS, on two things only the keyboard and the
+owner's plug-ins can say: whether a picture uploaded while a page runs draws, and how fast it goes
+up (the screen lab's upload probe), and how the panel scan does on real plug-ins.
+
 **Live.** The arpeggiator is per part (`ArpSettings` in `CE/src/Performance/PatternModel.h`), and
 the step lane is already there in full: velocities, octaves, ratchets, chance, ties, each cycled
 on the lane's length, and the engine reports the step that last sounded "for the UI playhead"

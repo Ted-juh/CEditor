@@ -304,6 +304,44 @@ int main()
                "a 2.5 s loading page is redrawn six times with keepalives, never 900 ms without one");
     }
 
+    {   // --- a PNG uploaded while the page runs ------------------------------------------------
+        struct Recorder final : IControllerOutput
+        {
+            std::vector<Bytes> frames;
+            void sendSysEx (const Bytes& frame) override { frames.push_back (frame); }
+        } out;
+        Ctrl49SessionOptions options;
+        options.loadingMilliseconds = 0;
+        int slept = 0;
+        options.sleep = [&slept] (int ms) { slept += ms; };
+        Ctrl49Session session (out, Bytes (100, static_cast<std::uint8_t> ('-')), options);
+        Bytes png (512 * 3 + 7, static_cast<std::uint8_t> (0x5A));
+        bool refused = false;
+        try { session.uploadPng (0x0300, png); } catch (const std::logic_error&) { refused = true; }
+        check (refused, "an upload before the session is ready is refused, not sent");
+
+        session.start();
+        const auto before = out.frames.size();
+        slept = 0;
+        const auto sent = session.uploadPng (0x0300, png);
+        const std::vector<Bytes> live (out.frames.begin() + (long) before, out.frames.end());
+        session.stop();
+
+        const std::vector<Ctrl49Session::PngAsset> assets { { 0x0300, png } };
+        const auto startup = Ctrl49Session::buildStartupSequence (Bytes (100, static_cast<std::uint8_t> ('-')), assets);
+        const auto expected = Ctrl49Session::buildPngUpload (0x0300, png);
+        int inStartup = 0;
+        for (const auto& step : startup)
+            for (const auto& frame : expected)
+                inStartup += step.frame == frame ? 1 : 0;
+        check (sent == expected.size() && expected.size() == 6,
+               "1543 bytes and a NUL go as a begin, four chunks of at most 512 and an end");
+        check (inStartup == (int) expected.size(), "the same frames an asset gets in the startup sequence");
+        check (std::vector<Bytes> (live.begin(), live.begin() + (long) std::min (live.size(), expected.size())) == expected,
+               "sent in order, nothing between them on one thread");
+        check (slept == 2 * (int) expected.size(), "at the startup sequence's pace, 2 ms a frame");
+    }
+
     std::cout << "-------------------\n"
               << (failures == 0 ? "ALL PASS" : std::to_string (failures) + " FAILED") << std::endl;
     return failures == 0 ? 0 : 1;

@@ -57,14 +57,15 @@ Adding a new kind of page:
 
 `CE/web/test/ctrl49KnobPage.test.js` runs the page in Lua and checks each of these.
 
-### The stage pages: CUE, LAYERS, SOUNDCHECK, DISCOVER and CHANGES
+### The stage pages: CUE, LIVE, LAYERS, METERS, SOUNDCHECK, DISCOVER and CHANGES
 
-Five pages that are not knob pages, mocked up first in `screen-lab/feature-mockups` and now
-real: three a player reads on stage, two to go to between songs. Like the browser, none is on the
-keyboard until it is asked for — the **Cue**, **Layers**, **Soundcheck**, **Discover** and
-**Changes** switches on the app's CTRL49 screen card (`cueOnSurface`, `layersOnSurface`,
-`soundcheckOnSurface`, `discoverOnSurface`, `changesOnSurface`) — and then they follow the
-performance page in that order. Each is one call with one payload (`set_cue`, `set_layers`,
+Seven pages that are not knob pages, mocked up first in `screen-lab/feature-mockups` and now
+real: five a player reads or plays from on stage, two to go to between songs. Like the browser,
+none is on the keyboard until it is asked for — the **Cue**, **Live**, **Layers**, **Meters**,
+**Soundcheck**, **Discover** and **Changes** switches on the app's CTRL49 screen card
+(`cueOnSurface`, `liveOnSurface`, `layersOnSurface`, `metersOnSurface`, `soundcheckOnSurface`,
+`discoverOnSurface`, `changesOnSurface`) — and then they follow the performance page in that
+order. Each is one call with one payload (`set_cue`, `set_live`, `set_layers`, `set_meters`,
 `set_check`, `set_discover`, `set_changes`; `CE/src/ControlSurface/Ctrl49StagePages.h` has the
 byte layouts) where a knob page takes two. CUE is the mockups' Stage page, renamed because "stage
 pages" already names this group.
@@ -72,16 +73,19 @@ pages" already names this group.
 | Page | Shows | Encoders and pads |
 | --- | --- | --- |
 | CUE | the song on stage, N of M, and its tempo; the section playing with its bar and the bars left (or the song's notes when it has no sections); the song's clock against the time planned, and the set's; what comes next and how much of its rig has preloaded | E1 picks a song, pad 1 goes to it; Shift + Page still steps the set from any page |
+| LIVE | the rack's focused part's arpeggiator: its sixteen steps (velocity as a bar, ratchets as dots, octave and chance where they are not the plain ones) with the step that last sounded outlined; every part's zone over 49 keys; the keys held, in the colour of the part that plays them, and the notes the arp plays from them marked | E1 picks a step, E2-E5 turn its velocity (four a detent; 0 is a rest), octave, ratchets and chance (five a detent), E6 the gate, E7 the rate, E8 the mode, with off before UP; pad N turns step N of the half the cursor is in on or off |
 | LAYERS | every part's key zone over 49 keys, its velocity range and transpose, muted parts and parts fed by another part; layer groups (`L1 V`: group 1 by velocity) with each member's share and crossfades drawn as LayerRouter weighs them; the notes held now, on the zones that would sound them | E1 picks the part, E2-E6 turn its lowest key, highest key, transpose, lowest and highest velocity |
+| METERS | five parts and the master on strips: each part's level after its inserts and fader, left and right (the rack's own meters, the loudest peak since the last redraw), peak hold, a clip lamp, the fader on the meter's scale and in decibels, muted parts; the master's last five seconds | E1-E5 the faders of the parts shown, E6 the master, half a decibel a detent; E7 shows the next parts when there are more than five |
 | SOUNDCHECK | the set: each song ready, with problems, or not checked, its measured level and how long it took to load when last recalled (slow ones marked); the selected song's problems in the check's own words, and whether it loaded preloaded | E1 walks the set, E8 checks it again (once a second at most) |
 | DISCOVER | what you own and have never opened, nearest first to what you load (`unplayedLikeHabits`), eight at a time; a map of brightness against attack with YOU (the load-weighted centre) and the sounds you load most; the selected sound's likeness and which of your regulars it is nearest | E1 picks, E2 reaches eight further, E3 keeps the list to one kind, E4 keeps the sound as a favourite (clockwise) or lets it go; pad N auditions row N |
 | CHANGES | the focused part's sound against a save of it: each parameter that moved, from what to what; which save, and when | E1 listens anywhere between the save and now, E2 picks a change, E3 puts it back (the other way takes it back, one a turn), E4 walks back through the saves to the original |
 
 A zone edit goes through `setPartMidiRules`, a re-check through `checkSetlistSoundcheck`, a
 song change through `setlistGo`, a keep through `setLibraryUserMetadata`, an audition through
-`auditionRecord` and a change put back through `setParameter`: the commands the app's own
+`auditionRecord`, a fader through `setPartMixer` or `setMasterLevel`, an arp edit through
+`setPartArp` and a change put back through `setParameter`: the commands the app's own
 buttons send, so Stage Lock refuses the edits there and the edition decides whether there is a
-set (CUE and SOUNDCHECK need scenes and setlists; the other three are for anyone). DISCOVER says
+set (CUE and SOUNDCHECK need scenes and setlists; the other five are for anyone). DISCOVER says
 when it has too little to go on (fewer than five measured sounds ever loaded) rather than
 guessing, and reads the library at most every two seconds while it is up.
 
@@ -91,14 +95,30 @@ parameter blend, as `morphVersions` is: anything else done to the rig (a save, a
 parameter set, leaving the page) first puts back exactly what was there, so a save never
 captures the blend.
 
+LIVE draws the arp's lane as ArpSettings keeps it, every row read to the longest one's length
+(the engine cycles each row on its own). Without a drawn lane every step plays as played, and the
+page shows sixteen plain steps and says so; the first step edit draws one, all five rows sixteen
+long at velocity 100, so the app's step editor shows what the keyboard drew. The notes the arp
+plays come from the engine itself (`ArpEngine::takeNotes`: the notes sounding, and every note
+started since the page last asked, so a step shorter than a redraw still shows once), and the
+playhead is `patternStep`, which the app's grid already used. A lane longer than sixteen shows
+its first sixteen.
+
+METERS takes the levels the app's mixer is sent (`instrumentHostMeters`): the service keeps the
+loudest of the pump's 30 Hz drains until the page takes them at its 10, so no transient falls
+between two redraws. Peak hold (1.5 s), the clip lamps (3 s) and the master's history the page
+keeps itself, counted in frames from the host, so a redraw the keyboard makes on its own does not
+age them. It is the HoSTage Live mockups' Meters page; the levels are no longer simulated.
+
 A song's load time runs from `setlistGo` to the last processor of its rig being ready, and is
 kept beside its soundcheck. Over five seconds without preloading reads as slow, with "turn
 preload on" when the setlist preloads nothing.
 
 **The page script has grown with them.** `Hostage_MultiKnob.lua` was 9 KB on `main` and is
-40.6 KB with all five (47 KB with the knob page work above), more than the slim stress builds (30-39 KB) that the mockups use to find
-the keyboard's limit. [`hardware-checklist.md`](hardware-checklist.md) is how to find out
-whether it fits.
+about 61 KB now, with all seven and the knob page work above. HoSTage uploads it without
+comments and indentation (`Ctrl49LuaStrip.h`): about 42 KB, inside the 58 KB Rig full build that
+ran on the keyboard.
+[`hardware-checklist.md`](hardware-checklist.md) is how to find out how far it can grow.
 
 Checks: `node --test test/ctrl49Preview.test.js` (payload bytes, and that every function the
 broker calls exists in the page) and `node browser-checks/ctrl49Screen.mjs` (every scene runs
@@ -419,6 +439,20 @@ What to watch, and write down:
 
 Raise one encoder at a time from zero; E6 last.
 
+**Upload** (`Hostage_Upload.lua`, `Ctrl49ScreenLab upload <screen-lab dir>`, launcher choice 3)
+— pictures uploaded while a page runs. Every image on the keyboard so far went up before the
+page started; two pages HoSTage could have need them made and sent later: SECTION (a plug-in's
+own window, cut out by the panel scan, uploaded when its part comes up) and LABELS (every word
+drawn in the app's own typeface, uploaded when the set changes). The probe keeps the page
+redrawing ten times a second from one thread and uploads six PNGs from another, 2 KB to 106 KB
+(`Ctrl49Session::uploadPng` sends a frame at a time and lets go of the cable between them, so
+the redraws and the keepalive get through), then has the page decode each and show a piece of it
+in a row of its own. The console prints each upload's time, its rate and how many redraws went
+out during it; the keyboard shows whether each picture decoded and drew. It answers three things
+at once: how fast a picture goes up, whether the screen keeps moving meanwhile, and whether an
+image decoded after the page has been running draws at all (no page has done that on the keyboard
+yet, which may be what the stress page's blocks ran into).
+
 Everything the tool sends is built in `CE/src/ControlSurface/Ctrl49ScreenLab.h` (tested by the
 `Ctrl49ScreenLab` ctest). `npm run test:screen-lab` in `CE/web` renders all six pages in the
 editor's draw-API shim from the same bytes (`CTRL49_LAB_SHOTS=<dir>` writes PNGs of them), so a
@@ -513,6 +547,15 @@ minutes; a crash or a hang is a line in the summary. Do not cover or move the sc
 The self-test passes under Wine with the window captured from the screen; on Windows itself
 `PrintWindow` is tried first. Not yet run on the owner's plug-ins.
 
+**What a HoSTage SECTION page waits on.** The page itself is decided (the HoSTage Live mockup's
+Section page, painting over each knob's cap: `scan.json` now carries each knob's cap and pointer
+colours). Two things stand between it and HoSTage, and neither can be settled without the
+keyboard or the owner's plug-ins: whether a picture uploaded after startup draws, and how long it
+takes (the screen lab's upload probe); and how the scan does on real plug-ins (`scan` above). With
+both, the scan moves into the plug-in worker (which already opens the editors), its results are
+kept beside the plug-in in the library, and the page uploads a section's picture when its part
+comes up. LABELS waits on the same probe: drawing the words in JUCE is the easy half.
+
 ## Still requires hardware (open Phase-3 measurements)
 
 [`hardware-checklist.md`](hardware-checklist.md) is the list to take to a CTRL49 now: HoSTage's
@@ -540,7 +583,7 @@ Rig full's 58 KB, the most decoded image memory Red Lead's 4,502 KiB, the busies
 280 calls at 15 a second (Motion, Effects) and Red Lead's Envelope at about 420 (some 6,300
 calls a second, mixed rectangles, sprites and text; more than the sprite-only figure above, so
 mixed pages cost less than sprites alone). Upload and startup took 2.8-4.6 s. HoSTage's page
-script (47 KB, 10 redraws a second) is well inside all of it.
+script (about 42 KB as uploaded, 10 redraws a second) is well inside all of it.
 
 **The largest page script: `Ctrl49ScreenLab size`.** 58 KB is only the largest tried. The
 protocol carries an object's size in 28 bits, so the limit is the keyboard's memory. The size

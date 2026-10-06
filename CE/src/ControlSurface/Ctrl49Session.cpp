@@ -247,6 +247,30 @@ void Ctrl49Session::stop()
     options_.log ("CTRL49 session stopped; keyboard watchdog may restore the normal screen.");
 }
 
+std::vector<Bytes> Ctrl49Session::buildPngUpload (std::uint16_t id, const Bytes& png)
+{
+    Bytes raw = png;
+    raw.push_back (0x00);
+    return buildObjectUpload (ObjectKey { kObjectTypePng, id }, raw);
+}
+
+std::size_t Ctrl49Session::uploadPng (std::uint16_t id, const Bytes& png)
+{
+    if (! ready_.load())
+        throw std::logic_error ("CTRL49 session is not ready");
+
+    const auto frames = buildPngUpload (id, png);
+    for (const auto& frame : frames)
+    {
+        {
+            std::lock_guard<std::mutex> lock (midiMutex_);
+            sendLocked (frame);
+        }
+        options_.sleep (2);     // the startup sequence's pace between upload frames
+    }
+    return frames.size();
+}
+
 void Ctrl49Session::callLua (const std::string& function, const Bytes& args, bool redraw)
 {
     if (! ready_.load())

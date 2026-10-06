@@ -15,6 +15,9 @@
 //   Ctrl49ScreenLab size                        how large a page script the keyboard takes: pages
 //                                               of real code, larger each time, until it refuses
 //                                               one, then the gap halved to the limit
+//   Ctrl49ScreenLab upload   <screen-lab dir>   PNGs uploaded while a page runs and redraws, each
+//                                               then decoded and shown: what Section and Labels
+//                                               would need, and how fast
 //
 // Every mode prints the keyboard's refusals as they arrive (each display command is answered:
 // out of memory, a Lua script error, ...), and preset mode counts its answers after the upload,
@@ -93,7 +96,8 @@ int usage()
 {
     std::printf ("usage: Ctrl49ScreenLab showcase|stress <tools\\ctrl49\\screen-lab folder> [--no-upload-keepalive]\n"
                  "       Ctrl49ScreenLab preset <name.ctrl49preset> [--check] [--no-upload-keepalive]\n"
-                 "       Ctrl49ScreenLab size [--no-upload-keepalive]\n");
+                 "       Ctrl49ScreenLab size [--no-upload-keepalive]\n"
+                 "       Ctrl49ScreenLab upload <tools\\ctrl49\\screen-lab folder>\n");
     return 2;
 }
 
@@ -168,6 +172,7 @@ struct Replies
 
 int runPreset (const std::filesystem::path& manifest, bool checkOnly, bool uploadKeepalive);
 int runSizeSweep (bool uploadKeepalive);
+int runUploadProbe (const std::filesystem::path& labDir);
 } // namespace
 
 namespace
@@ -346,6 +351,131 @@ int runPreset (const std::filesystem::path& manifest, bool checkOnly, bool uploa
 // refusal (out of memory, a Lua script error) fails it. Silence is neither: a keyboard that
 // answers nothing has stopped listening, and halving the gap over silence would find a limit
 // that is not there, so the sweep stops and says so.
+int runUploadProbe (const std::filesystem::path& labDir)
+{
+    // Smallest first: what a page of words would be, up to a whole section's picture and more.
+    // Each decodes into the buffer after its id, as every page that draws does.
+    const std::pair<const char*, std::uint16_t> files[] {
+        { "surface_atlas.png", 0x0300 }, { "rich_atlas.png", 0x0302 }, { "lab_bg.png", 0x0304 },
+        { "stress_textured.png", 0x0306 }, { "machined-metal/panels.png", 0x0308 }, { "logo_strip.png", 0x030A },
+    };
+    Bytes rawLua;
+    std::vector<Bytes> pngs;
+    try
+    {
+        rawLua = readFile (labDir / "Hostage_Upload.lua");
+        for (const auto& [name, id] : files)
+            pngs.push_back (readFile (labDir / name));
+    }
+    catch (const std::exception& error)
+    {
+        std::printf ("%s\n", error.what());
+        return 2;
+    }
+
+    HANDLE mutex = CreateMutexW (nullptr, TRUE, L"Local\\CEditor_CTRL49_Bridge");
+    if (mutex == nullptr || GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+        std::printf ("A CTRL49 bridge is already running (close HoSTage / CEditor first).\n");
+        if (mutex != nullptr) CloseHandle (mutex);
+        return 1;
+    }
+    SetConsoleCtrlHandler (consoleHandler, TRUE);
+
+    int exitCode = 0;
+    Replies replies;
+    try
+    {
+        const auto portId = Ctrl49WinMmOutput::findPort (Ctrl49WinMmOutput::kDefaultPortName);
+        if (! portId)
+            throw std::runtime_error ("output port 'CTRL49 USB' not found");
+        Ctrl49WinMmOutput output (*portId);
+        Ctrl49PrivateInput input;
+        input.setObserver ([&replies] (const Bytes& frame) { replies.observe (frame); });
+        logLine ("Opening hidden cable-2 capture...");
+        input.start (Ctrl49PrivateInput::discoverDevicePath());
+
+        Ctrl49SessionOptions options;
+        options.log = logLine;
+        options.loadingMilliseconds = 600;
+        Ctrl49Session session (output, rawLua, {}, options);
+        session.start();
+        std::this_thread::sleep_for (std::chrono::milliseconds (300));
+        logLine ("Page up. " + replies.summary());
+
+        // Ten redraws a second from a thread of its own, as HoSTage's broker sends them, so the
+        // upload has to share the cable with them.
+        std::atomic<bool> stopRedraws { false };
+        std::atomic<int> redrawsSent { 0 };
+        std::string redrawFailure;
+        std::thread redraws ([&]
+        {
+            int frame = 0;
+            while (! stopRedraws.load())
+            {
+                try
+                {
+                    ++frame;
+                    session.callLua ("set_frame", { (std::uint8_t) ((frame >> 8) & 0xFF), (std::uint8_t) (frame & 0xFF) }, true);
+                    ++redrawsSent;
+                }
+                catch (const std::exception& error)
+                {
+                    redrawFailure = error.what();
+                    return;
+                }
+                std::this_thread::sleep_for (std::chrono::milliseconds (100));
+            }
+        });
+
+        logLine ("Uploading six PNGs while the page redraws, smallest first; each is then decoded and shown "
+                 "in a row of its own. Watch the orange bar: it should keep moving.");
+        for (std::size_t i = 0; i < pngs.size() && ! g_quit.load(); ++i)
+        {
+            const auto& png = pngs[i];
+            const auto id = files[i].second;
+            replies.reset();
+            const auto redrawsBefore = redrawsSent.load();
+            const auto start = Clock::now();
+            const auto frames = session.uploadPng (id, png);
+            const auto ms = (int) millisecondsSince (start);
+            const auto during = redrawsSent.load() - redrawsBefore;
+            const auto kb = (int) ((png.size() + 1023) / 1024);
+            session.callLua ("show", { (std::uint8_t) i, (std::uint8_t) (id >> 8), (std::uint8_t) (id & 0xFF),
+                                       (std::uint8_t) (kb >> 8), (std::uint8_t) (kb & 0xFF),
+                                       (std::uint8_t) (std::min (ms, 65535) >> 8), (std::uint8_t) (std::min (ms, 65535) & 0xFF) },
+                             true);
+            std::this_thread::sleep_for (std::chrono::milliseconds (1500));
+            char line[200];
+            std::snprintf (line, sizeof line, "  %-20s %4d KB in %5d ms (%d KB/s, %zu frames); %d redraws went out during it (%d expected)",
+                           files[i].first, kb, ms, ms > 0 ? kb * 1000 / ms : 0, frames, during, ms / 100);
+            logLine (line);
+            logLine ("    " + replies.summary());
+            if (! session.failure().empty())
+                throw std::runtime_error (session.failure());
+        }
+        logLine ("Done. On the keyboard each row should have a piece of a picture beside its size. "
+                 "Write down which rows do. Ctrl+C to stop.");
+        while (! g_quit.load() && session.failure().empty() && redrawFailure.empty())
+            std::this_thread::sleep_for (std::chrono::milliseconds (100));
+        stopRedraws.store (true);
+        redraws.join();
+        if (! redrawFailure.empty())
+            throw std::runtime_error (redrawFailure);
+        session.stop();
+        input.stop();
+    }
+    catch (const std::exception& error)
+    {
+        std::printf ("ERROR: %s\n", error.what());
+        exitCode = 1;
+    }
+
+    ReleaseMutex (mutex);
+    CloseHandle (mutex);
+    return exitCode;
+}
+
 int runSizeSweep (bool uploadKeepalive)
 {
     HANDLE mutex = CreateMutexW (nullptr, TRUE, L"Local\\CEditor_CTRL49_Bridge");
@@ -449,6 +579,8 @@ int wmain (int argc, wchar_t** argv)
 {
     if (argc >= 2 && std::wstring (argv[1]) == L"size")
         return runSizeSweep (! (argc >= 3 && std::wstring (argv[2]) == L"--no-upload-keepalive"));
+    if (argc >= 3 && std::wstring (argv[1]) == L"upload")
+        return runUploadProbe (argv[2]);
     if (argc < 3)
         return usage();
 

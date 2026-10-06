@@ -24,7 +24,7 @@ is at the bottom.
 
 - [ ] The card says **Showing on the keyboard too**, and the keyboard shows the same page.
       If it says anything else, stop here: **write down** the card's text and its red line, if any.
-- [ ] The page script HoSTage uploads is 32 KB (the 47 KB file, sent without its comments and
+- [ ] The page script HoSTage uploads is 42 KB (the 62 KB file, sent without its comments and
       indentation). The stress test in section 2 has run (2026-10-05): the 58 KB Rig full build
       loaded and ran, so this should too. If it shows a Lua error or the stock screen comes back instead,
       **write down** exactly what it says.
@@ -209,6 +209,20 @@ a plug-in loaded and a control page assigned to it. On the keyboard:
 - [ ] Page Left / Right between two control pages: do the rings sweep to their new values over a
       moment, or jump at once? Either is fine; **write down** which.
 - [ ] DISCOVER (switch it on in the CTRL49 card): round dots on the map, YOU under its ring.
+- [ ] LIVE (switch **Live** on in the CTRL49 card; it comes right after the performance page, or
+      after CUE). Hold a chord: the keys light in the colour of the part whose zone they are in.
+      Turn knob 8 (the rightmost round knob) one step right: the title says ARP UP, and the part
+      shown starts to arpeggiate; the step that plays is outlined and moves, and the notes it plays
+      have a black dot. Turn knob 1 to step 3 and knob 2 left until the cell says REST: that step
+      goes silent. Press pad 3: it comes back. Turn knob 8 back left: ARP OFF.
+      **Write down** whether the outline keeps up with the beat or jumps, and whether the dots
+      show on fast steps.
+- [ ] METERS (switch **Meters** on in the CTRL49 card, then Page Right past LAYERS if that is on
+      too). Play: each part's two bars move in its colour, a white line holds the peak for a
+      moment, the master's history fills from the right. Turn knob 1: the first part's fader
+      value at the bottom changes half a decibel a step, and the app's mixer fader moves with it.
+      Turn knob 6: the master. Play loud enough to go over 0 dB: a red lamp over the strip.
+      **Write down** whether the bars keep up with the playing or lag, and anything cut off.
 - [ ] The browser: in the app's Sounds browser click **Browse on controller**. The keyboard shows
       eight sound names; the one under the cursor has a full ring, the others an empty one, and
       **no numbers** in any ring (it used to show 127 and 0). At the bottom: that sound's whole
@@ -234,6 +248,23 @@ bottom left: **EARLY** with an **F** and a **T** over two places for a square, a
       have a square under them, left to right (for example "F yes, T yes, F no, ...").
 - [ ] **Write down** the DEV number at the bottom right.
 - [ ] Press Ctrl+C in the prompt, then `notepad %TEMP%\stress-log.txt` and copy the whole log.
+
+## 8. Pictures uploaded while a page runs
+
+What a SECTION page (a plug-in's own window) and a LABELS page (words in the app's typeface)
+would need. Close CEditor, VIP and your DAW first. In the VS 2022 prompt, in your CEditor folder:
+
+    build\native\Release\Ctrl49ScreenLab.exe upload tools\ctrl49\screen-lab > %TEMP%\upload-log.txt 2>&1
+
+The keyboard shows UPLOAD PROBE, a counter and an orange bar under the header, and six empty
+rows. Over about fifteen seconds each row gets its size and time, and a piece of a picture beside
+them.
+
+- [ ] **Write down** whether the orange bar kept moving the whole time, or stopped while the
+      pictures went up (and for how long, roughly).
+- [ ] **Write down** which rows have a piece of a picture beside their size (1 at the top to 6).
+- [ ] Press Ctrl+C in the prompt, then `notepad %TEMP%\upload-log.txt` and copy the whole log
+      (each upload's KB, ms and redraws).
 
 ## What to send back
 

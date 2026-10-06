@@ -91,8 +91,18 @@ public:
     bool ready() const                { return ready_.load(); }
     std::string failure() const;
 
+    // A PNG uploaded while the page runs (the frames the startup sequence sends for an asset,
+    // with its NUL). Pure; exposed for tests.
+    static std::vector<Bytes> buildPngUpload (std::uint16_t id, const Bytes& png);
+
     // Live traffic — valid once ready().
     void callLua (const std::string& function, const Bytes& args, bool redraw);
+    // Uploads a PNG to the running page, which can then decode_image it: the pictures a page
+    // makes at run time (a plug-in's section, words drawn in the app's typeface). Sent a frame
+    // at a time, the cable released between frames, so the keepalive worker and live calls from
+    // other threads get it in between and the watchdog is fed however long the upload is.
+    // Blocking for the upload's length; returns the frames sent.
+    std::size_t uploadPng (std::uint16_t id, const Bytes& png);
     void setPadRgb (int pad, int red, int green, int blue);
     void setAllPadsRgb (int red, int green, int blue);
     void setActivePadBank (int bank);  // lights exactly one of the four bank LEDs

@@ -5,6 +5,7 @@ import { LuaFactory } from 'wasmoon';
 import { ScreenDrawApi } from '../src/CE_Application/screen/screenDrawApi.js';
 import showcaseLua from '../../../tools/ctrl49/screen-lab/Hostage_Showcase.lua?raw';
 import stressLua from '../../../tools/ctrl49/screen-lab/Hostage_Stress.lua?raw';
+import uploadLua from '../../../tools/ctrl49/screen-lab/Hostage_Upload.lua?raw';
 import surfaceAtlas from '../../../tools/ctrl49/screen-lab/surface_atlas.png?url';
 import richAtlas from '../../../tools/ctrl49/screen-lab/rich_atlas.png?url';
 import labBg from '../../../tools/ctrl49/screen-lab/lab_bg.png?url';
@@ -65,6 +66,9 @@ const assets = {
 // the stress page's uploads (Ctrl49ScreenLab.cpp): the flat and textured blocks, twice each
 assets[0x0250] = assets[0x0270] = await load(stressBlock);
 assets[0x0260] = assets[0x0278] = await load(stressTextured);
+// the upload probe's PNGs (Ctrl49ScreenLab.cpp, upload mode), as they arrive after startup
+const uploadAssets = { 0x0300: assets[0x0220], 0x0302: assets[0x0232], 0x0304: assets[0x0230],
+                       0x0306: assets[0x0260], 0x0308: assets[576], 0x030a: assets[0x0238] };
 
 async function page(source, strict = false, pageAssets = assets) {
   const api = new ScreenDrawApi(document.getElementById('screen').getContext('2d'), pageAssets);
@@ -129,6 +133,7 @@ window.lab = {
   envelope, showcaseFrame,
   showcase: await page(showcaseLua),
   stress: await page(stressLua),
+  upload: await page(uploadLua, true, uploadAssets),
   machined: await page(machinedLua, true),
   // How many distinct colours the screen shows: a page that failed to draw is one flat colour.
   colours() {

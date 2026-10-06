@@ -1,6 +1,6 @@
 @echo off
 REM Double-click launcher for the CTRL49 screen lab: the showcase of baked-PNG pages, or the
-REM stress page that measures what the screen can draw. Connect the CTRL49 and close VIP,
+REM stress page that measures what the screen can draw, or the upload probe. Connect the CTRL49 and close VIP,
 REM your DAW and HoSTage / CEditor first (only one program can own the screen).
 
 setlocal
@@ -18,8 +18,9 @@ if not exist "%EXE%" (
 
 echo   1  Showcase   - five pages: faders, pads, sequencer, envelope, meters
 echo   2  Stress     - raise the drawing load until the screen stutters
-choice /c 12 /n /m "Which one? [1/2] "
-if errorlevel 2 (set "MODE=stress") else (set "MODE=showcase")
+echo   3  Upload     - pictures uploaded while a page runs (what Section and Labels need)
+choice /c 123 /n /m "Which one? [1/2/3] "
+if errorlevel 3 (set "MODE=upload") else if errorlevel 2 (set "MODE=stress") else (set "MODE=showcase")
 
 "%EXE%" %MODE% "%HERE%screen-lab"
 
