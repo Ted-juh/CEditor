@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <map>
 #include <optional>
 #include <string>
@@ -655,6 +656,64 @@ inline Overlay overlayFor (const Param& p, const std::optional<Box>& box)
         if (box->w * 10 >= box->h * 22) return Overlay::hfader;
     }
     return Overlay::knob;
+}
+
+/** A knob's own colours, read off the scan's picture, so the keyboard page can paint over the
+    plug-in's pointer (frozen in the picture where it was when the scan took it) and draw one of
+    its own at the live value. `cap` is the middle, by brightness, of eight samples a quarter of
+    the knob's side out from its centre: the pointer covers at most one or two of them, so it
+    cannot win. `pointer` is the pixel within 0.4 of the side that differs most from the cap
+    (bright on a dark cap, dark on a light one). The page paints a disc of 0.44 of the side in
+    `cap`. Nothing for a box under 8 px or outside the picture. */
+struct KnobColours
+{
+    std::uint32_t cap = 0, pointer = 0;   // 0xRRGGBB
+};
+
+inline std::optional<KnobColours> knobColours (const Image& image, const Box& box)
+{
+    const int side = std::min (box.w, box.h);
+    if (! image.valid() || side < 8 || box.x < 0 || box.y < 0 || box.right() > image.width || box.bottom() > image.height)
+        return std::nullopt;
+    const double cx = box.x + box.w / 2.0, cy = box.y + box.h / 2.0;
+    const auto rgb = [&] (int x, int y) { return image.at (std::clamp (x, 0, image.width - 1), std::clamp (y, 0, image.height - 1)) & 0xFFFFFFu; };
+    const auto sum = [] (std::uint32_t c) { return (int) ((c >> 16) & 0xFF) + (int) ((c >> 8) & 0xFF) + (int) (c & 0xFF); };
+
+    std::array<std::uint32_t, 8> samples {};
+    const double r = side / 4.0;
+    for (int k = 0; k < 8; ++k)
+    {
+        const double a = k * 3.14159265358979323846 / 4.0;
+        samples[(std::size_t) k] = rgb ((int) std::lround (cx + r * std::cos (a)), (int) std::lround (cy + r * std::sin (a)));
+    }
+    std::stable_sort (samples.begin(), samples.end(), [&] (auto a, auto b) { return sum (a) < sum (b); });
+    KnobColours out;
+    out.cap = samples[4];
+
+    const auto distance = [&] (std::uint32_t c)
+    {
+        int d = 0;
+        for (int s = 0; s < 24; s += 8) d += std::abs ((int) ((c >> s) & 0xFF) - (int) ((out.cap >> s) & 0xFF));
+        return d;
+    };
+    const double reach = side * 0.4;
+    int best = -1;
+    for (int y = (int) std::floor (cy - reach); y <= (int) std::ceil (cy + reach); ++y)
+        for (int x = (int) std::floor (cx - reach); x <= (int) std::ceil (cx + reach); ++x)
+        {
+            const double dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+            if (dx * dx + dy * dy > reach * reach) continue;
+            const auto c = rgb (x, y);
+            if (const int d = distance (c); d > best) { best = d; out.pointer = c; }
+        }
+    return out;
+}
+
+inline std::string jsonColour (std::uint32_t rgb)
+{
+    char text[8];
+    std::snprintf (text, sizeof text, "#%06X", (unsigned) (rgb & 0xFFFFFFu));
+    return std::string ("\"") + text + "\"";
 }
 
 // --- 4. pages ------------------------------------------------------------------------------------

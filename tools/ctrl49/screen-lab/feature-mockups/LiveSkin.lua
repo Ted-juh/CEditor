@@ -384,6 +384,12 @@ local function draw_section ()
                 draw_image(BUF, TINT, cx - half, cy - half, L.arc[1] + col * L.arc[3], L.arc[2] + row * L.arc[3],
                            L.arc[3], L.arc[3], colour)
             end
+            -- the plug-in's own cap and pointer show where the value was when the scan took the
+            -- picture: paint the cap over in its own colour, and draw the pointer where it is now
+            tint("cap", cx - 20, cy - 20, c.cap)
+            local pf = floor(v * (L.ptr[4] - 1) / 127 + 0.5)
+            draw_image(BUF, TINT, cx - floor(L.ptr[3] / 2), cy - floor(L.ptr[3] / 2), L.ptr[1] + (pf % L.ptr[5]) * L.ptr[3],
+                       L.ptr[2] + floor(pf / L.ptr[5]) * L.ptr[3], L.ptr[3], L.ptr[3], c.ptr)
             arc(L.arc[4] - 1, T.track)
             if f > 0 then arc(f, accent) end
             tint("dot_big", cx + D.tip[v * 2 + 1] - 4, cy + D.tip[v * 2 + 2] - 4, accent)

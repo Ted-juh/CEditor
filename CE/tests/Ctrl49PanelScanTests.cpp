@@ -198,6 +198,32 @@ int main()
         check (scan::overlayFor (param (1, "x"), std::nullopt) == scan::Overlay::knob, "unplaced and continuous: a knob");
     }
 
+    {   // --- a knob's colours, for painting over its pointer ----------------------------------
+        // a 40 px knob at (10,10) on a grey ground: a dark cap of radius 18 and a light pointer
+        // from the centre up and to the right, drawn the way the fixture draws one
+        const auto knob = [] (std::uint32_t ground, std::uint32_t cap, std::uint32_t pointer)
+        {
+            scan::Image img (60, 60, ground);
+            for (int y = 0; y < 60; ++y)
+                for (int x = 0; x < 60; ++x)
+                    if ((x + 0.5 - 30) * (x + 0.5 - 30) + (y + 0.5 - 30) * (y + 0.5 - 30) <= 18 * 18) img.at (x, y) = cap;
+            for (int t = 0; t <= 15; ++t)
+                for (int w = -1; w <= 1; ++w)
+                    img.at (30 + (int) std::lround (t * 0.7071) + w, 30 - (int) std::lround (t * 0.7071)) = pointer;
+            return img;
+        };
+        const auto dark = scan::knobColours (knob (0x505050u, 0x202428u, 0xF0E0A0u), { 10, 10, 40, 40 });
+        check (dark && dark->cap == 0x202428u && dark->pointer == 0xF0E0A0u, "a dark cap and a light pointer are told apart");
+        const auto light = scan::knobColours (knob (0x505050u, 0xD8D8D0u, 0x101010u), { 10, 10, 40, 40 });
+        check (light && light->cap == 0xD8D8D0u && light->pointer == 0x101010u, "a dark pointer on a light cap is the one furthest from the cap");
+        // the pointer lying across a sample point does not move the cap: put it on the 45° sample
+        const auto across = scan::knobColours (knob (0x505050u, 0x30343Au, 0xFFFFFFu), { 10, 10, 40, 40 });
+        check (across && across->cap == 0x30343Au, "the pointer covering a sample does not become the cap");
+        check (! scan::knobColours (knob (0, 1, 2), { 10, 10, 6, 6 }), "under 8 px: no colours");
+        check (! scan::knobColours (knob (0, 1, 2), { 40, 40, 30, 30 }), "a box past the picture's edge: no colours");
+        check (scan::jsonColour (0xFFDC3Cu) == "\"#FFDC3C\"", "colours are written #RRGGBB");
+    }
+
     {   // --- reading order and pages ---------------------------------------------------------
         std::vector<std::optional<scan::Box>> boxes {
             scan::Box { 200, 12, 40, 40 },   // 0: top row, right

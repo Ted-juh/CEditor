@@ -90,6 +90,17 @@ From the parameter, then the shape of its box:
 | continuous | width ≥ 2.2 × height | `hfader` |
 | continuous | otherwise | `knob` (a ring) |
 
+**A knob's colours.** The picture is a photograph, so the plug-in's own painted pointer stays where
+it was when the scan took it while the value moves. For every placed knob the scan reads two
+colours off the picture so the page can paint over it: `cap`, the middle by brightness of eight
+samples a quarter of the knob's side out from its centre (the pointer covers one or two of them, so
+it cannot win), and `pointer`, the pixel within 0.4 of the side that differs most from the cap
+(bright on a dark cap, dark on a light one). The page tints a disc of 0.44 of the side in `cap`
+over the photographed knob and draws its own pointer in `pointer` at the live value, with the ring
+around it (`scan::knobColours`; the HoSTage Live mockup's Section page shows it). A knob whose cap
+is a gradient or a texture shows the painted disc; for those the scan could keep its three
+photographs of the knob (both ends and the middle) as a small filmstrip instead.
+
 ### 4. Keyboard pages
 
 A section's controls are put in **reading order**: placed controls by rows, top to bottom (a
@@ -163,13 +174,14 @@ Fixture Synth  640x400   3 (units)     9         4       4     1         ok
   "grouping": "units|names|order",
   "controls": [ { "id": 12, "title": "Cutoff", "units": "Hz", "stepCount": 0,
                   "section": 1, "how": "finder|diff|none", "kind": "knob",
-                  "box": [x, y, w, h] } ],
+                  "box": [x, y, w, h], "cap": "#3F424B", "pointer": "#D9CDB0" } ],
   "sections": [ { "name": "Filter", "pages": [ { "box": [x, y, w, h],
                   "controls": [12, 13, 14] } ] } ]
 }
 ```
 
-`box` is in editor pixels, absent when `how` is `none`. Control ids are the plug-in's VST3
+`box` is in editor pixels, absent when `how` is `none`; `cap` and `pointer` are there for placed
+knobs only. Control ids are the plug-in's VST3
 parameter ids, so a later step (HoSTage) can key everything by the plug-in's class id and drive
 the parameters directly.
 
@@ -178,7 +190,8 @@ the parameters directly.
 `Ctrl49PanelScanFixture.vst3` is a small VST3 built with the tool (no JUCE, GDI drawing): an
 editor of known layout with three units (Osc, Filter, Amp), nine controls (knobs, a fader, a
 button, a selector), a finder that answers for some of them only, and one control drawn nowhere.
-`selftest` scans it and checks that the units, boxes, kinds and pages come out as built. It runs
+`selftest` scans it and checks that the units, boxes, kinds and pages come out as built, and that each knob the finder
+placed reads as the fixture's cap (`#787C88`) and pointer (`#FFDC3C`). It runs
 before any real plug-in so a failure on the owner's machine is the tool's, not a plug-in's.
 
 ## Risks, and what the scan does about them

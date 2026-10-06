@@ -213,8 +213,8 @@ largest yet: the invented set, library and history are written into it.
 | Meters | every part's level, left and right, peak hold, clip, the fader; the master and its last six seconds | fader 1 | 2 | 3 | 4 | 5 | master | | |
 
 `hostage-live/preview-*.png` are its pages, and five moments: `1-live-chord` (the arp in chord
-mode, every note of the chord marked), `2-section-cutoff` (CUTOFF turned up: see the plug-in's
-pointer below), `3-labels-accents` (a song whose name the firmware's fonts cannot write),
+mode, every note of the chord marked), `2-section-cutoff` (CUTOFF turned up: the plug-in's
+pointer follows, see below), `3-labels-accents` (a song whose name the firmware's fonts cannot write),
 `3-labels-amber` (every word recoloured) and `4-meters-clipping` (every fader at the top).
 
 These four push the screen in the directions the measurements left room in: rectangles and
@@ -238,13 +238,17 @@ the overlays drawn by the keyboard. The picture here is an invented plug-in's fi
 painted at the size the scan would scale it to, with its own lettering (Liberation Sans, so it
 reads as somebody else's GUI). The controls are numbered in the scan's reading order, so CTRL49
 knob 1 is the top-left control; the one the scan found by name only (KEY TRACK) has a cell in the
-strip under the picture. **What the mockup shows on purpose:** the picture is a photograph, so
-the plug-in's own painted pointer stays where it was when the scan took it, and only the ring is
-live (`preview-2-section-cutoff.png`). Two ways out, both for the next step: the scan already
-photographs every knob at both ends and the middle, so it could keep the knob's own pictures as
-a small filmstrip and the page would draw the plug-in's own knob turning; or the page paints the
-knob's cap over in its own colour and draws a pointer. The first is the better picture, the
-second the smaller upload.
+strip under the picture. **The plug-in's own pointer.** The picture is a photograph, so the
+pointer the plug-in painted would stay where it was when the scan took it while the value moved.
+The page paints over it: the scan reads each knob's cap and pointer colours off its picture
+(`cap` and `pointer` in `scan.json`, by the rule in the [spec](../../../../docs/design/ctrl49-panel-scan.md#3-the-kind-of-overlay)),
+the page tints a round cap sprite in the cap's colour over the photographed one and draws a
+32-frame pointer in the pointer's colour at the live value (`preview-2-section-cutoff.png`: CUTOFF's pointer has moved with it). That
+costs one sprite and 32 pointer frames in `tint.png`, about 4 KB of upload. The alternative, kept
+for a plug-in whose caps are not flat (a gradient or a texture shows the painted disc): the scan
+already photographs every knob at both ends and the middle, so it could keep them as a small
+filmstrip per knob and the page would turn the plug-in's own knob. A better picture, a larger
+upload.
 
 **Labels.** The text budget is the tight one (Discover and Changes use about a third of it), and
 the firmware's fonts come in a few sizes and only the letters they have. Here every word is a
@@ -269,11 +273,13 @@ same loop as Layers), each part with its own fall-off.
 | File | Size | PNG id | Buffer | Holds |
 |---|---|---|---|---|
 | `panels.png` | 480 x 544 | 576 | 577 | the Live and Meters backgrounds |
-| `tint.png` | 480 x 1032 | 578 | 579 | 8-bit grey coverage: 32 frames of a knob's ring (y 0), dots, a badge and the lit keys (y 320), every word of Labels (y 370) |
+| `tint.png` | 480 x 1352 | 578 | 579 | 8-bit grey coverage: 32 frames of a knob's ring (y 0), 32 pointer frames (y 320), dots, a badge, the cap and the lit keys (y 640), every word of Labels (y 690) |
 | `parts.png` | 480 x 544 | 580 | 581 | the Section background (the plug-in's picture) and the Labels background |
 
-Uploads total about 94 KB; decoded, 3,975 KiB at four bytes a pixel, under the 4.5 MB that ran
-on the keyboard. `Skin.lua` is 42 KB.
+Uploads total about 98 KB; decoded, 4,575 KiB at four bytes a pixel, well under the 8 MB that
+ran on the keyboard. `Skin.lua` is 42 KB as written; HoSTage strips comments and indentation when
+it uploads a page (`CE/src/ControlSurface/Ctrl49LuaStrip.h`), which takes its own page from 47 KB
+to 32 KB.
 
 ## Making and checking them
 

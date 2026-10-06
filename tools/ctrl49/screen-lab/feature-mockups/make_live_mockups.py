@@ -60,9 +60,11 @@ ZONE = (8, 129, 464, 10)                 # a zone row: x, y, width, row pitch
 KB = (8, 160, 16, 39, 22)                # the keys: x, y, white key pitch, the mark's y on a white and a black key
 ARC = (0, 0, 64, 32, 7)                  # SECTION: the ring frames: x, y, size, frames, a row
 ARC_R, ARC_W = 28, 4
+PTR = (0, 320, 64, 32, 7)                # and the frames of a knob's own pointer, painted over its cap
+CAP_R = 19.5                             # the radius the page paints over: the plug-in's cap and pointer
 STRIP = (4, 236, 186)                    # the strip's first cell: x, y, a cell's width
 STRIPS, METER, HIST = (8, 34, 58, 56), (14, 52, 12, 138), (368, 100)
-SPRITE_Y, LABEL_Y = 320, 370
+SPRITE_Y, LABEL_Y = 640, 690
 
 # LIVE: the parts over the keys, and what the left hand holds bar by bar (bass, chord)
 ZONES = [  # name, low, high, colour (its sound's brightness, as on the rig's LAYERS)
@@ -356,6 +358,14 @@ def labels_bg():
 
 # --- the coverage atlas -----------------------------------------------------------------------------------
 
+def pointer_frame(k):
+    """A knob's pointer at frame k of PTR's frames, from 6 to 18 px out, as the plug-in draws its own."""
+    a = -150 + 300 * k / (PTR[3] - 1)
+    c = PTR[2] / 2
+    return mask(PTR[2], PTR[2], lambda d, s: d.line([pol(c * s, c * s, 6 * s, a), pol(c * s, c * s, 18 * s, a)],
+                                                     fill=255, width=int(3 * s)))
+
+
 def arc_frame(k):
     a1 = -150 + 300 * k / (ARC[3] - 1)
     c = ARC[2] / 2
@@ -367,6 +377,7 @@ SPRITES = {
     'badge': (26, SPRITE_Y, 13, 13),
     'key_c': (40, SPRITE_Y, 15, WHITE_H), 'key_d': (56, SPRITE_Y, 15, WHITE_H), 'key_e': (72, SPRITE_Y, 15, WHITE_H),
     'key_full': (88, SPRITE_Y, 15, WHITE_H), 'key_black': (104, SPRITE_Y, BLACK_W, BLACK_H),
+    'cap': (120, SPRITE_Y, 40, 40),
 }
 
 
@@ -375,7 +386,9 @@ def tint_atlas():
     atlas = Image.new('L', (W, height), 0)
     for k in range(ARC[3]):
         atlas.paste(arc_frame(k), (ARC[0] + (k % ARC[4]) * ARC[2], ARC[1] + (k // ARC[4]) * ARC[2]))
-    pieces = {'dot': dot(5, 2.2), 'dot_big': dot(9, 3.8), 'ring': ring(9, 3.4, 1.5), 'badge': dot(13, 6.3),
+    for k in range(PTR[3]):
+        atlas.paste(pointer_frame(k), (PTR[0] + (k % PTR[4]) * PTR[2], PTR[1] + (k // PTR[4]) * PTR[2]))
+    pieces = {'cap': dot(40, CAP_R), 'dot': dot(5, 2.2), 'dot_big': dot(9, 3.8), 'ring': ring(9, 3.4, 1.5), 'badge': dot(13, 6.3),
               'key_c': lit_key(False, True), 'key_d': lit_key(True, True), 'key_e': lit_key(True, False),
               'key_full': lit_key(False, False), 'key_black': black_key()}
     for name, im in pieces.items():
@@ -390,6 +403,27 @@ def tint_atlas():
 
 
 # --- the Lua and the manifest -------------------------------------------------------------------------
+
+def knob_colours(kind, box):
+    """What the scan reads off a knob in the picture so the page can paint its cap over and draw
+    the pointer itself, by the scan's own rule (scan::knobColours in Ctrl49PanelScan.h): the cap is
+    the middle, by brightness, of eight samples a quarter of the side out from the centre (the
+    pointer covers one or two of them, so it cannot win), the pointer the pixel within 0.4 of the
+    side that differs most from the cap."""
+    if kind != 'knob':
+        return {}
+    img = section_bg()
+    side = min(box[2], box[3])
+    cx, cy = box[0] + box[2] / 2, box[1] + box[3] / 2
+    samples = sorted((img.getpixel((round(x), round(y)))[:3] for x, y in (pol(cx, cy, side / 4, a) for a in range(0, 360, 45))),
+                     key=sum)
+    cap = samples[4]
+    reach = side * 0.4
+    pixels = [img.getpixel((x, y))[:3] for y in range(int(cy - reach), int(cy + reach) + 2)
+              for x in range(int(cx - reach), int(cx + reach) + 2) if (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= reach * reach]
+    pointer = max(pixels, key=lambda c: sum(abs(a - b) for a, b in zip(c, cap)))
+    return dict(cap='#%02X%02X%02X' % cap, ptr='#%02X%02X%02X' % pointer)
+
 
 def tips():
     out = []
@@ -409,7 +443,8 @@ def data():
                   for n, lo, hi, c in ZONES],
         'chords': CHORDS, 'steps': STEPS, 'rates': RATES, 'spb': SPB, 'modes': MODES, 'bpm': 112, 'offset': 0.42,
         'section': dict(name='FILTER', plugin=PLUGIN, index=3, count=6, segments=SEGMENTS, gap=SEG_GAP,
-                        controls=[dict(name=n, kind=k, fmt=f, box=b, tag=t) for n, k, f, b, _, t in CONTROLS]),
+                        controls=[dict(name=n, kind=k, fmt=f, box=b, tag=t, **knob_colours(k, b))
+                                  for n, k, f, b, _, t in CONTROLS]),
         'tip': tips(),
         'songs': songs, 'vocab': ['v%d' % (k + 1) for k in range(len(VOCAB))], 'kind': KIND,
         'meter_parts': [dict(name=n, short=SHORT[k], lo=lo, hi=hi, vlo=vlo, vhi=vhi, colour=c,
@@ -426,7 +461,7 @@ LAYOUT = {
     'dots': [410, 260, 12, 8, 4], 'bar': [6, 8, 4, 14], 'diag': [300, 255, 104, 12],
     'cell_label_y': 210, 'cell_value_y': 221, 'cell_bar_y': CELL_BAR_Y,
     'grid': list(GRID), 'zone': list(ZONE), 'kb': list(KB),
-    'arc': list(ARC), 'badge': 13, 'strip': list(STRIP),
+    'arc': list(ARC), 'ptr': list(PTR), 'badge': 13, 'strip': list(STRIP),
     'lright': 466, 'lname': [18, 33], 'lmeta': 90, 'lcard': [22, 121], 'lbeat': 168, 'lbars': [388, 129, 160],
     'lform': [18, 212, 444, 8], 'lnext': 244,
     'strips': list(STRIPS), 'meter': list(METER), 'hist': list(HIST),

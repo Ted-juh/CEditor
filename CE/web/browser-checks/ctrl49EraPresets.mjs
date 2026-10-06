@@ -136,7 +136,7 @@ const SPECS = {
   live: {
     root: 'feature-mockups', tables: ['T', 'L', 'S', 'D'],
     template: 'LiveSkin.lua', pages: ['live', 'section', 'labels', 'meters'], envelope: null,
-    atlases: { 'panels.png': [480, 544], 'tint.png': [480, 1032], 'parts.png': [480, 544] },
+    atlases: { 'panels.png': [480, 544], 'tint.png': [480, 1352], 'parts.png': [480, 544] },
     // the arp's playhead and the keys, the beat on the stage view, the meters
     moving: [[0, [0, 2, 4, 6, 8], 3], [2, [0, 10, 20, 30, 40], 2], [3, [0, 4, 8, 12, 16], 4]],
     // the fastest rate in every mode with every step ratcheted, every control at both ends, every

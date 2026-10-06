@@ -605,6 +605,7 @@ struct Control
     std::string how = "none";      // finder | diff | none
     std::string why;               // when none: what the diff saw
     scan::Overlay kind = scan::Overlay::knob;
+    std::optional<scan::KnobColours> colours;   // a placed knob's cap and pointer, off the picture
     int section = -1, page = -1, knob = -1;
 };
 
@@ -777,6 +778,8 @@ std::string jsonResult (const Result& r, const fs::path& pluginFile)
           << ", \"section\": " << c.section << ", \"how\": " << scan::jsonString (c.how)
           << ", \"kind\": " << scan::jsonString (scan::overlayName (c.kind));
         if (c.box) j << ", \"box\": " << scan::jsonBox (*c.box);
+        if (c.colours) j << ", \"cap\": " << scan::jsonColour (c.colours->cap)
+                         << ", \"pointer\": " << scan::jsonColour (c.colours->pointer);
         if (! c.why.empty()) j << ", \"why\": " << scan::jsonString (c.why);
         j << " }" << (i + 1 < r.controls.size() ? "," : "") << "\n";
     }
@@ -863,6 +866,15 @@ int checkFixture (const Result& r)
             const bool centred = std::abs (b.centreX() - drawn.centreX()) <= drawn.w / 4.0 && std::abs (b.centreY() - drawn.centreY()) <= drawn.h / 4.0;
             ok = ok && centreInside && centred && within && clearOfScope;
             what += ", box " + scan::jsonBox (b) + " on " + scan::jsonBox (drawn);
+            // the fixture's knobs are a flat cap (120,124,136) and a yellow pointer (255,220,60);
+            // a finder box is the knob's own, so its colours must be read exactly
+            if (got->kind == scan::Overlay::knob && got->how == "finder")
+            {
+                const bool colours = got->colours && got->colours->cap == 0x787C88u && got->colours->pointer == 0xFFDC3Cu;
+                ok = ok && colours;
+                what += got->colours ? ", cap " + scan::jsonColour (got->colours->cap) + " pointer " + scan::jsonColour (got->colours->pointer)
+                                     : std::string (", no colours");
+            }
         }
         what += " (got " + got->how + ", " + scan::overlayName (got->kind) + (got->why.empty() ? "" : ", " + got->why) + ")";
         check (ok, what);
@@ -1247,6 +1259,8 @@ int scanOne (const fs::path& plugin, const fs::path& outDir, bool noDiff, bool f
     for (auto& c : r.controls)
     {
         c.kind = scan::overlayFor (c.param, c.box);
+        if (c.kind == scan::Overlay::knob && c.box)
+            c.colours = scan::knobColours (r.picture, *c.box);
         boxes.push_back (c.box);
     }
     for (size_t s = 0; s < r.grouped.sections.size(); ++s)
