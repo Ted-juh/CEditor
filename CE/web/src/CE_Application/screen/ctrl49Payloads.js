@@ -120,6 +120,27 @@ export function browseSlotViews(rows, cursorRowInWindow, columns = 12) {
   });
 }
 
+// kMaxBrowseLineCharacters in Ctrl49RackDisplay.h: the most of the current sound the strip shows.
+export const MAX_BROWSE_LINE_CHARACTERS = 48;
+
+/** buildBrowseStatePayload: the browse page's set_values. The nine bytes as rackStatePayload
+    gives them (the cursor row's ring full), then [9] 7 (the browser) [10] 0 [11] 4 [12] 0 [13] 0,
+    eight empty value texts (so the rings carry no numbers), and the current sound for the strip. */
+export function browseStatePayload(cursorRow, slots, current) {
+  const out = rackStatePayload(cursorRow, slots);
+  out.push(7, 0, 4, 0, 0);
+  for (let i = 0; i < 8; i++) out.push(0);
+  appendString(out, current ?? '', MAX_BROWSE_LINE_CHARACTERS);
+  return out;
+}
+
+/** browseLineForDisplay: "Wool Pad - STAGE KEYS"; the name alone when there is no detail. */
+export function browseLineForDisplay(row) {
+  const name = String(row?.name ?? '');
+  const detail = String(row?.detail ?? '');
+  return (detail ? `${name} \u00B7 ${detail}` : name).replaceAll(' \u00B7 ', ' - ');
+}
+
 // surface::fitToColumns: printable ASCII per UTF-8 byte ('?' otherwise), and a name too long for
 // the columns ends in a '.' rather than being clipped silently.
 function fitToColumns(name, columns) {

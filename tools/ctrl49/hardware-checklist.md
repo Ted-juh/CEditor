@@ -172,8 +172,9 @@ is in `tools\ctrl49\screen-lab\feature-mockups\hostage-live\preview-*.png`.
       dot are the arp's notes. Turn knob 8 (the rightmost of the eight round knobs) right: the
       top line changes from ARP UP to ARP CHORD, and three keys at once get the dot.
 - [ ] **Section.** A plug-in's FILTER panel with purple rings around four knobs, numbered 1-8.
-      Turn knob 3: the ring around CUTOFF follows, and a tag CUTOFF with a value appears above it.
-      The plug-in's own white pointer does not move: that is expected (see the README).
+      Turn knob 3: the ring around CUTOFF follows, a tag CUTOFF with a value appears above it,
+      and the knob's own pale pointer turns with it (the page paints over the plug-in's one).
+      **Write down** whether you can see the edge of the painted-over disc on the knob.
 - [ ] **Labels.** A large song name, a section card with a big number, a coloured bar of the
       song's sections. Turn knob 1: the song changes (song 9 is "Über den Fluss", with the dots
       on the U). Turn knob 3 all the way right: every word turns amber.
@@ -208,6 +209,11 @@ a plug-in loaded and a control page assigned to it. On the keyboard:
 - [ ] Page Left / Right between two control pages: do the rings sweep to their new values over a
       moment, or jump at once? Either is fine; **write down** which.
 - [ ] DISCOVER (switch it on in the CTRL49 card): round dots on the map, YOU under its ring.
+- [ ] The browser: in the app's Sounds browser click **Browse on controller**. The keyboard shows
+      eight sound names; the one under the cursor has a full ring, the others an empty one, and
+      **no numbers** in any ring (it used to show 127 and 0). At the bottom: that sound's whole
+      name and where it comes from ("Wool Pad - STAGE KEYS"). Scroll: the full ring jumps to the
+      next sound at once, it does not sweep.
 - [ ] **Write down** anything cut off, any "The keyboard refused" line.
 
 ## What to send back

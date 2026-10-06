@@ -81,6 +81,21 @@ RackSlotViews browseSlotViews (const std::vector<surface::BrowseEntry>& rows,
     return views;
 }
 
+Bytes buildBrowseStatePayload (int cursorRow, const RackSlotViews& slots, const std::string& current)
+{
+    auto result = buildRackStatePayload (cursorRow, slots);
+    result.insert (result.end(), { 7, 0, 4, 0, 0 });    // [9] the browser, beat bytes, no page
+    for (std::size_t slot = 0; slot < 8; ++slot)
+        result.push_back (0);                              // no value texts: no numbers
+    appendString (result, current, kMaxBrowseLineCharacters);
+    return result;
+}
+
+std::string browseLineForDisplay (const surface::BrowseEntry& entry)
+{
+    return browseTitleForDisplay (entry.detail.empty() ? entry.name : entry.name + " \xC2\xB7 " + entry.detail);
+}
+
 std::string browseTitleForDisplay (const std::string& title)
 {
     static const std::string dot = " \xC2\xB7 ";

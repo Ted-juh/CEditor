@@ -42,6 +42,9 @@ local values = { 0, 0, 0, 0, 0, 0, 0, 0 }
 -- 0-127 positions as before.
 local value_texts = nil
 local page_number, page_count = 0, 0
+-- The browser (set_values kind 7) sends no value texts, so its rings carry no numbers (the
+-- full ring is the cursor; "127" and "0" said nothing), and the current sound for the strip.
+local browse_line = ""
 -- What each ring shows, which eases towards the value when it jumps (a page change, a preset
 -- loaded) if the keyboard redraws when asked (lua_widget_make_dirty): see ease().
 local shown = { 0, 0, 0, 0, 0, 0, 0, 0 }
@@ -54,7 +57,7 @@ local redraws_on_ask = false -- and a draw came with nothing new: asking works o
 -- (1-based, 0 when stopped) and beats per bar. The pages that are not knob pages set their own
 -- kind when the host sends them (set_check: 2, set_layers: 3, set_discover: 4, set_cue: 5,
 -- set_changes: 6);
--- set_values sets it back to a knob page.
+-- set_values sets it back to a knob page: 0 a control page, 1 the performance page, 7 the browser.
 local page_kind = 0
 local beat = 0
 local beats_per_bar = 4
@@ -205,7 +208,7 @@ function set_values(args)
         values[slot] = get_byte(args, slot)
     end
     page_kind = get_byte(args, 9)
-    if page_kind > 1 then page_kind = 0 end
+    if page_kind > 1 and page_kind ~= 7 then page_kind = 0 end
     beat = get_byte(args, 10)
     beats_per_bar = get_byte(args, 11)
     if beats_per_bar < 1 then beats_per_bar = 4 end
@@ -213,12 +216,14 @@ function set_values(args)
     -- a control page's extension (Ctrl49RackDisplay.h): the page number, then each value's text
     value_texts = nil
     page_number, page_count = 0, 0
+    browse_line = ""
     if #args > 13 then
         page_number = get_byte(args, 12)
         page_count = get_byte(args, 13)
         value_texts = {}
         local i = 14
         for slot = 1, 8 do value_texts[slot], i = read_string(args, i) end
+        if page_kind == 7 then browse_line = read_string(args, i) end
     end
 end
 
@@ -907,11 +912,12 @@ end
 
 -- --- the knob pages -------------------------------------------------------------------------------
 
--- A label's state mark, taken off: "!" a control that is not connected (a control page), "*" a
+-- A label's state mark, taken off: "!" a control that is not connected (a control page) or a
+-- sound that cannot load (the browser), "*" a
 -- clip running and ">" one waiting (the performance page). Returns the name and its symbol.
 local function unmark(label)
     local c = label:sub(1, 1)
-    if page_kind == 0 and c == "!" then return label:sub(2), "warn" end
+    if (page_kind == 0 or page_kind == 7) and c == "!" then return label:sub(2), "warn" end
     if page_kind == 1 and c == "*" then return label:sub(2), "run" end
     if page_kind == 1 and c == ">" then return label:sub(2), "wait" end
     return label, nil
@@ -930,7 +936,8 @@ local function ease()
     local moving = false
     for slot = 1, 8 do
         local d = values[slot] - shown[slot]
-        if redraws_on_ask and (d > EASE_FROM or d < -EASE_FROM) then
+        -- the browser's rings are its cursor, which has to be where you scrolled to at once
+        if redraws_on_ask and page_kind ~= 7 and (d > EASE_FROM or d < -EASE_FROM) then
             shown[slot] = shown[slot] + math.floor(d / 2 + 0.5)
             moving = true
         else
@@ -944,8 +951,10 @@ local function ask_redraw()
     if pcall and lua_widget_make_dirty then asked = pcall(lua_widget_make_dirty, WID) end
 end
 
--- What a knob shows in its ring: the plug-in's text when the host sent it, else the position.
+-- What a knob shows in its ring: the plug-in's text when the host sent it, else the position;
+-- on the browser, nothing.
 local function value_text(slot)
+    if page_kind == 7 then return "" end
     local text = ""
     if value_texts ~= nil then text = value_texts[slot] end
     if text == "" then text = tostring(values[slot]) end
@@ -980,10 +989,12 @@ local function draw_knobs(came_with_news)
         else
             draw_image(18, KNOB_DECODED_ID, x, y, 0, FRAME * shown[slot], FRAME, FRAME, is_active and ORANGE or DIM)
             local text = value_text(slot)
-            local box = VAL
-            if #text > 6 then box = VALS elseif #text > 3 then box = VALM end
-            text_data.set(box, { text = text, color = is_active and WHITE or GREY })
-            draw_text(box, x - 4, y + 20, 72, 26)
+            if text ~= "" then
+                local box = VAL
+                if #text > 6 then box = VALS elseif #text > 3 then box = VALM end
+                text_data.set(box, { text = text, color = is_active and WHITE or GREY })
+                draw_text(box, x - 4, y + 20, 72, 26)
+            end
             text_data.set(LBL, { text = name, color = is_active and WHITE or DARK })
             draw_text(LBL, x - 8, y + 66, 80, 14)
             if mark == "warn" then symbol("warn", x + 52, y, WARN)
@@ -998,6 +1009,11 @@ local function draw_knobs(came_with_news)
         local name = unmark(labels[active + 1] or "")
         if name ~= "" then say(STRIP, name .. "   " .. value_text(active + 1), WHITE, 16, 242, 324, 24) end
         say(ROWNUM, "PAGE " .. tostring(page_number) .. " / " .. tostring(page_count), DIM, 344, 244, 120, 20)
+    end
+    -- the browser's: the sound under the cursor, its whole name and where it comes from
+    if page_kind == 7 and browse_line ~= "" then
+        draw_rect(16, 238, 448, 1, ROW)
+        say(STRIP, browse_line, WHITE, 16, 242, 448, 24)
     end
 
     if page_kind == 1 then

@@ -49,6 +49,11 @@ Adding a new kind of page:
   first few draws, and only a redraw that arrives with nothing new from the host proves it. On a
   keyboard where it never does, rings are drawn at their value at once, never left half way.
 - **DISCOVER's map** draws round dots, and YOU's word clear of its ring.
+- **The browser** says it is the browser (`set_values` kind 7, `buildBrowseStatePayload`;
+  `browseStatePayload` in JS): its rings mark the cursor and carry no numbers (they read "127"
+  and "0"), they jump rather than ease so the cursor is where you scrolled to, a sound that cannot
+  load gets the warning sign, and the bottom strip has the sound under the cursor, its whole name
+  and where it comes from.
 
 `CE/web/test/ctrl49KnobPage.test.js` runs the page in Lua and checks each of these.
 

@@ -38,7 +38,7 @@ export const preview = $state({
 
   browse: {
     title: 'SOUNDS - Pads - 3/128',
-    names: 'Wool Pad\nGlass Choir\n!Missing Plugin Pad\nSlow Strings Ensemble\nNight Drive\nVapour\nFelt Keys\nAir',
+    names: 'Wool Pad | STAGE KEYS\nGlass Choir | DIVA\n!Missing Plugin Pad | ANALOG LAB\nSlow Strings Ensemble | STAGE KEYS\nNight Drive\nVapour | HW - JUNO-106\nFelt Keys\nAir',
     cursor: 1,
     columns: 12,
   },

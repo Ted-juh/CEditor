@@ -8,7 +8,8 @@ import {
   rackLabelPayload, rackStatePayload, performanceTitle, performanceLabelPayload,
   performanceStatePayload, browseSlotViews, soundcheckPayload, soundcheckLevelByte, layersPayload,
   readSoundcheckPayload, readLayersPayload, discoverPayload, readDiscoverPayload, cuePayload, readCuePayload,
-  changesPayload, readChangesPayload, readRackStateExtension,
+  changesPayload, readChangesPayload, readRackStateExtension, browseStatePayload, browseLineForDisplay,
+  MAX_BROWSE_LINE_CHARACTERS,
 } from '../src/CE_Application/screen/ctrl49Payloads.js';
 import { parseCalls } from '../src/ctrl49Preview/callScript.js';
 
@@ -75,6 +76,22 @@ test('browse: the cursor row takes a full knob, long names end in a dot', () => 
     { label: 'Lost Lead', assigned: true, resolved: false, position: 0 },
   ]);
   assert.equal(views[3].assigned, false, 'past the end of the list is empty');
+});
+
+// The golden in CE/tests/Ctrl49RackDisplayTests.cpp (buildBrowseStatePayload): change one, change
+// the other.
+test('browse: its set_values says it is the browser, with no numbers, and the strip line', () => {
+  const rows = [{ name: 'Wool Pad', detail: 'STAGE KEYS' }, { name: 'Glass Cathedral Extended', detail: 'STAGE KEYS' },
+    { name: 'Lost Lead', detail: 'DIVA', available: false }];
+  const views = browseSlotViews(rows, 1, 12);
+  assert.equal(browseLineForDisplay(rows[0]), 'Wool Pad - STAGE KEYS');
+  assert.equal(browseLineForDisplay({ name: 'Juno Brass', detail: 'HW \u00B7 JUNO-106' }), 'Juno Brass - HW - JUNO-106');
+  assert.equal(browseLineForDisplay({ name: 'Bare' }), 'Bare');
+  const bytes = browseStatePayload(1, views, 'Wool Pad - STAGE KEYS');
+  assert.deepEqual(bytes, [1, 0, 127, 0, 0, 0, 0, 0, 0, 7, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    21, ...ascii('Wool Pad - STAGE KEYS')]);
+  assert.deepEqual(bytes.slice(0, 9), rackStatePayload(1, views), 'the first nine bytes are the plain payload');
+  assert.equal(browseStatePayload(0, views, 'x'.repeat(60))[22], MAX_BROWSE_LINE_CHARACTERS);
 });
 
 // The same views and the same bytes as kGoldenSoundcheck and kGoldenLayers in

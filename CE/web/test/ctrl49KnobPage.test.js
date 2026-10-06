@@ -5,7 +5,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload } from '../src/CE_Application/screen/ctrl49Payloads.js';
+import {
+  rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload, browseSlotViews, browseStatePayload,
+} from '../src/CE_Application/screen/ctrl49Payloads.js';
 
 const source = fs.readFileSync(new URL('../../../tools/ctrl49/Hostage_MultiKnob.lua', import.meta.url), 'utf8');
 const SYMBOL_ROW = 80;          // make_symbols.py: the symbols sit under the 80 px logo
@@ -85,6 +87,29 @@ test('without the extension, the page reads the plain nine bytes as before', asy
   const texts = said(p.draw());
   assert.ok(texts.includes('88') && !texts.includes('2.40 kHz'), 'positions, as an older host sends');
   assert.ok(!texts.some((t) => t.startsWith('PAGE ')), 'and no bottom strip');
+  p.close();
+});
+
+test('the browser draws no numbers on its rings, the cursor full, and the current sound in the strip', async () => {
+  const p = await page();
+  const rows = [{ name: 'Wool Pad' }, { name: 'Glass Choir' }, { name: 'Lost Lead', available: false }];
+  const views = browseSlotViews(rows, 1, 12);
+  p.call('set_labels', rackLabelPayload('SOUNDS - 2/40', views));
+  p.call('set_values', browseStatePayload(1, views, 'Glass Choir - DIVA'));
+  for (let i = 0; i < 6; i++) p.draw();      // let any easing finish: the browser must not ease
+  const calls = p.draw();
+  const texts = said(calls);
+  assert.ok(!texts.includes('127') && !texts.includes('0'), 'no 127 under the cursor, no 0 under the others');
+  assert.ok(texts.includes('Glass Choir - DIVA'), 'the strip: the sound under the cursor');
+  assert.ok(texts.includes('Lost Lead') && !texts.includes('!Lost Lead'), 'one that cannot load loses its "!"');
+  assert.equal(symbols(calls).length, 1, 'and shows the warning symbol instead');
+  assert.equal(frameOf(calls, 1), 127, 'the cursor row is a full ring');
+  // scrolling moves the full ring at once: the cursor is where you scrolled to, not on its way
+  p.call('set_values', browseStatePayload(2, browseSlotViews(rows, 2, 12), 'Lost Lead - DIVA'));
+  const next = p.draw();
+  assert.equal(frameOf(next, 2), 127, 'the new cursor row is full on the first draw');
+  assert.equal(frameOf(next, 1), 0, 'and the old one empty');
+  assert.ok(!said(next).some((t) => t.startsWith('PAGE ')), 'the browser has no page number');
   p.close();
 });
 

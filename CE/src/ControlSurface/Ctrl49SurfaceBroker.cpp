@@ -1104,8 +1104,9 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     }
     else if (reducer.page() == layout.browse)
     {
-        // No new wire format and no new page on the device: a row of results is eight labels
-        // and eight knob positions, which is what this page already draws. See browseSlotViews.
+        // No new page on the device: a row of results is eight labels and eight knob positions,
+        // which is what this page already draws (see browseSlotViews), and set_values says it is
+        // the browser so the rings carry no numbers (buildBrowseStatePayload).
         const auto hardware = service.browseSurface();
         const auto cursor = service.browsePosition();
         const auto results = service.browseResults();
@@ -1117,8 +1118,10 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
         labels = buildRackLabelPayload (browseTitleForDisplay (surface::browseTitle (
                                             service.browseFacets(), cursor.index, (int) results.size())),
                                         views);
-        state = buildRackStatePayload (juce::jlimit (0, 7, cursor.index - cursor.firstVisible),
-                                       views);
+        const auto row = cursor.index - cursor.firstVisible;
+        state = buildBrowseStatePayload (juce::jlimit (0, 7, row), views,
+                                         row >= 0 && row < (int) rows.size() ? browseLineForDisplay (rows[(std::size_t) row])
+                                                                             : std::string());
     }
     else if (reducer.page() == performancePage)
     {

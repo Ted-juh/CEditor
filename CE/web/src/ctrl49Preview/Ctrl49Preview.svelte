@@ -16,6 +16,7 @@
   import { createCtrl49Screen } from '../CE_Application/screen/ctrl49Runtime.js';
   import {
     rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload, browseSlotViews,
+    browseStatePayload, browseLineForDisplay,
     layersPayload, soundcheckPayload, discoverPayload, cuePayload, changesPayload,
   } from '../CE_Application/screen/ctrl49Payloads.js';
   import { parseCalls } from './callScript.js';
@@ -77,13 +78,19 @@
           { name: 'set_values', bytes: performanceStatePayload(p.performance.active, p.performance.clips, p.performance.transport) },
         ];
       case 'browse': {
-        const rows = p.browse.names.split(/\r?\n/).filter((n) => n.trim()).slice(0, 8)
-          .map((n) => (n.startsWith('!') ? { name: n.slice(1), available: false } : { name: n, available: true }));
+        // "name | detail", one per line; "!" first for one that cannot load
+        const rows = p.browse.names.split(/\r?\n/).filter((n) => n.trim()).slice(0, 8).map((line) => {
+          const available = !line.startsWith('!');
+          const [name, detail = ''] = (available ? line : line.slice(1)).split('|').map((t) => t.trim());
+          return { name, detail, available };
+        });
         const views = browseSlotViews(rows, p.browse.cursor, p.browse.columns);
         return [
           { name: 'set_mode', bytes: [1] },
           { name: 'set_labels', bytes: rackLabelPayload(p.browse.title, views) },
-          { name: 'set_values', bytes: rackStatePayload(p.browse.cursor, views) },
+          // as the broker sends it: the page knows it is the browser, so no numbers on the rings
+          { name: 'set_values', bytes: browseStatePayload(p.browse.cursor, views,
+                                                           rows[p.browse.cursor] ? browseLineForDisplay(rows[p.browse.cursor]) : '') },
         ];
       }
       case 'layers': {
@@ -262,7 +269,7 @@
         <label class="field small">Columns <input type="number" min="1" max="40" value={preview.browse.columns} onfocus={selectAll}
                oninput={(e) => (preview.browse.columns = int(e.currentTarget.value, 1, 40))} /></label>
       </div>
-      <label class="field">Results, one per line (start with ! for one that cannot load)
+      <label class="field">Results, one per line: name | detail (start with ! for one that cannot load)
         <textarea rows="9" bind:value={preview.browse.names}></textarea></label>
 
     {:else if preview.scene === 'layers'}

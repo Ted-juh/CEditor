@@ -346,6 +346,24 @@ int main()
         check (state.size() == 9 && state[0] == 1 && state[2] == 127,
                "beside the nine-byte value payload, cursor row full");
 
+        // The browse page's own set_values: the rings with no numbers ("127" under the cursor
+        // and "0" under every other sound said nothing), the current sound in the strip.
+        // Shared with CE/web/test/ctrl49Preview.test.js (browseStatePayload).
+        check (browseLineForDisplay (rows[0]) == "Wool Pad - STAGE KEYS", "the strip's line: the name, then the detail");
+        check (browseLineForDisplay ({ "Juno Brass", "HW \xC2\xB7 JUNO-106", true, false }) == "Juno Brass - HW - JUNO-106",
+               "the detail's own dot made ASCII too");
+        check (browseLineForDisplay ({ "Bare", "", true, false }) == "Bare", "no detail, no dash");
+        const auto browse = buildBrowseStatePayload (1, views, "Wool Pad - STAGE KEYS");
+        const Bytes browseGolden { 1, 0, 127, 0, 0, 0, 0, 0, 0,   7, 0, 4,   0, 0,   0, 0, 0, 0, 0, 0, 0, 0,
+                                   21, 'W', 'o', 'o', 'l', ' ', 'P', 'a', 'd', ' ', '-', ' ',
+                                   'S', 'T', 'A', 'G', 'E', ' ', 'K', 'E', 'Y', 'S' };
+        check (browse == browseGolden, "the browser's set_values: nine bytes, kind 7, no page, no value texts, the strip's line");
+        check (Bytes (browse.begin(), browse.begin() + 9) == state,
+               "its first nine bytes are the plain payload, so a page that does not know kind 7 draws what it drew");
+        const auto longLine = buildBrowseStatePayload (0, views, std::string (60, 'x'));
+        check (longLine[22] == kMaxBrowseLineCharacters && longLine.size() == 23 + kMaxBrowseLineCharacters,
+               "the line caps at 48 characters");
+
         check (browseSlotViews ({}, 0, 12)[0].label.empty(),
                "an empty list draws an empty page rather than nothing at all");
     }

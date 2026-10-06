@@ -76,6 +76,26 @@ Bytes buildRackStatePayload (int activeSlot, const RackSlotViews& slots, int pag
 RackSlotViews browseSlotViews (const std::vector<surface::BrowseEntry>& rows,
                                int cursorRowInWindow, int columns);
 
+/** The most of the browser's current sound the bottom strip shows: "Wool Pad - STAGE KEYS". */
+inline constexpr std::size_t kMaxBrowseLineCharacters = 48;
+
+/** The browse page's set_values. The nine bytes give the cursor row the full ring and the rest
+    none, as before, but a ring's NUMBER meant nothing there: the keyboard drew "127" under the
+    cursor and "0" under every other sound. So the browser says it is the browser, and the page
+    draws no numbers:
+
+      [9] 7, the browser   [10] 0  [11] 4   [12] 0  [13] 0  (no page number)
+      8 x [0]: no value texts
+      [length][text]: the current sound, name and detail, for the bottom strip, ASCII ('?' for
+      any other byte), at most kMaxBrowseLineCharacters.
+
+    A page that does not know kind 7 reads the nine bytes and draws what it always drew. */
+Bytes buildBrowseStatePayload (int cursorRow, const RackSlotViews& slots, const std::string& current);
+
+/** The current sound as the strip writes it: its name, and its detail after " - " when it has
+    one, the computer's " · " made " - " as in the title. */
+std::string browseLineForDisplay (const surface::BrowseEntry& entry);
+
 /** The browser's title as the screen can draw it. surface::browseTitle separates its parts with
     " · " for the computer's screen; the label payload turns each byte of that UTF-8 dot into '?',
     so the keyboard read "SOUNDS ?? Pad ?? 5/40". The HoSTage screen preview showed it before
