@@ -144,6 +144,23 @@ The short version:
 - [ ] If the keyboard's own screen comes back mid-run, that is its watchdog: **write down**
       which page and what you were doing.
 
+## 3. The largest page script the keyboard takes
+
+Close CEditor, VIP and your DAW first, and switch the CTRL49 off and on, so nothing from an
+earlier session is in its memory. Then, in the VS 2022 prompt, in your CEditor folder:
+
+    build\native\Release\Ctrl49ScreenLab.exe size > %TEMP%\size-log.txt 2>&1
+
+It runs by itself for a few minutes: each size shows on the keyboard for two seconds (SCRIPT
+SIZE TEST, the size, RUNNING and how many functions), and each upload takes longer than the
+last. When the prompt comes back, `notepad %TEMP%\size-log.txt`. The last line is the answer.
+
+- [ ] **Write down** the last line of the log, and copy the whole log.
+- [ ] **Write down** the LUA and DEV numbers at the bottom of the keyboard's screen on the
+      largest size that showed RUNNING.
+- [ ] If the keyboard's own screen does not come back afterwards, switch it off and on: an
+      oversized script lives only in its memory.
+
 ## What to send back
 
 The **Write down** lines, the console lines copied as text, and a photo of any page that looks

@@ -12,6 +12,9 @@
 //                                               their encoders, at its own rate
 //   Ctrl49ScreenLab preset   <manifest> --check the manifest's rules, its files and its memory
 //                                               guard, without the keyboard
+//   Ctrl49ScreenLab size                        how large a page script the keyboard takes: pages
+//                                               of real code, larger each time, until it refuses
+//                                               one, then the gap halved to the limit
 //
 // Every mode prints the keyboard's refusals as they arrive (each display command is answered:
 // out of memory, a Lua script error, ...), and preset mode counts its answers after the upload,
@@ -89,7 +92,8 @@ double millisecondsSince (Clock::time_point start)
 int usage()
 {
     std::printf ("usage: Ctrl49ScreenLab showcase|stress <tools\\ctrl49\\screen-lab folder> [--no-upload-keepalive]\n"
-                 "       Ctrl49ScreenLab preset <name.ctrl49preset> [--check] [--no-upload-keepalive]\n");
+                 "       Ctrl49ScreenLab preset <name.ctrl49preset> [--check] [--no-upload-keepalive]\n"
+                 "       Ctrl49ScreenLab size [--no-upload-keepalive]\n");
     return 2;
 }
 
@@ -121,6 +125,29 @@ struct Replies
         logLine ("  " + line);
     }
 
+    void reset()
+    {
+        std::lock_guard<std::mutex> lock (mutex);
+        byCommand.clear();
+        firstRefusal.clear();
+    }
+
+    int refused()
+    {
+        std::lock_guard<std::mutex> lock (mutex);
+        int count = 0;
+        for (const auto& entry : byCommand)
+            count += entry.second.second;
+        return count;
+    }
+
+    int answered (const std::string& command)
+    {
+        std::lock_guard<std::mutex> lock (mutex);
+        const auto found = byCommand.find (command);
+        return found == byCommand.end() ? 0 : found->second.first;
+    }
+
     std::string summary()
     {
         std::lock_guard<std::mutex> lock (mutex);
@@ -140,6 +167,7 @@ struct Replies
 };
 
 int runPreset (const std::filesystem::path& manifest, bool checkOnly, bool uploadKeepalive);
+int runSizeSweep (bool uploadKeepalive);
 } // namespace
 
 namespace
@@ -312,10 +340,115 @@ int runPreset (const std::filesystem::path& manifest, bool checkOnly, bool uploa
     CloseHandle (mutex);
     return exitCode;
 }
+
+// The script-size probe: one session per size, the keyboard's answers deciding each. A size
+// passes when the page was bound, its init and draw answered ok and nothing was refused; a
+// refusal (out of memory, a Lua script error) fails it. Silence is neither: a keyboard that
+// answers nothing has stopped listening, and halving the gap over silence would find a limit
+// that is not there, so the sweep stops and says so.
+int runSizeSweep (bool uploadKeepalive)
+{
+    HANDLE mutex = CreateMutexW (nullptr, TRUE, L"Local\\CEditor_CTRL49_Bridge");
+    if (mutex == nullptr || GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+        std::printf ("A CTRL49 bridge is already running (close HoSTage / CEditor first).\n");
+        if (mutex != nullptr) CloseHandle (mutex);
+        return 1;
+    }
+    SetConsoleCtrlHandler (consoleHandler, TRUE);
+
+    int exitCode = 0;
+    Replies replies;
+    lab::SizeSweep sweep;
+    try
+    {
+        const auto portId = Ctrl49WinMmOutput::findPort (Ctrl49WinMmOutput::kDefaultPortName);
+        if (! portId)
+            throw std::runtime_error ("output port 'CTRL49 USB' not found");
+        Ctrl49WinMmOutput output (*portId);
+        Ctrl49PrivateInput input;
+        input.setObserver ([&replies] (const Bytes& frame) { replies.observe (frame); });
+        logLine ("Opening hidden cable-2 capture...");
+        input.start (Ctrl49PrivateInput::discoverDevicePath());
+        logLine ("Script-size test: pages of real code, " + std::to_string (lab::SizeSweep::kStartKb) + " KB first, "
+                 "doubling until the keyboard refuses one (or " + std::to_string (lab::SizeSweep::kMaxKb)
+                 + " KB passes), then the gap halved three times. Each size shows on the keyboard for two "
+                 "seconds. Ctrl+C to stop.");
+
+        for (int kb = sweep.next(); kb != 0 && ! g_quit.load(); kb = sweep.next())
+        {
+            const auto script = lab::buildSizeProbe ((std::size_t) kb * 1024, kb);
+            Bytes lua (script.begin(), script.end());
+            replies.reset();
+            Ctrl49SessionOptions options;
+            options.log = [] (const std::string&) {};
+            options.keepaliveEveryUploadFrames = uploadKeepalive ? 48 : 0;
+            std::string problem;
+            const auto start = Clock::now();
+            int seconds = 0;
+            {
+                Ctrl49Session session (output, lua, {}, options);
+                try
+                {
+                    session.start();
+                    seconds = (int) (millisecondsSince (start) / 1000.0 + 0.5);
+                    for (int waited = 0; waited < 2000 && ! g_quit.load(); waited += 100)
+                    {
+                        std::this_thread::sleep_for (std::chrono::milliseconds (100));
+                        if (! session.failure().empty())
+                            throw std::runtime_error (session.failure());
+                    }
+                    session.callLua ("set_mode", { 0x01 }, true);
+                    std::this_thread::sleep_for (std::chrono::milliseconds (300));
+                }
+                catch (const std::exception& error)
+                {
+                    problem = error.what();
+                }
+                session.stop();
+            }
+            if (! input.failure().empty() || ! input.running())
+                throw std::runtime_error ("the keyboard's hidden input stopped at " + std::to_string (kb)
+                                          + " KB; switch the CTRL49 off and on. " + sweep.answer());
+
+            const int refusals = replies.refused();
+            const bool ran = problem.empty() && refusals == 0 && replies.answered ("bind Lua") > 0
+                          && replies.answered ("Lua call") > 0 && replies.answered ("draw") > 0;
+            if (problem.empty() && refusals == 0 && ! ran)
+            {
+                logLine ("  " + std::to_string (kb) + " KB: the keyboard did not answer at all. Switch the CTRL49 "
+                         "off and on, then run the test again. " + replies.summary());
+                exitCode = 1;
+                break;
+            }
+            sweep.record (kb, ran);
+            if (ran)
+                logLine ("  " + std::to_string (kb) + " KB: loaded and ran (upload and startup "
+                         + std::to_string (seconds) + " s)");
+            else
+                logLine ("  " + std::to_string (kb) + " KB: did not run. "
+                         + (problem.empty() ? replies.summary() : problem + ". " + replies.summary()));
+            std::this_thread::sleep_for (std::chrono::milliseconds (2000));   // the watchdog's screen between sizes
+        }
+        input.stop();
+        logLine (sweep.answer());
+    }
+    catch (const std::exception& error)
+    {
+        std::printf ("ERROR: %s\n", error.what());
+        exitCode = 1;
+    }
+
+    ReleaseMutex (mutex);
+    CloseHandle (mutex);
+    return exitCode;
+}
 } // namespace
 
 int wmain (int argc, wchar_t** argv)
 {
+    if (argc >= 2 && std::wstring (argv[1]) == L"size")
+        return runSizeSweep (! (argc >= 3 && std::wstring (argv[2]) == L"--no-upload-keepalive"));
     if (argc < 3)
         return usage();
 

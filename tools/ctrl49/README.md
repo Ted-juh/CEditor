@@ -475,6 +475,18 @@ calls a second, mixed rectangles, sprites and text; more than the sprite-only fi
 mixed pages cost less than sprites alone). Upload and startup took 2.8-4.6 s. HoSTage's page
 script (40.6 KB, 10 redraws a second) is well inside all of it.
 
+**The largest page script: `Ctrl49ScreenLab size`.** 58 KB is only the largest tried. The
+protocol carries an object's size in 28 bits, so the limit is the keyboard's memory. The size
+mode finds it on its own: pages of real code (small distinct functions, so the keyboard parses,
+compiles and holds all of it, not padding), 64 KB first, doubling until the keyboard refuses one
+or 2048 KB passes, then the gap halved three times. Each page shows its size, how many functions
+it holds and what two of them return, so a page that ran is told from one that only arrived. A
+size passes when the keyboard bound the page and answered its init and draw with no refusal; a
+keyboard that answers nothing stops the test rather than being read as a limit. On a PC the
+2048 KB probe holds 29,008 functions in about 11 MB of Lua memory, so the keyboard is expected to
+stop somewhere below it. The preset loader's 64 KB rule is a rule of ours, not the keyboard's;
+the result says how far it can go.
+
 **Image memory.** Eight 1 MB blocks decoded on top of the page's own, with no refusal and no
 watchdog: `mem_usage(0)` went from 12,263,424 to 20,783,104, up 8.1 MB. So at least 8 MB of
 decoded images fit beside a page, and `mem_usage(0)` counts them. None of the eight could be

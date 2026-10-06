@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <utility>
 
 namespace
 {
@@ -277,6 +278,44 @@ int main()
                "the console line says what a design will ask of the keyboard");
         check (lab::loadPreset (std::filesystem::path (CTRL49_LAB_DIR) / "no-such/Design.ctrl49preset").errors.size() == 1,
                "and a manifest that is not there says so");
+    }
+
+    {   // --- the script-size probe ------------------------------------------------------------
+        const auto probe = lab::buildSizeProbe (64 * 1024, 64);
+        check (probe.size() >= 64 * 1024 && probe.size() < 64 * 1024 + 100,
+               "a probe is the size asked for, to within one line (" + std::to_string (probe.size()) + " bytes)");
+        check (probe.find ("function init") != std::string::npos && probe.find ("function draw") != std::string::npos
+                 && probe.find ("function set_mode") != std::string::npos,
+               "it is a page: init, set_mode and draw, as the session calls them");
+        check (probe.find ("local KB = 64") != std::string::npos && probe.find ("F[1]=function") != std::string::npos,
+               "it says its size, and the rest is real code, numbered from 1");
+        const auto big = lab::buildSizeProbe (2048 * 1024, 2048);
+        check (big.size() >= 2048u * 1024u && big.find ("local KB = 2048") != std::string::npos,
+               "the largest the sweep asks for builds too");
+
+        const auto run = [] (int limitKb)
+        {
+            lab::SizeSweep sweep;
+            std::string tried;
+            for (int kb = sweep.next(), steps = 0; kb != 0 && steps < 20; kb = sweep.next(), ++steps)
+            {
+                tried += (tried.empty() ? "" : " ") + std::to_string (kb);
+                sweep.record (kb, kb <= limitKb);
+            }
+            return std::make_pair (tried, sweep);
+        };
+        const auto [tried, sweep] = run (700);
+        check (tried == "64 128 256 512 1024 768 640 704",
+               "the sweep doubles until a size fails, then halves the gap three times (" + tried + ")");
+        check (sweep.lastOk == 640 && sweep.firstFail == 704
+                 && sweep.answer() == "Largest script that loaded and ran: 640 KB. Smallest that did not: 704 KB.",
+               "and says the largest that ran and the smallest that did not");
+        const auto [allTried, all] = run (100000);
+        check (allTried == "64 128 256 512 1024 2048" && all.answer() == "Every size up to 2048 KB loaded and ran.",
+               "a keyboard that takes everything stops the sweep at 2048 KB");
+        const auto [smallTried, small] = run (40);
+        check (small.lastOk <= 40 && small.firstFail > 40 && small.firstFail <= 64,
+               "and one under the first size still gets an answer (" + smallTried + ")");
     }
 
     std::cout << "-------------------" << std::endl;
