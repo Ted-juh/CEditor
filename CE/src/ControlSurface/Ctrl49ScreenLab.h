@@ -161,7 +161,8 @@ inline double demoLevel (int channel, int frame, int gain)
 
 /** How hard the stress page works, from its encoders. Every quantity is a count per redraw.
     E1 rectangles (x16), E2 sprite blits (x8), E3 text boxes, E4 full-screen image blits (0-7),
-    E5 1 MB memory blocks decoded (0-8, and never un-decoded: the device has no free), E6 the
+    E5 1 MB memory blocks decoded (0-6 on top of the page's two early ones, and never
+    un-decoded: the device has no free; see Hostage_Stress.lua for why two), E6 the
     redraw rate (1-30 per second). E7 and E8 are unused. */
 struct StressLoad
 {
@@ -173,7 +174,7 @@ struct StressLoad
     int fps = 10;
 };
 
-inline constexpr int kStressMemoryBlocks = 8;
+inline constexpr int kStressMemoryBlocks = 6;    // Hostage_Stress.lua: #BLOCKS less its two early ones
 
 inline StressLoad stressLoad (const std::array<int, 8>& e)
 {

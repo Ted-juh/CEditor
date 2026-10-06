@@ -479,8 +479,14 @@ int wmain (int argc, wchar_t** argv)
         assets.push_back ({ 0x0230, readFile (labDir / "lab_bg.png") });
         if (stress)
         {
-            // One upload, decoded once per 1 MB block (as many as lab::kStressMemoryBlocks).
-            assets.push_back ({ 0x0250, readFile (labDir / "stress_block.png") });
+            // The flat block and the textured one, and a second upload of each for the late
+            // decodes into the id after their own upload (Hostage_Stress.lua, BLOCKS).
+            const auto flat = readFile (labDir / "stress_block.png");
+            const auto textured = readFile (labDir / "stress_textured.png");
+            assets.push_back ({ 0x0250, flat });
+            assets.push_back ({ 0x0260, textured });
+            assets.push_back ({ 0x0270, flat });
+            assets.push_back ({ 0x0278, textured });
         }
         else
         {

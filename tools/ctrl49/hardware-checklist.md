@@ -24,9 +24,9 @@ is at the bottom.
 
 - [ ] The card says **Showing on the keyboard too**, and the keyboard shows the same page.
       If it says anything else, stop here: **write down** the card's text and its red line, if any.
-- [ ] The page script HoSTage uploads is 47 KB now (it was 9 KB before these pages). The
-      stress test in section 2 has run (2026-10-05): the 58 KB Rig full build loaded and ran,
-      so this should too. If it shows a Lua error or the stock screen comes back instead,
+- [ ] The page script HoSTage uploads is 32 KB (the 47 KB file, sent without its comments and
+      indentation). The stress test in section 2 has run (2026-10-05): the 58 KB Rig full build
+      loaded and ran, so this should too. If it shows a Lua error or the stock screen comes back instead,
       **write down** exactly what it says.
 - [ ] Page Left / Right on the keyboard walks the control pages and the performance page, and
       the card follows.
@@ -215,6 +215,25 @@ a plug-in loaded and a control page assigned to it. On the keyboard:
       name and where it comes from ("Wool Pad - STAGE KEYS"). Scroll: the full ring jumps to the
       next sound at once, it does not sweep.
 - [ ] **Write down** anything cut off, any "The keyboard refused" line.
+
+## 7. Why the memory blocks did not draw
+
+The stress page decoded eight 1 MB blocks and drew none of them. It now decodes two kinds, at two
+times, so one run says why (`tools/ctrl49/README.md`, "Why the blocks did not draw"). Close
+CEditor, VIP and your DAW first. In the VS 2022 prompt, in your CEditor folder:
+
+    build\native\Release\Ctrl49ScreenLab.exe stress tools\ctrl49\screen-lab > %TEMP%\stress-log.txt 2>&1
+
+The keyboard shows "STRESS - decoding block 1 of 2", then 2 of 2, then the stress page. At the
+bottom left: **EARLY** with an **F** and a **T** over two places for a square, and **LATE**.
+
+- [ ] Wait five seconds. **Write down** whether a square shows under EARLY F (blue) and under
+      EARLY T (orange).
+- [ ] Turn knob 5 (the fifth of the eight round knobs) slowly all the way right. Up to six more
+      letters appear under LATE: F T F T F T. Wait five seconds. **Write down** which of them
+      have a square under them, left to right (for example "F yes, T yes, F no, ...").
+- [ ] **Write down** the DEV number at the bottom right.
+- [ ] Press Ctrl+C in the prompt, then `notepad %TEMP%\stress-log.txt` and copy the whole log.
 
 ## What to send back
 

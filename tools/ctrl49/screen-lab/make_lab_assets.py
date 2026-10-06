@@ -13,6 +13,7 @@ Writes:
   vu_face.png        an analog VU face
   vu_needle.png      the needle as a 48-frame filmstrip (rotation is the one thing that must be baked)
   stress_block.png   a 256x1024 block that decodes to 1 MB, for the stress page's memory test
+  stress_textured.png  the same size with a real image's texture (see stress_textured)
   logo_strip.png     the HoSTage logo as a 16-frame flipbook, a sheen sweeping across it
   spinner_strip.png  a white 16-frame loading spinner the device tints
 
@@ -291,8 +292,32 @@ def stress_block():
     im.save(path('stress_block.png'), optimize=True)
 
 
+def stress_textured():
+    """The same 1 MB block with the texture of an image that does draw on the CTRL49. The flat
+    block decoded there (the keyboard's memory rose by its megabyte) and never drew, in three
+    builds; standard decoders (lodepng, stb_image, miniz streaming through pngle) read it exactly,
+    so it is a valid PNG, and what it does not share with any image that draws is its build: 430
+    to 1, nineteen literal codes, four distances. This one is Machined Metal's panels (which draw)
+    cut to 256 x 1024 and coloured orange so a crop of it shows: about 38 to 1, the Huffman tables
+    and match distances of every other image here. The stress page decodes both, so one run says
+    whether the image was the reason."""
+    panels = Image.open(os.path.join(HERE, 'machined-metal', 'panels.png')).convert('RGBA')
+    im = Image.new('RGBA', (256, 1024))
+    im.paste(panels.crop((0, 0, 256, 816)), (0, 0))
+    im.paste(panels.crop((224, 0, 480, 208)), (0, 816))
+    r, g, b, a = im.split()
+    r = r.point(lambda v: min(255, 120 + 3 * v))
+    g = g.point(lambda v: min(255, 50 + 2 * v))
+    b = b.point(lambda v: min(255, 20 + v))
+    Image.merge('RGBA', (r, g, b, a)).save(path('stress_textured.png'), optimize=True)
+
+
 if __name__ == '__main__':
     import sys
+    if len(sys.argv) >= 2 and sys.argv[1] == '--stress':     # only the stress page's two blocks
+        stress_block()
+        stress_textured()
+        sys.exit(0)
     if len(sys.argv) >= 4 and sys.argv[1] == '--gif':
         width = int(sys.argv[sys.argv.index('--width') + 1]) if '--width' in sys.argv else None
         gif_to_strip(sys.argv[2], sys.argv[3], width)
@@ -302,6 +327,7 @@ if __name__ == '__main__':
     rich = pack(rich_sprites(), 'rich_atlas.png')
     vu()
     stress_block()
+    stress_textured()
     logo_strip()
     spinner_strip()
     write_tables('Hostage_Showcase.lua', [lua_table('SPR', flat), lua_table('R', rich)])

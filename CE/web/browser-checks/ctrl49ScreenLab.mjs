@@ -68,26 +68,30 @@ try {
   assert.equal(frames[0] === frames[3], false);
   console.log(`  animation  ${frames.length} distinct frames`);
 
-  // The stress page at a middling load: it draws what it is asked, and decodes memory blocks
-  // one per redraw until it has as many as asked.
+  // The stress page at a middling load. Its first two redraws decode the early blocks (flat and
+  // textured) behind a loading frame; then it draws what it is asked, and decodes E5's blocks one
+  // per redraw until it has as many as asked.
   const stress = await page.evaluate(() => {
     const lab = window.lab;
-    const frame = [10, 12, 20, 1, 3, 9, 0, 42];      // 160 rects, 96 sprites, 20 texts, 1 full, 3 MB
+    const frame = [10, 12, 20, 1, 3, 9, 0, 42];      // 160 rects, 96 sprites, 20 texts, 1 full, 3 MB late
     let calls;
-    // Three blocks, one decoded per redraw, each drawn from nine redraws after its decode.
-    for (let i = 0; i < 13; i++) { lab.stress.call('set_load', frame); calls = lab.stress.draw(); }
+    // two early, then three late, one per redraw, each drawn from nine redraws after its decode
+    for (let i = 0; i < 15; i++) { lab.stress.call('set_load', frame); calls = lab.stress.draw(); }
     return calls;
   });
   assert.equal(stress.rect >= 160 && stress.text >= 20, true, 'the stress page draws the asked-for load');
-  assert.equal(stress.image, 96 + 1 + 3, 'sprites, the full-screen blit and one swatch per decoded block');
-  // Each swatch shows its block's band of colour: the swatch draws the buffer its block was
-  // decoded into (a wrong id draws nothing, which on the keyboard reads as a block that never
-  // decoded).
-  const swatches = await page.evaluate(() => [0, 1, 2].map((b) =>
-    Array.from(document.getElementById('screen').getContext('2d').getImageData(16 + b * 30 + 13, 249, 1, 1).data.slice(0, 3))));
-  const bands = [[80, 120, 200], [140, 156, 152], [200, 192, 104]];
-  swatches.forEach((rgb, b) => assert.ok(rgb.every((v, i) => Math.abs(v - bands[b][i]) <= 2),
-    `memory block ${b} shows its colour (${rgb} against ${bands[b]})`));
+  assert.equal(stress.image, 96 + 1 + 5, 'sprites, the full-screen blit and one swatch per decoded block, early and late');
+  // Each swatch shows its block: the flat ones their band of colour, the textured ones orange. A
+  // swatch draws the buffer its block was decoded into; a wrong id draws nothing, which on the
+  // keyboard reads as a block that never decoded.
+  const swatches = await page.evaluate(() => [16, 44, 96, 124, 152].map((x) =>
+    Array.from(document.getElementById('screen').getContext('2d').getImageData(x + 13, 249, 1, 1).data.slice(0, 3))));
+  const flatBands = { 0: [80, 120, 200], 2: [200, 192, 104], 4: [160, 168, 136] };
+  for (const [b, rgb] of swatches.entries()) {
+    if (flatBands[b]) assert.ok(rgb.every((v, i) => Math.abs(v - flatBands[b][i]) <= 2),
+      `flat block ${b} shows its band (${rgb} against ${flatBands[b]})`);
+    else assert.ok(rgb[0] > 120 && rgb[0] > rgb[1] + 40 && rgb[1] > rgb[2], `textured block ${b} shows orange (${rgb})`);
+  }
   await shot('stress');
   console.log(`  stress     ${stress.rect} rects, ${stress.image} images, ${stress.text} texts`);
 

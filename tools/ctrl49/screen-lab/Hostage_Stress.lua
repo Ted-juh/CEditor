@@ -9,13 +9,25 @@
 -- What to watch: the orange bar under the header moves 8 px per redraw and the counter counts
 -- them. Smooth and counting = the device keeps up. Jerky, or the counter jumping = it does not.
 -- The stock screen coming back = the watchdog gave up; the console has the load that did it.
--- The swatches along the bottom are crops of each decoded 1 MB block: one missing is a decode
--- that failed, which is the memory ceiling.
+-- The swatches along the bottom are crops of each decoded 1 MB block, F a flat block and T a
+-- textured one (labelled above each).
 --
--- Decoding, as the pages that draw on the keyboard do it: one PNG is uploaded and decoded once per
--- block into a buffer of its own, last thing in a redraw, and nothing draws from a block until a
--- second after its decode. On the CTRL49 the first build (eight uploads, each decoded and drawn
--- in the same redraw) raised mem_usage by the eight megabytes and drew no swatch at all.
+-- Why two kinds, early and late. On the CTRL49 three builds of this page decoded 1 MB blocks
+-- (mem_usage rose by each megabyte) and drew none of them: RGB blocks; RGBA blocks from eight
+-- uploads; RGBA blocks from one upload, decoded last in a redraw and drawn a second later. Each
+-- time the image was the flat one (stress_block.png, 430 to 1), and each time the decode came
+-- late, when E5 rose, where every page that draws decodes in its first redraws. Standard decoders
+-- read the flat block exactly, so offline it is a valid PNG. This build separates the causes in
+-- one run:
+--
+--   EARLY  F T   decoded in the first two redraws, each into the id after its upload, as the
+--                pages that draw do (Machined Metal)
+--   LATE   F T   E5's first two: a second upload of each, into the id after it, decoded late
+--          F T.. E5's others: the first uploads again, each into a buffer of its own
+--
+-- EARLY T drawing and EARLY F not: the image. Both early drawing and no late one: the time.
+-- Late own-upload drawing and late shared not: decoding one upload twice. None at all: none of
+-- these. Without swatches the memory measure is mem_usage(0), DEV in the corner.
 --
 -- Standard libraries are not assumed: no math.*, only what the proven pages already use.
 
@@ -25,11 +37,21 @@ local SPR = { pad = { 0, 0, 100, 78 }, padrim = { 101, 0, 100, 78 }, cap = { 202
 
 local FLAT, FLAT_PNG = 0x0221, 0x0220
 local BG, BG_PNG     = 0x0231, 0x0230
--- One upload (RGBA, the format confirmed there), decoded once per 1 MB block into 0x0251,
--- 0x0253, ... 0x025F: the first is the id after the upload, as every page that has drawn does.
-local BLOCK_PNG      = 0x0250
-local function block (b) return BLOCK_PNG + 1 + b * 2 end
+-- The uploads (Ctrl49ScreenLab.cpp): the flat and textured blocks, and a second copy of each for
+-- the late decodes into the id after their own upload.
+local FLAT_PNG, TEXTURED_PNG           = 0x0250, 0x0260
+local FLAT_PNG_LATE, TEXTURED_PNG_LATE = 0x0270, 0x0278
 local SETTLE         = 9               -- redraws between a block's decode and its first draw
+-- Every block: { upload, buffer, kind, the swatch's x }. 1-2 early, the rest E5's, in order.
+local BLOCKS = {
+    { FLAT_PNG,          0x0251, "F", 16 },  { TEXTURED_PNG,      0x0261, "T", 44 },
+    { FLAT_PNG_LATE,     0x0271, "F", 96 },  { TEXTURED_PNG_LATE, 0x0279, "T", 124 },
+    { FLAT_PNG,          0x0283, "F", 152 }, { TEXTURED_PNG,      0x0285, "T", 180 },
+    { FLAT_PNG,          0x0287, "F", 208 }, { TEXTURED_PNG,      0x0289, "T", 236 },
+}
+-- Decoded in the first redraws, before anything else. E5 adds the rest, up to #BLOCKS - EARLY
+-- (Ctrl49ScreenLab.h kStressMemoryBlocks): eight megabytes in all, as the builds before.
+local EARLY = 2
 
 local BLACK, WHITE, GREY, ORANGE = 0xFF07090D, 0xFFFFFFFF, 0xFFAAB2BF, 0xFFFF9408
 local COLOURS = { 0xFF2F6FDF, 0xFF3FBF7F, 0xFFDF5F3F, 0xFFBF3FBF, 0xFFDFBF3F, 0xFF3FBFDF }
@@ -37,7 +59,7 @@ local COLOURS = { 0xFF2F6FDF, 0xFF3FBF7F, 0xFFDF5F3F, 0xFFBF3FBF, 0xFFDFBF3F, 0x
 local work = { rects = 0, sprites = 0, texts = 0, full = 0, mem = 0, fps = 0, frame = 0 }
 local decoded = 0
 local decodedAt = {}                   -- the redraw each block was decoded on
-local HUD, HUD2, BIGNUM, TXT, DIAG
+local HUD, HUD2, BIGNUM, TXT, DIAG, TAG
 local diag, redraws = "", 0
 local initialized = false
 
@@ -56,6 +78,7 @@ function init (args)
     BIGNUM = textbox(10, 20, 2, WHITE)
     TXT = textbox(9, 10, 0, GREY)
     DIAG = textbox(9, 11, 2, GREY)
+    TAG = textbox(9, 10, 1, GREY)
     decode_image(14, FLAT_PNG, 18, FLAT, WHITE)
     decode_image(14, BG_PNG, 18, BG, WHITE)
     initialized = true
@@ -92,6 +115,18 @@ function draw (args)
 
     draw_rect(0, 0, 480, 272, BLACK)
 
+    -- The two early blocks, one per redraw, behind a loading frame, the way Machined Metal decodes.
+    if decoded < EARLY then
+        text_data.set(HUD, { text = "STRESS - decoding block " .. (decoded + 1) .. " of " .. EARLY })
+        draw_text(HUD, 10, 120, 460, 18)
+        local b = BLOCKS[decoded + 1]
+        decode_image(14, b[1], 18, b[2], WHITE)
+        decodedAt[decoded] = redraws
+        decoded = decoded + 1
+        redraws = redraws + 1
+        return
+    end
+
     -- Full-screen image blits: the most pixels one call can move.
     for i = 1, work.full do draw_image(18, BG, 0, 0, 0, 0, 480, 272, WHITE) end
 
@@ -110,10 +145,19 @@ function draw (args)
     end
 
     -- The memory swatches: a crop of every block decoded at least SETTLE redraws ago, from a
-    -- different band each.
+    -- different band each, and its kind above it. EARLY and LATE label the two groups, on a
+    -- black ground so the load drawn above cannot hide them.
+    draw_rect(10, 208, 256, 58, BLACK)
+    text_data.set(TAG, { text = "EARLY" })
+    draw_text(TAG, 16, 210, 54, 12)
+    text_data.set(TAG, { text = "LATE" })
+    draw_text(TAG, 96, 210, 54, 12)
     for b = 0, decoded - 1 do
+        local x = BLOCKS[b + 1][4]
+        text_data.set(TAG, { text = BLOCKS[b + 1][3] })
+        draw_text(TAG, x, 222, 26, 12)
         if redraws - decodedAt[b] >= SETTLE then
-            draw_image(18, block(b), 16 + b * 30, 236, 0, b * 128, 26, 26, WHITE)
+            draw_image(18, BLOCKS[b + 1][2], x, 236, 0, b * 128, 26, 26, WHITE)
         end
     end
 
@@ -123,7 +167,7 @@ function draw (args)
     text_data.set(HUD, { text = "RECT " .. work.rects .. "  SPRITE " .. work.sprites
                                .. "  TEXT " .. work.texts .. "  FULL " .. work.full })
     draw_text(HUD, 10, 5, 400, 18)
-    text_data.set(HUD2, { text = "MEMORY " .. decoded .. " MB extra  -  " .. work.fps
+    text_data.set(HUD2, { text = "MEMORY " .. decoded .. " MB extra (" .. EARLY .. " early)  -  " .. work.fps
                                 .. " redraws/s  -  "
                                 .. (work.rects + work.sprites + work.texts + work.full)
                                 .. " calls per redraw" })
@@ -142,8 +186,9 @@ function draw (args)
 
     -- Memory: decode one more block, the last thing this redraw does, until the asked-for count
     -- is reached. There is no way to free one, so the count only ever goes up.
-    if decoded < work.mem and decoded < 8 then
-        decode_image(14, BLOCK_PNG, 18, block(decoded), WHITE)
+    if decoded - EARLY < work.mem and decoded < #BLOCKS then
+        local b = BLOCKS[decoded + 1]
+        decode_image(14, b[1], 18, b[2], WHITE)
         decodedAt[decoded] = redraws
         decoded = decoded + 1
     end

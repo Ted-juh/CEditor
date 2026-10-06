@@ -400,7 +400,8 @@ is what the watchdog objects to.
 
 **Stress** (`Hostage_Stress.lua`) — the encoders set the load, per redraw:
 E1 rectangles (×16), E2 sprites (×8), E3 text boxes, E4 full-screen image blits (0–7),
-E5 1 MB image blocks decoded (0–8, never freed), E6 redraws per second (1–30).
+E5 1 MB image blocks decoded (0–6 on top of two decoded at the start, never freed), E6 redraws
+per second (1–30).
 The console prints every load and how long each redraw took to send.
 
 What to watch, and write down:
@@ -408,9 +409,10 @@ What to watch, and write down:
 - **The orange bar under the header** moves 8 px per redraw. Gliding = the screen keeps up.
   Jerky = it does not: note the console's last `Load:` line.
 - **The stock screen coming back** = the watchdog gave up; the console prints the last load.
-- **The swatches along the bottom** are one per decoded 1 MB block. One that does not appear
-  (or the keyboard giving up while E5 rises) is the image-memory ceiling. The knob filmstrip
-  (~2 MB) and the VU needle (~4 MB) are the sizes this decides.
+- **The swatches along the bottom** are one per decoded 1 MB block, F flat and T textured,
+  EARLY (the two decoded at the start) and LATE (E5's). Which of them appear is the question the
+  section [Image memory](#the-stress-pages-memory-blocks) below leaves open; the keyboard giving up
+  while E5 rises is the image-memory ceiling.
 - **The envelope and sequencer pages** — whether the gradients band on the panel.
 - **The animation page** — the lowest E1 rate at which the motion looks smooth, and whether it
   still keeps up at 30.
@@ -556,12 +558,31 @@ the result says how far it can go.
 watchdog: `mem_usage(0)` went from 12,263,424 to 20,783,104, up 8.1 MB. So at least 8 MB of
 decoded images fit beside a page, and `mem_usage(0)` counts them. None of the eight could be
 drawn, though, in three builds: RGB blocks, RGBA blocks from eight uploads drawn in the redraw
-that decoded them, and RGBA blocks from one upload decoded last and drawn a second later (the
-way Machined Metal decodes, which does draw). The swatches are therefore not a measure on this
-keyboard; `mem_usage(0)` is. Why these blocks decode and do not draw is open. What they still
-differ in from every image that draws is the image itself: 256 x 1024 of flat colour bands,
-which deflates 430 to 1. That is to be found without the keyboard before anyone is asked to run
-the page again.
+that decoded them, and RGBA blocks from one upload decoded last and drawn a second later.
+
+<a id="the-stress-pages-memory-blocks"></a>**Why the blocks did not draw: what was found without
+the keyboard.** The block (`stress_block.png`) is a valid PNG: lodepng, stb_image and miniz
+streaming through pngle, the decoders embedded firmware is built from, read it byte for byte as
+Pillow does. (upng refuses the HoSTage knob strip, which draws, so the keyboard's decoder is not
+upng.) What it shares with no image that has drawn on the keyboard is how it is built: 430 to 1
+where the rest are 5 to 83, one deflate block with nineteen literal codes and four distances
+(every other image here: 150 or more, and 24 or more), matches no further back than two rows.
+And one thing about the page: every page that draws decodes in its first redraws, behind a
+loading frame (Machined Metal, HoSTage while its splash is up), and all three builds decoded
+late, when E5 rose. So the stress page now asks both questions in one run:
+
+| Swatch | Image | Decoded | Into |
+|---|---|---|---|
+| EARLY F | the flat block | in the second redraw | the id after its upload, as the pages that draw do |
+| EARLY T | `stress_textured.png`: Machined Metal's panels cut to 256 x 1024 and turned orange, so built like the images that draw (38 to 1, full tables) | in the third redraw | the same |
+| LATE F, T | each from a second upload of its own | when E5 rises | the id after that upload |
+| LATE F, T, F, T | the first uploads again | when E5 rises further | a buffer each |
+
+EARLY T appearing and EARLY F not: the image (then the swatches use the textured block, and the
+memory test is what it was meant to be). Both EARLY and no LATE: decoding late. LATE from their
+own upload and not from a shared one: decoding one upload twice. None at all: none of these, and
+what is left is the block's shape, 256 x 1024 (the images that draw are 480, 440, 80 and 64
+wide), for the next build. The total is eight megabytes, as before: two early and E5's six.
 
 - **RAM / object budget** — how many/large filmstrips fit in device RAM before upload or
   decode fails. The Stress page's E5 decodes 1 MB blocks, up to 8.

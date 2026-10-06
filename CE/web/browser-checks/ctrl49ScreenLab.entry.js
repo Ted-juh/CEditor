@@ -11,6 +11,7 @@ import labBg from '../../../tools/ctrl49/screen-lab/lab_bg.png?url';
 import vuFace from '../../../tools/ctrl49/screen-lab/vu_face.png?url';
 import vuNeedle from '../../../tools/ctrl49/screen-lab/vu_needle.png?url';
 import stressBlock from '../../../tools/ctrl49/screen-lab/stress_block.png?url';
+import stressTextured from '../../../tools/ctrl49/screen-lab/stress_textured.png?url';
 import logoStrip from '../../../tools/ctrl49/screen-lab/logo_strip.png?url';
 import spinnerStrip from '../../../tools/ctrl49/screen-lab/spinner_strip.png?url';
 import machinedLua from '../../../tools/ctrl49/screen-lab/machined-metal/MachinedMetal.lua?raw';
@@ -61,7 +62,9 @@ const assets = {
   0x0238: await load(logoStrip), 0x023a: await load(spinnerStrip),
   576: await load(machinedPanels), 578: await load(machinedKnobs), 580: await load(machinedParts),
 };
-assets[0x0250] = await load(stressBlock);   // one upload, decoded once per block
+// the stress page's uploads (Ctrl49ScreenLab.cpp): the flat and textured blocks, twice each
+assets[0x0250] = assets[0x0270] = await load(stressBlock);
+assets[0x0260] = assets[0x0278] = await load(stressTextured);
 
 async function page(source, strict = false, pageAssets = assets) {
   const api = new ScreenDrawApi(document.getElementById('screen').getContext('2d'), pageAssets);
