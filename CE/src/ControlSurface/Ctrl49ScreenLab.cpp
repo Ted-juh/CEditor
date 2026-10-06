@@ -40,8 +40,12 @@
 #include "Ctrl49Session.h"
 #include "Ctrl49WinMmOutput.h"
 
+#ifndef NOMINMAX
+ #define NOMINMAX
+#endif
 #include <windows.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
