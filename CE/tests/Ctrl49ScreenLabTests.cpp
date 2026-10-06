@@ -6,12 +6,15 @@
 
 #include "ControlSurface/Ctrl49ScreenLab.h"
 #include "ControlSurface/Ctrl49ScreenLabPreset.h"
+#include "ControlSurface/Ctrl49LuaStrip.h"
 
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace
 {
@@ -319,6 +322,74 @@ int main()
     }
 
     std::cout << "-------------------" << std::endl;
+    {   // --- the page script as uploaded: without comments (Ctrl49LuaStrip.h) ----------------
+        using ceditor::ctrl49::stripLuaForUpload;
+        check (stripLuaForUpload (std::string ("t")) == "t", "a script with nothing to strip is itself");
+        check (stripLuaForUpload (std::string ("  local a = 1 -- one\n\n  -- a line\nb = 2")) == "local a = 1\nb = 2",
+               "line comments, indentation and empty lines go");
+        check (stripLuaForUpload (std::string ("s = \"a -- b\" -- c\nt = 'x\\'--y' --z")) == "s = \"a -- b\"\nt = 'x\\'--y'",
+               "a -- inside a quoted string stays, escaped quotes too");
+        check (stripLuaForUpload (std::string ("--[[ long\ncomment ]] x = 1\n--[==[ a ]] b ]==]y = 2")) == "x = 1\ny = 2",
+               "long comments of any level go, across lines");
+        check (stripLuaForUpload (std::string ("s = [[\n  keep -- this\n  ]] t = [=[ ]] ]=]")) == "s = [[\n  keep -- this\n  ]] t = [=[ ]] ]=]",
+               "a long string is copied exactly, its indentation and dashes kept");
+        check (stripLuaForUpload (std::string ("a = b\n(f)()")) == "a = b\n(f)()", "no two lines are ever joined");
+        check (stripLuaForUpload (std::string ("s = \"open")) == "s = \"open", "a script that does not lex comes back as it was");
+        check (stripLuaForUpload (std::string ("x = 1 --[[ open")) == "x = 1 --[[ open", "an unclosed long comment too");
+
+        // The HoSTage page: much smaller, and the same tokens in the same order. The token list
+        // is a lexer of its own (names and numbers as runs, strings whole, any other byte alone),
+        // with comments skipped: the stripped script must lex to exactly what the original does.
+        std::ifstream in (std::filesystem::path (CTRL49_LAB_DIR) / ".." / "Hostage_MultiKnob.lua", std::ios::binary);
+        const std::string page ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
+        const auto stripped = stripLuaForUpload (page);
+        const auto tokens = [] (const std::string& s)
+        {
+            std::vector<std::string> out;
+            std::size_t i = 0;
+            const auto longLevel = [&] (std::size_t at) -> int
+            {
+                if (at >= s.size() || s[at] != '[') return -1;
+                std::size_t j = at + 1; int level = 0;
+                while (j < s.size() && s[j] == '=') { ++level; ++j; }
+                return (j < s.size() && s[j] == '[') ? level : -1;
+            };
+            while (i < s.size())
+            {
+                const char c = s[i];
+                if (c == ' ' || c == '\t' || c == '\r' || c == '\n') { ++i; continue; }
+                if (c == '-' && i + 1 < s.size() && s[i + 1] == '-')
+                {
+                    const int level = longLevel (i + 2);
+                    if (level >= 0) i = s.find ("]" + std::string ((std::size_t) level, '=') + "]", i) + (std::size_t) level + 2;
+                    else while (i < s.size() && s[i] != '\n') ++i;
+                    continue;
+                }
+                std::size_t j = i + 1;
+                if (c == '"' || c == '\'')
+                {
+                    while (j < s.size() && s[j] != c) j += (s[j] == '\\') ? 2 : 1;
+                    ++j;
+                }
+                else if (longLevel (i) >= 0)
+                {
+                    const int level = longLevel (i);
+                    j = s.find ("]" + std::string ((std::size_t) level, '=') + "]", i) + (std::size_t) level + 2;
+                }
+                else if (std::isalnum ((unsigned char) c) || c == '_' || c == '.')
+                    while (j < s.size() && (std::isalnum ((unsigned char) s[j]) || s[j] == '_' || s[j] == '.')) ++j;
+                out.push_back (s.substr (i, j - i));
+                i = j;
+            }
+            return out;
+        };
+        check (! page.empty() && stripped.size() * 10 < page.size() * 7,
+               "the HoSTage page uploads at under 70 % of its size (" + std::to_string (page.size()) + " -> "
+                   + std::to_string (stripped.size()) + " bytes)");
+        check (tokens (stripped) == tokens (page), "and lexes to exactly the same tokens");
+        check (stripLuaForUpload (stripped) == stripped, "stripping twice changes nothing");
+    }
+
     std::cout << (failures == 0 ? "ALL PASS" : std::to_string (failures) + " FAILED") << std::endl;
     return failures == 0 ? 0 : 1;
 }

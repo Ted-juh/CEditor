@@ -1,4 +1,5 @@
 #include "Ctrl49SurfaceBroker.h"
+#include "Ctrl49LuaStrip.h"
 #include "Ctrl49RackDisplay.h"
 #include "Ctrl49PerformanceDisplay.h"
 #include "Ctrl49StagePages.h"
@@ -171,7 +172,9 @@ void Ctrl49SurfaceBroker::beginSessionStart()
             // fires mid-upload never shows the splash that follows. Every 16 chunks is ~8 KB.
             sessionOptions.keepaliveEveryUploadFrames = options.keepaliveEveryUploadFrames;
             sessionOptions.sleep = options.sessionSleep;
-            session = std::make_unique<Ctrl49Session> (*endpoints->output, options.pageLua,
+            // The page as the keyboard needs it: comments, indentation and empty lines out
+            // (Ctrl49LuaStrip.h). The file stays written to be read; the upload is a third smaller.
+            session = std::make_unique<Ctrl49Session> (*endpoints->output, stripLuaForUpload (options.pageLua),
                                                        options.pngAssets, sessionOptions);
             session->start();
             ready = true;
