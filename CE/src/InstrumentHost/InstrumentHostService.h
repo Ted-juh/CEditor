@@ -771,6 +771,27 @@ public:
     bool discoverOnSurface() const               { return surfaceDiscoverPage; }
     bool cueOnSurface() const                    { return surfaceCuePage; }
     bool changesOnSurface() const                { return surfaceChangesPage; }
+    bool metersOnSurface() const                 { return surfaceMetersPage; }
+    bool liveOnSurface() const                   { return surfaceLivePage; }
+
+    /** The CTRL49's METERS page: every part's level after its inserts and fader, left and right,
+        and the master's after its fader, as the rack meters them for the app. The levels are the
+        loudest peak since the page last took them (the pump drains the rack at 30 Hz, the page
+        redraws at 10), so no transient falls between two redraws; taking them starts the next
+        interval. The faders are the parts' volumes and the master level, linear 0..2. */
+    struct SurfaceMeterPart
+    {
+        juce::String id, name;
+        float left = 0.0f, right = 0.0f;   // linear peak, 1 = 0 dBFS
+        float volume = 1.0f;
+        bool muted = false, enabled = true;
+    };
+    struct SurfaceMeters
+    {
+        std::vector<SurfaceMeterPart> parts;   // the rack's parts, in order
+        float masterLeft = 0.0f, masterRight = 0.0f, masterVolume = 1.0f;
+    };
+    SurfaceMeters takeSurfaceMeters();
 
     /** The setlist's cue screen for the CTRL49 (CUE): the song on stage, its clocks, the section
         playing and what comes next. Empty (no songs) without the setlist feature. */
@@ -1616,6 +1637,12 @@ private:
     bool surfaceDiscoverPage = false;
     bool surfaceCuePage = false;
     bool surfaceChangesPage = false;
+    bool surfaceMetersPage = false;
+    bool surfaceLivePage = false;
+    // The loudest peak per meter id since the METERS page last took them (takeSurfaceMeters),
+    // filled by the pump from the readings it drains for the app.
+    std::map<juce::String, std::pair<float, float>> surfaceMeterPeaks;
+    std::mutex surfaceMeterLock;
     surface::BrowseCursor browseCursor;
     const double freeRunEpoch = juce::Time::getMillisecondCounterHiRes() * 0.001;
     // What the browser is currently looking at. Every mutation re-emits THIS rather than an

@@ -71,6 +71,8 @@ public:
 
     /** The first arpeggiator's live pattern step, for the UI playhead; -1 when none. */
     int arpPatternStep() const noexcept;
+    /** The first arp's notes (ArpEngine::takeNotes); none without an arp. */
+    std::array<std::uint64_t, 2> arpNotes() const noexcept;
 
     // -- the Chords module's triggers and readout -----------------------------------------
     // `slotId` names a module; empty means the first Chords module in the chain.

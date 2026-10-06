@@ -56,7 +56,7 @@ local redraws_on_ask = false -- and a draw came with nothing new: asking works o
 -- bytes, so they read 0 there and nothing extra is drawn): page kind, the beat in the bar
 -- (1-based, 0 when stopped) and beats per bar. The pages that are not knob pages set their own
 -- kind when the host sends them (set_check: 2, set_layers: 3, set_discover: 4, set_cue: 5,
--- set_changes: 6);
+-- set_changes: 6, set_meters: 8, set_live: 9);
 -- set_values sets it back to a knob page: 0 a control page, 1 the performance page, 7 the browser.
 local page_kind = 0
 local beat = 0
@@ -175,7 +175,7 @@ function note(args)
     if on and held[number] == nil then held_count = held_count + 1 end
     if (not on) and held[number] ~= nil then held_count = held_count - 1 end
     if on then held[number] = velocity else held[number] = nil end
-    if (page_kind == 1 or page_kind == 3) and pcall and lua_widget_make_dirty then pcall(lua_widget_make_dirty, WID) end
+    if (page_kind == 1 or page_kind == 3 or page_kind == 9) and pcall and lua_widget_make_dirty then pcall(lua_widget_make_dirty, WID) end
 end
 
 function set_mode(args)
@@ -468,15 +468,16 @@ local function is_black(pc) return pc == 1 or pc == 3 or pc == 6 or pc == 8 or p
 local function note_name(n) return NAMES[n % 12 + 1] .. tostring(math.floor(n / 12) - 1) end
 local KX, KY, KW = 8, 196, 16           -- 29 white keys of 16 px, 48 tall
 
--- Where key n is drawn and how wide; keys left or right of the 49 are pinned to the ends.
-local function key_x(n)
-    local first = layers.key
+-- Where key n is drawn and how wide, on 49 keys from `first`; keys left or right of them are
+-- pinned to the ends. key_x is LAYERS' keyboard, key_at any.
+local function key_at(first, n)
     if n < first then return KX, 2 end
     if n > first + 48 then return KX + 29 * KW - 2, 2 end
     local w = math.floor((n - first) / 12) * 7 + WHITE_OF[(n - first) % 12 + 1]
     if is_black(n % 12) then return KX + (w + 1) * KW - 5, 10 end
     return KX + w * KW, KW - 1
 end
+local function key_x(n) return key_at(layers.key, n) end
 
 -- A part the keys can reach: enabled, not muted, and taking its MIDI from the keyboard.
 local function playable(p)
@@ -910,6 +911,293 @@ local function draw_discover()
     say(ROWNUM, tostring(disc.selected + 1) .. " / " .. tostring(disc.count), DIM, 372, 250, 100, 16)
 end
 
+-- --- LIVE -------------------------------------------------------------------------------------------
+
+-- set_live (Ctrl49StagePages.h has the bytes): the keys as they are played, every part's zone over
+-- them, and the focused part's arpeggiator: its sixteen steps with the playhead, the notes it plays
+-- marked on the keys. E1 picks a step, E2-E5 turn its velocity, octave, ratchets and chance, E6-E8
+-- the gate, rate and mode; pad N turns step N of the cursor's half on or off.
+local live = { flags = 0, mode = 0, spb = 4, gate = 50, steps = {}, cursor = 0, playing = 0, tempo = 0,
+               key = 36, zones = {}, focused = 255, held = {}, arp = {}, part = "" }
+local ARP_MODES = { "UP", "DOWN", "UP-DOWN", "DOWN-UP", "ORDER", "RANDOM", "CHORD", "PATTERN" }
+local RATE_NAMES = { [1] = "1/4", [2] = "1/8", [3] = "1/8T", [4] = "1/16", [6] = "1/16T", [8] = "1/32",
+                     [12] = "1/32T", [16] = "1/64" }
+
+function set_live(args)
+    live.flags = get_byte(args, 0); live.mode = get_byte(args, 1); live.spb = get_byte(args, 2)
+    live.gate = get_byte(args, 3)
+    local count = get_byte(args, 4)
+    live.cursor = get_byte(args, 5); live.playing = get_byte(args, 6)
+    live.tempo = (get_byte(args, 7) + 256 * get_byte(args, 8)) / 10
+    live.key = get_byte(args, 9)
+    local zones = get_byte(args, 10)
+    live.focused = get_byte(args, 11)
+    local i = 12
+    live.steps = {}
+    for k = 1, count do
+        live.steps[k] = { vel = get_byte(args, i), oct = get_byte(args, i + 1) - 2, rat = get_byte(args, i + 2),
+                          chance = get_byte(args, i + 3), tie = get_byte(args, i + 4) }
+        i = i + 5
+    end
+    live.zones = {}
+    for k = 1, zones do
+        local z = { lo = get_byte(args, i), hi = get_byte(args, i + 1), playable = get_byte(args, i + 2) % 2 == 1 }
+        z.name, i = read_string(args, i + 3)
+        live.zones[k] = z
+    end
+    live.held = {}
+    local n = get_byte(args, i); i = i + 1
+    for k = 1, n do live.held[get_byte(args, i)] = true; i = i + 1 end
+    live.arp = {}
+    n = get_byte(args, i); i = i + 1
+    for k = 1, n do live.arp[get_byte(args, i)] = true; i = i + 1 end
+    live.part = read_string(args, i)
+    page_kind = 9
+end
+
+local function signed_int(v)
+    if v > 0 then return "+" .. tostring(v) end
+    return tostring(v)
+end
+
+local GX, GY, GP, GW, GH = 8, 30, 29, 27, 90   -- the step cells: x, y, pitch, width, height
+local ZY, ZH = 124, 30                         -- the zones' band over the keys
+local LY = 158                                 -- the keys
+
+local function draw_live()
+    local on = live.flags % 2 == 1
+    local accent = PART_COLOURS[(live.focused == 255 and 0 or live.focused) % 8 + 1]
+    local right = "ARP OFF"
+    if on then right = "ARP " .. (ARP_MODES[live.mode + 1] or "?") .. " " .. (RATE_NAMES[live.spb] or ("1/" .. tostring(live.spb * 4))) end
+    if live.part ~= "" then right = live.part .. "   " .. right end
+    if live.tempo > 0 then right = right .. "   " .. tostring(math.floor(live.tempo + 0.5)) .. " BPM" end
+    title_bar("LIVE", right)
+
+    -- the steps: velocity as a bar, ratchets as dots, the octave and chance under them where they
+    -- are not the plain ones
+    local base, tall = GY + 62, 54
+    for p = 1, #live.steps do
+        local q = live.steps[p]
+        local x = GX + (p - 1) * GP
+        local playing = on and live.playing == p
+        if p - 1 == live.cursor then draw_rect(x, GY, GW, GH, ROW) end
+        local c = DIM
+        if playing then c = accent end
+        if not on then c = DARK end
+        if q.vel > 0 then
+            local h = math.floor(q.vel * tall / 127)
+            if h > 0 then draw_rect(x + 6, base - h, GW - 12, h, c) end
+            local dots = q.rat * 5 - 2
+            for j = 1, q.rat do draw_rect(x + math.floor((GW - dots) / 2) + (j - 1) * 5, GY + 3, 3, 3, c) end
+            if q.tie == 1 then draw_rect(x + GW - 4, base - 2, 6, 2, c) end
+        else
+            draw_rect(x + 8, base - 2, GW - 16, 2, DARK)
+        end
+        if q.oct ~= 0 then say(SMALL, signed_int(q.oct), GREY, x, base + 3, GW, 12) end
+        if q.chance < 100 then say(SMALL, tostring(q.chance) .. "%", DARK, x, base + 15, GW, 12) end
+        if playing then outline(x, GY, GW, GH, accent) end
+    end
+
+    -- every part's zone over the keys, a band each, named where there is room
+    local zones = #live.zones
+    if zones > 0 then
+        local zh = math.floor(ZH / zones)
+        for k = 1, zones do
+            local z = live.zones[k]
+            local x0 = key_at(live.key, z.lo)
+            local x1, w1 = key_at(live.key, z.hi)
+            local y = ZY + (k - 1) * zh
+            local c = PART_COLOURS[(k - 1) % 8 + 1]
+            if not z.playable then c = DARK end
+            if z.lo <= z.hi then draw_rect(x0, y, x1 + w1 - x0, zh - 1, c) end
+            if zh >= 10 then
+                local name = z.name
+                if k - 1 == live.focused and on then name = name .. "  ARP" end
+                say(SMALL, name, BLACK, x0 + 3, y - 1, 200, zh)
+            end
+        end
+    end
+
+    -- the keys: held in the colour of the first playable part whose zone has them, and the arp's
+    -- notes marked with a dot near the front of the key
+    for pass = 1, 2 do
+        for k = 0, 48 do
+            local n = live.key + k
+            local black = is_black(n % 12)
+            if (pass == 1 and not black) or (pass == 2 and black) then
+                local x, w = key_at(live.key, n)
+                local c = 0xFFC9CEE0
+                if black then c = 0xFF161A2B end
+                if live.held[n] or held[n] ~= nil then
+                    c = DIM
+                    for z = #live.zones, 1, -1 do
+                        local zone = live.zones[z]
+                        if zone.playable and n >= zone.lo and n <= zone.hi then c = PART_COLOURS[(z - 1) % 8 + 1] end
+                    end
+                end
+                if live.arp[n] then c = accent end
+                if black then draw_rect(x, LY, w, 30, c) else draw_rect(x, LY, w, 48, c) end
+                if live.arp[n] then
+                    local y = LY + 38
+                    if black then y = LY + 21 end
+                    draw_rect(x + math.floor((w - 5) / 2), y, 5, 5, BLACK)
+                end
+            end
+        end
+    end
+
+    -- what the encoders turn, and where they are
+    local q = live.steps[live.cursor + 1] or { vel = 0, oct = 0, rat = 1, chance = 100 }
+    local vel = tostring(q.vel)
+    if q.vel == 0 then vel = "REST" end
+    local mode = "OFF"
+    if on then mode = ARP_MODES[live.mode + 1] or "?" end
+    local labels = { "STEP", "VEL", "OCTAVE", "RATCHET", "CHANCE", "GATE", "RATE", "MODE" }
+    local values = { tostring(live.cursor + 1) .. " / " .. tostring(#live.steps), vel, signed_int(q.oct),
+                     "x" .. tostring(q.rat), tostring(q.chance) .. "%", tostring(live.gate) .. "%",
+                     RATE_NAMES[live.spb] or ("1/" .. tostring(live.spb * 4)), mode }
+    for k = 1, 8 do
+        local x = 4 + (k - 1) * 59
+        say(SMALL, labels[k], DIM, x, 212, 57, 12)
+        say(ROWTXT, values[k], k == 1 and WHITE or GREY, x, 226, 57, 18)
+    end
+    if live.flags % 4 < 2 then
+        say(SMALL, "NO LANE DRAWN: EVERY STEP PLAYS AS PLAYED. TURN E2-E5 OR A PAD TO DRAW ONE", DARK, 8, 252, 464, 14)
+    else
+        say(SMALL, "PADS TURN STEPS ON AND OFF", DARK, 8, 252, 464, 14)
+    end
+end
+
+-- --- METERS -----------------------------------------------------------------------------------------
+
+-- set_meters (Ctrl49StagePages.h has the bytes): every part's level after its fader, left and
+-- right, as the loudest peak since the last redraw, its fader, and the master's. Five parts and
+-- the master on strips, E1-E5 and E6 their faders, E7 the parts on the strips. Peak hold, the clip
+-- lamps and the master's last seconds the page keeps itself, from the levels it is sent: a redraw
+-- that comes without news (the keyboard redrawing when asked) does not age them.
+local meters = { count = 0, first = 0, strips = 0, touched = 255, parts = {}, master = { 0, 0, 0 } }
+local meter_hold = {}      -- per strip (6 the master): { level, frames left }
+local meter_clip = {}      -- per strip: frames the clip lamp stays lit
+local meter_history = {}   -- the master's loudest side, newest first
+local METER_HISTORY = 48
+local HOLD_FRAMES, CLIP_FRAMES = 15, 30   -- at the 10 redraws a second HoSTage sends: 1.5 s, 3 s
+local CLIP_BYTE = 115                     -- 0 dBFS (metersLevelByte)
+
+local function meter_db(b) return (b - 1) / 2 - 57 end
+local function meter_db_text(b)
+    if b == 0 then return "-INF" end
+    local tenths = math.floor(meter_db(b) * 10 + 0.5)
+    local sign = ""
+    if tenths > 0 then sign = "+" elseif tenths < 0 then sign = "-"; tenths = -tenths end
+    return sign .. tostring(math.floor(tenths / 10)) .. "." .. tostring(tenths % 10)
+end
+
+local function meters_age(strip, l, r)
+    local top = math.max(l, r)
+    local hold = meter_hold[strip] or { 0, 0 }
+    if top >= hold[1] then hold = { top, HOLD_FRAMES }
+    elseif hold[2] > 0 then hold[2] = hold[2] - 1
+    else hold = { top, 0 } end
+    meter_hold[strip] = hold
+    if top > CLIP_BYTE then meter_clip[strip] = CLIP_FRAMES
+    elseif (meter_clip[strip] or 0) > 0 then meter_clip[strip] = meter_clip[strip] - 1 end
+end
+
+function set_meters(args)
+    local first = get_byte(args, 1)
+    if first ~= meters.first then meter_hold = {}; meter_clip = {} end   -- other parts on the strips
+    meters.count = get_byte(args, 0); meters.first = first; meters.strips = get_byte(args, 2)
+    meters.touched = get_byte(args, 3)
+    local i = 4
+    meters.parts = {}
+    for k = 1, meters.strips do
+        local p = { l = get_byte(args, i), r = get_byte(args, i + 1), fader = get_byte(args, i + 2),
+                    flags = get_byte(args, i + 3) }
+        p.name, i = read_string(args, i + 4)
+        meters.parts[k] = p
+        meters_age(k, p.l, p.r)
+    end
+    meters.master = { get_byte(args, i), get_byte(args, i + 1), get_byte(args, i + 2) }
+    meters_age(6, meters.master[1], meters.master[2])
+    -- newest first; no table library assumed (the stress page found none promised)
+    for k = math.min(#meter_history, METER_HISTORY - 1), 1, -1 do meter_history[k + 1] = meter_history[k] end
+    meter_history[1] = math.max(meters.master[1], meters.master[2])
+    page_kind = 8
+end
+
+local MX, MY, MW, MH = 8, 50, 56, 144     -- the first strip, a strip's pitch, the meters' height
+
+-- A level byte's height on the meters: -48 dB at the bottom, +6 dB at the top.
+local function meter_h(b)
+    if b == 0 then return 0 end
+    return math.max(0, math.min(MH, math.floor((meter_db(b) + 48) * MH / 54)))
+end
+
+local function draw_strip(k, name, l, r, fader, colour, off)
+    local x = MX + (k - 1) * MW
+    local touched = meters.touched == k - 1
+    say(SMALL, name, touched and WHITE or GREY, x, 32, MW - 4, 14)
+    draw_rect(x + 6, MY, 30, MH, ROW)
+    if (meter_clip[k] or 0) > 0 then draw_rect(x + 6, MY - 6, 30, 4, WARN) end
+    for side = 0, 1 do
+        local b = side == 0 and l or r
+        local h = meter_h(b)
+        local c = colour
+        if off then c = DARK end
+        if b > CLIP_BYTE then c = WARN end
+        if h > 0 then draw_rect(x + 8 + side * 14, MY + MH - h, 12, h, c) end
+    end
+    local hold = meter_hold[k] or { 0, 0 }
+    local hh = meter_h(hold[1])
+    if hh > 0 then draw_rect(x + 8, MY + MH - hh, 26, 2, WHITE) end
+    -- the fader, on the meters' own scale
+    local fh = meter_h(fader)
+    if fader > 0 then draw_rect(x + 38, MY + MH - fh - 1, 6, 3, touched and WHITE or colour) end
+    say(SMALL, meter_db_text(hold[1]), GREY, x, MY + MH + 4, MW - 4, 14)
+    local f = meter_db_text(fader)
+    if fader == 0 then f = "OFF" end
+    if off then f = "MUTED" end
+    say(ROWTXT, f, touched and WHITE or GREY, x, MY + MH + 22, MW - 4, 16)
+end
+
+local function draw_meters()
+    -- the loudest part now, at the top right
+    local loudest, top = nil, 0
+    for k = 1, meters.strips do
+        local p = meters.parts[k]
+        if math.max(p.l, p.r) > top then loudest, top = p, math.max(p.l, p.r) end
+    end
+    local right = "NOTHING PLAYING"
+    if loudest ~= nil then right = loudest.name .. "  " .. meter_db_text(top) .. " dB" end
+    if meters.count > meters.strips then
+        right = tostring(meters.first + 1) .. "-" .. tostring(meters.first + meters.strips) .. " OF "
+                .. tostring(meters.count) .. "   " .. right
+    end
+    title_bar("METERS", right)
+    for k = 1, meters.strips do
+        local p = meters.parts[k]
+        local off = p.flags % 2 == 1 or math.floor(p.flags / 2) % 2 == 1
+        draw_strip(k, p.name, p.l, p.r, p.fader, PART_COLOURS[(meters.first + k - 1) % 8 + 1], off)
+    end
+    -- the master in the sixth place whatever the rack holds, so E6 is always the master
+    draw_strip(6, "MASTER", meters.master[1], meters.master[2], meters.master[3], WHITE, false)
+    -- what the encoders do, under the fader values
+    local more = ""
+    if meters.count > 5 then more = "   E7 MORE PARTS" end
+    say(SMALL, "FADERS   E1-E5 THE PARTS   E6 THE MASTER" .. more, DIM, 8, 250, 464, 14)
+    -- the master's last seconds, newest on the right
+    local hx = MX + 6 * MW + 4
+    say(SMALL, "MASTER, LAST 5 S", GREY, hx, 32, 470 - hx, 14)
+    draw_rect(hx, MY, 2 * METER_HISTORY, MH, ROW)
+    for i = 1, #meter_history do
+        local h = meter_h(meter_history[i])
+        if h > 0 then
+            local x = hx + (METER_HISTORY - i) * 2
+            draw_rect(x, MY + MH - h, 2, h, meter_history[i] > CLIP_BYTE and WARN or DIM)
+        end
+    end
+end
+
 -- --- the knob pages -------------------------------------------------------------------------------
 
 -- A label's state mark, taken off: "!" a control that is not connected (a control page) or a
@@ -1058,6 +1346,14 @@ function draw(args)
     end
     if page_kind == 6 then
         draw_changes()
+        return
+    end
+    if page_kind == 8 then
+        draw_meters()
+        return
+    end
+    if page_kind == 9 then
+        draw_live()
         return
     end
 

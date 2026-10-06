@@ -56,6 +56,8 @@ try {
     discover: ['init', 'set_mode', 'set_discover', 'draw'],
     cue: ['init', 'set_mode', 'set_cue', 'draw'],
     changes: ['init', 'set_mode', 'set_changes', 'draw'],
+    meters: ['init', 'set_mode', 'set_meters', 'draw'],
+    live: ['init', 'set_mode', 'set_live', 'draw'],
     custom: ['init', 'set_mode', 'set_labels', 'set_values', 'draw'],
   };
   const drawn = {};
@@ -86,9 +88,9 @@ try {
 
   // A call the page does not define is named, where it can be read.
   await page.locator('[data-scene=custom]').click();
-  await page.getByTestId('ctrl49-calls').fill('set_labels s"X"\nset_meters 1 2 3');
+  await page.getByTestId('ctrl49-calls').fill('set_labels s"X"\nset_vu 1 2 3');
   await page.getByTestId('ctrl49-error').waitFor();
-  assert.match(await page.getByTestId('ctrl49-error').innerText(), /no function 'set_meters'/);
+  assert.match(await page.getByTestId('ctrl49-error').innerText(), /no function 'set_vu'/);
 
   // The same page, inside HoSTage: the Controller workspace's screen card draws with no keyboard
   // (the browser has no broker, so the store's stand-in feeds it), and its Page buttons page.
@@ -204,6 +206,26 @@ try {
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_changes');
   assert.ok(await canvasLit() > 1000, 'and draws why there is nothing to compare');
   await host.getByTestId('ctrl49-changes-toggle').click();
+  await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+
+  // LIVE: the mock rack's focused part, its lane plain until drawn; encoder 2 draws one.
+  await host.getByTestId('ctrl49-live-toggle').click();
+  await host.getByTestId('ctrl49-page-right').click();
+  await host.waitForFunction(() => /2\s*\/\s*2\s*Live/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_live');
+  assert.ok(await canvasLit() > 1000, 'and draws the lane and the keys');
+  if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-live.png` });
+  await host.getByTestId('ctrl49-live-toggle').click();
+  await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+
+  // METERS: the demo plays no audio, so the strips are silent; encoder 1 moves the first fader.
+  await host.getByTestId('ctrl49-meters-toggle').click();
+  await host.getByTestId('ctrl49-page-right').click();
+  await host.waitForFunction(() => /2\s*\/\s*2\s*Meters/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_meters');
+  assert.ok(await canvasLit() > 1000, 'and draws the strips');
+  if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-meters.png` });
+  await host.getByTestId('ctrl49-meters-toggle').click();
   await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
 
   // The rest of the firmware's Lua surface, through the real runtime: padding and the font table,

@@ -193,6 +193,128 @@ Bytes buildCuePayload (const CueView& view)
 
 // --- CHANGES --------------------------------------------------------------------------------------
 
+// --- LIVE -----------------------------------------------------------------------------------------
+
+int liveNextRate (int stepsPerBeat, int detents)
+{
+    static constexpr int rates[] { 1, 2, 3, 4, 6, 8, 12, 16 };
+    constexpr int count = (int) (sizeof (rates) / sizeof (rates[0]));
+    int at = 0;
+    while (at < count - 1 && rates[at] < stepsPerBeat)
+        ++at;
+    if (rates[at] != stepsPerBeat && detents < 0 && at > 0)
+        --at, ++detents;                     // between two rates: the first step down lands on the lower
+    else if (rates[at] != stepsPerBeat && detents > 0)
+        --detents;                           // and the first step up on the higher
+    return rates[std::clamp (at + detents, 0, count - 1)];
+}
+
+int liveNextMode (int mode, int detents)
+{
+    return std::clamp (mode + detents, -1, 7);
+}
+
+Bytes buildLivePayload (const LiveView& view)
+{
+    const int steps = std::min (kLiveSteps, (int) view.steps.size());
+    const int zones = std::min (kLiveZones, (int) view.zones.size());
+    const auto tempo = std::clamp ((int) std::lround (view.tempo * 10.0), 0, 65535);
+
+    Bytes out;
+    out.push_back ((std::uint8_t) ((view.arpOn ? 1 : 0) | (view.lane ? 2 : 0)));
+    out.push_back (byte (view.mode, 0, 7));
+    out.push_back (byte (view.stepsPerBeat, 1, 16));
+    out.push_back (byte (view.gate, 0, 100));
+    out.push_back (byte (steps));
+    out.push_back (byte (view.cursor, 0, std::max (0, steps - 1)));
+    out.push_back (view.playing >= 0 && view.playing < steps ? byte (view.playing + 1) : 0);
+    out.push_back ((std::uint8_t) (tempo & 0xFF));
+    out.push_back ((std::uint8_t) (tempo >> 8));
+    out.push_back (byte (view.firstKey, 0, 127 - 48));
+    out.push_back (byte (zones));
+    out.push_back (view.focused >= 0 && view.focused < zones ? (std::uint8_t) view.focused : 255);
+    for (int i = 0; i < steps; ++i)
+    {
+        const auto& step = view.steps[(std::size_t) i];
+        out.push_back (byte (step.velocity, 0, 127));
+        out.push_back (byte (step.octave + 2, 0, 4));
+        out.push_back (byte (step.ratchet, 1, 4));
+        out.push_back (byte (step.chance, 0, 100));
+        out.push_back (step.tie ? 1 : 0);
+    }
+    for (int i = 0; i < zones; ++i)
+    {
+        const auto& zone = view.zones[(std::size_t) i];
+        out.push_back (byte (zone.keyLow, 0, 127));
+        out.push_back (byte (zone.keyHigh, 0, 127));
+        out.push_back (zone.playable ? 1 : 0);
+        appendString (out, zone.name, kLiveNameChars);
+    }
+    for (const auto* notes : { &view.held, &view.arpNotes })
+    {
+        const int count = std::min (kLiveNotes, (int) notes->size());
+        out.push_back (byte (count));
+        for (int i = 0; i < count; ++i)
+            out.push_back (byte ((*notes)[(std::size_t) i], 0, 127));
+    }
+    appendString (out, view.part, kLiveNameChars);
+    return out;
+}
+
+// --- METERS ---------------------------------------------------------------------------------------
+
+std::uint8_t metersLevelByte (float linear)
+{
+    if (! (linear > 0.0f))
+        return 0;
+    const double db = std::isfinite (linear) ? 20.0 * std::log10 ((double) linear) : 6.0;
+    if (db < -57.25)
+        return 0;
+    return byte (1 + (int) std::lround ((std::min (db, 6.0) + 57.0) * 2.0), 1, 127);
+}
+
+float metersNudgeVolume (float volume, int detents)
+{
+    if (detents == 0)
+        return volume;
+    double db = volume > 0.0f ? 20.0 * std::log10 ((double) volume) : -57.5;
+    db = std::min (db + 0.5 * detents, 20.0 * std::log10 (2.0));
+    if (db < -57.0)
+        return 0.0f;
+    return std::clamp ((float) std::pow (10.0, db / 20.0), 0.0f, 2.0f);
+}
+
+int metersFirstPart (int parts, int first)
+{
+    return std::clamp (first, 0, std::max (0, parts - kMetersStrips));
+}
+
+Bytes buildMetersPayload (const MetersView& view)
+{
+    const int count = (int) view.parts.size();
+    const int first = metersFirstPart (count, view.first);
+    const int strips = std::min (kMetersStrips, count - first);
+
+    Bytes out;
+    out.push_back (byte (count));
+    out.push_back (byte (first));
+    out.push_back (byte (strips));
+    out.push_back (view.touched >= 0 && view.touched <= kMetersStrips ? (std::uint8_t) view.touched : 255);
+    for (int i = first; i < first + strips; ++i)
+    {
+        const auto& part = view.parts[(std::size_t) i];
+        out.push_back (metersLevelByte (part.left));
+        out.push_back (metersLevelByte (part.right));
+        out.push_back (metersLevelByte (part.volume));
+        out.push_back ((std::uint8_t) ((part.muted ? 1 : 0) | (part.enabled ? 0 : 2)));
+        appendString (out, part.name, kMetersNameChars);
+    }
+    out.push_back (metersLevelByte (view.masterLeft));
+    out.push_back (metersLevelByte (view.masterRight));
+    out.push_back (metersLevelByte (view.masterVolume));
+    return out;
+}
+
 Bytes buildChangesPayload (const ChangesView& view)
 {
     const int count = (int) view.rows.size();

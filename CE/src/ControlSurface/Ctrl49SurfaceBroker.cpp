@@ -433,7 +433,9 @@ Ctrl49SurfaceBroker::Pages Ctrl49SurfaceBroker::pages() const
     layout.performance = layout.control;
     auto next = layout.performance + 1;
     layout.cue = service.cueOnSurface() ? next++ : -1;
+    layout.live = service.liveOnSurface() ? next++ : -1;
     layout.layers = service.layersOnSurface() ? next++ : -1;
+    layout.meters = service.metersOnSurface() ? next++ : -1;
     layout.soundcheck = service.soundcheckOnSurface() ? next++ : -1;
     layout.discover = service.discoverOnSurface() ? next++ : -1;
     layout.changes = service.changesOnSurface() ? next++ : -1;
@@ -481,6 +483,11 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
     // LAYERS edits a part's zone by turning; the turns of one pump are summed and sent as one
     // edit, so a fast turn is one save of the rack rather than one a detent.
     std::array<int, 8> zoneTurns {};
+    // METERS likewise: E1-E5 the faders of the parts on its strips, E6 the master.
+    std::array<int, 6> meterTurns {};
+    // LIVE likewise: E2-E8 edit the arp, and a pad turns a step on or off (-1 none).
+    std::array<int, 8> liveTurns {};
+    int livePad = -1;
 
     // One reading for both sources: the app's screen sends what the cable sends, so nothing
     // below knows or cares which it was.
@@ -744,6 +751,29 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
                 }
             }
         }
+        else if (reducer.page() == layout.live)
+        {
+            // E1 picks the step, E2-E5 turn its velocity, octave, ratchets and chance, E6-E8 the
+            // arp's gate, rate and mode; pad N turns step N of the half the cursor is in on or off.
+            if (action->encoderMoved && action->encoderSlot == 0)
+                liveCursor = juce::jlimit (0, kLiveSteps - 1, liveCursor + action->encoderDelta);
+            else if (action->encoderMoved && action->encoderSlot >= 1 && action->encoderSlot <= 7)
+                liveTurns[(std::size_t) action->encoderSlot] += action->encoderDelta;
+            else if (action->padChanged && action->pad >= 1 && action->pad <= 8 && action->velocity > 0)
+                livePad = (liveCursor < 8 ? 0 : 8) + action->pad - 1;
+        }
+        else if (reducer.page() == layout.meters)
+        {
+            // E1-E5 the faders of the five parts on the strips, E6 the master, E7 which parts are
+            // on the strips (when the rack has more than five).
+            if (action->encoderMoved && action->encoderSlot >= 0 && action->encoderSlot <= 5)
+            {
+                meterTurns[(std::size_t) action->encoderSlot] += action->encoderDelta;
+                metersTouched = action->encoderSlot;
+            }
+            else if (action->encoderMoved && action->encoderSlot == 6)
+                metersFirst = metersFirstPart (performance.parts.size(), metersFirst + action->encoderDelta);
+        }
         else if (reducer.page() == layout.layers)
         {
             // E1 picks the part; E2-E6 turn its lowest key, highest key, transpose, lowest and
@@ -803,6 +833,37 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
         service.handleCommand (juce::var (payload));
     }
 
+    if (reducer.page() == layout.live
+        && (livePad >= 0 || std::any_of (liveTurns.begin(), liveTurns.end(), [] (int turn) { return turn != 0; })))
+        applyLiveTurns (liveTurns, livePad);
+
+    if (reducer.page() == layout.meters)
+    {
+        // Through the command surface, as the app's mixer sends them: the stage lock refuses
+        // them there, gestures are recorded there and the rack is saved there.
+        const auto& parts = performance.parts;
+        const auto first = metersFirstPart (parts.size(), metersFirst);
+        for (int strip = 0; strip < kMetersStrips; ++strip)
+        {
+            const auto turn = meterTurns[(std::size_t) strip];
+            if (turn == 0 || first + strip >= parts.size())
+                continue;
+            const auto& part = parts.getReference (first + strip);
+            auto* payload = new juce::DynamicObject();
+            payload->setProperty ("cmd", "setPartMixer");
+            payload->setProperty ("partId", part.partId);
+            payload->setProperty ("volume", metersNudgeVolume (part.volume, turn));
+            service.handleCommand (juce::var (payload));
+        }
+        if (meterTurns[5] != 0)
+        {
+            auto* payload = new juce::DynamicObject();
+            payload->setProperty ("cmd", "setMasterLevel");
+            payload->setProperty ("level", metersNudgeVolume (performance.masterLevel, meterTurns[5]));
+            service.handleCommand (juce::var (payload));
+        }
+    }
+
     // A held button steps its pad to the next layer once it has been held long enough. The
     // buttons sit one above each pad and are numbered as the pads are, 1..8.
     if (controlPages > 0 && reducer.page() < controlPages)
@@ -817,6 +878,95 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
                 service.cyclePadLayer (pageId, (int) slot + 1);
             }
     }
+}
+
+int Ctrl49SurfaceBroker::livePart() const
+{
+    const auto& performance = service.getRackHost().getPerformance();
+    for (int i = 0; i < performance.parts.size(); ++i)
+        if (performance.parts.getReference (i).partId == performance.focusedPartId)
+            return i;
+    return performance.parts.isEmpty() ? -1 : 0;
+}
+
+namespace
+{
+    // The arp's step lane as LIVE edits it: every row the length of the longest (the engine
+    // cycles each on its own length, so a shorter row is read cyclically), or sixteen plain
+    // steps when nothing is drawn yet.
+    std::vector<LiveStep> liveLaneOf (const perf::ArpSettings& arp)
+    {
+        const auto length = juce::jmax (arp.velocityPattern.size(), arp.octavePattern.size(), arp.ratchetPattern.size(),
+                                        juce::jmax (arp.chancePattern.size(), arp.tiePattern.size()));
+        const auto at = [] (const juce::Array<int>& row, int i, int fallback)
+        {
+            return row.isEmpty() ? fallback : row[i % row.size()];
+        };
+        std::vector<LiveStep> steps;
+        for (int i = 0; i < (length > 0 ? length : kLiveSteps); ++i)
+            steps.push_back ({ at (arp.velocityPattern, i, 100), at (arp.octavePattern, i, 0),
+                               at (arp.ratchetPattern, i, 1), at (arp.chancePattern, i, 100),
+                               at (arp.tiePattern, i, 0) != 0 });
+        return steps;
+    }
+} // namespace
+
+void Ctrl49SurfaceBroker::applyLiveTurns (const std::array<int, 8>& turns, int padToggled)
+{
+    const auto index = livePart();
+    if (index < 0)
+        return;
+    const auto& part = service.getRackHost().getPerformance().parts.getReference (index);
+    const auto& arp = part.arp;
+    auto* payload = new juce::DynamicObject();
+    payload->setProperty ("cmd", "setPartArp");
+    payload->setProperty ("partId", part.partId);
+
+    // The step edits: the whole lane, so a lane drawn here is one the app's editor shows as it is.
+    const bool stepEdit = padToggled >= 0 || turns[1] != 0 || turns[2] != 0 || turns[3] != 0 || turns[4] != 0;
+    if (stepEdit)
+    {
+        auto steps = liveLaneOf (arp);
+        if (padToggled >= 0 && padToggled < (int) steps.size())
+        {
+            auto& step = steps[(std::size_t) padToggled];
+            step.velocity = step.velocity > 0 ? 0 : 100;
+        }
+        if (juce::isPositiveAndBelow (liveCursor, (int) steps.size()))
+        {
+            auto& step = steps[(std::size_t) liveCursor];
+            step.velocity = juce::jlimit (0, 127, step.velocity + 4 * turns[1]);
+            step.octave = juce::jlimit (-2, 2, step.octave + turns[2]);
+            step.ratchet = juce::jlimit (1, 4, step.ratchet + turns[3]);
+            step.chance = juce::jlimit (0, 100, step.chance + 5 * turns[4]);
+        }
+        juce::Array<juce::var> velocity, octave, ratchet, chance, tie;
+        for (const auto& step : steps)
+        {
+            velocity.add (step.velocity);
+            octave.add (step.octave);
+            ratchet.add (step.ratchet);
+            chance.add (step.chance);
+            tie.add (step.tie ? 1 : 0);
+        }
+        payload->setProperty ("velocityPattern", velocity);
+        payload->setProperty ("octavePattern", octave);
+        payload->setProperty ("ratchetPattern", ratchet);
+        payload->setProperty ("chancePattern", chance);
+        payload->setProperty ("tiePattern", tie);
+    }
+    if (turns[5] != 0)
+        payload->setProperty ("gate", juce::jlimit (0.05, 1.0, (double) arp.gate + 0.05 * turns[5]));
+    if (turns[6] != 0)
+        payload->setProperty ("stepsPerBeat", liveNextRate (arp.stepsPerBeat, turns[6]));
+    if (turns[7] != 0)
+    {
+        const auto mode = liveNextMode (arp.enabled ? (int) arp.mode : -1, turns[7]);
+        payload->setProperty ("enabled", mode >= 0);
+        if (mode >= 0)
+            payload->setProperty ("mode", juce::String (perf::ArpSettings::modeName ((perf::ArpSettings::Mode) mode)));
+    }
+    service.handleCommand (juce::var (payload));
 }
 
 void Ctrl49SurfaceBroker::forgetPadState()
@@ -842,11 +992,19 @@ void Ctrl49SurfaceBroker::paintPads()
     const auto onControlPage = page < layout.control;
     const auto discoverRows = juce::jmin (kDiscoverRows, discoverRead.sounds.size()
                                                          - discoverFirstRow (discoverRead.sounds.size(), discoverSelected));
+    // LIVE: each pad is a step of the half of the lane the cursor is in, lit when it plays.
+    std::vector<LiveStep> liveSteps;
+    if (page == layout.live && livePart() >= 0)
+        liveSteps = liveLaneOf (performance.parts.getReference (livePart()).arp);
     for (int pad = 1; pad <= 8; ++pad)
     {
-        const auto rgb = onControlPage ? service.padLight (performance.pages.getReference (page).pageId, pad,
+        const auto liveStep = (liveCursor < 8 ? 0 : 8) + pad - 1;
+        const auto rgb = page == layout.live ? (liveStep < (int) liveSteps.size()
+                                                  && liveSteps[(std::size_t) liveStep].velocity > 0 ? 0xFFA500 : 0)
+                       : onControlPage ? service.padLight (performance.pages.getReference (page).pageId, pad,
                                                            reducer.padBank())
-                       : page == layout.layers || page == layout.soundcheck || page == layout.changes ? 0
+                       : page == layout.layers || page == layout.meters || page == layout.soundcheck
+                         || page == layout.changes ? 0
                        : page == layout.cue ? (pad == 1 && cuePicked >= 0 ? 0xFFA500 : 0)
                        : page == layout.discover ? (pad <= discoverRows ? 0xFFA500 : 0)
                                                  : 0xFFA500;
@@ -891,6 +1049,8 @@ void Ctrl49SurfaceBroker::emitScreen (const Bytes& labels, const Bytes& state,
     obj->setProperty ("pageKind", reducer.page() == layout.browse        ? "browse"
                                 : reducer.page() == layout.performance   ? "performance"
                                 : reducer.page() == layout.layers        ? "layers"
+                                : reducer.page() == layout.meters        ? "meters"
+                                : reducer.page() == layout.live          ? "live"
                                 : reducer.page() == layout.soundcheck    ? "soundcheck"
                                 : reducer.page() == layout.discover      ? "discover"
                                 : reducer.page() == layout.cue           ? "cue"
@@ -916,7 +1076,70 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
     Bytes labels, state, stage;
     std::string stageCall;
 
-    if (reducer.page() == layout.soundcheck)
+    if (reducer.page() == layout.live)
+    {
+        // The keys as they are played, and the focused part's arp lane with its playhead.
+        const auto& parts = performance.parts;
+        const auto index = livePart();
+        LiveView view;
+        for (int i = 0; i < parts.size(); ++i)
+        {
+            const auto& part = parts.getReference (i);
+            const auto name = part.lastPresetName.isNotEmpty() ? part.lastPresetName
+                            : part.pluginName.isNotEmpty()     ? part.pluginName
+                            : part.midiOutputName.isNotEmpty() ? part.midiOutputName
+                                                               : "Part " + juce::String (i + 1);
+            view.zones.push_back ({ name.toStdString(), part.midi.keyLow, part.midi.keyHigh,
+                                    part.enabled && ! part.mute && part.midiSourcePartId.isEmpty() });
+            if (i == index)
+                view.part = name.toStdString();
+        }
+        view.focused = index;
+        for (const auto& [note, velocity] : service.surfaceHeldNotes())
+            view.held.push_back (note);
+        if (index >= 0)
+        {
+            const auto& part = parts.getReference (index);
+            const auto& arp = part.arp;
+            view.arpOn = arp.enabled;
+            view.mode = (int) arp.mode;
+            view.stepsPerBeat = arp.stepsPerBeat;
+            view.gate = juce::roundToInt (arp.gate * 100.0f);
+            view.steps = liveLaneOf (arp);
+            view.lane = ! arp.velocityPattern.isEmpty() || ! arp.octavePattern.isEmpty() || ! arp.ratchetPattern.isEmpty()
+                     || ! arp.chancePattern.isEmpty() || ! arp.tiePattern.isEmpty();
+            if ((int) view.steps.size() > kLiveSteps)
+                view.steps.resize ((std::size_t) kLiveSteps);
+            view.playing = service.getRackHost().arpLiveStep (part.partId);
+            const auto notes = service.getRackHost().arpLiveNotes (part.partId);
+            for (int n = 0; n < 128; ++n)
+                if (((notes[(std::size_t) (n >> 6)] >> (n & 63)) & 1) != 0)
+                    view.arpNotes.push_back (n);
+        }
+        liveCursor = juce::jlimit (0, juce::jmax (0, (int) view.steps.size() - 1), liveCursor);
+        view.cursor = liveCursor;
+        view.tempo = service.surfaceTransport().tempo;
+        stage = buildLivePayload (view);
+        stageCall = "set_live";
+    }
+    else if (reducer.page() == layout.meters)
+    {
+        // The rack's own meters, the loudest peak since the last redraw, and the faders.
+        const auto meters = service.takeSurfaceMeters();
+        MetersView view;
+        for (const auto& part : meters.parts)
+            view.parts.push_back ({ part.name.toStdString(), part.left, part.right, part.volume,
+                                    part.muted, part.enabled });
+        metersFirst = metersFirstPart ((int) view.parts.size(), metersFirst);
+        view.first = metersFirst;
+        view.touched = metersTouched;
+        view.masterLeft = meters.masterLeft;
+        view.masterRight = meters.masterRight;
+        view.masterVolume = meters.masterVolume;
+        stage = buildMetersPayload (view);
+        stageCall = "set_meters";
+    }
+    else if (reducer.page() == layout.soundcheck)
     {
         // What the app's soundcheck holds, song by song: checked or not, what the check found,
         // the measured level. E1 moves through the set; it starts on the song on stage.

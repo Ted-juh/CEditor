@@ -59,7 +59,8 @@ import {
 import { stageCommandAllowed } from '../utils/stageLock.js';
 import { rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload,
          soundcheckPayload, layersPayload, discoverPayload, discoverFirstRow, cuePayload,
-         changesPayload } from '../screen/ctrl49Payloads.js';
+         changesPayload, metersPayload, metersFirstPart, metersNudgeVolume, livePayload, liveNextRate, liveNextMode,
+         ARP_MODE_NAMES } from '../screen/ctrl49Payloads.js';
 import { receiveHostMeters, resetHostMeters } from './hostMeters.js';
 import {
   RESPONSE_CURVES, normalizeResponseCurvePoints,
@@ -301,7 +302,7 @@ export function emptySurfaceScreen() {
 // A stage page is one call with one payload instead of a knob page's set_labels + set_values.
 // Only these two: the name is a function the page runs, so nothing else is let through.
 export const SURFACE_STAGE_CALLS = { layers: 'set_layers', soundcheck: 'set_check', discover: 'set_discover', cue: 'set_cue',
-                                     changes: 'set_changes' };
+                                     changes: 'set_changes', meters: 'set_meters', live: 'set_live' };
 
 export function normalizeSurfaceScreen(payload) {
   const bytes = (list) => (Array.isArray(list) ? list : [])
@@ -314,7 +315,7 @@ export function normalizeSurfaceScreen(payload) {
     payload: bytes(payload?.payload),
     pageIndex: Math.max(0, Math.min(count - 1, Math.trunc(Number(payload?.pageIndex ?? 0) || 0))),
     pageCount: count,
-    pageKind: ['control', 'performance', 'browse', 'layers', 'soundcheck', 'discover', 'cue', 'changes']
+    pageKind: ['control', 'performance', 'browse', 'layers', 'soundcheck', 'discover', 'cue', 'changes', 'meters', 'live']
       .includes(payload?.pageKind)
       ? payload.pageKind : 'control',
     pageId: String(payload?.pageId ?? ''),
@@ -345,11 +346,12 @@ export const surfaceInput = (cc, value) =>
 // nudging its slot. Built with the same payload builders the C++ uses, so the screen still draws.
 // The mock does not keep slot values (setControlSlotValue only drives its parameter view), so
 // the stand-in remembers where it turned each knob.
-const mockSurfaceCursor = writable({ page: 0, active: 0, turned: {}, song: -1, part: -1, sound: 0, kind: '', picked: -1 });
+const mockSurfaceCursor = writable({ page: 0, active: 0, turned: {}, song: -1, part: -1, sound: 0, kind: '', picked: -1,
+                                     first: 0, touched: -1, step: 0 });
 
 /** The stage pages the mock's surface has, in the broker's order: after the performance page. */
 function mockStagePages(state) {
-  return ['cue', 'layers', 'soundcheck', 'discover', 'changes'].filter((kind) => state?.surfacePages?.[kind] === true);
+  return ['cue', 'live', 'layers', 'meters', 'soundcheck', 'discover', 'changes'].filter((kind) => state?.surfacePages?.[kind] === true);
 }
 
 const clampStage = (value, low, high) => Math.max(low, Math.min(high, Math.trunc(Number(value) || 0)));
@@ -433,8 +435,52 @@ function mockCueScreen(state, cursor) {
   }) };
 }
 
+// LIVE over the mock rack, as the broker builds it: the focused part's arp lane (or sixteen plain
+// steps when none is drawn), every part's zone. The demo plays nothing, so no playhead or notes.
+function mockLivePart(state) {
+  const parts = state?.rack?.parts ?? [];
+  const at = parts.findIndex((p) => p.partId === state?.rack?.focusedPartId);
+  return at >= 0 ? at : parts.length ? 0 : -1;
+}
+function mockLiveLane(arp) {
+  const rows = [arp?.velocityPattern, arp?.octavePattern, arp?.ratchetPattern, arp?.chancePattern, arp?.tiePattern]
+    .map((row) => (Array.isArray(row) ? row : []));
+  const length = Math.max(...rows.map((row) => row.length));
+  const at = (row, i, fallback) => (row.length ? row[i % row.length] : fallback);
+  return Array.from({ length: length || 16 }, (_, i) => ({
+    velocity: at(rows[0], i, 100), octave: at(rows[1], i, 0), ratchet: at(rows[2], i, 1), chance: at(rows[3], i, 100),
+    tie: at(rows[4], i, 0) !== 0 }));
+}
+
 function mockStageScreen(kind, state, cursor, library) {
   if (kind === 'cue') return mockCueScreen(state, cursor);
+  if (kind === 'live') {
+    const parts = state?.rack?.parts ?? [];
+    const index = mockLivePart(state);
+    const arp = parts[index]?.arp ?? {};
+    const steps = mockLiveLane(arp).slice(0, 16);
+    const name = (p, i) => p.presetName || p.pluginName || `Part ${i + 1}`;
+    return { call: SURFACE_STAGE_CALLS.live, payload: livePayload({
+      part: index >= 0 ? name(parts[index], index) : '', arpOn: arp.enabled === true,
+      mode: Math.max(0, ARP_MODE_NAMES.indexOf(arp.mode)), stepsPerBeat: arp.stepsPerBeat ?? 4,
+      gate: Math.round((arp.gate ?? 0.5) * 100), steps, cursor: Math.min(cursor.step ?? 0, steps.length - 1),
+      lane: ['velocityPattern', 'octavePattern', 'ratchetPattern', 'chancePattern', 'tiePattern'].some((k) => arp[k]?.length),
+      tempo: Number(state?.performance?.transport?.tempo ?? 120) || 120,
+      zones: parts.map((p, i) => ({ name: name(p, i), keyLow: p.keyLow ?? 0, keyHigh: p.keyHigh ?? 127,
+                                    playable: p.enabled !== false && p.mute !== true && !p.midiSourcePartId })),
+      focused: index,
+    }) };
+  }
+  if (kind === 'meters') {
+    // The faders are the mock rack's; the demo plays no audio, so every level is silence.
+    const parts = state?.rack?.parts ?? [];
+    return { call: SURFACE_STAGE_CALLS.meters, payload: metersPayload({
+      parts: parts.map((p, i) => ({ name: p.presetName || p.pluginName || `Part ${i + 1}`, volume: p.volume ?? 1,
+                                    muted: p.mute === true, enabled: p.enabled !== false })),
+      first: cursor.first ?? 0, touched: cursor.touched ?? -1,
+      masterVolume: state?.product?.daw?.masterLevel ?? 1,
+    }) };
+  }
   if (kind === 'changes') {
     // Changes are read through the plug-in, which only HoSTage has: the demo says so rather than
     // making some up.
@@ -517,7 +563,58 @@ export function mockSurfaceScreen(state, cursor, library) {
 // The stage pages' encoders, as the broker reads them: LAYERS E1 picks the part and E2-E6 turn
 // its zone (lowest key, highest key, transpose, lowest and highest velocity); SOUNDCHECK E1
 // walks the set and E8 checks it again.
+function mockLiveEdit(state, cursor, turns, pad) {
+  const parts = state?.rack?.parts ?? [];
+  const part = parts[mockLivePart(state)];
+  if (!part) return;
+  const arp = part.arp ?? {};
+  const edit = { cmd: 'setPartArp', partId: part.partId };
+  if (pad >= 0 || turns[1] || turns[2] || turns[3] || turns[4]) {
+    const steps = mockLiveLane(arp);
+    if (pad >= 0 && steps[pad]) steps[pad].velocity = steps[pad].velocity > 0 ? 0 : 100;
+    const step = steps[cursor.step ?? 0];
+    if (step) {
+      step.velocity = clampStage(step.velocity + 4 * (turns[1] ?? 0), 0, 127);
+      step.octave = clampStage(step.octave + (turns[2] ?? 0), -2, 2);
+      step.ratchet = clampStage(step.ratchet + (turns[3] ?? 0), 1, 4);
+      step.chance = clampStage(step.chance + 5 * (turns[4] ?? 0), 0, 100);
+    }
+    Object.assign(edit, { velocityPattern: steps.map((s) => s.velocity), octavePattern: steps.map((s) => s.octave),
+                          ratchetPattern: steps.map((s) => s.ratchet), chancePattern: steps.map((s) => s.chance),
+                          tiePattern: steps.map((s) => (s.tie ? 1 : 0)) });
+  }
+  if (turns[5]) edit.gate = Math.max(0.05, Math.min(1, (arp.gate ?? 0.5) + 0.05 * turns[5]));
+  if (turns[6]) edit.stepsPerBeat = liveNextRate(arp.stepsPerBeat ?? 4, turns[6]);
+  if (turns[7]) {
+    const mode = liveNextMode(arp.enabled ? Math.max(0, ARP_MODE_NAMES.indexOf(arp.mode)) : -1, turns[7]);
+    edit.enabled = mode >= 0;
+    if (mode >= 0) edit.mode = ARP_MODE_NAMES[mode];
+  }
+  send(edit);
+}
+
 function mockStageTurn(kind, state, cursor, encoder, delta) {
+  if (kind === 'live') {
+    // E1 the step, E2-E5 its velocity, octave, ratchets and chance, E6-E8 gate, rate, mode.
+    if (encoder === 0) { mockSurfaceCursor.set({ ...cursor, active: 0, step: clampStage((cursor.step ?? 0) + delta, 0, 15) }); return; }
+    const turns = [0, 0, 0, 0, 0, 0, 0, 0];
+    turns[encoder] = delta;
+    mockLiveEdit(state, cursor, turns, -1);
+    return;
+  }
+  if (kind === 'meters') {
+    // E1-E5 the faders of the parts on the strips, E6 the master, E7 which parts are on the strips.
+    const parts = state?.rack?.parts ?? [];
+    const first = metersFirstPart(parts.length, cursor.first ?? 0);
+    if (encoder === 6) { mockSurfaceCursor.set({ ...cursor, active: 0, first: metersFirstPart(parts.length, first + delta) }); return; }
+    if (encoder > 5) return;
+    mockSurfaceCursor.set({ ...cursor, active: 0, first, touched: encoder });
+    if (encoder === 5) send({ cmd: 'setMasterLevel', level: metersNudgeVolume(state?.product?.daw?.masterLevel ?? 1, delta) });
+    else if (parts[first + encoder])
+      send({ cmd: 'setPartMixer', partId: parts[first + encoder].partId,
+             volume: metersNudgeVolume(parts[first + encoder].volume ?? 1, delta) });
+    return;
+  }
   if (kind === 'cue') {
     const setlist = state?.performance?.setlist ?? { items: [], currentIndex: -1 };
     if (encoder !== 0 || setlist.items.length === 0) return;
@@ -579,6 +676,9 @@ function mockSurfaceInput(data) {
     // Pad 1 goes to the song E1 picked, as setlistGo does on the keyboard.
     mockSurfaceCursor.set({ ...cursor, picked: -1 });
     send({ cmd: 'setlistGo', index: cursor.picked });
+  } else if (cc >= 1 && cc <= 8 && value > 0 && stage[cursor.page - controlPages - 1] === 'live') {
+    // A pad turns a step of the cursor's half on or off.
+    mockLiveEdit(state, cursor, [0, 0, 0, 0, 0, 0, 0, 0], ((cursor.step ?? 0) < 8 ? 0 : 8) + cc - 1);
   } else if (cc >= 1 && cc <= 8 && value > 0 && stage[cursor.page - controlPages - 1] === 'discover') {
     // A pad auditions the sound in its row, as on the keyboard.
     const d = mockDiscover(cursor, get(hostLibrary));
@@ -2213,7 +2313,8 @@ export function emptyHostState() {
     performance: emptyPerformance(),
     soundcheck: normalizeSoundcheck(),
     // The CTRL49's pages beyond the knobs: on the keyboard only once asked for, like the browser.
-    surfacePages: { soundcheck: false, layers: false, discover: false, cue: false, changes: false },
+    surfacePages: { soundcheck: false, layers: false, discover: false, cue: false, changes: false, meters: false,
+                    live: false },
     product: emptyProduct(),
     reliability: emptyReliability(),
     licence: emptyLicence(),
@@ -2578,6 +2679,12 @@ export const cueOnSurface = (on) =>
 /** CHANGES on the CTRL49: the focused part's sound against its saves, heard and put back. */
 export const changesOnSurface = (on) =>
   send(on === undefined ? { cmd: 'changesOnSurface' } : { cmd: 'changesOnSurface', on });
+/** LIVE on the CTRL49: the keys as played, the zones, and the focused part's arp lane to edit. */
+export const liveOnSurface = (on) =>
+  send(on === undefined ? { cmd: 'liveOnSurface' } : { cmd: 'liveOnSurface', on });
+/** METERS on the CTRL49: every part's level and fader, and the master's; E1-E6 turn the faders. */
+export const metersOnSurface = (on) =>
+  send(on === undefined ? { cmd: 'metersOnSurface' } : { cmd: 'metersOnSurface', on });
 /** DISCOVER on the CTRL49: what you own and have never opened, nearest to what you load. */
 export const discoverOnSurface = (on) =>
   send(on === undefined ? { cmd: 'discoverOnSurface' } : { cmd: 'discoverOnSurface', on });
@@ -4497,7 +4604,8 @@ export function normalizeHostState(payload) {
     soundcheck: normalizeSoundcheck(p.soundcheck),
     surfacePages: { soundcheck: p.surfacePages?.soundcheck === true, layers: p.surfacePages?.layers === true,
                     discover: p.surfacePages?.discover === true, cue: p.surfacePages?.cue === true,
-                    changes: p.surfacePages?.changes === true },
+                    changes: p.surfacePages?.changes === true, meters: p.surfacePages?.meters === true,
+                    live: p.surfacePages?.live === true },
     licence: normalizeLicence(p.licence),
     rack: {
       performanceId: String(rack.performanceId ?? ''),
@@ -5745,9 +5853,10 @@ export function applyMockCommand(state, payload) {
     return next;
   }
   if (cmd === 'soundcheckOnSurface' || cmd === 'layersOnSurface' || cmd === 'discoverOnSurface' || cmd === 'cueOnSurface'
-      || cmd === 'changesOnSurface') {
+      || cmd === 'changesOnSurface' || cmd === 'metersOnSurface' || cmd === 'liveOnSurface') {
     const key = { soundcheckOnSurface: 'soundcheck', layersOnSurface: 'layers', discoverOnSurface: 'discover',
-                  cueOnSurface: 'cue', changesOnSurface: 'changes' }[cmd];
+                  cueOnSurface: 'cue', changesOnSurface: 'changes', metersOnSurface: 'meters',
+                  liveOnSurface: 'live' }[cmd];
     next.surfacePages[key] = payload.on === undefined ? !next.surfacePages[key] : payload.on === true;
     if (key === 'soundcheck' && next.surfacePages.soundcheck) return applyMockCommand(next, { cmd: 'checkSetlistSoundcheck' });
     return next;

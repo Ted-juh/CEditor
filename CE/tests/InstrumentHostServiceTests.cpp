@@ -5138,6 +5138,214 @@ void testCtrl49StagePages()
     check (unpaid.service->layersOnSurface(), "while LAYERS, which only shows the rack, is there for anyone");
 }
 
+void testCtrl49Meters()
+{
+    std::cout << "\nthe CTRL49's METERS page: every part's level and fader, turned from the encoders" << std::endl;
+
+    using ceditor::ctrl49::Ctrl49SurfaceBroker;
+
+    const auto dir = freshDataDir ("surface-meters");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("addPart");
+
+    double fakeNow = 0.0;
+    Ctrl49SurfaceBroker::Options options;
+    options.discover = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+    options.emit = [&h] (const juce::String& name, const juce::var& payload)
+    {
+        h.emits.entries.push_back ({ name, payload });
+    };
+    options.pageLua = { 't' };
+    options.now = [&fakeNow] { return fakeNow; };
+    Ctrl49SurfaceBroker broker (*h.service, options);
+
+    const auto tickPast = [&] { fakeNow += 150.0; broker.tick(); };
+    const auto press = [&] (int cc, int value)
+    {
+        juce::Array<juce::var> data { 0xB0, cc, value };
+        h.cmd ("surfaceInput", { { "data", juce::var (data) } });
+    };
+    const auto screen = [&h] { return h.emits.last ("instrumentHostSurfaceScreen"); };
+    const auto payload = [&screen]
+    {
+        std::vector<int> bytes;
+        if (const auto* s = screen())
+            if (const auto* array = s->getProperty ("payload", {}).getArray())
+                for (const auto& b : *array)
+                    bytes.push_back ((int) b);
+        return bytes;
+    };
+    const auto at = [] (const std::vector<int>& b, std::size_t i) { return i < b.size() ? b[i] : -1; };
+    const auto& performance = h.service->getRackHost().getPerformance();
+    const auto near = [] (float a, float b) { return std::abs (a - b) < 1.0e-3f; };
+
+    tickPast();
+    check (broker.pages().meters < 0, "METERS is not on the surface until it is asked for");
+    h.cmd ("layersOnSurface", { { "on", true } });
+    h.cmd ("metersOnSurface", { { "on", true } });
+    const auto layout = broker.pages();
+    check (layout.meters == layout.layers + 1 && layout.count == layout.meters + 1,
+           "asked for, it follows LAYERS: the pages read on stage first");
+    check ((bool) h.emits.lastState()->getProperty ("surfacePages", {}).getProperty ("meters", false),
+           "and the app's state says it is on");
+
+    for (int i = 0; i < layout.count && broker.currentPage() != layout.meters; ++i)
+    {
+        press (40, 127);
+        tickPast();
+    }
+    check (screen() != nullptr && screen()->getProperty ("pageKind", {}).toString() == "meters"
+             && screen()->getProperty ("call", {}).toString() == "set_meters",
+           "Page Right walks to it, one set_meters payload");
+    auto bytes = payload();
+    check (at (bytes, 0) == 2 && at (bytes, 1) == 0 && at (bytes, 2) == 2 && at (bytes, 3) == 255,
+           "both parts on strips, none turned yet");
+    check (at (bytes, 6) == 115 && at (bytes, 4) == 0, "a fresh part's fader at unity (0 dB is 115), and silent");
+
+    press (11, 2);                                   // E1: the first part up a decibel
+    press (16, 127);                                 // E6: the master down half a decibel
+    tickPast();
+    check (near (performance.parts.getReference (0).volume, std::pow (10.0f, 1.0f / 20.0f)),
+           "E1 turns the first part's fader, half a decibel a detent");
+    check (near (performance.masterLevel, std::pow (10.0f, -0.5f / 20.0f)), "E6 turns the master");
+    check (near (performance.parts.getReference (1).volume, 1.0f), "and the other part is left alone");
+    bytes = payload();
+    check (at (bytes, 3) == 5 && at (bytes, 6) == 117, "the page shows the strip turned last, and the fader where it is now");
+
+    h.cmd ("setPartMixer", { { "partId", performance.parts.getReference (1).partId }, { "mute", true } });
+    tickPast();
+    bytes = payload();
+    const auto second = 4 + 5 + (std::size_t) at (bytes, 8);    // past the first strip and its name
+    check (at (bytes, second + 3) == 1, "a muted part says so");
+
+    h.cmd ("metersOnSurface", { { "on", false } });
+    tickPast();
+    check (broker.pages().meters < 0 && screen()->getProperty ("pageKind", {}).toString() == "layers",
+           "turned off while it is up, the surface steps back to the page before it");
+}
+
+void testCtrl49Live()
+{
+    std::cout << "\nthe CTRL49's LIVE page: the keys as played, and the focused part's arp lane drawn from the encoders" << std::endl;
+
+    using ceditor::ctrl49::Ctrl49SurfaceBroker;
+
+    const auto dir = freshDataDir ("surface-live");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("addPart");
+
+    double fakeNow = 0.0;
+    Ctrl49SurfaceBroker::Options options;
+    options.discover = []() -> std::unique_ptr<ceditor::ctrl49::Ctrl49SurfaceEndpoints> { return nullptr; };
+    options.emit = [&h] (const juce::String& name, const juce::var& payload)
+    {
+        h.emits.entries.push_back ({ name, payload });
+    };
+    options.pageLua = { 't' };
+    options.now = [&fakeNow] { return fakeNow; };
+    Ctrl49SurfaceBroker broker (*h.service, options);
+
+    const auto tickPast = [&] { fakeNow += 150.0; broker.tick(); };
+    const auto press = [&] (int cc, int value)
+    {
+        juce::Array<juce::var> data { 0xB0, cc, value };
+        h.cmd ("surfaceInput", { { "data", juce::var (data) } });
+    };
+    const auto screen = [&h] { return h.emits.last ("instrumentHostSurfaceScreen"); };
+    const auto payload = [&screen]
+    {
+        std::vector<int> bytes;
+        if (const auto* s = screen())
+            if (const auto* array = s->getProperty ("payload", {}).getArray())
+                for (const auto& b : *array)
+                    bytes.push_back ((int) b);
+        return bytes;
+    };
+    const auto at = [] (const std::vector<int>& b, std::size_t i) { return i < b.size() ? b[i] : -1; };
+    const auto& performance = h.service->getRackHost().getPerformance();
+    const auto focusedArp = [&performance]() -> const ceditor::perf::ArpSettings&
+    {
+        for (const auto& part : performance.parts)
+            if (part.partId == performance.focusedPartId)
+                return part.arp;
+        return performance.parts.getReference (0).arp;
+    };
+
+    tickPast();
+    check (broker.pages().live < 0, "LIVE is not on the surface until it is asked for");
+    h.cmd ("cueOnSurface", { { "on", true } });
+    h.cmd ("liveOnSurface", { { "on", true } });
+    h.cmd ("layersOnSurface", { { "on", true } });
+    const auto layout = broker.pages();
+    check (layout.live == layout.cue + 1 && layout.layers == layout.live + 1,
+           "asked for, it comes between CUE and LAYERS");
+    check ((bool) h.emits.lastState()->getProperty ("surfacePages", {}).getProperty ("live", false),
+           "and the app's state says it is on");
+    for (int i = 0; i < layout.count && broker.currentPage() != layout.live; ++i)
+    {
+        press (40, 127);
+        tickPast();
+    }
+    check (screen() != nullptr && screen()->getProperty ("pageKind", {}).toString() == "live"
+             && screen()->getProperty ("call", {}).toString() == "set_live",
+           "Page Right walks to it, one set_live payload");
+    auto bytes = payload();
+    check (at (bytes, 0) == 0 && at (bytes, 4) == 16 && at (bytes, 10) == 2,
+           "a fresh part: arp off, no lane drawn, sixteen plain steps, both parts' zones");
+    check (at (bytes, 12) == 100 && at (bytes, 13) == 2 && at (bytes, 14) == 1 && at (bytes, 15) == 100,
+           "a plain step: velocity 100, no octave, one hit, always");
+
+    press (12, 2);                                   // E2: the first step's velocity up two detents
+    press (18, 1);                                   // E8: the arp on, up
+    press (17, 1);                                   // E7: the rate from 1/16 to 1/16T (6 a beat)
+    press (16, 127);                                 // E6: the gate down a twentieth
+    tickPast();
+    auto arp = focusedArp();
+    check (arp.velocityPattern.size() == 16 && arp.velocityPattern[0] == 108 && arp.velocityPattern[1] == 100
+             && arp.chancePattern.size() == 16 && arp.ratchetPattern.size() == 16,
+           "E2 draws the lane: the first step four louder a detent, every row sixteen long");
+    check (arp.enabled && arp.mode == ceditor::perf::ArpSettings::Mode::up, "E8 turns the arp on, at its first mode");
+    check (arp.stepsPerBeat == 6, "E7 steps the rate");
+    check (std::abs (arp.gate - 0.45f) < 1.0e-4f, "E6 the gate, a twentieth a detent");
+    bytes = payload();
+    check (at (bytes, 0) == 3 && at (bytes, 12) == 108, "the page shows the arp on, the lane drawn, the step as it now is");
+
+    press (11, 3);                                   // E1: step four
+    press (13, 1);                                   // E3: an octave up
+    press (14, 2);                                   // E4: three hits
+    press (15, 127);                                 // E5: a little less likely
+    tickPast();
+    arp = focusedArp();
+    check (arp.octavePattern[3] == 1 && arp.ratchetPattern[3] == 3 && arp.chancePattern[3] == 95,
+           "E1 picks the step, E3-E5 turn its octave, ratchets and chance");
+
+    press (2, 100);                                  // pad 2: the second step off
+    tickPast();
+    check (focusedArp().velocityPattern[1] == 0, "a pad turns its step into a rest");
+    press (2, 100);
+    tickPast();
+    check (focusedArp().velocityPattern[1] == 100, "and back on");
+
+    press (18, 127);
+    tickPast();
+    check (! focusedArp().enabled, "E8 turned back past the first mode turns the arp off");
+
+    h.cmd ("setStageLock", { { "enabled", true } });
+    h.emits.clear();
+    press (12, 5);
+    tickPast();
+    check (focusedArp().velocityPattern[0] == 108 && h.emits.lastError().isNotEmpty(),
+           "under Stage Lock the lane stays as it is, refused aloud as the app's editor is");
+}
+
 void testCtrl49Changes()
 {
     std::cout << "\nthe CTRL49's CHANGES page: the sound against its saves, heard and put back" << std::endl;
@@ -14799,6 +15007,8 @@ int main (int argc, char* argv[])
     testCtrl49Broker();
     testCtrl49AppScreen();
     testCtrl49StagePages();
+    testCtrl49Meters();
+    testCtrl49Live();
     testCtrl49Discover();
     testCtrl49Cue();
     testCtrl49Changes();

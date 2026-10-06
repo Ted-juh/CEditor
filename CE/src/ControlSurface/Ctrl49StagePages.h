@@ -1,6 +1,6 @@
 // Ctrl49StagePages — the payloads for the HoSTage pages on the CTRL49 screen that are not knob
-// pages: SOUNDCHECK (the setlist checked before the show) and LAYERS (which part sounds where on
-// the keyboard), which a player reads on stage, and DISCOVER (what you own and have never opened,
+// pages: SOUNDCHECK (the setlist checked before the show), LAYERS (which part sounds where on
+// the keyboard) and METERS (every part's level), which a player reads on stage, and DISCOVER (what you own and have never opened,
 // nearest to what you keep loading), which you go to between songs.
 //
 // All three were mocked up first in tools/ctrl49/screen-lab/feature-mockups (hostage-rig), from
@@ -205,6 +205,113 @@ inline constexpr int kChangesRows = 8;
       then each row: [saved 0-100][now 0-100][name][saved text][now text]
     Names stop at 20 characters, values at 10, the problem at 44. */
 Bytes buildChangesPayload (const ChangesView& view);
+
+// --- LIVE -----------------------------------------------------------------------------------------
+//
+// The keys as you play them: every part's zone over 49 keys, the keys held in the colour of the
+// part that plays them, the notes the focused part's arpeggiator plays from them marked; and that
+// arpeggiator's step lane (ArpSettings: velocity, octave, ratchets, chance per step) with its
+// playhead, which E1-E5 edit and E6-E8 set the gate, rate and mode of.
+
+struct LiveStep
+{
+    int velocity = 100;    // 0: a rest
+    int octave = 0;        // -2..+2
+    int ratchet = 1;       // 1..4 hits in the step
+    int chance = 100;      // 0..100 %
+    bool tie = false;      // held into the next step
+};
+
+struct LiveZone
+{
+    std::string name;
+    int keyLow = 0, keyHigh = 127;
+    bool playable = true;  // enabled, not muted, and taking the keyboard's notes
+};
+
+struct LiveView
+{
+    std::string part;                 // the part whose arpeggiator is shown
+    bool arpOn = false;
+    int mode = 0;                     // ArpSettings::Mode
+    int stepsPerBeat = 4;
+    int gate = 50;                    // percent of a step
+    bool lane = false;                // the arp has a drawn lane; without one every step plays as played
+    std::vector<LiveStep> steps;      // the lane, up to kLiveSteps
+    int cursor = 0;                   // the step E2-E5 edit
+    int playing = -1;                 // the step that last sounded; -1 none
+    double tempo = 120.0;
+    std::vector<LiveZone> zones;      // the rack's parts, in order
+    int focused = -1;                 // which zone is the part shown
+    int firstKey = 36;                // the 49 keys drawn start here (C2)
+    std::vector<int> held, arpNotes;  // notes held on the keys, notes the arp plays
+};
+
+inline constexpr int kLiveSteps = 16;
+inline constexpr int kLiveZones = 6;
+inline constexpr int kLiveNotes = 16;
+inline constexpr std::size_t kLiveNameChars = 16;
+
+/** E7 on LIVE: the arp's rate, steps per beat, through 1 2 3 4 6 8 12 16 (a turn's detents at
+    once; a rate between two goes to the next one in the turn's direction). */
+int liveNextRate (int stepsPerBeat, int detents);
+
+/** E8 on LIVE: the arp's mode, with off before the first (-1 off, else ArpSettings::Mode 0-7). */
+int liveNextMode (int mode, int detents);
+
+/** set_live payload:
+      [0] flags: 1 arp on, 2 a drawn lane   [1] mode   [2] steps per beat   [3] gate %
+      [4] steps that follow   [5] cursor   [6] playing + 1 (0 none)   [7][8] tempo x 10, low first
+      [9] first key   [10] zones that follow   [11] focused zone (255 none)
+      then each step: [velocity][octave + 2][ratchet][chance][tie]
+      then each zone: [key low][key high][flags: 1 playable][name]
+      then [held][note]...  [arp notes][note]...  then [part name]
+    Zones stop at six, notes at sixteen each, names at sixteen characters. */
+Bytes buildLivePayload (const LiveView& view);
+
+// --- METERS ---------------------------------------------------------------------------------------
+//
+// Every part's level after its inserts and fader, left and right, and the master's, as the rack
+// meters them for the app; the faders on E1-E5 and the master on E6. Peak hold, clip and the
+// master's last seconds the page keeps itself, from the levels it is sent.
+
+struct MetersPartView
+{
+    std::string name;
+    float left = 0.0f, right = 0.0f;   // linear peak since the last redraw, 1 = 0 dBFS
+    float volume = 1.0f;               // the fader, linear 0..2
+    bool muted = false, enabled = true;
+};
+
+struct MetersView
+{
+    std::vector<MetersPartView> parts;   // the rack's parts, in order
+    int first = 0;                       // the first part on a strip; E7 moves it
+    int touched = -1;                    // the strip whose encoder turned last: 0-4 a part, 5 the master
+    float masterLeft = 0.0f, masterRight = 0.0f, masterVolume = 1.0f;
+};
+
+inline constexpr int kMetersStrips = 5;              // part strips; the master is a sixth
+inline constexpr std::size_t kMetersNameChars = 12;
+
+/** A level or a fader as one byte: 0 silence (or below -57 dB, or a fader at zero), else 1-127 for
+    -57..+6 dB in half decibels; 0 dB is 115, and anything over it is a clip. */
+std::uint8_t metersLevelByte (float linear);
+
+/** The first part on a strip, kept so that there are five where the rack has them. */
+int metersFirstPart (int parts, int first);
+
+/** A fader turned on METERS: half a decibel a detent, from off (0) to +6 dB (2.0, the mixer's
+    top). Turning down past -57 dB is off; turning up from off starts at -57 dB. */
+float metersNudgeVolume (float volume, int detents);
+
+/** set_meters payload:
+      [0] parts in the rack   [1] first part on a strip   [2] strips that follow (0-5)
+      [3] the strip turned last (0-4, 5 the master, 255 none)
+      then each strip: [left][right][fader][flags: 1 muted, 2 off][name]
+      then the master: [left][right][fader]
+    Levels and faders are metersLevelByte; names stop at 12 characters. */
+Bytes buildMetersPayload (const MetersView& view);
 
 // --- DISCOVER -------------------------------------------------------------------------------------
 //

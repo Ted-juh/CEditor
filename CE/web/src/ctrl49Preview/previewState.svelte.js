@@ -79,6 +79,31 @@ export const preview = $state({
     ],
   },
 
+  // The keys as played and the focused part's arp: C minor held with the left hand, the arp on
+  // the strings part playing the third of it.
+  live: {
+    part: 'String Pad', arpOn: true, mode: 0, stepsPerBeat: 4, gate: 50, lane: true, cursor: 2, playing: 5, tempo: 112,
+    steps: [100, 70, 90, 0, 110, 70, 90, 60, 100, 70, 0, 80, 120, 70, 90, 0].map((velocity, i) => ({
+      velocity, octave: i === 2 || i === 10 ? 1 : i === 7 ? -1 : 0, ratchet: i === 12 ? 2 : 1, chance: i === 7 ? 60 : 100,
+    })),
+    zones: [{ name: 'Sub Bass', keyLow: 36, keyHigh: 54 }, { name: 'String Pad', keyLow: 55, keyHigh: 84 },
+            { name: 'Bell Pluck', keyLow: 55, keyHigh: 84, playable: true }],
+    focused: 1, held: [43, 60, 63, 67], arpNotes: [63],
+  },
+
+  // Every part's level and fader, in dB; -60 or lower is silence. Bass is clipping.
+  meters: {
+    first: 0, touched: 0, master: -4,
+    parts: [
+      { name: 'Bass', left: 1, right: 0, fader: 0 },
+      { name: 'Piano', left: -9, right: -8, fader: -3 },
+      { name: 'Pad', left: -14, right: -15, fader: -2 },
+      { name: 'Brass', left: -21, right: -19, fader: -5, muted: false },
+      { name: 'Bell', left: -60, right: -60, fader: -6 },
+      { name: 'Strings', left: -12, right: -12, fader: 0 },
+    ],
+  },
+
   // The focused part's sound against a save of it (state: 0 a problem, 1 nothing changed, 2 changed).
   changes: {
     state: 2, selected: 1, total: 312, listen: 100, back: 0, saves: 3, putBack: 0,

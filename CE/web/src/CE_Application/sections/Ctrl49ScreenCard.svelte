@@ -9,11 +9,12 @@
    * Left/Right, the eight encoders (drag or scroll on a knob, or the steppers), the encoder
    * switches (click a knob) and the pads. The keyboard, when there is one, follows along.
    *
-   * Five more pages can follow the performance page once asked for here — CUE (the setlist read
-   * mid-show), LAYERS (every part's zone over the keys), SOUNDCHECK (the set, checked), DISCOVER
+   * Seven more pages can follow the performance page once asked for here — CUE (the setlist read
+   * mid-show), LIVE (the keys as played and the focused part's arp lane), LAYERS (every part's zone over the keys), METERS (every part's level and fader),
+   * SOUNDCHECK (the set, checked), DISCOVER
    * (what you own and have never opened, nearest to what you load) and CHANGES (the focused
-   * part's sound against its saves) — each drawn by one call (set_cue, set_layers, set_check,
-   * set_discover, set_changes) where a knob page takes two. Their encoders are labelled from the
+   * part's sound against its saves) — each drawn by one call (set_cue, set_live, set_layers, set_meters,
+   * set_check, set_discover, set_changes) where a knob page takes two. Their encoders are labelled from the
    * same bytes.
    *
    * The page and its images are loaded on demand, so a build that cannot reach them (a test
@@ -23,13 +24,15 @@
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import { ctrl49Screen, hostSurface, hostState, surfaceInput, setControlSlotValue, surfaceStatusText,
-           layersOnSurface, soundcheckOnSurface, discoverOnSurface, cueOnSurface, changesOnSurface } from '../stores/instrumentHost.js';
+           layersOnSurface, soundcheckOnSurface, discoverOnSurface, cueOnSurface, changesOnSurface,
+           metersOnSurface, liveOnSurface } from '../stores/instrumentHost.js';
   import { createCtrl49Screen } from '../screen/ctrl49Runtime.js';
   import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload, readCuePayload, readChangesPayload,
-           readRackStateExtension } from '../screen/ctrl49Payloads.js';
+           readMetersPayload, readLivePayload, readRackStateExtension, ARP_MODE_NAMES } from '../screen/ctrl49Payloads.js';
 
   const KIND = { control: 'Controls', performance: 'Performance', browse: 'Sound browser',
-                 layers: 'Layers', soundcheck: 'Soundcheck', discover: 'Discover', cue: 'Cue', changes: 'Changes' };
+                 layers: 'Layers', soundcheck: 'Soundcheck', discover: 'Discover', cue: 'Cue', changes: 'Changes',
+                 meters: 'Meters', live: 'Live' };
   const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const noteName = (n) => `${NOTE_NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
   const DRAG_STEP = 4;                   // pixels of drag per encoder detent
@@ -111,6 +114,35 @@
         { label: 'Highest velocity', text: String(part.velocityHigh) },
         unused, unused,
       ];
+    }
+    if (pageKind === 'live') {
+      const view = readLivePayload(payload);
+      const step = view.steps[view.cursor] ?? { velocity: 0, octave: 0, ratchet: 1, chance: 100 };
+      const rates = { 1: '1/4', 2: '1/8', 3: '1/8T', 4: '1/16', 6: '1/16T', 8: '1/32', 12: '1/32T', 16: '1/64' };
+      const sign = (n) => (n > 0 ? `+${n}` : String(n));
+      const off = view.zones.length === 0;
+      return [
+        { label: 'Step', text: `${view.cursor + 1} / ${view.steps.length}`, unused: off },
+        { label: 'Velocity', text: step.velocity === 0 ? 'Rest' : String(step.velocity), unused: off },
+        { label: 'Octave', text: sign(step.octave), unused: off },
+        { label: 'Ratchet', text: `x${step.ratchet}`, unused: off },
+        { label: 'Chance', text: `${step.chance}%`, unused: off },
+        { label: 'Gate', text: `${view.gate}%`, unused: off },
+        { label: 'Rate', text: rates[view.stepsPerBeat] ?? `${view.stepsPerBeat} a beat`, unused: off },
+        { label: 'Mode', text: view.arpOn ? (ARP_MODE_NAMES[view.mode] ?? '?') : 'Off', unused: off },
+      ];
+    }
+    if (pageKind === 'meters') {
+      const view = readMetersPayload(payload);
+      // a fader as the page writes it: half decibels from -57, 0 off
+      const db = (b) => (b === 0 ? 'Off' : `${((b - 1) / 2 - 57).toFixed(1)} dB`);
+      const strips = Array.from({ length: 5 }, (_, i) => {
+        const strip = view.strips[i];
+        return strip ? { label: strip.name || `Part ${strip.index + 1}`, text: strip.muted ? 'Muted' : db(strip.fader) } : unused;
+      });
+      return [...strips, { label: 'Master', text: db(view.master.fader) },
+              { label: 'Parts shown', text: view.count ? `${view.first + 1}-${view.first + view.strips.length} of ${view.count}` : 'No parts',
+                unused: view.count <= 5 }, unused];
     }
     if (pageKind === 'changes') {
       const view = readChangesPayload(payload);
@@ -288,16 +320,20 @@
                           : `${surfaceStatus.short} — shown here only`);
 
   // The stage pages are off until asked for; SOUNDCHECK needs the setlists the edition may not have.
-  const pagesOn = $derived($hostState.surfacePages ?? { layers: false, soundcheck: false, discover: false, cue: false, changes: false });
+  const pagesOn = $derived($hostState.surfacePages ?? { layers: false, soundcheck: false, discover: false, cue: false, changes: false,
+                                                        meters: false, live: false });
   // The pads do nothing on LAYERS and SOUNDCHECK; on DISCOVER each auditions the row beside it,
   // and on CUE pad 1 goes to the song E1 picked.
   const cuePick = $derived($ctrl49Screen.pageKind === 'cue' && readCuePayload($ctrl49Screen.payload).pickedSong !== '');
-  const padIdle = (index) => stage && !($ctrl49Screen.pageKind === 'discover' || (cuePick && index === 0));
+  const padIdle = (index) => stage && !($ctrl49Screen.pageKind === 'discover' || $ctrl49Screen.pageKind === 'live'
+                                       || (cuePick && index === 0));
   const setlists = $derived(($hostState.licence?.features ?? [])
     .find((f) => f.feature === 'scenesAndSetlists')?.allowed !== false);
   const HINT = {
     layers: 'Encoder 1 picks the part; 2–6 set its lowest and highest key, transpose and velocity range.',
     soundcheck: 'Encoder 1 walks the set; encoder 8 checks it again.',
+    live: 'Encoder 1 picks a step; 2–5 set its velocity, octave, ratchets and chance; 6–8 the gate, rate and mode. Pad N turns a step of the cursor\'s half on or off.',
+    meters: 'Encoders 1–5 are the faders of the parts shown, 6 the master; 7 shows the next parts when there are more than five.',
     cue: 'Encoder 1 picks a song; pad 1 goes to it. Shift + Page steps the set from any page.',
     changes: 'Encoder 1 listens between the save and now, 2 picks a change, 3 puts it back (the other way takes it back), 4 walks back through the saves.',
     discover: 'Encoder 1 picks, 2 reaches further, 3 keeps to one kind, 4 keeps a sound as a favourite. Pad N plays row N.',
@@ -336,9 +372,15 @@
                 disabled={!setlists && !pagesOn.cue}
                 title={setlists ? 'The setlist read mid-show: the song, its section, its clock, what is next' : 'Needs scenes and setlists'}
                 onclick={() => cueOnSurface(!pagesOn.cue)}>Cue</button>
+        <button type="button" aria-pressed={pagesOn.live} class:on={pagesOn.live} data-testid="ctrl49-live-toggle"
+                title="The keys as you play them, every part's zone, and the focused part's arpeggiator to edit"
+                onclick={() => liveOnSurface(!pagesOn.live)}>Live</button>
         <button type="button" aria-pressed={pagesOn.layers} class:on={pagesOn.layers} data-testid="ctrl49-layers-toggle"
                 title="Every part's zone over the keys, and the notes you hold"
                 onclick={() => layersOnSurface(!pagesOn.layers)}>Layers</button>
+        <button type="button" aria-pressed={pagesOn.meters} class:on={pagesOn.meters} data-testid="ctrl49-meters-toggle"
+                title="Every part's level and fader, and the master's"
+                onclick={() => metersOnSurface(!pagesOn.meters)}>Meters</button>
         <button type="button" aria-pressed={pagesOn.soundcheck} class:on={pagesOn.soundcheck} data-testid="ctrl49-soundcheck-toggle"
                 disabled={!setlists && !pagesOn.soundcheck}
                 title={setlists ? 'The set, checked before the show: what is ready and what is not' : 'Needs scenes and setlists'}

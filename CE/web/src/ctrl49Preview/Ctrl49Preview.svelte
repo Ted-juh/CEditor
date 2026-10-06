@@ -17,7 +17,7 @@
   import {
     rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload, browseSlotViews,
     browseStatePayload, browseLineForDisplay,
-    layersPayload, soundcheckPayload, discoverPayload, cuePayload, changesPayload,
+    layersPayload, soundcheckPayload, discoverPayload, cuePayload, changesPayload, metersPayload, livePayload,
   } from '../CE_Application/screen/ctrl49Payloads.js';
   import { parseCalls } from './callScript.js';
   import { preview } from './previewState.svelte.js';
@@ -35,6 +35,8 @@
     { id: 'discover', label: 'Discover' },
     { id: 'cue', label: 'Cue' },
     { id: 'changes', label: 'Changes' },
+    { id: 'meters', label: 'Meters' },
+    { id: 'live', label: 'Live' },
     { id: 'custom', label: 'Custom calls' },
   ];
 
@@ -111,6 +113,23 @@
           { name: 'set_check', bytes: soundcheckPayload({ songs, selected: p.soundcheck.selected, current: p.soundcheck.current,
             basis: p.soundcheck.basis, problems: song?.problems ?? [], seconds: p.soundcheck.seconds,
             preloadOff: p.soundcheck.preloadOff }) },
+        ];
+      }
+      case 'live':
+        return [
+          { name: 'set_mode', bytes: [1] },
+          { name: 'set_live', bytes: livePayload({ ...p.live, arpNotes: p.live.arpOn ? p.live.arpNotes : [] }) },
+        ];
+      case 'meters': {
+        // levels in dB (-60 or lower is silence), as the rack would meter them
+        const lin = (db) => (db <= -60 ? 0 : 10 ** (db / 20));
+        return [
+          { name: 'set_mode', bytes: [1] },
+          { name: 'set_meters', bytes: metersPayload({
+            parts: p.meters.parts.map((m) => ({ name: m.name, left: lin(m.left), right: lin(m.right), volume: lin(m.fader),
+                                                muted: m.muted })),
+            first: p.meters.first, touched: p.meters.touched,
+            masterLeft: lin(p.meters.master), masterRight: lin(p.meters.master - 1), masterVolume: 1 }) },
         ];
       }
       case 'changes':
@@ -309,6 +328,41 @@
           <span class="count">{song.problems.length}</span>
         {/each}
       </div>
+
+    {:else if preview.scene === 'live'}
+      <div class="row wrap">
+        <button type="button" class="flag" class:on={preview.live.arpOn} onclick={() => (preview.live.arpOn = !preview.live.arpOn)}>Arp on</button>
+        <button type="button" class="flag" class:on={preview.live.lane} onclick={() => (preview.live.lane = !preview.live.lane)}>Lane drawn</button>
+        <label class="field small">Mode (0-7) <input type="number" min="0" max="7" value={preview.live.mode} onfocus={selectAll}
+               oninput={(e) => (preview.live.mode = int(e.currentTarget.value, 0, 7))} /></label>
+        <label class="field small">Cursor <input type="number" min="0" max="15" value={preview.live.cursor} onfocus={selectAll}
+               oninput={(e) => (preview.live.cursor = int(e.currentTarget.value, 0, 15))} /></label>
+        <label class="field small">Playing <input type="number" min="-1" max="15" value={preview.live.playing} onfocus={selectAll}
+               oninput={(e) => (preview.live.playing = int(e.currentTarget.value, -1, 15))} /></label>
+        <label class="field small">Gate % <input type="number" min="5" max="100" value={preview.live.gate} onfocus={selectAll}
+               oninput={(e) => (preview.live.gate = int(e.currentTarget.value, 5, 100))} /></label>
+      </div>
+
+    {:else if preview.scene === 'meters'}
+      <div class="row wrap">
+        <label class="field small">First part <input type="number" min="0" value={preview.meters.first} onfocus={selectAll}
+               oninput={(e) => (preview.meters.first = int(e.currentTarget.value, 0, 16))} /></label>
+        <label class="field small">Turned (0-5) <input type="number" min="-1" max="5" value={preview.meters.touched} onfocus={selectAll}
+               oninput={(e) => (preview.meters.touched = int(e.currentTarget.value, -1, 5))} /></label>
+        <label class="field small">Master dB <input type="number" min="-60" max="6" value={preview.meters.master} onfocus={selectAll}
+               oninput={(e) => (preview.meters.master = int(e.currentTarget.value, -60, 6))} /></label>
+      </div>
+      {#each preview.meters.parts as m, i}
+        <div class="row">
+          <label class="field">Part {i + 1} <input type="text" bind:value={m.name} onfocus={selectAll} /></label>
+          <label class="field small">Left dB <input type="number" min="-60" max="6" value={m.left} onfocus={selectAll}
+                 oninput={(e) => (m.left = int(e.currentTarget.value, -60, 6))} /></label>
+          <label class="field small">Right dB <input type="number" min="-60" max="6" value={m.right} onfocus={selectAll}
+                 oninput={(e) => (m.right = int(e.currentTarget.value, -60, 6))} /></label>
+          <label class="field small">Fader dB <input type="number" min="-60" max="6" value={m.fader} onfocus={selectAll}
+                 oninput={(e) => (m.fader = int(e.currentTarget.value, -60, 6))} /></label>
+        </div>
+      {/each}
 
     {:else if preview.scene === 'changes'}
       <div class="row wrap">

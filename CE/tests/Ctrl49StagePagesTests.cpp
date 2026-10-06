@@ -4,6 +4,8 @@
 // the keyboard is sent.
 
 #include "ControlSurface/Ctrl49StagePages.h"
+#include <cmath>
+#include <limits>
 
 #include <iostream>
 #include <string>
@@ -348,6 +350,97 @@ int main()
         const auto empty = c49::buildDiscoverPayload (none);
         check (empty[0] == 0 && empty[1] == 0 && empty[3] == 0 && empty.size() == 14,
                "with nothing to go on the page is still sent, saying so");
+    }
+
+    {   // --- LIVE ---------------------------------------------------------------------------------
+        // The golden CE/web/test/ctrl49Preview.test.js also asserts (livePayload).
+        c49::LiveView view;
+        view.part = "Glass Pad";
+        view.arpOn = true;
+        view.mode = 6;
+        view.stepsPerBeat = 4;
+        view.gate = 50;
+        view.lane = true;
+        view.steps = { { 100, 0, 1, 100, false }, { 0, 1, 2, 80, true } };
+        view.cursor = 1;
+        view.playing = 0;
+        view.tempo = 112.0;
+        view.zones = { { "Bass", 36, 54, true }, { "Keys", 55, 96, false } };
+        view.focused = 1;
+        view.held = { 48, 60 };
+        view.arpNotes = { 60 };
+        const c49::Bytes golden { 3, 6, 4, 50, 2, 1, 1, 96, 4, 36, 2, 1,
+                                  100, 2, 1, 100, 0,   0, 3, 2, 80, 1,
+                                  36, 54, 1, 4, 'B', 'a', 's', 's',   55, 96, 0, 4, 'K', 'e', 'y', 's',
+                                  2, 48, 60,   1, 60,
+                                  9, 'G', 'l', 'a', 's', 's', ' ', 'P', 'a', 'd' };
+        check (c49::buildLivePayload (view) == golden,
+               "the live payload is the golden the app's test also asserts: the lane, the zones, the notes, the part");
+
+        c49::LiveView big;
+        big.steps.assign (32, {});
+        for (int i = 0; i < 10; ++i) big.zones.push_back ({ "Z", 0, 127, true });
+        for (int i = 0; i < 40; ++i) { big.held.push_back (i); big.arpNotes.push_back (i); }
+        big.playing = 20;
+        big.focused = 8;
+        const auto capped = c49::buildLivePayload (big);
+        check (capped[4] == c49::kLiveSteps && capped[10] == c49::kLiveZones && capped[6] == 0 && capped[11] == 255,
+               "sixteen steps, six zones; a playhead or a focus past them is none");
+        check (capped.size() < c49::kMaxPayloadBytes, "and the fullest page fits one frame");
+
+        check (c49::liveNextRate (4, 1) == 6 && c49::liveNextRate (4, -1) == 3 && c49::liveNextRate (16, 5) == 16
+                 && c49::liveNextRate (1, -3) == 1,
+               "E7 steps the rate through 1 2 3 4 6 8 12 16, stopping at the ends");
+        check (c49::liveNextRate (5, 1) == 6 && c49::liveNextRate (5, -1) == 4,
+               "a rate between two goes to the next one in the turn's direction");
+        check (c49::liveNextMode (-1, 1) == 0 && c49::liveNextMode (0, -1) == -1 && c49::liveNextMode (7, 3) == 7,
+               "E8 steps the mode with off before the first");
+    }
+
+    {   // --- METERS -------------------------------------------------------------------------------
+        // The golden CE/web/test/ctrl49Preview.test.js also asserts (metersPayload): change one,
+        // change the other.
+        c49::MetersView view;
+        view.parts = { { "Bass", 1.0f, 0.5f, 1.0f, false, true },
+                       { "Brass Section Long", 2.0f, 0.0f, 0.5f, true, true },
+                       { "Pad", 0.001f, 0.01f, 0.0f, false, false } };
+        view.touched = 5;
+        view.masterLeft = 0.25f;
+        view.masterRight = 0.3f;
+        view.masterVolume = 1.5f;
+        const c49::Bytes golden { 3, 0, 3, 5,
+                                  115, 103, 115, 0, 4, 'B', 'a', 's', 's',
+                                  127, 0, 103, 1, 12, 'B', 'r', 'a', 's', 's', ' ', 'S', 'e', 'c', 't', 'i', 'o',
+                                  0, 35, 0, 2, 3, 'P', 'a', 'd',
+                                  91, 94, 122 };
+        check (c49::buildMetersPayload (view) == golden,
+               "the meters payload is the golden the app's test also asserts: 0 dB is 115, +6 the top, "
+               "under -57 dB silence, names cut at twelve, muted 1 and off 2");
+
+        check (c49::metersLevelByte (1.0f) == 115 && c49::metersLevelByte (100.0f) == 127
+                 && c49::metersLevelByte (0.0f) == 0 && c49::metersLevelByte (-1.0f) == 0,
+               "a level byte: 0 dBFS 115, anything louder than +6 the top, nothing and below nothing 0");
+        check (c49::metersLevelByte (std::numeric_limits<float>::infinity()) == 127,
+               "an infinite peak (a plug-in gone wrong) is a clip, not silence");
+
+        c49::MetersView many;
+        for (int i = 0; i < 8; ++i) many.parts.push_back ({ "P" + std::to_string (i + 1), 0.0f, 0.0f, 1.0f, false, true });
+        many.first = 6;
+        const auto scrolled = c49::buildMetersPayload (many);
+        check (scrolled[0] == 8 && scrolled[1] == 3 && scrolled[2] == 5,
+               "with eight parts the strips start no later than the fourth, so five are always shown");
+        check (scrolled[3] == 255, "no encoder turned: no strip marked");
+        check (scrolled.size() < c49::kMaxPayloadBytes, "and the whole page fits one frame");
+
+        const auto near = [] (float a, float b) { return std::abs (a - b) < 1.0e-4f; };
+        check (near (c49::metersNudgeVolume (1.0f, 2), std::pow (10.0f, 1.0f / 20.0f)),
+               "a fader moves half a decibel a detent");
+        check (near (c49::metersNudgeVolume (1.9f, 40), 2.0f), "and stops at +6 dB, the mixer's top");
+        check (c49::metersNudgeVolume (std::pow (10.0f, -57.0f / 20.0f), -1) == 0.0f,
+               "turning down past -57 dB is off");
+        check (near (c49::metersNudgeVolume (0.0f, 1), std::pow (10.0f, -57.0f / 20.0f)),
+               "and turning up from off starts at -57 dB");
+        check (c49::metersNudgeVolume (0.7f, 0) == 0.7f, "no turn, no change");
     }
 
     std::cout << "-------------------" << std::endl;

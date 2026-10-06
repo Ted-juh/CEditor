@@ -306,6 +306,112 @@ export function cuePayload(view) {
   return out;
 }
 
+// --- LIVE (Ctrl49StagePages.h) ------------------------------------------------------------------
+
+export const LIVE_STEPS = 16;
+export const LIVE_ZONES = 6;
+export const LIVE_NOTES = 16;
+export const LIVE_NAME_CHARS = 16;
+export const ARP_MODE_NAMES = ['up', 'down', 'upDown', 'downUp', 'order', 'random', 'chord', 'pattern'];
+
+/** liveNextRate: E7 on LIVE, steps per beat through 1 2 3 4 6 8 12 16. */
+export function liveNextRate(stepsPerBeat, detents) {
+  const rates = [1, 2, 3, 4, 6, 8, 12, 16];
+  let at = 0;
+  while (at < rates.length - 1 && rates[at] < stepsPerBeat) at++;
+  let d = detents;
+  if (rates[at] !== stepsPerBeat && d < 0 && at > 0) { at--; d++; }
+  else if (rates[at] !== stepsPerBeat && d > 0) d--;
+  return rates[Math.max(0, Math.min(rates.length - 1, at + d))];
+}
+
+/** liveNextMode: E8 on LIVE, -1 off, else the arp mode 0-7. */
+export const liveNextMode = (mode, detents) => Math.max(-1, Math.min(7, mode + detents));
+
+/**
+ * buildLivePayload: the keys as played, the zones over them, and the focused part's arp lane.
+ * @param {{ part?: string, arpOn?: boolean, mode?: number, stepsPerBeat?: number, gate?: number, lane?: boolean,
+ *   steps?: { velocity?: number, octave?: number, ratchet?: number, chance?: number, tie?: boolean }[],
+ *   cursor?: number, playing?: number, tempo?: number, zones?: { name?: string, keyLow?: number, keyHigh?: number,
+ *   playable?: boolean }[], focused?: number, firstKey?: number, held?: number[], arpNotes?: number[] }} view
+ */
+export function livePayload(view) {
+  const steps = (view.steps ?? []).slice(0, LIVE_STEPS);
+  const zones = (view.zones ?? []).slice(0, LIVE_ZONES);
+  const tempo = clampTo(Math.round((view.tempo ?? 120) * 10), 0, 65535);
+  const playing = view.playing ?? -1;
+  const focused = view.focused ?? -1;
+  const out = [(view.arpOn ? 1 : 0) | (view.lane ? 2 : 0), clampTo(view.mode ?? 0, 0, 7), clampTo(view.stepsPerBeat ?? 4, 1, 16),
+    clampTo(view.gate ?? 50, 0, 100), steps.length, clampTo(view.cursor ?? 0, 0, Math.max(0, steps.length - 1)),
+    playing >= 0 && playing < steps.length ? playing + 1 : 0, tempo & 0xff, tempo >> 8,
+    clampTo(view.firstKey ?? 36, 0, 127 - 48), zones.length, focused >= 0 && focused < zones.length ? focused : 255];
+  for (const step of steps)
+    out.push(clampTo(step.velocity ?? 100, 0, 127), clampTo((step.octave ?? 0) + 2, 0, 4), clampTo(step.ratchet ?? 1, 1, 4),
+      clampTo(step.chance ?? 100, 0, 100), step.tie ? 1 : 0);
+  for (const zone of zones) {
+    out.push(clampTo(zone.keyLow ?? 0, 0, 127), clampTo(zone.keyHigh ?? 127, 0, 127), zone.playable === false ? 0 : 1);
+    appendCut(out, zone.name, LIVE_NAME_CHARS);
+  }
+  for (const notes of [view.held ?? [], view.arpNotes ?? []]) {
+    const list = notes.slice(0, LIVE_NOTES);
+    out.push(list.length, ...list.map((n) => clampTo(n, 0, 127)));
+  }
+  appendCut(out, view.part, LIVE_NAME_CHARS);
+  return out;
+}
+
+// --- METERS (Ctrl49StagePages.h) ----------------------------------------------------------------
+
+export const METERS_STRIPS = 5;
+export const METERS_NAME_CHARS = 12;
+
+/** metersLevelByte: 0 silence (below -57 dB, or a fader at zero), else 1-127 for -57..+6 dB in
+    half decibels; 0 dB is 115, anything over it a clip. `linear` 1 = 0 dBFS. */
+export function metersLevelByte(linear) {
+  const value = Number(linear);
+  if (!(value > 0)) return 0;
+  const db = Number.isFinite(value) ? 20 * Math.log10(value) : 6;
+  if (db < -57.25) return 0;
+  return clampTo(1 + Math.round((Math.min(db, 6) + 57) * 2), 1, 127);
+}
+
+/** metersFirstPart: the first part on a strip, kept so there are five where the rack has them. */
+export function metersFirstPart(parts, first) {
+  return clampTo(first, 0, Math.max(0, parts - METERS_STRIPS));
+}
+
+/** metersNudgeVolume: a fader turned on METERS, half a decibel a detent, from off to +6 dB (2.0). */
+export function metersNudgeVolume(volume, detents) {
+  if (!detents) return volume;
+  let db = volume > 0 ? 20 * Math.log10(volume) : -57.5;
+  db = Math.min(db + 0.5 * detents, 20 * Math.log10(2));
+  if (db < -57) return 0;
+  return Math.max(0, Math.min(2, 10 ** (db / 20)));
+}
+
+/**
+ * buildMetersPayload: every part's level and fader, five on strips, and the master's.
+ * @param {{ parts?: { name?: string, left?: number, right?: number, volume?: number, muted?: boolean,
+ *   enabled?: boolean }[], first?: number, touched?: number, masterLeft?: number, masterRight?: number,
+ *   masterVolume?: number }} view
+ */
+export function metersPayload(view) {
+  const parts = view.parts ?? [];
+  const first = metersFirstPart(parts.length, view.first ?? 0);
+  const strips = Math.min(METERS_STRIPS, parts.length - first);
+  const touched = view.touched ?? -1;
+  const out = [clampTo(parts.length, 0, 255), clampTo(first, 0, 255), strips,
+    touched >= 0 && touched <= METERS_STRIPS ? touched : 255];
+  for (const part of parts.slice(first, first + strips)) {
+    out.push(metersLevelByte(part.left ?? 0), metersLevelByte(part.right ?? 0), metersLevelByte(part.volume ?? 1),
+      (part.muted ? 1 : 0) | (part.enabled === false ? 2 : 0));
+    appendCut(out, part.name, METERS_NAME_CHARS);
+  }
+  out.push(metersLevelByte(view.masterLeft ?? 0), metersLevelByte(view.masterRight ?? 0),
+    metersLevelByte(view.masterVolume ?? 1));
+  return out;
+}
+
 export const CHANGES_ROWS = 8;
 
 /**
@@ -470,6 +576,42 @@ export function readCuePayload(bytes = []) {
   return { songs, current: current - 1, picked: picked - 1, loading: loading !== 0, songSeconds, setSeconds,
            plannedSeconds, tempo, sectionBar, sectionBars, nextReady: ready === 255 ? -1 : ready,
            song, section, nextSection, nextSong, pickedSong, notes };
+}
+
+/** The set_live payload as a view: the lane, the zones, the notes and the part. */
+export function readLivePayload(bytes = []) {
+  const r = reader(bytes);
+  const [flags, mode, stepsPerBeat, gate, count, cursor, playing, low, high, firstKey, zoneCount, focused] =
+    Array.from({ length: 12 }, () => r.byte());
+  const steps = [];
+  for (let i = 0; i < count; i++) {
+    const [velocity, octave, ratchet, chance, tie] = [r.byte(), r.byte(), r.byte(), r.byte(), r.byte()];
+    steps.push({ velocity, octave: octave - 2, ratchet, chance, tie: tie === 1 });
+  }
+  const zones = [];
+  for (let i = 0; i < zoneCount; i++) {
+    const [keyLow, keyHigh, zoneFlags] = [r.byte(), r.byte(), r.byte()];
+    zones.push({ keyLow, keyHigh, playable: (zoneFlags & 1) !== 0, name: r.text() });
+  }
+  const notes = () => Array.from({ length: r.byte() }, () => r.byte());
+  const held = notes();
+  const arpNotes = notes();
+  return { arpOn: (flags & 1) !== 0, lane: (flags & 2) !== 0, mode, stepsPerBeat, gate, steps, cursor,
+           playing: playing - 1, tempo: (low + 256 * high) / 10, firstKey, zones, focused: focused === 255 ? -1 : focused,
+           held, arpNotes, part: r.text() };
+}
+
+/** The set_meters payload as a view: the strips (from `first`) with their bytes, and the master. */
+export function readMetersPayload(bytes = []) {
+  const r = reader(bytes);
+  const [count, first, stripCount, touched] = [r.byte(), r.byte(), r.byte(), r.byte()];
+  const strips = [];
+  for (let i = 0; i < stripCount; i++) {
+    const [left, right, fader, flags] = [r.byte(), r.byte(), r.byte(), r.byte()];
+    strips.push({ index: first + i, left, right, fader, muted: (flags & 1) !== 0, off: (flags & 2) !== 0, name: r.text() });
+  }
+  const [left, right, fader] = [r.byte(), r.byte(), r.byte()];
+  return { count, first, touched: touched === 255 ? -1 : touched, strips, master: { left, right, fader } };
 }
 
 /** The set_changes payload as a view: the changes shown (from `first`) and the save they are against. */

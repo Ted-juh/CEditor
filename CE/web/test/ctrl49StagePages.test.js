@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 import {
   emptyHostState, normalizeHostState, applyMockCommand, normalizeSurfaceScreen, mockSurfaceScreen,
 } from '../src/CE_Application/stores/instrumentHost.js';
-import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload, readCuePayload, readChangesPayload } from '../src/CE_Application/screen/ctrl49Payloads.js';
+import { readLayersPayload, readSoundcheckPayload, readDiscoverPayload, readCuePayload, readChangesPayload,
+         readLivePayload, readMetersPayload } from '../src/CE_Application/screen/ctrl49Payloads.js';
 
 const cursor = (page, more = {}) => ({ page, active: 0, turned: {}, song: -1, part: -1, sound: 0, kind: '', ...more });
 
@@ -32,10 +33,10 @@ function rig() {
 }
 
 test('both pages are off until asked for, and a payload without them reads as off', () => {
-  assert.deepEqual(emptyHostState().surfacePages, { soundcheck: false, layers: false, discover: false, cue: false, changes: false });
-  assert.deepEqual(normalizeHostState({}).surfacePages, { soundcheck: false, layers: false, discover: false, cue: false, changes: false });
+  assert.deepEqual(emptyHostState().surfacePages, { soundcheck: false, layers: false, discover: false, cue: false, changes: false, meters: false, live: false });
+  assert.deepEqual(normalizeHostState({}).surfacePages, { soundcheck: false, layers: false, discover: false, cue: false, changes: false, meters: false, live: false });
   assert.deepEqual(normalizeHostState({ surfacePages: { soundcheck: true, layers: 'yes', discover: true, cue: 1 } }).surfacePages,
-    { soundcheck: true, layers: false, discover: true, cue: false, changes: false }, 'only a real true turns a page on');
+    { soundcheck: true, layers: false, discover: true, cue: false, changes: false, meters: false, live: false }, 'only a real true turns a page on');
 });
 
 test('the screen payload carries one stage call, and only one of the two known ones', () => {
@@ -52,7 +53,7 @@ test('the screen payload carries one stage call, and only one of the two known o
 test('turning the pages on in the stand-in adds them after the performance page, LAYERS first', () => {
   let state = applyMockCommand(rig(), { cmd: 'soundcheckOnSurface', on: true });
   state = applyMockCommand(state, { cmd: 'layersOnSurface' });
-  assert.deepEqual(state.surfacePages, { soundcheck: true, layers: true, discover: false, cue: false, changes: false },
+  assert.deepEqual(state.surfacePages, { soundcheck: true, layers: true, discover: false, cue: false, changes: false, meters: false, live: false },
     'on, and flipped with no "on"');
 
   const performance = mockSurfaceScreen(state, cursor(1));
@@ -135,4 +136,36 @@ test('CHANGES in the stand-in says it has no plug-in to read, rather than invent
   const view = readChangesPayload(screen.payload);
   assert.equal(view.state, 'problem');
   assert.match(view.problemText, /plug-in/);
+});
+
+test('LIVE and METERS in the stand-in: LIVE after CUE, METERS after LAYERS, built from the mock rack', () => {
+  let state = applyMockCommand(rig(), { cmd: 'metersOnSurface', on: true });
+  state = applyMockCommand(state, { cmd: 'liveOnSurface', on: true });
+  state = applyMockCommand(state, { cmd: 'layersOnSurface', on: true });
+  assert.equal(state.surfacePages.live, true);
+  assert.equal(state.surfacePages.meters, true);
+  const kinds = [2, 3, 4].map((page) => mockSurfaceScreen(state, cursor(page)).pageKind);
+  assert.deepEqual(kinds, ['live', 'layers', 'meters'], 'in the broker\'s order');
+
+  const live = mockSurfaceScreen(state, cursor(2, { step: 3 }));
+  assert.equal(live.call, 'set_live');
+  const view = readLivePayload(live.payload);
+  assert.equal(view.part, 'Glass Pad', 'the rack\'s focused part');
+  assert.equal(view.focused, 1);
+  assert.equal(view.steps.length, 16, 'sixteen plain steps before a lane is drawn');
+  assert.equal(view.lane, false);
+  assert.equal(view.cursor, 3);
+  assert.deepEqual(view.zones.map((z) => [z.name, z.keyLow, z.keyHigh]), [['Sub', 24, 59], ['Glass Pad', 60, 108]]);
+
+  state = applyMockCommand(state, { cmd: 'setPartArp', partId: 'b', enabled: true, mode: 'chord', velocityPattern: [90, 0] });
+  const drawn = readLivePayload(mockSurfaceScreen(state, cursor(2)).payload);
+  assert.ok(drawn.arpOn && drawn.lane && drawn.mode === 6, 'the arp on, in chord mode, with a lane');
+  assert.deepEqual(drawn.steps.map((st) => st.velocity), [90, 0], 'the lane as drawn');
+
+  const meters = mockSurfaceScreen(state, cursor(4));
+  assert.equal(meters.call, 'set_meters');
+  const levels = readMetersPayload(meters.payload);
+  assert.equal(levels.count, 2);
+  assert.deepEqual(levels.strips.map((st) => [st.name, st.left, st.fader]), [['Sub', 0, 115], ['Glass Pad', 0, 115]],
+    'the demo is silent, the faders at unity');
 });

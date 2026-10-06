@@ -2,6 +2,7 @@
 
 #include <array>
 #include <atomic>
+#include <cstdint>
 #include <limits>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "PatternModel.h"
@@ -88,6 +89,16 @@ public:
     /** The pattern step that last sounded (0-based), for the UI playhead; -1 while the arp
         is idle, disabled, or running without a drawn pattern. Any thread. */
     int patternStep() const noexcept                    { return livePatternStep.load(); }
+
+    /** The notes the arp is sounding now, and every note it started since the last call, as a
+        128-bit set (bit n of word n / 64). A step is often shorter than a screen's redraw, so a
+        note that started and stopped between two reads still shows once. Any thread; the
+        audio thread only sets and clears bits. */
+    std::array<std::uint64_t, 2> takeNotes() noexcept
+    {
+        return { liveNotes[0].load() | startedNotes[0].exchange (0),
+                 liveNotes[1].load() | startedNotes[1].exchange (0) };
+    }
 
     /** Audio thread. Consumes note-ons/offs from `in` into the held set and writes the arp's
         own notes to `out`; non-note messages pass through. When the arp is off this is a
@@ -510,6 +521,7 @@ private:
             {
                 out.addEvent (juce::MidiMessage::noteOff (1, note), offset);
                 slot.active = false;
+                markNote (note, false);
             }
 
         for (auto& slot : sounding)
@@ -518,6 +530,7 @@ private:
                 continue;
             slot = { true, note, releasePpq };
             out.addEvent (juce::MidiMessage::noteOn (1, note, velocity), offset);
+            markNote (note, true);
             return;
         }
     }
@@ -538,6 +551,7 @@ private:
                                                           / juce::jmax (1.0e-9, block.ppqPerSample)));
             out.addEvent (juce::MidiMessage::noteOff (1, slot.note), offset);
             slot.active = false;
+            markNote (slot.note, false);
         }
     }
 
@@ -549,7 +563,22 @@ private:
                 continue;
             out.addEvent (juce::MidiMessage::noteOff (1, slot.note), position);
             slot.active = false;
+            markNote (slot.note, false);
         }
+    }
+
+    // takeNotes' sets: lock-free bit operations, so the audio thread never waits on a reader.
+    void markNote (int note, bool on) noexcept
+    {
+        const auto word = (std::size_t) ((note >> 6) & 1);
+        const auto bit = std::uint64_t { 1 } << (note & 63);
+        if (on)
+        {
+            liveNotes[word].fetch_or (bit, std::memory_order_relaxed);
+            startedNotes[word].fetch_or (bit, std::memory_order_relaxed);
+        }
+        else
+            liveNotes[word].fetch_and (~bit, std::memory_order_relaxed);
     }
 
     bool anySounding() const noexcept
@@ -597,6 +626,7 @@ private:
     std::atomic<int> degreeCount { 0 };
     std::atomic<bool> semitoneRows { false };
     std::atomic<int> livePatternStep { -1 };
+    std::array<std::atomic<std::uint64_t>, 2> liveNotes {}, startedNotes {};
 
     static constexpr int maxRatchet = 4;
     static constexpr int maxPending = 64;

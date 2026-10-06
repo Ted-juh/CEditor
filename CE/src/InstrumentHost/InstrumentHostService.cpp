@@ -6303,7 +6303,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     }
 
     if (cmd == "soundcheckOnSurface" || cmd == "layersOnSurface" || cmd == "discoverOnSurface"
-        || cmd == "cueOnSurface" || cmd == "changesOnSurface")
+        || cmd == "cueOnSurface" || cmd == "changesOnSurface" || cmd == "metersOnSurface"
+        || cmd == "liveOnSurface")
     {
         // Off until asked for, like the browser page: a keyboard that grows a page under somebody's
         // hands is one that stopped doing what they had it doing.
@@ -6311,7 +6312,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         auto& flag = soundcheck ? surfaceSoundcheckPage
                    : cmd == "layersOnSurface" ? surfaceLayersPage
                    : cmd == "cueOnSurface" ? surfaceCuePage
-                   : cmd == "changesOnSurface" ? surfaceChangesPage : surfaceDiscoverPage;
+                   : cmd == "changesOnSurface" ? surfaceChangesPage
+                   : cmd == "metersOnSurface" ? surfaceMetersPage
+                   : cmd == "liveOnSurface" ? surfaceLivePage : surfaceDiscoverPage;
         const bool wanted = payload.getDynamicObject() != nullptr
                               && payload.getDynamicObject()->hasProperty ("on")
                             ? (bool) payload["on"] : ! flag;
@@ -13551,6 +13554,42 @@ std::vector<std::pair<int, int>> InstrumentHostService::surfaceHeldNotes()
     return { notes.begin(), notes.end() };
 }
 
+InstrumentHostService::SurfaceMeters InstrumentHostService::takeSurfaceMeters()
+{
+    std::map<juce::String, std::pair<float, float>> peaks;
+    {
+        const std::scoped_lock lock (surfaceMeterLock);
+        peaks.swap (surfaceMeterPeaks);
+    }
+    const auto peakOf = [&peaks] (const juce::String& id)
+    {
+        const auto at = peaks.find (id);
+        return at != peaks.end() ? at->second : std::pair<float, float> { 0.0f, 0.0f };
+    };
+
+    SurfaceMeters out;
+    const auto& performance = rack.getPerformance();
+    for (int i = 0; i < performance.parts.size(); ++i)
+    {
+        const auto& part = performance.parts.getReference (i);
+        SurfaceMeterPart row;
+        row.id = part.partId;
+        // A part has no name of its own: its sound, else its plug-in, else its port (as LAYERS).
+        row.name = part.lastPresetName.isNotEmpty() ? part.lastPresetName
+                 : part.pluginName.isNotEmpty()     ? part.pluginName
+                 : part.midiOutputName.isNotEmpty() ? part.midiOutputName
+                                                    : "Part " + juce::String (i + 1);
+        std::tie (row.left, row.right) = peakOf (part.partId);
+        row.volume = part.volume;
+        row.muted = part.mute;
+        row.enabled = part.enabled;
+        out.parts.push_back (row);
+    }
+    std::tie (out.masterLeft, out.masterRight) = peakOf ("@master");
+    out.masterVolume = performance.masterLevel;
+    return out;
+}
+
 InstrumentHostService::SurfaceDiscover InstrumentHostService::surfaceDiscover (const juce::String& kind, int count)
 {
     ensureLibrary();
@@ -17877,6 +17916,17 @@ void InstrumentHostService::drainParameterEvents()
     // is hidden prevents old audio from flashing on reopening. The graph only accumulates
     // atomic peaks; all JSON allocation and event delivery happens here, at UI rate.
     const auto meterReadings = rack.drainMeters();
+    if (surfaceMetersPage)
+    {
+        // The CTRL49's METERS page takes these at its own rate: keep the loudest until it does.
+        const std::scoped_lock lock (surfaceMeterLock);
+        for (const auto& reading : meterReadings)
+        {
+            auto& peak = surfaceMeterPeaks[reading.id];
+            peak.first = juce::jmax (peak.first, reading.left);
+            peak.second = juce::jmax (peak.second, reading.right);
+        }
+    }
     if (options.emit != nullptr)
     {
         juce::Array<juce::var> channels;
@@ -19057,6 +19107,8 @@ juce::var InstrumentHostService::buildStatePayload()
         surfacePages->setProperty ("discover", surfaceDiscoverPage);
         surfacePages->setProperty ("cue", surfaceCuePage);
         surfacePages->setProperty ("changes", surfaceChangesPage);
+        surfacePages->setProperty ("meters", surfaceMetersPage);
+        surfacePages->setProperty ("live", surfaceLivePage);
         root->setProperty ("surfacePages", juce::var (surfacePages));
     }
     root->setProperty ("product", productPayload());

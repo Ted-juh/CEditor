@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload, browseSlotViews, browseStatePayload,
+  metersPayload, livePayload,
 } from '../src/CE_Application/screen/ctrl49Payloads.js';
 
 const source = fs.readFileSync(new URL('../../../tools/ctrl49/Hostage_MultiKnob.lua', import.meta.url), 'utf8');
@@ -150,5 +151,63 @@ test('rings ease only once the keyboard has shown it redraws when asked, and alw
 
   p.call('set_values', rackStatePayload(0, at(5), { number: 1, count: 1 }));
   assert.equal(frameOf(p.draw(), 0), 5, 'turning a knob a little is immediate');
+  p.close();
+});
+
+test('METERS draws each part\'s level and fader, holds the peak, lights a clip and keeps the master\'s history', async () => {
+  const p = await page();
+  const view = (left, master = 0.5) => metersPayload({
+    parts: [{ name: 'Bass', left, right: left / 2, volume: 1 }, { name: 'Keys', left: 0.1, right: 0.1, volume: 0.5, muted: true }],
+    touched: 0, masterLeft: master, masterRight: master, masterVolume: 1,
+  });
+  p.call('set_meters', view(1.2));        // over 0 dB: a clip
+  let calls = p.draw();
+  let texts = said(calls);
+  assert.ok(texts[0] === 'METERS' && texts.some((t) => t.startsWith('Bass')), 'the title, and the loudest part');
+  assert.ok(texts.includes('MASTER') && texts.includes('MUTED'), 'the master strip, and a muted part says so');
+  assert.ok(texts.includes('0.0'), 'the fader at unity reads 0.0');
+  const clip = (cs) => cs.filter((c) => c.kind === 'rect' && c.c === 0xFFFF4D6A);
+  assert.ok(clip(calls).length >= 2, 'a clip lamp and a red bar');
+  // quieter: the peak holds, the clip lamp stays lit for a while
+  p.call('set_meters', view(0.1));
+  calls = p.draw();
+  texts = said(calls);
+  assert.ok(texts.includes('+1.5'), 'the held peak (+1.6 dB, in half decibels) is still written under the strip');
+  assert.ok(clip(calls).length >= 1, 'and the clip lamp is still lit');
+  // a redraw without news does not age the hold
+  for (let i = 0; i < 20; i++) p.draw();
+  assert.ok(said(p.draw()).includes('+1.5'), 'redraws alone do not move the hold');
+  for (let i = 0; i < 20; i++) p.call('set_meters', view(0.1));
+  texts = said(p.draw());
+  assert.ok(!texts.includes('+1.5') && texts.includes('-20.0'), 'twenty frames later it has fallen to the level');
+  const history = p.draw().filter((c) => c.kind === 'rect' && c.w === 2);
+  assert.ok(history.length >= 20, 'the master history has a column a frame');
+  p.close();
+});
+
+test('LIVE draws the lane with its playhead, the zones, the held keys and the arp\'s notes', async () => {
+  const p = await page();
+  const steps = Array.from({ length: 16 }, (_, i) => ({ velocity: i % 4 === 3 ? 0 : 100, octave: i === 2 ? 1 : 0,
+                                                       ratchet: i === 4 ? 3 : 1, chance: i === 5 ? 60 : 100 }));
+  p.call('set_live', livePayload({
+    part: 'Pluck', arpOn: true, mode: 0, stepsPerBeat: 4, gate: 50, lane: true, steps, cursor: 2, playing: 4, tempo: 112,
+    zones: [{ name: 'Bass', keyLow: 36, keyHigh: 54 }, { name: 'Pluck', keyLow: 55, keyHigh: 84 }],
+    focused: 1, held: [40, 60, 64], arpNotes: [64],
+  }));
+  const calls = p.draw();
+  const texts = said(calls);
+  assert.ok(texts[0] === 'LIVE' && texts.some((t) => t.includes('ARP UP 1/16') && t.includes('112 BPM')), 'the title says the arp');
+  assert.ok(texts.includes('+1') && texts.includes('60%'), 'an octave and a chance that are not the plain ones');
+  assert.ok(texts.includes('3 / 16') && texts.includes('+1') && texts.includes('UP') && texts.includes('50%'),
+    'the cells: the step picked, its octave, the mode and the gate');
+  assert.ok(texts.includes('PADS TURN STEPS ON AND OFF'), 'with a lane drawn, what the pads do');
+  const ORANGE = 0xFFFF9408, TEAL = 0xFF2DD4BF;
+  const rects = calls.filter((c) => c.kind === 'rect');
+  assert.ok(rects.some((c) => c.c === TEAL && c.h === 48), 'held keys in the colour of their part, the arp\'s in the part shown');
+  assert.ok(rects.some((c) => c.c === ORANGE && c.h === 48), 'the bass key held lights in the bass part\'s colour');
+  const dots = rects.filter((c) => c.w === 3 && c.h === 3);
+  assert.equal(dots.length, 12 + 2, 'a ratchet dot per hit on the twelve steps that play, three on step five; none on a rest');
+  p.call('set_live', livePayload({ part: 'Pluck', steps, arpOn: false, zones: [] }));
+  assert.ok(said(p.draw()).some((t) => t.includes('ARP OFF')), 'with the arp off the title says so');
   p.close();
 });

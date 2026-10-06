@@ -478,6 +478,12 @@ int InstrumentRackHost::arpLiveStep (const juce::String& partId) const
     return lp != nullptr ? lp->filter->getMidiInserts().arpPatternStep() : -1;
 }
 
+std::array<std::uint64_t, 2> InstrumentRackHost::arpLiveNotes (const juce::String& partId) const
+{
+    const auto* lp = findLive (partId);
+    return lp != nullptr ? lp->filter->getMidiInserts().arpNotes() : std::array<std::uint64_t, 2> {};
+}
+
 bool InstrumentRackHost::triggerChordPad (const juce::String& partId, const juce::String& slotId,
                                           int pad, int velocity)
 {

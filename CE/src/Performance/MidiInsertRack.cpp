@@ -411,3 +411,17 @@ int MidiInsertRack::arpPatternStep() const noexcept
 }
 
 } // namespace ceditor::perf
+
+namespace ceditor::perf
+{
+
+std::array<std::uint64_t, 2> MidiInsertRack::arpNotes() const noexcept
+{
+    const juce::SpinLock::ScopedLockType sl (lock);
+    for (const auto& module : modules)
+        if (module != nullptr && module->arp != nullptr)
+            return module->arp->takeNotes();
+    return {};
+}
+
+} // namespace ceditor::perf

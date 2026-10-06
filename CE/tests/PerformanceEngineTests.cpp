@@ -1398,6 +1398,21 @@ void testArpeggiator()
     check (played.size() >= 3 && played[0] == 60 && played[1] == 64 && played[2] == 67,
            "up mode walks the held chord upward");
     check (played.size() >= 4 && played[3] == 60, "and wraps to the bottom");
+    {
+        // What a screen reads: the notes sounding, and every note started since it last looked,
+        // so a step shorter than a redraw still shows once.
+        const auto seen = arp.takeNotes();
+        const auto has = [&seen] (int n) { return ((seen[(size_t) (n >> 6)] >> (n & 63)) & 1) != 0; };
+        check (has (60) && has (64) && has (67) && ! has (62),
+               "takeNotes has every note the arp played since it was last asked, and nothing else");
+        const auto again = arp.takeNotes();
+        const auto live = (again[0] | again[1]) != 0;
+        int sounding = 0;
+        for (int n = 0; n < 128; ++n)
+            sounding += (int) ((again[(size_t) (n >> 6)] >> (n & 63)) & 1);
+        check (sounding <= 1 && (live || sounding == 0),
+               "asked again at once, only the note still sounding (if any) is left");
+    }
 
     // Down mode over two octaves. A fresh chord restarts the walk (the grid keeps running),
     // so the first note of the new chord is the mode's first note.
@@ -1502,6 +1517,9 @@ void testArpeggiator()
         juce::MidiBuffer flush;
         drawn.allNotesOff (flush, 0);
         check (drawn.patternStep() == -1, "and reports nowhere again once silenced");
+        drawn.takeNotes();
+        const auto after = drawn.takeNotes();
+        check (after[0] == 0 && after[1] == 0, "and nothing sounds after all notes off");
     }
 
     {

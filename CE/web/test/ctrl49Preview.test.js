@@ -9,7 +9,8 @@ import {
   performanceStatePayload, browseSlotViews, soundcheckPayload, soundcheckLevelByte, layersPayload,
   readSoundcheckPayload, readLayersPayload, discoverPayload, readDiscoverPayload, cuePayload, readCuePayload,
   changesPayload, readChangesPayload, readRackStateExtension, browseStatePayload, browseLineForDisplay,
-  MAX_BROWSE_LINE_CHARACTERS,
+  MAX_BROWSE_LINE_CHARACTERS, metersPayload, readMetersPayload, metersLevelByte, metersNudgeVolume,
+  livePayload, readLivePayload, liveNextRate, liveNextMode,
 } from '../src/CE_Application/screen/ctrl49Payloads.js';
 import { parseCalls } from '../src/ctrl49Preview/callScript.js';
 
@@ -139,6 +140,57 @@ test('layers: the golden the C++ test pins', () => {
     60, 84, 100, 127, 52, 3, 1, 0, 80, 127, 13, 5, ...ascii('Brass'),
     2, 48, 90, 72, 112,
   ]);
+});
+
+// The golden in CE/tests/Ctrl49StagePagesTests.cpp (LIVE): change one, change the other.
+test('live: the golden the C++ test pins', () => {
+  const view = {
+    part: 'Glass Pad', arpOn: true, mode: 6, stepsPerBeat: 4, gate: 50, lane: true,
+    steps: [{ velocity: 100, octave: 0, ratchet: 1, chance: 100 }, { velocity: 0, octave: 1, ratchet: 2, chance: 80, tie: true }],
+    cursor: 1, playing: 0, tempo: 112,
+    zones: [{ name: 'Bass', keyLow: 36, keyHigh: 54 }, { name: 'Keys', keyLow: 55, keyHigh: 96, playable: false }],
+    focused: 1, held: [48, 60], arpNotes: [60],
+  };
+  const bytes = livePayload(view);
+  assert.deepEqual(bytes, [3, 6, 4, 50, 2, 1, 1, 96, 4, 36, 2, 1,
+    100, 2, 1, 100, 0, 0, 3, 2, 80, 1,
+    36, 54, 1, 4, ...ascii('Bass'), 55, 96, 0, 4, ...ascii('Keys'),
+    2, 48, 60, 1, 60, 9, ...ascii('Glass Pad')]);
+  const read = readLivePayload(bytes);
+  assert.equal(read.part, 'Glass Pad');
+  assert.equal(read.playing, 0);
+  assert.equal(read.tempo, 112);
+  assert.deepEqual(read.steps[1], { velocity: 0, octave: 1, ratchet: 2, chance: 80, tie: true });
+  assert.deepEqual(read.arpNotes, [60]);
+  assert.equal(liveNextRate(4, 1), 6);
+  assert.equal(liveNextRate(5, -1), 4);
+  assert.equal(liveNextMode(0, -1), -1);
+});
+
+// The golden in CE/tests/Ctrl49StagePagesTests.cpp (METERS): change one, change the other.
+test('meters: the golden the C++ test pins', () => {
+  const view = {
+    parts: [{ name: 'Bass', left: 1, right: 0.5, volume: 1 },
+            { name: 'Brass Section Long', left: 2, right: 0, volume: 0.5, muted: true },
+            { name: 'Pad', left: 0.001, right: 0.01, volume: 0, enabled: false }],
+    touched: 5, masterLeft: 0.25, masterRight: 0.3, masterVolume: 1.5,
+  };
+  const bytes = metersPayload(view);
+  assert.deepEqual(bytes, [3, 0, 3, 5,
+    115, 103, 115, 0, 4, ...ascii('Bass'),
+    127, 0, 103, 1, 12, ...ascii('Brass Sectio'),
+    0, 35, 0, 2, 3, ...ascii('Pad'),
+    91, 94, 122]);
+  const read = readMetersPayload(bytes);
+  assert.equal(read.touched, 5);
+  assert.deepEqual(read.strips.map((s) => [s.name, s.muted, s.off]), [['Bass', false, false], ['Brass Sectio', true, false], ['Pad', false, true]]);
+  assert.deepEqual(read.master, { left: 91, right: 94, fader: 122 });
+  assert.equal(metersLevelByte(Infinity), 127, 'an infinite peak is a clip');
+  const many = metersPayload({ parts: Array.from({ length: 8 }, (_, i) => ({ name: `P${i + 1}` })), first: 6 });
+  assert.deepEqual(many.slice(0, 4), [8, 3, 5, 255], 'five strips always, no strip marked');
+  assert.ok(Math.abs(metersNudgeVolume(1, 2) - 10 ** (1 / 20)) < 1e-6);
+  assert.equal(metersNudgeVolume(10 ** (-57 / 20), -1), 0);
+  assert.ok(Math.abs(metersNudgeVolume(1.9, 40) - 2) < 1e-9);
 });
 
 test('changes: the golden the C++ test pins', () => {
@@ -306,7 +358,7 @@ test('every function the broker calls is one the page defines', () => {
   // A page beyond the knobs names its call once and sends it through a variable
   // (callLua (stageCall, ...)).
   const stage = [...broker.matchAll(/stageCall = "([a-z_]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(stage.sort(), ['set_changes', 'set_check', 'set_cue', 'set_discover', 'set_layers'],
+  assert.deepEqual(stage.sort(), ['set_changes', 'set_check', 'set_cue', 'set_discover', 'set_layers', 'set_live', 'set_meters'],
     'each page beyond the knobs names its call');
   for (const name of [...called, ...stage, 'init', 'set_mode', 'draw'])
     assert.match(lua, new RegExp(`^function ${name}\\(`, 'm'), `${name} is defined`);
