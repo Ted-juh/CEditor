@@ -103,8 +103,14 @@ again**; they ran it five times.
 4. After the pages test: fix what it finds; then the PR can leave draft.
 5. Ideas with the headroom measured: images on HoSTage's pages (knob filmstrips, panels, as
    Machined Metal does) and 15 redraws/s for meters. Keep text counts down.
+6. **Panel scan** (`docs/design/ctrl49-panel-scan.md`, `Ctrl49PanelScan.exe`): a plug-in's own
+   sections as keyboard pages, the section cut from its GUI with overlays on its controls. The
+   scan tool is built and its self-test passes under Wine; the owner runs it on their own
+   plug-ins (steps below) and judges `scan.png` and `pages\*.png`. Next after that: a Lua page
+   that shows one section (background image + overlays), and HoSTage keeping the scan per class
+   id, inside the worker process.
 
-### The owner's steps for the two tests (give them exactly like this)
+### The owner's steps for the tests (give them exactly like this)
 
 **Script size:**
 1. Close CEditor/HoSTage, VIP and your DAW.
@@ -122,6 +128,21 @@ changed. Start `build\native\CEditor_artefacts\Release\CEditor.exe`, File > Host
 Controller tab, then for each page: switch it on on the card, Page Right/Left to it on the
 keyboard, and check what `tools/ctrl49/hardware-checklist.md` section 1 lists. Ask for, per page:
 looked right, smooth, anything cut off; and any red "The keyboard refused" line, copied exactly.
+
+**Panel scan** (no keyboard needed; close nothing):
+1. In the VS 2022 prompt, in your CEditor folder: `git pull`
+2. `cmake --build --preset native-release --target Ctrl49PanelScan`
+3. `build\native\Release\Ctrl49PanelScan.exe selftest > %TEMP%\panelscan-selftest.txt 2>&1` — a
+   window with knobs and a moving green wave opens for about 15 seconds; do not cover or move it.
+   Wait until the prompt comes back.
+4. `build\native\Release\Ctrl49PanelScan.exe list > %TEMP%\panelscan-list.txt 2>&1`, then
+   `notepad %TEMP%\panelscan-list.txt`, and pick three plug-ins (their numbers).
+5. `build\native\Release\Ctrl49PanelScan.exe scan <n1> <n2> <n3> > %TEMP%\panelscan-scan.txt 2>&1`
+   — each plug-in's window opens in turn, up to 5 minutes each; do not cover or move it, and
+   leave the mouse alone. Wait until the prompt comes back.
+6. `explorer %TEMP%\ctrl49-panel-scan`: per plug-in, open `scan.png` and the `pages` folder.
+7. Paste `notepad %TEMP%\panelscan-selftest.txt` and `notepad %TEMP%\ctrl49-panel-scan\summary.txt`,
+   and say per plug-in: do the boxes sit on the right controls, are the sections the plug-in's own.
 
 ---
 
@@ -167,6 +188,14 @@ node browser-checks/ctrl49EraPresets.mjs    # era designs and feature mockups, m
 x86_64-w64-mingw32-g++-posix -fsyntax-only -Wall -Wextra -std=gnu++23 -municode \
   -I CE/src -I CE/src/ControlSurface CE/src/ControlSurface/Ctrl49ScreenLab.cpp
 build/native/_deps/lua-build/Release/luac -p <script.lua>               # Lua syntax
+
+# The panel scan, end to end under Wine (apt: g++-mingw-w64-x86-64-posix wine64; Xvfb running)
+SDK=JUCE/include/JUCE-8.0.7/modules/juce_audio_processors/format_types/VST3_SDK
+x86_64-w64-mingw32-g++-posix -std=gnu++23 -municode -I CE/src -I $SDK -static \
+  CE/src/ControlSurface/Ctrl49PanelScan.cpp -o out/Ctrl49PanelScan.exe -lole32 -lgdi32 -luser32
+x86_64-w64-mingw32-g++-posix -std=gnu++23 -shared -I CE/src -I $SDK -static \
+  CE/src/ControlSurface/Ctrl49PanelScanFixture.cpp -o out/Ctrl49PanelScanFixture.vst3 -lgdi32 -luser32
+DISPLAY=:97 wine out/Ctrl49PanelScan.exe selftest    # 16 PASS; Wine captures from the screen
 ```
 
 `security.mjs` needs `CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome` here, and

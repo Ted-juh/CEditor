@@ -446,6 +446,30 @@ shared behavior changes in `machined-metal/MachinedMetal.lua` and rerun the gene
 The browser check renders all nine new pages at all 128 control positions, including mixed
 ADSR extremes, and checks source crops, screen bounds, text widths and image reuse.
 
+## Panel scan: a plug-in's own sections as keyboard pages
+
+`Ctrl49PanelScan.exe` finds a VST3's sections (its units, or its parameter names) and where each
+control sits on its own GUI (by asking the editor's `IParameterFinder`, or by moving the parameter
+and watching what redraws), and draws the 480 × 272 page each section would make: the section cut
+from the plug-in's window, a knob ring, fader cap, button light or selector mark on each control,
+numbered for the CTRL49's eight knobs. No keyboard needed. Spec:
+[`docs/design/ctrl49-panel-scan.md`](../../docs/design/ctrl49-panel-scan.md).
+
+```bat
+cmake --build --preset native-release --target Ctrl49PanelScan
+build\native\Release\Ctrl49PanelScan.exe selftest            :: the test plug-in, checked
+build\native\Release\Ctrl49PanelScan.exe list                :: installed VST3s, numbered
+build\native\Release\Ctrl49PanelScan.exe scan diva 12 serum  :: by name or number
+```
+
+Results per plug-in in `%TEMP%\ctrl49-panel-scan\<plug-in>\`: `editor.png`, `scan.png` (a box per
+control and per page), `pages\*.png` (the keyboard pages), `scan.json`, `log.txt`; one line per
+plug-in in `%TEMP%\ctrl49-panel-scan\summary.txt`. Each plug-in runs in its own process with five
+minutes; a crash or a hang is a line in the summary. Do not cover or move the scan window.
+
+The self-test passes under Wine with the window captured from the screen; on Windows itself
+`PrintWindow` is tried first. Not yet run on the owner's plug-ins.
+
 ## Still requires hardware (open Phase-3 measurements)
 
 [`hardware-checklist.md`](hardware-checklist.md) is the list to take to a CTRL49 now: HoSTage's

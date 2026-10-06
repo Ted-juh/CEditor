@@ -1024,6 +1024,20 @@ target_compile_definitions(CEditorCtrl49ScreenLabTests PRIVATE
 add_test(NAME Ctrl49ScreenLab COMMAND CEditorCtrl49ScreenLabTests)
 ce_configure_test(CEditorCtrl49ScreenLabTests)
 
+# CTRL49 panel scan (Ctrl49PanelScan.h): a plug-in's sections, each control's place on its GUI,
+# overlays and keyboard pages, checked where no plug-in and no window are needed. Pure std; the
+# Windows tool itself runs its own self-test over a test plug-in (`Ctrl49PanelScan selftest`).
+add_executable(CEditorCtrl49PanelScanTests
+    "${CE_ROOT}/tests/Ctrl49PanelScanTests.cpp"
+)
+
+target_include_directories(CEditorCtrl49PanelScanTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+add_test(NAME Ctrl49PanelScan COMMAND CEditorCtrl49PanelScanTests)
+ce_configure_test(CEditorCtrl49PanelScanTests)
+
 # CTRL49 stage pages (Ctrl49StagePages.h): the SOUNDCHECK and LAYERS payloads, byte for byte the
 # ones ctrl49Payloads.js builds for the app's screen card. Pure std.
 add_executable(CEditorCtrl49StagePagesTests
@@ -1224,6 +1238,36 @@ if(WIN32)
     target_compile_features(Ctrl49ScreenLab PRIVATE cxx_std_23)
     target_include_directories(Ctrl49ScreenLab PRIVATE "${CE_ROOT}/src")
     target_link_libraries(Ctrl49ScreenLab PRIVATE winmm)
+
+    # CTRL49 panel scan (docs/design/ctrl49-panel-scan.md): finds a VST3's sections and controls on
+    # its own GUI and draws the keyboard pages they would make. It talks to the plug-in through the
+    # VST3 SDK's interfaces, header-only (no SDK sources, only the interface IDs as constants),
+    # because it needs the editor view and the edit controller that JUCE's hosting keeps private.
+    # It is a lab tool and a process of its own, like the screen lab, not a shipping entry point;
+    # it never touches the keyboard. Its test plug-in is built beside it, for `selftest`.
+    set(CE_VST3_SDK "${CMAKE_SOURCE_DIR}/JUCE/include/JUCE-8.0.7/modules/juce_audio_processors/format_types/VST3_SDK")
+    add_executable(Ctrl49PanelScan
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PanelScan.cpp"
+    )
+    target_compile_features(Ctrl49PanelScan PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49PanelScan PRIVATE "${CE_ROOT}/src")
+    target_include_directories(Ctrl49PanelScan SYSTEM PRIVATE "${CE_VST3_SDK}")
+    target_link_libraries(Ctrl49PanelScan PRIVATE ole32 gdi32 user32)
+
+    add_library(Ctrl49PanelScanFixture MODULE
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PanelScanFixture.cpp"
+    )
+    target_compile_features(Ctrl49PanelScanFixture PRIVATE cxx_std_23)
+    target_include_directories(Ctrl49PanelScanFixture PRIVATE "${CE_ROOT}/src")
+    target_include_directories(Ctrl49PanelScanFixture SYSTEM PRIVATE "${CE_VST3_SDK}")
+    target_link_libraries(Ctrl49PanelScanFixture PRIVATE gdi32 user32)
+    # A single-file .vst3 beside the tool, where `selftest` looks for it: neither target sets an
+    # output directory, so both land in the build tree's <config> folder.
+    set_target_properties(Ctrl49PanelScanFixture PROPERTIES
+        PREFIX ""
+        SUFFIX ".vst3"
+    )
+    add_dependencies(Ctrl49PanelScan Ctrl49PanelScanFixture)
 
     # CTRL49 -> real synth first light (Phase 4): encoder 1 drives a device-profile
     # parameter (GAIA cutoff) via the DeviceProfile intent compiler. Links juce_core.
