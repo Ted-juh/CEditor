@@ -52,6 +52,23 @@ test('only imported faces are carried, under the name the document uses', async 
   assert.deepEqual(unused.fonts, [], 'a panel that uses no imported font carries none');
 });
 
+test('a font only a script uses is carried when the script names it in quotes', async () => {
+  const scripted = (source) => ({ ...panelWith(label('Rubik')), scripts: [{ language: 'javascript', source }] });
+  const styled = await embedPanelFonts(scripted('ce.text.style("L", { family: "imported sans" })'), stored, undefined, { subset: false });
+  assert.deepEqual(styled.fonts.map((face) => face.family), ['Imported Sans'],
+    'by the family the user sees, in any case, under the name the library gives it');
+  const lua = { ...panelWith(label('Rubik'), { _children: { Scripts: { scripts: [{ language: 'lua', source: "ce.text.style('L', { family = 'Web Face' })" }] } } }) };
+  assert.deepEqual((await embedPanelFonts(lua, stored, undefined, { subset: false })).fonts.map((face) => face.weight), ['400', '700'],
+    'a control\'s own script, in the saved form where the Scripts section has no _type');
+  const prose = await embedPanelFonts(scripted('// set this in Imported Sans later'), stored, undefined, { subset: false });
+  assert.deepEqual(prose.fonts, [], 'a word in a comment is not a name in quotes');
+  const both = await embedPanelFonts({ ...panelWith(label('Imported Sans')), scripts: [{ source: '"Imported Sans"' }] }, stored, undefined, { subset: false });
+  assert.equal(both.fonts.length, 1, 'a font a control already names is carried once');
+  const carried = { family: 'Theirs', weight: '400', style: 'normal', data: dataUrl };
+  const passed = await embedPanelFonts({ ...scripted('ce.text.style("L", { family: "Theirs" })'), fonts: [carried] }, [], undefined, { subset: false });
+  assert.deepEqual(passed.fonts, [carried], 'and a carried face a script names is passed on');
+});
+
 test('a panel that arrived carrying a font passes it on to the next person', async () => {
   const carried = { family: 'Imported Sans', weight: '400', style: 'normal', data: dataUrl };
   const original = { ...panelWith(label('Imported Sans')), fonts: [carried] };

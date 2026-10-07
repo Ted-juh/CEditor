@@ -352,8 +352,10 @@ off or remove it. Added fonts then appear in the font list wherever you choose a
 
 Your fonts are kept on your computer, not in the panel file. When the panel leaves your computer —
 with **File → Share Panel...**, or as an exported plugin — CEditor puts the fonts it uses inside, cut
-down to the characters the panel shows, so the text looks the same everywhere. A plain `.cepanel`
-file opened on another computer shows a stand-in font instead.
+down to the characters the panel shows, so the text looks the same everywhere. That includes a font
+only a script applies, as long as the script names it in quotes, as in
+`ce.text.style("Title", { family: "Inter" })`. A plain `.cepanel` file opened on another computer
+shows a stand-in font instead.
 
 **Icons** for buttons and labels are added in **Settings → Icons**, also in two ways:
 
@@ -371,9 +373,10 @@ file opened on another computer shows a stand-in font instead.
   WebP all work, and an icon you already have is skipped.
 
 Then choose an icon on a control's **Icon** tab or in the **Icon** section of the context bar. A
-button or label starts out showing only its text, so the icon does not appear until you also pick a
-layout that includes it: on the control's **Content Layout** tab, set **Mode** to *icon_only*, or to
-one of the layouts that place the icon beside, above or below the text. The **Library** on the Icons
+button or label starts out showing only its text; choosing an icon for it also changes its layout, so
+the icon appears to the left of the text, or on its own if there is no text. To put it somewhere
+else — above, below, to the right — change **Mode** on the control's **Content Layout** tab; a layout
+you have chosen yourself is left alone when you change the icon. The **Library** on the Icons
 page lists every icon, marked **Google** or **Local**, and lets you switch icons off or remove them.
 Google's icons are stored white by default, because panels are usually dark; the **Tint** setting on
 a control's Icon tab recolours any icon.

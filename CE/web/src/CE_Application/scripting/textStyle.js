@@ -66,20 +66,21 @@ export const JUSTIFICATIONS = TEXT_POSITION_OPTIONS.map((o) => o.value);
 
 /** One availableFonts entry, reduced to what a script needs to decide whether it can use it.
  *
- *  `portable` is the honest field. A builtin family is named in every runtime; a library font
- *  lives in the editor's app settings and is registered as a FontFace by the editor at edit time —
- *  no export path calls ensureStoredFontLoaded, and the font library is not part of the panel
- *  document. So a panel that styles itself with a library font looks right while you are building
- *  it and falls back to a platform default once exported. A script can now see that coming. */
-export function fontDescriptor(entry) {
+ *  `portable` says whether the font is there wherever the panel goes, as it stands. A builtin
+ *  family is named in every runtime, and the faces shipped for panels (assets/fonts/panelFonts.css)
+ *  are loaded by the player as well as the editor. A font from the author's library lives in app
+ *  settings, so it is not: it travels only once sharing or exporting packs it into the document
+ *  (utils/documentFonts.js), which happens when a control names it or a script names it in quotes.
+ *  A face the panel already carries — `carried`, from panel.fonts — is portable by definition. */
+export function fontDescriptor(entry, { carried = false } = {}) {
   if (!entry) return null;
-  const builtin = entry.sourceType === 'builtin';
+  const source = carried ? 'panel' : String(entry.sourceType ?? 'builtin');
   const axes = Array.isArray(entry.axes) ? entry.axes : [];
   return {
     family: String(entry.value ?? entry.family ?? ''),
     label: String(entry.label ?? entry.value ?? entry.family ?? ''),
-    source: String(entry.sourceType ?? 'builtin'),
-    portable: builtin,
+    source,
+    portable: source === 'builtin' || source === 'shipped' || source === 'panel',
     variable: entry.supportsWeight === true,
     axes: axes.map((axis) => ({
       tag: String(axis?.tag ?? ''),
@@ -95,9 +96,38 @@ export function fontDescriptor(entry) {
   };
 }
 
-/** The whole catalogue, in the order the Properties panel offers it. */
-export function fontCatalogue(entries) {
-  return (Array.isArray(entries) ? entries : []).map(fontDescriptor).filter(Boolean);
+/** A family the open panel carries (panel.fonts, utils/documentFonts.js), as one catalogue entry.
+ *  Its faces say whether it is variable: a weight written as a range ('100 900') is a wght axis. */
+function carriedFontEntry(family, faces) {
+  const ranges = faces.map((face) => String(face.weight ?? '').trim().split(/\s+/).map(Number))
+    .filter((parts) => parts.length === 2 && parts.every(Number.isFinite) && parts[1] > parts[0]);
+  const min = ranges.length ? Math.min(...ranges.map((r) => r[0])) : 0;
+  const max = ranges.length ? Math.max(...ranges.map((r) => r[1])) : 0;
+  return {
+    value: family,
+    label: family,
+    supportsWeight: ranges.length > 0,
+    axes: ranges.length ? [{ tag: 'wght', min, default: Math.min(max, Math.max(min, 400)), max }] : [],
+  };
+}
+
+/** The whole catalogue, in the order the Properties panel offers it, then the families the open
+ *  panel carries that it does not already list — the only imported fonts the exported player has. */
+export function fontCatalogue(entries, carriedFaces = []) {
+  const catalogue = (Array.isArray(entries) ? entries : []).map((entry) => fontDescriptor(entry)).filter(Boolean);
+  const listed = new Set(catalogue.flatMap((f) => [f.family.toLowerCase(), f.label.toLowerCase()]));
+  const families = new Map();
+  for (const face of Array.isArray(carriedFaces) ? carriedFaces : []) {
+    const family = String(face?.family ?? '').trim();
+    if (!family || listed.has(family.toLowerCase())) continue;
+    const key = family.toLowerCase();
+    if (!families.has(key)) families.set(key, { family, faces: [] });
+    families.get(key).faces.push(face);
+  }
+  for (const { family, faces } of families.values()) {
+    catalogue.push(fontDescriptor(carriedFontEntry(family, faces), { carried: true }));
+  }
+  return catalogue;
 }
 
 /** Find a family the way TextEditor does — by the stored `value` first, then by the human family

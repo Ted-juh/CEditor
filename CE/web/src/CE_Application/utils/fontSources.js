@@ -199,6 +199,11 @@ export function setDocumentFonts(faces) {
   documentFaces = Array.isArray(faces) ? faces : [];
 }
 
+/** The faces the open documents carry, as last set — for the script catalogue (ce.text.fonts). */
+export function currentDocumentFonts() {
+  return documentFaces;
+}
+
 function dataUrlBuffer(dataUrl) {
   const text = String(dataUrl ?? '');
   const comma = text.indexOf(',');

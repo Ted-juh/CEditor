@@ -8,7 +8,8 @@
  * could not be re-outlined at all.
  *
  * So a panel leaving the editor (packaged to share, or prepared for export — the same path,
- * stores/panelSharing.js) carries the imported faces it names, as `panel.fonts`:
+ * stores/panelSharing.js) carries the imported faces it names, as `panel.fonts` — named by a control,
+ * or in quotes by a script (utils/panelScriptStrings.js):
  *
  *   [{ family, weight, style, unicodeRange?, data }]
  *
@@ -24,6 +25,7 @@
  * redistribute.
  */
 import { primaryFamily, setDocumentFonts } from './fontSources.js';
+import { panelScriptStrings, scriptsName } from './panelScriptStrings.js';
 
 const FAMILY_KEY = /(^|\.)(family|fontFamily)$/;
 
@@ -44,6 +46,29 @@ export function panelFontNames(panel) {
   walk(panel?.controls ?? []);
   names.delete('');
   return [...names];
+}
+
+/**
+ * Fonts a script names in quotes and no control does: `ce.text.style("L", { family: "Inter" })`
+ * reaches for a font the controls never mention, and the player has no settings to find it in. The
+ * candidates are the author's imported fonts, by either name, and the faces the panel already carries.
+ */
+function scriptFontNames(panel, storedFonts, carried, named) {
+  const strings = panelScriptStrings(panel);
+  if (!strings.length) return [];
+  const have = new Set(named.map((name) => name.toLowerCase()));
+  const candidates = [
+    ...(storedFonts ?? []).filter((font) => font?.enabled !== false).flatMap((font) => [font.family, font.cssFamily]),
+    ...carried.map((face) => face.family),
+  ];
+  const found = [];
+  for (const candidate of candidates) {
+    const name = String(candidate ?? '').trim();
+    if (!name || have.has(name.toLowerCase()) || !scriptsName(strings, name)) continue;
+    have.add(name.toLowerCase());
+    found.push(name);
+  }
+  return found;
 }
 
 /** The imported font a name refers to, by the family the user sees or the CSS name it is loaded as. */
@@ -71,7 +96,8 @@ export async function embedPanelFonts(panel, storedFonts, readData = async () =>
   const fonts = [];
   const missing = [];
   const alreadyCarried = (Array.isArray(panel?.fonts) ? panel.fonts : []).filter(validFace);
-  for (const name of panelFontNames(panel)) {
+  const named = panelFontNames(panel);
+  for (const name of [...named, ...scriptFontNames(panel, storedFonts, alreadyCarried, named)]) {
     const matches = importedFontFor(name, storedFonts);
     if (!matches.length) {
       // A panel that arrived carrying a font this user never imported passes it on unchanged.

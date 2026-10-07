@@ -11,7 +11,8 @@
 //     cover/contain/fill, where `fill` does not even mean the same thing. A shared list would be
 //     wrong for one of them.
 //  3. THREE SOURCE MODELS with different portability: a data URL travels, a file path does not, and
-//     an icon-library reference does not either.
+//     an icon-library reference travels only once sharing or exporting packs the icon into the panel
+//     (utils/documentIcons.js).
 //
 // Every vocabulary is asserted against the module the renderer reads it from, never against a list
 // retyped here.
@@ -363,6 +364,24 @@ test('icon writes the id AND the name, so the fallback is not left deciding', ()
     assert.equal(api.get('B.Icon.source'), 'library');
     assert.equal(api.get('B.Icon.size'), 20);
     assert.equal(api.get('B.Icon.tint'), '5B9BD5', 'a leading # is stripped');
+  }));
+});
+
+test('icon shows on a control that showed only its text, and leaves a chosen layout alone', () => {
+  withIcons([{ id: 'i1', name: 'waveform', enabled: true, dataUrl: PNG }], () => withControls((api) => {
+    const button = createControl('ToggleButton', { name: 'B' });
+    const bare = createControl('ToggleButton', { name: 'Bare' });
+    bare._children.Text.content = '';
+    const stacked = createControl('ToggleButton', { name: 'S' });
+    stacked._children.ContentLayout.mode = 'icon_above_text_below';
+    panels.update((all) => [{ ...all[0], controls: [...all[0].controls, button, bare, stacked] }]);
+    assert.equal(api.get('B.ContentLayout.mode'), 'text_only', 'the case this covers');
+    api.imageIcon('B', 'waveform');
+    api.imageIcon('Bare', 'waveform');
+    api.imageIcon('S', 'waveform');
+    assert.equal(api.get('B.ContentLayout.mode'), 'icon_left_text_right', 'beside the text');
+    assert.equal(api.get('Bare.ContentLayout.mode'), 'icon_only', 'on its own where there is no text');
+    assert.equal(api.get('S.ContentLayout.mode'), 'icon_above_text_below');
   }));
 });
 

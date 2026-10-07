@@ -27,7 +27,8 @@
   import Square from 'lucide-svelte/icons/square';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Image from 'lucide-svelte/icons/image';
-  import { selectedControl, getSection, updateControlProperty, updateSelectedProperty, applyControlPatchesById, renameControl } from '../stores/controls.js';
+  import { selectedControl, selectedControls, getSection, updateControlProperty, updateSelectedProperty, applyControlPatchesById, renameControl } from '../stores/controls.js';
+  import { layoutModeForIcon } from '../utils/iconLayout.js';
   import { selectedComponentIds, resolvedActivePanelId } from '../stores/panels.js';
   import { componentWorkspaceMode } from '../stores/componentWorkspace.js';
   import { availableFonts, availableIcons } from '../stores/appSettings.js';
@@ -250,6 +251,14 @@
     set('Icon.source', asset ? 'library' : 'none');
     set('Icon.assetId', assetId);
     set('Icon.name', asset?.name ?? '');
+    // A control showing text only draws no icon (utils/iconLayout.js): give each one that is a
+    // layout that does, and leave a layout the author chose alone.
+    if (!asset) return;
+    for (const target of multiSelect ? $selectedControls : [control]) {
+      const mode = layoutModeForIcon(target);
+      const id = getSection(target, 'Core')?.id;
+      if (mode && id != null) updateControlProperty(id, 'ContentLayout.mode', mode);
+    }
   }
 </script>
 

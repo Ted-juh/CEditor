@@ -26,6 +26,7 @@
  * it must not stop an export that worked before icons travelled.
  */
 import { writable, get } from 'svelte/store';
+import { isSection, panelScriptStrings, scriptsName } from './panelScriptStrings.js';
 
 const ICON_SECTION = 'Icon';
 
@@ -36,11 +37,6 @@ function referenceFrom(source, assetId, name) {
   const label = typeof name === 'string' ? name.trim() : '';
   return id || label ? { assetId: id, name: label } : null;
 }
-
-/** Whether `node`, reached under `key`, is a section of that type. A saved or shared document writes
- *  each control as a difference from its defaults, and `_type` is a default: there the section is
- *  known only by the key it sits under in `_children`. */
-const isSection = (node, key, type) => node._type === type || key === type;
 
 /**
  * Every icon reference in a panel's controls: Icon sections (`{ assetId, name }`), and state
@@ -76,38 +72,6 @@ export function panelIconReferences(panel) {
   };
   walk(panel?.controls ?? []);
   return refs;
-}
-
-/** Every string a panel's scripts hold — source text, compiled text, a visual script's arguments. */
-function panelScriptText(panel) {
-  const strings = [];
-  const collect = (node) => {
-    if (typeof node === 'string') { strings.push(node); return; }
-    if (Array.isArray(node)) { node.forEach(collect); return; }
-    if (node && typeof node === 'object') Object.values(node).forEach(collect);
-  };
-  collect(panel?.scripts ?? []);
-  const walk = (node, key = '') => {
-    if (Array.isArray(node)) { node.forEach((item) => walk(item)); return; }
-    if (!node || typeof node !== 'object') return;
-    if (isSection(node, key, 'Scripts')) { collect(node.scripts ?? []); return; }
-    for (const [childKey, value] of Object.entries(node)) {
-      if (value && typeof value === 'object') walk(value, childKey);
-    }
-  };
-  walk(panel?.controls ?? []);
-  return strings;
-}
-
-const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-/** Whether a script names this text: as a whole string value, or in quotes inside source text. */
-function scriptsName(strings, text) {
-  const wanted = String(text ?? '').trim();
-  if (!wanted) return false;
-  const lower = wanted.toLowerCase();
-  const quoted = new RegExp(`["'\`]${escapeRegExp(wanted)}["'\`]`, 'i');
-  return strings.some((s) => s.trim().toLowerCase() === lower || quoted.test(s));
 }
 
 /** An icon that can be drawn: enabled, with a picture. */
@@ -168,7 +132,7 @@ export function embedPanelIcons(panel, storedIcons) {
 
   // Icons only a script reaches. ce.image.icon finds by id, then by name ignoring case
   // (utils/imageLayers.js findAsset), so a quoted name in any case counts.
-  const strings = panelScriptText(panel);
+  const strings = panelScriptStrings(panel);
   if (strings.length) {
     const candidates = [...(storedIcons ?? []).filter(drawable), ...alreadyCarried];
     for (const entry of candidates) {

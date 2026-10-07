@@ -3353,7 +3353,7 @@ Read all the settings of one image layer (`layer` is "image" unless you name ano
 
 #### `ce.image.icon(target, idOrName [, opts]) -> boolean`
 
-Show an image from the icon library (or one the panel carries) in a control's Icon section, chosen by id or name. `opts` can also set its size, fit, tint, opacity and rotation. An image that is not there is refused with a message rather than stored. Write the id or name in quotes, as a plain string: that is how sharing and exporting find the icon and pack it into the panel. Use this rather than `set()`: it records the asset's id and name together, so the control finds exactly that image.
+Show an image from the icon library (or one the panel carries) in a control's Icon section, chosen by id or name. `opts` can also set its size, fit, tint, opacity and rotation. An image that is not there is refused with a message rather than stored. A control that shows only its text is switched to show the icon beside it (or alone, when there is no text). Write the id or name in quotes, as a plain string: that is how sharing and exporting find the icon and pack it into the panel. Use this rather than `set()`: it records the asset's id and name together, so the control finds exactly that image.
 
 *Short name: `imageIcon`.*
 
@@ -3387,7 +3387,7 @@ Everything in this chapter needs the panel window. With the window closed these 
 
 #### `ce.text.fonts([opts]) -> list`
 
-List every font the panel can use, with what each one supports. `portable` says whether a font survives an export: the built-in fonts work everywhere, but a font from your font library lives on this computer, is not saved with the panel, and is replaced by a system font for anyone else. `featuresKnown` says whether the font's typographic features have actually been checked; when it is false, an empty `features` list means they are unknown, not that there are none.
+List every font the panel can use, with what each one supports: the built-in fonts, your font library, and any font the panel carries with it (`source` "panel"). `portable` says whether a font is already there wherever the panel goes: true for the built-in fonts and the carried ones, false for your library's. Sharing or exporting packs a library font into the panel if a control uses it or a script names it in quotes. `featuresKnown` says whether the font's typographic features have actually been checked; when it is false, an empty `features` list means they are unknown, not that there are none.
 
 *Short name: `textFonts`.*
 
@@ -3395,7 +3395,7 @@ List every font the panel can use, with what each one supports. `portable` says 
 
 | Name | Type | What it is |
 |---|---|---|
-| `portable` | true or false | Set true to list only fonts that survive an export. A font from the icon library is registered by the editor and is not part of the panel document, so it looks right while you build and falls back to a system font once exported. |
+| `portable` | true or false | Set true to list only fonts that are already there wherever the panel goes: the built-in fonts and the ones the panel carries. A font from your font library is packed in when you share or export the panel, if a control uses it or a script names it in quotes. |
 | `variable` | true or false | Set true to list only variable fonts, the ones with adjustable axes such as weight and width. |
 
 #### `ce.text.font(family) -> table|nil`

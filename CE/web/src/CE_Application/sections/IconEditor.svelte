@@ -1,8 +1,9 @@
 <script>
   import Settings from 'lucide-svelte/icons/settings';
-  import { getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
+  import { getSection, inspectorStateNameForPath, selectedControls, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { availableIcons } from '../stores/appSettings.js';
+  import { layoutModeForIcon } from '../utils/iconLayout.js';
   import PropertyGrid from '../properties/PropertyGrid.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
@@ -33,6 +34,19 @@
     set('Icon.source', asset ? 'library' : 'none');
     set('Icon.assetId', assetId);
     set('Icon.name', asset?.name ?? '');
+    if (asset) showChosenIcon();
+  }
+
+  // A control showing text only draws no icon (utils/iconLayout.js), so give each one that is a
+  // layout that does — per control, so a selection's other layouts are left as they were.
+  function showChosenIcon() {
+    const targets = $selectedComponentIds.size > 1 ? $selectedControls : [control];
+    const stateName = inspectorStateNameForPath('ContentLayout.mode');
+    for (const target of targets) {
+      const mode = layoutModeForIcon(target, stateName);
+      const id = getSection(target, 'Core')?.id;
+      if (mode && id != null) updateControlProperty(id, 'ContentLayout.mode', mode);
+    }
   }
 </script>
 
