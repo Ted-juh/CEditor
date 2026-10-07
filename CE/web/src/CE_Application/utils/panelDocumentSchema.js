@@ -108,6 +108,7 @@ const carriedFont = {
   required: ['family', 'data'],
   properties: {
     family: { type: 'string', pattern: '\\S' },
+    label: string,
     weight: string,
     style: string,
     unicodeRange: string,

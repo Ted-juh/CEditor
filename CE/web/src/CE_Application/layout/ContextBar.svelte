@@ -31,7 +31,7 @@
   import { layoutModeForIcon } from '../utils/iconLayout.js';
   import { selectedComponentIds, resolvedActivePanelId } from '../stores/panels.js';
   import { componentWorkspaceMode } from '../stores/componentWorkspace.js';
-  import { availableFonts, availableIcons } from '../stores/appSettings.js';
+  import { fontChoices, availableIcons } from '../stores/appSettings.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { activeFacet, setFacet, APPEARANCE_FACET_ORDER } from '../stores/editorFacet.js';
   import DeviceInsight from './DeviceInsight.svelte';
@@ -134,7 +134,7 @@
   });
 
   let weightedFontSelected = $derived(
-    $availableFonts.find(option => option.value === (font?.family ?? 'Arial'))?.supportsWeight === true
+    $fontChoices.find(option => option.value === (font?.family ?? 'Arial'))?.supportsWeight === true
   );
   let effectiveWeightValue = $derived(font?.weightValue ?? (font?.weight === 'Bold' ? 700 : 400));
   let boldActive = $derived(weightedFontSelected ? effectiveWeightValue >= 700 : font?.weight === 'Bold');
@@ -196,7 +196,7 @@
   function setFontFamily(event) {
     const family = event.target.value;
     set('Text.Font.family', family);
-    const nextFontOption = $availableFonts.find((option) => option.value === family) ?? null;
+    const nextFontOption = $fontChoices.find((option) => option.value === family) ?? null;
     if (nextFontOption?.supportsWeight === true) {
       const nextWeight = normalizeWeightValue(effectiveWeightValue);
       set('Text.Font.weightValue', nextWeight);
@@ -343,7 +343,7 @@
 
       <div class="prop-group">
         <select class="font-select" value={font?.family ?? 'Arial'} title="Font family" onchange={setFontFamily}>
-          {#each $availableFonts as option}
+          {#each $fontChoices as option}
             <option value={option.value}>{option.label}</option>
           {/each}
         </select>

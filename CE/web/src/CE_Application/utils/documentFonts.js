@@ -11,11 +11,13 @@
  * stores/panelSharing.js) carries the imported faces it names, as `panel.fonts` — named by a control,
  * or in quotes by a script (utils/panelScriptStrings.js):
  *
- *   [{ family, weight, style, unicodeRange?, data }]
+ *   [{ family, label?, weight, style, unicodeRange?, data }]
  *
  * `family` is the name exactly as the document writes it: a control may name the font by the family
  * the user sees or by the CSS name the editor registered it under, and the player has no settings to
- * map one to the other, so each face is registered under the name the document asks for. `weight`
+ * map one to the other, so each face is registered under the name the document asks for. `label` is
+ * the family the user sees, kept where it differs — the CSS name is `ce_font_…`, which is no name to
+ * offer anyone in a font list (`fontChoices`, stores/appSettings.js). `weight`
  * is a CSS descriptor ('400', or '100 900' for a variable face); `data` is the font file as a data URL,
  * cut to the characters the panel can show (utils/fontSubset.js).
  *
@@ -24,6 +26,7 @@
  * carried: the bundled panel faces ship with every build, and a system font is not the author's to
  * redistribute.
  */
+import { writable, get } from 'svelte/store';
 import { primaryFamily, setDocumentFonts } from './fontSources.js';
 import { panelScriptStrings, scriptsName } from './panelScriptStrings.js';
 
@@ -106,11 +109,14 @@ export async function embedPanelFonts(panel, storedFonts, readData = async () =>
     }
     let carried = 0;
     for (const font of matches) {
+      const label = String(font.family ?? '').trim();
+      const named = label && label !== name ? { label } : {};
       if (Array.isArray(font.cachedFaces) && font.cachedFaces.length) {
         for (const face of font.cachedFaces) {
           if (!face?.dataUrl) continue;
           fonts.push({
             family: name,
+            ...named,
             weight: String(face.weight ?? '400'),
             style: face.style === 'italic' ? 'italic' : 'normal',
             ...(face.unicodeRange ? { unicodeRange: face.unicodeRange } : {}),
@@ -122,7 +128,7 @@ export async function embedPanelFonts(panel, storedFonts, readData = async () =>
       }
       const data = font.localDataUrl || (font.filePath ? await readData(font.filePath) : null);
       if (!data) continue;
-      fonts.push({ family: name, weight: weightDescriptor(font), style: font.fontStyle === 'italic' ? 'italic' : 'normal', data });
+      fonts.push({ family: name, ...named, weight: weightDescriptor(font), style: font.fontStyle === 'italic' ? 'italic' : 'normal', data });
       carried += 1;
     }
     if (!carried) missing.push(name);
@@ -163,13 +169,47 @@ function validFace(face) {
 }
 
 /**
- * Make a document's carried faces available: to CSS (FontFace, once per face) and to the outline
- * code. `fonts` is every carried face of every open document; the outline code's list is replaced
- * with it, so a closed panel's faces stop answering for outlines.
+ * The faces every open document carries, for the font lists: a panel shared by someone whose fonts
+ * this user does not have keeps them choosable. Set by registerDocumentFonts.
+ */
+export const carriedFonts = writable([]);
+
+/**
+ * The carried faces as families, one per name the documents use, in first-seen order:
+ * `{ family, label, faces, weights }`, where `weights` is `{ min, max }` when a face is variable
+ * (a weight written as a range, '100 900') and null when every face is a single weight.
+ */
+export function carriedFontFamilies(faces) {
+  const families = new Map();
+  for (const face of (Array.isArray(faces) ? faces : []).filter(validFace)) {
+    const family = face.family.trim();
+    const key = family.toLowerCase();
+    if (!families.has(key)) families.set(key, { family, label: family, faces: [], weights: null });
+    const entry = families.get(key);
+    entry.faces.push(face);
+    if (typeof face.label === 'string' && face.label.trim()) entry.label = face.label.trim();
+    const range = String(face.weight ?? '').trim().split(/\s+/).map(Number);
+    if (range.length === 2 && range.every(Number.isFinite) && range[1] > range[0]) {
+      entry.weights = entry.weights
+        ? { min: Math.min(entry.weights.min, range[0]), max: Math.max(entry.weights.max, range[1]) }
+        : { min: range[0], max: range[1] };
+    }
+  }
+  return [...families.values()];
+}
+
+const sameFaces = (a, b) => a.length === b.length && a.every((face, i) => faceKey(face) === faceKey(b[i]));
+
+/**
+ * Make a document's carried faces available: to CSS (FontFace, once per face), to the outline
+ * code, and to the font lists. `fonts` is every carried face of every open document; each list is
+ * replaced with it, so a closed panel's faces stop answering.
  */
 export async function registerDocumentFonts(fonts) {
   const faces = (Array.isArray(fonts) ? fonts : []).filter(validFace);
   setDocumentFonts(faces);
+  // Called on every change to the open panels; the lists only hear about a real change.
+  if (!sameFaces(get(carriedFonts), faces)) carriedFonts.set(faces);
   if (typeof document === 'undefined' || typeof FontFace === 'undefined') return;
   for (const face of faces) {
     const key = faceKey(face);

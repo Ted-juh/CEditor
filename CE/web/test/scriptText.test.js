@@ -162,12 +162,17 @@ test('the fonts a panel carries are listed after the rest, once per family, and 
 
 test('where only the panel has a font — the exported player — a script can still style with it', async () => {
   const { setDocumentFonts } = await import('../src/CE_Application/utils/fontSources.js');
-  setDocumentFonts([{ family: 'Imported Sans', weight: '400', style: 'normal', data: 'data:font/woff2;base64,AAAA' }]);
+  setDocumentFonts([
+    { family: 'Imported Sans', weight: '400', style: 'normal', data: 'data:font/woff2;base64,AAAA' },
+    { family: 'ce_font_x', label: 'Shown Name', weight: '400', style: 'normal', data: 'data:font/woff2;base64,AAAA' },
+  ]);
   try {
     withText((api) => {
       assert.equal(api.textFont('Imported Sans').source, 'panel');
       assert.equal(api.textStyle('L', { family: 'imported sans' }), true);
       assert.equal(api.textRead('L', 'family'), 'Imported Sans', 'under the name the faces are registered as');
+      assert.equal(api.textStyle('L', { family: 'Shown Name' }), true, 'a carried font answers to the name people know');
+      assert.equal(api.textRead('L', 'family'), 'ce_font_x', 'and is written as the name its faces are registered under');
     });
   } finally {
     setDocumentFonts([]);

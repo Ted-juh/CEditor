@@ -62,6 +62,7 @@ import {
   svgToDataUrl,
 } from '../utils/googleIcons.js';
 import { documentIcons } from '../utils/documentIcons.js';
+import { carriedFontFamilies, carriedFonts } from '../utils/documentFonts.js';
 
 export { WEIGHT_OPTIONS } from './appSettingsSchema.js';
 
@@ -185,6 +186,32 @@ export const availableFonts = derived(appSettings, ($settings) => {
   }
 
   return merged;
+});
+
+/**
+ * The fonts a control can be given: availableFonts, then the families an open panel carries that it
+ * does not list (utils/documentFonts.js) — a panel someone shared keeps its fonts choosable, and the
+ * list shows the font a control already uses instead of nothing. Kept apart from availableFonts,
+ * which answers "what does this computer have" for the notepad and the component library.
+ */
+export const fontChoices = derived([availableFonts, carriedFonts], ([$available, $carried]) => {
+  const listed = new Set($available.map((entry) => String(entry.value ?? '').toLowerCase()));
+  const extra = carriedFontFamilies($carried)
+    .filter((carried) => !listed.has(carried.family.toLowerCase()))
+    .map(({ family, label, weights }) => ({
+      value: family,
+      label: `${label}${weights ? ' [W]' : ''} (carried by the panel)`,
+      family,
+      cssFamily: family,
+      sourceType: 'panel',
+      enabled: true,
+      supportsWeight: weights != null,
+      axes: weights ? [{ tag: 'wght', min: weights.min, default: Math.min(weights.max, Math.max(weights.min, 400)), max: weights.max }] : [],
+      weightAxis: weights ? { min: weights.min, default: Math.min(weights.max, Math.max(weights.min, 400)), max: weights.max } : null,
+      supportedFeatures: [],
+      featureSupportKnown: false,
+    }));
+  return extra.length ? [...$available, ...extra] : $available;
 });
 
 const iconOption = (icon, label = icon.name) => ({

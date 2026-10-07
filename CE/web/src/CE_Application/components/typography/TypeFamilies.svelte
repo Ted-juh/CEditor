@@ -3,17 +3,17 @@
    * The family list, each row set in its own face.
    *
    * There is no font specimen anywhere in the editor today, so choosing a family means setting it,
-   * looking at the canvas, and coming back. `availableFonts` already merges the built-in faces with
-   * the user's imported ones and `ensureStoredFontLoaded` gets a face on screen, so this is mostly
-   * a matter of asking.
+   * looking at the canvas, and coming back. `fontChoices` already merges the built-in faces with
+   * the user's imported ones and the fonts an open panel carries, and `ensureStoredFontLoaded` gets
+   * a face on screen, so this is mostly a matter of asking.
    */
-  import { availableFonts, ensureStoredFontLoaded } from '../../stores/appSettings.js';
+  import { fontChoices, ensureStoredFontLoaded } from '../../stores/appSettings.js';
 
   let { family = '', onpick = () => {} } = $props();
 
   let filter = $state('');
 
-  let rows = $derived(($availableFonts ?? []).filter((entry) => {
+  let rows = $derived(($fontChoices ?? []).filter((entry) => {
     const needle = filter.trim().toLowerCase();
     return !needle || String(entry.label ?? entry.value ?? '').toLowerCase().includes(needle);
   }));
@@ -32,7 +32,7 @@
   }
 
   $effect(() => {
-    const selected = ($availableFonts ?? []).find((entry) => entry.value === family);
+    const selected = ($fontChoices ?? []).find((entry) => entry.value === family);
     if (selected) warm(selected);
   });
 

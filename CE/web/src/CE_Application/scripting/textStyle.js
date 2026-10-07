@@ -19,6 +19,7 @@
 // so the vocabularies come from the app's own tables rather than being retyped. Nothing here
 // touches a store or a control: it takes plain data and returns plain data.
 
+import { carriedFontFamilies } from '../utils/documentFonts.js';
 import { numberOr } from '../utils/primitives.js';
 import { normalizeScriptMode, normalizeTextCaseMode } from '../editor/canvasControlStyles.js';
 import {
@@ -96,18 +97,16 @@ export function fontDescriptor(entry, { carried = false } = {}) {
   };
 }
 
-/** A family the open panel carries (panel.fonts, utils/documentFonts.js), as one catalogue entry.
- *  Its faces say whether it is variable: a weight written as a range ('100 900') is a wght axis. */
-function carriedFontEntry(family, faces) {
-  const ranges = faces.map((face) => String(face.weight ?? '').trim().split(/\s+/).map(Number))
-    .filter((parts) => parts.length === 2 && parts.every(Number.isFinite) && parts[1] > parts[0]);
-  const min = ranges.length ? Math.min(...ranges.map((r) => r[0])) : 0;
-  const max = ranges.length ? Math.max(...ranges.map((r) => r[1])) : 0;
+/** A family the open panel carries (utils/documentFonts.js carriedFontFamilies), as one catalogue
+ *  entry. Labelled with the family the user sees, so a script can name it either way. */
+function carriedFontEntry({ family, label, weights }) {
   return {
     value: family,
-    label: family,
-    supportsWeight: ranges.length > 0,
-    axes: ranges.length ? [{ tag: 'wght', min, default: Math.min(max, Math.max(min, 400)), max }] : [],
+    label,
+    supportsWeight: weights != null,
+    axes: weights
+      ? [{ tag: 'wght', min: weights.min, default: Math.min(weights.max, Math.max(weights.min, 400)), max: weights.max }]
+      : [],
   };
 }
 
@@ -116,16 +115,9 @@ function carriedFontEntry(family, faces) {
 export function fontCatalogue(entries, carriedFaces = []) {
   const catalogue = (Array.isArray(entries) ? entries : []).map((entry) => fontDescriptor(entry)).filter(Boolean);
   const listed = new Set(catalogue.flatMap((f) => [f.family.toLowerCase(), f.label.toLowerCase()]));
-  const families = new Map();
-  for (const face of Array.isArray(carriedFaces) ? carriedFaces : []) {
-    const family = String(face?.family ?? '').trim();
-    if (!family || listed.has(family.toLowerCase())) continue;
-    const key = family.toLowerCase();
-    if (!families.has(key)) families.set(key, { family, faces: [] });
-    families.get(key).faces.push(face);
-  }
-  for (const { family, faces } of families.values()) {
-    catalogue.push(fontDescriptor(carriedFontEntry(family, faces), { carried: true }));
+  for (const carried of carriedFontFamilies(carriedFaces)) {
+    if (listed.has(carried.family.toLowerCase())) continue;
+    catalogue.push(fontDescriptor(carriedFontEntry(carried), { carried: true }));
   }
   return catalogue;
 }

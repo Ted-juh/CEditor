@@ -354,8 +354,9 @@ Your fonts are kept on your computer, not in the panel file. When the panel leav
 with **File → Share Panel...**, or as an exported plugin — CEditor puts the fonts it uses inside, cut
 down to the characters the panel shows, so the text looks the same everywhere. That includes a font
 only a script applies, as long as the script names it in quotes, as in
-`ce.text.style("Title", { family: "Inter" })`. A plain `.cepanel` file opened on another computer
-shows a stand-in font instead.
+`ce.text.style("Title", { family: "Inter" })`. Whoever opens the shared panel finds those fonts in
+the font list as *"name (carried by the panel)"*, so they can use them on other controls of that
+panel too. A plain `.cepanel` file opened on another computer shows a stand-in font instead.
 
 **Icons** for buttons and labels are added in **Settings → Icons**, also in two ways:
 

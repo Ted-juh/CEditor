@@ -21,7 +21,7 @@
   import Type from 'lucide-svelte/icons/type';
   import { getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
-  import { availableFonts, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';
+  import { fontChoices, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { activateInspectorColorTarget } from '../stores/colorTarget.js';
   import { activeControlSet } from '../stores/controlSets.js';
   import { resolveColourLiteral, tokenNameOf } from '../models/controlSets.js';
@@ -87,8 +87,8 @@
   let textEffects = $derived(text?._children?.Effects ?? null);
   let position = $derived(text?._children?.Position ?? null);
   let selectedFontOption = $derived(
-    $availableFonts.find(option => option.value === (font?.family ?? 'Arial'))
-    ?? $availableFonts.find(option => option.family === (font?.family ?? 'Arial'))
+    $fontChoices.find(option => option.value === (font?.family ?? 'Arial'))
+    ?? $fontChoices.find(option => option.family === (font?.family ?? 'Arial'))
     ?? null
   );
   let weightedFontSelected = $derived(selectedFontOption?.supportsWeight === true);
@@ -447,8 +447,8 @@
     const family = event.target.value;
     set('Text.Font.family', family);
 
-    const nextFontOption = $availableFonts.find((option) => option.value === family)
-      ?? $availableFonts.find((option) => option.family === family)
+    const nextFontOption = $fontChoices.find((option) => option.value === family)
+      ?? $fontChoices.find((option) => option.family === family)
       ?? null;
 
     if (nextFontOption?.supportsWeight === true) {
@@ -818,7 +818,7 @@
             value={font?.family ?? 'Arial'}
             onchange={setFontFamily}
           >
-            {#each $availableFonts as option}
+            {#each $fontChoices as option}
               <option value={option.value} style={`font-family:'${option.cssFamily ?? option.value}'`}>{option.label}</option>
             {/each}
           </select>

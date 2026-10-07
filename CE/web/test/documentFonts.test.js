@@ -8,7 +8,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { embedPanelFonts, panelFontNames, registerDocumentFonts, withEmbeddedFonts } from '../src/CE_Application/utils/documentFonts.js';
+import { get } from 'svelte/store';
+import { carriedFontFamilies, carriedFonts, embedPanelFonts, panelFontNames, registerDocumentFonts, withEmbeddedFonts } from '../src/CE_Application/utils/documentFonts.js';
 import { FontUnavailableError, clearFontCache, resolveFont, setDocumentFonts, setFontSources } from '../src/CE_Application/utils/fontSources.js';
 import { textOutline } from '../src/CE_Application/utils/textOutline.js';
 
@@ -117,4 +118,59 @@ test('packaging a panel carries its fonts, and opening the package keeps them', 
   assert.equal(opened.panel.fonts[0].family, 'Imported Sans');
   assert.match(opened.panel.fonts[0].data, /^data:font\/woff2;base64,/, 'subset and compressed');
   appSettings.update((current) => ({ ...current, fonts: [] }));
+});
+
+test('a face carried under the editor\'s CSS name keeps the name people know it by', async () => {
+  const { fonts } = await embedPanelFonts(panelWith(label('cefont-c'), label('Imported Sans')), stored,
+    async () => dataUrl, { subset: false });
+  assert.deepEqual(fonts.map((face) => [face.family, face.label]), [
+    ['cefont-c', 'On Disk'],
+    ['Imported Sans', undefined],
+  ], 'recorded only where the document\'s name is not the one people see');
+});
+
+test('carried faces read as families: one per name, labelled, variable where a weight is a range', () => {
+  const families = carriedFontFamilies([
+    { family: 'cefont-c', label: 'On Disk', weight: '100 900', style: 'normal', data: dataUrl },
+    { family: 'Web Face', weight: '400', style: 'normal', data: dataUrl },
+    { family: 'web face', weight: '700', style: 'italic', data: dataUrl },
+    { family: 'Broken', weight: '400', style: 'normal', data: 'C:/fonts/broken.ttf' },
+  ]);
+  assert.deepEqual(families.map((f) => [f.family, f.label, f.faces.length, f.weights]), [
+    ['cefont-c', 'On Disk', 1, { min: 100, max: 900 }],
+    ['Web Face', 'Web Face', 2, null],
+  ], 'a face that is not a font file is not offered');
+});
+
+test('opened panels\' fonts are offered in the font list, after this computer\'s own', async () => {
+  const { fontChoices, availableFonts } = await import('../src/CE_Application/stores/appSettings.js');
+  const own = get(availableFonts);
+  await registerDocumentFonts([
+    { family: 'cefont-c', label: 'On Disk', weight: '100 900', style: 'normal', data: dataUrl },
+    { family: own[0].value, weight: '400', style: 'normal', data: dataUrl },
+  ]);
+  try {
+    const choices = get(fontChoices);
+    assert.deepEqual(choices.slice(0, own.length), own, 'the computer\'s own fonts come first, unchanged');
+    const extra = choices.slice(own.length);
+    assert.deepEqual(extra.map((f) => [f.value, f.label, f.sourceType, f.supportsWeight]), [
+      ['cefont-c', 'On Disk [W] (carried by the panel)', 'panel', true],
+    ], 'by the name people know, under the name the document uses; nothing already listed twice');
+    assert.equal(get(availableFonts).length, own.length, 'what the computer has is still only that');
+
+    const before = get(carriedFonts);
+    await registerDocumentFonts([...before]);
+    assert.equal(get(carriedFonts), before, 'the same faces again change nothing, so the lists do not churn');
+  } finally {
+    await registerDocumentFonts([]);
+  }
+  assert.equal(get(fontChoices).length, own.length, 'a closed panel\'s fonts leave the list');
+});
+
+test('every font picker offers the carried fonts', () => {
+  for (const file of ['sections/TextEditor.svelte', 'layout/ContextBar.svelte', 'components/typography/TypeFamilies.svelte']) {
+    const source = readFileSync(new URL(`../src/CE_Application/${file}`, import.meta.url), 'utf8');
+    assert.match(source, /\$fontChoices/, `${file} lists fontChoices`);
+    assert.doesNotMatch(source, /\$availableFonts/, `${file} no longer lists only this computer's fonts`);
+  }
 });
