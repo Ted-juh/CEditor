@@ -56,7 +56,14 @@ export const HELP_DOCUMENTS = [
     file: 'docs/editor-manual.md',
     section: 'Start here',
     title: 'CEditor manual',
-    blurb: 'The whole program in plain language: building, binding, testing and exporting a panel, and HoSTage.',
+    blurb: 'The whole program in plain language: building, binding, testing and exporting a panel.',
+  },
+  {
+    id: 'hostage-manual',
+    file: 'docs/hostage-manual.md',
+    section: 'Start here',
+    title: 'HoSTage manual',
+    blurb: 'The instrument host: racks, sounds, performance tools, songs, the stage, controllers and the CTRL49.',
   },
   {
     id: 'release-notes',
@@ -97,10 +104,9 @@ export const HELP_DOCUMENTS = [
 
 /** The gap the list above leaves, said out loud in the viewer rather than left to be noticed. */
 export const HELP_GAPS = [
-  'HoSTage, the instrument host, has no manual of its own yet: the CEditor manual covers the '
-  + 'essentials in one chapter. The meaning of each individual setting is in the hint the properties '
-  + 'panel shows when you point at it; the old 2026-08-10 editor manual, which listed them, is out of '
-  + 'date and not shipped.',
+  'The manuals explain how things work, not every setting one by one: the meaning of each setting is '
+  + 'in the hint the properties panel shows when you point at it. The old 2026-08-10 editor manual, '
+  + 'which listed them, is out of date and not shipped.',
 ];
 
 const firstParagraph = (text) => {

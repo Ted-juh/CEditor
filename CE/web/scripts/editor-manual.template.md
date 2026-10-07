@@ -117,6 +117,11 @@ With nothing open, the canvas offers buttons to start: **New Panel**, **Open Pan
 Component**, **New Device Profile**, **New Script Workspace**, **New Screen (CTRL49)** and **Import
 Device Profile**.
 
+**New Screen (CTRL49)** opens the Screen Builder, an early prototype for putting knob pages for a
+hardware synth on the screen of an M-Audio CTRL49 keyboard. It cannot save, and it cannot send pages to
+the keyboard itself. To put your own pages on a CTRL49, use the control pages in HoSTage
+([chapter 13](#13-hostage-the-instrument-host)).
+
 ### The dock
 
 The dock holds tools you use while you work: the colour picker, the text and effects editors,
@@ -816,85 +821,24 @@ space bar will not start playback. Click outside the plugin first.
 
 ## 13. HoSTage, the instrument host
 
-HoSTage is a plugin host for playing live, built into CEditor. You build a **rack** of parts, each
-holding a VST3 instrument or an external hardware synth, give each part its own key range, MIDI
-effects, insert effects and mixer channel, and play the whole rack from a keyboard. Around the rack
-sit a sound library with instant auditioning, songs and setlists, and a large-type **Stage** screen
-for playing a set. Open it with **File → Hostage...**; it opens in a tab of its own.
+HoSTage is a plugin host for playing live, built into CEditor. HoSTage has its own manual — the
+[HoSTage manual](hostage-manual.md), also in **Help** — which explains all of it. In short:
 
-> **Not finished yet:** loading plugins into parts works on Windows only. HoSTage has no manual of
-> its own yet; this chapter covers the essentials.
+- You build a **rack** of parts, each holding a VST3 instrument or an external hardware synth, with
+  its own key range, MIDI effects, audio effects and mixer channel, and play the whole rack from a
+  keyboard. Splits and layers are part of it.
+- Around the rack sit a **sound library** with instant auditioning; **performance tools** — patterns,
+  a clip launcher, a looper, a modulation matrix and microtuning; **songs and setlists**; and a
+  large-type **Stage** screen with a lock against accidental changes.
+- **Control pages** put the parameters you want on the knobs, faders and pads of any MIDI controller,
+  eight to a page. On an **M-Audio CTRL49**, each control page is shown on the keyboard's colour
+  screen, with the name and value of every knob — that is how you build screens for the CTRL49. See
+  the HoSTage manual's chapters on controllers and on the CTRL49.
 
-### Build and Stage
+Open it with **File → Hostage...**; it opens in a tab of its own. It saves the rack by itself after
+every change.
 
-The header has a **Build** / **Stage** switch. **Build** is for setting things up. **Stage** shows the
-stage screen and turns on **Stage Lock**, which stops accidental changes; to go back, **hold Build for
-one second**. The header also has the transport (play, stop, tempo, tap tempo, time signature, and
-**EXT** to follow an external MIDI clock) and a **Panic** button.
-
-In Build mode, the workspaces are **Rack**, **Sounds**, **Performance**, **Mixer**, **Layers** and
-**Controller**. The **Utilities** open in a drawer on the right: **Library**, **Audio & MIDI**,
-**Project**, **Product**, **Health** and **Edition**.
-
-### Plugins
-
-HoSTage only knows about plugins it has scanned, and it never scans by itself. Open the **Library**
-utility and press **Scan plug-ins**. On Windows it searches the standard VST3 folders plus any
-**Extra scan folders** you add; elsewhere, only the folders you add. Only VST3 plugins are scanned.
-
-Each plugin is examined by a separate helper program. If a plugin crashes or hangs during the scan,
-only that plugin is set aside ("quarantined") and the scan carries on. **Health → What could not be
-offered** lists the plugins that were set aside, with a **Retry** button.
-
-### Building a rack
-
-1. Press **+ Add part** in the Rack and click the part to select it.
-2. Press **Plug-ins** in the rack's header to show the instrument list, and press **Load** next to an
-   instrument. (Clicking a plugin's picture does not load it — it lets you choose a different picture.)
-   Or pick a sound from **Sounds** and double-click it.
-3. Use the tabs at the bottom: **Zone** (key and velocity range, channel, transpose), **MIDI** (MIDI
-   effects such as arpeggiator, chords and echo), **Inserts** (audio effects), **Routing** (sends and
-   outputs) and **Params** (the plugin's parameters).
-
-Every plugin runs in a process of its own. If one crashes, only that plugin falls silent, and HoSTage
-can restore it automatically (**Health → Live plug-in failover**). After a crash, **Safe startup** keeps
-the plugin that was playing from loading again until you allow it.
-
-For an external synth, choose **Use external hardware...** on an empty part, then its **MIDI output**,
-**Channel** and **Audio return**. **Capture patch...** records a patch dump from the synth so HoSTage
-can send the sound back later.
-
-There is no Save command for the rack: HoSTage saves it by itself after every change. **Save rack**
-puts a copy in the library.
-
-### Sounds
-
-The **Sounds** tab (or the Sounds workspace, for the whole screen) is a library of every preset,
-chain and rack, with search, favourites, ratings, tags and collections. Selecting a sound does not
-load it: double-click it, or press **Enter**, to load it into the selected part. The **audition bar**
-plays the selected sound — at once, if a preview has been recorded — with a note, chord, scale, riff
-or what you last played.
-
-### Songs, setlists and the stage
-
-**Performance → Songs** holds the set: the list of songs, and for each song its tempo, length,
-sections, notes for the stage and the rack it uses. **Before the show** checks the setlist without
-loading anything, and **Preload** gets the next song ready.
-
-The **Stage** screen shows the clock, the set and song timers, the current and next song, notes in
-large type, and the controls. Keys: **→** or **Page Down** next song, **←** or **Page Up** previous,
-**1–9** pick a song, **Space** play or stop, **hold P** for half a second to panic, **Esc** to cancel.
-
-### Editions
-
-Without a licence, HoSTage runs as the **Free** edition: one plugin at a time, and no patterns or
-clips, scenes, songs and setlists, return buses or extra outputs. The **Edition** utility shows what
-each edition includes and lets you install a licence.
-
-### Where HoSTage keeps its data
-
-In `%APPDATA%\CEditor\instrument-host\` on Windows (`~/.config/CEditor/instrument-host/` on Linux):
-the rack, the plugin catalogue, the scan folders, the sound library and previews, and the logs.
+> **Not finished yet:** loading plugins into HoSTage and driving the CTRL49 work on Windows only.
 
 ## 14. Settings
 
@@ -939,8 +883,8 @@ CEditor is a beta. Things to know before you rely on it:
   called **mainSynth**.
 - **Some tools are partly built.** The dock's **Designer** draws the contents of the Step Sequencer,
   the Envelope and the Turing Modulator only. A **Screen** (CTRL49) tab cannot be closed with its **×**;
-  use **Ctrl+W**. The CTRL49 screen builder can only be opened from the start screen, with no documents
-  open.
+  use **Ctrl+W**, which closes it without asking — the Screen Builder cannot save, so its pages are
+  lost. It can only be opened from the start screen, with no documents open.
 - **The DAW and the keyboard.** On Windows, the DAW gets no key presses while the plugin window has
   focus.
 

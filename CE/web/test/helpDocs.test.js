@@ -37,16 +37,18 @@ test('every document named in the generator is in the bundle, with its text', ()
   }
 });
 
-test('the current editor manual ships, the stale snapshot does not, and the gaps are stated', () => {
+test('the current manuals ship, the stale snapshot does not, and the gaps are stated', () => {
   // The 2026-08-10 snapshot calls itself a historical record on its own first lines and is wrong
   // about the program it would be inside. The generated manual (docs/editor-manual.md) replaced it.
   assert.ok(!HELP_DOCS.some((doc) => doc.source.includes('editor-manual-2026')),
     'the 2026-08-10 snapshot is being shipped as current documentation');
   assert.ok(HELP_DOCS.some((doc) => doc.source === 'docs/editor-manual.md'),
     'the current editor manual is missing from Help');
-  // What it still does not cover is said, rather than left to pass for completeness.
+  assert.ok(HELP_DOCS.some((doc) => doc.source === 'docs/hostage-manual.md'),
+    'the HoSTage manual is missing from Help');
+  // What they still do not cover is said, rather than left to pass for completeness.
   assert.ok(HELP_GAPS.length > 0, 'the remaining gaps must be stated somewhere');
-  assert.match(HELP_GAPS.join(' '), /HoSTage/);
+  assert.doesNotMatch(HELP_GAPS.join(' '), /HoSTage.*no manual/, 'HoSTage has a manual now');
 });
 
 test('sections are in reading order — what to read first, then the rest', () => {
