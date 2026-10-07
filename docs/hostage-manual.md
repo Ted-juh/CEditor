@@ -58,10 +58,12 @@ See [chapter 11](#11-on-stage).
 
 **The header** also holds:
 
-- **Undo** and **Redo** (**Ctrl+Z**, and **Ctrl+Shift+Z** or **Ctrl+Y**). HoSTage remembers the last 20
-  changes. Undo waits while anything is playing or recording ("Stop playback and recording to undo
-  Build edits.") and under Stage Lock. It does not cover the sound library, a plugin's own window or
-  your hardware.
+- **Undo** and **Redo** (**Ctrl+Z**, and **Ctrl+Shift+Z** or **Ctrl+Y**), for Build edits — up to 20
+  steps. Undo waits while anything is playing or recording ("Stop playback and recording to undo
+  Build edits.") and under Stage Lock. Some actions start the history afresh, so nothing before them
+  can be undone: loading a plugin, an effect or a sound, stepping through presets, learning a control,
+  changing the tuning or a hardware synth's settings, and finishing a recording or a capture. Undo
+  does not cover the sound library, a plugin's own window or your hardware.
 - The **transport**: play, **▷** continue from where it stopped, stop, **↤** back to the beginning, the
   position in bars and beats, the tempo, **tap tempo**, the time signature, and **EXT** to follow an
   external MIDI clock.
@@ -74,8 +76,8 @@ and **Controller**, each described in its own chapter below. The **Utilities** o
 right: **Library**, **Audio & MIDI**, **Project**, **Product**, **Health** and **Edition**
 ([chapter 12](#12-utilities)).
 
-**Removing things.** Every **×** and every remove button asks for a second click: it turns into
-**Confirm** for five seconds.
+**Removing things.** Removing a part, a plugin, a pattern and most other things asks for a second
+click within five seconds before it happens; many buttons say **Confirm** while they wait.
 
 **Saving.** There is no Save command. HoSTage saves the rack, its pages, scenes and songs by itself
 after every change. To keep a copy, use **Save rack** (see [Saving and presets](#saving-and-presets)).
@@ -86,7 +88,8 @@ HoSTage only knows the plugins it has scanned, and it never scans by itself. Ope
 utility and press **Scan plug-ins**. Only VST3 plugins are scanned.
 
 - On Windows it searches the standard VST3 folders, plus any **Extra scan folders** you add. That list
-  is at the bottom of the Rack's right-hand column: press **Browse…**, or type a folder and press **Add**.
+  is at the bottom of the Rack's right-hand column (see [The right-hand column](#the-right-hand-column)):
+  press **Browse…**, or type a folder and press **Add**.
 - On other systems it searches only the folders you add.
 
 Each plugin is examined by a separate helper program. If a plugin crashes or hangs during the scan,
@@ -101,11 +104,22 @@ the original back. (Clicking the picture never loads the plugin.)
 ### Parts
 
 1. Press **+ Add part** in the Rack and click the part to select it.
-2. Load an instrument: press **Load** next to it in the **Instruments** list in the right-hand column.
-   With the dock's **Sounds** tab open, that column shows sounds instead; press **Plug-ins** in the
-   rack's header to switch it to the instrument list. You can also drag an instrument onto the rack, or
-   pick a sound in **Sounds** and double-click it.
+2. Load an instrument: press **Load** next to it in the **Instruments** list in the right-hand column
+   (press **Plug-ins** in the rack's header if the column is hidden — see below). In **Canvas** view you
+   can also drag an instrument onto a part. Or pick a sound in **Sounds** and double-click it.
 3. Set the part up with the tabs of the dock at the bottom (see [The dock](#the-dock)).
+
+### The right-hand column
+
+Beside the rack is a column with the **Instruments** list (search, **Load**), the **Effects** list
+(**Insert**), **Control pages** with the CTRL49 screen card ([chapter 9](#9-controllers-and-control-pages)),
+and **Extra scan folders** ([chapter 3](#3-plugins)).
+
+While the dock's **Sounds** tab is open — as it is when HoSTage starts — the sound list takes its
+place and the column is hidden. Press **Plug-ins** in the rack's header to show it, or open another
+tab of the dock.
+
+### The part rows
 
 Each part's row shows:
 
@@ -145,8 +159,7 @@ left, then buses, then the master, with returns in a band of their own.
 ### The dock
 
 The dock along the bottom has the tabs **Sounds**, **Zone**, **MIDI**, **Inserts**, **Routing**, **Params**
-and **Rack**. Zone, MIDI, Inserts and Routing appear when a part is selected; Params when the part has
-parameters to show. Click the open tab again to fold the dock away; drag its top edge to resize it
+and **Rack**. Zone, MIDI, Inserts, Routing and Params appear when a part is selected. Click the open tab again to fold the dock away; drag its top edge to resize it
 (double-click it to fit), and use **↗** to enlarge it. The part picker in the dock chooses which part
 you are editing.
 
@@ -166,8 +179,9 @@ you are editing.
 - **Routing** — the part's sends to the return buses (once there are returns) and, for instruments
   with several outputs, where each output goes. For a hardware synth this tab holds its settings
   (see [External synths](#external-synths)).
-- **Params** — every parameter of the part's plugin, with a search box and filters for the ones
-  **assigned** to a control and by **ID**, plus your **Pinned** and **Recent** ones. On each row: **↺**
+- **Params** — every parameter of the part's plugin, with a search box, **assigned** to show only the
+  ones on a control, **ID** to show each parameter's own number, and your **Pinned** and **Recent**
+  ones. On each row: **↺**
   resets it, **→** puts it on a control page, **M+** adds it to a macro, **⚡** learns it to a knob on
   your controller ("click, then move a control on your MIDI keyboard"), **☆** pins it.
 - **Rack** — what belongs to the rack as a whole: **Master effects**; **Returns** (**+ Return**, each
@@ -182,8 +196,8 @@ its audio comes back on).
 
 - **Bank** / **Program** and **Send program** choose the synth's sound.
 - **Capture patch…** records a patch dump from the synth, so HoSTage can send the same sound back
-  later with **Send patch**. **Forget** throws the captured patch away. **Compare with** checks the
-  synth's current sound against a saved patch.
+  later with **Send patch**. **Forget** throws the captured patch away. **Compare with** compares the
+  captured patch with a patch saved in the library.
 - **On session open** decides what happens to the captured patch when you open the rack again:
   **Ask first**, **Send it** or **Do nothing**. With **Ask first** HoSTage asks "Restore a captured
   patch to your hardware?" — **Send it** or **Not now**.
@@ -284,10 +298,11 @@ first, decide afterwards.
 A pattern is made of **lanes**. **+ Add lane…** adds a note, chord, drum, CC or parameter lane. Note
 and chord lanes are a piano roll, drum lanes a step grid, CC and parameter lanes a row of bars. For
 each lane you set the number of **Steps** (1–64), **Steps per beat**, the **Part** it plays, its **Note**
-or **CC**, **Glide**, a **Euclid** rhythm, and **Clear**; **● Capture** records into it from your
-keyboard; **Mute** silences it.
+or **CC**, **Glide**, a **Euclid** rhythm, and **Clear**; **Mute** silences it. Once the pattern has a
+clip (**+ Clip**), **● Capture** records into a lane from your keyboard.
 
-Right-click a step for its own settings: the note or value, **Tie** to the next step, **Plays** only
+Right-click a step for its own settings: the note or value, **Tie** (the previous step holds on
+through this one), **Plays** only
 every few loops, and **Parameter locks** — a parameter or CC set to its own value on that step only
 (**+ Lock**, **+ CC lock**).
 
@@ -333,7 +348,8 @@ any of your LFOs, envelopes, MSEGs, random sources and macros — then the desti
 **Depth** from −100% to +100%. Up to 128 routes.
 
 **MIDI LFOs**, **Envelopes**, **MSEG** (a curve you draw) and **Random** each make up to 32 sources,
-which do nothing until you route them in the Matrix.
+which you route in the Matrix. A MIDI LFO can also go straight to a hardware synth, as a CC, NRPN or
+SysEx message: **+ Output** on the LFO (there must be a hardware part).
 
 ### Tuning
 
@@ -350,7 +366,8 @@ retuned; the MTS device ID and program are set here.
 - its **Rig**: the rack as it is now, or a saved rack to load;
 - its **Controller page**: the control page to show when the song starts, or **Keep**;
 - its **sections** on a timeline — drag a block to move it, drag its edge to change its length,
-  **+ Section from a scene…** adds one, and **Loop** repeats a section;
+  **+ Section from a scene…** adds one, and **Loop** starts the song again from its first section
+  when it reaches the end;
 - **▶ Play from the top**.
 
 **Before the show** prepares the set:
@@ -398,9 +415,9 @@ MIDI module, or a macro.
 
 ### Control pages
 
-Assignments are organised in **control pages**: a page is up to eight controls with a name, like
-"Filter" or "Lead". This is how you build screens for the CTRL49 — each control page *is* a screen
-on its display ([chapter 10](#10-the-ctrl49-and-its-screen)). On another controller, a page is a set
+Assignments are organised in **control pages**. A page has a name, like "Filter" or "Lead", and says
+what the eight encoders do — and the faders, pads and buttons too. This is how you build screens for
+the CTRL49 — each control page *is* a screen on its display, showing its eight encoders ([chapter 10](#10-the-ctrl49-and-its-screen)). On another controller, a page is a set
 of assignments: switch pages in the page menu, or let a scene, a song or a sound bring one up.
 
 The page tools are at the top of the Controller workspace (and under **Control pages** in the Rack's
@@ -409,7 +426,8 @@ right-hand column):
 - **+ Page** adds an empty page of eight controls. The first parameter you drop with no page yet
   makes one called "Surface".
 - **Auto pages** builds pages from the selected part's plugin: its parameters, grouped the way the
-  plugin groups them, eight to a page, each page named after its group ("Filter", "Filter 2", …).
+  plugin groups them, eight to a page, each page named after its group — "Filter", or "Filter 1", "Filter 2" and so
+  on when a group needs more than one page.
   Pressing it again replaces the pages it made before, not the ones you made yourself.
 - The page menu (**CONTROL PAGE n / m**) switches pages; the pencil renames one; the trash button
   removes it.
@@ -442,8 +460,9 @@ encoders and pads play whatever is on the page.
 HoSTage drives the keyboard only while its tab is open; close the tab and the keyboard gets its own
 screen back ("CTRL49 released (HoSTage is closed)"). Only one HoSTage window can drive it at a time.
 
-The connection's state is shown in the Controller workspace, in **Audio & MIDI → Control surface**, on
-the CTRL49 screen card and on the Stage screen. The messages:
+The connection's state is shown in the Controller workspace, in **Audio & MIDI → Control surface** and
+on the CTRL49 screen card (the Stage screen shows a shorter "Hardware display · Connected"). The
+messages:
 
 | Message | What to do |
 |---|---|
@@ -462,8 +481,9 @@ The screen shows one page at a time. In order:
 
 1. **Your control pages.** The page's name at the top, the eight encoders as knobs with the name of
    what each controls and its value as the plugin writes it (for example "2.40 kHz"), and
-   **PAGE n / m**. If you connect the keyboard to a rack with an instrument but no pages, HoSTage makes
-   **Auto pages** for you, once.
+   **PAGE n / m**. If the keyboard connects to a rack with no pages, and the selected part has an
+   instrument, HoSTage makes **Auto pages** for it — once each time the keyboard connects, and not
+   under Stage Lock.
 2. **Performance** — the transport, the position, tempo, song and scene. The pads launch clips (bank
    A) or scenes (bank B); the encoders set tempo, swing, rate, length, gate, velocity, probability and
    the master level.
@@ -563,7 +583,8 @@ Switch the header to **Stage**. HoSTage shows the stage screen and turns on **St
 - **Notes** in large type, with **A−** / **A+** for the size; words in CAPITALS are highlighted as cues.
 - **Controls**: the knobs of the current control page (they move when you turn the hardware), the
   scene buttons, the parts and the macros.
-- When something is wrong — a missing plugin, no audio — a banner says what, with a button to fix it.
+- When something goes wrong while you play — a plugin that stopped or is restarting, a stuck note, a
+  MIDI input that disappeared — a banner says what, with a button to fix it where there is one.
 
 ### Keys
 
@@ -587,8 +608,8 @@ levels, mute and solo, macros and parameters, stepping through presets, bypassin
 return levels, the looper and recording, and panic. Plugin windows in the pane are hidden; windows you
 popped out stay open.
 
-To unlock, **hold Build for one second** (or hold Enter or Space on it). Letting go too early shows
-"Hold Build for one second to leave Stage Lock."
+To unlock, **hold Build for one second** (or hold Enter or Space on it). Let go too early and the lock
+stays on.
 
 ## 12. Utilities
 
@@ -604,7 +625,8 @@ beside the rack rather than in the drawer.
 
 - **Output** — the audio device. HoSTage uses the device's own sample rate and buffer size, and two
   output channels.
-- **MIDI inputs** — switch each input on or off; the last message received is shown beside it.
+- **MIDI inputs** — switch each input on or off. The last message received, from any input, is shown
+  with the name of the device it came from.
 - **Control surface** — the CTRL49's status, and **HoSTage uses the Mackie section**
   ([chapter 10](#10-the-ctrl49-and-its-screen)).
 
@@ -657,11 +679,11 @@ this machine**.
 
 | Edition | What it adds |
 |---|---|
-| **Free** (no licence) | Everything below, with one instrument plugin loaded at a time. Effects do not count, and you can always replace the loaded instrument. |
+| **Free** (no licence) | One instrument plugin loaded at a time — effects do not count, and you can always replace the loaded instrument. |
 | **Core** and **Founder** | Any number of plugins. |
 | **Pro** | Patterns and clips (with the looper, gestures, Capture last and Freeze MIDI), scenes and setlists (songs, sections, the Cue and Soundcheck pages), buses, returns and extra outputs, and script actions. |
 
-Never withheld, whatever the edition: VST3 hosting, the CTRL49's screen and normal control pages,
+Free, Core and Founder have none of the Pro features. Never withheld, whatever the edition: VST3 hosting, the CTRL49's screen and normal control pages,
 mappings, preset browsing, splits, layers and multis, saving and recalling complete set-ups, basic MIDI
 routing, hardware detection, and the diagnostic export for support. The **Edition** utility lists what
 the current edition includes.
