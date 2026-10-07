@@ -329,12 +329,45 @@ The **Gradient** tool edits gradient fills: linear, radial, conical and several 
 Click the bar to add a colour stop, drag a stop to move it, double-click it to change its colour and
 right-click to remove it.
 
-### Text and fonts
+### Text
 
 The dock's **Text** tool has every text setting of the selected control: font, size, weight, spacing,
 alignment, how text wraps, its colour or fill, and effects. **Follow selection** switches to whichever
-control you select; **Pinned** keeps it on one. Fonts of your own are added in **Settings → Fonts** —
-from a file, or a Google font by name.
+control you select; **Pinned** keeps it on one.
+
+### Fonts and icons
+
+CEditor has a set of fonts built in. You can add your own in **Settings → Fonts**, in two ways:
+
+- **From Google Fonts.** Under **Add Google Font**, type the name of the font exactly as it appears
+  on [fonts.google.com](https://fonts.google.com) — for example *JetBrains Mono* — and press **Add**
+  (or Enter). CEditor checks the name with Google, downloads the regular, bold and italic styles and
+  keeps them on your computer, so you need the internet only this once. If the name is not quite
+  right, it says "Google could not find that family"; copy the name from the Google Fonts page.
+- **From a file.** Press **Import Local Fonts**, which opens a file browser for .ttf, .otf, .woff and
+  .woff2 files, or drop the files anywhere onto the page.
+
+The **Library** below lists every font you added, marked **Google** or **Local**; you can switch one
+off or remove it. Added fonts then appear in the font list wherever you choose a font.
+
+Your fonts are kept on your computer, not in the panel file. When the panel leaves your computer —
+with **File → Share Panel...**, or as an exported plugin — CEditor puts the fonts it uses inside, cut
+down to the characters the panel shows, so the text looks the same everywhere. A plain `.cepanel`
+file opened on another computer shows a stand-in font instead.
+
+**Icons** for buttons and labels are added in **Settings → Icons**. Press **Import Icons**, or drop
+files onto the page; SVG, PNG, JPG, GIF, BMP and WebP all work, and an icon you already have is
+skipped. Then choose an icon on a control's **Icon** tab or in the **Icon** section of the context
+bar. The **Library** on the same page lets you switch icons off or remove them.
+
+CEditor cannot fetch icons from Google directly, the way it fetches fonts. To use Google's icons
+(Material Symbols), download the ones you want from
+[fonts.google.com/icons](https://fonts.google.com/icons) — choose **SVG**, which stays sharp at any
+size — and import the downloaded files in **Settings → Icons**.
+
+> **Not finished yet:** icons are kept in CEditor's settings on your computer, and a panel only refers
+> to them, so they are not packed into a shared panel or an exported plugin the way fonts and images
+> are.
 
 ### Effects
 
@@ -849,9 +882,12 @@ Open **File → Settings...** (Ctrl+,). Changes apply straight away. There are s
   offset, and how far the arrow keys move a control (1 pixel, or 10 with Shift).
 - **Control Sets** — the ready-made looks for controls: the default for new panels, the built-in sets,
   and your own. Built-in sets must be duplicated before you can change them.
-- **Fonts** — import fonts from files (.ttf, .otf, .woff, .woff2) or add a Google font by name (this
-  needs the internet once; the font is then kept on your computer).
-- **Icons** — import icon images (.svg, .png, .jpg and others) for use on buttons and labels.
+- **Fonts** — add a font from Google Fonts by typing its name (this needs the internet once; the font
+  is then kept on your computer), or import font files (.ttf, .otf, .woff, .woff2). See
+  [Fonts and icons](#fonts-and-icons).
+- **Icons** — import icon images (SVG, PNG, JPG, GIF, BMP, WebP) for buttons and labels. Google's
+  icons can be used by downloading them from Google as SVG files and importing those; there is no
+  direct link to Google for icons.
 - **MIDI** — the devices your panels talk to, and their MIDI ports (see
   [chapter 5](#5-connecting-to-your-synth)).
 - **Scripting Toolchains** — Lua, JavaScript and TypeScript are built in; Python, C++, C# and Java
