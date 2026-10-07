@@ -355,15 +355,25 @@ with **File → Share Panel...**, or as an exported plugin — CEditor puts the 
 down to the characters the panel shows, so the text looks the same everywhere. A plain `.cepanel`
 file opened on another computer shows a stand-in font instead.
 
-**Icons** for buttons and labels are added in **Settings → Icons**. Press **Import Icons**, or drop
-files onto the page; SVG, PNG, JPG, GIF, BMP and WebP all work, and an icon you already have is
-skipped. Then choose an icon on a control's **Icon** tab or in the **Icon** section of the context
-bar. The **Library** on the same page lets you switch icons off or remove them.
+**Icons** for buttons and labels are added in **Settings → Icons**, also in two ways:
 
-CEditor cannot fetch icons from Google directly, the way it fetches fonts. To use Google's icons
-(Material Symbols), download the ones you want from
-[fonts.google.com/icons](https://fonts.google.com/icons) — choose **SVG**, which stays sharp at any
-size — and import the downloaded files in **Settings → Icons**.
+- **From Google's icons.** **Add Google Icons** offers Google's free icon set, Material Symbols —
+  more than 4,000 icons. Before you type, it shows a selection that suits a synth panel (play, stop,
+  volume, piano, tune and so on); type in the search box to search them all, for example *volume* or
+  *arrow*. Choose the look: **Outlined**, **Rounded** or **Sharp**, **Filled** or not, the **Weight**
+  (thin 100 to bold 700) and the colour, **White** or **Black**. The previews show the result. Click
+  the icons you want — they get a blue outline — and press **Add to library**. CEditor fetches them
+  from Google and keeps them on your computer, so the internet is needed only now. To browse the
+  whole set with pictures, visit [fonts.google.com/icons](https://fonts.google.com/icons) and type the
+  name you find there; if the name is newer than CEditor's list, **Try "…" anyway** fetches it
+  directly.
+- **From a file.** Press **Import Icons**, or drop files onto the page; SVG, PNG, JPG, GIF, BMP and
+  WebP all work, and an icon you already have is skipped.
+
+Then choose an icon on a control's **Icon** tab or in the **Icon** section of the context bar. The
+**Library** on the Icons page lists every icon, marked **Google** or **Local**, and lets you switch
+icons off or remove them. Google's icons are stored white by default, because panels are usually
+dark; the **Tint** setting on a control's Icon tab recolours any icon.
 
 > **Not finished yet:** icons are kept in CEditor's settings on your computer, and a panel only refers
 > to them, so they are not packed into a shared panel or an exported plugin the way fonts and images
@@ -885,9 +895,8 @@ Open **File → Settings...** (Ctrl+,). Changes apply straight away. There are s
 - **Fonts** — add a font from Google Fonts by typing its name (this needs the internet once; the font
   is then kept on your computer), or import font files (.ttf, .otf, .woff, .woff2). See
   [Fonts and icons](#fonts-and-icons).
-- **Icons** — import icon images (SVG, PNG, JPG, GIF, BMP, WebP) for buttons and labels. Google's
-  icons can be used by downloading them from Google as SVG files and importing those; there is no
-  direct link to Google for icons.
+- **Icons** — add icons from Google's free icon set (Material Symbols) by searching for them, or
+  import icon images (SVG, PNG, JPG, GIF, BMP, WebP). See [Fonts and icons](#fonts-and-icons).
 - **MIDI** — the devices your panels talk to, and their MIDI ports (see
   [chapter 5](#5-connecting-to-your-synth)).
 - **Scripting Toolchains** — Lua, JavaScript and TypeScript are built in; Python, C++, C# and Java

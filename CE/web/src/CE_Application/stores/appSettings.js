@@ -37,11 +37,13 @@ import {
   buildFontFaceSource,
   createDefaultSettings,
   createFontId,
+  createIconId,
   getBuiltinFonts,
   inferFontMimeTypeFromFileName,
   normalizeFamilyName,
   normalizeFontEntry,
   normalizeGeneralSettings,
+  normalizeIconEntry,
   normalizeDeviceSession,
   normalizeSettings,
   normalizeSupportedFeatures,
@@ -55,6 +57,10 @@ import {
   isSupportedIconFileName,
 } from './appSettingsImportBuilders.js';
 import { setProjectDeviceSession } from './projectDeviceSession.js';
+import {
+  fetchGoogleIconSvg, googleIconKey, googleIconLabel, googleIconVariant, normalizeGoogleIconRequest,
+  svgToDataUrl,
+} from '../utils/googleIcons.js';
 
 export { WEIGHT_OPTIONS } from './appSettingsSchema.js';
 
@@ -1028,6 +1034,59 @@ export async function importLocalIconFiles(fileList) {
 
   persistSettings();
   return { ok: true, importedCount: importedIcons.length, skippedCount };
+}
+
+/**
+ * Fetch Google icons (Material Symbols) into the icon library — the icon counterpart of
+ * addGoogleFont. `requests` is a list of `{ name, style, fill, weight }`; each is fetched from
+ * fonts.gstatic.com and stored as an SVG, so the internet is needed only now.
+ *
+ * Resolves to `{ ok, added, skipped, failed }`: the names added, the ones already in the library in
+ * that look, and `{ name, reason }` for the ones that could not be fetched (reason as
+ * fetchGoogleIconSvg reports it). `ok` is true when at least one was added.
+ */
+export async function addGoogleIcons(requests, { fetchImpl } = {}) {
+  const wanted = (Array.isArray(requests) ? requests : [requests])
+    .map(normalizeGoogleIconRequest)
+    .filter((request) => request.name);
+  if (wanted.length === 0) return { ok: false, reason: 'empty', added: [], skipped: [], failed: [] };
+
+  const have = new Set((get(appSettings).icons ?? [])
+    .filter((icon) => icon.sourceType === 'google' && icon.google)
+    .map((icon) => googleIconKey(icon.google)));
+
+  const added = [];
+  const skipped = [];
+  const failed = [];
+  const entries = [];
+  for (const request of wanted) {
+    const key = googleIconKey(request);
+    if (have.has(key)) { skipped.push(request.name); continue; }
+    have.add(key);
+    const result = await fetchGoogleIconSvg(request, fetchImpl);
+    if (!result.ok) { failed.push({ name: request.name, reason: result.reason }); continue; }
+    entries.push(normalizeIconEntry({
+      id: createIconId('gicon'),
+      name: googleIconLabel(request),
+      sourceType: 'google',
+      google: request,
+      // Unique per look, and never a bare "<name>.svg" — local imports skip a file name already in
+      // the library, and a Google icon must not stop somebody importing their own home.svg.
+      fileName: `material-symbols-${request.style}-${googleIconVariant(request)}-${request.name}.svg`,
+      mimeType: 'image/svg+xml',
+      dataUrl: svgToDataUrl(result.svg),
+      isVector: true,
+      width: 24,
+      height: 24,
+    }));
+    added.push(request.name);
+  }
+
+  if (entries.length > 0) {
+    appSettings.update((current) => ({ ...current, icons: [...(current.icons ?? []), ...entries] }));
+    persistSettings();
+  }
+  return { ok: entries.length > 0, added, skipped, failed };
 }
 
 export async function addGoogleFont(family) {

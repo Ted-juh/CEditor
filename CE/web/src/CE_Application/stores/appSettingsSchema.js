@@ -169,6 +169,18 @@ export function normalizeFontEntry(entry) {
   };
 }
 
+const ICON_SOURCE_TYPES = ['local', 'builtin', 'google'];
+
+function normalizeGoogleIconSource(google) {
+  return {
+    name: String(google?.name ?? ''),
+    style: String(google?.style ?? 'outlined'),
+    fill: google?.fill === true,
+    weight: Number.isFinite(Number(google?.weight)) ? Number(google.weight) : 400,
+    colour: google?.colour === 'black' ? 'black' : 'white',
+  };
+}
+
 export function normalizeIconEntry(entry) {
   const id = String(entry?.id ?? createIconId('icon'));
   const fileName = String(entry?.fileName ?? '');
@@ -179,7 +191,10 @@ export function normalizeIconEntry(entry) {
     id,
     name,
     enabled: entry?.enabled !== false,
-    sourceType: entry?.sourceType === 'builtin' ? 'builtin' : 'local',
+    sourceType: ICON_SOURCE_TYPES.includes(entry?.sourceType) ? entry.sourceType : 'local',
+    // Where a Google icon came from (utils/googleIcons.js), so the library can say which look it is
+    // and an import can tell it already has it. Absent for every other icon.
+    ...(entry?.sourceType === 'google' ? { google: normalizeGoogleIconSource(entry?.google) } : {}),
     fileName,
     filePath: String(entry?.filePath ?? ''),
     mimeType,
