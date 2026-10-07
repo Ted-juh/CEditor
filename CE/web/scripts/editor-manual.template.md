@@ -724,12 +724,14 @@ other computer, paste or load that file in the **Import** box of the same sectio
 **File → Save** (Ctrl+S) saves the panel as a `.cepanel` file; **Save As...** (Ctrl+Shift+S) saves
 it under a new name. A failed save is reported and the panel stays marked as unsaved.
 
-A `.cepanel` file refers to its images and fonts where they are on your computer. On another
+A `.cepanel` file refers to its images, fonts and icons where they are on your computer. On another
 computer they are missing. To give a panel to someone else, use **File → Share Panel...**: it writes
-one `.cepanelpkg` file with the images and fonts inside, and without your file paths and MIDI port
-settings. If some files could not be found, it says how many and lists them in the Console. Open a
-shared panel with **File → Open Shared Panel...**, then use **Save** to keep your own editable copy.
-Files that scripts read for themselves are not included.
+one `.cepanelpkg` file with the images, fonts and icons inside, and without your file paths and MIDI
+port settings. If some files could not be found, it says how many and lists them in the Console. Open
+a shared panel with **File → Open Shared Panel...**, then use **Save** to keep your own editable copy;
+the fonts and icons it brought stay in that copy, so it can be shared on again. Files that scripts
+read for themselves are not included. See [Fonts and icons](#fonts-and-icons) for which fonts and
+icons go along.
 
 **Open Recent** in the File menu lists your recent panels, components, device profiles and script
 workspaces.
@@ -751,9 +753,9 @@ Choose **Build → Export Plugin**. CEditor deselects everything, opens the pane
 properties panel and starts building. The same **Export Plugin** button sits at the top of the Export
 tab.
 
-Before it builds, CEditor checks that the panel's scripts are approved, collects every image and font
-the panel uses (if one cannot be read, the export stops and says which), and works out which settings
-the DAW will be able to automate.
+Before it builds, CEditor checks that the panel's scripts are approved, collects every image, font and
+icon the panel uses (if one cannot be read, the export stops and says which), and works out which
+settings the DAW will be able to automate.
 
 ### The Export tab
 
@@ -973,7 +975,7 @@ CEditor is a beta. Things to know before you rely on it:
 | **Open Script Workspace** | | Opens a saved script workspace file. |
 | **Save** | Ctrl+S | Saves the panel (or the script workspace in front). |
 | **Save As...** | Ctrl+Shift+S | Saves under a new name. |
-| **Share Panel...** | | Saves a `.cepanelpkg` with images and fonts inside, for another computer. |
+| **Share Panel...** | | Saves a `.cepanelpkg` with images, fonts and icons inside, for another computer. |
 | **Open Shared Panel...** | | Opens a `.cepanelpkg`. |
 | **Close Tab** | Ctrl+W | Closes the tab in front, asking first if it has unsaved changes. |
 | **Hostage...** | | Opens HoSTage, the instrument host. |

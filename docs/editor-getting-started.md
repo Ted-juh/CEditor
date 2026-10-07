@@ -67,7 +67,7 @@ at the end of its tab strip. Colors, Gradient, Notepad, Viewer and Preview stay 
 
 Choose **File → Save** (Ctrl+S) to save an editable `.cepanel`. Reopen it to check the result.
 Use **File → Share Panel** when another person needs the panel with its supported referenced
-images and fonts embedded. Missing assets are reported; resolve them before sharing or exporting.
+images, fonts and icons embedded. Missing assets are reported; resolve them before sharing or exporting.
 
 Choose **Build → Export Plugin**. The Export properties show the action, identity choice and
 build result. When copying an existing panel, choose whether this is an update of the same plugin
