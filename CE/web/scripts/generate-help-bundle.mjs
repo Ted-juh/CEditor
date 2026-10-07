@@ -70,7 +70,7 @@ export const HELP_DOCUMENTS = [
     file: 'docs/scripting-manual.md',
     section: 'Scripting',
     title: 'Scripting manual',
-    blurb: 'The complete panel API. Generated from the same table the editor validates against.',
+    blurb: 'How scripting works, in plain language, and every hook, event and command a script can use.',
   },
   {
     id: 'scripting-cookbook',

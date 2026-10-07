@@ -105,16 +105,16 @@ Your scripts can run in two places:
    keep running. Timers keep ticking. MIDI keeps arriving. There is just no
    window anymore.
 
-Most commands work the same in both places. The manual marks them
-**cross-runtime**. Some commands need the window: drawing, asking the user a
-question, and driving the on-screen components. The manual marks them
-**panel view only**. Calling one with the window closed does nothing, and a
-note goes to the log. A few commands are marked **player**: they only work in
-the exported plugin, because they need the DAW itself. `onDawSaveState` is one.
+Most commands work the same in both places. Some need the window: drawing,
+asking the user a question, and driving the on-screen components. The manual
+marks them **Panel window only**. Calling one with the window closed does
+nothing, and a note goes to the log. Two hooks work the other way round:
+`onDawSaveState` and `onDawRestoreState` only run in the exported plugin,
+because only a DAW saves projects.
 
 So: if your script must keep working with the window closed — for example a
-timer that keeps sending MIDI — use only cross-runtime commands. Check the
-badge in the manual when you are not sure.
+timer that keeps sending MIDI — avoid the commands marked **Panel window
+only**. The manual's chapter "When the plugin window is closed" explains more.
 
 ## 6. Where scripts live
 
@@ -127,5 +127,5 @@ console.
 
 - [Cookbook](scripting-cookbook.md) — link controls, fill the panel from a dump,
   build an Init Patch button, and more.
-- [Manual](scripting-manual.md) — every command, event, and helper, with
-  availability badges and all seven languages.
+- [Manual](scripting-manual.md) — how scripting works, explained step by step,
+  and every hook, event and command in one reference.
