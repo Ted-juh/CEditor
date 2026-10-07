@@ -872,6 +872,15 @@
 
   {#if activeUtility === 'project'}
     <div class="project-panel" aria-label="Host Project">
+      <!-- Said before the button, not after it fails: the build packages HoSTage programs that a
+           source checkout has already built (tools/scripts/build-host-product.mjs compiles nothing),
+           so an installed CEditor answers "Node.js is required…" or a missing build folder. -->
+      <p class="project-note" data-testid="host-build-needs">
+        Build product packages this rack with HoSTage's own programs, as a standalone app and a VST3
+        with an installer. It needs a developer set-up: Node.js, and a CEditor source checkout with
+        the host already built; the installer step also needs Inno Setup. The installed CEditor
+        cannot build a product yet.
+      </p>
       <div class="project-fields">
         <label class="project-field">Product name
           <input type="text" value={$hostProject.productName}
@@ -2084,6 +2093,20 @@
             </div>
           {/each}
         </div>
+        <!-- Group buses: each one an effect chain that the parts routed into it pass through.
+             Effects reach a bus by being dropped on it in the canvas, and this is the one place
+             they can be reordered, bypassed and removed — the mixer strip only counts them. -->
+        {#if $hostState.rack.buses.length > 0}
+          <div class="returns" data-testid="host-buses">
+            <div class="fx-head"><strong>Buses</strong></div>
+            {#each $hostState.rack.buses as bus (bus.busId)}
+              <div class="return-block">
+                {@render effectChain(bus.effects, bus.busId,
+                                     `${bus.name} effects${latencySuffix(bus.latencyMs)}`, 'host-bus-fx')}
+              </div>
+            {/each}
+          </div>
+        {/if}
         <!-- Stage 5 macros: one value fanning across parts and effects, always through the
              central parameter path. Select a macro, then add targets from the parameter view. -->
         <div class="macros" data-testid="host-macros">
@@ -2450,6 +2473,7 @@
   .project-field input { width: 180px; }
   .project-target { display: flex; align-items: center; gap: 6px; padding-bottom: 2px; }
   .project-appid { color: #96a2ad; font-size: 12px; }
+  .project-note { margin: 0; color: #96a2ad; font-size: 12px; line-height: 1.45; max-width: 60em; }
   .project-build-log {
     margin: 0;
     padding: 8px;

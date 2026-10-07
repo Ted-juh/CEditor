@@ -195,8 +195,39 @@ try {
   await returnLevel.press('ArrowDown');
   assert.ok((await state()).rack.returns.at(-1).level < level, 'a return level is a knob');
 
+  // A bus's effects, in the same tab: added, reordered, bypassed and removed. Effects dropped on a
+  // bus in the canvas used to be out of reach once they were there — the mixer only counted them.
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.addBus('Synths');
+  });
+  const busFx = page.getByTestId('host-bus-fx').last();
+  await busFx.scrollIntoViewIfNeeded();
+  const busEffects = async () => (await state()).rack.buses.at(-1).effects;
+  // Wait for the state to agree rather than read it the instant after a click.
+  const busNames = async (want) => {
+    let names = [];
+    for (let i = 0; i < 40; i += 1) {
+      names = (await busEffects()).map((e) => e.pluginName);
+      if (JSON.stringify(names) === JSON.stringify(want)) break;
+      await page.waitForTimeout(50);
+    }
+    return names;
+  };
+  await busFx.locator('select').selectOption('mock-reverb');
+  await busFx.locator('select').selectOption('mock-comp');
+  assert.deepEqual(await busNames(['Sweet Reverb', 'Big Comp']), ['Sweet Reverb', 'Big Comp'], 'effects are added to the bus');
+  await busFx.getByRole('button', { name: 'Move Big Comp earlier in the chain' }).click();
+  assert.deepEqual(await busNames(['Big Comp', 'Sweet Reverb']), ['Big Comp', 'Sweet Reverb'], 'and reordered');
+  await busFx.getByLabel('Bypass Sweet Reverb').click();
+  assert.equal((await busEffects()).find((e) => e.pluginName === 'Sweet Reverb').bypassed, true, 'and bypassed');
+  const removeComp = busFx.locator('.fx-row').first().getByTitle('Remove this effect');
+  await removeComp.click();
+  await busFx.locator('.fx-row').first().getByTitle('Click again to confirm').click();
+  assert.deepEqual(await busNames(['Sweet Reverb']), ['Sweet Reverb'], 'and removed, after the second click');
+
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros and returns work as drawn');
+  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros, returns and bus effects work as drawn');
 } finally {
   await browser.close();
   await server.close();

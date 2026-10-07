@@ -882,9 +882,9 @@ CEditor is a beta. Things to know before you rely on it:
 - **One device for some tools.** The Device tool, Detect devices and Presets work only with the device
   called **mainSynth**.
 - **Some tools are partly built.** The dock's **Designer** draws the contents of the Step Sequencer,
-  the Envelope and the Turing Modulator only. A **Screen** (CTRL49) tab cannot be closed with its **×**;
-  use **Ctrl+W**, which closes it without asking — the Screen Builder cannot save, so its pages are
-  lost. It can only be opened from the start screen, with no documents open.
+  the Envelope and the Turing Modulator only. The CTRL49 Screen Builder cannot save: closing its tab
+  asks first, then its pages are gone. It can only be opened from the start screen, with no documents
+  open.
 - **The DAW and the keyboard.** On Windows, the DAW gets no key presses while the plugin window has
   focus.
 

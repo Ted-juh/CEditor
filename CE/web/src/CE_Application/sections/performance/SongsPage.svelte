@@ -15,6 +15,7 @@
   import { parseSongLength } from '../../utils/stageScreen.js';
   import ScrubValue from '../../components/controls/ScrubValue.svelte';
   import Segmented from '../../components/controls/Segmented.svelte';
+  import ControllerPagePick from './ControllerPagePick.svelte';
   import PropertyToggle from '../../properties/PropertyToggle.svelte';
   import HostConfirmButton from '../HostConfirmButton.svelte';
   import SetlistSoundcheckRow from '../SetlistSoundcheckRow.svelte';
@@ -134,8 +135,6 @@
     if (!sceneId || !song) return;
     addArrangementItem(sceneId, undefined, song.itemId, 8);
   }
-  const pageOptions = $derived([{ value: '', label: 'Keep', title: 'Keep the controller page that is showing' },
-    ...$hostState.rack.pages.slice(0, 3).map((page) => ({ value: page.pageId, label: page.name }))]);
 </script>
 
 <div class="perf-body setlist-body songs-page" data-testid="perf-setlist">
@@ -193,8 +192,9 @@
                         onchange={(plannedSeconds) => setSetlistItem(song.itemId, { plannedSeconds })} />
           </div>
           <div class="field">Controller page
-            <Segmented options={pageOptions} value={song.pageId} label={`${song.name} controller page`} testid="song-page"
-                       onchange={(pageId) => setSetlistItem(song.itemId, { pageId })} />
+            <ControllerPagePick pages={$hostState.rack.pages} keepTitle="Keep the controller page that is showing"
+                                value={song.pageId} label={`${song.name} controller page`} testid="song-page"
+                                onchange={(pageId) => setSetlistItem(song.itemId, { pageId })} />
           </div>
           <span class="spacer"></span>
           {#if playingThis}

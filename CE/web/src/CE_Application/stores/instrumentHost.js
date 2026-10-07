@@ -5957,12 +5957,15 @@ export function applyMockCommand(state, payload) {
     }] } }).rack.masterEffects[0];
     if (payload.chainId === 'master') next.rack.masterEffects.push(slot);
     else if (part(payload.chainId)) part(payload.chainId).effects.push(slot);
-    else next.rack.returns.find((r) => r.returnId === payload.chainId)?.effects.push(slot);
+    else if (next.rack.returns.some((r) => r.returnId === payload.chainId))
+      next.rack.returns.find((r) => r.returnId === payload.chainId).effects.push(slot);
+    // A bus is an effect chain too, as it is in the host (InstrumentRackHost::chainFor).
+    else next.rack.buses.find((b) => b.busId === payload.chainId)?.effects.push(slot);
     return next;
   }
   if (cmd === 'openEffectEditor') {
     const effects = [next.rack.masterEffects, ...next.rack.parts.map((p) => p.effects),
-                     ...next.rack.returns.map((r) => r.effects)].flat();
+                     ...next.rack.returns.map((r) => r.effects), ...next.rack.buses.map((b) => b.effects)].flat();
     if (effects.some((effect) => effect.effectId === payload.effectId && effect.hasProcessor)) {
       setDockedEditors([...next.editorOpenPartIds, payload.effectId]);
       next.floatingEditorPartIds = next.floatingEditorPartIds
@@ -5972,7 +5975,7 @@ export function applyMockCommand(state, payload) {
   }
   if (cmd === 'removeEffect' || cmd === 'setEffectBypassed' || cmd === 'moveEffect') {
     const chains = [next.rack.masterEffects, ...next.rack.parts.map((p) => p.effects),
-                    ...next.rack.returns.map((r) => r.effects)];
+                    ...next.rack.returns.map((r) => r.effects), ...next.rack.buses.map((b) => b.effects)];
     for (const chain of chains) {
       const index = chain.findIndex((e) => e.effectId === payload.effectId);
       if (index < 0) continue;

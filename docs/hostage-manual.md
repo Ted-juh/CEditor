@@ -185,7 +185,8 @@ you are editing.
   resets it, **→** puts it on a control page, **M+** adds it to a macro, **⚡** learns it to a knob on
   your controller ("click, then move a control on your MIDI keyboard"), **☆** pins it.
 - **Rack** — what belongs to the rack as a whole: **Master effects**; **Returns** (**+ Return**, each
-  with its level and its own effects); and **Macros** (**+ Macro**): one knob that moves several
+  with its level and its own effects); **Buses**, once there are any, each with its own effects to
+  add, reorder, bypass or remove; and **Macros** (**+ Macro**): one knob that moves several
   parameters, each over its own range.
 
 ### External synths
@@ -251,7 +252,8 @@ on each strip chooses where it goes; when the product has more than one pair of 
 ([Product](#product)), another chooses which.
 
 After the parts come the buses (each with its name, effects count, latency, level and destination),
-the returns, and the **Master** strip with its latency, output and CPU load. **+ Bus** adds a bus
+the returns, and the **Master** strip with its latency, output and CPU load. A bus's effects are
+listed in the dock's **Rack** tab. **+ Bus** adds a bus
 — a group that several parts can be routed into. **Clear peaks** resets the peak readings.
 
 ## 7. Layers
@@ -437,10 +439,9 @@ right-hand column):
 Scenes and songs can bring up a page too: a scene's **Controls** and a song's **Controller page**
 setting ([chapter 8](#8-performance)).
 
-Pages are saved with the rack, like everything else, and travel with its scenes and songs.
-
-> **Not finished yet:** a scene's **Controls** and a song's **Controller page** offer only the first
-> three control pages. Put the pages you want songs and scenes to call up first.
+Pages are saved with the rack, like everything else, and travel with its scenes and songs. With up
+to three pages, a scene's **Controls** and a song's **Controller page** show them as buttons; with
+more, as a list.
 
 ## 10. The CTRL49 and its screen
 
@@ -540,9 +541,11 @@ eight **Pads**, and the arrow keys change page. It is how you check your pages w
 | **Discover** | Sounds you own and have never opened, nearest to the ones you load most. | Encoder 1 picks, 2 reaches further, 3 keeps to one kind, 4 keeps a sound as a favourite. Pad N plays row N. |
 | **Changes** | The selected part's sound against its saves: what moved. | Encoder 1 listens between the save and now, 2 picks a change, 3 puts it back, 4 walks back through the saves. |
 
+The switches are remembered: a page you switch on is on again the next time you start HoSTage.
+**Browse on controller** is not — it is a mode for a moment, so the keyboard always starts on your
+pages.
+
 > **Not finished yet:**
-> - The stage-page switches and **Browse on controller** are not remembered: they are off again
->   every time HoSTage starts.
 > - **Cue** and **Soundcheck** need the scenes and setlists of the **Pro** edition.
 > - Under Stage Lock, most stage-page changes are refused (zone edits on Layers, arpeggiator edits
 >   on Live, Discover, Soundcheck); the knobs of your control pages and the Meters faders still work.
@@ -558,9 +561,9 @@ CEditor's start screen has a button **New Screen (CTRL49)**. That opens a differ
 
 It has pages of eight slots, each a **LABEL** and a parameter name (**param.id**) from a device
 profile, a live preview of the page as the CTRL49 would draw it, and **Export**, which shows the page
-set as text ("Assignment JSON"). It cannot save — the screen is lost when you close its tab — and it
-cannot send anything to the keyboard: the only program that reads its JSON is a developer tool that is
-not part of the installed CEditor. HoSTage does not use it.
+set as text ("Assignment JSON", with a **Copy** button). It cannot save — closing its tab asks first,
+then the screen is gone — and it cannot send anything to the keyboard: the only program that reads its
+JSON is a developer tool that is not part of the installed CEditor. HoSTage does not use it.
 
 To put your own screens on a CTRL49, use HoSTage's control pages, described above.
 
@@ -703,8 +706,6 @@ The CTRL49's connection log is `%APPDATA%\CEditor\ctrl49-trace.log`.
   the output is stereo.
 - **Limits**: 8 MIDI modules per part, 128 modulation routes, 32 of each modulation source, 32 layers
   of 8 instruments, 20 undo steps.
-- **Bus effects**: effects dropped on a bus on the canvas cannot yet be reordered, bypassed or removed
-  — the Mixer shows only how many there are.
 - **Tuning** works only with instruments that support MIDI Tuning Standard messages.
 - **Build product** works only from a CEditor source checkout (see [Project](#project)).
 - **Not yet tested on real hardware**: the MIDI and the CTRL49 stage pages have been checked in

@@ -5138,6 +5138,43 @@ void testCtrl49StagePages()
     check (unpaid.service->layersOnSurface(), "while LAYERS, which only shows the rack, is there for anyone");
 }
 
+// Which stage pages the keyboard shows is the player's choice, made once. Before, every page
+// switched itself off again at the next launch, and a set rehearsed with METERS and CUE on the
+// keyboard opened the next evening without them. The browser is a mode, not a page, and stays
+// off at every start.
+void testCtrl49StagePagesRemembered()
+{
+    std::cout << "\nthe CTRL49's stage pages are remembered between sessions" << std::endl;
+
+    const auto dir = freshDataDir ("surface-pages-remembered");
+    seedCatalog (dir);
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        check (! h.service->metersOnSurface() && ! h.service->cueOnSurface() && ! h.service->layersOnSurface(),
+               "a first session has no stage pages until they are asked for");
+        h.cmd ("metersOnSurface", { { "on", true } });
+        h.cmd ("cueOnSurface", { { "on", true } });
+        h.cmd ("layersOnSurface", { { "on", true } });
+        h.cmd ("layersOnSurface", { { "on", false } });
+        h.cmd ("browseOnSurface", { { "on", true } });
+        check (h.service->browsingOnSurface(), "the browser is on for now");
+    }
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        check (h.service->metersOnSurface() && h.service->cueOnSurface(),
+               "pages switched on are on again in the next session");
+        check (! h.service->layersOnSurface() && ! h.service->liveOnSurface(),
+               "a page switched off again, or never on, stays off");
+        check (! h.service->browsingOnSurface(), "the browser is not remembered: every start shows the pages");
+        const auto pages = h.emits.lastState()->getProperty ("surfacePages", {});
+        check ((bool) pages.getProperty ("meters", false) && (bool) pages.getProperty ("cue", false)
+                 && ! (bool) pages.getProperty ("layers", true),
+               "and the app's state says so from the start");
+    }
+}
+
 void testCtrl49Meters()
 {
     std::cout << "\nthe CTRL49's METERS page: every part's level and fader, turned from the encoders" << std::endl;
@@ -15007,6 +15044,7 @@ int main (int argc, char* argv[])
     testCtrl49Broker();
     testCtrl49AppScreen();
     testCtrl49StagePages();
+    testCtrl49StagePagesRemembered();
     testCtrl49Meters();
     testCtrl49Live();
     testCtrl49Discover();

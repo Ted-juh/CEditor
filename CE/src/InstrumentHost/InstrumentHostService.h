@@ -2069,6 +2069,16 @@ private:
         tell the page. */
     void surfaceLayerChanged (const juce::String& pageId);
 
+    // -- the CTRL49's stage pages, remembered ----------------------------------------------
+    // Off until asked for, and then on until asked otherwise — across sessions, in
+    // surface-pages.json. They used to be forgotten at every launch, so a set rehearsed with
+    // METERS and CUE on the keyboard opened the next evening without them. The browser is not
+    // among them: it is a mode entered for a moment, and a keyboard that woke up as a browser
+    // would have stopped doing what it was doing.
+    juce::File surfacePagesFile() const { return options.dataDirectory.getChildFile ("surface-pages.json"); }
+    void loadSurfacePages();
+    bool saveSurfacePages() const;
+
     // -- the Mackie section ---------------------------------------------------------------
     std::atomic<bool> mackieSection { true };
     juce::File mackieSectionFile() const { return options.dataDirectory.getChildFile ("mackie-section.json"); }

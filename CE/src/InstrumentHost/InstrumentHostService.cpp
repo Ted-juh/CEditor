@@ -70,6 +70,7 @@ InstrumentHostService::InstrumentHostService (Options optionsToUse)
 {
     ctrl49::registerCtrl49Profile();
     loadMackieSection();
+    loadSurfacePages();
 
     activeMarker = std::make_unique<ActiveHostingMarker> (options.dataDirectory);
     safeMode = std::make_unique<SafeMode> (options.dataDirectory);
@@ -6322,6 +6323,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             && ! requireFeature (licensing::Feature::scenesAndSetlists))
             return;
         flag = wanted;
+        if (! saveSurfacePages())
+            emitError ("Could not save which pages the keyboard shows.");
         if (soundcheck && wanted)
             checkSetlistSoundcheck();   // the page opens on fresh results
         emitState();
@@ -14309,6 +14312,35 @@ bool InstrumentHostService::saveMackieSection() const
     auto* root = new juce::DynamicObject();
     root->setProperty ("enabled", mackieSection.load());
     return writeTextAtomically (mackieSectionFile(), juce::JSON::toString (juce::var (root)));
+}
+
+// The keys are the ones the app's state already uses for the same flags ("surfacePages").
+void InstrumentHostService::loadSurfacePages()
+{
+    const auto stored = juce::JSON::parse (surfacePagesFile());
+    if (! stored.isObject())
+        return;   // never saved: every page off, as before
+    const auto on = [&stored] (const char* key) { return (bool) stored.getProperty (key, false); };
+    surfaceSoundcheckPage = on ("soundcheck");
+    surfaceLayersPage     = on ("layers");
+    surfaceDiscoverPage   = on ("discover");
+    surfaceCuePage        = on ("cue");
+    surfaceChangesPage    = on ("changes");
+    surfaceMetersPage     = on ("meters");
+    surfaceLivePage       = on ("live");
+}
+
+bool InstrumentHostService::saveSurfacePages() const
+{
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("soundcheck", surfaceSoundcheckPage);
+    root->setProperty ("layers",     surfaceLayersPage);
+    root->setProperty ("discover",   surfaceDiscoverPage);
+    root->setProperty ("cue",        surfaceCuePage);
+    root->setProperty ("changes",    surfaceChangesPage);
+    root->setProperty ("meters",     surfaceMetersPage);
+    root->setProperty ("live",       surfaceLivePage);
+    return writeTextAtomically (surfacePagesFile(), juce::JSON::toString (juce::var (root)));
 }
 
 void InstrumentHostService::drainMackieEvents()
