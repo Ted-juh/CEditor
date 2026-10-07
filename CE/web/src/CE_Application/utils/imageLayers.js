@@ -15,6 +15,8 @@
 //      * an `Icon.assetId` — resolved against `storedIcons`, which is APP SETTINGS, falling back to
 //        matching by `name` when the id misses. Not portable, and the name fallback makes it quieter
 //        still, because a coincidental match looks like success.
+//        A panel leaving the editor now carries the library icons it uses (utils/documentIcons.js),
+//        but the reference itself is still into the library until then.
 //    embed() exists to collapse the last two into the first.
 //
 // 2. TWO ACTIVATION MODELS. Background.Fill composites its layers — `layerOrder` decides the
@@ -131,32 +133,40 @@ export function sourceKind(src) {
 export const isPortableSource = (src) => sourceKind(src) === 'data';
 
 /** One icon-library entry, reduced to what a script needs to decide whether it can use it. */
-export function assetDescriptor(entry) {
+export function assetDescriptor(entry, { carried = false } = {}) {
   if (!entry) return null;
   const dataUrl = String(entry.dataUrl ?? '');
   return {
     id: String(entry.id ?? ''),
     name: String(entry.name ?? ''),
-    source: String(entry.sourceType ?? 'local'),
+    // `panel` for an icon the panel brought with it (utils/documentIcons.js) rather than the library.
+    source: carried ? 'panel' : String(entry.sourceType ?? 'local'),
     mime: String(entry.mimeType ?? ''),
     vector: entry.isVector === true,
     width: Number(entry.width) || 0,
     height: Number(entry.height) || 0,
     filePath: String(entry.filePath ?? ''),
     dataUrl,
-    // A library REFERENCE never travels; the data URL behind it can, once embedded. Reporting both
-    // is what lets a script decide rather than discover it after an export.
-    portable: false,
+    // Whether the picture is in the panel document now. A library entry is not: it is packed in when
+    // the panel is shared or exported, if a control shows it or a script names it in quotes. A
+    // carried icon already is.
+    portable: carried,
     embeddable: dataUrl !== '',
   };
 }
 
-/** The catalogue, enabled entries only — a disabled icon is one the panel will not render. */
-export function assetCatalogue(entries) {
-  return (Array.isArray(entries) ? entries : [])
+/** The catalogue, enabled entries only — a disabled icon is one the panel will not render. Icons the
+ *  open panels carry (`carried`) follow, where the library has no entry with the same id. */
+export function assetCatalogue(entries, carried = []) {
+  const library = (Array.isArray(entries) ? entries : [])
     .filter((e) => e && e.enabled !== false)
-    .map(assetDescriptor)
+    .map((e) => assetDescriptor(e))
     .filter(Boolean);
+  const have = new Set(library.map((a) => a.id));
+  const extra = (Array.isArray(carried) ? carried : [])
+    .filter((e) => e && e.id && !have.has(String(e.id)))
+    .map((e) => assetDescriptor(e, { carried: true }));
+  return [...library, ...extra];
 }
 
 /** Find an asset by id first, then by name — the same order CanvasControl resolves in, so what a

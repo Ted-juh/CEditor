@@ -370,14 +370,22 @@ file opened on another computer shows a stand-in font instead.
 - **From a file.** Press **Import Icons**, or drop files onto the page; SVG, PNG, JPG, GIF, BMP and
   WebP all work, and an icon you already have is skipped.
 
-Then choose an icon on a control's **Icon** tab or in the **Icon** section of the context bar. The
-**Library** on the Icons page lists every icon, marked **Google** or **Local**, and lets you switch
-icons off or remove them. Google's icons are stored white by default, because panels are usually
-dark; the **Tint** setting on a control's Icon tab recolours any icon.
+Then choose an icon on a control's **Icon** tab or in the **Icon** section of the context bar. A
+button or label starts out showing only its text, so the icon does not appear until you also pick a
+layout that includes it: on the control's **Content Layout** tab, set **Mode** to *icon_only*, or to
+one of the layouts that place the icon beside, above or below the text. The **Library** on the Icons
+page lists every icon, marked **Google** or **Local**, and lets you switch icons off or remove them.
+Google's icons are stored white by default, because panels are usually dark; the **Tint** setting on
+a control's Icon tab recolours any icon.
 
-> **Not finished yet:** icons are kept in CEditor's settings on your computer, and a panel only refers
-> to them, so they are not packed into a shared panel or an exported plugin the way fonts and images
-> are.
+Icons travel the same way fonts do. Your icon library is kept on your computer, and a panel only
+points at the icons in it — but when the panel leaves your computer, with **File → Share Panel...**
+or as an exported plugin, CEditor packs in the icons the panel uses. Whoever opens the shared panel
+sees them even though their own library does not have them; in the icon list they appear as
+*"name (carried by the panel)"*, and stay with the panel when it is saved or shared again. An icon
+that only a script switches to is packed too, as long as the script names it in quotes, as in
+`ce.image.icon("Play", "pause")`. As with fonts, a plain `.cepanel` file copied to another computer
+does not carry them.
 
 ### Effects
 

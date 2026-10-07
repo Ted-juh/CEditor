@@ -70,6 +70,7 @@
   import { pushSnapshot } from '../stores/history.js';
   import { adoptParameterMetadata } from '../utils/parameterAdoption.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
+  import { documentIcons, resolveIcon } from '../utils/documentIcons.js';
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
   import { get } from 'svelte/store';
   import { onDestroy } from 'svelte';
@@ -3257,18 +3258,9 @@
 
     return () => cancelAnimationFrame(frame);
   });
-  let resolvedStoredIcon = $derived.by(() => {
-    const assetId = icon?.assetId ?? '';
-    if (assetId) {
-      const byId = $storedIcons.find((entry) => entry.id === assetId && entry.enabled);
-      if (byId) return byId;
-    }
-
-    const iconName = icon?.name ?? '';
-    if (!iconName) return null;
-
-    return $storedIcons.find((entry) => entry.name === iconName && entry.enabled) ?? null;
-  });
+  // The library first, then the icons the open panel carries with it (utils/documentIcons.js) — a
+  // shared panel or the exported player has the picture even where the library does not.
+  let resolvedStoredIcon = $derived(resolveIcon(icon, $storedIcons, $documentIcons));
   let radioGroupPreviewStateName = $derived(String(valueSection?.__segmentPreviewState ?? '').trim());
   let radioGroupPreviewSegmentIds = $derived(
     radioGroupPreviewStateName

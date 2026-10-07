@@ -61,6 +61,7 @@ import {
   fetchGoogleIconSvg, googleIconKey, googleIconLabel, googleIconVariant, normalizeGoogleIconRequest,
   svgToDataUrl,
 } from '../utils/googleIcons.js';
+import { documentIcons } from '../utils/documentIcons.js';
 
 export { WEIGHT_OPTIONS } from './appSettingsSchema.js';
 
@@ -186,20 +187,31 @@ export const availableFonts = derived(appSettings, ($settings) => {
   return merged;
 });
 
-export const availableIcons = derived(appSettings, ($settings) =>
-  ($settings.icons ?? [])
-    .filter((icon) => icon.enabled && icon.dataUrl)
-    .map((icon) => ({
-      value: icon.id,
-      label: icon.name,
-      name: icon.name,
-      dataUrl: icon.dataUrl,
-      mimeType: icon.mimeType,
-      isVector: icon.isVector === true,
-      width: icon.width ?? 0,
-      height: icon.height ?? 0,
-    }))
-);
+const iconOption = (icon, label = icon.name) => ({
+  value: icon.id,
+  label,
+  name: icon.name,
+  dataUrl: icon.dataUrl,
+  mimeType: icon.mimeType,
+  isVector: icon.isVector === true,
+  width: icon.width ?? 0,
+  height: icon.height ?? 0,
+});
+
+/**
+ * The icons a control can be given: the library's, then those an open panel carries that the library
+ * lacks (utils/documentIcons.js) — a panel someone shared keeps its icons choosable, and an icon
+ * set to one of them and back again stays the same picture.
+ */
+export const availableIcons = derived([appSettings, documentIcons], ([$settings, $documentIcons]) => {
+  const library = ($settings.icons ?? []).filter((icon) => icon.enabled && icon.dataUrl);
+  const have = new Set(library.map((icon) => icon.id));
+  return [
+    ...library.map((icon) => iconOption(icon)),
+    ...($documentIcons ?? []).filter((icon) => !have.has(icon.id))
+      .map((icon) => iconOption(icon, `${icon.name} (carried by the panel)`)),
+  ];
+});
 
 let listenersInitialized = false;
 let settingsLoaded = false;

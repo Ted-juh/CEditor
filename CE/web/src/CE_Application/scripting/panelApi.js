@@ -1590,7 +1590,7 @@ export const COMMANDS = [
   },
   {
     id: 'imageAssets', category: 'Images', signature: 'imageAssets([opts]) -> list',
-    summary: 'List the images in your icon library. Each entry is { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. Set `opts.vector` or `opts.embeddable` to true to list only those. `portable` is always false: the library is kept in the app\'s settings, not in the panel, so a panel that only refers to a library image loses it when exported. `embeddable` says whether the entry has image data that can be copied into the panel itself.',
+    summary: 'List the images in your icon library, then any icons the panel carries with it. Each entry is { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. `source` is "panel" for a carried icon, and `portable` says whether the picture is already in the panel: true for those, false for your library\'s. Sharing or exporting copies a library icon into the panel if a control shows it or a script names it in quotes, but not one whose name a script builds while it runs. `embeddable` says whether the entry has image data that can be copied into the panel.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
       { name: 'vector', type: 'true or false',
@@ -1603,7 +1603,7 @@ export const COMMANDS = [
   },
   {
     id: 'imageAsset', category: 'Images', signature: 'imageAsset(idOrName) -> table|nil',
-    summary: 'Look up one image in the icon library, by id first and then by name (capitals do not matter), the same way the panel finds an icon when it draws one. Returns the entry, in the same form as `ce.image.assets()`, or nothing if the library has no such image, so check with it before pointing a control at an asset. Be aware that a name which happens to match is returned just as an id match would be.',
+    summary: 'Look up one image in the icon library or among the icons the panel carries, by id first and then by name (capitals do not matter), the same way the panel finds an icon when it draws one. Returns the entry, in the same form as `ce.image.assets()`, or nothing if there is no such image, so check with it before pointing a control at an asset. Be aware that a name which happens to match is returned just as an id match would be.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'idOrName', type: 'string', required: true }],
     scopes: 'any',
@@ -1692,7 +1692,7 @@ export const COMMANDS = [
   },
   {
     id: 'imageIcon', category: 'Images', signature: 'imageIcon(target, idOrName [, opts]) -> boolean',
-    summary: 'Show an image from the icon library in a control\'s Icon section, chosen by id or name. `opts` can also set its size, fit, tint, opacity and rotation. An image the library does not have is refused with a message rather than stored. Use this rather than `set()`: it records the asset\'s id and name together, so the control finds exactly that image.',
+    summary: 'Show an image from the icon library (or one the panel carries) in a control\'s Icon section, chosen by id or name. `opts` can also set its size, fit, tint, opacity and rotation. An image that is not there is refused with a message rather than stored. Write the id or name in quotes, as a plain string: that is how sharing and exporting find the icon and pack it into the panel. Use this rather than `set()`: it records the asset\'s id and name together, so the control finds exactly that image.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'target', type: 'string', required: true },

@@ -34,6 +34,7 @@ import { deepClone } from '../utils/deepClone.js';
 import { controlSetForPanel, isTokenReference, resolveColourValue } from '../models/controlSets.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
+import { documentIcons } from '../utils/documentIcons.js';
 // ce.image (§50). The file cache is how a path source becomes something renderable, which is also
 // what makes embed() possible.
 import { fileCache, loadFile } from '../stores/fileCache.js';
@@ -4273,7 +4274,7 @@ function textApplyWrite(name, write) {
  */
 
 function imageCatalogue() {
-  return assetCatalogue(get(storedIcons));
+  return assetCatalogue(get(storedIcons), get(documentIcons));
 }
 
 /** The layer for a name, reporting rather than guessing when the name is not one. */
@@ -6881,7 +6882,8 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       return true;
     },
 
-    /* ce.image (§50). assets/asset answer from the icon library; the rest work on one control. */
+    /* ce.image (§50). assets/asset answer from the icon library and the icons the panel carries; the
+       rest work on one control. */
     imageAssets: (opts) => {
       const all = imageCatalogue();
       if (opts?.embeddable === true) return all.filter((a) => a.embeddable);
