@@ -40,8 +40,8 @@ export const OUT = resolve(HERE, '../src/CE_Application/generated/helpDocs.js');
  *                                      the program it is inside.
  *   docs/property-hints.md             a writing-style rule for contributors, not for users.
  *
- * That leaves a real gap — there is no current editor manual — and the viewer says so rather than
- * letting the absence pass for completeness.
+ * The current editor manual (docs/editor-manual.md) replaced the snapshot; what it still does not
+ * cover is stated in HELP_GAPS rather than letting the absence pass for completeness.
  */
 export const HELP_DOCUMENTS = [
   {
@@ -50,6 +50,13 @@ export const HELP_DOCUMENTS = [
     section: 'Start here',
     title: 'Your first working panel',
     blurb: 'Create, bind, preview, save and export a panel; find out why a control is not responding.',
+  },
+  {
+    id: 'editor-manual',
+    file: 'docs/editor-manual.md',
+    section: 'Start here',
+    title: 'CEditor manual',
+    blurb: 'The whole program in plain language: building, binding, testing and exporting a panel, and HoSTage.',
   },
   {
     id: 'release-notes',
@@ -90,9 +97,10 @@ export const HELP_DOCUMENTS = [
 
 /** The gap the list above leaves, said out loud in the viewer rather than left to be noticed. */
 export const HELP_GAPS = [
-  'Your first working panel covers the basic editor workflow. A complete current editor manual '
-  + 'is still missing; the historical 2026-08-10 snapshot is not shipped. Help → Keyboard Shortcuts '
-  + 'and the hint text on properties cover additional controls.',
+  'HoSTage, the instrument host, has no manual of its own yet: the CEditor manual covers the '
+  + 'essentials in one chapter. The meaning of each individual setting is in the hint the properties '
+  + 'panel shows when you point at it; the old 2026-08-10 editor manual, which listed them, is out of '
+  + 'date and not shipped.',
 ];
 
 const firstParagraph = (text) => {

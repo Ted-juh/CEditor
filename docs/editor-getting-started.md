@@ -8,7 +8,8 @@ exporting a VST3. You can design and save a panel without connecting any hardwar
 Choose **File → New Panel** (Ctrl+N). Give it a name and choose **Blank**, or use **Synth basics**
 for a starting layout. Panel width and height are canvas pixels. Create the panel.
 
-Use **+** in the left rail to add a **Knob**. Select it to edit its properties. In edit mode,
+Point at **Values & Sliders** in the left rail and click **Knob** (or press **+** at the top of the
+rail and search for it). Select it to edit its properties. In edit mode,
 dragging selects or arranges controls; it does not operate the instrument.
 
 ## Choose where MIDI goes
@@ -26,8 +27,9 @@ device settings are available in Settings → MIDI.
 
 With the knob selected, open **Device Bindings** in Properties. There are two ways to bind it:
 
-- **Known device parameter:** choose the instrument's profile in the **Device** tab, then drag
-  its parameter onto the knob. This uses the profile's message definition and compatible metadata.
+- **Known device parameter:** choose the instrument's profile in the dock's **Device** tab, then,
+  with the knob selected, click the parameter in the list. This uses the profile's message
+  definition and compatible metadata. The binding starts with **Dry Run** on.
 - **Raw MIDI control:** click **Add** in Device Bindings and change **Kind** to **MIDI control**.
   Choose **CC**, enter the controller number from the instrument's MIDI implementation, and set
   its channel. For example, CC 74 is only a useful test if your instrument assigns it a function.
@@ -43,8 +45,8 @@ You can also click **MIDI learn**, move a control on your instrument, and drag i
 onto the on-screen knob. **Last received** shows the latest controller number, channel and value
 for the selected binding's device role. Clock and keep-alive bytes do not replace that readout.
 
-**Binding status** explains the next missing step. A manually added device-parameter binding
-starts with **Dry Run** enabled: turn it off to send. Keep Dry Run on when you only want to inspect
+**Binding status** explains the next missing step. A binding made with **Add**, or by clicking a
+parameter in the Device tab, starts with **Dry Run** enabled: turn it off to send. Keep Dry Run on when you only want to inspect
 the generated message. Input-only bindings, such as note velocity, follow incoming messages;
 moving them does not send MIDI.
 
