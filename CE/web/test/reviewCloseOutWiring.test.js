@@ -79,7 +79,9 @@ test('single-control resize passes fromCenter and suspends positional snapping f
 // --- D9: the F1 overlay must not describe gestures the app no longer has -----------------------
 
 test('the shortcuts overlay does not advertise right-drag panning any more', () => {
-  const overlay = src('CE_Application/layout/ShortcutsOverlay.svelte');
+  // The gesture rows moved out of the overlay into utils/shortcutSheet.js, which the overlay and the
+  // editor manual both read.
+  const overlay = src('CE_Application/utils/shortcutSheet.js');
   assert.ok(
     !/Right Drag/.test(overlay),
     'right-drag no longer pans (canvasInteractions dropped it), so the row must be gone',
