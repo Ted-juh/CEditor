@@ -64,8 +64,8 @@ Every script answers two questions: **when** should it run, and **what** should 
 is a hook or an event, explained in [chapter 3](#3-when-a-script-runs). The "what" is your own
 code plus the commands in Part 2.
 
-Here is a complete script. It belongs to a knob, and whenever the knob is let go it sets two other
-controls and sends a MIDI message:
+Here is a complete script. It is attached to a knob and runs on `onValueChanged`: whenever the
+knob is let go, it sets two other controls and sends a MIDI message:
 
 ```lua
 -- Lua
@@ -90,32 +90,41 @@ Control Change on MIDI channel 1.
 
 ## 2. Where scripts live
 
-A script belongs either to **one control** or to **the whole panel**.
-
-- A control's script reacts to that control: it was turned, clicked, hovered over.
-- A panel script looks after the panel as a whole: what happens when it opens, MIDI arriving from
-  the synth, timers.
-
 You write scripts in the **Behavior Designer**. Select a control and press **Script Editor** in the
-Scripts / Logic area of the top bar. The left-hand side groups the scripts by when they run —
-Startup, Ready, Runtime, DAW state and Shutdown — and the right-hand side is the code editor.
+Scripts / Logic area of the top bar. On the left, the panel's scripts are grouped by when they run
+— Startup, Ready, Runtime, DAW state and Shutdown — and **+** adds a script to a group. On the
+right is the code, with three settings above it:
+
+- **Runs on** — the one event or hook this script answers, such as `onValueChanged` or
+  `onPanelReady`. The script defines a function with exactly that name, and that is the function
+  CEditor calls. [Chapter 3](#3-when-a-script-runs) explains what this means.
+- **Attached control** — for a script in the Runtime group, which control it listens to. A new
+  script starts as **Any control**, which means it runs for every control on the panel. Pick your
+  control here unless that is what you want.
+- **Language** — Lua, JavaScript, TypeScript, Python, C++, C# or Java. A script is stored exactly as
+  you wrote it, in its own language.
+
 Two things help while you type:
 
 - **The picker** lists every control on the panel with its properties, and every command with its
   description. Click an entry and the call is written into your script, in your language.
-- **Checking as you type.** A misspelled control name, a command used where it cannot work, or a
-  handler that will never be called shows up in the problems list straight away.
+- **The problems list** points out, as you type, a function that will never be called because it
+  does not match **Runs on**, a command used where it cannot work, a component command aimed at the
+  wrong kind of control, and a command from a module the panel has switched off. A misspelled
+  control name is not caught there: it shows up in Test / Trace when the line runs.
 
-Scripts are saved inside the panel file and travel with it, into the exported plugin as well. Each
-script is written in one language and is stored and run in that language; CEditor never converts
-it.
+Scripts are saved inside the panel file and go into the exported plugin with it.
 
 ### Trying a script out
 
-Turn on the panel **preview** and use the panel: your scripts run straight away, as you type, with
-nothing to build or save first. If something does not happen, open **Test / Trace**. It shows every
-event, every value a script set, every MIDI message, every error and every `log(…)` line, in the
-order they happened.
+Turn on the panel **preview** and use the panel; there is nothing to build. The first time, and
+again after every change to the code, CEditor pauses the scripts and shows a bar asking whether you
+trust them. Press **Enable scripts for this session** to run them. It asks because a script can send
+MIDI to your instruments.
+
+If something does not happen, open **Test / Trace**. It lists each handler as it runs, every
+`log(…)` line, every error, and the MIDI sent with send commands such as `sendCC`. It does not
+list every value a script sets, so add a `log` line when you want to see one.
 
 Preview is a rehearsal. When you turn it off, everything it changed is put back — a knob you
 turned, a colour a script set, a control a script created — so you can run a script a hundred
@@ -125,12 +134,13 @@ settings saved with `ce.storage.saveSetting`.
 
 ## 3. When a script runs
 
-A script does nothing until something calls it. There are two kinds of moment that can.
+A script does nothing until something calls it. Each script is called for **one** moment: the event
+or hook in its **Runs on** setting. It defines a function with that name, and CEditor calls that
+function every time the moment comes round. There are two kinds of moment.
 
 ### Hooks: moments in the panel's life
 
-A hook is a function with a fixed name that CEditor calls at a fixed moment. Write the ones you
-need and leave the rest out. Roughly in the order they happen:
+A hook is a fixed moment in the life of the panel. Roughly in the order they happen:
 
 | Hook | When it runs | Typical use |
 |---|---|---|
@@ -147,7 +157,7 @@ need and leave the rest out. Roughly in the order they happen:
 The two that matter most are `onPanelLoad` and `onPanelReady`. During `onPanelLoad` the controls
 do not exist yet, so do not read or set them there. By `onPanelReady` they do. In a plugin,
 `onPanelReady` runs again each time the window is reopened, so put work that should happen only
-once inside `if info.firstTime`:
+once inside `if info.firstTime`. A script that runs on `onPanelReady`:
 
 ```lua
 -- Lua
@@ -169,56 +179,66 @@ function onPanelReady(info) {
 ### Events: something happened
 
 An event is something happening: a knob moved, a button was clicked, a note arrived from the synth,
-a timer went off. There are two ways to react to one.
-
-**A control's own events.** In a script that belongs to a control, write a function named after the
-event. Nothing else is needed — the script already knows which control it belongs to:
+a timer went off. Choose the event in **Runs on** and write the function of the same name. A script
+that runs on `onClick`, attached to a button:
 
 ```lua
--- Lua, in the script of a button
+-- Lua
 function onClick(mouse)
   log("clicked at " .. mouse.x .. ", " .. mouse.y)
 end
 ```
-
-**Anything else.** To react to another control, the panel, the synth, or a custom event, use
-`on(target, event, fn)` and say what to listen to. `"*"` means "from anywhere":
-
-```lua
--- Lua
-on("cutoff", "valueChanged", function(value)
-  set("resonance.value", value * 0.5)
-end)
-
-on("*", "noteIn", function(note)
-  log("note " .. note.note .. " on channel " .. note.channel)
-end)
-```
-```js
-// JavaScript
-on("cutoff", "valueChanged", (value) => {
-  set("resonance.value", value * 0.5);
-});
-
-on("*", "noteIn", (note) => {
-  log("note " + note.note + " on channel " + note.channel);
-});
-```
-
-`off(target, event)` stops listening again.
 
 Your function is given what it needs to know. When that is one thing, you get it directly:
 `onValueChanged(value)`. When it is several things, you get one object that holds them:
 `onClick(mouse)`, then `mouse.x` and `mouse.y`. The [events tables](#events) in Part 2 list
 what each event gives you.
 
-**Moving or let go?** Turning a knob raises two events. `valueChange` fires again and again while
-it moves; `valueChanged` fires once when it settles. Use `onValueChange` for things on screen that
+**Moving or let go?** Turning a knob raises two events. `onValueChange` runs again and again while
+it moves; `onValueChanged` runs once when it settles. Use `onValueChange` for things on screen that
 should follow the knob, and `onValueChanged` to tell the synth, so it is not flooded with every
 step along the way.
 
+### One script, one event
+
+A script answers only the event in its **Runs on** box. If you write a second handler in the same
+script — `onPointerUp` next to `onPointerDown`, or `onTimer` next to `onPanelReady` — it is
+never called. To react to a second event, give it a script of its own, or listen for it with `on`.
+
+### Listening with on
+
+`on(target, event, fn)` asks CEditor to call `fn` whenever `event` happens on `target`. Name the
+event by its handler name, such as `"onValueChanged"`; `target` is a control's name, or `"*"` for
+anything. Put `on` calls at the top of a script, outside any function, so they are set up once,
+when the script loads:
+
+```lua
+-- Lua
+on("cutoff", "onValueChanged", function(value)
+  set("resonance.value", value * 0.5)
+end)
+
+on("*", "onNoteIn", function(note)
+  log("note " .. note.note .. " on channel " .. note.channel)
+end)
+```
+```js
+// JavaScript
+on("cutoff", "onValueChanged", (value) => {
+  set("resonance.value", value * 0.5);
+});
+
+on("*", "onNoteIn", (note) => {
+  log("note " + note.note + " on channel " + note.channel);
+});
+```
+
+Always write the full handler name, with `on` in front. The editor also understands the short form
+(`"valueChanged"`), but the exported plugin does not once its window is closed. `off(target, event)`
+stops listening again.
+
 **Your own events.** Scripts can talk to each other. One announces an event with
-`emit("name", data)`; any script listening with `on("*", "name", fn)` is called with the data.
+`emit("name", data)`; every script listening with `on("*", "name", fn)` is called with the data.
 When you need an answer back, give a function a name with `defineAction` in one script and call it
 with `run` from another.
 
@@ -287,10 +307,13 @@ There is one exception, and it is deliberate. While a script is reacting to MIDI
 the synth, the values it sets are not sent back — otherwise the synth would receive its own
 values as an echo, and a loop could start. You can change this either way for a block of code:
 
-- `noTransmit(fn)` runs `fn` without sending anything. Use it when one click sets many controls,
-  such as an Init Patch button, and you would rather send one dump at the end than fifty
-  separate messages.
+- `noTransmit(fn)` runs `fn` without sending the changes it makes with `set`. Use it when one
+  click sets many controls, such as an Init Patch button, and you would rather send one dump at the
+  end than fifty separate messages. Commands that send MIDI themselves, such as `sendCC`, still
+  send inside the block.
 - `transmit(fn)` runs `fn` and sends its changes even while reacting to the synth.
+
+A script that runs on `onClick`, attached to an Init Patch button:
 
 ```lua
 -- Lua
@@ -353,17 +376,17 @@ profile does not describe:
 - `onNoteIn(note)`, `onNoteOffIn(note)`, `onCcIn(cc)` — notes and controllers, decoded from MIDI.
 - `onMidiIn(midi)`, `onSysexIn(bytes)` — any message, exactly as it arrived.
 
-Each of these is a panel event: write the function in a panel script, or listen with
-`on("*", "presetChange", fn)` from anywhere.
+Choose one in a script's **Runs on** box, or listen with `on("*", "onPresetChange", fn)`. A
+script that runs on `onPresetChange`:
 
 ```lua
--- Lua, in a panel script
+-- Lua
 function onPresetChange(preset)
   ce.ui.status("Preset: " .. preset.name)
 end
 ```
 ```js
-// JavaScript, in a panel script
+// JavaScript
 function onPresetChange(preset) {
   ce.ui.status("Preset: " + preset.name);
 }
@@ -374,36 +397,37 @@ events is not sent back to the synth.
 
 ## 7. Timers and musical time
 
-To run code later, or again and again, use a timer:
+To run code later, or again and again, use a timer. This script runs on `onPanelReady`, where
+it starts the timer. Because a script answers only one event, it listens for the timer with `on`:
 
 ```lua
 -- Lua
 local lit = false
 
-function onPanelReady(info)
-  ce.time.startTimer("blink", 500)        -- every half second
-end
-
-function onTimer(info)
+on("*", "onTimer", function(info)
   if info.id == "blink" then
     lit = not lit
     set("led.background.fill.colour", lit and "#FF4000" or "#301000")
   end
+end)
+
+function onPanelReady(info)
+  ce.time.startTimer("blink", 500)        -- every half second
 end
 ```
 ```js
 // JavaScript
 let lit = false;
 
-function onPanelReady(info) {
-  ce.time.startTimer("blink", 500);       // every half second
-}
-
-function onTimer(info) {
+on("*", "onTimer", (info) => {
   if (info.id === "blink") {
     lit = !lit;
     set("led.background.fill.colour", lit ? "#FF4000" : "#301000");
   }
+});
+
+function onPanelReady(info) {
+  ce.time.startTimer("blink", 500);       // every half second
 }
 ```
 
@@ -558,8 +582,8 @@ The same conventions hold everywhere:
 
 ## Hooks
 
-Hooks are the functions CEditor calls at fixed moments; [chapter 3](#3-when-a-script-runs) explains
-them. Define the ones you need and leave the rest out.
+Hooks are the fixed moments in the life of a panel; [chapter 3](#3-when-a-script-runs) explains
+them. Choose one in a script's **Runs on** box and define the function of the same name.
 
 ### `onPanelLoad()`
 
@@ -766,83 +790,83 @@ function onDawRestoreState(store) {
 
 ## Events
 
-To handle one of a control's own events, write the handler function in that control's script. To
-handle anything else, use `on(target, "name", fn)` with the name from the second column.
+Choose an event in a script's **Runs on** box and define the handler function of the same name, or
+listen for it from any script with `on(target, "onValueChanged", fn)`, giving the handler name.
 [Chapter 3](#3-when-a-script-runs) explains both.
 
 ### Control events
 
 Raised by the control the script belongs to.
 
-| Handler | Name for `on` | When it fires, and what you get |
-|---|---|---|
-| `onValueChange(value)` | `"valueChange"` | Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control. |
-| `onValueChanged(value)` | `"valueChanged"` | Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth. |
-| `onActiveHandleChanged(info)` | `"activeHandleChanged"` | A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end". |
-| `onClick(mouse)` | `"click"` | The control was clicked. `mouse.x` and `mouse.y` say where, inside the control. |
-| `onDoubleClick(mouse)` | `"doubleClick"` | The control was double-clicked. `mouse.x` and `mouse.y` say where. |
-| `onPointerDown(mouse)` | `"pointerDown"` | A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held. |
-| `onPointerMove(mouse)` | `"pointerMove"` | The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position. |
-| `onPointerUp(mouse)` | `"pointerUp"` | The mouse button was released. |
-| `onHoverStart()` | `"hoverStart"` | The mouse pointer moved onto the control. |
-| `onHoverEnd()` | `"hoverEnd"` | The mouse pointer left the control. |
-| `onWheel(wheel)` | `"wheel"` | The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction. |
-| `onStateChanged(state)` | `"stateChanged"` | The control's look-state changed. `state` is one word: "normal", "hover", "pressed" or "disabled". |
+| Handler | When it runs, and what you get |
+|---|---|
+| `onValueChange(value)` | Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control. |
+| `onValueChanged(value)` | Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth. |
+| `onActiveHandleChanged(info)` | A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end". |
+| `onClick(mouse)` | The control was clicked. `mouse.x` and `mouse.y` say where, inside the control. |
+| `onDoubleClick(mouse)` | The control was double-clicked. `mouse.x` and `mouse.y` say where. |
+| `onPointerDown(mouse)` | A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held. |
+| `onPointerMove(mouse)` | The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position. |
+| `onPointerUp(mouse)` | The mouse button was released. |
+| `onHoverStart()` | The mouse pointer moved onto the control. |
+| `onHoverEnd()` | The mouse pointer left the control. |
+| `onWheel(wheel)` | The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction. |
+| `onStateChanged(state)` | The control's look-state changed. `state` is one word: "normal", "hover", "pressed" or "disabled". |
 
 ### Panel events
 
-| Handler | Name for `on` | When it fires, and what you get |
-|---|---|---|
-| `onControlChanged(info)` | `"controlChanged"` | Any control on the panel changed. `info.target` is the control's name and `info.value` its new value. Use it to react to many controls in one place. |
-| `onTimer(info)` | `"timer"` | A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`. |
+| Handler | When it runs, and what you get |
+|---|---|
+| `onControlChanged(info)` | Any control on the panel changed. `info.target` is the control's name and `info.value` its new value. Use it to react to many controls in one place. |
+| `onTimer(info)` | A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`. |
 
 ### Time events
 
 Raised while the transport plays. Accurate to about a thirtieth of a second — right for lights and
 displays, not for timing audio.
 
-| Handler | Name for `on` | When it fires, and what you get |
-|---|---|---|
-| `onBeat(time)` | `"beat"` | A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound. |
-| `onBar(time)` | `"bar"` | A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature's beats per bar. It fires on the downbeat, together with onBeat. |
-| `onTransport(time)` | `"transport"` | The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it. |
+| Handler | When it runs, and what you get |
+|---|---|
+| `onBeat(time)` | A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound. |
+| `onBar(time)` | A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature's beats per bar. It fires on the downbeat, together with onBeat. |
+| `onTransport(time)` | The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it. |
 
 ### Synth and MIDI events
 
 Raised when something arrives from a device. Values you `set` while handling these are not sent
 back to the synth ([chapter 5](#5-talking-to-your-synth)).
 
-| Handler | Name for `on` | When it fires, and what you get |
-|---|---|---|
-| `onParameterReceived(info)` | `"parameterReceived"` | The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units. |
-| `onDumpReceived(dump)` | `"dumpReceived"` | A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as "patch", and `dump.role` the device it came from. |
-| `onPresetChange(preset)` | `"presetChange"` | The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: "device" when the instrument sent a Program Change, "panel" when the panel called recallPreset. |
-| `onMidiIn(midi)` | `"midiIn"` | Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0. |
-| `onCcIn(cc)` | `"ccIn"` | A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16. |
-| `onNoteIn(note)` | `"noteIn"` | A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means "note off" in MIDI, so it arrives as onNoteOffIn instead. |
-| `onNoteOffIn(note)` | `"noteOffIn"` | A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off. |
-| `onSysexIn(bytes)` | `"sysexIn"` | A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers. |
-| `onDeviceConnected(device)` | `"deviceConnected"` | A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile. |
-| `onDeviceDisconnected(device)` | `"deviceDisconnected"` | A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why. |
+| Handler | When it runs, and what you get |
+|---|---|
+| `onParameterReceived(info)` | The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units. |
+| `onDumpReceived(dump)` | A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as "patch", and `dump.role` the device it came from. |
+| `onPresetChange(preset)` | The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: "device" when the instrument sent a Program Change, "panel" when the panel called recallPreset. |
+| `onMidiIn(midi)` | Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0. |
+| `onCcIn(cc)` | A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16. |
+| `onNoteIn(note)` | A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means "note off" in MIDI, so it arrives as onNoteOffIn instead. |
+| `onNoteOffIn(note)` | A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off. |
+| `onSysexIn(bytes)` | A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers. |
+| `onDeviceConnected(device)` | A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile. |
+| `onDeviceDisconnected(device)` | A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why. |
 
 ### Component events
 
-Raised by the ready-made components. Listen with `on("*", "step", fn)` to hear from every
+Raised by the ready-made components. Listen with `on("*", "onStep", fn)` to hear from every
 component, or put the component's name in place of `"*"`. These need the panel window.
 
-| Handler | Name for `on` | When it fires, and what you get |
-|---|---|---|
-| `onStep(step)` | `"step"` | A sequencer moved to its next step. `step.target` is the component's name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper. |
-| `onCycle(cycle)` | `"cycle"` | A sequence or loop came back round to its start. `cycle.target` is the component's name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit. |
-| `onHit(hit)` | `"hit"` | A pad, key or ribbon was struck. `hit.target` is the component's name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon. |
-| `onRelease(release)` | `"release"` | A pad, key or ribbon was let go. `release.target` is the component's name, `release.id` which pad or key, and `release.note` the note. |
-| `onScene(scene)` | `"scene"` | The Setlist switched to a scene. `scene.target` is the component's name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch. |
-| `onStage(stage)` | `"stage"` | A component moved into a new stage. `stage.target` is the component's name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports "idle", "armed", "recording" and "overdub"; the Envelope reports "sustain", "release" and "end". This is not the same as onStateChanged, which is about hover and press. |
-| `onSettled(settled)` | `"settled"` | A spring-loaded control finished gliding back to its rest position. `settled.target` is the component's name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick. |
-| `onBounce(bounce)` | `"bounce"` | The Kinetic ball hit a wall. `bounce.target` is the component's name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down. |
-| `onRecall(recall)` | `"recall"` | The Constellation snapped to one of its presets. `recall.target` is the component's name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode. |
-| `onZone(zone)` | `"zone"` | A Meter's reading crossed into a different zone, such as from green into red. `zone.target` is the component's name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading. |
-| `onVoiced(voiced)` | `"voiced"` | A component turned one played note into other notes. `voiced.target` is the component's name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser. |
+| Handler | When it runs, and what you get |
+|---|---|
+| `onStep(step)` | A sequencer moved to its next step. `step.target` is the component's name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper. |
+| `onCycle(cycle)` | A sequence or loop came back round to its start. `cycle.target` is the component's name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit. |
+| `onHit(hit)` | A pad, key or ribbon was struck. `hit.target` is the component's name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon. |
+| `onRelease(release)` | A pad, key or ribbon was let go. `release.target` is the component's name, `release.id` which pad or key, and `release.note` the note. |
+| `onScene(scene)` | The Setlist switched to a scene. `scene.target` is the component's name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch. |
+| `onStage(stage)` | A component moved into a new stage. `stage.target` is the component's name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports "idle", "armed", "recording" and "overdub"; the Envelope reports "sustain", "release" and "end". This is not the same as onStateChanged, which is about hover and press. |
+| `onSettled(settled)` | A spring-loaded control finished gliding back to its rest position. `settled.target` is the component's name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick. |
+| `onBounce(bounce)` | The Kinetic ball hit a wall. `bounce.target` is the component's name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down. |
+| `onRecall(recall)` | The Constellation snapped to one of its presets. `recall.target` is the component's name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode. |
+| `onZone(zone)` | A Meter's reading crossed into a different zone, such as from green into red. `zone.target` is the component's name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading. |
+| `onVoiced(voiced)` | A component turned one played note into other notes. `voiced.target` is the component's name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser. |
 
 ## Commands: The basics
 
@@ -910,7 +934,7 @@ transmit(() => {
 
 #### `on(target, event, fn)`
 
-Listen for an event somewhere else: on another control, on the panel, on the device, or a custom event announced with emit. `target` is the name of what to listen to ("*" means anything), `event` the event's name, and `fn` the function to call. A control's own events do not need this — just define the handler function in its script.
+Listen for an event from any script: on another control, on the panel, on the device, or a custom event announced with emit. `target` is the name of what to listen to ("*" means anything), `event` the handler name, such as "onValueChanged", and `fn` the function to call. Put it at the top of a script, outside any function, so it is set up once when the script loads. A script also answers the one event in its Runs on setting without this.
 
 ```lua
 -- Lua
@@ -1057,7 +1081,7 @@ Sending MIDI yourself, and catching MIDI on its way in or out. Most panels do no
 
 #### `ce.midi.sendCC(channel, cc, value)`
 
-Send a MIDI Control Change message: `channel` 1 to 16, controller number `cc` 0 to 127, `value` 0 to 127.
+Send a MIDI Control Change (CC) message: `channel` 1 to 16, controller number `cc` 0 to 127, `value` 0 to 127.
 
 *Short name: `sendCC`.*
 

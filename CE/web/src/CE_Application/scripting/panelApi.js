@@ -655,7 +655,7 @@ export const COMMANDS = [
   /* --- Events & Flow (Q3, Q6) --- */
   {
     id: 'on', category: 'Events & Flow', signature: 'on(target, event, fn)',
-    summary: 'Listen for an event somewhere else: on another control, on the panel, on the device, or a custom event announced with emit. `target` is the name of what to listen to ("*" means anything), `event` the event\'s name, and `fn` the function to call. A control\'s own events do not need this — just define the handler function in its script.',
+    summary: 'Listen for an event from any script: on another control, on the panel, on the device, or a custom event announced with emit. `target` is the name of what to listen to ("*" means anything), `event` the handler name, such as "onValueChanged", and `fn` the function to call. Put it at the top of a script, outside any function, so it is set up once when the script loads. A script also answers the one event in its Runs on setting without this.',
     params: [
       { name: 'target', type: 'targetRef', required: true },
       { name: 'event', type: 'eventName', required: true },
@@ -2758,7 +2758,7 @@ export const COMMANDS = [
   /* --- Device / MIDI: raw (Q9) --- */
   {
     id: 'sendCC', category: 'Device / MIDI', signature: 'sendCC(channel, cc, value)',
-    summary: 'Send a MIDI Control Change message: `channel` 1 to 16, controller number `cc` 0 to 127, `value` 0 to 127.',
+    summary: 'Send a MIDI Control Change (CC) message: `channel` 1 to 16, controller number `cc` 0 to 127, `value` 0 to 127.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'cc', type: 'number', required: true },

@@ -259,7 +259,7 @@
               "target": "self",
               "event": "onValueChange",
               "enabled": true,
-              "description": "Fires over and over while the value is moving. Use it for things on screen that should follow the control.",
+              "description": "Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control.",
               "group": ""
             },
             "qa04_lua_valueChanged": {
@@ -271,7 +271,7 @@
               "target": "self",
               "event": "onValueChanged",
               "enabled": true,
-              "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "description": "Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth.",
               "group": ""
             },
             "qa04_lua_activeHandleChanged": {
@@ -283,7 +283,7 @@
               "target": "self",
               "event": "onActiveHandleChanged",
               "enabled": true,
-              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
+              "description": "A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each \"start\", \"current\" or \"end\".",
               "group": ""
             },
             "qa04_lua_click": {
@@ -295,7 +295,7 @@
               "target": "self",
               "event": "onClick",
               "enabled": true,
-              "description": "Clicked. mouse.x, mouse.y.",
+              "description": "The control was clicked. `mouse.x` and `mouse.y` say where, inside the control.",
               "group": ""
             },
             "qa04_lua_doubleClick": {
@@ -307,7 +307,7 @@
               "target": "self",
               "event": "onDoubleClick",
               "enabled": true,
-              "description": "Double-clicked.",
+              "description": "The control was double-clicked. `mouse.x` and `mouse.y` say where.",
               "group": ""
             },
             "qa04_lua_pointerDown": {
@@ -319,7 +319,7 @@
               "target": "self",
               "event": "onPointerDown",
               "enabled": true,
-              "description": "Mouse pressed. mouse.x/.y/.button/.modifiers.",
+              "description": "A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held.",
               "group": ""
             },
             "qa04_lua_pointerMove": {
@@ -331,7 +331,7 @@
               "target": "self",
               "event": "onPointerMove",
               "enabled": true,
-              "description": "Mouse moved while down.",
+              "description": "The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position.",
               "group": ""
             },
             "qa04_lua_pointerUp": {
@@ -343,7 +343,7 @@
               "target": "self",
               "event": "onPointerUp",
               "enabled": true,
-              "description": "Mouse released.",
+              "description": "The mouse button was released.",
               "group": ""
             },
             "qa04_lua_hoverStart": {
@@ -355,7 +355,7 @@
               "target": "self",
               "event": "onHoverStart",
               "enabled": true,
-              "description": "Mouse entered the control.",
+              "description": "The mouse pointer moved onto the control.",
               "group": ""
             },
             "qa04_lua_hoverEnd": {
@@ -367,7 +367,7 @@
               "target": "self",
               "event": "onHoverEnd",
               "enabled": true,
-              "description": "Mouse left the control.",
+              "description": "The mouse pointer left the control.",
               "group": ""
             },
             "qa04_lua_wheel": {
@@ -379,7 +379,7 @@
               "target": "self",
               "event": "onWheel",
               "enabled": true,
-              "description": "Scrolled over the control. wheel.delta.",
+              "description": "The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction.",
               "group": ""
             },
             "qa04_lua_stateChanged": {
@@ -391,7 +391,7 @@
               "target": "self",
               "event": "onStateChanged",
               "enabled": true,
-              "description": "The control changed state: hover, pressed or disabled.",
+              "description": "The control's look-state changed. `state` is one word: \"normal\", \"hover\", \"pressed\" or \"disabled\".",
               "group": ""
             },
             "qa04_lua_controlChanged": {
@@ -403,7 +403,7 @@
               "target": "*",
               "event": "onControlChanged",
               "enabled": true,
-              "description": "Any control changed. info.target, info.value.",
+              "description": "Any control on the panel changed. `info.target` is the control's name and `info.value` its new value. Use it to react to many controls in one place.",
               "group": ""
             },
             "qa04_lua_timer": {
@@ -415,7 +415,7 @@
               "target": "*",
               "event": "onTimer",
               "enabled": true,
-              "description": "A started timer fired. info.id.",
+              "description": "A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`.",
               "group": ""
             },
             "qa04_lua_beat": {
@@ -427,7 +427,7 @@
               "target": "*",
               "event": "onBeat",
               "enabled": true,
-              "description": "A beat passed. time.bar, time.beat, time.beats, time.bpm. Message-thread accurate (~30Hz), not sample-accurate.",
+              "description": "A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound.",
               "group": ""
             },
             "qa04_lua_bar": {
@@ -439,7 +439,7 @@
               "target": "*",
               "event": "onBar",
               "enabled": true,
-              "description": "A bar passed. time.bar, time.beats, time.beatsPerBar. Fires with the downbeat, alongside onBeat.",
+              "description": "A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature's beats per bar. It fires on the downbeat, together with onBeat.",
               "group": ""
             },
             "qa04_lua_transport": {
@@ -451,7 +451,7 @@
               "target": "*",
               "event": "onTransport",
               "enabled": true,
-              "description": "The transport started, stopped, or changed tempo. time.playing, time.bpm, time.source.",
+              "description": "The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it.",
               "group": ""
             },
             "qa04_lua_parameterReceived": {
@@ -463,7 +463,7 @@
               "target": "*",
               "event": "onParameterReceived",
               "enabled": true,
-              "description": "A value arrived, decoded via the DPD. info.parameter, info.value.",
+              "description": "The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units.",
               "group": ""
             },
             "qa04_lua_dumpReceived": {
@@ -475,7 +475,7 @@
               "target": "*",
               "event": "onDumpReceived",
               "enabled": true,
-              "description": "A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.",
+              "description": "A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as \"patch\", and `dump.role` the device it came from.",
               "group": ""
             },
             "qa04_lua_presetChange": {
@@ -487,7 +487,7 @@
               "target": "*",
               "event": "onPresetChange",
               "enabled": true,
-              "description": "The current preset changed. preset.slot, preset.program, preset.name, preset.category, preset.bankId, preset.source (\"device\" when the instrument sent a Program Change, \"panel\" when recallPreset did it).",
+              "description": "The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: \"device\" when the instrument sent a Program Change, \"panel\" when the panel called recallPreset.",
               "group": ""
             },
             "qa04_lua_midiIn": {
@@ -499,7 +499,7 @@
               "target": "*",
               "event": "onMidiIn",
               "enabled": true,
-              "description": "Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.",
+              "description": "Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0.",
               "group": ""
             },
             "qa04_lua_ccIn": {
@@ -511,7 +511,7 @@
               "target": "*",
               "event": "onCcIn",
               "enabled": true,
-              "description": "A CC arrived. cc.channel, cc.cc, cc.value. cc.channel is 0-based here, unlike sendCC and onNoteIn.",
+              "description": "A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16.",
               "group": ""
             },
             "qa04_lua_noteIn": {
@@ -523,7 +523,7 @@
               "target": "*",
               "event": "onNoteIn",
               "enabled": true,
-              "description": "A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 counts as a note-off and arrives as onNoteOffIn instead.",
+              "description": "A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means \"note off\" in MIDI, so it arrives as onNoteOffIn instead.",
               "group": ""
             },
             "qa04_lua_noteOffIn": {
@@ -535,7 +535,7 @@
               "target": "*",
               "event": "onNoteOffIn",
               "enabled": true,
-              "description": "A note was released. note.channel (1-16), note.note, note.velocity (the release velocity, 0 when the device sent a note-on with velocity 0 instead of a note-off).",
+              "description": "A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off.",
               "group": ""
             },
             "qa04_lua_sysexIn": {
@@ -547,7 +547,7 @@
               "target": "*",
               "event": "onSysexIn",
               "enabled": true,
-              "description": "Raw SysEx arrived.",
+              "description": "A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers.",
               "group": ""
             },
             "qa04_lua_deviceConnected": {
@@ -559,7 +559,7 @@
               "target": "*",
               "event": "onDeviceConnected",
               "enabled": true,
-              "description": "A device connected.",
+              "description": "A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile.",
               "group": ""
             },
             "qa04_lua_deviceDisconnected": {
@@ -571,7 +571,7 @@
               "target": "*",
               "event": "onDeviceDisconnected",
               "enabled": true,
-              "description": "A device disconnected.",
+              "description": "A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why.",
               "group": ""
             },
             "qa04_lua_step": {
@@ -583,7 +583,7 @@
               "target": "self",
               "event": "onStep",
               "enabled": true,
-              "description": "A sequencer advanced. step.target, step.index (1-based), step.of, step.notes. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
+              "description": "A sequencer moved to its next step. `step.target` is the component's name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
               "group": ""
             },
             "qa04_lua_cycle": {
@@ -595,7 +595,7 @@
               "target": "self",
               "event": "onCycle",
               "enabled": true,
-              "description": "A sequence or loop came back round. cycle.target, cycle.count (how many times since the panel opened). Arpeggiator, Turing, Looper, Orbit.",
+              "description": "A sequence or loop came back round to its start. `cycle.target` is the component's name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit.",
               "group": ""
             },
             "qa04_lua_hit": {
@@ -607,7 +607,7 @@
               "target": "self",
               "event": "onHit",
               "enabled": true,
-              "description": "A pad, key or ribbon was struck. hit.target, hit.id, hit.note, hit.velocity. Chord Pad, Drum Pads, Note Ribbon.",
+              "description": "A pad, key or ribbon was struck. `hit.target` is the component's name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon.",
               "group": ""
             },
             "qa04_lua_release": {
@@ -619,7 +619,7 @@
               "target": "self",
               "event": "onRelease",
               "enabled": true,
-              "description": "A pad, key or ribbon was released. release.target, release.id, release.note.",
+              "description": "A pad, key or ribbon was let go. `release.target` is the component's name, `release.id` which pad or key, and `release.note` the note.",
               "group": ""
             },
             "qa04_lua_scene": {
@@ -631,7 +631,7 @@
               "target": "self",
               "event": "onScene",
               "enabled": true,
-              "description": "The Setlist recalled a scene. scene.target, scene.index (1-based), scene.name. Fires on any recall, scripted or footswitch.",
+              "description": "The Setlist switched to a scene. `scene.target` is the component's name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch.",
               "group": ""
             },
             "qa04_lua_stage": {
@@ -643,7 +643,7 @@
               "target": "self",
               "event": "onStage",
               "enabled": true,
-              "description": "A component entered a new stage. stage.target, stage.stage, stage.previous. Raised by the Recorder (\"idle\"/\"armed\"/\"recording\"/\"overdub\") and the Envelope (\"sustain\"/\"release\"/\"end\"). Not onStateChanged, which is a control's hover/pressed state.",
+              "description": "A component moved into a new stage. `stage.target` is the component's name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports \"idle\", \"armed\", \"recording\" and \"overdub\"; the Envelope reports \"sustain\", \"release\" and \"end\". This is not the same as onStateChanged, which is about hover and press.",
               "group": ""
             },
             "qa04_lua_settled": {
@@ -655,7 +655,7 @@
               "target": "self",
               "event": "onSettled",
               "enabled": true,
-              "description": "A spring-return control finished gliding home. settled.target, settled.value. Ribbon, Crossfader, Vector Joystick.",
+              "description": "A spring-loaded control finished gliding back to its rest position. `settled.target` is the component's name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick.",
               "group": ""
             },
             "qa04_lua_bounce": {
@@ -667,7 +667,7 @@
               "target": "self",
               "event": "onBounce",
               "enabled": true,
-              "description": "The Kinetic ball hit a wall. bounce.target, bounce.x, bounce.y, bounce.vx, bounce.vy.",
+              "description": "The Kinetic ball hit a wall. `bounce.target` is the component's name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down.",
               "group": ""
             },
             "qa04_lua_recall": {
@@ -679,7 +679,7 @@
               "target": "self",
               "event": "onRecall",
               "enabled": true,
-              "description": "The Constellation snapped to a preset. recall.target, recall.id, recall.label. Snap mode only — blend mode does not fire it.",
+              "description": "The Constellation snapped to one of its presets. `recall.target` is the component's name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode.",
               "group": ""
             },
             "qa04_lua_zone": {
@@ -691,7 +691,7 @@
               "target": "self",
               "event": "onZone",
               "enabled": true,
-              "description": "A Meter crossed into a different threshold zone. zone.target, zone.zone, zone.previous, zone.value.",
+              "description": "A Meter's reading crossed into a different zone, such as from green into red. `zone.target` is the component's name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading.",
               "group": ""
             },
             "qa04_lua_voiced": {
@@ -703,7 +703,7 @@
               "target": "self",
               "event": "onVoiced",
               "enabled": true,
-              "description": "A component turned a played note into other notes. voiced.target, voiced.note, voiced.velocity, voiced.out (the notes it produced). Raised by the Zone Splitter and the Harmoniser.",
+              "description": "A component turned one played note into other notes. `voiced.target` is the component's name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser.",
               "group": ""
             }
           }
@@ -3573,7 +3573,7 @@
               "target": "self",
               "event": "onValueChange",
               "enabled": true,
-              "description": "Fires over and over while the value is moving. Use it for things on screen that should follow the control.",
+              "description": "Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control.",
               "group": ""
             },
             "qa04_javascript_valueChanged": {
@@ -3585,7 +3585,7 @@
               "target": "self",
               "event": "onValueChanged",
               "enabled": true,
-              "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "description": "Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth.",
               "group": ""
             },
             "qa04_javascript_activeHandleChanged": {
@@ -3597,7 +3597,7 @@
               "target": "self",
               "event": "onActiveHandleChanged",
               "enabled": true,
-              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
+              "description": "A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each \"start\", \"current\" or \"end\".",
               "group": ""
             },
             "qa04_javascript_click": {
@@ -3609,7 +3609,7 @@
               "target": "self",
               "event": "onClick",
               "enabled": true,
-              "description": "Clicked. mouse.x, mouse.y.",
+              "description": "The control was clicked. `mouse.x` and `mouse.y` say where, inside the control.",
               "group": ""
             },
             "qa04_javascript_doubleClick": {
@@ -3621,7 +3621,7 @@
               "target": "self",
               "event": "onDoubleClick",
               "enabled": true,
-              "description": "Double-clicked.",
+              "description": "The control was double-clicked. `mouse.x` and `mouse.y` say where.",
               "group": ""
             },
             "qa04_javascript_pointerDown": {
@@ -3633,7 +3633,7 @@
               "target": "self",
               "event": "onPointerDown",
               "enabled": true,
-              "description": "Mouse pressed. mouse.x/.y/.button/.modifiers.",
+              "description": "A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held.",
               "group": ""
             },
             "qa04_javascript_pointerMove": {
@@ -3645,7 +3645,7 @@
               "target": "self",
               "event": "onPointerMove",
               "enabled": true,
-              "description": "Mouse moved while down.",
+              "description": "The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position.",
               "group": ""
             },
             "qa04_javascript_pointerUp": {
@@ -3657,7 +3657,7 @@
               "target": "self",
               "event": "onPointerUp",
               "enabled": true,
-              "description": "Mouse released.",
+              "description": "The mouse button was released.",
               "group": ""
             },
             "qa04_javascript_hoverStart": {
@@ -3669,7 +3669,7 @@
               "target": "self",
               "event": "onHoverStart",
               "enabled": true,
-              "description": "Mouse entered the control.",
+              "description": "The mouse pointer moved onto the control.",
               "group": ""
             },
             "qa04_javascript_hoverEnd": {
@@ -3681,7 +3681,7 @@
               "target": "self",
               "event": "onHoverEnd",
               "enabled": true,
-              "description": "Mouse left the control.",
+              "description": "The mouse pointer left the control.",
               "group": ""
             },
             "qa04_javascript_wheel": {
@@ -3693,7 +3693,7 @@
               "target": "self",
               "event": "onWheel",
               "enabled": true,
-              "description": "Scrolled over the control. wheel.delta.",
+              "description": "The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction.",
               "group": ""
             },
             "qa04_javascript_stateChanged": {
@@ -3705,7 +3705,7 @@
               "target": "self",
               "event": "onStateChanged",
               "enabled": true,
-              "description": "The control changed state: hover, pressed or disabled.",
+              "description": "The control's look-state changed. `state` is one word: \"normal\", \"hover\", \"pressed\" or \"disabled\".",
               "group": ""
             },
             "qa04_javascript_controlChanged": {
@@ -3717,7 +3717,7 @@
               "target": "*",
               "event": "onControlChanged",
               "enabled": true,
-              "description": "Any control changed. info.target, info.value.",
+              "description": "Any control on the panel changed. `info.target` is the control's name and `info.value` its new value. Use it to react to many controls in one place.",
               "group": ""
             },
             "qa04_javascript_timer": {
@@ -3729,7 +3729,7 @@
               "target": "*",
               "event": "onTimer",
               "enabled": true,
-              "description": "A started timer fired. info.id.",
+              "description": "A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`.",
               "group": ""
             },
             "qa04_javascript_beat": {
@@ -3741,7 +3741,7 @@
               "target": "*",
               "event": "onBeat",
               "enabled": true,
-              "description": "A beat passed. time.bar, time.beat, time.beats, time.bpm. Message-thread accurate (~30Hz), not sample-accurate.",
+              "description": "A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound.",
               "group": ""
             },
             "qa04_javascript_bar": {
@@ -3753,7 +3753,7 @@
               "target": "*",
               "event": "onBar",
               "enabled": true,
-              "description": "A bar passed. time.bar, time.beats, time.beatsPerBar. Fires with the downbeat, alongside onBeat.",
+              "description": "A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature's beats per bar. It fires on the downbeat, together with onBeat.",
               "group": ""
             },
             "qa04_javascript_transport": {
@@ -3765,7 +3765,7 @@
               "target": "*",
               "event": "onTransport",
               "enabled": true,
-              "description": "The transport started, stopped, or changed tempo. time.playing, time.bpm, time.source.",
+              "description": "The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it.",
               "group": ""
             },
             "qa04_javascript_parameterReceived": {
@@ -3777,7 +3777,7 @@
               "target": "*",
               "event": "onParameterReceived",
               "enabled": true,
-              "description": "A value arrived, decoded via the DPD. info.parameter, info.value.",
+              "description": "The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units.",
               "group": ""
             },
             "qa04_javascript_dumpReceived": {
@@ -3789,7 +3789,7 @@
               "target": "*",
               "event": "onDumpReceived",
               "enabled": true,
-              "description": "A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.",
+              "description": "A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as \"patch\", and `dump.role` the device it came from.",
               "group": ""
             },
             "qa04_javascript_presetChange": {
@@ -3801,7 +3801,7 @@
               "target": "*",
               "event": "onPresetChange",
               "enabled": true,
-              "description": "The current preset changed. preset.slot, preset.program, preset.name, preset.category, preset.bankId, preset.source (\"device\" when the instrument sent a Program Change, \"panel\" when recallPreset did it).",
+              "description": "The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: \"device\" when the instrument sent a Program Change, \"panel\" when the panel called recallPreset.",
               "group": ""
             },
             "qa04_javascript_midiIn": {
@@ -3813,7 +3813,7 @@
               "target": "*",
               "event": "onMidiIn",
               "enabled": true,
-              "description": "Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.",
+              "description": "Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0.",
               "group": ""
             },
             "qa04_javascript_ccIn": {
@@ -3825,7 +3825,7 @@
               "target": "*",
               "event": "onCcIn",
               "enabled": true,
-              "description": "A CC arrived. cc.channel, cc.cc, cc.value. cc.channel is 0-based here, unlike sendCC and onNoteIn.",
+              "description": "A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16.",
               "group": ""
             },
             "qa04_javascript_noteIn": {
@@ -3837,7 +3837,7 @@
               "target": "*",
               "event": "onNoteIn",
               "enabled": true,
-              "description": "A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 counts as a note-off and arrives as onNoteOffIn instead.",
+              "description": "A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means \"note off\" in MIDI, so it arrives as onNoteOffIn instead.",
               "group": ""
             },
             "qa04_javascript_noteOffIn": {
@@ -3849,7 +3849,7 @@
               "target": "*",
               "event": "onNoteOffIn",
               "enabled": true,
-              "description": "A note was released. note.channel (1-16), note.note, note.velocity (the release velocity, 0 when the device sent a note-on with velocity 0 instead of a note-off).",
+              "description": "A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off.",
               "group": ""
             },
             "qa04_javascript_sysexIn": {
@@ -3861,7 +3861,7 @@
               "target": "*",
               "event": "onSysexIn",
               "enabled": true,
-              "description": "Raw SysEx arrived.",
+              "description": "A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers.",
               "group": ""
             },
             "qa04_javascript_deviceConnected": {
@@ -3873,7 +3873,7 @@
               "target": "*",
               "event": "onDeviceConnected",
               "enabled": true,
-              "description": "A device connected.",
+              "description": "A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile.",
               "group": ""
             },
             "qa04_javascript_deviceDisconnected": {
@@ -3885,7 +3885,7 @@
               "target": "*",
               "event": "onDeviceDisconnected",
               "enabled": true,
-              "description": "A device disconnected.",
+              "description": "A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why.",
               "group": ""
             },
             "qa04_javascript_step": {
@@ -3897,7 +3897,7 @@
               "target": "self",
               "event": "onStep",
               "enabled": true,
-              "description": "A sequencer advanced. step.target, step.index (1-based), step.of, step.notes. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
+              "description": "A sequencer moved to its next step. `step.target` is the component's name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
               "group": ""
             },
             "qa04_javascript_cycle": {
@@ -3909,7 +3909,7 @@
               "target": "self",
               "event": "onCycle",
               "enabled": true,
-              "description": "A sequence or loop came back round. cycle.target, cycle.count (how many times since the panel opened). Arpeggiator, Turing, Looper, Orbit.",
+              "description": "A sequence or loop came back round to its start. `cycle.target` is the component's name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit.",
               "group": ""
             },
             "qa04_javascript_hit": {
@@ -3921,7 +3921,7 @@
               "target": "self",
               "event": "onHit",
               "enabled": true,
-              "description": "A pad, key or ribbon was struck. hit.target, hit.id, hit.note, hit.velocity. Chord Pad, Drum Pads, Note Ribbon.",
+              "description": "A pad, key or ribbon was struck. `hit.target` is the component's name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon.",
               "group": ""
             },
             "qa04_javascript_release": {
@@ -3933,7 +3933,7 @@
               "target": "self",
               "event": "onRelease",
               "enabled": true,
-              "description": "A pad, key or ribbon was released. release.target, release.id, release.note.",
+              "description": "A pad, key or ribbon was let go. `release.target` is the component's name, `release.id` which pad or key, and `release.note` the note.",
               "group": ""
             },
             "qa04_javascript_scene": {
@@ -3945,7 +3945,7 @@
               "target": "self",
               "event": "onScene",
               "enabled": true,
-              "description": "The Setlist recalled a scene. scene.target, scene.index (1-based), scene.name. Fires on any recall, scripted or footswitch.",
+              "description": "The Setlist switched to a scene. `scene.target` is the component's name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch.",
               "group": ""
             },
             "qa04_javascript_stage": {
@@ -3957,7 +3957,7 @@
               "target": "self",
               "event": "onStage",
               "enabled": true,
-              "description": "A component entered a new stage. stage.target, stage.stage, stage.previous. Raised by the Recorder (\"idle\"/\"armed\"/\"recording\"/\"overdub\") and the Envelope (\"sustain\"/\"release\"/\"end\"). Not onStateChanged, which is a control's hover/pressed state.",
+              "description": "A component moved into a new stage. `stage.target` is the component's name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports \"idle\", \"armed\", \"recording\" and \"overdub\"; the Envelope reports \"sustain\", \"release\" and \"end\". This is not the same as onStateChanged, which is about hover and press.",
               "group": ""
             },
             "qa04_javascript_settled": {
@@ -3969,7 +3969,7 @@
               "target": "self",
               "event": "onSettled",
               "enabled": true,
-              "description": "A spring-return control finished gliding home. settled.target, settled.value. Ribbon, Crossfader, Vector Joystick.",
+              "description": "A spring-loaded control finished gliding back to its rest position. `settled.target` is the component's name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick.",
               "group": ""
             },
             "qa04_javascript_bounce": {
@@ -3981,7 +3981,7 @@
               "target": "self",
               "event": "onBounce",
               "enabled": true,
-              "description": "The Kinetic ball hit a wall. bounce.target, bounce.x, bounce.y, bounce.vx, bounce.vy.",
+              "description": "The Kinetic ball hit a wall. `bounce.target` is the component's name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down.",
               "group": ""
             },
             "qa04_javascript_recall": {
@@ -3993,7 +3993,7 @@
               "target": "self",
               "event": "onRecall",
               "enabled": true,
-              "description": "The Constellation snapped to a preset. recall.target, recall.id, recall.label. Snap mode only — blend mode does not fire it.",
+              "description": "The Constellation snapped to one of its presets. `recall.target` is the component's name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode.",
               "group": ""
             },
             "qa04_javascript_zone": {
@@ -4005,7 +4005,7 @@
               "target": "self",
               "event": "onZone",
               "enabled": true,
-              "description": "A Meter crossed into a different threshold zone. zone.target, zone.zone, zone.previous, zone.value.",
+              "description": "A Meter's reading crossed into a different zone, such as from green into red. `zone.target` is the component's name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading.",
               "group": ""
             },
             "qa04_javascript_voiced": {
@@ -4017,7 +4017,7 @@
               "target": "self",
               "event": "onVoiced",
               "enabled": true,
-              "description": "A component turned a played note into other notes. voiced.target, voiced.note, voiced.velocity, voiced.out (the notes it produced). Raised by the Zone Splitter and the Harmoniser.",
+              "description": "A component turned one played note into other notes. `voiced.target` is the component's name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser.",
               "group": ""
             }
           }
@@ -6887,7 +6887,7 @@
               "target": "self",
               "event": "onValueChange",
               "enabled": true,
-              "description": "Fires over and over while the value is moving. Use it for things on screen that should follow the control.",
+              "description": "Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control.",
               "group": ""
             },
             "qa04_typescript_valueChanged": {
@@ -6899,7 +6899,7 @@
               "target": "self",
               "event": "onValueChanged",
               "enabled": true,
-              "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "description": "Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth.",
               "group": ""
             },
             "qa04_typescript_activeHandleChanged": {
@@ -6911,7 +6911,7 @@
               "target": "self",
               "event": "onActiveHandleChanged",
               "enabled": true,
-              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
+              "description": "A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each \"start\", \"current\" or \"end\".",
               "group": ""
             },
             "qa04_typescript_click": {
@@ -6923,7 +6923,7 @@
               "target": "self",
               "event": "onClick",
               "enabled": true,
-              "description": "Clicked. mouse.x, mouse.y.",
+              "description": "The control was clicked. `mouse.x` and `mouse.y` say where, inside the control.",
               "group": ""
             },
             "qa04_typescript_doubleClick": {
@@ -6935,7 +6935,7 @@
               "target": "self",
               "event": "onDoubleClick",
               "enabled": true,
-              "description": "Double-clicked.",
+              "description": "The control was double-clicked. `mouse.x` and `mouse.y` say where.",
               "group": ""
             },
             "qa04_typescript_pointerDown": {
@@ -6947,7 +6947,7 @@
               "target": "self",
               "event": "onPointerDown",
               "enabled": true,
-              "description": "Mouse pressed. mouse.x/.y/.button/.modifiers.",
+              "description": "A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held.",
               "group": ""
             },
             "qa04_typescript_pointerMove": {
@@ -6959,7 +6959,7 @@
               "target": "self",
               "event": "onPointerMove",
               "enabled": true,
-              "description": "Mouse moved while down.",
+              "description": "The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position.",
               "group": ""
             },
             "qa04_typescript_pointerUp": {
@@ -6971,7 +6971,7 @@
               "target": "self",
               "event": "onPointerUp",
               "enabled": true,
-              "description": "Mouse released.",
+              "description": "The mouse button was released.",
               "group": ""
             },
             "qa04_typescript_hoverStart": {
@@ -6983,7 +6983,7 @@
               "target": "self",
               "event": "onHoverStart",
               "enabled": true,
-              "description": "Mouse entered the control.",
+              "description": "The mouse pointer moved onto the control.",
               "group": ""
             },
             "qa04_typescript_hoverEnd": {
@@ -6995,7 +6995,7 @@
               "target": "self",
               "event": "onHoverEnd",
               "enabled": true,
-              "description": "Mouse left the control.",
+              "description": "The mouse pointer left the control.",
               "group": ""
             },
             "qa04_typescript_wheel": {
@@ -7007,7 +7007,7 @@
               "target": "self",
               "event": "onWheel",
               "enabled": true,
-              "description": "Scrolled over the control. wheel.delta.",
+              "description": "The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction.",
               "group": ""
             },
             "qa04_typescript_stateChanged": {
@@ -7019,7 +7019,7 @@
               "target": "self",
               "event": "onStateChanged",
               "enabled": true,
-              "description": "The control changed state: hover, pressed or disabled.",
+              "description": "The control's look-state changed. `state` is one word: \"normal\", \"hover\", \"pressed\" or \"disabled\".",
               "group": ""
             },
             "qa04_typescript_controlChanged": {
@@ -7031,7 +7031,7 @@
               "target": "*",
               "event": "onControlChanged",
               "enabled": true,
-              "description": "Any control changed. info.target, info.value.",
+              "description": "Any control on the panel changed. `info.target` is the control's name and `info.value` its new value. Use it to react to many controls in one place.",
               "group": ""
             },
             "qa04_typescript_timer": {
@@ -7043,7 +7043,7 @@
               "target": "*",
               "event": "onTimer",
               "enabled": true,
-              "description": "A started timer fired. info.id.",
+              "description": "A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`.",
               "group": ""
             },
             "qa04_typescript_beat": {
@@ -7055,7 +7055,7 @@
               "target": "*",
               "event": "onBeat",
               "enabled": true,
-              "description": "A beat passed. time.bar, time.beat, time.beats, time.bpm. Message-thread accurate (~30Hz), not sample-accurate.",
+              "description": "A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound.",
               "group": ""
             },
             "qa04_typescript_bar": {
@@ -7067,7 +7067,7 @@
               "target": "*",
               "event": "onBar",
               "enabled": true,
-              "description": "A bar passed. time.bar, time.beats, time.beatsPerBar. Fires with the downbeat, alongside onBeat.",
+              "description": "A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature's beats per bar. It fires on the downbeat, together with onBeat.",
               "group": ""
             },
             "qa04_typescript_transport": {
@@ -7079,7 +7079,7 @@
               "target": "*",
               "event": "onTransport",
               "enabled": true,
-              "description": "The transport started, stopped, or changed tempo. time.playing, time.bpm, time.source.",
+              "description": "The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it.",
               "group": ""
             },
             "qa04_typescript_parameterReceived": {
@@ -7091,7 +7091,7 @@
               "target": "*",
               "event": "onParameterReceived",
               "enabled": true,
-              "description": "A value arrived, decoded via the DPD. info.parameter, info.value.",
+              "description": "The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units.",
               "group": ""
             },
             "qa04_typescript_dumpReceived": {
@@ -7103,7 +7103,7 @@
               "target": "*",
               "event": "onDumpReceived",
               "enabled": true,
-              "description": "A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.",
+              "description": "A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as \"patch\", and `dump.role` the device it came from.",
               "group": ""
             },
             "qa04_typescript_presetChange": {
@@ -7115,7 +7115,7 @@
               "target": "*",
               "event": "onPresetChange",
               "enabled": true,
-              "description": "The current preset changed. preset.slot, preset.program, preset.name, preset.category, preset.bankId, preset.source (\"device\" when the instrument sent a Program Change, \"panel\" when recallPreset did it).",
+              "description": "The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: \"device\" when the instrument sent a Program Change, \"panel\" when the panel called recallPreset.",
               "group": ""
             },
             "qa04_typescript_midiIn": {
@@ -7127,7 +7127,7 @@
               "target": "*",
               "event": "onMidiIn",
               "enabled": true,
-              "description": "Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.",
+              "description": "Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0.",
               "group": ""
             },
             "qa04_typescript_ccIn": {
@@ -7139,7 +7139,7 @@
               "target": "*",
               "event": "onCcIn",
               "enabled": true,
-              "description": "A CC arrived. cc.channel, cc.cc, cc.value. cc.channel is 0-based here, unlike sendCC and onNoteIn.",
+              "description": "A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16.",
               "group": ""
             },
             "qa04_typescript_noteIn": {
@@ -7151,7 +7151,7 @@
               "target": "*",
               "event": "onNoteIn",
               "enabled": true,
-              "description": "A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 counts as a note-off and arrives as onNoteOffIn instead.",
+              "description": "A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means \"note off\" in MIDI, so it arrives as onNoteOffIn instead.",
               "group": ""
             },
             "qa04_typescript_noteOffIn": {
@@ -7163,7 +7163,7 @@
               "target": "*",
               "event": "onNoteOffIn",
               "enabled": true,
-              "description": "A note was released. note.channel (1-16), note.note, note.velocity (the release velocity, 0 when the device sent a note-on with velocity 0 instead of a note-off).",
+              "description": "A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off.",
               "group": ""
             },
             "qa04_typescript_sysexIn": {
@@ -7175,7 +7175,7 @@
               "target": "*",
               "event": "onSysexIn",
               "enabled": true,
-              "description": "Raw SysEx arrived.",
+              "description": "A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers.",
               "group": ""
             },
             "qa04_typescript_deviceConnected": {
@@ -7187,7 +7187,7 @@
               "target": "*",
               "event": "onDeviceConnected",
               "enabled": true,
-              "description": "A device connected.",
+              "description": "A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile.",
               "group": ""
             },
             "qa04_typescript_deviceDisconnected": {
@@ -7199,7 +7199,7 @@
               "target": "*",
               "event": "onDeviceDisconnected",
               "enabled": true,
-              "description": "A device disconnected.",
+              "description": "A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why.",
               "group": ""
             },
             "qa04_typescript_step": {
@@ -7211,7 +7211,7 @@
               "target": "self",
               "event": "onStep",
               "enabled": true,
-              "description": "A sequencer advanced. step.target, step.index (1-based), step.of, step.notes. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
+              "description": "A sequencer moved to its next step. `step.target` is the component's name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
               "group": ""
             },
             "qa04_typescript_cycle": {
@@ -7223,7 +7223,7 @@
               "target": "self",
               "event": "onCycle",
               "enabled": true,
-              "description": "A sequence or loop came back round. cycle.target, cycle.count (how many times since the panel opened). Arpeggiator, Turing, Looper, Orbit.",
+              "description": "A sequence or loop came back round to its start. `cycle.target` is the component's name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit.",
               "group": ""
             },
             "qa04_typescript_hit": {
@@ -7235,7 +7235,7 @@
               "target": "self",
               "event": "onHit",
               "enabled": true,
-              "description": "A pad, key or ribbon was struck. hit.target, hit.id, hit.note, hit.velocity. Chord Pad, Drum Pads, Note Ribbon.",
+              "description": "A pad, key or ribbon was struck. `hit.target` is the component's name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon.",
               "group": ""
             },
             "qa04_typescript_release": {
@@ -7247,7 +7247,7 @@
               "target": "self",
               "event": "onRelease",
               "enabled": true,
-              "description": "A pad, key or ribbon was released. release.target, release.id, release.note.",
+              "description": "A pad, key or ribbon was let go. `release.target` is the component's name, `release.id` which pad or key, and `release.note` the note.",
               "group": ""
             },
             "qa04_typescript_scene": {
@@ -7259,7 +7259,7 @@
               "target": "self",
               "event": "onScene",
               "enabled": true,
-              "description": "The Setlist recalled a scene. scene.target, scene.index (1-based), scene.name. Fires on any recall, scripted or footswitch.",
+              "description": "The Setlist switched to a scene. `scene.target` is the component's name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch.",
               "group": ""
             },
             "qa04_typescript_stage": {
@@ -7271,7 +7271,7 @@
               "target": "self",
               "event": "onStage",
               "enabled": true,
-              "description": "A component entered a new stage. stage.target, stage.stage, stage.previous. Raised by the Recorder (\"idle\"/\"armed\"/\"recording\"/\"overdub\") and the Envelope (\"sustain\"/\"release\"/\"end\"). Not onStateChanged, which is a control's hover/pressed state.",
+              "description": "A component moved into a new stage. `stage.target` is the component's name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports \"idle\", \"armed\", \"recording\" and \"overdub\"; the Envelope reports \"sustain\", \"release\" and \"end\". This is not the same as onStateChanged, which is about hover and press.",
               "group": ""
             },
             "qa04_typescript_settled": {
@@ -7283,7 +7283,7 @@
               "target": "self",
               "event": "onSettled",
               "enabled": true,
-              "description": "A spring-return control finished gliding home. settled.target, settled.value. Ribbon, Crossfader, Vector Joystick.",
+              "description": "A spring-loaded control finished gliding back to its rest position. `settled.target` is the component's name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick.",
               "group": ""
             },
             "qa04_typescript_bounce": {
@@ -7295,7 +7295,7 @@
               "target": "self",
               "event": "onBounce",
               "enabled": true,
-              "description": "The Kinetic ball hit a wall. bounce.target, bounce.x, bounce.y, bounce.vx, bounce.vy.",
+              "description": "The Kinetic ball hit a wall. `bounce.target` is the component's name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down.",
               "group": ""
             },
             "qa04_typescript_recall": {
@@ -7307,7 +7307,7 @@
               "target": "self",
               "event": "onRecall",
               "enabled": true,
-              "description": "The Constellation snapped to a preset. recall.target, recall.id, recall.label. Snap mode only — blend mode does not fire it.",
+              "description": "The Constellation snapped to one of its presets. `recall.target` is the component's name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode.",
               "group": ""
             },
             "qa04_typescript_zone": {
@@ -7319,7 +7319,7 @@
               "target": "self",
               "event": "onZone",
               "enabled": true,
-              "description": "A Meter crossed into a different threshold zone. zone.target, zone.zone, zone.previous, zone.value.",
+              "description": "A Meter's reading crossed into a different zone, such as from green into red. `zone.target` is the component's name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading.",
               "group": ""
             },
             "qa04_typescript_voiced": {
@@ -7331,7 +7331,7 @@
               "target": "self",
               "event": "onVoiced",
               "enabled": true,
-              "description": "A component turned a played note into other notes. voiced.target, voiced.note, voiced.velocity, voiced.out (the notes it produced). Raised by the Zone Splitter and the Harmoniser.",
+              "description": "A component turned one played note into other notes. `voiced.target` is the component's name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser.",
               "group": ""
             }
           }
@@ -10201,7 +10201,7 @@
               "target": "self",
               "event": "onValueChange",
               "enabled": true,
-              "description": "Fires over and over while the value is moving. Use it for things on screen that should follow the control.",
+              "description": "Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control.",
               "group": ""
             },
             "qa04_python_valueChanged": {
@@ -10213,7 +10213,7 @@
               "target": "self",
               "event": "onValueChanged",
               "enabled": true,
-              "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "description": "Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth.",
               "group": ""
             },
             "qa04_python_activeHandleChanged": {
@@ -10225,7 +10225,7 @@
               "target": "self",
               "event": "onActiveHandleChanged",
               "enabled": true,
-              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
+              "description": "A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each \"start\", \"current\" or \"end\".",
               "group": ""
             },
             "qa04_python_click": {
@@ -10237,7 +10237,7 @@
               "target": "self",
               "event": "onClick",
               "enabled": true,
-              "description": "Clicked. mouse.x, mouse.y.",
+              "description": "The control was clicked. `mouse.x` and `mouse.y` say where, inside the control.",
               "group": ""
             },
             "qa04_python_doubleClick": {
@@ -10249,7 +10249,7 @@
               "target": "self",
               "event": "onDoubleClick",
               "enabled": true,
-              "description": "Double-clicked.",
+              "description": "The control was double-clicked. `mouse.x` and `mouse.y` say where.",
               "group": ""
             },
             "qa04_python_pointerDown": {
@@ -10261,7 +10261,7 @@
               "target": "self",
               "event": "onPointerDown",
               "enabled": true,
-              "description": "Mouse pressed. mouse.x/.y/.button/.modifiers.",
+              "description": "A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held.",
               "group": ""
             },
             "qa04_python_pointerMove": {
@@ -10273,7 +10273,7 @@
               "target": "self",
               "event": "onPointerMove",
               "enabled": true,
-              "description": "Mouse moved while down.",
+              "description": "The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position.",
               "group": ""
             },
             "qa04_python_pointerUp": {
@@ -10285,7 +10285,7 @@
               "target": "self",
               "event": "onPointerUp",
               "enabled": true,
-              "description": "Mouse released.",
+              "description": "The mouse button was released.",
               "group": ""
             },
             "qa04_python_hoverStart": {
@@ -10297,7 +10297,7 @@
               "target": "self",
               "event": "onHoverStart",
               "enabled": true,
-              "description": "Mouse entered the control.",
+              "description": "The mouse pointer moved onto the control.",
               "group": ""
             },
             "qa04_python_hoverEnd": {
@@ -10309,7 +10309,7 @@
               "target": "self",
               "event": "onHoverEnd",
               "enabled": true,
-              "description": "Mouse left the control.",
+              "description": "The mouse pointer left the control.",
               "group": ""
             },
             "qa04_python_wheel": {
@@ -10321,7 +10321,7 @@
               "target": "self",
               "event": "onWheel",
               "enabled": true,
-              "description": "Scrolled over the control. wheel.delta.",
+              "description": "The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction.",
               "group": ""
             },
             "qa04_python_stateChanged": {
@@ -10333,7 +10333,7 @@
               "target": "self",
               "event": "onStateChanged",
               "enabled": true,
-              "description": "The control changed state: hover, pressed or disabled.",
+              "description": "The control's look-state changed. `state` is one word: \"normal\", \"hover\", \"pressed\" or \"disabled\".",
               "group": ""
             },
             "qa04_python_controlChanged": {
@@ -10345,7 +10345,7 @@
               "target": "*",
               "event": "onControlChanged",
               "enabled": true,
-              "description": "Any control changed. info.target, info.value.",
+              "description": "Any control on the panel changed. `info.target` is the control's name and `info.value` its new value. Use it to react to many controls in one place.",
               "group": ""
             },
             "qa04_python_timer": {
@@ -10357,7 +10357,7 @@
               "target": "*",
               "event": "onTimer",
               "enabled": true,
-              "description": "A started timer fired. info.id.",
+              "description": "A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`.",
               "group": ""
             },
             "qa04_python_beat": {
@@ -10369,7 +10369,7 @@
               "target": "*",
               "event": "onBeat",
               "enabled": true,
-              "description": "A beat passed. time.bar, time.beat, time.beats, time.bpm. Message-thread accurate (~30Hz), not sample-accurate.",
+              "description": "A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound.",
               "group": ""
             },
             "qa04_python_bar": {
@@ -10381,7 +10381,7 @@
               "target": "*",
               "event": "onBar",
               "enabled": true,
-              "description": "A bar passed. time.bar, time.beats, time.beatsPerBar. Fires with the downbeat, alongside onBeat.",
+              "description": "A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature's beats per bar. It fires on the downbeat, together with onBeat.",
               "group": ""
             },
             "qa04_python_transport": {
@@ -10393,7 +10393,7 @@
               "target": "*",
               "event": "onTransport",
               "enabled": true,
-              "description": "The transport started, stopped, or changed tempo. time.playing, time.bpm, time.source.",
+              "description": "The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it.",
               "group": ""
             },
             "qa04_python_parameterReceived": {
@@ -10405,7 +10405,7 @@
               "target": "*",
               "event": "onParameterReceived",
               "enabled": true,
-              "description": "A value arrived, decoded via the DPD. info.parameter, info.value.",
+              "description": "The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units.",
               "group": ""
             },
             "qa04_python_dumpReceived": {
@@ -10417,7 +10417,7 @@
               "target": "*",
               "event": "onDumpReceived",
               "enabled": true,
-              "description": "A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.",
+              "description": "A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as \"patch\", and `dump.role` the device it came from.",
               "group": ""
             },
             "qa04_python_presetChange": {
@@ -10429,7 +10429,7 @@
               "target": "*",
               "event": "onPresetChange",
               "enabled": true,
-              "description": "The current preset changed. preset.slot, preset.program, preset.name, preset.category, preset.bankId, preset.source (\"device\" when the instrument sent a Program Change, \"panel\" when recallPreset did it).",
+              "description": "The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: \"device\" when the instrument sent a Program Change, \"panel\" when the panel called recallPreset.",
               "group": ""
             },
             "qa04_python_midiIn": {
@@ -10441,7 +10441,7 @@
               "target": "*",
               "event": "onMidiIn",
               "enabled": true,
-              "description": "Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.",
+              "description": "Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0.",
               "group": ""
             },
             "qa04_python_ccIn": {
@@ -10453,7 +10453,7 @@
               "target": "*",
               "event": "onCcIn",
               "enabled": true,
-              "description": "A CC arrived. cc.channel, cc.cc, cc.value. cc.channel is 0-based here, unlike sendCC and onNoteIn.",
+              "description": "A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16.",
               "group": ""
             },
             "qa04_python_noteIn": {
@@ -10465,7 +10465,7 @@
               "target": "*",
               "event": "onNoteIn",
               "enabled": true,
-              "description": "A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 counts as a note-off and arrives as onNoteOffIn instead.",
+              "description": "A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means \"note off\" in MIDI, so it arrives as onNoteOffIn instead.",
               "group": ""
             },
             "qa04_python_noteOffIn": {
@@ -10477,7 +10477,7 @@
               "target": "*",
               "event": "onNoteOffIn",
               "enabled": true,
-              "description": "A note was released. note.channel (1-16), note.note, note.velocity (the release velocity, 0 when the device sent a note-on with velocity 0 instead of a note-off).",
+              "description": "A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off.",
               "group": ""
             },
             "qa04_python_sysexIn": {
@@ -10489,7 +10489,7 @@
               "target": "*",
               "event": "onSysexIn",
               "enabled": true,
-              "description": "Raw SysEx arrived.",
+              "description": "A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers.",
               "group": ""
             },
             "qa04_python_deviceConnected": {
@@ -10501,7 +10501,7 @@
               "target": "*",
               "event": "onDeviceConnected",
               "enabled": true,
-              "description": "A device connected.",
+              "description": "A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile.",
               "group": ""
             },
             "qa04_python_deviceDisconnected": {
@@ -10513,7 +10513,7 @@
               "target": "*",
               "event": "onDeviceDisconnected",
               "enabled": true,
-              "description": "A device disconnected.",
+              "description": "A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why.",
               "group": ""
             },
             "qa04_python_step": {
@@ -10525,7 +10525,7 @@
               "target": "self",
               "event": "onStep",
               "enabled": true,
-              "description": "A sequencer advanced. step.target, step.index (1-based), step.of, step.notes. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
+              "description": "A sequencer moved to its next step. `step.target` is the component's name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
               "group": ""
             },
             "qa04_python_cycle": {
@@ -10537,7 +10537,7 @@
               "target": "self",
               "event": "onCycle",
               "enabled": true,
-              "description": "A sequence or loop came back round. cycle.target, cycle.count (how many times since the panel opened). Arpeggiator, Turing, Looper, Orbit.",
+              "description": "A sequence or loop came back round to its start. `cycle.target` is the component's name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit.",
               "group": ""
             },
             "qa04_python_hit": {
@@ -10549,7 +10549,7 @@
               "target": "self",
               "event": "onHit",
               "enabled": true,
-              "description": "A pad, key or ribbon was struck. hit.target, hit.id, hit.note, hit.velocity. Chord Pad, Drum Pads, Note Ribbon.",
+              "description": "A pad, key or ribbon was struck. `hit.target` is the component's name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon.",
               "group": ""
             },
             "qa04_python_release": {
@@ -10561,7 +10561,7 @@
               "target": "self",
               "event": "onRelease",
               "enabled": true,
-              "description": "A pad, key or ribbon was released. release.target, release.id, release.note.",
+              "description": "A pad, key or ribbon was let go. `release.target` is the component's name, `release.id` which pad or key, and `release.note` the note.",
               "group": ""
             },
             "qa04_python_scene": {
@@ -10573,7 +10573,7 @@
               "target": "self",
               "event": "onScene",
               "enabled": true,
-              "description": "The Setlist recalled a scene. scene.target, scene.index (1-based), scene.name. Fires on any recall, scripted or footswitch.",
+              "description": "The Setlist switched to a scene. `scene.target` is the component's name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch.",
               "group": ""
             },
             "qa04_python_stage": {
@@ -10585,7 +10585,7 @@
               "target": "self",
               "event": "onStage",
               "enabled": true,
-              "description": "A component entered a new stage. stage.target, stage.stage, stage.previous. Raised by the Recorder (\"idle\"/\"armed\"/\"recording\"/\"overdub\") and the Envelope (\"sustain\"/\"release\"/\"end\"). Not onStateChanged, which is a control's hover/pressed state.",
+              "description": "A component moved into a new stage. `stage.target` is the component's name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports \"idle\", \"armed\", \"recording\" and \"overdub\"; the Envelope reports \"sustain\", \"release\" and \"end\". This is not the same as onStateChanged, which is about hover and press.",
               "group": ""
             },
             "qa04_python_settled": {
@@ -10597,7 +10597,7 @@
               "target": "self",
               "event": "onSettled",
               "enabled": true,
-              "description": "A spring-return control finished gliding home. settled.target, settled.value. Ribbon, Crossfader, Vector Joystick.",
+              "description": "A spring-loaded control finished gliding back to its rest position. `settled.target` is the component's name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick.",
               "group": ""
             },
             "qa04_python_bounce": {
@@ -10609,7 +10609,7 @@
               "target": "self",
               "event": "onBounce",
               "enabled": true,
-              "description": "The Kinetic ball hit a wall. bounce.target, bounce.x, bounce.y, bounce.vx, bounce.vy.",
+              "description": "The Kinetic ball hit a wall. `bounce.target` is the component's name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down.",
               "group": ""
             },
             "qa04_python_recall": {
@@ -10621,7 +10621,7 @@
               "target": "self",
               "event": "onRecall",
               "enabled": true,
-              "description": "The Constellation snapped to a preset. recall.target, recall.id, recall.label. Snap mode only — blend mode does not fire it.",
+              "description": "The Constellation snapped to one of its presets. `recall.target` is the component's name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode.",
               "group": ""
             },
             "qa04_python_zone": {
@@ -10633,7 +10633,7 @@
               "target": "self",
               "event": "onZone",
               "enabled": true,
-              "description": "A Meter crossed into a different threshold zone. zone.target, zone.zone, zone.previous, zone.value.",
+              "description": "A Meter's reading crossed into a different zone, such as from green into red. `zone.target` is the component's name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading.",
               "group": ""
             },
             "qa04_python_voiced": {
@@ -10645,7 +10645,7 @@
               "target": "self",
               "event": "onVoiced",
               "enabled": true,
-              "description": "A component turned a played note into other notes. voiced.target, voiced.note, voiced.velocity, voiced.out (the notes it produced). Raised by the Zone Splitter and the Harmoniser.",
+              "description": "A component turned one played note into other notes. `voiced.target` is the component's name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser.",
               "group": ""
             }
           }
@@ -13515,7 +13515,7 @@
               "target": "self",
               "event": "onValueChange",
               "enabled": true,
-              "description": "Fires over and over while the value is moving. Use it for things on screen that should follow the control.",
+              "description": "Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control.",
               "group": ""
             },
             "qa04_cpp_valueChanged": {
@@ -13527,7 +13527,7 @@
               "target": "self",
               "event": "onValueChanged",
               "enabled": true,
-              "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "description": "Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth.",
               "group": ""
             },
             "qa04_cpp_activeHandleChanged": {
@@ -13539,7 +13539,7 @@
               "target": "self",
               "event": "onActiveHandleChanged",
               "enabled": true,
-              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
+              "description": "A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each \"start\", \"current\" or \"end\".",
               "group": ""
             },
             "qa04_cpp_click": {
@@ -13551,7 +13551,7 @@
               "target": "self",
               "event": "onClick",
               "enabled": true,
-              "description": "Clicked. mouse.x, mouse.y.",
+              "description": "The control was clicked. `mouse.x` and `mouse.y` say where, inside the control.",
               "group": ""
             },
             "qa04_cpp_doubleClick": {
@@ -13563,7 +13563,7 @@
               "target": "self",
               "event": "onDoubleClick",
               "enabled": true,
-              "description": "Double-clicked.",
+              "description": "The control was double-clicked. `mouse.x` and `mouse.y` say where.",
               "group": ""
             },
             "qa04_cpp_pointerDown": {
@@ -13575,7 +13575,7 @@
               "target": "self",
               "event": "onPointerDown",
               "enabled": true,
-              "description": "Mouse pressed. mouse.x/.y/.button/.modifiers.",
+              "description": "A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held.",
               "group": ""
             },
             "qa04_cpp_pointerMove": {
@@ -13587,7 +13587,7 @@
               "target": "self",
               "event": "onPointerMove",
               "enabled": true,
-              "description": "Mouse moved while down.",
+              "description": "The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position.",
               "group": ""
             },
             "qa04_cpp_pointerUp": {
@@ -13599,7 +13599,7 @@
               "target": "self",
               "event": "onPointerUp",
               "enabled": true,
-              "description": "Mouse released.",
+              "description": "The mouse button was released.",
               "group": ""
             },
             "qa04_cpp_hoverStart": {
@@ -13611,7 +13611,7 @@
               "target": "self",
               "event": "onHoverStart",
               "enabled": true,
-              "description": "Mouse entered the control.",
+              "description": "The mouse pointer moved onto the control.",
               "group": ""
             },
             "qa04_cpp_hoverEnd": {
@@ -13623,7 +13623,7 @@
               "target": "self",
               "event": "onHoverEnd",
               "enabled": true,
-              "description": "Mouse left the control.",
+              "description": "The mouse pointer left the control.",
               "group": ""
             },
             "qa04_cpp_wheel": {
@@ -13635,7 +13635,7 @@
               "target": "self",
               "event": "onWheel",
               "enabled": true,
-              "description": "Scrolled over the control. wheel.delta.",
+              "description": "The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction.",
               "group": ""
             },
             "qa04_cpp_stateChanged": {
@@ -13647,7 +13647,7 @@
               "target": "self",
               "event": "onStateChanged",
               "enabled": true,
-              "description": "The control changed state: hover, pressed or disabled.",
+              "description": "The control's look-state changed. `state` is one word: \"normal\", \"hover\", \"pressed\" or \"disabled\".",
               "group": ""
             },
             "qa04_cpp_controlChanged": {
@@ -13659,7 +13659,7 @@
               "target": "*",
               "event": "onControlChanged",
               "enabled": true,
-              "description": "Any control changed. info.target, info.value.",
+              "description": "Any control on the panel changed. `info.target` is the control's name and `info.value` its new value. Use it to react to many controls in one place.",
               "group": ""
             },
             "qa04_cpp_timer": {
@@ -13671,7 +13671,7 @@
               "target": "*",
               "event": "onTimer",
               "enabled": true,
-              "description": "A started timer fired. info.id.",
+              "description": "A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`.",
               "group": ""
             },
             "qa04_cpp_beat": {
@@ -13683,7 +13683,7 @@
               "target": "*",
               "event": "onBeat",
               "enabled": true,
-              "description": "A beat passed. time.bar, time.beat, time.beats, time.bpm. Message-thread accurate (~30Hz), not sample-accurate.",
+              "description": "A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound.",
               "group": ""
             },
             "qa04_cpp_bar": {
@@ -13695,7 +13695,7 @@
               "target": "*",
               "event": "onBar",
               "enabled": true,
-              "description": "A bar passed. time.bar, time.beats, time.beatsPerBar. Fires with the downbeat, alongside onBeat.",
+              "description": "A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature's beats per bar. It fires on the downbeat, together with onBeat.",
               "group": ""
             },
             "qa04_cpp_transport": {
@@ -13707,7 +13707,7 @@
               "target": "*",
               "event": "onTransport",
               "enabled": true,
-              "description": "The transport started, stopped, or changed tempo. time.playing, time.bpm, time.source.",
+              "description": "The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it.",
               "group": ""
             },
             "qa04_cpp_parameterReceived": {
@@ -13719,7 +13719,7 @@
               "target": "*",
               "event": "onParameterReceived",
               "enabled": true,
-              "description": "A value arrived, decoded via the DPD. info.parameter, info.value.",
+              "description": "The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units.",
               "group": ""
             },
             "qa04_cpp_dumpReceived": {
@@ -13731,7 +13731,7 @@
               "target": "*",
               "event": "onDumpReceived",
               "enabled": true,
-              "description": "A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.",
+              "description": "A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as \"patch\", and `dump.role` the device it came from.",
               "group": ""
             },
             "qa04_cpp_presetChange": {
@@ -13743,7 +13743,7 @@
               "target": "*",
               "event": "onPresetChange",
               "enabled": true,
-              "description": "The current preset changed. preset.slot, preset.program, preset.name, preset.category, preset.bankId, preset.source (\"device\" when the instrument sent a Program Change, \"panel\" when recallPreset did it).",
+              "description": "The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: \"device\" when the instrument sent a Program Change, \"panel\" when the panel called recallPreset.",
               "group": ""
             },
             "qa04_cpp_midiIn": {
@@ -13755,7 +13755,7 @@
               "target": "*",
               "event": "onMidiIn",
               "enabled": true,
-              "description": "Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.",
+              "description": "Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0.",
               "group": ""
             },
             "qa04_cpp_ccIn": {
@@ -13767,7 +13767,7 @@
               "target": "*",
               "event": "onCcIn",
               "enabled": true,
-              "description": "A CC arrived. cc.channel, cc.cc, cc.value. cc.channel is 0-based here, unlike sendCC and onNoteIn.",
+              "description": "A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16.",
               "group": ""
             },
             "qa04_cpp_noteIn": {
@@ -13779,7 +13779,7 @@
               "target": "*",
               "event": "onNoteIn",
               "enabled": true,
-              "description": "A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 counts as a note-off and arrives as onNoteOffIn instead.",
+              "description": "A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means \"note off\" in MIDI, so it arrives as onNoteOffIn instead.",
               "group": ""
             },
             "qa04_cpp_noteOffIn": {
@@ -13791,7 +13791,7 @@
               "target": "*",
               "event": "onNoteOffIn",
               "enabled": true,
-              "description": "A note was released. note.channel (1-16), note.note, note.velocity (the release velocity, 0 when the device sent a note-on with velocity 0 instead of a note-off).",
+              "description": "A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off.",
               "group": ""
             },
             "qa04_cpp_sysexIn": {
@@ -13803,7 +13803,7 @@
               "target": "*",
               "event": "onSysexIn",
               "enabled": true,
-              "description": "Raw SysEx arrived.",
+              "description": "A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers.",
               "group": ""
             },
             "qa04_cpp_deviceConnected": {
@@ -13815,7 +13815,7 @@
               "target": "*",
               "event": "onDeviceConnected",
               "enabled": true,
-              "description": "A device connected.",
+              "description": "A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile.",
               "group": ""
             },
             "qa04_cpp_deviceDisconnected": {
@@ -13827,7 +13827,7 @@
               "target": "*",
               "event": "onDeviceDisconnected",
               "enabled": true,
-              "description": "A device disconnected.",
+              "description": "A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why.",
               "group": ""
             },
             "qa04_cpp_step": {
@@ -13839,7 +13839,7 @@
               "target": "self",
               "event": "onStep",
               "enabled": true,
-              "description": "A sequencer advanced. step.target, step.index (1-based), step.of, step.notes. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
+              "description": "A sequencer moved to its next step. `step.target` is the component's name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
               "group": ""
             },
             "qa04_cpp_cycle": {
@@ -13851,7 +13851,7 @@
               "target": "self",
               "event": "onCycle",
               "enabled": true,
-              "description": "A sequence or loop came back round. cycle.target, cycle.count (how many times since the panel opened). Arpeggiator, Turing, Looper, Orbit.",
+              "description": "A sequence or loop came back round to its start. `cycle.target` is the component's name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit.",
               "group": ""
             },
             "qa04_cpp_hit": {
@@ -13863,7 +13863,7 @@
               "target": "self",
               "event": "onHit",
               "enabled": true,
-              "description": "A pad, key or ribbon was struck. hit.target, hit.id, hit.note, hit.velocity. Chord Pad, Drum Pads, Note Ribbon.",
+              "description": "A pad, key or ribbon was struck. `hit.target` is the component's name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon.",
               "group": ""
             },
             "qa04_cpp_release": {
@@ -13875,7 +13875,7 @@
               "target": "self",
               "event": "onRelease",
               "enabled": true,
-              "description": "A pad, key or ribbon was released. release.target, release.id, release.note.",
+              "description": "A pad, key or ribbon was let go. `release.target` is the component's name, `release.id` which pad or key, and `release.note` the note.",
               "group": ""
             },
             "qa04_cpp_scene": {
@@ -13887,7 +13887,7 @@
               "target": "self",
               "event": "onScene",
               "enabled": true,
-              "description": "The Setlist recalled a scene. scene.target, scene.index (1-based), scene.name. Fires on any recall, scripted or footswitch.",
+              "description": "The Setlist switched to a scene. `scene.target` is the component's name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch.",
               "group": ""
             },
             "qa04_cpp_stage": {
@@ -13899,7 +13899,7 @@
               "target": "self",
               "event": "onStage",
               "enabled": true,
-              "description": "A component entered a new stage. stage.target, stage.stage, stage.previous. Raised by the Recorder (\"idle\"/\"armed\"/\"recording\"/\"overdub\") and the Envelope (\"sustain\"/\"release\"/\"end\"). Not onStateChanged, which is a control's hover/pressed state.",
+              "description": "A component moved into a new stage. `stage.target` is the component's name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports \"idle\", \"armed\", \"recording\" and \"overdub\"; the Envelope reports \"sustain\", \"release\" and \"end\". This is not the same as onStateChanged, which is about hover and press.",
               "group": ""
             },
             "qa04_cpp_settled": {
@@ -13911,7 +13911,7 @@
               "target": "self",
               "event": "onSettled",
               "enabled": true,
-              "description": "A spring-return control finished gliding home. settled.target, settled.value. Ribbon, Crossfader, Vector Joystick.",
+              "description": "A spring-loaded control finished gliding back to its rest position. `settled.target` is the component's name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick.",
               "group": ""
             },
             "qa04_cpp_bounce": {
@@ -13923,7 +13923,7 @@
               "target": "self",
               "event": "onBounce",
               "enabled": true,
-              "description": "The Kinetic ball hit a wall. bounce.target, bounce.x, bounce.y, bounce.vx, bounce.vy.",
+              "description": "The Kinetic ball hit a wall. `bounce.target` is the component's name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down.",
               "group": ""
             },
             "qa04_cpp_recall": {
@@ -13935,7 +13935,7 @@
               "target": "self",
               "event": "onRecall",
               "enabled": true,
-              "description": "The Constellation snapped to a preset. recall.target, recall.id, recall.label. Snap mode only — blend mode does not fire it.",
+              "description": "The Constellation snapped to one of its presets. `recall.target` is the component's name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode.",
               "group": ""
             },
             "qa04_cpp_zone": {
@@ -13947,7 +13947,7 @@
               "target": "self",
               "event": "onZone",
               "enabled": true,
-              "description": "A Meter crossed into a different threshold zone. zone.target, zone.zone, zone.previous, zone.value.",
+              "description": "A Meter's reading crossed into a different zone, such as from green into red. `zone.target` is the component's name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading.",
               "group": ""
             },
             "qa04_cpp_voiced": {
@@ -13959,7 +13959,7 @@
               "target": "self",
               "event": "onVoiced",
               "enabled": true,
-              "description": "A component turned a played note into other notes. voiced.target, voiced.note, voiced.velocity, voiced.out (the notes it produced). Raised by the Zone Splitter and the Harmoniser.",
+              "description": "A component turned one played note into other notes. `voiced.target` is the component's name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser.",
               "group": ""
             }
           }
@@ -16829,7 +16829,7 @@
               "target": "self",
               "event": "onValueChange",
               "enabled": true,
-              "description": "Fires over and over while the value is moving. Use it for things on screen that should follow the control.",
+              "description": "Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control.",
               "group": ""
             },
             "qa04_csharp_valueChanged": {
@@ -16841,7 +16841,7 @@
               "target": "self",
               "event": "onValueChanged",
               "enabled": true,
-              "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "description": "Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth.",
               "group": ""
             },
             "qa04_csharp_activeHandleChanged": {
@@ -16853,7 +16853,7 @@
               "target": "self",
               "event": "onActiveHandleChanged",
               "enabled": true,
-              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
+              "description": "A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each \"start\", \"current\" or \"end\".",
               "group": ""
             },
             "qa04_csharp_click": {
@@ -16865,7 +16865,7 @@
               "target": "self",
               "event": "onClick",
               "enabled": true,
-              "description": "Clicked. mouse.x, mouse.y.",
+              "description": "The control was clicked. `mouse.x` and `mouse.y` say where, inside the control.",
               "group": ""
             },
             "qa04_csharp_doubleClick": {
@@ -16877,7 +16877,7 @@
               "target": "self",
               "event": "onDoubleClick",
               "enabled": true,
-              "description": "Double-clicked.",
+              "description": "The control was double-clicked. `mouse.x` and `mouse.y` say where.",
               "group": ""
             },
             "qa04_csharp_pointerDown": {
@@ -16889,7 +16889,7 @@
               "target": "self",
               "event": "onPointerDown",
               "enabled": true,
-              "description": "Mouse pressed. mouse.x/.y/.button/.modifiers.",
+              "description": "A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held.",
               "group": ""
             },
             "qa04_csharp_pointerMove": {
@@ -16901,7 +16901,7 @@
               "target": "self",
               "event": "onPointerMove",
               "enabled": true,
-              "description": "Mouse moved while down.",
+              "description": "The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position.",
               "group": ""
             },
             "qa04_csharp_pointerUp": {
@@ -16913,7 +16913,7 @@
               "target": "self",
               "event": "onPointerUp",
               "enabled": true,
-              "description": "Mouse released.",
+              "description": "The mouse button was released.",
               "group": ""
             },
             "qa04_csharp_hoverStart": {
@@ -16925,7 +16925,7 @@
               "target": "self",
               "event": "onHoverStart",
               "enabled": true,
-              "description": "Mouse entered the control.",
+              "description": "The mouse pointer moved onto the control.",
               "group": ""
             },
             "qa04_csharp_hoverEnd": {
@@ -16937,7 +16937,7 @@
               "target": "self",
               "event": "onHoverEnd",
               "enabled": true,
-              "description": "Mouse left the control.",
+              "description": "The mouse pointer left the control.",
               "group": ""
             },
             "qa04_csharp_wheel": {
@@ -16949,7 +16949,7 @@
               "target": "self",
               "event": "onWheel",
               "enabled": true,
-              "description": "Scrolled over the control. wheel.delta.",
+              "description": "The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction.",
               "group": ""
             },
             "qa04_csharp_stateChanged": {
@@ -16961,7 +16961,7 @@
               "target": "self",
               "event": "onStateChanged",
               "enabled": true,
-              "description": "The control changed state: hover, pressed or disabled.",
+              "description": "The control's look-state changed. `state` is one word: \"normal\", \"hover\", \"pressed\" or \"disabled\".",
               "group": ""
             },
             "qa04_csharp_controlChanged": {
@@ -16973,7 +16973,7 @@
               "target": "*",
               "event": "onControlChanged",
               "enabled": true,
-              "description": "Any control changed. info.target, info.value.",
+              "description": "Any control on the panel changed. `info.target` is the control's name and `info.value` its new value. Use it to react to many controls in one place.",
               "group": ""
             },
             "qa04_csharp_timer": {
@@ -16985,7 +16985,7 @@
               "target": "*",
               "event": "onTimer",
               "enabled": true,
-              "description": "A started timer fired. info.id.",
+              "description": "A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`.",
               "group": ""
             },
             "qa04_csharp_beat": {
@@ -16997,7 +16997,7 @@
               "target": "*",
               "event": "onBeat",
               "enabled": true,
-              "description": "A beat passed. time.bar, time.beat, time.beats, time.bpm. Message-thread accurate (~30Hz), not sample-accurate.",
+              "description": "A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound.",
               "group": ""
             },
             "qa04_csharp_bar": {
@@ -17009,7 +17009,7 @@
               "target": "*",
               "event": "onBar",
               "enabled": true,
-              "description": "A bar passed. time.bar, time.beats, time.beatsPerBar. Fires with the downbeat, alongside onBeat.",
+              "description": "A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature's beats per bar. It fires on the downbeat, together with onBeat.",
               "group": ""
             },
             "qa04_csharp_transport": {
@@ -17021,7 +17021,7 @@
               "target": "*",
               "event": "onTransport",
               "enabled": true,
-              "description": "The transport started, stopped, or changed tempo. time.playing, time.bpm, time.source.",
+              "description": "The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it.",
               "group": ""
             },
             "qa04_csharp_parameterReceived": {
@@ -17033,7 +17033,7 @@
               "target": "*",
               "event": "onParameterReceived",
               "enabled": true,
-              "description": "A value arrived, decoded via the DPD. info.parameter, info.value.",
+              "description": "The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units.",
               "group": ""
             },
             "qa04_csharp_dumpReceived": {
@@ -17045,7 +17045,7 @@
               "target": "*",
               "event": "onDumpReceived",
               "enabled": true,
-              "description": "A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.",
+              "description": "A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as \"patch\", and `dump.role` the device it came from.",
               "group": ""
             },
             "qa04_csharp_presetChange": {
@@ -17057,7 +17057,7 @@
               "target": "*",
               "event": "onPresetChange",
               "enabled": true,
-              "description": "The current preset changed. preset.slot, preset.program, preset.name, preset.category, preset.bankId, preset.source (\"device\" when the instrument sent a Program Change, \"panel\" when recallPreset did it).",
+              "description": "The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: \"device\" when the instrument sent a Program Change, \"panel\" when the panel called recallPreset.",
               "group": ""
             },
             "qa04_csharp_midiIn": {
@@ -17069,7 +17069,7 @@
               "target": "*",
               "event": "onMidiIn",
               "enabled": true,
-              "description": "Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.",
+              "description": "Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0.",
               "group": ""
             },
             "qa04_csharp_ccIn": {
@@ -17081,7 +17081,7 @@
               "target": "*",
               "event": "onCcIn",
               "enabled": true,
-              "description": "A CC arrived. cc.channel, cc.cc, cc.value. cc.channel is 0-based here, unlike sendCC and onNoteIn.",
+              "description": "A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16.",
               "group": ""
             },
             "qa04_csharp_noteIn": {
@@ -17093,7 +17093,7 @@
               "target": "*",
               "event": "onNoteIn",
               "enabled": true,
-              "description": "A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 counts as a note-off and arrives as onNoteOffIn instead.",
+              "description": "A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means \"note off\" in MIDI, so it arrives as onNoteOffIn instead.",
               "group": ""
             },
             "qa04_csharp_noteOffIn": {
@@ -17105,7 +17105,7 @@
               "target": "*",
               "event": "onNoteOffIn",
               "enabled": true,
-              "description": "A note was released. note.channel (1-16), note.note, note.velocity (the release velocity, 0 when the device sent a note-on with velocity 0 instead of a note-off).",
+              "description": "A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off.",
               "group": ""
             },
             "qa04_csharp_sysexIn": {
@@ -17117,7 +17117,7 @@
               "target": "*",
               "event": "onSysexIn",
               "enabled": true,
-              "description": "Raw SysEx arrived.",
+              "description": "A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers.",
               "group": ""
             },
             "qa04_csharp_deviceConnected": {
@@ -17129,7 +17129,7 @@
               "target": "*",
               "event": "onDeviceConnected",
               "enabled": true,
-              "description": "A device connected.",
+              "description": "A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile.",
               "group": ""
             },
             "qa04_csharp_deviceDisconnected": {
@@ -17141,7 +17141,7 @@
               "target": "*",
               "event": "onDeviceDisconnected",
               "enabled": true,
-              "description": "A device disconnected.",
+              "description": "A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why.",
               "group": ""
             },
             "qa04_csharp_step": {
@@ -17153,7 +17153,7 @@
               "target": "self",
               "event": "onStep",
               "enabled": true,
-              "description": "A sequencer advanced. step.target, step.index (1-based), step.of, step.notes. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
+              "description": "A sequencer moved to its next step. `step.target` is the component's name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
               "group": ""
             },
             "qa04_csharp_cycle": {
@@ -17165,7 +17165,7 @@
               "target": "self",
               "event": "onCycle",
               "enabled": true,
-              "description": "A sequence or loop came back round. cycle.target, cycle.count (how many times since the panel opened). Arpeggiator, Turing, Looper, Orbit.",
+              "description": "A sequence or loop came back round to its start. `cycle.target` is the component's name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit.",
               "group": ""
             },
             "qa04_csharp_hit": {
@@ -17177,7 +17177,7 @@
               "target": "self",
               "event": "onHit",
               "enabled": true,
-              "description": "A pad, key or ribbon was struck. hit.target, hit.id, hit.note, hit.velocity. Chord Pad, Drum Pads, Note Ribbon.",
+              "description": "A pad, key or ribbon was struck. `hit.target` is the component's name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon.",
               "group": ""
             },
             "qa04_csharp_release": {
@@ -17189,7 +17189,7 @@
               "target": "self",
               "event": "onRelease",
               "enabled": true,
-              "description": "A pad, key or ribbon was released. release.target, release.id, release.note.",
+              "description": "A pad, key or ribbon was let go. `release.target` is the component's name, `release.id` which pad or key, and `release.note` the note.",
               "group": ""
             },
             "qa04_csharp_scene": {
@@ -17201,7 +17201,7 @@
               "target": "self",
               "event": "onScene",
               "enabled": true,
-              "description": "The Setlist recalled a scene. scene.target, scene.index (1-based), scene.name. Fires on any recall, scripted or footswitch.",
+              "description": "The Setlist switched to a scene. `scene.target` is the component's name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch.",
               "group": ""
             },
             "qa04_csharp_stage": {
@@ -17213,7 +17213,7 @@
               "target": "self",
               "event": "onStage",
               "enabled": true,
-              "description": "A component entered a new stage. stage.target, stage.stage, stage.previous. Raised by the Recorder (\"idle\"/\"armed\"/\"recording\"/\"overdub\") and the Envelope (\"sustain\"/\"release\"/\"end\"). Not onStateChanged, which is a control's hover/pressed state.",
+              "description": "A component moved into a new stage. `stage.target` is the component's name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports \"idle\", \"armed\", \"recording\" and \"overdub\"; the Envelope reports \"sustain\", \"release\" and \"end\". This is not the same as onStateChanged, which is about hover and press.",
               "group": ""
             },
             "qa04_csharp_settled": {
@@ -17225,7 +17225,7 @@
               "target": "self",
               "event": "onSettled",
               "enabled": true,
-              "description": "A spring-return control finished gliding home. settled.target, settled.value. Ribbon, Crossfader, Vector Joystick.",
+              "description": "A spring-loaded control finished gliding back to its rest position. `settled.target` is the component's name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick.",
               "group": ""
             },
             "qa04_csharp_bounce": {
@@ -17237,7 +17237,7 @@
               "target": "self",
               "event": "onBounce",
               "enabled": true,
-              "description": "The Kinetic ball hit a wall. bounce.target, bounce.x, bounce.y, bounce.vx, bounce.vy.",
+              "description": "The Kinetic ball hit a wall. `bounce.target` is the component's name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down.",
               "group": ""
             },
             "qa04_csharp_recall": {
@@ -17249,7 +17249,7 @@
               "target": "self",
               "event": "onRecall",
               "enabled": true,
-              "description": "The Constellation snapped to a preset. recall.target, recall.id, recall.label. Snap mode only — blend mode does not fire it.",
+              "description": "The Constellation snapped to one of its presets. `recall.target` is the component's name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode.",
               "group": ""
             },
             "qa04_csharp_zone": {
@@ -17261,7 +17261,7 @@
               "target": "self",
               "event": "onZone",
               "enabled": true,
-              "description": "A Meter crossed into a different threshold zone. zone.target, zone.zone, zone.previous, zone.value.",
+              "description": "A Meter's reading crossed into a different zone, such as from green into red. `zone.target` is the component's name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading.",
               "group": ""
             },
             "qa04_csharp_voiced": {
@@ -17273,7 +17273,7 @@
               "target": "self",
               "event": "onVoiced",
               "enabled": true,
-              "description": "A component turned a played note into other notes. voiced.target, voiced.note, voiced.velocity, voiced.out (the notes it produced). Raised by the Zone Splitter and the Harmoniser.",
+              "description": "A component turned one played note into other notes. `voiced.target` is the component's name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser.",
               "group": ""
             }
           }
@@ -20143,7 +20143,7 @@
               "target": "self",
               "event": "onValueChange",
               "enabled": true,
-              "description": "Fires over and over while the value is moving. Use it for things on screen that should follow the control.",
+              "description": "Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control.",
               "group": ""
             },
             "qa04_java_valueChanged": {
@@ -20155,7 +20155,7 @@
               "target": "self",
               "event": "onValueChanged",
               "enabled": true,
-              "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "description": "Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth.",
               "group": ""
             },
             "qa04_java_activeHandleChanged": {
@@ -20167,7 +20167,7 @@
               "target": "self",
               "event": "onActiveHandleChanged",
               "enabled": true,
-              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
+              "description": "A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each \"start\", \"current\" or \"end\".",
               "group": ""
             },
             "qa04_java_click": {
@@ -20179,7 +20179,7 @@
               "target": "self",
               "event": "onClick",
               "enabled": true,
-              "description": "Clicked. mouse.x, mouse.y.",
+              "description": "The control was clicked. `mouse.x` and `mouse.y` say where, inside the control.",
               "group": ""
             },
             "qa04_java_doubleClick": {
@@ -20191,7 +20191,7 @@
               "target": "self",
               "event": "onDoubleClick",
               "enabled": true,
-              "description": "Double-clicked.",
+              "description": "The control was double-clicked. `mouse.x` and `mouse.y` say where.",
               "group": ""
             },
             "qa04_java_pointerDown": {
@@ -20203,7 +20203,7 @@
               "target": "self",
               "event": "onPointerDown",
               "enabled": true,
-              "description": "Mouse pressed. mouse.x/.y/.button/.modifiers.",
+              "description": "A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held.",
               "group": ""
             },
             "qa04_java_pointerMove": {
@@ -20215,7 +20215,7 @@
               "target": "self",
               "event": "onPointerMove",
               "enabled": true,
-              "description": "Mouse moved while down.",
+              "description": "The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position.",
               "group": ""
             },
             "qa04_java_pointerUp": {
@@ -20227,7 +20227,7 @@
               "target": "self",
               "event": "onPointerUp",
               "enabled": true,
-              "description": "Mouse released.",
+              "description": "The mouse button was released.",
               "group": ""
             },
             "qa04_java_hoverStart": {
@@ -20239,7 +20239,7 @@
               "target": "self",
               "event": "onHoverStart",
               "enabled": true,
-              "description": "Mouse entered the control.",
+              "description": "The mouse pointer moved onto the control.",
               "group": ""
             },
             "qa04_java_hoverEnd": {
@@ -20251,7 +20251,7 @@
               "target": "self",
               "event": "onHoverEnd",
               "enabled": true,
-              "description": "Mouse left the control.",
+              "description": "The mouse pointer left the control.",
               "group": ""
             },
             "qa04_java_wheel": {
@@ -20263,7 +20263,7 @@
               "target": "self",
               "event": "onWheel",
               "enabled": true,
-              "description": "Scrolled over the control. wheel.delta.",
+              "description": "The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction.",
               "group": ""
             },
             "qa04_java_stateChanged": {
@@ -20275,7 +20275,7 @@
               "target": "self",
               "event": "onStateChanged",
               "enabled": true,
-              "description": "The control changed state: hover, pressed or disabled.",
+              "description": "The control's look-state changed. `state` is one word: \"normal\", \"hover\", \"pressed\" or \"disabled\".",
               "group": ""
             },
             "qa04_java_controlChanged": {
@@ -20287,7 +20287,7 @@
               "target": "*",
               "event": "onControlChanged",
               "enabled": true,
-              "description": "Any control changed. info.target, info.value.",
+              "description": "Any control on the panel changed. `info.target` is the control's name and `info.value` its new value. Use it to react to many controls in one place.",
               "group": ""
             },
             "qa04_java_timer": {
@@ -20299,7 +20299,7 @@
               "target": "*",
               "event": "onTimer",
               "enabled": true,
-              "description": "A started timer fired. info.id.",
+              "description": "A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`.",
               "group": ""
             },
             "qa04_java_beat": {
@@ -20311,7 +20311,7 @@
               "target": "*",
               "event": "onBeat",
               "enabled": true,
-              "description": "A beat passed. time.bar, time.beat, time.beats, time.bpm. Message-thread accurate (~30Hz), not sample-accurate.",
+              "description": "A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound.",
               "group": ""
             },
             "qa04_java_bar": {
@@ -20323,7 +20323,7 @@
               "target": "*",
               "event": "onBar",
               "enabled": true,
-              "description": "A bar passed. time.bar, time.beats, time.beatsPerBar. Fires with the downbeat, alongside onBeat.",
+              "description": "A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature's beats per bar. It fires on the downbeat, together with onBeat.",
               "group": ""
             },
             "qa04_java_transport": {
@@ -20335,7 +20335,7 @@
               "target": "*",
               "event": "onTransport",
               "enabled": true,
-              "description": "The transport started, stopped, or changed tempo. time.playing, time.bpm, time.source.",
+              "description": "The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it.",
               "group": ""
             },
             "qa04_java_parameterReceived": {
@@ -20347,7 +20347,7 @@
               "target": "*",
               "event": "onParameterReceived",
               "enabled": true,
-              "description": "A value arrived, decoded via the DPD. info.parameter, info.value.",
+              "description": "The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units.",
               "group": ""
             },
             "qa04_java_dumpReceived": {
@@ -20359,7 +20359,7 @@
               "target": "*",
               "event": "onDumpReceived",
               "enabled": true,
-              "description": "A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.",
+              "description": "A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as \"patch\", and `dump.role` the device it came from.",
               "group": ""
             },
             "qa04_java_presetChange": {
@@ -20371,7 +20371,7 @@
               "target": "*",
               "event": "onPresetChange",
               "enabled": true,
-              "description": "The current preset changed. preset.slot, preset.program, preset.name, preset.category, preset.bankId, preset.source (\"device\" when the instrument sent a Program Change, \"panel\" when recallPreset did it).",
+              "description": "The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: \"device\" when the instrument sent a Program Change, \"panel\" when the panel called recallPreset.",
               "group": ""
             },
             "qa04_java_midiIn": {
@@ -20383,7 +20383,7 @@
               "target": "*",
               "event": "onMidiIn",
               "enabled": true,
-              "description": "Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.",
+              "description": "Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0.",
               "group": ""
             },
             "qa04_java_ccIn": {
@@ -20395,7 +20395,7 @@
               "target": "*",
               "event": "onCcIn",
               "enabled": true,
-              "description": "A CC arrived. cc.channel, cc.cc, cc.value. cc.channel is 0-based here, unlike sendCC and onNoteIn.",
+              "description": "A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16.",
               "group": ""
             },
             "qa04_java_noteIn": {
@@ -20407,7 +20407,7 @@
               "target": "*",
               "event": "onNoteIn",
               "enabled": true,
-              "description": "A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 counts as a note-off and arrives as onNoteOffIn instead.",
+              "description": "A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means \"note off\" in MIDI, so it arrives as onNoteOffIn instead.",
               "group": ""
             },
             "qa04_java_noteOffIn": {
@@ -20419,7 +20419,7 @@
               "target": "*",
               "event": "onNoteOffIn",
               "enabled": true,
-              "description": "A note was released. note.channel (1-16), note.note, note.velocity (the release velocity, 0 when the device sent a note-on with velocity 0 instead of a note-off).",
+              "description": "A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off.",
               "group": ""
             },
             "qa04_java_sysexIn": {
@@ -20431,7 +20431,7 @@
               "target": "*",
               "event": "onSysexIn",
               "enabled": true,
-              "description": "Raw SysEx arrived.",
+              "description": "A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers.",
               "group": ""
             },
             "qa04_java_deviceConnected": {
@@ -20443,7 +20443,7 @@
               "target": "*",
               "event": "onDeviceConnected",
               "enabled": true,
-              "description": "A device connected.",
+              "description": "A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile.",
               "group": ""
             },
             "qa04_java_deviceDisconnected": {
@@ -20455,7 +20455,7 @@
               "target": "*",
               "event": "onDeviceDisconnected",
               "enabled": true,
-              "description": "A device disconnected.",
+              "description": "A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why.",
               "group": ""
             },
             "qa04_java_step": {
@@ -20467,7 +20467,7 @@
               "target": "self",
               "event": "onStep",
               "enabled": true,
-              "description": "A sequencer advanced. step.target, step.index (1-based), step.of, step.notes. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
+              "description": "A sequencer moved to its next step. `step.target` is the component's name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.",
               "group": ""
             },
             "qa04_java_cycle": {
@@ -20479,7 +20479,7 @@
               "target": "self",
               "event": "onCycle",
               "enabled": true,
-              "description": "A sequence or loop came back round. cycle.target, cycle.count (how many times since the panel opened). Arpeggiator, Turing, Looper, Orbit.",
+              "description": "A sequence or loop came back round to its start. `cycle.target` is the component's name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit.",
               "group": ""
             },
             "qa04_java_hit": {
@@ -20491,7 +20491,7 @@
               "target": "self",
               "event": "onHit",
               "enabled": true,
-              "description": "A pad, key or ribbon was struck. hit.target, hit.id, hit.note, hit.velocity. Chord Pad, Drum Pads, Note Ribbon.",
+              "description": "A pad, key or ribbon was struck. `hit.target` is the component's name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon.",
               "group": ""
             },
             "qa04_java_release": {
@@ -20503,7 +20503,7 @@
               "target": "self",
               "event": "onRelease",
               "enabled": true,
-              "description": "A pad, key or ribbon was released. release.target, release.id, release.note.",
+              "description": "A pad, key or ribbon was let go. `release.target` is the component's name, `release.id` which pad or key, and `release.note` the note.",
               "group": ""
             },
             "qa04_java_scene": {
@@ -20515,7 +20515,7 @@
               "target": "self",
               "event": "onScene",
               "enabled": true,
-              "description": "The Setlist recalled a scene. scene.target, scene.index (1-based), scene.name. Fires on any recall, scripted or footswitch.",
+              "description": "The Setlist switched to a scene. `scene.target` is the component's name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch.",
               "group": ""
             },
             "qa04_java_stage": {
@@ -20527,7 +20527,7 @@
               "target": "self",
               "event": "onStage",
               "enabled": true,
-              "description": "A component entered a new stage. stage.target, stage.stage, stage.previous. Raised by the Recorder (\"idle\"/\"armed\"/\"recording\"/\"overdub\") and the Envelope (\"sustain\"/\"release\"/\"end\"). Not onStateChanged, which is a control's hover/pressed state.",
+              "description": "A component moved into a new stage. `stage.target` is the component's name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports \"idle\", \"armed\", \"recording\" and \"overdub\"; the Envelope reports \"sustain\", \"release\" and \"end\". This is not the same as onStateChanged, which is about hover and press.",
               "group": ""
             },
             "qa04_java_settled": {
@@ -20539,7 +20539,7 @@
               "target": "self",
               "event": "onSettled",
               "enabled": true,
-              "description": "A spring-return control finished gliding home. settled.target, settled.value. Ribbon, Crossfader, Vector Joystick.",
+              "description": "A spring-loaded control finished gliding back to its rest position. `settled.target` is the component's name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick.",
               "group": ""
             },
             "qa04_java_bounce": {
@@ -20551,7 +20551,7 @@
               "target": "self",
               "event": "onBounce",
               "enabled": true,
-              "description": "The Kinetic ball hit a wall. bounce.target, bounce.x, bounce.y, bounce.vx, bounce.vy.",
+              "description": "The Kinetic ball hit a wall. `bounce.target` is the component's name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down.",
               "group": ""
             },
             "qa04_java_recall": {
@@ -20563,7 +20563,7 @@
               "target": "self",
               "event": "onRecall",
               "enabled": true,
-              "description": "The Constellation snapped to a preset. recall.target, recall.id, recall.label. Snap mode only — blend mode does not fire it.",
+              "description": "The Constellation snapped to one of its presets. `recall.target` is the component's name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode.",
               "group": ""
             },
             "qa04_java_zone": {
@@ -20575,7 +20575,7 @@
               "target": "self",
               "event": "onZone",
               "enabled": true,
-              "description": "A Meter crossed into a different threshold zone. zone.target, zone.zone, zone.previous, zone.value.",
+              "description": "A Meter's reading crossed into a different zone, such as from green into red. `zone.target` is the component's name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading.",
               "group": ""
             },
             "qa04_java_voiced": {
@@ -20587,7 +20587,7 @@
               "target": "self",
               "event": "onVoiced",
               "enabled": true,
-              "description": "A component turned a played note into other notes. voiced.target, voiced.note, voiced.velocity, voiced.out (the notes it produced). Raised by the Zone Splitter and the Harmoniser.",
+              "description": "A component turned one played note into other notes. `voiced.target` is the component's name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser.",
               "group": ""
             }
           }

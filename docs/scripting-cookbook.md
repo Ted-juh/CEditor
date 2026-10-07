@@ -5,21 +5,25 @@ the [scripting manual](scripting-manual.md). Look a name up there for the full
 signature. Recipes are shown in Lua and JavaScript. The API is the same in
 every language.
 
-A few commands work in one of the two places a script can run but not the
-other. The manual's badges say which.
+A few commands need the panel window and do nothing once a plugin window is
+closed. The manual marks them **Panel window only**.
 
-Before you start, three basics. A script attached to a control reacts to that
-control's own events. You only need to define the named function, such as
-`onValueChanged` or `onClick`. To react to anything else — another control, the
-panel, the device — use `on(target, event, handler)`. To read and write values,
-use `get` and `set` with a dot-path.
+Before you start, three basics:
+
+- Each script runs on **one** event, the one in its **Runs on** box. Define the
+  function with that name, such as `onValueChanged` or `onClick`. A second
+  function named after another event, in the same script, is never called.
+- To react to anything else — another event, another control, the panel, the
+  device — use `on(target, "onEventName", handler)` at the top of a script. Give
+  the full handler name, with `on` in front.
+- To read and write values, use `get` and `set` with a dot-path.
 
 ---
 
 ## 1. Link two controls
 
 Goal: when the cutoff moves, drive the resonance at half strength.
-Attach this to the `cutoff` control:
+Add a script that runs on `onValueChanged`, attached to the `cutoff` control:
 
 ```lua
 -- Lua
@@ -45,24 +49,32 @@ end
 
 ## 2. Rescale a value on the way through
 
-`scale` maps a value from one range to another. `clamp` keeps the result inside
-its limits. `curve` bends the response.
+`scale` maps a value from one range to another. `curve` bends the response, and
+works on a value from 0 to 1 — so bring the value into 0 to 1 first, bend it, then
+scale it to where it is going:
 
 ```lua
 -- Lua — a 0–127 input driving a 0–100 target, with a log feel
 function onValueChanged(value)
-  set("amount.value", clamp(curve(scale(value, 0, 127, 0, 100), "log"), 0, 100))
+  local position = scale(value, 0, 127, 0, 1)
+  set("amount.value", scale(curve(position, "log"), 0, 1, 0, 100))
 end
 ```
+
+`scale` does not keep its result inside the range: an input outside 0–127 gives
+an output outside 0–100. Wrap it in `clamp(…, 0, 100)` when the input can
+overshoot.
 
 ## 3. An "Init Patch" button (set many values without spamming the synth)
 
 A plain `set` sends the change to the synth. That is the right default for one
 value. But when one click sets many values, you do not want many messages.
-Wrap the calls in `noTransmit(...)` and nothing is sent:
+Wrap the calls in `noTransmit(...)` and those `set` changes are not sent
+(commands that send MIDI themselves, such as `sendCC`, still go out). A script
+that runs on `onClick`, attached to the button:
 
 ```lua
--- Lua — attach to the button, runs on click
+-- Lua
 function onClick(mouse)
   noTransmit(function()
     set("cutoff.value", 8000)
@@ -84,22 +96,25 @@ function onClick(mouse) {
 }
 ```
 
-Then send the whole result to the synth in one message. A **panel** script can
-react to the event and send a dump. `sendDump` works in panel and device scope,
-not from a control script:
+Then send the whole result to the synth in one message. Any script can listen
+for the event and send a dump — put this at the top of a script:
 
 ```lua
--- Lua — panel scope
-on("initPatchDone", function()
+-- Lua
+on("*", "initPatchDone", function()
   sendDump("patch")
 end)
 ```
 
+(You could also call `sendDump("patch")` straight after the `noTransmit` block.
+The event is useful when other scripts want to know as well.)
+
 ## 4. Read the synth into the panel on startup
 
-Use a panel-scope script. `onPanelReady` is the first moment the controls
-exist. Guard one-time work with `info.firstTime`, because the hook fires again
-when a VST3 window reopens:
+Add a script that runs on `onPanelReady`, the first moment the controls exist.
+Guard one-time work with `info.firstTime`, because the hook runs again when a
+plugin window reopens. (In the editor, only the first preview of a panel in a
+session has `firstTime` set.)
 
 ```lua
 -- Lua
@@ -108,63 +123,83 @@ function onPanelReady(info)
     requestDump("patch")          -- ask the synth to send its current patch
   end
 end
+```
 
-function onDumpReceived(dump)
-  applyDump(dump.bytes)           -- walk the device map, fill every control; nothing echoes back
+That is all it takes: when the dump arrives, the device profile decodes it and
+fills every bound control, and nothing is echoed back to the synth. To do
+something once it has arrived — show the patch name, say — give `requestDump` a
+function. It is called with the decoded values, or with `info.ok` false if
+nothing came back in time:
+
+```lua
+-- Lua
+function onPanelReady(info)
+  if info.firstTime then
+    requestDump("patch", function(values, info)
+      if info.ok then log("patch loaded") else logWarn("the synth did not answer") end
+    end)
+  end
 end
 ```
 
+A separate script that runs on `onDumpReceived` hears about every dump, however
+it was asked for: `dump.values` holds what was decoded, and `dump.kind` names the
+dump.
+
 ## 5. Blink an LED on a timer
 
-`startTimer(id, ms)` fires the `timer` panel event every `ms` milliseconds,
-until you call `stopTimer(id)`:
+`startTimer(id, ms)` raises the `onTimer` event every `ms` milliseconds, until
+you call `stopTimer(id)`. This script runs on `onPanelReady` and starts the
+timer; since a script answers only its own event, it listens for `onTimer` with
+`on`:
 
 ```lua
 -- Lua
 local lit = false
 
-function onPanelReady(info)
-  startTimer("blink", 500)
-end
-
-function onTimer(info)
+on("*", "onTimer", function(info)
   if info.id == "blink" then
     lit = not lit
     set("led.background.fill.colour", lit and "#ff4000" or "#301000")
   end
+end)
+
+function onPanelReady(info)
+  startTimer("blink", 500)
 end
 ```
 ```js
 // JavaScript
 let lit = false
 
-function onPanelReady(info) {
-  startTimer("blink", 500)
-}
-
-function onTimer(info) {
+on("*", "onTimer", (info) => {
   if (info.id === "blink") {
     lit = !lit
     set("led.background.fill.colour", lit ? "#ff4000" : "#301000")
   }
+})
+
+function onPanelReady(info) {
+  startTimer("blink", 500)
 }
 ```
 
 ## 6. React to a *different* control
 
-Any script can listen to another control. Register on it by name:
+Any script can listen to another control. Register on it by name, at the top
+of the script, with the full handler name:
 
 ```lua
 -- Lua
-on("cutoff", "valueChanged", function(value)
+on("cutoff", "onValueChanged", function(value)
   set("readout.text.content", tostring(round(value)) .. " Hz")
 end)
 ```
 
 ## 7. Let scripts talk to each other
 
-`emit` announces an event. Every script that registered `on(name, ...)` reacts.
-This works across languages:
+`emit` announces an event. Every script that registered `on("*", name, ...)`
+reacts. This works across languages:
 
 ```lua
 -- Lua — the announcing side
@@ -174,7 +209,7 @@ end
 ```
 ```js
 // JavaScript — a listening side, in another script
-on("bassBoostChanged", (value) => {
+on("*", "bassBoostChanged", (value) => {
   set("eqLow.value", value)
 })
 ```
@@ -207,22 +242,27 @@ other MIDI-encoding helpers in the manual.
 `sendNote(channel, note, velocity)` starts a note and leaves it sounding. Give
 it a fourth argument and it releases the note for you after that many
 milliseconds. Without one, the note is yours to stop: send `sendNoteOff` for
-every note you started. A one-finger chord button:
+every note you started. A one-finger chord button — a script that runs on
+`onPointerDown`, attached to the button, which also listens for the release:
 
 ```lua
--- Lua — attach to a button
+-- Lua
+on("chord", "onPointerUp", function(mouse)
+  sendNoteOff(1, 60)
+  sendNoteOff(1, 64)
+  sendNoteOff(1, 67)
+end)
+
 function onPointerDown(mouse)
   sendNote(1, 60, 100)   -- held: no duration given
   sendNote(1, 64, 100)
   sendNote(1, 67, 100)
 end
-
-function onPointerUp(mouse)
-  sendNoteOff(1, 60)
-  sendNoteOff(1, 64)
-  sendNoteOff(1, 67)
-end
 ```
+
+Here the button is called `chord`. Without the `on` line, `onPointerUp` would be
+a second handler in a script that runs on `onPointerDown`, so it would never be
+called and the notes would hang.
 ```js
 // JavaScript — or fire-and-forget with an automatic note-off
 function onClick(mouse) {
@@ -235,16 +275,17 @@ function onClick(mouse) {
 `transportInfo()` reads the master clock in one go — playing, bpm, bar, beat
 and the rest. (`ce.time.transport()` is the same call written with its module
 name; `tempo()` and `isPlaying()` fetch just those two.) `onBeat` and `onBar`
-fire while the clock runs. A tempo-synced metronome light, panel scope:
+fire while the clock runs. A tempo-synced metronome light — a script that runs
+on `onBeat`, which listens for `onBar` too:
 
 ```lua
 -- Lua
+on("*", "onBar", function(time)
+  set("barReadout.text.content", "bar " .. time.bar)
+end)
+
 function onBeat(time)
   set("beatLight.background.fill.colour", time.beat == 1 and "#ff4000" or "#804000")
-end
-
-function onBar(time)
-  set("barReadout.text.content", "bar " .. time.bar)
 end
 ```
 
@@ -268,16 +309,34 @@ function onValueChanged(value)
 end
 ```
 
-The console's trace also shows every event, every `set`, and every outgoing
-MIDI message. It is usually the fastest way to find out why something fired,
-or why it did not.
+The console's trace also lists each handler as it runs, every error, and the
+MIDI sent with send commands such as `sendCC`. It does not list every `set`, so
+add a `log` line when you want to see a value. It is usually the fastest way to
+find out why something fired, or why it did not.
 
 ## 12. Clean up when the panel closes
 
+Two hooks, for two different moments. `onPanelClose` runs whenever the panel
+window closes — in a DAW that happens all the time, and your scripts keep
+running afterwards. Use it for things that only matter on screen, in a script
+that runs on `onPanelClose`:
+
 ```lua
--- Lua — panel scope
+-- Lua
 function onPanelClose()
   stopTimer("blink")
+end
+```
+
+`onPanelDestroy` runs once, when the scripts themselves are about to stop: another
+panel is opened, or the plugin is removed. That is the moment to leave the synth
+in a good state, in a script that runs on `onPanelDestroy`:
+
+```lua
+-- Lua
+function onPanelDestroy()
   sendDump("patch")   -- park the edits on the synth on the way out
 end
 ```
+
+In the editor, stopping the preview runs `onPanelClose` only.
