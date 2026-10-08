@@ -9,7 +9,8 @@
 // VST3 bundle's Contents/Resources — and is written by whatever made the program:
 // build-host-product.mjs today, the player creator later.
 //
-//   { "role": "player", "product": { "name": "Super Rack", "appId": "8F3A…" } }
+//   { "role": "player", "product": { "name": "Super Rack", "appId": "8F3A…" },
+//     "show": "Super Rack.hostageshow" }
 //
 // Missing, unreadable, or a field absent or malformed: the editor, with no product identity. That
 // is what a program from a build tree is, and what every product built before the manifest
@@ -28,6 +29,9 @@ struct HostageManifest
         the product's data folder: the one thing about a product that never changes, so a product
         renamed between builds keeps its rig. */
     juce::String appId;
+    /** The built-in show to open on the first start (HostShow.h): a bare file name in the
+        program's shows folder, or empty for the first one there. */
+    juce::String showFileName;
 
     bool hasProduct() const noexcept { return appId.isNotEmpty(); }
 };
@@ -56,6 +60,11 @@ inline HostageManifest parseHostageManifest (const juce::var& json)
     manifest.appId = normaliseProductId (product.getProperty ("appId", {}).toString());
     if (manifest.hasProduct())
         manifest.productName = product.getProperty ("name", {}).toString().trim();
+
+    // A file name and nothing more: it is looked up in the program's own shows folder.
+    const auto show = json.getProperty ("show", {}).toString().trim();
+    if (show.endsWithIgnoreCase (".hostageshow") && ! show.containsAnyOf ("/\\:") && ! show.startsWith (".."))
+        manifest.showFileName = show;
     return manifest;
 }
 

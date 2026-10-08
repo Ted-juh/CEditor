@@ -16,7 +16,7 @@ import path from 'node:path';
 import {
   normalizeProject, sanitizeBaseName, artifactCandidateDirs, resolveArtifacts,
   stagePlan, privateSymbolPlan, isccArgs, TEMPLATE_DEFINES, factoryPerformance,
-  hostageManifestJson,
+  hostageManifestJson, showFileNameFor, factoryShow,
 } from '../../../tools/scripts/build-host-product.mjs';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -198,6 +198,48 @@ test('every target ships hostage.json, naming the product whose data folder it k
     .filter((op) => op.to.endsWith('hostage.json')).length, 1, 'a disabled target ships none of it');
 });
 
+test('a show ships in a shows folder beside each target, and is the product\'s first show', () => {
+  // The rack alone is not enough: a song that loads its own rack points at a sound-library
+  // record, and only the show carries those (HostShow.h).
+  const { project } = normalizeProject(goodProject);
+  const showJson = '{"format":"hostage-show","name":"Super Rack"}\n';
+  const showFileName = showFileNameFor(project.productName);
+  assert.equal(showFileName, 'Super Rack.hostageshow');
+  const { ops } = stagePlan({ project, artifacts: foundArtifacts, stageDir: '/s', showJson, showFileName });
+  const shows = ops.filter((op) => op.to.endsWith('.hostageshow'));
+  assert.deepEqual(shows.map((op) => op.to).sort(), [
+    path.join('/s', 'Standalone', 'shows', 'Super Rack.hostageshow'),
+    path.join('/s', 'VST3', 'Hostage.vst3', 'Contents', 'Resources', 'shows', 'Super Rack.hostageshow'),
+  ].sort());
+  assert.ok(shows.every((op) => op.kind === 'writeFile' && op.contents === showJson));
+  const manifests = ops.filter((op) => op.to.endsWith('hostage.json')).map((op) => JSON.parse(op.contents));
+  assert.ok(manifests.length === 2 && manifests.every((m) => m.show === 'Super Rack.hostageshow'),
+    'hostage.json names it, so the first start opens it');
+
+  const bare = stagePlan({ project, artifacts: foundArtifacts, stageDir: '/s' }).ops;
+  assert.ok(bare.every((op) => !op.to.endsWith('.hostageshow')));
+  assert.ok(bare.filter((op) => op.to.endsWith('hostage.json'))
+    .every((op) => !('show' in JSON.parse(op.contents))), 'no show, no show named');
+  assert.equal(showFileNameFor('A/B: Live'), 'AB Live.hostageshow', 'nothing a file system refuses');
+  assert.equal(showFileNameFor('..'), 'Show.hostageshow');
+});
+
+test('a shipped show carries no stage notes, in its rack or in any rack its songs load', () => {
+  const show = {
+    format: 'hostage-show',
+    rack: { setlist: { items: [{ name: 'One', notes: 'capo 3' }] } },
+    library: { records: [
+      { recordId: 'r1', type: 'rack', rackManifest: JSON.stringify({ setlist: { items: [{ name: 'Two', notes: 'in G' }] } }) },
+      { recordId: 'p1', type: 'preset', stateBlob: 'AAAA' },
+    ] },
+  };
+  const shipped = factoryShow(show);
+  assert.equal(shipped.rack.setlist.items[0].notes, '');
+  assert.equal(JSON.parse(shipped.library.records[0].rackManifest).setlist.items[0].notes, '');
+  assert.deepEqual(shipped.library.records[1], show.library.records[1], 'a sound is not a rack and is left alone');
+  assert.equal(factoryShow(show, { includeStageNotes: true }), show, 'kept when the project asks');
+});
+
 test('hostage.json says what the runtime reads, in the keys it reads', () => {
   const header = readFileSync(path.join(repoRoot, 'CE/src/InstrumentHost/HostageManifest.h'), 'utf8');
   const { project } = normalizeProject(goodProject);
@@ -206,6 +248,7 @@ test('hostage.json says what the runtime reads, in the keys it reads', () => {
   assert.match(header, /json\.getProperty \("product", \{\}\)/);
   assert.match(header, /product\.getProperty \("appId", \{\}\)/);
   assert.match(header, /product\.getProperty \("name", \{\}\)/);
+  assert.match(header, /json\.getProperty \("show", \{\}\)/, 'and the first show, by file name');
   assert.deepEqual(Object.keys(manifest).sort(), ['product', 'role']);
   assert.deepEqual(Object.keys(manifest.product).sort(), ['appId', 'name']);
   assert.match(manifest.product.appId, /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/,
@@ -651,7 +694,7 @@ test('every command-sending store export is reachable from Svelte or deliberatel
     'MidiChainPanel.svelte', 'LayerGroupsPanel.svelte', 'LayerGroupEditor.svelte', 'HostRackCanvas.svelte',
     'ProductPanel.svelte', 'ReliabilityPanel.svelte', 'LicencePanel.svelte',
     'StageView.svelte', 'HostSurfacePanel.svelte', 'SoundBrowser.svelte', 'HostLibraryPanel.svelte',
-    'Ctrl49ScreenCard.svelte',
+    'Ctrl49ScreenCard.svelte', 'HostShowsPanel.svelte',
     // The Performance modulators each own their card, and the commands it sends.
     'performance/LfoCard.svelte', 'performance/EnvelopeCard.svelte', 'performance/MsegCard.svelte',
     'performance/RandomCard.svelte', 'performance/SongsPage.svelte',

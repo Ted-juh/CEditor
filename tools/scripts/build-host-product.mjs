@@ -100,12 +100,50 @@ export function factoryPerformance(raw, { includeStageNotes = false } = {}) {
     A built product is the editor. Its appId names its data folder, so two products on one machine
     keep two rigs; a product shipped without this file falls back to the folder every product used
     to share. Upper-cased here as the runtime does, so the file and the folder agree. */
-export function hostageManifestJson(project) {
+export function hostageManifestJson(project, showFileName = null) {
   const manifest = {
     role: 'editor',
     product: { name: project.productName, appId: String(project.appId).toUpperCase() },
   };
+  // The built-in show the product opens on its very first start (HostShow.h).
+  if (showFileName) manifest.show = showFileName;
   return `${JSON.stringify(manifest, null, 2)}\n`;
+}
+
+/** The file a product's built-in show ships as: the product's name with what a file system
+    refuses taken out, as JUCE's createLegalFileName does. "Super Rack!" -> "Super Rack!.hostageshow",
+    "A/B: Live" -> "AB Live.hostageshow". */
+export function showFileNameFor(productName) {
+  const legal = String(productName).replace(/["#@,;:<>*^|?\\/]/g, '').trim()
+    .replace(/^\.+/, '').trim().slice(0, 120);
+  return `${legal || 'Show'}.hostageshow`;
+}
+
+/** The show as it should ship inside a product: the rack and every captured rack its songs
+    load, with the setlist's stage notes taken out unless the project asks for them — the same
+    split factoryPerformance makes, applied to every rack the show carries. The editor already
+    writes it this way; this holds a show handed over by any other route to the same rule. */
+export function factoryShow(raw, { includeStageNotes = false } = {}) {
+  if (!raw || typeof raw !== 'object') return null;
+  if (includeStageNotes) return raw;
+  const records = Array.isArray(raw.library?.records) ? raw.library.records : null;
+  return {
+    ...raw,
+    rack: factoryPerformance(raw.rack, { includeStageNotes }) ?? raw.rack,
+    ...(records ? {
+      library: {
+        ...raw.library,
+        records: records.map((record) => {
+          if (!record || typeof record.rackManifest !== 'string' || !record.rackManifest) return record;
+          try {
+            return { ...record, rackManifest: JSON.stringify(factoryPerformance(JSON.parse(record.rackManifest))) };
+          } catch {
+            return record;
+          }
+        }),
+      },
+    } : {}),
+  };
 }
 
 /** The installer's OutputBaseFilename half: the product name with everything hostile to a
@@ -179,7 +217,9 @@ export function resolveArtifacts({ candidateDirs, listDir }) {
 
     Pure: returns operations, executes nothing. Only the targets the manifest enables appear,
     and each op names the artifact it needs so a missing one refuses with its own name. */
-export function stagePlan({ project, artifacts, stageDir, performanceJson = null }) {
+export function stagePlan({ project, artifacts, stageDir, performanceJson = null,
+                            showJson = null, showFileName = null }) {
+  const show = showJson && showFileName ? showFileName : null;
   const ops = [];
   const missing = [];
 
@@ -195,7 +235,9 @@ export function stagePlan({ project, artifacts, stageDir, performanceJson = null
       // copying the author's own file would put their stage notes back.
       if (performanceJson)
         ops.push({ kind: 'writeFile', contents: performanceJson, to: path.join(stageDir, 'Standalone', 'factory-performance.json') });
-      ops.push({ kind: 'writeFile', contents: hostageManifestJson(project), to: path.join(stageDir, 'Standalone', 'hostage.json') });
+      ops.push({ kind: 'writeFile', contents: hostageManifestJson(project, show), to: path.join(stageDir, 'Standalone', 'hostage.json') });
+      if (show)
+        ops.push({ kind: 'writeFile', contents: showJson, to: path.join(stageDir, 'Standalone', 'shows', show) });
     }
   }
 
@@ -223,7 +265,9 @@ export function stagePlan({ project, artifacts, stageDir, performanceJson = null
         // runtime's factory-rack search looks from the module directory.
         ops.push({ kind: 'writeFile', contents: performanceJson, to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'Resources', 'factory-performance.json') });
       // Where the runtime's manifest search looks from the module directory, like the rack.
-      ops.push({ kind: 'writeFile', contents: hostageManifestJson(project), to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'Resources', 'hostage.json') });
+      ops.push({ kind: 'writeFile', contents: hostageManifestJson(project, show), to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'Resources', 'hostage.json') });
+      if (show)
+        ops.push({ kind: 'writeFile', contents: showJson, to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'Resources', 'shows', show) });
     }
   }
 
@@ -333,6 +377,7 @@ function parseArgs(argv) {
     else if (flag === '--out') out.out = next();
     else if (flag === '--iscc') out.iscc = next();
     else if (flag === '--performance') out.performance = next();
+    else if (flag === '--show') out.show = next();
     else throw new Error(`unknown argument: ${flag}`);
   }
   if (!out.project) throw new Error('--project <host-project.json> is required');
@@ -365,9 +410,26 @@ async function main() {
   for (const [kind, found] of Object.entries(artifacts))
     console.log(`  ${kind}: ${found ?? '(not found)'}`);
 
+  // The show the editor wrote ships as the product's first show: the rack with every sound its
+  // songs point at. Without one, the bare rack ships as the factory state, as before.
+  let showJson = null;
+  const showFileName = showFileNameFor(project.productName);
+  if (args.show && existsSync(args.show)) {
+    try {
+      const parsed = JSON.parse(readFileSync(args.show, 'utf8'));
+      if (parsed?.format === 'hostage-show') {
+        showJson = `${JSON.stringify(factoryShow(parsed, { includeStageNotes: project.includeStageNotes }))}\n`;
+        console.log(`  show: ${args.show} -> shows/${showFileName}`);
+      }
+    } catch {
+      showJson = null;
+    }
+    if (!showJson) console.log('  show: unreadable — shipping the bare rack instead');
+  }
+
   // The authored rack ships as the product's factory state; a project built without one
   // starts empty, and the summary says which happened rather than leaving it to guesswork.
-  const performanceFile = args.performance && existsSync(args.performance) ? args.performance : null;
+  const performanceFile = !showJson && args.performance && existsSync(args.performance) ? args.performance : null;
   let performanceJson = null;
   if (performanceFile) {
     let parsed = null;
@@ -389,12 +451,12 @@ async function main() {
         ? '  stage notes: INCLUDED — the setlist prose ships to whoever gets this product'
         : '  stage notes: stripped from the shipped rack');
     }
-  } else {
+  } else if (!showJson) {
     console.log('  factory rack: none — the product starts with an empty rack');
   }
 
   const stageDir = path.join(args.out, 'stage');
-  const { ops, missing } = stagePlan({ project, artifacts, stageDir, performanceJson });
+  const { ops, missing } = stagePlan({ project, artifacts, stageDir, performanceJson, showJson, showFileName });
   const symbolsRoot = path.join(args.out, 'private-symbols');
   const workerExeSha256 = artifacts.liveWorkerExe
     ? await sha256File(artifacts.liveWorkerExe) : null;

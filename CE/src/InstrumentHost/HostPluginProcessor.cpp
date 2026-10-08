@@ -195,6 +195,28 @@ HostPluginProcessor::HostPluginProcessor()
             });
     };
 
+    // A show to bring in (from a stick, a download) or a place to write one (HostShow.h).
+    options.pickShowFile = [this, aliveToken = alive] (bool saving, const juce::String& suggestedName,
+                                std::function<void (const juce::String&)> done)
+    {
+        const auto documents = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+        fileChooser = std::make_unique<juce::FileChooser> (
+            saving ? "Save the show as" : "Open a show",
+            saving && suggestedName.isNotEmpty() ? documents.getChildFile (suggestedName) : documents,
+            "*.hostageshow");
+        fileChooser->launchAsync (
+            saving ? (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                      | juce::FileBrowserComponent::warnAboutOverwriting)
+                   : (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles),
+            [aliveToken, done] (const juce::FileChooser& fc)
+            {
+                if (! aliveToken->load())
+                    return;
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
     const auto liveWorker = findHostLiveWorker ({ options.dataDirectory });
     options.livePluginIsolationAvailable = liveWorker.existsAsFile();
     options.instantiate = makeIsolatedPluginInstantiator (

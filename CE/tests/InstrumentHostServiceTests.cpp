@@ -19,6 +19,7 @@
 
 #include "InstrumentHost/InstrumentHostService.h"
 #include "InstrumentHost/HostageManifest.h"
+#include "InstrumentHost/HostShow.h"
 #include "InstrumentHost/EditorSnapshot.h"
 #include "InstrumentHost/LiveWorkerDiagnostics.h"
 #include "InstrumentHost/PatchDiff.h"
@@ -5368,6 +5369,251 @@ void testLegacyDataOffer()
            "a program in the shared folder itself has nothing to be offered");
     unbranded.cmd ("adoptLegacyData");
     check (unbranded.emits.lastError().contains ("no earlier"), "and asking anyway says so");
+}
+
+// A show (HostShow.h): the rig and everything it points at, in one file. Saved in one HoSTage
+// and opened in another with an empty library, every song still has its rack — the thing a
+// bare rack file, which is what a built product shipped until now, cannot do.
+void testShows()
+{
+    std::cout << "\na show: saved in one HoSTage, opened in another" << std::endl;
+    namespace show = ceditor::host::show;
+
+    check (show::fileNameFor ("Friday: Paradiso") == "Friday Paradiso.hostageshow"
+             && show::fileNameFor ("   ").isEmpty() && show::fileNameFor ("..").isEmpty()
+             && show::isShowFileName (show::fileNameFor ("../../etc/passwd")),
+           "a show's name becomes a file name, or nothing when nothing legal is left");
+    check (show::isShowFileName ("Gig.hostageshow") && ! show::isShowFileName ("../Gig.hostageshow")
+             && ! show::isShowFileName ("a/Gig.hostageshow") && ! show::isShowFileName ("Gig.json"),
+           "and the page names a show by its file alone, never by a path");
+
+    const auto rackOf = [] (Harness& h) { return h.emits.lastState()->getProperty ("rack", {}); };
+    const auto showsOf = [] (Harness& h) { return h.emits.lastState()->getProperty ("shows", {}); };
+    const auto recordIdNamed = [] (Harness& h, const juce::String& name)
+    {
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        juce::String id;
+        if (const auto* records = h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).getArray())
+            for (const auto& r : *records)
+                if (r.getProperty ("name", {}).toString() == name)
+                    id = r.getProperty ("recordId", {}).toString();
+        return id;
+    };
+
+    const auto editorDir = freshDataDir ("show-editor");
+    seedCatalog (editorDir);
+    const auto showPath = editorDir.getChildFile ("shows").getChildFile ("Friday Paradiso.hostageshow");
+    juce::String rackId;
+    {
+        Harness h (editorDir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("saveRackToLibrary", { { "name", "Second song rig" } });
+        rackId = recordIdNamed (h, "Second song rig");
+        h.cmd ("addSetlistItem", { { "rackRecordId", rackId }, { "name", "Song two" } });
+        const auto itemId = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {})
+                              .getProperty ("items", {})[0].getProperty ("itemId", {}).toString();
+        h.cmd ("setSetlistItem", { { "itemId", itemId }, { "notes", "capo 3" } });
+        h.cmd ("addControlPage");
+        h.cmd ("setUserSurface", { { "name", "Advance 49" }, { "encoders", 8 } });
+        h.cmd ("metersOnSurface", { { "on", true } });
+
+        h.cmd ("saveShow");
+        check (h.emits.lastError().contains ("name"), "a show needs a name to be saved");
+        h.cmd ("saveShow", { { "name", "Friday: Paradiso" } });
+        const auto shows = showsOf (h);
+        check (showPath.existsAsFile()
+                 && shows.getProperty ("current", {}).getProperty ("name", {}).toString() == "Friday: Paradiso"
+                 && ! (bool) shows.getProperty ("changed", true)
+                 && shows.getProperty ("list", {}).size() == 1,
+               "it is saved in the program's shows folder and becomes the current show");
+
+        const auto file = juce::JSON::parse (showPath);
+        const auto needs = file.getProperty ("requires", {}).getProperty ("plugins", {});
+        const auto items = file.getProperty ("rack", {}).getProperty ("setlist", {}).getProperty ("items", {});
+        check (needs.size() == 1 && needs[0].getProperty ("ceId", {}).toString() == "VST3-good-synth",
+               "it names the plug-ins it needs, and carries none of them");
+        check (file.getProperty ("library", {}).getProperty ("records", {}).size() == 1
+                 && file.getProperty ("library", {}).getProperty ("records", {})[0]
+                      .getProperty ("recordId", {}).toString() == rackId,
+               "it carries the rack the second song loads, under the id the song points at");
+        check (items[0].getProperty ("notes", {}).toString() == "capo 3",
+               "a show you save for yourself keeps your stage notes");
+
+        h.cmd ("addPart");
+        check ((bool) showsOf (h).getProperty ("changed", false), "a change to the rig shows as a change to the show");
+        h.cmd ("revertShow");
+        check (rackOf (h).getProperty ("parts", {}).size() == 1 && ! (bool) showsOf (h).getProperty ("changed", true),
+               "and Back to the show undoes it");
+        check (! (bool) h.emits.lastState()->getProperty ("editHistory", {}).getProperty ("canUndo", true),
+               "with nothing from before the show left to undo into it");
+
+        h.cmd ("openShow", { { "file", "../../outside.hostageshow" } });
+        check (h.emits.lastError().contains ("no show"), "a path is not a show");
+        h.cmd ("setStageLock", { { "enabled", true } });
+        h.cmd ("revertShow");
+        check (h.emits.lastError().contains ("Stage Lock"), "nor does anything happen to the show under Stage Lock");
+    }
+
+    // Somewhere else: a player with an empty library and a catalogue without the synth.
+    const auto playerDir = freshDataDir ("show-player");
+    {
+        Harness h (playerDir, {}, [] (InstrumentHostService::Options& o) { o.player = true; });
+        h.cmd ("getState");
+        h.cmd ("importShow", { { "path", showPath.getFullPathName() } });
+        const auto shows = showsOf (h);
+        check (shows.getProperty ("current", {}).getProperty ("name", {}).toString() == "Friday: Paradiso"
+                 && playerDir.getChildFile ("shows").getChildFile ("Friday Paradiso.hostageshow").existsAsFile(),
+               "a player imports a show into its own shows folder and opens it");
+        check (shows.getProperty ("missing", {}).size() == 1
+                 && shows.getProperty ("missing", {})[0].toString() == "Good Synth (Good Audio)",
+               "and says at once which plug-in this computer does not have");
+        const auto rack = rackOf (h);
+        check (rack.getProperty ("parts", {}).size() == 1
+                 && h.service->getRackHost().getPerformance().pages.size() == 1
+                 && h.service->getRackHost().getPerformance().setlist.items.getReference (0).rackRecordId == rackId,
+               "the rig, its control pages and its songs arrive as they were made");
+        check (recordIdNamed (h, "Second song rig") == rackId,
+               "and the second song's rack is in this library now, under the same id");
+        h.emits.clear();
+        h.cmd ("getSurfaceLayout");
+        check (h.emits.last ("instrumentHostSurfaceLayout")->getProperty ("userSurface", {}).toString() == "Advance 49",
+               "the controller the pages were drawn for comes with them");
+
+        h.cmd ("saveShow", { { "name", "Rehearsal" } });
+        check (showsOf (h).getProperty ("list", {}).size() == 2, "a player saves shows of its own");
+        h.cmd ("openShow", { { "file", "Friday Paradiso.hostageshow" } });
+        check (showsOf (h).getProperty ("current", {}).getProperty ("file", {}).toString() == "Friday Paradiso.hostageshow",
+               "and switches between them");
+        h.cmd ("importShow", { { "path", showPath.getFullPathName() } });
+        check (playerDir.getChildFile ("shows").getChildFile ("Friday Paradiso 2.hostageshow").existsAsFile(),
+               "importing the same show again keeps both, rather than overwriting one");
+        h.cmd ("deleteShow", { { "file", "Rehearsal.hostageshow" } });
+        check (! playerDir.getChildFile ("shows").getChildFile ("Rehearsal.hostageshow").exists(), "and deletes its own");
+    }
+
+    // Changes that go into the show as they happen, when that is what somebody chose.
+    {
+        Harness h (editorDir);
+        h.cmd ("getState");
+        h.cmd ("setShowChanges", { { "mode", "save" } });
+        h.cmd ("addPart");
+        check ((bool) showsOf (h).getProperty ("changed", false), "the change is noted at once");
+        juce::Thread::sleep (1700);
+        h.service->drainParameterEvents();
+        check (juce::JSON::parse (showPath).getProperty ("rack", {}).getProperty ("parts", {}).size() == 2
+                 && ! (bool) showsOf (h).getProperty ("changed", true),
+               "and written into the show's file once the changes settle");
+        h.cmd ("setShowChanges", { { "mode", "keep" } });
+    }
+
+    // A show that came with the program: opened on the very first start, never written.
+    {
+        const auto builtIn = freshDataDir ("show-builtin");
+        showPath.copyFileTo (builtIn.getChildFile ("Factory Set.hostageshow"));
+        const auto fresh = freshDataDir ("show-first-start");
+        Harness h (fresh, {}, [builtIn] (InstrumentHostService::Options& o) { o.builtInShowsDirectory = builtIn; });
+        h.cmd ("getState");
+        auto shows = showsOf (h);
+        check ((bool) shows.getProperty ("current", {}).getProperty ("builtIn", false)
+                 && rackOf (h).getProperty ("parts", {}).size() == 2,
+               "a program's first start opens the show it was built with");
+        h.cmd ("deleteShow", { { "file", "Factory Set.hostageshow" }, { "builtIn", true } });
+        check (h.emits.lastError().contains ("came with"), "which cannot be deleted");
+        h.cmd ("saveShow");
+        shows = showsOf (h);
+        check (! (bool) shows.getProperty ("current", {}).getProperty ("builtIn", true)
+                 && shows.getProperty ("list", {}).size() == 1
+                 && fresh.getChildFile ("shows").getChildFile ("Factory Set.hostageshow").existsAsFile()
+                 && builtIn.getChildFile ("Factory Set.hostageshow").getSize() == showPath.getSize(),
+               "saving it keeps this program's own copy, which takes its place; the original is untouched");
+    }
+
+    // What Build product ships: the show, with stage notes left out unless the project asks.
+    {
+        Harness h (editorDir, {}, [] (InstrumentHostService::Options& o)
+                   { o.runBuild = [] (const juce::var&, const juce::String&) {}; });
+        h.cmd ("getState");
+        h.cmd ("buildHostProduct");
+        const auto product = juce::JSON::parse (editorDir.getChildFile ("product-show.hostageshow"));
+        check (product.getProperty ("format", {}).toString() == "hostage-show"
+                 && product.getProperty ("rack", {}).getProperty ("setlist", {}).getProperty ("items", {})[0]
+                      .getProperty ("notes", {}).toString().isEmpty(),
+               "Build product writes the show to ship, without the stage notes");
+    }
+}
+
+// A vendor preset the other computer has too, scanned there under an id of its own: the show's
+// rig is pointed at that record rather than given a copy pointing at the author's disk, so what
+// it plays is a preset this computer can load.
+void testShowFindsVendorPresetsAlreadyHere()
+{
+    std::cout << "\na show finds the vendor presets the other computer already has" << std::endl;
+
+    const auto writePreset = [] (const juce::File& root)
+    {
+        const auto file = root.getChildFile ("Test Audio").getChildFile ("Good Synth").getChildFile ("Warm Pad.vstpreset");
+        std::vector<std::uint8_t> bytes (64, 0);
+        std::memcpy (bytes.data(), "VST3", 4);
+        std::memcpy (bytes.data() + 8, "ABCDEF0123456789ABCDEF0123456789", 32);
+        file.getParentDirectory().createDirectory();
+        file.replaceWithData (bytes.data(), bytes.size());
+    };
+    const auto accepting = [] (InstrumentHostService::Options& o)
+    {
+        o.applyVstPreset = [] (juce::AudioProcessor&, const juce::File&) { return true; };
+    };
+    const auto idsNamed = [] (Harness& h, const juce::String& name)
+    {
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        juce::StringArray ids;
+        if (const auto* records = h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).getArray())
+            for (const auto& r : *records)
+                if (r.getProperty ("name", {}).toString() == name)
+                    ids.add (r.getProperty ("recordId", {}).toString());
+        return ids;
+    };
+    const auto startWithPreset = [&writePreset] (Harness& h, const juce::File& dir)
+    {
+        writePreset (dir.getChildFile ("presets"));
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("addLibraryPath", { { "path", dir.getChildFile ("presets").getFullPathName() } });
+        h.cmd ("scanLibrary");
+    };
+
+    const auto editorDir = freshDataDir ("show-vendor-editor");
+    seedCatalog (editorDir);
+    juce::String authorsId;
+    {
+        Harness h (editorDir, {}, accepting);
+        startWithPreset (h, editorDir);
+        authorsId = idsNamed (h, "Warm Pad")[0];
+        h.cmd ("loadLibraryRecord", { { "recordId", authorsId } });
+        check (h.service->getRackHost().getPerformance().parts.getReference (0).lastPresetRecordId == authorsId,
+               "the author's part plays the vendor preset");
+        h.cmd ("saveShow", { { "name", "Vendor" } });
+    }
+
+    const auto playerDir = freshDataDir ("show-vendor-player");
+    seedCatalog (playerDir);
+    {
+        Harness h (playerDir, {}, accepting);
+        startWithPreset (h, playerDir);
+        const auto localIds = idsNamed (h, "Warm Pad");
+        check (localIds.size() == 1 && localIds[0] != authorsId,
+               "this computer has the same preset, under an id of its own");
+        h.cmd ("importShow", { { "path", editorDir.getChildFile ("shows").getChildFile ("Vendor.hostageshow").getFullPathName() } });
+        check (h.service->getRackHost().getPerformance().parts.getReference (0).lastPresetRecordId == localIds[0],
+               "the show's part is pointed at this computer's record");
+        check (idsNamed (h, "Warm Pad").size() == 1,
+               "and no copy pointing at the author's disk is added beside it");
+    }
 }
 
 // Which stage pages the keyboard shows is the player's choice, made once. Before, every page
@@ -15282,6 +15528,8 @@ int main (int argc, char* argv[])
     testHostageManifest();
     testHardwareClaimShared();
     testLegacyDataOffer();
+    testShows();
+    testShowFindsVendorPresetsAlreadyHere();
     testCtrl49Meters();
     testCtrl49Live();
     testCtrl49Discover();

@@ -13,6 +13,7 @@
 #include "PluginWorkerBoundary.h"
 #include "PluginWorkerCrashDumps.h"
 #include "Performance/MicrotuningMidi.h"
+#include "HostShow.h"
 
 #include <algorithm>
 #include <array>
@@ -72,6 +73,7 @@ InstrumentHostService::InstrumentHostService (Options optionsToUse)
     // where an earlier build kept it comes over now, while nothing here holds it open.
     adoptLegacyDataIfAsked();
     legacyOffered = legacyDataWorthOffering();
+    loadShowState();
 
     ctrl49::registerCtrl49Profile();
     loadMackieSection();
@@ -113,6 +115,13 @@ InstrumentHostService::~InstrumentHostService()
 {
     if (performanceSavePending.exchange (false))
         savePerformance();
+    // Changes going into the show, not yet written: the show is written now, while its
+    // plug-ins can still be asked for their state.
+    if (showSaveDueMs != 0)
+    {
+        showSaveDueMs = 1;
+        tickShowSave();
+    }
     *alive = false;
     if (options.editorWindows.closeAll != nullptr)
         options.editorWindows.closeAll();
@@ -721,6 +730,13 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         }
         writeLegacyDecision (cmd == "adoptLegacyData" ? "adopt" : "declined", {});
         emitState();
+        return;
+    }
+
+    if (cmd == "saveShow" || cmd == "openShow" || cmd == "importShow" || cmd == "exportShow"
+        || cmd == "revertShow" || cmd == "deleteShow" || cmd == "setShowChanges" || cmd == "refreshShows")
+    {
+        handleShowCommand (cmd, payload);
         return;
     }
 
@@ -2449,6 +2465,17 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             && ! (bool) hostProject.getProperty ("includeVst3", true))
         {
             emitError ("The Host Project has no targets enabled — nothing to build.");
+            return;
+        }
+
+        // The product ships the show this editor is running, sounds and all — not just the
+        // rack, whose songs would arrive pointing at a library the product does not have. Stage
+        // notes stay out unless the Host Project asks for them, as they always have.
+        const auto productShow = options.dataDirectory.getChildFile ("product-show" + show::extension());
+        if (! writeShow (productShow, name, (bool) hostProject.getProperty ("includeStageNotes", false)))
+        {
+            emitError ("Could not write the show to build into the product, at "
+                       + productShow.getFullPathName() + ".");
             return;
         }
 
@@ -8272,6 +8299,10 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
         }
     }
 
+    // A product's very first start, with no session yet: the show it was built with.
+    if (includePerformance && performanceSource == juce::File())
+        openFirstBuiltInShow();
+
     checkStateDigests();
 
     // The rig has proved itself: it restored, everything it named resolved, nothing was
@@ -8289,6 +8320,9 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
         && ! lastRestoreReport().degraded() && safeModeRefusals.empty()
         && stateDigestMismatches.isEmpty())
         recovery->markKnownGood (performanceFile());
+
+    // From here on a save is somebody changing the rig, and the show hears about it.
+    showTracking = true;
 
     if (options.enableAudio)
         startAudio();
@@ -14399,6 +14433,11 @@ void InstrumentHostService::loadSurfacePages()
     const auto stored = juce::JSON::parse (surfacePagesFile());
     if (! stored.isObject())
         return;   // never saved: every page off, as before
+    applySurfacePagesVar (stored);
+}
+
+void InstrumentHostService::applySurfacePagesVar (const juce::var& stored)
+{
     const auto on = [&stored] (const char* key) { return (bool) stored.getProperty (key, false); };
     surfaceSoundcheckPage = on ("soundcheck");
     surfaceLayersPage     = on ("layers");
@@ -14411,6 +14450,11 @@ void InstrumentHostService::loadSurfacePages()
 
 bool InstrumentHostService::saveSurfacePages() const
 {
+    return writeTextAtomically (surfacePagesFile(), juce::JSON::toString (surfacePagesVar()));
+}
+
+juce::var InstrumentHostService::surfacePagesVar() const
+{
     auto* root = new juce::DynamicObject();
     root->setProperty ("soundcheck", surfaceSoundcheckPage);
     root->setProperty ("layers",     surfaceLayersPage);
@@ -14419,7 +14463,7 @@ bool InstrumentHostService::saveSurfacePages() const
     root->setProperty ("changes",    surfaceChangesPage);
     root->setProperty ("meters",     surfaceMetersPage);
     root->setProperty ("live",       surfaceLivePage);
-    return writeTextAtomically (surfacePagesFile(), juce::JSON::toString (juce::var (root)));
+    return juce::var (root);
 }
 
 void InstrumentHostService::drainMackieEvents()
@@ -18003,6 +18047,7 @@ void InstrumentHostService::followPresetPages()
 
 void InstrumentHostService::drainParameterEvents()
 {
+    tickShowSave();
     followPresetPages();
     drainProcessorFailures();
     tickAutomaticFailover();
@@ -19227,6 +19272,7 @@ juce::var InstrumentHostService::buildStatePayload()
     // what makes it true.
     root->setProperty ("player", isPlayer());
     root->setProperty ("playerInstalled", options.player);
+    root->setProperty ("shows", showsPayload());
     root->setProperty ("product", productPayload());
     root->setProperty ("reliability", reliabilityPayload());
     root->setProperty ("licence", licencePayload());
@@ -20271,6 +20317,565 @@ juce::String InstrumentHostService::legacyDataState() const
     return legacyOffered ? "offered" : "none";
 }
 
+// -- shows (HostShow.h) -------------------------------------------------------------------------
+// A show is the rig plus everything the rig points at, in one file a player can open. The rig
+// itself stays where it always was — the session, saved after every change — so opening a show
+// is a restore like any other, and the show's file is written only when somebody saves it or,
+// if they chose so, as the rig changes.
+
+juce::File InstrumentHostService::showFile (const juce::String& fileName, bool builtIn) const
+{
+    const auto folder = builtIn ? options.builtInShowsDirectory : userShowsDirectory();
+    return folder == juce::File() || ! show::isShowFileName (fileName) ? juce::File()
+                                                                       : folder.getChildFile (fileName);
+}
+
+juce::var InstrumentHostService::buildShow (const juce::String& name, bool includeStageNotes)
+{
+    ensureLibrary();
+    auto performance = rack.captureState();
+    if (! includeStageNotes)
+        show::stripStageNotes (performance);
+
+    // The records the rack points at, and the records those point at: a song's own rack names
+    // sounds of its own. Each once, however many songs share it.
+    juce::StringArray wanted;
+    show::collectRecordIds (performance, wanted);
+    std::map<juce::String, show::PluginNeed> plugins;
+    show::collectPlugins (performance, plugins);
+
+    Library carried;
+    for (int i = 0; i < wanted.size(); ++i)
+    {
+        const auto* record = library.find (wanted[i]);
+        if (record == nullptr)
+            continue;   // missing here already; the other side is told the same way
+
+        auto copy = *record;
+        copy.versions.clear();   // the current sound travels; its history stays at home
+        if (copy.rackManifestJson.isNotEmpty())
+        {
+            Performance nested;
+            if (Performance::fromVar (juce::JSON::parse (copy.rackManifestJson), nested))
+            {
+                if (! includeStageNotes)
+                {
+                    show::stripStageNotes (nested);
+                    copy.rackManifestJson = juce::JSON::toString (nested.toVar(), true);
+                }
+                show::collectRecordIds (nested, wanted);   // appended: this loop reaches them
+                show::collectPlugins (nested, plugins);
+            }
+        }
+        carried.adoptRecord (std::move (copy));
+    }
+
+    juce::Array<juce::var> needs;
+    for (const auto& [ceId, need] : plugins)
+    {
+        auto* row = new juce::DynamicObject();
+        row->setProperty ("ceId", need.ceId);
+        row->setProperty ("name", need.name);
+        row->setProperty ("vendor", need.vendor);
+        needs.add (juce::var (row));
+    }
+    auto* required = new juce::DynamicObject();
+    required->setProperty ("plugins", needs);
+
+    // The controller the pages are drawn for. Written either way, so that opening a show made
+    // for the built-in CTRL49 drawing clears a description another show left behind.
+    loadUserSurface();
+    juce::var controller (false);
+    if (userSurfaceName.isNotEmpty())
+    {
+        auto* described = new juce::DynamicObject();
+        described->setProperty ("name", userSurfaceName);
+        described->setProperty ("encoders", userSurfaceCapabilities.encoders);
+        described->setProperty ("faders", userSurfaceCapabilities.faders);
+        described->setProperty ("pads", userSurfaceCapabilities.pads);
+        controller = juce::var (described);
+    }
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("format", show::formatName);
+    root->setProperty ("version", show::formatVersion);
+    root->setProperty ("name", name);
+    root->setProperty ("savedAtMs", juce::Time::currentTimeMillis());
+    root->setProperty ("rack", performance.toVar());
+    root->setProperty ("library", carried.toVar());
+    root->setProperty ("controller", controller);
+    root->setProperty ("stagePages", surfacePagesVar());
+    root->setProperty ("requires", juce::var (required));
+    return juce::var (root);
+}
+
+bool InstrumentHostService::writeShow (const juce::File& file, const juce::String& name,
+                                       bool includeStageNotes)
+{
+    file.getParentDirectory().createDirectory();
+    return writeTextAtomically (file, juce::JSON::toString (buildShow (name, includeStageNotes), true));
+}
+
+bool InstrumentHostService::saveCurrentShowAs (const juce::String& name, const juce::String& fileName)
+{
+    // Always into this program's own folder: a built-in show is part of the program and is
+    // never written, so saving one keeps a copy here that takes its place in the list.
+    const auto file = userShowsDirectory().getChildFile (fileName);
+    if (! writeShow (file, name, true))
+    {
+        emitError ("Could not save the show to " + file.getFullPathName() + ".");
+        return false;
+    }
+    currentShowName = name;
+    currentShowFileName = fileName;
+    currentShowBuiltIn = false;
+    showChanged = false;
+    showSaveDueMs = 0;
+    saveShowState();
+    refreshShowList();
+    if (options.emit != nullptr)
+    {
+        auto* saved = new juce::DynamicObject();
+        saved->setProperty ("name", name);
+        saved->setProperty ("path", file.getFullPathName());
+        options.emit ("instrumentHostShowSaved", juce::var (saved));
+    }
+    return true;
+}
+
+bool InstrumentHostService::openShow (const juce::File& file, const juce::String& fileName, bool builtIn)
+{
+    const auto parsed = juce::JSON::parse (file.loadFileAsString());
+    if (parsed.getProperty ("format", {}).toString() != show::formatName)
+    {
+        emitError ("\"" + file.getFileName() + "\" is not a HoSTage show.");
+        return false;
+    }
+    if ((int) parsed.getProperty ("version", 0) > show::formatVersion)
+    {
+        emitError ("\"" + file.getFileName() + "\" was saved by a newer HoSTage. Update this one to open it.");
+        return false;
+    }
+    Performance incoming;
+    if (! Performance::fromVar (parsed.getProperty ("rack", {}), incoming))
+    {
+        emitError ("The rig in \"" + file.getFileName() + "\" could not be read.");
+        return false;
+    }
+
+    // The sounds first, so that what the rig points at is there when it loads. A record this
+    // library already holds is the same record. A vendor preset it knows under an id of its own
+    // (scanned on this computer from the same file) is pointed at rather than copied, so the
+    // show's morphs and pages find the preset this computer can actually load.
+    ensureLibrary();
+    const auto carried = Library::fromVar (parsed.getProperty ("library", {}));
+    std::map<juce::String, juce::String> sameHere;
+    for (const auto& record : carried.allRecords())
+    {
+        if (! record.factory || record.fingerprint.isEmpty() || library.find (record.recordId) != nullptr)
+            continue;
+        for (const auto& local : library.allRecords())
+            if (local.factory && local.sourceType == record.sourceType && local.fingerprint == record.fingerprint)
+            {
+                sameHere[record.recordId] = local.recordId;
+                break;
+            }
+    }
+    bool libraryChanged = false;
+    for (const auto& record : carried.allRecords())
+    {
+        if (sameHere.count (record.recordId) > 0 || library.find (record.recordId) != nullptr)
+            continue;
+        auto copy = record;
+        if (! sameHere.empty() && copy.rackManifestJson.isNotEmpty())
+        {
+            Performance nested;
+            if (Performance::fromVar (juce::JSON::parse (copy.rackManifestJson), nested))
+            {
+                show::remapRecordIds (nested, sameHere);
+                copy.rackManifestJson = juce::JSON::toString (nested.toVar(), true);
+            }
+        }
+        libraryChanged = library.adoptRecord (std::move (copy)) || libraryChanged;
+    }
+    if (libraryChanged)
+        if (const auto report = libraryStore.write (library); ! report.ok())
+            emitError ("The show's sounds could not be added to the sound library at \""
+                       + libraryFile().getFullPathName() + "\". Songs that load their own rack, "
+                       "and morphs, may not work until it opens again.");
+    show::remapRecordIds (incoming, sameHere);
+
+    // The controller the pages are drawn for, and which CTRL49 stage pages are on.
+    loadUserSurface();
+    if (const auto controller = parsed.getProperty ("controller", juce::var (juce::String ("absent")));
+        controller.isObject())
+    {
+        userSurfaceName = controller.getProperty ("name", {}).toString();
+        userSurfaceCapabilities.encoders = juce::jlimit (0, 64, (int) controller.getProperty ("encoders", 0));
+        userSurfaceCapabilities.faders   = juce::jlimit (0, 64, (int) controller.getProperty ("faders", 0));
+        userSurfaceCapabilities.pads     = juce::jlimit (0, 64, (int) controller.getProperty ("pads", 0));
+        saveUserSurface();
+    }
+    else if (controller.isBool())
+    {
+        userSurfaceName = {};
+        userSurfaceCapabilities = {};
+        saveUserSurface();
+    }
+    if (const auto pages = parsed.getProperty ("stagePages", {}); pages.isObject())
+    {
+        applySurfacePagesVar (pages);
+        saveSurfacePages();
+    }
+
+    {
+        const juce::ScopedValueSetter<bool> opening (openingShow, true);
+        const SessionRecovery::ScopedOperation operation (recovery.get(), "openShow", file.getFileName());
+        applyPerformance (std::move (incoming));
+        savePerformance();
+    }
+    editHistory.clear();   // a different show: nothing before it can be undone into it
+
+    // What this computer lacks. The plug-ins never travel, so the show names them, and the
+    // player says so at once rather than one song at a time on stage.
+    showMissing.clear();
+    if (const auto* needs = parsed.getProperty ("requires", {}).getProperty ("plugins", {}).getArray())
+    {
+        const std::scoped_lock lock (catalogLock);
+        for (const auto& need : *needs)
+            if (findClass (need.getProperty ("ceId", {}).toString()) == nullptr)
+            {
+                const auto vendor = need.getProperty ("vendor", {}).toString();
+                showMissing.add (need.getProperty ("name", {}).toString()
+                                 + (vendor.isNotEmpty() ? " (" + vendor + ")" : juce::String()));
+            }
+    }
+
+    currentShowName = parsed.getProperty ("name", {}).toString().trim();
+    if (currentShowName.isEmpty())
+        currentShowName = file.getFileNameWithoutExtension();
+    currentShowFileName = fileName;
+    currentShowBuiltIn = builtIn;
+    showChanged = false;
+    showSaveDueMs = 0;
+    saveShowState();
+    refreshShowList();
+    return true;
+}
+
+bool InstrumentHostService::openFirstBuiltInShow()
+{
+    refreshShowList();
+    const ShowEntry* first = nullptr;
+    for (const auto& entry : showList)
+        if (entry.builtIn && (first == nullptr || entry.fileName == options.firstShowFileName))
+            first = &entry;
+    if (first == nullptr)
+        return false;
+    const auto entry = *first;
+    return openShow (showFile (entry.fileName, true), entry.fileName, true);
+}
+
+void InstrumentHostService::importShow (const juce::File& source)
+{
+    const auto parsed = juce::JSON::parse (source.loadFileAsString());
+    if (parsed.getProperty ("format", {}).toString() != show::formatName)
+    {
+        emitError ("\"" + source.getFileName() + "\" is not a HoSTage show.");
+        emitState();
+        return;
+    }
+
+    // Kept in this program's own folder, so it is in the list next time without the stick or
+    // the download it came from. A show of the same name already here is not overwritten.
+    auto name = parsed.getProperty ("name", {}).toString().trim();
+    if (name.isEmpty())
+        name = source.getFileNameWithoutExtension();
+    auto fileName = show::fileNameFor (name);
+    if (fileName.isEmpty())
+        fileName = "Show" + show::extension();
+    const auto stem = fileName.dropLastCharacters (show::extension().length());
+    for (int n = 2; userShowsDirectory().getChildFile (fileName).exists(); ++n)
+        fileName = stem + " " + juce::String (n) + show::extension();
+
+    const auto copy = userShowsDirectory().getChildFile (fileName);
+    if (! userShowsDirectory().createDirectory().wasOk() || ! source.copyFileTo (copy))
+    {
+        emitError ("Could not copy the show into " + userShowsDirectory().getFullPathName() + ".");
+        emitState();
+        return;
+    }
+    openShow (copy, fileName, false);
+    emitState();
+}
+
+void InstrumentHostService::refreshShowList()
+{
+    showList.clear();
+    juce::StringArray here;
+    const auto scan = [this, &here] (const juce::File& folder, bool builtIn)
+    {
+        if (folder == juce::File() || ! folder.isDirectory())
+            return;
+        for (const auto& file : folder.findChildFiles (juce::File::findFiles, false, "*" + show::extension()))
+        {
+            // A show saved here under a built-in show's name is this program's copy of it.
+            if (builtIn && here.contains (file.getFileName()))
+                continue;
+            here.add (file.getFileName());
+            showList.add ({ file.getFileNameWithoutExtension(), file.getFileName(), builtIn,
+                            file.getLastModificationTime().toMilliseconds() });
+        }
+    };
+    scan (userShowsDirectory(), false);
+    scan (options.builtInShowsDirectory, true);
+    std::sort (showList.begin(), showList.end(), [] (const ShowEntry& a, const ShowEntry& b)
+               { return a.name.compareIgnoreCase (b.name) < 0; });
+}
+
+void InstrumentHostService::loadShowState()
+{
+    if (options.dataDirectory != juce::File())
+    {
+        const auto stored = juce::JSON::parse (showStateFile().loadFileAsString());
+        const auto current = stored.getProperty ("current", {});
+        currentShowFileName = current.getProperty ("file", {}).toString();
+        if (! show::isShowFileName (currentShowFileName))
+            currentShowFileName = {};
+        currentShowName = currentShowFileName.isEmpty() ? juce::String()
+                                                        : current.getProperty ("name", {}).toString();
+        currentShowBuiltIn = (bool) current.getProperty ("builtIn", false);
+        showChanged = currentShowFileName.isNotEmpty() && (bool) stored.getProperty ("changed", false);
+        showChangesSaved = stored.getProperty ("changes", {}).toString() == "save";
+    }
+    refreshShowList();
+}
+
+void InstrumentHostService::saveShowState() const
+{
+    if (options.dataDirectory == juce::File())
+        return;
+    auto* root = new juce::DynamicObject();
+    if (currentShowFileName.isNotEmpty())
+    {
+        auto* current = new juce::DynamicObject();
+        current->setProperty ("name", currentShowName);
+        current->setProperty ("file", currentShowFileName);
+        current->setProperty ("builtIn", currentShowBuiltIn);
+        root->setProperty ("current", juce::var (current));
+    }
+    root->setProperty ("changed", showChanged);
+    root->setProperty ("changes", showChangesSaved ? "save" : "keep");
+    options.dataDirectory.createDirectory();
+    writeTextAtomically (showStateFile(), juce::JSON::toString (juce::var (root)));
+}
+
+void InstrumentHostService::noteShowChanged()
+{
+    if (! showTracking || openingShow || currentShowFileName.isEmpty())
+        return;
+    if (! showChanged)
+    {
+        showChanged = true;
+        saveShowState();
+    }
+    // Into the show as well, once the changes settle: a show can be megabytes of plug-in
+    // state, and a knob being turned is a hundred saves.
+    if (showChangesSaved)
+        showSaveDueMs = juce::Time::currentTimeMillis() + 1500;
+}
+
+void InstrumentHostService::tickShowSave()
+{
+    if (showSaveDueMs == 0 || juce::Time::currentTimeMillis() < showSaveDueMs)
+        return;
+    showSaveDueMs = 0;
+    if (showChangesSaved && showChanged && currentShowFileName.isNotEmpty()
+        && saveCurrentShowAs (currentShowName, currentShowFileName))
+        emitState();
+}
+
+juce::var InstrumentHostService::showsPayload() const
+{
+    juce::Array<juce::var> list;
+    for (const auto& entry : showList)
+    {
+        auto* row = new juce::DynamicObject();
+        row->setProperty ("name", entry.name);
+        row->setProperty ("file", entry.fileName);
+        row->setProperty ("builtIn", entry.builtIn);
+        row->setProperty ("savedAtMs", entry.savedAtMs);
+        list.add (juce::var (row));
+    }
+    juce::Array<juce::var> missing;
+    for (const auto& name : showMissing)
+        missing.add (name);
+
+    auto* root = new juce::DynamicObject();
+    if (currentShowFileName.isNotEmpty())
+    {
+        auto* current = new juce::DynamicObject();
+        current->setProperty ("name", currentShowName);
+        current->setProperty ("file", currentShowFileName);
+        current->setProperty ("builtIn", currentShowBuiltIn);
+        root->setProperty ("current", juce::var (current));
+    }
+    root->setProperty ("changed", showChanged);
+    root->setProperty ("changes", showChangesSaved ? "save" : "keep");
+    root->setProperty ("list", list);
+    root->setProperty ("missing", missing);
+    root->setProperty ("canPick", options.pickShowFile != nullptr);
+    return juce::var (root);
+}
+
+void InstrumentHostService::handleShowCommand (const juce::String& cmd, const juce::var& payload)
+{
+    if (options.dataDirectory == juce::File())
+    {
+        emitError ("Shows need a data folder, and this program has none.");
+        return;
+    }
+
+    if (cmd == "refreshShows")
+    {
+        refreshShowList();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setShowChanges")
+    {
+        showChangesSaved = payload.getProperty ("mode", {}).toString() == "save";
+        saveShowState();
+        if (showChangesSaved && showChanged)
+            showSaveDueMs = juce::Time::currentTimeMillis();   // what was kept apart goes in now
+        emitState();
+        return;
+    }
+
+    if (cmd == "saveShow")
+    {
+        // A name saves a new show, or over this program's show of that name; none saves the
+        // current show into the file it came from, so a built-in show's copy takes its place.
+        auto name = payload.getProperty ("name", {}).toString().trim();
+        auto fileName = name.isEmpty() ? currentShowFileName : show::fileNameFor (name);
+        if (name.isEmpty())
+            name = currentShowName;
+        if (fileName.isEmpty() || name.isEmpty())
+        {
+            emitError ("Give the show a name to save it.");
+            return;
+        }
+        saveCurrentShowAs (name, fileName);
+        emitState();
+        return;
+    }
+
+    if (cmd == "openShow" || cmd == "deleteShow")
+    {
+        const auto fileName = payload.getProperty ("file", {}).toString();
+        const bool builtIn = (bool) payload.getProperty ("builtIn", false);
+        const auto file = showFile (fileName, builtIn);
+        if (file == juce::File() || ! file.existsAsFile())
+        {
+            emitError ("There is no show \"" + fileName + "\" here.");
+            refreshShowList();
+            emitState();
+            return;
+        }
+        if (cmd == "deleteShow")
+        {
+            // A built-in show is part of the program, and the program is not edited from inside.
+            if (builtIn)
+            {
+                emitError ("A show that came with this program cannot be deleted.");
+                return;
+            }
+            if (! file.deleteFile())
+                emitError ("Could not delete " + file.getFullPathName() + ".");
+            else if (fileName == currentShowFileName && ! currentShowBuiltIn)
+            {
+                // The rig stays as it is; it just belongs to no show any more.
+                currentShowName = {};
+                currentShowFileName = {};
+                showChanged = false;
+                showSaveDueMs = 0;
+                saveShowState();
+            }
+            refreshShowList();
+            emitState();
+            return;
+        }
+        openShow (file, fileName, builtIn);
+        emitState();
+        return;
+    }
+
+    if (cmd == "revertShow")
+    {
+        const auto file = showFile (currentShowFileName, currentShowBuiltIn);
+        if (file == juce::File() || ! file.existsAsFile())
+        {
+            emitError ("There is no show open to go back to.");
+            return;
+        }
+        openShow (file, currentShowFileName, currentShowBuiltIn);
+        emitState();
+        return;
+    }
+
+    if (cmd == "importShow" || cmd == "exportShow")
+    {
+        const bool exporting = cmd == "exportShow";
+        auto name = currentShowName;
+        if (name.isEmpty())
+            name = rack.getPerformance().name.trim();
+        const auto act = [this, exporting, name] (const juce::String& path)
+        {
+            if (path.isEmpty())
+                return;   // cancelled
+            juce::File chosen (path);
+            if (! exporting)
+            {
+                importShow (chosen);
+                return;
+            }
+            if (! chosen.hasFileExtension (show::extension()))
+                chosen = chosen.withFileExtension (show::extension());
+            if (writeShow (chosen, name.isNotEmpty() ? name : chosen.getFileNameWithoutExtension(), true))
+            {
+                if (options.emit != nullptr)
+                {
+                    auto* saved = new juce::DynamicObject();
+                    saved->setProperty ("name", name);
+                    saved->setProperty ("path", chosen.getFullPathName());
+                    options.emit ("instrumentHostShowSaved", juce::var (saved));
+                }
+            }
+            else
+                emitError ("Could not write the show to " + chosen.getFullPathName() + ".");
+        };
+
+        if (const auto path = payload.getProperty ("path", {}).toString(); path.isNotEmpty())
+        {
+            act (path);
+            return;
+        }
+        if (options.pickShowFile == nullptr)
+        {
+            emitError ("Choosing a file is not available in this build.");
+            return;
+        }
+        options.pickShowFile (exporting, show::fileNameFor (name),
+                              [aliveToken = alive, act] (const juce::String& path)
+                              {
+                                  if (aliveToken->load())
+                                      act (path);
+                              });
+        return;
+    }
+}
+
 juce::var InstrumentHostService::reliabilityPayload() const
 {
     juce::Array<juce::var> suspects;
@@ -21149,6 +21754,7 @@ juce::var InstrumentHostService::performancePayload() const
 
 void InstrumentHostService::savePerformance()
 {
+    noteShowChanged();
     ++performanceSaveGeneration;
     if (! options.persistSession)
     {

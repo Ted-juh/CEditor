@@ -271,6 +271,48 @@ try {
   await page.getByTestId('surface-describe').waitFor();
   assert.equal(await page.getByTestId('host-utility-project').count(), 1, 'back in the editor, everything returns');
 
+  // Shows: the rig saved with everything its songs need, changed, gone back to, and switched.
+  await page.getByTestId('host-utility-shows').click();
+  await page.getByTestId('host-shows-panel').waitFor();
+  assert.ok(await page.getByTestId('show-import').isDisabled(), 'importing a file is the host\'s, not the preview\'s');
+  await page.getByTestId('show-new-name').fill('Friday: Paradiso');
+  await page.getByTestId('show-save-as').click();
+  assert.equal(await page.getByTestId('show-current-name').innerText(), 'Friday: Paradiso');
+  const partCount = async () => (await state()).rack.parts.length;
+  const addPartFromStore = () => page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.addRackPart();
+  });
+  const savedParts = await partCount();
+  await addPartFromStore();
+  await page.getByTestId('show-changed').waitFor();
+  const revert = page.getByTestId('show-revert');
+  await revert.click();
+  assert.equal(await partCount(), savedParts + 1, 'Back to the show asks before it throws changes away');
+  await revert.click();
+  assert.equal(await partCount(), savedParts, 'and on the second click it does');
+  assert.equal(await page.getByTestId('show-changed').count(), 0);
+
+  await page.getByTestId('show-new-name').fill('Rehearsal');
+  await page.getByTestId('show-save-as').click();
+  assert.equal(await page.getByTestId('show-row').count(), 2);
+  await page.getByTestId('show-row').filter({ hasText: 'Friday' }).getByTestId('show-open').click();
+  assert.match(await page.getByTestId('show-current-name').innerText(), /Friday/, 'switching opens the other show');
+  await addPartFromStore();
+  await page.getByTestId('show-changed').waitFor();
+  const openRehearsal = page.getByTestId('show-row').filter({ hasText: 'Rehearsal' }).getByTestId('show-open');
+  await openRehearsal.click();
+  assert.match(await page.getByTestId('show-current-name').innerText(), /Friday/,
+    'opening another show over unsaved changes asks first');
+  await openRehearsal.click();
+  assert.equal(await page.getByTestId('show-current-name').innerText(), 'Rehearsal');
+  await page.getByTestId('show-changes-save').check();
+  await addPartFromStore();
+  await page.waitForTimeout(100);
+  assert.equal(await page.getByTestId('show-changed').count(), 0, 'saving as it goes, the show never falls behind');
+  await page.getByTestId('show-changes-keep').check();
+  await page.getByTestId('host-utility-close').click();
+
   // A product in a folder of its own is asked, once, about the rig an earlier build kept in the
   // folder every product shared. The preview has no such folder, so the host's answer is set.
   await page.evaluate(async () => {
@@ -290,7 +332,7 @@ try {
     'and the Product utility says where this product keeps its data');
 
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros, returns, bus effects, Try as player and the data folder work as drawn');
+  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros, returns, bus effects, Try as player, shows and the data folder work as drawn');
 } finally {
   await browser.close();
   await server.close();

@@ -444,6 +444,18 @@ public:
             next start, before anything reads the data folder) or to leave it (declineLegacyData).
             Empty: nothing to offer. */
         juce::File legacyDataDirectory;
+        /** Shows that ship with the program (HostShow.h). Read-only; listed beside the shows saved
+            in the data folder's shows/. The runtime shells find them beside the program. Empty:
+            none. */
+        juce::File builtInShowsDirectory;
+        /** Which built-in show a program opens the first time it starts, before it has a session:
+            a file name in builtInShowsDirectory. Empty: the first one there. */
+        juce::String firstShowFileName;
+        /** Opens the native file chooser for a show and calls back with the chosen file, empty for
+            cancel. `saving` asks where to write one. Absent (tests, plain browser): importShow and
+            exportShow refuse aloud, as pickDirectory does. */
+        std::function<void (bool saving, const juce::String& suggestedName,
+                            std::function<void (const juce::String& file)>)> pickShowFile;
         double sampleRate = 44100.0;
         int blockSize = 512;
     };
@@ -1935,6 +1947,45 @@ private:
     /** "none", "offered", "pending" (asked for, applied at the next start), "adopted" or
         "declined". */
     juce::String legacyDataState() const;
+    // -- shows (HostShow.h) ---------------------------------------------------------------
+    // One show is current: its rig is the session, which saves after every change as it always
+    // has. Whether a change also goes into the show's file is the user's choice
+    // (showChangesSaved); kept apart, the show is what Back to the show returns to.
+    struct ShowEntry
+    {
+        juce::String name;          // the file's name without its extension
+        juce::String fileName;
+        bool builtIn = false;
+        juce::int64 savedAtMs = 0;
+    };
+    void handleShowCommand (const juce::String& cmd, const juce::var& payload);
+    juce::File userShowsDirectory() const { return options.dataDirectory.getChildFile ("shows"); }
+    juce::File showStateFile() const      { return options.dataDirectory.getChildFile ("show-state.json"); }
+    juce::File showFile (const juce::String& fileName, bool builtIn) const;
+    juce::var buildShow (const juce::String& name, bool includeStageNotes);
+    bool writeShow (const juce::File& file, const juce::String& name, bool includeStageNotes);
+    bool saveCurrentShowAs (const juce::String& name, const juce::String& fileName);
+    bool openShow (const juce::File& file, const juce::String& fileName, bool builtIn);
+    bool openFirstBuiltInShow();
+    void importShow (const juce::File& source);
+    void refreshShowList();
+    void loadShowState();
+    void saveShowState() const;
+    void noteShowChanged();
+    void tickShowSave();
+    juce::var showsPayload() const;
+    juce::var surfacePagesVar() const;
+    void applySurfacePagesVar (const juce::var& stored);
+    juce::Array<ShowEntry> showList;
+    juce::String currentShowName, currentShowFileName;
+    bool currentShowBuiltIn = false;
+    bool showChanged = false;           // the rig moved on since the show was opened or saved
+    bool showChangesSaved = false;      // the setting: changes go into the show's file as they happen
+    bool showTracking = false;          // from the end of the session restore: its own saves are not changes
+    bool openingShow = false;           // nor are the saves an opening show makes
+    juce::int64 showSaveDueMs = 0;
+    juce::StringArray showMissing;      // plug-ins the show opened last needs and this computer lacks
+
     juce::String legacyDecision;        // as legacy-data.json says
     juce::StringArray legacyFailed;     // what the copy could not bring over
     bool legacyOffered = false;

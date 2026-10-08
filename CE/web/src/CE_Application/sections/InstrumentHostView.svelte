@@ -95,6 +95,7 @@
   import HostSurfacePanel from './HostSurfacePanel.svelte';
   import Ctrl49ScreenCard from './Ctrl49ScreenCard.svelte';
   import ProductPanel from './ProductPanel.svelte';
+  import HostShowsPanel from './HostShowsPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
   import LicencePanel from './LicencePanel.svelte';
   import HostKeyboard from './HostKeyboard.svelte';
@@ -148,6 +149,7 @@
   let legacyData = $derived($hostState.product.data);
   let playerInstalled = $derived($hostState.playerInstalled === true);
   const hostUtilities = [
+    { id: 'shows', label: 'Shows' },
     { id: 'library', label: 'Library' },
     { id: 'devices', label: 'Audio & MIDI' },
     { id: 'project', label: 'Project' },
@@ -871,6 +873,10 @@
         </span>
       </div>
     </div>
+  {/if}
+
+  {#if activeUtility === 'shows'}
+    <HostShowsPanel />
   {/if}
 
   {#if activeUtility === 'product'}
@@ -2382,6 +2388,10 @@
     color: #dce4ea;
   }
   button.utility-tab.warn { color: #e4b3b3; }
+  /* Seven utilities and the role switch: below this the row's own label is what gives way. */
+  @media (max-width: 1200px) {
+    .utility-tabs .navigation-label { display: none; }
+  }
   /* Which program this is, at the end of the row: the header has no width to spare below 1400 px. */
   button.role-try, .role-badge { flex: none; margin-left: -6px; position: relative; white-space: nowrap; }
   button.role-try::before, .role-badge::before {

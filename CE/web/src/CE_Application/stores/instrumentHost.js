@@ -26,6 +26,7 @@ import {
   onInstrumentHostLibrary,
   onInstrumentHostLibraryLoad,
   onInstrumentHostLibrarySaved,
+  onInstrumentHostShowSaved,
   onInstrumentHostSupportBundle,
   onInstrumentHostLicenceReceipt,
   onInstrumentHostMidiActivity,
@@ -94,6 +95,14 @@ function showLibrarySaved(payload) {
   const name = String(payload?.name ?? '').trim();
   if (!name) return;
   hostSaveNotice.set(`Saved “${name}” to library.`);
+  saveNoticeTimer = setTimeout(clearSaveNotice, 5000);
+  saveNoticeTimer?.unref?.();
+}
+function showShowSaved(payload) {
+  clearSaveNotice();
+  const name = String(payload?.name ?? '').trim();
+  const where = String(payload?.path ?? '').trim();
+  hostSaveNotice.set(where ? `Saved the show${name ? ` “${name}”` : ''} to ${where}.` : `Saved the show “${name}”.`);
   saveNoticeTimer = setTimeout(clearSaveNotice, 5000);
   saveNoticeTimer?.unref?.();
 }
@@ -2296,6 +2305,7 @@ export function emptyHostState() {
     // acting as one — installed as one (`playerInstalled`) or the editor trying its show.
     player: false,
     playerInstalled: false,
+    shows: emptyShows(),
     editHistory: { canUndo: false, canRedo: false, undoLabel: '', redoLabel: '', blockedReason: '' },
     editorOpenPartId: '',
     editorOpenPartIds: [],
@@ -2587,6 +2597,31 @@ export function emptyProduct() {
     activeHostingIncidents: [],
     surfaceProfiles: [],
     data: { folder: '', legacy: 'none', legacyFolder: '', legacyFailed: [] },
+  };
+}
+
+/** The shows this program knows (HostShow.h): which one is open, whether the rig has moved on
+ *  since it was saved, where changes go, and what the open show needs that this computer lacks. */
+export function emptyShows() {
+  return { current: null, changed: false, changes: 'keep', list: [], missing: [], canPick: false };
+}
+export function normalizeShows(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const current = p.current && typeof p.current === 'object' && String(p.current.file ?? '')
+    ? { name: String(p.current.name ?? ''), file: String(p.current.file), builtIn: p.current.builtIn === true }
+    : null;
+  return {
+    current,
+    changed: current !== null && p.changed === true,
+    changes: p.changes === 'save' ? 'save' : 'keep',
+    list: (Array.isArray(p.list) ? p.list : []).map((row) => ({
+      name: String(row?.name ?? ''),
+      file: String(row?.file ?? ''),
+      builtIn: row?.builtIn === true,
+      savedAtMs: Number(row?.savedAtMs ?? 0) || 0,
+    })).filter((row) => row.file),
+    missing: (Array.isArray(p.missing) ? p.missing : []).map(String),
+    canPick: p.canPick === true,
   };
 }
 
@@ -4591,6 +4626,7 @@ export function normalizeHostState(payload) {
     scanning: p.scanning === true,
     stageLocked: p.stageLocked === true,
     player: p.player === true || p.playerInstalled === true,
+    shows: normalizeShows(p.shows),
     playerInstalled: p.playerInstalled === true,
     editHistory: {
       canUndo: p.editHistory?.canUndo === true,
@@ -5641,6 +5677,85 @@ function mockShowPlaying(perf) {
   perf.arrangement.songId = song?.itemId ?? '';
 }
 
+// The preview's shows live in memory for as long as the page does: enough to save, switch and go
+// back, which is what the Shows utility is for. A file to import or export needs the host.
+const mockShowRigs = new Map();
+export const MOCK_SHOW_COMMANDS = new Set([
+  'saveShow', 'openShow', 'revertShow', 'deleteShow', 'setShowChanges', 'refreshShows', 'importShow', 'exportShow',
+]);
+const mockShowFile = (name) => {
+  const legal = String(name).replace(/["#@,;:<>*^|?\\/]/g, '').trim().replace(/^\.+/, '').trim();
+  return legal ? `${legal}.hostageshow` : '';
+};
+const mockRig = (state) => JSON.parse(JSON.stringify({ rack: state.rack, performance: state.performance }));
+
+function applyMockShowCommand(next, payload) {
+  const cmd = payload.cmd;
+  const shows = next.shows;
+  const restore = (file) => {
+    const rig = mockShowRigs.get(file);
+    if (!rig) return false;
+    const copy = JSON.parse(JSON.stringify(rig));
+    next.rack = copy.rack;
+    next.performance = copy.performance;
+    return true;
+  };
+  if (cmd === 'setShowChanges') {
+    shows.changes = payload.mode === 'save' ? 'save' : 'keep';
+    if (shows.changes === 'save' && shows.changed && shows.current) {
+      mockShowRigs.set(shows.current.file, mockRig(next));
+      shows.changed = false;
+    }
+    return next;
+  }
+  if (cmd === 'saveShow') {
+    const named = String(payload.name ?? '').trim();
+    const name = named || shows.current?.name || '';
+    const file = named ? mockShowFile(named) : shows.current?.file ?? '';
+    if (!file || !name) return next;
+    mockShowRigs.set(file, mockRig(next));
+    shows.list = [...shows.list.filter((row) => row.file !== file),
+      { name: file.replace(/\.hostageshow$/, ''), file, builtIn: false, savedAtMs: Date.now() }]
+      .sort((a, b) => a.name.localeCompare(b.name));
+    shows.current = { name, file, builtIn: false };
+    shows.changed = false;
+    return next;
+  }
+  if (cmd === 'openShow' || cmd === 'revertShow') {
+    const file = cmd === 'openShow' ? String(payload.file ?? '') : shows.current?.file ?? '';
+    const row = shows.list.find((entry) => entry.file === file);
+    if (!row || !restore(file)) return next;
+    shows.current = { name: cmd === 'revertShow' ? shows.current.name : row.name, file, builtIn: row.builtIn };
+    shows.changed = false;
+    shows.missing = [];
+    return next;
+  }
+  if (cmd === 'deleteShow') {
+    const file = String(payload.file ?? '');
+    if (shows.list.some((row) => row.file === file && row.builtIn)) return next;
+    mockShowRigs.delete(file);
+    shows.list = shows.list.filter((row) => row.file !== file);
+    if (shows.current?.file === file) {
+      shows.current = null;
+      shows.changed = false;
+    }
+    return next;
+  }
+  return next;
+}
+
+/** As the host notes a save: a command that moved the rig moves the show on from its file — or,
+ *  when changes go into the show, into it. */
+export function noteMockShowChange(before, after, payload) {
+  if (!after.shows.current || MOCK_SHOW_COMMANDS.has(payload?.cmd)) return after;
+  if (JSON.stringify([before.rack, before.performance]) === JSON.stringify([after.rack, after.performance])) return after;
+  if (after.shows.changes === 'save') {
+    mockShowRigs.set(after.shows.current.file, mockRig(after));
+    return after;
+  }
+  return after.shows.changed ? after : { ...after, shows: { ...after.shows, changed: true } };
+}
+
 export function applyMockCommand(state, payload) {
   const cmd = payload?.cmd;
   const next = normalizeHostState(state);
@@ -5662,6 +5777,7 @@ export function applyMockCommand(state, payload) {
     return next;
   }
   if (next.player && editorOnlyCommand(payload)) return next;
+  if (MOCK_SHOW_COMMANDS.has(cmd)) return applyMockShowCommand(next, payload);
 
   if (cmd === 'startPerformanceRecording') {
     if (next.performance.performanceReplay.state !== 'idle') return next;
@@ -8410,6 +8526,7 @@ export function initInstrumentHostBridge() {
     hostLastError.set(String(payload?.message ?? ''));
   });
   onInstrumentHostLibrarySaved(showLibrarySaved);
+  onInstrumentHostShowSaved(showShowSaved);
   onInstrumentHostLibraryLoad((payload) => hostLibraryLoad.set(normalizeLibraryLoad(payload)));
   send({ cmd: 'getState' });
 }
@@ -8540,6 +8657,14 @@ function send(payload) {
     }
     if (payload?.cmd === 'setTryAsPlayer' && get(hostState).playerInstalled) {
       hostLastError.set('This is a player: there is no editor to go back to.');
+      return;
+    }
+    if (payload?.cmd === 'importShow' || payload?.cmd === 'exportShow') {
+      hostLastError.set('Choosing a file is not available in the browser preview.');
+      return;
+    }
+    if (payload?.cmd === 'saveShow' && !String(payload?.name ?? '').trim() && !get(hostState).shows.current) {
+      hostLastError.set('Give the show a name to save it.');
       return;
     }
 
@@ -9407,7 +9532,8 @@ function send(payload) {
       });
       return;
     }
-    hostState.set(applyMockCommand(get(hostState), payload));
+    const before = get(hostState);
+    hostState.set(noteMockShowChange(before, applyMockCommand(before, payload), payload));
     return;
   }
   sendInstrumentHostCommand(payload);
@@ -9972,6 +10098,16 @@ export const setPartOutputPair = (partId, pair) => send({ cmd: 'setPartOutputPai
 export const claimHardwareSurface = () => send({ cmd: 'claimHardwareSurface' });
 export const releaseHardwareSurface = () => send({ cmd: 'releaseHardwareSurface' });
 export const clearActiveHostingIncidents = () => send({ cmd: 'clearActiveHostingIncidents' });
+// Shows (HostShow.h): save the rig with every sound its songs use, open and switch between them,
+// bring one in from another computer or write one out for it.
+export const saveShow = (name) => send(name ? { cmd: 'saveShow', name } : { cmd: 'saveShow' });
+export const openShow = (file, builtIn = false) => send({ cmd: 'openShow', file, builtIn: builtIn === true });
+export const revertShow = () => send({ cmd: 'revertShow' });
+export const deleteShow = (file) => send({ cmd: 'deleteShow', file });
+export const importShow = () => send({ cmd: 'importShow' });
+export const exportShow = () => send({ cmd: 'exportShow' });
+export const setShowChanges = (mode) => send({ cmd: 'setShowChanges', mode: mode === 'save' ? 'save' : 'keep' });
+export const refreshShows = () => send({ cmd: 'refreshShows' });
 // The rig an earlier build kept in the folder every product shared: bring it over at the next
 // start, or leave it where it is.
 export const adoptLegacyData = () => send({ cmd: 'adoptLegacyData' });

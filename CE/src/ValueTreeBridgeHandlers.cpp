@@ -1873,6 +1873,26 @@ void ValueTreeBridge::ensureInstrumentHost()
             });
     };
 
+    // A show to bring in (from a stick, a download) or a place to write one (HostShow.h).
+    options.pickShowFile = [this] (bool saving, const juce::String& suggestedName,
+                                std::function<void (const juce::String&)> done)
+    {
+        const auto documents = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+        fileChooser = std::make_unique<juce::FileChooser> (
+            saving ? "Save the show as" : "Open a show",
+            saving && suggestedName.isNotEmpty() ? documents.getChildFile (suggestedName) : documents,
+            "*.hostageshow");
+        fileChooser->launchAsync (
+            saving ? (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                      | juce::FileBrowserComponent::warnAboutOverwriting)
+                   : (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles),
+            [done] (const juce::FileChooser& fc)
+            {
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
     // The same isolated instantiator the generated wrappers use (PluginInstantiator.h). The
     // returned factory captures only worker/staging paths and outlives this command safely.
     const auto liveWorker = findLivePluginWorker();
@@ -1928,6 +1948,9 @@ void ValueTreeBridge::ensureInstrumentHost()
             // The editor's preview session IS the authored rack; it ships as the product's
             // factory Performance (the script skips it gracefully when none exists yet).
             "--performance", dataDir.getChildFile ("session-performance.json").getFullPathName(),
+            // The show the service wrote just before calling this: the rack with every sound
+            // its songs point at (HostShow.h). When it is there it ships instead of the rack.
+            "--show",        dataDir.getChildFile ("product-show.hostageshow").getFullPathName(),
             "--build-dir",   root.getChildFile ("build").getChildFile ("native").getFullPathName(),
             "--config",      "Release",
             "--out",         out.getFullPathName(),

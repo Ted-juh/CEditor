@@ -216,9 +216,25 @@ inline HostageManifest readHostageManifest()
                                           .getParentDirectory());
 }
 
+/** The shows that ship with the program: a shows folder beside the standalone's exe, or in the
+    VST3 bundle's Contents/Resources — where the factory rack has always been looked for. */
+inline juce::File findBuiltInShows()
+{
+    const auto moduleDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+                               .getParentDirectory();
+    for (const auto& candidate : { moduleDir.getChildFile ("shows"),
+                                   moduleDir.getParentDirectory().getChildFile ("Resources")
+                                            .getChildFile ("shows") })
+        if (candidate.isDirectory())
+            return candidate;
+    return {};
+}
+
 inline HostageManifest configureForThisProgram (InstrumentHostService::Options& options)
 {
     const auto manifest = readHostageManifest();
+    options.builtInShowsDirectory = findBuiltInShows();
+    options.firstShowFileName = manifest.showFileName;
     options.dataDirectory = productDataDirectory (hostDataRoot(), manifest);
     options.hardwareClaimDirectory = hostDataRoot();
     if (manifest.hasProduct())

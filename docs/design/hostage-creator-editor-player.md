@@ -1,8 +1,8 @@
 # HoSTage: creator, editor and player
 
 *Status: the owner's intention, written down on 2026-10-08, with what exists today and what each
-part would take. Steps 1 and 2 — the player role, and a data folder per product — are built;
-nothing after them is. When this and the code disagree about what exists, the code is right.*
+part would take. Steps 1 to 3 — the player role, a data folder per product, and the show — are
+built; nothing after them is. When this and the code disagree about what exists, the code is right.*
 
 ## The intention, in the owner's words
 
@@ -59,8 +59,9 @@ Tier B already nearly exists — by accident rather than design:
 - **Stage Lock is already the restriction the owner describes**, enforced in the host itself
   (`InstrumentHostService.cpp`, the allow-list near the top): playing, songs, scenes, levels,
   macros and parameters work; changing the rig does not.
-- **The player role exists (step 1), but nothing makes a player yet**, and no file carries a show
-  from one program to another. A program becomes a player only by a hand-placed `hostage.json`.
+- **The player role exists (step 1), but nothing makes a player yet.** A program becomes a player
+  only by a hand-placed `hostage.json`. A show file now carries a rig from one program to another
+  (step 3).
 - **The player builds and runs on Linux too** — `CEHostStandalone` was built on a Linux x86-64
   machine for this note, as a 41 MB `Hostage`, and shows its UI in WebKitGTK (until step 1 it asked
   for WebView2 by name everywhere and showed only the missing-runtime message off Windows) — but
@@ -109,8 +110,9 @@ its own uninstall identity, which already exists as `appId`), optionally with a 
 - which plugins and sounds it needs, by name and ID — never the plugins themselves (their licences
   forbid it), so the player checks on start-up what is missing, the way Check setlist does now.
 
-The player carries one show, built in, and can save changes to it (outside Stage mode). Today's
-`session-performance.json` "factory performance" in `build-host-product.mjs` is the start of this.
+A player carries the show it was built with and can switch to others (the owner, 2026-10-08:
+"a player should be able to switch between different shows"). Whether changes go into a show as
+they happen or wait to be saved is the user's choice ("could be optional").
 
 **One set of programs, two modes.** B and C should be the *same* executables with a small
 manifest beside them saying which they are (`role: editor | player`, the product name, the show).
@@ -162,7 +164,29 @@ Two builds would double every test and every release; one build with a role cann
      stamped with it, so neither can match the product until the build ships the Host Project's
      identity (and its licence public key) and the runtime adopts it. That belongs with the
      licence decision below.
-3. **The show** — format, save in B, load in C, the missing-plugin check. Medium.
+3. **The show** — format, save in B, load in C, the missing-plugin check. Medium. *Built:*
+   - A `.hostageshow` file (`HostShow.h`): the rack as a session holds it (plug-in states,
+     pages and screens, scenes, songs, setlist, hardware patches), the sound-library records the
+     rack points at, the controller description, the stage pages, and the plug-ins it needs by
+     class id, name and vendor. A song with its own rack points at a library record, which is why
+     the bare rack Build product shipped until now could not carry a setlist of several racks.
+   - The rack points at the library in exactly five places (a part's last sound, both ends of a
+     morph, a page's sound, a song's rack); the show collects them, and the records those racks
+     point at in turn. Opening a show adds the records under their own ids; a vendor preset this
+     computer scanned itself (same file, same SHA-256) is pointed at instead of copied.
+   - Shows live in the data folder's `shows/`; a product's built-in shows in `shows/` beside the
+     program (VST3: `Contents/Resources/shows`), opened on the first start (`hostage.json` names
+     which). A built-in show is never written; saving it keeps a copy that takes its place.
+   - The rig stays the session, saved after every change. "Changes kept apart" (the default)
+     marks the show changed and offers Back to the show; "saved as I go" writes the show 1.5 s
+     after the changes settle, and once more on the way out.
+   - Opening a show names the plug-ins this computer lacks. It clears the undo history.
+   - The player opens, switches, saves, imports and deletes shows; Stage Lock refuses all of it.
+   - Build product writes the running show (stage notes per the Host Project) and ships it as
+     the product's first show; `build-host-product.mjs` strips the notes again from every rack in
+     it, whoever wrote it.
+   - Not carried: a vendor's preset *file*. The show records which preset; the other computer
+     needs it scanned into its own library.
 4. **Create a player from B without a developer machine.** The installed HoSTage ships its own
    programs as the template; creating a player copies them with the manifest and the show into a
    folder. No Node.js (the staging moves into C++), and no Inno Setup needed: the result is a

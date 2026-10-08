@@ -73,13 +73,14 @@ See [chapter 11](#11-on-stage).
 
 **Workspaces.** In Build mode there are six: **Rack**, **Sounds**, **Performance**, **Mixer**, **Layers**
 and **Controller**, each described in its own chapter below. The **Utilities** open in a drawer on the
-right: **Library**, **Audio & MIDI**, **Project**, **Product**, **Health** and **Edition**
+right: **Shows**, **Library**, **Audio & MIDI**, **Project**, **Product**, **Health** and **Edition**
 ([chapter 12](#12-utilities)).
 
 **Editor and player.** HoSTage has two roles. The **editor** — the HoSTage in CEditor — makes
 everything, including control pages and CTRL49 screens. A **player** plays a finished show. In a
-player you can still add and replace instruments and effects, browse and load sounds, mix, and edit
-songs and setlists. Stage Lock restricts those, as it always does. What a player does not have:
+player you can still add and replace instruments and effects, browse and load sounds, mix, edit
+songs and setlists, and switch between [shows](#shows). Stage Lock restricts those, as it always
+does. What a player does not have:
 
 - making, renaming or removing control pages;
 - assigning parameters to controls, **Auto pages** and the **⚡** quick-learn;
@@ -645,7 +646,42 @@ stays on.
 
 ## 12. Utilities
 
-The **Utilities** drawer on the right holds six pages. A player has five: it has no **Project**.
+The **Utilities** drawer on the right holds seven pages. A player has six: it has no **Project**.
+
+### Shows
+
+A **show** is a whole evening in one file. It holds:
+
+- the rig, with its control pages and CTRL49 screens;
+- scenes, songs and the setlist;
+- captured hardware patches;
+- the controller description, and which CTRL49 stage pages are on;
+- every sound from the library that a song, a morph or a page points at. A song that loads its own
+  rack ("Save rack") takes that rack with it.
+
+Plug-ins are never in a show. It names the ones it needs.
+
+- **Save as new show** keeps the rig as a show under the name you type. **Save show** saves the open
+  show again.
+- The list shows every show this HoSTage knows. **Open** switches to one. If the open show has
+  changes that are not saved, **Open** asks for a second click, because those changes are lost.
+- **Delete** removes a show, after a second click. Shows that came with the program are marked
+  **built in** and cannot be deleted. Saving one keeps your own copy in its place.
+- After you open a show whose plug-ins are not installed here, HoSTage says so: "This show needs
+  plug-ins this computer does not have: …". Install them and scan in the [Library](#library)
+  utility. Until then the parts that use them stay silent.
+- **Import a show…** opens a show file from a USB stick, a download or an email, and keeps a copy in
+  this HoSTage's list. **Export this show…** writes the rig as a show file wherever you choose.
+
+**When the rig changes**, you choose where the changes go:
+
+- **Keep the changes apart until I save** (the default). The show stays as you saved it, and shows
+  **changed**. The rig keeps your changes, after a restart too. **Back to the show** throws them
+  away, after a second click.
+- **Save them into the show as I go.** Each change goes into the show's file a moment later.
+
+Shows open and switch outside Stage mode only; under Stage Lock HoSTage refuses. A player opens and
+switches shows just as the editor does.
 
 ### Library
 
@@ -667,6 +703,10 @@ beside the rack rather than in the drawer.
 Turns your rack into a product of its own: a standalone program and a VST3 plugin, with an installer.
 Fill in the **Product name**, **Version** and **Publisher**, choose **Standalone**, **VST3** and
 **Stage notes**, and press **Build product**.
+
+The product starts with the show you are running: the rig and every sound its songs use. It lists
+that show among its [shows](#shows) as **built in**. Stage notes go with it only when **Stage notes**
+is ticked.
 
 > **Not finished yet:** **Build product** needs Node.js and a copy of the CEditor source code with the
 > host already built; the installed CEditor has neither, so it reports "Node.js is required…". The
@@ -734,6 +774,9 @@ renaming a product keeps its rig. A file in the folder, `product.json`, names th
 Product utility shows the folder under **This machine**. Two products on one computer keep
 separate rigs, plugin lists, sound libraries and licences.
 
+**Shows** are kept in a `shows` folder inside the data folder. The shows a product came with sit in a
+`shows` folder beside the program (inside a VST3, in `Contents/Resources/shows`).
+
 **Products built before that** all shared `%APPDATA%\CEditorInstrumentHost\` itself. When a newer
 build of a product starts in its own folder and finds data in the shared one, it asks once:
 
@@ -760,6 +803,8 @@ go, and the others leave it alone.
   of 8 instruments, 20 undo steps.
 - **Tuning** works only with instruments that support MIDI Tuning Standard messages.
 - **Build product** works only from a CEditor source checkout (see [Project](#project)).
+- **Shows** carry the sounds you saved yourself and every captured rack. A vendor's preset file is
+  not copied: the other computer needs the same preset, scanned into its library.
 - **Players**: HoSTage cannot make one yet; **Try as player** shows what one would do (see
   [Editor and player](#2-getting-around)).
 - **Not yet tested on real hardware**: the MIDI and the CTRL49 stage pages have been checked in

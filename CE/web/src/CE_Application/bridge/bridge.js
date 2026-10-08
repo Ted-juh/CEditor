@@ -1009,6 +1009,13 @@ export function onInstrumentHostLibrarySaved(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** Emitted after a show was written: saved in the program's shows folder, or exported. */
+export function onInstrumentHostShowSaved(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostShowSaved', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Result of loading a library preset, including asynchronous instrument construction. */
 export function onInstrumentHostLibraryLoad(callback) {
   if (!isJuceAvailable()) return () => {};
