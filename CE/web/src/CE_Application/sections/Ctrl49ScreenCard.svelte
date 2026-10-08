@@ -117,16 +117,17 @@
     }
     if (pageKind === 'live') {
       const view = readLivePayload(payload);
-      const step = view.steps[view.cursor] ?? { velocity: 0, octave: 0, ratchet: 1, chance: 100 };
+      // The cursor walks all sixteen places; past the end of a shorter lane there is no step to turn.
+      const step = view.steps[view.cursor];
       const rates = { 1: '1/4', 2: '1/8', 3: '1/8T', 4: '1/16', 6: '1/16T', 8: '1/32', 12: '1/32T', 16: '1/64' };
       const sign = (n) => (n > 0 ? `+${n}` : String(n));
       const off = view.zones.length === 0;
       return [
         { label: 'Step', text: `${view.cursor + 1} / ${view.steps.length}`, unused: off },
-        { label: 'Velocity', text: step.velocity === 0 ? 'Rest' : String(step.velocity), unused: off },
-        { label: 'Octave', text: sign(step.octave), unused: off },
-        { label: 'Ratchet', text: `x${step.ratchet}`, unused: off },
-        { label: 'Chance', text: `${step.chance}%`, unused: off },
+        { label: 'Velocity', text: !step ? '–' : step.velocity === 0 ? 'Rest' : String(step.velocity), unused: off || !step },
+        { label: 'Octave', text: step ? sign(step.octave) : '–', unused: off || !step },
+        { label: 'Ratchet', text: step ? `x${step.ratchet}` : '–', unused: off || !step },
+        { label: 'Chance', text: step ? `${step.chance}%` : '–', unused: off || !step },
         { label: 'Gate', text: `${view.gate}%`, unused: off },
         { label: 'Rate', text: rates[view.stepsPerBeat] ?? `${view.stepsPerBeat} a beat`, unused: off },
         { label: 'Mode', text: view.arpOn ? (ARP_MODE_NAMES[view.mode] ?? '?') : 'Off', unused: off },
@@ -304,9 +305,12 @@
       turn(slot, target - current);
   }
 
-  function pad(index) {
+  // A Shift-click is the keyboard's Shift held over the pad (LIVE: the lane ends at that step).
+  function pad(index, shift = false) {
+    if (shift) surfaceInput(58, 127);
     surfaceInput(1 + index, 100);
     surfaceInput(1 + index, 0);
+    if (shift) surfaceInput(58, 0);
   }
 
   function onKeydown(event) {
@@ -332,7 +336,7 @@
   const HINT = {
     layers: 'Encoder 1 picks the part; 2–6 set its lowest and highest key, transpose and velocity range.',
     soundcheck: 'Encoder 1 walks the set; encoder 8 checks it again.',
-    live: 'Encoder 1 picks a step; 2–5 set its velocity, octave, ratchets and chance; 6–8 the gate, rate and mode. Pad N turns a step of the cursor\'s half on or off.',
+    live: 'Encoder 1 picks a step; 2–5 set its velocity, octave, ratchets and chance; 6–8 the gate, rate and mode. Pad N turns a step of the cursor\'s half on or off; Shift + pad N ends the pattern at that step (Shift-click here).',
     meters: 'Encoders 1–5 are the faders of the parts shown, 6 the master; 7 shows the next parts when there are more than five.',
     cue: 'Encoder 1 picks a song; pad 1 goes to it. Shift + Page steps the set from any page.',
     changes: 'Encoder 1 listens between the save and now, 2 picks a change, 3 puts it back (the other way takes it back), 4 walks back through the saves.',
@@ -434,8 +438,10 @@
           <button type="button" class="pad" disabled={padIdle(index)}
                   title={padIdle(index) ? 'The pads do nothing on this page'
                          : $ctrl49Screen.pageKind === 'discover' ? `Audition row ${index + 1}`
-                         : $ctrl49Screen.pageKind === 'cue' ? 'Go to the song encoder 1 picked' : `Pad ${index + 1}`}
-                  onclick={() => pad(index)}>{index + 1}</button>
+                         : $ctrl49Screen.pageKind === 'cue' ? 'Go to the song encoder 1 picked'
+                         : $ctrl49Screen.pageKind === 'live' ? 'Click: this step on or off. Shift-click: the pattern ends here'
+                         : `Pad ${index + 1}`}
+                  onclick={(event) => pad(index, event.shiftKey)}>{index + 1}</button>
         {/each}
       </div>
 

@@ -177,8 +177,10 @@ private:
     void paintPads();
     /** LIVE: the part it shows (the rack's focused part, else the first), -1 without parts. */
     int livePart() const;
-    /** LIVE: the turns of one pump applied to that part's arp, sent once through setPartArp. */
-    void applyLiveTurns (const std::array<int, 8>& turns, int padToggled);
+    /** LIVE: the turns of one pump applied to that part's arp, sent once through setPartArp.
+        padToggled is the step a pad turned on or off (-1 none); endAtStep the step Shift + pad
+        made the lane's last, counted from 1 (0 none). */
+    void applyLiveTurns (const std::array<int, 8>& turns, int padToggled, int endAtStep);
     void forgetPadState();
 
     host::InstrumentHostService& service;

@@ -241,7 +241,8 @@ test('LIVE draws the lane with its playhead, the zones, the held keys and the ar
   assert.ok(texts.includes('+1') && texts.includes('60%'), 'an octave and a chance that are not the plain ones');
   assert.ok(texts.includes('3 / 16') && texts.includes('+1') && texts.includes('UP') && texts.includes('50%'),
     'the cells: the step picked, its octave, the mode and the gate');
-  assert.ok(texts.includes('PADS TURN STEPS ON AND OFF'), 'with a lane drawn, what the pads do');
+  assert.ok(texts.includes('PADS: STEPS 1-8 ON AND OFF     SHIFT + PAD: THE LANE ENDS THERE'),
+    'with a lane drawn, which steps the pads are and how the lane is made shorter');
   const ORANGE = 0xFFFF9408, TEAL = 0xFF2DD4BF;
   const rects = calls.filter((c) => c.kind === 'rect');
   assert.ok(rects.some((c) => c.c === TEAL && c.h === 48), 'held keys in the colour of their part, the arp\'s in the part shown');
@@ -250,5 +251,40 @@ test('LIVE draws the lane with its playhead, the zones, the held keys and the ar
   assert.equal(dots.length, 12 + 2, 'a ratchet dot per hit on the twelve steps that play, three on step five; none on a rest');
   p.call('set_live', livePayload({ part: 'Pluck', steps, arpOn: false, zones: [] }));
   assert.ok(said(p.draw()).some((t) => t.includes('ARP OFF')), 'with the arp off the title says so');
+  p.close();
+});
+
+// The owner at the keyboard (2026-10-08): a pad only rests a step, so there was no way to play
+// four steps round and round. Shift + pad ends the lane; the page then has to show a lane shorter
+// than sixteen as one, say which eight steps the pads are, and let the cursor stand past the end.
+test('LIVE draws a lane shorter than sixteen: the places past its end empty, the pads\' half marked', async () => {
+  const p = await page();
+  const steps = Array.from({ length: 4 }, () => ({ velocity: 100, octave: 0, ratchet: 1, chance: 100 }));
+  const drawn = (cursor) => {
+    p.call('set_live', livePayload({ part: 'Pluck', arpOn: true, mode: 0, stepsPerBeat: 4, gate: 50, lane: true, steps,
+                                     cursor, playing: 1, tempo: 120, zones: [{ name: 'Pluck', keyLow: 0, keyHigh: 127 }], focused: 0 }));
+    const calls = p.draw();
+    return { texts: said(calls), rects: calls.filter((c) => c.kind === 'rect') };
+  };
+
+  let { texts, rects } = drawn(2);
+  assert.ok(texts.includes('3 / 4'), 'the step picked, of the four there are');
+  assert.equal(rects.filter((c) => c.w === 3 && c.h === 3).length, 4, 'a ratchet dot for each of the four steps and no more');
+  assert.equal(rects.filter((c) => c.y === 90 && c.h === 2 && c.w === 5).length, 12, 'the twelve places past the end, a short mark each');
+  assert.deepEqual(rects.filter((c) => c.y === 30 && c.w === 2 && c.h === 90).map((c) => c.x), [8 + 4 * 29 - 2],
+    'and a bar after the fourth step: where the lane ends and goes round');
+  assert.deepEqual(rects.filter((c) => c.y === 121 && c.h === 2).map((c) => [c.x, c.w]), [[8, 230]],
+    'a line under the first eight: the steps the pads are');
+  assert.ok(texts.includes('PADS: STEPS 1-8 ON AND OFF     SHIFT + PAD: THE LANE ENDS THERE'));
+  assert.ok(texts.includes('100') && texts.includes('x1'), 'the cells of a step that is there');
+
+  ({ texts, rects } = drawn(10));         // E1 has walked past the end, into the second half
+  assert.ok(texts.includes('11 / 4'), 'the cursor stands past the end, and the page says where');
+  assert.ok(!texts.includes('x1') && texts.filter((t) => t === '-').length === 4,
+    'there is no step there: its four cells are dashes');
+  assert.deepEqual(rects.filter((c) => c.y === 121 && c.h === 2).map((c) => [c.x, c.w]), [[8 + 8 * 29, 230]],
+    'and the line is under the second eight');
+  assert.ok(texts.includes('PADS: STEPS 9-16 ON AND OFF     SHIFT + PAD: THE LANE ENDS THERE'));
+  assert.ok(rects.some((c) => c.x === 8 + 10 * 29 && c.y === 30 && c.w === 27 && c.h === 90), 'the cursor\'s place is still lit');
   p.close();
 });

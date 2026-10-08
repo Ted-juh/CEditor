@@ -924,7 +924,9 @@ end
 -- set_live (Ctrl49StagePages.h has the bytes): the keys as they are played, every part's zone over
 -- them, and the focused part's arpeggiator: its sixteen steps with the playhead, the notes it plays
 -- marked on the keys. E1 picks a step, E2-E5 turn its velocity, octave, ratchets and chance, E6-E8
--- the gate, rate and mode; pad N turns step N of the cursor's half on or off.
+-- the gate, rate and mode; pad N turns step N of the cursor's half on or off, and Shift + pad N
+-- ends the lane at that step. Sixteen places are always drawn: those past the end of a shorter
+-- lane are faint, the cursor walks them too, and a line under eight of them says which the pads are.
 local live = { flags = 0, mode = 0, spb = 4, gate = 50, steps = {}, cursor = 0, playing = 0, tempo = 0,
                key = 36, zones = {}, focused = 255, held = {}, arp = {}, part = "" }
 local ARP_MODES = { "UP", "DOWN", "UP-DOWN", "DOWN-UP", "ORDER", "RANDOM", "CHORD", "PATTERN" }
@@ -971,6 +973,7 @@ end
 local GX, GY, GP, GW, GH = 8, 30, 29, 27, 90   -- the step cells: x, y, pitch, width, height
 local ZY, ZH = 124, 30                         -- the zones' band over the keys
 local LY = 158                                 -- the keys
+local PAST = 0xFF2E3644                        -- a place past the end of the lane: there, and not played
 
 local function draw_live()
     local on = live.flags % 2 == 1
@@ -984,7 +987,7 @@ local function draw_live()
     -- the steps: velocity as a bar, ratchets as dots, the octave and chance under them where they
     -- are not the plain ones
     local base, tall = GY + 62, 54
-    for p = 1, #live.steps do
+    for p = 1, 16 do
         local q = live.steps[p]
         local x = GX + (p - 1) * GP
         local playing = on and live.playing == p
@@ -992,7 +995,11 @@ local function draw_live()
         local c = DIM
         if playing then c = accent end
         if not on then c = DARK end
-        if q.vel > 0 then
+        if q == nil then
+            -- past the end of the lane: a place, and nothing in it
+            draw_rect(x + 11, base - 2, GW - 22, 2, PAST)
+            q = { vel = 0, oct = 0, rat = 1, chance = 100, tie = 0 }
+        elseif q.vel > 0 then
             local h = math.floor(q.vel * tall / 127)
             if h > 0 then draw_rect(x + 6, base - h, GW - 12, h, c) end
             local dots = q.rat * 5 - 2
@@ -1005,6 +1012,14 @@ local function draw_live()
         if q.chance < 100 then say(SMALL, tostring(q.chance) .. "%", DARK, x, base + 15, GW, 12) end
         if playing then outline(x, GY, GW, GH, accent) end
     end
+    -- where a lane shorter than sixteen ends and goes round: a bar in the gap after its last step
+    if #live.steps > 0 and #live.steps < 16 then
+        draw_rect(GX + #live.steps * GP - 2, GY, 2, GH, GREY)
+    end
+    -- the eight the pads are: the half the cursor is in
+    local half = 0
+    if live.cursor >= 8 then half = 8 end
+    draw_rect(GX + half * GP, GY + GH + 1, 8 * GP - 2, 2, DIM)
 
     -- every part's zone over the keys, a band each, named where there is room
     local zones = #live.zones
@@ -1055,24 +1070,30 @@ local function draw_live()
     end
 
     -- what the encoders turn, and where they are
-    local q = live.steps[live.cursor + 1] or { vel = 0, oct = 0, rat = 1, chance = 100 }
-    local vel = tostring(q.vel)
-    if q.vel == 0 then vel = "REST" end
+    local q = live.steps[live.cursor + 1]
     local mode = "OFF"
     if on then mode = ARP_MODES[live.mode + 1] or "?" end
     local labels = { "STEP", "VEL", "OCTAVE", "RATCHET", "CHANCE", "GATE", "RATE", "MODE" }
-    local values = { tostring(live.cursor + 1) .. " / " .. tostring(#live.steps), vel, signed_int(q.oct),
-                     "x" .. tostring(q.rat), tostring(q.chance) .. "%", tostring(live.gate) .. "%",
-                     RATE_NAMES[live.spb] or ("1/" .. tostring(live.spb * 4)), mode }
+    local values = { tostring(live.cursor + 1) .. " / " .. tostring(#live.steps), "-", "-", "-", "-",
+                     tostring(live.gate) .. "%", RATE_NAMES[live.spb] or ("1/" .. tostring(live.spb * 4)), mode }
+    if q ~= nil then      -- past the end of the lane there is no step for E2-E5 to turn
+        values[2] = tostring(q.vel)
+        if q.vel == 0 then values[2] = "REST" end
+        values[3] = signed_int(q.oct)
+        values[4] = "x" .. tostring(q.rat)
+        values[5] = tostring(q.chance) .. "%"
+    end
     for k = 1, 8 do
         local x = 4 + (k - 1) * 59
         say(SMALL, labels[k], DIM, x, 212, 57, 12)
         say(ROWTXT, values[k], k == 1 and WHITE or GREY, x, 226, 57, 18)
     end
+    local pads = "1-8"
+    if half == 8 then pads = "9-16" end
     if live.flags % 4 < 2 then
         say(SMALL, "NO LANE DRAWN: EVERY STEP PLAYS AS PLAYED. TURN E2-E5 OR A PAD TO DRAW ONE", DARK, 8, 252, 464, 14)
     else
-        say(SMALL, "PADS TURN STEPS ON AND OFF", DARK, 8, 252, 464, 14)
+        say(SMALL, "PADS: STEPS " .. pads .. " ON AND OFF     SHIFT + PAD: THE LANE ENDS THERE", DARK, 8, 252, 464, 14)
     end
 end
 

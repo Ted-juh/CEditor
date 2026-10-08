@@ -388,6 +388,14 @@ int main()
                "sixteen steps, six zones; a playhead or a focus past them is none");
         check (capped.size() < c49::kMaxPayloadBytes, "and the fullest page fits one frame");
 
+        // A lane shorter than sixteen: the cursor may stand past its end (the page draws sixteen
+        // places whatever the length), and is held only to the sixteen.
+        view.cursor = 9;
+        check (c49::buildLivePayload (view)[4] == 2 && c49::buildLivePayload (view)[5] == 9,
+               "the cursor past the end of a two-step lane is sent where it stands");
+        view.cursor = 40;
+        check (c49::buildLivePayload (view)[5] == c49::kLiveSteps - 1, "and never past the sixteenth place");
+
         check (c49::liveNextRate (4, 1) == 6 && c49::liveNextRate (4, -1) == 3 && c49::liveNextRate (16, 5) == 16
                  && c49::liveNextRate (1, -3) == 1,
                "E7 steps the rate through 1 2 3 4 6 8 12 16, stopping at the ends");

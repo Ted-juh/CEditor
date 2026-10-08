@@ -512,9 +512,10 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
     std::array<int, 8> zoneTurns {};
     // METERS likewise: E1-E5 the faders of the parts on its strips, E6 the master.
     std::array<int, 6> meterTurns {};
-    // LIVE likewise: E2-E8 edit the arp, and a pad turns a step on or off (-1 none).
+    // LIVE likewise: E2-E8 edit the arp, a pad turns a step on or off (-1 none), and Shift + pad
+    // makes a step the lane's last (counted from 1; 0 none).
     std::array<int, 8> liveTurns {};
-    int livePad = -1;
+    int livePad = -1, liveEnd = 0;
 
     // One reading for both sources: the app's screen sends what the cable sends, so nothing
     // below knows or cares which it was.
@@ -782,12 +783,19 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
         {
             // E1 picks the step, E2-E5 turn its velocity, octave, ratchets and chance, E6-E8 the
             // arp's gate, rate and mode; pad N turns step N of the half the cursor is in on or off.
+            // Shift + pad N ends the lane at that step instead, so it loops over fewer than sixteen:
+            // a pad alone can only rest a step, which is not a shorter pattern (the owner at the
+            // keyboard, 2026-10-08, wanting four steps round and round).
             if (action->encoderMoved && action->encoderSlot == 0)
                 liveCursor = juce::jlimit (0, kLiveSteps - 1, liveCursor + action->encoderDelta);
             else if (action->encoderMoved && action->encoderSlot >= 1 && action->encoderSlot <= 7)
                 liveTurns[(std::size_t) action->encoderSlot] += action->encoderDelta;
             else if (action->padChanged && action->pad >= 1 && action->pad <= 8 && action->velocity > 0)
-                livePad = (liveCursor < 8 ? 0 : 8) + action->pad - 1;
+            {
+                const auto step = (liveCursor < 8 ? 0 : 8) + action->pad;   // counted from 1
+                if (action->shiftHeld) liveEnd = step;
+                else                   livePad = step - 1;
+            }
         }
         else if (reducer.page() == layout.meters)
         {
@@ -861,8 +869,8 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
     }
 
     if (reducer.page() == layout.live
-        && (livePad >= 0 || std::any_of (liveTurns.begin(), liveTurns.end(), [] (int turn) { return turn != 0; })))
-        applyLiveTurns (liveTurns, livePad);
+        && (livePad >= 0 || liveEnd > 0 || std::any_of (liveTurns.begin(), liveTurns.end(), [] (int turn) { return turn != 0; })))
+        applyLiveTurns (liveTurns, livePad, liveEnd);
 
     if (reducer.page() == layout.meters)
     {
@@ -938,7 +946,7 @@ namespace
     }
 } // namespace
 
-void Ctrl49SurfaceBroker::applyLiveTurns (const std::array<int, 8>& turns, int padToggled)
+void Ctrl49SurfaceBroker::applyLiveTurns (const std::array<int, 8>& turns, int padToggled, int endAtStep)
 {
     const auto index = livePart();
     if (index < 0)
@@ -950,10 +958,20 @@ void Ctrl49SurfaceBroker::applyLiveTurns (const std::array<int, 8>& turns, int p
     payload->setProperty ("partId", part.partId);
 
     // The step edits: the whole lane, so a lane drawn here is one the app's editor shows as it is.
-    const bool stepEdit = padToggled >= 0 || turns[1] != 0 || turns[2] != 0 || turns[3] != 0 || turns[4] != 0;
+    const bool stepEdit = padToggled >= 0 || endAtStep > 0 || turns[1] != 0 || turns[2] != 0 || turns[3] != 0 || turns[4] != 0;
     if (stepEdit)
     {
         auto steps = liveLaneOf (arp);
+        // The lane ends where it was told to. A longer one goes on as it was already sounding:
+        // the engine reads a lane round and round, so the steps added are the ones it was playing
+        // there anyway.
+        if (endAtStep > 0)
+        {
+            const auto was = steps;
+            steps.resize ((std::size_t) juce::jlimit (1, kLiveSteps, endAtStep));
+            for (auto i = was.size(); i < steps.size(); ++i)
+                steps[i] = was[i % was.size()];
+        }
         if (padToggled >= 0 && padToggled < (int) steps.size())
         {
             auto& step = steps[(std::size_t) padToggled];
@@ -1143,7 +1161,9 @@ void Ctrl49SurfaceBroker::refreshDisplay (bool toHardware)
                 if (((notes[(std::size_t) (n >> 6)] >> (n & 63)) & 1) != 0)
                     view.arpNotes.push_back (n);
         }
-        liveCursor = juce::jlimit (0, juce::jmax (0, (int) view.steps.size() - 1), liveCursor);
+        // The cursor walks all sixteen places, past the end of a shorter lane too: it is what says
+        // which eight the pads are, and Shift + pad there is how the lane is made longer again.
+        liveCursor = juce::jlimit (0, kLiveSteps - 1, liveCursor);
         view.cursor = liveCursor;
         view.tempo = service.surfaceTransport().tempo;
         stage = buildLivePayload (view);

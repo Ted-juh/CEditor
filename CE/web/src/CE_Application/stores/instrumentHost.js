@@ -377,6 +377,8 @@ export const surfaceInput = (cc, value) =>
 // the stand-in remembers where it turned each knob.
 const mockSurfaceCursor = writable({ page: 0, active: 0, turned: {}, song: -1, part: -1, sound: 0, kind: '', picked: -1,
                                      first: 0, touched: -1, step: 0 });
+// Shift, held (cable CC 58): it changes what a pad does on LIVE and draws nothing, so it is not in the cursor.
+let mockSurfaceShift = false;
 
 /** The stage pages the mock's surface has, in the broker's order: after the performance page. */
 function mockStagePages(state) {
@@ -492,7 +494,7 @@ function mockStageScreen(kind, state, cursor, library) {
     return { call: SURFACE_STAGE_CALLS.live, payload: livePayload({
       part: index >= 0 ? name(parts[index], index) : '', arpOn: arp.enabled === true,
       mode: Math.max(0, ARP_MODE_NAMES.indexOf(arp.mode)), stepsPerBeat: arp.stepsPerBeat ?? 4,
-      gate: Math.round((arp.gate ?? 0.5) * 100), steps, cursor: Math.min(cursor.step ?? 0, steps.length - 1),
+      gate: Math.round((arp.gate ?? 0.5) * 100), steps, cursor: cursor.step ?? 0,
       lane: ['velocityPattern', 'octavePattern', 'ratchetPattern', 'chancePattern', 'tiePattern'].some((k) => arp[k]?.length),
       tempo: Number(state?.performance?.transport?.tempo ?? 120) || 120,
       zones: parts.map((p, i) => ({ name: name(p, i), keyLow: p.keyLow ?? 0, keyHigh: p.keyHigh ?? 127,
@@ -592,14 +594,19 @@ export function mockSurfaceScreen(state, cursor, library) {
 // The stage pages' encoders, as the broker reads them: LAYERS E1 picks the part and E2-E6 turn
 // its zone (lowest key, highest key, transpose, lowest and highest velocity); SOUNDCHECK E1
 // walks the set and E8 checks it again.
-function mockLiveEdit(state, cursor, turns, pad) {
+function mockLiveEdit(state, cursor, turns, pad, endAtStep = 0) {
   const parts = state?.rack?.parts ?? [];
   const part = parts[mockLivePart(state)];
   if (!part) return;
   const arp = part.arp ?? {};
   const edit = { cmd: 'setPartArp', partId: part.partId };
-  if (pad >= 0 || turns[1] || turns[2] || turns[3] || turns[4]) {
-    const steps = mockLiveLane(arp);
+  if (pad >= 0 || endAtStep > 0 || turns[1] || turns[2] || turns[3] || turns[4]) {
+    let steps = mockLiveLane(arp);
+    // Shift + pad: the lane ends there. A longer one goes on as it was already sounding.
+    if (endAtStep > 0) {
+      const was = steps;
+      steps = Array.from({ length: clampStage(endAtStep, 1, 16) }, (_, i) => ({ ...was[i % was.length] }));
+    }
     if (pad >= 0 && steps[pad]) steps[pad].velocity = steps[pad].velocity > 0 ? 0 : 100;
     const step = steps[cursor.step ?? 0];
     if (step) {
@@ -705,9 +712,12 @@ function mockSurfaceInput(data) {
     // Pad 1 goes to the song E1 picked, as setlistGo does on the keyboard.
     mockSurfaceCursor.set({ ...cursor, picked: -1 });
     send({ cmd: 'setlistGo', index: cursor.picked });
+  } else if (cc === 58) {
+    mockSurfaceShift = value === 127;
   } else if (cc >= 1 && cc <= 8 && value > 0 && stage[cursor.page - controlPages - 1] === 'live') {
-    // A pad turns a step of the cursor's half on or off.
-    mockLiveEdit(state, cursor, [0, 0, 0, 0, 0, 0, 0, 0], ((cursor.step ?? 0) < 8 ? 0 : 8) + cc - 1);
+    // A pad turns a step of the cursor's half on or off; with Shift held it ends the lane there.
+    const step = ((cursor.step ?? 0) < 8 ? 0 : 8) + cc;
+    mockLiveEdit(state, cursor, [0, 0, 0, 0, 0, 0, 0, 0], mockSurfaceShift ? -1 : step - 1, mockSurfaceShift ? step : 0);
   } else if (cc >= 1 && cc <= 8 && value > 0 && stage[cursor.page - controlPages - 1] === 'discover') {
     // A pad auditions the sound in its row, as on the keyboard.
     const d = mockDiscover(cursor, get(hostLibrary));

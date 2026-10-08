@@ -76,7 +76,7 @@ pages" already names this group.
 | Page | Shows | Encoders and pads |
 | --- | --- | --- |
 | CUE | the song on stage, N of M, and its tempo; the section playing with its bar and the bars left (or the song's notes when it has no sections); the song's clock against the time planned, and the set's; what comes next and how much of its rig has preloaded | E1 picks a song, pad 1 goes to it; Shift + Page still steps the set from any page. CUE stays up when the song changes: a song's own control page is recalled from every other page, not from here |
-| LIVE | the rack's focused part's arpeggiator: its sixteen steps (velocity as a bar, ratchets as dots, octave and chance where they are not the plain ones) with the step that last sounded outlined; every part's zone over 49 keys; the keys held, in the colour of the part that plays them, and the notes the arp plays from them marked | E1 picks a step, E2-E5 turn its velocity (four a detent; 0 is a rest), octave, ratchets and chance (five a detent), E6 the gate, E7 the rate, E8 the mode, with off before UP; pad N turns step N of the half the cursor is in on or off |
+| LIVE | the rack's focused part's arpeggiator: its sixteen steps (velocity as a bar, ratchets as dots, octave and chance where they are not the plain ones) with the step that last sounded outlined; every part's zone over 49 keys; the keys held, in the colour of the part that plays them, and the notes the arp plays from them marked | E1 picks a step, E2-E5 turn its velocity (four a detent; 0 is a rest), octave, ratchets and chance (five a detent), E6 the gate, E7 the rate, E8 the mode, with off before UP; pad N turns step N of the half the cursor is in on or off, and Shift + pad N ends the lane at that step |
 | LAYERS | every part's key zone over 49 keys, its velocity range and transpose, muted parts and parts fed by another part; layer groups (`L1 V`: group 1 by velocity) with each member's share and crossfades drawn as LayerRouter weighs them; the notes held now, on the zones that would sound them; the picked part's range once more as a band right on top of the keys, with the white keys outside it greyed, so the keys E2 / E3 are selecting are seen and not read | E1 picks the part, E2-E6 turn its lowest key, highest key, transpose, lowest and highest velocity |
 | METERS | five parts and the master on strips: each part's level after its inserts and fader, left and right (the rack's own meters, the loudest peak since the last redraw), peak hold, a clip lamp, the fader on the meter's scale and in decibels, muted parts; the master's last five seconds | E1-E5 the faders of the parts shown, E6 the master, half a decibel a detent; E7 shows the next parts when there are more than five |
 | SOUNDCHECK | the set: each song ready, with problems, or not checked, its measured level and how long it took to load when last recalled (slow ones marked); the selected song's problems in the check's own words, and whether it loaded preloaded | E1 walks the set, E8 checks it again (once a second at most) |
@@ -106,6 +106,14 @@ plays come from the engine itself (`ArpEngine::takeNotes`: the notes sounding, a
 started since the page last asked, so a step shorter than a redraw still shows once), and the
 playhead is `patternStep`, which the app's grid already used. A lane longer than sixteen shows
 its first sixteen.
+
+`patternStep` is -1 for a plain arp, so **no step is outlined until a lane is drawn**; on the
+keyboard that read as the outline not working (2026-10-08). A pad rests a step and cannot make
+the lane shorter, so Shift + pad N ends the lane at step N of the cursor's half: every row is cut
+to that length, or made longer with the steps it had, which is what the engine was playing there
+anyway. The page draws sixteen places whatever the length: a bar after the last step, a faint
+mark in each place past it, a line under the eight the pads are, and the cursor walks all of
+them (past the end E2-E5 and the pads do nothing; Shift + pad is how the lane comes back).
 
 METERS takes the levels the app's mixer is sent (`instrumentHostMeters`): the service keeps the
 loudest of the pump's 30 Hz drains until the page takes them at its 10, so no transient falls

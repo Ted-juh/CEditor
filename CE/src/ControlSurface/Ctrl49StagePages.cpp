@@ -226,7 +226,7 @@ Bytes buildLivePayload (const LiveView& view)
     out.push_back (byte (view.stepsPerBeat, 1, 16));
     out.push_back (byte (view.gate, 0, 100));
     out.push_back (byte (steps));
-    out.push_back (byte (view.cursor, 0, std::max (0, steps - 1)));
+    out.push_back (byte (view.cursor, 0, kLiveSteps - 1));   // it may stand past the end of a short lane
     out.push_back (view.playing >= 0 && view.playing < steps ? byte (view.playing + 1) : 0);
     out.push_back ((std::uint8_t) (tempo & 0xFF));
     out.push_back ((std::uint8_t) (tempo >> 8));

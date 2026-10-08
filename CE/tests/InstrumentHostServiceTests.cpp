@@ -6364,6 +6364,57 @@ void testCtrl49Live()
     tickPast();
     check (focusedArp().velocityPattern[1] == 100, "and back on");
 
+    // Shift + pad: the lane ends at that step. A pad alone only rests a step, which is not a
+    // shorter pattern (the owner at the keyboard, 2026-10-08, wanting four steps round and round).
+    const auto shiftPad = [&] (int pad)
+    {
+        press (58, 127);
+        press (pad, 100);
+        press (pad, 0);
+        press (58, 0);
+        tickPast();
+    };
+    shiftPad (4);                                    // the cursor is on step four: the first half
+    arp = focusedArp();
+    check (arp.velocityPattern.size() == 4 && arp.octavePattern.size() == 4 && arp.ratchetPattern.size() == 4
+             && arp.chancePattern.size() == 4 && arp.tiePattern.size() == 4,
+           "Shift + pad 4 ends the lane at step four, every row with it");
+    check (arp.velocityPattern[0] == 108 && arp.velocityPattern[1] == 100 && arp.octavePattern[3] == 1
+             && arp.ratchetPattern[3] == 3 && arp.chancePattern[3] == 95,
+           "the steps that stay are as they were, and no step was turned off by the pad");
+    bytes = payload();
+    check (at (bytes, 4) == 4 && at (bytes, 5) == 3, "the page shows four steps, the cursor where it was");
+
+    press (11, 6);                                   // E1: on to the tenth place, past the end
+    tickPast();
+    bytes = payload();
+    check (at (bytes, 4) == 4 && at (bytes, 5) == 9, "the cursor walks past the end of a short lane");
+    press (12, 3);                                   // E2 there: no step to turn
+    press (3, 100);                                  // pad 3 is step eleven there: none either
+    tickPast();
+    arp = focusedArp();
+    check (arp.velocityPattern.size() == 4 && arp.velocityPattern[0] == 108 && arp.velocityPattern[2] == 100,
+           "past the end an encoder and a pad change nothing");
+
+    shiftPad (4);                                    // the second half now: step twelve
+    arp = focusedArp();
+    check (arp.velocityPattern.size() == 12 && arp.ratchetPattern.size() == 12,
+           "with the cursor in the second half Shift + pad 4 ends the lane at step twelve");
+    check (arp.velocityPattern[4] == 108 && arp.velocityPattern[8] == 108 && arp.octavePattern[7] == 1
+             && arp.octavePattern[11] == 1 && arp.chancePattern[11] == 95,
+           "a longer lane goes on as the short one was sounding: its steps round again");
+    check (at (payload(), 4) == 12, "and the page shows twelve");
+
+    press (11, 127);                                 // E1 back into the first half
+    press (11, 127);
+    tickPast();
+    check (at (payload(), 5) == 7, "the cursor back in the first half");
+    shiftPad (1);
+    check (focusedArp().velocityPattern.size() == 1 && focusedArp().velocityPattern[0] == 108,
+           "Shift + pad 1 is the shortest lane there is: one step");
+    shiftPad (8);
+    check (focusedArp().velocityPattern.size() == 8, "and Shift + pad 8 eight of it");
+
     press (18, 127);
     tickPast();
     check (! focusedArp().enabled, "E8 turned back past the first mode turns the arp off");

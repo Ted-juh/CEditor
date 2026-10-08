@@ -20,8 +20,11 @@ The first session on the owner's Windows machine, with the keyboard. What it fou
 | Script size (§3) | 64 and 128 KB ran; at 256 KB the keyboard went silent. Not narrowed further |
 | HoSTage's page, first run | Froze the keyboard on the logo: `lua_widget_make_dirty` called from `draw()`. The easing that used it is gone |
 | Knob pages, Page Left / Right | Right, and the app's card follows |
-| CUE | Right as far as a setlist without sections goes. Pad 1 went to the song and so left CUE; changed since (below) |
-| LAYERS | Draws; E3 moves the top key a key a click; a held key lights with its mark, and the keyboard does not freeze (2026-10-08) |
+| CUE | Right as far as a setlist without sections goes. Pad 1 went to the song and so left CUE; changed, and on the keyboard CUE now stays (2026-10-08) |
+| LAYERS | Draws; E3 moves the top key a key a click; a held key lights with its mark, and the keyboard does not freeze. The range drawn on the keys "reads at a glance now" (2026-10-08) |
+| A page switched on | The keyboard and the card go straight to it: Layers, Cue, Meters, Live (2026-10-08) |
+| METERS | The bars keep up, nothing cut off, the fader reads in half decibels, the red lamp shows (2026-10-08) |
+| LIVE | Held keys light, the arp's notes have their dots, the outline keeps up once a lane is drawn, a pad rests its step. A pad could not shorten the lane: Shift + pad now does (built 2026-10-08, not on the keyboard yet) |
 | Sound | A Vanguard part played nothing, and its presets changed the name and not the sound: Hostage was sending it every MIDI controller at zero. Fixed (2026-10-08, below) |
 
 The details are in `tools/ctrl49/README.md` ("Measured on the CTRL49, 2026-10-07") and the ticks
@@ -63,8 +66,7 @@ after a preset load, when `parameterText` requests are refused as busy), and its
 well over full scale (a single note at 1.2 to 1.7).
 **Open, for the owner to decide or for the next session:**
 
-- **Decided by the owner and built, 2026-10-08; not on the keyboard yet.** Check each on the next
-  session:
+- **Decided by the owner, built, and right on the keyboard (2026-10-08):**
   - CUE stays up when the song changes while it is showing. From any other page a song still
     recalls its control page (`surfacePageRequestIsForSong`, read by the broker's `pumpInput`).
   - Switching a stage page on in the card shows it at once, on the keyboard and in the card
@@ -73,6 +75,22 @@ well over full scale (a single note at 1.2 to 1.7).
   - LAYERS draws the picked part's range again as a band right on top of the keys, and greys the
     white keys outside it. The owner had found the band in the part's row too far from the keys
     to see at a glance which keys E2 / E3 were selecting.
+- **Decided by the owner and built, 2026-10-08; not on the keyboard yet.** On LIVE a pad only
+  rests a step, and the owner wanted four steps round and round. Shift + pad N now ends the lane
+  at that step of the cursor's half (`Ctrl49Action::shiftHeld`, `applyLiveTurns`' `endAtStep`);
+  a lane made longer repeats the steps it had, which is what the engine was already playing
+  there. The page always draws sixteen places: a bar after the last step, faint marks past it, a
+  line under the eight the pads are, and the bottom line says both. The cursor walks all sixteen,
+  so Shift + pad in the second half reaches 9-16. In the app's card a Shift-click on a pad does
+  the same. **Not known:** whether the keyboard sends a pad on the hidden cable while Shift is
+  held. If it does not, the eight small buttons (CC 19-26) do nothing on LIVE and could be the
+  length instead.
+- LIVE outlines the playing step only once a lane is drawn: `ArpEngine::patternStep()` is -1
+  for a plain arp. The owner read that as the outline not working; the page says NO LANE DRAWN
+  at the bottom, which was not enough. The checklist now says so.
+- The eight round knobs are too quick to ask for one click of. Ask for where the value should
+  end up, or use the card's − / + buttons. The big dial moves five at a time, and the keyboard's
+  up / down arrows are not used for anything yet.
 - The app does not notice a keyboard that has stopped answering; the card went on saying
   "Showing on the keyboard too" over a frozen keyboard. It could count unanswered keepalives.
 - The note hook still calls `lua_widget_make_dirty` (from `note()`, not from a draw). A key held
@@ -81,9 +99,9 @@ well over full scale (a single note at 1.2 to 1.7).
 - The panel scan writes parameters to the edit controller only, which Spire's window ignores,
   and gives each plug-in 200 s, which Zebra3's 4,273 controls do not fit in.
 
-**Still not on the keyboard:** the rest of LAYERS' encoders, SOUNDCHECK, DISCOVER, CHANGES, LIVE,
-METERS, the browser (§1 and §6), the stress blocks (§7), the upload probe (§8), the mockups and
-the smooth envelope (§4, §5).
+**Still not on the keyboard:** LIVE's Shift + pad, the rest of LAYERS' encoders, SOUNDCHECK,
+DISCOVER, CHANGES, the knob pages' values and the browser (§1 and §6), the stress blocks (§7), the
+upload probe (§8), the mockups and the smooth envelope (§4, §5).
 
 ### Before that (2026-10-06, evening)
 
@@ -211,7 +229,8 @@ that run.
   (`ArpEngine::takeNotes`, lock-free bits set on the audio thread, read via
   `MidiInsertRack::arpNotes` / `InstrumentRackHost::arpLiveNotes`), playhead from `patternStep`.
   E1 step, E2-E5 velocity/octave/ratchet/chance, E6 gate, E7 rate, E8 mode (off before UP), pads
-  toggle steps. Edits go through `setPartArp`. Broker: `livePart`, `applyLiveTurns`.
+  toggle steps, Shift + pad ends the lane at that step. Edits go through `setPartArp`. Broker:
+  `livePart`, `applyLiveTurns`.
 - **METERS** (`set_meters`, page kind 8): five part strips + master; levels from the rack's own
   meters (the pump keeps the loudest per id between redraws: `takeSurfaceMeters`); faders through
   `setPartMixer` / `setMasterLevel`, half a dB a detent (`metersNudgeVolume`); E7 scrolls parts.

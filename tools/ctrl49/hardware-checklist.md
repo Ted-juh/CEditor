@@ -12,8 +12,20 @@ keyboard on the HoSTage logo, and that is fixed (`README.md`, "Measured on the C
 
 **Sound: fixed.** The part that played nothing that morning, and Vanguard presets that changed
 the name and not the sound, were Hostage sending the plug-in every MIDI controller at zero on
-each save and each start (`docs/design/ctrl49-hostage-handoff.md`). LIVE and METERS can be
-checked. Go on at LAYERS, "E1 picks the part".
+each save and each start (`docs/design/ctrl49-hostage-handoff.md`).
+
+**Later the same day.** The three things the owner asked for that morning are on the keyboard
+and right: a page switched on is shown at once, CUE stays up when pad 1 goes to a song, and
+LAYERS draws the picked part's range on the keys ("reads at a glance now"). METERS and LIVE were
+checked too (section 6). LIVE turned up a gap: a pad only rests a step, so there was no way to
+play four steps round and round. Shift + pad now ends the lane at that step; **that is the next
+thing to check** (section 6, LIVE). After it: SOUNDCHECK, DISCOVER, CHANGES, the knob pages and
+the browser.
+
+**Asking for a turn.** The eight round knobs are too quick to ask for "one click": say where the
+value should end up, or use the − / + buttons of the app's CTRL49 card, which step exactly one.
+The big dial under the screen moves five at a time.
+
 ## 0. Before you start
 
 - [ ] Build on Windows, in a Developer shell (the root `CLAUDE.md` says why a plain PowerShell
@@ -46,15 +58,17 @@ is at the bottom.
 - [x] Turn on **Cue**. Page Right from the performance page arrives at CUE first.
       (2026-10-07: turning it on did not take the keyboard there, and the owner remarked on it.
       Since then a page that is switched on is shown at once.)
-- [ ] **New, 2026-10-08.** Switch any page off and on again in the card: the keyboard goes
+- [x] **New, 2026-10-08.** Switch any page off and on again in the card: the keyboard goes
       straight to it, and so does the card, with no Page press.
+      (2026-10-08: yes, for Layers, Cue, Meters and Live.)
 - [x] Before the set starts it says NO SONG ON STAGE YET. E1 picks song 1 (GO TO at the bottom,
       pad 1 lit); pad 1 goes to it, in the app too.
       (2026-10-07: yes, nothing cut off. Pad 1 also took the keyboard off CUE, to the control
       page the song recalls: six presses of Page Right to come back.)
-- [ ] **New, 2026-10-08.** With a song that has a control page of its own: pad 1 on CUE goes to
+- [x] **New, 2026-10-08.** With a song that has a control page of its own: pad 1 on CUE goes to
       the song and CUE stays on the screen. Then Page Left to the performance page and Shift +
       Page Right to the next such song: now the keyboard does go to that song's control page.
+      (2026-10-08: CUE stayed; from the performance page it went to the song's Page 1.)
 - [ ] On a song: SONG N OF M, its name and tempo; its notes when it has no sections, with its
       clock against the time planned (red when over); the set's clock in the title.
       (2026-10-07: SONG 1 OF 3, the name, both note lines, the clock counting, OF 4:30 PLANNED
@@ -78,10 +92,12 @@ is at the bottom.
       top key raised the band grew across the keys. **The owner:** the band is too far from
       the keys to see at a glance which keys are in it; put it right above the keys or colour
       the keys.)
-- [ ] **New, 2026-10-08.** The picked part's range is drawn again as a band in its colour right
+- [x] **New, 2026-10-08.** The picked part's range is drawn again as a band in its colour right
       on top of the keys, and the white keys outside it are grey. Turn E2 / E3: the band and
       the grey follow, a key a click. With two parts, E1 moves both to the other part's range.
       **Write down** whether the range now reads at a glance.
+      (2026-10-08: one part, E3. Both follow. **The owner:** "reads at a glance now". Not
+      looked at: two parts.)
 - [x] Hold a few notes: each lights its key in the colour of a part that plays it, and puts a
       white notch in the band of every part that plays it. Let go and they go.
       (2026-10-08: one note, yes to all of it, on the keyboard and in the app's card. No sound
@@ -247,20 +263,35 @@ a plug-in loaded and a control page assigned to it. On the keyboard:
 - [ ] Page Left / Right between two control pages: the rings jump to their new values at once.
       (They no longer sweep: the call that made them froze the keyboard, 2026-10-07.)
 - [ ] DISCOVER (switch it on in the CTRL49 card): round dots on the map, YOU under its ring.
-- [ ] LIVE (switch **Live** on in the CTRL49 card; it comes right after the performance page, or
-      after CUE). Hold a chord: the keys light in the colour of the part whose zone they are in.
-      Turn knob 8 (the rightmost round knob) one step right: the title says ARP UP, and the part
-      shown starts to arpeggiate; the step that plays is outlined and moves, and the notes it plays
-      have a black dot. Turn knob 1 to step 3 and knob 2 left until the cell says REST: that step
-      goes silent. Press pad 3: it comes back. Turn knob 8 back left: ARP OFF.
-      **Write down** whether the outline keeps up with the beat or jumps, and whether the dots
-      show on fast steps.
-- [ ] METERS (switch **Meters** on in the CTRL49 card, then Page Right past LAYERS if that is on
-      too). Play: each part's two bars move in its colour, a white line holds the peak for a
-      moment, the master's history fills from the right. Turn knob 1: the first part's fader
-      value at the bottom changes half a decibel a step, and the app's mixer fader moves with it.
-      Turn knob 6: the master. Play loud enough to go over 0 dB: a red lamp over the strip.
+- [x] LIVE (switch **Live** on in the CTRL49 card; the keyboard goes to it). Hold a chord: the
+      keys light in the colour of the part whose zone they are in. Turn knob 8 (the rightmost
+      round knob) to the right until the title says ARP and a mode: the part shown starts to
+      arpeggiate, and the notes it plays have a black dot. The bottom line says NO LANE DRAWN and
+      **no step is outlined yet**: a plain arp has no lane to walk. Press a pad, or turn one of
+      knobs 2-5: that draws the lane, and from then on the step that plays is outlined and
+      moves. A pad turns its step into a rest and back; with knob 1 in the second half of the
+      lane the pads are steps 9-16. Turn knob 8 back left: ARP OFF.
+      (2026-10-08: the keys lit and the dots showed. The outline did not move until a lane was
+      drawn, which the old wording here did not say; drawn, it moves and keeps up. A pad with
+      the cursor in the second half turned step 11 off and on. **The owner:** a pad only mutes
+      a step; there is no way to have four steps repeating.)
+- [ ] **New, 2026-10-08.** On LIVE with a lane drawn, hold **Shift** and press pad 4: the lane is
+      four steps long. A bar stands after step 4, the twelve places after it are faint marks, the
+      outline goes round steps 1-4, and the first cell at the bottom says N / 4. The bottom line
+      says which steps the pads are and SHIFT + PAD: THE LANE ENDS THERE. Shift + pad 8 makes it
+      eight again, the new steps the same as the four. Knob 1 still walks all sixteen places;
+      past the end the four step cells are dashes, and with it in the second half Shift + pad 4
+      ends the lane at step 12.
+      **Write down** whether the keyboard sends a pad at all while Shift is held (if nothing
+      happens, that is the answer), and whether the short lane reads at a glance.
+- [x] METERS (switch **Meters** on in the CTRL49 card; the keyboard goes to it). Play: each
+      part's two bars move in its colour, a white line holds the peak for a moment, the master's
+      history fills from the right. Turn knob 1: the first part's fader value at the bottom
+      changes half a decibel a step, and the app's mixer fader moves with it. Turn knob 6: the
+      master. Play loud enough to go over 0 dB: a red lamp over the strip.
       **Write down** whether the bars keep up with the playing or lag, and anything cut off.
+      (2026-10-08: the bars keep up, nothing cut off. Two steps down on the card's − read -1.0,
+      and the red lamp showed. Not looked at: knob 6, the app's mixer fader.)
 - [ ] The browser: in the app's Sounds browser click **Browse on controller**. The keyboard shows
       eight sound names; the one under the cursor has a full ring, the others an empty one, and
       **no numbers** in any ring (it used to show 127 and 0). At the bottom: that sound's whole

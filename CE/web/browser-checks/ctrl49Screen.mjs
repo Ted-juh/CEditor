@@ -213,7 +213,20 @@ try {
   await host.waitForFunction(() => /2\s*\/\s*2\s*Live/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_live');
   assert.ok(await canvasLit() > 1000, 'and draws the lane and the keys');
+  // Shift + pad ends the lane at that step (here a Shift-click on the card's pad); the cursor
+  // still walks all sixteen places, and past the end there is no step for encoders 2-5 to turn.
+  const liveValue = (n) => host.getByTestId(`ctrl49-encoder-${n}-value`);
+  assert.equal(await liveValue(1).innerText(), '1 / 16', 'sixteen plain steps to begin with');
+  await host.locator('.ctrl49-screen .pads .pad').nth(3).click({ modifiers: ['Shift'] });
+  await host.waitForFunction(() => document.querySelector('[data-testid=ctrl49-encoder-1-value]').innerText === '1 / 4');
+  for (let i = 0; i < 5; i++) await host.getByTestId('ctrl49-encoder-1-up').click();
+  await host.waitForFunction(() => document.querySelector('[data-testid=ctrl49-encoder-1-value]').innerText === '6 / 4');
+  assert.equal(await liveValue(2).innerText(), '–', 'past the end of the lane there is no velocity to turn');
+  assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'and the page still draws');
   if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-live.png` });
+  await host.locator('.ctrl49-screen .pads .pad').nth(7).click({ modifiers: ['Shift'] });
+  await host.waitForFunction(() => document.querySelector('[data-testid=ctrl49-encoder-1-value]').innerText === '6 / 8');
+  assert.equal(await liveValue(2).innerText(), '100', 'made longer again, the step under the cursor is one of the lane\'s');
   await host.getByTestId('ctrl49-live-toggle').click();
   await host.waitForFunction(() => /1\s*\/\s*1\s*Performance/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
 

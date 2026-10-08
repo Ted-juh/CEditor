@@ -342,7 +342,7 @@ export function livePayload(view) {
   const playing = view.playing ?? -1;
   const focused = view.focused ?? -1;
   const out = [(view.arpOn ? 1 : 0) | (view.lane ? 2 : 0), clampTo(view.mode ?? 0, 0, 7), clampTo(view.stepsPerBeat ?? 4, 1, 16),
-    clampTo(view.gate ?? 50, 0, 100), steps.length, clampTo(view.cursor ?? 0, 0, Math.max(0, steps.length - 1)),
+    clampTo(view.gate ?? 50, 0, 100), steps.length, clampTo(view.cursor ?? 0, 0, LIVE_STEPS - 1),
     playing >= 0 && playing < steps.length ? playing + 1 : 0, tempo & 0xff, tempo >> 8,
     clampTo(view.firstKey ?? 36, 0, 127 - 48), zones.length, focused >= 0 && focused < zones.length ? focused : 255];
   for (const step of steps)

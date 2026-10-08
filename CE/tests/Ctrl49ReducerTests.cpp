@@ -82,6 +82,12 @@ int main()
         auto pad = r.process (padStrike, 3);
         check (pad.has_value() && pad->padChanged && pad->velocity == 99,
                "Pad strike produces a pad-feedback action (velocity 99)");
+        // Shift is still down from the bank choice above: the strike says so (LIVE reads it as
+        // "the lane ends here"), and one after Shift is let go does not.
+        check (pad->shiftHeld, "a pad struck with Shift held says Shift was held");
+        feed (r, 0xB0, 0x3A, 0x00);           // Shift up
+        pad = r.process (padStrike, 3);
+        check (pad.has_value() && pad->padChanged && ! pad->shiftHeld, "and one struck without it does not");
 
         feed (r, 0xB0, 0x39, 0x7F);           // Time Division down
         const std::uint8_t switch3[3] { 0xB0, 0x15, 0x7F };  // Switch 3 -> division 3

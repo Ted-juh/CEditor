@@ -79,6 +79,7 @@ std::optional<Ctrl49Action> Ctrl49Reducer::process (const std::uint8_t* data, st
         action.padChanged = true;
         action.pad        = data1;
         action.velocity   = data2;
+        action.shiftHeld  = shiftDown_;
         return action;
     }
 
