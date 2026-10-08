@@ -598,8 +598,9 @@ run of HoSTage's own 42 KB page, and the script-size test.
   with that one call taken out, the same page, with its fifteen `text_data` objects, ran. The
   acknowledgements arrive when a command is received, not when it has been drawn: two draws and a
   keepalive were answered within 3 ms of each other, so an OK does not say the draw finished.
-  The note hook still calls it from `note()`, outside a draw; whether that is safe is not known,
-  because no key was played on a page that uses it (the performance page, LAYERS, LIVE).
+  The note hook still calls it from `note()`, outside a draw. A key held on LAYERS the next day
+  did not freeze the keyboard, which does not settle it: the host sends the held notes as well,
+  and nothing shows whether this keyboard calls the hook at all.
 - **The app does not notice a keyboard that has stopped answering.** It sent keepalives into the
   silence for as long as it ran. `%APPDATA%\CEditor\ctrl49-trace.log` is where it showed.
 - **Script size.** 64 KB and 128 KB loaded and ran (upload and startup 2 s and 3 s). At 256 KB

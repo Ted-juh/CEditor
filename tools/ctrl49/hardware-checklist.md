@@ -5,12 +5,16 @@ checks over the same Lua the keyboard is sent. This is the list to take to a CTR
 with what to write down. Tick as you go and send back what the **Write down** lines ask for, even
 when it worked: "it drew" with a number is worth more than "it worked".
 
-**Where it stands (2026-10-07).** Section 3 is done. Section 1 is done as far as LAYERS' first
-look; the ticks and the dated notes below say what was seen. The first run froze the keyboard on
-the HoSTage logo, and that is fixed (`README.md`, "Measured on the CTRL49, 2026-10-07"). Start
-the next session at LAYERS, "Hold a few notes". **Watch that step:** the page's note hook calls
-`lua_widget_make_dirty`, the call that froze the keyboard when it was made from a draw. If the
-keyboard stops on the first key held, that is why; switch it off and on and say so.
+**Where it stands (2026-10-08).** Section 3 is done. Section 1 is done as far as LAYERS with a
+note held; the ticks and the dated notes below say what was seen. The first run froze the
+keyboard on the HoSTage logo, and that is fixed (`README.md`, "Measured on the CTRL49,
+2026-10-07"). Holding a key on LAYERS did not freeze it.
+
+**Before going on: the part makes no sound.** On LAYERS the held key lit on the keyboard and in
+the app's card, so HoSTage receives the notes and counts the part as answering them, and CEditor
+put out silence the whole time (its Windows audio session, measured for two and a half minutes,
+never left zero). `docs/design/ctrl49-hostage-handoff.md` has what is known. LIVE and METERS
+cannot be checked until a part sounds. Then go on at LAYERS, "E1 picks the part".
 
 ## 0. Before you start
 
@@ -65,12 +69,18 @@ is at the bottom.
 - [x] The pads go dark: they do nothing on LAYERS or SOUNDCHECK.
 - [ ] One band per part, over the keys where it plays. The part E1 has picked is outlined; it
       starts on the part HoSTage has focused.
-      (2026-10-07: one part, its row outlined, its name and C-2-B1 in the title, the 49 keys
-      drawn. Its range lies below the keys, so there was no band to see. Stopped here.)
-- [ ] Hold a few notes: each lights its key in the colour of a part that plays it, and puts a
+      (2026-10-07: one part, its row outlined, its name and C-1-B1 in the title, the 49 keys
+      drawn. Its range lay below the keys, so there was no band to see. 2026-10-08: with the
+      top key raised the band grew across the keys. **The owner:** the band is too far from
+      the keys to see at a glance which keys are in it; put it right above the keys or colour
+      the keys.)
+- [x] Hold a few notes: each lights its key in the colour of a part that plays it, and puts a
       white notch in the band of every part that plays it. Let go and they go.
+      (2026-10-08: one note, yes to all of it, on the keyboard and in the app's card. No sound
+      came with it: see the top.)
 - [ ] E1 picks the part; the title shows its name and range. E2 / E3 move its lowest / highest
       key, E4 the transpose, E5 / E6 the velocity range. The app's zone editor shows the same.
+      (2026-10-08: E3 only. A click is a key: B1 to Eb3, and the saved rack has it.)
 - [ ] One fast turn of E2 is one Undo in the app, not one Undo a detent (edits to the same part
       less than 0.6 s apart are one step).
 - [ ] Make a layer group of two parts by velocity, with a crossfade. Each member shows `L1 V` and

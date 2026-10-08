@@ -21,24 +21,54 @@ The first session on the owner's Windows machine, with the keyboard. What it fou
 | HoSTage's page, first run | Froze the keyboard on the logo: `lua_widget_make_dirty` called from `draw()`. The easing that used it is gone |
 | Knob pages, Page Left / Right | Right, and the app's card follows |
 | CUE | Right as far as a setlist without sections goes. Pad 1 goes to the song and so leaves CUE |
-| LAYERS | Draws. Stopped before a note was played |
+| LAYERS | Draws; E3 moves the top key a key a click; a held key lights with its mark, and the keyboard does not freeze (2026-10-08) |
+| Sound | None: the part plays nothing although HoSTage receives the notes (2026-10-08, below) |
 
 The details are in `tools/ctrl49/README.md` ("Measured on the CTRL49, 2026-10-07") and the ticks
 and dated notes in `tools/ctrl49/hardware-checklist.md`.
+
+**First thing next session: the part makes no sound (2026-10-08).** On LAYERS, with the part's
+range raised over the keys (E3; now C-1 to Eb3), a held key lit on the keyboard and in the app's
+card, with its white mark in the band. Nothing was heard. What is known:
+
+- HoSTage receives the notes. The card draws only what the service sends, and it lit.
+- CEditor put out silence. Its Windows audio session (on the default device, SteelSeries Sonar -
+  Gaming, which reaches the owner's headphones and carried other sound meanwhile) was read every
+  two seconds for two and a half minutes, through both times the owner played: peak 0 throughout.
+- The rack looks right on disk: one part, Vanguard ("LD Chording"), enabled, not muted, volume
+  1, channel 0, keys 0-51, velocity 1-127, master 1. Its worker started and reported ready
+  (`logs/live-worker-events.jsonl`), with no failure logged that day.
+- The day before, going to a song from CUE logged sixteen `worker_operation_failed`, "busy: the
+  plug-in's message thread is occupied (building its editor, most likely) (message type 11)".
+  Not shown to be related.
+- Not known: whether this rack has ever sounded in CEditor on this machine. Until 2026-10-08 the
+  part's range (0-35) was below the keyboard's lowest key, so the keys could not have played it.
+
+How to take the keyboard out of the question: loopMIDI has a port here, "CEditor Test Out", that
+CEditor listens to. With HoSTage open (File > Hostage...; it does not reopen by itself, so the
+owner has to open it), send a note to that port from a script and read CEditor's audio session.
+Nothing in the repo does either; the session of 2026-10-08 used two throwaway C# snippets for it
+(WinMM `midiOutShortMsg`, WASAPI `IAudioMeterInformation`).
 
 **Open, for the owner to decide or for the next session:**
 
 - Going to a song from CUE recalls the song's control page and so leaves CUE. Suggested: stay on
   CUE when the song was chosen there. Not yet answered.
 - Turning a page on in the app's card does not take the keyboard to it. The owner remarked on it.
+- **LAYERS: show a part's range at the keys (the owner, 2026-10-08).** The band is in the part's
+  row at the top and the keys are drawn at the bottom, too far apart to see at a glance which
+  keys you are selecting while you turn E2 / E3. Wanted: the band right above the key drawing,
+  or the keys themselves coloured over the part's range. Seeing it beats reading the note names
+  in the title.
 - The app does not notice a keyboard that has stopped answering; the card went on saying
   "Showing on the keyboard too" over a frozen keyboard. It could count unanswered keepalives.
-- The note hook still calls `lua_widget_make_dirty` (from `note()`, not from a draw). Unknown
-  whether that is safe; the next step in the checklist finds out.
+- The note hook still calls `lua_widget_make_dirty` (from `note()`, not from a draw). A key held
+  on LAYERS did not freeze the keyboard (2026-10-08). That does not show the hook is safe: the
+  host sends the held notes too, and nothing says whether this keyboard calls the hook at all.
 - The panel scan writes parameters to the edit controller only, which Spire's window ignores,
   and gives each plug-in 200 s, which Zebra3's 4,273 controls do not fit in.
 
-**Still not on the keyboard:** notes and encoders on LAYERS, SOUNDCHECK, DISCOVER, CHANGES, LIVE,
+**Still not on the keyboard:** the rest of LAYERS' encoders, SOUNDCHECK, DISCOVER, CHANGES, LIVE,
 METERS, the browser (§1 and §6), the stress blocks (§7), the upload probe (§8), the mockups and
 the smooth envelope (§4, §5).
 
