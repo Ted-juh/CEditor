@@ -27,6 +27,7 @@
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor, floatEditor, closeEditorWindow,
     requestAudioDevices, setAudioDevice, setMidiInputEnabled, setMackieSection,
     hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct, setTryAsPlayer,
+    adoptLegacyData, declineLegacyData,
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
     parameterControlKind, setParameterText, groupParameters, assignedParameterIds, parameterPlaces, isBipolarParameter, quickLearnParameter,
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
@@ -144,6 +145,7 @@
   // as one, or the editor trying its show — makes no screens or pages and does not build; the
   // host refuses those commands, and these hide the buttons that would only be refused.
   let player = $derived($hostState.player === true);
+  let legacyData = $derived($hostState.product.data);
   let playerInstalled = $derived($hostState.playerInstalled === true);
   const hostUtilities = [
     { id: 'library', label: 'Library' },
@@ -966,6 +968,27 @@
         hostPatchPrompt.set([]);
       }}>Send {$hostPatchPrompt.length === 1 ? 'it' : 'them'}</button>
       <button type="button" class="ghost" onclick={() => hostPatchPrompt.set([])}>Not now</button>
+    </div>
+  {/if}
+
+  <!-- The rig an earlier build kept in the folder every product shared. Nothing there says which
+       product it belonged to, so a product now in a folder of its own asks rather than guesses:
+       an upgrade wants its rig back, and a product installed beside another must not inherit
+       that one's. -->
+  {#if legacyData.legacy === 'offered' || legacyData.legacy === 'pending'}
+    <div class="patch-prompt" data-testid="host-legacy-prompt">
+      {#if legacyData.legacy === 'offered'}
+        <span class="patch-prompt-text" title={legacyData.legacyFolder}>
+          This product now keeps its data in a folder of its own. An earlier HoSTage build left a
+          rig, a plug-in list and a sound library in the folder every product shared. Bring them
+          over? They replace what this product has, the next time it starts.
+        </span>
+        <button type="button" data-testid="host-legacy-adopt" onclick={() => adoptLegacyData()}>Bring it over</button>
+        <button type="button" class="ghost" data-testid="host-legacy-decline" onclick={() => declineLegacyData()}>Start fresh</button>
+      {:else}
+        <span class="patch-prompt-text">The earlier rig comes over the next time HoSTage starts. Restart it to finish.</span>
+        <button type="button" class="ghost" data-testid="host-legacy-decline" onclick={() => declineLegacyData()}>Don't bring it over</button>
+      {/if}
     </div>
   {/if}
 
@@ -2954,11 +2977,14 @@
   .hw-diff { display: inline-flex; gap: 8px; }
   .hw-diff-where { color: #7d8894; min-width: 80px; }
   .hw-diff-bytes { color: #d8e0e8; }
+  /* Inset like the error and save notices beside it, which it ran edge to edge between. */
   .patch-prompt {
+    flex: none;
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+    margin: 8px 14px 0;
     padding: 6px 10px;
     border: 1px solid #4a6a7a;
     border-radius: 4px;

@@ -142,11 +142,9 @@ HostPluginProcessor::HostPluginProcessor()
     // The same per-user product directory as the standalone: one catalogue, one scan-path
     // list, whichever wrapper scanned. The SESSION file is deliberately not shared —
     // persistSession=false keeps the rack in the DAW's project chunk instead.
-    options.dataDirectory = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-                                .getChildFile ("CEditorInstrumentHost");
+    configureForThisProgram (options);
     options.workerExecutable = findHostScannerWorker ({ options.dataDirectory });
     options.factoryPerformanceFile = findFactoryPerformance();
-    options.player = readHostageRole().player;
 
     options.emit = [this, aliveToken = alive] (const juce::String& eventName, const juce::var& payload)
     {

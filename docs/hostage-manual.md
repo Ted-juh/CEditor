@@ -97,10 +97,10 @@ HoSTage itself refuses what a player cannot do, so a script cannot do it either.
 "Screens and control pages are made in the HoSTage editor; a player shows them and cannot change
 them (…)".
 
-> **Not finished yet:** HoSTage cannot make a player yet. A built HoSTage program starts as a player
-> when a file named `hostage.json` containing `{"role":"player"}` sits beside the program (inside a
-> VST3, in `Contents/Resources`). It then shows **PLAYER** where **Try as player** would be, and has no
-> editor to go back to.
+> **Not finished yet:** HoSTage cannot make a player yet. **Build product** writes a file named
+> `hostage.json` beside the program (inside a VST3, in `Contents/Resources`) that names the product
+> and says `"role": "editor"`. Changed to `"role": "player"`, the program starts as a player. It
+> then shows **PLAYER** where **Try as player** would be, and has no editor to go back to.
 
 **Removing things.** Removing a part, a plugin, a pattern and most other things asks for a second
 click within five seconds before it happens; many buttons say **Confirm** while they wait.
@@ -722,9 +722,32 @@ the current edition includes.
 
 ## 14. Where HoSTage keeps its data
 
-In `%APPDATA%\CEditor\instrument-host\` on Windows (`~/.config/CEditor/instrument-host/` on Linux):
-the rack, the plugin catalogue, the scan folders, the sound library and its previews, and the logs.
-The CTRL49's connection log is `%APPDATA%\CEditor\ctrl49-trace.log`.
+**In CEditor**, HoSTage keeps its data in `%APPDATA%\CEditor\instrument-host\` on Windows
+(`~/.config/CEditor/instrument-host/` on Linux). That covers the rack, the plugin catalogue, the
+scan folders, the sound library and its previews, and the logs. The CTRL49's connection log is
+`%APPDATA%\CEditor\ctrl49-trace.log`.
+
+**A product made with Build product** has a folder of its own:
+`%APPDATA%\CEditorInstrumentHost\products\<id>\` (`~/.config/CEditorInstrumentHost/products/<id>/` on
+Linux). The id is the product's **Installer identity** from the [Project](#project) utility, so
+renaming a product keeps its rig. A file in the folder, `product.json`, names the product. The
+Product utility shows the folder under **This machine**. Two products on one computer keep
+separate rigs, plugin lists, sound libraries and licences.
+
+**Products built before that** all shared `%APPDATA%\CEditorInstrumentHost\` itself. When a newer
+build of a product starts in its own folder and finds data in the shared one, it asks once:
+
+- **Bring it over** copies the rack, plugin list, sound library, licence and settings into the
+  product's own folder the next time it starts. They replace what the product has. Restart it to
+  finish.
+- **Start fresh** leaves them where they are.
+
+HoSTage asks because nothing records which product the shared data belonged to. An upgraded
+product wants its rig back; a new product installed beside an old one must not take that one's.
+
+**One keyboard, one owner.** Every HoSTage on the computer — in CEditor, a product, or a product
+inside a DAW — claims the CTRL49 in the same place. Whichever takes it first keeps it until it lets
+go, and the others leave it alone.
 
 ## 15. Known limits
 

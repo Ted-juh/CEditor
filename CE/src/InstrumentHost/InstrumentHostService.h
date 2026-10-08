@@ -430,9 +430,20 @@ public:
             makes screens, control pages and players; a player shows the ones it was given and
             refuses the commands that would change them — here, natively, the way Stage Lock
             refuses rig edits, so nothing the page or a script sends gets around it. The runtime
-            shells read it from hostage.json beside the program (readHostageRole); CEditor's tab
-            is always the editor. Everything else a player keeps, and Stage Lock restricts. */
+            shells read it from hostage.json beside the program (HostageManifest.h); CEditor's
+            tab is always the editor. Everything else a player keeps, and Stage Lock restricts. */
         bool player = false;
+        /** Where the claim on the hardware surface is kept. One keyboard has one owner, so
+            every HoSTage on the machine — CEditor's tab, each product, each instance in a DAW —
+            claims it in the same place, whichever folder its own data is in. Empty means
+            dataDirectory, which is what a test with one service wants. */
+        juce::File hardwareClaimDirectory;
+        /** Where this program's data was kept before it had a folder of its own: the folder every
+            built product shared until each knew which product it was (HostageManifest.h). When
+            it holds a rig, the page offers once to bring it over (adoptLegacyData, applied at the
+            next start, before anything reads the data folder) or to leave it (declineLegacyData).
+            Empty: nothing to offer. */
+        juce::File legacyDataDirectory;
         double sampleRate = 44100.0;
         int blockSize = 512;
     };
@@ -1907,7 +1918,26 @@ private:
     static constexpr juce::int64 hardwareSendFenceMs = 6000;
     static constexpr juce::int64 hardwareClaimTimeoutMs = 8000;
 
-    juce::File hardwareOwnerFile() const { return options.dataDirectory.getChildFile ("hardware-owner.json"); }
+    juce::File hardwareClaimDirectory() const
+    {
+        return options.hardwareClaimDirectory != juce::File() ? options.hardwareClaimDirectory
+                                                              : options.dataDirectory;
+    }
+    juce::File hardwareOwnerFile() const { return hardwareClaimDirectory().getChildFile ("hardware-owner.json"); }
+
+    // -- bringing over a rig an earlier build kept elsewhere (Options::legacyDataDirectory) --
+    juce::File legacyDecisionFile() const { return options.dataDirectory.getChildFile ("legacy-data.json"); }
+    /** Whether the earlier folder holds anything worth bringing over. Read once, at start. */
+    bool legacyDataWorthOffering() const;
+    /** At start: copies the earlier folder's data in if the user asked for it last time. */
+    void adoptLegacyDataIfAsked();
+    void writeLegacyDecision (const juce::String& decision, const juce::StringArray& failed);
+    /** "none", "offered", "pending" (asked for, applied at the next start), "adopted" or
+        "declined". */
+    juce::String legacyDataState() const;
+    juce::String legacyDecision;        // as legacy-data.json says
+    juce::StringArray legacyFailed;     // what the copy could not bring over
+    bool legacyOffered = false;
     /** The package identity a saved state carries, so a project reopened elsewhere can say
         which product and revision wrote it (§18.9.4). */
     juce::var packageIdentity() const;

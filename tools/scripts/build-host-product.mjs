@@ -96,6 +96,18 @@ export function factoryPerformance(raw, { includeStageNotes = false } = {}) {
   };
 }
 
+/** hostage.json: which program this is and which product (CE/src/InstrumentHost/HostageManifest.h).
+    A built product is the editor. Its appId names its data folder, so two products on one machine
+    keep two rigs; a product shipped without this file falls back to the folder every product used
+    to share. Upper-cased here as the runtime does, so the file and the folder agree. */
+export function hostageManifestJson(project) {
+  const manifest = {
+    role: 'editor',
+    product: { name: project.productName, appId: String(project.appId).toUpperCase() },
+  };
+  return `${JSON.stringify(manifest, null, 2)}\n`;
+}
+
 /** The installer's OutputBaseFilename half: the product name with everything hostile to a
     filename removed. "Super Rack!" -> "SuperRack". */
 export function sanitizeBaseName(productName) {
@@ -161,8 +173,9 @@ export function resolveArtifacts({ candidateDirs, listDir }) {
 
 /** The copy operations that turn built artifacts into the installer's source tree:
 
-      <stageDir>/Standalone/<exe> + both worker executables
-      <stageDir>/VST3/<bundle>.vst3/** (+ both workers beside the module)
+      <stageDir>/Standalone/<exe> + both worker executables + hostage.json
+      <stageDir>/VST3/<bundle>.vst3/** (+ both workers beside the module, hostage.json in
+                                         Contents/Resources)
 
     Pure: returns operations, executes nothing. Only the targets the manifest enables appear,
     and each op names the artifact it needs so a missing one refuses with its own name. */
@@ -182,6 +195,7 @@ export function stagePlan({ project, artifacts, stageDir, performanceJson = null
       // copying the author's own file would put their stage notes back.
       if (performanceJson)
         ops.push({ kind: 'writeFile', contents: performanceJson, to: path.join(stageDir, 'Standalone', 'factory-performance.json') });
+      ops.push({ kind: 'writeFile', contents: hostageManifestJson(project), to: path.join(stageDir, 'Standalone', 'hostage.json') });
     }
   }
 
@@ -208,6 +222,8 @@ export function stagePlan({ project, artifacts, stageDir, performanceJson = null
         // Contents/Resources is the bundle's place for non-binary assets, and where the
         // runtime's factory-rack search looks from the module directory.
         ops.push({ kind: 'writeFile', contents: performanceJson, to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'Resources', 'factory-performance.json') });
+      // Where the runtime's manifest search looks from the module directory, like the rack.
+      ops.push({ kind: 'writeFile', contents: hostageManifestJson(project), to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'Resources', 'hostage.json') });
     }
   }
 

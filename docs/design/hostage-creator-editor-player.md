@@ -1,8 +1,8 @@
 # HoSTage: creator, editor and player
 
 *Status: the owner's intention, written down on 2026-10-08, with what exists today and what each
-part would take. Step 1, the player role, is built; nothing after it is. When this and the code
-disagree about what exists, the code is right.*
+part would take. Steps 1 and 2 — the player role, and a data folder per product — are built;
+nothing after them is. When this and the code disagree about what exists, the code is right.*
 
 ## The intention, in the owner's words
 
@@ -53,8 +53,9 @@ Tier B already nearly exists — by accident rather than design:
   not available in this build." — it cannot make tier C.
 - **Building needs a developer machine:** the script assembles programs a CMake build already made,
   with Node.js and Inno Setup. CEditor's installer ships none of the host programs.
-- **Every built product shares one data folder**, `%APPDATA%\CEditorInstrumentHost`
-  (`HostRuntimeShell.cpp`), so two products on one machine overwrite each other's rig.
+- **Each built product keeps its own data folder** (step 2),
+  `%APPDATA%\CEditorInstrumentHost\products\<appId>`. Until then every product shared
+  `CEditorInstrumentHost` itself, and two products on one machine overwrote each other's rig.
 - **Stage Lock is already the restriction the owner describes**, enforced in the host itself
   (`InstrumentHostService.cpp`, the allow-list near the top): playing, songs, scenes, levels,
   macros and parameters work; changing the rig does not.
@@ -123,8 +124,8 @@ Two builds would double every test and every release; one build with a role cann
    player role, and `InstrumentHostView` hiding them. Small. Also gives tier A and B "Try as player".
    - The manifest is `hostage.json`, `{"role":"player"}`, found where `factory-performance.json` is:
      beside the standalone's exe, or in the VST3 bundle's `Contents/Resources`
-     (`readHostageRole`, `HostRuntimeShared.h`). Missing or anything else means the editor. Only
-     the role is read so far; the product name and the show come with steps 2 and 3.
+     (`HostageManifest.h`). Missing or anything else means the editor. Step 2 added the product's
+     name and appId; the show comes with step 3.
    - The host refuses a deny-list, `isEditorOnlyCommand` in `InstrumentHostService.cpp`: making,
      naming, removing and assigning pages, Auto pages, quick-learn, fader and pad layers,
      describing a controller, and the Host Project and Build product. `setControlSlotOptions` is
@@ -138,6 +139,29 @@ Two builds would double every test and every release; one build with a role cann
      player, and is not saved — the editor always starts as the editor.
 2. **One data folder per product**, named from the Host Project, instead of the shared
    `CEditorInstrumentHost`. Small, and needed before two products can live on one machine.
+   *Built:*
+   - `build-host-product.mjs` writes `hostage.json` into every target with the product's name and
+     appId (`{"role":"editor","product":{…}}`); the installer copies it with the rest.
+   - The runtime keeps its data in `CEditorInstrumentHost/products/<appId>` (`HostageManifest.h`).
+     The appId, not the name, because it is the one thing about a product that never changes: a
+     product renamed between builds keeps its rig. Only a GUID becomes a path. A `product.json`
+     in the folder names the product for whoever looks; the Product utility shows the path.
+   - A program with no identity — a build tree, or a product built before this — stays in
+     `CEditorInstrumentHost` itself, where its data already is.
+   - The claim on the keyboard (`hardware-owner.json`) stays in `CEditorInstrumentHost` for every
+     program, and CEditor's own tab now claims there too. Before, the tab kept its claim in its
+     own folder, so the tab and a running product could both drive one CTRL49.
+   - A product starting in its own folder that finds a rig in the shared one asks once
+     (`adoptLegacyData` / `declineLegacyData`). It cannot know whether that rig is its own (an
+     upgrade) or another product's (a first install beside it), so it does not guess. Accepted,
+     the copy happens at the next start, before anything reads the folder, and brings everything
+     except what a running program leaves behind (markers, logs, crash evidence, the claim).
+   - *Found, not fixed:* the runtime's Host Project (`host-project.json`) is still minted fresh in
+     each data folder rather than carried from the build, so a built product's appId at run time
+     is not its author's. Licences are verified against that appId and saved DAW states are
+     stamped with it, so neither can match the product until the build ships the Host Project's
+     identity (and its licence public key) and the runtime adopts it. That belongs with the
+     licence decision below.
 3. **The show** — format, save in B, load in C, the missing-plugin check. Medium.
 4. **Create a player from B without a developer machine.** The installed HoSTage ships its own
    programs as the template; creating a player copies them with the manifest and the show into a

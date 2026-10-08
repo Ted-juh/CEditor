@@ -13,13 +13,12 @@ HostRuntimeShell::HostRuntimeShell()
 
     InstrumentHostService::Options options;
 
-    // The generated product's own per-user directory — never CEditor's. Its catalogue, scan
-    // paths and session live and die with the product.
-    options.dataDirectory = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-                                .getChildFile ("CEditorInstrumentHost");
+    // The generated product's own per-user directory — never CEditor's, and since each product
+    // knows which it is, never another product's (HostageManifest.h). Its catalogue, scan paths
+    // and session live and die with the product.
+    configureForThisProgram (options);
     options.workerExecutable = findHostScannerWorker ({ options.dataDirectory });
     options.factoryPerformanceFile = findFactoryPerformance();
-    options.player = readHostageRole().player;
 
     options.emit = [safe = juce::Component::SafePointer<HostRuntimeShell> (this)]
                    (const juce::String& eventName, const juce::var& payload)

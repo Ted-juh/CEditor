@@ -2586,6 +2586,20 @@ export function emptyProduct() {
     hardware: { owner: 'nobody', owned: false },
     activeHostingIncidents: [],
     surfaceProfiles: [],
+    data: { folder: '', legacy: 'none', legacyFolder: '', legacyFailed: [] },
+  };
+}
+
+/** Where this program keeps its data, and what became of the rig an earlier build kept in the
+ *  folder every product shared (InstrumentHostService::legacyDataState). */
+const LEGACY_DATA_STATES = ['none', 'offered', 'pending', 'adopted', 'declined'];
+export function normalizeProductData(payload) {
+  const d = payload && typeof payload === 'object' ? payload : {};
+  return {
+    folder: String(d.folder ?? ''),
+    legacy: LEGACY_DATA_STATES.includes(d.legacy) ? d.legacy : 'none',
+    legacyFolder: String(d.legacyFolder ?? ''),
+    legacyFailed: (Array.isArray(d.legacyFailed) ? d.legacyFailed : []).map(String),
   };
 }
 
@@ -2640,6 +2654,7 @@ export function normalizeProduct(payload) {
         count: Number(i?.count ?? 0),
       })),
     surfaceProfiles: (Array.isArray(p.surfaceProfiles) ? p.surfaceProfiles : []).map(String),
+    data: normalizeProductData(p.data),
   };
 }
 
@@ -7918,6 +7933,13 @@ export function applyMockCommand(state, payload) {
     next.product.activeHostingIncidents = [];
     return next;
   }
+  if (cmd === 'adoptLegacyData' || cmd === 'declineLegacyData') {
+    // As the host: a choice only while there is something on offer; bringing it over happens
+    // at the next start, which a browser preview never has.
+    if (['offered', 'pending'].includes(next.product.data.legacy))
+      next.product.data = { ...next.product.data, legacy: cmd === 'adoptLegacyData' ? 'pending' : 'declined' };
+    return next;
+  }
   if (cmd === 'setSafeMode') {
     const level = ['normal', 'skipSuspects', 'noThirdParty'].includes(payload.level)
       ? payload.level
@@ -9950,6 +9972,10 @@ export const setPartOutputPair = (partId, pair) => send({ cmd: 'setPartOutputPai
 export const claimHardwareSurface = () => send({ cmd: 'claimHardwareSurface' });
 export const releaseHardwareSurface = () => send({ cmd: 'releaseHardwareSurface' });
 export const clearActiveHostingIncidents = () => send({ cmd: 'clearActiveHostingIncidents' });
+// The rig an earlier build kept in the folder every product shared: bring it over at the next
+// start, or leave it where it is.
+export const adoptLegacyData = () => send({ cmd: 'adoptLegacyData' });
+export const declineLegacyData = () => send({ cmd: 'declineLegacyData' });
 
 // --- §17: safe startup, recovery and the support bundle --------------------------------------
 export const setSafeMode = (level) => send({ cmd: 'setSafeMode', level });

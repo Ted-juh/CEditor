@@ -68,6 +68,11 @@ bool prewarmWorkerEditorIfIdle (juce::AudioProcessor* processor, int quietMs)
 InstrumentHostService::InstrumentHostService (Options optionsToUse)
     : options (std::move (optionsToUse))
 {
+    // First, before anything reads the data folder: a rig the user asked to bring over from
+    // where an earlier build kept it comes over now, while nothing here holds it open.
+    adoptLegacyDataIfAsked();
+    legacyOffered = legacyDataWorthOffering();
+
     ctrl49::registerCtrl49Profile();
     loadMackieSection();
     loadSurfacePages();
@@ -701,6 +706,20 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (isPlayer() && isEditorOnlyCommand (cmd, payload))
     {
         emitError (editorOnlyRefusal (cmd));
+        emitState();
+        return;
+    }
+
+    // The rig an earlier build kept in the folder every product shared. Bringing it over waits
+    // for the next start: copied now, it would be overwritten by this session's next save.
+    if (cmd == "adoptLegacyData" || cmd == "declineLegacyData")
+    {
+        if (! legacyOffered)
+        {
+            emitError ("There is no earlier HoSTage data to bring over.");
+            return;
+        }
+        writeLegacyDecision (cmd == "adoptLegacyData" ? "adopt" : "declined", {});
         emitState();
         return;
     }
@@ -19849,7 +19868,7 @@ bool InstrumentHostService::claimHardwareSurface()
 
     bool acquired = false;
     juce::int64 now = 0;
-    options.dataDirectory.createDirectory();
+    hardwareClaimDirectory().createDirectory();
     if (! withHardwareClaimLock (hardwareOwnerFile(), [&]
         {
             // The clock is read under the lock, so claims are ordered: one read before waiting
@@ -20140,7 +20159,116 @@ juce::var InstrumentHostService::productPayload() const
             ids.add (id);
         return ids;
     }());
+
+    // Where this program keeps its data, and what became of a rig an earlier build kept in the
+    // folder every product shared.
+    juce::Array<juce::var> legacyFailedNames;
+    for (const auto& name : legacyFailed)
+        legacyFailedNames.add (name);
+    auto* data = new juce::DynamicObject();
+    data->setProperty ("folder",       options.dataDirectory.getFullPathName());
+    data->setProperty ("legacy",       legacyDataState());
+    data->setProperty ("legacyFolder", options.legacyDataDirectory.getFullPathName());
+    data->setProperty ("legacyFailed", legacyFailedNames);
+    root->setProperty ("data", juce::var (data));
     return juce::var (root);
+}
+
+// -- a rig an earlier build kept elsewhere ------------------------------------------------------
+// Until each product knew which one it was, every built product kept its data in one shared
+// folder (HostageManifest.h). Nothing there says which product a rig belonged to, so a product
+// starting in a folder of its own cannot know whether the shared rig is its own (an upgrade) or
+// another product's (a first install beside it). It asks instead, once.
+
+namespace
+{
+    /** What a running program keeps for itself — markers, logs, crash evidence, the keyboard
+        claim, staged workers — as opposed to what a person set up. Everything else comes over,
+        so data added to the folder later is brought over without anybody remembering to list
+        it here. */
+    bool isRuntimeState (const juce::File& item)
+    {
+        static const juce::StringArray runtime {
+            "products", "hardware-owner.json", "legacy-data.json", "product.json",
+            "logs", "crash-dumps", "crash-state", "worker-staging", "audition-jobs",
+            "active-hosting-log.json", "safe-mode.json",
+        };
+        return runtime.contains (item.getFileName(), true) || item.hasFileExtension ("marker;tmp");
+    }
+}
+
+bool InstrumentHostService::legacyDataWorthOffering() const
+{
+    const auto& from = options.legacyDataDirectory;
+    if (from == juce::File() || from == options.dataDirectory || ! from.isDirectory())
+        return false;
+    for (const auto* name : { "session-performance.json", "plugin-catalog.json", "library.db",
+                              "library.json", "licence.celicence" })
+        if (from.getChildFile (name).existsAsFile())
+            return true;
+    return false;
+}
+
+void InstrumentHostService::adoptLegacyDataIfAsked()
+{
+    const auto stored = juce::JSON::parse (legacyDecisionFile().loadFileAsString());
+    legacyDecision = stored.getProperty ("decision", {}).toString();
+    if (const auto* failed = stored.getProperty ("failed", {}).getArray())
+        for (const auto& name : *failed)
+            legacyFailed.add (name.toString());
+
+    if (legacyDecision != "adopt")
+        return;
+
+    const auto& from = options.legacyDataDirectory;
+    juce::StringArray failed;
+    if (from == juce::File() || ! from.isDirectory())
+        failed.add (from.getFullPathName());
+    else
+    {
+        options.dataDirectory.createDirectory();
+        for (const auto& item : from.findChildFiles (juce::File::findFilesAndDirectories, false))
+        {
+            if (isRuntimeState (item))
+                continue;
+            const auto to = options.dataDirectory.getChildFile (item.getFileName());
+            const auto copied = item.isDirectory() ? (to.deleteRecursively() && item.copyDirectoryTo (to))
+                                                   : item.copyFileTo (to);
+            if (! copied)
+                failed.add (item.getFileName());
+        }
+    }
+    writeLegacyDecision ("adopted", failed);
+}
+
+void InstrumentHostService::writeLegacyDecision (const juce::String& decision,
+                                                 const juce::StringArray& failed)
+{
+    juce::Array<juce::var> failedNames;
+    for (const auto& name : failed)
+        failedNames.add (name);
+    auto* record = new juce::DynamicObject();
+    record->setProperty ("decision", decision);
+    record->setProperty ("from", options.legacyDataDirectory.getFullPathName());
+    record->setProperty ("failed", failedNames);
+
+    options.dataDirectory.createDirectory();
+    if (writeTextAtomically (legacyDecisionFile(), juce::JSON::toString (juce::var (record))))
+    {
+        legacyDecision = decision;
+        legacyFailed = failed;
+    }
+    else
+        emitError ("Could not record the choice in " + legacyDecisionFile().getFullPathName() + ".");
+}
+
+juce::String InstrumentHostService::legacyDataState() const
+{
+    if (legacyDecision == "adopted" || legacyDecision == "declined")
+        return legacyDecision;
+    if (legacyDecision == "adopt")
+        return "pending";
+    return legacyOffered ? "offered" : "none";
 }
 
 juce::var InstrumentHostService::reliabilityPayload() const

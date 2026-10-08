@@ -271,8 +271,26 @@ try {
   await page.getByTestId('surface-describe').waitFor();
   assert.equal(await page.getByTestId('host-utility-project').count(), 1, 'back in the editor, everything returns');
 
+  // A product in a folder of its own is asked, once, about the rig an earlier build kept in the
+  // folder every product shared. The preview has no such folder, so the host's answer is set.
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostState.update((s) => ({ ...s, product: { ...s.product, data: {
+      ...s.product.data, legacy: 'offered', folder: '/home/me/.config/CEditorInstrumentHost/products/8F3A6C2E',
+    } } }));
+  });
+  const legacyPrompt = page.getByTestId('host-legacy-prompt');
+  await legacyPrompt.waitFor();
+  await page.getByTestId('host-legacy-adopt').click();
+  assert.match(await legacyPrompt.innerText(), /Restart it to finish/, 'bringing it over waits for a restart, and says so');
+  await page.getByTestId('host-legacy-decline').click();
+  assert.equal(await legacyPrompt.count(), 0, 'answered, the question goes');
+  await page.getByTestId('host-utility-product').click();
+  assert.match(await page.getByTestId('product-data-folder').innerText(), /products\/8F3A6C2E/,
+    'and the Product utility says where this product keeps its data');
+
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros, returns, bus effects and Try as player work as drawn');
+  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros, returns, bus effects, Try as player and the data folder work as drawn');
 } finally {
   await browser.close();
   await server.close();

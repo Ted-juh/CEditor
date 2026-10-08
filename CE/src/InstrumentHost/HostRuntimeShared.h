@@ -7,6 +7,8 @@
 #include "PluginInstantiator.h"
 #include "PluginCatalog.h"
 #include "PngResourceValidation.h"
+#include "HostageManifest.h"
+#include "InstrumentHostService.h"
 #include "BinaryData.h" // PlayerWebData — the embedded web bundle (host.html rides in it)
 
 // HostRuntimeShared — the glue both generated Hostage targets share.
@@ -203,32 +205,27 @@ inline juce::File findFactoryPerformance()
 }
 
 // -- which program this is ---------------------------------------------------------------------
-// hostage.json says whether this copy of HoSTage is the editor or a player
-// (docs/design/hostage-creator-editor-player.md): { "role": "player" }. Found where
-// factory-performance.json is — beside the standalone's exe, or in the VST3 bundle's
-// Contents/Resources. Missing, unreadable or any other role is the editor: an installed HoSTage
-// is the editor unless whoever created it said otherwise.
+// hostage.json (HostageManifest.h) says whether this copy of HoSTage is the editor or a player,
+// and which product it is. Its product decides the data folder; the claim on the keyboard stays
+// in the folder every HoSTage shares, because one keyboard has one owner whichever product holds
+// it; and a product that now has a folder of its own is offered the rig it kept in the shared one.
 
-struct HostageRole
+inline HostageManifest readHostageManifest()
 {
-    bool player = false;
-};
+    return readHostageManifestBeside (juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+                                          .getParentDirectory());
+}
 
-inline HostageRole readHostageRole()
+inline HostageManifest configureForThisProgram (InstrumentHostService::Options& options)
 {
-    const auto moduleDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
-                               .getParentDirectory();
-
-    for (const auto& candidate : { moduleDir.getChildFile ("hostage.json"),
-                                   moduleDir.getParentDirectory().getChildFile ("Resources")
-                                            .getChildFile ("hostage.json") })
-    {
-        if (! candidate.existsAsFile())
-            continue;
-        const auto parsed = juce::JSON::parse (candidate);
-        return { parsed.getProperty ("role", {}).toString() == "player" };
-    }
-    return {};
+    const auto manifest = readHostageManifest();
+    options.dataDirectory = productDataDirectory (hostDataRoot(), manifest);
+    options.hardwareClaimDirectory = hostDataRoot();
+    if (manifest.hasProduct())
+        options.legacyDataDirectory = hostDataRoot();
+    options.player = manifest.player;
+    labelProductDataDirectory (options.dataDirectory, manifest);
+    return manifest;
 }
 
 // -- finding the scanner worker ----------------------------------------------------------------

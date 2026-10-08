@@ -16,6 +16,7 @@ import path from 'node:path';
 import {
   normalizeProject, sanitizeBaseName, artifactCandidateDirs, resolveArtifacts,
   stagePlan, privateSymbolPlan, isccArgs, TEMPLATE_DEFINES, factoryPerformance,
+  hostageManifestJson,
 } from '../../../tools/scripts/build-host-product.mjs';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -174,6 +175,41 @@ test('the template pins identity to the manifest appId, braces escaped for Inno'
     path.join(repoRoot, 'tools', 'installer', 'HostProductTemplate.iss'), 'utf8');
   assert.match(template, /AppId=\{\{\{#MyAppId\}\}/,
     'AppId must render {GUID} — {{ is the literal brace, {#MyAppId} the preprocessor value');
+});
+
+test('every target ships hostage.json, naming the product whose data folder it keeps', () => {
+  // Without it a product falls back to the folder every product used to share, and two
+  // products on one machine overwrite each other's rig (HostageManifest.h).
+  const { project } = normalizeProject({ ...goodProject, appId: goodProject.appId.toLowerCase() });
+  const { ops } = stagePlan({ project, artifacts: foundArtifacts, stageDir: '/s' });
+  const staged = ops.filter((op) => op.to.endsWith('hostage.json'));
+  assert.deepEqual(staged.map((op) => op.to).sort(), [
+    path.join('/s', 'Standalone', 'hostage.json'),
+    path.join('/s', 'VST3', 'Hostage.vst3', 'Contents', 'Resources', 'hostage.json'),
+  ].sort(), 'beside the exe, and where the VST3 looks from its module — even with no factory rack');
+  const manifest = JSON.parse(staged[0].contents);
+  assert.deepEqual(manifest, {
+    role: 'editor',
+    product: { name: 'Super Rack', appId: goodProject.appId.toUpperCase() },
+  }, 'a built product is the editor; the appId is upper-cased as the runtime folds it');
+
+  const { project: standaloneOnly } = normalizeProject({ ...goodProject, includeVst3: false });
+  assert.equal(stagePlan({ project: standaloneOnly, artifacts: foundArtifacts, stageDir: '/s' }).ops
+    .filter((op) => op.to.endsWith('hostage.json')).length, 1, 'a disabled target ships none of it');
+});
+
+test('hostage.json says what the runtime reads, in the keys it reads', () => {
+  const header = readFileSync(path.join(repoRoot, 'CE/src/InstrumentHost/HostageManifest.h'), 'utf8');
+  const { project } = normalizeProject(goodProject);
+  const manifest = JSON.parse(hostageManifestJson(project));
+  assert.match(header, /getProperty \("role", \{\}\)\.toString\(\) == "player"/);
+  assert.match(header, /json\.getProperty \("product", \{\}\)/);
+  assert.match(header, /product\.getProperty \("appId", \{\}\)/);
+  assert.match(header, /product\.getProperty \("name", \{\}\)/);
+  assert.deepEqual(Object.keys(manifest).sort(), ['product', 'role']);
+  assert.deepEqual(Object.keys(manifest.product).sort(), ['appId', 'name']);
+  assert.match(manifest.product.appId, /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/,
+    'a GUID the runtime accepts as a folder name');
 });
 
 test('a factory performance stages beside the exe and into the bundle resources', () => {

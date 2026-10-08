@@ -3,6 +3,7 @@
 #include "AtomicFileWrite.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
 #include "InstrumentHost/InstrumentHostService.h"
+#include "InstrumentHost/HostageManifest.h"
 #include "InstrumentHost/PluginInstantiator.h"
 #include "InstrumentHost/PluginEditorHost.h"
 #include "InstrumentHost/FloatingEditorWindows.h"
@@ -1780,6 +1781,10 @@ void ValueTreeBridge::ensureInstrumentHost()
 
     options.dataDirectory = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
                                 .getChildFile ("CEditor").getChildFile ("instrument-host");
+    // The keyboard is claimed where every HoSTage product claims it. With the claim in this
+    // tab's own folder, the tab and a running product both drove the CTRL49 — two racks on one
+    // keyboard, the thing the claim exists to prevent.
+    options.hardwareClaimDirectory = ceditor::host::hostDataRoot();
     options.workerExecutable = findScannerWorker();
 
     // May fire from the scan thread; callAsync is the marshal. `this` raw is this file's

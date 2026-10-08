@@ -18,6 +18,7 @@
 // The stub worker's path arrives as argv[1] from CTest, same as the coordinator tests.
 
 #include "InstrumentHost/InstrumentHostService.h"
+#include "InstrumentHost/HostageManifest.h"
 #include "InstrumentHost/EditorSnapshot.h"
 #include "InstrumentHost/LiveWorkerDiagnostics.h"
 #include "InstrumentHost/PatchDiff.h"
@@ -5213,6 +5214,160 @@ void testTryAsPlayer()
     h.cmd ("addControlPage");
     check (! h.service->isPlayer() && h.service->getRackHost().getPerformance().pages.size() == 2,
            "and back in the editor, pages are made again");
+}
+
+// Each built product keeps its own data (HostageManifest.h): the folder is named by the
+// product's appId from hostage.json, which also becomes a path — so only a real GUID gets in.
+void testHostageManifest()
+{
+    std::cout << "\nhostage.json: the role, the product, and the folder it puts the data in" << std::endl;
+    using namespace ceditor::host;
+
+    const auto parse = [] (const juce::String& json) { return parseHostageManifest (juce::JSON::parse (json)); };
+    const auto root = freshDataDir ("manifest-root");
+
+    const auto product = parse (R"({"role":"player","product":{"name":" Super Rack ","appId":"8f3a6c2e-1b4d-4e5f-9a7b-0c1d2e3f4a5b"}})");
+    check (product.player && product.productName == "Super Rack"
+             && product.appId == "8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B",
+           "it reads the role, the name and the appId, upper-cased so one product is one folder");
+    check (productDataDirectory (root, product)
+             == root.getChildFile ("products").getChildFile ("8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B"),
+           "a product keeps its data in products/<appId>");
+
+    const auto editor = parse (R"({"product":{"name":"Rig","appId":"8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B"}})");
+    check (! editor.player && editor.hasProduct(), "no role is the editor, with its product all the same");
+
+    check (productDataDirectory (root, parse ("{}")) == root
+             && productDataDirectory (root, HostageManifest {}) == root,
+           "a program that does not know its product keeps the folder its data is already in");
+    for (const auto* hostile : { "../../../../../../../../../../../../../", "..\\..\\..",
+                                 "8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5G", "8F3A6C2E1B4D-4E5F-9A7B-0C1D2E3F4A5B-",
+                                 "C:/Windows/System32/drivers/etc/xx", "" })
+    {
+        auto* inner = new juce::DynamicObject();
+        inner->setProperty ("appId", hostile);
+        auto* outer = new juce::DynamicObject();
+        outer->setProperty ("product", juce::var (inner));
+        check (productDataDirectory (root, parseHostageManifest (juce::var (outer))) == root,
+               juce::String ("an appId that is not a GUID never becomes a path: \"") + hostile + "\"");
+    }
+
+    const auto bundle = freshDataDir ("manifest-bundle");
+    const auto module = bundle.getChildFile ("Contents").getChildFile ("x86_64-win");
+    module.createDirectory();
+    bundle.getChildFile ("Contents").getChildFile ("Resources").createDirectory();
+    bundle.getChildFile ("Contents").getChildFile ("Resources").getChildFile ("hostage.json")
+        .replaceWithText (R"({"product":{"name":"In A Bundle","appId":"11111111-2222-3333-4444-555555555555"}})");
+    check (readHostageManifestBeside (module).productName == "In A Bundle",
+           "a VST3 finds it in its bundle's Resources");
+    module.getChildFile ("hostage.json").replaceWithText (R"({"role":"player"})");
+    check (readHostageManifestBeside (module).player && ! readHostageManifestBeside (module).hasProduct(),
+           "and one beside the module comes first");
+
+    const auto folder = productDataDirectory (root, product);
+    labelProductDataDirectory (folder, product);
+    const auto label = juce::JSON::parse (folder.getChildFile ("product.json"));
+    check (label.getProperty ("name", {}).toString() == "Super Rack",
+           "the folder is labelled with the product's name, since its own name is an id");
+}
+
+// The keyboard is claimed in one place, whatever folder each program's data is in: two
+// products, or a product and CEditor's tab, must not both drive one CTRL49.
+void testHardwareClaimShared()
+{
+    std::cout << "\none keyboard, one owner, across data folders" << std::endl;
+
+    const auto shared = freshDataDir ("claim-shared");
+    const auto inShared = [shared] (InstrumentHostService::Options& o) { o.hardwareClaimDirectory = shared; };
+    const auto firstFolder = freshDataDir ("claim-product-a");
+    Harness first (firstFolder, {}, inShared);
+    Harness second (freshDataDir ("claim-product-b"), {}, inShared);
+
+    first.cmd ("claimHardwareSurface");
+    check (first.service->ownsHardwareSurface(), "one product claims the keyboard");
+    second.cmd ("claimHardwareSurface");
+    check (! second.service->ownsHardwareSurface(),
+           "another, with its data in a folder of its own, is refused it");
+    check (shared.getChildFile ("hardware-owner.json").existsAsFile()
+             && ! firstFolder.getChildFile ("hardware-owner.json").existsAsFile(),
+           "the claim is kept in the shared place, not in either product's folder");
+
+    first.cmd ("releaseHardwareSurface");
+    second.cmd ("claimHardwareSurface");
+    check (second.service->ownsHardwareSurface(), "and gets it once the first lets go");
+}
+
+// The rig an earlier build kept in the shared folder: offered once, brought over at the next
+// start if asked for, never if declined — and only what a person set up, not what a running
+// program left behind.
+void testLegacyDataOffer()
+{
+    std::cout << "\na rig an earlier build kept in the shared folder" << std::endl;
+
+    const auto legacy = freshDataDir ("legacy-root");
+    seedCatalog (legacy);
+    legacy.getChildFile ("my-notes.txt").replaceWithText ("second verse is in G");
+    legacy.getChildFile ("snapshots").createDirectory();
+    legacy.getChildFile ("snapshots").getChildFile ("a.json").replaceWithText ("{}");
+    legacy.getChildFile ("logs").createDirectory();
+    legacy.getChildFile ("logs").getChildFile ("host.log").replaceWithText ("old run");
+    legacy.getChildFile ("operation.marker").replaceWithText ("x");
+    legacy.getChildFile ("hardware-owner.json").replaceWithText ("{}");
+    const auto other = legacy.getChildFile ("products").getChildFile ("11111111-2222-3333-4444-555555555555");
+    other.createDirectory();
+    other.getChildFile ("my-notes.txt").replaceWithText ("another product's");
+
+    const auto mine = legacy.getChildFile ("products").getChildFile ("8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B");
+    const auto fromLegacy = [legacy] (InstrumentHostService::Options& o) { o.legacyDataDirectory = legacy; };
+    const auto legacyState = [] (Harness& h)
+    {
+        h.cmd ("getState");
+        return h.emits.lastState()->getProperty ("product", {}).getProperty ("data", {});
+    };
+
+    {
+        Harness h (mine, {}, fromLegacy);
+        const auto data = legacyState (h);
+        check (data.getProperty ("legacy", {}).toString() == "offered"
+                 && data.getProperty ("folder", {}).toString() == mine.getFullPathName(),
+               "a product in a folder of its own is offered the shared rig, and says where its data is");
+        h.cmd ("adoptLegacyData");
+        check (legacyState (h).getProperty ("legacy", {}).toString() == "pending"
+                 && ! mine.getChildFile ("my-notes.txt").existsAsFile(),
+               "asked for, it waits for the next start, so this session cannot save over it");
+    }
+    {
+        Harness h (mine, {}, fromLegacy);
+        check (legacyState (h).getProperty ("legacy", {}).toString() == "adopted",
+               "at the next start it has come over");
+        check (mine.getChildFile ("my-notes.txt").loadFileAsString() == "second verse is in G"
+                 && mine.getChildFile ("plugin-catalog.json").existsAsFile()
+                 && mine.getChildFile ("snapshots").getChildFile ("a.json").existsAsFile(),
+               "everything a person set up came, a file nobody listed included");
+        check (! mine.getChildFile ("logs").exists() && ! mine.getChildFile ("operation.marker").exists()
+                 && ! mine.getChildFile ("hardware-owner.json").exists()
+                 && ! mine.getChildFile ("products").exists(),
+               "and nothing a running program left behind, nor the other products' folders");
+    }
+
+    const auto declining = legacy.getChildFile ("products").getChildFile ("AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE");
+    {
+        Harness h (declining, {}, fromLegacy);
+        h.cmd ("declineLegacyData");
+        check (legacyState (h).getProperty ("legacy", {}).toString() == "declined", "it can be declined");
+    }
+    {
+        Harness h (declining, {}, fromLegacy);
+        check (legacyState (h).getProperty ("legacy", {}).toString() == "declined"
+                 && ! declining.getChildFile ("my-notes.txt").existsAsFile(),
+               "which is remembered, and brings nothing");
+    }
+
+    Harness unbranded (freshDataDir ("legacy-none"));
+    check (legacyState (unbranded).getProperty ("legacy", {}).toString() == "none",
+           "a program in the shared folder itself has nothing to be offered");
+    unbranded.cmd ("adoptLegacyData");
+    check (unbranded.emits.lastError().contains ("no earlier"), "and asking anyway says so");
 }
 
 // Which stage pages the keyboard shows is the player's choice, made once. Before, every page
@@ -15124,6 +15279,9 @@ int main (int argc, char* argv[])
     testCtrl49StagePagesRemembered();
     testPlayerRole();
     testTryAsPlayer();
+    testHostageManifest();
+    testHardwareClaimShared();
+    testLegacyDataOffer();
     testCtrl49Meters();
     testCtrl49Live();
     testCtrl49Discover();
