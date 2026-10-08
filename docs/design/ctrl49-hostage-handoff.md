@@ -30,12 +30,15 @@ and dated notes in `tools/ctrl49/hardware-checklist.md`.
 **It was the Vanguard part, not HoSTage's sound (2026-10-08, evening).** The owner put a Spire
 part in the Vanguard part's place and heard it. Measured the same way as below, with four notes
 sent to the "CEditor Test Out" port: CEditor's audio session peaked at 0.66 to 0.69 of full
-scale, and zero with nothing sent. So notes reach a part and its sound reaches the device. What
-is left open is why Vanguard ("LD Chording") stayed silent: the plug-in or that sound itself, or
-how HoSTage hosts it. Nothing showed in the app either way, and a part that loads and makes no
-sound without saying so is worth finding. To settle it, load Vanguard again, send notes to the
-test port and read the session, once on that sound and once on another of its sounds. What
-follows is the morning's record.
+scale, and zero with nothing sent. So notes reach a part and its sound reaches the device.
+Vanguard itself sounds in HoSTage too: loaded again and walked to "BA Hi-levelbass" with the
+rack's preset arrows, three notes peaked at 2.27, well over full scale. So the morning's silence
+belonged to that one part as the saved rack restored it (Vanguard on "LD Chording"), not to the
+plug-in and not to HoSTage's sound. Whether that sound is silent by itself or the restore left
+it so was not looked at; the part is gone from the rack. Vanguard does stall its own message
+thread: 2 s when its window opens, and 4 s after a preset load in which 21 `parameterText`
+requests were refused as busy (`logs/live-worker-events.jsonl`). What follows is the morning's
+record.
 
 **The morning: the part makes no sound (2026-10-08).** On LAYERS, with the part's
 range raised over the keys (E3; now C-1 to Eb3), a held key lit on the keyboard and in the app's
