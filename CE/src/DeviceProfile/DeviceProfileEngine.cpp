@@ -1693,6 +1693,67 @@ juce::StringArray DeviceProfileEngine::dumpDefinitionIds() const
     return ids;
 }
 
+juce::StringArray DeviceProfileEngine::dumpAddressVariables (const juce::String& dumpId) const
+{
+    juce::StringArray names;
+    const auto collect = [&names] (const juce::var& tokens)
+    {
+        if (auto* items = asArray (tokens))
+            for (const auto& item : *items)
+            {
+                const auto token = item.toString().trim();
+                if (! token.startsWithChar ('$')) continue;
+                const auto name = token.substring (1).initialSectionContainingOnly (
+                    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_");
+                if (name.isNotEmpty()) names.addIfNotAlreadyThere (name);
+            }
+    };
+
+    auto* dump = findDumpDefinition (dumpId);
+    if (dump == nullptr)
+        return names;
+
+    if (auto* matcher = asObject (dump->getProperty ("matcher")))
+    {
+        collect (matcher->getProperty ("prefix"));
+        collect (matcher->getProperty ("suffix"));
+    }
+
+    const auto recipe = propString (*dump, "requestRecipe");
+    auto* root = profileObject();
+    if (auto* requests = root != nullptr ? asArray (root->getProperty ("requests")) : nullptr)
+        for (const auto& requestValue : *requests)
+            if (auto* request = asObject (requestValue))
+            {
+                auto* response = asObject (request->getProperty ("response"));
+                const bool fetchesThisDump = (recipe.isNotEmpty() && propString (*request, "id") == recipe)
+                    || (response != nullptr && propString (*response, "dump") == propString (*dump, "id"));
+                if (fetchesThisDump)
+                    collect (request->getProperty ("template"));
+            }
+
+    return names;
+}
+
+juce::StringArray DeviceProfileEngine::presetSlotVariables() const
+{
+    juce::StringArray names { "slot", "program", "bankMsb", "bankLsb" };
+    auto* root = profileObject();
+    if (root == nullptr)
+        return names;
+
+    if (auto* browser = asObject (root->getProperty ("presetBrowser")))
+        if (const auto name = propString (*browser, "slotVariable"); name.isNotEmpty())
+            names.addIfNotAlreadyThere (name);
+
+    if (auto* presets = asObject (root->getProperty ("presets")))
+        if (auto* nameRequest = asObject (presets->getProperty ("nameRequest")))
+            if (const auto name = propString (*nameRequest, "slotVariable"); name.isNotEmpty())
+                names.addIfNotAlreadyThere (name);
+
+    return names;
+}
+
 const juce::DynamicObject* DeviceProfileEngine::findDumpDefinition (const juce::String& dumpId) const
 {
     auto* root = profileObject();

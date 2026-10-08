@@ -95,6 +95,7 @@ import { compileJava, invokeJava } from './javaPreview.js';
 import { ensureTs, transpileTs } from './tsService.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
+import { GUARD_NAME, PYTHON_WATCHDOG_PRELUDE, isScriptTimeLimit, scriptLoopGuard } from './scriptWatchdog.js';
 import { applySplitScriptAction } from '../utils/splitZoneLayout.js';
 import { phraseScriptPatch } from '../utils/phraseLayout.js';
 import { recorderScriptPatch } from '../utils/noteRecorderLayout.js';
@@ -7438,25 +7439,89 @@ async function loadHandlersLua(script) {
 // always-on native core is Lua+JS; embedded CPython is the optional third window-closed engine.
 
 let pyodidePromise = null;
+/**
+ * Where Pyodide is loaded from: a realm of its own.
+ *
+ * The script sandbox locks the page's realm down (SES lockdown, scriptSandbox.js) before any panel
+ * code runs, and that freezes the built-ins Pyodide extends while it loads, so Pyodide loaded into
+ * the page failed with "Cannot add property sig, object is not extensible", and every Python preview
+ * with it, since the security pass. A hidden same-origin iframe is a separate realm with its own
+ * built-ins that lockdown never touched. This is not a sandbox and does not claim to be one: Python
+ * already needs its own approval, as trusted code (scriptTrust.js), and the page's realm stays locked.
+ *
+ * Off the page (the unit tests) there is no document, and whoever runs the runtime supplies
+ * globalThis.loadPyodide. Exported for the test that pins the realm.
+ */
+export async function pyodideLoader(CDN) {
+  if (typeof document === 'undefined') return globalThis.loadPyodide;
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.tabIndex = -1;
+  frame.style.display = 'none';
+  document.body.appendChild(frame);
+  const realm = frame.contentWindow;
+  await new Promise((resolve, reject) => {
+    const s = realm.document.createElement('script');
+    s.src = CDN + 'pyodide.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('could not load pyodide.js (offline?)'));
+    realm.document.head.appendChild(s);
+  });
+  return realm.loadPyodide;
+}
+
 async function getPyodideEngine() {
   if (!pyodidePromise) {
     pyodidePromise = (async () => {
       const CDN = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
-      if (!globalThis.loadPyodide) {
-        await new Promise((resolve, reject) => {
-          const s = document.createElement('script');
-          s.src = CDN + 'pyodide.js';
-          s.onload = resolve;
-          s.onerror = () => reject(new Error('could not load pyodide.js (offline?)'));
-          document.head.appendChild(s);
-        });
-      }
+      const loadPyodide = await pyodideLoader(CDN);
+      if (typeof loadPyodide !== 'function') throw new Error('no Pyodide loader');
       // Do not expose the privileged WebView global through Python's `import js`.
       // CPython/native exported handlers remain trusted code, not an OS sandbox.
-      return globalThis.loadPyodide({ indexURL: CDN, jsglobals: Object.create(null) });
+      const py = await loadPyodide({ indexURL: CDN, jsglobals: Object.create(null) });
+      // Python is the one preview engine with no execution bound of its own (QuickJS, Wasmoon and
+      // the interpreters' shared budget cover the rest), so its loops carry the watchdog (C-57).
+      py.runPython(PYTHON_WATCHDOG_PRELUDE);
+      return py;
     })();
   }
   return pyodidePromise;
+}
+
+/**
+ * The panel API as Python should see it.
+ *
+ * Pyodide hands a Python dict, list or callable to a JavaScript function as a BORROWED proxy, which it
+ * destroys the moment the call returns. Anything the API keeps — a saved setting, a callback for
+ * after()/on()/watch(), an options object it reads later — was dead by the time it was used: a dict
+ * saved with saveSetting() made the panel impossible to save at all, every callback threw "This
+ * borrowed proxy was automatically destroyed", and options and lists arrived empty (release audit
+ * C-96, C-97, C-99, C-59). So every function is wrapped: dicts, lists, tuples and sets are converted
+ * to plain JavaScript before the call, and a callable is copied into a proxy that outlives it.
+ *
+ * Exported for the test, which drives it with a stand-in for Pyodide's proxy class.
+ */
+export function apiForPython(api, PyProxy) {
+  const isPyProxy = (value) => PyProxy != null && value instanceof PyProxy;
+  const fromPython = (value) => {
+    if (!isPyProxy(value)) return value;
+    if (typeof value === 'function') return value.copy();
+    return value.toJs({ dict_converter: Object.fromEntries });
+  };
+  const wrapped = new WeakMap();
+  const wrap = (value) => {
+    if (typeof value === 'function') {
+      if (!wrapped.has(value)) wrapped.set(value, function pythonCall(...args) { return value.apply(this, args.map(fromPython)); });
+      return wrapped.get(value);
+    }
+    if (value == null || typeof value !== 'object' || Array.isArray(value) || isPyProxy(value)) return value;
+    if (wrapped.has(value)) return wrapped.get(value);
+    const out = {};
+    wrapped.set(value, out);
+    for (const [key, entry] of Object.entries(value)) out[key] = wrap(entry);
+    return out;
+  };
+  return wrap(api);
 }
 
 /** Execute a Python script's source and return its declared handlers (async). */
@@ -7474,8 +7539,11 @@ async function loadHandlersPython(script) {
     // Fresh namespace per run, seeded with the panel API + helpers as Python globals, so the source
     // can call set()/get()/sendCC()/log()/clamp()/scale()/… directly. Each defined handler is read
     // back out as a callable; JS payloads auto-convert (numbers → int/float, objects → attr access).
-    const ns = py.toPy(api);
-    py.runPython(script.source, { globals: ns });
+    // One level deep: the names become Python globals, and `ce` stays a JavaScript object, so
+    // `ce.midi.sendCC(...)` resolves by attribute the way the exported plug-in's `ce` namespace does.
+    // Converting it all the way turned `ce` into a dict and every `ce.*` call into AttributeError (C-98).
+    const ns = py.toPy(apiForPython({ ...api, [GUARD_NAME]: scriptLoopGuard }, py.ffi?.PyProxy), { depth: 1 });
+    py.globals.get('__ce_exec')(script.source, ns);
     const handlers = {};
     for (const name of probeNames(script)) {
       const fn = ns.get(name);
@@ -7720,6 +7788,7 @@ function reportScriptLoadError(scriptId, message) {
 // Report a thrown error as an error line plus a few call-stack frames (when available),
 // so the console shows the exception AND where it came from.
 function reportScriptError(scriptId, e) {
+  if (isScriptTimeLimit(e)) stopScript(scriptId);
   const msg = e?.message ?? String(e);
   addScriptTrace('error', scriptId, msg);
   dispatchErrorHook(scriptId, msg, 'dispatch');
@@ -7750,12 +7819,30 @@ function cacheKey(script) {
 /** Load (or reuse) a script's handlers. Re-loading replaces the script's on(…) listeners and its
     watch/compute/intercept rules and actions — an edit must not leave the previous version's rules
     running beside the new ones. */
+/**
+ * Scripts the watchdog stopped, by id, with the source they were stopped in. A stopped script loads
+ * nothing and its listeners are gone, so an endless loop in onValueChanged costs one stall rather
+ * than one per knob movement. Editing the script changes its key and runs it again.
+ */
+const stoppedScripts = new Map();
+
+function stopScript(scriptId) {
+  const loaded = handlerCache.get(scriptId);
+  if (!loaded || stoppedScripts.get(scriptId) === loaded.key) return;
+  stoppedScripts.set(scriptId, loaded.key);
+  clearListeners(scriptId);
+  clearReactive(scriptId);
+  clearMidiFiltersFor(scriptId);
+}
+
 async function handlersFor(script) {
   if (!ensurePanelExecutionApproved(script)) return null;
   await ensureScriptSandbox();
   if (!ensurePanelExecutionApproved(script)) return null;
   const epoch = executionEpoch;
   const key = cacheKey(script);
+  if (stoppedScripts.get(script.id) === key) return null;
+  stoppedScripts.delete(script.id);
   const hit = handlerCache.get(script.id);
   if (hit && hit.key === key) return hit.handlers;
   disposeJavascriptSandboxes(script.id);
@@ -7883,6 +7970,7 @@ async function invokeHandler(script, hook = null, payload = undefined) {
 export async function runScript(script, hook = null, payload = undefined) {
   disposeJavascriptSandboxes(script.id);
   handlerCache.delete(script.id);
+  stoppedScripts.delete(script.id);   // pressing Run is asking to try again, stopped or not
   return invokeHandler(script, hook, payload);
 }
 

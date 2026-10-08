@@ -165,9 +165,11 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         { if (safe != nullptr) safe->emitToWebView (eventName, payload); });
 
     // Panel-load handshake: the JS player announces readiness, we push the panel document.
-    options = options.withEventListener ("playerReady", [this] (const juce::var&)
+    // The load is posted, and the host can be closed before it runs (release audit X-02): the same
+    // SafePointer the device events above use, so a late post finds nothing to load into.
+    options = options.withEventListener ("playerReady", [safe = juce::Component::SafePointer<PlayerHost> (this)] (const juce::var&)
     {
-        juce::MessageManager::callAsync ([this]() { loadPanelIntoWebView(); });
+        juce::MessageManager::callAsync ([safe]() { if (safe != nullptr) safe->loadPanelIntoWebView(); });
     });
 
     // Host-parameter sync (M2): the user moved a control -> set the matching host parameter so the

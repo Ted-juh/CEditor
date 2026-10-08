@@ -190,6 +190,24 @@ public:
      */
     [[nodiscard]] juce::StringArray dumpDefinitionIds() const;
 
+    /**
+     * The template variables a dump is addressed by, without the `$`: every `$name` in its
+     * matcher's prefix and suffix, and in the template of each request that fetches it (its
+     * `requestRecipe`, and any request whose response names it). No duplicates.
+     *
+     * A fact about the profile, not a judgement: the exported plugin uses it, with
+     * presetSlotVariables, to recognise a dump that addresses the synth's stored memory (the AN1x
+     * `userVoice` bulk is `... 11 $slot 00`) and must never be written back by Total Recall.
+     */
+    [[nodiscard]] juce::StringArray dumpAddressVariables (const juce::String& dumpId) const;
+
+    /**
+     * The variables this profile uses to name a stored preset slot: the preset-recall vocabulary
+     * compilePresetRecall substitutes (`slot`, `program`, `bankMsb`, `bankLsb`), plus any
+     * `slotVariable` declared by `presetBrowser` or `presets.nameRequest`.
+     */
+    [[nodiscard]] juce::StringArray presetSlotVariables() const;
+
     CompileResult compileSetParameter (const juce::String& deviceRole,
                                        const juce::String& parameterId,
                                        const juce::var& value,

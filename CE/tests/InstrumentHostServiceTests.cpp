@@ -16009,6 +16009,287 @@ void testMixerMeterEvents()
                "stopped audio drains silence instead of replaying an old peak");
 }
 
+// C-34. The auditioner's last act is a closure posted to the control thread, and in the plug-in
+// that is a bare callAsync: the DAW's message loop runs it whenever it gets there, which can be
+// after the plug-in was removed and the service freed. The closure edits the library, saves it,
+// sweeps the snapshots and emits — all through `this`.
+void testAuditionerClosureOutlivesTheService()
+{
+    std::cout << "\nthe auditioner's last word, delivered after the plug-in is gone" << std::endl;
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = { { "Init", 0.50f }, { "Bright", 0.90f } };
+
+    const auto dir = freshDataDir ("audition-after-close");
+    seedCatalog (dir);
+
+    // The control thread, held back: what the run posts waits here as it would in a message
+    // queue, until the test plays the message loop.
+    std::vector<std::function<void()>> controlQueue;
+    bool holdControlThread = false;
+    Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+    {
+        o.onControlThread = [&] (std::function<void()> work)
+        {
+            if (holdControlThread)
+                controlQueue.push_back (std::move (work));
+            else
+                work();
+        };
+    });
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+
+    // The plug-in will not load for the auditioner, so the run goes straight to its end
+    // without waiting on the control thread once — and its end is the closure.
+    h.failInstantiation = true;
+    holdControlThread = true;
+    h.cmd ("analyseLibrary");
+    check (controlQueue.size() == 1, "the run's findings are posted to the control thread, not applied");
+
+    // The plug-in is removed. The service's memory is scribbled over after its destructor, as
+    // an allocator reusing it would: a closure that still reads through `this` then follows a
+    // non-canonical pointer and crashes here every time, instead of reading stale bytes that
+    // happen to look right and passing.
+    static_assert (alignof (InstrumentHostService) <= alignof (std::max_align_t));
+    auto* freed = h.service.release();
+    freed->~InstrumentHostService();
+    std::memset (static_cast<void*> (freed), 0xA5, sizeof (InstrumentHostService));
+
+    const auto emitted = h.emits.entries.size();
+    for (auto& work : controlQueue)
+        work();
+    controlQueue.clear();
+    ::operator delete (static_cast<void*> (freed));
+
+    check (h.emits.entries.size() == emitted,
+           "and run afterwards, the closure finds the service gone and touches nothing");
+}
+
+// C-34, the other half. Without a worker the auditioner waits on the control thread twice per
+// plug-in — for the instance, and for each preset to be applied. The destructor runs ON that
+// thread and joins the auditioner, so neither wait could ever be answered: removing the
+// plug-in mid-Listen hung the DAW before anything got the chance to crash it.
+void testClosingWhileTheAuditionerWaits()
+{
+    std::cout << "\nclosing while the auditioner waits on the control thread" << std::endl;
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = { { "Init", 0.50f }, { "Bright", 0.90f } };
+
+    const auto dir = freshDataDir ("audition-close-while-waiting");
+    seedCatalog (dir);
+
+    std::mutex queueLock;
+    std::vector<std::function<void()>> controlQueue;
+    std::atomic<bool> holdControlThread { false };
+    std::mutex emitLock;
+    Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+    {
+        // The service's own thread, which its destructor joins — the product's arrangement.
+        o.analysisExecutor = nullptr;
+        o.onControlThread = [&] (std::function<void()> work)
+        {
+            if (! holdControlThread)
+            {
+                work();
+                return;
+            }
+            const std::scoped_lock lock (queueLock);
+            controlQueue.push_back (std::move (work));
+        };
+        // The auditioner reports progress from its own thread.
+        o.emit = [emit = o.emit, &emitLock] (const juce::String& name, const juce::var& payload)
+        {
+            const std::scoped_lock lock (emitLock);
+            emit (name, payload);
+        };
+    });
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+
+    const auto queued = [&]
+    {
+        const std::scoped_lock lock (queueLock);
+        return controlQueue.size();
+    };
+
+    holdControlThread = true;
+    h.cmd ("analyseLibrary");
+    for (int i = 0; i < 500 && queued() == 0; ++i)
+        std::this_thread::sleep_for (std::chrono::milliseconds (10));
+    check (queued() == 1, "the auditioner is waiting for its first preset to be applied");
+
+    // Close it. Nothing in the queue runs until the destructor returns — on the message
+    // thread that is simply true; here the test does not play the loop until then.
+    std::atomic<bool> closed { false };
+    std::thread closer ([&] { h.service.reset(); closed = true; });
+    for (int i = 0; i < 500 && ! closed; ++i)
+        std::this_thread::sleep_for (std::chrono::milliseconds (10));
+    check (closed, "the service closes rather than waiting for a closure it is itself holding up");
+    if (! closed)
+    {
+        // A deadlocked thread can be neither joined nor detached safely; there is no
+        // continuing from here.
+        std::cout << "\nFAILURES: deadlocked on close" << std::endl;
+        std::_Exit (1);
+    }
+    closer.join();
+
+    // Now the message loop gets its turn, and everything the run posted finds the service gone.
+    std::vector<std::function<void()>> late;
+    {
+        const std::scoped_lock lock (queueLock);
+        late.swap (controlQueue);
+    }
+    for (auto& work : late)
+        work();
+    check (late.size() >= 2,
+           "what was posted after the close — the instance handed back, the findings — runs "
+           "afterwards without reaching into the freed service");
+}
+
+// C-35, and C-38 with it. A library preset of another plug-in is a LOAD, and until that load
+// commits the part is still the plug-in that is playing: in its name, in what it saves, and in
+// where the next pick goes. The part used to take the new plug-in's identity before the load
+// was even started; a load that then failed left it named as the new plug-in with the old one
+// playing, and every save after that wrote the old plug-in's state under the new identity —
+// which the next start fed to the new plug-in.
+void testFailedPresetLoadKeepsThePart()
+{
+    std::cout << "\na preset load that never commits leaves the part as it was" << std::endl;
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = {};
+
+    const auto patchIn = [] (const juce::var& blob)
+    {
+        juce::MemoryOutputStream decoded;
+        if (! juce::Base64::convertFromBase64 (decoded, blob.toString()) || decoded.getDataSize() < 4)
+            return -1;
+        juce::MemoryInputStream stream (decoded.getData(), decoded.getDataSize(), false);
+        return stream.readInt();
+    };
+
+    const auto dir = freshDataDir ("preset-load-failure");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+
+    const auto recordNamed = [&h] (const juce::String& name)
+    {
+        h.cmd ("getLibrary");
+        for (const auto& r : *h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).getArray())
+            if (r.getProperty ("name", {}).toString() == name)
+                return r.getProperty ("recordId", {}).toString();
+        return juce::String();
+    };
+
+    // Two user presets of the Other synth and one of the Good synth, captured from live ones.
+    const auto capture = [&] (const juce::String& ceId, int patch, const juce::String& name)
+    {
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", ceId } });
+        h.lastStub->patch = patch;
+        h.cmd ("saveUserPreset", { { "partId", partId }, { "name", name } });
+        return recordNamed (name);
+    };
+    const auto other42 = capture ("VST3-other-synth", 42, "Other 42");
+    const auto other43 = capture ("VST3-other-synth", 43, "Other 43");
+    const auto good5   = capture ("VST3-good-synth",  5,  "Good 5");
+    check (other42.isNotEmpty() && other43.isNotEmpty() && good5.isNotEmpty(),
+           "three user presets across two plug-ins");
+
+    // The part is the Good synth, tweaked by hand: that tweak is the user's work.
+    auto* playing = h.lastStub;
+    playing->patch = 7;
+
+    const auto savedPart = [&h] { return h.service->captureStateVar().getProperty ("parts", {})[0]; };
+    const auto live = [&h, &partId]
+    {
+        return dynamic_cast<StubSynthProcessor*> (h.service->getRackHost().getInstrument (partId));
+    };
+    // Finishes the i-th deferred construction, if there is one: a pick that was wrongly applied
+    // in place never asked for an instance, and the checks below say so rather than crash.
+    const auto construct = [&h] (size_t i)
+    {
+        if (i < h.deferred.size())
+            h.deferred[i] (std::make_unique<StubSynthProcessor>(), {});
+    };
+
+    h.deferCallbacks = true;
+    h.cmd ("loadLibraryRecord", { { "recordId", other42 }, { "action", "replace" }, { "partId", partId } });
+    check (h.deferred.size() == 1, "the Other synth is being constructed");
+
+    // The DAW's getStateInformation does not wait for a load to finish.
+    const auto during = savedPart();
+    check (during.getProperty ("pluginCeId", {}).toString() == "VST3-good-synth"
+             && patchIn (during.getProperty ("stateBlob", {})) == 7,
+           "while it loads, a save writes the Good synth that is playing, with its own state");
+
+    h.deferred.back() (nullptr, "the worker died in construction");
+    h.deferred.clear();
+
+    const auto after = savedPart();
+    check (after.getProperty ("pluginCeId", {}).toString() == "VST3-good-synth"
+             && after.getProperty ("pluginName", {}).toString() == "Good Synth",
+           "after the failure the part is still named as the Good synth");
+    check (patchIn (after.getProperty ("stateBlob", {})) == 7,
+           "and saves the Good synth's state, tweak included, under the Good synth's name");
+    check (after.getProperty ("lastPresetName", {}).toString() != "Other 42",
+           "nor does it claim the preset that never arrived");
+    check (live() == playing && playing->patch == 7, "the Good synth plays on untouched");
+
+    // What the next start does with that save: the plug-in it names, with the state it holds.
+    {
+        const auto dir2 = freshDataDir ("preset-load-failure-reopen");
+        seedTwoSynthCatalog (dir2);
+        Harness reopened (dir2);
+        reopened.cmd ("getState");
+        auto session = h.service->captureStateVar();
+        reopened.service->restoreFromVar (session);
+        check (reopened.lastDescriptionXml.contains ("Good Synth")
+                 && reopened.lastStub != nullptr && reopened.lastStub->patch == 7,
+               "the next start loads the Good synth with the Good synth's state");
+    }
+
+    // C-38: a second pick while the first is still loading. The part is not yet the Other
+    // synth, so the second preset is not applied to the Good synth in place — it loads, and
+    // it supersedes the first.
+    h.cmd ("loadLibraryRecord", { { "recordId", other42 }, { "action", "replace" }, { "partId", partId } });
+    h.cmd ("loadLibraryRecord", { { "recordId", other43 }, { "action", "replace" }, { "partId", partId } });
+    check (h.deferred.size() == 2 && playing->patch == 7,
+           "a second pick during the load is a load of its own, and the Good synth is not touched");
+    construct (0);
+    check (live() == playing, "the first load, superseded, does not commit");
+    construct (1);
+    h.deferred.clear();
+    check (live() != nullptr && live() != playing && live()->patch == 43
+             && savedPart().getProperty ("pluginCeId", {}).toString() == "VST3-other-synth"
+             && savedPart().getProperty ("lastPresetName", {}).toString() == "Other 43",
+           "the last pick wins: the Other synth on Other 43, named so");
+
+    // And the mirror: a preset of the plug-in still playing, picked while another is loading,
+    // is not applied to the instrument that load is about to replace.
+    h.deferCallbacks = false;
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    playing = h.lastStub;
+    playing->patch = 7;
+    h.deferCallbacks = true;
+    h.cmd ("loadLibraryRecord", { { "recordId", other42 }, { "action", "replace" }, { "partId", partId } });
+    h.cmd ("loadLibraryRecord", { { "recordId", good5 }, { "action", "replace" }, { "partId", partId } });
+    check (h.deferred.size() == 2 && playing->patch == 7,
+           "a Good preset picked while the Other synth loads is a load too");
+    construct (0);
+    construct (1);
+    h.deferred.clear();
+    h.deferCallbacks = false;
+    check (live() != nullptr && live()->patch == 5
+             && savedPart().getProperty ("pluginCeId", {}).toString() == "VST3-good-synth"
+             && savedPart().getProperty ("lastPresetName", {}).toString() == "Good 5",
+           "and it is what the part ends up on, rather than being overwritten by the Other synth");
+}
+
 int main (int argc, char* argv[])
 {
     if (argc != 2)
@@ -16159,6 +16440,9 @@ int main (int argc, char* argv[])
     testAutomaticFailoverStopsImmediateCrashLoop();
     testAutomaticEffectFailover();
     testHostProject();
+    testAuditionerClosureOutlivesTheService();
+    testClosingWhileTheAuditionerWaits();
+    testFailedPresetLoadKeepsThePart();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)
         .getChildFile ("ceditor-host-service-tests").deleteRecursively();

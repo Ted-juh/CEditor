@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <atomic>
 #include <map>
+#include <set>
 #include <vector>
 #include "PlayerHost.h"
 
@@ -50,6 +51,7 @@ static inline juce::File ceditorPlayerPanelFile()
  #include "PanelParameters.h"
  #include "ProgramBank.h"
  #include "RestorePolicy.h"
+ #include "DumpCapturePolicy.h"
 #endif
 
 #if CEDITOR_SCRIPTING
@@ -395,6 +397,11 @@ public:
         // Read from a cache the message-thread timer maintains rather than built here: the host may
         // call this from any thread, and assembling two dumps means walking the profile and running
         // the shared encoder over every parameter in it.
+        //
+        // What the cache holds is narrower than "the whole patch": only dumps the panel's exported
+        // parameters cover completely (DumpCapturePolicy.h). The rest of a dump is not something
+        // this session knows, and saving it would mean saving the profile's default byte as if it
+        // were the user's sound.
         {
             const juce::SpinLock::ScopedLockType lock (capturedDumpsLock);
             if (capturedDumps.isNotEmpty())
@@ -432,21 +439,19 @@ public:
                 apvts.replaceState (juce::ValueTree::fromXml (*apvtsXml));
             if (auto* dev = xml->getChildByName ("DeviceMappings"))
                 deviceService.importRoleMappings (juce::JSON::parse (dev->getAllSubText()));
-            if (auto* answer = xml->getChildByName ("RestoreAnswer"))
-                restoreAnswer = answer->getAllSubText().trim();
+            // The answer and the program are this session's, replaced wholesale — absent means
+            // unanswered and program 0, not "whatever the instance had" (RestorePolicy.h, X-03).
+            // Set WITHOUT sending the program: the restore push is about to run and will put the
+            // whole patch back; a program change on top of it would recall a slot over the top of
+            // the patch that was just restored, which is the wrong sound and the wrong order. A
+            // change the host asked for before this state arrived goes with the state it preceded.
+            const auto recall = ce::readSessionRecall (*xml, ce::hostProgramCount (programBank));
+            restoreAnswer = recall.restoreAnswer;
+            currentProgram = recall.program;
+            programChangePending.store (false);
             restoredDumps = juce::var();
             if (auto* dumps = xml->getChildByName ("DeviceDumps"))
                 restoredDumps = juce::JSON::parse (dumps->getAllSubText());
-            if (auto* program = xml->getChildByName ("CurrentProgram"))
-            {
-                const int index = program->getAllSubText().trim().getIntValue();
-                // Set WITHOUT sending. The restore push is about to run and will put the whole
-                // patch back; a program change on top of it would recall a slot over the top of
-                // the patch that was just restored, which is the wrong sound and the wrong order.
-                if (juce::isPositiveAndBelow (index, ce::hostProgramCount (programBank)))
-                    currentProgram = index;
-            }
-
             markSessionRestored();
 
             // ARM THE RESTORE PUSH — do not send here. This call can arrive before the ports are
@@ -478,6 +483,10 @@ public:
         }
         else if (xml->hasTagName (apvts.state.getType())) // backward-compat: APVTS-only state
         {
+            // A state from before recall existed answered nothing and selected nothing.
+            restoreAnswer = {};
+            currentProgram = 0;
+            programChangePending.store (false);
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
             markSessionRestored();
         }
@@ -831,8 +840,11 @@ private:
         if (now - dumpsLastCapturedMs < 4000.0) return;
 
         // Cheap change detection off the same map the send loop keeps. An unchanged patch is the
-        // common case — a project sitting open — and it must cost nothing.
-        bool changed = capturedDumps.isEmpty();
+        // common case — a project sitting open — and it must cost nothing. The first build always
+        // runs; that is a flag rather than `capturedDumps.isEmpty()`, because a panel that covers no
+        // dump completely legitimately captures nothing, and that must not mean walking the whole
+        // profile again every four seconds.
+        bool changed = ! dumpCaptureBuilt;
         for (const auto& desc : panelParams)
         {
             if (desc.deviceParameterId.isEmpty()) continue;
@@ -1006,6 +1018,9 @@ private:
     // captured). Dump first — the same rule the Setlist follows when it sends MIDI before values,
     // and for the same reason: the stored values belong to the patch being restored, so the patch
     // has to land first or they are overwritten by it.
+    //
+    // A dump is captured only when every parameter it carries comes from the session; a partial
+    // one is skipped, never padded (release audit C-11 — see DumpCapturePolicy.h).
 
     /** Semantic values for every device-bound parameter, keyed by parameter id, out of the APVTS. */
     juce::var boundParameterValues() const
@@ -1035,21 +1050,21 @@ private:
         const auto ids = engine->dumpDefinitionIds();
         if (ids.isEmpty()) return;
 
-        const auto values = boundParameterValues();
-        auto* built = new juce::DynamicObject();
-        for (const auto& id : ids)
-        {
-            const auto result = engine->buildDumpMessage (id, values);
-            // A dump that will not build is skipped rather than aborting the others: a profile can
-            // declare a dump this panel binds nothing in, and one unbuildable block should not cost
-            // the user the block that would have worked.
-            if (result.ok && result.hex.isNotEmpty())
-                built->setProperty (id, result.hex);
-        }
+        // Only dumps the panel covers COMPLETELY (DumpCapturePolicy.h). A dump built from part of
+        // a patch has every other parameter at the profile's default byte, and restoring it sends
+        // those zeros to the synth — the GAIA's whole System block, the AN1x's user memory.
+        const auto capture = ce::captureCompleteDumps (*engine, boundParameterValues());
+        dumpCaptureBuilt = true;
 
-        auto json = juce::JSON::toString (juce::var (built), true);
+        // Said once per dump, not every four seconds: which part of the patch this session will
+        // NOT carry is worth knowing, and worth knowing once.
+        for (const auto& skipped : capture.skipped)
+            if (loggedSkippedDumps.insert (skipped.id).second)
+                scriptLogLine ("[dumps] not saving \"" + skipped.id + "\" with the session: " + skipped.reason);
+
+        auto json = juce::JSON::toString (capture.captured, true);
         const juce::SpinLock::ScopedLockType lock (capturedDumpsLock);
-        capturedDumps = built->getProperties().size() > 0 ? json : juce::String();
+        capturedDumps = capture.capturedCount > 0 ? json : juce::String();
     }
 
     /**
@@ -1061,30 +1076,21 @@ private:
      */
     int sendRestoredDumps()
     {
-        auto* stored = restoredDumps.getDynamicObject();
-        if (stored == nullptr) return 0;
-
+        // Re-checked against today's profile and panel, not sent verbatim: a project saved by an
+        // older export carries the zero-filled partial dumps capture used to keep, and the synth
+        // must not receive those either. A stored dump goes out only if the current panel would
+        // capture it whole; the rest are dropped by name. Same engine lookup as capture, so the
+        // two cannot disagree about which profile they mean.
         auto* engine = deviceService.engineForRole ({});
-        // Order from the profile when there is one to ask; otherwise whatever the saved object
-        // holds, which at least sends them.
-        juce::StringArray order = engine != nullptr ? engine->dumpDefinitionIds() : juce::StringArray();
-        if (order.isEmpty())
-            for (const auto& property : stored->getProperties())
-                order.add (property.name.toString());
+        const auto plan = ce::planRestoredDumps (engine, restoredDumps, boundParameterValues());
+
+        for (const auto& dropped : plan.dropped)
+            scriptLogLine ("[restore] not sending saved dump \"" + dropped.id + "\": " + dropped.reason);
 
         int sent = 0;
-        for (const auto& id : order)
+        for (const auto& dump : plan.send)
         {
-            const auto hex = stored->getProperty (id).toString();
-            if (hex.isEmpty()) continue;
-
-            juce::Array<int> bytes;
-            for (const auto& token : juce::StringArray::fromTokens (hex, " ", ""))
-                if (token.isNotEmpty())
-                    bytes.add (token.getHexValue32() & 0xff);
-
-            if (bytes.isEmpty()) continue;
-            sendRawMidiBytes ("restore_dump_" + id, bytes);
+            sendRawMidiBytes ("restore_dump_" + dump.id, dump.bytes);
             ++sent;
         }
         return sent;
@@ -1271,6 +1277,8 @@ private:
     juce::var restoredDumps;
     double dumpsLastCapturedMs = 0.0;
     std::map<juce::String, float> lastCapturedValue;
+    bool dumpCaptureBuilt = false;                 // refreshCapturedDumps has reached a profile
+    std::set<juce::String> loggedSkippedDumps;     // dumps already reported as not captured
 
     // S4. The bank is baked at export and never changes — the host caches getNumPrograms() the
     // moment it loads us. `programChangePending` is atomic because setCurrentProgram can arrive on

@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <condition_variable>
 #include <cstdint>
@@ -136,6 +137,9 @@ InstrumentHostService::~InstrumentHostService()
     if (productThread.joinable())
         productThread.join();
     *alive = false;
+    // Told now rather than just before the join below: everything in between is time the
+    // auditioner would otherwise spend starting on the next plug-in for a service that is going.
+    analysisStopRequested = true;
     if (options.editorWindows.closeAll != nullptr)
         options.editorWindows.closeAll();
     // Hand the hardware back on the way out: a claim outliving its owner is what the heartbeat
@@ -8590,7 +8594,8 @@ void InstrumentHostService::applyPerformance (Performance&& performance)
 void InstrumentHostService::requestInstrument (const juce::String& partId, const juce::String& ceId,
                                                std::function<void (juce::AudioProcessor&)> afterCommit,
                                                std::function<void (bool, const juce::String&)> completion,
-                                               bool failoverAttempt)
+                                               bool failoverAttempt,
+                                               std::optional<juce::String> primedState)
 {
     juce::String descriptionXml, refusal;
     ClassInfoForCommit info;
@@ -8676,9 +8681,10 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
 
     if (! restoringEditHistory) editHistory.clear();
     ++historyPendingLoads;
+    instrumentLoadsInFlight[partId] = generation;
     emitState();
     auto finishLoad =
-        [this, aliveToken = alive, partId, generation, info,
+        [this, aliveToken = alive, partId, generation, info, primedState = std::move (primedState),
          afterCommit = std::move (afterCommit), completion = std::move (completion)]
         (std::unique_ptr<juce::AudioProcessor> instrument, const juce::String& error,
          bool completedInstantiation)
@@ -8686,6 +8692,9 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
             if (! aliveToken->load())
                 return;
             --historyPendingLoads;
+            if (const auto inFlight = instrumentLoadsInFlight.find (partId);
+                inFlight != instrumentLoadsInFlight.end() && inFlight->second == generation)
+                instrumentLoadsInFlight.erase (inFlight);
             const auto historyLoad = restoringEditHistory || historyRestorationPending;
             const juce::ScopeGuard finishHistoryLoad { [this, historyLoad]
             {
@@ -8717,7 +8726,8 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
             const bool editorWasHere = editorTargetIds.contains (partId);
 
             if (! rack.commitLoad (partId, generation, std::move (instrument),
-                                   { info.ceId, info.modulePath, info.name, info.vendor }))
+                                   { info.ceId, info.modulePath, info.name, info.vendor },
+                                   primedState))
             {
                 // Superseded by a newer selection, or the part left in the meantime — the
                 // rack host's ticket refused it, which is the designed outcome, not a fault.
@@ -11286,6 +11296,14 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
     // onControlThread, and the only shared things are the two atomics and the emit hook.
     std::vector<AnalysisFinding> findings;
 
+    // The service can be destroyed while this runs — the plug-in removed from the DAW, the
+    // project closed in the middle of Listen. The destructor joins this thread, but what this
+    // thread has POSTED is not joined: in the plug-in, onControlThread is a bare callAsync, and
+    // the DAW's message loop runs the closure after the service is freed. So nothing posted
+    // from here touches `this` without asking the token first, which is what the library
+    // scan's `finish` has always done.
+    const auto token = alive;
+
     const auto marshal = [this] (std::function<void()> work)
     {
         if (options.onControlThread != nullptr)
@@ -11294,30 +11312,59 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
             work();
     };
 
-    // The same, but the caller waits. Applying a preset to a VST3 is a CONTROLLER operation,
-    // and JUCE marshals it to the message thread — so calling it from here and rendering
-    // immediately renders the state that was there BEFORE. That is not a hypothetical: against
-    // a real plug-in every preset was measured with the previous preset's sound, one whole
-    // render behind, and every number was plausible. The stub could never show it, because a
-    // plain AudioProcessor applies its state where it is asked.
-    const auto marshalAndWait = [&marshal] (std::function<void()> work)
+    // Waiting on the control thread from here has the mirror-image problem. The destructor
+    // runs ON the control thread and blocks in the join, so whatever this thread is waiting
+    // for there cannot be delivered until it gives up: closing the plug-in mid-Listen hung
+    // before it could crash. A wait therefore gives up when the token goes, and only then —
+    // a late answer finds `abandoned` set under the same lock and touches nothing it was given.
+    struct ControlThreadWait
     {
         std::mutex mutex;
         std::condition_variable ready;
-        bool done = false;
+        bool done = false;        // the control thread answered
+        bool abandoned = false;   // this thread stopped waiting; a late answer must do nothing
+    };
 
-        marshal ([&]
+    const auto waitForControlThread = [token] (ControlThreadWait& wait)
+    {
+        std::unique_lock lock (wait.mutex);
+        while (! wait.done)
         {
-            work();
+            if (! token->load())
             {
-                const std::scoped_lock lock (mutex);
-                done = true;
+                wait.abandoned = true;
+                return false;
             }
-            ready.notify_all();
+            wait.ready.wait_for (lock, std::chrono::milliseconds (20));
+        }
+        return true;
+    };
+
+    // The same as marshal, but the caller waits. Applying a preset to a VST3 is a CONTROLLER
+    // operation, and JUCE marshals it to the message thread — so calling it from here and
+    // rendering immediately renders the state that was there BEFORE. That is not a
+    // hypothetical: against a real plug-in every preset was measured with the previous
+    // preset's sound, one whole render behind, and every number was plausible. The stub could
+    // never show it, because a plain AudioProcessor applies its state where it is asked.
+    // False when the service went away first and `work` never ran.
+    const auto marshalAndWait = [&marshal, &waitForControlThread, token] (std::function<void()> work)
+    {
+        auto wait = std::make_shared<ControlThreadWait>();
+
+        marshal ([wait, token, work = std::move (work)]
+        {
+            {
+                // `work` holds references into the waiting thread's stack and calls into the
+                // service, so it runs only while that thread is provably still waiting.
+                const std::scoped_lock lock (wait->mutex);
+                if (! wait->abandoned && token->load())
+                    work();
+                wait->done = true;
+            }
+            wait->ready.notify_all();
         });
 
-        std::unique_lock lock (mutex);
-        ready.wait (lock, [&done] { return done; });
+        return waitForControlThread (*wait);
     };
 
     ProbeSpec spec;
@@ -11414,29 +11461,44 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
         // message thread in the app — and this thread waits for it rather than making one.
         std::unique_ptr<juce::AudioProcessor> instrument;
         juce::String instantiationError;
-        {
-            std::mutex mutex;
-            std::condition_variable ready;
-            bool answered = false;
 
-            if (options.instantiate == nullptr)
+        if (options.instantiate == nullptr)
+        {
+            instantiationError = "no instantiator";
+        }
+        else
+        {
+            // The live worker's handshake answers on the message thread, so this is the same
+            // wait as marshalAndWait's and gives up the same way. An instance that arrives
+            // after this thread stopped waiting stays in `answer` and goes with the callback,
+            // on the thread that delivered it.
+            struct Instantiation : ControlThreadWait
             {
-                instantiationError = "no instantiator";
+                std::unique_ptr<juce::AudioProcessor> made;
+                juce::String error;
+            };
+            auto answer = std::make_shared<Instantiation>();
+
+            options.instantiate (job.descriptionXml, spec.sampleRate, spec.blockSize,
+                [answer] (std::unique_ptr<juce::AudioProcessor> made, const juce::String& error)
+                {
+                    {
+                        const std::scoped_lock lock (answer->mutex);
+                        answer->made = std::move (made);
+                        answer->error = error;
+                        answer->done = true;
+                    }
+                    answer->ready.notify_all();
+                });
+
+            if (waitForControlThread (*answer))
+            {
+                instrument = std::move (answer->made);
+                instantiationError = answer->error;
             }
             else
             {
-                options.instantiate (job.descriptionXml, spec.sampleRate, spec.blockSize,
-                    [&] (std::unique_ptr<juce::AudioProcessor> made, const juce::String& error)
-                    {
-                        const std::scoped_lock lock (mutex);
-                        instrument = std::move (made);
-                        instantiationError = error;
-                        answered = true;
-                        ready.notify_all();
-                    });
-
-                std::unique_lock lock (mutex);
-                ready.wait (lock, [&answered] { return answered; });
+                instantiationError = "stopped";
             }
         }
 
@@ -11470,7 +11532,8 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
             asRecord.stateBlobBase64 = preset.stateBlobBase64;
 
             juce::String refusal;
-            marshalAndWait ([&] { refusal = applyRecordState (processor, asRecord); });
+            if (! marshalAndWait ([&] { refusal = applyRecordState (processor, asRecord); }))
+                return juce::String ("stopped");
             return refusal;
         };
 
@@ -11491,8 +11554,14 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
 
     const auto cancelled = analysisStopRequested.load();
 
-    marshal ([this, findings = std::move (findings), done, total, cancelled]
+    marshal ([this, token, findings = std::move (findings), done, total, cancelled]
     {
+        // Run whenever the control thread gets to it, which in the plug-in can be after the
+        // service that posted it is gone. The findings go with it: a record without its stamp
+        // is simply measured again by the next run.
+        if (! token->load())
+            return;
+
         int measured = 0;
         for (const auto& finding : findings)
         {
@@ -13064,9 +13133,12 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record,
         return;
     }
 
+    // Not while another load is on its way to this part: the live instrument is the one about
+    // to be replaced, and applying a preset to it would be undone by that commit.
     const auto sameClassLoaded = part != nullptr
                               && rack.getInstrument (partId) != nullptr
-                              && part->pluginCeId == record.targetCeId;
+                              && part->pluginCeId == record.targetCeId
+                              && ! instrumentLoadsInFlight.contains (partId);
 
     const auto applyVendorPreset = [this, record, failed] (juce::AudioProcessor& instrument) -> bool
     {
@@ -13098,56 +13170,53 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record,
         return;
     }
 
-    // The full path: prime the part's document with the preset's identity (and state, for
-    // captured presets), then run the one load transaction — commit restores the primed
-    // blob, and a vendor preset applies right after commit through afterCommit.
-    InstrumentRackHost::ClassInfo info;
+    // The full path: the one load transaction, carrying the preset's state (for captured
+    // presets; none for the rest, which start from the plug-in's defaults) to the commit, and a
+    // vendor preset or program applied right after it through afterCommit.
+    //
+    // Nothing is written into the part before that commit. The part's document says what is
+    // playing, and until the commit that is still the old instrument: a load that fails — a
+    // worker that dies in construction, a handshake timeout, safe mode — must leave the part
+    // named, and saved, as the plug-in that is actually there.
     {
         const std::scoped_lock lock (catalogLock);
         const ModuleRecord* module = nullptr;
-        const auto* classRecord = findClass (record.targetCeId, &module);
-        if (classRecord == nullptr || module == nullptr)
+        if (findClass (record.targetCeId, &module) == nullptr || module == nullptr)
         {
             failed ("Instrument not in the catalogue: " + record.targetCeId);
             return;
         }
-        info = { classRecord->ceId, module->path, classRecord->name, classRecord->vendor };
     }
 
-    rack.primePartState (partId, info,
-                         record.sourceType == "userState" ? record.stateBlobBase64 : juce::String());
-    if (! isVendorPresetSource (record.sourceType))
-        rack.setPartLastPreset (partId, record.recordId, record.name);
-    else
-        rack.setPartLastPreset (partId, {}, {});
+    const auto primedState = record.sourceType == "userState" ? record.stateBlobBase64
+                                                              : juce::String();
 
-    if (isVendorPresetSource (record.sourceType))
+    if (isVendorPresetSource (record.sourceType) || record.sourceType == "programList")
         requestInstrument (partId, record.targetCeId,
                            [this, partId, record, applyVendorPreset, afterLoaded = std::move (afterLoaded)]
                            (juce::AudioProcessor& instrument)
                            {
+                               // The part's place in the walk moves only once the preset
+                               // actually applied; a refused one leaves the new plug-in on its
+                               // defaults, which is no preset at all.
                                if (applyVendorPreset (instrument))
                                {
                                    rack.setPartLastPreset (partId, record.recordId, record.name);
                                    if (afterLoaded != nullptr) afterLoaded();
                                }
-                           }, completion);
-    else if (record.sourceType == "programList")
-        requestInstrument (partId, record.targetCeId,
-                           [this, record, failed,
-                            afterLoaded = std::move (afterLoaded)] (juce::AudioProcessor& instrument)
-                           {
-                               if (const auto error = applyRecordState (instrument, record); error.isNotEmpty())
-                                   failed (error);
-                               else if (afterLoaded != nullptr) afterLoaded();
-                           }, completion);
+                               else
+                               {
+                                   rack.setPartLastPreset (partId, {}, {});
+                               }
+                           }, completion, false, primedState);
     else
         requestInstrument (partId, record.targetCeId,
-                           [afterLoaded = std::move (afterLoaded)] (juce::AudioProcessor&)
+                           [this, partId, record, afterLoaded = std::move (afterLoaded)] (juce::AudioProcessor&)
                            {
+                               rack.setPartLastPreset (partId, record.recordId, record.name);
                                if (afterLoaded != nullptr)
                                    afterLoaded();
-                           }, completion);
+                           }, completion, false, primedState);
 }
 
 void InstrumentHostService::loadChainRecord (const LibraryRecord& record, const juce::String& partId)
@@ -13171,20 +13240,17 @@ void InstrumentHostService::loadChainRecord (const LibraryRecord& record, const 
     // The instrument is resolved BEFORE anything is torn down. A chain whose instrument is
     // gone must leave the part exactly as it was — half a chain over the previous sound is
     // worse than a refusal, because it looks like it worked.
-    ClassInfoForCommit instrumentInfo;
     if (source.pluginCeId.isNotEmpty())
     {
         const std::scoped_lock lock (catalogLock);
         const ModuleRecord* module = nullptr;
-        const auto* classRecord = findClass (source.pluginCeId, &module);
-        if (classRecord == nullptr || module == nullptr)
+        if (findClass (source.pluginCeId, &module) == nullptr || module == nullptr)
         {
             emitError ("Requires " + (source.pluginName.isNotEmpty() ? source.pluginName
                                                                      : source.pluginCeId)
                        + ", which is not in the catalogue.");
             return;
         }
-        instrumentInfo = { classRecord->ceId, module->path, classRecord->name, classRecord->vendor };
     }
 
     // The part's own identity, place and mix stay: dropping a chain onto part 3 must not
@@ -13233,15 +13299,12 @@ void InstrumentHostService::loadChainRecord (const LibraryRecord& record, const 
         requestEffect (effectId, slot.pluginCeId);
     }
 
-    // The instrument last, through the one load transaction: its commit restores the primed
-    // blob, so the captured sound arrives with the captured chain already around it.
+    // The instrument last, through the one load transaction: its commit restores the captured
+    // blob, so the captured sound arrives with the captured chain already around it. The blob
+    // rides with the load rather than being written into the part first, so an instrument
+    // that never arrives leaves the part named as the one still playing.
     if (source.pluginCeId.isNotEmpty())
-    {
-        rack.primePartState (partId, { instrumentInfo.ceId, instrumentInfo.modulePath,
-                                       instrumentInfo.name, instrumentInfo.vendor },
-                             source.stateBlobBase64);
-        requestInstrument (partId, source.pluginCeId);
-    }
+        requestInstrument (partId, source.pluginCeId, {}, {}, false, source.stateBlobBase64);
 
     savePerformance();
     emitState();

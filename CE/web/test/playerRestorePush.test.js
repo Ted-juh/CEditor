@@ -23,9 +23,12 @@ import { dirname, join } from 'node:path';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const PROCESSOR = readFileSync(join(REPO, 'CE/src/Player/PluginProcessor.h'), 'utf8');
+const POLICY = readFileSync(join(REPO, 'CE/src/Player/DumpCapturePolicy.h'), 'utf8');
+const POLICY_RESTORE = readFileSync(join(REPO, 'CE/src/Player/RestorePolicy.h'), 'utf8');
 const HOST_H = readFileSync(join(REPO, 'CE/src/Player/PlayerHost.h'), 'utf8');
 const HOST_CPP = readFileSync(join(REPO, 'CE/src/Player/PlayerHost.cpp'), 'utf8');
 const PLAYER = readFileSync(join(REPO, 'CE/web/src/Player.svelte'), 'utf8');
+const DEVICE_BRIDGE = readFileSync(join(REPO, 'CE/src/DeviceProfile/DeviceRuntimeBridge.cpp'), 'utf8');
 
 test('setStateInformation arms the restore and does not send', () => {
   // The core constraint: that call arrives before the ports are open, before prepareToPlay, and on
@@ -107,7 +110,9 @@ test('the answer is persisted with the project, and only always/never are rememb
   // Saved with the project rather than globally: the decision was made about this session's patch
   // and this session's synth, and a different project is a different question.
   assert.match(PROCESSOR, /createNewChildElement \("RestoreAnswer"\)/);
-  assert.match(PROCESSOR, /getChildByName \("RestoreAnswer"\)/);
+  // Read back through readSessionRecall (RestorePolicy.h), which keeps only always/never too.
+  assert.match(PROCESSOR, /ce::readSessionRecall/);
+  assert.match(POLICY_RESTORE, /getChildByName \("RestoreAnswer"\)/);
   const answer = PROCESSOR.slice(PROCESSOR.indexOf('void answerRestorePrompt'));
   const body = answer.slice(0, answer.indexOf('\n    }\n'));
   assert.match(body, /if \(a != "always" && a != "never"\) return;[\s\S]*restoreAnswer = a;/,
@@ -215,10 +220,14 @@ test('capture is throttled and skipped when the patch has not moved', () => {
 
 test('dumps are sent in the profile\'s declared order', () => {
   // A device with a common block and per-part blocks wants the common block first, and the profile
-  // author is the only one who knows which is which.
+  // author is the only one who knows which is which. The plan lives in DumpCapturePolicy.h, which
+  // walks the profile's ids rather than the stored dumps (release audit C-11).
   const send = PROCESSOR.slice(PROCESSOR.indexOf('int sendRestoredDumps'),
     PROCESSOR.indexOf('void runRestorePush'));
-  assert.match(send, /dumpDefinitionIds\(\)/, 'the send order does not come from the profile');
+  assert.match(send, /ce::planRestoredDumps/, 'the restore does not go through the shared plan');
+  const plan = POLICY.slice(POLICY.indexOf('inline RestoredDumpPlan planRestoredDumps'));
+  assert.match(plan, /engine->dumpDefinitionIds\(\)[\s\S]{0,80}for \(const auto& id : declared\)/,
+    'the send order does not come from the profile');
 });
 
 test('one unbuildable dump does not cost the others', () => {
@@ -226,8 +235,13 @@ test('one unbuildable dump does not cost the others', () => {
   // would lose the block that would have worked.
   const refresh = PROCESSOR.slice(PROCESSOR.indexOf('void refreshCapturedDumps'),
     PROCESSOR.indexOf('int sendRestoredDumps'));
-  assert.match(refresh, /if \(result\.ok && result\.hex\.isNotEmpty\(\)\)/,
+  assert.match(refresh, /ce::captureCompleteDumps/, 'the capture does not go through the shared policy');
+  const capture = POLICY.slice(POLICY.indexOf('inline DumpCapture captureCompleteDumps'),
+    POLICY.indexOf('inline RestoredDumpPlan planRestoredDumps'));
+  assert.match(capture, /if \(isCompleteDump \(result\)\)[\s\S]{0,160}else[\s\S]{0,40}capture\.skipped\.add/,
     'a failed dump must be skipped, not fatal');
+  assert.ok(!/\breturn\b/.test(capture.slice(capture.indexOf('for (const auto& id'), capture.lastIndexOf('return capture;'))),
+    'one dump must not end the capture for the rest');
 });
 
 // --- S4: host-visible programs ----------------------------------------------------------------
@@ -245,11 +259,28 @@ test('setCurrentProgram sends nothing — the timer does', () => {
 
 test('a restored program index does not fire a program change', () => {
   // The restore push is about to put the whole patch back. A program change on top of it recalls a
-  // slot over the patch that was just restored — the wrong sound and the wrong order.
-  const load = PROCESSOR.slice(PROCESSOR.indexOf('getChildByName ("CurrentProgram")'),
-    PROCESSOR.indexOf('getChildByName ("CurrentProgram")') + 700);
-  assert.ok(!load.includes('programChangePending'), 'restoring the index must not queue a send');
-  assert.match(load, /currentProgram = index;/);
+  // slot over the patch that was just restored — the wrong sound and the wrong order. Restoring the
+  // index cancels a change the host queued before the state arrived; it never queues one.
+  const load = PROCESSOR.slice(PROCESSOR.indexOf('ce::readSessionRecall'),
+    PROCESSOR.indexOf('markSessionRestored();'));
+  assert.match(load, /currentProgram = recall\.program;/);
+  assert.ok(!load.includes('programChangePending.store (true)'), 'restoring the index must not queue a send');
+  assert.match(load, /programChangePending\.store \(false\);/);
+});
+
+test('a restored session replaces the answer and the program instead of keeping the old ones', () => {
+  // Release audit X-03. Saving omits both at their defaults, and the loader used to change them only
+  // when an element was present, so restoring an older state into a live instance kept a later
+  // "always" and pushed the patch at the synth unasked. RestorePolicyTests drives readSessionRecall;
+  // this pins that setStateInformation assigns its result unconditionally, in both state formats.
+  const load = PROCESSOR.slice(PROCESSOR.indexOf('void setStateInformation'),
+    PROCESSOR.indexOf('bool isBusesLayoutSupported'));
+  assert.ok(!/getChildByName \("RestoreAnswer"\)/.test(load), 'the answer must come from readSessionRecall, not a conditional read');
+  assert.ok(!/getChildByName \("CurrentProgram"\)/.test(load), 'the program must come from readSessionRecall, not a conditional read');
+  assert.match(load, /restoreAnswer = recall\.restoreAnswer;/);
+  const legacy = load.slice(load.indexOf('backward-compat: APVTS-only state'));
+  assert.match(legacy, /restoreAnswer = \{\};[\s\S]{0,80}currentProgram = 0;/,
+    'an APVTS-only state must reset the recall state too');
 });
 
 test('a captured patch is sent as itself; a name-only slot is recalled', () => {
@@ -283,4 +314,22 @@ test('the Player asks in a bar, and "not now" answers nothing', () => {
   assert.match(PLAYER, /answerRestore\(''\)/, 'there is no "not now" that sends nothing');
   assert.match(PLAYER, /if \(backend && answer\) backend\.emitEvent\('restoreAnswer'/,
     '"not now" must not reach the processor');
+});
+
+// --- Lifetime: work posted from the Player's WebView ------------------------------------------
+
+test('nothing the Player posts to the message thread holds a raw pointer to what can close first', () => {
+  // Release audit X-02. A posted closure runs whenever the message loop gets to it, and the Player
+  // window, a standalone Player's own device service, or a plug-in's whole processor can be gone by
+  // then. Both paths below dereferenced freed memory in that order: the device bridge's handler ran
+  // on the destroyed service (AddressSanitizer: heap-use-after-free, measured off-tree with the real
+  // bridge and service), and playerReady loaded a panel into a destroyed host.
+  assert.ok(!/callAsync \(\[[^\]]*\bthis\b/.test(HOST_CPP), 'PlayerHost posts a closure that captures `this`');
+  assert.match(HOST_CPP, /"playerReady", \[safe = juce::Component::SafePointer<PlayerHost> \(this\)\]/);
+  assert.match(HOST_CPP, /if \(safe != nullptr\) safe->loadPanelIntoWebView\(\);/);
+
+  assert.ok(!/auto\* svc = &service;/.test(DEVICE_BRIDGE), 'the device bridge must not post a raw service pointer');
+  assert.match(DEVICE_BRIDGE, /juce::WeakReference<DeviceProfileService> weak \(&service\);/);
+  assert.match(DEVICE_BRIDGE, /callAsync \(\[weak, emit, handler, payload\]\(\)\s*\{\s*if \(auto\* svc = weak\.get\(\)\)/,
+    'a posted device request must check the service is still there');
 });

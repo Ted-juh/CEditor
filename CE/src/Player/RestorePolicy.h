@@ -142,4 +142,42 @@ inline RestoreVerdict decideRestore (const RestoreSituation& s)
         : RestoreVerdict { RestoreAction::Ask, "asking whether to restore the hardware" };
 }
 
+/**
+ * What a saved session says about recall: the answer to "restore the hardware?" and the program
+ * the host had selected.
+ *
+ * Read FRESH from each state, and absent means the default — unanswered, program 0. Saving omits
+ * both when they are at their defaults, and the processor used to change them only when an element
+ * was present. So restoring an older state into a live instance kept whatever the later session had
+ * set: a state that never authorised sending inherited an "always" and pushed the patch at the synth
+ * unasked, a stale "never" suppressed a restore that should have asked, and the later program
+ * survived too (release audit X-03, observed on Windows against the real processor).
+ *
+ * An answer that is neither "always" nor "never" reads as unanswered: asking again is the only safe
+ * reading of a value this code did not write.
+ */
+struct SessionRecall
+{
+    juce::String restoreAnswer;   ///< "", "always" or "never"
+    int program = 0;
+};
+
+inline SessionRecall readSessionRecall (const juce::XmlElement& state, int programCount)
+{
+    SessionRecall recall;
+    if (auto* answer = state.getChildByName ("RestoreAnswer"))
+    {
+        const auto value = answer->getAllSubText().trim().toLowerCase();
+        if (value == "always" || value == "never")
+            recall.restoreAnswer = value;
+    }
+    if (auto* program = state.getChildByName ("CurrentProgram"))
+    {
+        const int index = program->getAllSubText().trim().getIntValue();
+        if (juce::isPositiveAndBelow (index, programCount))
+            recall.program = index;
+    }
+    return recall;
+}
+
 } // namespace ce

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include "RackModel.h"
 #include "RackProcessors.h"
 #include "AuditionPlayer.h"
@@ -102,7 +103,8 @@ public:
     /** Reorders within its own chain; identities and nodes stay put. */
     bool moveEffectSlot (const juce::String& effectId, int newIndex);
     bool setEffectBypassed (const juce::String& effectId, bool bypassed);
-    /** Document-only identity/state priming, like primePartState. */
+    /** Writes an effect's identity and state blob into the slot's DOCUMENT only; the slot's
+        load transaction then restores the primed blob on commit. */
     bool primeEffectSlot (const juce::String& effectId, const ClassInfo& info,
                           const juce::String& stateBlobBase64);
     int  beginEffectLoad (const juce::String& effectId);
@@ -370,22 +372,23 @@ public:
 
     /** Commits a constructed instrument into the part. Refuses a stale generation (a newer
         beginLoad supersedes) and an unknown part. Restores the part's saved state into the
-        instrument when the class identity matches; a different identity clears the blob. */
+        instrument when the class identity matches; a different identity clears the blob.
+
+        `primedState` is how a library preset loads through Stage 1's one path instead of
+        growing another (baseline §18.6.7): when given, it is the state the new instrument
+        starts from — empty meaning its defaults — in place of whatever the part held, and it
+        becomes the part's blob. It travels with the load rather than being written into the
+        part beforehand, because the part's document describes what is PLAYING: written early,
+        a load that failed left the part named as a plug-in that never arrived while the old
+        one played on, and the next capture saved the old one's state under the new identity. */
     bool commitLoad (const juce::String& partId, int generation,
                      std::unique_ptr<juce::AudioProcessor> instrument,
-                     const ClassInfo& info);
+                     const ClassInfo& info,
+                     std::optional<juce::String> primedState = std::nullopt);
 
     /** Removes the part's instrument (capturing its state first) but keeps the part, its
         identity and its rules — reloading the same class restores where it left off. */
     bool unloadInstrument (const juce::String& partId);
-
-    /** Writes a preset's identity and state blob into the part's DOCUMENT only — the live
-        instrument (if any) keeps playing untouched. The caller then runs the normal load
-        transaction, whose commit restores the primed blob into the new instrument: this is
-        how a library preset loads through Stage 1's one path instead of growing another
-        (baseline §18.6.7). */
-    bool primePartState (const juce::String& partId, const ClassInfo& info,
-                         const juce::String& stateBlobBase64);
 
     bool partHasInstrument (const juce::String& partId) const;
 

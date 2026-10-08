@@ -5,6 +5,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import { SLIDER_TICK_LIMITS, clampSliderTickCount } from '../utils/sliderGeometry.js';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
   import Cloud from 'lucide-svelte/icons/cloud';
@@ -400,10 +401,10 @@
     {/if}
 
     <PropertyCell label="Major Count" span={1} compact hint="Generated major tick stops across the slider domain.">
-      <NumberCell label="Major" value={behavior.majorTickCount ?? 11} defaultValue={11} step={1} min={2} onchange={(value) => set('Behavior.majorTickCount', Math.max(2, Math.round(value)))} />
+      <NumberCell label="Major" value={behavior.majorTickCount ?? 11} defaultValue={11} step={1} min={SLIDER_TICK_LIMITS.majorMin} max={SLIDER_TICK_LIMITS.majorMax} onchange={(value) => set('Behavior.majorTickCount', clampSliderTickCount('major', value, 11))} />
     </PropertyCell>
     <PropertyCell label="Minor / Gap" span={1} compact hint="Minor ticks inserted between each pair of major ticks.">
-      <NumberCell label="Minor" value={behavior.minorTickCount ?? 3} defaultValue={3} step={1} min={0} onchange={(value) => set('Behavior.minorTickCount', Math.max(0, Math.round(value)))} />
+      <NumberCell label="Minor" value={behavior.minorTickCount ?? 3} defaultValue={3} step={1} min={SLIDER_TICK_LIMITS.minorMin} max={SLIDER_TICK_LIMITS.minorMax} onchange={(value) => set('Behavior.minorTickCount', clampSliderTickCount('minor', value, 3))} />
     </PropertyCell>
     <PropertyCell label="Tick Placement" span={2} hint="Place ticks inside or outside the body track.">
       <select class="val" value={behavior.tickPlacement ?? 'outside'} onchange={(event) => set('Behavior.tickPlacement', event.target.value)}>
