@@ -1,10 +1,16 @@
 # CTRL49 hardware checklist
 
-Everything below has run in software only: the C++ tests over a fake keyboard cable, the browser
-checks over the same Lua the keyboard is sent. None of it has been on a CTRL49. This is the list
-to take to one, in order, with what to write down. Tick as you go and send back what the
-**Write down** lines ask for, even when it worked: "it drew" with a number is worth more than
-"it worked".
+Everything below ran in software first: the C++ tests over a fake keyboard cable, the browser
+checks over the same Lua the keyboard is sent. This is the list to take to a CTRL49, in order,
+with what to write down. Tick as you go and send back what the **Write down** lines ask for, even
+when it worked: "it drew" with a number is worth more than "it worked".
+
+**Where it stands (2026-10-07).** Section 3 is done. Section 1 is done as far as LAYERS' first
+look; the ticks and the dated notes below say what was seen. The first run froze the keyboard on
+the HoSTage logo, and that is fixed (`README.md`, "Measured on the CTRL49, 2026-10-07"). Start
+the next session at LAYERS, "Hold a few notes". **Watch that step:** the page's note hook calls
+`lua_widget_make_dirty`, the call that froze the keyboard when it was made from a draw. If the
+keyboard stops on the first key held, that is why; switch it off and on and say so.
 
 ## 0. Before you start
 
@@ -22,22 +28,29 @@ to take to one, in order, with what to write down. Tick as you go and send back 
 Open CEditor, then File > Hostage..., then the **Controller** workspace. The CTRL49 screen card
 is at the bottom.
 
-- [ ] The card says **Showing on the keyboard too**, and the keyboard shows the same page.
+- [x] The card says **Showing on the keyboard too**, and the keyboard shows the same page.
       If it says anything else, stop here: **write down** the card's text and its red line, if any.
-- [ ] The page script HoSTage uploads is 42 KB (the 62 KB file, sent without its comments and
+      (2026-10-07: yes, after the freeze was fixed. The card says this even when the keyboard has
+      stopped answering, so look at the keyboard, not only at the card.)
+- [x] The page script HoSTage uploads is 42 KB (the 62 KB file, sent without its comments and
       indentation). The stress test in section 2 has run (2026-10-05): the 58 KB Rig full build
       loaded and ran, so this should too. If it shows a Lua error or the stock screen comes back instead,
       **write down** exactly what it says.
-- [ ] Page Left / Right on the keyboard walks the control pages and the performance page, and
+- [x] Page Left / Right on the keyboard walks the control pages and the performance page, and
       the card follows.
 
 **Cue.** Have a setlist of a few songs, one with sections and notes.
 
-- [ ] Turn on **Cue**. Page Right from the performance page arrives at CUE first.
-- [ ] Before the set starts it says NO SONG ON STAGE YET. E1 picks song 1 (GO TO at the bottom,
+- [x] Turn on **Cue**. Page Right from the performance page arrives at CUE first.
+      (Turning it on does not take the keyboard there; the owner remarked on it.)
+- [x] Before the set starts it says NO SONG ON STAGE YET. E1 picks song 1 (GO TO at the bottom,
       pad 1 lit); pad 1 goes to it, in the app too.
+      (2026-10-07: yes, nothing cut off. Pad 1 also took the keyboard off CUE, to the control
+      page the song recalls: six presses of Page Right to come back.)
 - [ ] On a song: SONG N OF M, its name and tempo; its notes when it has no sections, with its
       clock against the time planned (red when over); the set's clock in the title.
+      (2026-10-07: SONG 1 OF 3, the name, both note lines, the clock counting, OF 4:30 PLANNED
+      and NEXT were right. Not looked at: a tempo, the clock going red, the set's clock.)
 - [ ] Start its sections: the section name, BAR N OF M filling in, the bars left counting down, and
       NEXT naming the next section.
 - [ ] NEXT names the next song, with LOADING n% / READY when it preloads a rig.
@@ -46,11 +59,14 @@ is at the bottom.
 
 **Layers.** Have at least two parts with different zones (a split is the clearest).
 
-- [ ] Turn on **Layers** on the card (the switch's light comes on). Page Right from the
+- [x] Turn on **Layers** on the card (the switch's light comes on). Page Right from the
       performance page arrives at LAYERS, on the keyboard and on the card.
-- [ ] The pads go dark: they do nothing on LAYERS or SOUNDCHECK.
+      (2026-10-07: on the keyboard, one Page Right from CUE. The card was not looked at.)
+- [x] The pads go dark: they do nothing on LAYERS or SOUNDCHECK.
 - [ ] One band per part, over the keys where it plays. The part E1 has picked is outlined; it
       starts on the part HoSTage has focused.
+      (2026-10-07: one part, its row outlined, its name and C-2-B1 in the title, the 49 keys
+      drawn. Its range lies below the keys, so there was no band to see. Stopped here.)
 - [ ] Hold a few notes: each lights its key in the colour of a part that plays it, and puts a
       white notch in the band of every part that plays it. Let go and they go.
 - [ ] E1 picks the part; the title shows its name and range. E2 / E3 move its lowest / highest
@@ -155,9 +171,13 @@ It runs by itself for a few minutes: each size shows on the keyboard for two sec
 SIZE TEST, the size, RUNNING and how many functions), and each upload takes longer than the
 last. When the prompt comes back, `notepad %TEMP%\size-log.txt`. The last line is the answer.
 
-- [ ] **Write down** the last line of the log, and copy the whole log.
+- [x] **Write down** the last line of the log, and copy the whole log.
+      (2026-10-07: "Every size up to 128 KB loaded and ran." 64 KB in 2 s, 128 KB in 3 s. At
+      256 KB the keyboard answered scene begin, create target, layer position and scene activate
+      and then nothing, and had to be switched off and on. The test stops on silence, so the gap
+      between 128 and 256 KB was not narrowed. Do not run it again for that.)
 - [ ] **Write down** the LUA and DEV numbers at the bottom of the keyboard's screen on the
-      largest size that showed RUNNING.
+      largest size that showed RUNNING. (Not noted on 2026-10-07.)
 - [ ] If the keyboard's own screen does not come back afterwards, switch it off and on: an
       oversized script lives only in its memory.
 
@@ -206,8 +226,8 @@ a plug-in loaded and a control page assigned to it. On the keyboard:
 - [ ] A knob with nothing on it is a faint ring with no number.
 - [ ] Page Right to the performance page: a play triangle or stop square at the top left instead
       of ">" or "#"; a running clip has a green dot, a waiting one a hollow ring, and no "*" or ">".
-- [ ] Page Left / Right between two control pages: do the rings sweep to their new values over a
-      moment, or jump at once? Either is fine; **write down** which.
+- [ ] Page Left / Right between two control pages: the rings jump to their new values at once.
+      (They no longer sweep: the call that made them froze the keyboard, 2026-10-07.)
 - [ ] DISCOVER (switch it on in the CTRL49 card): round dots on the map, YOU under its ring.
 - [ ] LIVE (switch **Live** on in the CTRL49 card; it comes right after the performance page, or
       after CUE). Hold a chord: the keys light in the colour of the part whose zone they are in.

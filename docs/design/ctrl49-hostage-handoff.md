@@ -1,6 +1,6 @@
 # CTRL49 + HoSTage — handoff
 
-Branch: `ccr-afa36ff6-0e0ifw`, draft **PR #28** into `main`. Everything below is pushed. Start by
+All of it is on `main` (PR #28 merged, 2026-10-06; work on `main`, not on a branch). Start by
 reading this file, then `CLAUDE.md`, then `tools/ctrl49/README.md` and
 `tools/ctrl49/hardware-checklist.md`.
 
@@ -8,14 +8,45 @@ Paste the section [Prompt for Claude Code](#prompt-for-claude-code) to start the
 
 ---
 
-## Where things stand (2026-10-06, evening)
+## Where things stand (2026-10-07)
 
-- **PR #28** is a draft. Last commit `e348a5c`; the previous one (`a2e6d5a`) was green under MSVC.
-- **The owner's local work is merged in** (`5d77495`). Their local `main` is still 8 commits ahead
-  of `origin/main` with those same commits: once PR #28 merges, reset it to `origin/main`.
-- **Nothing since the owner last pulled has been on the keyboard.** Everything below runs in
-  software only (C++ tests over a fake keyboard cable, the Lua pages in a firmware stand-in, the
-  browser previews). The owner cannot test on hardware right now; every check waits in
+The first session on the owner's Windows machine, with the keyboard. What it found:
+
+| | Result |
+|---|---|
+| Windows build | Did not compile: `std::min` after `windows.h` in `Ctrl49ScreenLab.cpp`. Fixed (`fa47a4e`) |
+| Panel scan, self-test | 16 of 16 |
+| Panel scan, Spire / TB-303 / Zebra3 | 0 / 11 / 78 controls placed; usable on TB-303 only (`tools/ctrl49/README.md`, "Panel scan") |
+| Script size (§3) | 64 and 128 KB ran; at 256 KB the keyboard went silent. Not narrowed further |
+| HoSTage's page, first run | Froze the keyboard on the logo: `lua_widget_make_dirty` called from `draw()`. The easing that used it is gone |
+| Knob pages, Page Left / Right | Right, and the app's card follows |
+| CUE | Right as far as a setlist without sections goes. Pad 1 goes to the song and so leaves CUE |
+| LAYERS | Draws. Stopped before a note was played |
+
+The details are in `tools/ctrl49/README.md` ("Measured on the CTRL49, 2026-10-07") and the ticks
+and dated notes in `tools/ctrl49/hardware-checklist.md`.
+
+**Open, for the owner to decide or for the next session:**
+
+- Going to a song from CUE recalls the song's control page and so leaves CUE. Suggested: stay on
+  CUE when the song was chosen there. Not yet answered.
+- Turning a page on in the app's card does not take the keyboard to it. The owner remarked on it.
+- The app does not notice a keyboard that has stopped answering; the card went on saying
+  "Showing on the keyboard too" over a frozen keyboard. It could count unanswered keepalives.
+- The note hook still calls `lua_widget_make_dirty` (from `note()`, not from a draw). Unknown
+  whether that is safe; the next step in the checklist finds out.
+- The panel scan writes parameters to the edit controller only, which Spire's window ignores,
+  and gives each plug-in 200 s, which Zebra3's 4,273 controls do not fit in.
+
+**Still not on the keyboard:** notes and encoders on LAYERS, SOUNDCHECK, DISCOVER, CHANGES, LIVE,
+METERS, the browser (§1 and §6), the stress blocks (§7), the upload probe (§8), the mockups and
+the smooth envelope (§4, §5).
+
+### Before that (2026-10-06, evening)
+
+- **The owner's local work is merged in** (`5d77495`).
+- Everything below ran in software only until 2026-10-07 (C++ tests over a fake keyboard cable,
+  the Lua pages in a firmware stand-in, the browser previews); every check is in
   `tools/ctrl49/hardware-checklist.md`, sections 1-8.
 - **The owner's decisions (2026-10-06):** the four HoSTage Live mockups become real pages where
   they suit HoSTage; Section paints over the plug-in's knob cap; do what can be done without the
@@ -32,7 +63,7 @@ Paste the section [Prompt for Claude Code](#prompt-for-claude-code) to start the
 | `c4e0abd` | The sound browser on the keyboard: no more 127/0 under the knobs; the sound under the cursor in the bottom strip |
 | `958bdce` | Section mockup paints over each knob's cap; the panel scan records each knob's `cap` and `pointer` colour |
 | `e628051` | The page script is uploaded without comments or indentation (`Ctrl49LuaStrip.h`): 62 KB in the repo, 42 KB sent |
-| `a2e6d5a` | Knob pages: the plug-in's own values, symbols for the ASCII marks, empty knobs, a bottom strip, easing |
+| `a2e6d5a` | Knob pages: the plug-in's own values, symbols for the ASCII marks, empty knobs, a bottom strip, easing (the easing froze the keyboard and was taken out, 2026-10-07) |
 | `7ed6c18` | Smooth envelope curves (anti-aliased line pieces) in the designs |
 | `b6703ff` | HoSTage Live mockups: Live, Section, Labels, Meters |
 | `8ed03e3` | The panel scan tool (`Ctrl49PanelScan.exe`) |
@@ -104,19 +135,20 @@ that run.
 
 ## What is next
 
-1. **Wait for the owner's hardware results**; do not ask them to rerun anything that failed
-   before. The order to give them (each section of the checklist has its exact steps):
-   1. §3 script size (`Ctrl49ScreenLab size`).
-   2. §1 HoSTage's pages on the keyboard (Cue, Layers, Soundcheck, Discover, Changes).
-   3. §6 the knob pages, the browser, LIVE and METERS.
-   4. §7 the stress page's blocks (which of EARLY/LATE, F/T show).
-   5. §8 the upload probe (does a picture sent while a page runs draw; how fast).
-   6. §4 and §5 the mockups and the smooth envelope, when they like.
-   7. The panel scan on three of their plug-ins (steps below; no keyboard needed).
-2. **With §3:** record the script limit in `tools/ctrl49/README.md` and the checklist; decide
-   whether the preset rule's 64 KB Lua cap (`kPresetMaxLuaBytes` in `Ctrl49ScreenLabPreset.h`, and
-   `CE/web/browser-checks/ctrl49EraPresets.mjs`) should follow it.
-3. **With §1 and §6:** fix what they find; then the PR can leave draft.
+1. **Go on with the owner at the keyboard**; do not ask them to rerun anything that failed
+   before. Done: §3 and the panel scan, and §1 as far as LAYERS' first look. The order for the
+   rest (each section of the checklist has its exact steps):
+   1. §1 from LAYERS, "Hold a few notes" (the note hook's first try: see the checklist's top),
+      then Soundcheck, Discover, Changes.
+   2. §6 the knob pages, the browser, LIVE and METERS.
+   3. §7 the stress page's blocks (which of EARLY/LATE, F/T show).
+   4. §8 the upload probe (does a picture sent while a page runs draw; how fast).
+   5. §4 and §5 the mockups and the smooth envelope, when they like.
+2. **§3 is in:** the limit is between 128 and 256 KB, recorded in `tools/ctrl49/README.md` and
+   the checklist. The preset rule's 64 KB Lua cap (`kPresetMaxLuaBytes` in
+   `Ctrl49ScreenLabPreset.h`, and `CE/web/browser-checks/ctrl49EraPresets.mjs`) is inside it and
+   was left alone; it could go to 128 KB if a design needs it.
+3. **With §1 and §6:** fix what they find, and take the open points above to the owner.
 4. **With §7:** if EARLY T draws and EARLY F not, it was the image: make the stress block textured
    and the memory test works as meant. If only EARLY draws: decoding late is the problem, which
    matters for Section and Labels (see 5). Record it in the README's "Why the blocks did not draw".
@@ -189,9 +221,12 @@ Before any of them: `git pull`, then
 
 This matters as much as the code. From this conversation:
 
-- **Exact, complete, ordered steps.** Every check goes in the list at its place (a `git status`
-  before a switch is step 4, not a remark after the list). Never add "but first ..." afterwards.
-  They said so plainly and were right.
+- **One step at a time when they are at the keyboard.** One thing to do, what should happen,
+  then wait for what they saw. Never a list of checks. That is how 2026-10-07 was run, and it is
+  what they ask for.
+- **Exact and complete.** Whatever a step needs goes in the step (a `git status` before a switch
+  comes first, not as a remark afterwards). Never add "but first ..." afterwards. They said so
+  plainly and were right.
 - **Name physical things.** "Knob 1" is the leftmost of the CTRL49's eight round knobs in a row
   (the ones VIP uses for its eight on-screen parameters); not the sliders, not the big dial (it
   changes whichever knob was turned last), not the wheels. "Page Left / Right" are the buttons
@@ -201,9 +236,10 @@ This matters as much as the code. From this conversation:
   copying from the console was unclear.
 - **Do not make them repeat a hardware run that has failed.** Fix it offline, or drop it and say
   what was learned anyway.
-- They work on Windows, in the **x64 Native Tools Command Prompt for VS 2022**, on branch
-  `ccr-afa36ff6-0e0ifw`. They have run what CI runs (`npm test` and `npm run test:script-exports`
-  in `CE/web`, `cmake --build --preset native-release`, `ctest`) and can again.
+- They work on Windows, on `main`, and do not use Visual Studio. A session on their machine
+  builds for them (`tools/scripts/build-native.ps1 -Configuration Release`, into `build/native`
+  and nowhere else) and reads the logs itself: have a tool write to a file under `C:\tmp` and
+  read that, rather than asking them to paste.
 - Short answers. Tables for results. No "I apologise" paragraphs; fix and say what changed.
 
 ---
@@ -243,19 +279,19 @@ screenshot to `C:/tmp/...`, which on Linux becomes a folder named `C:` in `CE/we
 not commit it.
 
 Commits: the repo's voice (`git log`), trailer `Co-authored-by: Claude <noreply@anthropic.com>`,
-no model names; `[skip ci]` on documentation-only pushes; push with
-`git push -u origin ccr-afa36ff6-0e0ifw`.
+no model names; `[skip ci]` on documentation-only pushes. Commit to `main` locally; push only
+when the owner says so.
 
 ---
 
 ## Prompt for Claude Code
 
-> Continue the CTRL49 / HoSTage work on branch `ccr-afa36ff6-0e0ifw` of Ted-juh/CEditor (draft PR
-> #28). Read `docs/design/ctrl49-hostage-handoff.md` first, then `CLAUDE.md`,
-> `tools/ctrl49/README.md` and `tools/ctrl49/hardware-checklist.md`. Nothing from the last session
-> has been on the CTRL49 yet: the owner will bring results from the checklist's sections 1-8 and
-> the panel scan. Record each result where the handoff's "What is next" says, fix what they find,
-> and build SECTION and LABELS only once the upload probe (§8) and the panel scan say they can
-> work. Follow "Working with the owner" to the letter: exact, complete, ordered steps, physical
-> controls named, logs into a file, never ask for a failed hardware run again. Go straight to
-> implementation rather than long design discussion.
+> Continue the CTRL49 / HoSTage work on `main` of Ted-juh/CEditor. Read
+> `docs/design/ctrl49-hostage-handoff.md` first, then `CLAUDE.md`, `tools/ctrl49/README.md` and
+> `tools/ctrl49/hardware-checklist.md`. The checklist has been on the CTRL49 as far as LAYERS'
+> first look (2026-10-07); go on from there with the owner, one step at a time. Record each
+> result where the handoff's "What is next" says, fix what they find, and build SECTION and
+> LABELS only once the upload probe (§8) says a late picture draws and the panel scan works on
+> more than a simple panel. Follow "Working with the owner" to the letter: one step and what
+> should happen, physical controls named, logs into a file you read yourself, never ask for a
+> failed hardware run again. Go straight to implementation rather than long design discussion.
