@@ -20,7 +20,7 @@ test('the Hostage header separates identity, mode, transport and emergency actio
   assert.match(view, /class="host-mode"[\s\S]*class="host-command-area"/);
   assert.match(view, /class="host-transport-group"[\s\S]*data-testid="host-transport"/);
   assert.match(view, /class="host-global-actions"[\s\S]*class="panic"/);
-  assert.match(view, /@media \(max-width: 1120px\)[\s\S]*grid-column: 1 \/ -1/,
+  assert.match(view, /@media \(max-width: 1270px\)[\s\S]*grid-column: 1 \/ -1/,
     'the command area must wrap as a unit instead of crushing the transport');
 });
 

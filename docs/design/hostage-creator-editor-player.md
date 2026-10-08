@@ -1,8 +1,8 @@
 # HoSTage: creator, editor and player
 
 *Status: the owner's intention, written down on 2026-10-08, with what exists today and what each
-part would take. Nothing in the "would take" columns is built. When this and the code disagree
-about what exists, the code is right.*
+part would take. Step 1, the player role, is built; nothing after it is. When this and the code
+disagree about what exists, the code is right.*
 
 ## The intention, in the owner's words
 
@@ -58,9 +58,12 @@ Tier B already nearly exists — by accident rather than design:
 - **Stage Lock is already the restriction the owner describes**, enforced in the host itself
   (`InstrumentHostService.cpp`, the allow-list near the top): playing, songs, scenes, levels,
   macros and parameters work; changing the rig does not.
-- **There is no "player" yet**, and no file that carries a show from one program to another.
-- **The player builds on Linux too** — `CEHostStandalone` was built on a Linux x86-64 machine for
-  this note, as a 41 MB `Hostage` — but plugins load only on Windows: live plugin isolation is Windows-only
+- **The player role exists (step 1), but nothing makes a player yet**, and no file carries a show
+  from one program to another. A program becomes a player only by a hand-placed `hostage.json`.
+- **The player builds and runs on Linux too** — `CEHostStandalone` was built on a Linux x86-64
+  machine for this note, as a 41 MB `Hostage`, and shows its UI in WebKitGTK (until step 1 it asked
+  for WebView2 by name everywhere and showed only the missing-runtime message off Windows) — but
+  plugins load only on Windows: live plugin isolation is Windows-only
   (`IsolatedPluginProxy.cpp`), and the product refuses to load plugins any other way. The CTRL49
   is Windows-only too (`Ctrl49WindowsEndpoints.cpp`).
 
@@ -116,8 +119,23 @@ Two builds would double every test and every release; one build with a role cann
 
 ## What each step would take
 
-1. **The player role.** The manifest, the host refusing screen and player creation in the player
-   role, and `InstrumentHostView` hiding them. Small. Also gives tier A and B "Try as player".
+1. **The player role.** *Built.* The manifest, the host refusing screen and player creation in the
+   player role, and `InstrumentHostView` hiding them. Small. Also gives tier A and B "Try as player".
+   - The manifest is `hostage.json`, `{"role":"player"}`, found where `factory-performance.json` is:
+     beside the standalone's exe, or in the VST3 bundle's `Contents/Resources`
+     (`readHostageRole`, `HostRuntimeShared.h`). Missing or anything else means the editor. Only
+     the role is read so far; the product name and the show come with steps 2 and 3.
+   - The host refuses a deny-list, `isEditorOnlyCommand` in `InstrumentHostService.cpp`: making,
+     naming, removing and assigning pages, Auto pages, quick-learn, fader and pad layers,
+     describing a controller, and the Host Project and Build product. `setControlSlotOptions` is
+     refused field by field: how a knob sends MIDI (relative mode, pickup) is the player's; its
+     label, range, steps, direction and colour are the page's. A deny-list rather than Stage
+     Lock's allow-list, because a player is HoSTage minus a few things, not a few things.
+   - `hostagePlayerRole.test.js` holds the browser preview's copy (`utils/hostageRole.js`) to the
+     host's list, and fails when a new page, surface or project command is added without
+     deciding which side it is on.
+   - "Try as player" is `setTryAsPlayer`; it is refused under Stage Lock and in an installed
+     player, and is not saved — the editor always starts as the editor.
 2. **One data folder per product**, named from the Host Project, instead of the shared
    `CEditorInstrumentHost`. Small, and needed before two products can live on one machine.
 3. **The show** — format, save in B, load in C, the missing-plugin check. Medium.
@@ -155,7 +173,9 @@ Two builds would double every test and every release; one build with a role cann
    commercial licence or a different business model, and that decision is still open — it applies
    to the Creator licence as much as to the editions.
 3. **Re-learning in the player** (the "decide" rows above): may a player re-learn which physical
-   knob a slot listens to, record previews, install a licence?
+   knob a slot listens to, record previews, install a licence? *Step 1 assumed yes to all three, as
+   the easier to take back:* the player role refuses none of them. Saying no to re-learning is two
+   commands (`learnControlSlotMidi`, `learnSurfaceControl`) moved to the editor-only list.
 4. **USB stick:** a portable Windows folder that runs on any PC, a bootable Pi image, or both — and
    which first.
 5. **Raspberry Pi scope:** hardware synths and open-source plugins only, accepted as the scope?

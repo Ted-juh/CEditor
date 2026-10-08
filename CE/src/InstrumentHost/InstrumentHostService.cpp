@@ -171,6 +171,44 @@ namespace
         return safeCommands.contains (command);
     }
 
+    /** What only the HoSTage editor does (docs/design/hostage-creator-editor-player.md): make or
+        change screens and control pages, describe a controller, and build. A player keeps
+        everything else — adding instruments and effects, changing the setlist — and Stage Lock
+        restricts those as it always has. Unlike Stage Lock's list this one names what is
+        refused, because a player is nearly everything; CE/web/test/hostagePlayerRole.test.js
+        holds every page, surface and project command in this file to one side or the other, so a
+        new one cannot slip past by not being listed. */
+    bool isEditorOnlyCommand (const juce::String& command, const juce::var& payload)
+    {
+        static const juce::StringArray editorOnly {
+            "addControlPage", "removeControlPage", "renameControlPage", "generateControlPages",
+            "setControlPagePreset", "assignControlSlot", "assignSurfaceControl", "clearControlSlot",
+            "learnControlSlotParameter", "quickLearnParameter", "setFaderLayers", "setPadLayers",
+            "setUserSurface", "clearUserSurface", "learnUserSurface", "finishUserSurfaceLearn",
+            "setHostProject", "buildHostProduct",
+        };
+        if (editorOnly.contains (command))
+            return true;
+
+        // A slot's options are mostly what the page shows and how the knob maps onto the
+        // parameter — the editor's. How the physical control sends MIDI is the keyboard's, and a
+        // player on a different keyboard from the one the show was made on has to say so.
+        if (command == "setControlSlotOptions")
+            for (const char* field : { "rangeMin", "rangeMax", "inverted", "bipolar", "toggle",
+                                       "steps", "label", "colour" })
+                if (payload.hasProperty (field))
+                    return true;
+        return false;
+    }
+
+    juce::String editorOnlyRefusal (const juce::String& command)
+    {
+        if (command == "setHostProject" || command == "buildHostProduct")
+            return "Building belongs to the HoSTage editor; a player cannot build.";
+        return "Screens and control pages are made in the HoSTage editor; a player shows them and "
+               "cannot change them ('" + command + "').";
+    }
+
     juce::String editLabel (const juce::String& cmd)
     {
         static const juce::StringArray edits {
@@ -641,6 +679,28 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         emitError ("Stage Lock blocked '" + cmd
                    + "'. Hold Build for one second before changing the rig.");
+        emitState();
+        return;
+    }
+
+    if (cmd == "setTryAsPlayer")
+    {
+        if (options.player)
+        {
+            emitError ("This is a player: there is no editor to go back to.");
+            emitState();
+            return;
+        }
+        tryingPlayer = payload.getDynamicObject() != nullptr
+                         && payload.getDynamicObject()->hasProperty ("on")
+                       ? (bool) payload["on"] : ! tryingPlayer;
+        emitState();
+        return;
+    }
+
+    if (isPlayer() && isEditorOnlyCommand (cmd, payload))
+    {
+        emitError (editorOnlyRefusal (cmd));
         emitState();
         return;
     }
@@ -19143,6 +19203,11 @@ juce::var InstrumentHostService::buildStatePayload()
         surfacePages->setProperty ("live", surfaceLivePage);
         root->setProperty ("surfacePages", juce::var (surfacePages));
     }
+    // Which program the page is drawing: the editor, or a player (installed as one, or the
+    // editor trying its show as one). The page hides what a player lacks; the refusal above is
+    // what makes it true.
+    root->setProperty ("player", isPlayer());
+    root->setProperty ("playerInstalled", options.player);
     root->setProperty ("product", productPayload());
     root->setProperty ("reliability", reliabilityPayload());
     root->setProperty ("licence", licencePayload());

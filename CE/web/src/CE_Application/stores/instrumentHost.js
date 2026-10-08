@@ -57,6 +57,7 @@ import {
   onInstrumentHostSurfaceBrowse,
 } from '../bridge/bridge.js';
 import { stageCommandAllowed } from '../utils/stageLock.js';
+import { editorOnlyCommand, editorOnlyRefusal } from '../utils/hostageRole.js';
 import { rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload,
          soundcheckPayload, layersPayload, discoverPayload, discoverFirstRow, cuePayload,
          changesPayload, metersPayload, metersFirstPart, metersNudgeVolume, livePayload, liveNextRate, liveNextMode,
@@ -2291,6 +2292,10 @@ export function emptyHostState() {
     scanPaths: [],
     scanning: false,
     stageLocked: false,
+    // Which program this is (docs/design/hostage-creator-editor-player.md): `player` when
+    // acting as one — installed as one (`playerInstalled`) or the editor trying its show.
+    player: false,
+    playerInstalled: false,
     editHistory: { canUndo: false, canRedo: false, undoLabel: '', redoLabel: '', blockedReason: '' },
     editorOpenPartId: '',
     editorOpenPartIds: [],
@@ -4570,6 +4575,8 @@ export function normalizeHostState(payload) {
     scanPaths: (Array.isArray(p.scanPaths) ? p.scanPaths : []).map(String),
     scanning: p.scanning === true,
     stageLocked: p.stageLocked === true,
+    player: p.player === true || p.playerInstalled === true,
+    playerInstalled: p.playerInstalled === true,
     editHistory: {
       canUndo: p.editHistory?.canUndo === true,
       canRedo: p.editHistory?.canRedo === true,
@@ -5635,6 +5642,11 @@ export function applyMockCommand(state, payload) {
   }
   if (cmd === 'beginStageUnlock' || cmd === 'cancelStageUnlock') return next;
   if (!stageCommandAllowed(next.stageLocked, cmd)) return next;
+  if (cmd === 'setTryAsPlayer') {
+    if (!next.playerInstalled) next.player = payload?.on === undefined ? !next.player : payload.on === true;
+    return next;
+  }
+  if (next.player && editorOnlyCommand(payload)) return next;
 
   if (cmd === 'startPerformanceRecording') {
     if (next.performance.performanceReplay.state !== 'idle') return next;
@@ -8500,6 +8512,14 @@ function send(payload) {
       hostLastError.set(`Stage Lock blocked '${String(payload?.cmd ?? '')}'. Hold Build for one second before changing the rig.`);
       return;
     }
+    if (get(hostState).player && editorOnlyCommand(payload)) {
+      hostLastError.set(editorOnlyRefusal(String(payload?.cmd ?? '')));
+      return;
+    }
+    if (payload?.cmd === 'setTryAsPlayer' && get(hostState).playerInstalled) {
+      hostLastError.set('This is a player: there is no editor to go back to.');
+      return;
+    }
 
     // Device commands mutate the device store, everything else the host state.
     if (payload?.cmd === 'setAudioDevice') {
@@ -9373,6 +9393,8 @@ function send(payload) {
 
 export const requestHostState = () => send({ cmd: 'getState' });
 export const setStageLock = (enabled) => send({ cmd: 'setStageLock', enabled: enabled === true });
+/** The editor runs its show as the player will, to test it before creating one. */
+export const setTryAsPlayer = (on) => send({ cmd: 'setTryAsPlayer', on: on === true });
 export const beginStageUnlock = () => send({ cmd: 'beginStageUnlock' });
 export const cancelStageUnlock = () => send({ cmd: 'cancelStageUnlock' });
 export const scanForInstruments = () => send({ cmd: 'scan' });

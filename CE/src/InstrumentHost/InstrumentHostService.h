@@ -426,6 +426,13 @@ public:
             reads whatever the developer happens to have installed is not a test — it passes on
             a clean machine and fails on a working one, which is the worst way round. */
         bool includeDefaultScanRoots = true;
+        /** Which program this is (docs/design/hostage-creator-editor-player.md). The editor
+            makes screens, control pages and players; a player shows the ones it was given and
+            refuses the commands that would change them — here, natively, the way Stage Lock
+            refuses rig edits, so nothing the page or a script sends gets around it. The runtime
+            shells read it from hostage.json beside the program (readHostageRole); CEditor's tab
+            is always the editor. Everything else a player keeps, and Stage Lock restricts. */
+        bool player = false;
         double sampleRate = 44100.0;
         int blockSize = 512;
     };
@@ -447,6 +454,8 @@ public:
     const InstrumentRackHost& getRackHost() const     { return rack; }
     bool isScanning() const                           { return scanBusy.load(); }
     bool isStageLocked() const noexcept               { return stageLocked; }
+    /** Acting as a player: installed as one, or an editor trying its show as one. */
+    bool isPlayer() const noexcept                    { return options.player || tryingPlayer; }
 
     // -- wrapper-context API --------------------------------------------------------------
     // The generated targets drive the service beside the bridge, not through it. The
@@ -1612,6 +1621,10 @@ private:
     // owner in a performance view. The unlock clock is native so a WebView click cannot
     // bypass the hold gesture by sending `enabled: false` directly.
     bool stageLocked = false;
+    // "Try as player" — the editor running its show as the player will, to test before it
+    // creates one. Session-only like Stage Lock; a program installed as a player has no editor
+    // to go back to and refuses to leave.
+    bool tryingPlayer = false;
     double stageUnlockStartedMs = 0.0;
     static constexpr double stageUnlockHoldMs = 900.0;
     juce::var hostProject;          // the Host Project manifest; loaded/minted on first ask

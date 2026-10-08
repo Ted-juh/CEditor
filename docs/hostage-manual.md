@@ -76,6 +76,32 @@ and **Controller**, each described in its own chapter below. The **Utilities** o
 right: **Library**, **Audio & MIDI**, **Project**, **Product**, **Health** and **Edition**
 ([chapter 12](#12-utilities)).
 
+**Editor and player.** HoSTage has two roles. The **editor** — the HoSTage in CEditor — makes
+everything, including control pages and CTRL49 screens. A **player** plays a finished show. In a
+player you can still add and replace instruments and effects, browse and load sounds, mix, and edit
+songs and setlists. Stage Lock restricts those, as it always does. What a player does not have:
+
+- making, renaming or removing control pages;
+- assigning parameters to controls, **Auto pages** and the **⚡** quick-learn;
+- **Describe controller**;
+- the **Project** utility.
+
+On the Controller workspace a player keeps the page menu, the knobs, **Learn hardware**, the **MIDI
+mode** and **Pickup**. A show made on one keyboard can then be played from another.
+
+**Try as player**, at the right end of the row of workspaces, shows your show as a player will run
+it. The line under the logo then reads **PLAYER · LIVE STAGE**, and **Back to editor** brings
+everything back. You cannot switch while Stage Lock is on.
+
+HoSTage itself refuses what a player cannot do, so a script cannot do it either. It says why:
+"Screens and control pages are made in the HoSTage editor; a player shows them and cannot change
+them (…)".
+
+> **Not finished yet:** HoSTage cannot make a player yet. A built HoSTage program starts as a player
+> when a file named `hostage.json` containing `{"role":"player"}` sits beside the program (inside a
+> VST3, in `Contents/Resources`). It then shows **PLAYER** where **Try as player** would be, and has no
+> editor to go back to.
+
 **Removing things.** Removing a part, a plugin, a pattern and most other things asks for a second
 click within five seconds before it happens; many buttons say **Confirm** while they wait.
 
@@ -443,6 +469,9 @@ Pages are saved with the rack, like everything else, and travel with its scenes 
 to three pages, a scene's **Controls** and a song's **Controller page** show them as buttons; with
 more, as a list.
 
+In a player, and under **Try as player**, pages can be played and switched but not made or changed.
+See [Editor and player](#2-getting-around).
+
 ## 10. The CTRL49 and its screen
 
 The **M-Audio CTRL49** is a 49-key controller keyboard with a colour screen (480 × 272 pixels), eight
@@ -616,7 +645,7 @@ stays on.
 
 ## 12. Utilities
 
-The **Utilities** drawer on the right holds six pages.
+The **Utilities** drawer on the right holds six pages. A player has five: it has no **Project**.
 
 ### Library
 
@@ -708,5 +737,7 @@ The CTRL49's connection log is `%APPDATA%\CEditor\ctrl49-trace.log`.
   of 8 instruments, 20 undo steps.
 - **Tuning** works only with instruments that support MIDI Tuning Standard messages.
 - **Build product** works only from a CEditor source checkout (see [Project](#project)).
+- **Players**: HoSTage cannot make one yet; **Try as player** shows what one would do (see
+  [Editor and player](#2-getting-around)).
 - **Not yet tested on real hardware**: the MIDI and the CTRL49 stage pages have been checked in
   software.

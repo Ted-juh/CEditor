@@ -5138,6 +5138,83 @@ void testCtrl49StagePages()
     check (unpaid.service->layersOnSurface(), "while LAYERS, which only shows the rack, is there for anyone");
 }
 
+// The player role (docs/design/hostage-creator-editor-player.md). A player keeps the rig and
+// the setlist and refuses only what makes or changes screens and pages, or builds — in the host,
+// so the page hiding a button is a convenience and not the guard.
+void testPlayerRole()
+{
+    std::cout << "\nthe player role: screens and pages are the editor's, the rig is everyone's" << std::endl;
+
+    const auto dir = freshDataDir ("player-role");
+    seedCatalog (dir);
+    Harness h (dir, {}, [] (InstrumentHostService::Options& o) { o.player = true; });
+    h.cmd ("getState");
+    check (h.service->isPlayer(), "a program installed as a player is one");
+    check ((bool) h.emits.lastState()->getProperty ("player", false)
+             && (bool) h.emits.lastState()->getProperty ("playerInstalled", false),
+           "and its state says so, both ways");
+
+    const auto pages = [&h] { return h.service->getRackHost().getPerformance().pages.size(); };
+    const auto before = pages();
+    h.cmd ("addControlPage");
+    check (pages() == before && h.emits.lastError().contains ("HoSTage editor"),
+           "it cannot add a control page, and says where pages are made");
+    h.cmd ("setUserSurface", { { "name", "Advance 49" }, { "encoders", 8 } });
+    check (h.emits.lastError().contains ("HoSTage editor"), "nor describe a controller");
+    h.cmd ("buildHostProduct");
+    check (h.emits.lastError().contains ("cannot build"), "nor build");
+
+    const auto parts = [&h] { return h.service->getRackHost().getPerformance().parts.size(); };
+    const auto partsBefore = parts();
+    h.cmd ("addPart");
+    check (parts() == partsBefore + 1, "but it adds a part to the rig like anyone else");
+
+    h.cmd ("setTryAsPlayer", { { "on", false } });
+    check (h.service->isPlayer() && h.emits.lastError().contains ("no editor"),
+           "and it cannot turn itself back into the editor");
+}
+
+// "Try as player": the editor running its show as the player will, before it creates one.
+void testTryAsPlayer()
+{
+    std::cout << "\nthe editor tries its show as the player" << std::endl;
+
+    const auto dir = freshDataDir ("try-as-player");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    check (! h.service->isPlayer(), "the editor is the editor");
+    h.cmd ("addControlPage");
+    const auto& performance = h.service->getRackHost().getPerformance();
+    check (performance.pages.size() == 1, "and makes pages");
+    const auto pageId = performance.pages.getReference (0).pageId;
+    const auto slotId = performance.pages.getReference (0).slots.getReference (0).slotId;
+
+    h.cmd ("setTryAsPlayer", { { "on", true } });
+    check (h.service->isPlayer()
+             && (bool) h.emits.lastState()->getProperty ("player", false)
+             && ! (bool) h.emits.lastState()->getProperty ("playerInstalled", true),
+           "trying the player, it acts as one, and its state says it is only trying");
+    h.cmd ("addControlPage");
+    check (h.service->getRackHost().getPerformance().pages.size() == 1, "it refuses a new page like a player");
+
+    const auto slot = [&h, &pageId, &slotId]
+    {
+        return h.service->getRackHost().getPerformance().findPage (pageId)->slots.getReference (0);
+    };
+    juce::ignoreUnused (slotId);
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", slotId }, { "midiRelative", true } });
+    check (slot().midiRelative, "how a knob sends MIDI is the keyboard's, and a player may set it");
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", slotId }, { "label", "Cutoff" } });
+    check (slot().binding.label.isEmpty() && h.emits.lastError().contains ("HoSTage editor"),
+           "what the page shows is the editor's, and is refused");
+
+    h.cmd ("setTryAsPlayer", { { "on", false } });
+    h.cmd ("addControlPage");
+    check (! h.service->isPlayer() && h.service->getRackHost().getPerformance().pages.size() == 2,
+           "and back in the editor, pages are made again");
+}
+
 // Which stage pages the keyboard shows is the player's choice, made once. Before, every page
 // switched itself off again at the next launch, and a set rehearsed with METERS and CUE on the
 // keyboard opened the next evening without them. The browser is a mode, not a page, and stays
@@ -15045,6 +15122,8 @@ int main (int argc, char* argv[])
     testCtrl49AppScreen();
     testCtrl49StagePages();
     testCtrl49StagePagesRemembered();
+    testPlayerRole();
+    testTryAsPlayer();
     testCtrl49Meters();
     testCtrl49Live();
     testCtrl49Discover();

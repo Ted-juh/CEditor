@@ -399,7 +399,10 @@ void Ctrl49SurfaceBroker::tick()
             // its automatic first pass, once per connection, through the same command the UI
             // uses — so the state emit reaches the editor too.
             const auto& performance = service.getRackHost().getPerformance();
-            if (! triedPageGeneration && ! service.isStageLocked() && performance.pages.isEmpty()
+            // Not in a player: a show's pages are its editor's, and a show made without any
+            // has none to grow (docs/design/hostage-creator-editor-player.md).
+            if (! triedPageGeneration && ! service.isStageLocked() && ! service.isPlayer()
+                && performance.pages.isEmpty()
                 && performance.focusedPartId.isNotEmpty()
                 && service.getRackHost().partHasInstrument (performance.focusedPartId))
             {

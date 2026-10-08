@@ -146,6 +146,7 @@ HostPluginProcessor::HostPluginProcessor()
                                 .getChildFile ("CEditorInstrumentHost");
     options.workerExecutable = findHostScannerWorker ({ options.dataDirectory });
     options.factoryPerformanceFile = findFactoryPerformance();
+    options.player = readHostageRole().player;
 
     options.emit = [this, aliveToken = alive] (const juce::String& eventName, const juce::var& payload)
     {

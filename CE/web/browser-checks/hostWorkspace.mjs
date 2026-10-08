@@ -76,9 +76,19 @@ try {
   const tapped = (await state()).performance.transport.tempo;
   assert.ok(tapped > 100 && tapped < 125, `four taps half a second apart set about 120 (${tapped})`);
   await page.getByTestId('host-ts-denominator').press('ArrowUp');
-  await page.setViewportSize({ width: 1280, height: 1400 });
-  const header = await page.locator('.host-header').evaluate((el) => [el.scrollWidth, el.clientWidth]);
-  assert.ok(header[0] <= header[1], `the header fits a 1280 px window (${header[0]} > ${header[1]})`);
+  // The command area is aligned to the end, so when it is too wide it runs left, under Build and
+  // Stage, where the scroll width does not see it. Measure that too.
+  for (const width of [1280, 1200, 1121]) {
+    await page.setViewportSize({ width, height: 1400 });
+    const header = await page.locator('.host-header').evaluate((el) => {
+      const mode = el.querySelector('.host-mode').getBoundingClientRect();
+      const first = el.querySelector('.host-command-area').firstElementChild.getBoundingClientRect();
+      const apart = first.left >= mode.right || first.top >= mode.bottom;
+      return { scroll: el.scrollWidth, client: el.clientWidth, apart };
+    });
+    assert.ok(header.scroll <= header.client, `the header fits a ${width} px window (${header.scroll} > ${header.client})`);
+    assert.ok(header.apart, `at ${width} px, Undo does not sit on top of Build and Stage`);
+  }
   await page.setViewportSize({ width: 1400, height: 1400 });
   await page.getByTestId('host-ts-numerator').press('ArrowUp');
   const ts = (await state()).performance.transport;
@@ -226,8 +236,43 @@ try {
   await busFx.locator('.fx-row').first().getByTitle('Click again to confirm').click();
   assert.deepEqual(await busNames(['Sweet Reverb']), ['Sweet Reverb'], 'and removed, after the second click');
 
+  // Try as player: the editor runs its show the way a player will. Making pages, describing a
+  // controller and the Project utility go; playing stays; and all of it comes back.
+  const tryPlayer = page.getByTestId('host-try-player');
+  const addPage = page.getByTestId('host-add-page');
+  await addPage.scrollIntoViewIfNeeded();
+  await addPage.click();
+  const pageCount = async () => (await state()).rack.pages.length;
+  const made = await pageCount();
+  assert.ok(made >= 1, 'the editor makes a control page');
+  await tryPlayer.click();
+  assert.equal(await tryPlayer.innerText(), 'Back to editor');
+  assert.equal((await state()).player, true);
+  assert.equal(await addPage.count(), 0, 'trying the player, the rack offers no + Page');
+  assert.equal(await page.getByTestId('host-utility-project').count(), 0, 'and no Project utility');
+  await page.getByTestId('host-workspace-controller').click();
+  await page.getByTestId('surface-page').waitFor();
+  for (const id of ['surface-describe', 'surface-page-add', 'surface-page-auto', 'surface-page-remove', 'surface-parameters']) {
+    assert.equal(await page.getByTestId(id).count(), 0, `the controller hides ${id} in a player`);
+  }
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.addControlPage();
+  });
+  assert.equal(await pageCount(), made, 'a page asked for anyway is refused');
+  const refusal = await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    let value; store.hostLastError.subscribe((v) => { value = v; })();
+    return value;
+  });
+  assert.match(refusal, /made in the HoSTage editor/, 'and says where pages are made');
+  await page.getByTestId('host-try-player').click();
+  assert.equal((await state()).player, false);
+  await page.getByTestId('surface-describe').waitFor();
+  assert.equal(await page.getByTestId('host-utility-project').count(), 1, 'back in the editor, everything returns');
+
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros, returns and bus effects work as drawn');
+  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros, returns, bus effects and Try as player work as drawn');
 } finally {
   await browser.close();
   await server.close();

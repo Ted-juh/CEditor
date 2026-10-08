@@ -149,8 +149,14 @@ makeHostWebViewOptions (const juce::String& userDataFolderName,
         .withStatusBarDisabled()
         .withUserDataFolder (userDataFolder);
 
+    // WebView2 by name on Windows only, as WebViewHost.cpp and PlayerHost.cpp do: elsewhere JUCE
+    // accepts the platform default alone, and naming webview2 there means the missing-runtime
+    // message instead of HoSTage (WebKitGTK on Linux; the bridge is window.__JUCE__ on every
+    // backend).
     auto options = juce::WebBrowserComponent::Options()
+       #if JUCE_WINDOWS
         .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
+       #endif
         .withKeepPageLoadedWhenBrowserIsHidden()
         .withWinWebView2Options (webview2Options)
         .withNativeIntegrationEnabled()
@@ -193,6 +199,35 @@ inline juce::File findFactoryPerformance()
         if (candidate.existsAsFile())
             return candidate;
 
+    return {};
+}
+
+// -- which program this is ---------------------------------------------------------------------
+// hostage.json says whether this copy of HoSTage is the editor or a player
+// (docs/design/hostage-creator-editor-player.md): { "role": "player" }. Found where
+// factory-performance.json is — beside the standalone's exe, or in the VST3 bundle's
+// Contents/Resources. Missing, unreadable or any other role is the editor: an installed HoSTage
+// is the editor unless whoever created it said otherwise.
+
+struct HostageRole
+{
+    bool player = false;
+};
+
+inline HostageRole readHostageRole()
+{
+    const auto moduleDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+                               .getParentDirectory();
+
+    for (const auto& candidate : { moduleDir.getChildFile ("hostage.json"),
+                                   moduleDir.getParentDirectory().getChildFile ("Resources")
+                                            .getChildFile ("hostage.json") })
+    {
+        if (! candidate.existsAsFile())
+            continue;
+        const auto parsed = juce::JSON::parse (candidate);
+        return { parsed.getProperty ("role", {}).toString() == "player" };
+    }
     return {};
 }
 

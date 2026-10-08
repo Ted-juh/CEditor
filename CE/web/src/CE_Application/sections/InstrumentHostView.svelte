@@ -26,7 +26,7 @@
     addRackPart, removeRackPart, moveRackPart, focusRackPart, loadInstrument, unloadInstrument,
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor, floatEditor, closeEditorWindow,
     requestAudioDevices, setAudioDevice, setMidiInputEnabled, setMackieSection,
-    hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct,
+    hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct, setTryAsPlayer,
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
     parameterControlKind, setParameterText, groupParameters, assignedParameterIds, parameterPlaces, isBipolarParameter, quickLearnParameter,
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
@@ -140,6 +140,11 @@
     { id: 'layers', label: 'Layers' },
     { id: 'controller', label: 'Controller' },
   ];
+  // Which program this is (docs/design/hostage-creator-editor-player.md). A player — installed
+  // as one, or the editor trying its show — makes no screens or pages and does not build; the
+  // host refuses those commands, and these hide the buttons that would only be refused.
+  let player = $derived($hostState.player === true);
+  let playerInstalled = $derived($hostState.playerInstalled === true);
   const hostUtilities = [
     { id: 'library', label: 'Library' },
     { id: 'devices', label: 'Audio & MIDI' },
@@ -658,7 +663,7 @@
       <span class="host-logo-frame">
         <HostageLogo />
       </span>
-      <span class="host-purpose">PLUG-IN HOST · LIVE STAGE</span>
+      <span class="host-purpose">{player ? 'PLAYER · LIVE STAGE' : 'PLUG-IN HOST · LIVE STAGE'}</span>
       <span class="host-audio-status" class:on={$hostState.audio.running} title={audioLine}>
         <span class="host-status-dot"></span>{audioLine}
       </span>
@@ -764,7 +769,7 @@
     </div>
     <div class="utility-tabs" role="group" aria-label="Utilities">
       <span class="navigation-label">Utilities</span>
-      {#each hostUtilities as utility (utility.id)}
+      {#each hostUtilities.filter((u) => !(player && u.id === 'project')) as utility (utility.id)}
         <button type="button" class="utility-tab" class:on={activeUtility === utility.id}
                 class:warn={utility.id === 'health'
                             && ($hostState.reliability.recovery.interrupted
@@ -774,6 +779,18 @@
                 onclick={() => chooseUtility(utility.id)}>{utility.label}</button>
       {/each}
     </div>
+    <!-- The editor tries its show as the player will run it, before it creates one; a program
+         installed as a player says so instead and has no way back. -->
+    {#if playerInstalled}
+      <span class="role-badge" data-testid="host-role-player"
+            title="This HoSTage is a player: it plays the show it was given. Screens and control pages are made in the HoSTage editor.">PLAYER</span>
+    {:else}
+      <button type="button" class="role-try" class:on={player} aria-pressed={player}
+              data-testid="host-try-player" disabled={$hostState.stageLocked}
+              title={player ? 'Back to the editor: make screens and control pages again'
+                            : 'Try the show as the player will run it — screens and control pages cannot be changed'}
+              onclick={() => setTryAsPlayer(!player)}>{player ? 'Back to editor' : 'Try as player'}</button>
+    {/if}
   </nav>
 
   <div class="build-content" bind:clientHeight={buildContentHeight}>
@@ -870,7 +887,7 @@
     <HostLibraryPanel onShowSounds={showSounds} />
   {/if}
 
-  {#if activeUtility === 'project'}
+  {#if activeUtility === 'project' && !player}
     <div class="project-panel" aria-label="Host Project">
       <!-- Said before the button, not after it fails: the build packages HoSTage programs that a
            source checkout has already built (tools/scripts/build-host-product.mjs compiles nothing),
@@ -1333,6 +1350,7 @@
         <div class="pages-head">
           <strong>Control pages</strong>
           {#if selectedPage}<span class="pages-count">{selectedPage.slots.filter(s => s.assigned).length} / {selectedPage.slots.length} assigned</span>{/if}
+          {#if !player}
           <span class="pages-actions">
             <button type="button" disabled={!focusedPart?.hasInstrument}
                     title={focusedPart?.hasInstrument
@@ -1342,24 +1360,27 @@
                     data-testid="host-auto-pages">Auto pages</button>
             <button type="button" onclick={() => addControlPage()} data-testid="host-add-page">+ Page</button>
           </span>
+          {/if}
         </div>
         {#if pages.length > 0}
           <div class="page-tabs">
             {#each pages as page (page.pageId)}
               <span class="page-tab" class:on={selectedPage?.pageId === page.pageId}>
-                <input type="text" class="page-name" value={page.name}
+                <input type="text" class="page-name" value={page.name} readonly={player}
                        aria-label="Control page name"
-                       title={page.generated ? 'Generated — regenerating replaces this page' : 'Rename control page'}
+                       title={player ? page.name : page.generated ? 'Generated — regenerating replaces this page' : 'Rename control page'}
                        onfocus={() => (selectedPageId = page.pageId)}
                        onclick={() => (selectedPageId = page.pageId)}
-                       onchange={(e) => renameControlPage(page.pageId, e.currentTarget.value)} />
+                       onchange={(e) => { if (!player) renameControlPage(page.pageId, e.currentTarget.value); }} />
                 {#if page.generated}<span class="page-auto">auto</span>{/if}
+                {#if !player}
                 <button type="button" class="ghost danger" class:confirming={pendingDestructive === `page:${page.pageId}`}
                         aria-label={`Remove ${page.name}`}
                         title={pendingDestructive === `page:${page.pageId}` ? 'Click again to confirm' : 'Remove this page'}
                         onclick={() => guardedAction(`page:${page.pageId}`, () => removeControlPage(page.pageId))}>
                   {pendingDestructive === `page:${page.pageId}` ? 'Confirm' : '×'}
                 </button>
+                {/if}
               </span>
             {/each}
           </div>
@@ -1398,12 +1419,14 @@
                       {#if midiArmed}<span class="slot-listening" role="status">Move a MIDI control…</span>{/if}
                       {#if paramArmed}<span class="slot-listening" role="status">Move a plug-in control…</span>{/if}
                     </div>
+                    {#if !player}
                     <button type="button" class="slot-clear ghost danger" disabled={!slot.assigned}
                       aria-label={`Clear slot ${slotIndex + 1}`} class:confirming={pendingDestructive === `slot:${selectedPage.pageId}:${slot.slotId}`}
                       title={pendingDestructive === `slot:${selectedPage.pageId}:${slot.slotId}` ? 'Click again to clear assignment' : 'Clear parameter assignment'}
                       onclick={() => guardedAction(`slot:${selectedPage.pageId}:${slot.slotId}`, () => clearControlSlot(selectedPage.pageId, slot.slotId))}>
                       ×
                     </button>
+                    {/if}
                   </div>
                   <div class="slot-value">
                     {#if slot.assigned && slot.resolved}
@@ -1433,6 +1456,7 @@
                       onclick={() => midiArmed ? cancelMidiLearn() : learnControlSlotMidi(selectedPage.pageId, slot.slotId)}>
                       <KeyboardMusic size={16} strokeWidth={1.75} aria-hidden="true" />
                     </button>
+                    {#if !player}
                     <button type="button" class:armed={paramArmed} aria-pressed={paramArmed}
                       data-testid={paramArmed ? 'param-learn-armed' : 'param-learn'}
                       aria-label={`${paramArmed ? 'Cancel pick' : 'Pick parameter'} for slot ${slotIndex + 1}`}
@@ -1440,6 +1464,7 @@
                       onclick={() => paramArmed ? cancelLearnControlSlotParameter() : learnControlSlotParameter(selectedPage.pageId, slot.slotId)}>
                       <Crosshair size={16} strokeWidth={1.75} aria-hidden="true" />
                     </button>
+                    {/if}
                   </div>
                 </div>
               {/each}
@@ -1447,7 +1472,8 @@
             <div class="pages-footer">{selectedPage.name}</div>
           {/if}
         {:else}
-          <div class="empty-hint">No pages yet — a page holds eight control slots for hardware and macros.</div>
+          <div class="empty-hint">{player ? 'This show has no control pages.'
+            : 'No pages yet — a page holds eight control slots for hardware and macros.'}</div>
         {/if}
       </div>
 
@@ -1994,20 +2020,24 @@
                   {/if}
                   <button type="button" class="ghost" title="Reset to the plug-in's default"
                           onclick={() => resetParameter(paramTargetId, parameter.id)}>↺</button>
+                  {#if !player}
                   <button type="button" class="ghost" disabled={!selectedPage || !firstEmptySlot}
                           title={selectedPage
                                    ? (firstEmptySlot ? `Assign to ${selectedPage.name}, slot ${firstEmptySlot.slotId}`
                                                      : 'The selected page has no empty slot')
                                    : 'Create a control page first'}
                           onclick={() => assignToSelectedPage(parameter)}>→</button>
+                  {/if}
                   <button type="button" class="ghost" disabled={!selectedMacro}
                           title={selectedMacro ? `Add to macro ${selectedMacro.name}` : 'Create a macro first'}
                           onclick={() => selectedMacro && addMacroTarget(selectedMacro.macroId, paramTargetId, parameter.id)}>M+</button>
+                  {#if !player}
                   <button type="button" class="ghost quick-learn"
                           class:armed={armedParameterId === parameter.id}
                           data-testid="param-quick-learn"
                           title="Put this on a knob: click, then move a control on your MIDI keyboard"
                           onclick={() => quickLearnParameter(paramTargetId, parameter.id)}>⚡</button>
+                  {/if}
                   <!-- Pinned per plug-in CLASS, not per part: you reach for the same dozen on
                        the same synth whichever rack it is in today. -->
                   <button type="button" class="ghost param-pin"
@@ -2264,7 +2294,10 @@
   .stage-header-hint { color: #8b99a4; font-size: 12px; }
   .scan-status { color: #96a2ad; font-size: 11px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  @media (max-width: 1120px) {
+  /* Below this the command area, aligned to the end, runs left under Build and Stage rather
+     than past the window's edge — which a scroll-width check does not see. Measured: it starts
+     to overlap at about 1270 px. */
+  @media (max-width: 1270px) {
     .host-header { grid-template-columns: minmax(260px, 1fr) auto; }
     .host-command-area {
       grid-column: 1 / -1;
@@ -2296,6 +2329,7 @@
     overflow-x: auto;
   }
   .workspace-tabs, .utility-tabs { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .utility-tabs { margin-left: auto; }
   .navigation-label {
     margin-right: 3px;
     color: #8795a0;
@@ -2325,6 +2359,15 @@
     color: #dce4ea;
   }
   button.utility-tab.warn { color: #e4b3b3; }
+  /* Which program this is, at the end of the row: the header has no width to spare below 1400 px. */
+  button.role-try, .role-badge { flex: none; margin-left: -6px; position: relative; white-space: nowrap; }
+  button.role-try::before, .role-badge::before {
+    content: ''; position: absolute; left: -7px; top: 3px; bottom: 3px; border-left: 1px solid var(--host-line);
+  }
+  button.role-try { padding: 4px 10px; font-size: 12px; }
+  button.role-try.on { border-color: var(--host-accent); background: var(--host-accent-surface); color: #edf5fa; }
+  .role-badge { padding: 3px 8px; border: 1px solid var(--host-accent); border-radius: 4px;
+    color: var(--host-accent); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
 
   .build-content {
     flex: 1;

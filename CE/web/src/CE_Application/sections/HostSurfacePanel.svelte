@@ -125,6 +125,11 @@
   // has to know anything else about the hardware.
   let pageId = $state('');
   let pages = $derived($hostState.rack.pages);
+  // A player shows the pages and the controller it was given and changes neither
+  // (docs/design/hostage-creator-editor-player.md): it may switch pages and layers and re-learn
+  // which physical control sends what, for a keyboard other than the one the show was made on.
+  // The host refuses the rest; hiding it here only keeps the buttons from lying.
+  let player = $derived($hostState.player === true);
   // Follows the rack when the chosen page disappears, rather than showing an empty drawing
   // and no explanation for it.
   let page = $derived(pages.find((p) => p.pageId === pageId) ?? pages[0] ?? null);
@@ -274,7 +279,7 @@
   let hoveredId = $state('');
 
   function dropOn(event, control) {
-    if (!addressable(control) || !$hostParamDrag.parameterId) return;
+    if (player || !addressable(control) || !$hostParamDrag.parameterId) return;
     event.preventDefault();
     // By control, not by slot: a fader or a pad has no slot until this very drop. And by
     // page if there is one — with none, the drop mints it, so the drawing works from the
@@ -287,7 +292,7 @@
   }
 
   function dragOver(event, control) {
-    if (!addressable(control) || !$hostParamDrag.parameterId) return;
+    if (player || !addressable(control) || !$hostParamDrag.parameterId) return;
     event.preventDefault();
     // Must match the source's effectAllowed or the browser cancels the drop in silence.
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
@@ -384,8 +389,15 @@
 
 <div class="surface" data-testid="host-surface-panel">
   <div class="workspace-title">
-    <div class="workspace-heading"><SlidersHorizontal size={18} /><div><h2>MIDI learn</h2>
-      <p>Drag a parameter onto a control, then learn its hardware binding.</p></div></div>
+    <div class="workspace-heading"><SlidersHorizontal size={18} /><div>
+      {#if player}
+        <h2>Controller</h2>
+        <p>The pages this show was made with. Switch pages here, and re-learn which knob sends what on a different keyboard.</p>
+      {:else}
+        <h2>MIDI learn</h2>
+        <p>Drag a parameter onto a control, then learn its hardware binding.</p>
+      {/if}
+    </div></div>
     <span class="connection-state" class:connected={$hostSurface.state === 'connected'}>
       <i></i><span title={surfaceStatusText($hostSurface).detail}>{surfaceStatusText($hostSurface).short}</span>
     </span>
@@ -409,9 +421,11 @@
       {#if layout.connected}<span class="plugged-in" data-testid="surface-connected" title="This controller is plugged in">● plugged in</span>{/if}
       {#if layout.vendor}<span class="dim">{layout.vendor}</span>{/if}
     {/if}
-    <button type="button" class="ghost" data-testid="surface-describe"
-            title="Any controller works — CEditor just needs to know what is on yours"
-            onclick={() => (describing = !describing)}>{layout.userSurface ? 'Edit controller' : 'Describe controller'}</button>
+    {#if !player}
+      <button type="button" class="ghost" data-testid="surface-describe"
+              title="Any controller works — CEditor just needs to know what is on yours"
+              onclick={() => (describing = !describing)}>{layout.userSurface ? 'Edit controller' : 'Describe controller'}</button>
+    {/if}
     <div class="page-picker">
       {#if pages.length > 0}
         <!-- Which page the drawing is showing. Eight knobs mean eight assignments, and which
@@ -432,6 +446,12 @@
               <option value={p.pageId}>{p.name}</option>
             {/each}
           </select>
+          {#if player}
+            {#if page?.presetRecordId}
+              <span class="preset-tie dim" data-testid="surface-page-preset-shown"
+                    title={`Shown when "${page.presetName || 'its preset'}" is loaded`}><Link size={14} /> {page.presetName || 'Preset'}</span>
+            {/if}
+          {:else}
           <button type="button" class="ghost" title="Rename this page" aria-label="Rename page"
                   data-testid="surface-page-rename-start" onclick={() => (renaming = true)}><Pencil size={14} /></button>
           <!-- Tie this page to the preset the focused part has loaded, so loading that preset
@@ -451,8 +471,12 @@
           <HostConfirmButton identity={`surface-page:${page?.pageId ?? ''}`} type="button" class="ghost"
                              title="Remove this page" aria-label="Remove page" data-testid="surface-page-remove"
                              onclick={() => page && removeControlPage(page.pageId)}><Trash2 size={14} /></HostConfirmButton>
+          {/if}
       {/if}
       {/if}
+      {#if player}
+        {#if pages.length === 0}<span class="dim" data-testid="surface-no-pages">This show has no control pages.</span>{/if}
+      {:else}
       <button type="button" data-testid="surface-page-add" title="Add an empty page of eight controls"
               onclick={() => { pickNewestPage = pages.length; addControlPage(); }}><Plus size={14} /> Page</button>
       <button type="button" data-testid="surface-page-auto" disabled={!focusedPart?.hasInstrument}
@@ -460,10 +484,11 @@
                        ? 'Build pages from this instrument\'s parameters (replaces its earlier auto pages)'
                        : 'Focus a part with an instrument first'}
               onclick={() => generateControlPages(focusedPart.partId)}>Auto pages</button>
+      {/if}
     </div>
   </div>
 
-  {#if describing}
+  {#if describing && !player}
     <div class="describe" data-testid="surface-describe-form">
       <p class="dim">
         Every controller already works: MIDI learn binds whatever you move, whatever sent it.
@@ -509,12 +534,18 @@
 
   {#if layout.controls.length === 0}
     <div class="empty-hint">
-      No drawing yet — CEditor has no built-in profile for what is connected. Pages and MIDI
-      learn already work; press <strong>Describe controller</strong> and the picture follows.
+      {#if player}
+        No drawing for this controller. Its pages and MIDI learn work without one.
+      {:else}
+        No drawing yet — CEditor has no built-in profile for what is connected. Pages and MIDI
+        learn already work; press <strong>Describe controller</strong> and the picture follows.
+      {/if}
     </div>
   {:else}
-    <div class="surface-body">
-      <!-- The drag source, beside the drawing rather than a tab away. -->
+    <div class="surface-body" class:player>
+      <!-- The drag source, beside the drawing rather than a tab away. A player has nothing to
+           drag: what is on its controls is the show's. -->
+      {#if !player}
       <div class="param-column" data-testid="surface-parameters">
         <div class="panel-heading"><strong>Parameters</strong><span>{parameters.length}</span></div>
         <HostPartPicker parts={$hostState.rack.parts} partId={focusedPart?.partId ?? ''}
@@ -580,6 +611,7 @@
           </div>
         {/if}
       </div>
+      {/if}
 
       <!-- Fit the authored geometry within the available canvas; drag feedback never resizes it. -->
       <section class="controller-canvas" aria-label="Controller mapping">
@@ -671,7 +703,8 @@
       </div>
         </div>
         <div class="canvas-caption" role="status" title={$hostParamDrag.name}>
-          {$hostParamDrag.parameterId ? `Drop ${$hostParamDrag.name || 'parameter'} onto a control`
+          {player ? 'Select a control to see what it does in this show'
+            : $hostParamDrag.parameterId ? `Drop ${$hostParamDrag.name || 'parameter'} onto a control`
             : 'Select a control to inspect · drop a parameter to map'}
         </div>
         <div class="surface-regions">
@@ -706,11 +739,13 @@
                    Bank ◀ ▶ does on the keyboard, and the faders pick their new parameters up
                    where they are rather than jumping them. -->
               <div class="pad-layer-editor" data-testid="surface-fader-layers">
+                {#if !player}
                 <div class="layer-count">Fader layers
                   <Segmented options={LAYER_COUNTS} value={faderLayerCount} label="Number of fader layers"
                              testid="surface-fader-layer-count"
                              onchange={(count) => setFaderLayers(page?.pageId ?? '', count)} />
                 </div>
+                {/if}
                 {#if faderLayerCount > 1}
                   <div class="layer-tabs" role="group" aria-label="Layer the faders play">
                     {#each Array.from({ length: faderLayerCount }, (_, i) => i) as layer (layer)}
@@ -729,11 +764,13 @@
                    state a long press on the small button above the pad steps through — so the
                    assignment below is always the one you would hear. -->
               <div class="pad-layer-editor" data-testid="surface-pad-layers">
+                {#if !player}
                 <div class="layer-count">Layers
                   <Segmented options={LAYER_COUNTS} value={layers.count} label="Number of layers on this pad"
                              testid="surface-pad-layer-count"
                              onchange={(count) => setPadLayers(page?.pageId ?? '', selectedControl.index, count)} />
                 </div>
+                {/if}
                 {#if layers.count > 1}
                   <div class="layer-tabs" role="group" aria-label="Layer this pad plays">
                     {#each layerPips(selectedControl) as pip (pip.layer)}
@@ -746,6 +783,7 @@
                   </div>
                   <p class="dim layer-hint">Hold the small button above the pad to step through its layers.</p>
                 {/if}
+                {#if !player}
                 <label class="colour-row">Pad colour
                   <span>
                     <input type="color" aria-label="Pad colour on this layer" data-testid="surface-pad-colour"
@@ -760,12 +798,13 @@
                 {#if !selectedSlot}
                   <p class="dim layer-hint">Assign something to this layer to give it a colour of its own.</p>
                 {/if}
+                {/if}
               </div>
             {/if}
             <div class="assignment-summary">
               <strong>{selectedSlot?.assigned ? selectedSlot.displayName : 'No parameter assigned'}
                 <HostPickupIndicator direction={selectedSlot?.pickupDirection} /></strong>
-              <span>{selectedSlot?.partName || (selectedParameter
+              <span>{selectedSlot?.partName || (player ? 'Nothing on this control in this show' : selectedParameter
                 ? `Ready to assign ${selectedParameter.name || selectedParameter.id}`
                 : selectedMacro ? `Ready to assign macro ${selectedMacro.name || ''}`
                 : 'Select a parameter or macro, or drag one onto the control')}</span>
@@ -779,8 +818,10 @@
             </div>
 
             <div class="inspector-actions">
+              {#if !player}
               <button type="button" disabled={!selectedMacro && (!selectedParameter || !focusedPart)}
                       data-testid="surface-assign-selected" onclick={assignSelected}>Assign selected</button>
+              {/if}
               <button type="button" class="toggle" class:on={$hostMidiLearn.armed}
                       data-testid="surface-learn-selected" onclick={learnSelected}>
                 {$hostMidiLearn.armed ? 'Cancel learning' : 'Learn hardware'}
@@ -797,6 +838,7 @@
             {#if selectedSlot?.assigned}
               <!-- The mapping, drawn: the control's travel across, the parameter up. Its ends are
                    rangeMin and rangeMax, swapped when the control is inverted. -->
+              {#if !player}
               <SlotResponse slot={selectedSlot} onset={(fields) => updateSelectedOptions(fields)} />
               <div class="option-grid">
                 <!-- Stepped: a waveform selector with 4 shapes wants 4 positions, not 128. -->
@@ -821,6 +863,7 @@
                              testid="slot-press-mode" onchange={(toggle) => updateSelectedOptions({ toggle })} />
                 </div>
               {/if}
+              {/if}
               {#if selectedSlot.midiCc >= 0 && selectedSlot.midiNote < 0 && !pressable(selectedControl) && !selectedSlot.toggle}
                 <div class="option">MIDI mode
                   <!-- A relative encoder sends a turn, not a position, and controllers disagree on how:
@@ -843,10 +886,12 @@
                   <HostConfirmButton identity={JSON.stringify([page.pageId, selectedSlot.slotId])} title="Clear MIDI binding" aria-label="Clear MIDI binding" type="button" class="ghost"
                           onclick={() => clearControlSlotMidi(page.pageId, selectedSlot.slotId)}>Clear MIDI binding</HostConfirmButton>
                 {/if}
+                {#if !player}
                 <button type="button" class="ghost danger" class:confirming={clearArmed}
                         data-testid="surface-clear-selected" onclick={clearSelected}>
                   {clearArmed ? 'Confirm' : 'Clear assignment'}
                 </button>
+                {/if}
               </div>
             {/if}
           {/if}
@@ -854,7 +899,8 @@
           <div class="inspector-empty">
             <SlidersHorizontal size={26} />
             <strong>Select a control</strong>
-            <p>Choose a knob, fader, pad or button on the controller to assign a parameter and learn MIDI.</p>
+            <p>{player ? 'Choose a knob, fader, pad or button to see what it does in this show, and re-learn its MIDI.'
+              : 'Choose a knob, fader, pad or button on the controller to assign a parameter and learn MIDI.'}</p>
           </div>
         {/if}
       </aside>
@@ -888,7 +934,7 @@
   .surface-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 12px; border: 1px solid var(--host-line); border-radius: var(--host-radius-panel); background: var(--host-surface); }
   .dim { color: var(--host-text-dim); font-size: 12px; }
   .page-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
-  .page-picker > span, .eyebrow { color: #81acd0; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
+  .page-picker > span:not(.dim), .eyebrow { color: #81acd0; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
   .page-picker select { min-width: 150px; font-weight: 650; }
   .page-picker .page-rename { width: 170px; font-weight: 650; }
   .plugged-in { color: #8fd0a4; font-size: 11px; }
@@ -909,6 +955,7 @@
     grid-template-columns: minmax(180px, 230px) minmax(240px, 1fr) minmax(230px, 280px);
     gap: 12px;
   }
+  .surface-body.player { grid-template-columns: minmax(240px, 1fr) minmax(230px, 280px); }
   .param-column {
     display: flex;
     flex-direction: column;
@@ -1292,7 +1339,7 @@
     .page-picker { margin-left: 0; }
   }
   @container (max-width: 520px) {
-    .surface-body { grid-template-columns: minmax(0, 1fr); }
+    .surface-body, .surface-body.player { grid-template-columns: minmax(0, 1fr); }
     .param-column { height: 240px; }
     .controller-canvas { height: 300px; }
     .control-inspector { grid-column: 1; }
