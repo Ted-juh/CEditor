@@ -9362,7 +9362,19 @@ function send(payload) {
       });
       return;
     }
+    const stageBefore = mockStagePages(get(hostState));
     hostState.set(applyMockCommand(get(hostState), payload));
+    // A stage page switched on is shown at once, as the broker shows it on the keyboard: the
+    // switch is how the page is asked for.
+    if (String(payload?.cmd ?? '').endsWith('OnSurface')) {
+      const state = get(hostState);
+      const stage = mockStagePages(state);
+      const shown = stage.find((kind) => !stageBefore.includes(kind));
+      if (shown) {
+        const controlPages = state?.rack?.pages?.length ?? 0;
+        mockSurfaceCursor.update((c) => ({ ...c, page: controlPages + 1 + stage.indexOf(shown), active: 0 }));
+      }
+    }
     return;
   }
   sendInstrumentHostCommand(payload);

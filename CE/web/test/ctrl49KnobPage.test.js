@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload, browseSlotViews, browseStatePayload,
-  metersPayload, livePayload,
+  metersPayload, livePayload, layersPayload,
 } from '../src/CE_Application/screen/ctrl49Payloads.js';
 
 const source = fs.readFileSync(new URL('../../../tools/ctrl49/Hostage_MultiKnob.lua', import.meta.url), 'utf8');
@@ -157,6 +157,41 @@ test('drawing never asks the keyboard to redraw, and a ring that jumps is drawn 
   p.call('set_live', livePayload({ part: 'Pluck', steps: [], arpOn: false, zones: [] }));
   for (let i = 0; i < 3; i++) p.draw();
   assert.equal(p.asked(), 0, 'lua_widget_make_dirty was never called');
+  p.close();
+});
+
+// The owner at the keyboard (2026-10-08): the band in the part's row is too far from the keys to
+// see at a glance which keys E2 / E3 are selecting. So the picked part's range is drawn again
+// right on top of the keys, and the white keys outside it are greyed.
+test('LAYERS draws the picked part\'s range on top of the keys, and greys the keys outside it', async () => {
+  const p = await page();
+  const ORANGE = 0xFFFF9408, TEAL = 0xFF2DD4BF, KEY = 0xFFC9CEE0, GREYED = 0xFF3D4250;
+  const parts = [{ name: 'Pad', keyLow: 36, keyHigh: 51, velocityLow: 1, velocityHigh: 127, transpose: 0 },
+                 { name: 'Lead', keyLow: 60, keyHigh: 84, velocityLow: 1, velocityHigh: 127, transpose: 0 }];
+  const drawn = (focused) => {
+    p.call('set_layers', layersPayload({ parts, focused, held: [] }));
+    const rects = p.draw().filter((c) => c.kind === 'rect');
+    return { band: rects.filter((c) => c.y === 191 && c.h === 4), whites: rects.filter((c) => c.y === 196 && c.h === 48) };
+  };
+
+  let { band, whites } = drawn(0);
+  assert.deepEqual(band.map((c) => [c.x, c.w, c.c]), [[8, 149, ORANGE]],
+    'one band, in the part\'s colour, from C2 at the left edge to Eb3, touching the keys');
+  assert.equal(whites.length, 29, 'the 29 white keys of 49');
+  assert.deepEqual(whites.map((c) => c.c), [...Array(9).fill(KEY), ...Array(20).fill(GREYED)],
+    'the nine white keys from C2 to D3 as they were, the twenty above the range greyed');
+
+  ({ band, whites } = drawn(1));          // E1 picks the other part: the band and the greying follow
+  assert.deepEqual(band.map((c) => c.c), [TEAL]);
+  assert.equal(band[0].x + band[0].w, 8 + 29 * 16 - 1, 'its band runs to the right edge of the top C');
+  assert.deepEqual(whites.map((c) => c.c), [...Array(14).fill(GREYED), ...Array(15).fill(KEY)],
+    'C2 to B3 greyed, C4 to C6 as they were');
+
+  // A part below the keys altogether: a stub at the left end, and every key greyed.
+  p.call('set_layers', layersPayload({ parts: [{ ...parts[0], keyLow: 0, keyHigh: 35 }], focused: 0, held: [] }));
+  const off = p.draw().filter((c) => c.kind === 'rect');
+  assert.deepEqual(off.filter((c) => c.y === 191 && c.h === 4).map((c) => [c.x, c.w]), [[8, 2]]);
+  assert.ok(off.filter((c) => c.y === 196 && c.h === 48).every((c) => c.c === GREYED), 'none of these keys plays it');
   p.close();
 });
 

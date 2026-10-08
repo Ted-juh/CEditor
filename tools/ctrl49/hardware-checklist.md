@@ -46,11 +46,17 @@ is at the bottom.
 **Cue.** Have a setlist of a few songs, one with sections and notes.
 
 - [x] Turn on **Cue**. Page Right from the performance page arrives at CUE first.
-      (Turning it on does not take the keyboard there; the owner remarked on it.)
+      (2026-10-07: turning it on did not take the keyboard there, and the owner remarked on it.
+      Since then a page that is switched on is shown at once.)
+- [ ] **New, 2026-10-08.** Switch any page off and on again in the card: the keyboard goes
+      straight to it, and so does the card, with no Page press.
 - [x] Before the set starts it says NO SONG ON STAGE YET. E1 picks song 1 (GO TO at the bottom,
       pad 1 lit); pad 1 goes to it, in the app too.
       (2026-10-07: yes, nothing cut off. Pad 1 also took the keyboard off CUE, to the control
       page the song recalls: six presses of Page Right to come back.)
+- [ ] **New, 2026-10-08.** With a song that has a control page of its own: pad 1 on CUE goes to
+      the song and CUE stays on the screen. Then Page Left to the performance page and Shift +
+      Page Right to the next such song: now the keyboard does go to that song's control page.
 - [ ] On a song: SONG N OF M, its name and tempo; its notes when it has no sections, with its
       clock against the time planned (red when over); the set's clock in the title.
       (2026-10-07: SONG 1 OF 3, the name, both note lines, the clock counting, OF 4:30 PLANNED
@@ -74,6 +80,10 @@ is at the bottom.
       top key raised the band grew across the keys. **The owner:** the band is too far from
       the keys to see at a glance which keys are in it; put it right above the keys or colour
       the keys.)
+- [ ] **New, 2026-10-08.** The picked part's range is drawn again as a band in its colour right
+      on top of the keys, and the white keys outside it are grey. Turn E2 / E3: the band and
+      the grey follow, a key a click. With two parts, E1 moves both to the other part's range.
+      **Write down** whether the range now reads at a glance.
 - [x] Hold a few notes: each lights its key in the colour of a part that plays it, and puts a
       white notch in the band of every part that plays it. Let go and they go.
       (2026-10-08: one note, yes to all of it, on the keyboard and in the app's card. No sound

@@ -125,7 +125,10 @@ try {
   });
   const pageLabel = () => host.getByTestId('ctrl49-page').innerText();
   assert.equal(await host.getByTestId('ctrl49-layers-toggle').getAttribute('aria-pressed'), 'false', 'Layers starts off');
+  const performanceLit = await canvasLit();
+  // Switching a page on shows it: the switch is how it is asked for (the owner, 2026-10-08).
   await host.getByTestId('ctrl49-layers-toggle').click();
+  await host.waitForFunction(() => /2\s*\/\s*2\s*Layers/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   // The stand-in is the Free edition, which has no setlists to check, so SOUNDCHECK is offered
   // and refused in one place: the switch says why it is off. The licence a paid edition would
   // carry is then put into the store, as the native side reports one it has verified.
@@ -138,11 +141,15 @@ try {
       features: s.licence.features.map((f) => ({ ...f, allowed: true })) } }));
   });
   await soundcheckToggle.click();
-  await host.waitForFunction(() => /1\s*\/\s*3/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
-  const performanceLit = await canvasLit();
-  await host.getByTestId('ctrl49-page-right').click();
+  await host.waitForFunction(() => /3\s*\/\s*3\s*Soundcheck/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
+  assert.equal(await card.locator('.encoder').nth(7).locator('.label').innerText(), 'Check again');
+  assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_check');
+  assert.ok(await canvasLit() > 2000, 'and draws something');
+  if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-soundcheck.png` });
+
+  await host.getByTestId('ctrl49-page-left').click();
   await host.waitForFunction(() => /Layers/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
-  assert.match(await pageLabel(), /2\s*\/\s*3\s*Layers/, 'Page Right walks on to LAYERS once it is on');
+  assert.match(await pageLabel(), /2\s*\/\s*3\s*Layers/, 'Page Left walks back to LAYERS, between the performance page and SOUNDCHECK');
   assert.match(await host.getByTestId('ctrl49-hint').innerText(), /Encoder 1 picks the part/);
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_layers');
   await host.waitForFunction((before) => {
@@ -158,11 +165,7 @@ try {
 
   await host.getByTestId('ctrl49-page-right').click();
   await host.waitForFunction(() => /Soundcheck/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
-  assert.match(await pageLabel(), /3\s*\/\s*3\s*Soundcheck/, 'and on to SOUNDCHECK');
-  assert.equal(await card.locator('.encoder').nth(7).locator('.label').innerText(), 'Check again');
-  assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_check');
-  assert.ok(await canvasLit() > 2000, 'and draws something');
-  if (process.env.CTRL49_SCREENSHOT) await card.screenshot({ path: `${process.env.CTRL49_SCREENSHOT}ctrl49-host-soundcheck.png` });
+  assert.match(await pageLabel(), /3\s*\/\s*3\s*Soundcheck/, 'and Page Right on to SOUNDCHECK again');
 
   await host.getByTestId('ctrl49-soundcheck-toggle').click();
   await host.getByTestId('ctrl49-layers-toggle').click();
@@ -171,7 +174,6 @@ try {
   // DISCOVER: the demo library has a taste in it, so the page lists what it would suggest, and
   // its pads are live (each auditions its row) where the other two pages' are not.
   await host.getByTestId('ctrl49-discover-toggle').click();
-  await host.getByTestId('ctrl49-page-right').click();
   await host.waitForFunction(() => /2\s*\/\s*2\s*Discover/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_discover');
   assert.equal(await encoderOne.locator('.label').innerText(), 'Pick');
@@ -190,7 +192,6 @@ try {
 
   // CUE: the setlist read mid-show (the licence above allows setlists). Encoder 1 is the pick.
   await host.getByTestId('ctrl49-cue-toggle').click();
-  await host.getByTestId('ctrl49-page-right').click();
   await host.waitForFunction(() => /2\s*\/\s*2\s*Cue/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_cue');
   assert.equal(await encoderOne.locator('.label').innerText(), 'Pick a song');
@@ -201,7 +202,6 @@ try {
 
   // CHANGES: the preview has no plug-in to read changes through, and the page says so.
   await host.getByTestId('ctrl49-changes-toggle').click();
-  await host.getByTestId('ctrl49-page-right').click();
   await host.waitForFunction(() => /2\s*\/\s*2\s*Changes/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_changes');
   assert.ok(await canvasLit() > 1000, 'and draws why there is nothing to compare');
@@ -210,7 +210,6 @@ try {
 
   // LIVE: the mock rack's focused part, its lane plain until drawn; encoder 2 draws one.
   await host.getByTestId('ctrl49-live-toggle').click();
-  await host.getByTestId('ctrl49-page-right').click();
   await host.waitForFunction(() => /2\s*\/\s*2\s*Live/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_live');
   assert.ok(await canvasLit() > 1000, 'and draws the lane and the keys');
@@ -220,7 +219,6 @@ try {
 
   // METERS: the demo plays no audio, so the strips are silent; encoder 1 moves the first fader.
   await host.getByTestId('ctrl49-meters-toggle').click();
-  await host.getByTestId('ctrl49-page-right').click();
   await host.waitForFunction(() => /2\s*\/\s*2\s*Meters/.test(document.querySelector('[data-testid=ctrl49-page]').innerText));
   assert.equal(await host.getByTestId('ctrl49-screen-failure').count(), 0, 'the page draws set_meters');
   assert.ok(await canvasLit() > 1000, 'and draws the strips');

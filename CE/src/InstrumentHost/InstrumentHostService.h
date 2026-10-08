@@ -581,7 +581,20 @@ public:
     void noteSurfacePage (const juce::String& pageId) { currentSurfacePageId = pageId; }
     juce::String consumeSurfacePageRequest()
     {
+        requestedSurfacePageForSong = false;
         return std::exchange (requestedSurfacePageId, {});
+    }
+    /** Whether the page waiting in consumeSurfacePageRequest was asked for by a song gone to in
+        the setlist (its own page, or its scene's). Read before consuming. The broker leaves the
+        CUE page up over such a request: whoever is on CUE is reading the set. */
+    bool surfacePageRequestIsForSong() const { return requestedSurfacePageForSong; }
+
+    /** A stage page that was just switched on ("cueOnSurface" and the rest) asks to be shown,
+        once: "cue", "live", "layers", "meters", "soundcheck", "discover" or "changes". Whoever
+        switches a page on wants to see it. Empty when nothing is waiting. */
+    juce::String consumeSurfaceStagePageRequest()
+    {
+        return std::exchange (requestedSurfaceStagePage, {});
     }
 
     /** Hardware-surface input from the screen in the app ("surfaceInput"): three-byte CC
@@ -1722,6 +1735,8 @@ private:
     std::map<int, juce::String> pendingScenes;
     juce::String currentSurfacePageId;
     juce::String requestedSurfacePageId;
+    bool requestedSurfacePageForSong = false;
+    juce::String requestedSurfaceStagePage;
     std::vector<std::vector<std::uint8_t>> virtualSurfaceInput;
     // Each part's loaded preset as last seen, so a change can show that preset's page.
     std::map<juce::String, juce::String> seenPartPresets;

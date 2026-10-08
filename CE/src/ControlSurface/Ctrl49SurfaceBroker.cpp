@@ -463,7 +463,12 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
 
     // Scene/setlist page recall is intentionally consumed once. It moves the hardware to
     // the requested layout, then gets out of the way so the player's next Page press wins.
-    if (const auto requested = service.consumeSurfacePageRequest(); requested.isNotEmpty())
+    // A song gone to while CUE is up leaves CUE up: whoever is there is reading the set, and the
+    // song's page put the keyboard six presses of Page Right away from it at every song (the
+    // owner, 2026-10-08). The request is consumed all the same, so it does not fire later.
+    const auto forSong = service.surfacePageRequestIsForSong();
+    if (const auto requested = service.consumeSurfacePageRequest();
+        requested.isNotEmpty() && ! (forSong && reducer.page() == layout.cue))
         for (int i = 0; i < controlPages; ++i)
             if (performance.pages.getReference (i).pageId == requested)
             {
@@ -476,6 +481,25 @@ void Ctrl49SurfaceBroker::pumpInput (bool fromHardware)
                 }
                 break;
             }
+
+    // A stage page switched on in the app is shown at once: the switch is how it is asked for.
+    if (const auto shown = service.consumeSurfaceStagePageRequest(); shown.isNotEmpty())
+    {
+        const auto target = shown == "cue" ? layout.cue : shown == "live" ? layout.live
+                          : shown == "layers" ? layout.layers : shown == "meters" ? layout.meters
+                          : shown == "soundcheck" ? layout.soundcheck : shown == "discover" ? layout.discover
+                          : shown == "changes" ? layout.changes : -1;
+        if (target >= 0 && reducer.setPage (target))
+        {
+            lastLabels.clear();
+            lastState.clear();
+            lastStage.clear();
+            switchDownAt.fill (-1.0);
+            discoverStale = true;
+            changesStale = true;
+            emitStatus();
+        }
+    }
 
     service.noteSurfacePage (reducer.page() < controlPages
         ? performance.pages.getReference (reducer.page()).pageId : juce::String());

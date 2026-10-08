@@ -5488,6 +5488,11 @@ void testCtrl49Cue()
                          .getProperty ("items", {});
     h.cmd ("setSetlistItem", { { "itemId", items[1].getProperty ("itemId", {}) }, { "tempo", 124.0 },
                                { "plannedSeconds", 300 }, { "notes", "Capo 2.\n\nWatch the drummer" } });
+    // The second song has a control page of its own, as the owner's songs do.
+    h.cmd ("addControlPage", { { "name", "Night Bus knobs" } });
+    const auto songPageId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {})[0]
+                              .getProperty ("pageId", {}).toString();
+    h.cmd ("setSetlistItem", { { "itemId", items[1].getProperty ("itemId", {}) }, { "pageId", songPageId } });
 
     double fakeNow = 0.0;
     Ctrl49SurfaceBroker::Options options;
@@ -5526,11 +5531,14 @@ void testCtrl49Cue()
     h.cmd ("cueOnSurface", { { "on", true } });
     check (broker.pages().cue == broker.pages().performance + 1 && broker.pages().layers == broker.pages().cue + 1,
            "asked for, CUE comes straight after the performance page, before LAYERS");
-    for (int i = 0; i < broker.pages().count && broker.currentPage() != broker.pages().cue; ++i)
-    {
-        press (40, 127);
-        tickPast();
-    }
+    tickPast();
+    check (broker.currentPage() == broker.pages().cue,
+           "and the page switched on last is on the keyboard at once, with no Page Right");
+    press (39, 127);                                // Page Left, then back
+    tickPast();
+    check (broker.currentPage() == broker.pages().performance, "Page Left leaves it as it leaves any page");
+    press (40, 127);
+    tickPast();
     const auto* screen = h.emits.last ("instrumentHostSurfaceScreen");
     check (screen != nullptr && screen->getProperty ("pageKind", {}).toString() == "cue"
              && screen->getProperty ("call", {}).toString() == "set_cue",
@@ -5549,6 +5557,11 @@ void testCtrl49Cue()
     auto bytes = payload();
     check (currentIndex() == 1 && at (bytes, 1) == 2 && at (bytes, 2) == 0,
            "pad 1 goes to the picked song, and the pick is spent");
+    tickPast();                                     // the tick that takes the song's page request
+    check (broker.currentPage() == broker.pages().cue,
+           "CUE stays up over the song's own control page: whoever is here is reading the set");
+    check (h.service->consumeSurfacePageRequest().isEmpty(),
+           "and the song's page is not left waiting to fire from the next page");
     check (at (bytes, 8) + 256 * at (bytes, 9) == 300 && at (bytes, 10) + 256 * at (bytes, 11) == 1240,
            "the page has its planned five minutes and its 124 BPM");
     check (at (bytes, 13) == 0 && at (bytes, 14) == 255, "no sections playing, and the next song has no rig to preload");
@@ -5578,6 +5591,16 @@ void testCtrl49Cue()
            "with its sections playing, the page shows the section, bar 1 of 4, and the next one");
     check (at (payload(), 12) == 1 && at (payload(), 13) == 4, "and sends them");
     h.cmd ("stopArrangement");
+
+    // From any other page a song still recalls its control page, as it did before CUE.
+    press (39, 127);
+    tickPast();
+    h.cmd ("setlistGo", { { "index", 0 } });
+    tickPast();
+    check (broker.currentPage() == broker.pages().performance, "a song with no page of its own moves nothing");
+    h.cmd ("setlistGo", { { "index", 1 } });
+    tickPast();
+    check (broker.currentPage() == 0, "off CUE, going to the song shows its control page");
 
     // Without the setlist feature there is no set to cue.
     const auto freeDir = freshDataDir ("surface-cue-free");
@@ -6200,14 +6223,17 @@ void testCtrl49Broker()
         };
 
         check (broker.state() == Ctrl49SurfaceBroker::State::connected, "the keyboard is there");
-        const auto beforeLayers = frameCount();
-        h.cmd ("layersOnSurface", { { "on", true } });
-        broker.tick();
-        for (int i = 0; i < broker.pages().count && broker.currentPage() != broker.pages().layers; ++i)
+        // From the performance page, whose pads are lit, so that going dark is a change to see.
+        for (int i = 0; i < broker.pages().count && broker.currentPage() != broker.pages().performance; ++i)
         {
             fake.feed (0xB0, 40, 127);         // Page Right
             broker.tick();
         }
+        const auto beforeLayers = frameCount();
+        h.cmd ("layersOnSurface", { { "on", true } });
+        broker.tick();
+        check (broker.currentPage() == broker.pages().layers,
+               "switched on in the app, LAYERS is on the keyboard at once, with no Page press");
         fakeNow += 150.0;
         broker.tick();
         const auto layers = shown ("payload");
@@ -6237,14 +6263,10 @@ void testCtrl49Broker()
         // DISCOVER over a library with no taste in it yet: nothing listed, so nothing for a pad to
         // audition, and the pads say so by staying dark.
         h.cmd ("layersOnSurface", { { "on", false } });
+        const auto beforeDiscover = frameCount();
         h.cmd ("discoverOnSurface", { { "on", true } });
         broker.tick();
-        const auto beforeDiscover = frameCount();
-        for (int i = 0; i < broker.pages().count && broker.currentPage() != broker.pages().discover; ++i)
-        {
-            fake.feed (0xB0, 40, 127);
-            broker.tick();
-        }
+        check (broker.currentPage() == broker.pages().discover, "DISCOVER too is shown as it is switched on");
         fakeNow += 150.0;
         broker.tick();
         const auto discover = shown ("payload");

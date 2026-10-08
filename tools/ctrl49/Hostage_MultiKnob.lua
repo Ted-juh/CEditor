@@ -575,6 +575,21 @@ local function draw_layers()
         if tx > KX + 29 * KW - 54 - room then tx = KX + 29 * KW - 54 - room end
         say(SMALL, text, c, tx, y, room, 14)
     end
+    -- The range E2 / E3 are turning, again, where the eye is: the picked part's band right on top
+    -- of the keys, and the white keys outside it greyed. The band in the part's row can be the
+    -- whole screen away from the keys, too far to see at a glance which keys are in it, and the
+    -- note names in the title have to be read (the owner at the keyboard, 2026-10-08).
+    local in_lo, in_hi = 0, 127
+    if focus ~= nil then
+        in_lo, in_hi = focus.lo, focus.hi
+        if in_lo <= in_hi then
+            local x0 = key_x(in_lo)
+            local x1, w1 = key_x(in_hi)
+            local band = PART_COLOURS[layers.focused % 8 + 1]
+            if not playable(focus) then band = DARK end
+            draw_rect(x0, KY - 5, x1 + w1 - x0, 4, band)
+        end
+    end
     -- the keys, lit in the colour of the first part that answers each (grey when none does)
     for pass = 1, 2 do
         for k = 0, 48 do
@@ -584,6 +599,7 @@ local function draw_layers()
                 local x, w = key_x(n)
                 local v = sounding[n]
                 local c = 0xFFC9CEE0
+                if (n < in_lo or n > in_hi) then c = 0xFF3D4250 end
                 if black then c = 0xFF161A2B end
                 if v ~= nil then
                     c = DIM

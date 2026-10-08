@@ -798,6 +798,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         currentSurfacePageId = pageId;
         requestedSurfacePageId = pageId;
+        requestedSurfacePageForSong = false;
         return;
     }
     if (cmd == "setSurfaceActive")
@@ -6307,7 +6308,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         || cmd == "liveOnSurface")
     {
         // Off until asked for, like the browser page: a keyboard that grows a page under somebody's
-        // hands is one that stopped doing what they had it doing.
+        // hands is one that stopped doing what they had it doing. Asking for one is asking to see
+        // it, so switching a page on also sends the surface there, once (the owner, 2026-10-08:
+        // a page that was switched on and did not appear looked like a switch that did nothing).
         const bool soundcheck = cmd == "soundcheckOnSurface";
         auto& flag = soundcheck ? surfaceSoundcheckPage
                    : cmd == "layersOnSurface" ? surfaceLayersPage
@@ -6321,6 +6324,11 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         if ((soundcheck || cmd == "cueOnSurface") && wanted
             && ! requireFeature (licensing::Feature::scenesAndSetlists))
             return;
+        const auto kind = cmd.upToFirstOccurrenceOf ("OnSurface", false, false);
+        if (wanted && ! flag)
+            requestedSurfaceStagePage = kind;
+        else if (! wanted && requestedSurfaceStagePage == kind)
+            requestedSurfaceStagePage.clear();
         flag = wanted;
         if (soundcheck && wanted)
             checkSetlistSoundcheck();   // the page opens on fresh results
@@ -8314,6 +8322,7 @@ void InstrumentHostService::applyPerformance (Performance&& performance)
     failovers.clear();
     currentSurfacePageId.clear();
     requestedSurfacePageId.clear();
+    requestedSurfacePageForSong = false;
 
     pendingScenes.clear();
     sceneMorph = {};
@@ -14014,6 +14023,7 @@ void InstrumentHostService::tickPendingSetlistRecall()
         currentSurfacePageId = recall.pageId;
         requestedSurfacePageId = recall.pageId;
     }
+    requestedSurfacePageForSong = requestedSurfacePageId.isNotEmpty();   // its scene's page too
     if (timedOut && ! rackProcessorsReady())
         emitError ("The song opened after the preload timeout; unavailable plug-ins remain visible for repair.");
     emitState();
@@ -16062,6 +16072,7 @@ void InstrumentHostService::applySceneState (const perf::Scene& scene)
     {
         currentSurfacePageId = scene.pageId;
         requestedSurfacePageId = scene.pageId;
+        requestedSurfacePageForSong = false;   // a song that launched this scene says so itself
     }
 
     if (scene.tempo > 0.0)
@@ -16603,6 +16614,10 @@ bool InstrumentHostService::goToSetlistItem (int index)
             requestedSurfacePageId = item.pageId;
         }
     }
+
+    // Whatever page is now waiting for the surface, the song's own or its scene's, a song asked
+    // for it: the CUE page stays up over that (surfacePageRequestIsForSong).
+    requestedSurfacePageForSong = requestedSurfacePageId.isNotEmpty();
 
     // The stage's timers: this song starts now, and so does the set when this is its first
     // song, either because nothing was on or because going to song 1 is starting the set
@@ -17887,6 +17902,7 @@ void InstrumentHostService::followPresetPages()
     {
         currentSurfacePageId = showPage;
         requestedSurfacePageId = showPage;
+        requestedSurfacePageForSong = false;
     }
 }
 

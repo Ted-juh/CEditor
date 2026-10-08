@@ -20,7 +20,7 @@ The first session on the owner's Windows machine, with the keyboard. What it fou
 | Script size (§3) | 64 and 128 KB ran; at 256 KB the keyboard went silent. Not narrowed further |
 | HoSTage's page, first run | Froze the keyboard on the logo: `lua_widget_make_dirty` called from `draw()`. The easing that used it is gone |
 | Knob pages, Page Left / Right | Right, and the app's card follows |
-| CUE | Right as far as a setlist without sections goes. Pad 1 goes to the song and so leaves CUE |
+| CUE | Right as far as a setlist without sections goes. Pad 1 went to the song and so left CUE; changed since (below) |
 | LAYERS | Draws; E3 moves the top key a key a click; a held key lights with its mark, and the keyboard does not freeze (2026-10-08) |
 | Sound | None: the part plays nothing although HoSTage receives the notes (2026-10-08, below) |
 
@@ -52,14 +52,16 @@ Nothing in the repo does either; the session of 2026-10-08 used two throwaway C#
 
 **Open, for the owner to decide or for the next session:**
 
-- Going to a song from CUE recalls the song's control page and so leaves CUE. Suggested: stay on
-  CUE when the song was chosen there. Not yet answered.
-- Turning a page on in the app's card does not take the keyboard to it. The owner remarked on it.
-- **LAYERS: show a part's range at the keys (the owner, 2026-10-08).** The band is in the part's
-  row at the top and the keys are drawn at the bottom, too far apart to see at a glance which
-  keys you are selecting while you turn E2 / E3. Wanted: the band right above the key drawing,
-  or the keys themselves coloured over the part's range. Seeing it beats reading the note names
-  in the title.
+- **Decided by the owner and built, 2026-10-08; not on the keyboard yet.** Check each on the next
+  session:
+  - CUE stays up when the song changes while it is showing. From any other page a song still
+    recalls its control page (`surfacePageRequestIsForSong`, read by the broker's `pumpInput`).
+  - Switching a stage page on in the card shows it at once, on the keyboard and in the card
+    (`consumeSurfaceStagePageRequest`). The switches are not saved, so nothing is "restored" on
+    start: every page is off until clicked.
+  - LAYERS draws the picked part's range again as a band right on top of the keys, and greys the
+    white keys outside it. The owner had found the band in the part's row too far from the keys
+    to see at a glance which keys E2 / E3 were selecting.
 - The app does not notice a keyboard that has stopped answering; the card went on saying
   "Showing on the keyboard too" over a frozen keyboard. It could count unanswered keepalives.
 - The note hook still calls `lua_widget_make_dirty` (from `note()`, not from a draw). A key held

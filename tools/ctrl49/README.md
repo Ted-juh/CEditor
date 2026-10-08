@@ -66,16 +66,18 @@ none is on the keyboard until it is asked for — the **Cue**, **Live**, **Layer
 **Soundcheck**, **Discover** and **Changes** switches on the app's CTRL49 screen card
 (`cueOnSurface`, `liveOnSurface`, `layersOnSurface`, `metersOnSurface`, `soundcheckOnSurface`,
 `discoverOnSurface`, `changesOnSurface`) — and then they follow the performance page in that
-order. Each is one call with one payload (`set_cue`, `set_live`, `set_layers`, `set_meters`,
+order. Switching one on also shows it, on the keyboard and in the card, once: the switch is how
+the page is asked for, and one that was switched on and did not appear looked like a switch that
+did nothing (`consumeSurfaceStagePageRequest`). Each is one call with one payload (`set_cue`, `set_live`, `set_layers`, `set_meters`,
 `set_check`, `set_discover`, `set_changes`; `CE/src/ControlSurface/Ctrl49StagePages.h` has the
 byte layouts) where a knob page takes two. CUE is the mockups' Stage page, renamed because "stage
 pages" already names this group.
 
 | Page | Shows | Encoders and pads |
 | --- | --- | --- |
-| CUE | the song on stage, N of M, and its tempo; the section playing with its bar and the bars left (or the song's notes when it has no sections); the song's clock against the time planned, and the set's; what comes next and how much of its rig has preloaded | E1 picks a song, pad 1 goes to it; Shift + Page still steps the set from any page |
+| CUE | the song on stage, N of M, and its tempo; the section playing with its bar and the bars left (or the song's notes when it has no sections); the song's clock against the time planned, and the set's; what comes next and how much of its rig has preloaded | E1 picks a song, pad 1 goes to it; Shift + Page still steps the set from any page. CUE stays up when the song changes: a song's own control page is recalled from every other page, not from here |
 | LIVE | the rack's focused part's arpeggiator: its sixteen steps (velocity as a bar, ratchets as dots, octave and chance where they are not the plain ones) with the step that last sounded outlined; every part's zone over 49 keys; the keys held, in the colour of the part that plays them, and the notes the arp plays from them marked | E1 picks a step, E2-E5 turn its velocity (four a detent; 0 is a rest), octave, ratchets and chance (five a detent), E6 the gate, E7 the rate, E8 the mode, with off before UP; pad N turns step N of the half the cursor is in on or off |
-| LAYERS | every part's key zone over 49 keys, its velocity range and transpose, muted parts and parts fed by another part; layer groups (`L1 V`: group 1 by velocity) with each member's share and crossfades drawn as LayerRouter weighs them; the notes held now, on the zones that would sound them | E1 picks the part, E2-E6 turn its lowest key, highest key, transpose, lowest and highest velocity |
+| LAYERS | every part's key zone over 49 keys, its velocity range and transpose, muted parts and parts fed by another part; layer groups (`L1 V`: group 1 by velocity) with each member's share and crossfades drawn as LayerRouter weighs them; the notes held now, on the zones that would sound them; the picked part's range once more as a band right on top of the keys, with the white keys outside it greyed, so the keys E2 / E3 are selecting are seen and not read | E1 picks the part, E2-E6 turn its lowest key, highest key, transpose, lowest and highest velocity |
 | METERS | five parts and the master on strips: each part's level after its inserts and fader, left and right (the rack's own meters, the loudest peak since the last redraw), peak hold, a clip lamp, the fader on the meter's scale and in decibels, muted parts; the master's last five seconds | E1-E5 the faders of the parts shown, E6 the master, half a decibel a detent; E7 shows the next parts when there are more than five |
 | SOUNDCHECK | the set: each song ready, with problems, or not checked, its measured level and how long it took to load when last recalled (slow ones marked); the selected song's problems in the check's own words, and whether it loaded preloaded | E1 walks the set, E8 checks it again (once a second at most) |
 | DISCOVER | what you own and have never opened, nearest first to what you load (`unplayedLikeHabits`), eight at a time; a map of brightness against attack with YOU (the load-weighted centre) and the sounds you load most; the selected sound's likeness and which of your regulars it is nearest | E1 picks, E2 reaches eight further, E3 keeps the list to one kind, E4 keeps the sound as a favourite (clockwise) or lets it go; pad N auditions row N |
@@ -615,7 +617,10 @@ run of HoSTage's own 42 KB page, and the script-size test.
   SOUNDCHECK, DISCOVER, CHANGES, LIVE, METERS, the browser.
 - **Going to a song from CUE leaves CUE.** A setlist song recalls its control page, so pad 1 on
   CUE put the keyboard on that page, six presses of Page Right away from CUE. Working as the
-  page recall was written; whether CUE should stay up is the owner's call.
+  page recall was written. The owner's call the next day: CUE stays up when the song changes,
+  and from any other page a song recalls its page as before. Built, with the two other things
+  asked for at the keyboard: a page switched on is shown at once, and LAYERS draws the picked
+  part's range on top of the keys. None of the three has been on the keyboard yet.
 
 **Measured on the CTRL49, 2026-10-05** (the screen lab's Stress page, one kind of call at a time,
 at 9 redraws a second, until the bar under the header stopped gliding):
