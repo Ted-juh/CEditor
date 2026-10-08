@@ -45,6 +45,7 @@ struct Request
     juce::Array<juce::File> shows;          // the first is the one it opens on its first start
     bool standalone = true;
     bool vst3 = true;
+    bool portable = false;                  // the standalone keeps its data beside it (step 6)
     juce::File destination;                 // the folder the player's folder is made in
 };
 
@@ -80,6 +81,8 @@ inline juce::String manifestJson (const Request& request)
     root->setProperty ("product", juce::var (product));
     if (! request.shows.isEmpty())
         root->setProperty ("show", request.shows.getFirst().getFileName());
+    if (request.portable)
+        root->setProperty ("portable", true);
     return juce::JSON::toString (juce::var (root));
 }
 
@@ -96,6 +99,13 @@ inline juce::String readMe (const Request& request, const juce::String& programN
         lines.add ("");
         lines.add ("On its own: the Standalone folder can go anywhere, a USB stick included. Start");
         lines.add (programName + " in it. Keep the files beside it together.");
+        if (request.portable)
+        {
+            lines.add ("It keeps its rig, shows and settings in a Data folder beside it, so they go");
+            lines.add ("wherever the folder goes. On a computer it has not been on, scan for plug-ins");
+            lines.add ("once in its Library utility. Where it cannot write beside itself, it keeps them");
+            lines.add ("on that computer instead.");
+        }
     }
     if (vst3)
     {

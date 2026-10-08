@@ -242,12 +242,19 @@ inline HostageManifest configureForThisProgram (InstrumentHostService::Options& 
     options.playerTemplate = findPlayerTemplate (manifest, asPlugin);
     options.builtInShowsDirectory = findBuiltInShows();
     options.firstShowFileName = manifest.showFileName;
-    options.dataDirectory = productDataDirectory (hostDataRoot(), manifest);
+    // A portable standalone keeps its data beside itself; anything else, and a portable one that
+    // cannot write there, in the per-user folder. The keyboard claim stays per computer either
+    // way: it is about the CTRL49 on this desk, not about the stick.
+    const auto programDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+                                .getParentDirectory();
+    options.dataDirectory = asPlugin ? productDataDirectory (hostDataRoot(), manifest)
+                                     : dataDirectoryFor (manifest, programDir, hostDataRoot());
     options.hardwareClaimDirectory = hostDataRoot();
     // Only a product that may have used the shared folder is offered what is in it: every
     // product built before each had a folder of its own was an editor. A player was made after,
-    // and the shared rig was never its own.
-    if (manifest.hasProduct() && ! manifest.player)
+    // and the shared rig was never its own; nor was a portable program's.
+    if (manifest.hasProduct() && ! manifest.player
+        && options.dataDirectory == productDataDirectory (hostDataRoot(), manifest))
         options.legacyDataDirectory = hostDataRoot();
     options.player = manifest.player;
     labelProductDataDirectory (options.dataDirectory, manifest);

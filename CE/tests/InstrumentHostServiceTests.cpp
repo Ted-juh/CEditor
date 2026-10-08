@@ -5772,6 +5772,52 @@ void testCreatePlayerCommand()
     check (inPlayer.emits.lastError().contains ("cannot build"), "and a player does not make players");
 }
 
+// A portable player (step 6) keeps its data beside it, on the stick, when it can write there.
+void testPortableData()
+{
+    std::cout << "\na portable player keeps its data beside it" << std::endl;
+    using namespace ceditor::host;
+
+    const auto root = freshDataDir ("portable-root");
+    const auto stick = freshDataDir ("portable-stick").getChildFile ("Standalone");
+    stick.createDirectory();
+    const auto portable = parseHostageManifest (juce::JSON::parse (
+        R"({"role":"player","product":{"name":"Stick Rig","appId":"8f3a6c2e-1b4d-4e5f-9a7b-0c1d2e3f4a5b"},"portable":true})"));
+    check (portable.portable && portable.player, "hostage.json says it is portable");
+
+    check (dataDirectoryFor (portable, stick, root) == stick.getChildFile ("Data")
+             && ! stick.getChildFile ("Data").getChildFile (".write-test").exists(),
+           "its data goes in a Data folder beside the program, and the write test leaves nothing behind");
+    auto settled = portable;
+    settled.portable = false;
+    check (dataDirectoryFor (settled, stick, root) == productDataDirectory (root, settled),
+           "a player that is not portable keeps its data on the computer, as before");
+
+    // Somewhere it cannot write: here, a "folder" that is really a file.
+    const auto blocked = freshDataDir ("portable-blocked").getChildFile ("not-a-folder");
+    blocked.replaceWithText ("x");
+    check (dataDirectoryFor (portable, blocked, root) == productDataDirectory (root, portable),
+           "where it cannot write beside itself, it still starts, with its data on this computer");
+
+    namespace player = ceditor::host::player;
+    player::Template from;
+    fakePlayerTemplate ("portable-template", from);
+    const auto show = freshDataDir ("portable-show").getChildFile ("Gig.hostageshow");
+    show.replaceWithText ("{}");
+    player::Request request;
+    request.name = "Stick Rig";
+    request.appId = juce::Uuid().toDashedString().toUpperCase();
+    request.shows = { show };
+    request.portable = true;
+    request.destination = freshDataDir ("portable-destination");
+    const auto plan = player::plan (from, request);
+    check (player::execute (plan).wasOk(), "a portable player is made");
+    const auto made = readHostageManifestBeside (plan.folder.getChildFile ("Standalone"));
+    check (made.portable && made.player, "and says so in its hostage.json");
+    check (plan.folder.getChildFile ("Read me.txt").loadFileAsString().contains ("Data folder beside it"),
+           "and its note says where its data goes");
+}
+
 // Which stage pages the keyboard shows is the player's choice, made once. Before, every page
 // switched itself off again at the next launch, and a set rehearsed with METERS and CUE on the
 // keyboard opened the next evening without them. The browser is a mode, not a page, and stays
@@ -15688,6 +15734,7 @@ int main (int argc, char* argv[])
     testShowFindsVendorPresetsAlreadyHere();
     testPlayerCreator();
     testCreatePlayerCommand();
+    testPortableData();
     testCtrl49Meters();
     testCtrl49Live();
     testCtrl49Discover();

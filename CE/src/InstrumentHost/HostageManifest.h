@@ -10,7 +10,7 @@
 // build-host-product.mjs today, the player creator later.
 //
 //   { "role": "player", "product": { "name": "Super Rack", "appId": "8F3A…" },
-//     "show": "Super Rack.hostageshow" }
+//     "show": "Super Rack.hostageshow", "portable": true }
 //
 // Missing, unreadable, or a field absent or malformed: the editor, with no product identity. That
 // is what a program from a build tree is, and what every product built before the manifest
@@ -32,6 +32,10 @@ struct HostageManifest
     /** The built-in show to open on the first start (HostShow.h): a bare file name in the
         program's shows folder, or empty for the first one there. */
     juce::String showFileName;
+    /** Keeps its data beside the program rather than in the user's folder, so that it travels
+        with it — the USB stick player (step 6). The standalone only: a VST3 lives wherever the
+        DAW keeps plug-ins. */
+    bool portable = false;
 
     bool hasProduct() const noexcept { return appId.isNotEmpty(); }
 };
@@ -65,6 +69,7 @@ inline HostageManifest parseHostageManifest (const juce::var& json)
     const auto show = json.getProperty ("show", {}).toString().trim();
     if (show.endsWithIgnoreCase (".hostageshow") && ! show.containsAnyOf ("/\\:") && ! show.startsWith (".."))
         manifest.showFileName = show;
+    manifest.portable = (bool) json.getProperty ("portable", false);
     return manifest;
 }
 
@@ -98,6 +103,23 @@ inline juce::File productDataDirectory (const juce::File& root, const HostageMan
 {
     return manifest.hasProduct() ? root.getChildFile ("products").getChildFile (manifest.appId)
                                  : root;
+}
+
+/** Where a portable program keeps its data: a Data folder beside it, when that folder can be
+    written — tried by writing, since a folder can look writable and not be (Program Files, a
+    stick with its lock switch on). Otherwise the per-user folder it would have used anyway, so a
+    portable program copied somewhere read-only still starts, with its data on this computer. */
+inline juce::File dataDirectoryFor (const HostageManifest& manifest, const juce::File& programDir,
+                                    const juce::File& root)
+{
+    if (manifest.portable && programDir != juce::File())
+    {
+        const auto beside = programDir.getChildFile ("Data");
+        const auto probe = beside.getChildFile (".write-test");
+        if (beside.createDirectory().wasOk() && probe.replaceWithText ("HoSTage") && probe.deleteFile())
+            return beside;
+    }
+    return productDataDirectory (root, manifest);
 }
 
 /** Leaves product.json in a product's folder, naming the product. The folder is named by an id,

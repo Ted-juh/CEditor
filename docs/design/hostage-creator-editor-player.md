@@ -1,8 +1,8 @@
 # HoSTage: creator, editor and player
 
 *Status: the owner's intention, written down on 2026-10-08, with what exists today and what each
-part would take. Steps 1 to 4 — the player role, a data folder per product, the show, and
-making a player — are built; nothing after them is. When this and the code disagree about what exists, the code is right.*
+part would take. Steps 1 to 4 and 6 — the player role, a data folder per product, the show,
+making a player, and the USB stick player — are built; step 5 and the Raspberry Pi are not. When this and the code disagree about what exists, the code is right.*
 
 ## The intention, in the owner's words
 
@@ -208,12 +208,23 @@ Two builds would double every test and every release; one build with a role cann
      editors predate per-product folders.
    - The Shows utility's **Make a player** (editor only; `createPlayer` is on the editor-only list).
    - Open: a created player has no licence (decision 1), so it runs as the Free edition, one
-     instrument; its data stays per computer until step 6; macOS app bundles are not handled.
+     instrument; macOS app bundles are not handled.
 5. **The creator in CEditor builds the tier B installer** the same way — CEditor's installer ships
    the host programs; Inno Setup is needed only for the installer itself. The **Creator licence**
    gates it. Medium, plus the licence (below).
 6. **USB stick, Windows:** the step 4 folder with "portable" set in the manifest — data kept on
-   the stick beside the program instead of in `%APPDATA%`. Small once 4 exists.
+   the stick beside the program instead of in `%APPDATA%`. Small once 4 exists. *Built* (done
+   before step 5, at the owner's request):
+   - `"portable": true` in `hostage.json` puts the standalone's data in `Data/` beside it
+     (`dataDirectoryFor`, `HostageManifest.h`). Tried by writing a file, because a folder can
+     look writable and not be; where it cannot write, the per-user folder it would otherwise
+     have used, so a portable player copied somewhere read-only still starts.
+   - Make a player offers it for the standalone, on by default: most players go on a stick, and
+     the fallback makes "on" cost nothing elsewhere.
+   - The VST3 ignores it (it lives where the DAW keeps plug-ins), and the CTRL49 claim stays
+     per computer. A portable program is not offered the shared folder's rig.
+   - What does not travel by itself: the plug-ins, and paths on the stick that change with the
+     drive letter (a scan folder on the stick). On a new computer the player is scanned once.
 7. **Raspberry Pi.** Large, and honest about it:
    - a Linux ARM64 build of the player (the code builds on Linux already);
    - live plugin isolation ported to Linux — the single biggest item: a worker process and shared

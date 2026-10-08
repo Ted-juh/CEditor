@@ -10149,9 +10149,11 @@ export const setShowChanges = (mode) => send({ cmd: 'setShowChanges', mode: mode
 export const refreshShows = () => send({ cmd: 'refreshShows' });
 // A player: this HoSTage copied into a folder with the chosen shows (PlayerCreator.h). The host
 // asks where; shows are { file, builtIn } rows from the list.
-export const createPlayer = ({ name, shows = [], standalone = true, vst3 = true } = {}) =>
+export const createPlayer = ({ name, shows = [], standalone = true, vst3 = true, portable = false } = {}) =>
   send({
     cmd: 'createPlayer', name: String(name ?? ''), standalone: standalone === true, vst3: vst3 === true,
+    // The standalone keeps its data beside it, so it travels on a USB stick (step 6).
+    portable: portable === true && standalone === true,
     shows: shows.map((row) => ({ file: String(row.file), builtIn: row.builtIn === true })),
   });
 // The rig an earlier build kept in the folder every product shared: bring it over at the next

@@ -20249,6 +20249,7 @@ void InstrumentHostService::createPlayer (const juce::var& payload)
     request.appId = juce::Uuid().toDashedString().toUpperCase();
     request.standalone = (bool) payload.getProperty ("standalone", true);
     request.vst3 = (bool) payload.getProperty ("vst3", true);
+    request.portable = (bool) payload.getProperty ("portable", false);
     if (const auto* shows = payload.getProperty ("shows", {}).getArray())
         for (const auto& row : *shows)
         {

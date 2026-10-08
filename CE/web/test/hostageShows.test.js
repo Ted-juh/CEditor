@@ -111,5 +111,7 @@ test('Make a player is the editor\'s, starts from the open show, and says what g
   assert.match(panel, /data-testid="player-unsaved">The open show goes in as it was last saved/);
   assert.match(panel, /data-testid="player-standalone" disabled=\{!players\.standalone\}/);
   assert.match(panel, /data-testid="player-nothing"/, 'with nothing to copy, it says so instead of offering');
-  assert.match(panel, /createPlayer\(\{ name: playerName\.trim\(\), shows: chosen, standalone: standaloneOn, vst3: vst3On \}\)/);
+  assert.match(panel, /createPlayer\(\{ name: playerName\.trim\(\), shows: chosen, standalone: standaloneOn, vst3: vst3On,\s*portable: wantPortable && standaloneOn \}\)/);
+  assert.match(panel, /let wantPortable = \$state\(true\)/, 'portable to begin with: most players go on a stick');
+  assert.match(panel, /data-testid="player-portable" disabled=\{!standaloneOn\}/, 'and only the standalone can be');
 });

@@ -692,13 +692,20 @@ but makes no screens or control pages.
    one the player opens first. The open show goes in as it was last saved, so save it first if it
    has changes.
 3. Choose **Standalone**, **VST3** or both.
-4. Press **Make the player…** and choose a folder. A folder named after the player is made in it,
+4. Leave **For a USB stick** ticked (the default) to have the standalone keep its rig, shows and
+   settings in a `Data` folder beside it, so they go wherever the folder goes. Untick it to keep
+   them on each computer instead.
+5. Press **Make the player…** and choose a folder. A folder named after the player is made in it,
    and HoSTage says where: "Made "Friday Rig" in …".
 
 The folder holds:
 
 - **Standalone** — the player program, under the player's name, with its helpers. This folder can
-  go anywhere, a USB stick included. Start the program in it.
+  go anywhere, a USB stick included. Start the program in it. A player made for a USB stick makes
+  its `Data` folder here the first time it starts. On a computer it has not been on, scan for
+  plugins once in its Library utility. If it cannot write beside itself (a stick with its lock
+  switch on, or a folder like `Program Files`), it still starts, and keeps its data on that
+  computer.
 - **VST3** — the player as a plugin. Copy it into your VST3 folder (on Windows,
   `C:\Program Files\Common Files\VST3`).
 - **Read me.txt**, which says the same.
@@ -709,7 +716,6 @@ for them in the player's Library utility.
 > **Not finished yet:**
 >
 > - Every player is the same plugin to a DAW, so install one player's VST3 at a time.
-> - A player keeps its rig and settings on each computer it runs on, not on the stick.
 > - A player has no licence of its own yet, so it runs as the Free edition: one instrument at a
 >   time.
 > - It makes a folder, not an installer.
@@ -807,6 +813,9 @@ renaming a product keeps its rig. A file in the folder, `product.json`, names th
 Product utility shows the folder under **This machine**. Two products on one computer keep
 separate rigs, plugin lists, sound libraries and licences.
 
+**A player made for a USB stick** keeps everything in a `Data` folder beside its program instead,
+so it travels with it. The claim on the CTRL49 stays on each computer.
+
 **Shows** are kept in a `shows` folder inside the data folder. The shows a product came with sit in a
 `shows` folder beside the program (inside a VST3, in `Contents/Resources/shows`).
 
@@ -838,7 +847,8 @@ go, and the others leave it alone.
 - **Build product** works only from a CEditor source checkout (see [Project](#project)).
 - **Shows** carry the sounds you saved yourself and every captured rack. A vendor's preset file is
   not copied: the other computer needs the same preset, scanned into its library.
-- **Players** share one plugin identity in a DAW, keep their data on each computer rather than on a
-  stick, and run as the Free edition until players get licences (see [Make a player](#make-a-player)).
+- **Players** share one plugin identity in a DAW, and run as the Free edition until players get
+  licences (see [Make a player](#make-a-player)). A player's VST3 keeps its data on the computer
+  even when the standalone is made for a USB stick.
 - **Not yet tested on real hardware**: the MIDI and the CTRL49 stage pages have been checked in
   software.

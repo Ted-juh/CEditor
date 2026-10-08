@@ -44,6 +44,10 @@
   let ticked = $state({});
   let wantStandalone = $state(true);
   let wantVst3 = $state(true);
+  // On by default: a player is most often made for a stick, and one that is not portable would
+  // leave its rig on whichever computer it last ran on. Copied somewhere it cannot write, a
+  // portable player keeps its data on that computer instead, so on costs nothing.
+  let wantPortable = $state(true);
   const keyOf = (row) => `${row.builtIn ? 'b' : 'u'}:${row.file}`;
   const isTicked = (row) => ticked[keyOf(row)] ?? Boolean(isCurrent(row));
   let chosen = $derived(shows.list.filter((row) => isTicked(row)));
@@ -54,7 +58,8 @@
 
   function makePlayer() {
     if (!canMake) return;
-    createPlayer({ name: playerName.trim(), shows: chosen, standalone: standaloneOn, vst3: vst3On });
+    createPlayer({ name: playerName.trim(), shows: chosen, standalone: standaloneOn, vst3: vst3On,
+      portable: wantPortable && standaloneOn });
   }
   const savedOn = (ms) => (ms > 0 ? new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 </script>
@@ -197,6 +202,11 @@
               <span>VST3</span>
             </label>
           </div>
+          <label class="choice">
+            <input type="checkbox" data-testid="player-portable" disabled={!standaloneOn} bind:checked={wantPortable} />
+            <span>For a USB stick: the standalone keeps its rig, shows and settings beside it, so they go
+              where it goes.</span>
+          </label>
           <button type="button" data-testid="player-create" disabled={!canMake} onclick={makePlayer}
                   title="Choose a folder, and the player is made in it">
             {players.busy ? 'Making the player…' : 'Make the player…'}

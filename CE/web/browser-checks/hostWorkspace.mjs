@@ -325,6 +325,11 @@ try {
   const ticks = page.getByTestId('player-show');
   assert.deepEqual(await ticks.evaluateAll((boxes) => boxes.map((b) => b.checked)), [false, true],
     'the open show (Rehearsal) is ticked, the other not');
+  const portable = page.getByTestId('player-portable');
+  assert.ok(await portable.isChecked(), 'made for a USB stick to begin with');
+  await page.getByTestId('player-standalone').uncheck();
+  assert.ok(await portable.isDisabled(), 'which only the standalone can be');
+  await page.getByTestId('player-standalone').check();
   await createButton.click();
   assert.match(await page.locator('.host-error').innerText(), /browser preview/, 'the copying is the host\'s');
   await page.evaluate(async () => {
