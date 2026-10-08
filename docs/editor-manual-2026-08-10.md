@@ -1,5 +1,8 @@
 # CEditor Manual — snapshot of 2026-08-10
 
+> **Superseded.** The current manual is [editor-manual.md](editor-manual.md). This page is kept as a
+> dated record only.
+
 > **Historical snapshot, not a generated file.**
 >
 > This was produced by `tools/scripts/gen-editor-manual.mjs` on the

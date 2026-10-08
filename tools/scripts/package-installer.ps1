@@ -241,6 +241,42 @@ function Build-And-Stage-Templates([string]$RepoRoot, [string]$StageDir, [string
     }
 }
 
+function Stage-HostTemplate([string]$RepoRoot, [string]$StageDir, [string]$Configuration) {
+    # HoSTage's own programs, for the Hostage tab to build products and make players from with
+    # nothing but CEditor installed (CE/src/InstrumentHost/ProductBuilder.h and PlayerCreator.h;
+    # docs/design/hostage-creator-editor-player.md, step 5). Build-And-Stage-Native built them with
+    # everything else; this copies them out of that tree into templates\hostage\. The exporter's
+    # template search lists templates\ for *.vst3, *.clap and *.lv2 and looks no deeper, so a
+    # folder called hostage is never taken for a panel template.
+    #
+    # The scanner and the live worker are not copied: CEditor installs the same two programs beside
+    # itself, and the tab takes them from there. Runs after Build-And-Stage-Templates, which empties
+    # templates\.
+    $buildDir = Join-Path $RepoRoot "build\package\build"
+    $hostDir = Join-Path $StageDir "templates\hostage"
+    Reset-Directory $hostDir
+
+    $standaloneSrc = Join-Path $buildDir "CEHostStandalone_artefacts\$Configuration"
+    $programs = @(Get-ChildItem -LiteralPath $standaloneSrc -Filter "*.exe" -File)
+    if ($programs.Count -ne 1) {
+        throw "Expected one HoSTage standalone in $standaloneSrc; found $($programs.Count)."
+    }
+    $standaloneDst = Join-Path $hostDir "Standalone"
+    New-Item -ItemType Directory -Path $standaloneDst -Force | Out-Null
+    Copy-Item -LiteralPath $programs[0].FullName -Destination $standaloneDst -Force
+
+    $vst3Src = Join-Path $buildDir "CEHostVST3_artefacts\$Configuration\VST3"
+    $bundles = @(Get-ChildItem -LiteralPath $vst3Src -Filter "*.vst3" -Directory)
+    if ($bundles.Count -ne 1) {
+        throw "Expected one HoSTage VST3 bundle in $vst3Src; found $($bundles.Count)."
+    }
+    $vst3Dst = Join-Path $hostDir "VST3"
+    New-Item -ItemType Directory -Path $vst3Dst -Force | Out-Null
+    Copy-Item -LiteralPath $bundles[0].FullName -Destination (Join-Path $vst3Dst $bundles[0].Name) -Recurse -Force
+
+    Write-Host "Staged HoSTage template: $($programs[0].Name), $($bundles[0].Name)"
+}
+
 function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
     # Stage the export pipeline + toolchain provisioning SCRIPTS (never the provisioned binaries — those
     # are downloaded on demand). This makes Settings -> Scripting Toolchains work in the installed app and
@@ -268,6 +304,12 @@ function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
     Copy-Item -LiteralPath (Join-Path $RepoRoot "JUCE\bin\JUCE-8.0.7\juce_vst3_helper.exe") -Destination $binDst -Force
     # The LV2 helper writes a copied template's manifests per export (export-panel-template.mjs).
     Copy-Item -LiteralPath (Join-Path $RepoRoot "JUCE\bin\JUCE-8.0.7\juce_lv2_helper.exe") -Destination $binDst -Force
+
+    # The script a product's installer is compiled from, when the Hostage tab builds a product on a
+    # computer with Inno Setup (ProductBuilder.h). Without it a product is built as its folder.
+    $installerDst = Join-Path $toolsDst "installer"
+    New-Item -ItemType Directory -Path $installerDst -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $toolsSrc "installer\HostProductTemplate.iss") -Destination $installerDst -Force
 
     # Toolchain provisioning scripts only: the top-level files (manifest.json, *.mjs, provision.cmd/.sh,
     # *.cmake, README). Get-ChildItem -File skips the provisioned binary subdirs (llvm-mingw/, dotnet/, ...).
@@ -355,6 +397,7 @@ Build-And-Stage-Native -RepoRoot $repoRoot -StageDir $stageDir -Configuration $C
 Archive-PrivateWorkerSymbols -BuildDir (Join-Path $repoRoot "build\package\build") `
     -SymbolsRoot $privateSymbolsDir -Version $Version -Configuration $Configuration
 Build-And-Stage-Templates -RepoRoot $repoRoot -StageDir $stageDir -Configuration $Configuration
+Stage-HostTemplate -RepoRoot $repoRoot -StageDir $stageDir -Configuration $Configuration
 Stage-ExportPipeline -RepoRoot $repoRoot -StageDir $stageDir
 Stage-NodeRuntime -StageDir $stageDir
 Copy-OptionalPrerequisites -RepoRoot $repoRoot -StageDir $stageDir -WebView2InstallerPath $WebView2InstallerPath

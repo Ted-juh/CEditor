@@ -433,6 +433,11 @@ public:
         touched by vendor rescans. Returns the new record id. */
     juce::String addCapturedRecord (LibraryRecord record);
 
+    /** Adds a record under the id it already has: one carried in a show from another library,
+        which the show's rack refers to by that id. Refuses (false) an id this library already
+        holds, because the record here is that one, or a later save of it. */
+    bool adoptRecord (LibraryRecord record);
+
     bool removeRecord (const juce::String& recordId);
 
     /** Merges one vendor source's freshly scanned records (all of one sourceType). Identity

@@ -20,7 +20,7 @@ test('the Hostage header separates identity, mode, transport and emergency actio
   assert.match(view, /class="host-mode"[\s\S]*class="host-command-area"/);
   assert.match(view, /class="host-transport-group"[\s\S]*data-testid="host-transport"/);
   assert.match(view, /class="host-global-actions"[\s\S]*class="panic"/);
-  assert.match(view, /@media \(max-width: 1120px\)[\s\S]*grid-column: 1 \/ -1/,
+  assert.match(view, /@media \(max-width: 1270px\)[\s\S]*grid-column: 1 \/ -1/,
     'the command area must wrap as a unit instead of crushing the transport');
 });
 
@@ -69,9 +69,15 @@ test('the binary rename migrates the old default without changing identity', () 
 });
 
 test('renaming leaves existing Hostage data and installer identities recoverable', () => {
-  const shell = read('../../../CE/src/InstrumentHost/HostRuntimeShell.cpp');
-  assert.match(shell, /getChildFile \("CEditorInstrumentHost"\)/,
+  // Each product now keeps its own folder inside it (HostageManifest.h), but the folder keeps
+  // its name, a program that does not know its product stays in it, and a product that does is
+  // offered what it kept there (testLegacyDataOffer).
+  const manifest = read('../../../CE/src/InstrumentHost/HostageManifest.h');
+  assert.match(manifest, /getChildFile \("CEditorInstrumentHost"\)/,
     'changing the data directory would hide existing sessions and scan catalogues');
+  assert.match(manifest, /manifest\.hasProduct\(\) \? root\.getChildFile \("products"\)[\s\S]*: root;/,
+    'a program with no product identity keeps the shared folder its data is already in');
+  assert.match(read('../../../CE/src/InstrumentHost/HostRuntimeShell.cpp'), /configureForThisProgram \(options\);/);
   const service = read('../../../CE/src/InstrumentHost/InstrumentHostService.cpp');
   assert.match(service, /the appId never does/);
   assert.match(service, /juce::Uuid\(\)\.toDashedString\(\)/);

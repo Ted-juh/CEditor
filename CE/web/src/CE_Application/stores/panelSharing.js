@@ -26,6 +26,7 @@ import { fileCache, loadFile } from './fileCache.js';
 import { appSettings } from './appSettings.js';
 import { readFontData } from './fontFileData.js';
 import { withEmbeddedFonts } from '../utils/documentFonts.js';
+import { withEmbeddedIcons } from '../utils/documentIcons.js';
 import {
   createPanelPackage,
   openPanelPackage,
@@ -104,7 +105,11 @@ export async function packagePanelForSharing(panel, metadata = {}) {
   // The imported fonts the panel names travel with it (utils/documentFonts.js): whoever opens it —
   // another author, or the exported plug-in's player — has no Settings holding them. A font whose
   // file cannot be read is missing in the same sense an image is.
-  const carried = await withEmbeddedFonts(panel, get(appSettings)?.fonts ?? [], readFontData);
+  const carriedFonts = await withEmbeddedFonts(panel, get(appSettings)?.fonts ?? [], readFontData);
+  // The same for library icons (utils/documentIcons.js). The library already holds each picture as
+  // data, so nothing is read and nothing can be missing: a reference that resolves to no icon was
+  // showing nothing in the editor either.
+  const carried = { ...carriedFonts, panel: withEmbeddedIcons(carriedFonts.panel, get(appSettings)?.icons ?? []) };
 
   const envelope = await createPanelPackage(carried.panel, {
     readAsset: readAssetViaCache,
@@ -120,6 +125,7 @@ export async function packagePanelForSharing(panel, metadata = {}) {
     warnings: validation.warnings,
     missing,
     fontCount: carried.panel.fonts?.length ?? 0,
+    iconCount: carried.panel.icons?.length ?? 0,
     assetCount: Object.keys(envelope.assets).length,
   };
 }

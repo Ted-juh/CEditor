@@ -13,10 +13,10 @@ HostRuntimeShell::HostRuntimeShell()
 
     InstrumentHostService::Options options;
 
-    // The generated product's own per-user directory — never CEditor's. Its catalogue, scan
-    // paths and session live and die with the product.
-    options.dataDirectory = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-                                .getChildFile ("CEditorInstrumentHost");
+    // The generated product's own per-user directory — never CEditor's, and since each product
+    // knows which it is, never another product's (HostageManifest.h). Its catalogue, scan paths
+    // and session live and die with the product.
+    configureForThisProgram (options);
     options.workerExecutable = findHostScannerWorker ({ options.dataDirectory });
     options.factoryPerformanceFile = findFactoryPerformance();
 
@@ -76,6 +76,40 @@ HostRuntimeShell::HostRuntimeShell()
             "*.png;*.jpg;*.jpeg;*.gif");
         fileChooser->launchAsync (
             juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+            [done] (const juce::FileChooser& fc)
+            {
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
+    // A show to bring in (from a stick, a download) or a place to write one (HostShow.h).
+    options.pickShowFile = [this] (bool saving, const juce::String& suggestedName,
+                                std::function<void (const juce::String&)> done)
+    {
+        const auto documents = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+        fileChooser = std::make_unique<juce::FileChooser> (
+            saving ? "Save the show as" : "Open a show",
+            saving && suggestedName.isNotEmpty() ? documents.getChildFile (suggestedName) : documents,
+            "*.hostageshow");
+        fileChooser->launchAsync (
+            saving ? (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                      | juce::FileBrowserComponent::warnAboutOverwriting)
+                   : (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles),
+            [done] (const juce::FileChooser& fc)
+            {
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
+    // Where a player is made (PlayerCreator.h).
+    options.pickFolder = [this] (const juce::String& title, std::function<void (const juce::String&)> done)
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            title, juce::File::getSpecialLocation (juce::File::userDocumentsDirectory));
+        fileChooser->launchAsync (
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
             [done] (const juce::FileChooser& fc)
             {
                 const auto result = fc.getResult();

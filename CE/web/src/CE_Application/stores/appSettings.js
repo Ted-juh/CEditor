@@ -37,11 +37,13 @@ import {
   buildFontFaceSource,
   createDefaultSettings,
   createFontId,
+  createIconId,
   getBuiltinFonts,
   inferFontMimeTypeFromFileName,
   normalizeFamilyName,
   normalizeFontEntry,
   normalizeGeneralSettings,
+  normalizeIconEntry,
   normalizeDeviceSession,
   normalizeSettings,
   normalizeSupportedFeatures,
@@ -55,6 +57,12 @@ import {
   isSupportedIconFileName,
 } from './appSettingsImportBuilders.js';
 import { setProjectDeviceSession } from './projectDeviceSession.js';
+import {
+  fetchGoogleIconSvg, googleIconKey, googleIconLabel, googleIconVariant, normalizeGoogleIconRequest,
+  svgToDataUrl,
+} from '../utils/googleIcons.js';
+import { documentIcons } from '../utils/documentIcons.js';
+import { carriedFontFamilies, carriedFonts } from '../utils/documentFonts.js';
 
 export { WEIGHT_OPTIONS } from './appSettingsSchema.js';
 
@@ -180,20 +188,57 @@ export const availableFonts = derived(appSettings, ($settings) => {
   return merged;
 });
 
-export const availableIcons = derived(appSettings, ($settings) =>
-  ($settings.icons ?? [])
-    .filter((icon) => icon.enabled && icon.dataUrl)
-    .map((icon) => ({
-      value: icon.id,
-      label: icon.name,
-      name: icon.name,
-      dataUrl: icon.dataUrl,
-      mimeType: icon.mimeType,
-      isVector: icon.isVector === true,
-      width: icon.width ?? 0,
-      height: icon.height ?? 0,
-    }))
-);
+/**
+ * The fonts a control can be given: availableFonts, then the families an open panel carries that it
+ * does not list (utils/documentFonts.js) — a panel someone shared keeps its fonts choosable, and the
+ * list shows the font a control already uses instead of nothing. Kept apart from availableFonts,
+ * which answers "what does this computer have" for the notepad and the component library.
+ */
+export const fontChoices = derived([availableFonts, carriedFonts], ([$available, $carried]) => {
+  const listed = new Set($available.map((entry) => String(entry.value ?? '').toLowerCase()));
+  const extra = carriedFontFamilies($carried)
+    .filter((carried) => !listed.has(carried.family.toLowerCase()))
+    .map(({ family, label, weights }) => ({
+      value: family,
+      label: `${label}${weights ? ' [W]' : ''} (carried by the panel)`,
+      family,
+      cssFamily: family,
+      sourceType: 'panel',
+      enabled: true,
+      supportsWeight: weights != null,
+      axes: weights ? [{ tag: 'wght', min: weights.min, default: Math.min(weights.max, Math.max(weights.min, 400)), max: weights.max }] : [],
+      weightAxis: weights ? { min: weights.min, default: Math.min(weights.max, Math.max(weights.min, 400)), max: weights.max } : null,
+      supportedFeatures: [],
+      featureSupportKnown: false,
+    }));
+  return extra.length ? [...$available, ...extra] : $available;
+});
+
+const iconOption = (icon, label = icon.name) => ({
+  value: icon.id,
+  label,
+  name: icon.name,
+  dataUrl: icon.dataUrl,
+  mimeType: icon.mimeType,
+  isVector: icon.isVector === true,
+  width: icon.width ?? 0,
+  height: icon.height ?? 0,
+});
+
+/**
+ * The icons a control can be given: the library's, then those an open panel carries that the library
+ * lacks (utils/documentIcons.js) — a panel someone shared keeps its icons choosable, and an icon
+ * set to one of them and back again stays the same picture.
+ */
+export const availableIcons = derived([appSettings, documentIcons], ([$settings, $documentIcons]) => {
+  const library = ($settings.icons ?? []).filter((icon) => icon.enabled && icon.dataUrl);
+  const have = new Set(library.map((icon) => icon.id));
+  return [
+    ...library.map((icon) => iconOption(icon)),
+    ...($documentIcons ?? []).filter((icon) => !have.has(icon.id))
+      .map((icon) => iconOption(icon, `${icon.name} (carried by the panel)`)),
+  ];
+});
 
 let listenersInitialized = false;
 let settingsLoaded = false;
@@ -1028,6 +1073,59 @@ export async function importLocalIconFiles(fileList) {
 
   persistSettings();
   return { ok: true, importedCount: importedIcons.length, skippedCount };
+}
+
+/**
+ * Fetch Google icons (Material Symbols) into the icon library — the icon counterpart of
+ * addGoogleFont. `requests` is a list of `{ name, style, fill, weight }`; each is fetched from
+ * fonts.gstatic.com and stored as an SVG, so the internet is needed only now.
+ *
+ * Resolves to `{ ok, added, skipped, failed }`: the names added, the ones already in the library in
+ * that look, and `{ name, reason }` for the ones that could not be fetched (reason as
+ * fetchGoogleIconSvg reports it). `ok` is true when at least one was added.
+ */
+export async function addGoogleIcons(requests, { fetchImpl } = {}) {
+  const wanted = (Array.isArray(requests) ? requests : [requests])
+    .map(normalizeGoogleIconRequest)
+    .filter((request) => request.name);
+  if (wanted.length === 0) return { ok: false, reason: 'empty', added: [], skipped: [], failed: [] };
+
+  const have = new Set((get(appSettings).icons ?? [])
+    .filter((icon) => icon.sourceType === 'google' && icon.google)
+    .map((icon) => googleIconKey(icon.google)));
+
+  const added = [];
+  const skipped = [];
+  const failed = [];
+  const entries = [];
+  for (const request of wanted) {
+    const key = googleIconKey(request);
+    if (have.has(key)) { skipped.push(request.name); continue; }
+    have.add(key);
+    const result = await fetchGoogleIconSvg(request, fetchImpl);
+    if (!result.ok) { failed.push({ name: request.name, reason: result.reason }); continue; }
+    entries.push(normalizeIconEntry({
+      id: createIconId('gicon'),
+      name: googleIconLabel(request),
+      sourceType: 'google',
+      google: request,
+      // Unique per look, and never a bare "<name>.svg" — local imports skip a file name already in
+      // the library, and a Google icon must not stop somebody importing their own home.svg.
+      fileName: `material-symbols-${request.style}-${googleIconVariant(request)}-${request.name}.svg`,
+      mimeType: 'image/svg+xml',
+      dataUrl: svgToDataUrl(result.svg),
+      isVector: true,
+      width: 24,
+      height: 24,
+    }));
+    added.push(request.name);
+  }
+
+  if (entries.length > 0) {
+    appSettings.update((current) => ({ ...current, icons: [...(current.icons ?? []), ...entries] }));
+    persistSettings();
+  }
+  return { ok: entries.length > 0, added, skipped, failed };
 }
 
 export async function addGoogleFont(family) {

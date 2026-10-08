@@ -1,6 +1,6 @@
 <script>
   import { tick } from 'svelte';
-  import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, closePanel, panels, setActiveEditorTab, closeSettingsTab, closeInstrumentHostTab, closeDeviceProfileTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
+  import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, closePanel, panels, setActiveEditorTab, closeSettingsTab, closeInstrumentHostTab, closeDeviceProfileTab, closeScreenTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
   import { closeComponentDocument, createComponentDocument } from '../stores/componentWorkspace.js';
   import { closeScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile, scriptDocuments } from '../stores/scriptWorkspace.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
@@ -302,6 +302,8 @@
       if (activeTab?.type === 'script' && activeTab?.id === tab.id) {
         setActiveEditorTab(nextId ? { type: 'script', id: nextId } : { type: 'panel', id: null });
       }
+    } else if (tab.tabType === 'screen') {
+      closeScreenTab(tab.id);
     } else {
       closePanel(tab.id);
     }

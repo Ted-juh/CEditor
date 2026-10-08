@@ -23,6 +23,20 @@
   let activeSlot = $state(0);
   let testValues = $state([100, 64, 20, 90, 48, 72, 30, 110]);
   let showExport = $state(false);
+  let copied = $state(false);
+  let copiedTimer = 0;
+  $effect(() => () => clearTimeout(copiedTimer));
+
+  async function copyExport() {
+    try {
+      await navigator.clipboard.writeText(exportJson);
+      copied = true;
+      clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => (copied = false), 1500);
+    } catch {
+      copied = false;
+    }
+  }
 
   const page = $derived(doc?.pages?.[pageIndex] ?? null);
   const labels = $derived(page ? page.slots.map((s) => s.label || s.param || '') : []);
@@ -155,12 +169,18 @@
   </div>
 
   <div class="sb-export" style:display={showExport ? 'block' : 'none'}>
-    <div class="sb-export-head">Assignment JSON (save as a <code>.assignment.json</code> for the native host)</div>
+    <!-- The Screen Builder has no Save, so this text is the only way the pages leave it: Copy puts
+         it on the clipboard instead of asking for a select-all that a read-only box makes fiddly. -->
+    <div class="sb-export-head">
+      <span>Assignment JSON (save as a <code>.assignment.json</code> for the native host)</span>
+      <button type="button" onclick={copyExport}>{copied ? 'Copied' : 'Copy'}</button>
+    </div>
     <textarea readonly onfocus={selectAll}>{exportJson}</textarea>
   </div>
 </div>
 
 <style>
+  .sb-export-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .screen-builder { display: flex; flex-direction: column; width: 100%; height: 100%; background: #0e1116; color: #cbd2dc; }
   .sb-header { display: flex; align-items: center; justify-content: space-between; gap: 16px;
     height: 40px; padding: 0 14px; border-bottom: 1px solid #1e2430; flex: 0 0 auto; }

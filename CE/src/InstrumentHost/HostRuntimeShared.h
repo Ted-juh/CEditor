@@ -7,6 +7,8 @@
 #include "PluginInstantiator.h"
 #include "PluginCatalog.h"
 #include "PngResourceValidation.h"
+#include "HostageManifest.h"
+#include "InstrumentHostService.h"
 #include "BinaryData.h" // PlayerWebData — the embedded web bundle (host.html rides in it)
 
 // HostRuntimeShared — the glue both generated Hostage targets share.
@@ -149,8 +151,14 @@ makeHostWebViewOptions (const juce::String& userDataFolderName,
         .withStatusBarDisabled()
         .withUserDataFolder (userDataFolder);
 
+    // WebView2 by name on Windows only, as WebViewHost.cpp and PlayerHost.cpp do: elsewhere JUCE
+    // accepts the platform default alone, and naming webview2 there means the missing-runtime
+    // message instead of HoSTage (WebKitGTK on Linux; the bridge is window.__JUCE__ on every
+    // backend).
     auto options = juce::WebBrowserComponent::Options()
+       #if JUCE_WINDOWS
         .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
+       #endif
         .withKeepPageLoadedWhenBrowserIsHidden()
         .withWinWebView2Options (webview2Options)
         .withNativeIntegrationEnabled()
@@ -194,6 +202,63 @@ inline juce::File findFactoryPerformance()
             return candidate;
 
     return {};
+}
+
+// -- which program this is ---------------------------------------------------------------------
+// hostage.json (HostageManifest.h) says whether this copy of HoSTage is the editor or a player,
+// and which product it is. Its product decides the data folder; the claim on the keyboard stays
+// in the folder every HoSTage shares, because one keyboard has one owner whichever product holds
+// it; and a product that now has a folder of its own is offered the rig it kept in the shared one.
+
+inline HostageManifest readHostageManifest()
+{
+    return readHostageManifestBeside (juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+                                          .getParentDirectory());
+}
+
+/** The shows that ship with the program: a shows folder beside the standalone's exe, or in the
+    VST3 bundle's Contents/Resources — where the factory rack has always been looked for. */
+inline juce::File findBuiltInShows()
+{
+    const auto moduleDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+                               .getParentDirectory();
+    for (const auto& candidate : { moduleDir.getChildFile ("shows"),
+                                   moduleDir.getParentDirectory().getChildFile ("Resources")
+                                            .getChildFile ("shows") })
+        if (candidate.isDirectory())
+            return candidate;
+    return {};
+}
+
+/** What a player made here is copied from (PlayerCreator.h): this program. The standalone
+    offers itself, its helpers and the VST3 that belongs with it; the VST3 can only offer its own
+    bundle, since it cannot know where a standalone was installed. */
+inline player::Template findPlayerTemplate (const HostageManifest& manifest, bool asPlugin);
+
+inline HostageManifest configureForThisProgram (InstrumentHostService::Options& options,
+                                                bool asPlugin = false)
+{
+    const auto manifest = readHostageManifest();
+    options.playerTemplate = findPlayerTemplate (manifest, asPlugin);
+    options.builtInShowsDirectory = findBuiltInShows();
+    options.firstShowFileName = manifest.showFileName;
+    // A portable standalone keeps its data beside itself; anything else, and a portable one that
+    // cannot write there, in the per-user folder. The keyboard claim stays per computer either
+    // way: it is about the CTRL49 on this desk, not about the stick.
+    const auto programDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+                                .getParentDirectory();
+    options.dataDirectory = asPlugin ? productDataDirectory (hostDataRoot(), manifest)
+                                     : dataDirectoryFor (manifest, programDir, hostDataRoot());
+    options.hardwareClaimDirectory = hostDataRoot();
+    // Only a product that may have used the shared folder is offered what is in it: every
+    // product built before each had a folder of its own was an editor. A player was made after,
+    // and the shared rig was never its own; nor was a portable program's.
+    if (manifest.hasProduct() && ! manifest.player
+        && options.dataDirectory == productDataDirectory (hostDataRoot(), manifest))
+        options.legacyDataDirectory = hostDataRoot();
+    options.player = manifest.player;
+    labelProductDataDirectory (options.dataDirectory, manifest);
+    return manifest;
 }
 
 // -- finding the scanner worker ----------------------------------------------------------------
@@ -250,6 +315,28 @@ inline juce::File findHostLiveWorker (const juce::Array<juce::File>& extraDirect
    #else
     return findHostWorkerNamed ("CEditorPluginWorker", extraDirectories);
    #endif
+}
+
+inline player::Template findPlayerTemplate (const HostageManifest& manifest, bool asPlugin)
+{
+    player::Template found;
+    const auto module = juce::File::getSpecialLocation (juce::File::currentExecutableFile);
+    if (asPlugin)
+    {
+        // <bundle>.vst3/Contents/<platform>/<module>
+        const auto bundle = module.getParentDirectory().getParentDirectory().getParentDirectory();
+        if (bundle.hasFileExtension (".vst3") && bundle.isDirectory())
+            found.vst3Bundle = bundle;
+    }
+    else
+    {
+        found.standalone = module;
+        found.vst3Bundle = player::findSiblingVst3 (module, manifest.appId);
+    }
+    for (const auto& helper : { findHostScannerWorker(), findHostLiveWorker() })
+        if (helper.existsAsFile())
+            found.companions.add (helper);
+    return found;
 }
 
 } // namespace ceditor::host

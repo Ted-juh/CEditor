@@ -40,8 +40,8 @@ export const OUT = resolve(HERE, '../src/CE_Application/generated/helpDocs.js');
  *                                      the program it is inside.
  *   docs/property-hints.md             a writing-style rule for contributors, not for users.
  *
- * That leaves a real gap — there is no current editor manual — and the viewer says so rather than
- * letting the absence pass for completeness.
+ * The current editor manual (docs/editor-manual.md) replaced the snapshot; what it still does not
+ * cover is stated in HELP_GAPS rather than letting the absence pass for completeness.
  */
 export const HELP_DOCUMENTS = [
   {
@@ -50,6 +50,20 @@ export const HELP_DOCUMENTS = [
     section: 'Start here',
     title: 'Your first working panel',
     blurb: 'Create, bind, preview, save and export a panel; find out why a control is not responding.',
+  },
+  {
+    id: 'editor-manual',
+    file: 'docs/editor-manual.md',
+    section: 'Start here',
+    title: 'CEditor manual',
+    blurb: 'The whole program in plain language: building, binding, testing and exporting a panel.',
+  },
+  {
+    id: 'hostage-manual',
+    file: 'docs/hostage-manual.md',
+    section: 'Start here',
+    title: 'HoSTage manual',
+    blurb: 'The instrument host: racks, sounds, performance tools, songs, the stage, controllers and the CTRL49.',
   },
   {
     id: 'release-notes',
@@ -70,7 +84,7 @@ export const HELP_DOCUMENTS = [
     file: 'docs/scripting-manual.md',
     section: 'Scripting',
     title: 'Scripting manual',
-    blurb: 'The complete panel API. Generated from the same table the editor validates against.',
+    blurb: 'How scripting works, in plain language, and every hook, event and command a script can use.',
   },
   {
     id: 'scripting-cookbook',
@@ -90,9 +104,9 @@ export const HELP_DOCUMENTS = [
 
 /** The gap the list above leaves, said out loud in the viewer rather than left to be noticed. */
 export const HELP_GAPS = [
-  'Your first working panel covers the basic editor workflow. A complete current editor manual '
-  + 'is still missing; the historical 2026-08-10 snapshot is not shipped. Help → Keyboard Shortcuts '
-  + 'and the hint text on properties cover additional controls.',
+  'The manuals explain how things work, not every setting one by one: the meaning of each setting is '
+  + 'in the hint the properties panel shows when you point at it. The old 2026-08-10 editor manual, '
+  + 'which listed them, is out of date and not shipped.',
 ];
 
 const firstParagraph = (text) => {

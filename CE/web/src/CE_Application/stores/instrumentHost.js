@@ -26,6 +26,9 @@ import {
   onInstrumentHostLibrary,
   onInstrumentHostLibraryLoad,
   onInstrumentHostLibrarySaved,
+  onInstrumentHostShowSaved,
+  onInstrumentHostPlayerCreated,
+  onInstrumentHostProductBuilt,
   onInstrumentHostSupportBundle,
   onInstrumentHostLicenceReceipt,
   onInstrumentHostMidiActivity,
@@ -57,6 +60,7 @@ import {
   onInstrumentHostSurfaceBrowse,
 } from '../bridge/bridge.js';
 import { stageCommandAllowed } from '../utils/stageLock.js';
+import { editorOnlyCommand, editorOnlyRefusal } from '../utils/hostageRole.js';
 import { rackLabelPayload, rackStatePayload, performanceLabelPayload, performanceStatePayload,
          soundcheckPayload, layersPayload, discoverPayload, discoverFirstRow, cuePayload,
          changesPayload, metersPayload, metersFirstPart, metersNudgeVolume, livePayload, liveNextRate, liveNextMode,
@@ -93,6 +97,31 @@ function showLibrarySaved(payload) {
   const name = String(payload?.name ?? '').trim();
   if (!name) return;
   hostSaveNotice.set(`Saved “${name}” to library.`);
+  saveNoticeTimer = setTimeout(clearSaveNotice, 5000);
+  saveNoticeTimer?.unref?.();
+}
+function showPlayerCreated(payload) {
+  clearSaveNotice();
+  const name = String(payload?.name ?? '').trim();
+  const folder = String(payload?.folder ?? '').trim();
+  hostSaveNotice.set(`Made the player${name ? ` “${name}”` : ''}${folder ? ` in ${folder}` : ''}.`);
+  saveNoticeTimer = setTimeout(clearSaveNotice, 8000);
+  saveNoticeTimer?.unref?.();
+}
+function showProductBuilt(payload) {
+  clearSaveNotice();
+  const name = String(payload?.name ?? '').trim();
+  const installer = String(payload?.installer ?? '').trim();
+  const folder = String(payload?.folder ?? '').trim();
+  hostSaveNotice.set(`Built${name ? ` “${name}”` : ' the product'}${installer ? `: ${installer}` : folder ? ` in ${folder}` : ''}.`);
+  saveNoticeTimer = setTimeout(clearSaveNotice, 8000);
+  saveNoticeTimer?.unref?.();
+}
+function showShowSaved(payload) {
+  clearSaveNotice();
+  const name = String(payload?.name ?? '').trim();
+  const where = String(payload?.path ?? '').trim();
+  hostSaveNotice.set(where ? `Saved the show${name ? ` “${name}”` : ''} to ${where}.` : `Saved the show “${name}”.`);
   saveNoticeTimer = setTimeout(clearSaveNotice, 5000);
   saveNoticeTimer?.unref?.();
 }
@@ -2291,6 +2320,13 @@ export function emptyHostState() {
     scanPaths: [],
     scanning: false,
     stageLocked: false,
+    // Which program this is (docs/design/hostage-creator-editor-player.md): `player` when
+    // acting as one — installed as one (`playerInstalled`) or the editor trying its show.
+    player: false,
+    playerInstalled: false,
+    shows: emptyShows(),
+    players: emptyPlayers(),
+    creator: emptyCreator(),
     editHistory: { canUndo: false, canRedo: false, undoLabel: '', redoLabel: '', blockedReason: '' },
     editorOpenPartId: '',
     editorOpenPartIds: [],
@@ -2581,6 +2617,114 @@ export function emptyProduct() {
     hardware: { owner: 'nobody', owned: false },
     activeHostingIncidents: [],
     surfaceProfiles: [],
+    data: { folder: '', legacy: 'none', legacyFolder: '', legacyFailed: [] },
+  };
+}
+
+/** The shows this program knows (HostShow.h): which one is open, whether the rig has moved on
+ *  since it was saved, where changes go, and what the open show needs that this computer lacks. */
+export function emptyShows() {
+  return { current: null, changed: false, changes: 'keep', list: [], missing: [], canPick: false };
+}
+export function normalizeShows(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const current = p.current && typeof p.current === 'object' && String(p.current.file ?? '')
+    ? { name: String(p.current.name ?? ''), file: String(p.current.file), builtIn: p.current.builtIn === true }
+    : null;
+  return {
+    current,
+    changed: current !== null && p.changed === true,
+    changes: p.changes === 'save' ? 'save' : 'keep',
+    list: (Array.isArray(p.list) ? p.list : []).map((row) => ({
+      name: String(row?.name ?? ''),
+      file: String(row?.file ?? ''),
+      builtIn: row?.builtIn === true,
+      savedAtMs: Number(row?.savedAtMs ?? 0) || 0,
+    })).filter((row) => row.file),
+    missing: (Array.isArray(p.missing) ? p.missing : []).map(String),
+    canPick: p.canPick === true,
+  };
+}
+
+/** Making players (PlayerCreator.h): what this HoSTage can copy, whether a copy is running, and
+ *  how the last one ended. */
+export function emptyPlayers() {
+  return { standalone: false, vst3: false, canPick: false, busy: false, last: null };
+}
+export function normalizePlayers(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const last = p.last && typeof p.last === 'object' ? {
+    ok: p.last.ok === true,
+    name: String(p.last.name ?? ''),
+    folder: String(p.last.folder ?? ''),
+    message: String(p.last.message ?? ''),
+    notes: (Array.isArray(p.last.notes) ? p.last.notes : []).map(String),
+  } : null;
+  return {
+    standalone: p.standalone === true,
+    vst3: p.vst3 === true,
+    canPick: p.canPick === true,
+    busy: p.busy === true,
+    last,
+  };
+}
+
+/** Build product, the creator's (ProductBuilder.h; docs/design/hostage-creator-editor-player.md,
+ *  step 5): whether this program builds products at all (CEditor's tab does, a HoSTage does not),
+ *  what it has to build them from, whether Inno Setup is there for the installer, the Creator
+ *  licence when the build asks for one, and how the last build ended. */
+export function emptyCreator() {
+  return {
+    available: false, standalone: false, vst3: false, helpers: false, installer: false,
+    canPick: false, busy: false,
+    licence: { required: false, licensed: false, licensee: '', detail: '' },
+    last: null,
+  };
+}
+export function normalizeCreator(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const licence = p.licence && typeof p.licence === 'object' ? p.licence : {};
+  const last = p.last && typeof p.last === 'object' ? {
+    ok: p.last.ok === true,
+    name: String(p.last.name ?? ''),
+    folder: String(p.last.folder ?? ''),
+    installer: String(p.last.installer ?? ''),
+    message: String(p.last.message ?? ''),
+  } : null;
+  return {
+    available: p.available === true,
+    standalone: p.standalone === true,
+    vst3: p.vst3 === true,
+    helpers: p.helpers === true,
+    installer: p.installer === true,
+    canPick: p.canPick === true,
+    busy: p.busy === true,
+    licence: {
+      required: licence.required === true,
+      licensed: licence.licensed === true,
+      licensee: String(licence.licensee ?? ''),
+      detail: String(licence.detail ?? ''),
+    },
+    last,
+  };
+}
+/** Whether Build product may be pressed: the creator, not busy, with what it needs. */
+export function creatorCanBuild(creator) {
+  return creator.available && !creator.busy && creator.helpers
+    && (creator.standalone || creator.vst3)
+    && (!creator.licence.required || creator.licence.licensed);
+}
+
+/** Where this program keeps its data, and what became of the rig an earlier build kept in the
+ *  folder every product shared (InstrumentHostService::legacyDataState). */
+const LEGACY_DATA_STATES = ['none', 'offered', 'pending', 'adopted', 'declined'];
+export function normalizeProductData(payload) {
+  const d = payload && typeof payload === 'object' ? payload : {};
+  return {
+    folder: String(d.folder ?? ''),
+    legacy: LEGACY_DATA_STATES.includes(d.legacy) ? d.legacy : 'none',
+    legacyFolder: String(d.legacyFolder ?? ''),
+    legacyFailed: (Array.isArray(d.legacyFailed) ? d.legacyFailed : []).map(String),
   };
 }
 
@@ -2635,6 +2779,7 @@ export function normalizeProduct(payload) {
         count: Number(i?.count ?? 0),
       })),
     surfaceProfiles: (Array.isArray(p.surfaceProfiles) ? p.surfaceProfiles : []).map(String),
+    data: normalizeProductData(p.data),
   };
 }
 
@@ -4570,6 +4715,11 @@ export function normalizeHostState(payload) {
     scanPaths: (Array.isArray(p.scanPaths) ? p.scanPaths : []).map(String),
     scanning: p.scanning === true,
     stageLocked: p.stageLocked === true,
+    player: p.player === true || p.playerInstalled === true,
+    shows: normalizeShows(p.shows),
+    players: normalizePlayers(p.players),
+    creator: normalizeCreator(p.creator),
+    playerInstalled: p.playerInstalled === true,
     editHistory: {
       canUndo: p.editHistory?.canUndo === true,
       canRedo: p.editHistory?.canRedo === true,
@@ -5162,6 +5312,9 @@ export function mockHostState() {
       },
       scales: ['chromatic', 'major', 'minor', 'dorian', 'pentatonic minor'],
     },
+    // The preview stands in for CEditor's tab, which is the creator: it has programs to build
+    // from, and no Inno Setup, so a build is a folder.
+    creator: { available: true, standalone: true, vst3: true, helpers: true, installer: false },
   });
 }
 
@@ -5619,6 +5772,85 @@ function mockShowPlaying(perf) {
   perf.arrangement.songId = song?.itemId ?? '';
 }
 
+// The preview's shows live in memory for as long as the page does: enough to save, switch and go
+// back, which is what the Shows utility is for. A file to import or export needs the host.
+const mockShowRigs = new Map();
+export const MOCK_SHOW_COMMANDS = new Set([
+  'saveShow', 'openShow', 'revertShow', 'deleteShow', 'setShowChanges', 'refreshShows', 'importShow', 'exportShow',
+]);
+const mockShowFile = (name) => {
+  const legal = String(name).replace(/["#@,;:<>*^|?\\/]/g, '').trim().replace(/^\.+/, '').trim();
+  return legal ? `${legal}.hostageshow` : '';
+};
+const mockRig = (state) => JSON.parse(JSON.stringify({ rack: state.rack, performance: state.performance }));
+
+function applyMockShowCommand(next, payload) {
+  const cmd = payload.cmd;
+  const shows = next.shows;
+  const restore = (file) => {
+    const rig = mockShowRigs.get(file);
+    if (!rig) return false;
+    const copy = JSON.parse(JSON.stringify(rig));
+    next.rack = copy.rack;
+    next.performance = copy.performance;
+    return true;
+  };
+  if (cmd === 'setShowChanges') {
+    shows.changes = payload.mode === 'save' ? 'save' : 'keep';
+    if (shows.changes === 'save' && shows.changed && shows.current) {
+      mockShowRigs.set(shows.current.file, mockRig(next));
+      shows.changed = false;
+    }
+    return next;
+  }
+  if (cmd === 'saveShow') {
+    const named = String(payload.name ?? '').trim();
+    const name = named || shows.current?.name || '';
+    const file = named ? mockShowFile(named) : shows.current?.file ?? '';
+    if (!file || !name) return next;
+    mockShowRigs.set(file, mockRig(next));
+    shows.list = [...shows.list.filter((row) => row.file !== file),
+      { name: file.replace(/\.hostageshow$/, ''), file, builtIn: false, savedAtMs: Date.now() }]
+      .sort((a, b) => a.name.localeCompare(b.name));
+    shows.current = { name, file, builtIn: false };
+    shows.changed = false;
+    return next;
+  }
+  if (cmd === 'openShow' || cmd === 'revertShow') {
+    const file = cmd === 'openShow' ? String(payload.file ?? '') : shows.current?.file ?? '';
+    const row = shows.list.find((entry) => entry.file === file);
+    if (!row || !restore(file)) return next;
+    shows.current = { name: cmd === 'revertShow' ? shows.current.name : row.name, file, builtIn: row.builtIn };
+    shows.changed = false;
+    shows.missing = [];
+    return next;
+  }
+  if (cmd === 'deleteShow') {
+    const file = String(payload.file ?? '');
+    if (shows.list.some((row) => row.file === file && row.builtIn)) return next;
+    mockShowRigs.delete(file);
+    shows.list = shows.list.filter((row) => row.file !== file);
+    if (shows.current?.file === file) {
+      shows.current = null;
+      shows.changed = false;
+    }
+    return next;
+  }
+  return next;
+}
+
+/** As the host notes a save: a command that moved the rig moves the show on from its file — or,
+ *  when changes go into the show, into it. */
+export function noteMockShowChange(before, after, payload) {
+  if (!after.shows.current || MOCK_SHOW_COMMANDS.has(payload?.cmd)) return after;
+  if (JSON.stringify([before.rack, before.performance]) === JSON.stringify([after.rack, after.performance])) return after;
+  if (after.shows.changes === 'save') {
+    mockShowRigs.set(after.shows.current.file, mockRig(after));
+    return after;
+  }
+  return after.shows.changed ? after : { ...after, shows: { ...after.shows, changed: true } };
+}
+
 export function applyMockCommand(state, payload) {
   const cmd = payload?.cmd;
   const next = normalizeHostState(state);
@@ -5635,6 +5867,12 @@ export function applyMockCommand(state, payload) {
   }
   if (cmd === 'beginStageUnlock' || cmd === 'cancelStageUnlock') return next;
   if (!stageCommandAllowed(next.stageLocked, cmd)) return next;
+  if (cmd === 'setTryAsPlayer') {
+    if (!next.playerInstalled) next.player = payload?.on === undefined ? !next.player : payload.on === true;
+    return next;
+  }
+  if (next.player && editorOnlyCommand(payload)) return next;
+  if (MOCK_SHOW_COMMANDS.has(cmd)) return applyMockShowCommand(next, payload);
 
   if (cmd === 'startPerformanceRecording') {
     if (next.performance.performanceReplay.state !== 'idle') return next;
@@ -5957,12 +6195,15 @@ export function applyMockCommand(state, payload) {
     }] } }).rack.masterEffects[0];
     if (payload.chainId === 'master') next.rack.masterEffects.push(slot);
     else if (part(payload.chainId)) part(payload.chainId).effects.push(slot);
-    else next.rack.returns.find((r) => r.returnId === payload.chainId)?.effects.push(slot);
+    else if (next.rack.returns.some((r) => r.returnId === payload.chainId))
+      next.rack.returns.find((r) => r.returnId === payload.chainId).effects.push(slot);
+    // A bus is an effect chain too, as it is in the host (InstrumentRackHost::chainFor).
+    else next.rack.buses.find((b) => b.busId === payload.chainId)?.effects.push(slot);
     return next;
   }
   if (cmd === 'openEffectEditor') {
     const effects = [next.rack.masterEffects, ...next.rack.parts.map((p) => p.effects),
-                     ...next.rack.returns.map((r) => r.effects)].flat();
+                     ...next.rack.returns.map((r) => r.effects), ...next.rack.buses.map((b) => b.effects)].flat();
     if (effects.some((effect) => effect.effectId === payload.effectId && effect.hasProcessor)) {
       setDockedEditors([...next.editorOpenPartIds, payload.effectId]);
       next.floatingEditorPartIds = next.floatingEditorPartIds
@@ -5972,7 +6213,7 @@ export function applyMockCommand(state, payload) {
   }
   if (cmd === 'removeEffect' || cmd === 'setEffectBypassed' || cmd === 'moveEffect') {
     const chains = [next.rack.masterEffects, ...next.rack.parts.map((p) => p.effects),
-                    ...next.rack.returns.map((r) => r.effects)];
+                    ...next.rack.returns.map((r) => r.effects), ...next.rack.buses.map((b) => b.effects)];
     for (const chain of chains) {
       const index = chain.findIndex((e) => e.effectId === payload.effectId);
       if (index < 0) continue;
@@ -7903,6 +8144,13 @@ export function applyMockCommand(state, payload) {
     next.product.activeHostingIncidents = [];
     return next;
   }
+  if (cmd === 'adoptLegacyData' || cmd === 'declineLegacyData') {
+    // As the host: a choice only while there is something on offer; bringing it over happens
+    // at the next start, which a browser preview never has.
+    if (['offered', 'pending'].includes(next.product.data.legacy))
+      next.product.data = { ...next.product.data, legacy: cmd === 'adoptLegacyData' ? 'pending' : 'declined' };
+    return next;
+  }
   if (cmd === 'setSafeMode') {
     const level = ['normal', 'skipSuspects', 'noThirdParty'].includes(payload.level)
       ? payload.level
@@ -8373,6 +8621,9 @@ export function initInstrumentHostBridge() {
     hostLastError.set(String(payload?.message ?? ''));
   });
   onInstrumentHostLibrarySaved(showLibrarySaved);
+  onInstrumentHostShowSaved(showShowSaved);
+  onInstrumentHostPlayerCreated(showPlayerCreated);
+  onInstrumentHostProductBuilt(showProductBuilt);
   onInstrumentHostLibraryLoad((payload) => hostLibraryLoad.set(normalizeLibraryLoad(payload)));
   send({ cmd: 'getState' });
 }
@@ -8497,6 +8748,26 @@ function send(payload) {
       hostLastError.set(`Stage Lock blocked '${String(payload?.cmd ?? '')}'. Hold Build for one second before changing the rig.`);
       return;
     }
+    if (get(hostState).player && editorOnlyCommand(payload)) {
+      hostLastError.set(editorOnlyRefusal(String(payload?.cmd ?? '')));
+      return;
+    }
+    if (payload?.cmd === 'setTryAsPlayer' && get(hostState).playerInstalled) {
+      hostLastError.set('This is a player: there is no editor to go back to.');
+      return;
+    }
+    if (payload?.cmd === 'importShow' || payload?.cmd === 'exportShow') {
+      hostLastError.set('Choosing a file is not available in the browser preview.');
+      return;
+    }
+    if (payload?.cmd === 'createPlayer') {
+      hostLastError.set('Making a player copies the HoSTage program, which the browser preview does not have.');
+      return;
+    }
+    if (payload?.cmd === 'saveShow' && !String(payload?.name ?? '').trim() && !get(hostState).shows.current) {
+      hostLastError.set('Give the show a name to save it.');
+      return;
+    }
 
     // Device commands mutate the device store, everything else the host state.
     if (payload?.cmd === 'setAudioDevice') {
@@ -8531,9 +8802,19 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'buildHostProduct') {
+      // The preview has no programs to copy and no folder chooser: it prints what the host
+      // would, and ends as a build without Inno Setup ends.
       const project = get(hostProject);
-      hostBuild.set(applyBuildProgress(emptyHostBuild(), { line: `Building "${project.productName}" ${project.version} (mock)` }));
-      hostBuild.update((b) => applyBuildProgress(b, { line: 'Staged mock product folder.', done: true, ok: true }));
+      hostBuild.set(applyBuildProgress(emptyHostBuild(), { line: `Building "${project.productName}" ${project.version} (preview)` }));
+      hostBuild.update((b) => applyBuildProgress(b, { line: 'Copying the HoSTage programs, the show and the manifest.' }));
+      hostBuild.update((b) => applyBuildProgress(b, {
+        line: 'Built as a folder, without an installer: Inno Setup 6 was not found. Install it (free, from jrsoftware.org) and build again for one.',
+        done: true, ok: true,
+      }));
+      return;
+    }
+    if (payload?.cmd === 'installCreatorLicence' || payload?.cmd === 'removeCreatorLicence') {
+      hostLastError.set('This CEditor does not ask for a Creator licence; Build product is open.');
       return;
     }
     if (payload?.cmd === 'toggleParameterFavourite') {
@@ -9362,8 +9643,9 @@ function send(payload) {
       });
       return;
     }
-    const stageBefore = mockStagePages(get(hostState));
-    hostState.set(applyMockCommand(get(hostState), payload));
+    const before = get(hostState);
+    const stageBefore = mockStagePages(before);
+    hostState.set(noteMockShowChange(before, applyMockCommand(before, payload), payload));
     // A stage page switched on is shown at once, as the broker shows it on the keyboard: the
     // switch is how the page is asked for.
     if (String(payload?.cmd ?? '').endsWith('OnSurface')) {
@@ -9382,6 +9664,8 @@ function send(payload) {
 
 export const requestHostState = () => send({ cmd: 'getState' });
 export const setStageLock = (enabled) => send({ cmd: 'setStageLock', enabled: enabled === true });
+/** The editor runs its show as the player will, to test it before creating one. */
+export const setTryAsPlayer = (on) => send({ cmd: 'setTryAsPlayer', on: on === true });
 export const beginStageUnlock = () => send({ cmd: 'beginStageUnlock' });
 export const cancelStageUnlock = () => send({ cmd: 'cancelStageUnlock' });
 export const scanForInstruments = () => send({ cmd: 'scan' });
@@ -9937,6 +10221,29 @@ export const setPartOutputPair = (partId, pair) => send({ cmd: 'setPartOutputPai
 export const claimHardwareSurface = () => send({ cmd: 'claimHardwareSurface' });
 export const releaseHardwareSurface = () => send({ cmd: 'releaseHardwareSurface' });
 export const clearActiveHostingIncidents = () => send({ cmd: 'clearActiveHostingIncidents' });
+// Shows (HostShow.h): save the rig with every sound its songs use, open and switch between them,
+// bring one in from another computer or write one out for it.
+export const saveShow = (name) => send(name ? { cmd: 'saveShow', name } : { cmd: 'saveShow' });
+export const openShow = (file, builtIn = false) => send({ cmd: 'openShow', file, builtIn: builtIn === true });
+export const revertShow = () => send({ cmd: 'revertShow' });
+export const deleteShow = (file) => send({ cmd: 'deleteShow', file });
+export const importShow = () => send({ cmd: 'importShow' });
+export const exportShow = () => send({ cmd: 'exportShow' });
+export const setShowChanges = (mode) => send({ cmd: 'setShowChanges', mode: mode === 'save' ? 'save' : 'keep' });
+export const refreshShows = () => send({ cmd: 'refreshShows' });
+// A player: this HoSTage copied into a folder with the chosen shows (PlayerCreator.h). The host
+// asks where; shows are { file, builtIn } rows from the list.
+export const createPlayer = ({ name, shows = [], standalone = true, vst3 = true, portable = false } = {}) =>
+  send({
+    cmd: 'createPlayer', name: String(name ?? ''), standalone: standalone === true, vst3: vst3 === true,
+    // The standalone keeps its data beside it, so it travels on a USB stick (step 6).
+    portable: portable === true && standalone === true,
+    shows: shows.map((row) => ({ file: String(row.file), builtIn: row.builtIn === true })),
+  });
+// The rig an earlier build kept in the folder every product shared: bring it over at the next
+// start, or leave it where it is.
+export const adoptLegacyData = () => send({ cmd: 'adoptLegacyData' });
+export const declineLegacyData = () => send({ cmd: 'declineLegacyData' });
 
 // --- §17: safe startup, recovery and the support bundle --------------------------------------
 export const setSafeMode = (level) => send({ cmd: 'setSafeMode', level });
@@ -9965,7 +10272,12 @@ export const hostNote = (note, velocity, on, channel = 1) =>
 
 export const requestHostProject = () => send({ cmd: 'getHostProject' });
 export const setHostProject = (fields) => send({ cmd: 'setHostProject', ...fields });
+// The host asks where to build it, and says how it went in instrumentHostBuildProgress lines;
+// whether one is running is state.creator.busy, so a build refused before it starts leaves
+// nothing waiting.
 export const buildHostProduct = () => {
-  hostBuild.set({ ...emptyHostBuild(), running: true });
+  hostBuild.set(emptyHostBuild());
   send({ cmd: 'buildHostProduct' });
 };
+export const installCreatorLicence = (text) => send({ cmd: 'installCreatorLicence', text: String(text ?? '') });
+export const removeCreatorLicence = () => send({ cmd: 'removeCreatorLicence' });

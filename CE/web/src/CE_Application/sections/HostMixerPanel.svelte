@@ -136,7 +136,7 @@
         <input type="text" class="strip-name editable-name" value={bus.name}
                aria-label="Bus name" title="Rename group bus"
                onchange={(e) => renameBus(bus.busId, e.currentTarget.value)} />
-        <span class="strip-kind">
+        <span class="strip-kind" title="The bus's effects are listed in the dock's Rack tab">
           bus{bus.effects.length ? ` · ${bus.effects.length} fx` : ''}
           {#if bus.latencyMs > 0.05}<br />+{bus.latencyMs.toFixed(1)} ms{/if}
         </span>

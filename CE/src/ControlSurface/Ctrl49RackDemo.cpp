@@ -8,8 +8,9 @@
 // Usage:
 //   Ctrl49RackDemo <multiknob.lua> <knob_strip.png> [--data <dir>]
 //
-// Shares the per-user data directory with the generated standalone by default
-// (CEditorInstrumentHost), so whatever was scanned and saved there is what plays here.
+// Shares the per-user data directory with an unbranded standalone by default
+// (CEditorInstrumentHost), so whatever was scanned and saved there is what plays here; a built
+// product keeps its own under products/<appId>, which --data can point at.
 // With no control pages saved, it auto-generates pages for the focused part's instrument.
 // Page Left/Right and the mode buttons switch pages; encoders and the data dial nudge;
 // Ctrl-C panics the rack and releases the session. Windows-only. Close other CTRL49 owners first.
@@ -24,6 +25,7 @@
 #include "Ctrl49WinMmOutput.h"
 
 #include "InstrumentHost/InstrumentHostService.h"
+#include "InstrumentHost/HostageManifest.h"
 #include "InstrumentHost/PluginInstantiator.h"
 
 #include <windows.h>
@@ -79,14 +81,14 @@ int wmain (int argc, wchar_t** argv)
     // all live on it, and this console thread IS it once initialised.
     juce::ScopedJuceInitialiser_GUI juceInit;
 
-    juce::File dataDir = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-                             .getChildFile ("CEditorInstrumentHost");
+    juce::File dataDir = ceditor::host::hostDataRoot();
     for (int i = 3; i + 1 < argc; ++i)
         if (std::wstring (argv[i]) == L"--data")
             dataDir = juce::File (juce::String (argv[i + 1]));
 
     ceditor::host::InstrumentHostService::Options options;
     options.dataDirectory = dataDir;
+    options.hardwareClaimDirectory = ceditor::host::hostDataRoot();   // one keyboard, one owner
     options.workerExecutable = findWorkerForDemo ("CEditorPluginScanner.exe");
     options.enableAudio = true;
     options.emit = [] (const juce::String& eventName, const juce::var& payload)

@@ -34,6 +34,9 @@ import { deepClone } from '../utils/deepClone.js';
 import { controlSetForPanel, isTokenReference, resolveColourValue } from '../models/controlSets.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
+import { documentIcons } from '../utils/documentIcons.js';
+import { layoutModeForIcon } from '../utils/iconLayout.js';
+import { currentDocumentFonts } from '../utils/fontSources.js';
 // ce.image (§50). The file cache is how a path source becomes something renderable, which is also
 // what makes embed() possible.
 import { fileCache, loadFile } from '../stores/fileCache.js';
@@ -4231,7 +4234,7 @@ function drawMeasureImpl(text, opts) {
 
 /** The font catalogue as descriptors, from the app's own availableFonts store. */
 function textCatalogue() {
-  return fontCatalogue(get(availableFonts));
+  return fontCatalogue(get(availableFonts), currentDocumentFonts());
 }
 
 /** The Font node of a control, or nothing when it has no Text section (a Knob has none). */
@@ -4273,7 +4276,7 @@ function textApplyWrite(name, write) {
  */
 
 function imageCatalogue() {
-  return assetCatalogue(get(storedIcons));
+  return assetCatalogue(get(storedIcons), get(documentIcons));
 }
 
 /** The layer for a name, reporting rather than guessing when the name is not one. */
@@ -4441,6 +4444,13 @@ function imageIconImpl(target, idOrName, opts) {
     const value = key === 'tint' ? String(opts[key]).replace(/^#/, '') : opts[key];
     setValue(`${name}.Icon.${field}`, value);
   }
+  // A control showing text only draws no icon; the same rule as the editor's icon pickers
+  // (utils/iconLayout.js), so the icon this call asked for is seen.
+  const mode = layoutModeForIcon({ _children: {
+    ContentLayout: getValue(`${name}.ContentLayout`),
+    Text: { content: getValue(`${name}.Text.content`) },
+  } });
+  if (mode) setValue(`${name}.ContentLayout.mode`, mode);
   return all;
 }
 
@@ -6881,7 +6891,8 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
       return true;
     },
 
-    /* ce.image (§50). assets/asset answer from the icon library; the rest work on one control. */
+    /* ce.image (§50). assets/asset answer from the icon library and the icons the panel carries; the
+       rest work on one control. */
     imageAssets: (opts) => {
       const all = imageCatalogue();
       if (opts?.embeddable === true) return all.filter((a) => a.embeddable);

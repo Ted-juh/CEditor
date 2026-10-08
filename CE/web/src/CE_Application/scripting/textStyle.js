@@ -19,6 +19,7 @@
 // so the vocabularies come from the app's own tables rather than being retyped. Nothing here
 // touches a store or a control: it takes plain data and returns plain data.
 
+import { carriedFontFamilies } from '../utils/documentFonts.js';
 import { numberOr } from '../utils/primitives.js';
 import { normalizeScriptMode, normalizeTextCaseMode } from '../editor/canvasControlStyles.js';
 import {
@@ -66,20 +67,21 @@ export const JUSTIFICATIONS = TEXT_POSITION_OPTIONS.map((o) => o.value);
 
 /** One availableFonts entry, reduced to what a script needs to decide whether it can use it.
  *
- *  `portable` is the honest field. A builtin family is named in every runtime; a library font
- *  lives in the editor's app settings and is registered as a FontFace by the editor at edit time —
- *  no export path calls ensureStoredFontLoaded, and the font library is not part of the panel
- *  document. So a panel that styles itself with a library font looks right while you are building
- *  it and falls back to a platform default once exported. A script can now see that coming. */
-export function fontDescriptor(entry) {
+ *  `portable` says whether the font is there wherever the panel goes, as it stands. A builtin
+ *  family is named in every runtime, and the faces shipped for panels (assets/fonts/panelFonts.css)
+ *  are loaded by the player as well as the editor. A font from the author's library lives in app
+ *  settings, so it is not: it travels only once sharing or exporting packs it into the document
+ *  (utils/documentFonts.js), which happens when a control names it or a script names it in quotes.
+ *  A face the panel already carries — `carried`, from panel.fonts — is portable by definition. */
+export function fontDescriptor(entry, { carried = false } = {}) {
   if (!entry) return null;
-  const builtin = entry.sourceType === 'builtin';
+  const source = carried ? 'panel' : String(entry.sourceType ?? 'builtin');
   const axes = Array.isArray(entry.axes) ? entry.axes : [];
   return {
     family: String(entry.value ?? entry.family ?? ''),
     label: String(entry.label ?? entry.value ?? entry.family ?? ''),
-    source: String(entry.sourceType ?? 'builtin'),
-    portable: builtin,
+    source,
+    portable: source === 'builtin' || source === 'shipped' || source === 'panel',
     variable: entry.supportsWeight === true,
     axes: axes.map((axis) => ({
       tag: String(axis?.tag ?? ''),
@@ -95,9 +97,29 @@ export function fontDescriptor(entry) {
   };
 }
 
-/** The whole catalogue, in the order the Properties panel offers it. */
-export function fontCatalogue(entries) {
-  return (Array.isArray(entries) ? entries : []).map(fontDescriptor).filter(Boolean);
+/** A family the open panel carries (utils/documentFonts.js carriedFontFamilies), as one catalogue
+ *  entry. Labelled with the family the user sees, so a script can name it either way. */
+function carriedFontEntry({ family, label, weights }) {
+  return {
+    value: family,
+    label,
+    supportsWeight: weights != null,
+    axes: weights
+      ? [{ tag: 'wght', min: weights.min, default: Math.min(weights.max, Math.max(weights.min, 400)), max: weights.max }]
+      : [],
+  };
+}
+
+/** The whole catalogue, in the order the Properties panel offers it, then the families the open
+ *  panel carries that it does not already list — the only imported fonts the exported player has. */
+export function fontCatalogue(entries, carriedFaces = []) {
+  const catalogue = (Array.isArray(entries) ? entries : []).map((entry) => fontDescriptor(entry)).filter(Boolean);
+  const listed = new Set(catalogue.flatMap((f) => [f.family.toLowerCase(), f.label.toLowerCase()]));
+  for (const carried of carriedFontFamilies(carriedFaces)) {
+    if (listed.has(carried.family.toLowerCase())) continue;
+    catalogue.push(fontDescriptor(carriedFontEntry(carried), { carried: true }));
+  }
+  return catalogue;
 }
 
 /** Find a family the way TextEditor does — by the stored `value` first, then by the human family

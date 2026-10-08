@@ -7,9 +7,12 @@ import './assets/fonts/webFonts.css';
 import './assets/fonts/panelFonts.css';
 import App from './App.svelte';
 import { wireFontOutlineSources } from './CE_Application/stores/fontOutlineSources.js';
+import { wireDocumentIcons } from './CE_Application/stores/documentIconSources.js';
 
 // Imported fonts for text turned into outlines, and the fonts open panels carry.
 wireFontOutlineSources();
+// The icons open panels carry, for panels shared by someone whose icon library this is not.
+wireDocumentIcons();
 
 const app = mount(App, {
   target: document.getElementById('app'),

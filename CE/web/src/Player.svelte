@@ -7,6 +7,7 @@
   import PanelPreviewSurface from './CE_Application/editor/PanelPreviewSurface.svelte';
   import { deserializePanel } from './CE_Application/stores/panelModel.js';
   import { registerDocumentFonts } from './CE_Application/utils/documentFonts.js';
+  import { setDocumentIcons } from './CE_Application/utils/documentIcons.js';
   import { updatePanelPreviewSession, updatePanelPreviewSessions, panelPreviewSessions, setPreviewModeEnabled, setInteractionPreviewPanelProvider } from './CE_Application/stores/interactionPreview.js';
   import { initPanelRuntime, setRuntimeHost } from './CE_Application/scripting/panelRuntime.js';
   import { createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
@@ -478,6 +479,8 @@
     // The imported fonts the author's panel carries (utils/documentFonts.js): the only ones the
     // player has. Registered before the controls draw, so text lands in its face, not a fallback.
     registerDocumentFonts(next.fonts);
+    // The same for the icons it uses (utils/documentIcons.js): the player has no icon library.
+    setDocumentIcons(next.icons);
     // A queued frame or partial NRPN belongs to the document that received it. Panel ids and
     // control ids are commonly reused across generated exports, so letting either cross a reload
     // can apply the previous synth's final message to the new panel.

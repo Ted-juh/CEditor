@@ -18,6 +18,10 @@
 // The stub worker's path arrives as argv[1] from CTest, same as the coordinator tests.
 
 #include "InstrumentHost/InstrumentHostService.h"
+#include "InstrumentHost/HostageManifest.h"
+#include "InstrumentHost/HostShow.h"
+#include "InstrumentHost/PlayerCreator.h"
+#include "InstrumentHost/ProductBuilder.h"
 #include "InstrumentHost/EditorSnapshot.h"
 #include "InstrumentHost/LiveWorkerDiagnostics.h"
 #include "InstrumentHost/PatchDiff.h"
@@ -5136,6 +5140,1032 @@ void testCtrl49StagePages()
            "an edition without setlists refuses SOUNDCHECK, aloud");
     unpaid.cmd ("layersOnSurface", { { "on", true } });
     check (unpaid.service->layersOnSurface(), "while LAYERS, which only shows the rack, is there for anyone");
+}
+
+// The player role (docs/design/hostage-creator-editor-player.md). A player keeps the rig and
+// the setlist and refuses only what makes or changes screens and pages, or builds — in the host,
+// so the page hiding a button is a convenience and not the guard.
+void testPlayerRole()
+{
+    std::cout << "\nthe player role: screens and pages are the editor's, the rig is everyone's" << std::endl;
+
+    const auto dir = freshDataDir ("player-role");
+    seedCatalog (dir);
+    Harness h (dir, {}, [] (InstrumentHostService::Options& o) { o.player = true; });
+    h.cmd ("getState");
+    check (h.service->isPlayer(), "a program installed as a player is one");
+    check ((bool) h.emits.lastState()->getProperty ("player", false)
+             && (bool) h.emits.lastState()->getProperty ("playerInstalled", false),
+           "and its state says so, both ways");
+
+    const auto pages = [&h] { return h.service->getRackHost().getPerformance().pages.size(); };
+    const auto before = pages();
+    h.cmd ("addControlPage");
+    check (pages() == before && h.emits.lastError().contains ("HoSTage editor"),
+           "it cannot add a control page, and says where pages are made");
+    h.cmd ("setUserSurface", { { "name", "Advance 49" }, { "encoders", 8 } });
+    check (h.emits.lastError().contains ("HoSTage editor"), "nor describe a controller");
+    h.cmd ("buildHostProduct");
+    check (h.emits.lastError().contains ("cannot build"), "nor build");
+
+    const auto parts = [&h] { return h.service->getRackHost().getPerformance().parts.size(); };
+    const auto partsBefore = parts();
+    h.cmd ("addPart");
+    check (parts() == partsBefore + 1, "but it adds a part to the rig like anyone else");
+
+    h.cmd ("setTryAsPlayer", { { "on", false } });
+    check (h.service->isPlayer() && h.emits.lastError().contains ("no editor"),
+           "and it cannot turn itself back into the editor");
+}
+
+// "Try as player": the editor running its show as the player will, before it creates one.
+void testTryAsPlayer()
+{
+    std::cout << "\nthe editor tries its show as the player" << std::endl;
+
+    const auto dir = freshDataDir ("try-as-player");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    check (! h.service->isPlayer(), "the editor is the editor");
+    h.cmd ("addControlPage");
+    const auto& performance = h.service->getRackHost().getPerformance();
+    check (performance.pages.size() == 1, "and makes pages");
+    const auto pageId = performance.pages.getReference (0).pageId;
+    const auto slotId = performance.pages.getReference (0).slots.getReference (0).slotId;
+
+    h.cmd ("setTryAsPlayer", { { "on", true } });
+    check (h.service->isPlayer()
+             && (bool) h.emits.lastState()->getProperty ("player", false)
+             && ! (bool) h.emits.lastState()->getProperty ("playerInstalled", true),
+           "trying the player, it acts as one, and its state says it is only trying");
+    h.cmd ("addControlPage");
+    check (h.service->getRackHost().getPerformance().pages.size() == 1, "it refuses a new page like a player");
+
+    const auto slot = [&h, &pageId, &slotId]
+    {
+        return h.service->getRackHost().getPerformance().findPage (pageId)->slots.getReference (0);
+    };
+    juce::ignoreUnused (slotId);
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", slotId }, { "midiRelative", true } });
+    check (slot().midiRelative, "how a knob sends MIDI is the keyboard's, and a player may set it");
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", slotId }, { "label", "Cutoff" } });
+    check (slot().binding.label.isEmpty() && h.emits.lastError().contains ("HoSTage editor"),
+           "what the page shows is the editor's, and is refused");
+
+    h.cmd ("setTryAsPlayer", { { "on", false } });
+    h.cmd ("addControlPage");
+    check (! h.service->isPlayer() && h.service->getRackHost().getPerformance().pages.size() == 2,
+           "and back in the editor, pages are made again");
+}
+
+// Each built product keeps its own data (HostageManifest.h): the folder is named by the
+// product's appId from hostage.json, which also becomes a path — so only a real GUID gets in.
+void testHostageManifest()
+{
+    std::cout << "\nhostage.json: the role, the product, and the folder it puts the data in" << std::endl;
+    using namespace ceditor::host;
+
+    const auto parse = [] (const juce::String& json) { return parseHostageManifest (juce::JSON::parse (json)); };
+    const auto root = freshDataDir ("manifest-root");
+
+    const auto product = parse (R"({"role":"player","product":{"name":" Super Rack ","appId":"8f3a6c2e-1b4d-4e5f-9a7b-0c1d2e3f4a5b"}})");
+    check (product.player && product.productName == "Super Rack"
+             && product.appId == "8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B",
+           "it reads the role, the name and the appId, upper-cased so one product is one folder");
+    check (productDataDirectory (root, product)
+             == root.getChildFile ("products").getChildFile ("8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B"),
+           "a product keeps its data in products/<appId>");
+
+    const auto editor = parse (R"({"product":{"name":"Rig","appId":"8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B"}})");
+    check (! editor.player && editor.hasProduct(), "no role is the editor, with its product all the same");
+
+    check (productDataDirectory (root, parse ("{}")) == root
+             && productDataDirectory (root, HostageManifest {}) == root,
+           "a program that does not know its product keeps the folder its data is already in");
+    for (const auto* hostile : { "../../../../../../../../../../../../../", "..\\..\\..",
+                                 "8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5G", "8F3A6C2E1B4D-4E5F-9A7B-0C1D2E3F4A5B-",
+                                 "C:/Windows/System32/drivers/etc/xx", "" })
+    {
+        auto* inner = new juce::DynamicObject();
+        inner->setProperty ("appId", hostile);
+        auto* outer = new juce::DynamicObject();
+        outer->setProperty ("product", juce::var (inner));
+        check (productDataDirectory (root, parseHostageManifest (juce::var (outer))) == root,
+               juce::String ("an appId that is not a GUID never becomes a path: \"") + hostile + "\"");
+    }
+
+    const auto bundle = freshDataDir ("manifest-bundle");
+    const auto module = bundle.getChildFile ("Contents").getChildFile ("x86_64-win");
+    module.createDirectory();
+    bundle.getChildFile ("Contents").getChildFile ("Resources").createDirectory();
+    bundle.getChildFile ("Contents").getChildFile ("Resources").getChildFile ("hostage.json")
+        .replaceWithText (R"({"product":{"name":"In A Bundle","appId":"11111111-2222-3333-4444-555555555555"}})");
+    check (readHostageManifestBeside (module).productName == "In A Bundle",
+           "a VST3 finds it in its bundle's Resources");
+    module.getChildFile ("hostage.json").replaceWithText (R"({"role":"player"})");
+    check (readHostageManifestBeside (module).player && ! readHostageManifestBeside (module).hasProduct(),
+           "and one beside the module comes first");
+
+    const auto folder = productDataDirectory (root, product);
+    labelProductDataDirectory (folder, product);
+    const auto label = juce::JSON::parse (folder.getChildFile ("product.json"));
+    check (label.getProperty ("name", {}).toString() == "Super Rack",
+           "the folder is labelled with the product's name, since its own name is an id");
+}
+
+// The keyboard is claimed in one place, whatever folder each program's data is in: two
+// products, or a product and CEditor's tab, must not both drive one CTRL49.
+void testHardwareClaimShared()
+{
+    std::cout << "\none keyboard, one owner, across data folders" << std::endl;
+
+    const auto shared = freshDataDir ("claim-shared");
+    const auto inShared = [shared] (InstrumentHostService::Options& o) { o.hardwareClaimDirectory = shared; };
+    const auto firstFolder = freshDataDir ("claim-product-a");
+    Harness first (firstFolder, {}, inShared);
+    Harness second (freshDataDir ("claim-product-b"), {}, inShared);
+
+    first.cmd ("claimHardwareSurface");
+    check (first.service->ownsHardwareSurface(), "one product claims the keyboard");
+    second.cmd ("claimHardwareSurface");
+    check (! second.service->ownsHardwareSurface(),
+           "another, with its data in a folder of its own, is refused it");
+    check (shared.getChildFile ("hardware-owner.json").existsAsFile()
+             && ! firstFolder.getChildFile ("hardware-owner.json").existsAsFile(),
+           "the claim is kept in the shared place, not in either product's folder");
+
+    first.cmd ("releaseHardwareSurface");
+    second.cmd ("claimHardwareSurface");
+    check (second.service->ownsHardwareSurface(), "and gets it once the first lets go");
+}
+
+// The rig an earlier build kept in the shared folder: offered once, brought over at the next
+// start if asked for, never if declined — and only what a person set up, not what a running
+// program left behind.
+void testLegacyDataOffer()
+{
+    std::cout << "\na rig an earlier build kept in the shared folder" << std::endl;
+
+    const auto legacy = freshDataDir ("legacy-root");
+    seedCatalog (legacy);
+    legacy.getChildFile ("my-notes.txt").replaceWithText ("second verse is in G");
+    legacy.getChildFile ("snapshots").createDirectory();
+    legacy.getChildFile ("snapshots").getChildFile ("a.json").replaceWithText ("{}");
+    legacy.getChildFile ("logs").createDirectory();
+    legacy.getChildFile ("logs").getChildFile ("host.log").replaceWithText ("old run");
+    legacy.getChildFile ("operation.marker").replaceWithText ("x");
+    legacy.getChildFile ("hardware-owner.json").replaceWithText ("{}");
+    const auto other = legacy.getChildFile ("products").getChildFile ("11111111-2222-3333-4444-555555555555");
+    other.createDirectory();
+    other.getChildFile ("my-notes.txt").replaceWithText ("another product's");
+
+    const auto mine = legacy.getChildFile ("products").getChildFile ("8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B");
+    const auto fromLegacy = [legacy] (InstrumentHostService::Options& o) { o.legacyDataDirectory = legacy; };
+    const auto legacyState = [] (Harness& h)
+    {
+        h.cmd ("getState");
+        return h.emits.lastState()->getProperty ("product", {}).getProperty ("data", {});
+    };
+
+    {
+        Harness h (mine, {}, fromLegacy);
+        const auto data = legacyState (h);
+        check (data.getProperty ("legacy", {}).toString() == "offered"
+                 && data.getProperty ("folder", {}).toString() == mine.getFullPathName(),
+               "a product in a folder of its own is offered the shared rig, and says where its data is");
+        h.cmd ("adoptLegacyData");
+        check (legacyState (h).getProperty ("legacy", {}).toString() == "pending"
+                 && ! mine.getChildFile ("my-notes.txt").existsAsFile(),
+               "asked for, it waits for the next start, so this session cannot save over it");
+    }
+    {
+        Harness h (mine, {}, fromLegacy);
+        check (legacyState (h).getProperty ("legacy", {}).toString() == "adopted",
+               "at the next start it has come over");
+        check (mine.getChildFile ("my-notes.txt").loadFileAsString() == "second verse is in G"
+                 && mine.getChildFile ("plugin-catalog.json").existsAsFile()
+                 && mine.getChildFile ("snapshots").getChildFile ("a.json").existsAsFile(),
+               "everything a person set up came, a file nobody listed included");
+        check (! mine.getChildFile ("logs").exists() && ! mine.getChildFile ("operation.marker").exists()
+                 && ! mine.getChildFile ("hardware-owner.json").exists()
+                 && ! mine.getChildFile ("products").exists(),
+               "and nothing a running program left behind, nor the other products' folders");
+    }
+
+    const auto declining = legacy.getChildFile ("products").getChildFile ("AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE");
+    {
+        Harness h (declining, {}, fromLegacy);
+        h.cmd ("declineLegacyData");
+        check (legacyState (h).getProperty ("legacy", {}).toString() == "declined", "it can be declined");
+    }
+    {
+        Harness h (declining, {}, fromLegacy);
+        check (legacyState (h).getProperty ("legacy", {}).toString() == "declined"
+                 && ! declining.getChildFile ("my-notes.txt").existsAsFile(),
+               "which is remembered, and brings nothing");
+    }
+
+    Harness unbranded (freshDataDir ("legacy-none"));
+    check (legacyState (unbranded).getProperty ("legacy", {}).toString() == "none",
+           "a program in the shared folder itself has nothing to be offered");
+    unbranded.cmd ("adoptLegacyData");
+    check (unbranded.emits.lastError().contains ("no earlier"), "and asking anyway says so");
+}
+
+// A show (HostShow.h): the rig and everything it points at, in one file. Saved in one HoSTage
+// and opened in another with an empty library, every song still has its rack — the thing a
+// bare rack file, which is what a built product shipped until now, cannot do.
+juce::File fakePlayerTemplate (const juce::String& name, ceditor::host::player::Template& out);
+
+/** A file that is not there, as an absolute path: an Inno Setup that is not installed. */
+juce::File noInnoSetup() { return freshDataDir ("no-inno-setup").getChildFile ("ISCC.exe"); }
+
+void testShows()
+{
+    std::cout << "\na show: saved in one HoSTage, opened in another" << std::endl;
+    namespace show = ceditor::host::show;
+
+    check (show::fileNameFor ("Friday: Paradiso") == "Friday Paradiso.hostageshow"
+             && show::fileNameFor ("   ").isEmpty() && show::fileNameFor ("..").isEmpty()
+             && show::isShowFileName (show::fileNameFor ("../../etc/passwd")),
+           "a show's name becomes a file name, or nothing when nothing legal is left");
+    check (show::isShowFileName ("Gig.hostageshow") && ! show::isShowFileName ("../Gig.hostageshow")
+             && ! show::isShowFileName ("a/Gig.hostageshow") && ! show::isShowFileName ("Gig.json"),
+           "and the page names a show by its file alone, never by a path");
+
+    const auto rackOf = [] (Harness& h) { return h.emits.lastState()->getProperty ("rack", {}); };
+    const auto showsOf = [] (Harness& h) { return h.emits.lastState()->getProperty ("shows", {}); };
+    const auto recordIdNamed = [] (Harness& h, const juce::String& name)
+    {
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        juce::String id;
+        if (const auto* records = h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).getArray())
+            for (const auto& r : *records)
+                if (r.getProperty ("name", {}).toString() == name)
+                    id = r.getProperty ("recordId", {}).toString();
+        return id;
+    };
+
+    const auto editorDir = freshDataDir ("show-editor");
+    seedCatalog (editorDir);
+    const auto showPath = editorDir.getChildFile ("shows").getChildFile ("Friday Paradiso.hostageshow");
+    juce::String rackId;
+    {
+        Harness h (editorDir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("saveRackToLibrary", { { "name", "Second song rig" } });
+        rackId = recordIdNamed (h, "Second song rig");
+        h.cmd ("addSetlistItem", { { "rackRecordId", rackId }, { "name", "Song two" } });
+        const auto itemId = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {})
+                              .getProperty ("items", {})[0].getProperty ("itemId", {}).toString();
+        h.cmd ("setSetlistItem", { { "itemId", itemId }, { "notes", "capo 3" } });
+        h.cmd ("addControlPage");
+        h.cmd ("setUserSurface", { { "name", "Advance 49" }, { "encoders", 8 } });
+        h.cmd ("metersOnSurface", { { "on", true } });
+
+        h.cmd ("saveShow");
+        check (h.emits.lastError().contains ("name"), "a show needs a name to be saved");
+        h.cmd ("saveShow", { { "name", "Friday: Paradiso" } });
+        const auto shows = showsOf (h);
+        check (showPath.existsAsFile()
+                 && shows.getProperty ("current", {}).getProperty ("name", {}).toString() == "Friday: Paradiso"
+                 && ! (bool) shows.getProperty ("changed", true)
+                 && shows.getProperty ("list", {}).size() == 1,
+               "it is saved in the program's shows folder and becomes the current show");
+
+        const auto file = juce::JSON::parse (showPath);
+        const auto needs = file.getProperty ("requires", {}).getProperty ("plugins", {});
+        const auto items = file.getProperty ("rack", {}).getProperty ("setlist", {}).getProperty ("items", {});
+        check (needs.size() == 1 && needs[0].getProperty ("ceId", {}).toString() == "VST3-good-synth",
+               "it names the plug-ins it needs, and carries none of them");
+        check (file.getProperty ("library", {}).getProperty ("records", {}).size() == 1
+                 && file.getProperty ("library", {}).getProperty ("records", {})[0]
+                      .getProperty ("recordId", {}).toString() == rackId,
+               "it carries the rack the second song loads, under the id the song points at");
+        check (items[0].getProperty ("notes", {}).toString() == "capo 3",
+               "a show you save for yourself keeps your stage notes");
+
+        h.cmd ("addPart");
+        check ((bool) showsOf (h).getProperty ("changed", false), "a change to the rig shows as a change to the show");
+        h.cmd ("revertShow");
+        check (rackOf (h).getProperty ("parts", {}).size() == 1 && ! (bool) showsOf (h).getProperty ("changed", true),
+               "and Back to the show undoes it");
+        check (! (bool) h.emits.lastState()->getProperty ("editHistory", {}).getProperty ("canUndo", true),
+               "with nothing from before the show left to undo into it");
+
+        h.cmd ("openShow", { { "file", "../../outside.hostageshow" } });
+        check (h.emits.lastError().contains ("no show"), "a path is not a show");
+        h.cmd ("setStageLock", { { "enabled", true } });
+        h.cmd ("revertShow");
+        check (h.emits.lastError().contains ("Stage Lock"), "nor does anything happen to the show under Stage Lock");
+    }
+
+    // Somewhere else: a player with an empty library and a catalogue without the synth.
+    const auto playerDir = freshDataDir ("show-player");
+    {
+        Harness h (playerDir, {}, [] (InstrumentHostService::Options& o) { o.player = true; });
+        h.cmd ("getState");
+        h.cmd ("importShow", { { "path", showPath.getFullPathName() } });
+        const auto shows = showsOf (h);
+        check (shows.getProperty ("current", {}).getProperty ("name", {}).toString() == "Friday: Paradiso"
+                 && playerDir.getChildFile ("shows").getChildFile ("Friday Paradiso.hostageshow").existsAsFile(),
+               "a player imports a show into its own shows folder and opens it");
+        check (shows.getProperty ("missing", {}).size() == 1
+                 && shows.getProperty ("missing", {})[0].toString() == "Good Synth (Good Audio)",
+               "and says at once which plug-in this computer does not have");
+        const auto rack = rackOf (h);
+        check (rack.getProperty ("parts", {}).size() == 1
+                 && h.service->getRackHost().getPerformance().pages.size() == 1
+                 && h.service->getRackHost().getPerformance().setlist.items.getReference (0).rackRecordId == rackId,
+               "the rig, its control pages and its songs arrive as they were made");
+        check (recordIdNamed (h, "Second song rig") == rackId,
+               "and the second song's rack is in this library now, under the same id");
+        h.emits.clear();
+        h.cmd ("getSurfaceLayout");
+        check (h.emits.last ("instrumentHostSurfaceLayout")->getProperty ("userSurface", {}).toString() == "Advance 49",
+               "the controller the pages were drawn for comes with them");
+
+        h.cmd ("saveShow", { { "name", "Rehearsal" } });
+        check (showsOf (h).getProperty ("list", {}).size() == 2, "a player saves shows of its own");
+        h.cmd ("openShow", { { "file", "Friday Paradiso.hostageshow" } });
+        check (showsOf (h).getProperty ("current", {}).getProperty ("file", {}).toString() == "Friday Paradiso.hostageshow",
+               "and switches between them");
+        h.cmd ("importShow", { { "path", showPath.getFullPathName() } });
+        check (playerDir.getChildFile ("shows").getChildFile ("Friday Paradiso 2.hostageshow").existsAsFile(),
+               "importing the same show again keeps both, rather than overwriting one");
+        h.cmd ("deleteShow", { { "file", "Rehearsal.hostageshow" } });
+        check (! playerDir.getChildFile ("shows").getChildFile ("Rehearsal.hostageshow").exists(), "and deletes its own");
+    }
+
+    // Changes that go into the show as they happen, when that is what somebody chose.
+    {
+        Harness h (editorDir);
+        h.cmd ("getState");
+        h.cmd ("setShowChanges", { { "mode", "save" } });
+        h.cmd ("addPart");
+        check ((bool) showsOf (h).getProperty ("changed", false), "the change is noted at once");
+        juce::Thread::sleep (1700);
+        h.service->drainParameterEvents();
+        check (juce::JSON::parse (showPath).getProperty ("rack", {}).getProperty ("parts", {}).size() == 2
+                 && ! (bool) showsOf (h).getProperty ("changed", true),
+               "and written into the show's file once the changes settle");
+        h.cmd ("setShowChanges", { { "mode", "keep" } });
+    }
+
+    // A show that came with the program: opened on the very first start, never written.
+    {
+        const auto builtIn = freshDataDir ("show-builtin");
+        showPath.copyFileTo (builtIn.getChildFile ("Factory Set.hostageshow"));
+        const auto fresh = freshDataDir ("show-first-start");
+        Harness h (fresh, {}, [builtIn] (InstrumentHostService::Options& o) { o.builtInShowsDirectory = builtIn; });
+        h.cmd ("getState");
+        auto shows = showsOf (h);
+        check ((bool) shows.getProperty ("current", {}).getProperty ("builtIn", false)
+                 && rackOf (h).getProperty ("parts", {}).size() == 2,
+               "a program's first start opens the show it was built with");
+        h.cmd ("deleteShow", { { "file", "Factory Set.hostageshow" }, { "builtIn", true } });
+        check (h.emits.lastError().contains ("came with"), "which cannot be deleted");
+        h.cmd ("saveShow");
+        shows = showsOf (h);
+        check (! (bool) shows.getProperty ("current", {}).getProperty ("builtIn", true)
+                 && shows.getProperty ("list", {}).size() == 1
+                 && fresh.getChildFile ("shows").getChildFile ("Factory Set.hostageshow").existsAsFile()
+                 && builtIn.getChildFile ("Factory Set.hostageshow").getSize() == showPath.getSize(),
+               "saving it keeps this program's own copy, which takes its place; the original is untouched");
+    }
+
+    // What Build product ships: the show, with stage notes left out unless the project asks.
+    {
+        ceditor::host::player::Template from;
+        fakePlayerTemplate ("show-product-template", from);
+        const auto out = freshDataDir ("show-product-out");
+        Harness h (editorDir, {}, [from] (InstrumentHostService::Options& o)
+                   { o.creator = true; o.playerTemplate = from; o.innoCompiler = noInnoSetup(); });
+        h.cmd ("getState");
+        h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+        const auto product = juce::JSON::parse (editorDir.getChildFile ("product-show.hostageshow"));
+        check (product.getProperty ("format", {}).toString() == "hostage-show"
+                 && product.getProperty ("rack", {}).getProperty ("setlist", {}).getProperty ("items", {})[0]
+                      .getProperty ("notes", {}).toString().isEmpty(),
+               "Build product writes the show to ship, without the stage notes");
+    }
+}
+
+// A vendor preset the other computer has too, scanned there under an id of its own: the show's
+// rig is pointed at that record rather than given a copy pointing at the author's disk, so what
+// it plays is a preset this computer can load.
+void testShowFindsVendorPresetsAlreadyHere()
+{
+    std::cout << "\na show finds the vendor presets the other computer already has" << std::endl;
+
+    const auto writePreset = [] (const juce::File& root)
+    {
+        const auto file = root.getChildFile ("Test Audio").getChildFile ("Good Synth").getChildFile ("Warm Pad.vstpreset");
+        std::vector<std::uint8_t> bytes (64, 0);
+        std::memcpy (bytes.data(), "VST3", 4);
+        std::memcpy (bytes.data() + 8, "ABCDEF0123456789ABCDEF0123456789", 32);
+        file.getParentDirectory().createDirectory();
+        file.replaceWithData (bytes.data(), bytes.size());
+    };
+    const auto accepting = [] (InstrumentHostService::Options& o)
+    {
+        o.applyVstPreset = [] (juce::AudioProcessor&, const juce::File&) { return true; };
+    };
+    const auto idsNamed = [] (Harness& h, const juce::String& name)
+    {
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        juce::StringArray ids;
+        if (const auto* records = h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).getArray())
+            for (const auto& r : *records)
+                if (r.getProperty ("name", {}).toString() == name)
+                    ids.add (r.getProperty ("recordId", {}).toString());
+        return ids;
+    };
+    const auto startWithPreset = [&writePreset] (Harness& h, const juce::File& dir)
+    {
+        writePreset (dir.getChildFile ("presets"));
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("addLibraryPath", { { "path", dir.getChildFile ("presets").getFullPathName() } });
+        h.cmd ("scanLibrary");
+    };
+
+    const auto editorDir = freshDataDir ("show-vendor-editor");
+    seedCatalog (editorDir);
+    juce::String authorsId;
+    {
+        Harness h (editorDir, {}, accepting);
+        startWithPreset (h, editorDir);
+        authorsId = idsNamed (h, "Warm Pad")[0];
+        h.cmd ("loadLibraryRecord", { { "recordId", authorsId } });
+        check (h.service->getRackHost().getPerformance().parts.getReference (0).lastPresetRecordId == authorsId,
+               "the author's part plays the vendor preset");
+        h.cmd ("saveShow", { { "name", "Vendor" } });
+    }
+
+    const auto playerDir = freshDataDir ("show-vendor-player");
+    seedCatalog (playerDir);
+    {
+        Harness h (playerDir, {}, accepting);
+        startWithPreset (h, playerDir);
+        const auto localIds = idsNamed (h, "Warm Pad");
+        check (localIds.size() == 1 && localIds[0] != authorsId,
+               "this computer has the same preset, under an id of its own");
+        h.cmd ("importShow", { { "path", editorDir.getChildFile ("shows").getChildFile ("Vendor.hostageshow").getFullPathName() } });
+        check (h.service->getRackHost().getPerformance().parts.getReference (0).lastPresetRecordId == localIds[0],
+               "the show's part is pointed at this computer's record");
+        check (idsNamed (h, "Warm Pad").size() == 1,
+               "and no copy pointing at the author's disk is added beside it");
+    }
+}
+
+// A player is made by copying the HoSTage that is running (PlayerCreator.h): its programs, a
+// manifest that says "player" with an identity of its own, and the shows it is to play.
+juce::File fakePlayerTemplate (const juce::String& name, ceditor::host::player::Template& out)
+{
+    const auto root = freshDataDir (name);
+    const auto file = [] (const juce::File& f, const juce::String& text)
+    {
+        f.getParentDirectory().createDirectory();
+        f.replaceWithText (text);
+        return f;
+    };
+    out.standalone = file (root.getChildFile ("Hostage.exe"), "program");
+    out.companions = { file (root.getChildFile ("CEditorPluginScanner.exe"), "scanner"),
+                       file (root.getChildFile ("CEditorPluginWorker.exe"), "worker") };
+    out.vst3Bundle = root.getChildFile ("Hostage.vst3");
+    file (out.vst3Bundle.getChildFile ("Contents").getChildFile ("x86_64-win").getChildFile ("Hostage.vst3"), "module");
+    const auto resources = out.vst3Bundle.getChildFile ("Contents").getChildFile ("Resources");
+    file (resources.getChildFile ("moduleinfo.json"), "{}");
+    // What the HoSTage being copied shipped with itself, which is not the player's.
+    file (resources.getChildFile ("hostage.json"), R"({"role":"editor","product":{"name":"Hostage","appId":"11111111-2222-3333-4444-555555555555"}})");
+    file (resources.getChildFile ("shows").getChildFile ("Its Own.hostageshow"), "{}");
+    file (resources.getChildFile ("factory-performance.json"), "{}");
+    return root;
+}
+
+void testPlayerCreator()
+{
+    std::cout << "\nmaking a player: a folder copied from the HoSTage that is running" << std::endl;
+    namespace player = ceditor::host::player;
+    using ceditor::host::parseHostageManifest;
+
+    player::Template from;
+    fakePlayerTemplate ("player-template", from);
+    const auto shows = freshDataDir ("player-shows");
+    const auto gig = shows.getChildFile ("Gig.hostageshow");
+    const auto rehearsal = shows.getChildFile ("Rehearsal.hostageshow");
+    gig.replaceWithText (R"({"format":"hostage-show","name":"Gig"})");
+    rehearsal.replaceWithText (R"({"format":"hostage-show","name":"Rehearsal"})");
+    const auto destination = freshDataDir ("player-destination");
+
+    player::Request request;
+    request.name = "Friday: Rig";
+    request.appId = juce::Uuid().toDashedString().toUpperCase();
+    request.shows = { gig, rehearsal };
+    request.destination = destination;
+
+    auto refused = request;
+    refused.name = "  ";
+    refused.shows.clear();
+    refused.standalone = refused.vst3 = false;
+    refused.destination = destination.getChildFile ("nowhere");
+    const auto problems = player::plan (from, refused).problems;
+    check (problems.size() == 4 && problems.joinIntoString (" ").contains ("name")
+             && problems.joinIntoString (" ").contains ("at least one show")
+             && problems.joinIntoString (" ").contains ("standalone, the VST3")
+             && problems.joinIntoString (" ").contains ("folder"),
+           "everything that would stop it is said at once, before anything is touched");
+    check (! destination.getChildFile ("Friday Rig").exists(), "and nothing is made");
+    auto noProgram = request;
+    check (player::plan (player::Template {}, noProgram).problems.joinIntoString (" ").contains ("no standalone program"),
+           "a HoSTage with nothing to copy says so");
+
+    const auto plan = player::plan (from, request);
+    check (plan.problems.isEmpty() && plan.notes.isEmpty() && player::execute (plan).wasOk(), "it is made");
+    const auto folder = destination.getChildFile ("Friday Rig");
+    const auto standalone = folder.getChildFile ("Standalone");
+    const auto bundle = folder.getChildFile ("VST3").getChildFile ("Hostage.vst3");
+    const auto resources = bundle.getChildFile ("Contents").getChildFile ("Resources");
+    check (plan.folder == folder && standalone.getChildFile ("Friday Rig.exe").loadFileAsString() == "program"
+             && standalone.getChildFile ("CEditorPluginScanner.exe").existsAsFile()
+             && standalone.getChildFile ("CEditorPluginWorker.exe").existsAsFile(),
+           "the standalone is copied under the player's name, with its helpers beside it");
+    check (bundle.getChildFile ("Contents").getChildFile ("x86_64-win").getChildFile ("CEditorPluginWorker.exe").existsAsFile()
+             && resources.getChildFile ("moduleinfo.json").existsAsFile(),
+           "the VST3 bundle is copied whole, with the helpers beside its module");
+
+    for (const auto& where : { standalone, bundle.getChildFile ("Contents").getChildFile ("x86_64-win") })
+    {
+        const auto manifest = ceditor::host::readHostageManifestBeside (where);
+        check (manifest.player && manifest.productName == "Friday: Rig" && manifest.appId == request.appId
+                 && manifest.showFileName == "Gig.hostageshow",
+               "each says it is a player, with its own name and identity, opening the first show: " + where.getFileName());
+    }
+    check (standalone.getChildFile ("shows").getChildFile ("Rehearsal.hostageshow").existsAsFile()
+             && resources.getChildFile ("shows").getChildFile ("Gig.hostageshow").existsAsFile(),
+           "both get every show");
+    check (! resources.getChildFile ("shows").getChildFile ("Its Own.hostageshow").exists()
+             && ! resources.getChildFile ("factory-performance.json").exists(),
+           "and nothing the copied HoSTage shipped with itself, whose rack would open first");
+    check (folder.getChildFile ("Read me.txt").loadFileAsString().contains ("USB stick"),
+           "a note says what to do with the folder");
+
+    check (player::plan (from, request).folder == destination.getChildFile ("Friday Rig 2"),
+           "a second player of the same name is numbered, never written over the first");
+
+    auto broken = player::plan (from, request);
+    rehearsal.deleteFile();
+    check (player::execute (broken).failed() && ! broken.folder.exists(),
+           "a copy that fails half-way takes away what it made");
+}
+
+void testCreatePlayerCommand()
+{
+    std::cout << "\nmaking a player from the Shows utility" << std::endl;
+
+    ceditor::host::player::Template from;
+    fakePlayerTemplate ("player-command-template", from);
+    const auto destination = freshDataDir ("player-command-destination");
+    const auto dir = freshDataDir ("player-command");
+    seedCatalog (dir);
+
+    Harness h (dir, {}, [from] (InstrumentHostService::Options& o) { o.playerTemplate = from; });
+    h.cmd ("getState");
+    const auto players = [&h] { return h.emits.lastState()->getProperty ("players", {}); };
+    check ((bool) players().getProperty ("standalone", false) && (bool) players().getProperty ("vst3", false),
+           "the page is told what this HoSTage can copy");
+
+    h.cmd ("createPlayer", { { "name", "Rig" }, { "destination", destination.getFullPathName() } });
+    check (h.emits.lastError().contains ("at least one show"), "a player needs a show, and is told so first");
+
+    h.cmd ("saveShow", { { "name", "Gig" } });
+    juce::Array<juce::var> shows;
+    auto* row = new juce::DynamicObject();
+    row->setProperty ("file", "Gig.hostageshow");
+    shows.add (juce::var (row));
+    h.cmd ("createPlayer", { { "name", "Rig" }, { "shows", shows }, { "vst3", false },
+                             { "destination", destination.getFullPathName() } });
+    for (int i = 0; i < 200 && (bool) players().getProperty ("busy", true); ++i)
+    {
+        juce::Thread::sleep (10);
+        h.service->drainParameterEvents();
+    }
+    const auto last = players().getProperty ("last", {});
+    check ((bool) last.getProperty ("ok", false)
+             && last.getProperty ("folder", {}).toString() == destination.getChildFile ("Rig").getFullPathName()
+             && h.emits.last ("instrumentHostPlayerCreated") != nullptr,
+           "it is made on a thread of its own, and the page hears where");
+    check (destination.getChildFile ("Rig").getChildFile ("Standalone").getChildFile ("shows")
+               .getChildFile ("Gig.hostageshow").existsAsFile()
+             && ! destination.getChildFile ("Rig").getChildFile ("VST3").exists(),
+           "with the show, and only the parts asked for");
+
+    Harness withNothing (freshDataDir ("player-command-empty"));
+    withNothing.cmd ("getState");
+    withNothing.cmd ("createPlayer", { { "name", "Rig" }, { "shows", shows } });
+    check (withNothing.emits.lastError().contains ("no standalone program"),
+           "a HoSTage with nothing to copy says so before asking for a folder");
+
+    Harness inPlayer (freshDataDir ("player-command-player"), {}, [from] (InstrumentHostService::Options& o)
+                      { o.player = true; o.playerTemplate = from; });
+    inPlayer.cmd ("getState");
+    inPlayer.cmd ("createPlayer", { { "name", "Rig" } });
+    check (inPlayer.emits.lastError().contains ("cannot build"), "and a player does not make players");
+}
+
+// A portable player (step 6) keeps its data beside it, on the stick, when it can write there.
+void testPortableData()
+{
+    std::cout << "\na portable player keeps its data beside it" << std::endl;
+    using namespace ceditor::host;
+
+    const auto root = freshDataDir ("portable-root");
+    const auto stick = freshDataDir ("portable-stick").getChildFile ("Standalone");
+    stick.createDirectory();
+    const auto portable = parseHostageManifest (juce::JSON::parse (
+        R"({"role":"player","product":{"name":"Stick Rig","appId":"8f3a6c2e-1b4d-4e5f-9a7b-0c1d2e3f4a5b"},"portable":true})"));
+    check (portable.portable && portable.player, "hostage.json says it is portable");
+
+    check (dataDirectoryFor (portable, stick, root) == stick.getChildFile ("Data")
+             && ! stick.getChildFile ("Data").getChildFile (".write-test").exists(),
+           "its data goes in a Data folder beside the program, and the write test leaves nothing behind");
+    auto settled = portable;
+    settled.portable = false;
+    check (dataDirectoryFor (settled, stick, root) == productDataDirectory (root, settled),
+           "a player that is not portable keeps its data on the computer, as before");
+
+    // Somewhere it cannot write: here, a "folder" that is really a file.
+    const auto blocked = freshDataDir ("portable-blocked").getChildFile ("not-a-folder");
+    blocked.replaceWithText ("x");
+    check (dataDirectoryFor (portable, blocked, root) == productDataDirectory (root, portable),
+           "where it cannot write beside itself, it still starts, with its data on this computer");
+
+    namespace player = ceditor::host::player;
+    player::Template from;
+    fakePlayerTemplate ("portable-template", from);
+    const auto show = freshDataDir ("portable-show").getChildFile ("Gig.hostageshow");
+    show.replaceWithText ("{}");
+    player::Request request;
+    request.name = "Stick Rig";
+    request.appId = juce::Uuid().toDashedString().toUpperCase();
+    request.shows = { show };
+    request.portable = true;
+    request.destination = freshDataDir ("portable-destination");
+    const auto plan = player::plan (from, request);
+    check (player::execute (plan).wasOk(), "a portable player is made");
+    const auto made = readHostageManifestBeside (plan.folder.getChildFile ("Standalone"));
+    check (made.portable && made.player, "and says so in its hostage.json");
+    check (plan.folder.getChildFile ("Read me.txt").loadFileAsString().contains ("Data folder beside it"),
+           "and its note says where its data goes");
+}
+
+// Build product in the creator (ProductBuilder.h; step 5): the programs a player is made of,
+// with the editor's manifest, the Host Project's identity and the show, ready for Inno Setup.
+void testProductBuilder()
+{
+    std::cout << "\nbuilding a product: the programs, the show, and the installer's switches" << std::endl;
+    namespace player = ceditor::host::player;
+    namespace product = ceditor::host::product;
+
+    player::Template from;
+    fakePlayerTemplate ("product-template", from);
+    const auto show = freshDataDir ("product-show").getChildFile ("product-show.hostageshow");
+    show.replaceWithText (R"({"format":"hostage-show","name":"Super Rack!"})");
+    const auto destination = freshDataDir ("product-destination");
+    const auto script = freshDataDir ("product-script").getChildFile ("HostProductTemplate.iss");
+
+    product::Request request;
+    request.project = product::Project::fromVar (juce::JSON::parse (
+        R"({"productName":" Super Rack! ","version":"1.2.0","publisher":"Tedjuh","appId":"8f3a6c2e-1b4d-4e5f-9a7b-0c1d2e3f4a5b"})"));
+    request.show = show;
+    request.destination = destination;
+    check (request.project.name == "Super Rack!" && request.project.appId == "8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B"
+             && request.project.standalone && request.project.vst3,
+           "the Host Project is read as a build reads it, its identity upper-cased as the runtime does");
+
+    auto refused = request;
+    refused.project.name = "A \"Live\" Rig";
+    refused.project.version = "1.2-beta";
+    refused.project.standalone = refused.project.vst3 = false;
+    refused.destination = destination.getChildFile ("nowhere");
+    const auto problems = product::plan (from, refused).problems.joinIntoString (" ");
+    check (problems.contains ("cannot contain") && problems.contains ("dotted numbers")
+             && problems.contains ("no targets") && problems.contains ("Choose a folder"),
+           "everything that would stop it is said at once");
+    check (! destination.getChildFile ("A Live Rig 1.2-beta").exists(), "and nothing is made");
+
+    auto helperless = from;
+    helperless.companions.clear();
+    check (product::problemsWith (helperless, request, false).joinIntoString (" ").contains ("scanner"),
+           "a product without the scanner and the worker is not built: it would install and do nothing");
+    check (product::problemsWith ({}, request, false).joinIntoString (" ").contains ("no HoSTage standalone"),
+           "nor one with nothing to build it from");
+
+    const auto plan = product::plan (from, request);
+    check (plan.problems.isEmpty() && player::execute (plan).wasOk(), "it is built");
+    const auto folder = destination.getChildFile ("Super Rack! 1.2.0");
+    const auto standalone = folder.getChildFile ("Standalone");
+    const auto bundle = folder.getChildFile ("VST3").getChildFile ("Hostage.vst3");
+    const auto resources = bundle.getChildFile ("Contents").getChildFile ("Resources");
+    check (plan.folder == folder && standalone.getChildFile ("Super Rack!.exe").loadFileAsString() == "program"
+             && standalone.getChildFile ("CEditorPluginWorker.exe").existsAsFile()
+             && bundle.getChildFile ("Contents").getChildFile ("x86_64-win").getChildFile ("CEditorPluginScanner.exe").existsAsFile(),
+           "in a folder named for the product and its version: the standalone under the product's name, both helpers");
+    for (const auto& where : { standalone, bundle.getChildFile ("Contents").getChildFile ("x86_64-win") })
+    {
+        const auto manifest = ceditor::host::readHostageManifestBeside (where);
+        check (! manifest.player && manifest.productName == "Super Rack!"
+                 && manifest.appId == "8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B"
+                 && manifest.showFileName == "Super Rack!.hostageshow",
+               "each is the editor, under the product's name and identity, opening its show: " + where.getFileName());
+    }
+    check (standalone.getChildFile ("shows").getChildFile ("Super Rack!.hostageshow").loadFileAsString().contains ("hostage-show")
+             && resources.getChildFile ("shows").getChildFile ("Super Rack!.hostageshow").existsAsFile()
+             && ! resources.getChildFile ("shows").getChildFile ("Its Own.hostageshow").exists()
+             && ! resources.getChildFile ("factory-performance.json").exists(),
+           "the show ships under the product's name, and nothing the template shipped with itself");
+    check (folder.getChildFile ("Read me.txt").loadFileAsString().contains ("SuperRack-Setup-1.2.0.exe"),
+           "a note says what the folder is, and which file the installer is");
+    check (product::plan (from, request).folder == destination.getChildFile ("Super Rack! 1.2.0 2"),
+           "a second build of the same version is numbered, never written over the first");
+
+    // The switches are build-host-product.mjs's, in its order (hostProductBuild.test.js reads both).
+    const auto args = product::isccArgs (from, request, folder, script);
+    const juce::StringArray expected {
+        "/DMyAppName=Super Rack!", "/DMyAppVersion=1.2.0", "/DMyAppPublisher=Tedjuh",
+        "/DMyAppId=8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B", "/DMySetupBase=SuperRack",
+        "/DMySourceDir=" + folder.getFullPathName(), "/DMyOutputDir=" + folder.getFullPathName(),
+        "/DIncludeStandalone=1", "/DIncludeVst3=1", "/DMyAppExeName=Super Rack!.exe",
+        "/DMyVst3BundleName=Hostage.vst3", script.getFullPathName() };
+    check (args == expected, "Inno Setup is given the project as the developer's build gives it");
+    auto vst3Only = request;
+    vst3Only.project.standalone = false;
+    const auto vst3Args = product::isccArgs (from, vst3Only, folder, script);
+    check (vst3Args.contains ("/DIncludeStandalone=0") && ! vst3Args.joinIntoString (" ").contains ("MyAppExeName"),
+           "and only the parts that were built");
+
+    // What an installed CEditor builds from: templates/hostage beside it (package-installer.ps1),
+    // and the scanner and worker CEditor installs beside itself.
+   #if JUCE_WINDOWS
+    const juce::String exe (".exe");
+   #else
+    const juce::String exe;
+   #endif
+    const auto installed = freshDataDir ("installed-ceditor");
+    const auto hostage = installed.getChildFile ("templates").getChildFile ("hostage");
+    const auto make = [] (const juce::File& f) { f.getParentDirectory().createDirectory(); f.replaceWithText ("x"); return f; };
+    make (installed.getChildFile ("CEditorPluginScanner" + exe));
+    make (installed.getChildFile ("CEditorPluginWorker" + exe));
+    check (! player::findInstalledTemplate (hostage, installed).hasStandalone()
+             && player::findInstalledTemplate (hostage, installed).companions.isEmpty(),
+           "without templates/hostage there is nothing to build from, and no helpers are offered for nothing");
+    make (hostage.getChildFile ("Standalone").getChildFile ("Hostage" + exe));
+    make (hostage.getChildFile ("VST3").getChildFile ("Hostage.vst3").getChildFile ("Contents").getChildFile ("x86_64-win").getChildFile ("Hostage.vst3"));
+    auto found = player::findInstalledTemplate (hostage, installed);
+    check (found.standalone == hostage.getChildFile ("Standalone").getChildFile ("Hostage" + exe)
+             && found.vst3Bundle == hostage.getChildFile ("VST3").getChildFile ("Hostage.vst3")
+             && found.companions.size() == 2 && found.companions[0].getParentDirectory() == installed,
+           "the installed template is found, with CEditor's own scanner and worker beside it");
+    make (hostage.getChildFile ("Standalone").getChildFile ("CEditorPluginScanner" + exe));
+    found = player::findInstalledTemplate (hostage, installed);
+    check (found.standalone.getFileNameWithoutExtension() == "Hostage"
+             && found.companions[0].getParentDirectory() == hostage.getChildFile ("Standalone"),
+           "a helper the template brings is preferred, and is never taken for the program");
+}
+
+void testBuildProductCommand()
+{
+    std::cout << "\nBuild product in the creator: on a thread, with Inno Setup when it is there" << std::endl;
+
+    ceditor::host::player::Template from;
+    fakePlayerTemplate ("build-command-template", from);
+    const auto dir = freshDataDir ("build-command");
+    seedCatalog (dir);
+    const auto script = freshDataDir ("build-command-script").getChildFile ("HostProductTemplate.iss");
+    script.replaceWithText ("; the template");
+    const auto creatorOf = [] (Harness& h) { return h.emits.lastState()->getProperty ("creator", {}); };
+    const auto finished = [&creatorOf] (Harness& h)
+    {
+        for (int i = 0; i < 500 && (bool) creatorOf (h).getProperty ("busy", true); ++i)
+        {
+            juce::Thread::sleep (10);
+            h.service->drainParameterEvents();
+        }
+        return creatorOf (h).getProperty ("last", {});
+    };
+
+    // Without Inno Setup the folder is the product, and the build says what it skipped.
+    {
+        const auto out = freshDataDir ("build-command-folder");
+        Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+                   { o.creator = true; o.playerTemplate = from; o.installerScript = script; o.innoCompiler = noInnoSetup(); });
+        h.cmd ("getState");
+        const auto creator = creatorOf (h);
+        check ((bool) creator.getProperty ("available", false) && (bool) creator.getProperty ("standalone", false)
+                 && (bool) creator.getProperty ("vst3", false) && (bool) creator.getProperty ("helpers", false)
+                 && ! (bool) creator.getProperty ("installer", true)
+                 && ! (bool) creator.getProperty ("licence", {}).getProperty ("required", true),
+               "the page is told what the creator can build, and that this build asks for no licence");
+        h.cmd ("setHostProject", { { "productName", "Night Rack" }, { "version", "2.0.0" } });
+        h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+        check ((bool) creatorOf (h).getProperty ("busy", false), "it builds on a thread of its own");
+        const auto last = finished (h);
+        check ((bool) last.getProperty ("ok", false) && last.getProperty ("installer", {}).toString().isEmpty()
+                 && last.getProperty ("message", {}).toString().contains ("Inno Setup 6 was not found"),
+               "it is built as a folder, and says the installer is what it skipped");
+        check (out.getChildFile ("Night Rack 2.0.0").getChildFile ("Standalone").getChildFile ("shows")
+                 .getChildFile ("Night Rack.hostageshow").existsAsFile(),
+               "with the show the editor is running");
+        const auto* done = h.emits.last ("instrumentHostBuildProgress");
+        check (done != nullptr && (bool) done->getProperty ("done", false) && (bool) done->getProperty ("ok", false)
+                 && h.emits.count ("instrumentHostBuildProgress") >= 3
+                 && h.emits.last ("instrumentHostProductBuilt") != nullptr,
+               "the build log runs to its end, and the page hears where the product is");
+    }
+
+   #if ! JUCE_WINDOWS
+    // A stand-in for Inno Setup that writes the setup file where it is told to, and says so.
+    const auto fakeIscc = [] (const juce::String& name, const juce::String& lastLine)
+    {
+        const auto file = freshDataDir (name).getChildFile ("ISCC");
+        file.replaceWithText ("#!/bin/sh\n"
+                              "for a in \"$@\"; do printf '%s\\n' \"$a\"; done > \"$(dirname \"$0\")/args.txt\"\n"
+                              "for a in \"$@\"; do case \"$a\" in\n"
+                              "  /DMyOutputDir=*) out=\"${a#/DMyOutputDir=}\";;\n"
+                              "  /DMySetupBase=*) base=\"${a#/DMySetupBase=}\";;\n"
+                              "  /DMyAppVersion=*) ver=\"${a#/DMyAppVersion=}\";;\n"
+                              "esac; done\n"
+                              "echo \"Compiling $base\"\n"
+                              + lastLine + "\n", false, false, "\n");   // not \r\n: "/bin/sh\r" is no shell
+        file.setExecutePermission (true);
+        return file;
+    };
+
+    {
+        const auto out = freshDataDir ("build-command-installer");
+        const auto iscc = fakeIscc ("build-command-iscc", "printf setup > \"$out/$base-Setup-$ver.exe\"");
+        Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+                   { o.creator = true; o.playerTemplate = from; o.installerScript = script; o.innoCompiler = iscc; });
+        h.cmd ("getState");
+        h.cmd ("getHostProject");
+        check ((bool) creatorOf (h).getProperty ("installer", false),
+               "with Inno Setup there, the page is told a build makes an installer");
+        h.emits.clear();
+        h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+        const auto last = finished (h);
+        const auto setup = out.getChildFile ("Night Rack 2.0.0").getChildFile ("NightRack-Setup-2.0.0.exe");
+
+        check ((bool) last.getProperty ("ok", false) && setup.existsAsFile()
+                 && last.getProperty ("installer", {}).toString() == setup.getFullPathName(),
+               "Inno Setup is run over the folder, and the installer is in it");
+        const auto passed = juce::StringArray::fromLines (iscc.getSiblingFile ("args.txt").loadFileAsString().trim());
+        check (passed.contains ("/DMyAppName=Night Rack") && passed.contains ("/DMyAppExeName=Night Rack.exe")
+                 && passed[passed.size() - 1] == script.getFullPathName(),
+               "with the project's switches, and the template's script last");
+        bool printed = false;
+        for (const auto& e : h.emits.entries)
+            if (e.name == "instrumentHostBuildProgress" && e.payload.getProperty ("line", {}).toString() == "Compiling NightRack")
+                printed = true;
+        check (printed, "and what Inno Setup prints reaches the build log");
+    }
+
+    {
+        const auto out = freshDataDir ("build-command-failing");
+        const auto iscc = fakeIscc ("build-command-iscc-failing", "exit 2");
+        Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+                   { o.creator = true; o.playerTemplate = from; o.installerScript = script; o.innoCompiler = iscc; });
+        h.cmd ("getState");
+        h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+        const auto last = finished (h);
+        check (! (bool) last.getProperty ("ok", true) && last.getProperty ("message", {}).toString().contains ("exit code 2)")
+                 && out.getChildFile ("Night Rack 2.0.0").getChildFile ("Standalone").isDirectory()
+                 && h.emits.lastError().contains ("could not be made"),
+               "an installer that fails is said to have failed, and the folder it was made from stays");
+    }
+   #endif
+
+    {
+        Harness h (freshDataDir ("build-command-not-creator"), {}, [from] (InstrumentHostService::Options& o)
+                   { o.playerTemplate = from; });
+        h.cmd ("getState");
+        h.cmd ("buildHostProduct", { { "outputDirectory", freshDataDir ("build-command-nowhere").getFullPathName() } });
+        check (h.emits.lastError().contains ("built in CEditor")
+                 && ! (bool) creatorOf (h).getProperty ("available", true),
+               "a HoSTage is not the creator: it makes players, and says where products are built");
+    }
+}
+
+// The Creator licence (step 5): asked for only when a key is compiled in, kept apart from the
+// tab's own licence, and nothing is built without it.
+void testCreatorLicence()
+{
+    std::cout << "\nthe Creator licence, when the build asks for one" << std::endl;
+
+    ceditor::host::player::Template from;
+    fakePlayerTemplate ("creator-licence-template", from);
+    const auto dir = freshDataDir ("creator-licence");
+    seedCatalog (dir);
+    const auto out = freshDataDir ("creator-licence-out");
+    Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+               { o.creator = true; o.playerTemplate = from; o.innoCompiler = noInnoSetup();
+                 o.creatorPublicKey = testKeys().first; });
+    h.cmd ("getState");
+    const auto tabLicence = dir.getChildFile ("licence.celicence").loadFileAsString();
+    const auto licence = [&h] { return h.emits.lastState()->getProperty ("creator", {}).getProperty ("licence", {}); };
+    const auto nothingBuilt = [&out] { return out.findChildFiles (juce::File::findFilesAndDirectories, false).isEmpty(); };
+    check ((bool) licence().getProperty ("required", false) && ! (bool) licence().getProperty ("licensed", true)
+             && licence().getProperty ("detail", {}).toString() == "No Creator licence is installed.",
+           "a build with a key asks for a Creator licence, and says there is none");
+    h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+    check (h.emits.lastError().contains ("needs a Creator licence") && nothingBuilt(),
+           "without one, nothing is built");
+
+    licensing::LicenceDocument document;
+    document.productId = "11111111-2222-3333-4444-555555555555";
+    document.licensee = "Studio Tedjuh";
+    document.edition = licensing::Edition::core;
+    const auto licenceText = [&document] { return juce::JSON::toString (licensing::makeLicenceFile (document, testKeys().second)); };
+    h.cmd ("installCreatorLicence", { { "text", licenceText() } });
+    check (h.emits.lastError().contains ("not this product") && ! (bool) licence().getProperty ("licensed", true),
+           "a genuine licence for a product is not a Creator licence");
+
+    document.productId = ceditor::host::product::creatorProductId;
+    h.emits.clear();
+    h.cmd ("installCreatorLicence", { { "text", licenceText() } });
+    check (h.emits.lastError().isEmpty() && (bool) licence().getProperty ("licensed", false)
+             && licence().getProperty ("licensee", {}).toString() == "Studio Tedjuh",
+           "a Creator licence is installed");
+    check (dir.getChildFile ("creator").getChildFile ("licence.celicence").existsAsFile()
+             && dir.getChildFile ("licence.celicence").loadFileAsString() == tabLicence,
+           "in a folder of its own, not in place of the tab's own licence");
+
+    h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+    for (int i = 0; i < 500 && (bool) h.emits.lastState()->getProperty ("creator", {}).getProperty ("busy", true); ++i)
+    {
+        juce::Thread::sleep (10);
+        h.service->drainParameterEvents();
+    }
+    check ((bool) h.emits.lastState()->getProperty ("creator", {}).getProperty ("last", {}).getProperty ("ok", false)
+             && ! nothingBuilt(),
+           "with it, the product is built");
+
+    h.cmd ("removeCreatorLicence");
+    const bool removed = ! (bool) licence().getProperty ("licensed", true);
+    h.emits.clear();
+    h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+    check (removed && h.emits.lastError().contains ("needs a Creator licence"),
+           "and once it is removed, building waits for one again");
+
+    Harness inPlayer (freshDataDir ("creator-licence-player"), {}, [&] (InstrumentHostService::Options& o)
+                      { o.player = true; o.creator = true; o.creatorPublicKey = testKeys().first; });
+    inPlayer.cmd ("getState");
+    inPlayer.cmd ("installCreatorLicence", { { "text", licenceText() } });
+    check (inPlayer.emits.lastError().contains ("cannot build"), "a player has no use for one");
+}
+
+// Which stage pages the keyboard shows is the player's choice, made once. Before, every page
+// switched itself off again at the next launch, and a set rehearsed with METERS and CUE on the
+// keyboard opened the next evening without them. The browser is a mode, not a page, and stays
+// off at every start.
+void testCtrl49StagePagesRemembered()
+{
+    std::cout << "\nthe CTRL49's stage pages are remembered between sessions" << std::endl;
+
+    const auto dir = freshDataDir ("surface-pages-remembered");
+    seedCatalog (dir);
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        check (! h.service->metersOnSurface() && ! h.service->cueOnSurface() && ! h.service->layersOnSurface(),
+               "a first session has no stage pages until they are asked for");
+        h.cmd ("metersOnSurface", { { "on", true } });
+        h.cmd ("cueOnSurface", { { "on", true } });
+        h.cmd ("layersOnSurface", { { "on", true } });
+        h.cmd ("layersOnSurface", { { "on", false } });
+        h.cmd ("browseOnSurface", { { "on", true } });
+        check (h.service->browsingOnSurface(), "the browser is on for now");
+    }
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        check (h.service->metersOnSurface() && h.service->cueOnSurface(),
+               "pages switched on are on again in the next session");
+        check (! h.service->layersOnSurface() && ! h.service->liveOnSurface(),
+               "a page switched off again, or never on, stays off");
+        check (! h.service->browsingOnSurface(), "the browser is not remembered: every start shows the pages");
+        const auto pages = h.emits.lastState()->getProperty ("surfacePages", {});
+        check ((bool) pages.getProperty ("meters", false) && (bool) pages.getProperty ("cue", false)
+                 && ! (bool) pages.getProperty ("layers", true),
+               "and the app's state says so from the start");
+    }
 }
 
 void testCtrl49Meters()
@@ -14525,8 +15555,8 @@ void testHostProject()
 
         h.emits.clear();
         h.cmd ("buildHostProduct");
-        check (h.emits.lastError().contains ("not available"),
-               "building without a runBuild hook refuses aloud");
+        check (h.emits.lastError().contains ("built in CEditor"),
+               "a HoSTage that is not the creator says where products are built");
     }
 
     {
@@ -14545,29 +15575,19 @@ void testHostProject()
     }
 
     {
-        juce::var builtProject;
-        juce::String builtOutputDir;
-        Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
-        {
-            o.runBuild = [&] (const juce::var& project, const juce::String& outputDirectory)
-            {
-                builtProject = project;
-                builtOutputDir = outputDirectory;
-            };
-        });
-
-        h.cmd ("buildHostProduct", { { "outputDirectory", "D:\\out" } });
-        check (builtProject.getProperty ("productName", {}).toString() == "Super Rack"
-                 && builtOutputDir == "D:\\out",
-               "buildHostProduct hands the hook the manifest and the destination");
-
+        ceditor::host::player::Template from;
+        fakePlayerTemplate ("host-project-template", from);
+        const auto out = freshDataDir ("host-project-out");
+        Harness h (dir, {}, [from] (InstrumentHostService::Options& o)
+                   { o.creator = true; o.playerTemplate = from; o.innoCompiler = noInnoSetup(); });
+        h.cmd ("getState");
         h.cmd ("setHostProject", { { "includeStandalone", false } });   // includeVst3 already off
         h.emits.clear();
-        builtProject = juce::var();
-        h.cmd ("buildHostProduct");
+        h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
         check (h.emits.lastError().contains ("no targets"),
                "a project with every target off refuses to build");
-        check (builtProject.isVoid(), "and the hook never runs");
+        check (out.findChildFiles (juce::File::findFilesAndDirectories, false).isEmpty(),
+               "and nothing is made");
     }
 }
 
@@ -15029,6 +16049,20 @@ int main (int argc, char* argv[])
     testCtrl49Broker();
     testCtrl49AppScreen();
     testCtrl49StagePages();
+    testCtrl49StagePagesRemembered();
+    testPlayerRole();
+    testTryAsPlayer();
+    testHostageManifest();
+    testHardwareClaimShared();
+    testLegacyDataOffer();
+    testShows();
+    testShowFindsVendorPresetsAlreadyHere();
+    testPlayerCreator();
+    testCreatePlayerCommand();
+    testPortableData();
+    testProductBuilder();
+    testBuildProductCommand();
+    testCreatorLicence();
     testCtrl49Meters();
     testCtrl49Live();
     testCtrl49Discover();

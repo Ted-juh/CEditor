@@ -112,6 +112,18 @@ juce::String Library::addCapturedRecord (LibraryRecord record)
     return id;
 }
 
+bool Library::adoptRecord (LibraryRecord record)
+{
+    if (record.recordId.isEmpty() || find (record.recordId) != nullptr)
+        return false;
+    if (record.addedAtMs <= 0)
+        record.addedAtMs = juce::Time::currentTimeMillis();
+    const auto id = record.recordId;
+    records.add (std::move (record));
+    changes.records[id] = LibraryChanges::created;
+    return true;
+}
+
 bool Library::removeRecord (const juce::String& recordIdToRemove)
 {
     // Copied, because callers pass `record->recordId` — a reference into the element this is

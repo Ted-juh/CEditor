@@ -108,10 +108,27 @@ const carriedFont = {
   required: ['family', 'data'],
   properties: {
     family: { type: 'string', pattern: '\\S' },
+    label: string,
     weight: string,
     style: string,
     unicodeRange: string,
     data: { type: 'string', pattern: '^data:' },
+  },
+};
+
+// A library icon the panel carries with it (utils/documentIcons.js). `id` and `name` are the
+// library entry's, so a control's Icon.assetId still finds it.
+const carriedIcon = {
+  type: 'object',
+  required: ['id', 'name', 'dataUrl'],
+  properties: {
+    id: { type: 'string', pattern: '\\S' },
+    name: string,
+    dataUrl: { type: 'string', pattern: '^data:image/' },
+    mimeType: string,
+    isVector: { type: 'boolean' },
+    width: { type: 'number', minimum: 0 },
+    height: { type: 'number', minimum: 0 },
   },
 };
 
@@ -160,5 +177,6 @@ export const PANEL_DOCUMENT_SCHEMA = {
     scripts: { type: 'array', items: script },
     exportParameters: { type: 'array', items: exportParameter },
     fonts: { type: 'array', items: carriedFont },
+    icons: { type: 'array', items: carriedIcon },
   },
 };

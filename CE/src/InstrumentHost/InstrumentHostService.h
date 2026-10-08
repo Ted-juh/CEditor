@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <deque>
 #include <functional>
 #include <cstddef>
@@ -20,6 +21,7 @@
 #include "SetlistSoundcheck.h"
 #include "ParameterModel.h"
 #include "Library.h"
+#include "ProductBuilder.h"
 #include "LibraryStore.h"
 #include "SnapshotStore.h"
 #include "RecentPlay.h"
@@ -77,8 +79,12 @@
 //   getHostProject | setHostProject {productName?,version?,publisher?,includeStandalone?,
 //     includeVst3?} | buildHostProduct {outputDirectory?}
 //     (both project commands answer with instrumentHostProject; the appId is minted once and
-//      never writable from the page — installer identity survives every rename. Building goes
-//      through Options::runBuild; without the hook the command refuses aloud.)
+//      never writable from the page — installer identity survives every rename. Building is
+//      the creator's (Options::creator): the programs copied into a product folder and Inno
+//      Setup run over it when it is there, on a thread, printing instrumentHostBuildProgress
+//      lines; without outputDirectory it asks for a folder. Elsewhere it refuses aloud.)
+//   installCreatorLicence {text | path} | removeCreatorLicence
+//     (the Creator licence that Build product needs when a key is compiled in; state.creator)
 //   getParameters {partId} | setParameter {partId,id,value} | resetParameter {partId,id}
 //   beginParameterGesture {partId,id} | endParameterGesture {partId,id}
 //     (the Stage 2 parameter model: getParameters answers with instrumentHostParameters —
@@ -382,10 +388,22 @@ public:
         // into the library. Default (nullptr) = run it inline, which is what a test with an
         // inline executor wants and what an app must NOT leave unset.
         std::function<void (std::function<void()>)> onControlThread;
-        // Launches the Host Project build pipeline (the app streams a node child process;
-        // tests capture the call). Absent = building is not available in this build, and
-        // buildHostProduct says so instead of doing nothing.
-        std::function<void (const juce::var& project, const juce::String& outputDirectory)> runBuild;
+        // -- Build product: the creator's (ProductBuilder.h) --------------------------------
+        /** This program builds products: CEditor's Hostage tab, the creator. A HoSTage program
+            is not one (it makes players), and buildHostProduct says where products are built.
+            What a product is copied from is playerTemplate, the same programs a player is. */
+        bool creator = false;
+        /** tools/installer/HostProductTemplate.iss, the installer's script. Not there: products
+            are built as their folders, and the build says the installer is what it skipped. */
+        juce::File installerScript;
+        /** Inno Setup's compiler. Empty: looked for where Inno Setup installs it
+            (product::findInnoCompiler). A file that is not there: none, which is what a test
+            that wants the folder alone passes. */
+        juce::File innoCompiler;
+        /** The public half of the key Creator licences are signed with (CEditorLicenceTool
+            keypair), compiled into the creator. Empty: this build asks for no Creator licence
+            and Build product is open, which is every build until the owner sets one. */
+        juce::String creatorPublicKey;
         // Opens the native directory picker and calls back with the chosen path — empty for
         // cancel. The app provides an async FileChooser; absent (tests, plain browser) makes
         // browseScanPath refuse aloud rather than silently do nothing.
@@ -426,6 +444,44 @@ public:
             reads whatever the developer happens to have installed is not a test — it passes on
             a clean machine and fails on a working one, which is the worst way round. */
         bool includeDefaultScanRoots = true;
+        /** Which program this is (docs/design/hostage-creator-editor-player.md). The editor
+            makes screens, control pages and players; a player shows the ones it was given and
+            refuses the commands that would change them — here, natively, the way Stage Lock
+            refuses rig edits, so nothing the page or a script sends gets around it. The runtime
+            shells read it from hostage.json beside the program (HostageManifest.h); CEditor's
+            tab is always the editor. Everything else a player keeps, and Stage Lock restricts. */
+        bool player = false;
+        /** Where the claim on the hardware surface is kept. One keyboard has one owner, so
+            every HoSTage on the machine — CEditor's tab, each product, each instance in a DAW —
+            claims it in the same place, whichever folder its own data is in. Empty means
+            dataDirectory, which is what a test with one service wants. */
+        juce::File hardwareClaimDirectory;
+        /** Where this program's data was kept before it had a folder of its own: the folder every
+            built product shared until each knew which product it was (HostageManifest.h). When
+            it holds a rig, the page offers once to bring it over (adoptLegacyData, applied at the
+            next start, before anything reads the data folder) or to leave it (declineLegacyData).
+            Empty: nothing to offer. */
+        juce::File legacyDataDirectory;
+        /** Shows that ship with the program (HostShow.h). Read-only; listed beside the shows saved
+            in the data folder's shows/. The runtime shells find them beside the program. Empty:
+            none. */
+        juce::File builtInShowsDirectory;
+        /** Which built-in show a program opens the first time it starts, before it has a session:
+            a file name in builtInShowsDirectory. Empty: the first one there. */
+        juce::String firstShowFileName;
+        /** Opens the native file chooser for a show and calls back with the chosen file, empty for
+            cancel. `saving` asks where to write one. Absent (tests, plain browser): importShow and
+            exportShow refuse aloud, as pickDirectory does. */
+        std::function<void (bool saving, const juce::String& suggestedName,
+                            std::function<void (const juce::String& file)>)> pickShowFile;
+        /** The programs a player is made of (PlayerCreator.h): this HoSTage's own standalone, its
+            helpers and its VST3, found by the shell. Empty: this program cannot make players,
+            and createPlayer says so. */
+        player::Template playerTemplate;
+        /** Opens the native folder chooser under a title and calls back with the chosen folder,
+            empty for cancel. Absent: createPlayer needs its destination in the command. */
+        std::function<void (const juce::String& title,
+                            std::function<void (const juce::String& folder)>)> pickFolder;
         double sampleRate = 44100.0;
         int blockSize = 512;
     };
@@ -447,6 +503,8 @@ public:
     const InstrumentRackHost& getRackHost() const     { return rack; }
     bool isScanning() const                           { return scanBusy.load(); }
     bool isStageLocked() const noexcept               { return stageLocked; }
+    /** Acting as a player: installed as one, or an editor trying its show as one. */
+    bool isPlayer() const noexcept                    { return options.player || tryingPlayer; }
 
     // -- wrapper-context API --------------------------------------------------------------
     // The generated targets drive the service beside the bridge, not through it. The
@@ -1625,6 +1683,10 @@ private:
     // owner in a performance view. The unlock clock is native so a WebView click cannot
     // bypass the hold gesture by sending `enabled: false` directly.
     bool stageLocked = false;
+    // "Try as player" — the editor running its show as the player will, to test before it
+    // creates one. Session-only like Stage Lock; a program installed as a player has no editor
+    // to go back to and refuses to leave.
+    bool tryingPlayer = false;
     double stageUnlockStartedMs = 0.0;
     static constexpr double stageUnlockHoldMs = 900.0;
     juce::var hostProject;          // the Host Project manifest; loaded/minted on first ask
@@ -1909,7 +1971,118 @@ private:
     static constexpr juce::int64 hardwareSendFenceMs = 6000;
     static constexpr juce::int64 hardwareClaimTimeoutMs = 8000;
 
-    juce::File hardwareOwnerFile() const { return options.dataDirectory.getChildFile ("hardware-owner.json"); }
+    juce::File hardwareClaimDirectory() const
+    {
+        return options.hardwareClaimDirectory != juce::File() ? options.hardwareClaimDirectory
+                                                              : options.dataDirectory;
+    }
+    juce::File hardwareOwnerFile() const { return hardwareClaimDirectory().getChildFile ("hardware-owner.json"); }
+
+    // -- bringing over a rig an earlier build kept elsewhere (Options::legacyDataDirectory) --
+    juce::File legacyDecisionFile() const { return options.dataDirectory.getChildFile ("legacy-data.json"); }
+    /** Whether the earlier folder holds anything worth bringing over. Read once, at start. */
+    bool legacyDataWorthOffering() const;
+    /** At start: copies the earlier folder's data in if the user asked for it last time. */
+    void adoptLegacyDataIfAsked();
+    void writeLegacyDecision (const juce::String& decision, const juce::StringArray& failed);
+    /** "none", "offered", "pending" (asked for, applied at the next start), "adopted" or
+        "declined". */
+    juce::String legacyDataState() const;
+    // -- shows (HostShow.h) ---------------------------------------------------------------
+    // One show is current: its rig is the session, which saves after every change as it always
+    // has. Whether a change also goes into the show's file is the user's choice
+    // (showChangesSaved); kept apart, the show is what Back to the show returns to.
+    struct ShowEntry
+    {
+        juce::String name;          // the file's name without its extension
+        juce::String fileName;
+        bool builtIn = false;
+        juce::int64 savedAtMs = 0;
+    };
+    void handleShowCommand (const juce::String& cmd, const juce::var& payload);
+    juce::File userShowsDirectory() const { return options.dataDirectory.getChildFile ("shows"); }
+    juce::File showStateFile() const      { return options.dataDirectory.getChildFile ("show-state.json"); }
+    juce::File showFile (const juce::String& fileName, bool builtIn) const;
+    juce::var buildShow (const juce::String& name, bool includeStageNotes);
+    bool writeShow (const juce::File& file, const juce::String& name, bool includeStageNotes);
+    bool saveCurrentShowAs (const juce::String& name, const juce::String& fileName);
+    bool openShow (const juce::File& file, const juce::String& fileName, bool builtIn);
+    bool openFirstBuiltInShow();
+    void importShow (const juce::File& source);
+    void refreshShowList();
+    void loadShowState();
+    void saveShowState() const;
+    void noteShowChanged();
+    void tickShowSave();
+    juce::var showsPayload() const;
+    juce::var surfacePagesVar() const;
+    void applySurfacePagesVar (const juce::var& stored);
+    juce::Array<ShowEntry> showList;
+    juce::String currentShowName, currentShowFileName;
+    bool currentShowBuiltIn = false;
+    bool showChanged = false;           // the rig moved on since the show was opened or saved
+    bool showChangesSaved = false;      // the setting: changes go into the show's file as they happen
+    bool showTracking = false;          // from the end of the session restore: its own saves are not changes
+    bool openingShow = false;           // nor are the saves an opening show makes
+    juce::int64 showSaveDueMs = 0;
+    juce::StringArray showMissing;      // plug-ins the show opened last needs and this computer lacks
+
+    // -- making players (PlayerCreator.h) -------------------------------------------------
+    // The copying runs on a thread of its own (a hundred megabytes to a USB stick is not a
+    // pause anybody should sit through with the window frozen); the result is collected on
+    // the pump, like the library's.
+    struct PlayerResult
+    {
+        bool done = false, ok = false;
+        juce::String name, folder, message;
+        juce::StringArray notes;
+    };
+    void createPlayer (const juce::var& payload);
+    void startPlayerCreation (player::Request request);
+    void tickPlayerCreation();
+    juce::var playersPayload() const;
+    std::thread playerThread;
+    std::mutex playerResultLock;
+    PlayerResult playerResult;          // written by the copying thread, under the lock
+    PlayerResult lastPlayer;            // the last one finished, for the page
+    bool playerBusy = false;
+    bool playerHasStandalone = false, playerHasVst3 = false;   // the template, looked at once
+
+    // -- building products (ProductBuilder.h) ---------------------------------------------
+    // The creator's Build product: the programs copied into a product folder, then Inno Setup
+    // over it when it is there, both on a thread of their own. What the build prints is queued
+    // under the lock and sent to the page from the pump, as instrumentHostBuildProgress lines.
+    struct ProductResult
+    {
+        bool done = false, ok = false;
+        juce::String name, folder, installer, message;
+    };
+    void buildHostProduct (const juce::var& payload);
+    void startProductBuild (product::Request request);
+    void tickProductBuild();
+    void emitBuildLine (const juce::String& line, bool done, bool ok);
+    juce::File innoCompiler() const;
+    juce::var creatorPayload();
+    std::thread productThread;
+    std::mutex productLock;
+    juce::StringArray productLines;     // printed by the build thread, not yet sent; under the lock
+    ProductResult productResult;        // written by the build thread, under the lock
+    ProductResult lastProduct;          // the last one finished, for the page
+    std::atomic<bool> productStop { false };   // the service is going: stop Inno Setup
+    bool productBusy = false;
+    bool creatorHasInstaller = false;   // Inno Setup and the script, looked at when the page asks
+    bool creatorHasHelpers = false;     // the scanner and the worker, which every product needs
+
+    /** The Creator licence (docs/design/hostage-creator-editor-player.md, step 5): a licence
+        for the creator's own product id, verified against options.creatorPublicKey and kept in
+        the data folder's creator/. Only asked for when a key is compiled in. */
+    std::unique_ptr<licensing::LicenceStore> creatorLicence;
+    licensing::LicenceStore& ensureCreatorLicence();
+    bool creatorLicenceRequired() const { return options.creatorPublicKey.isNotEmpty(); }
+
+    juce::String legacyDecision;        // as legacy-data.json says
+    juce::StringArray legacyFailed;     // what the copy could not bring over
+    bool legacyOffered = false;
     /** The package identity a saved state carries, so a project reopened elsewhere can say
         which product and revision wrote it (§18.9.4). */
     juce::var packageIdentity() const;
@@ -2083,6 +2256,16 @@ private:
     /** After a pad or the fader bank changes layer: re-listen, drop stale pickups, save, and
         tell the page. */
     void surfaceLayerChanged (const juce::String& pageId);
+
+    // -- the CTRL49's stage pages, remembered ----------------------------------------------
+    // Off until asked for, and then on until asked otherwise — across sessions, in
+    // surface-pages.json. They used to be forgotten at every launch, so a set rehearsed with
+    // METERS and CUE on the keyboard opened the next evening without them. The browser is not
+    // among them: it is a mode entered for a moment, and a keyboard that woke up as a browser
+    // would have stopped doing what it was doing.
+    juce::File surfacePagesFile() const { return options.dataDirectory.getChildFile ("surface-pages.json"); }
+    void loadSurfacePages();
+    bool saveSurfacePages() const;
 
     // -- the Mackie section ---------------------------------------------------------------
     std::atomic<bool> mackieSection { true };

@@ -156,9 +156,6 @@ private:
     // only the handlers .cpp needs the host implementation.
     std::unique_ptr<ceditor::host::InstrumentHostService> instrumentHost;
     ceditor::host::PluginEditorHost* editorPane = nullptr;
-    // Active Host Project build (tools/scripts/build-host-product.mjs as a child process), held
-    // as its Timer base for the same reason as buildJob above.
-    std::unique_ptr<juce::Timer> hostBuildJob;
     // Floating vendor-editor windows, any number at once beside the docked pane. Created
     // with the service; declared after it so every window (and the editor inside it) is
     // destroyed before the rack destroys the processors they watch.

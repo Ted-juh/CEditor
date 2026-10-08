@@ -26,7 +26,9 @@
     addRackPart, removeRackPart, moveRackPart, focusRackPart, loadInstrument, unloadInstrument,
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor, floatEditor, closeEditorWindow,
     requestAudioDevices, setAudioDevice, setMidiInputEnabled, setMackieSection,
-    hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct,
+    hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct, setTryAsPlayer,
+    creatorCanBuild, installCreatorLicence, removeCreatorLicence,
+    adoptLegacyData, declineLegacyData,
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
     parameterControlKind, setParameterText, groupParameters, assignedParameterIds, parameterPlaces, isBipolarParameter, quickLearnParameter,
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
@@ -94,6 +96,7 @@
   import HostSurfacePanel from './HostSurfacePanel.svelte';
   import Ctrl49ScreenCard from './Ctrl49ScreenCard.svelte';
   import ProductPanel from './ProductPanel.svelte';
+  import HostShowsPanel from './HostShowsPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
   import LicencePanel from './LicencePanel.svelte';
   import HostKeyboard from './HostKeyboard.svelte';
@@ -140,7 +143,17 @@
     { id: 'layers', label: 'Layers' },
     { id: 'controller', label: 'Controller' },
   ];
+  // Which program this is (docs/design/hostage-creator-editor-player.md). A player — installed
+  // as one, or the editor trying its show — makes no screens or pages and does not build; the
+  // host refuses those commands, and these hide the buttons that would only be refused.
+  let player = $derived($hostState.player === true);
+  // Build product is the creator's (CEditor's tab), not a HoSTage program's: those make players.
+  let creator = $derived($hostState.creator);
+  let creatorLicenceText = $state('');
+  let legacyData = $derived($hostState.product.data);
+  let playerInstalled = $derived($hostState.playerInstalled === true);
   const hostUtilities = [
+    { id: 'shows', label: 'Shows' },
     { id: 'library', label: 'Library' },
     { id: 'devices', label: 'Audio & MIDI' },
     { id: 'project', label: 'Project' },
@@ -658,7 +671,7 @@
       <span class="host-logo-frame">
         <HostageLogo />
       </span>
-      <span class="host-purpose">PLUG-IN HOST · LIVE STAGE</span>
+      <span class="host-purpose">{player ? 'PLAYER · LIVE STAGE' : 'PLUG-IN HOST · LIVE STAGE'}</span>
       <span class="host-audio-status" class:on={$hostState.audio.running} title={audioLine}>
         <span class="host-status-dot"></span>{audioLine}
       </span>
@@ -764,7 +777,7 @@
     </div>
     <div class="utility-tabs" role="group" aria-label="Utilities">
       <span class="navigation-label">Utilities</span>
-      {#each hostUtilities as utility (utility.id)}
+      {#each hostUtilities.filter((u) => !(u.id === 'project' && (player || !creator.available))) as utility (utility.id)}
         <button type="button" class="utility-tab" class:on={activeUtility === utility.id}
                 class:warn={utility.id === 'health'
                             && ($hostState.reliability.recovery.interrupted
@@ -774,6 +787,18 @@
                 onclick={() => chooseUtility(utility.id)}>{utility.label}</button>
       {/each}
     </div>
+    <!-- The editor tries its show as the player will run it, before it creates one; a program
+         installed as a player says so instead and has no way back. -->
+    {#if playerInstalled}
+      <span class="role-badge" data-testid="host-role-player"
+            title="This HoSTage is a player: it plays the show it was given. Screens and control pages are made in the HoSTage editor.">PLAYER</span>
+    {:else}
+      <button type="button" class="role-try" class:on={player} aria-pressed={player}
+              data-testid="host-try-player" disabled={$hostState.stageLocked}
+              title={player ? 'Back to the editor: make screens and control pages again'
+                            : 'Try the show as the player will run it — screens and control pages cannot be changed'}
+              onclick={() => setTryAsPlayer(!player)}>{player ? 'Back to editor' : 'Try as player'}</button>
+    {/if}
   </nav>
 
   <div class="build-content" bind:clientHeight={buildContentHeight}>
@@ -854,6 +879,10 @@
     </div>
   {/if}
 
+  {#if activeUtility === 'shows'}
+    <HostShowsPanel />
+  {/if}
+
   {#if activeUtility === 'product'}
     <ProductPanel />
   {/if}
@@ -870,8 +899,53 @@
     <HostLibraryPanel onShowSounds={showSounds} />
   {/if}
 
-  {#if activeUtility === 'project'}
+  {#if activeUtility === 'project' && !player && !creator.available}
+    <p class="project-note project-elsewhere" data-testid="host-build-elsewhere">
+      Products are built in CEditor, the HoSTage creator. This HoSTage makes players instead: Shows,
+      Make a player.
+    </p>
+  {/if}
+
+  {#if activeUtility === 'project' && !player && creator.available}
     <div class="project-panel" aria-label="Host Project">
+      <!-- Said before the button, not after it fails (ProductBuilder.h): what a build makes, from
+           what, and the one part that needs more than CEditor, Inno Setup for the installer. -->
+      <p class="project-note" data-testid="host-build-needs">
+        Build product makes this rack a product of its own: HoSTage's programs under the product's
+        name, as a standalone and a VST3, with the show you are running. It goes in a folder you
+        choose{#if creator.installer}, with its installer{/if}.
+        {#if !creator.standalone && !creator.vst3}
+          <span data-testid="host-build-nothing">This CEditor has no HoSTage programs to build from. An
+          installed CEditor has them in its templates folder; in a source checkout, build
+          CEHostStandalone and CEHostVST3 first.</span>
+        {:else if !creator.helpers}
+          <span data-testid="host-build-helpers">The plug-in scanner or the live plug-in worker is missing
+          beside CEditor, and every product needs both.</span>
+        {:else if !creator.installer}
+          <span data-testid="host-build-no-installer">Inno Setup 6 was not found, so a build is the folder
+          without an installer. Install Inno Setup 6 (free, from jrsoftware.org) for one; the folder
+          runs either way.</span>
+        {/if}
+      </p>
+      {#if creator.licence.required}
+        <!-- The Creator licence: asked for only by a build with the vendor's key compiled in. -->
+        <div class="project-licence" data-testid="creator-licence">
+          {#if creator.licence.licensed}
+            <span class="project-note">Creator licence: {creator.licence.detail}</span>
+            <button type="button" data-testid="creator-licence-remove"
+                    onclick={() => removeCreatorLicence()}>Remove licence</button>
+          {:else}
+            <span class="project-note">Building a product needs a Creator licence. {creator.licence.detail}</span>
+            <textarea bind:value={creatorLicenceText} rows="3" spellcheck="false"
+                      data-testid="creator-licence-text"
+                      placeholder="Paste the contents of your Creator .celicence file"></textarea>
+            <button type="button" data-testid="creator-licence-install" disabled={!creatorLicenceText.trim()}
+                    onclick={() => { installCreatorLicence(creatorLicenceText); creatorLicenceText = ''; }}>
+              Install licence
+            </button>
+          {/if}
+        </div>
+      {/if}
       <div class="project-fields">
         <label class="project-field">Product name
           <input type="text" value={$hostProject.productName}
@@ -890,23 +964,24 @@
                           onchange={(v) => setHostProject({ includeStandalone: v })} />
           <PropertyToggle compact label="VST3" value={$hostProject.includeVst3}
                           onchange={(v) => setHostProject({ includeVst3: v })} />
-          <!-- The authored rack ships inside the product, and a setlist item's notes are the
-               one piece of personal prose in it — "what the player needs to read on stage".
-               Off unless asked for: a build that published them cannot be taken back. -->
+          <!-- The show ships inside the product, and a setlist item's notes are the one piece of
+               personal prose in it — "what the player needs to read on stage". Off unless asked
+               for: a build that published them cannot be taken back. -->
           <PropertyToggle compact label="Stage notes" value={$hostProject.includeStageNotes}
                           ariaLabel="Include my setlist stage notes in the built product"
                           onchange={(v) => setHostProject({ includeStageNotes: v })} />
         </span>
         <button type="button" class="project-build" data-testid="host-build"
-                disabled={$hostBuild.running} onclick={() => buildHostProduct()}>
-          {$hostBuild.running ? 'Building…' : 'Build product'}
+                disabled={!creatorCanBuild(creator)} onclick={() => buildHostProduct()}>
+          {creator.busy ? 'Building…' : 'Build product…'}
         </button>
       </div>
       <!-- Identity is minted, not authored — shown so support can match an installer to a
            project, never editable (a changed AppId splits upgrades into a second install). -->
       <span class="project-appid">Installer identity: {$hostProject.appId || '(minted on first save)'}</span>
       {#if $hostBuild.lines.length > 0}
-        <pre class="project-build-log" class:failed={$hostBuild.done && !$hostBuild.ok}>{$hostBuild.lines.join('\n')}</pre>
+        <pre class="project-build-log" data-testid="host-build-log"
+             class:failed={$hostBuild.done && !$hostBuild.ok}>{$hostBuild.lines.join('\n')}</pre>
       {/if}
     </div>
   {/if}
@@ -940,6 +1015,27 @@
         hostPatchPrompt.set([]);
       }}>Send {$hostPatchPrompt.length === 1 ? 'it' : 'them'}</button>
       <button type="button" class="ghost" onclick={() => hostPatchPrompt.set([])}>Not now</button>
+    </div>
+  {/if}
+
+  <!-- The rig an earlier build kept in the folder every product shared. Nothing there says which
+       product it belonged to, so a product now in a folder of its own asks rather than guesses:
+       an upgrade wants its rig back, and a product installed beside another must not inherit
+       that one's. -->
+  {#if legacyData.legacy === 'offered' || legacyData.legacy === 'pending'}
+    <div class="patch-prompt" data-testid="host-legacy-prompt">
+      {#if legacyData.legacy === 'offered'}
+        <span class="patch-prompt-text" title={legacyData.legacyFolder}>
+          This product now keeps its data in a folder of its own. An earlier HoSTage build left a
+          rig, a plug-in list and a sound library in the folder every product shared. Bring them
+          over? They replace what this product has, the next time it starts.
+        </span>
+        <button type="button" data-testid="host-legacy-adopt" onclick={() => adoptLegacyData()}>Bring it over</button>
+        <button type="button" class="ghost" data-testid="host-legacy-decline" onclick={() => declineLegacyData()}>Start fresh</button>
+      {:else}
+        <span class="patch-prompt-text">The earlier rig comes over the next time HoSTage starts. Restart it to finish.</span>
+        <button type="button" class="ghost" data-testid="host-legacy-decline" onclick={() => declineLegacyData()}>Don't bring it over</button>
+      {/if}
     </div>
   {/if}
 
@@ -1324,6 +1420,7 @@
         <div class="pages-head">
           <strong>Control pages</strong>
           {#if selectedPage}<span class="pages-count">{selectedPage.slots.filter(s => s.assigned).length} / {selectedPage.slots.length} assigned</span>{/if}
+          {#if !player}
           <span class="pages-actions">
             <button type="button" disabled={!focusedPart?.hasInstrument}
                     title={focusedPart?.hasInstrument
@@ -1333,24 +1430,27 @@
                     data-testid="host-auto-pages">Auto pages</button>
             <button type="button" onclick={() => addControlPage()} data-testid="host-add-page">+ Page</button>
           </span>
+          {/if}
         </div>
         {#if pages.length > 0}
           <div class="page-tabs">
             {#each pages as page (page.pageId)}
               <span class="page-tab" class:on={selectedPage?.pageId === page.pageId}>
-                <input type="text" class="page-name" value={page.name}
+                <input type="text" class="page-name" value={page.name} readonly={player}
                        aria-label="Control page name"
-                       title={page.generated ? 'Generated — regenerating replaces this page' : 'Rename control page'}
+                       title={player ? page.name : page.generated ? 'Generated — regenerating replaces this page' : 'Rename control page'}
                        onfocus={() => (selectedPageId = page.pageId)}
                        onclick={() => (selectedPageId = page.pageId)}
-                       onchange={(e) => renameControlPage(page.pageId, e.currentTarget.value)} />
+                       onchange={(e) => { if (!player) renameControlPage(page.pageId, e.currentTarget.value); }} />
                 {#if page.generated}<span class="page-auto">auto</span>{/if}
+                {#if !player}
                 <button type="button" class="ghost danger" class:confirming={pendingDestructive === `page:${page.pageId}`}
                         aria-label={`Remove ${page.name}`}
                         title={pendingDestructive === `page:${page.pageId}` ? 'Click again to confirm' : 'Remove this page'}
                         onclick={() => guardedAction(`page:${page.pageId}`, () => removeControlPage(page.pageId))}>
                   {pendingDestructive === `page:${page.pageId}` ? 'Confirm' : '×'}
                 </button>
+                {/if}
               </span>
             {/each}
           </div>
@@ -1389,12 +1489,14 @@
                       {#if midiArmed}<span class="slot-listening" role="status">Move a MIDI control…</span>{/if}
                       {#if paramArmed}<span class="slot-listening" role="status">Move a plug-in control…</span>{/if}
                     </div>
+                    {#if !player}
                     <button type="button" class="slot-clear ghost danger" disabled={!slot.assigned}
                       aria-label={`Clear slot ${slotIndex + 1}`} class:confirming={pendingDestructive === `slot:${selectedPage.pageId}:${slot.slotId}`}
                       title={pendingDestructive === `slot:${selectedPage.pageId}:${slot.slotId}` ? 'Click again to clear assignment' : 'Clear parameter assignment'}
                       onclick={() => guardedAction(`slot:${selectedPage.pageId}:${slot.slotId}`, () => clearControlSlot(selectedPage.pageId, slot.slotId))}>
                       ×
                     </button>
+                    {/if}
                   </div>
                   <div class="slot-value">
                     {#if slot.assigned && slot.resolved}
@@ -1424,6 +1526,7 @@
                       onclick={() => midiArmed ? cancelMidiLearn() : learnControlSlotMidi(selectedPage.pageId, slot.slotId)}>
                       <KeyboardMusic size={16} strokeWidth={1.75} aria-hidden="true" />
                     </button>
+                    {#if !player}
                     <button type="button" class:armed={paramArmed} aria-pressed={paramArmed}
                       data-testid={paramArmed ? 'param-learn-armed' : 'param-learn'}
                       aria-label={`${paramArmed ? 'Cancel pick' : 'Pick parameter'} for slot ${slotIndex + 1}`}
@@ -1431,6 +1534,7 @@
                       onclick={() => paramArmed ? cancelLearnControlSlotParameter() : learnControlSlotParameter(selectedPage.pageId, slot.slotId)}>
                       <Crosshair size={16} strokeWidth={1.75} aria-hidden="true" />
                     </button>
+                    {/if}
                   </div>
                 </div>
               {/each}
@@ -1438,7 +1542,8 @@
             <div class="pages-footer">{selectedPage.name}</div>
           {/if}
         {:else}
-          <div class="empty-hint">No pages yet — a page holds eight control slots for hardware and macros.</div>
+          <div class="empty-hint">{player ? 'This show has no control pages.'
+            : 'No pages yet — a page holds eight control slots for hardware and macros.'}</div>
         {/if}
       </div>
 
@@ -1985,20 +2090,24 @@
                   {/if}
                   <button type="button" class="ghost" title="Reset to the plug-in's default"
                           onclick={() => resetParameter(paramTargetId, parameter.id)}>↺</button>
+                  {#if !player}
                   <button type="button" class="ghost" disabled={!selectedPage || !firstEmptySlot}
                           title={selectedPage
                                    ? (firstEmptySlot ? `Assign to ${selectedPage.name}, slot ${firstEmptySlot.slotId}`
                                                      : 'The selected page has no empty slot')
                                    : 'Create a control page first'}
                           onclick={() => assignToSelectedPage(parameter)}>→</button>
+                  {/if}
                   <button type="button" class="ghost" disabled={!selectedMacro}
                           title={selectedMacro ? `Add to macro ${selectedMacro.name}` : 'Create a macro first'}
                           onclick={() => selectedMacro && addMacroTarget(selectedMacro.macroId, paramTargetId, parameter.id)}>M+</button>
+                  {#if !player}
                   <button type="button" class="ghost quick-learn"
                           class:armed={armedParameterId === parameter.id}
                           data-testid="param-quick-learn"
                           title="Put this on a knob: click, then move a control on your MIDI keyboard"
                           onclick={() => quickLearnParameter(paramTargetId, parameter.id)}>⚡</button>
+                  {/if}
                   <!-- Pinned per plug-in CLASS, not per part: you reach for the same dozen on
                        the same synth whichever rack it is in today. -->
                   <button type="button" class="ghost param-pin"
@@ -2084,6 +2193,20 @@
             </div>
           {/each}
         </div>
+        <!-- Group buses: each one an effect chain that the parts routed into it pass through.
+             Effects reach a bus by being dropped on it in the canvas, and this is the one place
+             they can be reordered, bypassed and removed — the mixer strip only counts them. -->
+        {#if $hostState.rack.buses.length > 0}
+          <div class="returns" data-testid="host-buses">
+            <div class="fx-head"><strong>Buses</strong></div>
+            {#each $hostState.rack.buses as bus (bus.busId)}
+              <div class="return-block">
+                {@render effectChain(bus.effects, bus.busId,
+                                     `${bus.name} effects${latencySuffix(bus.latencyMs)}`, 'host-bus-fx')}
+              </div>
+            {/each}
+          </div>
+        {/if}
         <!-- Stage 5 macros: one value fanning across parts and effects, always through the
              central parameter path. Select a macro, then add targets from the parameter view. -->
         <div class="macros" data-testid="host-macros">
@@ -2241,7 +2364,10 @@
   .stage-header-hint { color: #8b99a4; font-size: 12px; }
   .scan-status { color: #96a2ad; font-size: 11px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  @media (max-width: 1120px) {
+  /* Below this the command area, aligned to the end, runs left under Build and Stage rather
+     than past the window's edge — which a scroll-width check does not see. Measured: it starts
+     to overlap at about 1270 px. */
+  @media (max-width: 1270px) {
     .host-header { grid-template-columns: minmax(260px, 1fr) auto; }
     .host-command-area {
       grid-column: 1 / -1;
@@ -2273,6 +2399,7 @@
     overflow-x: auto;
   }
   .workspace-tabs, .utility-tabs { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .utility-tabs { margin-left: auto; }
   .navigation-label {
     margin-right: 3px;
     color: #8795a0;
@@ -2302,6 +2429,19 @@
     color: #dce4ea;
   }
   button.utility-tab.warn { color: #e4b3b3; }
+  /* Seven utilities and the role switch: below this the row's own label is what gives way. */
+  @media (max-width: 1200px) {
+    .utility-tabs .navigation-label { display: none; }
+  }
+  /* Which program this is, at the end of the row: the header has no width to spare below 1400 px. */
+  button.role-try, .role-badge { flex: none; margin-left: -6px; position: relative; white-space: nowrap; }
+  button.role-try::before, .role-badge::before {
+    content: ''; position: absolute; left: -7px; top: 3px; bottom: 3px; border-left: 1px solid var(--host-line);
+  }
+  button.role-try { padding: 4px 10px; font-size: 12px; }
+  button.role-try.on { border-color: var(--host-accent); background: var(--host-accent-surface); color: #edf5fa; }
+  .role-badge { padding: 3px 8px; border: 1px solid var(--host-accent); border-radius: 4px;
+    color: var(--host-accent); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
 
   .build-content {
     flex: 1;
@@ -2450,6 +2590,7 @@
   .project-field input { width: 180px; }
   .project-target { display: flex; align-items: center; gap: 6px; padding-bottom: 2px; }
   .project-appid { color: #96a2ad; font-size: 12px; }
+  .project-note { margin: 0; color: #96a2ad; font-size: 12px; line-height: 1.45; max-width: 60em; }
   .project-build-log {
     margin: 0;
     padding: 8px;
@@ -2463,6 +2604,14 @@
     white-space: pre-wrap;
   }
   .project-build-log.failed { color: #e4b3b3; border-color: #7a4a4a; }
+  .project-elsewhere { margin: 8px 14px 0; }
+  .project-licence { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; max-width: 60em; }
+  .project-licence textarea {
+    width: 100%;
+    font-size: 11px;
+    font-family: var(--host-font-mono);
+    resize: vertical;
+  }
 
   .host-error {
     display: flex;
@@ -2887,11 +3036,14 @@
   .hw-diff { display: inline-flex; gap: 8px; }
   .hw-diff-where { color: #7d8894; min-width: 80px; }
   .hw-diff-bytes { color: #d8e0e8; }
+  /* Inset like the error and save notices beside it, which it ran edge to edge between. */
   .patch-prompt {
+    flex: none;
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+    margin: 8px 14px 0;
     padding: 6px 10px;
     border: 1px solid #4a6a7a;
     border-radius: 4px;

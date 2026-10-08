@@ -31,7 +31,7 @@ import {
 } from './runtimePreferences.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
 import { fileDataByteSize, fileDataText } from '../utils/fileDataPayload.js';
-import { confirmDiscardUnsaved } from '../utils/confirmDiscard.js';
+import { confirmDiscardUnsaved, confirmDestructive } from '../utils/confirmDiscard.js';
 import { runWhenIdle } from '../utils/runWhenIdle.js';
 import { rememberRecentFile } from './recentFiles.js';
 import { equalityWritable } from '../utils/equalityStore.js';
@@ -901,6 +901,22 @@ function normalizeEditorTabDescriptor(tab) {
   };
 }
 
+/** Close a CTRL49 Screen Builder tab. It asks first when the screen has changes: the Screen
+ *  Builder cannot save, so closing one loses it — and Ctrl+W used to do that without a word, while
+ *  the tab's × did nothing at all (the tab bar sent it to closePanel, which knows no screens).
+ *  Returns false when the user keeps it open. */
+export function closeScreenTab(id) {
+  const closing = get(screenDocuments).find((doc) => doc.id === id);
+  if (closing?.modified && !confirmDestructive(
+    `"${closing.name}" has changes, and the Screen Builder cannot save them. Close it anyway?`)) return false;
+  closeScreenDocument(id);
+  const active = get(activeEditorTab);
+  if (active?.type === 'screen' && active?.id === id) {
+    activeEditorTab.set({ type: 'panel', id: get(activePanelId) ?? null });
+  }
+  return true;
+}
+
 /** Close a panel by id. Prompts when the panel has unsaved changes; returns
  *  false when the user keeps the panel open. */
 export function closePanel(id) {
@@ -1064,12 +1080,7 @@ export function closeActiveEditorTab() {
   }
 
   if (tab.type === 'screen') {
-    closeScreenDocument(tab.id);
-    if (get(activePanelId) != null) {
-      activeEditorTab.set({ type: 'panel', id: get(activePanelId) });
-    } else {
-      activeEditorTab.set({ type: 'panel', id: null });
-    }
+    closeScreenTab(tab.id);
     return;
   }
 

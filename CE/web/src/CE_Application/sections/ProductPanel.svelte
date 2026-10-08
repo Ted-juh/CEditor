@@ -120,6 +120,20 @@
         {/each}
       </div>
 
+      <!-- Each product keeps its own folder, named by its id so a rename keeps the rig; this is
+           where a person finds it. -->
+      <div class="readout">
+        <span class="label">Data folder</span>
+        <span class="value" data-testid="product-data-folder" title={product.data.folder}>{product.data.folder || '—'}</span>
+      </div>
+      {#if product.data.legacy === 'adopted'}
+        <p class="note" data-testid="product-legacy-adopted">
+          Brought over from {product.data.legacyFolder}, where every product kept its data before
+          each had its own.{product.data.legacyFailed.length > 0
+            ? ` These could not be copied: ${product.data.legacyFailed.join(', ')}.` : ''}
+        </p>
+      {/if}
+
       <div class="readout">
         <span class="label">Hardware surface</span>
         <span class="value">{product.hardware.owner}</span>

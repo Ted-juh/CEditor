@@ -115,7 +115,8 @@ async function prepareSharedPanel(metadata) {
   }
 
   const file = panelPackageFile(result.envelope);
-  cinfo(`[share] ${result.assetCount} asset(s) embedded, ${(file.text.length / 1024).toFixed(0)} KB.`);
+  cinfo(`[share] ${result.assetCount} asset(s), ${result.fontCount} font(s) and ${result.iconCount} icon(s) embedded, `
+    + `${(file.text.length / 1024).toFixed(0)} KB.`);
   ensurePanelSharingListeners();
   bridgeSavePanelPackageAs(file.fileName, file.text);
   return result;

@@ -76,9 +76,19 @@ try {
   const tapped = (await state()).performance.transport.tempo;
   assert.ok(tapped > 100 && tapped < 125, `four taps half a second apart set about 120 (${tapped})`);
   await page.getByTestId('host-ts-denominator').press('ArrowUp');
-  await page.setViewportSize({ width: 1280, height: 1400 });
-  const header = await page.locator('.host-header').evaluate((el) => [el.scrollWidth, el.clientWidth]);
-  assert.ok(header[0] <= header[1], `the header fits a 1280 px window (${header[0]} > ${header[1]})`);
+  // The command area is aligned to the end, so when it is too wide it runs left, under Build and
+  // Stage, where the scroll width does not see it. Measure that too.
+  for (const width of [1280, 1200, 1121]) {
+    await page.setViewportSize({ width, height: 1400 });
+    const header = await page.locator('.host-header').evaluate((el) => {
+      const mode = el.querySelector('.host-mode').getBoundingClientRect();
+      const first = el.querySelector('.host-command-area').firstElementChild.getBoundingClientRect();
+      const apart = first.left >= mode.right || first.top >= mode.bottom;
+      return { scroll: el.scrollWidth, client: el.clientWidth, apart };
+    });
+    assert.ok(header.scroll <= header.client, `the header fits a ${width} px window (${header.scroll} > ${header.client})`);
+    assert.ok(header.apart, `at ${width} px, Undo does not sit on top of Build and Stage`);
+  }
   await page.setViewportSize({ width: 1400, height: 1400 });
   await page.getByTestId('host-ts-numerator').press('ArrowUp');
   const ts = (await state()).performance.transport;
@@ -195,8 +205,190 @@ try {
   await returnLevel.press('ArrowDown');
   assert.ok((await state()).rack.returns.at(-1).level < level, 'a return level is a knob');
 
+  // A bus's effects, in the same tab: added, reordered, bypassed and removed. Effects dropped on a
+  // bus in the canvas used to be out of reach once they were there — the mixer only counted them.
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.addBus('Synths');
+  });
+  const busFx = page.getByTestId('host-bus-fx').last();
+  await busFx.scrollIntoViewIfNeeded();
+  const busEffects = async () => (await state()).rack.buses.at(-1).effects;
+  // Wait for the state to agree rather than read it the instant after a click.
+  const busNames = async (want) => {
+    let names = [];
+    for (let i = 0; i < 40; i += 1) {
+      names = (await busEffects()).map((e) => e.pluginName);
+      if (JSON.stringify(names) === JSON.stringify(want)) break;
+      await page.waitForTimeout(50);
+    }
+    return names;
+  };
+  await busFx.locator('select').selectOption('mock-reverb');
+  await busFx.locator('select').selectOption('mock-comp');
+  assert.deepEqual(await busNames(['Sweet Reverb', 'Big Comp']), ['Sweet Reverb', 'Big Comp'], 'effects are added to the bus');
+  await busFx.getByRole('button', { name: 'Move Big Comp earlier in the chain' }).click();
+  assert.deepEqual(await busNames(['Big Comp', 'Sweet Reverb']), ['Big Comp', 'Sweet Reverb'], 'and reordered');
+  await busFx.getByLabel('Bypass Sweet Reverb').click();
+  assert.equal((await busEffects()).find((e) => e.pluginName === 'Sweet Reverb').bypassed, true, 'and bypassed');
+  const removeComp = busFx.locator('.fx-row').first().getByTitle('Remove this effect');
+  await removeComp.click();
+  await busFx.locator('.fx-row').first().getByTitle('Click again to confirm').click();
+  assert.deepEqual(await busNames(['Sweet Reverb']), ['Sweet Reverb'], 'and removed, after the second click');
+
+  // Try as player: the editor runs its show the way a player will. Making pages, describing a
+  // controller and the Project utility go; playing stays; and all of it comes back.
+  const tryPlayer = page.getByTestId('host-try-player');
+  const addPage = page.getByTestId('host-add-page');
+  await addPage.scrollIntoViewIfNeeded();
+  await addPage.click();
+  const pageCount = async () => (await state()).rack.pages.length;
+  const made = await pageCount();
+  assert.ok(made >= 1, 'the editor makes a control page');
+  await tryPlayer.click();
+  assert.equal(await tryPlayer.innerText(), 'Back to editor');
+  assert.equal((await state()).player, true);
+  assert.equal(await addPage.count(), 0, 'trying the player, the rack offers no + Page');
+  assert.equal(await page.getByTestId('host-utility-project').count(), 0, 'and no Project utility');
+  await page.getByTestId('host-workspace-controller').click();
+  await page.getByTestId('surface-page').waitFor();
+  for (const id of ['surface-describe', 'surface-page-add', 'surface-page-auto', 'surface-page-remove', 'surface-parameters']) {
+    assert.equal(await page.getByTestId(id).count(), 0, `the controller hides ${id} in a player`);
+  }
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.addControlPage();
+  });
+  assert.equal(await pageCount(), made, 'a page asked for anyway is refused');
+  const refusal = await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    let value; store.hostLastError.subscribe((v) => { value = v; })();
+    return value;
+  });
+  assert.match(refusal, /made in the HoSTage editor/, 'and says where pages are made');
+  await page.getByTestId('host-try-player').click();
+  assert.equal((await state()).player, false);
+  await page.getByTestId('surface-describe').waitFor();
+  assert.equal(await page.getByTestId('host-utility-project').count(), 1, 'back in the editor, everything returns');
+
+  // Shows: the rig saved with everything its songs need, changed, gone back to, and switched.
+  await page.getByTestId('host-utility-shows').click();
+  await page.getByTestId('host-shows-panel').waitFor();
+  assert.ok(await page.getByTestId('show-import').isDisabled(), 'importing a file is the host\'s, not the preview\'s');
+  await page.getByTestId('show-new-name').fill('Friday: Paradiso');
+  await page.getByTestId('show-save-as').click();
+  assert.equal(await page.getByTestId('show-current-name').innerText(), 'Friday: Paradiso');
+  const partCount = async () => (await state()).rack.parts.length;
+  const addPartFromStore = () => page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.addRackPart();
+  });
+  const savedParts = await partCount();
+  await addPartFromStore();
+  await page.getByTestId('show-changed').waitFor();
+  const revert = page.getByTestId('show-revert');
+  await revert.click();
+  assert.equal(await partCount(), savedParts + 1, 'Back to the show asks before it throws changes away');
+  await revert.click();
+  assert.equal(await partCount(), savedParts, 'and on the second click it does');
+  assert.equal(await page.getByTestId('show-changed').count(), 0);
+
+  await page.getByTestId('show-new-name').fill('Rehearsal');
+  await page.getByTestId('show-save-as').click();
+  assert.equal(await page.getByTestId('show-row').count(), 2);
+  await page.getByTestId('show-row').filter({ hasText: 'Friday' }).getByTestId('show-open').click();
+  assert.match(await page.getByTestId('show-current-name').innerText(), /Friday/, 'switching opens the other show');
+  await addPartFromStore();
+  await page.getByTestId('show-changed').waitFor();
+  const openRehearsal = page.getByTestId('show-row').filter({ hasText: 'Rehearsal' }).getByTestId('show-open');
+  await openRehearsal.click();
+  assert.match(await page.getByTestId('show-current-name').innerText(), /Friday/,
+    'opening another show over unsaved changes asks first');
+  await openRehearsal.click();
+  assert.equal(await page.getByTestId('show-current-name').innerText(), 'Rehearsal');
+  await page.getByTestId('show-changes-save').check();
+  await addPartFromStore();
+  await page.waitForTimeout(100);
+  assert.equal(await page.getByTestId('show-changed').count(), 0, 'saving as it goes, the show never falls behind');
+  await page.getByTestId('show-changes-keep').check();
+
+  // Make a player: the editor's, starting from the open show. The preview has no program to
+  // copy and says so; given one, the form appears, and the copying itself is the host's.
+  assert.equal(await page.getByTestId('player-nothing').count(), 1, 'nothing to copy is said, not offered');
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostState.update((s) => ({ ...s, players: { ...s.players, standalone: true, vst3: true } }));
+  });
+  const createButton = page.getByTestId('player-create');
+  assert.ok(await createButton.isDisabled(), 'no name, no player');
+  await page.getByTestId('player-name').fill('Friday Rig');
+  const ticks = page.getByTestId('player-show');
+  assert.deepEqual(await ticks.evaluateAll((boxes) => boxes.map((b) => b.checked)), [false, true],
+    'the open show (Rehearsal) is ticked, the other not');
+  const portable = page.getByTestId('player-portable');
+  assert.ok(await portable.isChecked(), 'made for a USB stick to begin with');
+  await page.getByTestId('player-standalone').uncheck();
+  assert.ok(await portable.isDisabled(), 'which only the standalone can be');
+  await page.getByTestId('player-standalone').check();
+  await createButton.click();
+  assert.match(await page.locator('.host-error').innerText(), /browser preview/, 'the copying is the host\'s');
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostLastError.set('');
+  });
+  await page.getByTestId('host-try-player').click();
+  assert.equal(await page.getByTestId('player-maker').count(), 0, 'and a player does not make players');
+  await page.getByTestId('host-try-player').click();
+  await page.getByTestId('host-utility-close').click();
+
+  // A product in a folder of its own is asked, once, about the rig an earlier build kept in the
+  // folder every product shared. The preview has no such folder, so the host's answer is set.
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostState.update((s) => ({ ...s, product: { ...s.product, data: {
+      ...s.product.data, legacy: 'offered', folder: '/home/me/.config/CEditorInstrumentHost/products/8F3A6C2E',
+    } } }));
+  });
+  const legacyPrompt = page.getByTestId('host-legacy-prompt');
+  await legacyPrompt.waitFor();
+  await page.getByTestId('host-legacy-adopt').click();
+  assert.match(await legacyPrompt.innerText(), /Restart it to finish/, 'bringing it over waits for a restart, and says so');
+  await page.getByTestId('host-legacy-decline').click();
+  assert.equal(await legacyPrompt.count(), 0, 'answered, the question goes');
+  await page.getByTestId('host-utility-product').click();
+  assert.match(await page.getByTestId('product-data-folder').innerText(), /products\/8F3A6C2E/,
+    'and the Product utility says where this product keeps its data');
+
+  // Build product, the creator's (step 5). The preview stands in for CEditor's tab: programs to
+  // build from, no Inno Setup. It says so before the button, builds the folder, and asks for a
+  // Creator licence only when the build has the key.
+  await page.getByTestId('host-utility-project').click();
+  assert.match(await page.getByTestId('host-build-needs').innerText(), /Inno Setup 6 was not found/,
+    'without Inno Setup, the installer is said to be the part it skips');
+  assert.equal(await page.getByTestId('creator-licence').count(), 0, 'no licence asked for without the key');
+  await page.getByTestId('host-build').click();
+  assert.match(await page.getByTestId('host-build-log').innerText(), /Built as a folder/);
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostState.update((s) => ({ ...s, creator: { ...s.creator,
+      licence: { required: true, licensed: false, licensee: '', detail: 'No Creator licence is installed.' } } }));
+  });
+  assert.ok(await page.getByTestId('host-build').isDisabled(), 'with the key and no licence, nothing is built');
+  const installLicence = page.getByTestId('creator-licence-install');
+  assert.ok(await installLicence.isDisabled(), 'nothing pasted, nothing to install');
+  await page.getByTestId('creator-licence-text').fill('{"licence":{}}');
+  assert.ok(await installLicence.isEnabled());
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostState.update((s) => ({ ...s, creator: { ...s.creator, available: false } }));
+  });
+  assert.equal(await page.getByTestId('host-utility-project').count(), 0, 'a HoSTage program has no Project utility');
+  assert.match(await page.getByTestId('host-build-elsewhere').innerText(), /built in CEditor/,
+    'and, reached anyway, says where products are made');
+  await page.getByTestId('host-utility-close').click();
+
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros and returns work as drawn');
+  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros, returns, bus effects, Try as player, shows, making a player, the data folder and Build product work as drawn');
 } finally {
   await browser.close();
   await server.close();

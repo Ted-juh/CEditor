@@ -127,19 +127,56 @@ test('style() writes both halves of the weight pair', () => {
 
 /* ------------------------------------------------------------------ the catalogue */
 
-test('the catalogue reports every available font, and marks only builtins portable', () => {
+test('the catalogue reports every available font, and marks the ones that go everywhere portable', () => {
   const entries = storeGet(availableFonts);
   const catalogue = fontCatalogue(entries);
   assert.equal(catalogue.length, entries.length);
   for (const descriptor of catalogue) {
     const entry = entries.find((e) => (e.value ?? e.family) === descriptor.family);
     assert.ok(entry, `${descriptor.family} should come from the store`);
-    // portable is exactly "builtin", because nothing else survives an export: the font library is
-    // app settings, not part of the panel document, and no export path registers a FontFace.
-    assert.equal(descriptor.portable, entry.sourceType === 'builtin');
+    // The builtins are named in every runtime and the shipped panel faces load in the player too.
+    // A library font is in app settings, not the document, until sharing or exporting packs it in.
+    assert.equal(descriptor.portable, entry.sourceType === 'builtin' || entry.sourceType === 'shipped');
     assert.equal(descriptor.variable, entry.supportsWeight === true);
   }
-  assert.ok(catalogue.some((f) => f.portable), 'the builtins should be portable');
+  assert.ok(catalogue.some((f) => f.source === 'builtin' && f.portable), 'the builtins should be portable');
+  assert.ok(catalogue.some((f) => f.source === 'shipped' && f.portable), 'and so should the shipped faces');
+});
+
+test('the fonts a panel carries are listed after the rest, once per family, and portable', () => {
+  const data = 'data:font/woff2;base64,AAAA';
+  const carried = [
+    { family: 'Imported Sans', weight: '400', style: 'normal', data },
+    { family: 'Imported Sans', weight: '700', style: 'italic', data },
+    { family: 'Wide Var', weight: '100 900', style: 'normal', data },
+    { family: 'arial', weight: '400', style: 'normal', data },
+  ];
+  const catalogue = fontCatalogue(storeGet(availableFonts), carried);
+  const extra = catalogue.filter((f) => f.source === 'panel');
+  assert.deepEqual(extra.map((f) => [f.family, f.portable, f.variable]), [
+    ['Imported Sans', true, false],
+    ['Wide Var', true, true],
+  ], 'a carried face of a family already listed (any case) adds nothing');
+  assert.deepEqual(extra[1].axes, [{ tag: 'wght', min: 100, default: 400, max: 900 }]);
+});
+
+test('where only the panel has a font — the exported player — a script can still style with it', async () => {
+  const { setDocumentFonts } = await import('../src/CE_Application/utils/fontSources.js');
+  setDocumentFonts([
+    { family: 'Imported Sans', weight: '400', style: 'normal', data: 'data:font/woff2;base64,AAAA' },
+    { family: 'ce_font_x', label: 'Shown Name', weight: '400', style: 'normal', data: 'data:font/woff2;base64,AAAA' },
+  ]);
+  try {
+    withText((api) => {
+      assert.equal(api.textFont('Imported Sans').source, 'panel');
+      assert.equal(api.textStyle('L', { family: 'imported sans' }), true);
+      assert.equal(api.textRead('L', 'family'), 'Imported Sans', 'under the name the faces are registered as');
+      assert.equal(api.textStyle('L', { family: 'Shown Name' }), true, 'a carried font answers to the name people know');
+      assert.equal(api.textRead('L', 'family'), 'ce_font_x', 'and is written as the name its faces are registered under');
+    });
+  } finally {
+    setDocumentFonts([]);
+  }
 });
 
 test('a library font is reported, and reported as not portable', () => {

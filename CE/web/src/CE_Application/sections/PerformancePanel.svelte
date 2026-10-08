@@ -52,6 +52,7 @@
   import ScrubValue from '../components/controls/ScrubValue.svelte';
   import { parseSongLength as parseLength } from '../utils/stageScreen.js';
   import Segmented from '../components/controls/Segmented.svelte';
+  import ControllerPagePick from './performance/ControllerPagePick.svelte';
 
   let { onShowMixer = () => {} } = $props();
   const stopMeasurement = () => { if ($hostState.soundcheck.activeItemId) finishSoundcheck(); };
@@ -2175,10 +2176,9 @@
             </span>
             <span class="scene-morph" title="CTRL49 control layout recalled with this scene">
               Controls
-              <Segmented options={[{ value: '', label: 'Keep', title: 'Keep the page that is showing' },
-                                   ...$hostState.rack.pages.slice(0, 3).map((page) => ({ value: page.pageId, label: page.name }))]}
-                         value={scene.pageId} label={`${scene.name} CTRL49 controls`} testid="scene-page"
-                         onchange={(pageId) => setSceneOptions(scene.sceneId, { pageId })} />
+              <ControllerPagePick pages={$hostState.rack.pages} keepTitle="Keep the page that is showing"
+                                  value={scene.pageId} label={`${scene.name} CTRL49 controls`} testid="scene-page"
+                                  onchange={(pageId) => setSceneOptions(scene.sceneId, { pageId })} />
             </span>
             <button type="button" class="ghost" title="Replace this scene's contents with the rig as it stands"
                     onclick={() => captureScene(scene.sceneId)}>Capture</button>
@@ -2197,7 +2197,7 @@
                     onclick={() => addSetlistItem(scene.sceneId, `Song ${performance.setlist.items.length + 1}`)}>+ Song</button>
             {#if songCount(scene.sceneId) > 0}
               <span class="in-setlist" data-testid="scene-in-setlist"
-                    title="Songs in the setlist (Live setup › Setlist) that recall this scene">
+                    title="Songs in the setlist (Performance › Songs) that recall this scene">
                 {songCount(scene.sceneId) === 1 ? 'in setlist' : `in setlist ×${songCount(scene.sceneId)}`}</span>
             {/if}
             <HostConfirmButton identity={JSON.stringify([scene.sceneId])} title="Remove scene" aria-label="Remove scene" type="button" class="ghost danger" onclick={() => removeScene(scene.sceneId)}>×</HostConfirmButton>

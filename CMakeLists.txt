@@ -327,6 +327,26 @@ if(CEDITOR_BUILD_APP)
         CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
     )
 
+    # The Creator licence (docs/design/hostage-creator-editor-player.md, step 5). The public half
+    # of the key Creator licences are signed with — the public.key that `CEditorLicenceTool
+    # keypair` writes — compiled into the creator. Unset, Build product asks for no licence,
+    # which is every build until the owner decides to sell one. Set and unreadable, the configure
+    # stops: a build asked to require a licence must not quietly ship without the check.
+    set(CEDITOR_CREATOR_PUBLIC_KEY_FILE "" CACHE FILEPATH
+        "public.key the Creator licences are verified against; empty = Build product needs no licence")
+    if (CEDITOR_CREATOR_PUBLIC_KEY_FILE)
+        if (NOT EXISTS "${CEDITOR_CREATOR_PUBLIC_KEY_FILE}")
+            message(FATAL_ERROR "CEDITOR_CREATOR_PUBLIC_KEY_FILE names ${CEDITOR_CREATOR_PUBLIC_KEY_FILE}, which is not there.")
+        endif()
+        file(READ "${CEDITOR_CREATOR_PUBLIC_KEY_FILE}" CE_CREATOR_PUBLIC_KEY)
+        string(STRIP "${CE_CREATOR_PUBLIC_KEY}" CE_CREATOR_PUBLIC_KEY)
+        if (NOT CE_CREATOR_PUBLIC_KEY MATCHES "^[0-9a-fA-F]+,[0-9a-fA-F]+$")
+            message(FATAL_ERROR "${CEDITOR_CREATOR_PUBLIC_KEY_FILE} is not a key CEditorLicenceTool wrote (hex,hex).")
+        endif()
+        target_compile_definitions(CEditor PRIVATE CEDITOR_CREATOR_PUBLIC_KEY="${CE_CREATOR_PUBLIC_KEY}")
+        message(STATUS "CEditor: Build product needs a Creator licence (key from ${CEDITOR_CREATOR_PUBLIC_KEY_FILE}).")
+    endif()
+
     target_include_directories(CEditor PRIVATE
         "${WEBVIEW2_INCLUDE}"
         # CE/src on the include path, like every other target here. It was missing, and it went
