@@ -22,12 +22,22 @@ The first session on the owner's Windows machine, with the keyboard. What it fou
 | Knob pages, Page Left / Right | Right, and the app's card follows |
 | CUE | Right as far as a setlist without sections goes. Pad 1 went to the song and so left CUE; changed since (below) |
 | LAYERS | Draws; E3 moves the top key a key a click; a held key lights with its mark, and the keyboard does not freeze (2026-10-08) |
-| Sound | None: the part plays nothing although HoSTage receives the notes (2026-10-08, below) |
+| Sound | The Vanguard part played nothing although HoSTage received the notes; a Spire part in its place sounds (2026-10-08, below) |
 
 The details are in `tools/ctrl49/README.md` ("Measured on the CTRL49, 2026-10-07") and the ticks
 and dated notes in `tools/ctrl49/hardware-checklist.md`.
 
-**First thing next session: the part makes no sound (2026-10-08).** On LAYERS, with the part's
+**It was the Vanguard part, not HoSTage's sound (2026-10-08, evening).** The owner put a Spire
+part in the Vanguard part's place and heard it. Measured the same way as below, with four notes
+sent to the "CEditor Test Out" port: CEditor's audio session peaked at 0.66 to 0.69 of full
+scale, and zero with nothing sent. So notes reach a part and its sound reaches the device. What
+is left open is why Vanguard ("LD Chording") stayed silent: the plug-in or that sound itself, or
+how HoSTage hosts it. Nothing showed in the app either way, and a part that loads and makes no
+sound without saying so is worth finding. To settle it, load Vanguard again, send notes to the
+test port and read the session, once on that sound and once on another of its sounds. What
+follows is the morning's record.
+
+**The morning: the part makes no sound (2026-10-08).** On LAYERS, with the part's
 range raised over the keys (E3; now C-1 to Eb3), a held key lit on the keyboard and in the app's
 card, with its white mark in the band. Nothing was heard. What is known:
 
