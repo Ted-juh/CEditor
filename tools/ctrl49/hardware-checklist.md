@@ -10,16 +10,10 @@ note held; the ticks and the dated notes below say what was seen. The first run 
 keyboard on the HoSTage logo, and that is fixed (`README.md`, "Measured on the CTRL49,
 2026-10-07"). Holding a key on LAYERS did not freeze it.
 
-**Sound: settled for HoSTage, open for one plug-in.** That evening a Spire part in the Vanguard
-part's place sounded, heard and measured, so LIVE and METERS can be checked. Why Vanguard stayed
-silent is not known (`docs/design/ctrl49-hostage-handoff.md`). The morning's note follows.
-
-**The morning: the part makes no sound.** On LAYERS the held key lit on the keyboard and in
-the app's card, so HoSTage receives the notes and counts the part as answering them, and CEditor
-put out silence the whole time (its Windows audio session, measured for two and a half minutes,
-never left zero). `docs/design/ctrl49-hostage-handoff.md` has what is known. LIVE and METERS
-cannot be checked until a part sounds. Then go on at LAYERS, "E1 picks the part".
-
+**Sound: fixed.** The part that played nothing that morning, and Vanguard presets that changed
+the name and not the sound, were Hostage sending the plug-in every MIDI controller at zero on
+each save and each start (`docs/design/ctrl49-hostage-handoff.md`). LIVE and METERS can be
+checked. Go on at LAYERS, "E1 picks the part".
 ## 0. Before you start
 
 - [ ] Build on Windows, in a Developer shell (the root `CLAUDE.md` says why a plain PowerShell

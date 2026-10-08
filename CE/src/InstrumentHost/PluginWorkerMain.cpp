@@ -31,6 +31,39 @@ namespace
 {
 using namespace ceditor::host::plugin_worker;
 
+/** Whether this is one of the parameters a VST3 built with JUCE lists for MIDI controllers.
+
+    Such a plug-in has, after its own parameters, one for every controller on every channel
+    ("MIDI CC 0|7": 16 x 130 of them, ids from 'mcm\0' up), because that is how a VST3 is sent
+    controllers at all. Setting one IS sending that controller, pitch bend and channel pressure
+    included, whether or not the value is new. */
+bool isMidiControllerParameter (const juce::AudioProcessorParameter& parameter)
+{
+    constexpr juce::int64 first = 0x6d636d00, count = 16 * 130;
+    if (const auto* hosted = dynamic_cast<const juce::HostedAudioProcessorParameter*> (&parameter))
+    {
+        const auto id = hosted->getParameterID().getLargeIntValue();
+        return id >= first && id < first + count;
+    }
+    return false;
+}
+
+/** Whether a value that arrives with every other parameter's (a snapshot being put back, not
+    a knob being turned) is to be written: only one that differs from what is there, and never
+    a MIDI-controller parameter.
+
+    Both used to be written. Hostage hands the worker every parameter's value before it reads a
+    state (IsolatedPluginProxy::flushParameterValues), so each save of the rack wrote all of
+    them, and on Vanguard, which is built with JUCE, that sent every controller on all sixteen
+    channels at zero: volume off, pitch bend at the bottom, all sound off. A preset loaded, the
+    rack saved, and the keys played some other sound or none; a rack reopened was silent. The
+    parameters all read right throughout, which is why it was looked for in the wrong place
+    (heard and measured 2026-10-08; CEditorPluginWorkerRealVstSmoke's sound sequence holds it). */
+bool snapshotValueIsToBeWritten (const juce::AudioProcessorParameter& parameter, float value)
+{
+    return ! isMidiControllerParameter (parameter) && std::abs (parameter.getValue() - value) > 1.0e-6f;
+}
+
 juce::var parameterMetadata (juce::AudioProcessor& processor)
 {
     juce::Array<juce::var> result;
@@ -159,8 +192,12 @@ public:
         processor.setPlayHead (&playHead);
         const auto parameters = processor.getParameters();
         lastParameterValues.reserve (static_cast<size_t> (parameters.size()));
+        midiControllerParameters.reserve (static_cast<size_t> (parameters.size()));
         for (auto* parameter : parameters)
+        {
             lastParameterValues.push_back (parameter->getValue());
+            midiControllerParameters.push_back (isMidiControllerParameter (*parameter));   // not asked on the audio thread
+        }
     }
 
     ~WorkerAudioThread() override { processor.setPlayHead (nullptr); }
@@ -274,9 +311,14 @@ private:
                 || event.sampleOffset >= header.numFrames)
                 continue;
             auto* parameter = parameters[static_cast<int> (event.parameterIndex)];
+            const auto value = juce::jlimit (0.0f, 1.0f, event.normalizedValue);
+            // A MIDI-controller parameter written with the value it has is a controller sent for
+            // nothing (snapshotValueIsToBeWritten): a morph blends every parameter, these too.
+            if (midiControllerParameters[event.parameterIndex] && std::abs (parameter->getValue() - value) <= 1.0e-6f)
+                continue;
             if ((event.flags & parameterGestureBegin) != 0)
                 parameter->beginChangeGesture();
-            parameter->setValue (juce::jlimit (0.0f, 1.0f, event.normalizedValue));
+            parameter->setValue (value);
             if ((event.flags & parameterGestureEnd) != 0)
                 parameter->endChangeGesture();
         }
@@ -384,6 +426,7 @@ private:
     juce::MidiBuffer midi;
     WorkerPlayHead playHead;
     std::vector<float> lastParameterValues;
+    std::vector<bool> midiControllerParameters;
     size_t parameterScanCursor = 0;
     juce::uint64 lastProcessedSequence = 0;
     std::atomic<bool> failed { false };
@@ -710,41 +753,6 @@ public:
     {
     }
 
-    void captureState (juce::MemoryBlock& state)
-    {
-        processor.getStateInformation (state);
-        if (processor.getName() != "Vanguard") return;
-        auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
-        if (xml == nullptr || ! xml->hasTagName ("VST3PluginState")) return;
-        // Vanguard's bank blob does not reliably restore the current imported patch values.
-        // Retain the native blob for hidden state and supplement its stable parameter IDs.
-        auto* snapshot = xml->createNewChildElement ("HostageVanguardParameters");
-        for (const auto* parameter : processor.getParameters())
-            if (const auto* hosted = dynamic_cast<const juce::HostedAudioProcessorParameter*> (parameter))
-            {
-                auto* value = snapshot->createNewChildElement ("P");
-                value->setAttribute ("id", hosted->getParameterID());
-                value->setAttribute ("value", static_cast<double> (parameter->getValue()));
-            }
-        juce::AudioProcessor::copyXmlToBinary (*xml, state);
-    }
-
-    void restoreSupplementalParameters (const juce::MemoryBlock& state)
-    {
-        if (processor.getName() != "Vanguard") return;
-        const auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
-        const auto* snapshot = xml != nullptr ? xml->getChildByName ("HostageVanguardParameters") : nullptr;
-        if (snapshot == nullptr) return; // native and older Hostage sessions remain readable
-        for (auto* parameter : processor.getParameters())
-            if (const auto* hosted = dynamic_cast<const juce::HostedAudioProcessorParameter*> (parameter))
-                if (const auto* value = snapshot->getChildByAttribute ("id", hosted->getParameterID()))
-                {
-                    const auto normalised = value->getDoubleAttribute ("value", -1);
-                    if (std::isfinite (normalised) && normalised >= 0 && normalised <= 1)
-                        parameter->setValueNotifyingHost (static_cast<float> (normalised));
-                }
-    }
-
     void waitForDeferredState (const juce::MemoryBlock& beforeState)
     {
         // These vendors acknowledge state before all engine/controller updates commit. Keep the message
@@ -803,7 +811,7 @@ public:
                                             "invalid worker state request");
                     else
                     {
-                        invokeExclusiveProcessor ([&] { captureState (reply.payload); },
+                        invokeExclusiveProcessor ([&] { processor.getStateInformation (reply.payload); },
                                                   pickUpMs);
                         if (reply.payload.getSize() > maxPayloadBytes)
                             reply = errorReply (generation, received.message.requestId,
@@ -837,9 +845,12 @@ public:
                         invokeProcessor ([&]
                         {
                             for (int index = 0; index < parameters.size(); ++index)
-                                parameters[index]->setValue (juce::jlimit (
-                                    0.0f, 1.0f, static_cast<float> (static_cast<double> (
-                                        values->getReference (index)))));
+                            {
+                                const auto value = juce::jlimit (0.0f, 1.0f, static_cast<float> (
+                                    static_cast<double> (values->getReference (index))));
+                                if (snapshotValueIsToBeWritten (*parameters[index], value))
+                                    parameters[index]->setValue (value);
+                            }
                             reply = makeJsonMessage (MessageType::setParameter, generation,
                                 received.message.requestId, processorSnapshot (processor));
                         }, pickUpMs);
@@ -897,6 +908,12 @@ public:
                 }
                 else if (received.message.type == MessageType::setState)
                 {
+                    // The state is the plug-in's own and nothing else. Vanguard's used to travel with
+                    // a copy of every parameter beside it, written back after the restore because
+                    // "its bank blob did not bring the sound back". It does: what silenced a restored
+                    // Vanguard was Hostage itself, writing its MIDI-controller parameters
+                    // (snapshotValueIsToBeWritten), and that copy was one more place it did so. A
+                    // state saved with the copy still loads; the copy is ignored.
                     juce::MemoryBlock beforeState;
                     bool deferredState = false;
                     invokeExclusiveProcessor ([&]
@@ -910,7 +927,6 @@ public:
                     if (deferredState) waitForDeferredState (beforeState);
                     invokeExclusiveProcessor ([&]
                     {
-                        restoreSupplementalParameters (received.message.payload);
                         reply = makeJsonMessage (MessageType::setState, generation,
                             received.message.requestId, processorSnapshot (processor));
                     });

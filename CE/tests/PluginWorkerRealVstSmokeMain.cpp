@@ -286,6 +286,177 @@ int main (int argc, char* argv[])
                 }
         }
 
+        // Presets by ear. The checks above read state and parameters, and both can be right while
+        // the plug-in plays something else: Vanguard did, with every load reported applied and
+        // every parameter reading as saved, because Hostage was writing its MIDI-controller
+        // parameters (PluginWorkerMain.cpp, snapshotValueIsToBeWritten). So this listens.
+        //
+        // HOSTAGE_SMOKE_SOUND_SEQUENCE is a ';'-separated list. A preset file is loaded; the words
+        // below do to the part what Hostage does between loads. After each step one held note is
+        // rendered and reduced to three numbers. Two different sounds must not come out alike, and
+        // one sound must come out the same each time, whatever was done in between.
+        //
+        //   @save           read the state, as every save of the rack does
+        //   @save-restore   read the state and put the same state back
+        //   @restart        restore the state into a new worker, as reopening the rack does
+        //   @remember       keep the state as it is now ...
+        //   @recall         ... and put it back over whatever was loaded since (a comparison ended)
+        //   @tweak          turn the filter's cutoff well away: a new sound, which must then last
+        //   @state:<file>   put back a state saved in a file (a part of a saved rack)
+        //
+        // Use sounds that repeat: a bass does, a pad with free-running modulation does not.
+        if (const auto sequence = juce::StringArray::fromTokens (
+                juce::SystemStats::getEnvironmentVariable ("HOSTAGE_SMOKE_SOUND_SEQUENCE", {}), ";", {});
+            ! sequence.isEmpty())
+        {
+            result.phase = "preset sound";
+            struct Sound { juce::String name; double rms = 0.0, peak = 0.0, crossingsHz = 0.0; };
+            const auto render = [&] (const juce::String& name)
+            {
+                juce::AudioBuffer<float> audio (juce::jmax (1, result.inputChannels, result.outputChannels), blockSize);
+                juce::MidiBuffer midi;
+                // A short note first, unmeasured: the first note after a load is not the sound yet on a
+                // patch that glides (Spire's 303 basses slide up to it from wherever the voice was).
+                const int primed = 24, held = 96, tail = 48;
+                double squares = 0.0, peak = 0.0;
+                int crossings = 0, samples = 0;
+                float last = 0.0f;
+                for (int block = 0; block < primed + held + tail; ++block)
+                {
+                    audio.clear();
+                    midi.clear();
+                    if (block == 0)             midi.addEvent (juce::MidiMessage::noteOn (1, 48, (juce::uint8) 100), 0);
+                    if (block == 8)             midi.addEvent (juce::MidiMessage::noteOff (1, 48), 0);
+                    if (block == primed)        midi.addEvent (juce::MidiMessage::noteOn (1, 48, (juce::uint8) 100), 0);
+                    if (block == primed + held) midi.addEvent (juce::MidiMessage::noteOff (1, 48), 0);
+                    processor->processBlock (audio, midi);
+                    if (block >= primed && block < primed + held)
+                        for (int i = 0; i < blockSize; ++i, ++samples)
+                        {
+                            const auto sample = audio.getSample (0, i);
+                            squares += (double) sample * sample;
+                            peak = juce::jmax (peak, (double) std::abs (sample));
+                            crossings += (sample >= 0.0f) != (last >= 0.0f) ? 1 : 0;
+                            last = sample;
+                        }
+                    juce::Thread::sleep (10);
+                    ++result.processedBlocks;
+                }
+                Sound sound { name, std::sqrt (squares / juce::jmax (1, samples)), peak,
+                              crossings * sampleRate / (2.0 * juce::jmax (1, samples)) };
+                std::cout << "SOUND " << juce::File::createLegalFileName (juce::File (name).getFileNameWithoutExtension()).paddedRight (' ', 28)
+                          << " rms " << juce::String (sound.rms, 4) << "  peak " << juce::String (sound.peak, 4)
+                          << "  crossings " << juce::String (sound.crossingsHz, 0) << " Hz" << std::endl;
+                return sound;
+            };
+            // The same sound twice lands within a per cent or two in level. Its zero crossings wander
+            // far more (free-running oscillators), so they count only by the factor: a filter opened
+            // moves them tenfold where the level hardly moves.
+            const auto alike = [] (const Sound& a, const Sound& b)
+            {
+                const auto near = [] (double x, double y) { return std::abs (x - y) <= 0.06 * juce::jmax (x, y, 1.0e-6); };
+                const auto low = juce::jmax (5.0, juce::jmin (a.crossingsHz, b.crossingsHz));
+                const auto high = juce::jmax (5.0, a.crossingsHz, b.crossingsHz);
+                return near (a.rms, b.rms) && near (a.peak, b.peak) && high / low < 1.5;
+            };
+            const auto restore = [&] (const juce::MemoryBlock& state)
+            {
+                processor->setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+            };
+
+            std::vector<Sound> sounds;
+            sounds.push_back (render ("(as the plug-in starts)"));   // shown, and compared with nothing
+            int restarts = 0;
+            juce::MemoryBlock remembered;
+            juce::String rememberedName;
+            for (const auto& step : sequence)
+            {
+                const auto current = sounds.back().name;
+                auto heard = current;
+                if (step == "@save" || step == "@save-restore" || step == "@restart")
+                {
+                    juce::MemoryBlock state;
+                    processor->getStateInformation (state);
+                    if (step == "@restart")
+                    {
+                        processor->releaseResources();
+                        processor.reset();
+                        processor = launchProxy (worker, workspace.getChildFile ("restart-" + juce::String (++restarts)),
+                                                 selected->descriptionXml, launchError);
+                        isolated = dynamic_cast<ceditor::host::IsolatedPluginProxy*> (processor.get());
+                        if (processor == nullptr || isolated == nullptr)
+                            throw std::runtime_error ("could not start the worker again");
+                        processor->prepareToPlay (sampleRate, blockSize);
+                    }
+                    if (step != "@save")
+                        restore (state);
+                }
+                else if (step == "@remember")
+                {
+                    processor->getStateInformation (remembered);
+                    rememberedName = current;
+                    std::cout << "      " << step << std::endl;
+                    continue;
+                }
+                else if (step == "@recall")
+                {
+                    restore (remembered);
+                    heard = rememberedName;
+                }
+                else if (step == "@tweak")
+                {
+                    juce::AudioProcessorParameter* cutoff = nullptr;
+                    for (auto* parameter : processor->getParameters())
+                        if (parameter->getName (64).containsIgnoreCase ("cut")) { cutoff = parameter; break; }
+                    if (cutoff == nullptr)
+                        throw std::runtime_error ("this plug-in has no parameter named for a cutoff to turn");
+                    std::cout << "      (" << cutoff->getName (64) << ")" << std::endl;
+                    cutoff->setValueNotifyingHost (cutoff->getValue() < 0.5f ? 0.95f : 0.05f);
+                    heard = current + " tweaked";
+                }
+                else if (step.startsWith ("@state:"))
+                {
+                    juce::MemoryBlock saved;
+                    const juce::File source (step.fromFirstOccurrenceOf (":", false, false));
+                    if (! source.loadFileAsData (saved) || saved.isEmpty())
+                        throw std::runtime_error (("could not read the saved state: " + source.getFullPathName()).toStdString());
+                    restore (saved);
+                    heard = source.getFullPathName();
+                }
+                else if (step.startsWith ("@"))
+                {
+                    throw std::runtime_error (("unknown step in the sound sequence: " + step).toStdString());
+                }
+                else
+                {
+                    if (! isolated->applyVstPreset (juce::File (step)))
+                        throw std::runtime_error (("worker refused the vendor preset: " + step).toStdString());
+                    heard = step;
+                }
+                if (step.startsWith ("@"))
+                    std::cout << "      " << step.upToFirstOccurrenceOf (":", false, false) << std::endl;
+                sounds.push_back (render (heard));
+            }
+            for (size_t a = 1; a < sounds.size(); ++a)
+                for (size_t b = a + 1; b < sounds.size(); ++b)
+                {
+                    const bool same = sounds[a].name == sounds[b].name;
+                    if (same != alike (sounds[a], sounds[b]))
+                        throw std::runtime_error ((same
+                            ? juce::File (sounds[a].name).getFileName() + " did not sound the same every time (steps "
+                                + juce::String ((int) a) + " and " + juce::String ((int) b) + ")"
+                            : juce::File (sounds[a].name).getFileName() + " and " + juce::File (sounds[b].name).getFileName()
+                                + " are different sounds and came out alike").toStdString());
+                }
+            processor->releaseResources();
+            processor.reset();
+            result.passed = true;
+            result.phase = "complete";
+            result.detail = "every sound in the sequence was heard as itself, each time";
+            workspace.deleteRecursively();
+            return finish (result);
+        }
+
         result.phase = "audio and MIDI";
         const auto channels = juce::jmax (1, result.inputChannels, result.outputChannels);
         juce::AudioBuffer<float> audio (channels, blockSize);

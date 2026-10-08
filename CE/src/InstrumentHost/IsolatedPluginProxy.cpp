@@ -555,6 +555,13 @@ IsolatedPluginProxy::IsolatedPluginProxy (Metadata metadataToUse,
         addParameter (remote);
         remoteParameters.push_back (remote);
     }
+    // Nothing is waiting to be sent: every value here is the one the worker just reported. Left
+    // at zero these said the opposite, and the first blocks of every new instance wrote all of its
+    // parameters back at it. On a VST3 built with JUCE that includes one parameter for every MIDI
+    // controller on every channel, and writing one sends it: a rack reopened with Vanguard on it
+    // had its state restored and was then sent volume 0 and all-sound-off, and played nothing.
+    for (size_t index = 0; index < remoteParameters.size(); ++index)
+        sentParameterRevisions[index] = remoteParameters[index]->getRevision();
     setLatencySamples (metadata.latencySamples + initialBlockSize);
 }
 

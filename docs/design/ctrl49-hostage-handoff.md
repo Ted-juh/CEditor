@@ -22,47 +22,45 @@ The first session on the owner's Windows machine, with the keyboard. What it fou
 | Knob pages, Page Left / Right | Right, and the app's card follows |
 | CUE | Right as far as a setlist without sections goes. Pad 1 went to the song and so left CUE; changed since (below) |
 | LAYERS | Draws; E3 moves the top key a key a click; a held key lights with its mark, and the keyboard does not freeze (2026-10-08) |
-| Sound | The Vanguard part played nothing although HoSTage received the notes; a Spire part in its place sounds (2026-10-08, below) |
+| Sound | A Vanguard part played nothing, and its presets changed the name and not the sound: Hostage was sending it every MIDI controller at zero. Fixed (2026-10-08, below) |
 
 The details are in `tools/ctrl49/README.md` ("Measured on the CTRL49, 2026-10-07") and the ticks
 and dated notes in `tools/ctrl49/hardware-checklist.md`.
 
-**It was the Vanguard part, not HoSTage's sound (2026-10-08, evening).** The owner put a Spire
-part in the Vanguard part's place and heard it. Measured the same way as below, with four notes
-sent to the "CEditor Test Out" port: CEditor's audio session peaked at 0.66 to 0.69 of full
-scale, and zero with nothing sent. So notes reach a part and its sound reaches the device.
-Vanguard itself sounds in HoSTage too: loaded again and walked to "BA Hi-levelbass" with the
-rack's preset arrows, three notes peaked at 2.27, well over full scale. So the morning's silence
-belonged to that one part as the saved rack restored it (Vanguard on "LD Chording"), not to the
-plug-in and not to HoSTage's sound. Whether that sound is silent by itself or the restore left
-it so was not looked at; the part is gone from the rack. Vanguard does stall its own message
-thread: 2 s when its window opens, and 4 s after a preset load in which 21 `parameterText`
-requests were refused as busy (`logs/live-worker-events.jsonl`). What follows is the morning's
-record.
+**The silent Vanguard part, and presets that changed the name but not the sound: Hostage's doing,
+fixed (2026-10-08).** The morning's part played nothing although HoSTage received its notes; in
+the evening the owner found that loading another Vanguard preset changed the name in the rack and
+left the sound as it was. One cause, in three places.
 
-**The morning: the part makes no sound (2026-10-08).** On LAYERS, with the part's
-range raised over the keys (E3; now C-1 to Eb3), a held key lit on the keyboard and in the app's
-card, with its white mark in the band. Nothing was heard. What is known:
+- A VST3 built with JUCE lists, after its own parameters, one for every MIDI controller on every
+  channel ("MIDI CC 0|7": 2,080 of them on Vanguard, pitch bend and channel pressure among them).
+  Writing one sends that controller, whether or not the value is new.
+- Hostage wrote all of a plug-in's parameters back at it: before every read of its state, which is
+  every save of the rack (`IsolatedPluginProxy::flushParameterValues`); in the first blocks of
+  every new instance (`sentParameterRevisions` began at zero); and, for Vanguard only, after every
+  restore, from a copy of the parameters kept beside the state because "its bank blob did not
+  restore the patch". Each sent every controller on all sixteen channels at zero: volume off,
+  pitch bend at the bottom, all sound off.
+- So a preset loaded, the rack saved, and the keys played something else; a rack reopened was
+  silent. The parameters read right throughout, which is where it had been looked for
+  (`a948b29`, 28 September, added the `preset_applied` log lines to catch a parameter moving
+  back; none ever did).
 
-- HoSTage receives the notes. The card draws only what the service sends, and it lit.
-- CEditor put out silence. Its Windows audio session (on the default device, SteelSeries Sonar -
-  Gaming, which reaches the owner's headphones and carried other sound meanwhile) was read every
-  two seconds for two and a half minutes, through both times the owner played: peak 0 throughout.
-- The rack looks right on disk: one part, Vanguard ("LD Chording"), enabled, not muted, volume
-  1, channel 0, keys 0-51, velocity 1-127, master 1. Its worker started and reported ready
-  (`logs/live-worker-events.jsonl`), with no failure logged that day.
-- The day before, going to a song from CUE logged sixteen `worker_operation_failed`, "busy: the
-  plug-in's message thread is occupied (building its editor, most likely) (message type 11)".
-  Not shown to be related.
-- Not known: whether this rack has ever sounded in CEditor on this machine. Until 2026-10-08 the
-  part's range (0-35) was below the keyboard's lowest key, so the keys could not have played it.
+Now a value that is already there is not written again, a MIDI-controller parameter is never
+written as part of a set, a new instance has nothing pending, and Vanguard's state is Vanguard's
+own with nothing beside it: that restores the patch and a turned knob, in place and into a new
+worker, and the morning's part plays again from the state the rack had saved.
 
-How to take the keyboard out of the question: loopMIDI has a port here, "CEditor Test Out", that
-CEditor listens to. With HoSTage open (File > Hostage...; it does not reopen by itself, so the
-owner has to open it), send a note to that port from a script and read CEditor's audio session.
-Nothing in the repo does either; the session of 2026-10-08 used two throwaway C# snippets for it
-(WinMM `midiOutShortMsg`, WASAPI `IAudioMeterInformation`).
+It was found and is held by ear, not by parameters: `CEditorPluginWorkerRealVstSmoke` (configure
+with `-DCEDITOR_REAL_VST_SMOKE=ON`) takes `HOSTAGE_SMOKE_SOUND_SEQUENCE`, a list of preset files
+and of `@save`, `@save-restore`, `@restart`, `@remember`, `@recall`, `@tweak`, `@state:<file>`,
+renders a note after each and fails when two sounds come out alike or one does not come back as
+itself. In the app, the same was measured from outside: notes sent to the loopMIDI port
+"CEditor Test Out", and CEditor's audio session read (WASAPI `IAudioMeterInformation`).
 
+Not looked into: Vanguard stalls its own message thread (2 s when its window opens, about 4 s
+after a preset load, when `parameterText` requests are refused as busy), and its presets come out
+well over full scale (a single note at 1.2 to 1.7).
 **Open, for the owner to decide or for the next session:**
 
 - **Decided by the owner and built, 2026-10-08; not on the keyboard yet.** Check each on the next
