@@ -20,6 +20,7 @@
 #include "SetlistSoundcheck.h"
 #include "ParameterModel.h"
 #include "Library.h"
+#include "PlayerCreator.h"
 #include "LibraryStore.h"
 #include "SnapshotStore.h"
 #include "RecentPlay.h"
@@ -456,6 +457,14 @@ public:
             exportShow refuse aloud, as pickDirectory does. */
         std::function<void (bool saving, const juce::String& suggestedName,
                             std::function<void (const juce::String& file)>)> pickShowFile;
+        /** The programs a player is made of (PlayerCreator.h): this HoSTage's own standalone, its
+            helpers and its VST3, found by the shell. Empty: this program cannot make players,
+            and createPlayer says so. */
+        player::Template playerTemplate;
+        /** Opens the native folder chooser under a title and calls back with the chosen folder,
+            empty for cancel. Absent: createPlayer needs its destination in the command. */
+        std::function<void (const juce::String& title,
+                            std::function<void (const juce::String& folder)>)> pickFolder;
         double sampleRate = 44100.0;
         int blockSize = 512;
     };
@@ -1985,6 +1994,27 @@ private:
     bool openingShow = false;           // nor are the saves an opening show makes
     juce::int64 showSaveDueMs = 0;
     juce::StringArray showMissing;      // plug-ins the show opened last needs and this computer lacks
+
+    // -- making players (PlayerCreator.h) -------------------------------------------------
+    // The copying runs on a thread of its own (a hundred megabytes to a USB stick is not a
+    // pause anybody should sit through with the window frozen); the result is collected on
+    // the pump, like the library's.
+    struct PlayerResult
+    {
+        bool done = false, ok = false;
+        juce::String name, folder, message;
+        juce::StringArray notes;
+    };
+    void createPlayer (const juce::var& payload);
+    void startPlayerCreation (player::Request request);
+    void tickPlayerCreation();
+    juce::var playersPayload() const;
+    std::thread playerThread;
+    std::mutex playerResultLock;
+    PlayerResult playerResult;          // written by the copying thread, under the lock
+    PlayerResult lastPlayer;            // the last one finished, for the page
+    bool playerBusy = false;
+    bool playerHasStandalone = false, playerHasVst3 = false;   // the template, looked at once
 
     juce::String legacyDecision;        // as legacy-data.json says
     juce::StringArray legacyFailed;     // what the copy could not bring over

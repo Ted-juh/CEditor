@@ -230,14 +230,24 @@ inline juce::File findBuiltInShows()
     return {};
 }
 
-inline HostageManifest configureForThisProgram (InstrumentHostService::Options& options)
+/** What a player made here is copied from (PlayerCreator.h): this program. The standalone
+    offers itself, its helpers and the VST3 that belongs with it; the VST3 can only offer its own
+    bundle, since it cannot know where a standalone was installed. */
+inline player::Template findPlayerTemplate (const HostageManifest& manifest, bool asPlugin);
+
+inline HostageManifest configureForThisProgram (InstrumentHostService::Options& options,
+                                                bool asPlugin = false)
 {
     const auto manifest = readHostageManifest();
+    options.playerTemplate = findPlayerTemplate (manifest, asPlugin);
     options.builtInShowsDirectory = findBuiltInShows();
     options.firstShowFileName = manifest.showFileName;
     options.dataDirectory = productDataDirectory (hostDataRoot(), manifest);
     options.hardwareClaimDirectory = hostDataRoot();
-    if (manifest.hasProduct())
+    // Only a product that may have used the shared folder is offered what is in it: every
+    // product built before each had a folder of its own was an editor. A player was made after,
+    // and the shared rig was never its own.
+    if (manifest.hasProduct() && ! manifest.player)
         options.legacyDataDirectory = hostDataRoot();
     options.player = manifest.player;
     labelProductDataDirectory (options.dataDirectory, manifest);
@@ -298,6 +308,28 @@ inline juce::File findHostLiveWorker (const juce::Array<juce::File>& extraDirect
    #else
     return findHostWorkerNamed ("CEditorPluginWorker", extraDirectories);
    #endif
+}
+
+inline player::Template findPlayerTemplate (const HostageManifest& manifest, bool asPlugin)
+{
+    player::Template found;
+    const auto module = juce::File::getSpecialLocation (juce::File::currentExecutableFile);
+    if (asPlugin)
+    {
+        // <bundle>.vst3/Contents/<platform>/<module>
+        const auto bundle = module.getParentDirectory().getParentDirectory().getParentDirectory();
+        if (bundle.hasFileExtension (".vst3") && bundle.isDirectory())
+            found.vst3Bundle = bundle;
+    }
+    else
+    {
+        found.standalone = module;
+        found.vst3Bundle = player::findSiblingVst3 (module, manifest.appId);
+    }
+    for (const auto& helper : { findHostScannerWorker(), findHostLiveWorker() })
+        if (helper.existsAsFile())
+            found.companions.add (helper);
+    return found;
 }
 
 } // namespace ceditor::host

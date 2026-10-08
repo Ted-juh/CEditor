@@ -27,6 +27,7 @@ import {
   onInstrumentHostLibraryLoad,
   onInstrumentHostLibrarySaved,
   onInstrumentHostShowSaved,
+  onInstrumentHostPlayerCreated,
   onInstrumentHostSupportBundle,
   onInstrumentHostLicenceReceipt,
   onInstrumentHostMidiActivity,
@@ -96,6 +97,14 @@ function showLibrarySaved(payload) {
   if (!name) return;
   hostSaveNotice.set(`Saved “${name}” to library.`);
   saveNoticeTimer = setTimeout(clearSaveNotice, 5000);
+  saveNoticeTimer?.unref?.();
+}
+function showPlayerCreated(payload) {
+  clearSaveNotice();
+  const name = String(payload?.name ?? '').trim();
+  const folder = String(payload?.folder ?? '').trim();
+  hostSaveNotice.set(`Made the player${name ? ` “${name}”` : ''}${folder ? ` in ${folder}` : ''}.`);
+  saveNoticeTimer = setTimeout(clearSaveNotice, 8000);
   saveNoticeTimer?.unref?.();
 }
 function showShowSaved(payload) {
@@ -2306,6 +2315,7 @@ export function emptyHostState() {
     player: false,
     playerInstalled: false,
     shows: emptyShows(),
+    players: emptyPlayers(),
     editHistory: { canUndo: false, canRedo: false, undoLabel: '', redoLabel: '', blockedReason: '' },
     editorOpenPartId: '',
     editorOpenPartIds: [],
@@ -2622,6 +2632,29 @@ export function normalizeShows(payload) {
     })).filter((row) => row.file),
     missing: (Array.isArray(p.missing) ? p.missing : []).map(String),
     canPick: p.canPick === true,
+  };
+}
+
+/** Making players (PlayerCreator.h): what this HoSTage can copy, whether a copy is running, and
+ *  how the last one ended. */
+export function emptyPlayers() {
+  return { standalone: false, vst3: false, canPick: false, busy: false, last: null };
+}
+export function normalizePlayers(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const last = p.last && typeof p.last === 'object' ? {
+    ok: p.last.ok === true,
+    name: String(p.last.name ?? ''),
+    folder: String(p.last.folder ?? ''),
+    message: String(p.last.message ?? ''),
+    notes: (Array.isArray(p.last.notes) ? p.last.notes : []).map(String),
+  } : null;
+  return {
+    standalone: p.standalone === true,
+    vst3: p.vst3 === true,
+    canPick: p.canPick === true,
+    busy: p.busy === true,
+    last,
   };
 }
 
@@ -4627,6 +4660,7 @@ export function normalizeHostState(payload) {
     stageLocked: p.stageLocked === true,
     player: p.player === true || p.playerInstalled === true,
     shows: normalizeShows(p.shows),
+    players: normalizePlayers(p.players),
     playerInstalled: p.playerInstalled === true,
     editHistory: {
       canUndo: p.editHistory?.canUndo === true,
@@ -8527,6 +8561,7 @@ export function initInstrumentHostBridge() {
   });
   onInstrumentHostLibrarySaved(showLibrarySaved);
   onInstrumentHostShowSaved(showShowSaved);
+  onInstrumentHostPlayerCreated(showPlayerCreated);
   onInstrumentHostLibraryLoad((payload) => hostLibraryLoad.set(normalizeLibraryLoad(payload)));
   send({ cmd: 'getState' });
 }
@@ -8661,6 +8696,10 @@ function send(payload) {
     }
     if (payload?.cmd === 'importShow' || payload?.cmd === 'exportShow') {
       hostLastError.set('Choosing a file is not available in the browser preview.');
+      return;
+    }
+    if (payload?.cmd === 'createPlayer') {
+      hostLastError.set('Making a player copies the HoSTage program, which the browser preview does not have.');
       return;
     }
     if (payload?.cmd === 'saveShow' && !String(payload?.name ?? '').trim() && !get(hostState).shows.current) {
@@ -10108,6 +10147,13 @@ export const importShow = () => send({ cmd: 'importShow' });
 export const exportShow = () => send({ cmd: 'exportShow' });
 export const setShowChanges = (mode) => send({ cmd: 'setShowChanges', mode: mode === 'save' ? 'save' : 'keep' });
 export const refreshShows = () => send({ cmd: 'refreshShows' });
+// A player: this HoSTage copied into a folder with the chosen shows (PlayerCreator.h). The host
+// asks where; shows are { file, builtIn } rows from the list.
+export const createPlayer = ({ name, shows = [], standalone = true, vst3 = true } = {}) =>
+  send({
+    cmd: 'createPlayer', name: String(name ?? ''), standalone: standalone === true, vst3: vst3 === true,
+    shows: shows.map((row) => ({ file: String(row.file), builtIn: row.builtIn === true })),
+  });
 // The rig an earlier build kept in the folder every product shared: bring it over at the next
 // start, or leave it where it is.
 export const adoptLegacyData = () => send({ cmd: 'adoptLegacyData' });

@@ -20,6 +20,7 @@
 #include "InstrumentHost/InstrumentHostService.h"
 #include "InstrumentHost/HostageManifest.h"
 #include "InstrumentHost/HostShow.h"
+#include "InstrumentHost/PlayerCreator.h"
 #include "InstrumentHost/EditorSnapshot.h"
 #include "InstrumentHost/LiveWorkerDiagnostics.h"
 #include "InstrumentHost/PatchDiff.h"
@@ -5614,6 +5615,161 @@ void testShowFindsVendorPresetsAlreadyHere()
         check (idsNamed (h, "Warm Pad").size() == 1,
                "and no copy pointing at the author's disk is added beside it");
     }
+}
+
+// A player is made by copying the HoSTage that is running (PlayerCreator.h): its programs, a
+// manifest that says "player" with an identity of its own, and the shows it is to play.
+juce::File fakePlayerTemplate (const juce::String& name, ceditor::host::player::Template& out)
+{
+    const auto root = freshDataDir (name);
+    const auto file = [] (const juce::File& f, const juce::String& text)
+    {
+        f.getParentDirectory().createDirectory();
+        f.replaceWithText (text);
+        return f;
+    };
+    out.standalone = file (root.getChildFile ("Hostage.exe"), "program");
+    out.companions = { file (root.getChildFile ("CEditorPluginScanner.exe"), "scanner"),
+                       file (root.getChildFile ("CEditorPluginWorker.exe"), "worker") };
+    out.vst3Bundle = root.getChildFile ("Hostage.vst3");
+    file (out.vst3Bundle.getChildFile ("Contents").getChildFile ("x86_64-win").getChildFile ("Hostage.vst3"), "module");
+    const auto resources = out.vst3Bundle.getChildFile ("Contents").getChildFile ("Resources");
+    file (resources.getChildFile ("moduleinfo.json"), "{}");
+    // What the HoSTage being copied shipped with itself, which is not the player's.
+    file (resources.getChildFile ("hostage.json"), R"({"role":"editor","product":{"name":"Hostage","appId":"11111111-2222-3333-4444-555555555555"}})");
+    file (resources.getChildFile ("shows").getChildFile ("Its Own.hostageshow"), "{}");
+    file (resources.getChildFile ("factory-performance.json"), "{}");
+    return root;
+}
+
+void testPlayerCreator()
+{
+    std::cout << "\nmaking a player: a folder copied from the HoSTage that is running" << std::endl;
+    namespace player = ceditor::host::player;
+    using ceditor::host::parseHostageManifest;
+
+    player::Template from;
+    fakePlayerTemplate ("player-template", from);
+    const auto shows = freshDataDir ("player-shows");
+    const auto gig = shows.getChildFile ("Gig.hostageshow");
+    const auto rehearsal = shows.getChildFile ("Rehearsal.hostageshow");
+    gig.replaceWithText (R"({"format":"hostage-show","name":"Gig"})");
+    rehearsal.replaceWithText (R"({"format":"hostage-show","name":"Rehearsal"})");
+    const auto destination = freshDataDir ("player-destination");
+
+    player::Request request;
+    request.name = "Friday: Rig";
+    request.appId = juce::Uuid().toDashedString().toUpperCase();
+    request.shows = { gig, rehearsal };
+    request.destination = destination;
+
+    auto refused = request;
+    refused.name = "  ";
+    refused.shows.clear();
+    refused.standalone = refused.vst3 = false;
+    refused.destination = destination.getChildFile ("nowhere");
+    const auto problems = player::plan (from, refused).problems;
+    check (problems.size() == 4 && problems.joinIntoString (" ").contains ("name")
+             && problems.joinIntoString (" ").contains ("at least one show")
+             && problems.joinIntoString (" ").contains ("standalone, the VST3")
+             && problems.joinIntoString (" ").contains ("folder"),
+           "everything that would stop it is said at once, before anything is touched");
+    check (! destination.getChildFile ("Friday Rig").exists(), "and nothing is made");
+    auto noProgram = request;
+    check (player::plan (player::Template {}, noProgram).problems.joinIntoString (" ").contains ("no standalone program"),
+           "a HoSTage with nothing to copy says so");
+
+    const auto plan = player::plan (from, request);
+    check (plan.problems.isEmpty() && plan.notes.isEmpty() && player::execute (plan).wasOk(), "it is made");
+    const auto folder = destination.getChildFile ("Friday Rig");
+    const auto standalone = folder.getChildFile ("Standalone");
+    const auto bundle = folder.getChildFile ("VST3").getChildFile ("Hostage.vst3");
+    const auto resources = bundle.getChildFile ("Contents").getChildFile ("Resources");
+    check (plan.folder == folder && standalone.getChildFile ("Friday Rig.exe").loadFileAsString() == "program"
+             && standalone.getChildFile ("CEditorPluginScanner.exe").existsAsFile()
+             && standalone.getChildFile ("CEditorPluginWorker.exe").existsAsFile(),
+           "the standalone is copied under the player's name, with its helpers beside it");
+    check (bundle.getChildFile ("Contents").getChildFile ("x86_64-win").getChildFile ("CEditorPluginWorker.exe").existsAsFile()
+             && resources.getChildFile ("moduleinfo.json").existsAsFile(),
+           "the VST3 bundle is copied whole, with the helpers beside its module");
+
+    for (const auto& where : { standalone, bundle.getChildFile ("Contents").getChildFile ("x86_64-win") })
+    {
+        const auto manifest = ceditor::host::readHostageManifestBeside (where);
+        check (manifest.player && manifest.productName == "Friday: Rig" && manifest.appId == request.appId
+                 && manifest.showFileName == "Gig.hostageshow",
+               "each says it is a player, with its own name and identity, opening the first show: " + where.getFileName());
+    }
+    check (standalone.getChildFile ("shows").getChildFile ("Rehearsal.hostageshow").existsAsFile()
+             && resources.getChildFile ("shows").getChildFile ("Gig.hostageshow").existsAsFile(),
+           "both get every show");
+    check (! resources.getChildFile ("shows").getChildFile ("Its Own.hostageshow").exists()
+             && ! resources.getChildFile ("factory-performance.json").exists(),
+           "and nothing the copied HoSTage shipped with itself, whose rack would open first");
+    check (folder.getChildFile ("Read me.txt").loadFileAsString().contains ("USB stick"),
+           "a note says what to do with the folder");
+
+    check (player::plan (from, request).folder == destination.getChildFile ("Friday Rig 2"),
+           "a second player of the same name is numbered, never written over the first");
+
+    auto broken = player::plan (from, request);
+    rehearsal.deleteFile();
+    check (player::execute (broken).failed() && ! broken.folder.exists(),
+           "a copy that fails half-way takes away what it made");
+}
+
+void testCreatePlayerCommand()
+{
+    std::cout << "\nmaking a player from the Shows utility" << std::endl;
+
+    ceditor::host::player::Template from;
+    fakePlayerTemplate ("player-command-template", from);
+    const auto destination = freshDataDir ("player-command-destination");
+    const auto dir = freshDataDir ("player-command");
+    seedCatalog (dir);
+
+    Harness h (dir, {}, [from] (InstrumentHostService::Options& o) { o.playerTemplate = from; });
+    h.cmd ("getState");
+    const auto players = [&h] { return h.emits.lastState()->getProperty ("players", {}); };
+    check ((bool) players().getProperty ("standalone", false) && (bool) players().getProperty ("vst3", false),
+           "the page is told what this HoSTage can copy");
+
+    h.cmd ("createPlayer", { { "name", "Rig" }, { "destination", destination.getFullPathName() } });
+    check (h.emits.lastError().contains ("at least one show"), "a player needs a show, and is told so first");
+
+    h.cmd ("saveShow", { { "name", "Gig" } });
+    juce::Array<juce::var> shows;
+    auto* row = new juce::DynamicObject();
+    row->setProperty ("file", "Gig.hostageshow");
+    shows.add (juce::var (row));
+    h.cmd ("createPlayer", { { "name", "Rig" }, { "shows", shows }, { "vst3", false },
+                             { "destination", destination.getFullPathName() } });
+    for (int i = 0; i < 200 && (bool) players().getProperty ("busy", true); ++i)
+    {
+        juce::Thread::sleep (10);
+        h.service->drainParameterEvents();
+    }
+    const auto last = players().getProperty ("last", {});
+    check ((bool) last.getProperty ("ok", false)
+             && last.getProperty ("folder", {}).toString() == destination.getChildFile ("Rig").getFullPathName()
+             && h.emits.last ("instrumentHostPlayerCreated") != nullptr,
+           "it is made on a thread of its own, and the page hears where");
+    check (destination.getChildFile ("Rig").getChildFile ("Standalone").getChildFile ("shows")
+               .getChildFile ("Gig.hostageshow").existsAsFile()
+             && ! destination.getChildFile ("Rig").getChildFile ("VST3").exists(),
+           "with the show, and only the parts asked for");
+
+    Harness withNothing (freshDataDir ("player-command-empty"));
+    withNothing.cmd ("getState");
+    withNothing.cmd ("createPlayer", { { "name", "Rig" }, { "shows", shows } });
+    check (withNothing.emits.lastError().contains ("no standalone program"),
+           "a HoSTage with nothing to copy says so before asking for a folder");
+
+    Harness inPlayer (freshDataDir ("player-command-player"), {}, [from] (InstrumentHostService::Options& o)
+                      { o.player = true; o.playerTemplate = from; });
+    inPlayer.cmd ("getState");
+    inPlayer.cmd ("createPlayer", { { "name", "Rig" } });
+    check (inPlayer.emits.lastError().contains ("cannot build"), "and a player does not make players");
 }
 
 // Which stage pages the keyboard shows is the player's choice, made once. Before, every page
@@ -15530,6 +15686,8 @@ int main (int argc, char* argv[])
     testLegacyDataOffer();
     testShows();
     testShowFindsVendorPresetsAlreadyHere();
+    testPlayerCreator();
+    testCreatePlayerCommand();
     testCtrl49Meters();
     testCtrl49Live();
     testCtrl49Discover();

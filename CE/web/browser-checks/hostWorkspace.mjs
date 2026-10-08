@@ -311,6 +311,29 @@ try {
   await page.waitForTimeout(100);
   assert.equal(await page.getByTestId('show-changed').count(), 0, 'saving as it goes, the show never falls behind');
   await page.getByTestId('show-changes-keep').check();
+
+  // Make a player: the editor's, starting from the open show. The preview has no program to
+  // copy and says so; given one, the form appears, and the copying itself is the host's.
+  assert.equal(await page.getByTestId('player-nothing').count(), 1, 'nothing to copy is said, not offered');
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostState.update((s) => ({ ...s, players: { ...s.players, standalone: true, vst3: true } }));
+  });
+  const createButton = page.getByTestId('player-create');
+  assert.ok(await createButton.isDisabled(), 'no name, no player');
+  await page.getByTestId('player-name').fill('Friday Rig');
+  const ticks = page.getByTestId('player-show');
+  assert.deepEqual(await ticks.evaluateAll((boxes) => boxes.map((b) => b.checked)), [false, true],
+    'the open show (Rehearsal) is ticked, the other not');
+  await createButton.click();
+  assert.match(await page.locator('.host-error').innerText(), /browser preview/, 'the copying is the host\'s');
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostLastError.set('');
+  });
+  await page.getByTestId('host-try-player').click();
+  assert.equal(await page.getByTestId('player-maker').count(), 0, 'and a player does not make players');
+  await page.getByTestId('host-try-player').click();
   await page.getByTestId('host-utility-close').click();
 
   // A product in a folder of its own is asked, once, about the rig an earlier build kept in the
@@ -332,7 +355,7 @@ try {
     'and the Product utility says where this product keeps its data');
 
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros, returns, bus effects, Try as player, shows and the data folder work as drawn');
+  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros, returns, bus effects, Try as player, shows, making a player and the data folder work as drawn');
 } finally {
   await browser.close();
   await server.close();

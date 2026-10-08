@@ -88,3 +88,28 @@ test('the Shows utility asks before changes are thrown away, and says what is mi
   assert.match(view, /\{ id: 'shows', label: 'Shows' \}/);
   assert.match(view, /\{#if activeUtility === 'shows'\}\s*<HostShowsPanel \/>/);
 });
+
+// Step 4: making a player (PlayerCreator.h; testPlayerCreator and testCreatePlayerCommand natively).
+test('the page is told what this HoSTage can copy into a player, and how the last one went', async () => {
+  const { normalizePlayers } = await import('../src/CE_Application/stores/instrumentHost.js');
+  assert.deepEqual(normalizePlayers(undefined), { standalone: false, vst3: false, canPick: false, busy: false, last: null });
+  const players = normalizePlayers({
+    standalone: true, vst3: true, busy: false,
+    last: { ok: true, name: 'Friday Rig', folder: '/media/stick/Friday Rig', notes: ['The live plug-in worker was not found'] },
+  });
+  assert.equal(players.last.folder, '/media/stick/Friday Rig');
+  assert.deepEqual(players.last.notes, ['The live plug-in worker was not found']);
+  assert.equal(editorOnlyCommand({ cmd: 'createPlayer' }), true, 'a player does not make players');
+});
+
+test('Make a player is the editor\'s, starts from the open show, and says what goes in', () => {
+  const panel = source('sections/HostShowsPanel.svelte');
+  assert.match(panel, /let makesPlayers = \$derived\(!\$hostState\.player\)/);
+  assert.match(panel, /\{#if makesPlayers\}\s*<section class="shows-block" data-testid="player-maker">/);
+  assert.match(panel, /const isTicked = \(row\) => ticked\[keyOf\(row\)\] \?\? Boolean\(isCurrent\(row\)\)/,
+    'the open show is ticked until somebody says otherwise');
+  assert.match(panel, /data-testid="player-unsaved">The open show goes in as it was last saved/);
+  assert.match(panel, /data-testid="player-standalone" disabled=\{!players\.standalone\}/);
+  assert.match(panel, /data-testid="player-nothing"/, 'with nothing to copy, it says so instead of offering');
+  assert.match(panel, /createPlayer\(\{ name: playerName\.trim\(\), shows: chosen, standalone: standaloneOn, vst3: vst3On \}\)/);
+});

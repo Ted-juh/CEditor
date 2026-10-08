@@ -142,7 +142,7 @@ HostPluginProcessor::HostPluginProcessor()
     // The same per-user product directory as the standalone: one catalogue, one scan-path
     // list, whichever wrapper scanned. The SESSION file is deliberately not shared —
     // persistSession=false keeps the rack in the DAW's project chunk instead.
-    configureForThisProgram (options);
+    configureForThisProgram (options, true);
     options.workerExecutable = findHostScannerWorker ({ options.dataDirectory });
     options.factoryPerformanceFile = findFactoryPerformance();
 
@@ -208,6 +208,22 @@ HostPluginProcessor::HostPluginProcessor()
             saving ? (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
                       | juce::FileBrowserComponent::warnAboutOverwriting)
                    : (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles),
+            [aliveToken, done] (const juce::FileChooser& fc)
+            {
+                if (! aliveToken->load())
+                    return;
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
+    // Where a player is made (PlayerCreator.h).
+    options.pickFolder = [this, aliveToken = alive] (const juce::String& title, std::function<void (const juce::String&)> done)
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            title, juce::File::getSpecialLocation (juce::File::userDocumentsDirectory));
+        fileChooser->launchAsync (
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
             [aliveToken, done] (const juce::FileChooser& fc)
             {
                 if (! aliveToken->load())

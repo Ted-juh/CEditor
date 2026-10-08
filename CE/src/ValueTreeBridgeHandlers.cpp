@@ -1785,6 +1785,11 @@ void ValueTreeBridge::ensureInstrumentHost()
     // tab's own folder, the tab and a running product both drove the CTRL49 — two racks on one
     // keyboard, the thing the claim exists to prevent.
     options.hardwareClaimDirectory = ceditor::host::hostDataRoot();
+    // A player made here is copied from what CMake built (PlayerCreator.h): CEditor's own
+    // installer does not ship the host programs yet, so outside a source checkout there is
+    // nothing to copy and the Shows utility says so.
+    options.playerTemplate = ceditor::host::player::findTemplateInBuildTree (
+        ceditorSourceRoot().getChildFile ("build").getChildFile ("native"));
     options.workerExecutable = findScannerWorker();
 
     // May fire from the scan thread; callAsync is the marshal. `this` raw is this file's
@@ -1886,6 +1891,20 @@ void ValueTreeBridge::ensureInstrumentHost()
             saving ? (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
                       | juce::FileBrowserComponent::warnAboutOverwriting)
                    : (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles),
+            [done] (const juce::FileChooser& fc)
+            {
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
+    // Where a player is made (PlayerCreator.h).
+    options.pickFolder = [this] (const juce::String& title, std::function<void (const juce::String&)> done)
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            title, juce::File::getSpecialLocation (juce::File::userDocumentsDirectory));
+        fileChooser->launchAsync (
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
             [done] (const juce::FileChooser& fc)
             {
                 const auto result = fc.getResult();

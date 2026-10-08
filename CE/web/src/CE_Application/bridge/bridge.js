@@ -1009,6 +1009,13 @@ export function onInstrumentHostLibrarySaved(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** Emitted when a player has been made: its name and the folder it was made in. */
+export function onInstrumentHostPlayerCreated(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostPlayerCreated', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Emitted after a show was written: saved in the program's shows folder, or exported. */
 export function onInstrumentHostShowSaved(callback) {
   if (!isJuceAvailable()) return () => {};

@@ -98,10 +98,8 @@ HoSTage itself refuses what a player cannot do, so a script cannot do it either.
 "Screens and control pages are made in the HoSTage editor; a player shows them and cannot change
 them (…)".
 
-> **Not finished yet:** HoSTage cannot make a player yet. **Build product** writes a file named
-> `hostage.json` beside the program (inside a VST3, in `Contents/Resources`) that names the product
-> and says `"role": "editor"`. Changed to `"role": "player"`, the program starts as a player. It
-> then shows **PLAYER** where **Try as player** would be, and has no editor to go back to.
+**Make a player** in the [Shows](#make-a-player) utility makes one. A player shows **PLAYER** where
+**Try as player** would be, and has no editor to go back to.
 
 **Removing things.** Removing a part, a plugin, a pattern and most other things asks for a second
 click within five seconds before it happens; many buttons say **Confirm** while they wait.
@@ -683,6 +681,41 @@ Plug-ins are never in a show. It names the ones it needs.
 Shows open and switch outside Stage mode only; under Stage Lock HoSTage refuses. A player opens and
 switches shows just as the editor does.
 
+### Make a player
+
+At the bottom of the **Shows** utility, the editor makes players. A player is this HoSTage copied
+into a folder, together with the shows you tick. It plays them, and any show you import into it,
+but makes no screens or control pages.
+
+1. Type the **Player name**.
+2. Tick the shows to put in it. The open show is ticked to begin with; the first ticked show is the
+   one the player opens first. The open show goes in as it was last saved, so save it first if it
+   has changes.
+3. Choose **Standalone**, **VST3** or both.
+4. Press **Make the player…** and choose a folder. A folder named after the player is made in it,
+   and HoSTage says where: "Made "Friday Rig" in …".
+
+The folder holds:
+
+- **Standalone** — the player program, under the player's name, with its helpers. This folder can
+  go anywhere, a USB stick included. Start the program in it.
+- **VST3** — the player as a plugin. Copy it into your VST3 folder (on Windows,
+  `C:\Program Files\Common Files\VST3`).
+- **Read me.txt**, which says the same.
+
+The plugins the shows use are not in the folder. Install them on the computer that plays, and scan
+for them in the player's Library utility.
+
+> **Not finished yet:**
+>
+> - Every player is the same plugin to a DAW, so install one player's VST3 at a time.
+> - A player keeps its rig and settings on each computer it runs on, not on the stick.
+> - A player has no licence of its own yet, so it runs as the Free edition: one instrument at a
+>   time.
+> - It makes a folder, not an installer.
+> - **Make a player** needs HoSTage's own programs to copy. The HoSTage tab in an installed CEditor
+>   does not have them yet, and says "There is nothing here to copy".
+
 ### Library
 
 Scanning plugins (**Scan plug-ins**) and the sound library's folders, preview recording and
@@ -805,7 +838,7 @@ go, and the others leave it alone.
 - **Build product** works only from a CEditor source checkout (see [Project](#project)).
 - **Shows** carry the sounds you saved yourself and every captured rack. A vendor's preset file is
   not copied: the other computer needs the same preset, scanned into its library.
-- **Players**: HoSTage cannot make one yet; **Try as player** shows what one would do (see
-  [Editor and player](#2-getting-around)).
+- **Players** share one plugin identity in a DAW, keep their data on each computer rather than on a
+  stick, and run as the Free edition until players get licences (see [Make a player](#make-a-player)).
 - **Not yet tested on real hardware**: the MIDI and the CTRL49 stage pages have been checked in
   software.

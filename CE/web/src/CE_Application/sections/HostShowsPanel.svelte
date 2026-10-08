@@ -14,7 +14,7 @@
   import { onMount } from 'svelte';
   import {
     hostState, saveShow, openShow, revertShow, deleteShow, importShow, exportShow,
-    setShowChanges, refreshShows,
+    setShowChanges, refreshShows, createPlayer,
   } from '../stores/instrumentHost.js';
   import HostConfirmButton from './HostConfirmButton.svelte';
 
@@ -35,6 +35,27 @@
   }
 
   const isCurrent = (row) => current && current.file === row.file && current.builtIn === row.builtIn;
+
+  // Making a player (PlayerCreator.h) is the editor's; a player only plays. The open show is
+  // ticked until somebody says otherwise, since that is the one most players are made for.
+  let players = $derived($hostState.players);
+  let makesPlayers = $derived(!$hostState.player);
+  let playerName = $state('');
+  let ticked = $state({});
+  let wantStandalone = $state(true);
+  let wantVst3 = $state(true);
+  const keyOf = (row) => `${row.builtIn ? 'b' : 'u'}:${row.file}`;
+  const isTicked = (row) => ticked[keyOf(row)] ?? Boolean(isCurrent(row));
+  let chosen = $derived(shows.list.filter((row) => isTicked(row)));
+  let standaloneOn = $derived(wantStandalone && players.standalone);
+  let vst3On = $derived(wantVst3 && players.vst3);
+  let canMake = $derived(!players.busy && playerName.trim() !== '' && chosen.length > 0
+    && (standaloneOn || vst3On));
+
+  function makePlayer() {
+    if (!canMake) return;
+    createPlayer({ name: playerName.trim(), shows: chosen, standalone: standaloneOn, vst3: vst3On });
+  }
   const savedOn = (ms) => (ms > 0 ? new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 </script>
 
@@ -133,6 +154,60 @@
         <span>Save them into the show as I go.</span>
       </label>
     </section>
+
+    {#if makesPlayers}
+      <section class="shows-block" data-testid="player-maker">
+        <strong>Make a player</strong>
+        <p class="note">
+          A player plays shows and makes no screens or control pages. It is this HoSTage copied into a
+          folder with the shows you tick, ready for a USB stick or another computer. The plug-ins are
+          not in it.
+        </p>
+        {#if !players.standalone && !players.vst3}
+          <p class="note" data-testid="player-nothing">
+            There is nothing here to copy: this HoSTage was not installed with its own programs.
+          </p>
+        {:else}
+          <input type="text" placeholder="Player name" aria-label="Player name" data-testid="player-name"
+                 bind:value={playerName} />
+          {#if shows.list.length === 0}
+            <p class="note">Save a show first: a player needs at least one.</p>
+          {:else}
+            <div class="player-shows" role="group" aria-label="Shows to put in the player">
+              {#each shows.list as row (keyOf(row))}
+                <label class="choice">
+                  <input type="checkbox" data-testid="player-show" checked={isTicked(row)}
+                         onchange={(event) => { ticked = { ...ticked, [keyOf(row)]: event.currentTarget.checked }; }} />
+                  <span>{row.name}{chosen[0] && keyOf(chosen[0]) === keyOf(row) ? ' — opens first' : ''}</span>
+                </label>
+              {/each}
+            </div>
+            {#if unsaved && chosen.some((row) => isCurrent(row))}
+              <p class="note" data-testid="player-unsaved">The open show goes in as it was last saved, without the changes since.</p>
+            {/if}
+          {/if}
+          <div class="actions">
+            <label class="choice">
+              <input type="checkbox" data-testid="player-standalone" disabled={!players.standalone}
+                     bind:checked={wantStandalone} />
+              <span>Standalone</span>
+            </label>
+            <label class="choice">
+              <input type="checkbox" data-testid="player-vst3" disabled={!players.vst3} bind:checked={wantVst3} />
+              <span>VST3</span>
+            </label>
+          </div>
+          <button type="button" data-testid="player-create" disabled={!canMake} onclick={makePlayer}
+                  title="Choose a folder, and the player is made in it">
+            {players.busy ? 'Making the player…' : 'Make the player…'}
+          </button>
+          {#if players.last?.ok}
+            <p class="made" data-testid="player-made">Made “{players.last.name}” in {players.last.folder}.</p>
+            {#each players.last.notes as note (note)}<p class="note">{note}</p>{/each}
+          {/if}
+        {/if}
+      </section>
+    {/if}
   </div>
 </div>
 
@@ -169,4 +244,6 @@
 
   .choice { display: flex; align-items: flex-start; gap: 6px; color: #aab5be; font-size: 12px; line-height: 1.4; }
   .choice input { margin-top: 2px; }
+  .player-shows { display: flex; flex-direction: column; gap: 2px; }
+  .made { margin: 0; color: #9fd6a3; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
 </style>

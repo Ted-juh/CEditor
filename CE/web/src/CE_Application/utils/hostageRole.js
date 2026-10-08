@@ -11,7 +11,7 @@ export const EDITOR_ONLY_COMMANDS = new Set([
   'setControlPagePreset', 'assignControlSlot', 'assignSurfaceControl', 'clearControlSlot',
   'learnControlSlotParameter', 'quickLearnParameter', 'setFaderLayers', 'setPadLayers',
   'setUserSurface', 'clearUserSurface', 'learnUserSurface', 'finishUserSurfaceLearn',
-  'setHostProject', 'buildHostProduct',
+  'setHostProject', 'buildHostProduct', 'createPlayer',
 ]);
 
 /** A slot's options a player may not set: what the page shows and how the knob maps. How the
@@ -28,7 +28,7 @@ export function editorOnlyCommand(payload) {
 
 /** The host's refusal, word for word, so the preview reads like the app. */
 export function editorOnlyRefusal(cmd) {
-  if (cmd === 'setHostProject' || cmd === 'buildHostProduct') {
+  if (cmd === 'setHostProject' || cmd === 'buildHostProduct' || cmd === 'createPlayer') {
     return 'Building belongs to the HoSTage editor; a player cannot build.';
   }
   return `Screens and control pages are made in the HoSTage editor; a player shows them and cannot change them ('${cmd}').`;

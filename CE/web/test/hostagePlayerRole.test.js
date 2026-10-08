@@ -56,7 +56,7 @@ const PLAYER_KEEPS = {
 
 test('every page, surface and project command in the host is decided for a player', () => {
   const commands = new Set([...cpp.matchAll(/cmd == "([A-Za-z]+)"/g)].map((m) => m[1]));
-  const kinds = /ControlPage|ControlSlot|UserSurface|SurfaceControl|HostProject|HostProduct|quickLearn|FaderLayers|PadLayers|SurfaceLayout|HardwareSurface|OnSurface|TryAsPlayer/;
+  const kinds = /ControlPage|ControlSlot|UserSurface|SurfaceControl|HostProject|HostProduct|quickLearn|FaderLayers|PadLayers|SurfaceLayout|HardwareSurface|OnSurface|TryAsPlayer|Player\b/;
   const undecided = [...commands].filter((cmd) => kinds.test(cmd)
     && !EDITOR_ONLY_COMMANDS.has(cmd) && !(cmd in PLAYER_KEEPS));
   assert.deepEqual(undecided, [], 'add each to the editor-only list or to PLAYER_KEEPS, with a reason');

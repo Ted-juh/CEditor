@@ -57,7 +57,10 @@ public:
 
     void initialise (const juce::String&) override
     {
-        mainWindow = std::make_unique<HostRuntimeWindow> (getApplicationName());
+        // A player is called what it was named when it was made (hostage.json), not what the
+        // program it was copied from was compiled as.
+        const auto named = ceditor::host::readHostageManifest().productName;
+        mainWindow = std::make_unique<HostRuntimeWindow> (named.isNotEmpty() ? named : getApplicationName());
     }
 
     void shutdown() override { mainWindow = nullptr; }

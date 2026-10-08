@@ -103,6 +103,20 @@ HostRuntimeShell::HostRuntimeShell()
             });
     };
 
+    // Where a player is made (PlayerCreator.h).
+    options.pickFolder = [this] (const juce::String& title, std::function<void (const juce::String&)> done)
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            title, juce::File::getSpecialLocation (juce::File::userDocumentsDirectory));
+        fileChooser->launchAsync (
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+            [done] (const juce::FileChooser& fc)
+            {
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
     const auto liveWorker = findHostLiveWorker ({ options.dataDirectory });
     options.livePluginIsolationAvailable = liveWorker.existsAsFile();
     options.instantiate = makeIsolatedPluginInstantiator (

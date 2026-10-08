@@ -1,8 +1,8 @@
 # HoSTage: creator, editor and player
 
 *Status: the owner's intention, written down on 2026-10-08, with what exists today and what each
-part would take. Steps 1 to 3 — the player role, a data folder per product, and the show — are
-built; nothing after them is. When this and the code disagree about what exists, the code is right.*
+part would take. Steps 1 to 4 — the player role, a data folder per product, the show, and
+making a player — are built; nothing after them is. When this and the code disagree about what exists, the code is right.*
 
 ## The intention, in the owner's words
 
@@ -59,9 +59,9 @@ Tier B already nearly exists — by accident rather than design:
 - **Stage Lock is already the restriction the owner describes**, enforced in the host itself
   (`InstrumentHostService.cpp`, the allow-list near the top): playing, songs, scenes, levels,
   macros and parameters work; changing the rig does not.
-- **The player role exists (step 1), but nothing makes a player yet.** A program becomes a player
-  only by a hand-placed `hostage.json`. A show file now carries a rig from one program to another
-  (step 3).
+- **The player role exists (step 1), and HoSTage makes players (step 4)**: a folder copied from
+  the running program, with the shows it is to play. A show file carries a rig from one program to
+  another (step 3).
 - **The player builds and runs on Linux too** — `CEHostStandalone` was built on a Linux x86-64
   machine for this note, as a 41 MB `Hostage`, and shows its UI in WebKitGTK (until step 1 it asked
   for WebView2 by name everywhere and showed only the missing-runtime message off Windows) — but
@@ -190,7 +190,25 @@ Two builds would double every test and every release; one build with a role cann
 4. **Create a player from B without a developer machine.** The installed HoSTage ships its own
    programs as the template; creating a player copies them with the manifest and the show into a
    folder. No Node.js (the staging moves into C++), and no Inno Setup needed: the result is a
-   folder, which is also what a USB stick wants. An installer stays optional. Medium.
+   folder, which is also what a USB stick wants. An installer stays optional. Medium. *Built:*
+   - `PlayerCreator.h` plans the copy (everything that would stop it is said before a folder is
+     asked for; nothing is written over an existing folder) and carries it out on a thread of its
+     own, removing what it made if a copy fails half-way.
+   - The template is the running program: the standalone offers itself, its scanner and live
+     worker, and the VST3 that belongs with it (a build tree's bundle, or the installed bundle whose
+     `hostage.json` names the same product); a VST3 offers only its own bundle; CEditor's tab
+     offers what CMake built.
+   - The player gets `hostage.json` with `"role": "player"`, a newly minted appId (so a data
+     folder of its own, step 2), its name, and the first show. The standalone is renamed after the
+     player and its window takes the name from the manifest. The VST3 bundle keeps its name: the
+     plug-in's identity is compiled in (`CE_HOST_PLUGIN_CODE`), so every player is the same plug-in
+     to a DAW — one player's VST3 per computer until identities can differ.
+   - What the copied program shipped with itself goes: its shows, and a factory rack that would
+     open before the player's show. A player is not offered the shared folder's rig (step 2): only
+     editors predate per-product folders.
+   - The Shows utility's **Make a player** (editor only; `createPlayer` is on the editor-only list).
+   - Open: a created player has no licence (decision 1), so it runs as the Free edition, one
+     instrument; its data stays per computer until step 6; macOS app bundles are not handled.
 5. **The creator in CEditor builds the tier B installer** the same way — CEditor's installer ships
    the host programs; Inno Setup is needed only for the installer itself. The **Creator licence**
    gates it. Medium, plus the licence (below).

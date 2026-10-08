@@ -74,6 +74,8 @@ InstrumentHostService::InstrumentHostService (Options optionsToUse)
     adoptLegacyDataIfAsked();
     legacyOffered = legacyDataWorthOffering();
     loadShowState();
+    playerHasStandalone = options.playerTemplate.hasStandalone();
+    playerHasVst3 = options.playerTemplate.hasVst3();
 
     ctrl49::registerCtrl49Profile();
     loadMackieSection();
@@ -122,6 +124,8 @@ InstrumentHostService::~InstrumentHostService()
         showSaveDueMs = 1;
         tickShowSave();
     }
+    if (playerThread.joinable())
+        playerThread.join();   // a player half-copied is removed by the copy itself on failure
     *alive = false;
     if (options.editorWindows.closeAll != nullptr)
         options.editorWindows.closeAll();
@@ -199,7 +203,7 @@ namespace
             "setControlPagePreset", "assignControlSlot", "assignSurfaceControl", "clearControlSlot",
             "learnControlSlotParameter", "quickLearnParameter", "setFaderLayers", "setPadLayers",
             "setUserSurface", "clearUserSurface", "learnUserSurface", "finishUserSurfaceLearn",
-            "setHostProject", "buildHostProduct",
+            "setHostProject", "buildHostProduct", "createPlayer",
         };
         if (editorOnly.contains (command))
             return true;
@@ -217,7 +221,7 @@ namespace
 
     juce::String editorOnlyRefusal (const juce::String& command)
     {
-        if (command == "setHostProject" || command == "buildHostProduct")
+        if (command == "setHostProject" || command == "buildHostProduct" || command == "createPlayer")
             return "Building belongs to the HoSTage editor; a player cannot build.";
         return "Screens and control pages are made in the HoSTage editor; a player shows them and "
                "cannot change them ('" + command + "').";
@@ -730,6 +734,12 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         }
         writeLegacyDecision (cmd == "adoptLegacyData" ? "adopt" : "declined", {});
         emitState();
+        return;
+    }
+
+    if (cmd == "createPlayer")
+    {
+        createPlayer (payload);
         return;
     }
 
@@ -18048,6 +18058,7 @@ void InstrumentHostService::followPresetPages()
 void InstrumentHostService::drainParameterEvents()
 {
     tickShowSave();
+    tickPlayerCreation();
     followPresetPages();
     drainProcessorFailures();
     tickAutomaticFailover();
@@ -19273,6 +19284,7 @@ juce::var InstrumentHostService::buildStatePayload()
     root->setProperty ("player", isPlayer());
     root->setProperty ("playerInstalled", options.player);
     root->setProperty ("shows", showsPayload());
+    root->setProperty ("players", playersPayload());
     root->setProperty ("product", productPayload());
     root->setProperty ("reliability", reliabilityPayload());
     root->setProperty ("licence", licencePayload());
@@ -20217,6 +20229,133 @@ juce::var InstrumentHostService::productPayload() const
     data->setProperty ("legacyFolder", options.legacyDataDirectory.getFullPathName());
     data->setProperty ("legacyFailed", legacyFailedNames);
     root->setProperty ("data", juce::var (data));
+    return juce::var (root);
+}
+
+// -- making players (PlayerCreator.h) ----------------------------------------------------------
+// A player is this program's own files with a manifest that says "player", its own identity
+// and some shows. The editor makes them; a player is refused before this is reached.
+
+void InstrumentHostService::createPlayer (const juce::var& payload)
+{
+    if (playerBusy)
+    {
+        emitError ("A player is already being made. Wait for it to finish.");
+        return;
+    }
+
+    player::Request request;
+    request.name = payload.getProperty ("name", {}).toString().trim();
+    request.appId = juce::Uuid().toDashedString().toUpperCase();
+    request.standalone = (bool) payload.getProperty ("standalone", true);
+    request.vst3 = (bool) payload.getProperty ("vst3", true);
+    if (const auto* shows = payload.getProperty ("shows", {}).getArray())
+        for (const auto& row : *shows)
+        {
+            const auto file = showFile (row.getProperty ("file", {}).toString(),
+                                        (bool) row.getProperty ("builtIn", false));
+            if (file != juce::File())
+                request.shows.add (file);
+        }
+
+    // Everything that would stop it is said before a folder is asked for.
+    if (const auto problems = player::problemsWith (options.playerTemplate, request, false); ! problems.isEmpty())
+    {
+        emitError (problems.joinIntoString (" "));
+        return;
+    }
+
+    if (const auto destination = payload.getProperty ("destination", {}).toString(); destination.isNotEmpty())
+    {
+        request.destination = juce::File (destination);
+        startPlayerCreation (std::move (request));
+        return;
+    }
+    if (options.pickFolder == nullptr)
+    {
+        emitError ("Choosing a folder is not available in this build.");
+        return;
+    }
+    options.pickFolder ("Choose where to put the player",
+                        [this, aliveToken = alive, request] (const juce::String& folder) mutable
+                        {
+                            if (! aliveToken->load() || folder.isEmpty())
+                                return;
+                            request.destination = juce::File (folder);
+                            startPlayerCreation (std::move (request));
+                        });
+}
+
+void InstrumentHostService::startPlayerCreation (player::Request request)
+{
+    const auto plan = player::plan (options.playerTemplate, request);
+    if (! plan.problems.isEmpty())
+    {
+        emitError (plan.problems.joinIntoString (" "));
+        return;
+    }
+    if (playerThread.joinable())
+        playerThread.join();
+
+    playerBusy = true;
+    lastPlayer = {};
+    emitState();
+    playerThread = std::thread ([this, plan, name = request.name]
+    {
+        const auto result = player::execute (plan);
+        const std::scoped_lock lock (playerResultLock);
+        playerResult = { true, result.wasOk(), name, plan.folder.getFullPathName(),
+                         result.getErrorMessage(), plan.notes };
+    });
+}
+
+void InstrumentHostService::tickPlayerCreation()
+{
+    PlayerResult finished;
+    {
+        const std::scoped_lock lock (playerResultLock);
+        if (! playerResult.done)
+            return;
+        finished = playerResult;
+        playerResult = {};
+    }
+    if (playerThread.joinable())
+        playerThread.join();
+
+    playerBusy = false;
+    lastPlayer = finished;
+    if (! finished.ok)
+        emitError ("The player could not be made: " + finished.message);
+    else if (options.emit != nullptr)
+    {
+        auto* made = new juce::DynamicObject();
+        made->setProperty ("name", finished.name);
+        made->setProperty ("folder", finished.folder);
+        options.emit ("instrumentHostPlayerCreated", juce::var (made));
+    }
+    emitState();
+}
+
+juce::var InstrumentHostService::playersPayload() const
+{
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("standalone", playerHasStandalone);
+    root->setProperty ("vst3", playerHasVst3);
+    root->setProperty ("canPick", options.pickFolder != nullptr);
+    root->setProperty ("busy", playerBusy);
+    if (lastPlayer.done)
+    {
+        juce::Array<juce::var> notes;
+        for (const auto& note : lastPlayer.notes)
+            notes.add (note);
+        auto* last = new juce::DynamicObject();
+        last->setProperty ("ok", lastPlayer.ok);
+        last->setProperty ("name", lastPlayer.name);
+        last->setProperty ("folder", lastPlayer.folder);
+        last->setProperty ("message", lastPlayer.message);
+        last->setProperty ("notes", notes);
+        root->setProperty ("last", juce::var (last));
+    }
     return juce::var (root);
 }
 
