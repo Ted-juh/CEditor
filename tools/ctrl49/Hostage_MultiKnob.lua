@@ -45,12 +45,6 @@ local page_number, page_count = 0, 0
 -- The browser (set_values kind 7) sends no value texts, so its rings carry no numbers (the
 -- full ring is the cursor; "127" and "0" said nothing), and the current sound for the strip.
 local browse_line = ""
--- What each ring shows, which eases towards the value when it jumps (a page change, a preset
--- loaded) if the keyboard redraws when asked (lua_widget_make_dirty): see ease().
-local shown = { 0, 0, 0, 0, 0, 0, 0, 0 }
-local fresh = false          -- the host sent something since the last draw
-local asked = false          -- this page asked for a redraw at the end of the last draw
-local redraws_on_ask = false -- and a draw came with nothing new: asking works on this keyboard
 
 -- The performance page's extras, read from set_values bytes 9..11 (a control page sends nine
 -- bytes, so they read 0 there and nothing extra is drawn): page kind, the beat in the bar
@@ -191,7 +185,6 @@ end
 
 -- args is a Lua string (see VIP's set_text pattern): get_byte is 0-based, :sub is 1-based.
 function set_labels(args)
-    fresh = true
     local i = 0
     local titleLen = get_byte(args, i); i = i + 1
     title = args:sub(i + 1, i + titleLen); i = i + titleLen
@@ -202,7 +195,6 @@ function set_labels(args)
 end
 
 function set_values(args)
-    fresh = true
     active = get_byte(args, 0)
     for slot = 1, 8 do
         values[slot] = get_byte(args, slot)
@@ -1211,33 +1203,13 @@ local function unmark(label)
     return label, nil
 end
 
--- Easing. A ring that jumps further than EASE_FROM (a page change, a preset loaded) moves half way
--- each redraw instead, so it sweeps rather than snaps; turning a knob moves it less than that, so
--- turning stays immediate. It needs the keyboard to redraw when the page asks it to
--- (lua_widget_make_dirty), and that is found out, not assumed: the page asks on its first few
--- knob draws, and only a draw that then comes with nothing new from the host proves it. Until
--- then, and on a keyboard where it never does, every ring is drawn at its value at once, so none
--- is ever left half way.
-local EASE_FROM = 8
-local probes = 0
-local function ease()
-    local moving = false
-    for slot = 1, 8 do
-        local d = values[slot] - shown[slot]
-        -- the browser's rings are its cursor, which has to be where you scrolled to at once
-        if redraws_on_ask and page_kind ~= 7 and (d > EASE_FROM or d < -EASE_FROM) then
-            shown[slot] = shown[slot] + math.floor(d / 2 + 0.5)
-            moving = true
-        else
-            shown[slot] = values[slot]
-        end
-    end
-    return moving
-end
-
-local function ask_redraw()
-    if pcall and lua_widget_make_dirty then asked = pcall(lua_widget_make_dirty, WID) end
-end
+-- NEVER call lua_widget_make_dirty from draw(). The rings once eased towards a value that jumped,
+-- which needs the keyboard to redraw when the page asks, and the page asked at the end of its
+-- knob draws to find out whether it would. On the CTRL49 (2026-10-07) that froze the keyboard at
+-- the first knob page: the HoSTage logo stayed up, and it answered nothing more, not even a
+-- keepalive, until it was switched off and on. pcall does not catch it, and every command had
+-- been acknowledged OK, so the app showed nothing wrong. With that one call gone the same page
+-- ran. So every ring is drawn at its value, at once.
 
 -- What a knob shows in its ring: the plug-in's text when the host sent it, else the position;
 -- on the browser, nothing.
@@ -1249,11 +1221,8 @@ local function value_text(slot)
     return text
 end
 
-local function draw_knobs(came_with_news)
+local function draw_knobs()
     ensure_knobs()
-    if asked and not came_with_news then redraws_on_ask = true end
-    asked = false
-    local moving = ease()
 
     -- the title; on the performance page, play or stop drawn in place of "> " or "# "
     local t = title
@@ -1275,7 +1244,7 @@ local function draw_knobs(came_with_news)
             -- nothing on this knob: its ring, barely there, and no number
             draw_image(18, KNOB_DECODED_ID, x, y, 0, 0, FRAME, FRAME, EMPTY)
         else
-            draw_image(18, KNOB_DECODED_ID, x, y, 0, FRAME * shown[slot], FRAME, FRAME, is_active and ORANGE or DIM)
+            draw_image(18, KNOB_DECODED_ID, x, y, 0, FRAME * values[slot], FRAME, FRAME, is_active and ORANGE or DIM)
             local text = value_text(slot)
             if text ~= "" then
                 local box = VAL
@@ -1308,17 +1277,10 @@ local function draw_knobs(came_with_news)
         draw_beats()
         draw_held_notes()
     end
-
-    if moving or (not redraws_on_ask and probes < 5) then
-        probes = probes + 1
-        ask_redraw()
-    end
 end
 
 function draw(args)
     if not initialized then init("") end
-    local came_with_news = fresh
-    fresh = false
 
     draw_rect(0, 0, 480, 272, BLACK)
     draw_rect(0, 0, 480, 3, ORANGE)
@@ -1357,5 +1319,5 @@ function draw(args)
         return
     end
 
-    draw_knobs(came_with_news)
+    draw_knobs()
 end

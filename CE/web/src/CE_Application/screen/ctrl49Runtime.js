@@ -46,9 +46,10 @@ const HELPERS = `
  * @param {HTMLCanvasElement} canvas
  * @param {{ lua: string, assets?: Record<number, string>, redrawOnAsk?: boolean }} page  Lua
  *        source, and the uploaded PNG objects as { objectId: url } — the same ids the host
- *        uploads before binding. With redrawOnAsk, lua_widget_make_dirty does what it does on the
- *        keyboard: the page is drawn again shortly after (once, however often it asks). Without
- *        it a page is drawn only when the caller says, so a picture is taken of one exact frame.
+ *        uploads before binding. With redrawOnAsk, lua_widget_make_dirty draws the page again
+ *        shortly after (once, however often it asks), which is what a page's note hook counts on.
+ *        Without it a page is drawn only when the caller says, so a picture is taken of one exact
+ *        frame. A page must not call it from draw(): on a CTRL49 that froze the keyboard.
  * @returns {Promise<{ call(name: string, bytes?: number[]): void, dispose(): void }>}
  *          `call` throws with Lua's own message when the page errors.
  */

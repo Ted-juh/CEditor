@@ -29,7 +29,7 @@ Adding a new kind of page:
    with a byte test, and the same builder in `ctrl49Payloads.js` with a scene in the preview.
 3. Give it a page in `Ctrl49SurfaceBroker`: `pages()`, `pumpInput()`, `refreshDisplay()`.
 
-### The knob pages: values, symbols, the bottom strip, easing
+### The knob pages: values, symbols, the bottom strip
 
 - **Values as the plug-in writes them.** A control page's `set_values` carries, after its nine
   bytes, the page's number and count and each knob's value as the plug-in formats it
@@ -43,15 +43,16 @@ Adding a new kind of page:
   keeps the logo pixel for pixel), so they cost no upload of their own, and are tinted as drawn.
 - **Empty knobs** (no label, no value) are a faint ring with no number.
 - **The bottom strip** on a control page: the knob turned last, larger, and PAGE n / m.
-- **Easing.** A ring that jumps (a page change, a preset) sweeps over a few redraws; turning a
-  knob stays immediate. It needs the keyboard to redraw when the page asks
-  (`lua_widget_make_dirty`), and the page finds that out rather than assuming it: it asks on its
-  first few draws, and only a redraw that arrives with nothing new from the host proves it. On a
-  keyboard where it never does, rings are drawn at their value at once, never left half way.
+- **No easing, and why.** Rings are drawn at their value at once. They used to sweep when a value
+  jumped, which needs the keyboard to redraw when the page asks (`lua_widget_make_dirty`), and the
+  page asked at the end of its first knob draws to find out whether it would. On the CTRL49
+  (2026-10-07) that call, made from `draw()`, froze the keyboard: see
+  [Measured on the CTRL49, 2026-10-07](#measured-on-the-ctrl49-2026-10-07). A page must never
+  call it from `draw()`; `ctrl49KnobPage.test.js` holds the page to that.
 - **DISCOVER's map** draws round dots, and YOU's word clear of its ring.
 - **The browser** says it is the browser (`set_values` kind 7, `buildBrowseStatePayload`;
   `browseStatePayload` in JS): its rings mark the cursor and carry no numbers (they read "127"
-  and "0"), they jump rather than ease so the cursor is where you scrolled to, a sound that cannot
+  and "0"), a sound that cannot
   load gets the warning sign, and the bottom strip has the sound under the cursor, its whole name
   and where it comes from.
 
@@ -545,7 +546,31 @@ plug-in in `%TEMP%\ctrl49-panel-scan\summary.txt`. Each plug-in runs in its own 
 minutes; a crash or a hang is a line in the summary. Do not cover or move the scan window.
 
 The self-test passes under Wine with the window captured from the screen; on Windows itself
-`PrintWindow` is tried first. Not yet run on the owner's plug-ins.
+`PrintWindow` is tried first.
+
+**On the owner's plug-ins (Windows, 2026-10-06).** The self-test passed, 16 of 16, captured by
+`PrintWindow`. Then three plug-ins; none of their editors answers `IParameterFinder`, so every
+control was left to watching:
+
+| Plug-in | Controls | Sections | Placed | What the picture shows |
+|---|---|---|---|---|
+| Spire | 725 | 41, from names | 0 | Nothing moved on screen, to the scan or to the eye; 280 controls tried before the 200 s ran out |
+| TB-303 | 151 | 2, from units: Root, Others | 11 | The boxes sit on the right controls: the six top knobs, waveform, shuffle, scale, play mode, volume |
+| Zebra3 | 4,273 | 139, from units | 78 | 280 controls tried before the 200 s ran out; many boxes are on the wrong panel (LFO 1's on Env 3, LFO 2's on the LFO 1 panel) |
+
+What that says about the scan as it stands:
+
+- **Spire's window ignores the scan's writes.** The scan moves a parameter with
+  `IEditController::setParamNormalized` only. A host also sends the change through the processor
+  (`process()` with the parameter change), and Spire's window appears to draw from that side. The
+  scan activates the component and never calls `process()`.
+- **200 seconds is not enough for a large plug-in.** Zebra3 got through 7 % of its controls.
+- **A window that shows one module at a time misplaces the others.** On Zebra3 a control of a
+  module that is not on screen was boxed where the visible module of that kind sits. Seen in the
+  picture; the cause is read from it, not traced.
+- **Units are not always sections.** TB-303's two units say nothing about its panel.
+
+So the scan as built gives a usable page for a simple panel (TB-303) and not for the other two.
 
 **What a HoSTage SECTION page waits on.** The page itself is decided (the HoSTage Live mockup's
 Section page, painting over each knob's cap: `scan.json` now carries each knob's cap and pointer
@@ -561,6 +586,35 @@ comes up. LABELS waits on the same probe: drawing the words in JUCE is the easy 
 [`hardware-checklist.md`](hardware-checklist.md) is the list to take to a CTRL49 now: HoSTage's
 pages on the keyboard, including CUE, LAYERS, SOUNDCHECK, DISCOVER and CHANGES, then the mockups' stress test, with what to
 write down at each step. The measurements below are the older, open ones.
+
+<a id="measured-on-the-ctrl49-2026-10-07"></a>**Measured on the CTRL49, 2026-10-07.** The first
+run of HoSTage's own 42 KB page, and the script-size test.
+
+- **`lua_widget_make_dirty` from `draw()` freezes the keyboard.** HoSTage's page uploaded, bound
+  and drew its logo. The first knob page then never appeared: the logo stayed up and the keyboard
+  answered nothing more, not even a keepalive, until it was switched off and on. Every command
+  before that had been acknowledged OK, so the app's card went on saying "Showing on the keyboard
+  too". The knob draw ended by calling `lua_widget_make_dirty` under `pcall` (the easing probe);
+  with that one call taken out, the same page, with its fifteen `text_data` objects, ran. The
+  acknowledgements arrive when a command is received, not when it has been drawn: two draws and a
+  keepalive were answered within 3 ms of each other, so an OK does not say the draw finished.
+  The note hook still calls it from `note()`, outside a draw; whether that is safe is not known,
+  because no key was played on a page that uses it (the performance page, LAYERS, LIVE).
+- **The app does not notice a keyboard that has stopped answering.** It sent keepalives into the
+  silence for as long as it ran. `%APPDATA%\CEditor\ctrl49-trace.log` is where it showed.
+- **Script size.** 64 KB and 128 KB loaded and ran (upload and startup 2 s and 3 s). At 256 KB
+  the keyboard acknowledged the scene and its target and then answered nothing, and had to be
+  switched off and on; the test stops there, so the gap was not narrowed. The limit is between
+  128 and 256 KB. HoSTage's page and the 64 KB preset rule are inside it.
+- **HoSTage's pages, as far as the session went.** The knob pages draw; Page Left and Right walk
+  them and the app's card follows. CUE: NO SONG ON STAGE YET, E1 picks a song (GO TO, pad 1
+  lit), pad 1 goes to it, and on the song the name, its notes, the clock counting against the
+  time planned and NEXT are right, with nothing cut off. LAYERS draws its row, the part's range
+  and the keys, and the pads go dark. Not reached: playing notes on LAYERS, its encoders,
+  SOUNDCHECK, DISCOVER, CHANGES, LIVE, METERS, the browser.
+- **Going to a song from CUE leaves CUE.** A setlist song recalls its control page, so pad 1 on
+  CUE put the keyboard on that page, six presses of Page Right away from CUE. Working as the
+  page recall was written; whether CUE should stay up is the owner's call.
 
 **Measured on the CTRL49, 2026-10-05** (the screen lab's Stress page, one kind of call at a time,
 at 9 redraws a second, until the bar under the header stopped gliding):

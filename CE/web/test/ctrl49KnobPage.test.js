@@ -1,7 +1,7 @@
 // The HoSTage keyboard page's knob pages (tools/ctrl49/Hostage_MultiKnob.lua), run in Lua against
 // a recording stand-in for the firmware: what each knob says (the plug-in's value, else its
 // position), a knob with nothing on it, the symbols drawn for the host's ASCII marks, the bottom
-// strip, and easing, which happens only once the keyboard has shown that it redraws when asked.
+// strip, and that drawing never asks the keyboard to redraw, which freezes a CTRL49.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -97,7 +97,6 @@ test('the browser draws no numbers on its rings, the cursor full, and the curren
   const views = browseSlotViews(rows, 1, 12);
   p.call('set_labels', rackLabelPayload('SOUNDS - 2/40', views));
   p.call('set_values', browseStatePayload(1, views, 'Glass Choir - DIVA'));
-  for (let i = 0; i < 6; i++) p.draw();      // let any easing finish: the browser must not ease
   const calls = p.draw();
   const texts = said(calls);
   assert.ok(!texts.includes('127') && !texts.includes('0'), 'no 127 under the cursor, no 0 under the others');
@@ -129,28 +128,35 @@ test('the performance page draws play and the clip states as symbols', async () 
   p.close();
 });
 
-test('rings ease only once the keyboard has shown it redraws when asked, and always arrive', async () => {
+// On the CTRL49 (2026-10-07) a knob page that called lua_widget_make_dirty at the end of its draw
+// froze the keyboard on the HoSTage logo: it answered nothing more until it was switched off and
+// on. The rings eased through that call; now they are drawn at their value.
+test('drawing never asks the keyboard to redraw, and a ring that jumps is drawn where it is', async () => {
   const p = await page();
   const at = (v) => [slot('A', v, '')];
   p.call('set_labels', rackLabelPayload('Page', at(0)));
   p.call('set_values', rackStatePayload(0, at(0), { number: 1, count: 1 }));
   p.draw();
-  assert.equal(p.asked(), 1, 'the first knob draw asks for a redraw, to find out');
   p.call('set_values', rackStatePayload(0, at(120), { number: 1, count: 1 }));
-  assert.equal(frameOf(p.draw(), 0), 120, 'before any proof, a jump is drawn at once');
-  assert.equal(p.asked(), 2, 'and it asks again: the host spoke first, which proves nothing');
-
-  // The redraw it asked for arrives with nothing new: now the page knows asking works.
-  p.draw();
-  p.call('set_values', rackStatePayload(0, at(0), { number: 1, count: 1 }));
-  const frames = [frameOf(p.draw(), 0)];
-  for (let i = 0; i < 10 && frames.at(-1) !== 0; i++) frames.push(frameOf(p.draw(), 0));
-  assert.ok(frames[0] > 0 && frames[0] < 120, `a jump now sweeps (${frames.join(', ')})`);
-  assert.equal(frames.at(-1), 0, 'and lands on the value');
-  assert.ok(frames.length <= 6, 'within a few redraws');
-
+  assert.equal(frameOf(p.draw(), 0), 120, 'a jump is drawn at once');
+  for (let i = 0; i < 6; i++) assert.equal(frameOf(p.draw(), 0), 120, 'and stays there, redraw after redraw');
   p.call('set_values', rackStatePayload(0, at(5), { number: 1, count: 1 }));
-  assert.equal(frameOf(p.draw(), 0), 5, 'turning a knob a little is immediate');
+  assert.equal(frameOf(p.draw(), 0), 5, 'as does a small turn');
+
+  // Every page the host can put up, drawn a few times: not one asks.
+  const transport = { playing: true, bar: 1, beat: 1, tempo: 120, beatsPerBar: 4 };
+  p.call('set_labels', performanceLabelPayload(transport, [{ name: 'Clip', active: true }]));
+  p.call('set_values', performanceStatePayload(0, [{ name: 'Clip', active: true }], transport));
+  for (let i = 0; i < 3; i++) p.draw();
+  const views = browseSlotViews([{ name: 'Wool Pad' }], 0, 12);
+  p.call('set_values', browseStatePayload(0, views, 'Wool Pad'));
+  for (let i = 0; i < 3; i++) p.draw();
+  p.call('set_meters', metersPayload({ parts: [{ name: 'Bass', left: 0.5, right: 0.5, volume: 1 }], touched: 0,
+                                       masterLeft: 0.5, masterRight: 0.5, masterVolume: 1 }));
+  for (let i = 0; i < 3; i++) p.draw();
+  p.call('set_live', livePayload({ part: 'Pluck', steps: [], arpOn: false, zones: [] }));
+  for (let i = 0; i < 3; i++) p.draw();
+  assert.equal(p.asked(), 0, 'lua_widget_make_dirty was never called');
   p.close();
 });
 
