@@ -27,8 +27,12 @@ const read=(id,path)=>page.evaluate(async({id,path})=>{
 const signatures=loc=>loc.locator('[data-screen-section]').evaluateAll(es=>Object.fromEntries(es.map(e=>[e.dataset.screenSection,Array.from(e.querySelectorAll('.property-label,.nc-label')).map(n=>n.textContent.trim()).sort()])));
 try {
  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`);await page.locator('.app').waitFor();
+ // On plain Graphite, which leaves a display as the factory makes it. A new panel starts on the
+ // designed Graphite, where an LCD is an unlit OLED: its Backlight switch starts off and its dots
+ // square, and this check is of the dock's controls, not of what a set does to a screen.
  const [lcd,pixel]=await page.evaluate(async()=>{
-  const p=await import('/src/CE_Application/stores/panels.js'),c=await import('/src/CE_Application/stores/controls.js');p.addPanel();
+  const p=await import('/src/CE_Application/stores/panels.js'),c=await import('/src/CE_Application/stores/controls.js');
+  const m=await import('/src/CE_Application/stores/panelModel.js');p.addPanel({...m.createPanel(),controlSet:{id:'graphite'}});
   const ids=['LcdDisplay','PixelDisplay'].map(t=>c.addControl(t)._children.Core.id);
   c.applyControlPatch(ids[0],{'Core.name':'LCD screen','Transform.x':80,'Transform.y':70,'Transform.width':440,'Transform.height':160});
   c.applyControlPatch(ids[1],{'Core.name':'Pixel screen','Transform.x':550,'Transform.y':70,'Transform.width':440,'Transform.height':220});

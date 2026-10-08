@@ -2,7 +2,7 @@
   import SynthExpansionAnatomy from './SynthExpansionAnatomy.svelte';
   import SculptedSynthAnatomy from './SculptedSynthAnatomy.svelte';
   import {PHYSICAL_DIRECTIONS} from '../models/physicalControlSets.js';
-  let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue}=$props();
+  let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue,caption=true} = $props();
   const uid=$props.id(), paint=name=>`url(#${uid}-${name})`;
   let style=$derived(PHYSICAL_DIRECTIONS.find(d=>d.id===design)?.style??'flat');
   let modern=$derived(['flat','glass','future','digital'].includes(style));
@@ -23,9 +23,9 @@
   {#if numbers}{#each [0,2,4,6,8,10] as n}{@const v=pt(-135+n*27,radius+12)}<text x={v[0]} y={v[1]+3} fill={legend} text-anchor="middle" font-size="7">{n}</text>{/each}{/if}
 {/snippet}
 {#if PHYSICAL_DIRECTIONS.find(d=>d.id===design)?.series===3}
-  <SculptedSynthAnatomy {design} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} {showValue}/>
+  <SculptedSynthAnatomy {design} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} {showValue} {caption}/>
 {:else if PHYSICAL_DIRECTIONS.find(d=>d.id===design)?.series===2}
-  <SynthExpansionAnatomy {design} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} {showValue}/>
+  <SynthExpansionAnatomy {design} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} {showValue} {caption}/>
 {:else if knob}
   <g transform={`translate(${80*(1-size)} ${76*(1-size)}) scale(${size})`} data-synth-profile={style}>
   {#if style==='vintage'}
@@ -74,5 +74,5 @@
     <rect x="21" y="13" width="118" height="59" rx={radius+2} fill="#0c1114" stroke={modern?face:'#657073'} stroke-width=".8"/>
     <g transform={`translate(0 ${down})`}><rect x="25" y="14" width="110" height="51" rx={radius} fill={modern?face:paint('cap')} stroke={modern?'#657987':'#282e30'} stroke-width=".8"/>{#if ['console','precision','workstation'].includes(style)}<path d="M32 19h96M32 58h96" stroke={ink} stroke-opacity=".18"/>{/if}{#if style==='glass'}<rect x="26" y="15" width="108" height="49" rx="3" fill={paint('glass')}/>{/if}<rect x={toggle?49:67} y="25" width={toggle?62:26} height={modern?3:4} rx="1" fill={active?accent:housing}/><path d="M68 46h24" stroke={ink} stroke-opacity=".7" stroke-width="2"/></g>
   {/if}
-  <text x="80" y="95" text-anchor="middle" fill={legend} font-size="11" font-family="sans-serif">{label}</text>
+  {#if caption}<text x="80" y="95" text-anchor="middle" fill={legend} font-size="11" font-family="sans-serif">{label}</text>{/if}
 {/if}

@@ -10,7 +10,9 @@
   // Reuse the SAME major/minor tick generator the sliders use for value divisions.
   import { buildSliderTickStops } from '../utils/sliderGeometry.js';
 
-  let { control = null, width = 0, height = 0, dragging = false, idPrefix = '' } = $props();
+  // ownKnob false: the canvas draws the set's knob under this (utils/macroKnob.js), and this draws
+  // only the caption, the readout and the lanes.
+  let { control = null, width = 0, height = 0, dragging = false, idPrefix = '', series = null, tone = (colour) => colour, ownKnob = true } = $props();
   let svgId = $derived(`macro-${idPrefix || String(control?._children?.Core?.id ?? 'x')}`);
 
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -24,6 +26,11 @@
   }
   function n(v, f = 0) { const x = Number(v); return Number.isFinite(x) ? x : f; }
   const LANE_PALETTE = ['rgba(57,217,138,1)', 'rgba(91,155,213,1)', 'rgba(242,201,76,1)', 'rgba(242,153,74,1)', 'rgba(155,138,255,1)', 'rgba(235,87,87,1)'];
+  // The set's series of voices (series.one to series.alert, models/instrumentDesigns.js), in
+  // this control's own order. Graphite's series is the palette above, so a panel that never
+  // chose a set is unchanged.
+  const SERIES_ORDER = [1, 3, 2, 5, 4, 6];
+  let palette = $derived(Array.isArray(series) && series.length >= 6 ? SERIES_ORDER.map((n, i) => css(series[n - 1], LANE_PALETTE[i])) : LANE_PALETTE);
 
   let cfg = $derived(macroConfig(control));
   let value = $derived(cfg.__value !== undefined ? Math.max(0, Math.min(1, n(cfg.__value, 0.5))) : macroValue(control));
@@ -66,7 +73,7 @@
         i, s, val,
         y: y0 + i * rowH, rowH, labelW,
         trackX, trackW, valW,
-        colour: s.colour ? css(s.colour) : LANE_PALETTE[i % LANE_PALETTE.length],
+        colour: s.colour ? css(s.colour) : palette[i % palette.length],
       };
     });
   });
@@ -88,18 +95,20 @@
   </defs>
 
   <!-- Knob -->
-  <circle cx={geom.knobCX} cy={geom.knobCY} r={arcR + 4} fill="rgba(0,0,0,0.35)" />
-  <path d={arcPath(arcR, 135, 405)} fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="5" stroke-linecap="round" />
-  {#if value > 0}
-    <path d={arcPath(arcR, 135, angle)} fill="none" stroke={arcCss} stroke-width="5" stroke-linecap="round" />
+  {#if ownKnob}
+    <circle cx={geom.knobCX} cy={geom.knobCY} r={arcR + 4} fill="rgba(0,0,0,0.35)" />
+    <path d={arcPath(arcR, 135, 405)} fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="5" stroke-linecap="round" />
+    {#if value > 0}
+      <path d={arcPath(arcR, 135, angle)} fill="none" stroke={arcCss} stroke-width="5" stroke-linecap="round" />
+    {/if}
+    <circle cx={geom.knobCX} cy={geom.knobCY} r={geom.knobR} fill={knobCss} stroke="rgba(0,0,0,0.6)" stroke-width="1" />
+    <circle cx={geom.knobCX} cy={geom.knobCY} r={geom.knobR} fill={`url(#${svgId}-face)`} />
+    <line x1={geom.knobCX} y1={geom.knobCY} x2={pointer[0]} y2={pointer[1]} stroke={dragging ? 'rgba(255,255,255,1)' : tone('rgba(240,240,245,0.92)')} stroke-width="3" stroke-linecap="round" />
   {/if}
-  <circle cx={geom.knobCX} cy={geom.knobCY} r={geom.knobR} fill={knobCss} stroke="rgba(0,0,0,0.6)" stroke-width="1" />
-  <circle cx={geom.knobCX} cy={geom.knobCY} r={geom.knobR} fill={`url(#${svgId}-face)`} />
-  <line x1={geom.knobCX} y1={geom.knobCY} x2={pointer[0]} y2={pointer[1]} stroke={dragging ? 'rgba(255,255,255,1)' : 'rgba(240,240,245,0.92)'} stroke-width="3" stroke-linecap="round" />
 
   <!-- Knob readout / label -->
   {#if cfg.showValues !== false}
-    <text x={geom.knobCX} y={geom.knobCY + geom.knobR + 15} font-size={Math.max(12, geom.knobR * 0.42)} fill="rgba(240,240,245,0.95)" text-anchor="middle" style="font-variant-numeric:tabular-nums;font-weight:700">{Math.round(value * 100)}</text>
+    <text x={geom.knobCX} y={geom.knobCY + geom.knobR + 15} font-size={Math.max(12, geom.knobR * 0.42)} fill={tone('rgba(240,240,245,0.95)')} text-anchor="middle" style="font-variant-numeric:tabular-nums;font-weight:700">{Math.round(value * 100)}</text>
   {/if}
   {#if cfg.label}
     <text x={geom.knobCX} y={geom.knobCY - geom.knobR - 7} font-size={labelSize} fill={labelCss} text-anchor="middle" style="letter-spacing:.12em;text-transform:uppercase" opacity="0.85">{cfg.label}</text>
@@ -114,7 +123,7 @@
   {#each laneRows as row (row.i)}
     {@const cy = row.y + row.rowH / 2}
     <text x={geom.lanesX0} y={cy} font-size={labelSize} clip-path={`url(#${svgId}-label-${row.i})`}
-          fill={row.s.enabled ? 'rgba(220,220,228,1)' : 'rgba(150,150,160,0.5)'} dominant-baseline="middle" style="letter-spacing:.01em">{row.s.label}</text>
+          fill={row.s.enabled ? tone('rgba(220,220,228,1)') : tone('rgba(150,150,160,0.5)')} dominant-baseline="middle" style="letter-spacing:.01em">{row.s.label}</text>
     <rect x={row.trackX} y={cy - 4} width={row.trackW} height="8" rx="4" fill={trackCss} />
     <!-- value-scale divisions (vertical; same generator as the sliders' ticks) -->
     {#each divs.minor as dv (`mn${row.i}_${dv.key}`)}
@@ -125,7 +134,7 @@
     {/each}
     <rect x={row.trackX} y={cy - 4} width={Math.max(0, row.val * row.trackW)} height="8" rx="4" fill={row.colour} opacity={row.s.enabled ? 1 : 0.4} />
     {#if row.valW > 0}
-      <text x={geom.lanesX0 + geom.lanesW} y={cy} font-size={Math.max(8, labelSize - 1)} fill="rgba(232,232,238,1)" text-anchor="end" dominant-baseline="middle" style="font-variant-numeric:tabular-nums">{Math.round(row.val * 100)}%</text>
+      <text x={geom.lanesX0 + geom.lanesW} y={cy} font-size={Math.max(8, labelSize - 1)} fill={tone('rgba(232,232,238,1)')} text-anchor="end" dominant-baseline="middle" style="font-variant-numeric:tabular-nums">{Math.round(row.val * 100)}%</text>
     {/if}
   {/each}
 </svg>

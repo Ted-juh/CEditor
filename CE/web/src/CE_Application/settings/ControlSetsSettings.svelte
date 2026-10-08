@@ -10,7 +10,7 @@
   import ControlSetGallery from '../panels/ControlSetGallery.svelte';
   import { buildSolidStyle } from '../utils/backgroundCSS.js';
   import { createControlSetStarter } from '../models/controlSetStarter.js';
-  import { BUILT_IN_CONTROL_SETS, getControlSet } from '../models/controlSets.js';
+  import { BASE_CONTROL_SET, BUILT_IN_CONTROL_SETS, NEW_PANEL_CONTROL_SET_ID, getControlSet, normalizeControlSetDefinition, resolveToken } from '../models/controlSets.js';
   import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
   import { MATERIAL_KINDS } from '../utils/materialFilter.js';
   import { controlSetFileName } from '../models/controlSetPackage.js';
@@ -24,17 +24,17 @@
   import { deepClone } from '../utils/deepClone.js';
 
   const COLOUR_ROLES = [
-    ['surface', 'Panel surface'], ['control.body', 'Control body'], ['control.cap', 'Knob / fader cap'],
+    ['panel.surface', 'Panel surface'], ['surface', 'Button surface'], ['control.body', 'Control body'], ['control.cap', 'Knob / fader cap'],
     ['control.fill', 'Value fill'], ['accent', 'Accent'], ['text.primary', 'Primary text'],
     ['display.screen', 'Display glass'], ['display.lit', 'Display light'],
   ];
   const FAMILY_ROLES = [
     ['Knob', 'Knobs'], ['Slider', 'Sliders'], ['Button', 'Buttons'],
-    ['ToggleButton', 'Switches'], ['DrumPads', 'Drum pads'], ['StepSequencer', 'Steppers'],
+    ['ToggleButton', 'Switches'], ['DrumPads', 'Drum pads'], ['StepSequencer', 'Steppers'], ['Label', 'Labels'],
   ];
   const DESIGN_SOURCES = PHYSICAL_DIRECTIONS.map((entry) => getControlSet(entry.id)).filter(Boolean);
 
-  let selectedId = $state(untrack(() => $generalSettings.defaultControlSetId || 'graphite'));
+  let selectedId = $state(untrack(() => $generalSettings.defaultControlSetId || NEW_PANEL_CONTROL_SET_ID));
   let draft = $state(null);
   let loadedId = $state('');
   let fileInput = $state(null);
@@ -49,6 +49,11 @@
     ...BUILT_IN_CONTROL_SETS.filter((set) => !$controlSetLibrary.some((custom) => custom.id === set.id))
       .map((set) => ({ ...set, origin: 'built-in' })),
   ]);
+  // The default for new panels can be one of your own sets: createPanel carries it into the new
+  // document (models/controlSets.js newPanelControlSet), so the panel keeps it wherever it opens.
+  let defaultSetId = $derived($generalSettings.defaultControlSetId || NEW_PANEL_CONTROL_SET_ID);
+  let mySets = $derived(allSets.filter((set) => set.origin === 'library'));
+  let builtInSets = $derived(allSets.filter((set) => set.origin === 'built-in'));
   let selectedSet = $derived(allSets.find((set) => set.id === selectedId) ?? allSets[0]);
   let isCustom = $derived(selectedSet?.origin === 'library');
 
@@ -58,7 +63,7 @@
     if (!set || loadedId === id) return;
     draft = deepClone(set);
     delete draft.origin;
-    familySources = {};
+    familySources = { ...(draft.chosenFamilies ?? {}) };
     loadedId = id;
     status = '';
   });
@@ -67,7 +72,9 @@
     if (!draft) return null;
     const sourceId = BUILT_IN_CONTROL_SETS.some((set) => set.id === draft.id) ? draft.id : 'graphite';
     const sample = createControlSetStarter(sourceId);
-    return { ...sample, name: `${draft.name} preview`, controlSet: { id: draft.id }, controlSets: [draft] };
+    // Normalised, so what the set derives from its colours (its sections, its instruments' face and
+    // voices) follows the swatches while they are edited, not only after a save.
+    return { ...sample, name: `${draft.name} preview`, controlSet: { id: draft.id }, controlSets: [normalizeControlSetDefinition(draft) ?? draft] };
   });
 
   function choose(id) {
@@ -83,7 +90,9 @@
   }
 
   function createSet() {
-    const copy = duplicateControlSet(getControlSet('graphite'), 'New Control Set');
+    // A copy of what a new panel starts on: the designed Graphite, not Classic, which has none of
+    // the designs and is kept only so that old documents keep their look.
+    const copy = duplicateControlSet(getControlSet(NEW_PANEL_CONTROL_SET_ID), 'New Control Set');
     if (copy) choose(copy.id);
   }
 
@@ -97,19 +106,24 @@
     if (typeof window !== 'undefined' && !window.confirm(`Delete “${draft.name}” from your library?`)) return;
     const wasDefault = $generalSettings.defaultControlSetId === draft.id;
     removeControlSetFromLibrary(draft.id);
-    if (wasDefault) updateGeneralSettings({ defaultControlSetId: 'graphite' });
-    choose(wasDefault ? 'graphite' : ($generalSettings.defaultControlSetId || 'graphite'));
+    if (wasDefault) updateGeneralSettings({ defaultControlSetId: NEW_PANEL_CONTROL_SET_ID, defaultControlSetChosen: false });
+    choose(wasDefault ? NEW_PANEL_CONTROL_SET_ID : ($generalSettings.defaultControlSetId || NEW_PANEL_CONTROL_SET_ID));
     status = 'Removed from your library.';
   }
 
   function setToken(key, event) {
     const old = String(draft?.tokens?.[key] ?? 'FFFFFFFF').replace('#', '');
     const alpha = old.length === 8 ? old.slice(0, 2) : 'FF';
-    draft = { ...draft, tokens: { ...draft.tokens, [key]: `${alpha}${event.target.value.slice(1).toUpperCase()}` } };
+    const value = `${alpha}${event.target.value.slice(1).toUpperCase()}`;
+    draft = { ...draft, tokens: { ...draft.tokens, [key]: value } };
+    // The panel's own fill reads `panel.colour` (utils/backgroundCSS.js), so the panel behind the
+    // labels follows the swatch too.
+    if (key === 'panel.surface') draft = { ...draft, panel: { ...(draft.panel ?? {}), colour: value } };
   }
 
   function colourValue(key) {
-    const raw = String(draft?.tokens?.[key] ?? 'FFFFFFFF').replace('#', '');
+    // A role may be an alias ('{surface}', '{accent}'): show the colour it gives, not its name.
+    const raw = String(resolveToken(key, draft) ?? 'FFFFFFFF').replace('#', '');
     return `#${(raw.length === 8 ? raw.slice(2) : raw).padStart(6, '0').slice(-6)}`;
   }
 
@@ -121,7 +135,15 @@
   function setFamilySource(family, sourceId) {
     const source = getControlSet(sourceId);
     if (!source?.families?.[family]) return;
-    draft = { ...draft, families: { ...(draft.families ?? {}), [family]: deepClone(source.families[family]) } };
+    // Recorded as the author's choice, so the set's own derived designs never overwrite it
+    // (models/personalSetDesigns.js), and the record of what they last wrote no longer applies.
+    const { [family]: _, ...designed } = draft.designed ?? {};
+    draft = {
+      ...draft,
+      families: { ...(draft.families ?? {}), [family]: deepClone(source.families[family]) },
+      chosenFamilies: { ...(draft.chosenFamilies ?? {}), [family]: sourceId },
+      designed,
+    };
     familySources = { ...familySources, [family]: sourceId };
   }
 
@@ -168,8 +190,14 @@
     <div class="card-head"><h2>Control Sets</h2><p>Choose the starting design for new panels and manage reusable visual systems.</p></div>
     <div class="default-row">
       <label><span>Default for new panels</span>
-        <select value={$generalSettings.defaultControlSetId} onchange={(event) => updateGeneralSettings({ defaultControlSetId: event.target.value })}>
-          {#each BUILT_IN_CONTROL_SETS as set}<option value={set.id}>{set.name}</option>{/each}
+        <select value={defaultSetId} onchange={(event) => updateGeneralSettings({ defaultControlSetId: event.target.value, defaultControlSetChosen: true })}>
+          {#if mySets.length}
+            <optgroup label="My sets">{#each mySets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
+          {/if}
+          <optgroup label="Built in">{#each builtInSets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
+          {#if !allSets.some((set) => set.id === defaultSetId)}
+            <option value={defaultSetId}>{defaultSetId} (not installed; new panels use {BASE_CONTROL_SET.name})</option>
+          {/if}
         </select>
       </label>
       <button class="primary" onclick={() => galleryOpen = true}><Images size={15} /> Browse 36 templates</button>

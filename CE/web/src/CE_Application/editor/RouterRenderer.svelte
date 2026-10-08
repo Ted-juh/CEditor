@@ -14,7 +14,7 @@
   // Reuse the SAME major/minor tick generator the sliders use for value divisions.
   import { buildSliderTickStops } from '../utils/sliderGeometry.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, tone = (colour) => colour } = $props();
 
   const PAD = 8;
   const HEADER = 26;   // source chip / input bar row
@@ -88,10 +88,10 @@
 
 <svg class="router" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <!-- Header: source chip + live input bar -->
-  <rect x={PAD} y={PAD} width={Math.min(140, (width - PAD * 2) * 0.5)} height="20" rx="10" fill="rgba(23,23,32,1)" stroke="rgba(58,58,72,1)" />
+  <rect x={PAD} y={PAD} width={Math.min(140, (width - PAD * 2) * 0.5)} height="20" rx="10" fill={tone('rgba(23,23,32,1)')} stroke={tone('rgba(58,58,72,1)')} />
   <circle cx={PAD + 12} cy={PAD + 10} r="4" fill={inputCss} opacity={isLive ? 1 : 0.45} />
   <text x={PAD + 21} y={PAD + 14} font-size={labelSize} fill={labelCss}>{routerSourceDisplay(control)}</text>
-  <rect x={inBarX} y={PAD + 2} width={inBarW} height="16" rx="8" fill="rgba(10,10,15,1)" stroke="rgba(32,32,42,1)" />
+  <rect x={inBarX} y={PAD + 2} width={inBarW} height="16" rx="8" fill={tone('rgba(10,10,15,1)')} stroke={tone('rgba(32,32,42,1)')} />
   <rect x={inBarX} y={PAD + 2} width={Math.max(0, input * inBarW)} height="16" rx="8" fill={inputCss} opacity={isLive ? 0.75 : 0.4} />
   <!-- LIVE when hardware is driving it; TEST when the bar is the design value -->
   {#if inBarW >= 54}
@@ -99,14 +99,14 @@
          underneath it, which it does whenever the controller is near the top. -->
     <text x={inBarX + inBarW - 6} y={PAD + 14} font-size="8" text-anchor="end"
           fill={isLive ? inputCss : labelCss} opacity={isLive ? 1 : 0.7} style="font-weight:700"
-          stroke="rgba(8,8,12,0.9)" stroke-width="2.5" paint-order="stroke">
+          stroke={tone('rgba(8,8,12,0.9)')} stroke-width="2.5" paint-order="stroke">
       {isLive ? 'LIVE' : 'TEST'}
     </text>
   {/if}
 
   <!-- Transfer curve -->
   <g transform={`translate(0 ${gy})`}>
-    <rect x={curveGeom.x0} y={curveGeom.y0} width={curveGeom.w} height={curveGeom.h} rx="6" fill={fieldCss} stroke="rgba(32,32,42,1)" />
+    <rect x={curveGeom.x0} y={curveGeom.y0} width={curveGeom.w} height={curveGeom.h} rx="6" fill={fieldCss} stroke={tone('rgba(32,32,42,1)')} />
     {#if cfg.showGrid !== false}
       {#each [0.25, 0.5, 0.75] as g (g)}
         <line x1={curveGeom.x0 + curveGeom.w * g} y1={curveGeom.y0} x2={curveGeom.x0 + curveGeom.w * g} y2={curveGeom.y0 + curveGeom.h} stroke={gridCss} />
@@ -127,10 +127,10 @@
     <!-- editable nodes -->
     {#each points as p, i (p.id ?? i)}
       {@const q = routerNodeToPx(p, curveGeom)}
-      <circle cx={q.px} cy={q.py} r={dragIndex === i ? 5.5 : 4} fill={dragIndex === i ? 'rgba(255,255,255,1)' : 'rgba(240,240,245,0.9)'} stroke="rgba(0,0,0,0.5)" stroke-width="1" />
+      <circle cx={q.px} cy={q.py} r={dragIndex === i ? 5.5 : 4} fill={dragIndex === i ? 'rgba(255,255,255,1)' : tone('rgba(240,240,245,0.9)')} stroke="rgba(0,0,0,0.5)" stroke-width="1" />
     {/each}
     <!-- live output dot -->
-    <circle cx={cross.ix} cy={cross.oy} r="4.5" fill={inputCss} stroke="rgba(10,10,15,1)" stroke-width="1.5" />
+    <circle cx={cross.ix} cy={cross.oy} r="4.5" fill={inputCss} stroke={tone('rgba(10,10,15,1)')} stroke-width="1.5" />
   </g>
 
   <!-- Destination lanes -->
@@ -138,8 +138,8 @@
     {@const cy = row.y + row.rowH / 2}
     {@const trackX = lanesX + 4}
     {@const trackW = Math.max(8, lanesW - 8 - 34)}
-    <text x={lanesX + 4} y={cy - 5} font-size={labelSize} fill={row.d.enabled ? 'rgba(220,220,228,1)' : 'rgba(150,150,160,0.5)'}>{row.d.label}</text>
-    <rect x={trackX} y={cy + 1} width={trackW} height="7" rx="3.5" fill="rgba(14,14,18,1)" />
+    <text x={lanesX + 4} y={cy - 5} font-size={labelSize} fill={row.d.enabled ? tone('rgba(220,220,228,1)') : tone('rgba(150,150,160,0.5)')}>{row.d.label}</text>
+    <rect x={trackX} y={cy + 1} width={trackW} height="7" rx="3.5" fill={tone('rgba(14,14,18,1)')} />
     <!-- value-scale divisions (vertical; same generator as the sliders' ticks) -->
     {#each divs.minor as dv (`mn${row.i}_${dv.key}`)}
       <line x1={trackX + dv.normalized * trackW} y1={cy - 0.5} x2={trackX + dv.normalized * trackW} y2={cy + 9.5} stroke="rgba(255,255,255,0.5)" stroke-width="1" opacity="0.14" />
@@ -148,7 +148,7 @@
       <line x1={trackX + dv.normalized * trackW} y1={cy - 1.5} x2={trackX + dv.normalized * trackW} y2={cy + 10.5} stroke="rgba(255,255,255,0.5)" stroke-width="1" opacity="0.28" />
     {/each}
     <rect x={trackX} y={cy + 1} width={Math.max(0, row.val * trackW)} height="7" rx="3.5" fill={row.colour} opacity={row.d.enabled ? 1 : 0.4} />
-    <text x={lanesX + lanesW} y={cy + 8} font-size={Math.max(8, labelSize - 1)} fill="rgba(232,232,238,1)" text-anchor="end" style="font-variant-numeric:tabular-nums">{Math.round(row.val * 100)}</text>
+    <text x={lanesX + lanesW} y={cy + 8} font-size={Math.max(8, labelSize - 1)} fill={tone('rgba(232,232,238,1)')} text-anchor="end" style="font-variant-numeric:tabular-nums">{Math.round(row.val * 100)}</text>
   {/each}
 </svg>
 

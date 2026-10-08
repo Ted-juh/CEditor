@@ -153,9 +153,12 @@
     resizeHandleStyle,
   } from '../utils/transformMath.js';
   import { sortControlsForHitTest } from '../utils/controlOrder.js';
-  import { getContext, setContext } from 'svelte';
+  import { getContext, setContext, untrack } from 'svelte';
   import { activeControlSet, CONTROL_SET_CONTEXT_KEY } from '../stores/controlSets.js';
-  import { CONTROL_SET_LAMP_CONTEXT_KEY } from '../models/controlSets.js';
+  import { CONTROL_SET_LAMP_CONTEXT_KEY, resolveToken } from '../models/controlSets.js';
+  import { SERIES_ROLES, chromeTone } from '../models/instrumentDesigns.js';
+  import { macroGeometry, macroValue } from '../utils/macroLayout.js';
+  import { macroKnobBaseRuntime, macroKnobBox, macroKnobControl, macroKnobHalo, macroKnobRuntime, macroKnobSignature, macroUsesSetKnob } from '../utils/macroKnob.js';
   import { resolveControlForSet, controlSetForControl } from '../models/controlSetFamilies.js';
 
   let {
@@ -168,6 +171,9 @@
     interactionRuntimeOverride = null,
     renderIdNamespace = '',
     editorInteractionEnabled = true,
+    // Drawn as part of another control (a Macro's set knob): no control id in the DOM, so nothing that
+    // finds controls by `data-control-id` finds it, and no pointer events.
+    embedded = false,
     snapToGrid = false,
     gridSize = 10,
     gridOriginX = 0,
@@ -244,6 +250,13 @@
   // the same object it always was.
   const contextControlSet = getContext(CONTROL_SET_CONTEXT_KEY) ?? null;
   let controlSet = $derived(controlSetForControl(documentControl, typeof contextControlSet === 'function' ? contextControlSet() : $activeControlSet));
+  // The set's series of voices, for the instruments that colour lanes and nodes from a palette
+  // rather than from one property each (Macro, Orbit, Timbre, Constraint). Graphite's series is
+  // their old built-in palette, and a set that names none falls back to it.
+  let seriesPalette = $derived(SERIES_ROLES.map((role) => resolveToken(role, controlSet) ?? null));
+  // The fixed greys an instrument draws around its readout (header plates, edges, idle lamps),
+  // moved onto the set's own face and lettering. Under Graphite each is itself.
+  let instrumentTone = $derived(chromeTone(resolveToken('instrument.face', controlSet), resolveToken('instrument.text', controlSet)));
   // The set's family patch first (a knob gets its cap, a button its finish), then the tokens —
   // models/controlSetFamilies.js. The set's lamp goes into context for every material filter
   // drawn under this control, so all of them are lit from the panel's one light.
@@ -404,6 +417,33 @@
     });
   });
   onDestroy(() => { if (core?.id) disposeKeyframePlayer(core.id); });
+  // A Macro whose knob follows the set hosts the set's Knob, drawn by this same component
+  // (utils/macroKnob.js). The knob is rebuilt only when its box or what it takes from the set
+  // changes, never as the Macro turns: the key is a string, so an unchanged key notifies nothing,
+  // and the value goes in as a runtime. The set is keyed by content, not identity, since a document
+  // set can arrive as a new object on any change to the panel, and by all of its colours, which the
+  // knob and its ring read (macroKnobSignature).
+  let macroKnobKey = $derived(isMacro && macroUsesSetKnob(renderControl)
+    ? macroKnobSignature(renderControl, macroKnobBox(macroGeometry(displayW, displayH, renderControl), renderControl), controlSet)
+    : '');
+  let macroKnob = $derived.by(() => {
+    if (!macroKnobKey) return null;
+    return untrack(() => macroKnobControl(renderControl, macroKnobBox(macroGeometry(displayW, displayH, renderControl), renderControl), controlSet));
+  });
+  let macroKnobList = $derived(macroKnob ? [macroKnob] : []);
+  // A dark knob on the Macro's dark face sits on a ring of the set's display light.
+  let macroKnobRing = $derived.by(() => {
+    if (!macroKnob) return '';
+    const lit = untrack(() => macroKnobHalo(macroKnob, controlSet));
+    if (!lit) return '';
+    const [r, g, b] = [2, 4, 6].map((i) => parseInt(lit.slice(i, i + 2), 16));
+    const t = macroKnob._children.Transform;
+    return `left:${t.x}px; top:${t.y}px; width:${t.width}px; height:${t.height}px; background:radial-gradient(circle closest-side, rgba(${r},${g},${b},0) 62%, rgba(${r},${g},${b},0.5) 74%, rgba(${r},${g},${b},0.16) 88%, rgba(${r},${g},${b},0) 100%);`;
+  });
+  let macroKnobBase = $derived(macroKnobBaseRuntime(macroKnob));
+  let macroKnobState = $derived(macroKnob
+    ? macroKnobRuntime(macroKnobBase, renderControl?._children?.Macro?.__value ?? macroValue(renderControl), previewSession?.dragging === true)
+    : null);
   let svgIdSeed = $derived.by(() => {
     const baseId = safeSvgId(core?.id);
     const namespace = safeSvgId(renderIdNamespace);
@@ -2871,7 +2911,12 @@
   });
   let svgTextBaseX = $derived.by(() => {
     const left = textUnrotatedOrigin.left;
-    const width = Math.max(0, textGlyphSize.width);
+    // The origin's width, which falls back to the layout's line box, not the raw DOM measurement.
+    // Folded scenery is baked in a detached element (utils/sceneryMarkupCache.js), where nothing is
+    // ever measured: with the raw width of 0 a centred line was anchored at the line box's LEFT
+    // edge, so a label with a text shadow or glow (drawn here, as SVG) lost its left half —
+    // "Cutoff" read "toff". The same trap textUnrotatedOrigin documents for the DOM text.
+    const width = Math.max(0, textUnrotatedOrigin.width);
 
     if (svgTextAnchor === 'start') return left;
     if (svgTextAnchor === 'end') return left + width;
@@ -3017,7 +3062,7 @@
     if (blockLineFillWidthApplied(index)) return textUnrotatedOrigin.left;
     const align = blockLineEffectiveAlign(index);
     if (align === 'left') return textUnrotatedOrigin.left;
-    if (align === 'right') return textUnrotatedOrigin.left + Math.max(0, textGlyphSize.width);
+    if (align === 'right') return textUnrotatedOrigin.left + Math.max(0, textUnrotatedOrigin.width);
     return svgTextBaseX;
   }
 
@@ -3510,7 +3555,8 @@
 <div
   bind:this={rootElement}
   class="canvas-control"
-  data-control-id={core?.id}
+  class:embedded
+  data-control-id={embedded ? undefined : core?.id}
   class:selected={editorInteractionEnabled && isSelected && !panelLocked}
   class:key-object={editorInteractionEnabled && isKeyObject && !panelLocked}
   class:hidden-component={!isVisible}
@@ -3644,23 +3690,39 @@
     {/if}
 
     {#if isMacro}
-      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} />
+      {#if macroKnobRing}
+        <div class="macro-knob-ring" style={macroKnobRing} aria-hidden="true"></div>
+      {/if}
+      {#if macroKnob}
+        <CanvasControlNested
+          control={macroKnob}
+          {scale}
+          embedded
+          editorInteractionEnabled={false}
+          interactionRuntimeOverride={macroKnobState}
+          allControls={macroKnobList}
+          panelWidth={displayW}
+          panelHeight={displayH}
+          renderIdNamespace={`${svgIdSeed}-knob`}
+        />
+      {/if}
+      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} series={seriesPalette} tone={instrumentTone} ownKnob={!macroKnob} />
     {/if}
 
     {#if isOrbit}
-      <OrbitRenderer control={renderControl} width={displayW} height={displayH} />
+      <OrbitRenderer control={renderControl} width={displayW} height={displayH} series={seriesPalette} />
     {/if}
 
     {#if isLooper}
-      <LooperRenderer control={renderControl} width={displayW} height={displayH} />
+      <LooperRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isRouter}
-      <RouterRenderer control={renderControl} width={displayW} height={displayH} />
+      <RouterRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isTimbre}
-      <TimbreRenderer control={renderControl} width={displayW} height={displayH} idSeed={svgIdSeed} />
+      <TimbreRenderer control={renderControl} width={displayW} height={displayH} idSeed={svgIdSeed} series={seriesPalette} tone={instrumentTone} />
     {/if}
 
     {#if isTuring}
@@ -3668,27 +3730,27 @@
     {/if}
 
     {#if isKinetic}
-      <KineticRenderer control={renderControl} width={displayW} height={displayH} />
+      <KineticRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isConstellation}
-      <ConstellationRenderer control={renderControl} width={displayW} height={displayH} />
+      <ConstellationRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isConstraint}
-      <ConstraintRenderer control={renderControl} width={displayW} height={displayH} />
+      <ConstraintRenderer control={renderControl} width={displayW} height={displayH} series={seriesPalette} tone={instrumentTone} />
     {/if}
 
     {#if isChordPad}
-      <ChordPadRenderer control={renderControl} width={displayW} height={displayH} />
+      <ChordPadRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isArp}
-      <ArpRenderer control={renderControl} width={displayW} height={displayH} />
+      <ArpRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isNoteRibbon}
-      <NoteRibbonRenderer control={renderControl} width={displayW} height={displayH} />
+      <NoteRibbonRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isDrumPads}
@@ -3700,24 +3762,24 @@
     {/if}
 
     {#if isSplitZone}
-      <SplitZoneRenderer control={renderControl} width={displayW} height={displayH} />
+      <SplitZoneRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isPhrase}
-      <PhraseRenderer control={renderControl} width={displayW} height={displayH} />
+      <PhraseRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
     {#if isRecorder}
-      <RecorderRenderer control={renderControl} width={displayW} height={displayH} />
+      <RecorderRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
     {#if isHarmoniser}
-      <HarmoniserRenderer control={renderControl} width={displayW} height={displayH} />
+      <HarmoniserRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
     {#if isSetlist}
-      <SetlistRenderer control={renderControl} width={displayW} height={displayH} />
+      <SetlistRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     {#if isTransport}
-      <TransportRenderer control={renderControl} width={displayW} height={displayH} />
+      <TransportRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
     <!-- ce.draw: whatever a script has drawn on THIS control, painted over its normal content.
@@ -4462,6 +4524,8 @@
     box-sizing: border-box;
     cursor: default;
   }
+  .canvas-control.embedded { pointer-events: none; }
+  .macro-knob-ring { position: absolute; border-radius: 50%; pointer-events: none; }
 
   /* THE DRAG AFFORDANCE. The canvas had exactly two cursors — the resize handles' arrows and this
      `default` — so nothing on the surface ever said a control could be dragged; you found out by

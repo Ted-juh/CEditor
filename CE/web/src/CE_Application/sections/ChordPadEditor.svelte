@@ -71,7 +71,9 @@
   <PropertySection title="Appearance" icon={Palette}>
     <PropertyCell label="Pad colours" span={4} hint="Pad fill, in-key accent, tonic accent, minor ring, labels. Click a swatch to edit it in the Colors tab.">
       <SwatchCluster swatches={[
+        { key: 'fieldColour', label: 'Field', value: cp.fieldColour ?? 'FF101017', target: { type: 'control', controlId: core?.id, path: 'ChordPad.fieldColour' } },
         { key: 'padColour', label: 'Pads', value: cp.padColour ?? 'FF171720', target: { type: 'control', controlId: core?.id, path: 'ChordPad.padColour' } },
+        { key: 'echoColour', label: 'Echo', value: cp.echoColour ?? 'FF39D98A', target: { type: 'control', controlId: core?.id, path: 'ChordPad.echoColour' } },
         { key: 'inKeyColour', label: 'In key', value: cp.inKeyColour ?? 'FF5B9BD5', target: { type: 'control', controlId: core?.id, path: 'ChordPad.inKeyColour' } },
         { key: 'tonicColour', label: 'Tonic', value: cp.tonicColour ?? 'FFF2C94C', target: { type: 'control', controlId: core?.id, path: 'ChordPad.tonicColour' } },
         { key: 'minorColour', label: 'Minors', value: cp.minorColour ?? 'FF9B8AFF', target: { type: 'control', controlId: core?.id, path: 'ChordPad.minorColour' } },

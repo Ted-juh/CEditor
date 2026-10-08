@@ -32,7 +32,8 @@
 
 import { COMPONENT_TYPES, createControl } from './componentTypes.js';
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
-import { BUILT_IN_CONTROL_SETS, isTokenReference, resolveColourValue, resolveControlTokens, getControlSet } from './controlSets.js';
+import { BUILT_IN_CONTROL_SETS, isTokenReference, resolveColourValue, resolveControlTokens, resolveToken, getControlSet } from './controlSets.js';
+import { GRAPHITE_SERIES, INSTRUMENT_TYPES, SERIES_ROLES } from './instrumentDesigns.js';
 import { typeFamilies } from './controlSetRecipes.js';
 import { deepClone } from '../utils/deepClone.js';
 
@@ -182,6 +183,10 @@ export function familyPatchFor(set, controlType) {
  */
 export function resolveControlFamily(control, set) {
   set = controlSetForControl(control, set);
+  return withSetVoices(patchFamily(control, set), set);
+}
+
+function patchFamily(control, set) {
   const type = control?._children?.Core?.controlType;
   const family = familyPatchFor(set, type);
   if (!family) return control;
@@ -208,6 +213,48 @@ export function resolveControlFamily(control, set) {
     }
   }
   return out;
+}
+
+// The instruments, and the step sequencer's tracks. Not the Meter: its green, amber and red zones
+// are levels (safe, hot, clipping), not voices, and read the same on every set.
+const VOICED_TYPES = new Set([...INSTRUMENT_TYPES, 'StepSequencer']);
+const sixDigit = (value) => {
+  const text = String(value ?? '').trim().replace(/^#/, '').toUpperCase();
+  return /^[0-9A-F]{6}$/.test(text) ? `FF${text}` : /^FF[0-9A-F]{6}$/.test(text) ? text : '';
+};
+
+/**
+ * An instrument's lanes, slots, scenes and tracks carry a colour each, and the factory gives them
+ * the palette's: the Macro's first assignment is Graphite's green because green IS the first
+ * voice. One that still wears one of the six palette colours speaks that voice, and takes the
+ * set's colour for it. A colour the author chose that is not one of the six is theirs and stays.
+ * Graphite's series is the palette, so under Graphite nothing moves; and since this runs at draw
+ * time, like the family patch, nothing is written into the document.
+ */
+function withSetVoices(control, set) {
+  const type = control?._children?.Core?.controlType;
+  const section = control?._children?.[type];
+  if (!VOICED_TYPES.has(type) || !isPlainObject(section)) return control;
+  const voices = new Map();
+  GRAPHITE_SERIES.forEach((colour, i) => {
+    const own = sixDigit(resolveToken(SERIES_ROLES[i], set));
+    if (own && own !== colour) voices.set(colour, own);
+  });
+  if (!voices.size) return control;
+  let changed = null;
+  for (const [key, value] of Object.entries(section)) {
+    if (!Array.isArray(value)) continue;
+    let touched = false;
+    const next = value.map((item) => {
+      const own = isPlainObject(item) ? voices.get(sixDigit(item.colour)) : undefined;
+      if (!own) return item;
+      touched = true;
+      return { ...item, colour: own };
+    });
+    if (touched) (changed ??= {})[key] = next;
+  }
+  if (!changed) return control;
+  return { ...control, _children: { ...control._children, [type]: { ...section, ...changed } } };
 }
 
 /**

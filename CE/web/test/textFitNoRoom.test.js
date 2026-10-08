@@ -26,3 +26,22 @@ test('real room still shrinks text that does not fit', () => {
   const { fitScale } = buildBlockTextLayoutState('CHECK SELECTION', { fontSection: font, maxWidth: 30, maxHeight: 12, fitMode: 'shrink' });
   assert.ok(fitScale > 0.05 && fitScale < 1, `expected a real shrink, got ${fitScale}`);
 });
+
+// The canvas lays every caption in a line box forced to the full width (forceLineBoxWidth), and the
+// layout's `width` is that box. Fitting measured the box against itself, so it always fitted: a
+// one-line caption too wide for its control was clipped, never shrunk. Only text too tall shrank.
+test('a one-line caption too wide for its box shrinks in the line box the canvas uses', () => {
+  const caption = 'A CAPTION FAR TOO LONG FOR ITS BOX';
+  const forced = buildBlockTextLayoutState(caption, { fontSection: font, maxWidth: 52, maxHeight: 16, fitMode: 'shrink', wrapMode: 'none', forceLineBoxWidth: true });
+  assert.ok(forced.fitScale < 0.9, `expected a real shrink, got ${forced.fitScale}`);
+  assert.ok(forced.layout.contentWidth * forced.fitScale <= 52.5, 'and the shrunk text fits the box');
+  const loose = buildBlockTextLayoutState(caption, { fontSection: font, maxWidth: 52, maxHeight: 16, fitMode: 'shrink', wrapMode: 'none' });
+  assert.equal(forced.fitScale, loose.fitScale, 'the line box does not change the answer');
+});
+
+test('a caption that fits keeps its size, line box or not', () => {
+  for (const forceLineBoxWidth of [true, false]) {
+    const { fitScale } = buildBlockTextLayoutState('VOL', { fontSection: font, maxWidth: 52, maxHeight: 16, fitMode: 'shrink', wrapMode: 'none', forceLineBoxWidth });
+    assert.equal(fitScale, 1, `forceLineBoxWidth ${forceLineBoxWidth}`);
+  }
+});

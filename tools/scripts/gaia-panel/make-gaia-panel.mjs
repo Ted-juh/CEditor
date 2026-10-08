@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { createControl } from '../../../CE/web/src/CE_Application/models/componentTypes.js';
 import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/utils/parameterAdoptionRules.js';
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
+import { DEFAULT_CONTROL_SET_ID } from '../../../CE/web/src/CE_Application/models/controlSets.js';
 import { createScript } from '../../../CE/web/src/CE_Application/scripting/scriptModel.js';
 import { ARP_STRIP, COMMON_STRIP, EFFECTS_STRIP, PANEL_WIDTH, SKIN, TONE_STRIP } from './layout.mjs';
 import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds, gaiaSectionTab, gaiaHardwareSyncStatus } from './components.mjs';
@@ -763,6 +764,10 @@ export function buildGaiaPanel({ sections = true } = {}) {
   seq = 0;
 
   const panel = createPanel('Roland GAIA SH-01');
+  // createPanel starts a new panel on the user's default set,
+  // which is the designed Graphite; this is a curated document, drawn on the base set, Graphite
+  // Classic, since before sets existed, and its file stays that way (no controlSet key).
+  panel.controlSet = { id: DEFAULT_CONTROL_SET_ID };
   const controls = [];
   const missing = [];
   const bankScripts = [];

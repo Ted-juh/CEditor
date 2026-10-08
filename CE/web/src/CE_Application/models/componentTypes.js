@@ -187,7 +187,11 @@ export const COMPONENT_TYPES = {
     // HOST AUTOMATION.
     // Nothing to automate: this type holds no value, only appearance and layout.
     exportValues: [],
-    defaultOverrides: {},
+    // The panel's face, not a button's: a Background is what the panel's own lettering and every
+    // control's captions sit on, and the sets choose their text colours to read on the panel.
+    defaultOverrides: {
+      Background: { _children: { Fill: { colour: '{panel.surface}' } } },
+    },
   },
 
   Label: {
@@ -197,6 +201,8 @@ export const COMPONENT_TYPES = {
     exportValues: [],
     defaultOverrides: {
       Transform: { width: 120, height: 32 },
+      // Lettering on the panel, so its plate is the panel's colour (see Background above).
+      Background: { _children: { Fill: { colour: '{panel.surface}' } } },
       Text: { content: 'Label' },
       ContentLayout: {
         mode: 'text_only',

@@ -27,6 +27,13 @@ import { PILOT_CONTROL_SETS } from './pilotControlSets.js';
 import { CATALOG_CONTROL_SETS, CATALOG_SET_EXTRAS } from './catalogControlSets.js';
 import { makeAdditionalControlSets } from './additionalControlSets.js';
 import { extendControlSet } from './controlSetCoverage.js';
+import { typeFamilies } from './controlSetRecipes.js';
+import { withLabelDesign } from './labelDesigns.js';
+import { withSectionDesign, withSectionSurface } from './sectionDesigns.js';
+import { withInstrumentDesign, withInstrumentTokens } from './instrumentDesigns.js';
+import { withDisplayDesign } from './displayDesigns.js';
+import { withPersonalDesigns } from './personalSetDesigns.js';
+import { deepClone } from '../utils/deepClone.js';
 
 const TOKEN_REFERENCE_PATTERN = /^\{([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)\}$/i;
 const COLOUR_LITERAL_PATTERN = /^[0-9A-F]{6}(?:[0-9A-F]{2})?$/i;
@@ -39,6 +46,24 @@ const MAX_ALIAS_DEPTH = 8;
  * says what the role is for, not what colour it is.
  */
 export const CONTROL_SET_TOKEN_ROLES = [
+  // The panel itself. Every text role is chosen to read on this, not on `surface`: in a set whose
+  // buttons are cream on a black panel, `surface` is the cream and the text is cream too, and a
+  // Label filled with `surface` had cream lettering on a cream plate.
+  { name: 'panel.surface', group: 'panel', description: 'The panel\'s face: the fill of a Label and of a Background block. Text roles read on it.' },
+  { name: 'section.surface', group: 'panel', description: 'The face of a section (Group, Container, tab page, scroll area): the panel a step further from the lettering, so text roles read on it too.' },
+  // Instruments: the controls that draw a live display (Macro, Turing, Arp, Transport, Keyboard...).
+  // Their face is the set's display window; the series are their voices. Graphite's are today's
+  // palette, so a panel that never chose a set draws them as it always did.
+  { name: 'instrument.face', group: 'instrument', description: 'The face of an instrument control: the set\'s display window.' },
+  { name: 'instrument.ink', group: 'instrument', description: 'Secondary lettering on an instrument face: captions, scales, units.' },
+  { name: 'instrument.text', group: 'instrument', description: 'Primary lettering on an instrument face: names, the current item.' },
+  { name: 'series.one', group: 'series', description: 'First voice: bars, notes, curves, the main value.' },
+  { name: 'series.two', group: 'series', description: 'The moving or current thing: a playhead, a head step, a puck, a tonic.' },
+  { name: 'series.three', group: 'series', description: 'Second voice: steps, in-key notes, rings.' },
+  { name: 'series.four', group: 'series', description: 'Third voice: minor chords, added notes.' },
+  { name: 'series.five', group: 'series', description: 'Fourth voice: the next lane in a multi-lane display.' },
+  { name: 'series.alert', group: 'series', description: 'Alert: record, panic.' },
+
   // Surfaces: the body of a button-like control and its interaction states.
   { name: 'surface', group: 'surface', description: 'Body of a ready-made control at rest (Button, Toggle, containers).' },
   { name: 'surface.hover', group: 'surface', description: 'Body while the pointer is over it.' },
@@ -112,9 +137,13 @@ export const CONTROL_SET_TOKEN_NAMES = CONTROL_SET_TOKEN_ROLES.map((role) => rol
 const BASE_BUILT_IN_SETS = [
   {
     id: 'graphite',
-    name: 'Graphite',
+    // Classic: every document that names no set is on it, so it stays exactly what it was. New
+    // panels start on the designed Graphite below instead.
+    name: 'Graphite Classic',
     description: 'The original look: neutral dark greys with a cool blue accent.',
     tokens: {
+      // Graphite names no panel colour, and its labels have always sat on the control surface.
+      'panel.surface': '{surface}',
       'surface': 'FF3A3A3A',
       'surface.hover': 'FF4A4A4A',
       'surface.pressed': 'FF2C2C2C',
@@ -265,6 +294,61 @@ const BASE_BUILT_IN_SETS = [
   },
 ];
 
+/**
+ * A set's `panel.surface`: the panel colour it names (`panel.colour`), unless the set says
+ * otherwise. A set that names no panel colour gets `fallback` — the built-ins pass `'{surface}'`
+ * because every built-in must define every role; a user's set is left without one and reaches
+ * Graphite's `'{surface}'` alias through the base-set fallback, which resolves against its own
+ * surface. Either way that is what its labels sat on before this role existed.
+ *
+ * An inherited `'{surface}'` alias is replaced when there is a panel colour to replace it with:
+ * the additional sets copy their base's tokens wholesale, Graphite's alias among them, and with a
+ * panel colour present that alias is exactly the cream-on-cream this role exists to prevent.
+ */
+export function withPanelSurface(set, { fallback = null } = {}) {
+  const current = set?.tokens?.['panel.surface'];
+  const panelColour = String(set?.panel?.colour ?? '').trim().toUpperCase();
+  const hasPanelColour = COLOUR_LITERAL_PATTERN.test(panelColour);
+  let next = current;
+  if (hasPanelColour && (current === undefined || tokenNameOf(current) === 'surface')) next = panelColour;
+  else if (current === undefined && fallback) next = fallback;
+  if (next === current) return set;
+  return { ...set, tokens: { ...set.tokens, 'panel.surface': next } };
+}
+
+// Graphite, designed: what NEW panels start on (stores/runtimePreferences.js). Graphite itself is
+// the base set, the one every document that names no set is drawn in, and it has no designs so
+// that those documents keep their look; it is listed as Graphite Classic. This is a set like the
+// others: a panel on it names it, so a file made today keeps its look whatever the base set does.
+// It is Graphite (its greys and blue, its lettering, its lamp, its buttons and slider) with the
+// knob and meter Graphite's starter already drew with (the flat disc and the continuous bar: the
+// 'graphite' direction in models/controlSetCoverage.js), a panel a step darker than its controls
+// so they sit on it, a display in its own blue rather than the factory's green, and every design
+// the pipeline below derives.
+function designedGraphite(classic) {
+  // Every button letters in Graphite's face. The type block reaches the Button, the Momentary and
+  // the Toggle; the timed, one-shot, cycle and radio buttons stayed in the factory's, which Classic
+  // keeps as they were.
+  const legend = typeFamilies(classic.type).Button?.component ?? {};
+  const lettered = Object.fromEntries(['TimedButton', 'OneShotButton', 'CyclicButton', 'RadioButtonGroup']
+    .map((type) => [type, { ...classic.families[type], component: { ...legend, ...classic.families[type]?.component } }]));
+  return {
+    ...classic,
+    families: { ...classic.families, ...lettered },
+    id: 'graphite-studio',
+    name: 'Graphite',
+    description: 'The original greys and blue, designed: flat disc knobs, continuous bars, and its panel, sections, displays and instruments drawn in one hand.',
+    tokens: {
+      ...classic.tokens,
+      'display.lit': 'FF89C2FF',
+      'display.unlit': '1F89C2FF',
+      'display.screen': 'FF060709',
+      'display.backlight': 'FF0C1622',
+    },
+    panel: { colour: 'FF27292D' },
+  };
+}
+
 // Ember and Ivory began as colour-only sets; their mockup boards showed a chicken-head and a
 // black-bodied knob, and models/catalogControlSets.js carries those as extras. Graphite stays
 // exactly what it was: it is the look every existing document has.
@@ -272,16 +356,32 @@ const ORIGINAL_CONTROL_SETS = [
   ...BASE_BUILT_IN_SETS.map((set) => {
     const extras = CATALOG_SET_EXTRAS[set.id];
     return extras ? { ...set, ...extras, tokens: { ...set.tokens, ...(extras.tokens ?? {}) } } : set;
-  }),
+  }).flatMap((set) => (set.id === 'graphite' ? [set, designedGraphite(set)] : [set])),
   // Tolex and Machined: the pilot sets that reach beyond colour — a family patch each, a lamp, a
   // panel material. Defined in their own module because they are mostly data.
   ...PILOT_CONTROL_SETS,
   // And the rest of the boards.
   ...CATALOG_CONTROL_SETS,
 ];
-export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditionalControlSets(ORIGINAL_CONTROL_SETS)].map(extendControlSet);
+export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditionalControlSets(ORIGINAL_CONTROL_SETS)]
+  .map(extendControlSet)
+  .map((set) => withPanelSurface(set, { fallback: '{surface}' }))
+  // After panel.surface, which the label designs read to light their lettering.
+  .map(withLabelDesign)
+  // Then the sections, whose surface is the panel's moved a step from the lettering.
+  .map((set) => withSectionSurface(set, { fallback: '{surface}' }))
+  .map(withSectionDesign)
+  // And the instruments, in the set's display window and its series of voices.
+  .map(withInstrumentTokens)
+  .map(withInstrumentDesign)
+  // And the displays and shapes, in the set's readout and its section language.
+  .map(withDisplayDesign);
 
 export const DEFAULT_CONTROL_SET_ID = 'graphite';
+// What a new panel starts on unless the user chose otherwise (Settings → Control Sets). Not the
+// base set: a document that names no set is a document from before this, and stays on Classic.
+// stores/runtimePreferences.js holds the same id as its default, without importing the sets.
+export const NEW_PANEL_CONTROL_SET_ID = 'graphite-studio';
 
 // Svelte context key under which a surface that renders a panel of its own (the preview, the
 // Player) hands its controls the set to resolve against. A getter, so it follows the panel.
@@ -292,6 +392,15 @@ export const CONTROL_SET_LAMP_CONTEXT_KEY = 'ce.controlSetLamp';
 export const BASE_CONTROL_SET = BUILT_IN_CONTROL_SETS.find((set) => set.id === DEFAULT_CONTROL_SET_ID);
 
 const SETS_BY_ID = new Map(BUILT_IN_CONTROL_SETS.map((set) => [set.id, set]));
+// A built-in by its id, or by its name as duplication turns a name into an id ('Vintage Mono' is
+// brassworks; its copies are 'vintage-mono-copy').
+const slugOf = (text) => String(text ?? '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const BUILT_IN_BY_SLUG = new Map(BUILT_IN_CONTROL_SETS.map((set) => [slugOf(set.name), set.id]));
+export function builtInControlSetId(text) {
+  const key = String(text ?? '').trim();
+  if (SETS_BY_ID.has(key)) return key;
+  return BUILT_IN_BY_SLUG.get(slugOf(key)) ?? null;
+}
 
 /**
  * The set an id names. Three places can hold one, and the order is a rule, not an accident:
@@ -339,7 +448,24 @@ export function normalizeControlSetDefinition(value) {
   if (value.panel && typeof value.panel === 'object' && !Array.isArray(value.panel)) out.panel = value.panel;
   const type = normalizeControlSetType(value.type);
   if (type) out.type = type;
-  return out;
+  // A personal set's lineage and its author's choices (models/personalSetDesigns.js).
+  if (typeof value.basedOn === 'string' && value.basedOn.trim()) out.basedOn = value.basedOn.trim();
+  const plainStrings = (entry) => (entry && typeof entry === 'object' && !Array.isArray(entry)
+    ? Object.fromEntries(Object.entries(entry).filter(([, v]) => typeof v === 'string')) : null);
+  const chosen = plainStrings(value.chosenFamilies);
+  if (chosen && Object.keys(chosen).length) out.chosenFamilies = chosen;
+  // What the designs wrote on the last read, per family: key and value, or (as the label design kept
+  // it before values were recorded) a list of keys. An empty record is kept: it says the design wrote
+  // nothing its author had not already, which no record would not.
+  if (value.designed && typeof value.designed === 'object' && !Array.isArray(value.designed)) {
+    const designed = Object.fromEntries(Object.entries(value.designed)
+      .filter(([, record]) => record && typeof record === 'object')
+      .map(([family, record]) => [family, Array.isArray(record) ? record.filter((key) => typeof key === 'string') : { ...record }]));
+    if (Object.keys(designed).length) out.designed = designed;
+  }
+  // A set written before `panel.surface` existed still names its panel colour; that is the role.
+  // Then its designs, derived again from its own colours, the same way the built-ins' are.
+  return withPersonalDesigns(withPanelSurface(out), { builtInId: builtInControlSetId, isBuiltIn: (key) => SETS_BY_ID.has(key) });
 }
 
 /**
@@ -545,4 +671,23 @@ export function serializeControlSet(value) {
  */
 export function controlSetForPanel(panel, library = []) {
   return getControlSet(panel?.controlSet?.id, { document: panel?.controlSets, library }) ?? BASE_CONTROL_SET;
+}
+
+/**
+ * What a new panel starts on, given the user's default (Settings → Control Sets) and their
+ * library. The default may be one of the user's own sets, and a panel pointed at a library set
+ * has to carry a copy of it — the Player and the build have no library, so a set the document
+ * only names renders as the base set there. So a library default comes back as `controlSets` too,
+ * the same copy choosing it from the panel's picker would have put there. The library is looked
+ * at first, so an imported set that shares a built-in's id is the one carried, as it is the one
+ * the editor shows. A default nobody has (a library set deleted since) starts on the base set
+ * rather than on a name the new panel would only render as Graphite anyway.
+ */
+export function newPanelControlSet(defaultId, library = []) {
+  const id = normalizeControlSet(defaultId).id;
+  const librarySet = (Array.isArray(library) ? library : []).find((set) => set?.id === id);
+  const carried = librarySet ? normalizeControlSetDefinition(deepClone(librarySet)) : null;
+  if (carried) return { controlSet: { id }, controlSets: [carried] };
+  if (SETS_BY_ID.has(id)) return { controlSet: { id }, controlSets: [] };
+  return { controlSet: { id: DEFAULT_CONTROL_SET_ID }, controlSets: [] };
 }

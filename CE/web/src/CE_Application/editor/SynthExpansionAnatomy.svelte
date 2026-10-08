@@ -1,6 +1,6 @@
 <script>
   import {SYNTH_EXPANSION} from '../models/synthExpansionSets.js';
-  let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue}=$props();
+  let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue,caption=true} = $props();
   const uid=$props.id(), paint=n=>`url(#${uid}-${n})`;
   let cfg=$derived(SYNTH_EXPANSION.find(d=>d.id===design));
   let angle=$derived(-135+p*270);
@@ -87,5 +87,5 @@
       {:else}<path d="M38 23h84" stroke={ink} stroke-opacity=".2"/><rect x="66" y="28" width="28" height="4" rx="1" fill={active?accent:housing}/>{/if}
     </g>
   {/if}
-  <text x="80" y="95" fill={legend} text-anchor="middle" font-size="11">{label}</text>
+  {#if caption}<text x="80" y="95" fill={legend} text-anchor="middle" font-size="11">{label}</text>{/if}
 {/if}

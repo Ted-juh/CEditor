@@ -1,5 +1,5 @@
 <script>
-  let { design, knob, meter, toggle, p, active, face, ink, accent, housing, legend, depth, size, detail, readout, label, showValue } = $props();
+  let { design, knob, meter, toggle, p, active, face, ink, accent, housing, legend, depth, size, detail, readout, label, showValue, caption = true } = $props();
   const uid=$props.id();
   let angle=$derived(-135+p*270);
   const pt=(a,r,x=80,y=76)=>[x+Math.sin(a*Math.PI/180)*r,y-Math.cos(a*Math.PI/180)*r];
@@ -110,5 +110,5 @@
       <path d="M33 20H127V65H33Z" fill={face} stroke={ink}/><path d={active?'M50 17V36H110V17':'M50 6V25H110V6'} fill="none" stroke={accent} stroke-width="10"/>{#each [0,1,2,3,4] as i}<path d={`M${48+i*16} 50v20`} stroke={ink} stroke-width="5"/>{/each}
     {/if}
   </g>
-  <text x="80" y="95" text-anchor="middle" fill={legend} font-size="10">{label}{toggle?(active?' · ON':' · OFF'):''}</text>
+  {#if caption}<text x="80" y="95" text-anchor="middle" fill={legend} font-size="10">{label}{toggle?(active?' · ON':' · OFF'):''}</text>{/if}
 {/if}

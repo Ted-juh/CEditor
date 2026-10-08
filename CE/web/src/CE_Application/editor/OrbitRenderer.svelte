@@ -9,7 +9,7 @@
     orbitConfig, orbitPhase, orbitNodes, orbitGeometry, nodeToPx, nodeOutput,
   } from '../utils/orbitLayout.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, series = null } = $props();
 
   const PAD = 10;
   const TRAIL_STEPS = 14;      // comet-trail samples
@@ -26,6 +26,11 @@
   }
   function n(v, f = 0) { const x = Number(v); return Number.isFinite(x) ? x : f; }
   const NODE_PALETTE = ['rgba(57,217,138,1)', 'rgba(91,155,213,1)', 'rgba(242,153,74,1)', 'rgba(155,138,255,1)', 'rgba(242,201,76,1)', 'rgba(235,87,87,1)'];
+  // The set's series of voices (series.one to series.alert, models/instrumentDesigns.js), in
+  // this control's own order. Graphite's series is the palette above, so a panel that never
+  // chose a set is unchanged.
+  const SERIES_ORDER = [1, 3, 5, 4, 2, 6];
+  let palette = $derived(Array.isArray(series) && series.length >= 6 ? SERIES_ORDER.map((n, i) => css(series[n - 1], NODE_PALETTE[i])) : NODE_PALETTE);
 
   let cfg = $derived(orbitConfig(control));
   let phase = $derived(orbitPhase(control));
@@ -43,7 +48,7 @@
 
   // Per-satellite geometry: live px, colour, output value, spoke, comet trail.
   let sats = $derived.by(() => nodes.map((s, i) => {
-    const colour = s.colour ? css(s.colour) : NODE_PALETTE[i % NODE_PALETTE.length];
+    const colour = s.colour ? css(s.colour) : palette[i % palette.length];
     const here = nodeToPx(s, phase, geom);
     const out = s.enabled ? nodeOutput(s, phase) : 0;
     const r = 4 + out * 6;                        // radius grows with output

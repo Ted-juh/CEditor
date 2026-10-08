@@ -22,10 +22,17 @@ function knob(name, x, y, size = 64) {
   return createControl('Knob', { name, Transform: { x, y, width: size, height: size } });
 }
 
+// A caption: one line, scaled down only when it would not fit. The boxes were sized for Graphite's
+// 12px Arial, and a set's own lettering is often bolder, wider or letter-spaced (Tolex, Neon), so a
+// word that fitted there wrapped onto a second line here, and a 16px box cut it off. Even Graphite
+// lost "VOL" and "MOD": a 40px box less the factory's 8px a side left 24px for them. So the side
+// padding is 2px and the vertical padding none (the box is the line), and `shrink` covers any set
+// whose lettering is wider still.
 function label(content, x, y, w = 80, h = 18) {
   return createControl('Label', {
     Transform: { x, y, width: w, height: h },
-    Text: { content },
+    Text: { content, _children: { Multiline: { wrapMode: 'none', fitMode: 'shrink' } } },
+    ContentLayout: { paddingLeft: 2, paddingRight: 2, paddingTop: 0, paddingBottom: 0 },
   });
 }
 
@@ -58,12 +65,14 @@ export const PANEL_TEMPLATES = [
       knobs.forEach((name, i) => {
         const x = 32 + i * 110;
         controls.push(knob(name, x, 90));
-        controls.push(label(name, x - 8, 162, 80, 16));
+        // Centred under the knob, as wide as the 110px pitch allows with a gap between.
+        controls.push(label(name, x - 16, 162, 96, 16));
       });
       controls.push(slider('Volume', 500, 60, 40, 200));
       controls.push(slider('Mod', 560, 60, 40, 200));
-      controls.push(label('VOL', 500, 268, 40, 16));
-      controls.push(label('MOD', 560, 268, 40, 16));
+      // Centred under each fader, using the 60px pitch rather than the fader's 40.
+      controls.push(label('VOL', 492, 268, 56, 16));
+      controls.push(label('MOD', 552, 268, 56, 16));
       controls.push(createControl('MomentaryButton', {
         name: 'Init',
         Transform: { x: 32, y: 260, width: 110, height: 40 },

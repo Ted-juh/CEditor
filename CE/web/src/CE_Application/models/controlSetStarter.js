@@ -47,7 +47,7 @@ export function createControlSetStarter(setId, { materialize = true } = {}) {
     place('Matrix',540,466,166,100,{Matrix:{rows:['LFO','ENV','VEL'],cols:['OSC','FLT','AMP'],amounts:[.6,0,-.4,0,.7,0,0,.4,.8]}});
     place('VectorJoystick',728,466,124,100);
     label('Editable synthesizer controls — copy individual controls into your panel.',26,590,820,12);
-    return {...createPanel(),name:`${set.name} — starter`,width:880,height:636,description:direction.detail,controls,controlSet:{id:setId},modified:true};
+    return {...createPanel(),name:`${set.name} — starter`,width:880,height:636,description:direction.detail,controls,controlSet:{id:setId},controlSets:[],modified:true};
   }
   label(set.name.toUpperCase(), 26, 16, 650, 24);
   label(direction?.title ?? 'Control set', 26, 48, 650, 12);
@@ -84,5 +84,7 @@ export function createControlSetStarter(setId, { materialize = true } = {}) {
   }
   label('Copy a control into your panel. Its pinned design travels with it.', 26, 590, 820, 12);
   return { ...createPanel(), name: `${set.name} — starter`, width: 880, height: 636,
-    description: direction?.detail ?? set.description, controls, controlSet: { id: setId }, modified: true };
+    description: direction?.detail ?? set.description, controls, controlSet: { id: setId },
+    // A starter shows a built-in; it must not carry the user's library default along with it.
+    controlSets: [], modified: true };
 }
