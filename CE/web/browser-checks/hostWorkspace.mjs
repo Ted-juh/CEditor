@@ -359,8 +359,36 @@ try {
   assert.match(await page.getByTestId('product-data-folder').innerText(), /products\/8F3A6C2E/,
     'and the Product utility says where this product keeps its data');
 
+  // Build product, the creator's (step 5). The preview stands in for CEditor's tab: programs to
+  // build from, no Inno Setup. It says so before the button, builds the folder, and asks for a
+  // Creator licence only when the build has the key.
+  await page.getByTestId('host-utility-project').click();
+  assert.match(await page.getByTestId('host-build-needs').innerText(), /Inno Setup 6 was not found/,
+    'without Inno Setup, the installer is said to be the part it skips');
+  assert.equal(await page.getByTestId('creator-licence').count(), 0, 'no licence asked for without the key');
+  await page.getByTestId('host-build').click();
+  assert.match(await page.getByTestId('host-build-log').innerText(), /Built as a folder/);
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostState.update((s) => ({ ...s, creator: { ...s.creator,
+      licence: { required: true, licensed: false, licensee: '', detail: 'No Creator licence is installed.' } } }));
+  });
+  assert.ok(await page.getByTestId('host-build').isDisabled(), 'with the key and no licence, nothing is built');
+  const installLicence = page.getByTestId('creator-licence-install');
+  assert.ok(await installLicence.isDisabled(), 'nothing pasted, nothing to install');
+  await page.getByTestId('creator-licence-text').fill('{"licence":{}}');
+  assert.ok(await installLicence.isEnabled());
+  await page.evaluate(async () => {
+    const store = await import('/src/CE_Application/stores/instrumentHost.js');
+    store.hostState.update((s) => ({ ...s, creator: { ...s.creator, available: false } }));
+  });
+  assert.equal(await page.getByTestId('host-utility-project').count(), 0, 'a HoSTage program has no Project utility');
+  assert.match(await page.getByTestId('host-build-elsewhere').innerText(), /built in CEditor/,
+    'and, reached anyway, says where products are made');
+  await page.getByTestId('host-utility-close').click();
+
   assert.deepEqual(errors, [], 'no uncaught page errors');
-  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros, returns, bus effects, Try as player, shows, making a player and the data folder work as drawn');
+  console.log('hostWorkspace: the dock, select-all, transport, Params, Zone, part rows, mixer, macros, returns, bus effects, Try as player, shows, making a player, the data folder and Build product work as drawn');
 } finally {
   await browser.close();
   await server.close();

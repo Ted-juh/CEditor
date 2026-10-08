@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <deque>
 #include <functional>
 #include <cstddef>
@@ -20,7 +21,7 @@
 #include "SetlistSoundcheck.h"
 #include "ParameterModel.h"
 #include "Library.h"
-#include "PlayerCreator.h"
+#include "ProductBuilder.h"
 #include "LibraryStore.h"
 #include "SnapshotStore.h"
 #include "RecentPlay.h"
@@ -78,8 +79,12 @@
 //   getHostProject | setHostProject {productName?,version?,publisher?,includeStandalone?,
 //     includeVst3?} | buildHostProduct {outputDirectory?}
 //     (both project commands answer with instrumentHostProject; the appId is minted once and
-//      never writable from the page — installer identity survives every rename. Building goes
-//      through Options::runBuild; without the hook the command refuses aloud.)
+//      never writable from the page — installer identity survives every rename. Building is
+//      the creator's (Options::creator): the programs copied into a product folder and Inno
+//      Setup run over it when it is there, on a thread, printing instrumentHostBuildProgress
+//      lines; without outputDirectory it asks for a folder. Elsewhere it refuses aloud.)
+//   installCreatorLicence {text | path} | removeCreatorLicence
+//     (the Creator licence that Build product needs when a key is compiled in; state.creator)
 //   getParameters {partId} | setParameter {partId,id,value} | resetParameter {partId,id}
 //   beginParameterGesture {partId,id} | endParameterGesture {partId,id}
 //     (the Stage 2 parameter model: getParameters answers with instrumentHostParameters —
@@ -383,10 +388,22 @@ public:
         // into the library. Default (nullptr) = run it inline, which is what a test with an
         // inline executor wants and what an app must NOT leave unset.
         std::function<void (std::function<void()>)> onControlThread;
-        // Launches the Host Project build pipeline (the app streams a node child process;
-        // tests capture the call). Absent = building is not available in this build, and
-        // buildHostProduct says so instead of doing nothing.
-        std::function<void (const juce::var& project, const juce::String& outputDirectory)> runBuild;
+        // -- Build product: the creator's (ProductBuilder.h) --------------------------------
+        /** This program builds products: CEditor's Hostage tab, the creator. A HoSTage program
+            is not one (it makes players), and buildHostProduct says where products are built.
+            What a product is copied from is playerTemplate, the same programs a player is. */
+        bool creator = false;
+        /** tools/installer/HostProductTemplate.iss, the installer's script. Not there: products
+            are built as their folders, and the build says the installer is what it skipped. */
+        juce::File installerScript;
+        /** Inno Setup's compiler. Empty: looked for where Inno Setup installs it
+            (product::findInnoCompiler). A file that is not there: none, which is what a test
+            that wants the folder alone passes. */
+        juce::File innoCompiler;
+        /** The public half of the key Creator licences are signed with (CEditorLicenceTool
+            keypair), compiled into the creator. Empty: this build asks for no Creator licence
+            and Build product is open, which is every build until the owner sets one. */
+        juce::String creatorPublicKey;
         // Opens the native directory picker and calls back with the chosen path — empty for
         // cancel. The app provides an async FileChooser; absent (tests, plain browser) makes
         // browseScanPath refuse aloud rather than silently do nothing.
@@ -2015,6 +2032,38 @@ private:
     PlayerResult lastPlayer;            // the last one finished, for the page
     bool playerBusy = false;
     bool playerHasStandalone = false, playerHasVst3 = false;   // the template, looked at once
+
+    // -- building products (ProductBuilder.h) ---------------------------------------------
+    // The creator's Build product: the programs copied into a product folder, then Inno Setup
+    // over it when it is there, both on a thread of their own. What the build prints is queued
+    // under the lock and sent to the page from the pump, as instrumentHostBuildProgress lines.
+    struct ProductResult
+    {
+        bool done = false, ok = false;
+        juce::String name, folder, installer, message;
+    };
+    void buildHostProduct (const juce::var& payload);
+    void startProductBuild (product::Request request);
+    void tickProductBuild();
+    void emitBuildLine (const juce::String& line, bool done, bool ok);
+    juce::File innoCompiler() const;
+    juce::var creatorPayload();
+    std::thread productThread;
+    std::mutex productLock;
+    juce::StringArray productLines;     // printed by the build thread, not yet sent; under the lock
+    ProductResult productResult;        // written by the build thread, under the lock
+    ProductResult lastProduct;          // the last one finished, for the page
+    std::atomic<bool> productStop { false };   // the service is going: stop Inno Setup
+    bool productBusy = false;
+    bool creatorHasInstaller = false;   // Inno Setup and the script, looked at when the page asks
+    bool creatorHasHelpers = false;     // the scanner and the worker, which every product needs
+
+    /** The Creator licence (docs/design/hostage-creator-editor-player.md, step 5): a licence
+        for the creator's own product id, verified against options.creatorPublicKey and kept in
+        the data folder's creator/. Only asked for when a key is compiled in. */
+    std::unique_ptr<licensing::LicenceStore> creatorLicence;
+    licensing::LicenceStore& ensureCreatorLicence();
+    bool creatorLicenceRequired() const { return options.creatorPublicKey.isNotEmpty(); }
 
     juce::String legacyDecision;        // as legacy-data.json says
     juce::StringArray legacyFailed;     // what the copy could not bring over

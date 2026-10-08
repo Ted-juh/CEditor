@@ -27,6 +27,7 @@
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor, floatEditor, closeEditorWindow,
     requestAudioDevices, setAudioDevice, setMidiInputEnabled, setMackieSection,
     hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct, setTryAsPlayer,
+    creatorCanBuild, installCreatorLicence, removeCreatorLicence,
     adoptLegacyData, declineLegacyData,
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
     parameterControlKind, setParameterText, groupParameters, assignedParameterIds, parameterPlaces, isBipolarParameter, quickLearnParameter,
@@ -146,6 +147,9 @@
   // as one, or the editor trying its show — makes no screens or pages and does not build; the
   // host refuses those commands, and these hide the buttons that would only be refused.
   let player = $derived($hostState.player === true);
+  // Build product is the creator's (CEditor's tab), not a HoSTage program's: those make players.
+  let creator = $derived($hostState.creator);
+  let creatorLicenceText = $state('');
   let legacyData = $derived($hostState.product.data);
   let playerInstalled = $derived($hostState.playerInstalled === true);
   const hostUtilities = [
@@ -773,7 +777,7 @@
     </div>
     <div class="utility-tabs" role="group" aria-label="Utilities">
       <span class="navigation-label">Utilities</span>
-      {#each hostUtilities.filter((u) => !(player && u.id === 'project')) as utility (utility.id)}
+      {#each hostUtilities.filter((u) => !(u.id === 'project' && (player || !creator.available))) as utility (utility.id)}
         <button type="button" class="utility-tab" class:on={activeUtility === utility.id}
                 class:warn={utility.id === 'health'
                             && ($hostState.reliability.recovery.interrupted
@@ -895,17 +899,53 @@
     <HostLibraryPanel onShowSounds={showSounds} />
   {/if}
 
-  {#if activeUtility === 'project' && !player}
+  {#if activeUtility === 'project' && !player && !creator.available}
+    <p class="project-note project-elsewhere" data-testid="host-build-elsewhere">
+      Products are built in CEditor, the HoSTage creator. This HoSTage makes players instead: Shows,
+      Make a player.
+    </p>
+  {/if}
+
+  {#if activeUtility === 'project' && !player && creator.available}
     <div class="project-panel" aria-label="Host Project">
-      <!-- Said before the button, not after it fails: the build packages HoSTage programs that a
-           source checkout has already built (tools/scripts/build-host-product.mjs compiles nothing),
-           so an installed CEditor answers "Node.js is required…" or a missing build folder. -->
+      <!-- Said before the button, not after it fails (ProductBuilder.h): what a build makes, from
+           what, and the one part that needs more than CEditor, Inno Setup for the installer. -->
       <p class="project-note" data-testid="host-build-needs">
-        Build product packages this rack with HoSTage's own programs, as a standalone app and a VST3
-        with an installer. It needs a developer set-up: Node.js, and a CEditor source checkout with
-        the host already built; the installer step also needs Inno Setup. The installed CEditor
-        cannot build a product yet.
+        Build product makes this rack a product of its own: HoSTage's programs under the product's
+        name, as a standalone and a VST3, with the show you are running. It goes in a folder you
+        choose{#if creator.installer}, with its installer{/if}.
+        {#if !creator.standalone && !creator.vst3}
+          <span data-testid="host-build-nothing">This CEditor has no HoSTage programs to build from. An
+          installed CEditor has them in its templates folder; in a source checkout, build
+          CEHostStandalone and CEHostVST3 first.</span>
+        {:else if !creator.helpers}
+          <span data-testid="host-build-helpers">The plug-in scanner or the live plug-in worker is missing
+          beside CEditor, and every product needs both.</span>
+        {:else if !creator.installer}
+          <span data-testid="host-build-no-installer">Inno Setup 6 was not found, so a build is the folder
+          without an installer. Install Inno Setup 6 (free, from jrsoftware.org) for one; the folder
+          runs either way.</span>
+        {/if}
       </p>
+      {#if creator.licence.required}
+        <!-- The Creator licence: asked for only by a build with the vendor's key compiled in. -->
+        <div class="project-licence" data-testid="creator-licence">
+          {#if creator.licence.licensed}
+            <span class="project-note">Creator licence: {creator.licence.detail}</span>
+            <button type="button" data-testid="creator-licence-remove"
+                    onclick={() => removeCreatorLicence()}>Remove licence</button>
+          {:else}
+            <span class="project-note">Building a product needs a Creator licence. {creator.licence.detail}</span>
+            <textarea bind:value={creatorLicenceText} rows="3" spellcheck="false"
+                      data-testid="creator-licence-text"
+                      placeholder="Paste the contents of your Creator .celicence file"></textarea>
+            <button type="button" data-testid="creator-licence-install" disabled={!creatorLicenceText.trim()}
+                    onclick={() => { installCreatorLicence(creatorLicenceText); creatorLicenceText = ''; }}>
+              Install licence
+            </button>
+          {/if}
+        </div>
+      {/if}
       <div class="project-fields">
         <label class="project-field">Product name
           <input type="text" value={$hostProject.productName}
@@ -924,23 +964,24 @@
                           onchange={(v) => setHostProject({ includeStandalone: v })} />
           <PropertyToggle compact label="VST3" value={$hostProject.includeVst3}
                           onchange={(v) => setHostProject({ includeVst3: v })} />
-          <!-- The authored rack ships inside the product, and a setlist item's notes are the
-               one piece of personal prose in it — "what the player needs to read on stage".
-               Off unless asked for: a build that published them cannot be taken back. -->
+          <!-- The show ships inside the product, and a setlist item's notes are the one piece of
+               personal prose in it — "what the player needs to read on stage". Off unless asked
+               for: a build that published them cannot be taken back. -->
           <PropertyToggle compact label="Stage notes" value={$hostProject.includeStageNotes}
                           ariaLabel="Include my setlist stage notes in the built product"
                           onchange={(v) => setHostProject({ includeStageNotes: v })} />
         </span>
         <button type="button" class="project-build" data-testid="host-build"
-                disabled={$hostBuild.running} onclick={() => buildHostProduct()}>
-          {$hostBuild.running ? 'Building…' : 'Build product'}
+                disabled={!creatorCanBuild(creator)} onclick={() => buildHostProduct()}>
+          {creator.busy ? 'Building…' : 'Build product…'}
         </button>
       </div>
       <!-- Identity is minted, not authored — shown so support can match an installer to a
            project, never editable (a changed AppId splits upgrades into a second install). -->
       <span class="project-appid">Installer identity: {$hostProject.appId || '(minted on first save)'}</span>
       {#if $hostBuild.lines.length > 0}
-        <pre class="project-build-log" class:failed={$hostBuild.done && !$hostBuild.ok}>{$hostBuild.lines.join('\n')}</pre>
+        <pre class="project-build-log" data-testid="host-build-log"
+             class:failed={$hostBuild.done && !$hostBuild.ok}>{$hostBuild.lines.join('\n')}</pre>
       {/if}
     </div>
   {/if}
@@ -2563,6 +2604,14 @@
     white-space: pre-wrap;
   }
   .project-build-log.failed { color: #e4b3b3; border-color: #7a4a4a; }
+  .project-elsewhere { margin: 8px 14px 0; }
+  .project-licence { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; max-width: 60em; }
+  .project-licence textarea {
+    width: 100%;
+    font-size: 11px;
+    font-family: var(--host-font-mono);
+    resize: vertical;
+  }
 
   .host-error {
     display: flex;

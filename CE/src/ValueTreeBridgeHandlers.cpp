@@ -309,77 +309,6 @@ private:
     juce::String pending;
 };
 
-/**
- * Streams a `node tools/scripts/build-host-product.mjs` run — the Host Project build
- * (Hostage). Same shape as VstBuildJob/ToolchainJob above; the events ride the
- * instrument host's own channel: every line -> "instrumentHostBuildProgress" { line, done:false },
- * terminal -> { line: summary, done:true, ok }. One event stream, one UI listener, mirroring how
- * the scanner reports.
- */
-class HostBuildJob : public juce::Timer
-{
-public:
-    HostBuildJob (juce::WebBrowserComponent* browserToUse, const juce::StringArray& command)
-        : browser (browserToUse)
-    {
-        emitLine ("$ " + command.joinIntoString (" "), false, false);
-        if (! process.start (command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr))
-        {
-            emitLine ("Failed to launch node (the build process could not start).", true, false);
-            return;   // timer never starts — isTimerRunning() stays false, so a retry is allowed
-        }
-        startTimerHz (8);
-    }
-
-private:
-    void timerCallback() override
-    {
-        char buffer[1 << 14];
-        for (;;)
-        {
-            const int n = process.readProcessOutput (buffer, (int) sizeof (buffer));
-            if (n <= 0) break;
-            pending += juce::String::fromUTF8 (buffer, n);
-        }
-        flushLines (false);
-        if (! process.isRunning())
-        {
-            flushLines (true);
-            stopTimer();
-            const int code = process.getExitCode();
-            emitLine (code == 0 ? juce::String ("Host product build finished.")
-                                : ("Host product build failed (exit code " + juce::String (code) + ")."),
-                      true, code == 0);
-        }
-    }
-
-    void flushLines (bool flushRemainder)
-    {
-        for (int nl; (nl = pending.indexOfChar ('\n')) >= 0; )
-        {
-            emitLine (pending.substring (0, nl).trimEnd(), false, false);
-            pending = pending.substring (nl + 1);
-        }
-        if (flushRemainder && pending.trim().isNotEmpty()) { emitLine (pending.trimEnd(), false, false); pending.clear(); }
-    }
-
-    void emitLine (const juce::String& line, bool done, bool ok)
-    {
-        if (browser == nullptr || (line.isEmpty() && ! done))
-            return;
-        auto* obj = new juce::DynamicObject();
-        obj->setProperty ("line", line);
-        obj->setProperty ("done", done);
-        if (done)
-            obj->setProperty ("ok", ok);
-        browser->emitEventIfBrowserIsVisible ("instrumentHostBuildProgress", juce::var (obj));
-    }
-
-    juce::WebBrowserComponent* browser = nullptr;
-    juce::ChildProcess process;
-    juce::String pending;
-};
-
 // Resolve the root that holds the export pipeline (tools/scripts/export-panel-vst3.mjs). A dev build
 // runs from a source checkout (CEDITOR_SOURCE_ROOT / cwd); an installed build has tools/ staged beside
 // the executable. Try, in order: the executable's dir (and its parent), the compile-time source root,
@@ -1785,11 +1714,28 @@ void ValueTreeBridge::ensureInstrumentHost()
     // tab's own folder, the tab and a running product both drove the CTRL49 — two racks on one
     // keyboard, the thing the claim exists to prevent.
     options.hardwareClaimDirectory = ceditor::host::hostDataRoot();
-    // A player made here is copied from what CMake built (PlayerCreator.h): CEditor's own
-    // installer does not ship the host programs yet, so outside a source checkout there is
-    // nothing to copy and the Shows utility says so.
-    options.playerTemplate = ceditor::host::player::findTemplateInBuildTree (
-        ceditorSourceRoot().getChildFile ("build").getChildFile ("native"));
+    // This tab is the creator (docs/design/hostage-creator-editor-player.md, step 5): it builds
+    // products, and makes players, by copying HoSTage's programs. An installed CEditor ships them
+    // in templates/hostage (package-installer.ps1), with the scanner and worker CEditor itself
+    // uses beside it; a source checkout has what CMake built. The installer's script is in
+    // tools/ in both, and Inno Setup is used when it is installed.
+    {
+        namespace player = ceditor::host::player;
+        const auto root = ceditorSourceRoot();
+        const auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+        auto found = player::findInstalledTemplate (root.getChildFile ("templates").getChildFile ("hostage"), exeDir);
+        if (! found.hasStandalone() && ! found.hasVst3())
+            found = player::findTemplateInBuildTree (root.getChildFile ("build").getChildFile ("native"));
+        options.playerTemplate = found;
+        options.creator = true;
+        options.installerScript = root.getChildFile ("tools").getChildFile ("installer")
+                                      .getChildFile ("HostProductTemplate.iss");
+       #if defined (CEDITOR_CREATOR_PUBLIC_KEY)
+        // Set at configure time (CEDITOR_CREATOR_PUBLIC_KEY_FILE); without it Build product
+        // asks for no Creator licence.
+        options.creatorPublicKey = CEDITOR_CREATOR_PUBLIC_KEY;
+       #endif
+    }
     options.workerExecutable = findScannerWorker();
 
     // May fire from the scan thread; callAsync is the marshal. `this` raw is this file's
@@ -1927,54 +1873,6 @@ void ValueTreeBridge::ensureInstrumentHost()
     options.onControlThread = [] (std::function<void()> work)
     {
         juce::MessageManager::callAsync (std::move (work));
-    };
-
-    // The Host Project build: the node pipeline as a streamed child process, one at a time.
-    // The service already validated the manifest; the persisted file is what the script reads,
-    // and every manifest mutation saves before this can run.
-    options.runBuild = [this, dataDir = options.dataDirectory]
-                       (const juce::var&, const juce::String& outputDirectory)
-    {
-        const auto emitHostError = [this] (const juce::String& message)
-        {
-            auto* obj = new juce::DynamicObject();
-            obj->setProperty ("message", message);
-            if (browser != nullptr)
-                browser->emitEventIfBrowserIsVisible ("instrumentHostError", juce::var (obj));
-        };
-
-        if (hostBuildJob != nullptr && hostBuildJob->isTimerRunning())
-        {
-            emitHostError ("A host product build is already running.");
-            return;
-        }
-
-        const auto node = findNodeExecutable();
-        if (node == juce::File())
-        {
-            emitHostError ("Node.js is required to build the host product and was not found.");
-            return;
-        }
-
-        const auto root = ceditorSourceRoot();
-        const auto out = outputDirectory.isNotEmpty() ? juce::File (outputDirectory)
-                                                      : dataDir.getChildFile ("build-output");
-        const juce::StringArray command {
-            node.getFullPathName(),
-            root.getChildFile ("tools").getChildFile ("scripts")
-                .getChildFile ("build-host-product.mjs").getFullPathName(),
-            "--project",     dataDir.getChildFile ("host-project.json").getFullPathName(),
-            // The editor's preview session IS the authored rack; it ships as the product's
-            // factory Performance (the script skips it gracefully when none exists yet).
-            "--performance", dataDir.getChildFile ("session-performance.json").getFullPathName(),
-            // The show the service wrote just before calling this: the rack with every sound
-            // its songs point at (HostShow.h). When it is there it ships instead of the rack.
-            "--show",        dataDir.getChildFile ("product-show.hostageshow").getFullPathName(),
-            "--build-dir",   root.getChildFile ("build").getChildFile ("native").getFullPathName(),
-            "--config",      "Release",
-            "--out",         out.getFullPathName(),
-        };
-        hostBuildJob = std::make_unique<HostBuildJob> (browser, command);
     };
 
     instrumentHost = std::make_unique<ceditor::host::InstrumentHostService> (std::move (options));

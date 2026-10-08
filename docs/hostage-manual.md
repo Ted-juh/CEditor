@@ -719,8 +719,6 @@ for them in the player's Library utility.
 > - A player has no licence of its own yet, so it runs as the Free edition: one instrument at a
 >   time.
 > - It makes a folder, not an installer.
-> - **Make a player** needs HoSTage's own programs to copy. The HoSTage tab in an installed CEditor
->   does not have them yet, and says "There is nothing here to copy".
 
 ### Library
 
@@ -739,17 +737,51 @@ beside the rack rather than in the drawer.
 
 ### Project
 
-Turns your rack into a product of its own: a standalone program and a VST3 plugin, with an installer.
-Fill in the **Product name**, **Version** and **Publisher**, choose **Standalone**, **VST3** and
-**Stage notes**, and press **Build product**.
+**Build product** turns your rack into a product of its own: a standalone program and a VST3
+plugin under your product's name, and an installer for them. Products are built in CEditor's
+HoSTage tab; a HoSTage program has no Project utility, because it makes [players](#make-a-player)
+instead. CEditor has everything it needs for the build. Only the installer needs one more thing,
+Inno Setup (below).
+
+1. Fill in the **Product name**, the **Version** (numbers with dots, such as `1.0.0`) and the
+   **Publisher**. A name or publisher cannot contain `"`, `{` or `}`.
+2. Choose **Standalone**, **VST3** and **Stage notes**.
+3. Press **Build product…** and choose a folder.
+
+A folder named after the product and its version is made in it, for example `Night Rack 2.0.0`.
+Building the same version again makes `Night Rack 2.0.0 2` rather than writing over the first. The
+folder holds:
+
+- **Standalone**: the program under the product's name, with its helpers and its show. It runs from
+  this folder as it is.
+- **VST3**: the product as a plugin.
+- **Read me.txt**, which says what the folder is.
+- **NightRack-Setup-2.0.0.exe**: the installer (the name without spaces or punctuation, then the
+  version). It installs the program, adds it to the Start menu and puts the plugin in the
+  computer's VST3 folder.
+
+The build is shown underneath as it happens, and HoSTage says where the product is when it has
+finished: "Built "Night Rack": …".
 
 The product starts with the show you are running: the rig and every sound its songs use. It lists
 that show among its [shows](#shows) as **built in**. Stage notes go with it only when **Stage notes**
 is ticked.
 
-> **Not finished yet:** **Build product** needs Node.js and a copy of the CEditor source code with the
-> host already built; the installed CEditor has neither, so it reports "Node.js is required…". The
-> installer step needs Inno Setup.
+**The installer needs Inno Setup 6**, which is free, from jrsoftware.org. Without it, the build makes
+the folder and says that the installer is the part it skipped. The folder works as it is, and
+building again after installing Inno Setup adds the installer. The utility says before you press
+the button whether Inno Setup was found.
+
+**The Creator licence.** A CEditor built to require one asks for a **Creator licence** before it
+builds. Paste the contents of your `.celicence` file into the box, and press **Install licence**.
+**Remove licence** takes it off this computer. The beta does not ask for one.
+
+> **Not finished yet:**
+>
+> - Products are built on Windows. On other systems HoSTage has no live plugin worker, which every
+>   product needs, so the build says the worker is missing.
+> - Every product is the same plugin to a DAW, as every player is, so install one product's VST3 at
+>   a time.
 
 ### Product
 
@@ -813,6 +845,9 @@ renaming a product keeps its rig. A file in the folder, `product.json`, names th
 Product utility shows the folder under **This machine**. Two products on one computer keep
 separate rigs, plugin lists, sound libraries and licences.
 
+**The Creator licence** is kept in `creator\` inside CEditor's HoSTage folder, apart from the
+HoSTage tab's own licence.
+
 **A player made for a USB stick** keeps everything in a `Data` folder beside its program instead,
 so it travels with it. The claim on the CTRL49 stays on each computer.
 
@@ -844,7 +879,8 @@ go, and the others leave it alone.
 - **Limits**: 8 MIDI modules per part, 128 modulation routes, 32 of each modulation source, 32 layers
   of 8 instruments, 20 undo steps.
 - **Tuning** works only with instruments that support MIDI Tuning Standard messages.
-- **Build product** works only from a CEditor source checkout (see [Project](#project)).
+- **Build product** makes an installer only where Inno Setup 6 is installed, and builds only on
+  Windows (see [Project](#project)).
 - **Shows** carry the sounds you saved yourself and every captured rack. A vendor's preset file is
   not copied: the other computer needs the same preset, scanned into its library.
 - **Players** share one plugin identity in a DAW, and run as the Free edition until players get

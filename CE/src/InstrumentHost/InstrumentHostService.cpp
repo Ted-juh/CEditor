@@ -76,6 +76,12 @@ InstrumentHostService::InstrumentHostService (Options optionsToUse)
     loadShowState();
     playerHasStandalone = options.playerTemplate.hasStandalone();
     playerHasVst3 = options.playerTemplate.hasVst3();
+    if (options.creator)
+    {
+        const auto helpers = player::helperNames (options.playerTemplate);
+        creatorHasHelpers = helpers.contains ("CEditorPluginScanner") && helpers.contains ("CEditorPluginWorker");
+        creatorHasInstaller = options.installerScript.existsAsFile() && innoCompiler().existsAsFile();
+    }
 
     ctrl49::registerCtrl49Profile();
     loadMackieSection();
@@ -126,6 +132,9 @@ InstrumentHostService::~InstrumentHostService()
     }
     if (playerThread.joinable())
         playerThread.join();   // a player half-copied is removed by the copy itself on failure
+    productStop = true;        // Inno Setup is stopped; a copy finishes, or undoes itself
+    if (productThread.joinable())
+        productThread.join();
     *alive = false;
     if (options.editorWindows.closeAll != nullptr)
         options.editorWindows.closeAll();
@@ -204,6 +213,7 @@ namespace
             "learnControlSlotParameter", "quickLearnParameter", "setFaderLayers", "setPadLayers",
             "setUserSurface", "clearUserSurface", "learnUserSurface", "finishUserSurfaceLearn",
             "setHostProject", "buildHostProduct", "createPlayer",
+            "installCreatorLicence", "removeCreatorLicence",
         };
         if (editorOnly.contains (command))
             return true;
@@ -221,7 +231,8 @@ namespace
 
     juce::String editorOnlyRefusal (const juce::String& command)
     {
-        if (command == "setHostProject" || command == "buildHostProduct" || command == "createPlayer")
+        if (command == "setHostProject" || command == "buildHostProduct" || command == "createPlayer"
+            || command.endsWith ("CreatorLicence"))
             return "Building belongs to the HoSTage editor; a player cannot build.";
         return "Screens and control pages are made in the HoSTage editor; a player shows them and "
                "cannot change them ('" + command + "').";
@@ -2403,6 +2414,12 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         ensureHostProject();
         emitHostProject();
+        // Looked at again whenever the Project utility opens: Inno Setup may have been
+        // installed since, and the page says whether a build will make an installer.
+        const auto hadInstaller = creatorHasInstaller;
+        creatorHasInstaller = options.installerScript.existsAsFile() && innoCompiler().existsAsFile();
+        if (hadInstaller != creatorHasInstaller)
+            emitState();
         return;
     }
 
@@ -2457,39 +2474,32 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "buildHostProduct")
     {
-        ensureHostProject();
+        buildHostProduct (payload);
+        return;
+    }
 
-        if (options.runBuild == nullptr)
-        {
-            emitError ("Building is not available in this build.");
-            return;
-        }
+    if (cmd == "installCreatorLicence")
+    {
+        // As installLicence: the text of the file, or a path to it.
+        auto text = payload.getProperty ("text", {}).toString();
+        if (text.isEmpty())
+            if (const auto path = payload.getProperty ("path", {}).toString(); path.isNotEmpty())
+                text = juce::File (path).loadFileAsString();
+        if (! options.creator)
+            emitError ("Products are built in CEditor, the HoSTage creator; this program has no use for a Creator licence.");
+        else if (! creatorLicenceRequired())
+            emitError ("This CEditor does not ask for a Creator licence; Build product is open.");
+        else if (const auto failure = ensureCreatorLicence().install (text); failure.isNotEmpty())
+            emitError (failure);
+        emitState();
+        return;
+    }
 
-        const auto name = hostProject.getProperty ("productName", {}).toString().trim();
-        if (name.isEmpty())
-        {
-            emitError ("The Host Project needs a product name before it can build.");
-            return;
-        }
-        if (! (bool) hostProject.getProperty ("includeStandalone", true)
-            && ! (bool) hostProject.getProperty ("includeVst3", true))
-        {
-            emitError ("The Host Project has no targets enabled — nothing to build.");
-            return;
-        }
-
-        // The product ships the show this editor is running, sounds and all — not just the
-        // rack, whose songs would arrive pointing at a library the product does not have. Stage
-        // notes stay out unless the Host Project asks for them, as they always have.
-        const auto productShow = options.dataDirectory.getChildFile ("product-show" + show::extension());
-        if (! writeShow (productShow, name, (bool) hostProject.getProperty ("includeStageNotes", false)))
-        {
-            emitError ("Could not write the show to build into the product, at "
-                       + productShow.getFullPathName() + ".");
-            return;
-        }
-
-        options.runBuild (hostProject, payload.getProperty ("outputDirectory", {}).toString());
+    if (cmd == "removeCreatorLicence")
+    {
+        if (options.creator && creatorLicenceRequired())
+            ensureCreatorLicence().remove();
+        emitState();
         return;
     }
 
@@ -18059,6 +18069,7 @@ void InstrumentHostService::drainParameterEvents()
 {
     tickShowSave();
     tickPlayerCreation();
+    tickProductBuild();
     followPresetPages();
     drainProcessorFailures();
     tickAutomaticFailover();
@@ -19285,6 +19296,7 @@ juce::var InstrumentHostService::buildStatePayload()
     root->setProperty ("playerInstalled", options.player);
     root->setProperty ("shows", showsPayload());
     root->setProperty ("players", playersPayload());
+    root->setProperty ("creator", creatorPayload());
     root->setProperty ("product", productPayload());
     root->setProperty ("reliability", reliabilityPayload());
     root->setProperty ("licence", licencePayload());
@@ -20289,6 +20301,12 @@ void InstrumentHostService::createPlayer (const juce::var& payload)
 
 void InstrumentHostService::startPlayerCreation (player::Request request)
 {
+    // Again here, for the same reason as startProductBuild: two choosers, one copy at a time.
+    if (playerBusy)
+    {
+        emitError ("A player is already being made. Wait for it to finish.");
+        return;
+    }
     const auto plan = player::plan (options.playerTemplate, request);
     if (! plan.problems.isEmpty())
     {
@@ -20355,6 +20373,278 @@ juce::var InstrumentHostService::playersPayload() const
         last->setProperty ("folder", lastPlayer.folder);
         last->setProperty ("message", lastPlayer.message);
         last->setProperty ("notes", notes);
+        root->setProperty ("last", juce::var (last));
+    }
+    return juce::var (root);
+}
+
+// -- building products (ProductBuilder.h) ------------------------------------------------------
+// The creator's Build product. The programs are the ones a player is made of; a product gets the
+// editor's manifest, the Host Project's identity and the show this editor is running, and an
+// installer when Inno Setup is there to make one. Elsewhere than the creator it is refused.
+
+juce::File InstrumentHostService::innoCompiler() const
+{
+    return options.innoCompiler != juce::File() ? options.innoCompiler : product::findInnoCompiler();
+}
+
+licensing::LicenceStore& InstrumentHostService::ensureCreatorLicence()
+{
+    // Its own folder: the data folder's licence.celicence is the Hostage tab's product licence.
+    if (creatorLicence == nullptr)
+        creatorLicence = std::make_unique<licensing::LicenceStore> (options.dataDirectory.getChildFile ("creator"),
+                                                                    options.creatorPublicKey,
+                                                                    product::creatorProductId);
+    return *creatorLicence;
+}
+
+void InstrumentHostService::emitBuildLine (const juce::String& line, bool done, bool ok)
+{
+    if (options.emit == nullptr || (line.isEmpty() && ! done))
+        return;
+    auto* progress = new juce::DynamicObject();
+    progress->setProperty ("line", line);
+    progress->setProperty ("done", done);
+    if (done)
+        progress->setProperty ("ok", ok);
+    options.emit ("instrumentHostBuildProgress", juce::var (progress));
+}
+
+void InstrumentHostService::buildHostProduct (const juce::var& payload)
+{
+    ensureHostProject();
+    if (! options.creator)
+    {
+        emitError ("Products are built in CEditor, the HoSTage creator. This HoSTage makes players "
+                   "instead: Shows, Make a player.");
+        return;
+    }
+    if (productBusy)
+    {
+        emitError ("A product is already being built. Wait for it to finish.");
+        return;
+    }
+    if (creatorLicenceRequired() && ! ensureCreatorLicence().status().verified())
+    {
+        emitError ("Building a product needs a Creator licence. Install it in the Project utility.");
+        return;
+    }
+
+    // Everything that would stop it is said before a folder is asked for.
+    product::Request request;
+    request.project = product::Project::fromVar (hostProject);
+    if (const auto problems = product::problemsWith (options.playerTemplate, request, false); ! problems.isEmpty())
+    {
+        emitError (problems.joinIntoString (" "));
+        return;
+    }
+
+    // The product ships the show this editor is running, sounds and all — not just the rack,
+    // whose songs would arrive pointing at a library the product does not have. Stage notes
+    // stay out unless the Host Project asks for them, as they always have.
+    request.show = options.dataDirectory.getChildFile ("product-show" + show::extension());
+    if (! writeShow (request.show, request.project.name, (bool) hostProject.getProperty ("includeStageNotes", false)))
+    {
+        emitError ("Could not write the show to build into the product, at "
+                   + request.show.getFullPathName() + ".");
+        return;
+    }
+
+    if (const auto destination = payload.getProperty ("outputDirectory", {}).toString(); destination.isNotEmpty())
+    {
+        if (! juce::File::isAbsolutePath (destination))
+        {
+            emitError ("Choose a folder to build the product in.");
+            return;
+        }
+        request.destination = juce::File (destination);
+        startProductBuild (std::move (request));
+        return;
+    }
+    if (options.pickFolder == nullptr)
+    {
+        emitError ("Choosing a folder is not available in this build.");
+        return;
+    }
+    options.pickFolder ("Choose where to build the product",
+                        [this, aliveToken = alive, request] (const juce::String& folder) mutable
+                        {
+                            if (! aliveToken->load() || folder.isEmpty())
+                                return;
+                            request.destination = juce::File (folder);
+                            startProductBuild (std::move (request));
+                        });
+}
+
+void InstrumentHostService::startProductBuild (product::Request request)
+{
+    // Checked again here: two presses can each open a folder chooser before either build starts,
+    // and joining a running build's thread below would freeze the window until Inno Setup ends.
+    if (productBusy)
+    {
+        emitError ("A product is already being built. Wait for it to finish.");
+        return;
+    }
+    const auto plan = product::plan (options.playerTemplate, request);
+    if (! plan.problems.isEmpty())
+    {
+        emitError (plan.problems.joinIntoString (" "));
+        return;
+    }
+    if (productThread.joinable())
+        productThread.join();
+
+    const auto script = options.installerScript;
+    const auto compiler = innoCompiler();
+    const auto args = product::isccArgs (options.playerTemplate, request, plan.folder, script);
+    const auto setup = plan.folder.getChildFile (product::setupFileName (request.project));
+    const auto& project = request.project;
+
+    productBusy = true;
+    productStop = false;
+    lastProduct = {};
+    emitBuildLine ("Building \"" + project.name + "\" " + project.version + " in " + plan.folder.getFullPathName(), false, false);
+    emitState();
+
+    productThread = std::thread ([this, plan, script, compiler, args, setup, name = project.name]
+    {
+        const auto say = [this] (const juce::String& line)
+        {
+            const std::scoped_lock lock (productLock);
+            productLines.add (line);
+        };
+        const auto finish = [this, &plan, &name] (bool ok, const juce::String& installer, const juce::String& message)
+        {
+            const std::scoped_lock lock (productLock);
+            productResult = { true, ok, name, plan.folder.getFullPathName(), installer, message };
+        };
+
+        say ("Copying the HoSTage programs, the show and the manifest.");
+        if (const auto copied = player::execute (plan); copied.failed())
+            return finish (false, {}, "The product could not be built: " + copied.getErrorMessage());
+        say ("Made " + plan.folder.getFullPathName());
+
+        // The folder is the product. The installer is the one part that needs more than CEditor,
+        // so its absence is said, not failed: the folder runs, and a build later can add it.
+        if (! script.existsAsFile())
+            return finish (true, {}, "Built as a folder, without an installer: this CEditor does not have the "
+                                     "installer's script (tools/installer/HostProductTemplate.iss).");
+        if (! compiler.existsAsFile())
+            return finish (true, {}, "Built as a folder, without an installer: Inno Setup 6 was not found. "
+                                     "Install it (free, from jrsoftware.org) and build again for one.");
+
+        say ("$ " + compiler.getFileName() + " " + args.joinIntoString (" "));
+        auto command = args;
+        command.insert (0, compiler.getFullPathName());
+        juce::ChildProcess iscc;
+        if (! iscc.start (command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr))
+            return finish (false, {}, "Inno Setup could not be started. The product's folder is made, at "
+                                      + plan.folder.getFullPathName() + "; the installer is not.");
+
+        juce::String pending;
+        char buffer[4096];
+        for (;;)
+        {
+            if (productStop)
+            {
+                iscc.kill();
+                return finish (false, {}, "Stopped before the installer was made.");
+            }
+            const int n = iscc.readProcessOutput (buffer, (int) sizeof (buffer));
+            if (n <= 0)
+                break;
+            pending += juce::String::fromUTF8 (buffer, n);
+            for (int nl; (nl = pending.indexOfChar ('\n')) >= 0; pending = pending.substring (nl + 1))
+                if (const auto line = pending.substring (0, nl).trimEnd(); line.isNotEmpty())
+                    say (line);
+        }
+        if (pending.trim().isNotEmpty())
+            say (pending.trimEnd());
+        iscc.waitForProcessToFinish (60000);
+
+        const auto code = (int) iscc.getExitCode();
+        if (code != 0 || ! setup.existsAsFile())
+            return finish (false, {}, "The installer could not be made (Inno Setup's exit code "
+                                      + juce::String (code) + "). The product's folder is made, at "
+                                      + plan.folder.getFullPathName() + ".");
+        finish (true, setup.getFullPathName(), "Built the installer: " + setup.getFullPathName());
+    });
+}
+
+void InstrumentHostService::tickProductBuild()
+{
+    juce::StringArray lines;
+    ProductResult finished;
+    {
+        const std::scoped_lock lock (productLock);
+        lines.swapWith (productLines);
+        if (productResult.done)
+        {
+            finished = productResult;
+            productResult = {};
+        }
+    }
+    for (const auto& line : lines)
+        emitBuildLine (line, false, false);
+    if (! finished.done)
+        return;
+
+    if (productThread.joinable())
+        productThread.join();
+    productBusy = false;
+    lastProduct = finished;
+    creatorHasInstaller = options.installerScript.existsAsFile() && innoCompiler().existsAsFile();
+    emitBuildLine (finished.message, true, finished.ok);
+    if (! finished.ok)
+        emitError (finished.message);
+    else if (options.emit != nullptr)
+    {
+        auto* built = new juce::DynamicObject();
+        built->setProperty ("name", finished.name);
+        built->setProperty ("folder", finished.folder);
+        built->setProperty ("installer", finished.installer);
+        options.emit ("instrumentHostProductBuilt", juce::var (built));
+    }
+    emitState();
+}
+
+juce::var InstrumentHostService::creatorPayload()
+{
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("available", options.creator);
+    if (! options.creator)
+        return juce::var (root);
+
+    root->setProperty ("standalone", playerHasStandalone);
+    root->setProperty ("vst3", playerHasVst3);
+    root->setProperty ("helpers", creatorHasHelpers);
+    root->setProperty ("installer", creatorHasInstaller);
+    root->setProperty ("canPick", options.pickFolder != nullptr);
+    root->setProperty ("busy", productBusy);
+
+    auto* licence = new juce::DynamicObject();
+    licence->setProperty ("required", creatorLicenceRequired());
+    if (creatorLicenceRequired())
+    {
+        auto& store = ensureCreatorLicence();
+        const auto status = store.status();
+        licence->setProperty ("licensed", status.verified());
+        licence->setProperty ("licensee", status.verified() ? status.document.licensee : juce::String());
+        // The store's own sentence for no licence is the product's ("one plug-in can be
+        // loaded"), which says nothing about building.
+        licence->setProperty ("detail", store.licenceFile().existsAsFile() ? status.detail
+                                                                           : juce::String ("No Creator licence is installed."));
+    }
+    root->setProperty ("licence", juce::var (licence));
+
+    if (lastProduct.done)
+    {
+        auto* last = new juce::DynamicObject();
+        last->setProperty ("ok", lastProduct.ok);
+        last->setProperty ("name", lastProduct.name);
+        last->setProperty ("folder", lastProduct.folder);
+        last->setProperty ("installer", lastProduct.installer);
+        last->setProperty ("message", lastProduct.message);
         root->setProperty ("last", juce::var (last));
     }
     return juce::var (root);

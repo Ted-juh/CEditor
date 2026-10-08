@@ -21,6 +21,7 @@
 #include "InstrumentHost/HostageManifest.h"
 #include "InstrumentHost/HostShow.h"
 #include "InstrumentHost/PlayerCreator.h"
+#include "InstrumentHost/ProductBuilder.h"
 #include "InstrumentHost/EditorSnapshot.h"
 #include "InstrumentHost/LiveWorkerDiagnostics.h"
 #include "InstrumentHost/PatchDiff.h"
@@ -5375,6 +5376,11 @@ void testLegacyDataOffer()
 // A show (HostShow.h): the rig and everything it points at, in one file. Saved in one HoSTage
 // and opened in another with an empty library, every song still has its rack — the thing a
 // bare rack file, which is what a built product shipped until now, cannot do.
+juce::File fakePlayerTemplate (const juce::String& name, ceditor::host::player::Template& out);
+
+/** A file that is not there, as an absolute path: an Inno Setup that is not installed. */
+juce::File noInnoSetup() { return freshDataDir ("no-inno-setup").getChildFile ("ISCC.exe"); }
+
 void testShows()
 {
     std::cout << "\na show: saved in one HoSTage, opened in another" << std::endl;
@@ -5535,10 +5541,13 @@ void testShows()
 
     // What Build product ships: the show, with stage notes left out unless the project asks.
     {
-        Harness h (editorDir, {}, [] (InstrumentHostService::Options& o)
-                   { o.runBuild = [] (const juce::var&, const juce::String&) {}; });
+        ceditor::host::player::Template from;
+        fakePlayerTemplate ("show-product-template", from);
+        const auto out = freshDataDir ("show-product-out");
+        Harness h (editorDir, {}, [from] (InstrumentHostService::Options& o)
+                   { o.creator = true; o.playerTemplate = from; o.innoCompiler = noInnoSetup(); });
         h.cmd ("getState");
-        h.cmd ("buildHostProduct");
+        h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
         const auto product = juce::JSON::parse (editorDir.getChildFile ("product-show.hostageshow"));
         check (product.getProperty ("format", {}).toString() == "hostage-show"
                  && product.getProperty ("rack", {}).getProperty ("setlist", {}).getProperty ("items", {})[0]
@@ -5816,6 +5825,310 @@ void testPortableData()
     check (made.portable && made.player, "and says so in its hostage.json");
     check (plan.folder.getChildFile ("Read me.txt").loadFileAsString().contains ("Data folder beside it"),
            "and its note says where its data goes");
+}
+
+// Build product in the creator (ProductBuilder.h; step 5): the programs a player is made of,
+// with the editor's manifest, the Host Project's identity and the show, ready for Inno Setup.
+void testProductBuilder()
+{
+    std::cout << "\nbuilding a product: the programs, the show, and the installer's switches" << std::endl;
+    namespace player = ceditor::host::player;
+    namespace product = ceditor::host::product;
+
+    player::Template from;
+    fakePlayerTemplate ("product-template", from);
+    const auto show = freshDataDir ("product-show").getChildFile ("product-show.hostageshow");
+    show.replaceWithText (R"({"format":"hostage-show","name":"Super Rack!"})");
+    const auto destination = freshDataDir ("product-destination");
+    const auto script = freshDataDir ("product-script").getChildFile ("HostProductTemplate.iss");
+
+    product::Request request;
+    request.project = product::Project::fromVar (juce::JSON::parse (
+        R"({"productName":" Super Rack! ","version":"1.2.0","publisher":"Tedjuh","appId":"8f3a6c2e-1b4d-4e5f-9a7b-0c1d2e3f4a5b"})"));
+    request.show = show;
+    request.destination = destination;
+    check (request.project.name == "Super Rack!" && request.project.appId == "8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B"
+             && request.project.standalone && request.project.vst3,
+           "the Host Project is read as a build reads it, its identity upper-cased as the runtime does");
+
+    auto refused = request;
+    refused.project.name = "A \"Live\" Rig";
+    refused.project.version = "1.2-beta";
+    refused.project.standalone = refused.project.vst3 = false;
+    refused.destination = destination.getChildFile ("nowhere");
+    const auto problems = product::plan (from, refused).problems.joinIntoString (" ");
+    check (problems.contains ("cannot contain") && problems.contains ("dotted numbers")
+             && problems.contains ("no targets") && problems.contains ("Choose a folder"),
+           "everything that would stop it is said at once");
+    check (! destination.getChildFile ("A Live Rig 1.2-beta").exists(), "and nothing is made");
+
+    auto helperless = from;
+    helperless.companions.clear();
+    check (product::problemsWith (helperless, request, false).joinIntoString (" ").contains ("scanner"),
+           "a product without the scanner and the worker is not built: it would install and do nothing");
+    check (product::problemsWith ({}, request, false).joinIntoString (" ").contains ("no HoSTage standalone"),
+           "nor one with nothing to build it from");
+
+    const auto plan = product::plan (from, request);
+    check (plan.problems.isEmpty() && player::execute (plan).wasOk(), "it is built");
+    const auto folder = destination.getChildFile ("Super Rack! 1.2.0");
+    const auto standalone = folder.getChildFile ("Standalone");
+    const auto bundle = folder.getChildFile ("VST3").getChildFile ("Hostage.vst3");
+    const auto resources = bundle.getChildFile ("Contents").getChildFile ("Resources");
+    check (plan.folder == folder && standalone.getChildFile ("Super Rack!.exe").loadFileAsString() == "program"
+             && standalone.getChildFile ("CEditorPluginWorker.exe").existsAsFile()
+             && bundle.getChildFile ("Contents").getChildFile ("x86_64-win").getChildFile ("CEditorPluginScanner.exe").existsAsFile(),
+           "in a folder named for the product and its version: the standalone under the product's name, both helpers");
+    for (const auto& where : { standalone, bundle.getChildFile ("Contents").getChildFile ("x86_64-win") })
+    {
+        const auto manifest = ceditor::host::readHostageManifestBeside (where);
+        check (! manifest.player && manifest.productName == "Super Rack!"
+                 && manifest.appId == "8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B"
+                 && manifest.showFileName == "Super Rack!.hostageshow",
+               "each is the editor, under the product's name and identity, opening its show: " + where.getFileName());
+    }
+    check (standalone.getChildFile ("shows").getChildFile ("Super Rack!.hostageshow").loadFileAsString().contains ("hostage-show")
+             && resources.getChildFile ("shows").getChildFile ("Super Rack!.hostageshow").existsAsFile()
+             && ! resources.getChildFile ("shows").getChildFile ("Its Own.hostageshow").exists()
+             && ! resources.getChildFile ("factory-performance.json").exists(),
+           "the show ships under the product's name, and nothing the template shipped with itself");
+    check (folder.getChildFile ("Read me.txt").loadFileAsString().contains ("SuperRack-Setup-1.2.0.exe"),
+           "a note says what the folder is, and which file the installer is");
+    check (product::plan (from, request).folder == destination.getChildFile ("Super Rack! 1.2.0 2"),
+           "a second build of the same version is numbered, never written over the first");
+
+    // The switches are build-host-product.mjs's, in its order (hostProductBuild.test.js reads both).
+    const auto args = product::isccArgs (from, request, folder, script);
+    const juce::StringArray expected {
+        "/DMyAppName=Super Rack!", "/DMyAppVersion=1.2.0", "/DMyAppPublisher=Tedjuh",
+        "/DMyAppId=8F3A6C2E-1B4D-4E5F-9A7B-0C1D2E3F4A5B", "/DMySetupBase=SuperRack",
+        "/DMySourceDir=" + folder.getFullPathName(), "/DMyOutputDir=" + folder.getFullPathName(),
+        "/DIncludeStandalone=1", "/DIncludeVst3=1", "/DMyAppExeName=Super Rack!.exe",
+        "/DMyVst3BundleName=Hostage.vst3", script.getFullPathName() };
+    check (args == expected, "Inno Setup is given the project as the developer's build gives it");
+    auto vst3Only = request;
+    vst3Only.project.standalone = false;
+    const auto vst3Args = product::isccArgs (from, vst3Only, folder, script);
+    check (vst3Args.contains ("/DIncludeStandalone=0") && ! vst3Args.joinIntoString (" ").contains ("MyAppExeName"),
+           "and only the parts that were built");
+
+    // What an installed CEditor builds from: templates/hostage beside it (package-installer.ps1),
+    // and the scanner and worker CEditor installs beside itself.
+   #if JUCE_WINDOWS
+    const juce::String exe (".exe");
+   #else
+    const juce::String exe;
+   #endif
+    const auto installed = freshDataDir ("installed-ceditor");
+    const auto hostage = installed.getChildFile ("templates").getChildFile ("hostage");
+    const auto make = [] (const juce::File& f) { f.getParentDirectory().createDirectory(); f.replaceWithText ("x"); return f; };
+    make (installed.getChildFile ("CEditorPluginScanner" + exe));
+    make (installed.getChildFile ("CEditorPluginWorker" + exe));
+    check (! player::findInstalledTemplate (hostage, installed).hasStandalone()
+             && player::findInstalledTemplate (hostage, installed).companions.isEmpty(),
+           "without templates/hostage there is nothing to build from, and no helpers are offered for nothing");
+    make (hostage.getChildFile ("Standalone").getChildFile ("Hostage" + exe));
+    make (hostage.getChildFile ("VST3").getChildFile ("Hostage.vst3").getChildFile ("Contents").getChildFile ("x86_64-win").getChildFile ("Hostage.vst3"));
+    auto found = player::findInstalledTemplate (hostage, installed);
+    check (found.standalone == hostage.getChildFile ("Standalone").getChildFile ("Hostage" + exe)
+             && found.vst3Bundle == hostage.getChildFile ("VST3").getChildFile ("Hostage.vst3")
+             && found.companions.size() == 2 && found.companions[0].getParentDirectory() == installed,
+           "the installed template is found, with CEditor's own scanner and worker beside it");
+    make (hostage.getChildFile ("Standalone").getChildFile ("CEditorPluginScanner" + exe));
+    found = player::findInstalledTemplate (hostage, installed);
+    check (found.standalone.getFileNameWithoutExtension() == "Hostage"
+             && found.companions[0].getParentDirectory() == hostage.getChildFile ("Standalone"),
+           "a helper the template brings is preferred, and is never taken for the program");
+}
+
+void testBuildProductCommand()
+{
+    std::cout << "\nBuild product in the creator: on a thread, with Inno Setup when it is there" << std::endl;
+
+    ceditor::host::player::Template from;
+    fakePlayerTemplate ("build-command-template", from);
+    const auto dir = freshDataDir ("build-command");
+    seedCatalog (dir);
+    const auto script = freshDataDir ("build-command-script").getChildFile ("HostProductTemplate.iss");
+    script.replaceWithText ("; the template");
+    const auto creatorOf = [] (Harness& h) { return h.emits.lastState()->getProperty ("creator", {}); };
+    const auto finished = [&creatorOf] (Harness& h)
+    {
+        for (int i = 0; i < 500 && (bool) creatorOf (h).getProperty ("busy", true); ++i)
+        {
+            juce::Thread::sleep (10);
+            h.service->drainParameterEvents();
+        }
+        return creatorOf (h).getProperty ("last", {});
+    };
+
+    // Without Inno Setup the folder is the product, and the build says what it skipped.
+    {
+        const auto out = freshDataDir ("build-command-folder");
+        Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+                   { o.creator = true; o.playerTemplate = from; o.installerScript = script; o.innoCompiler = noInnoSetup(); });
+        h.cmd ("getState");
+        const auto creator = creatorOf (h);
+        check ((bool) creator.getProperty ("available", false) && (bool) creator.getProperty ("standalone", false)
+                 && (bool) creator.getProperty ("vst3", false) && (bool) creator.getProperty ("helpers", false)
+                 && ! (bool) creator.getProperty ("installer", true)
+                 && ! (bool) creator.getProperty ("licence", {}).getProperty ("required", true),
+               "the page is told what the creator can build, and that this build asks for no licence");
+        h.cmd ("setHostProject", { { "productName", "Night Rack" }, { "version", "2.0.0" } });
+        h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+        check ((bool) creatorOf (h).getProperty ("busy", false), "it builds on a thread of its own");
+        const auto last = finished (h);
+        check ((bool) last.getProperty ("ok", false) && last.getProperty ("installer", {}).toString().isEmpty()
+                 && last.getProperty ("message", {}).toString().contains ("Inno Setup 6 was not found"),
+               "it is built as a folder, and says the installer is what it skipped");
+        check (out.getChildFile ("Night Rack 2.0.0").getChildFile ("Standalone").getChildFile ("shows")
+                 .getChildFile ("Night Rack.hostageshow").existsAsFile(),
+               "with the show the editor is running");
+        const auto* done = h.emits.last ("instrumentHostBuildProgress");
+        check (done != nullptr && (bool) done->getProperty ("done", false) && (bool) done->getProperty ("ok", false)
+                 && h.emits.count ("instrumentHostBuildProgress") >= 3
+                 && h.emits.last ("instrumentHostProductBuilt") != nullptr,
+               "the build log runs to its end, and the page hears where the product is");
+    }
+
+   #if ! JUCE_WINDOWS
+    // A stand-in for Inno Setup that writes the setup file where it is told to, and says so.
+    const auto fakeIscc = [] (const juce::String& name, const juce::String& lastLine)
+    {
+        const auto file = freshDataDir (name).getChildFile ("ISCC");
+        file.replaceWithText ("#!/bin/sh\n"
+                              "for a in \"$@\"; do printf '%s\\n' \"$a\"; done > \"$(dirname \"$0\")/args.txt\"\n"
+                              "for a in \"$@\"; do case \"$a\" in\n"
+                              "  /DMyOutputDir=*) out=\"${a#/DMyOutputDir=}\";;\n"
+                              "  /DMySetupBase=*) base=\"${a#/DMySetupBase=}\";;\n"
+                              "  /DMyAppVersion=*) ver=\"${a#/DMyAppVersion=}\";;\n"
+                              "esac; done\n"
+                              "echo \"Compiling $base\"\n"
+                              + lastLine + "\n", false, false, "\n");   // not \r\n: "/bin/sh\r" is no shell
+        file.setExecutePermission (true);
+        return file;
+    };
+
+    {
+        const auto out = freshDataDir ("build-command-installer");
+        const auto iscc = fakeIscc ("build-command-iscc", "printf setup > \"$out/$base-Setup-$ver.exe\"");
+        Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+                   { o.creator = true; o.playerTemplate = from; o.installerScript = script; o.innoCompiler = iscc; });
+        h.cmd ("getState");
+        h.cmd ("getHostProject");
+        check ((bool) creatorOf (h).getProperty ("installer", false),
+               "with Inno Setup there, the page is told a build makes an installer");
+        h.emits.clear();
+        h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+        const auto last = finished (h);
+        const auto setup = out.getChildFile ("Night Rack 2.0.0").getChildFile ("NightRack-Setup-2.0.0.exe");
+
+        check ((bool) last.getProperty ("ok", false) && setup.existsAsFile()
+                 && last.getProperty ("installer", {}).toString() == setup.getFullPathName(),
+               "Inno Setup is run over the folder, and the installer is in it");
+        const auto passed = juce::StringArray::fromLines (iscc.getSiblingFile ("args.txt").loadFileAsString().trim());
+        check (passed.contains ("/DMyAppName=Night Rack") && passed.contains ("/DMyAppExeName=Night Rack.exe")
+                 && passed[passed.size() - 1] == script.getFullPathName(),
+               "with the project's switches, and the template's script last");
+        bool printed = false;
+        for (const auto& e : h.emits.entries)
+            if (e.name == "instrumentHostBuildProgress" && e.payload.getProperty ("line", {}).toString() == "Compiling NightRack")
+                printed = true;
+        check (printed, "and what Inno Setup prints reaches the build log");
+    }
+
+    {
+        const auto out = freshDataDir ("build-command-failing");
+        const auto iscc = fakeIscc ("build-command-iscc-failing", "exit 2");
+        Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+                   { o.creator = true; o.playerTemplate = from; o.installerScript = script; o.innoCompiler = iscc; });
+        h.cmd ("getState");
+        h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+        const auto last = finished (h);
+        check (! (bool) last.getProperty ("ok", true) && last.getProperty ("message", {}).toString().contains ("exit code 2)")
+                 && out.getChildFile ("Night Rack 2.0.0").getChildFile ("Standalone").isDirectory()
+                 && h.emits.lastError().contains ("could not be made"),
+               "an installer that fails is said to have failed, and the folder it was made from stays");
+    }
+   #endif
+
+    {
+        Harness h (freshDataDir ("build-command-not-creator"), {}, [from] (InstrumentHostService::Options& o)
+                   { o.playerTemplate = from; });
+        h.cmd ("getState");
+        h.cmd ("buildHostProduct", { { "outputDirectory", freshDataDir ("build-command-nowhere").getFullPathName() } });
+        check (h.emits.lastError().contains ("built in CEditor")
+                 && ! (bool) creatorOf (h).getProperty ("available", true),
+               "a HoSTage is not the creator: it makes players, and says where products are built");
+    }
+}
+
+// The Creator licence (step 5): asked for only when a key is compiled in, kept apart from the
+// tab's own licence, and nothing is built without it.
+void testCreatorLicence()
+{
+    std::cout << "\nthe Creator licence, when the build asks for one" << std::endl;
+
+    ceditor::host::player::Template from;
+    fakePlayerTemplate ("creator-licence-template", from);
+    const auto dir = freshDataDir ("creator-licence");
+    seedCatalog (dir);
+    const auto out = freshDataDir ("creator-licence-out");
+    Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
+               { o.creator = true; o.playerTemplate = from; o.innoCompiler = noInnoSetup();
+                 o.creatorPublicKey = testKeys().first; });
+    h.cmd ("getState");
+    const auto tabLicence = dir.getChildFile ("licence.celicence").loadFileAsString();
+    const auto licence = [&h] { return h.emits.lastState()->getProperty ("creator", {}).getProperty ("licence", {}); };
+    const auto nothingBuilt = [&out] { return out.findChildFiles (juce::File::findFilesAndDirectories, false).isEmpty(); };
+    check ((bool) licence().getProperty ("required", false) && ! (bool) licence().getProperty ("licensed", true)
+             && licence().getProperty ("detail", {}).toString() == "No Creator licence is installed.",
+           "a build with a key asks for a Creator licence, and says there is none");
+    h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+    check (h.emits.lastError().contains ("needs a Creator licence") && nothingBuilt(),
+           "without one, nothing is built");
+
+    licensing::LicenceDocument document;
+    document.productId = "11111111-2222-3333-4444-555555555555";
+    document.licensee = "Studio Tedjuh";
+    document.edition = licensing::Edition::core;
+    const auto licenceText = [&document] { return juce::JSON::toString (licensing::makeLicenceFile (document, testKeys().second)); };
+    h.cmd ("installCreatorLicence", { { "text", licenceText() } });
+    check (h.emits.lastError().contains ("not this product") && ! (bool) licence().getProperty ("licensed", true),
+           "a genuine licence for a product is not a Creator licence");
+
+    document.productId = ceditor::host::product::creatorProductId;
+    h.emits.clear();
+    h.cmd ("installCreatorLicence", { { "text", licenceText() } });
+    check (h.emits.lastError().isEmpty() && (bool) licence().getProperty ("licensed", false)
+             && licence().getProperty ("licensee", {}).toString() == "Studio Tedjuh",
+           "a Creator licence is installed");
+    check (dir.getChildFile ("creator").getChildFile ("licence.celicence").existsAsFile()
+             && dir.getChildFile ("licence.celicence").loadFileAsString() == tabLicence,
+           "in a folder of its own, not in place of the tab's own licence");
+
+    h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+    for (int i = 0; i < 500 && (bool) h.emits.lastState()->getProperty ("creator", {}).getProperty ("busy", true); ++i)
+    {
+        juce::Thread::sleep (10);
+        h.service->drainParameterEvents();
+    }
+    check ((bool) h.emits.lastState()->getProperty ("creator", {}).getProperty ("last", {}).getProperty ("ok", false)
+             && ! nothingBuilt(),
+           "with it, the product is built");
+
+    h.cmd ("removeCreatorLicence");
+    const bool removed = ! (bool) licence().getProperty ("licensed", true);
+    h.emits.clear();
+    h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
+    check (removed && h.emits.lastError().contains ("needs a Creator licence"),
+           "and once it is removed, building waits for one again");
+
+    Harness inPlayer (freshDataDir ("creator-licence-player"), {}, [&] (InstrumentHostService::Options& o)
+                      { o.player = true; o.creator = true; o.creatorPublicKey = testKeys().first; });
+    inPlayer.cmd ("getState");
+    inPlayer.cmd ("installCreatorLicence", { { "text", licenceText() } });
+    check (inPlayer.emits.lastError().contains ("cannot build"), "a player has no use for one");
 }
 
 // Which stage pages the keyboard shows is the player's choice, made once. Before, every page
@@ -15220,8 +15533,8 @@ void testHostProject()
 
         h.emits.clear();
         h.cmd ("buildHostProduct");
-        check (h.emits.lastError().contains ("not available"),
-               "building without a runBuild hook refuses aloud");
+        check (h.emits.lastError().contains ("built in CEditor"),
+               "a HoSTage that is not the creator says where products are built");
     }
 
     {
@@ -15240,29 +15553,19 @@ void testHostProject()
     }
 
     {
-        juce::var builtProject;
-        juce::String builtOutputDir;
-        Harness h (dir, {}, [&] (InstrumentHostService::Options& o)
-        {
-            o.runBuild = [&] (const juce::var& project, const juce::String& outputDirectory)
-            {
-                builtProject = project;
-                builtOutputDir = outputDirectory;
-            };
-        });
-
-        h.cmd ("buildHostProduct", { { "outputDirectory", "D:\\out" } });
-        check (builtProject.getProperty ("productName", {}).toString() == "Super Rack"
-                 && builtOutputDir == "D:\\out",
-               "buildHostProduct hands the hook the manifest and the destination");
-
+        ceditor::host::player::Template from;
+        fakePlayerTemplate ("host-project-template", from);
+        const auto out = freshDataDir ("host-project-out");
+        Harness h (dir, {}, [from] (InstrumentHostService::Options& o)
+                   { o.creator = true; o.playerTemplate = from; o.innoCompiler = noInnoSetup(); });
+        h.cmd ("getState");
         h.cmd ("setHostProject", { { "includeStandalone", false } });   // includeVst3 already off
         h.emits.clear();
-        builtProject = juce::var();
-        h.cmd ("buildHostProduct");
+        h.cmd ("buildHostProduct", { { "outputDirectory", out.getFullPathName() } });
         check (h.emits.lastError().contains ("no targets"),
                "a project with every target off refuses to build");
-        check (builtProject.isVoid(), "and the hook never runs");
+        check (out.findChildFiles (juce::File::findFilesAndDirectories, false).isEmpty(),
+               "and nothing is made");
     }
 }
 
@@ -15735,6 +16038,9 @@ int main (int argc, char* argv[])
     testPlayerCreator();
     testCreatePlayerCommand();
     testPortableData();
+    testProductBuilder();
+    testBuildProductCommand();
+    testCreatorLicence();
     testCtrl49Meters();
     testCtrl49Live();
     testCtrl49Discover();

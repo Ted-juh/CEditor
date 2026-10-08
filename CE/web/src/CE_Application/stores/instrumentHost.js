@@ -28,6 +28,7 @@ import {
   onInstrumentHostLibrarySaved,
   onInstrumentHostShowSaved,
   onInstrumentHostPlayerCreated,
+  onInstrumentHostProductBuilt,
   onInstrumentHostSupportBundle,
   onInstrumentHostLicenceReceipt,
   onInstrumentHostMidiActivity,
@@ -104,6 +105,15 @@ function showPlayerCreated(payload) {
   const name = String(payload?.name ?? '').trim();
   const folder = String(payload?.folder ?? '').trim();
   hostSaveNotice.set(`Made the player${name ? ` “${name}”` : ''}${folder ? ` in ${folder}` : ''}.`);
+  saveNoticeTimer = setTimeout(clearSaveNotice, 8000);
+  saveNoticeTimer?.unref?.();
+}
+function showProductBuilt(payload) {
+  clearSaveNotice();
+  const name = String(payload?.name ?? '').trim();
+  const installer = String(payload?.installer ?? '').trim();
+  const folder = String(payload?.folder ?? '').trim();
+  hostSaveNotice.set(`Built${name ? ` “${name}”` : ' the product'}${installer ? `: ${installer}` : folder ? ` in ${folder}` : ''}.`);
   saveNoticeTimer = setTimeout(clearSaveNotice, 8000);
   saveNoticeTimer?.unref?.();
 }
@@ -2316,6 +2326,7 @@ export function emptyHostState() {
     playerInstalled: false,
     shows: emptyShows(),
     players: emptyPlayers(),
+    creator: emptyCreator(),
     editHistory: { canUndo: false, canRedo: false, undoLabel: '', redoLabel: '', blockedReason: '' },
     editorOpenPartId: '',
     editorOpenPartIds: [],
@@ -2656,6 +2667,52 @@ export function normalizePlayers(payload) {
     busy: p.busy === true,
     last,
   };
+}
+
+/** Build product, the creator's (ProductBuilder.h; docs/design/hostage-creator-editor-player.md,
+ *  step 5): whether this program builds products at all (CEditor's tab does, a HoSTage does not),
+ *  what it has to build them from, whether Inno Setup is there for the installer, the Creator
+ *  licence when the build asks for one, and how the last build ended. */
+export function emptyCreator() {
+  return {
+    available: false, standalone: false, vst3: false, helpers: false, installer: false,
+    canPick: false, busy: false,
+    licence: { required: false, licensed: false, licensee: '', detail: '' },
+    last: null,
+  };
+}
+export function normalizeCreator(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const licence = p.licence && typeof p.licence === 'object' ? p.licence : {};
+  const last = p.last && typeof p.last === 'object' ? {
+    ok: p.last.ok === true,
+    name: String(p.last.name ?? ''),
+    folder: String(p.last.folder ?? ''),
+    installer: String(p.last.installer ?? ''),
+    message: String(p.last.message ?? ''),
+  } : null;
+  return {
+    available: p.available === true,
+    standalone: p.standalone === true,
+    vst3: p.vst3 === true,
+    helpers: p.helpers === true,
+    installer: p.installer === true,
+    canPick: p.canPick === true,
+    busy: p.busy === true,
+    licence: {
+      required: licence.required === true,
+      licensed: licence.licensed === true,
+      licensee: String(licence.licensee ?? ''),
+      detail: String(licence.detail ?? ''),
+    },
+    last,
+  };
+}
+/** Whether Build product may be pressed: the creator, not busy, with what it needs. */
+export function creatorCanBuild(creator) {
+  return creator.available && !creator.busy && creator.helpers
+    && (creator.standalone || creator.vst3)
+    && (!creator.licence.required || creator.licence.licensed);
 }
 
 /** Where this program keeps its data, and what became of the rig an earlier build kept in the
@@ -4661,6 +4718,7 @@ export function normalizeHostState(payload) {
     player: p.player === true || p.playerInstalled === true,
     shows: normalizeShows(p.shows),
     players: normalizePlayers(p.players),
+    creator: normalizeCreator(p.creator),
     playerInstalled: p.playerInstalled === true,
     editHistory: {
       canUndo: p.editHistory?.canUndo === true,
@@ -5254,6 +5312,9 @@ export function mockHostState() {
       },
       scales: ['chromatic', 'major', 'minor', 'dorian', 'pentatonic minor'],
     },
+    // The preview stands in for CEditor's tab, which is the creator: it has programs to build
+    // from, and no Inno Setup, so a build is a folder.
+    creator: { available: true, standalone: true, vst3: true, helpers: true, installer: false },
   });
 }
 
@@ -8562,6 +8623,7 @@ export function initInstrumentHostBridge() {
   onInstrumentHostLibrarySaved(showLibrarySaved);
   onInstrumentHostShowSaved(showShowSaved);
   onInstrumentHostPlayerCreated(showPlayerCreated);
+  onInstrumentHostProductBuilt(showProductBuilt);
   onInstrumentHostLibraryLoad((payload) => hostLibraryLoad.set(normalizeLibraryLoad(payload)));
   send({ cmd: 'getState' });
 }
@@ -8740,9 +8802,19 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'buildHostProduct') {
+      // The preview has no programs to copy and no folder chooser: it prints what the host
+      // would, and ends as a build without Inno Setup ends.
       const project = get(hostProject);
-      hostBuild.set(applyBuildProgress(emptyHostBuild(), { line: `Building "${project.productName}" ${project.version} (mock)` }));
-      hostBuild.update((b) => applyBuildProgress(b, { line: 'Staged mock product folder.', done: true, ok: true }));
+      hostBuild.set(applyBuildProgress(emptyHostBuild(), { line: `Building "${project.productName}" ${project.version} (preview)` }));
+      hostBuild.update((b) => applyBuildProgress(b, { line: 'Copying the HoSTage programs, the show and the manifest.' }));
+      hostBuild.update((b) => applyBuildProgress(b, {
+        line: 'Built as a folder, without an installer: Inno Setup 6 was not found. Install it (free, from jrsoftware.org) and build again for one.',
+        done: true, ok: true,
+      }));
+      return;
+    }
+    if (payload?.cmd === 'installCreatorLicence' || payload?.cmd === 'removeCreatorLicence') {
+      hostLastError.set('This CEditor does not ask for a Creator licence; Build product is open.');
       return;
     }
     if (payload?.cmd === 'toggleParameterFavourite') {
@@ -10188,7 +10260,12 @@ export const hostNote = (note, velocity, on, channel = 1) =>
 
 export const requestHostProject = () => send({ cmd: 'getHostProject' });
 export const setHostProject = (fields) => send({ cmd: 'setHostProject', ...fields });
+// The host asks where to build it, and says how it went in instrumentHostBuildProgress lines;
+// whether one is running is state.creator.busy, so a build refused before it starts leaves
+// nothing waiting.
 export const buildHostProduct = () => {
-  hostBuild.set({ ...emptyHostBuild(), running: true });
+  hostBuild.set(emptyHostBuild());
   send({ cmd: 'buildHostProduct' });
 };
+export const installCreatorLicence = (text) => send({ cmd: 'installCreatorLicence', text: String(text ?? '') });
+export const removeCreatorLicence = () => send({ cmd: 'removeCreatorLicence' });

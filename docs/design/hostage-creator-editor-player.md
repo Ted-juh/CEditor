@@ -1,8 +1,9 @@
 # HoSTage: creator, editor and player
 
 *Status: the owner's intention, written down on 2026-10-08, with what exists today and what each
-part would take. Steps 1 to 4 and 6 — the player role, a data folder per product, the show,
-making a player, and the USB stick player — are built; step 5 and the Raspberry Pi are not. When this and the code disagree about what exists, the code is right.*
+part would take. Steps 1 to 6 — the player role, a data folder per product, the show, making a
+player, CEditor building the installer, and the USB stick player — are built; the Raspberry Pi is
+not. When this and the code disagree about what exists, the code is right.*
 
 ## The intention, in the owner's words
 
@@ -36,7 +37,7 @@ CEditor  ──(HoSTage Creator licence)──►  HoSTage installer
 
 | Tier | What it is | Who uses it | Licence |
 |---|---|---|---|
-| **A. CEditor's Hostage tab** | The development instance and the **creator**: everything HoSTage has, plus building the HoSTage installer. | Whoever develops HoSTage further; buyers of the creator licence. | A new **HoSTage Creator** licence on top of CEditor. Does not exist yet. |
+| **A. CEditor's Hostage tab** | The development instance and the **creator**: everything HoSTage has, plus building the HoSTage installer. | Whoever develops HoSTage further; buyers of the creator licence. | A **HoSTage Creator** licence on top of CEditor. The mechanism exists (step 5); its price and scope are the owner's decision 2, and no build asks for it yet. |
 | **B. HoSTage, installed** | **Editor + player** in one program. Racks, sounds, songs, setlists, control pages and CTRL49 screens, Stage. Creates players. | A musician setting up and playing a rig. | The existing edition ladder: Free, Core, Founder, Pro (`docs/licence-and-sunset-policy.md`). |
 | **C. A created player** | The same program with screen creation and player creation taken out, carrying one show. Standalone + VST3; later a USB stick and a Raspberry Pi. | The same musician on stage, in a DAW, or on a machine with no laptop. | To be decided (see the end). |
 
@@ -211,7 +212,42 @@ Two builds would double every test and every release; one build with a role cann
      instrument; macOS app bundles are not handled.
 5. **The creator in CEditor builds the tier B installer** the same way — CEditor's installer ships
    the host programs; Inno Setup is needed only for the installer itself. The **Creator licence**
-   gates it. Medium, plus the licence (below).
+   gates it. Medium, plus the licence (below). *Built:*
+   - `ProductBuilder.h` is a player's copy (`PlayerCreator.h`, whose copying it shares) with the
+     editor's `hostage.json`, the Host Project's appId and name, and the show the editor is
+     running, into `<folder>/<Product> <version>/`. Then, on the same thread, Inno Setup's
+     `ISCC` over that folder with `HostProductTemplate.iss` — the switches
+     `build-host-product.mjs` passes, in its order (`hostageCreator.test.js` holds the two
+     lists together), so the installer is the one the developer's route makes.
+   - No Node.js: Build product no longer runs `build-host-product.mjs`. The script stays as the
+     developer's route from a build tree (it also archives the worker's private symbols, which
+     an installed CEditor does not have).
+   - The programs: `package-installer.ps1` copies the HoSTage standalone and VST3 it already
+     builds into `templates\hostage\` (`Stage-HostTemplate`), and the script into
+     `tools\installer\`; CEditor's installer ships both. The tab takes the scanner and the
+     worker from beside CEditor, the same programs. A source checkout has what CMake built.
+   - Without Inno Setup (it looks where its installer puts it, for everyone or for one user, and
+     on the PATH), the build is the folder and says so; the folder runs as it is. The Project
+     utility says before the button whether Inno Setup was found. Off Windows there is no live
+     worker, which every product needs, so the build refuses there and says why.
+   - Build product is the creator's alone (`Options::creator`): a HoSTage program has no Project
+     utility and makes players instead.
+   - The Creator licence: an ordinary signed licence (`Licence.h`) for one fixed product id,
+     `6DA0CC3A-E1E5-465F-9013-91FC7E3CCC27` (`product::creatorProductId`), kept in the data
+     folder's `creator/`, apart from the tab's own licence. It is asked for only when the
+     vendor's public key is compiled in: configure with
+     `-DCEDITOR_CREATOR_PUBLIC_KEY_FILE=<public.key from CEditorLicenceTool keypair>`, and issue
+     with `CEditorLicenceTool issue --key private.key --product 6DA0CC3A-E1E5-465F-9013-91FC7E3CCC27
+     --name … --out creator.celicence`. Without the key, which is every build until the owner
+     sets one, building is open. A key named and not there stops the configure. The edition on a
+     Creator licence is not read; the sunset key unlocks it like everything else.
+   - Verified on Linux: CEditor's tab built a product through its own folder chooser from an
+     installed-style `templates/hostage`; the product started under its name, in its own data
+     folder, with its show open and no Project utility; Inno Setup 6.3.1's `ISCC` (under Wine)
+     compiled that folder with those switches into `NightRack-Setup-2.0.0.exe`; and a CEditor
+     configured with a key asked for the licence and built once one was pasted.
+   - Open: the Creator licence's price and scope (decision 2); every product is the same plug-in
+     to a DAW, as every player is; the runtime appId gap under step 2 is unchanged.
 6. **USB stick, Windows:** the step 4 folder with "portable" set in the manifest — data kept on
    the stick beside the program instead of in `%APPDATA%`. Small once 4 exists. *Built* (done
    before step 5, at the owner's request):

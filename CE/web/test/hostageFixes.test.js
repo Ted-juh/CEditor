@@ -84,7 +84,9 @@ test('a Screen Builder tab closes from its ×, and asks before throwing changes 
 test('Build product says what it needs before it is pressed', () => {
   const view = source('sections/InstrumentHostView.svelte');
   const note = view.match(/data-testid="host-build-needs">([\s\S]*?)<\/p>/)?.[1] ?? '';
-  assert.match(note, /Node\.js/);
-  assert.match(note, /source checkout/);
-  assert.match(note, /installed CEditor\s+cannot build a product yet/);
+  // Since step 5 an installed CEditor builds products itself: no Node.js, no source checkout.
+  assert.doesNotMatch(note, /Node\.js|cannot build a product yet/);
+  assert.match(note, /no HoSTage programs to build from/, 'with nothing to copy, it says so');
+  assert.match(note, /Inno Setup 6 was not found, so a build is the folder\s+without an installer/,
+    'and without Inno Setup, that the installer is the part it skips');
 });

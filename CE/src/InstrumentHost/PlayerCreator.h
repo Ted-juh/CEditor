@@ -4,6 +4,8 @@
 
 #include <juce_core/juce_core.h>
 
+#include <utility>
+
 // PlayerCreator — making a player out of the HoSTage that is running
 // (docs/design/hostage-creator-editor-player.md, step 4).
 //
@@ -154,24 +156,25 @@ inline juce::StringArray problemsWith (const Template& from, const Request& requ
     return problems;
 }
 
-inline Plan plan (const Template& from, const Request& request)
+/** What goes into a copy of the programs: the standalone's new name, the manifest, and the shows
+    with the names they go in under. Players and products (ProductBuilder.h) differ only here. */
+struct Contents
 {
-    Plan result;
-    const auto name = legalName (request.name);
-    result.problems = problemsWith (from, request, true);
-    if (! result.problems.isEmpty())
-        return result;
+    juce::String programName;                               // the standalone's file name in the copy
+    juce::String manifest;                                  // hostage.json
+    juce::Array<std::pair<juce::File, juce::String>> shows; // a show, and the file name it goes in as
+    bool standalone = true;
+    bool vst3 = true;
+};
 
-    // Never over another folder: a second player of the same name is numbered.
-    result.folder = request.destination.getChildFile (name);
-    for (int n = 2; result.folder.exists(); ++n)
-        result.folder = request.destination.getChildFile (name + " " + juce::String (n));
-
-    const auto manifest = manifestJson (request);
-    const auto addShows = [&result, &request] (const juce::File& into)
+/** The operations that put the programs into `folder`: Standalone/ and VST3/, each with its
+    helpers, its hostage.json and its shows. */
+inline void addPrograms (Plan& result, const Template& from, const juce::File& folder, const Contents& contents)
+{
+    const auto addShows = [&result, &contents] (const juce::File& into)
     {
-        for (const auto& show : request.shows)
-            result.operations.add ({ Operation::Kind::copyFile, show, into.getChildFile (show.getFileName()), {} });
+        for (const auto& [show, name] : contents.shows)
+            result.operations.add ({ Operation::Kind::copyFile, show, into.getChildFile (name), {} });
     };
     const auto addCompanions = [&result, &from] (const juce::File& into)
     {
@@ -180,45 +183,80 @@ inline Plan plan (const Template& from, const Request& request)
                 result.operations.add ({ Operation::Kind::copyProgram, helper, into.getChildFile (helper.getFileName()), {} });
     };
 
-    juce::String programName;
-    if (request.standalone)
+    if (contents.standalone)
     {
-        const auto folder = result.folder.getChildFile ("Standalone");
-        programName = name + from.standalone.getFileExtension();
-        result.operations.add ({ Operation::Kind::copyProgram, from.standalone, folder.getChildFile (programName), {} });
-        addCompanions (folder);
-        result.operations.add ({ Operation::Kind::writeText, {}, folder.getChildFile ("hostage.json"), manifest });
-        addShows (folder.getChildFile ("shows"));
+        const auto standalone = folder.getChildFile ("Standalone");
+        result.operations.add ({ Operation::Kind::copyProgram, from.standalone, standalone.getChildFile (contents.programName), {} });
+        addCompanions (standalone);
+        result.operations.add ({ Operation::Kind::writeText, {}, standalone.getChildFile ("hostage.json"), contents.manifest });
+        addShows (standalone.getChildFile ("shows"));
     }
 
-    const auto bundleName = from.vst3Bundle.getFileName();
-    if (request.vst3)
+    if (contents.vst3)
     {
-        const auto bundle = result.folder.getChildFile ("VST3").getChildFile (bundleName);
+        const auto bundle = folder.getChildFile ("VST3").getChildFile (from.vst3Bundle.getFileName());
         const auto resources = bundle.getChildFile ("Contents").getChildFile ("Resources");
         result.operations.add ({ Operation::Kind::copyFolder, from.vst3Bundle, bundle, {} });
-        // What the HoSTage being copied shipped with is its own, not the player's: its manifest
+        // What the HoSTage being copied shipped with is its own, not the copy's: its manifest
         // is replaced, and its shows and factory rack go (a factory rack would open before the
-        // player's show on the first start).
+        // copy's show on the first start).
         result.operations.add ({ Operation::Kind::remove, {}, resources.getChildFile ("shows"), {} });
         result.operations.add ({ Operation::Kind::remove, {}, resources.getChildFile ("factory-performance.json"), {} });
         if (const auto binaries = bundleBinaryFolder (from.vst3Bundle); binaries != juce::File())
             addCompanions (bundle.getChildFile ("Contents").getChildFile (binaries.getFileName()));
-        result.operations.add ({ Operation::Kind::writeText, {}, resources.getChildFile ("hostage.json"), manifest });
+        result.operations.add ({ Operation::Kind::writeText, {}, resources.getChildFile ("hostage.json"), contents.manifest });
         addShows (resources.getChildFile ("shows"));
     }
+}
 
-    result.operations.add ({ Operation::Kind::writeText, {}, result.folder.getChildFile ("Read me.txt"),
-                             readMe (request, programName, bundleName, request.standalone, request.vst3) });
+/** A folder named `name` in `destination`, never over another one: a second of the same name is
+    numbered. */
+inline juce::File freshFolder (const juce::File& destination, const juce::String& name)
+{
+    auto folder = destination.getChildFile (name);
+    for (int n = 2; folder.exists(); ++n)
+        folder = destination.getChildFile (name + " " + juce::String (n));
+    return folder;
+}
 
-    // What it will lack, said before it is made.
-    juce::StringArray helperNames;
+/** The helpers the template has, by name without the extension. */
+inline juce::StringArray helperNames (const Template& from)
+{
+    juce::StringArray names;
     for (const auto& helper : from.companions)
         if (helper.existsAsFile())
-            helperNames.add (helper.getFileNameWithoutExtension());
-    if (! helperNames.contains ("CEditorPluginScanner"))
+            names.add (helper.getFileNameWithoutExtension());
+    return names;
+}
+
+inline Plan plan (const Template& from, const Request& request)
+{
+    Plan result;
+    const auto name = legalName (request.name);
+    result.problems = problemsWith (from, request, true);
+    if (! result.problems.isEmpty())
+        return result;
+
+    result.folder = freshFolder (request.destination, name);
+
+    Contents contents;
+    contents.programName = request.standalone ? name + from.standalone.getFileExtension() : juce::String();
+    contents.manifest = manifestJson (request);
+    contents.standalone = request.standalone;
+    contents.vst3 = request.vst3;
+    for (const auto& show : request.shows)
+        contents.shows.add ({ show, show.getFileName() });
+    addPrograms (result, from, result.folder, contents);
+
+    result.operations.add ({ Operation::Kind::writeText, {}, result.folder.getChildFile ("Read me.txt"),
+                             readMe (request, contents.programName, from.vst3Bundle.getFileName(),
+                                     request.standalone, request.vst3) });
+
+    // What it will lack, said before it is made.
+    const auto helpers = helperNames (from);
+    if (! helpers.contains ("CEditorPluginScanner"))
         result.notes.add ("The plug-in scanner was not found, so the player will not be able to scan for plug-ins.");
-    if (! helperNames.contains ("CEditorPluginWorker"))
+    if (! helpers.contains ("CEditorPluginWorker"))
         result.notes.add ("The live plug-in worker was not found, so the player will not load plug-ins.");
     return result;
 }
@@ -307,40 +345,81 @@ inline juce::File findSiblingVst3 (const juce::File& standalone, const juce::Str
     return {};
 }
 
-/** The template in a CMake build tree, for CEditor's own Hostage tab: the standalone, the bundle
-    and the helpers where the build put them. Empty where nothing was built. */
-inline Template findTemplateInBuildTree (const juce::File& buildDir, const juce::String& config = "Release")
+#if JUCE_WINDOWS
+inline const juce::StringArray& helperFileNames()
 {
-    Template found;
-    const auto program = [] (const juce::File& folder)
+    static const juce::StringArray names { "CEditorPluginScanner.exe", "CEditorPluginWorker.exe" };
+    return names;
+}
+#else
+inline const juce::StringArray& helperFileNames()
+{
+    static const juce::StringArray names { "CEditorPluginScanner", "CEditorPluginWorker" };
+    return names;
+}
+#endif
+
+/** The program in a folder: an .exe on Windows, a file with no extension elsewhere, and not one
+    of the helpers. Empty where there is none. */
+inline juce::File findProgramIn (const juce::File& folder)
+{
+    for (const auto& file : folder.findChildFiles (juce::File::findFiles, false))
     {
-        for (const auto& file : folder.findChildFiles (juce::File::findFiles, false))
-           #if JUCE_WINDOWS
-            if (file.hasFileExtension (".exe"))
-           #else
-            if (file.getFileExtension().isEmpty())
-           #endif
-                return file;
-        return juce::File();
-    };
-    for (const auto& folder : { buildDir.getChildFile ("CEHostStandalone_artefacts").getChildFile (config),
-                                buildDir.getChildFile ("CEHostStandalone_artefacts") })
-        if (const auto file = program (folder); file != juce::File() && found.standalone == juce::File())
-            found.standalone = file;
-    if (found.hasStandalone())
-        found.vst3Bundle = findSiblingVst3 (found.standalone, {});
-   #if JUCE_WINDOWS
-    const juce::StringArray helpers { "CEditorPluginScanner.exe", "CEditorPluginWorker.exe" };
-   #else
-    const juce::StringArray helpers { "CEditorPluginScanner", "CEditorPluginWorker" };
-   #endif
-    for (const auto& helper : helpers)
-        for (const auto& folder : { buildDir.getChildFile (config), buildDir })
+        if (helperFileNames().contains (file.getFileName()))
+            continue;
+       #if JUCE_WINDOWS
+        if (file.hasFileExtension (".exe"))
+       #else
+        if (file.getFileExtension().isEmpty())
+       #endif
+            return file;
+    }
+    return {};
+}
+
+/** The helpers, from the first of `folders` that has each. */
+inline void addHelpersFrom (Template& found, std::initializer_list<juce::File> folders)
+{
+    for (const auto& helper : helperFileNames())
+        for (const auto& folder : folders)
             if (const auto file = folder.getChildFile (helper); file.existsAsFile())
             {
                 found.companions.add (file);
                 break;
             }
+}
+
+/** The template in a CMake build tree, for CEditor's own Hostage tab in a source checkout: the
+    standalone, the bundle and the helpers where the build put them. Empty where nothing was
+    built. */
+inline Template findTemplateInBuildTree (const juce::File& buildDir, const juce::String& config = "Release")
+{
+    Template found;
+    for (const auto& folder : { buildDir.getChildFile ("CEHostStandalone_artefacts").getChildFile (config),
+                                buildDir.getChildFile ("CEHostStandalone_artefacts") })
+        if (const auto file = findProgramIn (folder); file != juce::File() && found.standalone == juce::File())
+            found.standalone = file;
+    if (found.hasStandalone())
+        found.vst3Bundle = findSiblingVst3 (found.standalone, {});
+    addHelpersFrom (found, { buildDir.getChildFile (config), buildDir });
+    return found;
+}
+
+/** The template an installed CEditor ships, for its Hostage tab: templates/hostage beside it
+    (tools/scripts/package-installer.ps1), with the standalone in Standalone/ and the bundle in
+    VST3/. The helpers are the ones the template brings, or else CEditor's own, which are the
+    same programs and are installed beside it. Empty where there is no such folder. */
+inline Template findInstalledTemplate (const juce::File& folder, const juce::File& helpersDir)
+{
+    Template found;
+    found.standalone = findProgramIn (folder.getChildFile ("Standalone"));
+    for (const auto& bundle : folder.getChildFile ("VST3").findChildFiles (juce::File::findDirectories, false, "*.vst3"))
+    {
+        found.vst3Bundle = bundle;
+        break;
+    }
+    if (found.hasStandalone() || found.hasVst3())
+        addHelpersFrom (found, { folder.getChildFile ("Standalone"), helpersDir });
     return found;
 }
 
