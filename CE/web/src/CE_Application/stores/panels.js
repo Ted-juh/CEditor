@@ -212,7 +212,8 @@ function serializePanelDocument(panel) {
  * A saved .cepanel stores each control as a diff against its type's defaults and is expanded again
  * by deserializePanel. The exported plugin never runs that code: Player/PanelValueModel.h parses
  * the .cepanel in C++ and reads Core, Behavior and Scripts directly off controls[]. A field that
- * was elided is simply absent to it. So the build payload is written in full.
+ * was elided is simply absent to it. So the build payload is written in full — all but authored
+ * parts, which that C++ never reads and the player page expands as it loads them.
  */
 export function serializePanelForExport(panel) {
   return serializePanel(panelWithBoundScripts(panel), {

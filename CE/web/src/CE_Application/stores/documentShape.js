@@ -319,6 +319,36 @@ export function expandControl(sparse) {
   return control;
 }
 
+/**
+ * A complete control with its authored parts in the form a saved document gives them — the shape
+ * of the export payload.
+ *
+ * The payload is complete because the plug-in's C++ (Player/PanelValueModel.h) reads controls off
+ * it raw and cannot rebuild a default it never saw. But nothing in that C++ reads a part. The one
+ * thing that draws parts is the player page, and it loads the payload through deserializePanel,
+ * whose expandControl gives every authored part its defaults back with expandPart, exactly as the
+ * editor does on opening a file. So parts can travel sparse and arrive whole, and only controls
+ * need writing out.
+ *
+ * It is most of the file. A part's section defaults were 26 MB of the AN1x's 35 MB payload and
+ * 18.5 of GAIA's 29, and the plug-in parses that file three times while it starts and keeps one
+ * juce::var copy for its lifetime: 101 MB for the AN1x, against 42 MB with sparse parts.
+ *
+ * What it gives up, said rather than found later: a window-closed script that addresses a part by
+ * path now reads the saved form, so a property still at its default reads as nothing, and a write
+ * into a sub-object that was elided is refused. No panel in the tree has such a script, and the
+ * C++ already does not follow a published property into its part, which is the route the API
+ * offers for reaching inside a component.
+ */
+export function shrinkAuthoredParts(control) {
+  const pristine = pristineFor(control?._children?.Core?.controlType);
+  const kids = childMapOf(control);
+  const working = kids && Object.keys(kids).length
+    ? withChildMap(control, Object.fromEntries(Object.entries(kids).map(([key, child]) => [key, shrinkAuthoredParts(child)])))
+    : control;
+  return mapAuthoredParts(working, typePartNames(pristine), shrinkPart);
+}
+
 /** Exposed so tests can assert the reserved key never collides with a real model key. */
 export const REMOVED_KEY = REMOVED;
 export const NEVER_ELIDED_TYPES = NEVER_ELIDE;

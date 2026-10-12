@@ -3,7 +3,7 @@ import { defaultControlSetId, defaultGridSize, defaultSnapToGrid } from './runti
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
 import { normalizeCaptureSession } from '../utils/captureSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
-import { expandControl, shrinkControl } from './documentShape.js';
+import { expandControl, shrinkAuthoredParts, shrinkControl } from './documentShape.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
 import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
 import { controlSetLibrary } from './controlSetLibraryStore.js';
@@ -304,7 +304,10 @@ function panelNameFromPath(filePath) {
  *   C++ (Player/PanelValueModel.h walks controls[] and reads Core, Behavior and Scripts straight
  *   off it), and that reader has no way to reconstruct a default it never saw. So the authoring
  *   document is compact and the export payload is complete, and the split is explicit rather than
- *   something the exporter has to remember.
+ *   something the exporter has to remember. Complete except for authored parts (every part of a
+ *   custom component, and any added to a built-in control), which no C++ reads and the player
+ *   page expands on load: they go out as a saved document has them (shrinkAuthoredParts in
+ *   documentShape.js says why, and what it costs).
  */
 export function serializePanel(panel, options = {}) {
   const { id, modified, ...data } = panel;
@@ -319,7 +322,7 @@ export function serializePanel(panel, options = {}) {
   const baked = options.bakeControlSet
     ? controls.map((control) => resolveControlForSet(control, options.bakeControlSet))
     : controls;
-  data.controls = elide ? baked.map(toDocumentForm) : baked;
+  data.controls = elide ? baked.map(toDocumentForm) : baked.map(shrinkAuthoredParts);
 
   // Panel identity. deserializePanel prefers the name the host derives from the filename, so a
   // stale `name` in the document is invisible in the app and only shows up when someone reads the

@@ -2,8 +2,10 @@
 //
 // A saved .cepanel stores each control as a difference from its type's defaults
 // (CE/web/src/CE_Application/stores/documentShape.js). The plug-in's C++ reader
-// (Player/PanelValueModel.h) cannot rebuild a default it never saw, so it needs every field written
-// out, colour-set tokens resolved to literals, and the export parameters derived from full controls.
+// (Player/PanelValueModel.h) cannot rebuild a default it never saw, so it needs every field of every
+// control written out, colour-set tokens resolved to literals, and the export parameters derived from
+// full controls. (Not of every part: no C++ reads one, so parts travel as a saved document has them
+// and the player page expands them — shrinkAuthoredParts in stores/documentShape.js.)
 // The editor does exactly that before it hands a panel to the exporter (serializePanelForExport in
 // stores/panels.js). Anything that bakes a saved file directly did not:
 //
