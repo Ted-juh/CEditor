@@ -21,7 +21,7 @@ panel API (mirrors `CE/web/src/CE_Application/scripting/panelApi.js`).
 |------|------|
 | `ScriptRuntime.h/.cpp` | Interfaces + routing: lifecycle hooks, event dispatch, origin/transmit tracking, error logging. Pure C++. |
 | `LuaScriptEngine.cpp` | Lua 5.4 via Sol3. Per-script `sol::environment` isolation, native API bindings, pure-Lua helper prelude. |
-| `JsScriptEngine.cpp` | JS via `juce::JavascriptEngine`. One engine per script, native `__api` object + JS prelude. |
+| `JsScriptEngine.cpp` | JS via `juce::JavascriptEngine`. One engine per panel, each script a function scope with its own per-script context (listeners, timers, `state`, `self`); native `__api` object + JS prelude. |
 | `BridgeScriptHost.h` | `ScriptHostApi` impl forwarding to app-supplied callbacks; computes transmit-by-default. |
 
 ## Build

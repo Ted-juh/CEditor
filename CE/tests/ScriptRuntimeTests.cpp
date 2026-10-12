@@ -2909,6 +2909,95 @@ int main()
                "a panel carrying no modules reads as none");
     }
 
+    // 40) One JavaScript engine for the whole panel --------------------------------------------------
+    // Every JavaScript script used to get an engine of its own, and that was what kept their handlers,
+    // globals, `state` and `self` apart. It also cost 650 KB a script. The engine is shared now
+    // (JsScriptEngine.cpp, the top of the prelude), so each check here is something the separate
+    // engines guaranteed, asked of the shared one.
+    {
+        TestHost shareHost;
+        ScriptRuntime share (shareHost);
+        shareHost.runtime = &share;
+        juce::StringArray shareErrors;
+        share.setErrorLogger ([&shareErrors] (const juce::String& line)
+            { shareErrors.add (line); std::cout << "  [error] " << line << "\n"; });
+
+        juce::Array<juce::var> iso;
+        iso.add (makeScript ("isoA", "javascript", "panel", "onPing", "*",
+            "var count = 0;\n"
+            "self.tag = 'A';\n"
+            "function onPing() { count++; state.mine = 'A'; log('A ' + count + ' ' + state.mine); }\n"
+            "function onSeeA() { log('A sees ' + state.mine + ' ' + (ce.storage.state === state)); }\n"
+            "on('*', 'onShout', function () { log('A heard'); });\n"
+            "defineAction('fromA', function (n) { count += 10; return 'A' + count + ':' + state.mine; });"));
+        iso.add (makeScript ("isoB", "javascript", "panel", "onPing", "*",
+            "var count = 100;\n"
+            "function onPing() { count++; log('B ' + count + ' ' + state.mine); }\n"
+            "function onCallA() { log('B got ' + run('fromA', 1) + ' then ' + count + ' ' + state.mine); }\n"
+            "function onProbe() { log('B sees ' + typeof onSeeA + ' ' + self.tag); }\n"
+            "const onConst = function () { log('B const'); };\n"
+            "off('*', 'onShout');"));
+        // A component script: its `self` is its own control, not the panel the others are on.
+        iso.add (makeScript ("isoC", "javascript", "component", "onSelfJs", "knob",
+            "function onSelfJs() { self.set('value', 7); }"));
+        iso.add (makeScript ("isoBad", "javascript", "panel", "onPing", "*",
+            "function onPing() { log('BAD ran'); }\nthrow new Error('top level fails');"));
+        // after() in two scripts: each needs its own copy of the listener the prelude registers.
+        iso.add (makeScript ("isoT1", "javascript", "panel", "onArmT", "*",
+            "function onArmT() { after(10, function () { log('T1 fired'); }); }"));
+        iso.add (makeScript ("isoT2", "javascript", "panel", "onArmT", "*",
+            "function onArmT() { after(10, function () { log('T2 fired'); }); }"));
+        share.loadScripts (juce::var (iso));
+
+        share.dispatchEvent ("onPing", "panel", juce::var());
+        share.dispatchEvent ("onPing", "panel", juce::var());
+        check (shareHost.logs.contains ("A 2 A"), "two scripts both define onPing, and each runs its own");
+        check (shareHost.logs.contains ("B 102 undefined"),
+               "…with its own top-level `count`, and a `state` the other script's writes do not reach");
+        check (! shareHost.logs.contains ("BAD ran"), "a script whose top level throws is not loaded");
+        check (shareErrors.joinIntoString ("\n").contains ("isoBad")
+                   && shareErrors.joinIntoString ("\n").contains ("load error"),
+               "…and says so, under its own id");
+
+        shareHost.logs.clear();
+        share.runAction ("onSeeA", juce::var());
+        check (shareHost.logs.contains ("A sees A true"), "ce.storage.state is the running script's `state`");
+        share.runAction ("onProbe", juce::var());
+        check (shareHost.logs.contains ("B sees undefined undefined"),
+               "one script cannot see another's functions, nor what it put on its `self`");
+        share.runAction ("onConst", juce::var());
+        check (shareHost.logs.contains ("B const"), "a handler held in a top-level const is found by name");
+
+        // run() from one script into another re-enters the shared engine. The action has to run as
+        // the script that defined it, and the caller has to be itself again afterwards.
+        share.runAction ("onCallA", juce::var());
+        check (shareHost.logs.contains ("B got A12:A then 102 undefined"),
+               "run() across scripts runs the action in its own script, and hands the caller back intact");
+
+        shareHost.logs.clear();
+        share.dispatchEvent ("onShout", "panel", juce::var());
+        check (shareHost.logs.size() == 1 && shareHost.logs[0] == "A heard",
+               "off() in one script leaves another script's listener alone");
+
+        share.runAction ("onSelfJs", juce::var());
+        check (shareHost.values.count ("knob.value") == 1 && (int) shareHost.values["knob.value"] == 7,
+               "a component script's `self` is its own control");
+
+        shareHost.logs.clear(); shareHost.timerStarts.clear();
+        share.dispatchEvent ("onArmT", "panel", juce::var());
+        check (shareHost.timerStarts.size() == 2, "after() in two scripts arms two timers");
+        juce::StringArray ids (shareHost.timerStarts);
+        ids.removeDuplicates (false);
+        for (const auto& id : ids)
+        {
+            auto* info = new juce::DynamicObject();
+            info->setProperty ("id", id);
+            share.dispatchEvent ("onTimer", "", juce::var (info));
+        }
+        check (shareHost.logs.contains ("T1 fired") && shareHost.logs.contains ("T2 fired"),
+               "…and both fire: each script starts with its own copy of the prelude's listeners");
+    }
+
     std::cout << "------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

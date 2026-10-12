@@ -1,9 +1,15 @@
 // JsScriptEngine — JavaScript via juce::JavascriptEngine (QuickJS, juce_javascript module).
 //
-// Isolation: ONE juce::JavascriptEngine PER script (QuickJS has a single global scope per engine),
-// so handler names + `self` never clash. Native calls go through a registered "__api" object;
-// helpers / on / emit / self / noTransmit are defined in a JS prelude (kept in sync with the Lua
-// prelude + panelApi.js).
+// ONE juce::JavascriptEngine per panel, shared by every JavaScript script on it. Each script runs as
+// the body of a function, so what it declares is its own and two scripts can both define onClick;
+// what the prelude keeps per script (listeners, rules, timers, `state`, `self`) is switched in on
+// every entry. The top of the prelude says how, and what an engine per script used to cost. Native
+// calls go through a registered "__api" object; helpers / on / emit / self / noTransmit are defined
+// in a JS prelude (kept in sync with the Lua prelude + panelApi.js).
+//
+// What a shared engine does NOT isolate: an assignment to a name the script never declared creates a
+// global, and a write onto a built-in (Math, Array.prototype) or onto `ce` changes it for every
+// script on the panel. Declared names are private. None of the 236 scripts in the tree does either.
 //
 // NOTE: juce::JavascriptEngine's exact surface (registerNativeObject / callFunction / NativeFunctionArgs)
 // should be confirmed against the JUCE 8 headers during the build — this is the less-certain engine.
@@ -13,8 +19,8 @@
 #include <juce_javascript/juce_javascript.h>
 
 #include <cmath>
-#include <map>
 #include <memory>
+#include <set>
 
 namespace ceditor::scripting
 {
@@ -24,10 +30,107 @@ namespace
 const char* kJsPrelude = R"JS(
 // @module -
 // Wrap the native bridge as globals + pure-math helpers + event registry + self.
-var __listeners = [];
+//
+// ONE ENGINE PER PANEL, ONE CONTEXT PER SCRIPT. This prelude runs once, and every JavaScript script
+// on the panel shares the engine it runs in. It used to run once per script, each in an engine of
+// its own, and that cost 650 KB a script where the engine itself is 75 KB: a panel of 232 scripts
+// held 150 MB of identical copies of this file. What a script owns is not this code but a handful
+// of tables (its listeners, rules, actions, timers, `state`, its `self`), and __CE_OWN lists them.
+// Each script gets its own copy, and the names below are accessors onto whichever script is
+// running (__ceCur). The host enters a script only through __ceAdd, __ceCall and __ceIn, which
+// switch __ceCur and put it back, so the rest of this file is written as if it served one script,
+// and it does, one at a time.
+var __ceGlobal = (typeof globalThis !== 'undefined') ? globalThis : this;
+var __ceCur = {
+  __owner: "", __scriptId: "", self: null, state: {},
+  __listeners: [], __watchers: [], __computeds: [], __filters: [], __actions: {},
+  __filterDepth: 0, __reactiveDepth: 0, __timerIds: {}, __syncFollow: {},
+  __rndStates: {}, __streamOverride: "", __midiIn: [], __midiOut: [], __lastSyncBpm: null,
+  __after: {}, __afterN: 0, __animDone: {}, __animGroup: {}, __animGroupN: 0, __dumpWaiters: []
+};
+var __CE_OWN = Object.keys(__ceCur);
+// The prelude's own context, current while this file loads. What the prelude registers for itself
+// (the on("*", ...) listeners further down, above all) lands here, and every script starts from a
+// copy of it, as each script's private engine used to start from a freshly run prelude.
+var __cePrelude = __ceCur;
+for (var __ceI = 0; __ceI < __CE_OWN.length; __ceI++) {
+  (function (name) {
+    // An identity set on the global before this file runs (an embedding that runs one script and
+    // injects __scriptId, as the host's boot string used to) becomes the prelude context's own.
+    if (Object.prototype.hasOwnProperty.call(__ceGlobal, name)) __ceCur[name] = __ceGlobal[name];
+    Object.defineProperty(__ceGlobal, name, {
+      get: function () { return __ceCur[name]; },
+      set: function (v) { __ceCur[name] = v; },
+      enumerable: false, configurable: false
+    });
+  })(__CE_OWN[__ceI]);
+}
+__ceCur.self = __ceMakeSelf();
+
+// A script's starting context: a copy of the prelude's, with its own identity, `self` and `state`.
+// Arrays and tables are copied one level deep, which is as deep as anything here is shared: a
+// listener or rule entry is replaced, never edited in place.
+function __ceFresh(owner, scriptId) {
+  var ctx = {};
+  for (var i = 0; i < __CE_OWN.length; i++) {
+    var k = __CE_OWN[i], v = __cePrelude[k];
+    if (Array.isArray(v)) ctx[k] = v.slice();
+    else if (v !== null && typeof v === "object") {
+      var o = {};
+      for (var p in v) if (Object.prototype.hasOwnProperty.call(v, p)) o[p] = v[p];
+      ctx[k] = o;
+    } else ctx[k] = v;
+  }
+  ctx.__owner = owner; ctx.__scriptId = scriptId; ctx.self = __ceMakeSelf(); ctx.state = {};
+  return ctx;
+}
+var __ceScripts = {};
+// Load a script. `body` is the script's source wrapped in a function by the host, so its top-level
+// declarations are its own, and it returns the resolver its handlers are looked up through. A
+// script whose top level throws is not added: nothing it registered can be reached afterwards.
+function __ceAdd(id, owner, body) {
+  var ctx = __ceFresh(owner, id), prev = __ceCur;
+  __ceCur = ctx;
+  try { ctx.__resolve = body(); } finally { __ceCur = prev; }
+  __ceScripts[id] = ctx;
+}
+// A handler, looked up by name in the script's own scope as `typeof name === 'function'` used to
+// be asked of its private engine, so a handler can be a function declaration, a var or a
+// let/const at the script's top level.
+function __ceHandler(ctx, name) {
+  if (typeof ctx.__resolve !== "function" || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name)) return undefined;
+  var f;
+  try { f = ctx.__resolve("typeof " + name + " === 'function' ? " + name + " : undefined"); }
+  catch (err) { return undefined; }
+  return typeof f === "function" ? f : undefined;
+}
+function __ceHas(id, name) {
+  var ctx = __ceScripts[id];
+  return ctx !== undefined && __ceHandler(ctx, name) !== undefined;
+}
+// Call a script's handler, inside its context.
+function __ceCall(id, name, payload) {
+  var ctx = __ceScripts[id];
+  if (ctx === undefined) return undefined;
+  var prev = __ceCur;
+  __ceCur = ctx;
+  try {
+    var f = __ceHandler(ctx, name);
+    return f === undefined ? undefined : f(payload);
+  } finally { __ceCur = prev; }
+}
+// Run one of this prelude's own entry points (__deliver, __runReactive, ...) for one script.
+function __ceIn(id, name, args) {
+  var ctx = __ceScripts[id];
+  if (ctx === undefined) return undefined;
+  var prev = __ceCur;
+  __ceCur = ctx;
+  try { return __ceGlobal[name].apply(undefined, args || []); } finally { __ceCur = prev; }
+}
+
 function on(target, event, fn) { __listeners.push({ t: target, e: event, fn: fn }); }
-// off(target, event) — this engine instance holds one script's listeners (QuickJS gives each script
-// its own engine), so filtering here is already scoped to the calling script.
+// off(target, event) — __listeners is the calling script's own list (__CE_OWN), so filtering here
+// is already scoped to it.
 function off(target, event) {
   var kept = [];
   for (var i = 0; i < __listeners.length; i++) {
@@ -46,10 +149,8 @@ function __deliver(target, event, payload) {
 /* --- the reactive core: watch / compute / intercept / defineAction ---------------------------
  * The verbs that do what setting a property cannot: a property is a CONSTANT chosen at design
  * time, each of these is a RULE the runtime keeps applying. In JS they live in the prelude rather
- * than in C++, for the same reason on()/off() do — QuickJS gives each script its own engine, so
- * these arrays are already scoped to one script and need no tagging. */
-var __watchers = [], __computeds = [], __filters = [], __actions = {};
-var __filterDepth = 0, __reactiveDepth = 0;
+ * than in C++, for the same reason on()/off() do: these arrays are the calling script's own
+ * (__CE_OWN at the top of this file), so they need no tagging. */
 
 function __sig(v) { return v === undefined ? "\u0000void" : JSON.stringify(v); }
 // A rule REPLACES the same path's rule rather than stacking beside it: two filters on one path
@@ -142,31 +243,34 @@ function set(path, value, opts) {
 }
 function get(path, form) { return __api.get(path, form || "value"); }
 
-// `self` — owner-relative set/get (Q7), parity with the Lua/Python preludes. __owner is injected per
-// script (boot string below). Plain object literal (not an ES class) so it works in QuickJS configs
-// without class support. Empty/"self"/"*" owner => no prefix.
+// `self` — owner-relative set/get (Q7), parity with the Lua/Python preludes. __owner is the running
+// script's (__CE_OWN), and each script gets its own `self` from __ceMakeSelf. Plain object literal
+// (not an ES class) so it works in QuickJS configs without class support. Empty/"self"/"*" owner =>
+// no prefix.
 function __ownerPrefix(p) {
   var o = (typeof __owner !== 'undefined' && __owner) ? __owner : "";
   return !o ? p : (o + "." + p);
 }
-var self = {
-  set: function (p, value, opts) { return __api.set(__ownerPrefix(p), value, opts || null); },
-  get: function (p, form) { return __api.get(__ownerPrefix(p), form || "value"); }
-};
+function __ceMakeSelf() {
+  return {
+    set: function (p, value, opts) { return __api.set(__ownerPrefix(p), value, opts || null); },
+    get: function (p, form) { return __api.get(__ownerPrefix(p), form || "value"); }
+  };
+}
 // @module ce.midi
 function sendCC(ch, cc, v) { return __api.sendCC(ch, cc, v); }
 function sendNRPN(ch, msb, lsb, v) { return __api.sendNRPN(ch, msb, lsb, v); }
 function sendSysex(bytes) { return __api.sendSysex(bytes); }
 // @module ce.device
 // requestDump is assembled further down, over __api.requestDump: it takes an optional callback,
-// which is a language value the host has no per-engine way to call back.
+// which is a language value the host has no way to call back.
 function applyDump(bytes) { return __api.applyDump(bytes); }
 function sendDump(kind) { return __api.sendDump(kind); }
 function buildDump(kind) { return __api.buildDump(kind); }
 // @module ce.time
 // The prelude tracks which timers exist (runningTimers) and which follow the tempo (syncTimer), so
-// these are more than a pass-through to the host.
-var __timerIds = {}, __syncFollow = {};
+// these are more than a pass-through to the host. Both tables, __timerIds and __syncFollow, are the
+// running script's own (__CE_OWN).
 function startTimer(id, ms) {
   var key = String(id === undefined || id === null ? "" : id);
   if (!key) return undefined;
@@ -588,11 +692,9 @@ function unshape(y, curve, tension) {
 // five runtimes, so a "random" patch could not be reproduced and a generative sequence would sound
 // different in the editor and in the export.
 var __RND_DEFAULT = 0x9E3779B9;
-// ONE GENERATOR PER STREAM. QuickJS gives every script its own engine, so this table is already
-// per script and the key only has to separate streams within one — where a single state meant
-// shuffle() advanced what gaussian() read, and seeding one element reset the other.
-var __rndStates = {};
-var __streamOverride = "";
+// ONE GENERATOR PER STREAM. __rndStates is the running script's own (__CE_OWN), so the key only has
+// to separate streams within one script, where a single state meant shuffle() advanced what
+// gaussian() read, and seeding one element reset the other. __streamOverride is per script too.
 function randomSeed(n) {
   var v = (Math.floor(Number(n) || 0)) >>> 0;
   // 0 is a DEAD state for xorshift — it would return zero forever — so it means "the default"
@@ -1409,7 +1511,7 @@ function sendNote(channel, note, velocity, ms) {
 // input and the transport long before any script sees it, so the HOST runs these chains.
 function routeMidi(role, fn) { __api.beginRoute(String(role || "")); try { fn(); } finally { __api.endRoute(); } }
 function feedMidi(bytes) { return __api.feedMidi(bytes); }
-var __midiIn = [], __midiOut = [];
+// __midiIn and __midiOut are the running script's own (__CE_OWN).
 function interceptMidiIn(fn) { __midiIn = [fn]; }
 function interceptMidiOut(fn) { __midiOut = [fn]; }
 function __applyMidiFilter(inbound, bytes) {
@@ -1525,7 +1627,7 @@ function __reArmSyncTimers() {
     __syncFollow[k] = pending[k];
   }
 }
-var __lastSyncBpm = null;
+// __lastSyncBpm is per script (__CE_OWN), and so is this listener: every script starts with a copy.
 on("*", "onTransport", function (t) {
   var bpm = t && t.bpm !== undefined ? t.bpm : null;
   if (bpm === __lastSyncBpm) return;
@@ -1539,8 +1641,8 @@ on("*", "onTransport", function (t) {
 //
 // The order inside the tick is why this exists instead of every panel hand-rolling it. The entry is
 // removed and the timer stopped BEFORE fn runs, so a callback that throws cannot leave a one-shot
-// repeating forever — which is precisely what the hand-rolled version does.
-var __after = {}, __afterN = 0;
+// repeating forever — which is precisely what the hand-rolled version does. __after and __afterN
+// are the running script's own (__CE_OWN).
 function after(ms, fn) {
   if (typeof fn !== "function") {
     log("after(ms, fn) needs a function to run — nothing was scheduled");
@@ -1715,8 +1817,8 @@ function clockTempo(intervalsMs) {
 //
 // `done` is a FUNCTION the script owns, so the host cannot call it: the engine emits __animDone and
 // this routes it to the function stored here. Exactly how after()'s one-shot works, and the reason
-// a completion callback can be a plain argument in every language.
-var __animDone = {}, __animGroup = {}, __animGroupN = 0;
+// a completion callback can be a plain argument in every language. __animDone, __animGroup and
+// __animGroupN are the running script's own (__CE_OWN).
 
 // An envelope's shape is SAMPLED here, with map() — ce.math's, which is the Envelope component's
 // own envValueAt — and the host interpolates the samples. That is what lets the host engine run an
@@ -1921,8 +2023,8 @@ function deviceDefineDump(kind, spec, role) { return __define("dump", kind, spec
 // nothing tying it to the request.
 //
 // The waiter is removed BEFORE the callback runs, so a throw inside it cannot leave one armed for
-// the next dump — the same rule after() follows, for the same reason.
-var __dumpWaiters = [];
+// the next dump — the same rule after() follows, for the same reason. __dumpWaiters is the running
+// script's own (__CE_OWN).
 function __resolveDumps(kind, role, values, err) {
   for (var i = 0; i < __dumpWaiters.length;) {
     var w = __dumpWaiters[i];
@@ -1958,10 +2060,9 @@ on("*", "onDumpReceived", function(info) {
 });
 
 // @module ce.storage
-// ce.storage. `state` is a plain object: QuickJS gives each script its own engine, whose globals
-// live as long as the script is loaded, so it persists between handler calls with no host help.
-// Settings go through the host, because they outlive the session.
-var state = {};
+// ce.storage. `state` is a plain object, the running script's own (__CE_OWN), which lives as long as
+// the script is loaded, so it persists between handler calls with no host help. Settings go through
+// the host, because they outlive the session.
 
 /* Three scopes, differing in who sees a value and where it lives (design doc §43):
  *   panel  — shared by every script on the panel, in the document, travels with it. The default,
@@ -2256,6 +2357,35 @@ function __ce_register_module(path, members, version, runtime) {
 
 __ce_apply_modules(null);
 // END GENERATED module namespace
+
+// The gate above builds the namespace once for the panel, which is right for functions. A VALUE
+// member (ce.storage.state) is different: it is the same object as the global it mirrors, and that
+// global is the running script's own (__CE_OWN). So after every application of the gate, a value
+// member becomes an accessor onto the running script, and ce.storage.state stays `state`.
+function __ceOwnValues() {
+  for (var path in __CE_MODULES) {
+    if (!Object.prototype.hasOwnProperty.call(__CE_MODULES, path)) continue;
+    var node = ce, segs = path.split('.').slice(1);
+    for (var s = 0; s < segs.length && node; s++) node = node[segs[s]];
+    if (!node) continue;
+    var members = __CE_MODULES[path];
+    for (var key in members) {
+      if (!Object.prototype.hasOwnProperty.call(members, key)) continue;
+      if (__CE_VALUES[members[key]] === true && __CE_OWN.indexOf(members[key]) >= 0)
+        __ceOwnValue(node, key, members[key]);
+    }
+  }
+}
+function __ceOwnValue(node, key, name) {
+  Object.defineProperty(node, key, {
+    get: function () { return __ceCur[name]; },
+    set: function (v) { __ceCur[name] = v; },
+    enumerable: true, configurable: true
+  });
+}
+var __ceApplyModules = __ce_apply_modules;
+__ce_apply_modules = function (enabled) { __ceApplyModules(enabled); __ceOwnValues(); };
+__ceOwnValues();
 )JS";
 
 // Build the native "__api" object the prelude wraps.
@@ -2358,32 +2488,23 @@ public:
 
     bool installApi (ScriptHostApi& h) override { host = &h; return true; }
 
-    // Stored, not applied: every script gets its own QuickJS engine, so the gate goes on at load.
-    // Changing the set after scripts are loaded re-gates the engines that already exist, which is
-    // what makes toggling a module in the editor take effect without a reload.
+    // One engine serves every script (see the top of the prelude), so the gate goes on once and
+    // covers them all. Stored as well, for the engine the first script creates.
     void setEnabledModules (const juce::StringArray& moduleIds) override
     {
         enabledModules = moduleIds;
-        for (auto& [id, eng] : engines)
-        {
-            juce::ignoreUnused (id);
-            eng->execute (moduleGateCall());
-        }
+        if (engine != nullptr) engine->execute (moduleGateCall());
     }
 
-    // Also stored rather than applied: QuickJS gives each script its own engine, so a module has to
-    // be installed into each of them. Re-installing into engines that already exist keeps a module
-    // added mid-session usable without reloading every script.
+    // Likewise installed once into the shared engine. A module added mid-session is usable by every
+    // loaded script without a reload. A module whose prelude registers listeners at its own top level
+    // registers them in the prelude's context, so scripts loaded after it start with them and scripts
+    // already loaded do not; no shipped module does either.
     void setExtensionModules (const juce::var& modules) override
     {
         extensions = modules;
         const auto boot = extensionBoot();
-        if (boot.isEmpty()) return;
-        for (auto& [id, eng] : engines)
-        {
-            juce::ignoreUnused (id);
-            eng->execute (boot);
-        }
+        if (engine != nullptr && boot.isNotEmpty()) engine->execute (boot);
     }
 
     bool loadScript (const ScriptDefinition& def, const ScriptErrorSink& onError) override
@@ -2399,93 +2520,82 @@ public:
         }
         const juce::String code = def.compiledSource.isNotEmpty() ? def.compiledSource : def.source;
 
-        auto eng = std::make_unique<juce::JavascriptEngine>();
-        // Anti-flood / loop guard (scripting-redesign §7 keep-list): QuickJS's
-        // interrupt handler aborts any evaluate/callFunction that runs longer
-        // than this, so `while (true) {}` in a handler can't freeze the DAW.
-        eng->maximumExecutionTime = juce::RelativeTime::seconds (2.0);
-        eng->registerNativeObject ("__api", makeApi (host, def.owner).get());
+        if (! ensureEngine())
+        {
+            onError (def.id, "prelude error: " + preludeError);
+            return false;
+        }
 
-        // Inject owner + prelude + the user source (or transpiled JS for TypeScript).
-        // resolveSelfOwner: a panel script's `self` is the panel, a component script's is its control.
-        // __scriptId as well as __owner: ce.storage's "script" scope spells a private key with the
-        // owning script's id in it, so the prelude has to be able to read it.
-        juce::String boot = "var __owner = " + resolveSelfOwner (def).quoted() + ";\n"
-                          + "var __scriptId = " + def.id.quoted() + ";\n";
-        // …then gate the API down to the panel's declared modules. QuickJS gives every script its
-        // own engine, so the gate is applied per script here rather than once for the language.
-        // fromUTF8, NOT String(const char*): the prelude contains ♭/♯ literals, and the plain
-        // constructor reads bytes as single characters — every non-ASCII glyph arrives mangled.
-        auto r1 = eng->execute (boot + juce::String::fromUTF8 (kJsPrelude) + "\n" + extensionBoot() + moduleGateCall());
-        if (r1.failed()) { onError (def.id, "prelude error: " + r1.getErrorMessage()); return false; }
+        // The script becomes the body of a function, so what it declares at its top level is its own
+        // and two scripts can both define onClick, which is the isolation an engine apiece used to
+        // buy. The function returns a resolver evaluated in the script's scope, which is how a
+        // handler is found by name. Everything else the script names resolves to the prelude's
+        // globals, the gated ones included.
+        //
+        // The source starts on the wrapper's first line, so an error's line number is the script's
+        // own. resolveSelfOwner: a panel script's `self` is the panel, a component script's is its
+        // control.
+        const auto r = engine->execute ("__ceAdd(" + jsString (def.id) + "," + jsString (resolveSelfOwner (def))
+                                        + ",function(){" + code
+                                        + "\n;return function(__ceName){return eval(__ceName);};});");
+        if (r.failed()) { onError (def.id, "load error: " + withoutWrapperFrames (r.getErrorMessage(), true)); return false; }
 
-        auto r2 = eng->execute (code);
-        if (r2.failed()) { onError (def.id, "load error: " + r2.getErrorMessage()); return false; }
-
-        engines[def.id] = std::move (eng);
+        loaded.insert (def.id);
         return true;
     }
 
     bool hasHandler (const juce::String& scriptId, const juce::String& fn) const override
     {
-        auto it = engines.find (scriptId);
-        if (it == engines.end()) return false;
+        if (engine == nullptr || loaded.count (scriptId) == 0) return false;
         juce::Result err = juce::Result::ok();
-        auto v = it->second->evaluate ("typeof " + fn + " === 'function'", &err);
+        const juce::var args[] = { scriptId, fn };
+        auto v = engine->callFunction ("__ceHas", juce::var::NativeFunctionArgs (juce::var(), args, 2), &err);
         return err.wasOk() && (bool) v;
     }
 
     juce::var dispatch (const juce::String& scriptId, const juce::String& fn,
                         const juce::var& payload, const ScriptErrorSink& onError) override
     {
-        auto it = engines.find (scriptId);
-        if (it == engines.end()) return {};
+        if (engine == nullptr || loaded.count (scriptId) == 0) return {};
         juce::Result err = juce::Result::ok();
-        const juce::var args[] = { payload };
-        auto result = it->second->callFunction (juce::Identifier (fn),
-                                                juce::var::NativeFunctionArgs (juce::var(), args, 1), &err);
-        if (err.failed()) onError (scriptId, err.getErrorMessage());
+        const juce::var args[] = { scriptId, fn, payload };
+        auto result = engine->callFunction ("__ceCall", juce::var::NativeFunctionArgs (juce::var(), args, 3), &err);
+        if (err.failed()) onError (scriptId, withoutWrapperFrames (err.getErrorMessage()));
         return result;
     }
 
     void deliverEvent (const juce::String& target, const juce::String& event,
                        const juce::var& payload, const ScriptErrorSink& onError) override
     {
-        for (auto& kv : engines)
+        for (const auto& id : loaded)
         {
             juce::Result err = juce::Result::ok();
-            const juce::var args[] = { target, event, payload };
-            kv.second->callFunction (juce::Identifier ("__deliver"),
-                                     juce::var::NativeFunctionArgs (juce::var(), args, 3), &err);
-            if (err.failed()) onError ("on:" + event, err.getErrorMessage());
+            callIn (id, "__deliver", { target, event, payload }, err);
+            if (err.failed()) onError ("on:" + event, withoutWrapperFrames (err.getErrorMessage()));
         }
     }
 
     /* --------------------------------------------------------------- the reactive core
-     * The rules live in each engine's prelude (see __runReactive there), because QuickJS gives
-     * every script its own engine — so the arrays are already scoped to one script and the C++
-     * side is only the caller. Every engine gets a pass: a formula in one script has to settle
+     * The rules live in the prelude (see __runReactive there), in each script's own tables, so the
+     * C++ side is only the caller. Every script gets a pass: a formula in one script has to settle
      * whatever moved in another. */
     void runReactive (const ScriptErrorSink& onError) override
     {
-        for (auto& kv : engines)
+        for (const auto& id : loaded)
         {
             juce::Result err = juce::Result::ok();
-            kv.second->callFunction (juce::Identifier ("__runReactive"),
-                                     juce::var::NativeFunctionArgs (juce::var(), nullptr, 0), &err);
-            if (err.failed()) onError ("compute/watch", err.getErrorMessage());
+            callIn (id, "__runReactive", {}, err);
+            if (err.failed()) onError ("compute/watch", withoutWrapperFrames (err.getErrorMessage()));
         }
     }
 
     bool applyMidiFilter (bool inbound, juce::var& bytes, const ScriptErrorSink& onError) override
     {
-        for (auto& kv : engines)
+        for (const auto& id : loaded)
         {
             juce::Result err = juce::Result::ok();
-            const juce::var args[] = { inbound, bytes };
-            auto out = kv.second->callFunction (juce::Identifier ("__applyMidiFilter"),
-                                                juce::var::NativeFunctionArgs (juce::var(), args, 2), &err);
-            if (err.failed()) { onError ("interceptMidi", err.getErrorMessage()); continue; }
+            auto out = callIn (id, "__applyMidiFilter", { inbound, bytes }, err);
+            if (err.failed()) { onError ("interceptMidi", withoutWrapperFrames (err.getErrorMessage())); continue; }
             if (auto* o = out.getDynamicObject())
             {
                 if (o->hasProperty ("swallow")) return false;
@@ -2498,13 +2608,11 @@ public:
     bool callAction (const juce::String& name, const juce::var& args, juce::var& result,
                      const ScriptErrorSink& onError) override
     {
-        for (auto& kv : engines)
+        for (const auto& id : loaded)
         {
             juce::Result err = juce::Result::ok();
-            const juce::var a[] = { name, args };
-            auto out = kv.second->callFunction (juce::Identifier ("__callAction"),
-                                                juce::var::NativeFunctionArgs (juce::var(), a, 2), &err);
-            if (err.failed()) { onError ("action:" + name, err.getErrorMessage()); continue; }
+            auto out = callIn (id, "__callAction", { name, args }, err);
+            if (err.failed()) { onError ("action:" + name, withoutWrapperFrames (err.getErrorMessage())); continue; }
             if (auto* o = out.getDynamicObject())
                 if ((bool) o->getProperty ("found")) { result = o->getProperty ("value"); return true; }
         }
@@ -2514,11 +2622,10 @@ public:
     juce::StringArray registeredActions() const override
     {
         juce::StringArray out;
-        for (auto& kv : engines)
+        for (const auto& id : loaded)
         {
             juce::Result err = juce::Result::ok();
-            auto names = kv.second->callFunction (juce::Identifier ("__actionNames"),
-                                                  juce::var::NativeFunctionArgs (juce::var(), nullptr, 0), &err);
+            auto names = callIn (id, "__actionNames", {}, err);
             if (err.failed()) continue;
             if (auto* arr = names.getArray())
                 for (auto& n : *arr) out.addIfNotAlreadyThere (n.toString());
@@ -2526,7 +2633,12 @@ public:
         return out;
     }
 
-    void reset() override { engines.clear(); }
+    void reset() override
+    {
+        engine.reset();
+        loaded.clear();
+        preludeError.clear();
+    }
 
 private:
     /** Each installed ce.ext.* module's JS prelude, followed by its registration call. Emitted as
@@ -2585,7 +2697,66 @@ private:
         return "__ce_apply_modules([" + quoted.joinIntoString (",") + "]);";
     }
 
-    std::map<juce::String, std::unique_ptr<juce::JavascriptEngine>> engines;
+    /** The shared engine, made with the first script: the prelude, then the installed modules, then
+        the gate, in the order each script's private engine used to boot. A panel with no JavaScript
+        never pays for it. A failed prelude is remembered and reported for every script until reset. */
+    bool ensureEngine()
+    {
+        if (engine != nullptr) return true;
+        if (preludeError.isNotEmpty()) return false;
+
+        auto eng = std::make_unique<juce::JavascriptEngine>();
+        // Anti-flood / loop guard (scripting-redesign §7 keep-list): QuickJS's interrupt handler
+        // aborts any evaluate/callFunction that runs longer than this, so `while (true) {}` in a
+        // handler can't freeze the DAW. Per call, as before, now that every call shares one engine.
+        eng->maximumExecutionTime = juce::RelativeTime::seconds (2.0);
+        eng->registerNativeObject ("__api", makeApi (host, {}).get());
+        // fromUTF8, NOT String(const char*): the prelude contains ♭/♯ literals, and the plain
+        // constructor reads bytes as single characters — every non-ASCII glyph arrives mangled.
+        const auto r = eng->execute (juce::String::fromUTF8 (kJsPrelude) + "\n" + extensionBoot() + moduleGateCall());
+        if (r.failed())
+        {
+            preludeError = r.getErrorMessage();
+            return false;
+        }
+        engine = std::move (eng);
+        return true;
+    }
+
+    /** One of the prelude's entry points, run for one script inside its context (__ceIn). */
+    juce::var callIn (const juce::String& id, const char* fn, juce::Array<juce::var> args, juce::Result& err) const
+    {
+        const juce::var a[] = { id, juce::String (fn), juce::var (std::move (args)) };
+        return engine->callFunction ("__ceIn", juce::var::NativeFunctionArgs (juce::var(), a, 3), &err);
+    }
+
+    /** A QuickJS error without the frames of the entry points every call now passes through
+        (__ceAdd, __ceCall, __ceIn), and for a load error without the statement that wrapped the
+        script, so what a panel author reads names their code and nothing of the plumbing. */
+    static juce::String withoutWrapperFrames (const juce::String& message, bool loading = false)
+    {
+        juce::StringArray lines;
+        lines.addLines (message);
+        juce::StringArray kept;
+        for (const auto& line : lines)
+            if (! line.trimStart().startsWith ("at __ce")) kept.add (line);
+        if (loading)
+            for (int i = kept.size(); --i >= 0;)
+                if (kept[i].trim().isNotEmpty())
+                {
+                    if (kept[i].trimStart().startsWith ("at <eval>")) kept.remove (i);
+                    break;
+                }
+        return kept.joinIntoString ("\n");
+    }
+
+    /** A JS string literal, escaped: an id or a control name is data, not source. */
+    static juce::String jsString (const juce::String& s) { return juce::JSON::toString (juce::var (s)); }
+
+    std::unique_ptr<juce::JavascriptEngine> engine;
+    std::set<juce::String> loaded;      // sorted by id, the order scripts were always visited in: it decides
+                                        // which script's action answers a run() first
+    juce::String preludeError;
     ScriptHostApi* host = nullptr;
     juce::StringArray enabledModules;
     juce::var extensions;               // ce.ext.* modules the panel carries

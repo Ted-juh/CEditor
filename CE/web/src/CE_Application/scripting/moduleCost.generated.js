@@ -12,8 +12,8 @@
 // today; the number is what the panel's scripting surface weighs, and it is the figure the Export
 // tab shows beside the (far larger) Python runtime cost.
 export const MODULE_COST = {
-  "-": { "javascript": 32227, "lua": 29800, "python": 31639, "webview": 168214 },
-  "ce.anim": { "javascript": 4744, "lua": 4489, "python": 4348, "webview": 24408 },
+  "-": { "javascript": 38460, "lua": 29800, "python": 31639, "webview": 168214 },
+  "ce.anim": { "javascript": 4772, "lua": 4489, "python": 4348, "webview": 24408 },
   "ce.components": { "javascript": 0, "lua": 0, "python": 0, "webview": 31968 },
   "ce.components.arp": { "javascript": 407, "lua": 407, "python": 407, "webview": 0 },
   "ce.components.chordpad": { "javascript": 417, "lua": 417, "python": 417, "webview": 0 },
@@ -43,17 +43,17 @@ export const MODULE_COST = {
   "ce.components.timbre": { "javascript": 240, "lua": 240, "python": 240, "webview": 0 },
   "ce.components.transport": { "javascript": 324, "lua": 324, "python": 324, "webview": 0 },
   "ce.components.turing": { "javascript": 250, "lua": 250, "python": 250, "webview": 0 },
-  "ce.core": { "javascript": 5159, "lua": 0, "python": 5012, "webview": 0 },
-  "ce.device": { "javascript": 7177, "lua": 6426, "python": 6839, "webview": 29384 },
+  "ce.core": { "javascript": 5032, "lua": 0, "python": 5012, "webview": 0 },
+  "ce.device": { "javascript": 7199, "lua": 6426, "python": 6839, "webview": 29384 },
   "ce.draw": { "javascript": 351, "lua": 351, "python": 351, "webview": 37071 },
   "ce.image": { "javascript": 106, "lua": 106, "python": 106, "webview": 0 },
-  "ce.math": { "javascript": 23979, "lua": 26701, "python": 23331, "webview": 39300 },
-  "ce.midi": { "javascript": 10494, "lua": 8830, "python": 9757, "webview": 20778 },
+  "ce.math": { "javascript": 23942, "lua": 26701, "python": 23331, "webview": 39300 },
+  "ce.midi": { "javascript": 10526, "lua": 8830, "python": 9757, "webview": 20778 },
   "ce.music": { "javascript": 14790, "lua": 14962, "python": 14048, "webview": 13374 },
   "ce.panel": { "javascript": 1974, "lua": 1776, "python": 1766, "webview": 37295 },
-  "ce.storage": { "javascript": 7950, "lua": 15686, "python": 11572, "webview": 12348 },
+  "ce.storage": { "javascript": 7922, "lua": 15686, "python": 11572, "webview": 12348 },
   "ce.text": { "javascript": 84, "lua": 84, "python": 84, "webview": 0 },
-  "ce.time": { "javascript": 14127, "lua": 14506, "python": 13888, "webview": 15271 },
+  "ce.time": { "javascript": 14281, "lua": 14506, "python": 13888, "webview": 15271 },
   "ce.ui": { "javascript": 946, "lua": 731, "python": 716, "webview": 4026 },
 };
 
