@@ -317,7 +317,18 @@ test('the bank is read once, at construction', () => {
   // The host caches getNumPrograms() the moment it loads us, so the count had better not change.
   const ctor = PROCESSOR.slice(PROCESSOR.indexOf('PlayerAudioProcessor()'),
     PROCESSOR.indexOf('~PlayerAudioProcessor() override'));
-  assert.match(ctor, /programBank = ce::parseProgramBank \(document\);/);
+  assert.match(ctor, /programBank = ce::parseProgramBank \(panelDocument\);/);
+});
+
+test('the panel file is parsed once per instance', () => {
+  // Most of a second each on a large panel, on the thread the host builds us on, for every instance
+  // in a project. It was parsed three times: for the host parameters, the policy and bank, and the
+  // window-closed script model. One parse now feeds all three.
+  const parses = PROCESSOR.match(/JSON::parse \(ceditorPlayerPanelFile\(\)\.loadFileAsString\(\)\)/g) ?? [];
+  assert.equal(parses.length, 1, `the panel file is parsed ${parses.length} times`);
+  assert.ok(!/loadFromJson/.test(PROCESSOR), 'the script model reads the file again instead of taking the parsed document');
+  assert.match(PROCESSOR, /panelParams \(ce::parseExportParameters \(panelDocument\)\)/);
+  assert.match(PROCESSOR, /scriptValues\.load \(panelDocument\);/);
 });
 
 test('the Player asks in a bar, and "not now" answers nothing', () => {

@@ -60,14 +60,10 @@ struct PanelParameter
     MidiControl midiControl;
 };
 
-/** Read `exportParameters` from a .cepanel file. Returns an empty list if absent/malformed. */
-inline juce::Array<PanelParameter> parseExportParameters (const juce::File& panelFile)
+/** Read `exportParameters` from a parsed .cepanel. Returns an empty list if absent/malformed. */
+inline juce::Array<PanelParameter> parseExportParameters (const juce::var& parsed)
 {
     juce::Array<PanelParameter> params;
-    if (! panelFile.existsAsFile())
-        return params;
-
-    const auto parsed = juce::JSON::parse (panelFile.loadFileAsString());
     const auto list = parsed.getProperty ("exportParameters", juce::var());
     if (auto* arr = list.getArray())
     {
@@ -127,6 +123,15 @@ inline juce::Array<PanelParameter> parseExportParameters (const juce::File& pane
     }
 
     return params;
+}
+
+/** Read `exportParameters` from a .cepanel file. The plug-in parses its panel once and calls the
+    overload above; this one is for a caller holding nothing but the path. */
+inline juce::Array<PanelParameter> parseExportParameters (const juce::File& panelFile)
+{
+    if (! panelFile.existsAsFile())
+        return {};
+    return parseExportParameters (juce::JSON::parse (panelFile.loadFileAsString()));
 }
 
 /**

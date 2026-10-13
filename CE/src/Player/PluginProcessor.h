@@ -76,28 +76,44 @@ class PlayerAudioProcessor : public juce::AudioProcessor
                           #endif
 {
 public:
-    PlayerAudioProcessor()
+    PlayerAudioProcessor() : PlayerAudioProcessor (readPanelDocument()) {}
+
+private:
+    /** The panel document, parsed ONCE for everything construction reads out of it: the host
+        parameters, the restore policy, the program bank and the window-closed script model.
+
+        It used to be parsed three times, once by each, and a parse is most of a second on a large
+        panel (GAIA's 12 MB took 0.37 s each), all of it on the thread the host builds us on, for
+        every instance in a project. Only the script model keeps it, and it keeps this same tree:
+        nothing is held twice, and without scripting nothing is held at all once we are built. */
+    static juce::var readPanelDocument()
+    {
+       #if CEDITOR_VALUE_LAYER || CEDITOR_SCRIPTING
+        return juce::JSON::parse (ceditorPlayerPanelFile().loadFileAsString());
+       #else
+        return {};
+       #endif
+    }
+
+    explicit PlayerAudioProcessor (const juce::var& panelDocument)
         : juce::AudioProcessor (BusesProperties()
               .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
               .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 #if CEDITOR_VALUE_LAYER
-        , panelParams (ce::parseExportParameters (ceditorPlayerPanelFile()))
+        , panelParams (ce::parseExportParameters (panelDocument))
         , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams))
 #endif
     {
+        juce::ignoreUnused (panelDocument);
 #if CEDITOR_VALUE_LAYER
-        // The panel document, parsed once for the two things the processor reads out of it directly:
-        // the restore policy and the baked program bank. Both are constant for the life of the
-        // plugin — the host caches getNumPrograms() the moment it loads us, so the bank had better
-        // not change afterwards.
+        // The two things the processor reads out of the panel directly: the restore policy and the
+        // baked program bank. Both are constant for the life of the plugin — the host caches
+        // getNumPrograms() the moment it loads us, so the bank had better not change afterwards.
         //
         // Absent policy means Ask, which is the conservative reading: a panel exported before that
         // setting existed pushed nothing at all.
-        {
-            const auto document = juce::JSON::parse (ceditorPlayerPanelFile().loadFileAsString());
-            restorePolicy = ce::readPanelRestorePolicy (document);
-            programBank = ce::parseProgramBank (document);
-        }
+        restorePolicy = ce::readPanelRestorePolicy (panelDocument);
+        programBank = ce::parseProgramBank (panelDocument);
         // Window-CLOSED automation -> MIDI: a message-thread timer that sends bound parameters to the
         // synth when there is no editor (when open, the WebView/JS does the sending). The MIDI service
         // lives here on the processor, so it persists across the editor window being closed.
@@ -105,10 +121,13 @@ public:
 #endif
 #if CEDITOR_SCRIPTING
         // window-closed: load the panel's scripts + fire onPanelLoad — ON the message thread,
-        // whichever thread the host is building us on (see onMessageThread).
-        onMessageThread ([this] { setupScripting(); });
+        // whichever thread the host is building us on (see onMessageThread). onMessageThread waits
+        // for it, so the document outlives the call.
+        onMessageThread ([this, &panelDocument] { setupScripting (panelDocument); });
 #endif
     }
+
+public:
 
     /**
      * Run `fn` on JUCE's message thread, now, and return when it is done.
@@ -1655,10 +1674,12 @@ private:
         return juce::var (out);
     }
 
-    void setupScripting()
+    void setupScripting (const juce::var& panelDocument)
     {
-        const auto json = ceditorPlayerPanelFile().loadFileAsString();
-        if (json.isEmpty() || ! scriptValues.loadFromJson (json)) return;
+        // The document construction already parsed, kept rather than read again: the script model
+        // edits it in place as scripts set values, and nothing else holds it after construction.
+        if (! panelDocument.isObject()) return;
+        scriptValues.load (panelDocument);
 
         using namespace ceditor::scripting;
         BridgeScriptHost::Callbacks cb;
