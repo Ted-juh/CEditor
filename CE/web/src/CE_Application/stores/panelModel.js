@@ -4,6 +4,7 @@ import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
 import { normalizeCaptureSession } from '../utils/captureSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
 import { expandControl, shrinkAuthoredParts, shrinkControl } from './documentShape.js';
+import { panelDocumentText } from './documentLayout.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
 import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
 import { controlSetLibrary } from './controlSetLibraryStore.js';
@@ -410,12 +411,14 @@ export function serializePanel(panel, options = {}) {
   // one; a person may pass a saved .cepanel), and a saved one has to be completed first —
   // tools/scripts/lib/exportDocument.mjs. The mark is how they tell, where no structural test can:
   // a default item the author deleted is simply absent from both forms.
+  //
+  // Laid out one line per control section, not one per property (stores/documentLayout.js).
   const { formatVersion, documentForm, ...rest } = data;
-  return JSON.stringify({
+  return panelDocumentText({
     formatVersion: Math.max(PANEL_FORMAT_VERSION, panelFormatVersion({ formatVersion })),
     ...(elide ? {} : { documentForm: 'complete' }),
     ...rest,
-  }, null, 2);
+  });
 }
 
 // What the last deserializePanel call had to say, for the caller to show: why a document was

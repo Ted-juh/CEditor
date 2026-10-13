@@ -230,595 +230,141 @@
   "controls": [
     {
       "_children": {
-        "Core": {
-          "name": "group_Cross_cutting_sections_each_cell_is_one_section_pushed_as_far_as_it_goes",
-          "id": "qa_group_0",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 28,
-          "width": 1544,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF23282D"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "3389C2FF"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        },
-        "Text": {
-          "content": "Cross-cutting sections — each cell is one section pushed as far as it goes",
-          "_children": {
-            "Font": {
-              "size": 13,
-              "bold": true
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 10,
-          "paddingRight": 10,
-          "paddingTop": 3,
-          "paddingBottom": 3
-        }
+        "Core": {"name":"group_Cross_cutting_sections_each_cell_is_one_section_pushed_as_far_as_it_goes","id":"qa_group_0","controlType":"Label"},
+        "Transform": {"x":28,"y":28,"width":1544,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
+        "Text": {"content":"Cross-cutting sections — each cell is one section pushed as far as it goes","_children":{"Font":{"size":13,"bold":true}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_0",
-          "id": "qa_cap_0",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 64,
-          "width": 180,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Core — identity",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_0","id":"qa_cap_0","controlType":"Label"},
+        "Transform": {"x":28,"y":64,"width":180,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Core — identity","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_core_named",
-          "locked": true,
-          "id": "qa02_core",
-          "description": "Core carries id, name, description, enabled, locked, visible.",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 86,
-          "width": 180,
-          "height": 40
-        },
-        "Text": {
-          "content": "Core (locked)"
-        }
+        "Core": {"name":"qa02_core_named","locked":true,"id":"qa02_core","description":"Core carries id, name, description, enabled, locked, visible.","controlType":"Label"},
+        "Transform": {"x":28,"y":86,"width":180,"height":40},
+        "Text": {"content":"Core (locked)"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_1",
-          "id": "qa_cap_1",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 232,
-          "y": 64,
-          "width": 150,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Transform — rot/scale/opacity",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_1","id":"qa_cap_1","controlType":"Label"},
+        "Transform": {"x":232,"y":64,"width":150,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Transform — rot/scale/opacity","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_transform",
-          "id": "qa02_transform",
-          "controlType": "Button"
-        },
-        "Transform": {
-          "x": 232,
-          "y": 86,
-          "width": 150,
-          "height": 60,
-          "minWidth": 40,
-          "minHeight": 20,
-          "aspectLock": true,
-          "opacity": 0.7,
-          "rotation": 12,
-          "scale": 0.9
-        },
-        "Text": {
-          "content": "rot 12 / 0.7"
-        }
+        "Core": {"name":"qa02_transform","id":"qa02_transform","controlType":"Button"},
+        "Transform": {"x":232,"y":86,"width":150,"height":60,"minWidth":40,"minHeight":20,"aspectLock":true,"opacity":0.7,"rotation":12,"scale":0.9},
+        "Text": {"content":"rot 12 / 0.7"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_2",
-          "id": "qa_cap_2",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 406,
-          "y": 64,
-          "width": 200,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Background — 4 fill layers",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_2","id":"qa_cap_2","controlType":"Label"},
+        "Transform": {"x":406,"y":64,"width":200,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Background — 4 fill layers","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_background",
-          "id": "qa02_background",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 406,
-          "y": 86,
-          "width": 200,
-          "height": 96
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF1E4A6E",
-              "gradientEnabled": true,
-              "gradientOpacity": 80,
-              "gradient": {
-                "type": "linear",
-                "angle": 45,
-                "centerX": 50,
-                "centerY": 50,
-                "radiusX": 50,
-                "radiusY": 50,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "2266FF",
-                    "position": 0
-                  },
-                  {
-                    "color": "FF44AA",
-                    "position": 100
-                  }
-                ]
-              },
-              "overlayEnabled": true,
-              "overlayColour": "2200FF88"
-            },
-            "Border": {
-              "thickness": 3,
-              "colour": "FF89C2FF"
-            },
-            "Corners": {
-              "radius": 18,
-              "topLeftRadius": 2,
-              "bottomRightRadius": 30
-            }
-          }
-        },
-        "Text": {
-          "content": "stacked fill"
-        }
+        "Core": {"name":"qa02_background","id":"qa02_background","controlType":"Label"},
+        "Transform": {"x":406,"y":86,"width":200,"height":96},
+        "Background": {"_children":{"Fill":{"colour":"FF1E4A6E","gradientEnabled":true,"gradientOpacity":80,"gradient":{"type":"linear","angle":45,"centerX":50,"centerY":50,"radiusX":50,"radiusY":50,"edge":0,"stops":[{"color":"2266FF","position":0},{"color":"FF44AA","position":100}]},"overlayEnabled":true,"overlayColour":"2200FF88"},"Border":{"thickness":3,"colour":"FF89C2FF"},"Corners":{"radius":18,"topLeftRadius":2,"bottomRightRadius":30}}},
+        "Text": {"content":"stacked fill"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_3",
-          "id": "qa_cap_3",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 630,
-          "y": 64,
-          "width": 260,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Text — every effect layer",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_3","id":"qa_cap_3","controlType":"Label"},
+        "Transform": {"x":630,"y":64,"width":260,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Text — every effect layer","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_text",
-          "id": "qa02_text",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 630,
-          "y": 86,
-          "width": 260,
-          "height": 90
-        },
-        "Text": {
-          "content": "Wave",
-          "_children": {
-            "Font": {
-              "family": "Georgia",
-              "weight": "Bold",
-              "weightValue": 700,
-              "size": 40,
-              "underline": true,
-              "letterSpacing": 1,
-              "underlineOffset": 3,
-              "underlineThickness": 2
-            },
-            "Effects": {
-              "outlineEnabled": true,
-              "outlineWidth": 2,
-              "outlineThickness": 2,
-              "stroke2Enabled": true,
-              "stroke2Thickness": 2,
-              "shadowEnabled": true,
-              "shadowOffsetX": 2,
-              "shadowOffsetY": 3,
-              "shadowBlur": 6,
-              "glowEnabled": true,
-              "glowSize": 6,
-              "glowColour": "8899DDFF",
-              "innerGlowEnabled": true,
-              "innerGlowSize": 4,
-              "innerShadowEnabled": true,
-              "innerShadowOffsetY": 2,
-              "innerShadowBlur": 3,
-              "bevelEnabled": true,
-              "bevelDepth": 2,
-              "reflectionEnabled": true,
-              "reflectionOpacity": 40,
-              "reflectionGap": 2
-            }
-          }
-        }
+        "Core": {"name":"qa02_text","id":"qa02_text","controlType":"Label"},
+        "Transform": {"x":630,"y":86,"width":260,"height":90},
+        "Text": {"content":"Wave","_children":{"Font":{"family":"Georgia","weight":"Bold","weightValue":700,"size":40,"underline":true,"letterSpacing":1,"underlineOffset":3,"underlineThickness":2},"Effects":{"outlineEnabled":true,"outlineWidth":2,"outlineThickness":2,"stroke2Enabled":true,"stroke2Thickness":2,"shadowEnabled":true,"shadowOffsetX":2,"shadowOffsetY":3,"shadowBlur":6,"glowEnabled":true,"glowSize":6,"glowColour":"8899DDFF","innerGlowEnabled":true,"innerGlowSize":4,"innerShadowEnabled":true,"innerShadowOffsetY":2,"innerShadowBlur":3,"bevelEnabled":true,"bevelDepth":2,"reflectionEnabled":true,"reflectionOpacity":40,"reflectionGap":2}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_4",
-          "id": "qa_cap_4",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 914,
-          "y": 64,
-          "width": 150,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Effects — shadow/bevel/filters",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_4","id":"qa_cap_4","controlType":"Label"},
+        "Transform": {"x":914,"y":64,"width":150,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Effects — shadow/bevel/filters","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_effects",
-          "id": "qa02_effects",
-          "controlType": "Button"
-        },
-        "Transform": {
-          "x": 914,
-          "y": 86,
-          "width": 150,
-          "height": 60
-        },
-        "Text": {
-          "content": "filters"
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 3,
-                  "offsetY": 4,
-                  "blur": 8,
-                  "spread": 1,
-                  "colour": "AA000000"
-                },
-                {
-                  "enabled": true,
-                  "type": "inner",
-                  "offsetX": -2,
-                  "offsetY": -2,
-                  "blur": 5,
-                  "spread": 0,
-                  "colour": "66FFFFFF"
-                }
-              ]
-            },
-            "Bevel": {
-              "enabled": true,
-              "style": "pillow-emboss",
-              "depth": 140,
-              "size": 6,
-              "softness": 2
-            },
-            "Filters": {
-              "blur": 0.4,
-              "brightness": 115,
-              "contrast": 120,
-              "saturation": 140,
-              "hueRotate": 25
-            },
-            "Blend": {
-              "mode": "screen"
-            }
-          }
-        }
+        "Core": {"name":"qa02_effects","id":"qa02_effects","controlType":"Button"},
+        "Transform": {"x":914,"y":86,"width":150,"height":60},
+        "Text": {"content":"filters"},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":3,"offsetY":4,"blur":8,"spread":1,"colour":"AA000000"},{"enabled":true,"type":"inner","offsetX":-2,"offsetY":-2,"blur":5,"spread":0,"colour":"66FFFFFF"}]},"Bevel":{"enabled":true,"style":"pillow-emboss","depth":140,"size":6,"softness":2},"Filters":{"blur":0.4,"brightness":115,"contrast":120,"saturation":140,"hueRotate":25},"Blend":{"mode":"screen"}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_5",
-          "id": "qa_cap_5",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1088,
-          "y": 64,
-          "width": 170,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Icon + ContentLayout",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_5","id":"qa_cap_5","controlType":"Label"},
+        "Transform": {"x":1088,"y":64,"width":170,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Icon + ContentLayout","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_icon",
-          "id": "qa02_icon",
-          "controlType": "Button"
-        },
-        "Transform": {
-          "x": 1088,
-          "y": 86,
-          "width": 170,
-          "height": 64
-        },
-        "Text": {
-          "content": "icon+text"
-        },
-        "Icon": {
-          "name": "zap",
-          "size": 28,
-          "tint": "FFFFD166",
-          "opacity": 0.9,
-          "rotation": 15
-        },
-        "ContentLayout": {
-          "mode": "icon_and_text",
-          "horizontalAlign": "left",
-          "verticalAlign": "bottom",
-          "gap": 14,
-          "paddingLeft": 14,
-          "paddingBottom": 10,
-          "textOffsetX": 6,
-          "iconOffsetY": -4,
-          "textAboveIcon": false,
-          "iconZIndex": 3
-        }
+        "Core": {"name":"qa02_icon","id":"qa02_icon","controlType":"Button"},
+        "Transform": {"x":1088,"y":86,"width":170,"height":64},
+        "Text": {"content":"icon+text"},
+        "Icon": {"name":"zap","size":28,"tint":"FFFFD166","opacity":0.9,"rotation":15},
+        "ContentLayout": {"mode":"icon_and_text","horizontalAlign":"left","verticalAlign":"bottom","gap":14,"paddingLeft":14,"paddingBottom":10,"textOffsetX":6,"iconOffsetY":-4,"textAboveIcon":false,"iconZIndex":3}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_6",
-          "id": "qa_cap_6",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1282,
-          "y": 64,
-          "width": 260,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Children + Grid",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_6","id":"qa_cap_6","controlType":"Label"},
+        "Transform": {"x":1282,"y":64,"width":260,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Children + Grid","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_children",
-          "id": "qa02_children",
-          "controlType": "Container"
-        },
-        "Transform": {
-          "x": 1282,
-          "y": 86,
-          "width": 260,
-          "height": 120
-        },
-        "Grid": {
-          "columns": 4,
-          "rows": 2,
-          "size": 20,
-          "colour": "5589C2FF",
-          "style": "points"
-        },
+        "Core": {"name":"qa02_children","id":"qa02_children","controlType":"Container"},
+        "Transform": {"x":1282,"y":86,"width":260,"height":120},
+        "Grid": {"columns":4,"rows":2,"size":20,"colour":"5589C2FF","style":"points"},
         "Children": {
           "layout": "row",
           "gap": 10,
@@ -830,750 +376,167 @@
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_7",
-          "id": "qa_cap_7",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 234,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Mouse — drag/focus/hit",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_7","id":"qa_cap_7","controlType":"Label"},
+        "Transform": {"x":28,"y":234,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Mouse — drag/focus/hit","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_mouse",
-          "id": "qa02_mouse",
-          "controlType": "Knob"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 256,
-          "width": 90,
-          "height": 90
-        },
-        "Mouse": {
-          "cursor": "crosshair",
-          "bringToFrontOnClick": true,
-          "hitTestShape": "ellipse",
-          "focusOutline": true,
-          "tabIndex": 3,
-          "dragMode": "vertical",
-          "dragSensitivity": 2.5,
-          "invertY": true
-        }
+        "Core": {"name":"qa02_mouse","id":"qa02_mouse","controlType":"Knob"},
+        "Transform": {"x":28,"y":256,"width":90,"height":90},
+        "Mouse": {"cursor":"crosshair","bringToFrontOnClick":true,"hitTestShape":"ellipse","focusOutline":true,"tabIndex":3,"dragMode":"vertical","dragSensitivity":2.5,"invertY":true}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_8",
-          "id": "qa_cap_8",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 184,
-          "y": 234,
-          "width": 190,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Behavior + Value rows",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_8","id":"qa_cap_8","controlType":"Label"},
+        "Transform": {"x":184,"y":234,"width":190,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Behavior + Value rows","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_value",
-          "id": "qa02_value",
-          "controlType": "Combobox"
-        },
-        "Transform": {
-          "x": 184,
-          "y": 256,
-          "width": 190
-        },
-        "Text": {
-          "content": "Super Saw"
-        },
-        "Behavior": {
-          "defaultValue": "supersaw",
-          "keyboardEnabled": false,
-          "focusable": false
-        },
-        "Value": {
-          "rows": [
-            {
-              "id": "saw",
-              "displayText": "Saw",
-              "internalValue": "saw",
-              "sendValue": 0,
-              "receiveValue": 0,
-              "selectedByDefault": false,
-              "enabled": true,
-              "visualOverrides": {},
-              "icon": "",
-              "subtitle": "",
-              "badge": "",
-              "swatch": "FF44AAFF",
-              "isHeader": false,
-              "parentValue": ""
-            },
-            {
-              "id": "supersaw",
-              "displayText": "Super Saw",
-              "internalValue": "supersaw",
-              "sendValue": 6,
-              "receiveValue": 6,
-              "selectedByDefault": true,
-              "enabled": true,
-              "visualOverrides": {},
-              "icon": "",
-              "subtitle": "7 detuned saws",
-              "badge": "GAIA",
-              "swatch": "FFFFD166",
-              "isHeader": false,
-              "parentValue": ""
-            },
-            {
-              "id": "noise",
-              "displayText": "Noise",
-              "internalValue": "noise",
-              "sendValue": 5,
-              "receiveValue": 5,
-              "selectedByDefault": false,
-              "enabled": false,
-              "visualOverrides": {},
-              "icon": "",
-              "subtitle": "",
-              "badge": "",
-              "swatch": "",
-              "isHeader": false,
-              "parentValue": ""
-            }
-          ]
-        }
+        "Core": {"name":"qa02_value","id":"qa02_value","controlType":"Combobox"},
+        "Transform": {"x":184,"y":256,"width":190},
+        "Text": {"content":"Super Saw"},
+        "Behavior": {"defaultValue":"supersaw","keyboardEnabled":false,"focusable":false},
+        "Value": {"rows":[{"id":"saw","displayText":"Saw","internalValue":"saw","sendValue":0,"receiveValue":0,"selectedByDefault":false,"enabled":true,"visualOverrides":{},"icon":"","subtitle":"","badge":"","swatch":"FF44AAFF","isHeader":false,"parentValue":""},{"id":"supersaw","displayText":"Super Saw","internalValue":"supersaw","sendValue":6,"receiveValue":6,"selectedByDefault":true,"enabled":true,"visualOverrides":{},"icon":"","subtitle":"7 detuned saws","badge":"GAIA","swatch":"FFFFD166","isHeader":false,"parentValue":""},{"id":"noise","displayText":"Noise","internalValue":"noise","sendValue":5,"receiveValue":5,"selectedByDefault":false,"enabled":false,"visualOverrides":{},"icon":"","subtitle":"","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_9",
-          "id": "qa_cap_9",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 398,
-          "y": 234,
-          "width": 210,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Listbox — rich rows",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_9","id":"qa_cap_9","controlType":"Label"},
+        "Transform": {"x":398,"y":234,"width":210,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Listbox — rich rows","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_listbox",
-          "id": "qa02_listbox",
-          "controlType": "Listbox"
-        },
-        "Transform": {
-          "x": 398,
-          "y": 256,
-          "width": 210,
-          "height": 168
-        },
-        "Value": {
-          "rows": [
-            {
-              "id": "hdr",
-              "displayText": "USER BANK A",
-              "internalValue": "",
-              "sendValue": "",
-              "receiveValue": "",
-              "selectedByDefault": false,
-              "enabled": true,
-              "visualOverrides": {},
-              "icon": "",
-              "subtitle": "",
-              "badge": "",
-              "swatch": "",
-              "isHeader": true,
-              "parentValue": ""
-            },
-            {
-              "id": "a1",
-              "displayText": "Init Patch",
-              "internalValue": "a1",
-              "sendValue": 0,
-              "receiveValue": 0,
-              "selectedByDefault": true,
-              "enabled": true,
-              "visualOverrides": {},
-              "icon": "",
-              "subtitle": "A-1",
-              "badge": "FAV",
-              "swatch": "FF66DDAA",
-              "isHeader": false,
-              "parentValue": ""
-            },
-            {
-              "id": "a2",
-              "displayText": "Hoover Lead",
-              "internalValue": "a2",
-              "sendValue": 1,
-              "receiveValue": 1,
-              "selectedByDefault": false,
-              "enabled": true,
-              "visualOverrides": {},
-              "icon": "",
-              "subtitle": "A-2",
-              "badge": "",
-              "swatch": "FFFF6B6B",
-              "isHeader": false,
-              "parentValue": ""
-            },
-            {
-              "id": "a3",
-              "displayText": "(empty)",
-              "internalValue": "a3",
-              "sendValue": 2,
-              "receiveValue": 2,
-              "selectedByDefault": false,
-              "enabled": false,
-              "visualOverrides": {},
-              "icon": "",
-              "subtitle": "A-3",
-              "badge": "",
-              "swatch": "",
-              "isHeader": false,
-              "parentValue": ""
-            }
-          ]
-        }
+        "Core": {"name":"qa02_listbox","id":"qa02_listbox","controlType":"Listbox"},
+        "Transform": {"x":398,"y":256,"width":210,"height":168},
+        "Value": {"rows":[{"id":"hdr","displayText":"USER BANK A","internalValue":"","sendValue":"","receiveValue":"","selectedByDefault":false,"enabled":true,"visualOverrides":{},"icon":"","subtitle":"","badge":"","swatch":"","isHeader":true,"parentValue":""},{"id":"a1","displayText":"Init Patch","internalValue":"a1","sendValue":0,"receiveValue":0,"selectedByDefault":true,"enabled":true,"visualOverrides":{},"icon":"","subtitle":"A-1","badge":"FAV","swatch":"FF66DDAA","isHeader":false,"parentValue":""},{"id":"a2","displayText":"Hoover Lead","internalValue":"a2","sendValue":1,"receiveValue":1,"selectedByDefault":false,"enabled":true,"visualOverrides":{},"icon":"","subtitle":"A-2","badge":"","swatch":"FFFF6B6B","isHeader":false,"parentValue":""},{"id":"a3","displayText":"(empty)","internalValue":"a3","sendValue":2,"receiveValue":2,"selectedByDefault":false,"enabled":false,"visualOverrides":{},"icon":"","subtitle":"A-3","badge":"","swatch":"","isHeader":false,"parentValue":""}]}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_10",
-          "id": "qa_cap_10",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 632,
-          "y": 234,
-          "width": 160,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "States — all patched",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_10","id":"qa_cap_10","controlType":"Label"},
+        "Transform": {"x":632,"y":234,"width":160,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"States — all patched","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_states",
-          "id": "qa02_states",
-          "controlType": "ToggleButton"
-        },
-        "Transform": {
-          "x": 632,
-          "y": 256,
-          "width": 160,
-          "height": 52
-        },
-        "Text": {
-          "content": "states"
-        },
-        "States": {
-          "debug": true,
-          "_children": {
-            "Hover": {
-              "description": "QA: Hover",
-              "patches": {
-                "component": {
-                  "Background.Border.thickness": 3
-                }
-              }
-            },
-            "Pressed": {
-              "description": "QA: Pressed",
-              "patches": {
-                "component": {
-                  "Background.Border.thickness": 3
-                }
-              }
-            },
-            "Focused": {
-              "description": "QA: Focused",
-              "patches": {
-                "component": {
-                  "Background.Border.thickness": 3
-                }
-              }
-            },
-            "Disabled": {
-              "description": "QA: Disabled",
-              "patches": {
-                "component": {
-                  "Background.Border.thickness": 3
-                }
-              }
-            },
-            "Selected": {
-              "description": "QA: Selected",
-              "patches": {
-                "component": {
-                  "Background.Border.thickness": 3
-                }
-              }
-            },
-            "Mixed": {
-              "description": "QA: Mixed",
-              "patches": {
-                "component": {
-                  "Background.Border.thickness": 3
-                }
-              }
-            }
-          }
-        }
+        "Core": {"name":"qa02_states","id":"qa02_states","controlType":"ToggleButton"},
+        "Transform": {"x":632,"y":256,"width":160,"height":52},
+        "Text": {"content":"states"},
+        "States": {"debug":true,"_children":{"Hover":{"description":"QA: Hover","patches":{"component":{"Background.Border.thickness":3}}},"Pressed":{"description":"QA: Pressed","patches":{"component":{"Background.Border.thickness":3}}},"Focused":{"description":"QA: Focused","patches":{"component":{"Background.Border.thickness":3}}},"Disabled":{"description":"QA: Disabled","patches":{"component":{"Background.Border.thickness":3}}},"Selected":{"description":"QA: Selected","patches":{"component":{"Background.Border.thickness":3}}},"Mixed":{"description":"QA: Mixed","patches":{"component":{"Background.Border.thickness":3}}}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_11",
-          "id": "qa_cap_11",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 816,
-          "y": 234,
-          "width": 150,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Animations",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_11","id":"qa_cap_11","controlType":"Label"},
+        "Transform": {"x":816,"y":234,"width":150,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Animations","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_animations",
-          "id": "qa02_animations",
-          "controlType": "Button"
-        },
-        "Transform": {
-          "x": 816,
-          "y": 256,
-          "width": 150,
-          "height": 56
-        },
-        "Text": {
-          "content": "animated"
-        },
-        "Animations": {
-          "_children": {
-            "Pulse": {
-              "_type": "Animation",
-              "name": "Pulse",
-              "enabled": true,
-              "trigger": "hover",
-              "durationMs": 240,
-              "easing": "easeInOutQuad",
-              "loop": false,
-              "tracks": [
-                {
-                  "target": "Transform.scale",
-                  "from": 1,
-                  "to": 1.06
-                }
-              ]
-            }
-          }
-        }
+        "Core": {"name":"qa02_animations","id":"qa02_animations","controlType":"Button"},
+        "Transform": {"x":816,"y":256,"width":150,"height":56},
+        "Text": {"content":"animated"},
+        "Animations": {"_children":{"Pulse":{"_type":"Animation","name":"Pulse","enabled":true,"trigger":"hover","durationMs":240,"easing":"easeInOutQuad","loop":false,"tracks":[{"target":"Transform.scale","from":1,"to":1.06}]}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_12",
-          "id": "qa_cap_12",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 990,
-          "y": 234,
-          "width": 200,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Scripts — per control",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_12","id":"qa_cap_12","controlType":"Label"},
+        "Transform": {"x":990,"y":234,"width":200,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Scripts — per control","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_scripts",
-          "id": "qa02_scripts",
-          "controlType": "Slider"
-        },
-        "Transform": {
-          "x": 990,
-          "y": 256,
-          "width": 200,
-          "height": 46
-        },
-        "Scripts": {
-          "scripts": [
-            {
-              "id": "qa02_onValueChanged",
-              "name": "QA-02 value echo",
-              "language": "lua",
-              "source": "function onValueChanged(value)\n  log(\"qa02 slider: \" .. tostring(value))\nend",
-              "scope": "component",
-              "target": "self",
-              "event": "onValueChanged",
-              "enabled": true,
-              "description": "Proves a per-control script survives serialization and reload.",
-              "group": ""
-            }
-          ]
-        }
+        "Core": {"name":"qa02_scripts","id":"qa02_scripts","controlType":"Slider"},
+        "Transform": {"x":990,"y":256,"width":200,"height":46},
+        "Scripts": {"scripts":[{"id":"qa02_onValueChanged","name":"QA-02 value echo","language":"lua","source":"function onValueChanged(value)\n  log(\"qa02 slider: \" .. tostring(value))\nend","scope":"component","target":"self","event":"onValueChanged","enabled":true,"description":"Proves a per-control script survives serialization and reload.","group":""}]}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_13",
-          "id": "qa_cap_13",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1214,
-          "y": 234,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "DeviceBindings",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_13","id":"qa_cap_13","controlType":"Label"},
+        "Transform": {"x":1214,"y":234,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"DeviceBindings","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_devicebindings",
-          "id": "qa02_devicebindings",
-          "controlType": "Knob"
-        },
-        "Transform": {
-          "x": 1214,
-          "y": 256,
-          "width": 90,
-          "height": 90
-        },
-        "DeviceBindings": {
-          "bindings": [
-            {
-              "kind": "deviceParameter",
-              "port": "value",
-              "deviceRole": "primary",
-              "parameterId": "filter.cutoff",
-              "parameterType": "integer",
-              "adoptMetadata": true,
-              "dryRun": true,
-              "feedback": {
-                "receiveUpdates": true,
-                "ignoreOwnEchoes": true,
-                "echoWindowMs": 250
-              }
-            }
-          ]
-        }
+        "Core": {"name":"qa02_devicebindings","id":"qa02_devicebindings","controlType":"Knob"},
+        "Transform": {"x":1214,"y":256,"width":90,"height":90},
+        "DeviceBindings": {"bindings":[{"kind":"deviceParameter","port":"value","deviceRole":"primary","parameterId":"filter.cutoff","parameterType":"integer","adoptMetadata":true,"dryRun":true,"feedback":{"receiveUpdates":true,"ignoreOwnEchoes":true,"echoWindowMs":250}}]}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_14",
-          "id": "qa_cap_14",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 452,
-          "width": 240,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Display — segment LCD",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_14","id":"qa_cap_14","controlType":"Label"},
+        "Transform": {"x":28,"y":452,"width":240,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Display — segment LCD","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_display",
-          "id": "qa02_display",
-          "controlType": "LcdDisplay"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 474,
-          "width": 240,
-          "height": 90
-        },
-        "Display": {
-          "panelType": "segment",
-          "segmentType": "14",
-          "lines": [
-            "QA-02",
-            "DISPLAY"
-          ]
-        }
+        "Core": {"name":"qa02_display","id":"qa02_display","controlType":"LcdDisplay"},
+        "Transform": {"x":28,"y":474,"width":240,"height":90},
+        "Display": {"panelType":"segment","segmentType":"14","lines":["QA-02","DISPLAY"]}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "caption_qa_cap_15",
-          "id": "qa_cap_15",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 292,
-          "y": 452,
-          "width": 240,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Pixel — dot matrix",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
+        "Core": {"name":"caption_qa_cap_15","id":"qa_cap_15","controlType":"Label"},
+        "Transform": {"x":292,"y":452,"width":240,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Pixel — dot matrix","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "qa02_pixel",
-          "id": "qa02_pixel",
-          "controlType": "PixelDisplay"
-        },
-        "Transform": {
-          "x": 292,
-          "y": 474,
-          "width": 240,
-          "height": 90
-        },
-        "Pixel": {
-          "lines": [
-            "QA-02 PIXEL"
-          ]
-        }
+        "Core": {"name":"qa02_pixel","id":"qa02_pixel","controlType":"PixelDisplay"},
+        "Transform": {"x":292,"y":474,"width":240,"height":90},
+        "Pixel": {"lines":["QA-02 PIXEL"]}
       },
       "_type": "Control"
     }
