@@ -141,10 +141,14 @@ test('the header defines the raw-MIDI funnel in every configuration that calls i
 });
 
 test('arming a restore seeds the automation cache before policy resolution', () => {
-  // The seeding lives in rebaselineSentMidi, which closing the window shares: both must take the
-  // current values as sent rather than leave the cache empty.
-  const arm = /void armRestorePush\(\)[\s\S]*?\n\s*}/.exec(SOURCE)?.[0] ?? '';
-  assert.match(arm, /rebaselineSentMidi\(\);[\s\S]*restorePending = true;/, 'the cache is not seeded before the restore is armed');
+  // setStateInformation takes the restored values as the baseline (on the host's thread, from the
+  // atomics), and the timer installs them as the cache before it raises restorePending. Closing the
+  // window does the same through rebaselineSentMidi: both take the current values as sent rather
+  // than leave the cache empty.
+  const stage = /void stageRestorePush \([^)]*\)[\s\S]*?\n {4}}/.exec(SOURCE)?.[0] ?? '';
+  assert.match(stage, /staged\.baseline\[desc\.id\]\s*=\s*raw->load\(\)/, 'the restored values are not taken as the baseline');
+  const arm = /void applyStagedRestore\(\)[\s\S]*?\n {4}}/.exec(SOURCE)?.[0] ?? '';
+  assert.match(arm, /lastSentMidi = std::move \(staged->baseline\);[\s\S]*restorePending = true;/, 'the cache is not seeded before the restore is armed');
   const rebaseline = /void rebaselineSentMidi\(\)[\s\S]*?\n\s*}/.exec(SOURCE)?.[0] ?? '';
   assert.match(rebaseline, /lastSentMidi\.clear\(\)/);
   assert.match(rebaseline, /lastSentMidi\[desc\.id\]\s*=\s*raw->load\(\)/,

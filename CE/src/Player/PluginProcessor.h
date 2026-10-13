@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <atomic>
 #include <map>
+#include <optional>
 #include <set>
 #include <vector>
 #include "PlayerHost.h"
@@ -379,8 +380,8 @@ public:
         // The answer to "restore the hardware from this session?", if it has been given. Saved with
         // the project rather than globally: the decision was made about THIS session's patch and
         // this session's synth, and a different project is a different question.
-        if (restoreAnswer.isNotEmpty())
-            root.createNewChildElement ("RestoreAnswer")->addTextElement (restoreAnswer);
+        if (const auto answer = getRestoreAnswer(); answer.isNotEmpty())
+            root.createNewChildElement ("RestoreAnswer")->addTextElement (answer);
         // Which program the host had selected. Hosts do restore this themselves through
         // setCurrentProgram, but not all of them and not always before setStateInformation, so it
         // rides along and the two agree either way.
@@ -446,12 +447,12 @@ public:
             // the patch that was just restored, which is the wrong sound and the wrong order. A
             // change the host asked for before this state arrived goes with the state it preceded.
             const auto recall = ce::readSessionRecall (*xml, ce::hostProgramCount (programBank));
-            restoreAnswer = recall.restoreAnswer;
+            setRestoreAnswer (recall.restoreAnswer);
             currentProgram = recall.program;
             programChangePending.store (false);
-            restoredDumps = juce::var();
-            if (auto* dumps = xml->getChildByName ("DeviceDumps"))
-                restoredDumps = juce::JSON::parse (dumps->getAllSubText());
+            juce::var dumps;
+            if (auto* d = xml->getChildByName ("DeviceDumps"))
+                dumps = juce::JSON::parse (d->getAllSubText());
             markSessionRestored();
 
             // ARM THE RESTORE PUSH — do not send here. This call can arrive before the ports are
@@ -461,7 +462,7 @@ public:
             // Without this the whole feature was: values restored, ports reconnected, and the synth
             // left on whatever patch it happened to be on. The state was known and not transmitted,
             // which from the user's chair is the same as not having been saved.
-            armRestorePush();
+            stageRestorePush (std::move (dumps));
            #if CEDITOR_SCRIPTING
             {
                 const juce::SpinLock::ScopedLockType lock (scriptStateLock);
@@ -484,7 +485,7 @@ public:
         else if (xml->hasTagName (apvts.state.getType())) // backward-compat: APVTS-only state
         {
             // A state from before recall existed answered nothing and selected nothing.
-            restoreAnswer = {};
+            setRestoreAnswer ({});
             currentProgram = 0;
             programChangePending.store (false);
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
@@ -656,6 +657,7 @@ private:
 
     void timerCallback() override
     {
+        applyStagedRestore();
         const bool windowOpen = getActiveEditor() != nullptr;
        #if CEDITOR_SCRIPTING
         servicePendingScriptRestore();
@@ -779,16 +781,64 @@ private:
         sessionRestoreCount.fetch_add (1);
     }
 
-    /** Called from setStateInformation. Never sends — see the comment there for why. */
-    void armRestorePush()
+    /** Called from setStateInformation, on whatever thread the host calls it from. Never sends —
+        see the comment there for why — and touches nothing the timer owns: it stages the restore,
+        and applyStagedRestore arms it on the message thread.
+
+        It used to arm it here, and that wrote lastSentMidi from the host's thread while the timer
+        read and wrote it on the message thread. Most hosts call this on the message thread, so the
+        two never met. An LV2 on Linux runs a message thread of its own inside the plug-in while the
+        host restores from its own thread, and pluginval met them: a SIGSEGV inside the map's
+        comparator, in two LV2 runs of ten on a loaded machine. */
+    void stageRestorePush (juce::var dumps)
     {
         // Treat the restored snapshot as the baseline until the restore policy decides what may
         // be sent. Otherwise the ordinary automation loop sees an empty cache on its first tick
         // and pushes every parameter even when the policy is Never or still waiting for an answer.
-        rebaselineSentMidi();
+        // Taken here, from the values this call just restored (the raw parameters are atomics), so
+        // it is the same snapshot it always was however late the timer picks it up.
+        StagedRestore staged;
+        for (const auto& desc : panelParams)
+            if (auto* raw = apvts.getRawParameterValue (desc.id))
+                staged.baseline[desc.id] = raw->load();
+        staged.dumps = std::move (dumps);
+        staged.armedAtMs = juce::Time::getMillisecondCounterHiRes();
+        {
+            const juce::SpinLock::ScopedLockType lock (stagedRestoreLock);
+            stagedRestore = std::move (staged);
+        }
+        restoreStaged.store (true);
+    }
+
+    /** On the message thread, first thing on every tick: arm a restore setStateInformation staged,
+        before anything below can read lastSentMidi or the restore flags. */
+    void applyStagedRestore()
+    {
+        if (! restoreStaged.exchange (false)) return;
+        std::optional<StagedRestore> staged;
+        {
+            const juce::SpinLock::ScopedLockType lock (stagedRestoreLock);
+            staged.swap (stagedRestore);
+        }
+        if (! staged.has_value()) return;
+        lastSentMidi = std::move (staged->baseline);
+        restoredDumps = std::move (staged->dumps);
         restorePending = true;
         restorePromptSent = false;
-        restoreArmedAtMs = juce::Time::getMillisecondCounterHiRes();
+        restoreArmedAtMs = staged->armedAtMs;
+    }
+
+    /** The user's answer is written by setStateInformation (the host's thread) and the editor, and
+        read by getStateInformation (any thread) and the timer, so it lives behind a lock. */
+    juce::String getRestoreAnswer() const
+    {
+        const juce::SpinLock::ScopedLockType lock (restoreAnswerLock);
+        return restoreAnswer;
+    }
+    void setRestoreAnswer (const juce::String& answer)
+    {
+        const juce::SpinLock::ScopedLockType lock (restoreAnswerLock);
+        restoreAnswer = answer;
     }
 
     /** Is any role this panel actually binds reporting `ready`? */
@@ -934,7 +984,7 @@ private:
 
         ce::RestoreSituation situation;
         situation.policy = restorePolicy;
-        situation.rememberedAnswer = restoreAnswer;
+        situation.rememberedAnswer = getRestoreAnswer();
         situation.deviceReady = anyBoundDeviceReady();
         situation.windowOpen = windowOpen;
         situation.promptAlreadySent = restorePromptSent;
@@ -1159,7 +1209,7 @@ public:
             return;
         }
         if (a != "always" && a != "never") return;
-        restoreAnswer = a;
+        setRestoreAnswer (a);
         updateHostDisplay();   // the project is dirty: this choice is saved with it
     }
 
@@ -1261,13 +1311,23 @@ private:
     // Total Recall S2. `restorePolicy` is the panel author's default, read once at construction;
     // `restoreAnswer` is the user's decision, which outranks it and is saved with the project.
     ce::RestorePolicy restorePolicy = ce::RestorePolicy::Ask;
-    juce::String restoreAnswer;          // "", "always" or "never"
+    juce::String restoreAnswer;          // "", "always" or "never" — only through get/setRestoreAnswer
+    mutable juce::SpinLock restoreAnswerLock;
     std::atomic<bool> sessionRestored { false };   // setStateInformation ran: a reopened project
     std::atomic<int> sessionRestoreCount { 0 };
-    bool restorePending = false;
-    bool restorePromptSent = false;
+    bool restorePending = false;         // these four, and lastSentMidi, are the message thread's:
+    bool restorePromptSent = false;      // setStateInformation stages a restore and the timer arms it
     double restoreArmedAtMs = 0.0;
     double restoreLastCheckedMs = 0.0;
+    struct StagedRestore
+    {
+        std::map<juce::String, float> baseline;   // the restored values, taken as already on the synth
+        juce::var dumps;                          // what becomes restoredDumps
+        double armedAtMs = 0.0;
+    };
+    juce::SpinLock stagedRestoreLock;
+    std::optional<StagedRestore> stagedRestore;   // guarded by stagedRestoreLock
+    std::atomic<bool> restoreStaged { false };
 
     // S3. `capturedDumps` is a JSON object of dumpId -> hex, rebuilt on the message thread and read
     // by getStateInformation, which the host may call from another one — hence the lock, held only
