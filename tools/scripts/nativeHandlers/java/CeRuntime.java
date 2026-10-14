@@ -16,6 +16,9 @@
 //
 // The user-facing surface (CeContext / CeEvent) is byte-for-byte source-compatible with the previous
 // version, so existing Java handler sources keep compiling unchanged.
+//
+// Each plug-in instance loads this class, the registry and the handlers through a class loader of its
+// own (the shim's ce_new_loader), so every static here and in a handler is that instance's alone.
 
 import java.util.HashMap;
 import java.util.Map;
@@ -121,7 +124,8 @@ public final class CeRuntime {
         }
     }
 
-    /** ce_handler_shutdown (the shim destroys the JVM afterwards). */
+    /** ce_handler_shutdown: this instance's registry. The shim then closes the instance's class loader;
+     *  the JVM stays up for the process. */
     public static void shutdown() {
         try { REGISTRY.clear(); } catch (Throwable t) { /* swallow */ }
     }

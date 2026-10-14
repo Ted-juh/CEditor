@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { generateCsharpModule } from './genCsharp.mjs';
+import { buildEngineE2E, engineE2EUnavailable } from '../engineE2E.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ABI_DIR = path.resolve(HERE, '../../../../CE/src/Scripting');
@@ -52,6 +53,8 @@ try {
     const gen = generateCsharpModule({ scripts: [
       { id: 'knob1', name: 'Cutoff', event: 'onValueChanged', source: 'void onValueChanged(CeContext ctx, CeEvent e){ ctx.sendCC(1, 25, 127); ctx.setValue("out", e.value*2+1); ctx.log("ran"); }' },
       { id: 'knob2', name: 'Values', event: 'onValueChanged', source: 'void OnValueChanged(CeContext ctx, CeEvent e){ ctx.Log("v", 1.5); ctx.SendSysex(new[] { 0xF0, 0x7F, 0xF7 }); ctx.SendSysex("F0 7E F7"); ctx.SendNRPN(1, 2, 3, 400); ctx.SendCC(1, 64, true); ctx.SetValue("typed", ctx.GetValue("cutoff.value") + 42); }' },
+      // Two instances of this module in one process must count apart (harness.c), in a field and a static.
+      { id: 'counter', name: 'Counter', event: 'onValueChanged', source: 'int count = 0; static int calls = 0;\nvoid onValueChanged(CeContext ctx, CeEvent e){ count++; calls++; ctx.setValue("count", count == calls ? count : -1); }' },
     ], outDir: work, abiInfo: { dir: ABI_DIR, targetFramework: targetFramework() } });
 
     // 1) Roslyn → self-contained CoreCLR + ce_managed.dll
@@ -63,12 +66,53 @@ try {
     const shimOut = path.join(pub, `ce_handlers_csharp${ext()}`);
     execSync(`${cc} -x c -shared -fPIC -O2 -fvisibility=hidden -I "${ABI_DIR}" -I "${gen.hostingIncludeDir}" "${gen.shimSource}" -o "${shimOut}" -ldl`, { stdio: 'inherit' });
 
+    // Another panel, in a folder of its own with its own runtime, as a second exported plug-in would
+    // have: the same class and script names, different code.
+    const other = path.join(work, 'other-panel');
+    const gen2 = generateCsharpModule({ scripts: [
+      { id: 'counter', name: 'Counter', event: 'onValueChanged', source: 'static int count = 0;\nvoid onValueChanged(CeContext ctx, CeEvent e){ count += 100; ctx.setValue("count", count); }' },
+    ], outDir: other, abiInfo: { dir: ABI_DIR, targetFramework: targetFramework() } });
+    execSync(gen2.publishCommand(rid()), { cwd: other, stdio: 'inherit', env: { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_NOLOGO: '1' } });
+    const otherShim = path.join(other, gen2.publishSubdir, `ce_handlers_csharp${ext()}`);
+    execSync(`${cc} -x c -shared -fPIC -O2 -fvisibility=hidden -I "${ABI_DIR}" -I "${gen2.hostingIncludeDir}" "${gen2.shimSource}" -o "${otherShim}" -ldl`, { stdio: 'inherit' });
+
     // 3) load through the shared host harness and dispatch
     execSync(`${cc} -I "${ABI_DIR}" "${HARNESS}" -o "${path.join(pub, 'charness')}" -ldl`, { stdio: 'inherit' });
-    const out = execSync(`"${path.join(pub, 'charness')}" "./ce_handlers_csharp${ext()}"`, { cwd: pub, encoding: 'utf8' });
+    const out = execSync(`"${path.join(pub, 'charness')}" "./ce_handlers_csharp${ext()}" "${otherShim}"`, { cwd: pub, encoding: 'utf8' });
     process.stdout.write(out);
     if (!/NATIVE HANDLER E2E PASS/.test(out)) { console.error('verify-csharp: FAIL (full build)'); process.exit(1); }
     console.log('verify-csharp: full hosted-CoreCLR build loads + dispatches a C# handler (host callbacks OK) ✓');
+
+    // The same module through the real loader, as the plug-in runs it: two instances count apart, a
+    // reload starts an instance's handlers afresh, and closing one leaves the other running.
+    const unavailable = engineE2EUnavailable();
+    if (unavailable) { console.log(`verify-csharp: ${unavailable} — the NativeHandlerEngine run is skipped.`); process.exit(0); }
+    const e2e = buildEngineE2E({ work: pub, main: `
+  TestHost hostA, hostB;
+  auto a = createNativeHandlerEngine(); a->installApi(hostA);
+  auto b = createNativeHandlerEngine(); b->installApi(hostB);
+  ScriptDefinition c; c.id="counter"; c.name="Counter"; c.language="csharp"; c.event="onValueChanged"; c.scope="component";
+  const bool loaded = a->loadScript(c, onErr) && b->loadScript(c, onErr);
+  a->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+  a->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+  b->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+  const bool apart = loaded && hostA.vals["count"] == 2.0 && hostB.vals["count"] == 1.0;
+  std::printf("engine: two instances, A counted %.0f, B %.0f -> %s\\n", hostA.vals["count"], hostB.vals["count"], apart ? "PASS" : "FAIL");
+  b->reset(); b->loadScript(c, onErr);
+  b->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+  a->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+  const bool reload = hostB.vals["count"] == 1.0 && hostA.vals["count"] == 3.0;
+  std::printf("engine: B reloaded counts afresh (%.0f), A carries on (%.0f) -> %s\\n", hostB.vals["count"], hostA.vals["count"], reload ? "PASS" : "FAIL");
+  b.reset();
+  a->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+  const bool survives = hostA.vals["count"] == 4.0;
+  std::printf("engine: B closed, A counted %.0f -> %s\\n", hostA.vals["count"], survives ? "PASS" : "FAIL");
+  return apart && reload && survives ? 0 : 1;
+` });
+    const eout = execSync(`"${e2e}"`, { cwd: pub, encoding: 'utf8' });
+    process.stdout.write(eout);
+    if (/FAIL/.test(eout) || !/PASS/.test(eout)) { console.error('verify-csharp: FAIL (NativeHandlerEngine)'); process.exit(1); }
+    console.log('verify-csharp: NativeHandlerEngine runs the C# module per instance ✓');
     process.exit(0);
   }
 

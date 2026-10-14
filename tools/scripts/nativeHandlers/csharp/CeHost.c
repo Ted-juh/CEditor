@@ -87,12 +87,19 @@ static int s_boot_tried = 0, s_boot_ok = 0;
 
 /* ----------------------------------------------------------------- path helpers (char_t world) */
 
+/* An address inside THIS module, to ask the loader which file it came from. Private on purpose: an
+ * exported function's address, which this used, resolves through the global symbol scope, so with
+ * another panel's copy of this shim loaded too it named the other one's file, and this panel ran the
+ * other panel's handlers. Nor is this module put in the global scope when it pins itself, for the same
+ * reason. */
+static void ce_self_anchor(void) {}
+
 /* Directory containing THIS shared module, written into `out` (capacity `cap` ch_t units, NUL-term). */
 static int ce_self_dir(ch_t* out, size_t cap) {
 #ifdef _WIN32
     HMODULE self = NULL;
     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                            (LPCWSTR)(void*)&ce_handler_abi_version, &self))
+                            (LPCWSTR)(void*)&ce_self_anchor, &self))
         return 0;
     DWORD n = GetModuleFileNameW(self, out, (DWORD)cap);
     if (n == 0 || n >= cap) return 0;
@@ -100,7 +107,7 @@ static int ce_self_dir(ch_t* out, size_t cap) {
     return 0;
 #else
     Dl_info info;
-    if (!dladdr((void*)&ce_handler_abi_version, &info) || !info.dli_fname) return 0;
+    if (!dladdr((void*)&ce_self_anchor, &info) || !info.dli_fname) return 0;
     size_t n = strlen(info.dli_fname);
     if (n >= cap) return 0;
     memcpy(out, info.dli_fname, n + 1);
@@ -168,11 +175,11 @@ static void ce_pin_self(void) {
 #ifdef _WIN32
     HMODULE self = NULL;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
-                       (LPCWSTR)(void*)&ce_handler_abi_version, &self);
+                       (LPCWSTR)(void*)&ce_self_anchor, &self);
 #else
     Dl_info info;
-    if (dladdr((void*)&ce_handler_abi_version, &info) && info.dli_fname)
-        dlopen(info.dli_fname, RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE);
+    if (dladdr((void*)&ce_self_anchor, &info) && info.dli_fname)
+        dlopen(info.dli_fname, RTLD_NOW | RTLD_NOLOAD | RTLD_NODELETE);
 #endif
 }
 

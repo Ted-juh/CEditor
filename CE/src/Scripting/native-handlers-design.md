@@ -119,8 +119,33 @@ if (language == "cpp" || language == "csharp" || language == "java")
   pointers trampoline into the live `ScriptHostApi`, and calls `ce_handler_init`.
 - `hasHandler` → `ce_handler_has`. `dispatch` → marshal payload `juce::var`→`CeValue`, call
   `ce_handler_dispatch` inside the crash-guard (§6), marshal the result back.
-- `reset`/dtor → `ce_handler_shutdown` + close the library (note: C# NativeAOT can't truly unload —
-  keep loaded for process lifetime; Java tears down its isolate here).
+- `reset`/dtor → `ce_handler_shutdown` + close the library, for every language. The C# and Java
+  runtimes stay up for the process (neither can be started again in one process; each shim pins itself
+  resident, so closing the handle unloads nothing) — what shutdown lets go of is the instance's own state
+  (see *Instances* below), so a reload starts its handlers afresh, as Lua's and JS's are.
+
+### Instances
+
+Two plug-in instances of a panel in one process (two in one DAW) share nothing through their handlers:
+
+| Language | An instance's own | Shared by the process |
+|----------|-------------------|-----------------------|
+| C++ | a copy of the module at its own path (a library is mapped once however often it is opened), so its globals | nothing |
+| C# | a collectible `AssemblyLoadContext` holding a copy of `ce_managed.dll`: the registry, every handler object and static | the CoreCLR |
+| Java | a `URLClassLoader` over the jar (parent: the platform loader): `CeRuntime`, the registry, every handler class and static | the JVM |
+
+Every call carries the instance's `state`, which leads to its own host. Until October 2026 the C# and
+Java instances shared the one registry and every static, a reset kept their state, and a destroyed
+engine never shut its modules down. `harness.c` (driven by `verify-java.mjs` and `verify-csharp.mjs`)
+checks two instances side by side, and both verifiers run the real `NativeHandlerEngine` through
+reload and close.
+
+Two *different* panels in one process: each shim finds its own folder through a private symbol (an
+exported one resolved through the global scope to the other panel's shim, which then loaded the other
+panel's jar). Java uses the JVM already in the process rather than load its own `libjvm` beside it. A
+second C# panel boots its own hostfxr and CoreCLR from its own folder; that runs (the harness checks it
+on Linux) but two CoreCLRs in one process is not a configuration .NET supports, and is untested on
+Windows and macOS.
 
 The `juce::var`↔`CeValue` marshalling mirrors the existing `varToPy`/`pyToVar` in
 `PythonScriptEngine.cpp`.

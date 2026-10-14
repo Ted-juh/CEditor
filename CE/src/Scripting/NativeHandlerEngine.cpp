@@ -424,31 +424,27 @@ public:
 
     void reset() override
     {
-        // C#/Java host an IN-PROCESS runtime (CoreCLR via hostfxr, JVM via JNI) that CANNOT be torn down
-        // and recreated in the same process. reset() runs on every reload (e.g. the panel window
-        // closing/reopening), so closing those modules' library would drop the DLL refcount, lose the
-        // shim's handle to the still-alive runtime, and make the NEXT load's init fail (JNI_CreateJavaVM
-        // refuses a second VM) — which is exactly why C#/Java fired on the first window-open but went
-        // silent on the second. So we keep the hosted-runtime modules RESIDENT + initialised for the
-        // process lifetime (their handlers are compiled-in and immutable anyway); ensureModule's
-        // short-circuit reuses them on the next load. Only the runtime-less modules (C++) are torn down.
-        for (auto it = modules.begin(); it != modules.end(); )
+        // Every module lets go of this instance's state, so a reload (the panel window closing and
+        // opening, say) starts each language's handlers afresh, as Lua's and JS's are: the C++ module's
+        // copy is closed and deleted, and the C# and Java modules drop this instance's load context or
+        // class loader. Their runtime (CoreCLR via hostfxr, the JVM via JNI) cannot be torn down and
+        // started again in one process, and is not: each shim pins itself resident, as does
+        // pinModuleResident, so closing this handle unloads nothing and the next load reuses the
+        // live runtime.
+        //
+        // Until October 2026 the C# and Java modules were kept open and initialised across a reset
+        // instead (from before they were pinned, when closing them lost the runtime and the next
+        // window went silent), and the engine was never shut down when it was destroyed — so a closed
+        // instance's Java or C# state stayed for the process lifetime.
+        for (auto& entry : modules)
         {
-            const bool keepResident = (it->first == "csharp" || it->first == "java");
-            if (keepResident && it->second != nullptr && it->second->ok)
-            {
-                ++it; // leave loaded + inited; reused via ensureModule on the next loadScript
-                continue;
-            }
-            auto& m = it->second;
-            if (m != nullptr)
-            {
-                if (m->ok && m->shutdown != nullptr && m->state != nullptr) m->shutdown (m->state);
-                m->lib.close();
-                if (m->privateCopy != juce::File()) m->privateCopy.deleteFile();
-            }
-            it = modules.erase (it);
+            auto& m = entry.second;
+            if (m == nullptr) continue;
+            if (m->ok && m->shutdown != nullptr && m->state != nullptr) m->shutdown (m->state);
+            m->lib.close();
+            if (m->privateCopy != juce::File()) m->privateCopy.deleteFile();
         }
+        modules.clear();
         scriptLang.clear();
     }
 

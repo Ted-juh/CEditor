@@ -2,8 +2,10 @@
  * GraalVM native-image). Loads the module (argv[1], default ./ce_handlers_java.so) through the flat
  * ABI, provides a CeHostVtable, inits (which brings up the language runtime: GC for C#, isolate for
  * Java), checks hasHandler, and dispatches knob1.onValueChanged with a scalar payload of 10 —
- * asserting the handler ran and called back into the host (set("out", 21) + log("ran")). Used by
- * verify-{java,csharp}.mjs when the toolchain is available. */
+ * asserting the handler ran and called back into the host (set("out", 21) + log("ran")). With a
+ * "counter" script it also runs two instances of the module side by side, and with a second module
+ * path (another panel's) both panels in one process. Used by verify-{java,csharp}.mjs when the
+ * toolchain is available. */
 #include "NativeHandlerAbi.h"
 #include <dlfcn.h>
 #include <stdio.h>
@@ -45,6 +47,18 @@ static void CE_CALL h_emit(void* c,const CeStr* nm,const CeValue* d){ (void)c;(v
 static void CE_CALL h_fv(void* c,CeValue* v){ (void)c;(void)v; }
 static void* CE_CALL h_al(void* c,size_t n){ (void)c; return malloc(n); }
 static void CE_CALL h_de(void* c,void* p,size_t n){ (void)c;(void)n; free(p); }
+
+/* One plug-in instance's host, for the two-instance checks: what "count" was last set to there. */
+typedef struct { double count; } Instance;
+static int CE_CALL h_set_instance(void* c, const CeStr* k, const CeValue* v, const CeValue* o) {
+    (void)o; Instance* in = (Instance*)c;
+    if (k && k->len == 5 && memcmp(k->ptr, "count", 5) == 0) in->count = num(v);
+    return 0;
+}
+typedef int  (CE_CALL *InitFn)(const CeHostVtable*, void**);
+typedef int  (CE_CALL *DispFn)(void*, CeStr, CeStr, const CeValue*, CeValue*);
+typedef int  (CE_CALL *HasFn)(void*, CeStr, CeStr);
+typedef void (CE_CALL *ShutFn)(void*);
 
 int main(int argc, char** argv) {
     void* lib = dlopen(argc>1?argv[1]:"./ce_handlers_java.so", RTLD_NOW);
@@ -99,6 +113,48 @@ int main(int argc, char** argv) {
                  && strcmp(g_logv_msg,"still running")==0 && g_logv_tag==CE_NULL;
         printf("knob3: dispatch=%d %s=%g last log '%s' -> %s\n", rc, g_out_key, g_out_val, g_logv_msg, nulls ? "ok" : "WRONG");
         ok = ok && nulls;
+    }
+    /* counter, when the module has it: two instances of one panel in one process. The handler counts
+     * its calls in a field and sets "count". A is called twice and B once, then B is shut down and A is
+     * called again: each host must see its own count, A 2, B 1, A 3. With the handler classes shared
+     * between instances (the Java shim until October 2026), B saw 3 and A then 4. */
+    CeStr sidc = { "counter", 7 };
+    ShutFn shut = (ShutFn)dlsym(lib, "ce_handler_shutdown");
+    if (has(st, sidc, ev)) {
+        Instance a = { -1 }, b = { -1 };
+        CeHostVtable va = vt, vb = vt;
+        va.set = h_set_instance; va.host_ctx = &a;
+        vb.set = h_set_instance; vb.host_ctx = &b;
+        void *sa = NULL, *sb = NULL;
+        int ra = init(&va, &sa), rb = init(&vb, &sb);
+        disp(sa, sidc, ev, &p, NULL); disp(sa, sidc, ev, &p, NULL);
+        disp(sb, sidc, ev, &p, NULL);
+        double a2 = a.count, b1 = b.count;
+        if (shut) shut(sb);
+        disp(sa, sidc, ev, &p, NULL);
+        int apart = ra == 0 && rb == 0 && sa != sb && a2 == 2 && b1 == 1 && a.count == 3;
+        printf("two instances: A counted %g, B %g, A after B closed %g -> %s\n", a2, b1, a.count, apart ? "ok" : "WRONG");
+        ok = ok && apart;
+
+        /* argv[2], when given: another panel's module (its own folder, the same class and script names,
+         * a counter that adds 100), loaded into this process beside the first. Its instance must run its
+         * own code, and the first panel's instance must not notice. The old Java shim found the first
+         * panel's jar from the second panel's module and ran the first panel's counter. */
+        if (argc > 2) {
+            void* lib2 = dlopen(argv[2], RTLD_NOW);
+            InitFn init2 = lib2 ? (InitFn)dlsym(lib2, "ce_handler_init") : NULL;
+            DispFn disp2 = lib2 ? (DispFn)dlsym(lib2, "ce_handler_dispatch") : NULL;
+            Instance c = { -1 };
+            CeHostVtable vc = vt; vc.set = h_set_instance; vc.host_ctx = &c;
+            void* sc = NULL;
+            int rc2 = init2 ? init2(&vc, &sc) : -99;
+            if (disp2 && rc2 == 0) disp2(sc, sidc, ev, &p, NULL);
+            disp(sa, sidc, ev, &p, NULL);
+            int panels = lib2 && rc2 == 0 && c.count == 100 && a.count == 4;
+            printf("another panel: init=%d its counter %g, first panel's A %g -> %s\n", rc2, c.count, a.count, panels ? "ok" : "WRONG");
+            ok = ok && panels;
+        }
+        if (shut) shut(sa);
     }
     printf("%s\n", ok ? "NATIVE HANDLER E2E PASS" : "FAIL");
     return ok ? 0 : 1;
