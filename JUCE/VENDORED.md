@@ -11,7 +11,7 @@ corruption. `.gitignore` now has an explicit exception and
 
 ## Local modifications
 
-Upstream JUCE is otherwise untouched. There are exactly six patches, and they are listed here because a
+Upstream JUCE is otherwise untouched. There are exactly seven patches, and they are listed here because a
 patch inside a vendored tree is invisible in a diff against upstream and dies silently the day
 somebody drops in a new JUCE.
 
@@ -172,3 +172,37 @@ This complements `CE/src/TrustedWebBrowser.h`, which blocks navigation away from
 Both protections must survive a JUCE update; reapply the source check before `handleNativeEvent`
 in the Windows `WebMessageReceived` callback. Other platforms retain the navigation protection;
 this message-source patch specifically covers WebView2 on Windows.
+
+### 7. QuickJS: a global read asks a proxy in the global's prototype chain before getting
+
+**File:** `include/JUCE-8.0.7/modules/juce_javascript/choc/javascript/choc_javascript_QuickJS.h`,
+`JS_GetPropertyInternal`, the exotic-object branch (where QuickJS's own comment reads
+`XXX: should pass throw_ref_error`).
+
+**Guard:** none. It is a fix toward the spec, and inert in any engine that does not put an exotic
+object in its global's prototype chain, which nothing does but CEditor's JavaScript prelude.
+
+**Pinned by:** `CE/web/test/vendoredJucePatches.test.js`.
+
+**What was wrong.** Reading a global variable, QuickJS walks the global object's prototype chain,
+and when it reaches a Proxy it returns whatever the proxy's `get` trap returns, without asking its
+`has` trap first. The spec asks first (a global binding exists only if HasProperty says so), and
+that is the only way a proxy can say "not here": without it a read of an undefined name through
+the proxy is `undefined` instead of a ReferenceError. `typeof` cannot be told apart from a read
+inside a trap, so the trap cannot make up for it.
+
+**Why it matters here.** `CE/src/Scripting/JsScriptEngine.cpp` runs every JavaScript script on a
+panel in one engine, and keeps a name a script assigns without declaring it in that script's own
+context, from behind the global object: a proxy in the global's prototype chain. Without the
+patch, every typo in every script would read as `undefined` in the plug-in, where the editor's
+WebView (a context per script) throws "not defined".
+
+**What the patch does.** When the lookup is a global read (`throw_ref_error`, set by `OP_get_var`
+only; `typeof` uses `OP_get_var_undef`, which does not set it), it calls the exotic object's
+`has_property` first and throws "not defined" when that says no. Every other caller of
+`JS_GetPropertyInternal` passes `FALSE` and is unaffected.
+
+**If you upgrade JUCE:** check whether upstream QuickJS (or choc's copy) has started passing
+`throw_ref_error` to exotic objects; if not, re-apply the five lines after the `XXX` comment. The
+pin test fails while they are missing, and `ScriptRuntimeTests` section 40b fails without them.
+

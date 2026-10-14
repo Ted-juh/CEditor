@@ -11,9 +11,28 @@ export function initialiseJavascriptSandbox() {
     .then(module => { engine = module; });
 }
 
+// `memoryBytes` is each script's own ceiling. `panelMemoryBytes` is all of them together: every
+// sandbox lives in the one WebAssembly heap the interpreter runs in, and that heap is what the page
+// pays for. It replaces a cap of 32 sandboxes, which was the same 512 MB reached by counting
+// scripts — 32 at 16 MB each — and refused the 33rd script of any panel. The GAIA panel has 232,
+// at about 51 KB apiece; counting stopped 200 of them while the memory was nowhere near the limit.
 export const SCRIPT_LIMITS = Object.freeze({ milliseconds: 250, memoryBytes: 16 * 1024 * 1024,
-  stackBytes: 256 * 1024, contexts: 32, calls: 4096, entries: 20000, text: 1024 * 1024 });
+  panelMemoryBytes: 512 * 1024 * 1024, stackBytes: 256 * 1024, calls: 4096, entries: 20000, text: 1024 * 1024 });
 const active = new Set();
+let panelMemoryBytes = SCRIPT_LIMITS.panelMemoryBytes;
+
+/** A smaller budget for a test, which cannot afford to allocate 512 MB to reach the real one. */
+export function setPanelMemoryBudgetForTesting(bytes = SCRIPT_LIMITS.panelMemoryBytes) { panelMemoryBytes = bytes; }
+/** The shared heap's size now, and how many sandboxes are live: what a test sets a budget against. */
+export const scriptHeapBytesForTesting = () => heapBytes();
+export const sandboxCountForTesting = () => active.size;
+
+// The shared heap's size. It only ever grows: what a stopped sandbox gave back is reused from inside
+// it, not returned. So the budget is enforced on growth — whatever made the heap grow past the budget
+// is stopped — and never on size alone, which after one runaway would refuse every script after it.
+const heapBytes = () => engine.getWasmMemory().buffer.byteLength;
+const grewPastBudget = (before) => { const now = heapBytes(); return now > before && now > panelMemoryBytes; };
+const BUDGET_EXCEEDED = 'Script memory limit exceeded: the panel\'s scripts together have reached their budget';
 let depth = 0;
 let deadline = 0;
 let calls = 0;
@@ -90,8 +109,8 @@ export function disposeJavascriptSandboxes(owner) {
 
 export function evaluateBoundedJavascript(source, api, names, options = {}) {
   if (!engine) throw Error('Script interpreter has not finished loading');
-  if (active.size >= SCRIPT_LIMITS.contexts) throw Error('Too many script instances; stop preview before loading more');
   if (source.length > SCRIPT_LIMITS.text) throw Error('Script source limit exceeded');
+  const heapAtStart = heapBytes();
   const runtime = engine.newRuntime();
   runtime.setMemoryLimit(options.memoryBytes ?? SCRIPT_LIMITS.memoryBytes);
   runtime.setMaxStackSize(SCRIPT_LIMITS.stackBytes);
@@ -116,11 +135,16 @@ export function evaluateBoundedJavascript(source, api, names, options = {}) {
     vm.dispose(); runtime.dispose();
   } };
   active.add(sandbox);
+  if (grewPastBudget(heapAtStart)) {
+    sandbox.dispose();
+    throw Error(BUDGET_EXCEEDED);
+  }
 
   function run(fn) {
     if (disposed || retire) throw Error('Script instance stopped; enable or reload the current code');
     const outer = depth === 0;
     if (outer) { deadline = performance.now() + (options.milliseconds ?? SCRIPT_LIMITS.milliseconds); calls = 0; }
+    const heapBefore = heapBytes();
     depth++; busy++;
     try {
       const result = fn();
@@ -134,11 +158,19 @@ export function evaluateBoundedJavascript(source, api, names, options = {}) {
         }
       }
       if (performance.now() >= deadline) throw Error('Script execution limit exceeded');
+      // Checked at every depth, so a script called from another is held to it on its own. The caller
+      // grew too, by what the callee took, and is stopped with it: a chain that ran a panel out of
+      // memory does not get to carry on.
+      if (grewPastBudget(heapBefore)) throw Error(BUDGET_EXCEEDED);
       return result;
     } catch (error) {
-      if (/interrupted|out of memory|stack overflow|limit exceeded/i.test(error?.message ?? '')) {
+      // Asked again here, because a script leaves by throwing as well as by returning: one that grew
+      // the heap past the budget and then threw an error of its own would otherwise keep what it took,
+      // and could take it again on the next call.
+      const overBudget = grewPastBudget(heapBefore);
+      if (overBudget || /interrupted|out of memory|stack overflow|limit exceeded/i.test(error?.message ?? '')) {
         retire = true;
-        throw Error(`Script stopped: execution or memory limit exceeded (${error.message})`);
+        throw Error(`Script stopped: execution or memory limit exceeded (${overBudget ? BUDGET_EXCEEDED : error.message})`);
       }
       throw error;
     } finally {

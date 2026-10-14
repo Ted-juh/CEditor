@@ -1,6 +1,7 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateBoundedJavascript as evaluate, disposeJavascriptSandboxes, initialiseJavascriptSandbox } from '../src/CE_Application/scripting/boundedJavascript.js';
+import { evaluateBoundedJavascript as evaluate, disposeJavascriptSandboxes, initialiseJavascriptSandbox,
+  sandboxCountForTesting } from '../src/CE_Application/scripting/boundedJavascript.js';
 await initialiseJavascriptSandbox();
 
 afterEach(() => disposeJavascriptSandboxes());
@@ -52,4 +53,12 @@ test('API floods and oversized data cannot grow host resources without a limit',
   assert.throws(() => evaluate('while (true) send();', { send: () => { count++; } }, [], { milliseconds: 1000 }), /limit exceeded/);
   assert.ok(count <= 4096);
   assert.throws(() => evaluate('send("x".repeat(2 * 1024 * 1024));', { send() {} }, []), /limit exceeded/);
+});
+test('a panel holds as many scripts as its memory allows, not a fixed count', () => {
+  // There was a cap of 32 sandboxes, and the GAIA panel has 232 scripts: the 33rd onward never
+  // loaded. Three hundred small ones, all live at once, each still answering.
+  const scripts = [];
+  for (let i = 0; i < 300; i++) scripts.push(evaluate(`function id() { return ${i}; }`, {}, ['id']));
+  assert.equal(sandboxCountForTesting(), 300);
+  scripts.forEach((script, i) => assert.equal(script.id(), i));
 });

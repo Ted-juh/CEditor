@@ -184,3 +184,17 @@ test('JUCE/VENDORED.md records the MIDI-CI patch', () => {
   assert.ok(text.includes('juce_CIDevice.cpp') && text.includes('stack-use-after-return'),
     'VENDORED.md must name the MIDI-CI file and the defect');
 });
+
+test('QuickJS still asks a proxy in the global prototype chain before reading a global through it', () => {
+  // Without it, a read of an undefined name in a plug-in script is undefined instead of an error:
+  // the per-script scope for undeclared names (JsScriptEngine.cpp) sits behind the global as a proxy.
+  const source = readFileSync(join(repoRoot,
+    'JUCE/include/JUCE-8.0.7/modules/juce_javascript/choc/javascript/choc_javascript_QuickJS.h'), 'utf8');
+  const branch = source.slice(source.indexOf('/* XXX: should pass throw_ref_error */'));
+  const get = branch.indexOf('em->get_property(ctx, obj1, prop, this_obj)');
+  assert.ok(get > 0, 'the exotic get branch of JS_GetPropertyInternal moved');
+  const before = branch.slice(0, get);
+  for (const piece of ['CEditor patch 7', 'throw_ref_error && em->has_property', 'JS_ThrowReferenceErrorNotDefined(ctx, prop)'])
+    assert.ok(before.includes(piece), `Missing ${piece} before the proxy's get. ${REAPPLY}`);
+});
+
