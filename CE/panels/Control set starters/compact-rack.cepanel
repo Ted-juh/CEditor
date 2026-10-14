@@ -371,7 +371,7 @@
       "_children": {
         "Core": {"name":"Label_1720127958065","controlSetId":"compact-rack","id":"ctrl_1720127958065","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"COMPACT RACK","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FF867048","lampOffColour":"FFBEC1BA","lampBezelColour":"AA3A3E43"}
       },
@@ -381,7 +381,7 @@
       "_children": {
         "Core": {"name":"Label_1720127958066","controlSetId":"compact-rack","id":"ctrl_1720127958066","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Rack / close spacing","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FF867048","lampOffColour":"FFBEC1BA","lampBezelColour":"AA3A3E43"}
       },
@@ -391,7 +391,7 @@
       "_children": {
         "Core": {"name":"Label_1720127958067","controlSetId":"compact-rack","id":"ctrl_1720127958067","controlType":"Label"},
         "Transform": {"x":26,"y":85,"width":300,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"OSCILLATOR / FILTER","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FF867048","lampOffColour":"FFBEC1BA","lampBezelColour":"AA3A3E43"}
       },
@@ -401,7 +401,7 @@
       "_children": {
         "Core": {"name":"Label_1720127958068","controlSetId":"compact-rack","id":"ctrl_1720127958068","controlType":"Label"},
         "Transform": {"x":356,"y":85,"width":210,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"ENVELOPE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FF867048","lampOffColour":"FFBEC1BA","lampBezelColour":"AA3A3E43"}
       },
@@ -411,7 +411,7 @@
       "_children": {
         "Core": {"name":"Label_1720127958069","controlSetId":"compact-rack","id":"ctrl_1720127958069","controlType":"Label"},
         "Transform": {"x":586,"y":85,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PERFORMANCE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FF867048","lampOffColour":"FFBEC1BA","lampBezelColour":"AA3A3E43"}
       },
@@ -483,7 +483,7 @@
       "_children": {
         "Core": {"name":"Label_1720127958072","controlSetId":"compact-rack","id":"ctrl_1720127958072","controlType":"Label"},
         "Transform": {"x":26,"y":280,"width":150,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"TUNE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FF867048","lampOffColour":"FFBEC1BA","lampBezelColour":"AA3A3E43"}
       },
@@ -493,7 +493,7 @@
       "_children": {
         "Core": {"name":"Label_1720127958073","controlSetId":"compact-rack","id":"ctrl_1720127958073","controlType":"Label"},
         "Transform": {"x":194,"y":280,"width":150,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"CUTOFF","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FF867048","lampOffColour":"FFBEC1BA","lampBezelColour":"AA3A3E43"}
       },
@@ -703,7 +703,7 @@
       "_children": {
         "Core": {"name":"Label_1720127958084","controlSetId":"compact-rack","id":"ctrl_1720127958084","controlType":"Label"},
         "Transform": {"x":26,"y":318,"width":360,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PADS / MODULATION","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FF867048","lampOffColour":"FFBEC1BA","lampBezelColour":"AA3A3E43"}
       },
@@ -713,7 +713,7 @@
       "_children": {
         "Core": {"name":"Label_1720127958085","controlSetId":"compact-rack","id":"ctrl_1720127958085","controlType":"Label"},
         "Transform": {"x":540,"y":318,"width":300,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"OUTPUT / ROUTING","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FF867048","lampOffColour":"FFBEC1BA","lampBezelColour":"AA3A3E43"}
       },
@@ -799,7 +799,7 @@
       "_children": {
         "Core": {"name":"Label_1720127958093","controlSetId":"compact-rack","id":"ctrl_1720127958093","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Editable synthesizer controls — copy individual controls into your panel.","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FF867048","lampOffColour":"FFBEC1BA","lampBezelColour":"AA3A3E43"}
       },

@@ -371,7 +371,7 @@
       "_children": {
         "Core": {"name":"Label_1719771023512","controlSetId":"gemstone","id":"ctrl_1719771023512","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"GLASS SIGNAL","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9},"Effects":{"glowEnabled":true,"glowSize":3,"glowColour":"B3F7F4EC"}}},
         "ContentLayout": {"lampColour":"FFB5D9E1","lampOffColour":"FF1E2A35","lampBezelColour":"AAFFFFFF"}
       },
@@ -381,7 +381,7 @@
       "_children": {
         "Core": {"name":"Label_1719771023513","controlSetId":"gemstone","id":"ctrl_1719771023513","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Future / translucent","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Effects":{"glowEnabled":true,"glowSize":3,"glowColour":"B3F7F4EC"}}},
         "ContentLayout": {"lampColour":"FFB5D9E1","lampOffColour":"FF1E2A35","lampBezelColour":"AAFFFFFF"}
       },
@@ -391,7 +391,7 @@
       "_children": {
         "Core": {"name":"Label_1719771023514","controlSetId":"gemstone","id":"ctrl_1719771023514","controlType":"Label"},
         "Transform": {"x":26,"y":85,"width":300,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"OSCILLATOR / FILTER","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"glowEnabled":true,"glowSize":3,"glowColour":"B3F7F4EC"}}},
         "ContentLayout": {"lampColour":"FFB5D9E1","lampOffColour":"FF1E2A35","lampBezelColour":"AAFFFFFF"}
       },
@@ -401,7 +401,7 @@
       "_children": {
         "Core": {"name":"Label_1719771023515","controlSetId":"gemstone","id":"ctrl_1719771023515","controlType":"Label"},
         "Transform": {"x":356,"y":85,"width":210,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"ENVELOPE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"glowEnabled":true,"glowSize":3,"glowColour":"B3F7F4EC"}}},
         "ContentLayout": {"lampColour":"FFB5D9E1","lampOffColour":"FF1E2A35","lampBezelColour":"AAFFFFFF"}
       },
@@ -411,7 +411,7 @@
       "_children": {
         "Core": {"name":"Label_1719771023516","controlSetId":"gemstone","id":"ctrl_1719771023516","controlType":"Label"},
         "Transform": {"x":586,"y":85,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PERFORMANCE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"glowEnabled":true,"glowSize":3,"glowColour":"B3F7F4EC"}}},
         "ContentLayout": {"lampColour":"FFB5D9E1","lampOffColour":"FF1E2A35","lampBezelColour":"AAFFFFFF"}
       },
@@ -483,7 +483,7 @@
       "_children": {
         "Core": {"name":"Label_1719771023519","controlSetId":"gemstone","id":"ctrl_1719771023519","controlType":"Label"},
         "Transform": {"x":26,"y":280,"width":150,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"TUNE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9},"Effects":{"glowEnabled":true,"glowSize":3,"glowColour":"B3F7F4EC"}}},
         "ContentLayout": {"lampColour":"FFB5D9E1","lampOffColour":"FF1E2A35","lampBezelColour":"AAFFFFFF"}
       },
@@ -493,7 +493,7 @@
       "_children": {
         "Core": {"name":"Label_1719771023520","controlSetId":"gemstone","id":"ctrl_1719771023520","controlType":"Label"},
         "Transform": {"x":194,"y":280,"width":150,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"CUTOFF","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9},"Effects":{"glowEnabled":true,"glowSize":3,"glowColour":"B3F7F4EC"}}},
         "ContentLayout": {"lampColour":"FFB5D9E1","lampOffColour":"FF1E2A35","lampBezelColour":"AAFFFFFF"}
       },
@@ -703,7 +703,7 @@
       "_children": {
         "Core": {"name":"Label_1719771023531","controlSetId":"gemstone","id":"ctrl_1719771023531","controlType":"Label"},
         "Transform": {"x":26,"y":318,"width":360,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PADS / MODULATION","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"glowEnabled":true,"glowSize":3,"glowColour":"B3F7F4EC"}}},
         "ContentLayout": {"lampColour":"FFB5D9E1","lampOffColour":"FF1E2A35","lampBezelColour":"AAFFFFFF"}
       },
@@ -713,7 +713,7 @@
       "_children": {
         "Core": {"name":"Label_1719771023532","controlSetId":"gemstone","id":"ctrl_1719771023532","controlType":"Label"},
         "Transform": {"x":540,"y":318,"width":300,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"OUTPUT / ROUTING","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"glowEnabled":true,"glowSize":3,"glowColour":"B3F7F4EC"}}},
         "ContentLayout": {"lampColour":"FFB5D9E1","lampOffColour":"FF1E2A35","lampBezelColour":"AAFFFFFF"}
       },
@@ -799,7 +799,7 @@
       "_children": {
         "Core": {"name":"Label_1719771023540","controlSetId":"gemstone","id":"ctrl_1719771023540","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Editable synthesizer controls — copy individual controls into your panel.","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Effects":{"glowEnabled":true,"glowSize":3,"glowColour":"B3F7F4EC"}}},
         "ContentLayout": {"lampColour":"FFB5D9E1","lampOffColour":"FF1E2A35","lampBezelColour":"AAFFFFFF"}
       },

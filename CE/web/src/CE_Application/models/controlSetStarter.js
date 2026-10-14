@@ -4,6 +4,7 @@ import { resolveControlForSet } from './controlSetFamilies.js';
 import { createPanel } from '../stores/panelModel.js';
 import { setAnatomy } from './controlAnatomy.js';
 import { starterDirection } from './controlSetCoverage.js';
+import { labelTreatmentFor } from './labelDesigns.js';
 
 // Gallery and starter share ordinary controls. Materialization exposes design values in the
 // inspector; the pin keeps the design when the user copies a control to another panel.
@@ -25,8 +26,14 @@ export function createControlSetStarter(setId, { materialize = true, nextId = nu
     controls.push(c);
     return c;
   }
+  // A caption is drawn the way the set draws a Label: printed on the panel, engraved, lit, on a brass
+  // plate or in a hairline frame (models/labelDesigns.js). Only Graphite has no Label design, and
+  // there the starter takes off the box every control is born with. Doing that under every set, as
+  // the starter did before sets designed labels, kept the plate sets' dark plate lettering and
+  // removed the plate it is lettered on.
+  const bareCaption = labelTreatmentFor(set) ? {} : { Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false, thickness: 0 } } } };
   function label(title, x, y, width = 250, size = 13) {
-    place('Label', x, y, width, 26, { Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false, thickness: 0 } } }, Text: { content: title, _children: { Font: { size } } } });
+    place('Label', x, y, width, 26, { ...bareCaption, Text: { content: title, _children: { Font: { size } } } });
   }
   if(direction?.physical) {
     label(set.name.toUpperCase(),26,16,650,24);

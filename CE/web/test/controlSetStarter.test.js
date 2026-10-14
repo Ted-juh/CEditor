@@ -6,7 +6,7 @@ import { SHIPPED_STARTER_IDS, STARTERS_DIR, starterFile } from '../scripts/expor
 import { STARTER_CONTROL_SETS } from '../src/CE_Application/models/controlSetCoverage.js';
 import { PHYSICAL_DIRECTIONS } from '../src/CE_Application/models/physicalControlSets.js';
 import { createControlSetStarter } from '../src/CE_Application/models/controlSetStarter.js';
-import { getControlSet } from '../src/CE_Application/models/controlSets.js';
+import { getControlSet, resolveToken } from '../src/CE_Application/models/controlSets.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { resolveControlForSet, readControlPath } from '../src/CE_Application/models/controlSetFamilies.js';
 import { shrinkControl, expandControl } from '../src/CE_Application/stores/documentShape.js';
@@ -51,6 +51,35 @@ test('the shipped starters are what the generator writes, byte for byte', () => 
       owner.set(cid, id);
     }
   }
+});
+
+test('every starter caption can be read against what is behind it', () => {
+  // The lettering against its plate where the label has one, the panel where it does not. The plate
+  // sets' captions once kept their dark plate lettering with the plate taken away by the starter:
+  // 1.0 to 1, which is invisible, and nothing failed. 4.5 to 1 is WCAG's floor for body text.
+  const luminance = (argb) => {
+    const [r, g, b] = [2, 4, 6].map((i) => parseInt(argb.slice(i, i + 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrast = (a, b) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  let captions = 0;
+  for (const { id } of STARTER_CONTROL_SETS) {
+    const panelColour = resolveToken('panel.surface', getControlSet(id));
+    for (const c of createControlSetStarter(id).controls) {
+      if (c._children.Core.controlType !== 'Label') continue;
+      const ink = c._children.Text._children.Fill.colour;
+      const plate = c._children.Background._children.Fill.colour;
+      const behind = plate.startsWith('00') ? panelColour : plate;
+      const ratio = contrast(ink, behind);
+      assert.ok(ratio >= 4.5, `${id}: "${c._children.Text.content}" is ${ink} on ${behind}, ${ratio.toFixed(2)} to 1`);
+      captions++;
+    }
+  }
+  assert.ok(captions > 500, `every starter has its captions checked, saw ${captions}`);
 });
 
 test('the third synth collection has twelve distinct sculpted mechanisms, not palette aliases', () => {

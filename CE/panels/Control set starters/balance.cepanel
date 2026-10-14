@@ -345,7 +345,7 @@
       "_children": {
         "Core": {"name":"Label_1790495872467","controlSetId":"balance","id":"ctrl_1790495872467","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"BALANCE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFB65A42","lampOffColour":"FFEEECE4","lampBezelColour":"66403A30"}
       },
@@ -355,7 +355,7 @@
       "_children": {
         "Core": {"name":"Label_1790495872468","controlSetId":"balance","id":"ctrl_1790495872468","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Balance / kinetic","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFB65A42","lampOffColour":"FFEEECE4","lampBezelColour":"66403A30"}
       },
@@ -365,7 +365,7 @@
       "_children": {
         "Core": {"name":"Label_1790495872469","controlSetId":"balance","id":"ctrl_1790495872469","controlType":"Label"},
         "Transform": {"x":26,"y":82,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"TURN / SLIDE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFB65A42","lampOffColour":"FFEEECE4","lampBezelColour":"66403A30"}
       },
@@ -375,7 +375,7 @@
       "_children": {
         "Core": {"name":"Label_1790495872470","controlSetId":"balance","id":"ctrl_1790495872470","controlType":"Label"},
         "Transform": {"x":580,"y":82,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PRESS / SELECT","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFB65A42","lampOffColour":"FFEEECE4","lampBezelColour":"66403A30"}
       },
@@ -559,7 +559,7 @@
       "_children": {
         "Core": {"name":"Label_1790495872481","controlSetId":"balance","id":"ctrl_1790495872481","controlType":"Label"},
         "Transform": {"x":26,"y":310,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PLAY / SHAPE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFB65A42","lampOffColour":"FFEEECE4","lampBezelColour":"66403A30"}
       },
@@ -569,7 +569,7 @@
       "_children": {
         "Core": {"name":"Label_1790495872482","controlSetId":"balance","id":"ctrl_1790495872482","controlType":"Label"},
         "Transform": {"x":540,"y":310,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"MEASURE / ROUTE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFB65A42","lampOffColour":"FFEEECE4","lampBezelColour":"66403A30"}
       },
@@ -648,7 +648,7 @@
       "_children": {
         "Core": {"name":"Label_1790495872490","controlSetId":"balance","id":"ctrl_1790495872490","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Copy a control into your panel. Its pinned design travels with it.","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFB65A42","lampOffColour":"FFEEECE4","lampBezelColour":"66403A30"}
       },

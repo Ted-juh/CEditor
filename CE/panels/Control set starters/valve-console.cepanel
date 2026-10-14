@@ -371,7 +371,7 @@
       "_children": {
         "Core": {"name":"Label_1750795207249","controlSetId":"valve-console","id":"ctrl_1750795207249","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FF7C6638"},"Corners":{"radius":2}}},
+        "Background": {"_children":{"Fill":{"colour":"FFC8A45A"},"Border":{"thickness":1,"colour":"FF7C6638"},"Corners":{"radius":2}}},
         "Text": {"content":"VALVE CONSOLE","_children":{"Fill":{"colour":"FF2A2116"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99E6D6B5"}}},
         "ContentLayout": {"lampColour":"FFD0B16F","lampOffColour":"FF28231F","lampBezelColour":"AA1C1A17"}
       },
@@ -381,7 +381,7 @@
       "_children": {
         "Core": {"name":"Label_1750795207250","controlSetId":"valve-console","id":"ctrl_1750795207250","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FF7C6638"},"Corners":{"radius":2}}},
+        "Background": {"_children":{"Fill":{"colour":"FFC8A45A"},"Border":{"thickness":1,"colour":"FF7C6638"},"Corners":{"radius":2}}},
         "Text": {"content":"Valve era / domed","_children":{"Fill":{"colour":"FF2A2116"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99E6D6B5"}}},
         "ContentLayout": {"lampColour":"FFD0B16F","lampOffColour":"FF28231F","lampBezelColour":"AA1C1A17"}
       },
@@ -391,7 +391,7 @@
       "_children": {
         "Core": {"name":"Label_1750795207251","controlSetId":"valve-console","id":"ctrl_1750795207251","controlType":"Label"},
         "Transform": {"x":26,"y":85,"width":300,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FF7C6638"},"Corners":{"radius":2}}},
+        "Background": {"_children":{"Fill":{"colour":"FFC8A45A"},"Border":{"thickness":1,"colour":"FF7C6638"},"Corners":{"radius":2}}},
         "Text": {"content":"OSCILLATOR / FILTER","_children":{"Fill":{"colour":"FF2A2116"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99E6D6B5"}}},
         "ContentLayout": {"lampColour":"FFD0B16F","lampOffColour":"FF28231F","lampBezelColour":"AA1C1A17"}
       },
@@ -401,7 +401,7 @@
       "_children": {
         "Core": {"name":"Label_1750795207252","controlSetId":"valve-console","id":"ctrl_1750795207252","controlType":"Label"},
         "Transform": {"x":356,"y":85,"width":210,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FF7C6638"},"Corners":{"radius":2}}},
+        "Background": {"_children":{"Fill":{"colour":"FFC8A45A"},"Border":{"thickness":1,"colour":"FF7C6638"},"Corners":{"radius":2}}},
         "Text": {"content":"ENVELOPE","_children":{"Fill":{"colour":"FF2A2116"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99E6D6B5"}}},
         "ContentLayout": {"lampColour":"FFD0B16F","lampOffColour":"FF28231F","lampBezelColour":"AA1C1A17"}
       },
@@ -411,7 +411,7 @@
       "_children": {
         "Core": {"name":"Label_1750795207253","controlSetId":"valve-console","id":"ctrl_1750795207253","controlType":"Label"},
         "Transform": {"x":586,"y":85,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FF7C6638"},"Corners":{"radius":2}}},
+        "Background": {"_children":{"Fill":{"colour":"FFC8A45A"},"Border":{"thickness":1,"colour":"FF7C6638"},"Corners":{"radius":2}}},
         "Text": {"content":"PERFORMANCE","_children":{"Fill":{"colour":"FF2A2116"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99E6D6B5"}}},
         "ContentLayout": {"lampColour":"FFD0B16F","lampOffColour":"FF28231F","lampBezelColour":"AA1C1A17"}
       },
@@ -483,7 +483,7 @@
       "_children": {
         "Core": {"name":"Label_1750795207256","controlSetId":"valve-console","id":"ctrl_1750795207256","controlType":"Label"},
         "Transform": {"x":26,"y":280,"width":150,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FF7C6638"},"Corners":{"radius":2}}},
+        "Background": {"_children":{"Fill":{"colour":"FFC8A45A"},"Border":{"thickness":1,"colour":"FF7C6638"},"Corners":{"radius":2}}},
         "Text": {"content":"TUNE","_children":{"Fill":{"colour":"FF2A2116"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99E6D6B5"}}},
         "ContentLayout": {"lampColour":"FFD0B16F","lampOffColour":"FF28231F","lampBezelColour":"AA1C1A17"}
       },
@@ -493,7 +493,7 @@
       "_children": {
         "Core": {"name":"Label_1750795207257","controlSetId":"valve-console","id":"ctrl_1750795207257","controlType":"Label"},
         "Transform": {"x":194,"y":280,"width":150,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FF7C6638"},"Corners":{"radius":2}}},
+        "Background": {"_children":{"Fill":{"colour":"FFC8A45A"},"Border":{"thickness":1,"colour":"FF7C6638"},"Corners":{"radius":2}}},
         "Text": {"content":"CUTOFF","_children":{"Fill":{"colour":"FF2A2116"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99E6D6B5"}}},
         "ContentLayout": {"lampColour":"FFD0B16F","lampOffColour":"FF28231F","lampBezelColour":"AA1C1A17"}
       },
@@ -703,7 +703,7 @@
       "_children": {
         "Core": {"name":"Label_1750795207268","controlSetId":"valve-console","id":"ctrl_1750795207268","controlType":"Label"},
         "Transform": {"x":26,"y":318,"width":360,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FF7C6638"},"Corners":{"radius":2}}},
+        "Background": {"_children":{"Fill":{"colour":"FFC8A45A"},"Border":{"thickness":1,"colour":"FF7C6638"},"Corners":{"radius":2}}},
         "Text": {"content":"PADS / MODULATION","_children":{"Fill":{"colour":"FF2A2116"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99E6D6B5"}}},
         "ContentLayout": {"lampColour":"FFD0B16F","lampOffColour":"FF28231F","lampBezelColour":"AA1C1A17"}
       },
@@ -713,7 +713,7 @@
       "_children": {
         "Core": {"name":"Label_1750795207269","controlSetId":"valve-console","id":"ctrl_1750795207269","controlType":"Label"},
         "Transform": {"x":540,"y":318,"width":300,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FF7C6638"},"Corners":{"radius":2}}},
+        "Background": {"_children":{"Fill":{"colour":"FFC8A45A"},"Border":{"thickness":1,"colour":"FF7C6638"},"Corners":{"radius":2}}},
         "Text": {"content":"OUTPUT / ROUTING","_children":{"Fill":{"colour":"FF2A2116"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99E6D6B5"}}},
         "ContentLayout": {"lampColour":"FFD0B16F","lampOffColour":"FF28231F","lampBezelColour":"AA1C1A17"}
       },
@@ -799,7 +799,7 @@
       "_children": {
         "Core": {"name":"Label_1750795207277","controlSetId":"valve-console","id":"ctrl_1750795207277","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FF7C6638"},"Corners":{"radius":2}}},
+        "Background": {"_children":{"Fill":{"colour":"FFC8A45A"},"Border":{"thickness":1,"colour":"FF7C6638"},"Corners":{"radius":2}}},
         "Text": {"content":"Editable synthesizer controls — copy individual controls into your panel.","_children":{"Fill":{"colour":"FF2A2116"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99E6D6B5"}}},
         "ContentLayout": {"lampColour":"FFD0B16F","lampOffColour":"FF28231F","lampBezelColour":"AA1C1A17"}
       },

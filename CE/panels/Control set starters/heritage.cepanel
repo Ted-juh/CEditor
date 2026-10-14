@@ -371,7 +371,7 @@
       "_children": {
         "Core": {"name":"Label_1716938016750","controlSetId":"heritage","id":"ctrl_1716938016750","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"HERITAGE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBEB591","lampOffColour":"FF2C2925","lampBezelColour":"AA1C1A17"}
       },
@@ -381,7 +381,7 @@
       "_children": {
         "Core": {"name":"Label_1716938016751","controlSetId":"heritage","id":"ctrl_1716938016751","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"1970s / cream caps","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBEB591","lampOffColour":"FF2C2925","lampBezelColour":"AA1C1A17"}
       },
@@ -391,7 +391,7 @@
       "_children": {
         "Core": {"name":"Label_1716938016752","controlSetId":"heritage","id":"ctrl_1716938016752","controlType":"Label"},
         "Transform": {"x":26,"y":85,"width":300,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"OSCILLATOR / FILTER","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBEB591","lampOffColour":"FF2C2925","lampBezelColour":"AA1C1A17"}
       },
@@ -401,7 +401,7 @@
       "_children": {
         "Core": {"name":"Label_1716938016753","controlSetId":"heritage","id":"ctrl_1716938016753","controlType":"Label"},
         "Transform": {"x":356,"y":85,"width":210,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"ENVELOPE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBEB591","lampOffColour":"FF2C2925","lampBezelColour":"AA1C1A17"}
       },
@@ -411,7 +411,7 @@
       "_children": {
         "Core": {"name":"Label_1716938016754","controlSetId":"heritage","id":"ctrl_1716938016754","controlType":"Label"},
         "Transform": {"x":586,"y":85,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PERFORMANCE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBEB591","lampOffColour":"FF2C2925","lampBezelColour":"AA1C1A17"}
       },
@@ -483,7 +483,7 @@
       "_children": {
         "Core": {"name":"Label_1716938016757","controlSetId":"heritage","id":"ctrl_1716938016757","controlType":"Label"},
         "Transform": {"x":26,"y":280,"width":150,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"TUNE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBEB591","lampOffColour":"FF2C2925","lampBezelColour":"AA1C1A17"}
       },
@@ -493,7 +493,7 @@
       "_children": {
         "Core": {"name":"Label_1716938016758","controlSetId":"heritage","id":"ctrl_1716938016758","controlType":"Label"},
         "Transform": {"x":194,"y":280,"width":150,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"CUTOFF","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBEB591","lampOffColour":"FF2C2925","lampBezelColour":"AA1C1A17"}
       },
@@ -703,7 +703,7 @@
       "_children": {
         "Core": {"name":"Label_1716938016769","controlSetId":"heritage","id":"ctrl_1716938016769","controlType":"Label"},
         "Transform": {"x":26,"y":318,"width":360,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PADS / MODULATION","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBEB591","lampOffColour":"FF2C2925","lampBezelColour":"AA1C1A17"}
       },
@@ -713,7 +713,7 @@
       "_children": {
         "Core": {"name":"Label_1716938016770","controlSetId":"heritage","id":"ctrl_1716938016770","controlType":"Label"},
         "Transform": {"x":540,"y":318,"width":300,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"OUTPUT / ROUTING","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBEB591","lampOffColour":"FF2C2925","lampBezelColour":"AA1C1A17"}
       },
@@ -799,7 +799,7 @@
       "_children": {
         "Core": {"name":"Label_1716938016778","controlSetId":"heritage","id":"ctrl_1716938016778","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Editable synthesizer controls — copy individual controls into your panel.","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBEB591","lampOffColour":"FF2C2925","lampBezelColour":"AA1C1A17"}
       },

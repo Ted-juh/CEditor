@@ -313,7 +313,7 @@
       "_children": {
         "Core": {"name":"Label_1776129950810","controlSetId":"blueprint","id":"ctrl_1776129950810","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FFDCE8F5"}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"thickness":1,"colour":"FFDCE8F5"}}},
         "Text": {"content":"BLUEPRINT","_children":{"Fill":{"colour":"FFDCE8F5"},"Font":{"family":"JetBrains Mono","weight":"SemiBold","weightValue":600,"size":24,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFDCE8F5","lampOffColour":"FF22375A","lampBezelColour":"66DCE8F5"}
       },
@@ -323,7 +323,7 @@
       "_children": {
         "Core": {"name":"Label_1776129950811","controlSetId":"blueprint","id":"ctrl_1776129950811","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FFDCE8F5"}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"thickness":1,"colour":"FFDCE8F5"}}},
         "Text": {"content":"Technical / outline","_children":{"Fill":{"colour":"FFDCE8F5"},"Font":{"family":"JetBrains Mono","weight":"SemiBold","weightValue":600,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFDCE8F5","lampOffColour":"FF22375A","lampBezelColour":"66DCE8F5"}
       },
@@ -333,7 +333,7 @@
       "_children": {
         "Core": {"name":"Label_1776129950812","controlSetId":"blueprint","id":"ctrl_1776129950812","controlType":"Label"},
         "Transform": {"x":26,"y":82,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FFDCE8F5"}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"thickness":1,"colour":"FFDCE8F5"}}},
         "Text": {"content":"TURN / SLIDE","_children":{"Fill":{"colour":"FFDCE8F5"},"Font":{"family":"JetBrains Mono","weight":"SemiBold","weightValue":600,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFDCE8F5","lampOffColour":"FF22375A","lampBezelColour":"66DCE8F5"}
       },
@@ -343,7 +343,7 @@
       "_children": {
         "Core": {"name":"Label_1776129950813","controlSetId":"blueprint","id":"ctrl_1776129950813","controlType":"Label"},
         "Transform": {"x":580,"y":82,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FFDCE8F5"}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"thickness":1,"colour":"FFDCE8F5"}}},
         "Text": {"content":"PRESS / SELECT","_children":{"Fill":{"colour":"FFDCE8F5"},"Font":{"family":"JetBrains Mono","weight":"SemiBold","weightValue":600,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFDCE8F5","lampOffColour":"FF22375A","lampBezelColour":"66DCE8F5"}
       },
@@ -527,7 +527,7 @@
       "_children": {
         "Core": {"name":"Label_1776129950824","controlSetId":"blueprint","id":"ctrl_1776129950824","controlType":"Label"},
         "Transform": {"x":26,"y":310,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FFDCE8F5"}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"thickness":1,"colour":"FFDCE8F5"}}},
         "Text": {"content":"PLAY / SHAPE","_children":{"Fill":{"colour":"FFDCE8F5"},"Font":{"family":"JetBrains Mono","weight":"SemiBold","weightValue":600,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFDCE8F5","lampOffColour":"FF22375A","lampBezelColour":"66DCE8F5"}
       },
@@ -537,7 +537,7 @@
       "_children": {
         "Core": {"name":"Label_1776129950825","controlSetId":"blueprint","id":"ctrl_1776129950825","controlType":"Label"},
         "Transform": {"x":540,"y":310,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FFDCE8F5"}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"thickness":1,"colour":"FFDCE8F5"}}},
         "Text": {"content":"MEASURE / ROUTE","_children":{"Fill":{"colour":"FFDCE8F5"},"Font":{"family":"JetBrains Mono","weight":"SemiBold","weightValue":600,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFDCE8F5","lampOffColour":"FF22375A","lampBezelColour":"66DCE8F5"}
       },
@@ -607,7 +607,7 @@
       "_children": {
         "Core": {"name":"Label_1776129950832","controlSetId":"blueprint","id":"ctrl_1776129950832","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0,"colour":"FFDCE8F5"}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"thickness":1,"colour":"FFDCE8F5"}}},
         "Text": {"content":"Copy a control into your panel. Its pinned design travels with it.","_children":{"Fill":{"colour":"FFDCE8F5"},"Font":{"family":"JetBrains Mono","weight":"SemiBold","weightValue":600,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFDCE8F5","lampOffColour":"FF22375A","lampBezelColour":"66DCE8F5"}
       },

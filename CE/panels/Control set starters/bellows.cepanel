@@ -345,7 +345,7 @@
       "_children": {
         "Core": {"name":"Label_1794327485264","controlSetId":"bellows","id":"ctrl_1794327485264","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"BELLOWS","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFE9A86B","lampOffColour":"FF27252B","lampBezelColour":"660F1012"}
       },
@@ -355,7 +355,7 @@
       "_children": {
         "Core": {"name":"Label_1794327485265","controlSetId":"bellows","id":"ctrl_1794327485265","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Fold / pneumatic","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFE9A86B","lampOffColour":"FF27252B","lampBezelColour":"660F1012"}
       },
@@ -365,7 +365,7 @@
       "_children": {
         "Core": {"name":"Label_1794327485266","controlSetId":"bellows","id":"ctrl_1794327485266","controlType":"Label"},
         "Transform": {"x":26,"y":82,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"TURN / SLIDE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFE9A86B","lampOffColour":"FF27252B","lampBezelColour":"660F1012"}
       },
@@ -375,7 +375,7 @@
       "_children": {
         "Core": {"name":"Label_1794327485267","controlSetId":"bellows","id":"ctrl_1794327485267","controlType":"Label"},
         "Transform": {"x":580,"y":82,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PRESS / SELECT","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFE9A86B","lampOffColour":"FF27252B","lampBezelColour":"660F1012"}
       },
@@ -565,7 +565,7 @@
       "_children": {
         "Core": {"name":"Label_1794327485278","controlSetId":"bellows","id":"ctrl_1794327485278","controlType":"Label"},
         "Transform": {"x":26,"y":310,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PLAY / SHAPE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFE9A86B","lampOffColour":"FF27252B","lampBezelColour":"660F1012"}
       },
@@ -575,7 +575,7 @@
       "_children": {
         "Core": {"name":"Label_1794327485279","controlSetId":"bellows","id":"ctrl_1794327485279","controlType":"Label"},
         "Transform": {"x":540,"y":310,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"MEASURE / ROUTE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFE9A86B","lampOffColour":"FF27252B","lampBezelColour":"660F1012"}
       },
@@ -660,7 +660,7 @@
       "_children": {
         "Core": {"name":"Label_1794327485287","controlSetId":"bellows","id":"ctrl_1794327485287","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Copy a control into your panel. Its pinned design travels with it.","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFE9A86B","lampOffColour":"FF27252B","lampBezelColour":"660F1012"}
       },

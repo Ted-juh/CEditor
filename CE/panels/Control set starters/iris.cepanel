@@ -345,7 +345,7 @@
       "_children": {
         "Core": {"name":"Label_1718572545101","controlSetId":"iris","id":"ctrl_1718572545101","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"IRIS","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFECBA68","lampOffColour":"FF171C26","lampBezelColour":"AA0B0D10"}
       },
@@ -355,7 +355,7 @@
       "_children": {
         "Core": {"name":"Label_1718572545102","controlSetId":"iris","id":"ctrl_1718572545102","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Optical / shutter","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFECBA68","lampOffColour":"FF171C26","lampBezelColour":"AA0B0D10"}
       },
@@ -365,7 +365,7 @@
       "_children": {
         "Core": {"name":"Label_1718572545103","controlSetId":"iris","id":"ctrl_1718572545103","controlType":"Label"},
         "Transform": {"x":26,"y":82,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"TURN / SLIDE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFECBA68","lampOffColour":"FF171C26","lampBezelColour":"AA0B0D10"}
       },
@@ -375,7 +375,7 @@
       "_children": {
         "Core": {"name":"Label_1718572545104","controlSetId":"iris","id":"ctrl_1718572545104","controlType":"Label"},
         "Transform": {"x":580,"y":82,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PRESS / SELECT","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFECBA68","lampOffColour":"FF171C26","lampBezelColour":"AA0B0D10"}
       },
@@ -565,7 +565,7 @@
       "_children": {
         "Core": {"name":"Label_1718572545115","controlSetId":"iris","id":"ctrl_1718572545115","controlType":"Label"},
         "Transform": {"x":26,"y":310,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PLAY / SHAPE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFECBA68","lampOffColour":"FF171C26","lampBezelColour":"AA0B0D10"}
       },
@@ -575,7 +575,7 @@
       "_children": {
         "Core": {"name":"Label_1718572545116","controlSetId":"iris","id":"ctrl_1718572545116","controlType":"Label"},
         "Transform": {"x":540,"y":310,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"MEASURE / ROUTE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFECBA68","lampOffColour":"FF171C26","lampBezelColour":"AA0B0D10"}
       },
@@ -660,7 +660,7 @@
       "_children": {
         "Core": {"name":"Label_1718572545124","controlSetId":"iris","id":"ctrl_1718572545124","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Copy a control into your panel. Its pinned design travels with it.","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFECBA68","lampOffColour":"FF171C26","lampBezelColour":"AA0B0D10"}
       },

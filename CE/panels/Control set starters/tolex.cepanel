@@ -313,7 +313,7 @@
       "_children": {
         "Core": {"name":"Label_1719767988120","controlSetId":"tolex","id":"ctrl_1719767988120","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"TOLEX","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFC8342B","lampOffColour":"FFB8892E","lampBezelColour":"AA1C1A17"}
       },
@@ -323,7 +323,7 @@
       "_children": {
         "Core": {"name":"Label_1719767988121","controlSetId":"tolex","id":"ctrl_1719767988121","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Vintage / bakelite","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFC8342B","lampOffColour":"FFB8892E","lampBezelColour":"AA1C1A17"}
       },
@@ -333,7 +333,7 @@
       "_children": {
         "Core": {"name":"Label_1719767988122","controlSetId":"tolex","id":"ctrl_1719767988122","controlType":"Label"},
         "Transform": {"x":26,"y":82,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"TURN / SLIDE","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFC8342B","lampOffColour":"FFB8892E","lampBezelColour":"AA1C1A17"}
       },
@@ -343,7 +343,7 @@
       "_children": {
         "Core": {"name":"Label_1719767988123","controlSetId":"tolex","id":"ctrl_1719767988123","controlType":"Label"},
         "Transform": {"x":580,"y":82,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PRESS / SELECT","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFC8342B","lampOffColour":"FFB8892E","lampBezelColour":"AA1C1A17"}
       },
@@ -533,7 +533,7 @@
       "_children": {
         "Core": {"name":"Label_1719767988134","controlSetId":"tolex","id":"ctrl_1719767988134","controlType":"Label"},
         "Transform": {"x":26,"y":310,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PLAY / SHAPE","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFC8342B","lampOffColour":"FFB8892E","lampBezelColour":"AA1C1A17"}
       },
@@ -543,7 +543,7 @@
       "_children": {
         "Core": {"name":"Label_1719767988135","controlSetId":"tolex","id":"ctrl_1719767988135","controlType":"Label"},
         "Transform": {"x":540,"y":310,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"MEASURE / ROUTE","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFC8342B","lampOffColour":"FFB8892E","lampBezelColour":"AA1C1A17"}
       },
@@ -619,7 +619,7 @@
       "_children": {
         "Core": {"name":"Label_1719767988142","controlSetId":"tolex","id":"ctrl_1719767988142","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Copy a control into your panel. Its pinned design travels with it.","_children":{"Fill":{"colour":"FFF1E6CC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFC8342B","lampOffColour":"FFB8892E","lampBezelColour":"AA1C1A17"}
       },
