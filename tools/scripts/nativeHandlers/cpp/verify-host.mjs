@@ -58,7 +58,10 @@ try {
       source: 'void onValueChanged(CeContext& ctx, const CeEvent& event){ ctx.setValue("out", event.value*2+1); ctx.log("ran"); }' },
     // The values that travel through the slots appended after ABI 1, into the real host trampolines.
     { id: 'knob2', name: 'Values', event: 'onValueChanged',
-      source: 'void onValueChanged(CeContext& ctx, const CeEvent& event){ ctx.log("v", 1.5); ctx.sendSysex({0xF0, 0x7F, 0xF7}); ctx.sendSysex("F0 7E F7"); }' }],
+      source: 'void onValueChanged(CeContext& ctx, const CeEvent& event){ ctx.log("v", 1.5); ctx.sendSysex({0xF0, 0x7F, 0xF7}); ctx.sendSysex("F0 7E F7"); }' },
+    // A variable the script keeps: one per plug-in instance, never shared between two.
+    { id: 'counter', name: 'Counter', event: 'onValueChanged',
+      source: 'int count = 0;\nvoid onValueChanged(CeContext& ctx, const CeEvent&){ ++count; ctx.setValue("count", count); }' }],
     outDir: work, abiHeaderDir: ABI_DIR, runtimeHeaderDir: HERE,
   });
   run(`${cxx} -std=c++20 -fPIC -shared -fvisibility=hidden -I ${q(ABI_DIR)} -I ${q(HERE)} ${q(path.join(work, 'glue.cpp'))} -o ${q(path.join(work, 'ce_handlers_cpp.so'))}`);
@@ -107,6 +110,28 @@ int main(){
   std::printf("knob2: log('%s', %s) sysex=%s then %s -> %s\\n", host.log_.toRawUTF8(), host.logValue.toString().toRawUTF8(),
               list ? "[F0,7F,F7]" : "WRONG", hex ? "\\"F0 7E F7\\"" : "WRONG", values ? "PASS" : "FAIL");
   ok = ok && values;
+
+  // Two instances of the same panel in one process, as two plug-ins in one DAW. Each must reach its
+  // own host and keep its own count; and removing one must leave the other working. With one module
+  // global for the host, the second instance received both instances' calls, the count was shared,
+  // and the first instance called into freed memory once the second was gone.
+  {
+    TestHost hostA, hostB;
+    auto a = createNativeHandlerEngine(); a->installApi(hostA);
+    auto b = createNativeHandlerEngine(); b->installApi(hostB);
+    ScriptDefinition c = d; c.id = "counter"; c.name = "Counter";
+    a->loadScript(c, onErr); b->loadScript(c, onErr);
+    a->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+    a->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+    b->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+    const bool apart = hostA.vals["count"] == 2.0 && hostB.vals["count"] == 1.0;
+    std::printf("two instances: A counted %.0f, B counted %.0f -> %s\\n", hostA.vals["count"], hostB.vals["count"], apart ? "PASS" : "FAIL");
+    b.reset();
+    a->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+    const bool survives = hostA.vals["count"] == 3.0;
+    std::printf("instance B removed: A counted %.0f -> %s\\n", hostA.vals["count"], survives ? "PASS" : "FAIL");
+    ok = ok && apart && survives;
+  }
   return ok?0:1;
 }
 `);

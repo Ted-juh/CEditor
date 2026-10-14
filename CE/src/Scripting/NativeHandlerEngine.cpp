@@ -286,6 +286,31 @@ juce::File hostModuleDir()
     return dir;
 }
 
+// A copy of the C++ handler module of this instance's own, in a folder of the OS temp directory.
+//
+// A script's variables are globals of the module, and a process maps one library file once however
+// many times it is opened, so two plug-in instances of the same panel in one DAW shared every one
+// of them: a counter one instance kept, the other read. A copy at its own path is a library of its
+// own. Where the OS lets a loaded library's file go (Linux, macOS) the copy is deleted as soon as it
+// is open; on Windows it goes when the instance closes it, and a copy left by a crash is swept up the
+// next time any instance makes one (a library still loaded refuses to be deleted, so that is safe).
+juce::File privateModuleCopy (const juce::File& shared)
+{
+    auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("CEditorHandlerModules");
+    if (! dir.createDirectory()) return {};
+   #if defined(_WIN32)
+    // Ten minutes old at least, so a copy another process has made and not yet opened is left alone.
+    const auto old = juce::Time::getCurrentTime() - juce::RelativeTime::minutes (10);
+    for (const auto& stale : dir.findChildFiles (juce::File::findFiles, false))
+        if (stale.getLastModificationTime() < old) stale.deleteFile();
+   #endif
+    auto copy = dir.getChildFile (shared.getFileNameWithoutExtension() + "_"
+                                  + juce::Uuid().toString() + shared.getFileExtension());
+    if (! shared.copyFileTo (copy)) return {};
+    copy.setLastModificationTime (juce::Time::getCurrentTime());
+    return copy;
+}
+
 juce::String moduleFileName (const juce::String& language)
 {
    #if defined(_WIN32)
@@ -328,6 +353,10 @@ static void pinModuleResident (const juce::String& fullPath)
 class NativeHandlerEngine final : public ScriptEngine
 {
 public:
+    // Shut down and close what this instance loaded. Without it, a removed instance's module vtable
+    // was freed with it while the module could still be called.
+    ~NativeHandlerEngine() override { reset(); }
+
     juce::String language() const override { return "native"; } // serves cpp/csharp/java
 
     bool installApi (ScriptHostApi& h) override { host = &h; return true; }
@@ -416,6 +445,7 @@ public:
             {
                 if (m->ok && m->shutdown != nullptr && m->state != nullptr) m->shutdown (m->state);
                 m->lib.close();
+                if (m->privateCopy != juce::File()) m->privateCopy.deleteFile();
             }
             it = modules.erase (it);
         }
@@ -438,6 +468,7 @@ private:
         void*      state    = nullptr;
         CeHostVtable vtable {};
         HostCtx    ctx {};
+        juce::File privateCopy;   // this instance's copy of the module, where it has one (C++)
         bool       ok = false;
     };
 
@@ -451,12 +482,38 @@ private:
         auto mp = std::make_unique<Module>();
         Module& m = *mp;
         const auto file = hostModuleDir().getChildFile (moduleFileName (language));
-        if (! file.existsAsFile() || ! m.lib.open (file.getFullPathName()))
+        if (! file.existsAsFile())
         {
             onError ("native:" + language, "handler module not found: " + file.getFullPathName());
             modules[language] = std::move (mp);
             return nullptr;
         }
+        // C++ modules are opened from a copy of this instance's own (privateModuleCopy says why). The
+        // C# and Java modules host a runtime that exists once per process, and keep each instance's
+        // state apart themselves.
+        juce::File toOpen = file;
+        if (language == "cpp")
+        {
+            m.privateCopy = privateModuleCopy (file);
+            if (m.privateCopy == juce::File())
+            {
+                onError ("native:" + language, "could not make this instance's own copy of the handler module in "
+                                                + juce::File::getSpecialLocation (juce::File::tempDirectory).getFullPathName());
+                modules[language] = std::move (mp);
+                return nullptr;
+            }
+            toOpen = m.privateCopy;
+        }
+        if (! m.lib.open (toOpen.getFullPathName()))
+        {
+            onError ("native:" + language, "handler module could not be loaded: " + toOpen.getFullPathName());
+            if (m.privateCopy != juce::File()) m.privateCopy.deleteFile();
+            modules[language] = std::move (mp);
+            return nullptr;
+        }
+       #if ! defined(_WIN32)
+        if (m.privateCopy != juce::File()) { m.privateCopy.deleteFile(); m.privateCopy = juce::File(); }
+       #endif
 
         auto ver = (FnAbiVersion) m.lib.getFunction ("ce_handler_abi_version");
         auto ini = (FnInit)       m.lib.getFunction ("ce_handler_init");
