@@ -20,9 +20,13 @@ export const SCRIPT_LIMITS = Object.freeze({ milliseconds: 250, memoryBytes: 16 
   panelMemoryBytes: 512 * 1024 * 1024, stackBytes: 256 * 1024, calls: 4096, entries: 20000, text: 1024 * 1024 });
 const active = new Set();
 let panelMemoryBytes = SCRIPT_LIMITS.panelMemoryBytes;
+let callMilliseconds = SCRIPT_LIMITS.milliseconds;
 
 /** A smaller budget for a test, which cannot afford to allocate 512 MB to reach the real one. */
 export function setPanelMemoryBudgetForTesting(bytes = SCRIPT_LIMITS.panelMemoryBytes) { panelMemoryBytes = bytes; }
+/** A longer time limit for a test that is not about it. The limit is wall-clock, so on a busy machine
+    a call that takes 40 ms idle can pass 250, and the sandbox it stops changes what such a test counts. */
+export function setTimeLimitForTesting(milliseconds = SCRIPT_LIMITS.milliseconds) { callMilliseconds = milliseconds; }
 /** The shared heap's size now, and how many sandboxes are live: what a test sets a budget against. */
 export const scriptHeapBytesForTesting = () => heapBytes();
 export const sandboxCountForTesting = () => active.size;
@@ -143,7 +147,7 @@ export function evaluateBoundedJavascript(source, api, names, options = {}) {
   function run(fn) {
     if (disposed || retire) throw Error('Script instance stopped; enable or reload the current code');
     const outer = depth === 0;
-    if (outer) { deadline = performance.now() + (options.milliseconds ?? SCRIPT_LIMITS.milliseconds); calls = 0; }
+    if (outer) { deadline = performance.now() + (options.milliseconds ?? callMilliseconds); calls = 0; }
     const heapBefore = heapBytes();
     depth++; busy++;
     try {
