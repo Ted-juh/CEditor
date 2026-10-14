@@ -175,12 +175,12 @@ function writeLv2Manifests(bundle, lv2Helper, log) {
 
 export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir, formats, log = console.log }) {
   let panelDoc = JSON.parse(readFileSync(panelFile, 'utf8'));
-  // A saved .cepanel passed by hand from a source checkout is completed as the app would complete it
-  // (lib/exportDocument.mjs). An installation has no editor source to do that with, and needs none:
-  // the app always hands this script the complete document it prepared.
+  // A saved .cepanel passed by hand from a source checkout is made into the payload as the app makes
+  // it (lib/exportDocument.mjs). An installation has no editor source to do that with, and needs
+  // none: the app always hands this script the payload it prepared.
   if (existsSync(path.join(REPO, 'CE/web/src/CE_Application/stores/documentShape.js'))) {
-    const { completeExportDocument } = await import(pathToFileURL(path.join(HERE, 'lib/exportDocument.mjs')).href);
-    panelDoc = await completeExportDocument(panelDoc, path.resolve(panelFile));
+    const { exportFormFor } = await import(pathToFileURL(path.join(HERE, 'lib/exportDocument.mjs')).href);
+    panelDoc = await exportFormFor(panelDoc, path.resolve(panelFile));
   }
   // What the bytes are, before anything is written: the one number an export used to give was the
   // bundle's, and on GAIA it was taken to be artwork when there was none (lib/exportSizeReport.mjs).
