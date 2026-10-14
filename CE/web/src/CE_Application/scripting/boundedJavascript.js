@@ -32,6 +32,7 @@ export const sandboxCountForTesting = () => active.size;
 // is stopped — and never on size alone, which after one runaway would refuse every script after it.
 const heapBytes = () => engine.getWasmMemory().buffer.byteLength;
 const grewPastBudget = (before) => { const now = heapBytes(); return now > before && now > panelMemoryBytes; };
+const BUDGET_EXCEEDED = 'Script memory limit exceeded: the panel\'s scripts together have reached their budget';
 let depth = 0;
 let deadline = 0;
 let calls = 0;
@@ -136,7 +137,7 @@ export function evaluateBoundedJavascript(source, api, names, options = {}) {
   active.add(sandbox);
   if (grewPastBudget(heapAtStart)) {
     sandbox.dispose();
-    throw Error('Script memory limit exceeded: the panel\'s scripts together have reached their budget');
+    throw Error(BUDGET_EXCEEDED);
   }
 
   function run(fn) {
@@ -160,12 +161,16 @@ export function evaluateBoundedJavascript(source, api, names, options = {}) {
       // Checked at every depth, so a script called from another is held to it on its own. The caller
       // grew too, by what the callee took, and is stopped with it: a chain that ran a panel out of
       // memory does not get to carry on.
-      if (grewPastBudget(heapBefore)) throw Error('Script memory limit exceeded: the panel\'s scripts together have reached their budget');
+      if (grewPastBudget(heapBefore)) throw Error(BUDGET_EXCEEDED);
       return result;
     } catch (error) {
-      if (/interrupted|out of memory|stack overflow|limit exceeded/i.test(error?.message ?? '')) {
+      // Asked again here, because a script leaves by throwing as well as by returning: one that grew
+      // the heap past the budget and then threw an error of its own would otherwise keep what it took,
+      // and could take it again on the next call.
+      const overBudget = grewPastBudget(heapBefore);
+      if (overBudget || /interrupted|out of memory|stack overflow|limit exceeded/i.test(error?.message ?? '')) {
         retire = true;
-        throw Error(`Script stopped: execution or memory limit exceeded (${error.message})`);
+        throw Error(`Script stopped: execution or memory limit exceeded (${overBudget ? BUDGET_EXCEEDED : error.message})`);
       }
       throw error;
     } finally {
