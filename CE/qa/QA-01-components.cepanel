@@ -846,3430 +846,1077 @@
   "controls": [
     {
       "_children": {
-        "Core": {
-          "name": "group_Structure_the_furniture_a_panel_is_built_out_of",
-          "id": "qa_group_0",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 28,
-          "width": 1544,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF23282D"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "3389C2FF"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        },
-        "Text": {
-          "content": "Structure — the furniture a panel is built out of",
-          "_children": {
-            "Font": {
-              "size": 13,
-              "bold": true
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 10,
-          "paddingRight": 10,
-          "paddingTop": 3,
-          "paddingBottom": 3
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_0",
-          "id": "qa_cap_0",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 64,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Background",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Background",
-          "id": "qa01_Background",
-          "controlType": "Background"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 86
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_1",
-          "id": "qa_cap_1",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 184,
-          "y": 64,
-          "width": 300,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Container",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Container",
-          "id": "qa01_Container",
-          "controlType": "Container"
-        },
-        "Transform": {
-          "x": 184,
-          "y": 86
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_2",
-          "id": "qa_cap_2",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 508,
-          "y": 64,
-          "width": 260,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Group",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Group",
-          "id": "qa01_Group",
-          "controlType": "Group"
-        },
-        "Transform": {
-          "x": 508,
-          "y": 86
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_3",
-          "id": "qa_cap_3",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 792,
-          "y": 64,
-          "width": 320,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "TabContainer",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_TabContainer",
-          "id": "qa01_TabContainer",
-          "controlType": "TabContainer"
-        },
-        "Transform": {
-          "x": 792,
-          "y": 86
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_4",
-          "id": "qa_cap_4",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1136,
-          "y": 64,
-          "width": 280,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "ScrollArea",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_ScrollArea",
-          "id": "qa01_ScrollArea",
-          "controlType": "ScrollArea"
-        },
-        "Transform": {
-          "x": 1136,
-          "y": 86
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_5",
-          "id": "qa_cap_5",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 334,
-          "width": 160,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Image",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Image",
-          "id": "qa01_Image",
-          "controlType": "Image"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 356
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_6",
-          "id": "qa_cap_6",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 212,
-          "y": 334,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Shape",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Shape",
-          "id": "qa01_Shape",
-          "controlType": "Shape"
-        },
-        "Transform": {
-          "x": 212,
-          "y": 356
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_7",
-          "id": "qa_cap_7",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 368,
-          "y": 334,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "TestBox",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_TestBox",
-          "id": "qa01_TestBox",
-          "controlType": "TestBox"
-        },
-        "Transform": {
-          "x": 368,
-          "y": 356
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "group_Text_numeric_entry",
-          "id": "qa_group_1",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 510,
-          "width": 1544,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF23282D"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "3389C2FF"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        },
-        "Text": {
-          "content": "Text & numeric entry",
-          "_children": {
-            "Font": {
-              "size": 13,
-              "bold": true
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 10,
-          "paddingRight": 10,
-          "paddingTop": 3,
-          "paddingBottom": 3
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_8",
-          "id": "qa_cap_8",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 546,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Label",
-          "id": "qa01_Label",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 568
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_9",
-          "id": "qa_cap_9",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 184,
-          "y": 546,
-          "width": 160,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "TextInput",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_TextInput",
-          "id": "qa01_TextInput",
-          "controlType": "TextInput"
-        },
-        "Transform": {
-          "x": 184,
-          "y": 568
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_10",
-          "id": "qa_cap_10",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 368,
-          "y": 546,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Number",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Number",
-          "id": "qa01_Number",
-          "controlType": "Number"
-        },
-        "Transform": {
-          "x": 368,
-          "y": 568
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_11",
-          "id": "qa_cap_11",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 524,
-          "y": 546,
-          "width": 200,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Range",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Range",
-          "id": "qa01_Range",
-          "controlType": "Range"
-        },
-        "Transform": {
-          "x": 524,
-          "y": 568
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "group_Buttons_every_trigger_variant_because_they_differ_only_in_behaviour",
-          "id": "qa_group_2",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 642,
-          "width": 1544,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF23282D"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "3389C2FF"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        },
-        "Text": {
-          "content": "Buttons — every trigger variant, because they differ only in behaviour",
-          "_children": {
-            "Font": {
-              "size": 13,
-              "bold": true
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 10,
-          "paddingRight": 10,
-          "paddingTop": 3,
-          "paddingBottom": 3
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_12",
-          "id": "qa_cap_12",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 678,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Button",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Button",
-          "id": "qa01_Button",
-          "controlType": "Button"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 700
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_13",
-          "id": "qa_cap_13",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 184,
-          "y": 678,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "MomentaryButton",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_MomentaryButton",
-          "id": "qa01_MomentaryButton",
-          "controlType": "MomentaryButton"
-        },
-        "Transform": {
-          "x": 184,
-          "y": 700
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_14",
-          "id": "qa_cap_14",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 340,
-          "y": 678,
-          "width": 136,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "ToggleButton",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_ToggleButton",
-          "id": "qa01_ToggleButton",
-          "controlType": "ToggleButton"
-        },
-        "Transform": {
-          "x": 340,
-          "y": 700
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_15",
-          "id": "qa_cap_15",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 500,
-          "y": 678,
-          "width": 148,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "TimedButton",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_TimedButton",
-          "id": "qa01_TimedButton",
-          "controlType": "TimedButton"
-        },
-        "Transform": {
-          "x": 500,
-          "y": 700
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_16",
-          "id": "qa_cap_16",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 672,
-          "y": 678,
-          "width": 148,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "OneShotButton",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_OneShotButton",
-          "id": "qa01_OneShotButton",
-          "controlType": "OneShotButton"
-        },
-        "Transform": {
-          "x": 672,
-          "y": 700
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_17",
-          "id": "qa_cap_17",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 844,
-          "y": 678,
-          "width": 136,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "CyclicButton",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_CyclicButton",
-          "id": "qa01_CyclicButton",
-          "controlType": "CyclicButton"
-        },
-        "Transform": {
-          "x": 844,
-          "y": 700
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_18",
-          "id": "qa_cap_18",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1004,
-          "y": 678,
-          "width": 240,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "RadioButtonGroup",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_RadioButtonGroup",
-          "id": "qa01_RadioButtonGroup",
-          "controlType": "RadioButtonGroup"
-        },
-        "Transform": {
-          "x": 1004,
-          "y": 700
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "group_Selection",
-          "id": "qa_group_3",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 778,
-          "width": 1544,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF23282D"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "3389C2FF"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        },
-        "Text": {
-          "content": "Selection",
-          "_children": {
-            "Font": {
-              "size": 13,
-              "bold": true
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 10,
-          "paddingRight": 10,
-          "paddingTop": 3,
-          "paddingBottom": 3
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_19",
-          "id": "qa_cap_19",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 814,
-          "width": 160,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Combobox",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Combobox",
-          "id": "qa01_Combobox",
-          "controlType": "Combobox"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 836
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_20",
-          "id": "qa_cap_20",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 212,
-          "y": 814,
-          "width": 160,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Listbox",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Listbox",
-          "id": "qa01_Listbox",
-          "controlType": "Listbox"
-        },
-        "Transform": {
-          "x": 212,
-          "y": 836
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_21",
-          "id": "qa_cap_21",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 396,
-          "y": 814,
-          "width": 168,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Numpad",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Numpad",
-          "id": "qa01_Numpad",
-          "controlType": "Numpad"
-        },
-        "Transform": {
-          "x": 396,
-          "y": 836
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "group_Continuous_controls",
-          "id": "qa_group_4",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 1102,
-          "width": 1544,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF23282D"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "3389C2FF"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        },
-        "Text": {
-          "content": "Continuous controls",
-          "_children": {
-            "Font": {
-              "size": 13,
-              "bold": true
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 10,
-          "paddingRight": 10,
-          "paddingTop": 3,
-          "paddingBottom": 3
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_22",
-          "id": "qa_cap_22",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 1138,
-          "width": 220,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Slider",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Slider",
-          "id": "qa01_Slider",
-          "controlType": "Slider"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 1160
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_23",
-          "id": "qa_cap_23",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 272,
-          "y": 1138,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Knob",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Knob",
-          "id": "qa01_Knob",
-          "controlType": "Knob"
-        },
-        "Transform": {
-          "x": 272,
-          "y": 1160
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_24",
-          "id": "qa_cap_24",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 428,
-          "y": 1138,
-          "width": 200,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Crossfader",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Crossfader",
-          "id": "qa01_Crossfader",
-          "controlType": "Crossfader"
-        },
-        "Transform": {
-          "x": 428,
-          "y": 1160
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_25",
-          "id": "qa_cap_25",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 652,
-          "y": 1138,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Ribbon",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Ribbon",
-          "id": "qa01_Ribbon",
-          "controlType": "Ribbon"
-        },
-        "Transform": {
-          "x": 652,
-          "y": 1160
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_26",
-          "id": "qa_cap_26",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 808,
-          "y": 1138,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "PitchWheel",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_PitchWheel",
-          "id": "qa01_PitchWheel",
-          "controlType": "PitchWheel"
-        },
-        "Transform": {
-          "x": 808,
-          "y": 1160
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_27",
-          "id": "qa_cap_27",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 964,
-          "y": 1138,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "ModWheel",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_ModWheel",
-          "id": "qa01_ModWheel",
-          "controlType": "ModWheel"
-        },
-        "Transform": {
-          "x": 964,
-          "y": 1160
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_28",
-          "id": "qa_cap_28",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1120,
-          "y": 1138,
-          "width": 160,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "VectorJoystick",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_VectorJoystick",
-          "id": "qa01_VectorJoystick",
-          "controlType": "VectorJoystick"
-        },
-        "Transform": {
-          "x": 1120,
-          "y": 1160
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "group_Displays_the_read_only_half_where_value_arrived_becomes_visible",
-          "id": "qa_group_5",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 1354,
-          "width": 1544,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF23282D"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "3389C2FF"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        },
-        "Text": {
-          "content": "Displays — the read-only half, where \"value arrived\" becomes visible",
-          "_children": {
-            "Font": {
-              "size": 13,
-              "bold": true
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 10,
-          "paddingRight": 10,
-          "paddingTop": 3,
-          "paddingBottom": 3
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_29",
-          "id": "qa_cap_29",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 1390,
-          "width": 260,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "LcdDisplay",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_LcdDisplay",
-          "id": "qa01_LcdDisplay",
-          "controlType": "LcdDisplay"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 1412
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_30",
-          "id": "qa_cap_30",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 312,
-          "y": 1390,
-          "width": 260,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "PixelDisplay",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_PixelDisplay",
-          "id": "qa01_PixelDisplay",
-          "controlType": "PixelDisplay"
-        },
-        "Transform": {
-          "x": 312,
-          "y": 1412
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_31",
-          "id": "qa_cap_31",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 596,
-          "y": 1390,
-          "width": 220,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Meter",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Meter",
-          "id": "qa01_Meter",
-          "controlType": "Meter"
-        },
-        "Transform": {
-          "x": 596,
-          "y": 1412
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_32",
-          "id": "qa_cap_32",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 840,
-          "y": 1390,
-          "width": 220,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "ProgressBar",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_ProgressBar",
-          "id": "qa01_ProgressBar",
-          "controlType": "ProgressBar"
-        },
-        "Transform": {
-          "x": 840,
-          "y": 1412
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "group_Modulation_mapping",
-          "id": "qa_group_6",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 1586,
-          "width": 1544,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF23282D"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "3389C2FF"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        },
-        "Text": {
-          "content": "Modulation & mapping",
-          "_children": {
-            "Font": {
-              "size": 13,
-              "bold": true
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 10,
-          "paddingRight": 10,
-          "paddingTop": 3,
-          "paddingBottom": 3
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_33",
-          "id": "qa_cap_33",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 1622,
-          "width": 320,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Macro",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Macro",
-          "id": "qa01_Macro",
-          "controlType": "Macro"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 1644
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_34",
-          "id": "qa_cap_34",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 372,
-          "y": 1622,
-          "width": 260,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Constellation",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Constellation",
-          "id": "qa01_Constellation",
-          "controlType": "Constellation"
-        },
-        "Transform": {
-          "x": 372,
-          "y": 1644
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_35",
-          "id": "qa_cap_35",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 656,
-          "y": 1622,
-          "width": 220,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Timbre",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Timbre",
-          "id": "qa01_Timbre",
-          "controlType": "Timbre"
-        },
-        "Transform": {
-          "x": 656,
-          "y": 1644
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_36",
-          "id": "qa_cap_36",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 900,
-          "y": 1622,
-          "width": 320,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Router",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Router",
-          "id": "qa01_Router",
-          "controlType": "Router"
-        },
-        "Transform": {
-          "x": 900,
-          "y": 1644
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_37",
-          "id": "qa_cap_37",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1244,
-          "y": 1622,
-          "width": 260,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Turing",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Turing",
-          "id": "qa01_Turing",
-          "controlType": "Turing"
-        },
-        "Transform": {
-          "x": 1244,
-          "y": 1644
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_38",
-          "id": "qa_cap_38",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 1892,
-          "width": 180,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Kinetic",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Kinetic",
-          "id": "qa01_Kinetic",
-          "controlType": "Kinetic"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 1914
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_39",
-          "id": "qa_cap_39",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 232,
-          "y": 1892,
-          "width": 200,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Orbit",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Orbit",
-          "id": "qa01_Orbit",
-          "controlType": "Orbit"
-        },
-        "Transform": {
-          "x": 232,
-          "y": 1914
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_40",
-          "id": "qa_cap_40",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 456,
-          "y": 1892,
-          "width": 280,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Envelope",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Envelope",
-          "id": "qa01_Envelope",
-          "controlType": "Envelope"
-        },
-        "Transform": {
-          "x": 456,
-          "y": 1914
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_41",
-          "id": "qa_cap_41",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 760,
-          "y": 1892,
-          "width": 260,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Matrix",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Matrix",
-          "id": "qa01_Matrix",
-          "controlType": "Matrix"
-        },
-        "Transform": {
-          "x": 760,
-          "y": 1914
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_42",
-          "id": "qa_cap_42",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1044,
-          "y": 1892,
-          "width": 200,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Constraint",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Constraint",
-          "id": "qa01_Constraint",
-          "controlType": "Constraint"
-        },
-        "Transform": {
-          "x": 1044,
-          "y": 1914
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "group_Performance_MIDI",
-          "id": "qa_group_7",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 2148,
-          "width": 1544,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF23282D"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "3389C2FF"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        },
-        "Text": {
-          "content": "Performance & MIDI",
-          "_children": {
-            "Font": {
-              "size": 13,
-              "bold": true
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 10,
-          "paddingRight": 10,
-          "paddingTop": 3,
-          "paddingBottom": 3
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_43",
-          "id": "qa_cap_43",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 2184,
-          "width": 320,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Keyboard",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Keyboard",
-          "id": "qa01_Keyboard",
-          "controlType": "Keyboard"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 2206
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_44",
-          "id": "qa_cap_44",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 372,
-          "y": 2184,
-          "width": 420,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "StepSequencer",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_StepSequencer",
-          "id": "qa01_StepSequencer",
-          "controlType": "StepSequencer"
-        },
-        "Transform": {
-          "x": 372,
-          "y": 2206
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_45",
-          "id": "qa_cap_45",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 816,
-          "y": 2184,
-          "width": 260,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "ChordPad",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_ChordPad",
-          "id": "qa01_ChordPad",
-          "controlType": "ChordPad"
-        },
-        "Transform": {
-          "x": 816,
-          "y": 2206
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_46",
-          "id": "qa_cap_46",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1100,
-          "y": 2184,
-          "width": 320,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Arp",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Arp",
-          "id": "qa01_Arp",
-          "controlType": "Arp"
-        },
-        "Transform": {
-          "x": 1100,
-          "y": 2206
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_47",
-          "id": "qa_cap_47",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 2514,
-          "width": 360,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "NoteRibbon",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_NoteRibbon",
-          "id": "qa01_NoteRibbon",
-          "controlType": "NoteRibbon"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 2536
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_48",
-          "id": "qa_cap_48",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 412,
-          "y": 2514,
-          "width": 260,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "DrumPads",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_DrumPads",
-          "id": "qa01_DrumPads",
-          "controlType": "DrumPads"
-        },
-        "Transform": {
-          "x": 412,
-          "y": 2536
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_49",
-          "id": "qa_cap_49",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 696,
-          "y": 2514,
-          "width": 460,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Phrase",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Phrase",
-          "id": "qa01_Phrase",
-          "controlType": "Phrase"
-        },
-        "Transform": {
-          "x": 696,
-          "y": 2536
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_50",
-          "id": "qa_cap_50",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1180,
-          "y": 2514,
-          "width": 300,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Looper",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Looper",
-          "id": "qa01_Looper",
-          "controlType": "Looper"
-        },
-        "Transform": {
-          "x": 1180,
-          "y": 2536
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_51",
-          "id": "qa_cap_51",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 2844,
-          "width": 260,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Setlist",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Setlist",
-          "id": "qa01_Setlist",
-          "controlType": "Setlist"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 2866
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_52",
-          "id": "qa_cap_52",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 312,
-          "y": 2844,
-          "width": 340,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Harmoniser",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Harmoniser",
-          "id": "qa01_Harmoniser",
-          "controlType": "Harmoniser"
-        },
-        "Transform": {
-          "x": 312,
-          "y": 2866
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_53",
-          "id": "qa_cap_53",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 676,
-          "y": 2844,
-          "width": 420,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Recorder",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Recorder",
-          "id": "qa01_Recorder",
-          "controlType": "Recorder"
-        },
-        "Transform": {
-          "x": 676,
-          "y": 2866
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_54",
-          "id": "qa_cap_54",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1120,
-          "y": 2844,
-          "width": 420,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "SplitZone",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_SplitZone",
-          "id": "qa01_SplitZone",
-          "controlType": "SplitZone"
-        },
-        "Transform": {
-          "x": 1120,
-          "y": 2866
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_55",
-          "id": "qa_cap_55",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 3044,
-          "width": 132,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Panic",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Panic",
-          "id": "qa01_Panic",
-          "controlType": "Panic"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 3066
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_56",
-          "id": "qa_cap_56",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 184,
-          "y": 3044,
-          "width": 230,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "Transport",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_Transport",
-          "id": "qa01_Transport",
-          "controlType": "Transport"
-        },
-        "Transform": {
-          "x": 184,
-          "y": 3066
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "group_Custom_components_the_empty_shell_QA_07_covers_real_packages",
-          "id": "qa_group_8",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 3158,
-          "width": 1544,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF23282D"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "3389C2FF"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        },
-        "Text": {
-          "content": "Custom components — the empty shell; QA-07 covers real packages",
-          "_children": {
-            "Font": {
-              "size": 13,
-              "bold": true
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 10,
-          "paddingRight": 10,
-          "paddingTop": 3,
-          "paddingBottom": 3
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_57",
-          "id": "qa_cap_57",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 3194,
-          "width": 200,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "CustomComponent",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "qa01_CustomComponent",
-          "id": "qa01_CustomComponent",
-          "controlType": "CustomComponent"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 3216
-        }
+        "Core": {"name":"group_Structure_the_furniture_a_panel_is_built_out_of","id":"qa_group_0","controlType":"Label"},
+        "Transform": {"x":28,"y":28,"width":1544,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
+        "Text": {"content":"Structure — the furniture a panel is built out of","_children":{"Font":{"size":13,"bold":true}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_0","id":"qa_cap_0","controlType":"Label"},
+        "Transform": {"x":28,"y":64,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Background","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Background","id":"qa01_Background","controlType":"Background"},
+        "Transform": {"x":28,"y":86}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_1","id":"qa_cap_1","controlType":"Label"},
+        "Transform": {"x":184,"y":64,"width":300,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Container","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Container","id":"qa01_Container","controlType":"Container"},
+        "Transform": {"x":184,"y":86}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_2","id":"qa_cap_2","controlType":"Label"},
+        "Transform": {"x":508,"y":64,"width":260,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Group","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Group","id":"qa01_Group","controlType":"Group"},
+        "Transform": {"x":508,"y":86}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_3","id":"qa_cap_3","controlType":"Label"},
+        "Transform": {"x":792,"y":64,"width":320,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"TabContainer","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_TabContainer","id":"qa01_TabContainer","controlType":"TabContainer"},
+        "Transform": {"x":792,"y":86}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_4","id":"qa_cap_4","controlType":"Label"},
+        "Transform": {"x":1136,"y":64,"width":280,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"ScrollArea","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_ScrollArea","id":"qa01_ScrollArea","controlType":"ScrollArea"},
+        "Transform": {"x":1136,"y":86}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_5","id":"qa_cap_5","controlType":"Label"},
+        "Transform": {"x":28,"y":334,"width":160,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Image","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Image","id":"qa01_Image","controlType":"Image"},
+        "Transform": {"x":28,"y":356}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_6","id":"qa_cap_6","controlType":"Label"},
+        "Transform": {"x":212,"y":334,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Shape","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Shape","id":"qa01_Shape","controlType":"Shape"},
+        "Transform": {"x":212,"y":356}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_7","id":"qa_cap_7","controlType":"Label"},
+        "Transform": {"x":368,"y":334,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"TestBox","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_TestBox","id":"qa01_TestBox","controlType":"TestBox"},
+        "Transform": {"x":368,"y":356}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"group_Text_numeric_entry","id":"qa_group_1","controlType":"Label"},
+        "Transform": {"x":28,"y":510,"width":1544,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
+        "Text": {"content":"Text & numeric entry","_children":{"Font":{"size":13,"bold":true}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_8","id":"qa_cap_8","controlType":"Label"},
+        "Transform": {"x":28,"y":546,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Label","id":"qa01_Label","controlType":"Label"},
+        "Transform": {"x":28,"y":568}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_9","id":"qa_cap_9","controlType":"Label"},
+        "Transform": {"x":184,"y":546,"width":160,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"TextInput","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_TextInput","id":"qa01_TextInput","controlType":"TextInput"},
+        "Transform": {"x":184,"y":568}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_10","id":"qa_cap_10","controlType":"Label"},
+        "Transform": {"x":368,"y":546,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Number","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Number","id":"qa01_Number","controlType":"Number"},
+        "Transform": {"x":368,"y":568}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_11","id":"qa_cap_11","controlType":"Label"},
+        "Transform": {"x":524,"y":546,"width":200,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Range","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Range","id":"qa01_Range","controlType":"Range"},
+        "Transform": {"x":524,"y":568}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"group_Buttons_every_trigger_variant_because_they_differ_only_in_behaviour","id":"qa_group_2","controlType":"Label"},
+        "Transform": {"x":28,"y":642,"width":1544,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
+        "Text": {"content":"Buttons — every trigger variant, because they differ only in behaviour","_children":{"Font":{"size":13,"bold":true}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_12","id":"qa_cap_12","controlType":"Label"},
+        "Transform": {"x":28,"y":678,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Button","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Button","id":"qa01_Button","controlType":"Button"},
+        "Transform": {"x":28,"y":700}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_13","id":"qa_cap_13","controlType":"Label"},
+        "Transform": {"x":184,"y":678,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"MomentaryButton","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_MomentaryButton","id":"qa01_MomentaryButton","controlType":"MomentaryButton"},
+        "Transform": {"x":184,"y":700}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_14","id":"qa_cap_14","controlType":"Label"},
+        "Transform": {"x":340,"y":678,"width":136,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"ToggleButton","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_ToggleButton","id":"qa01_ToggleButton","controlType":"ToggleButton"},
+        "Transform": {"x":340,"y":700}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_15","id":"qa_cap_15","controlType":"Label"},
+        "Transform": {"x":500,"y":678,"width":148,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"TimedButton","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_TimedButton","id":"qa01_TimedButton","controlType":"TimedButton"},
+        "Transform": {"x":500,"y":700}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_16","id":"qa_cap_16","controlType":"Label"},
+        "Transform": {"x":672,"y":678,"width":148,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"OneShotButton","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_OneShotButton","id":"qa01_OneShotButton","controlType":"OneShotButton"},
+        "Transform": {"x":672,"y":700}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_17","id":"qa_cap_17","controlType":"Label"},
+        "Transform": {"x":844,"y":678,"width":136,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"CyclicButton","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_CyclicButton","id":"qa01_CyclicButton","controlType":"CyclicButton"},
+        "Transform": {"x":844,"y":700}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_18","id":"qa_cap_18","controlType":"Label"},
+        "Transform": {"x":1004,"y":678,"width":240,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"RadioButtonGroup","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_RadioButtonGroup","id":"qa01_RadioButtonGroup","controlType":"RadioButtonGroup"},
+        "Transform": {"x":1004,"y":700}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"group_Selection","id":"qa_group_3","controlType":"Label"},
+        "Transform": {"x":28,"y":778,"width":1544,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
+        "Text": {"content":"Selection","_children":{"Font":{"size":13,"bold":true}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_19","id":"qa_cap_19","controlType":"Label"},
+        "Transform": {"x":28,"y":814,"width":160,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Combobox","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Combobox","id":"qa01_Combobox","controlType":"Combobox"},
+        "Transform": {"x":28,"y":836}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_20","id":"qa_cap_20","controlType":"Label"},
+        "Transform": {"x":212,"y":814,"width":160,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Listbox","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Listbox","id":"qa01_Listbox","controlType":"Listbox"},
+        "Transform": {"x":212,"y":836}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_21","id":"qa_cap_21","controlType":"Label"},
+        "Transform": {"x":396,"y":814,"width":168,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Numpad","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Numpad","id":"qa01_Numpad","controlType":"Numpad"},
+        "Transform": {"x":396,"y":836}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"group_Continuous_controls","id":"qa_group_4","controlType":"Label"},
+        "Transform": {"x":28,"y":1102,"width":1544,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
+        "Text": {"content":"Continuous controls","_children":{"Font":{"size":13,"bold":true}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_22","id":"qa_cap_22","controlType":"Label"},
+        "Transform": {"x":28,"y":1138,"width":220,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Slider","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Slider","id":"qa01_Slider","controlType":"Slider"},
+        "Transform": {"x":28,"y":1160}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_23","id":"qa_cap_23","controlType":"Label"},
+        "Transform": {"x":272,"y":1138,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Knob","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Knob","id":"qa01_Knob","controlType":"Knob"},
+        "Transform": {"x":272,"y":1160}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_24","id":"qa_cap_24","controlType":"Label"},
+        "Transform": {"x":428,"y":1138,"width":200,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Crossfader","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Crossfader","id":"qa01_Crossfader","controlType":"Crossfader"},
+        "Transform": {"x":428,"y":1160}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_25","id":"qa_cap_25","controlType":"Label"},
+        "Transform": {"x":652,"y":1138,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Ribbon","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Ribbon","id":"qa01_Ribbon","controlType":"Ribbon"},
+        "Transform": {"x":652,"y":1160}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_26","id":"qa_cap_26","controlType":"Label"},
+        "Transform": {"x":808,"y":1138,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"PitchWheel","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_PitchWheel","id":"qa01_PitchWheel","controlType":"PitchWheel"},
+        "Transform": {"x":808,"y":1160}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_27","id":"qa_cap_27","controlType":"Label"},
+        "Transform": {"x":964,"y":1138,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"ModWheel","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_ModWheel","id":"qa01_ModWheel","controlType":"ModWheel"},
+        "Transform": {"x":964,"y":1160}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_28","id":"qa_cap_28","controlType":"Label"},
+        "Transform": {"x":1120,"y":1138,"width":160,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"VectorJoystick","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_VectorJoystick","id":"qa01_VectorJoystick","controlType":"VectorJoystick"},
+        "Transform": {"x":1120,"y":1160}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"group_Displays_the_read_only_half_where_value_arrived_becomes_visible","id":"qa_group_5","controlType":"Label"},
+        "Transform": {"x":28,"y":1354,"width":1544,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
+        "Text": {"content":"Displays — the read-only half, where \"value arrived\" becomes visible","_children":{"Font":{"size":13,"bold":true}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_29","id":"qa_cap_29","controlType":"Label"},
+        "Transform": {"x":28,"y":1390,"width":260,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"LcdDisplay","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_LcdDisplay","id":"qa01_LcdDisplay","controlType":"LcdDisplay"},
+        "Transform": {"x":28,"y":1412}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_30","id":"qa_cap_30","controlType":"Label"},
+        "Transform": {"x":312,"y":1390,"width":260,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"PixelDisplay","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_PixelDisplay","id":"qa01_PixelDisplay","controlType":"PixelDisplay"},
+        "Transform": {"x":312,"y":1412}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_31","id":"qa_cap_31","controlType":"Label"},
+        "Transform": {"x":596,"y":1390,"width":220,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Meter","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Meter","id":"qa01_Meter","controlType":"Meter"},
+        "Transform": {"x":596,"y":1412}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_32","id":"qa_cap_32","controlType":"Label"},
+        "Transform": {"x":840,"y":1390,"width":220,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"ProgressBar","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_ProgressBar","id":"qa01_ProgressBar","controlType":"ProgressBar"},
+        "Transform": {"x":840,"y":1412}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"group_Modulation_mapping","id":"qa_group_6","controlType":"Label"},
+        "Transform": {"x":28,"y":1586,"width":1544,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
+        "Text": {"content":"Modulation & mapping","_children":{"Font":{"size":13,"bold":true}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_33","id":"qa_cap_33","controlType":"Label"},
+        "Transform": {"x":28,"y":1622,"width":320,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Macro","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Macro","id":"qa01_Macro","controlType":"Macro"},
+        "Transform": {"x":28,"y":1644}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_34","id":"qa_cap_34","controlType":"Label"},
+        "Transform": {"x":372,"y":1622,"width":260,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Constellation","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Constellation","id":"qa01_Constellation","controlType":"Constellation"},
+        "Transform": {"x":372,"y":1644}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_35","id":"qa_cap_35","controlType":"Label"},
+        "Transform": {"x":656,"y":1622,"width":220,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Timbre","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Timbre","id":"qa01_Timbre","controlType":"Timbre"},
+        "Transform": {"x":656,"y":1644}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_36","id":"qa_cap_36","controlType":"Label"},
+        "Transform": {"x":900,"y":1622,"width":320,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Router","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Router","id":"qa01_Router","controlType":"Router"},
+        "Transform": {"x":900,"y":1644}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_37","id":"qa_cap_37","controlType":"Label"},
+        "Transform": {"x":1244,"y":1622,"width":260,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Turing","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Turing","id":"qa01_Turing","controlType":"Turing"},
+        "Transform": {"x":1244,"y":1644}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_38","id":"qa_cap_38","controlType":"Label"},
+        "Transform": {"x":28,"y":1892,"width":180,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Kinetic","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Kinetic","id":"qa01_Kinetic","controlType":"Kinetic"},
+        "Transform": {"x":28,"y":1914}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_39","id":"qa_cap_39","controlType":"Label"},
+        "Transform": {"x":232,"y":1892,"width":200,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Orbit","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Orbit","id":"qa01_Orbit","controlType":"Orbit"},
+        "Transform": {"x":232,"y":1914}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_40","id":"qa_cap_40","controlType":"Label"},
+        "Transform": {"x":456,"y":1892,"width":280,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Envelope","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Envelope","id":"qa01_Envelope","controlType":"Envelope"},
+        "Transform": {"x":456,"y":1914}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_41","id":"qa_cap_41","controlType":"Label"},
+        "Transform": {"x":760,"y":1892,"width":260,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Matrix","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Matrix","id":"qa01_Matrix","controlType":"Matrix"},
+        "Transform": {"x":760,"y":1914}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_42","id":"qa_cap_42","controlType":"Label"},
+        "Transform": {"x":1044,"y":1892,"width":200,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Constraint","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Constraint","id":"qa01_Constraint","controlType":"Constraint"},
+        "Transform": {"x":1044,"y":1914}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"group_Performance_MIDI","id":"qa_group_7","controlType":"Label"},
+        "Transform": {"x":28,"y":2148,"width":1544,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
+        "Text": {"content":"Performance & MIDI","_children":{"Font":{"size":13,"bold":true}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_43","id":"qa_cap_43","controlType":"Label"},
+        "Transform": {"x":28,"y":2184,"width":320,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Keyboard","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Keyboard","id":"qa01_Keyboard","controlType":"Keyboard"},
+        "Transform": {"x":28,"y":2206}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_44","id":"qa_cap_44","controlType":"Label"},
+        "Transform": {"x":372,"y":2184,"width":420,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"StepSequencer","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_StepSequencer","id":"qa01_StepSequencer","controlType":"StepSequencer"},
+        "Transform": {"x":372,"y":2206}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_45","id":"qa_cap_45","controlType":"Label"},
+        "Transform": {"x":816,"y":2184,"width":260,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"ChordPad","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_ChordPad","id":"qa01_ChordPad","controlType":"ChordPad"},
+        "Transform": {"x":816,"y":2206}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_46","id":"qa_cap_46","controlType":"Label"},
+        "Transform": {"x":1100,"y":2184,"width":320,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Arp","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Arp","id":"qa01_Arp","controlType":"Arp"},
+        "Transform": {"x":1100,"y":2206}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_47","id":"qa_cap_47","controlType":"Label"},
+        "Transform": {"x":28,"y":2514,"width":360,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"NoteRibbon","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_NoteRibbon","id":"qa01_NoteRibbon","controlType":"NoteRibbon"},
+        "Transform": {"x":28,"y":2536}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_48","id":"qa_cap_48","controlType":"Label"},
+        "Transform": {"x":412,"y":2514,"width":260,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"DrumPads","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_DrumPads","id":"qa01_DrumPads","controlType":"DrumPads"},
+        "Transform": {"x":412,"y":2536}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_49","id":"qa_cap_49","controlType":"Label"},
+        "Transform": {"x":696,"y":2514,"width":460,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Phrase","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Phrase","id":"qa01_Phrase","controlType":"Phrase"},
+        "Transform": {"x":696,"y":2536}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_50","id":"qa_cap_50","controlType":"Label"},
+        "Transform": {"x":1180,"y":2514,"width":300,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Looper","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Looper","id":"qa01_Looper","controlType":"Looper"},
+        "Transform": {"x":1180,"y":2536}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_51","id":"qa_cap_51","controlType":"Label"},
+        "Transform": {"x":28,"y":2844,"width":260,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Setlist","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Setlist","id":"qa01_Setlist","controlType":"Setlist"},
+        "Transform": {"x":28,"y":2866}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_52","id":"qa_cap_52","controlType":"Label"},
+        "Transform": {"x":312,"y":2844,"width":340,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Harmoniser","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Harmoniser","id":"qa01_Harmoniser","controlType":"Harmoniser"},
+        "Transform": {"x":312,"y":2866}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_53","id":"qa_cap_53","controlType":"Label"},
+        "Transform": {"x":676,"y":2844,"width":420,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Recorder","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Recorder","id":"qa01_Recorder","controlType":"Recorder"},
+        "Transform": {"x":676,"y":2866}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_54","id":"qa_cap_54","controlType":"Label"},
+        "Transform": {"x":1120,"y":2844,"width":420,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"SplitZone","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_SplitZone","id":"qa01_SplitZone","controlType":"SplitZone"},
+        "Transform": {"x":1120,"y":2866}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_55","id":"qa_cap_55","controlType":"Label"},
+        "Transform": {"x":28,"y":3044,"width":132,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Panic","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Panic","id":"qa01_Panic","controlType":"Panic"},
+        "Transform": {"x":28,"y":3066}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_56","id":"qa_cap_56","controlType":"Label"},
+        "Transform": {"x":184,"y":3044,"width":230,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"Transport","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_Transport","id":"qa01_Transport","controlType":"Transport"},
+        "Transform": {"x":184,"y":3066}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"group_Custom_components_the_empty_shell_QA_07_covers_real_packages","id":"qa_group_8","controlType":"Label"},
+        "Transform": {"x":28,"y":3158,"width":1544,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
+        "Text": {"content":"Custom components — the empty shell; QA-07 covers real packages","_children":{"Font":{"size":13,"bold":true}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"caption_qa_cap_57","id":"qa_cap_57","controlType":"Label"},
+        "Transform": {"x":28,"y":3194,"width":200,"height":18},
+        "Background": {"_children":{"Fill":{"colour":"00000000"}}},
+        "Text": {"content":"CustomComponent","_children":{"Font":{"size":11}}},
+        "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"qa01_CustomComponent","id":"qa01_CustomComponent","controlType":"CustomComponent"},
+        "Transform": {"x":28,"y":3216}
       },
       "_type": "Control"
     }

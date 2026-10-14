@@ -2,6 +2,7 @@
 
 #include <juce_core/juce_core.h>
 #include <map>
+#include <unordered_map>
 
 namespace ceditor
 {
@@ -19,6 +20,9 @@ namespace ceditor
  *   splitScriptPath → findControlByName → resolveModelPath (SHORTHANDS / section walk / channelize)
  *   → valueAtPath (readChildValue: array-index, then _children[part], then plain [part]).
  *
+ * findControlByName answers from an index of names and ids built on first use; nameIndex below
+ * says why, and what keeps it true.
+ *
  * Pure juce_core; message-thread only (like the rest of ScriptRuntime). Header-only for easy testing.
  */
 class PanelValueModel
@@ -27,7 +31,7 @@ public:
     PanelValueModel() = default;
 
     /** Load from a parsed panel document (juce::JSON::parse of a .cepanel). */
-    void load (const juce::var& panelDocument) { doc = panelDocument; }
+    void load (const juce::var& panelDocument) { doc = panelDocument; forgetNames(); }
 
     /** Load from raw .cepanel JSON text. Returns false if the JSON is invalid. */
     bool loadFromJson (const juce::String& json)
@@ -35,6 +39,7 @@ public:
         auto parsed = juce::JSON::parse (json);
         if (! parsed.isObject()) return false;
         doc = parsed;
+        forgetNames();
         return true;
     }
 
@@ -85,6 +90,7 @@ public:
         // Mirrors sanitizeControlName in utils/controlNames.js.
         if (modelPath == "Core.name")
             toWrite = juce::var (toWrite.toString().replaceCharacter ('.', '_'));
+        if (writeCanMoveAName (modelPath)) forgetNames();
         return setAtPath (control, modelPath, toWrite);
     }
 
@@ -268,21 +274,52 @@ private:
     // Matches on name OR id, case-insensitively, and DOES descend into containers — a control
     // inside a group was unreachable window-closed until snapshot needed to list one, at which
     // point listing a name that get() could not read would have been worse than not listing it.
+    // The first control in document order wins, whether it matched by name or by id.
     juce::var findControlByName (const juce::String& name) const
     {
-        const auto target = name.toLowerCase();
-        juce::var found;
-        forEachControl ([&found, &target] (const juce::var& c)
+        if (! nameIndexBuilt)
         {
-            if (found.isObject()) return;
-            if (auto* coreObj = readChildValue (c, "Core").getDynamicObject())
+            forEachControl ([this] (const juce::var& c)
             {
-                const auto cname = coreObj->getProperty ("name").toString().toLowerCase();
-                const auto cid   = coreObj->getProperty ("id").toString().toLowerCase();
-                if (cname == target || cid == target) found = c;
-            }
-        });
-        return found;
+                if (auto* coreObj = readChildValue (c, "Core").getDynamicObject())
+                {
+                    // emplace keeps the first entry for a key, which is what keeps document order.
+                    nameIndex.emplace (coreObj->getProperty ("name").toString().toLowerCase(), c);
+                    nameIndex.emplace (coreObj->getProperty ("id").toString().toLowerCase(), c);
+                }
+            });
+            nameIndexBuilt = true;
+        }
+        const auto it = nameIndex.find (name.toLowerCase());
+        return it != nameIndex.end() ? it->second : juce::var();
+    }
+
+    // The index findControlByName answers from: lower-cased name and id to control. A panel's load
+    // scripts call set() thousands of times, and each call used to walk every control lower-casing
+    // two strings apiece; on the GAIA panel that was two thirds of an instance's start-up.
+    //
+    // What a name finds depends on each control's Core.name and Core.id and on the controls under
+    // each Children section, and on nothing else in the document. Every write that reaches a
+    // control comes through setValue, which drops the index when the write could touch one of
+    // those (writeCanMoveAName); writes to the panel document cannot, because `controls` is
+    // read-only there. The next lookup rebuilds it.
+    mutable std::unordered_map<juce::String, juce::var> nameIndex;
+    mutable bool nameIndexBuilt = false;
+
+    void forgetNames() { nameIndex.clear(); nameIndexBuilt = false; }
+
+    /** Whether a write at this resolved path could change which control a name finds. Plainly
+        inside a section other than Core and Children, it cannot, and nor can the rest of Core.
+        Everything else counts: a whole section, the sections map itself, a key outside every
+        section — a script can reach those by spelling the path out, and each can rename or
+        replace a control. Paths are as resolveModelPath returns them, so the case is the
+        document's. */
+    static bool writeCanMoveAName (const juce::String& modelPath)
+    {
+        const auto parts = juce::StringArray::fromTokens (modelPath, ".", "");
+        if (parts.size() < 2 || parts[0].startsWithChar ('_') || parts[0] == "Children") return true;
+        if (parts[0] == "Core") return parts[1] == "name" || parts[1] == "id";
+        return false;
     }
 
 private:

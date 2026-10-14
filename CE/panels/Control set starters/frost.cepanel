@@ -310,2449 +310,317 @@
   "controls": [
     {
       "_children": {
-        "Core": {
-          "name": "Label_1789880205449",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205449",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 26,
-          "y": 16,
-          "width": 650,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "FROST",
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk",
-              "weight": "Bold",
-              "weightValue": 700,
-              "size": 24,
-              "letterSpacing": 0.9
-            }
-          }
-        },
-        "ContentLayout": {
-          "lampColour": "FFFFE27A",
-          "lampOffColour": "55FFFFFF",
-          "lampBezelColour": "AAFFFFFF"
-        }
+        "Core": {"name":"Label_1789880205449","controlSetId":"frost","id":"ctrl_1789880205449","controlType":"Label"},
+        "Transform": {"x":26,"y":16,"width":650,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Text": {"content":"FROST","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9}}},
+        "ContentLayout": {"lampColour":"FFFFE27A","lampOffColour":"55FFFFFF","lampBezelColour":"AAFFFFFF"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Label_1789880205450",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205450",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 26,
-          "y": 48,
-          "width": 650,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "Frosted / translucent",
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk",
-              "weight": "Bold",
-              "weightValue": 700,
-              "letterSpacing": 0.9
-            }
-          }
-        },
-        "ContentLayout": {
-          "lampColour": "FFFFE27A",
-          "lampOffColour": "55FFFFFF",
-          "lampBezelColour": "AAFFFFFF"
-        }
+        "Core": {"name":"Label_1789880205450","controlSetId":"frost","id":"ctrl_1789880205450","controlType":"Label"},
+        "Transform": {"x":26,"y":48,"width":650,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Text": {"content":"Frosted / translucent","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
+        "ContentLayout": {"lampColour":"FFFFE27A","lampOffColour":"55FFFFFF","lampBezelColour":"AAFFFFFF"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Label_1789880205451",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205451",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 26,
-          "y": 82,
-          "width": 250,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "TURN / SLIDE",
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk",
-              "weight": "Bold",
-              "weightValue": 700,
-              "size": 13,
-              "letterSpacing": 0.9
-            }
-          }
-        },
-        "ContentLayout": {
-          "lampColour": "FFFFE27A",
-          "lampOffColour": "55FFFFFF",
-          "lampBezelColour": "AAFFFFFF"
-        }
+        "Core": {"name":"Label_1789880205451","controlSetId":"frost","id":"ctrl_1789880205451","controlType":"Label"},
+        "Transform": {"x":26,"y":82,"width":250,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Text": {"content":"TURN / SLIDE","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "ContentLayout": {"lampColour":"FFFFE27A","lampOffColour":"55FFFFFF","lampBezelColour":"AAFFFFFF"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Label_1789880205452",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205452",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 580,
-          "y": 82,
-          "width": 250,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "PRESS / SELECT",
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk",
-              "weight": "Bold",
-              "weightValue": 700,
-              "size": 13,
-              "letterSpacing": 0.9
-            }
-          }
-        },
-        "ContentLayout": {
-          "lampColour": "FFFFE27A",
-          "lampOffColour": "55FFFFFF",
-          "lampBezelColour": "AAFFFFFF"
-        }
+        "Core": {"name":"Label_1789880205452","controlSetId":"frost","id":"ctrl_1789880205452","controlType":"Label"},
+        "Transform": {"x":580,"y":82,"width":250,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Text": {"content":"PRESS / SELECT","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "ContentLayout": {"lampColour":"FFFFE27A","lampOffColour":"55FFFFFF","lampBezelColour":"AAFFFFFF"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Knob_1789880205453",
-          "controlSetId": "frost",
-          "controlForm": "halo",
-          "formFaceColour": "38FFFFFF",
-          "formHousingColour": "55FFFFFF",
-          "formInkColour": "FFF2F2F2",
-          "formLabelColour": "FFFFFFFF",
-          "formAccentColour": "FFFFE27A",
-          "id": "ctrl_1789880205453",
-          "controlType": "Knob"
-        },
-        "Transform": {
-          "x": 26,
-          "y": 112,
-          "width": 190,
-          "height": 190
-        },
-        "Behavior": {
-          "defaultCurrentValue": 0.63,
-          "showTicks": false,
-          "showMinMaxLabels": false,
-          "labelReadoutPlacement": "bottom"
-        },
+        "Core": {"name":"Knob_1789880205453","controlSetId":"frost","controlForm":"halo","formFaceColour":"38FFFFFF","formHousingColour":"55FFFFFF","formInkColour":"FFF2F2F2","formLabelColour":"FFFFFFFF","formAccentColour":"FFFFE27A","id":"ctrl_1789880205453","controlType":"Knob"},
+        "Transform": {"x":26,"y":112,"width":190,"height":190},
+        "Behavior": {"defaultCurrentValue":0.63,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
           "_children": {
-            "bodyTrackBase": {
-              "_children": {
-                "Layout": {
-                  "height": 5
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "55FFFFFF"
-                    },
-                    "Border": {
-                      "colour": "55FFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "bodyTrackFill": {
-              "_children": {
-                "Layout": {
-                  "height": 5
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFE27A"
-                    }
-                  }
-                }
-              }
-            },
-            "bodySelectedRange": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFB6E6"
-                    }
-                  }
-                }
-              }
-            },
-            "bodyCap": {
-              "visible": true,
-              "_children": {
-                "Layout": {
-                  "width": 77,
-                  "height": 77
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "38FFFFFF"
-                    },
-                    "Border": {
-                      "thickness": 1.2,
-                      "colour": "8CFFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "bodyCenterMarker": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "pointerStart": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFE27A"
-                    },
-                    "Border": {
-                      "colour": "99FFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "pointerCurrent": {
-              "_children": {
-                "Layout": {
-                  "width": 3,
-                  "height": 92,
-                  "offsetX": 30
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    },
-                    "Border": {
-                      "enabled": false,
-                      "colour": "99FFFFFF"
-                    }
-                  }
-                }
-              },
-              "kind": "line"
-            },
-            "pointerEnd": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFB6FFE8"
-                    },
-                    "Border": {
-                      "colour": "99FFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "tickMajor": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "CCFFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "tickMinor": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "88FFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "labelMin": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelMax": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelStart": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFE27A"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelCurrent": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "CCFFFFFF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelEnd": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFB6FFE8"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelValue": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelTitle": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFEAE6FF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelUnit": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFEAE6FF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            }
+            "bodyTrackBase": {"_children":{"Layout":{"height":5},"Background":{"_children":{"Fill":{"colour":"55FFFFFF"},"Border":{"colour":"55FFFFFF"}}}}},
+            "bodyTrackFill": {"_children":{"Layout":{"height":5},"Background":{"_children":{"Fill":{"colour":"FFFFE27A"}}}}},
+            "bodySelectedRange": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFB6E6"}}}}},
+            "bodyCap": {"visible":true,"_children":{"Layout":{"width":77,"height":77},"Background":{"_children":{"Fill":{"colour":"38FFFFFF"},"Border":{"thickness":1.2,"colour":"8CFFFFFF"}}}}},
+            "bodyCenterMarker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"}}}}},
+            "pointerStart": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFE27A"},"Border":{"colour":"99FFFFFF"}}}}},
+            "pointerCurrent": {"_children":{"Layout":{"width":3,"height":92,"offsetX":30},"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"},"Border":{"enabled":false,"colour":"99FFFFFF"}}}},"kind":"line"},
+            "pointerEnd": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFB6FFE8"},"Border":{"colour":"99FFFFFF"}}}}},
+            "tickMajor": {"_children":{"Background":{"_children":{"Fill":{"colour":"CCFFFFFF"}}}}},
+            "tickMinor": {"_children":{"Background":{"_children":{"Fill":{"colour":"88FFFFFF"}}}}},
+            "labelMin": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelMax": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelStart": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFE27A"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"CCFFFFFF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFB6FFE8"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFEAE6FF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelUnit": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFEAE6FF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}}
           }
         },
-        "States": {
-          "_children": {
-            "Dragging": {
-              "patches": {
-                "parts": {
-                  "bodyTrackFill": {
-                    "Background.Fill.colour": "FFFFFFFF"
-                  },
-                  "bodySelectedRange": {
-                    "Background.Fill.colour": "FFFFC1EA"
-                  },
-                  "pointerCurrent": {
-                    "Background.Fill.colour": "FFFFFFFF"
-                  }
-                }
-              }
-            },
-            "Focused": {
-              "patches": {
-                "parts": {
-                  "pointerCurrent": {
-                    "Background.Border.colour": "FFFFE27A"
-                  },
-                  "labelValue": {
-                    "Text.Fill.colour": "FFFFE27A"
-                  }
-                }
-              }
-            }
-          }
-        }
+        "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFFFFFF"},"bodySelectedRange":{"Background.Fill.colour":"FFFFC1EA"},"pointerCurrent":{"Background.Fill.colour":"FFFFFFFF"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFFFE27A"},"labelValue":{"Text.Fill.colour":"FFFFE27A"}}}}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Knob_1789880205454",
-          "controlSetId": "frost",
-          "controlForm": "halo",
-          "formFaceColour": "38FFFFFF",
-          "formHousingColour": "55FFFFFF",
-          "formInkColour": "FFF2F2F2",
-          "formLabelColour": "FFFFFFFF",
-          "formAccentColour": "FFFFE27A",
-          "id": "ctrl_1789880205454",
-          "controlType": "Knob"
-        },
-        "Transform": {
-          "x": 220,
-          "y": 125,
-          "width": 128,
-          "height": 158
-        },
-        "Behavior": {
-          "defaultCurrentValue": 0.35,
-          "showTicks": false,
-          "showMinMaxLabels": false,
-          "labelReadoutPlacement": "bottom"
-        },
+        "Core": {"name":"Knob_1789880205454","controlSetId":"frost","controlForm":"halo","formFaceColour":"38FFFFFF","formHousingColour":"55FFFFFF","formInkColour":"FFF2F2F2","formLabelColour":"FFFFFFFF","formAccentColour":"FFFFE27A","id":"ctrl_1789880205454","controlType":"Knob"},
+        "Transform": {"x":220,"y":125,"width":128,"height":158},
+        "Behavior": {"defaultCurrentValue":0.35,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
           "_children": {
-            "bodyTrackBase": {
-              "_children": {
-                "Layout": {
-                  "height": 5
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "55FFFFFF"
-                    },
-                    "Border": {
-                      "colour": "55FFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "bodyTrackFill": {
-              "_children": {
-                "Layout": {
-                  "height": 5
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFE27A"
-                    }
-                  }
-                }
-              }
-            },
-            "bodySelectedRange": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFB6E6"
-                    }
-                  }
-                }
-              }
-            },
-            "bodyCap": {
-              "visible": true,
-              "_children": {
-                "Layout": {
-                  "width": 77,
-                  "height": 77
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "38FFFFFF"
-                    },
-                    "Border": {
-                      "thickness": 1.2,
-                      "colour": "8CFFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "bodyCenterMarker": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "pointerStart": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFE27A"
-                    },
-                    "Border": {
-                      "colour": "99FFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "pointerCurrent": {
-              "_children": {
-                "Layout": {
-                  "width": 3,
-                  "height": 92,
-                  "offsetX": 30
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    },
-                    "Border": {
-                      "enabled": false,
-                      "colour": "99FFFFFF"
-                    }
-                  }
-                }
-              },
-              "kind": "line"
-            },
-            "pointerEnd": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFB6FFE8"
-                    },
-                    "Border": {
-                      "colour": "99FFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "tickMajor": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "CCFFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "tickMinor": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "88FFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "labelMin": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelMax": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelStart": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFE27A"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelCurrent": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "CCFFFFFF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelEnd": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFB6FFE8"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelValue": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelTitle": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFEAE6FF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelUnit": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFEAE6FF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            }
+            "bodyTrackBase": {"_children":{"Layout":{"height":5},"Background":{"_children":{"Fill":{"colour":"55FFFFFF"},"Border":{"colour":"55FFFFFF"}}}}},
+            "bodyTrackFill": {"_children":{"Layout":{"height":5},"Background":{"_children":{"Fill":{"colour":"FFFFE27A"}}}}},
+            "bodySelectedRange": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFB6E6"}}}}},
+            "bodyCap": {"visible":true,"_children":{"Layout":{"width":77,"height":77},"Background":{"_children":{"Fill":{"colour":"38FFFFFF"},"Border":{"thickness":1.2,"colour":"8CFFFFFF"}}}}},
+            "bodyCenterMarker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"}}}}},
+            "pointerStart": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFE27A"},"Border":{"colour":"99FFFFFF"}}}}},
+            "pointerCurrent": {"_children":{"Layout":{"width":3,"height":92,"offsetX":30},"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"},"Border":{"enabled":false,"colour":"99FFFFFF"}}}},"kind":"line"},
+            "pointerEnd": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFB6FFE8"},"Border":{"colour":"99FFFFFF"}}}}},
+            "tickMajor": {"_children":{"Background":{"_children":{"Fill":{"colour":"CCFFFFFF"}}}}},
+            "tickMinor": {"_children":{"Background":{"_children":{"Fill":{"colour":"88FFFFFF"}}}}},
+            "labelMin": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelMax": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelStart": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFE27A"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"CCFFFFFF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFB6FFE8"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFEAE6FF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelUnit": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFEAE6FF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}}
           }
         },
-        "States": {
-          "_children": {
-            "Dragging": {
-              "patches": {
-                "parts": {
-                  "bodyTrackFill": {
-                    "Background.Fill.colour": "FFFFFFFF"
-                  },
-                  "bodySelectedRange": {
-                    "Background.Fill.colour": "FFFFC1EA"
-                  },
-                  "pointerCurrent": {
-                    "Background.Fill.colour": "FFFFFFFF"
-                  }
-                }
-              }
-            },
-            "Focused": {
-              "patches": {
-                "parts": {
-                  "pointerCurrent": {
-                    "Background.Border.colour": "FFFFE27A"
-                  },
-                  "labelValue": {
-                    "Text.Fill.colour": "FFFFE27A"
-                  }
-                }
-              }
-            }
-          }
-        }
+        "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFFFFFF"},"bodySelectedRange":{"Background.Fill.colour":"FFFFC1EA"},"pointerCurrent":{"Background.Fill.colour":"FFFFFFFF"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFFFE27A"},"labelValue":{"Text.Fill.colour":"FFFFE27A"}}}}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Slider_1789880205455",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205455",
-          "controlType": "Slider"
-        },
-        "Transform": {
-          "x": 364,
-          "y": 133,
-          "width": 190,
-          "height": 78
-        },
-        "Behavior": {
-          "defaultCurrentValue": 0.66,
-          "showTicks": false,
-          "showMinMaxLabels": false,
-          "labelReadoutPlacement": "topRight",
-          "labelTitlePlacement": "topLeft"
-        },
+        "Core": {"name":"Slider_1789880205455","controlSetId":"frost","id":"ctrl_1789880205455","controlType":"Slider"},
+        "Transform": {"x":364,"y":133,"width":190,"height":78},
+        "Behavior": {"defaultCurrentValue":0.66,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
           "_children": {
-            "bodyTrackBase": {
-              "_children": {
-                "Layout": {
-                  "height": 8
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "55FFFFFF"
-                    },
-                    "Border": {
-                      "colour": "88FFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "bodyTrackFill": {
-              "_children": {
-                "Layout": {
-                  "height": 8
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFE27A"
-                    }
-                  }
-                }
-              }
-            },
-            "bodySelectedRange": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFB6E6"
-                    }
-                  }
-                }
-              }
-            },
-            "bodyCap": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "CCFFFFFF"
-                    },
-                    "Border": {
-                      "colour": "99FFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "bodyCenterMarker": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "pointerStart": {
-              "_children": {
-                "Layout": {
-                  "width": 20,
-                  "height": 20
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFE27A"
-                    },
-                    "Border": {
-                      "thickness": 2,
-                      "colour": "FFFFE27A"
-                    }
-                  }
-                }
-              },
-              "shadow": true
-            },
-            "pointerCurrent": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "E6FFFFFF"
-                    },
-                    "Border": {
-                      "thickness": 2,
-                      "colour": "FFFFE27A"
-                    }
-                  }
-                }
-              },
-              "shadow": true
-            },
-            "pointerEnd": {
-              "_children": {
-                "Layout": {
-                  "width": 20,
-                  "height": 20
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFB6FFE8"
-                    },
-                    "Border": {
-                      "thickness": 2,
-                      "colour": "FFFFE27A"
-                    }
-                  }
-                }
-              },
-              "shadow": true
-            },
-            "tickMajor": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "CCFFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "tickMinor": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "88FFFFFF"
-                    }
-                  }
-                }
-              }
-            },
-            "labelMin": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelMax": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelStart": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFE27A"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelCurrent": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "CCFFFFFF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelEnd": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFB6FFE8"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelValue": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFFFFFFF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelTitle": {
-              "_children": {
-                "Text": {
-                  "content": "LEVEL",
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFEAE6FF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            },
-            "labelUnit": {
-              "_children": {
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFEAE6FF"
-                    },
-                    "Font": {
-                      "family": "Space Grotesk",
-                      "letterSpacing": 0.9
-                    }
-                  }
-                }
-              }
-            }
+            "bodyTrackBase": {"_children":{"Layout":{"height":8},"Background":{"_children":{"Fill":{"colour":"55FFFFFF"},"Border":{"colour":"88FFFFFF"}}}}},
+            "bodyTrackFill": {"_children":{"Layout":{"height":8},"Background":{"_children":{"Fill":{"colour":"FFFFE27A"}}}}},
+            "bodySelectedRange": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFB6E6"}}}}},
+            "bodyCap": {"_children":{"Background":{"_children":{"Fill":{"colour":"CCFFFFFF"},"Border":{"colour":"99FFFFFF"}}}}},
+            "bodyCenterMarker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"}}}}},
+            "pointerStart": {"_children":{"Layout":{"width":20,"height":20},"Background":{"_children":{"Fill":{"colour":"FFFFE27A"},"Border":{"thickness":2,"colour":"FFFFE27A"}}}},"shadow":true},
+            "pointerCurrent": {"_children":{"Background":{"_children":{"Fill":{"colour":"E6FFFFFF"},"Border":{"thickness":2,"colour":"FFFFE27A"}}}},"shadow":true},
+            "pointerEnd": {"_children":{"Layout":{"width":20,"height":20},"Background":{"_children":{"Fill":{"colour":"FFB6FFE8"},"Border":{"thickness":2,"colour":"FFFFE27A"}}}},"shadow":true},
+            "tickMajor": {"_children":{"Background":{"_children":{"Fill":{"colour":"CCFFFFFF"}}}}},
+            "tickMinor": {"_children":{"Background":{"_children":{"Fill":{"colour":"88FFFFFF"}}}}},
+            "labelMin": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelMax": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelStart": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFE27A"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"CCFFFFFF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFB6FFE8"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelTitle": {"_children":{"Text":{"content":"LEVEL","_children":{"Fill":{"colour":"FFEAE6FF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelUnit": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFEAE6FF"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}}
           }
         },
-        "States": {
-          "_children": {
-            "Dragging": {
-              "patches": {
-                "parts": {
-                  "bodyTrackFill": {
-                    "Background.Fill.colour": "FFFFFFFF"
-                  },
-                  "bodySelectedRange": {
-                    "Background.Fill.colour": "FFFFC1EA"
-                  },
-                  "pointerCurrent": {
-                    "Background.Fill.colour": "FFFFFFFF"
-                  }
-                }
-              }
-            },
-            "Focused": {
-              "patches": {
-                "parts": {
-                  "pointerCurrent": {
-                    "Background.Border.colour": "FFFFE27A"
-                  },
-                  "labelValue": {
-                    "Text.Fill.colour": "FFFFE27A"
-                  }
-                }
-              }
-            }
-          }
-        }
+        "States": {"_children":{"Dragging":{"patches":{"parts":{"bodyTrackFill":{"Background.Fill.colour":"FFFFFFFF"},"bodySelectedRange":{"Background.Fill.colour":"FFFFC1EA"},"pointerCurrent":{"Background.Fill.colour":"FFFFFFFF"}}}},"Focused":{"patches":{"parts":{"pointerCurrent":{"Background.Border.colour":"FFFFE27A"},"labelValue":{"Text.Fill.colour":"FFFFE27A"}}}}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Crossfader_1789880205456",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205456",
-          "controlType": "Crossfader"
-        },
-        "Transform": {
-          "x": 364,
-          "y": 234,
-          "width": 190,
-          "height": 62
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "33FFFFFF"
-            },
-            "Border": {
-              "colour": "AAFFFFFF"
-            },
-            "Corners": {
-              "radius": 14
-            }
-          }
-        },
-        "Crossfader": {
-          "handleSize": 22,
-          "handleStyle": "ring",
-          "trackSize": 8,
-          "trackColour": "55FFFFFF",
-          "fillAColour": "FFFFE27A",
-          "fillBColour": "FFFFB6E6",
-          "handleColour": "CCFFFFFF",
-          "labelColour": "FFF2F2F2"
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 4,
-                  "blur": 12,
-                  "spread": 0,
-                  "colour": "33000000"
-                }
-              ]
-            }
-          }
-        }
+        "Core": {"name":"Crossfader_1789880205456","controlSetId":"frost","id":"ctrl_1789880205456","controlType":"Crossfader"},
+        "Transform": {"x":364,"y":234,"width":190,"height":62},
+        "Background": {"_children":{"Fill":{"colour":"33FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
+        "Crossfader": {"handleSize":22,"handleStyle":"ring","trackSize":8,"trackColour":"55FFFFFF","fillAColour":"FFFFE27A","fillBColour":"FFFFB6E6","handleColour":"CCFFFFFF","labelColour":"FFF2F2F2"},
+        "Text": {"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk"}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":4,"blur":12,"spread":0,"colour":"33000000"}]}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Button_1789880205457",
-          "controlSetId": "frost",
-          "controlForm": "glasskey",
-          "formFaceColour": "38FFFFFF",
-          "formHousingColour": "55FFFFFF",
-          "formInkColour": "FFF2F2F2",
-          "formLabelColour": "FFFFFFFF",
-          "formAccentColour": "FFFFE27A",
-          "id": "ctrl_1789880205457",
-          "controlType": "Button"
-        },
-        "Transform": {
-          "x": 576,
-          "y": 118,
-          "width": 124,
-          "height": 84
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "38FFFFFF"
-            },
-            "Border": {
-              "colour": "AAFFFFFF"
-            },
-            "Corners": {
-              "radius": 14
-            }
-          }
-        },
-        "Text": {
-          "content": "TRIGGER",
-          "_children": {
-            "Fill": {
-              "colour": "FFF2F2F2"
-            },
-            "Font": {
-              "family": "Space Grotesk",
-              "weight": "Bold",
-              "weightValue": 700,
-              "letterSpacing": 0.7
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 4,
-                  "blur": 12,
-                  "spread": 0,
-                  "colour": "33000000"
-                }
-              ]
-            }
-          }
-        },
-        "ContentLayout": {
-          "lampColour": "FFFFE27A",
-          "lampOffColour": "55FFFFFF",
-          "lampBezelColour": "AAFFFFFF"
-        },
-        "States": {
-          "_children": {
-            "Hover": {
-              "patches": {
-                "component": {
-                  "Background.Fill.colour": "55FFFFFF"
-                }
-              }
-            },
-            "Pressed": {
-              "patches": {
-                "component": {
-                  "Background.Fill.colour": "22FFFFFF"
-                }
-              }
-            },
-            "Focused": {
-              "patches": {
-                "component": {
-                  "Background.Border.colour": "FFFFE27A"
-                }
-              }
-            }
-          }
-        }
+        "Core": {"name":"Button_1789880205457","controlSetId":"frost","controlForm":"glasskey","formFaceColour":"38FFFFFF","formHousingColour":"55FFFFFF","formInkColour":"FFF2F2F2","formLabelColour":"FFFFFFFF","formAccentColour":"FFFFE27A","id":"ctrl_1789880205457","controlType":"Button"},
+        "Transform": {"x":576,"y":118,"width":124,"height":84},
+        "Background": {"_children":{"Fill":{"colour":"38FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
+        "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":4,"blur":12,"spread":0,"colour":"33000000"}]}}},
+        "ContentLayout": {"lampColour":"FFFFE27A","lampOffColour":"55FFFFFF","lampBezelColour":"AAFFFFFF"},
+        "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"55FFFFFF"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"22FFFFFF"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFFFE27A"}}}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "ToggleButton_1789880205458",
-          "controlSetId": "frost",
-          "controlForm": "orbit",
-          "formFaceColour": "38FFFFFF",
-          "formHousingColour": "55FFFFFF",
-          "formInkColour": "FFF2F2F2",
-          "formLabelColour": "FFFFFFFF",
-          "formAccentColour": "FFFFE27A",
-          "id": "ctrl_1789880205458",
-          "controlType": "ToggleButton"
-        },
-        "Transform": {
-          "x": 716,
-          "y": 118,
-          "height": 84
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "38FFFFFF"
-            },
-            "Border": {
-              "colour": "AAFFFFFF"
-            },
-            "Corners": {
-              "radius": 14
-            }
-          }
-        },
-        "Text": {
-          "content": "HOLD",
-          "_children": {
-            "Fill": {
-              "colour": "FFF2F2F2"
-            },
-            "Font": {
-              "family": "Space Grotesk",
-              "weight": "Bold",
-              "weightValue": 700,
-              "letterSpacing": 0.7
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 4,
-                  "blur": 12,
-                  "spread": 0,
-                  "colour": "33000000"
-                }
-              ]
-            }
-          }
-        },
-        "ContentLayout": {
-          "lamp": "led",
-          "lampSize": 7,
-          "lampColour": "FFFFFFFF",
-          "lampOffColour": "55FFFFFF",
-          "lampBezelColour": "AAFFFFFF"
-        },
-        "Behavior": {
-          "defaultValue": true
-        },
-        "States": {
-          "_children": {
-            "Hover": {
-              "patches": {
-                "component": {
-                  "Background.Fill.colour": "55FFFFFF"
-                }
-              }
-            },
-            "Pressed": {
-              "patches": {
-                "component": {
-                  "Background.Fill.colour": "22FFFFFF"
-                }
-              }
-            },
-            "Focused": {
-              "patches": {
-                "component": {
-                  "Background.Border.colour": "FFFFE27A"
-                }
-              }
-            },
-            "Selected": {
-              "patches": {
-                "component": {
-                  "Background.Border.colour": "FFFFE27A",
-                  "_removed": [
-                    "Background.Fill.colour",
-                    "Text.Fill.colour"
-                  ]
-                }
-              }
-            },
-            "Mixed": {
-              "patches": {
-                "component": {
-                  "Background.Fill.colour": "FFCCB562",
-                  "Background.Border.colour": "FFFFE27A",
-                  "Text.Fill.colour": "FF2B2270"
-                }
-              }
-            }
-          }
-        }
+        "Core": {"name":"ToggleButton_1789880205458","controlSetId":"frost","controlForm":"orbit","formFaceColour":"38FFFFFF","formHousingColour":"55FFFFFF","formInkColour":"FFF2F2F2","formLabelColour":"FFFFFFFF","formAccentColour":"FFFFE27A","id":"ctrl_1789880205458","controlType":"ToggleButton"},
+        "Transform": {"x":716,"y":118,"height":84},
+        "Background": {"_children":{"Fill":{"colour":"38FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
+        "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":4,"blur":12,"spread":0,"colour":"33000000"}]}}},
+        "ContentLayout": {"lamp":"led","lampSize":7,"lampColour":"FFFFFFFF","lampOffColour":"55FFFFFF","lampBezelColour":"AAFFFFFF"},
+        "Behavior": {"defaultValue":true},
+        "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"55FFFFFF"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"22FFFFFF"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFFFE27A"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFFFE27A","_removed":["Background.Fill.colour","Text.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FFCCB562","Background.Border.colour":"FFFFE27A","Text.Fill.colour":"FF2B2270"}}}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "CyclicButton_1789880205459",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205459",
-          "controlType": "CyclicButton"
-        },
-        "Transform": {
-          "x": 576,
-          "y": 220,
-          "width": 124,
-          "height": 36
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "38FFFFFF"
-            },
-            "Border": {
-              "colour": "AAFFFFFF"
-            },
-            "Corners": {
-              "radius": 14
-            }
-          }
-        },
-        "Text": {
-          "content": "CYCLE",
-          "_children": {
-            "Fill": {
-              "colour": "FFF2F2F2"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 4,
-                  "blur": 12,
-                  "spread": 0,
-                  "colour": "33000000"
-                }
-              ]
-            }
-          }
-        },
-        "ContentLayout": {
-          "lampColour": "FFFFE27A",
-          "lampOffColour": "55FFFFFF",
-          "lampBezelColour": "AAFFFFFF"
-        },
-        "States": {
-          "_children": {
-            "Hover": {
-              "patches": {
-                "component": {
-                  "Background.Fill.colour": "55FFFFFF"
-                }
-              }
-            },
-            "Pressed": {
-              "patches": {
-                "component": {
-                  "Background.Fill.colour": "22FFFFFF"
-                }
-              }
-            },
-            "Focused": {
-              "patches": {
-                "component": {
-                  "Background.Border.colour": "FFFFE27A"
-                }
-              }
-            },
-            "Selected": {
-              "patches": {
-                "component": {
-                  "Background.Border.colour": "FFFFE27A",
-                  "Text.Fill.colour": "FFF2F2F2",
-                  "_removed": [
-                    "Background.Fill.colour"
-                  ]
-                }
-              }
-            },
-            "Mixed": {
-              "patches": {
-                "component": {
-                  "Background.Fill.colour": "FFCCB562",
-                  "Background.Border.colour": "FFFFE27A",
-                  "Text.Fill.colour": "FF2B2270"
-                }
-              }
-            }
-          }
-        }
+        "Core": {"name":"CyclicButton_1789880205459","controlSetId":"frost","id":"ctrl_1789880205459","controlType":"CyclicButton"},
+        "Transform": {"x":576,"y":220,"width":124,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"38FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
+        "Text": {"content":"CYCLE","_children":{"Fill":{"colour":"FFF2F2F2"}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":4,"blur":12,"spread":0,"colour":"33000000"}]}}},
+        "ContentLayout": {"lampColour":"FFFFE27A","lampOffColour":"55FFFFFF","lampBezelColour":"AAFFFFFF"},
+        "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"55FFFFFF"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"22FFFFFF"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFFFE27A"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFFFE27A","Text.Fill.colour":"FFF2F2F2","_removed":["Background.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FFCCB562","Background.Border.colour":"FFFFE27A","Text.Fill.colour":"FF2B2270"}}}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Combobox_1789880205460",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205460",
-          "controlType": "Combobox"
-        },
-        "Transform": {
-          "x": 716,
-          "y": 220,
-          "width": 136,
-          "height": 36
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "38FFFFFF"
-            },
-            "Border": {
-              "colour": "AAFFFFFF"
-            },
-            "Corners": {
-              "radius": 14
-            }
-          }
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFF2F2F2"
-            },
-            "Font": {
-              "family": "Space Grotesk",
-              "weight": "Bold",
-              "weightValue": 700,
-              "letterSpacing": 0.7
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 4,
-                  "blur": 12,
-                  "spread": 0,
-                  "colour": "33000000"
-                }
-              ]
-            }
-          }
-        },
-        "ContentLayout": {
-          "lampColour": "FFFFE27A",
-          "lampOffColour": "55FFFFFF",
-          "lampBezelColour": "AAFFFFFF"
-        },
-        "States": {
-          "_children": {
-            "Hover": {
-              "patches": {
-                "component": {
-                  "Background.Fill.colour": "55FFFFFF"
-                }
-              }
-            },
-            "Pressed": {
-              "patches": {
-                "component": {
-                  "Background.Fill.colour": "22FFFFFF"
-                }
-              }
-            },
-            "Focused": {
-              "patches": {
-                "component": {
-                  "Background.Border.colour": "FFFFE27A"
-                }
-              }
-            }
-          }
-        }
+        "Core": {"name":"Combobox_1789880205460","controlSetId":"frost","id":"ctrl_1789880205460","controlType":"Combobox"},
+        "Transform": {"x":716,"y":220,"width":136,"height":36},
+        "Background": {"_children":{"Fill":{"colour":"38FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
+        "Text": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":4,"blur":12,"spread":0,"colour":"33000000"}]}}},
+        "ContentLayout": {"lampColour":"FFFFE27A","lampOffColour":"55FFFFFF","lampBezelColour":"AAFFFFFF"},
+        "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"55FFFFFF"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"22FFFFFF"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFFFE27A"}}}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Number_1789880205461",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205461",
-          "controlType": "Number"
-        },
-        "Transform": {
-          "x": 576,
-          "y": 273,
-          "width": 124,
-          "height": 32
-        },
+        "Core": {"name":"Number_1789880205461","controlSetId":"frost","id":"ctrl_1789880205461","controlType":"Number"},
+        "Transform": {"x":576,"y":273,"width":124,"height":32},
         "Parts": {
           "_children": {
-            "decrement": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "38FFFFFF"
-                    },
-                    "Border": {
-                      "colour": "88FFFFFF"
-                    }
-                  }
-                },
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FF2B2270"
-                    }
-                  }
-                }
-              }
-            },
-            "valueField": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "33FFFFFF"
-                    },
-                    "Border": {
-                      "colour": "88FFFFFF"
-                    }
-                  }
-                },
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FF2B2270"
-                    },
-                    "Font": {
-                      "family": "JetBrains Mono"
-                    }
-                  }
-                }
-              }
-            },
-            "increment": {
-              "_children": {
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "38FFFFFF"
-                    },
-                    "Border": {
-                      "colour": "88FFFFFF"
-                    }
-                  }
-                },
-                "Text": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FF2B2270"
-                    }
-                  }
-                }
-              }
-            }
+            "decrement": {"_children":{"Background":{"_children":{"Fill":{"colour":"38FFFFFF"},"Border":{"colour":"88FFFFFF"}}},"Text":{"_children":{"Fill":{"colour":"FF2B2270"}}}}},
+            "valueField": {"_children":{"Background":{"_children":{"Fill":{"colour":"33FFFFFF"},"Border":{"colour":"88FFFFFF"}}},"Text":{"_children":{"Fill":{"colour":"FF2B2270"},"Font":{"family":"JetBrains Mono"}}}}},
+            "increment": {"_children":{"Background":{"_children":{"Fill":{"colour":"38FFFFFF"},"Border":{"colour":"88FFFFFF"}}},"Text":{"_children":{"Fill":{"colour":"FF2B2270"}}}}}
           }
         },
-        "States": {
-          "_children": {
-            "Hover": {
-              "patches": {
-                "parts": {
-                  "decrement": {
-                    "Background.Fill.colour": "55FFFFFF"
-                  },
-                  "increment": {
-                    "Background.Fill.colour": "55FFFFFF"
-                  },
-                  "valueField": {
-                    "Background.Fill.colour": "44FFFFFF"
-                  }
-                }
-              }
-            },
-            "Pressed": {
-              "patches": {
-                "parts": {
-                  "decrement": {
-                    "Background.Fill.colour": "22FFFFFF"
-                  },
-                  "increment": {
-                    "Background.Fill.colour": "22FFFFFF"
-                  }
-                }
-              }
-            },
-            "Dragging": {
-              "patches": {
-                "parts": {
-                  "valueField": {
-                    "Background.Fill.colour": "55FFFFFF",
-                    "Background.Border.colour": "FFFFE27A"
-                  }
-                }
-              }
-            },
-            "Focused": {
-              "patches": {
-                "parts": {
-                  "valueField": {
-                    "Background.Border.colour": "FFFFE27A"
-                  }
-                }
-              }
-            }
-          }
-        }
+        "States": {"_children":{"Hover":{"patches":{"parts":{"decrement":{"Background.Fill.colour":"55FFFFFF"},"increment":{"Background.Fill.colour":"55FFFFFF"},"valueField":{"Background.Fill.colour":"44FFFFFF"}}}},"Pressed":{"patches":{"parts":{"decrement":{"Background.Fill.colour":"22FFFFFF"},"increment":{"Background.Fill.colour":"22FFFFFF"}}}},"Dragging":{"patches":{"parts":{"valueField":{"Background.Fill.colour":"55FFFFFF","Background.Border.colour":"FFFFE27A"}}}},"Focused":{"patches":{"parts":{"valueField":{"Background.Border.colour":"FFFFE27A"}}}}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "TextInput_1789880205462",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205462",
-          "controlType": "TextInput"
-        },
-        "Transform": {
-          "x": 716,
-          "y": 273,
-          "width": 136
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "33FFFFFF"
-            },
-            "Border": {
-              "colour": "AAFFFFFF"
-            },
-            "Corners": {
-              "radius": 14
-            }
-          }
-        },
-        "Text": {
-          "content": "Studio A",
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 4,
-                  "blur": 12,
-                  "spread": 0,
-                  "colour": "33000000"
-                }
-              ]
-            }
-          }
-        },
-        "ContentLayout": {
-          "lampColour": "FFFFE27A",
-          "lampOffColour": "55FFFFFF",
-          "lampBezelColour": "AAFFFFFF"
-        },
-        "States": {
-          "_children": {
-            "Hover": {
-              "patches": {
-                "component": {
-                  "Background.Fill.colour": "55FFFFFF"
-                }
-              }
-            },
-            "Pressed": {
-              "patches": {
-                "component": {
-                  "Background.Fill.colour": "22FFFFFF"
-                }
-              }
-            },
-            "Focused": {
-              "patches": {
-                "component": {
-                  "Background.Border.colour": "FFFFE27A"
-                }
-              }
-            }
-          }
-        }
+        "Core": {"name":"TextInput_1789880205462","controlSetId":"frost","id":"ctrl_1789880205462","controlType":"TextInput"},
+        "Transform": {"x":716,"y":273,"width":136},
+        "Background": {"_children":{"Fill":{"colour":"33FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
+        "Text": {"content":"Studio A","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk"}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":4,"blur":12,"spread":0,"colour":"33000000"}]}}},
+        "ContentLayout": {"lampColour":"FFFFE27A","lampOffColour":"55FFFFFF","lampBezelColour":"AAFFFFFF"},
+        "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"55FFFFFF"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"22FFFFFF"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFFFE27A"}}}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Label_1789880205463",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205463",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 26,
-          "y": 310,
-          "width": 250,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "PLAY / SHAPE",
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk",
-              "weight": "Bold",
-              "weightValue": 700,
-              "size": 13,
-              "letterSpacing": 0.9
-            }
-          }
-        },
-        "ContentLayout": {
-          "lampColour": "FFFFE27A",
-          "lampOffColour": "55FFFFFF",
-          "lampBezelColour": "AAFFFFFF"
-        }
+        "Core": {"name":"Label_1789880205463","controlSetId":"frost","id":"ctrl_1789880205463","controlType":"Label"},
+        "Transform": {"x":26,"y":310,"width":250,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Text": {"content":"PLAY / SHAPE","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "ContentLayout": {"lampColour":"FFFFE27A","lampOffColour":"55FFFFFF","lampBezelColour":"AAFFFFFF"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Label_1789880205464",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205464",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 540,
-          "y": 310,
-          "width": 250,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "MEASURE / ROUTE",
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk",
-              "weight": "Bold",
-              "weightValue": 700,
-              "size": 13,
-              "letterSpacing": 0.9
-            }
-          }
-        },
-        "ContentLayout": {
-          "lampColour": "FFFFE27A",
-          "lampOffColour": "55FFFFFF",
-          "lampBezelColour": "AAFFFFFF"
-        }
+        "Core": {"name":"Label_1789880205464","controlSetId":"frost","id":"ctrl_1789880205464","controlType":"Label"},
+        "Transform": {"x":540,"y":310,"width":250,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Text": {"content":"MEASURE / ROUTE","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "ContentLayout": {"lampColour":"FFFFE27A","lampOffColour":"55FFFFFF","lampBezelColour":"AAFFFFFF"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "DrumPads_1789880205465",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205465",
-          "controlType": "DrumPads"
-        },
-        "Transform": {
-          "x": 26,
-          "y": 348,
-          "width": 228,
-          "height": 214
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "33FFFFFF"
-            },
-            "Border": {
-              "colour": "AAFFFFFF"
-            },
-            "Corners": {
-              "radius": 14
-            }
-          }
-        },
-        "DrumPads": {
-          "rows": 2,
-          "cols": 2,
-          "showNotes": false,
-          "showHeader": false,
-          "padAppearance": "glass",
-          "padRadius": 18,
-          "fieldColour": "33FFFFFF",
-          "padColour": "38FFFFFF",
-          "accentColour": "FFFFE27A",
-          "hitColour": "FFFFE27A",
-          "labelColour": "FFF2F2F2"
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 4,
-                  "blur": 12,
-                  "spread": 0,
-                  "colour": "33000000"
-                }
-              ]
-            }
-          }
-        }
+        "Core": {"name":"DrumPads_1789880205465","controlSetId":"frost","id":"ctrl_1789880205465","controlType":"DrumPads"},
+        "Transform": {"x":26,"y":348,"width":228,"height":214},
+        "Background": {"_children":{"Fill":{"colour":"33FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
+        "DrumPads": {"rows":2,"cols":2,"showNotes":false,"showHeader":false,"padAppearance":"glass","padRadius":18,"fieldColour":"33FFFFFF","padColour":"38FFFFFF","accentColour":"FFFFE27A","hitColour":"FFFFE27A","labelColour":"FFF2F2F2"},
+        "Text": {"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk"}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":4,"blur":12,"spread":0,"colour":"33000000"}]}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Envelope_1789880205466",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205466",
-          "controlType": "Envelope"
-        },
-        "Transform": {
-          "x": 284,
-          "y": 348,
-          "width": 220,
-          "height": 120
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "33FFFFFF"
-            },
-            "Border": {
-              "colour": "AAFFFFFF"
-            },
-            "Corners": {
-              "radius": 14
-            }
-          }
-        },
-        "Envelope": {
-          "lineWidth": 3,
-          "nodeRadius": 6,
-          "lineColour": "FFFFE27A",
-          "fillColour": "20000000",
-          "nodeColour": "CCFFFFFF",
-          "gridColour": "88FFFFFF",
-          "sustainColour": "FFFFB6E6",
-          "playheadColour": "FFFFE27A"
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 4,
-                  "blur": 12,
-                  "spread": 0,
-                  "colour": "33000000"
-                }
-              ]
-            }
-          }
-        }
+        "Core": {"name":"Envelope_1789880205466","controlSetId":"frost","id":"ctrl_1789880205466","controlType":"Envelope"},
+        "Transform": {"x":284,"y":348,"width":220,"height":120},
+        "Background": {"_children":{"Fill":{"colour":"33FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
+        "Envelope": {"lineWidth":3,"nodeRadius":6,"lineColour":"FFFFE27A","fillColour":"20000000","nodeColour":"CCFFFFFF","gridColour":"88FFFFFF","sustainColour":"FFFFB6E6","playheadColour":"FFFFE27A"},
+        "Text": {"_children":{"Fill":{"colour":"FFFFFFFF"}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":4,"blur":12,"spread":0,"colour":"33000000"}]}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Ribbon_1789880205467",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205467",
-          "controlType": "Ribbon"
-        },
-        "Transform": {
-          "x": 284,
-          "y": 484,
-          "width": 220,
-          "height": 76
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "33FFFFFF"
-            },
-            "Border": {
-              "colour": "AAFFFFFF"
-            },
-            "Corners": {
-              "radius": 14
-            }
-          }
-        },
-        "Ribbon": {
-          "orientation": "horizontal",
-          "style": "strip",
-          "trackColour": "55FFFFFF",
-          "fillColour": "FFFFE27A",
-          "indicatorColour": "CCFFFFFF",
-          "glowColour": "FFFFE27A",
-          "wheelColour": "FFFFFFFF",
-          "labelColour": "FFF2F2F2"
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 4,
-                  "blur": 12,
-                  "spread": 0,
-                  "colour": "33000000"
-                }
-              ]
-            }
-          }
-        }
+        "Core": {"name":"Ribbon_1789880205467","controlSetId":"frost","id":"ctrl_1789880205467","controlType":"Ribbon"},
+        "Transform": {"x":284,"y":484,"width":220,"height":76},
+        "Background": {"_children":{"Fill":{"colour":"33FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
+        "Ribbon": {"orientation":"horizontal","style":"strip","trackColour":"55FFFFFF","fillColour":"FFFFE27A","indicatorColour":"CCFFFFFF","glowColour":"FFFFE27A","wheelColour":"FFFFFFFF","labelColour":"FFF2F2F2"},
+        "Text": {"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk"}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":4,"blur":12,"spread":0,"colour":"33000000"}]}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Meter_1789880205468",
-          "controlSetId": "frost",
-          "controlForm": "column",
-          "formFaceColour": "38FFFFFF",
-          "formHousingColour": "55FFFFFF",
-          "formInkColour": "FFF2F2F2",
-          "formLabelColour": "FFFFFFFF",
-          "formAccentColour": "FFFFE27A",
-          "id": "ctrl_1789880205468",
-          "controlType": "Meter"
-        },
-        "Transform": {
-          "x": 540,
-          "y": 342,
-          "width": 312,
-          "height": 108
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "33FFFFFF"
-            },
-            "Border": {
-              "colour": "AAFFFFFF"
-            },
-            "Corners": {
-              "radius": 14
-            }
-          }
-        },
-        "Meter": {
-          "value": 0.7,
-          "segmentGap": 3,
-          "trackColour": "55FFFFFF",
-          "fillColour": "FFFFE27A",
-          "thickness": 10,
-          "rounded": true,
-          "peakColour": "FFFFE27A",
-          "valuePrecision": 2
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFF2F2F2"
-            },
-            "Font": {
-              "family": "Space Grotesk"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 4,
-                  "blur": 12,
-                  "spread": 0,
-                  "colour": "33000000"
-                }
-              ]
-            }
-          }
-        }
+        "Core": {"name":"Meter_1789880205468","controlSetId":"frost","controlForm":"column","formFaceColour":"38FFFFFF","formHousingColour":"55FFFFFF","formInkColour":"FFF2F2F2","formLabelColour":"FFFFFFFF","formAccentColour":"FFFFE27A","id":"ctrl_1789880205468","controlType":"Meter"},
+        "Transform": {"x":540,"y":342,"width":312,"height":108},
+        "Background": {"_children":{"Fill":{"colour":"33FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
+        "Meter": {"value":0.7,"segmentGap":3,"trackColour":"55FFFFFF","fillColour":"FFFFE27A","thickness":10,"rounded":true,"peakColour":"FFFFE27A","valuePrecision":2},
+        "Text": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Space Grotesk"}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":4,"blur":12,"spread":0,"colour":"33000000"}]}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Matrix_1789880205469",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205469",
-          "controlType": "Matrix"
-        },
-        "Transform": {
-          "x": 540,
-          "y": 466,
-          "width": 166,
-          "height": 100
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "33FFFFFF"
-            },
-            "Border": {
-              "colour": "AAFFFFFF"
-            },
-            "Corners": {
-              "radius": 14
-            }
-          }
-        },
-        "Matrix": {
-          "rows": [
-            "LFO",
-            "ENV",
-            "VEL"
-          ],
-          "cols": [
-            "OSC",
-            "FLT",
-            "AMP"
-          ],
-          "amounts": [
-            0.6,
-            0,
-            -0.4,
-            0,
-            0.7,
-            0,
-            0,
-            0.4,
-            0.8
-          ],
-          "cellStyle": "dot",
-          "rowHeaderW": 42,
-          "cellBg": "33FFFFFF",
-          "gridColour": "88FFFFFF",
-          "posColour": "FFFFE27A",
-          "negColour": "FFFFB6E6",
-          "labelColour": "FFF2F2F2",
-          "activeColour": "FFFFE27A"
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 4,
-                  "blur": 12,
-                  "spread": 0,
-                  "colour": "33000000"
-                }
-              ]
-            }
-          }
-        }
+        "Core": {"name":"Matrix_1789880205469","controlSetId":"frost","id":"ctrl_1789880205469","controlType":"Matrix"},
+        "Transform": {"x":540,"y":466,"width":166,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"33FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
+        "Matrix": {"rows":["LFO","ENV","VEL"],"cols":["OSC","FLT","AMP"],"amounts":[0.6,0,-0.4,0,0.7,0,0,0.4,0.8],"cellStyle":"dot","rowHeaderW":42,"cellBg":"33FFFFFF","gridColour":"88FFFFFF","posColour":"FFFFE27A","negColour":"FFFFB6E6","labelColour":"FFF2F2F2","activeColour":"FFFFE27A"},
+        "Text": {"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk"}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":4,"blur":12,"spread":0,"colour":"33000000"}]}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "VectorJoystick_1789880205470",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205470",
-          "controlType": "VectorJoystick"
-        },
-        "Transform": {
-          "x": 728,
-          "y": 466,
-          "width": 124,
-          "height": 100
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "33FFFFFF"
-            },
-            "Border": {
-              "colour": "AAFFFFFF"
-            },
-            "Corners": {
-              "radius": 14
-            }
-          }
-        },
-        "Joystick": {
-          "showGrid": false,
-          "puckRadius": 14,
-          "padColour": "33FFFFFF",
-          "gridColour": "88FFFFFF",
-          "crosshairColour": "FFFFE27A",
-          "puckColour": "CCFFFFFF",
-          "cornerColour": "FFEAE6FF",
-          "labelColour": "FFF2F2F2"
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 4,
-                  "blur": 12,
-                  "spread": 0,
-                  "colour": "33000000"
-                }
-              ]
-            }
-          }
-        }
+        "Core": {"name":"VectorJoystick_1789880205470","controlSetId":"frost","id":"ctrl_1789880205470","controlType":"VectorJoystick"},
+        "Transform": {"x":728,"y":466,"width":124,"height":100},
+        "Background": {"_children":{"Fill":{"colour":"33FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
+        "Joystick": {"showGrid":false,"puckRadius":14,"padColour":"33FFFFFF","gridColour":"88FFFFFF","crosshairColour":"FFFFE27A","puckColour":"CCFFFFFF","cornerColour":"FFEAE6FF","labelColour":"FFF2F2F2"},
+        "Text": {"_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk"}}},
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":4,"blur":12,"spread":0,"colour":"33000000"}]}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {
-          "name": "Label_1789880205471",
-          "controlSetId": "frost",
-          "id": "ctrl_1789880205471",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 26,
-          "y": 590,
-          "width": 820,
-          "height": 26
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "Copy a control into your panel. Its pinned design travels with it.",
-          "_children": {
-            "Fill": {
-              "colour": "FFFFFFFF"
-            },
-            "Font": {
-              "family": "Space Grotesk",
-              "weight": "Bold",
-              "weightValue": 700,
-              "letterSpacing": 0.9
-            }
-          }
-        },
-        "ContentLayout": {
-          "lampColour": "FFFFE27A",
-          "lampOffColour": "55FFFFFF",
-          "lampBezelColour": "AAFFFFFF"
-        }
+        "Core": {"name":"Label_1789880205471","controlSetId":"frost","id":"ctrl_1789880205471","controlType":"Label"},
+        "Transform": {"x":26,"y":590,"width":820,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Text": {"content":"Copy a control into your panel. Its pinned design travels with it.","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
+        "ContentLayout": {"lampColour":"FFFFE27A","lampOffColour":"55FFFFFF","lampBezelColour":"AAFFFFFF"}
       },
       "_type": "Control"
     }

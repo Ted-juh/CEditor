@@ -30,14 +30,27 @@ const HOST_CPP = readFileSync(join(REPO, 'CE/src/Player/PlayerHost.cpp'), 'utf8'
 const PLAYER = readFileSync(join(REPO, 'CE/web/src/Player.svelte'), 'utf8');
 const DEVICE_BRIDGE = readFileSync(join(REPO, 'CE/src/DeviceProfile/DeviceRuntimeBridge.cpp'), 'utf8');
 
-test('setStateInformation arms the restore and does not send', () => {
+test('setStateInformation stages the restore and does not send', () => {
   // The core constraint: that call arrives before the ports are open, before prepareToPlay, and on
   // a thread with no business emitting SysEx.
   const body = PROCESSOR.slice(PROCESSOR.indexOf('void setStateInformation'),
     PROCESSOR.indexOf('bool isBusesLayoutSupported'));
-  assert.ok(body.includes('armRestorePush();'), 'setStateInformation does not arm the restore');
+  assert.ok(body.includes('stageRestorePush ('), 'setStateInformation does not stage the restore');
   assert.ok(!body.includes('runRestorePush'), 'setStateInformation must not send — wrong thread, ports may be shut');
   assert.ok(!body.includes('sendParamMidi'), 'nor send a parameter directly');
+  // Nor touch what the timer owns. It runs on the host's thread, and an LV2 on Linux runs the
+  // timer on a message thread of its own at the same time: writing lastSentMidi from here crashed
+  // pluginval inside the map.
+  for (const owned of ['lastSentMidi', 'restorePending', 'restorePromptSent', 'restoredDumps', 'rebaselineSentMidi'])
+    assert.ok(!body.includes(owned), `setStateInformation touches ${owned}, which belongs to the message thread`);
+});
+
+test('the timer arms a staged restore before anything reads the cache or the flags', () => {
+  const timer = PROCESSOR.slice(PROCESSOR.indexOf('void timerCallback() override'));
+  const apply = timer.indexOf('applyStagedRestore();');
+  assert.ok(apply > -1, 'nothing on the message thread arms a staged restore');
+  assert.ok(apply < timer.indexOf('serviceRestorePush'), 'the restore is serviced before it is armed');
+  assert.ok(apply < timer.indexOf('lastSentMidi.find'), 'the automation loop reads the cache before it is seeded');
 });
 
 test('the push is serviced from the timer, before the window-open early return', () => {
@@ -115,7 +128,7 @@ test('the answer is persisted with the project, and only always/never are rememb
   assert.match(POLICY_RESTORE, /getChildByName \("RestoreAnswer"\)/);
   const answer = PROCESSOR.slice(PROCESSOR.indexOf('void answerRestorePrompt'));
   const body = answer.slice(0, answer.indexOf('\n    }\n'));
-  assert.match(body, /if \(a != "always" && a != "never"\) return;[\s\S]*restoreAnswer = a;/,
+  assert.match(body, /if \(a != "always" && a != "never"\) return;[\s\S]*setRestoreAnswer \(a\);/,
     'anything other than always/never must be ignored, not stored');
 });
 
@@ -127,7 +140,7 @@ test('"load" settles the pending push without sending or remembering anything', 
   assert.ok(load.length > 0, 'the load answer is not handled');
   assert.match(load, /restorePending = false;/, 'the pending restore is not settled');
   assert.match(load, /scriptLogLine/, 'a restore that did not happen must say why');
-  assert.ok(!/restoreAnswer = /.test(load), 'load is a one-off, never remembered');
+  assert.ok(!/restoreAnswer = |setRestoreAnswer/.test(load), 'load is a one-off, never remembered');
   assert.ok(!/runRestorePush|sendParamMidi/.test(load), 'and never sends');
   assert.match(PLAYER, /answerRestore\('load'\)/, 'the bar has no Load button');
   assert.match(PLAYER, /if \(answer === 'load'\) runStartupRead\(/, 'Load does not read the synth');
@@ -277,9 +290,10 @@ test('a restored session replaces the answer and the program instead of keeping 
     PROCESSOR.indexOf('bool isBusesLayoutSupported'));
   assert.ok(!/getChildByName \("RestoreAnswer"\)/.test(load), 'the answer must come from readSessionRecall, not a conditional read');
   assert.ok(!/getChildByName \("CurrentProgram"\)/.test(load), 'the program must come from readSessionRecall, not a conditional read');
-  assert.match(load, /restoreAnswer = recall\.restoreAnswer;/);
+  // Through the setter: the answer is read by getStateInformation on any thread, so it is locked.
+  assert.match(load, /setRestoreAnswer \(recall\.restoreAnswer\);/);
   const legacy = load.slice(load.indexOf('backward-compat: APVTS-only state'));
-  assert.match(legacy, /restoreAnswer = \{\};[\s\S]{0,80}currentProgram = 0;/,
+  assert.match(legacy, /setRestoreAnswer \(\{\}\);[\s\S]{0,80}currentProgram = 0;/,
     'an APVTS-only state must reset the recall state too');
 });
 
@@ -303,7 +317,18 @@ test('the bank is read once, at construction', () => {
   // The host caches getNumPrograms() the moment it loads us, so the count had better not change.
   const ctor = PROCESSOR.slice(PROCESSOR.indexOf('PlayerAudioProcessor()'),
     PROCESSOR.indexOf('~PlayerAudioProcessor() override'));
-  assert.match(ctor, /programBank = ce::parseProgramBank \(document\);/);
+  assert.match(ctor, /programBank = ce::parseProgramBank \(panelDocument\);/);
+});
+
+test('the panel file is parsed once per instance', () => {
+  // Most of a second each on a large panel, on the thread the host builds us on, for every instance
+  // in a project. It was parsed three times: for the host parameters, the policy and bank, and the
+  // window-closed script model. One parse now feeds all three.
+  const parses = PROCESSOR.match(/JSON::parse \(ceditorPlayerPanelFile\(\)\.loadFileAsString\(\)\)/g) ?? [];
+  assert.equal(parses.length, 1, `the panel file is parsed ${parses.length} times`);
+  assert.ok(!/loadFromJson/.test(PROCESSOR), 'the script model reads the file again instead of taking the parsed document');
+  assert.match(PROCESSOR, /panelParams \(ce::parseExportParameters \(panelDocument\)\)/);
+  assert.match(PROCESSOR, /scriptValues\.load \(panelDocument\);/);
 });
 
 test('the Player asks in a bar, and "not now" answers nothing', () => {

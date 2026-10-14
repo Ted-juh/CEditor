@@ -3,7 +3,8 @@ import { defaultControlSetId, defaultGridSize, defaultSnapToGrid } from './runti
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
 import { normalizeCaptureSession } from '../utils/captureSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
-import { expandControl, shrinkControl } from './documentShape.js';
+import { expandControl, shrinkAuthoredParts, shrinkControl } from './documentShape.js';
+import { panelDocumentText } from './documentLayout.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
 import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
 import { controlSetLibrary } from './controlSetLibraryStore.js';
@@ -304,7 +305,10 @@ function panelNameFromPath(filePath) {
  *   C++ (Player/PanelValueModel.h walks controls[] and reads Core, Behavior and Scripts straight
  *   off it), and that reader has no way to reconstruct a default it never saw. So the authoring
  *   document is compact and the export payload is complete, and the split is explicit rather than
- *   something the exporter has to remember.
+ *   something the exporter has to remember. Complete except for authored parts (every part of a
+ *   custom component, and any added to a built-in control), which no C++ reads and the player
+ *   page expands on load: they go out as a saved document has them (shrinkAuthoredParts in
+ *   documentShape.js says why, and what it costs).
  */
 export function serializePanel(panel, options = {}) {
   const { id, modified, ...data } = panel;
@@ -319,7 +323,7 @@ export function serializePanel(panel, options = {}) {
   const baked = options.bakeControlSet
     ? controls.map((control) => resolveControlForSet(control, options.bakeControlSet))
     : controls;
-  data.controls = elide ? baked.map(toDocumentForm) : baked;
+  data.controls = elide ? baked.map(toDocumentForm) : baked.map(shrinkAuthoredParts);
 
   // Panel identity. deserializePanel prefers the name the host derives from the filename, so a
   // stale `name` in the document is invisible in the app and only shows up when someone reads the
@@ -407,12 +411,14 @@ export function serializePanel(panel, options = {}) {
   // one; a person may pass a saved .cepanel), and a saved one has to be completed first —
   // tools/scripts/lib/exportDocument.mjs. The mark is how they tell, where no structural test can:
   // a default item the author deleted is simply absent from both forms.
+  //
+  // Laid out one line per control section, not one per property (stores/documentLayout.js).
   const { formatVersion, documentForm, ...rest } = data;
-  return JSON.stringify({
+  return panelDocumentText({
     formatVersion: Math.max(PANEL_FORMAT_VERSION, panelFormatVersion({ formatVersion })),
     ...(elide ? {} : { documentForm: 'complete' }),
     ...rest,
-  }, null, 2);
+  });
 }
 
 // What the last deserializePanel call had to say, for the caller to show: why a document was

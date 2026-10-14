@@ -18,11 +18,12 @@ if (!panelPath) { console.error('Usage: node rebake-export-params.mjs <panel.cep
 const webSrc = (rel) => pathToFileURL(path.join(REPO, 'CE/web/src/CE_Application', rel)).href;
 const mod = await import(webSrc('utils/exportParameters.js'));
 const { expandControl } = await import(webSrc('stores/documentShape.js'));
+const { panelDocumentText } = await import(webSrc('stores/documentLayout.js'));
 
 const panel = JSON.parse(readFileSync(panelPath, 'utf8'));
 panel.controls = (panel.controls ?? []).map(expandControl);
 panel.exportParameters = mod.deriveExportParameters(panel);  // force re-derive from controls
-writeFileSync(panelPath, JSON.stringify(panel, null, 2));
+writeFileSync(panelPath, panelDocumentText(panel));   // the layout serializePanel writes
 
 console.log(`re-baked ${panel.exportParameters.length} params into ${panelPath}`);
 for (const p of panel.exportParameters)

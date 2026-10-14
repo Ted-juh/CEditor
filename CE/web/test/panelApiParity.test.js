@@ -86,9 +86,15 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // whole drift this file exists to catch.
 function definesName(source, name, { value = false } = {}) {
   const n = escapeRe(name);
-  // A VALUE member (`state`) is assigned, not declared — `state = {}` in Lua/Python, `var state = {}`
-  // in JS. Matching only function shapes would report it missing from all three engines.
-  if (value) return new RegExp(`(?:^|\\n)\\s*(?:var |let |const )?${n}\\s*=`).test(source);
+  // A VALUE member (`state`) is assigned, not declared — `state = {}` in Lua/Python. In JS it is a
+  // field of the per-script context table (`var __ceCur = { ..., state: {}, ... }`), because one
+  // engine serves every script and each one gets its own copy. Matching only function shapes would
+  // report it missing from all three engines.
+  if (value) {
+    const jsContext = /var __ceCur = \{([\s\S]*?)\};/.exec(source);
+    if (jsContext && new RegExp(`(?:^|[\\s,{])${n}\\s*:`).test(jsContext[1])) return true;
+    return new RegExp(`(?:^|\\n)\\s*(?:var |let |const )?${n}\\s*=`).test(source);
+  }
   return new RegExp(
     `function\\s+${n}\\s*\\(`            // Lua / JS prelude
     + `|def\\s+${n}\\s*\\(`              // Python prelude

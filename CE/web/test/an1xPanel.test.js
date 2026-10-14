@@ -9,10 +9,10 @@
 // `make-an1x-panel.mjs --check`, which nothing ran — not `npm test`, not CI. It happened to be up to
 // date, by luck rather than by anything that would have noticed.
 //
-// That matters more here than almost anywhere, because this is the largest file in the repository
-// at 26 MB. A model change that quietly alters how a control serialises leaves it stale, the next
-// person to run the generator gets a 26 MB diff they did not make, and nobody can tell whether that
-// diff is their change or six months of drift arriving at once.
+// That matters more here than almost anywhere, because at 9 MB this is one of the two largest
+// panels in the repository. A model change that quietly alters how a control serialises leaves it
+// stale, the next person to run the generator gets a 9 MB diff they did not make, and nobody can
+// tell whether that diff is their change or six months of drift arriving at once.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,9 +26,6 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.
 const PANEL = path.join(REPO, 'CE/panels/Yamaha AN1x.cepanel');
 
 test('the committed panel matches the generator', () => {
-  // `slim` defaults to true in both the generator's CLI and its serializer, so this compares what
-  // `node tools/scripts/an1x-panel/make-an1x-panel.mjs` would write. `--fat` is a debugging switch
-  // and is not what is committed.
   assertSameText(readText(PANEL), serializeAn1xPanel(),
     'CE/panels/Yamaha AN1x.cepanel is stale — run: node tools/scripts/an1x-panel/make-an1x-panel.mjs',
     { actual: 'committed', expected: 'the generator' });
@@ -42,4 +39,30 @@ test('the panel is the whole synth, not a fragment of it', () => {
   assert.ok(panel.controls.length > 500,
     `expected the full AN1x, got ${panel.controls.length} controls`);
   assert.ok(panel.width > 0 && panel.height > 0, 'a panel with no size draws nothing');
+});
+
+test('no part is written with a removal list', () => {
+  // A `_removed` list says the author deleted a key the defaults have. The generator authors parts
+  // and deletes nothing from them, so on a part one can only mean a pass that strips default-valued
+  // keys before serializePanel diffs against the same defaults. The generator had one: the diff
+  // wrote every key it stripped back out as a deletion, and that was 17 MB of a 26.9 MB file which
+  // saving from the editor wrote back every time. The control-level lists stay: a custom component
+  // really does replace the shell's own value channels and bindings.
+  //
+  // The committed file rather than a fresh build, which the first test has already compared it to.
+  const carrying = [];
+  const visit = (node, where) => {
+    if (Array.isArray(node)) { node.forEach((item) => visit(item, where)); return; }
+    if (!node || typeof node !== 'object') return;
+    if (node._type === 'Part') {
+      if (JSON.stringify(node).includes('"_removed"')) carrying.push(`${where} / ${node.name}`);
+      return;
+    }
+    const id = node._children?.Core?.id;
+    for (const value of Object.values(node)) visit(value, id ?? where);
+  };
+  visit(JSON.parse(readText(PANEL)).controls, 'panel');
+
+  assert.deepEqual(carrying.slice(0, 5), [],
+    `${carrying.length} parts carry _removed lists — is something stripping default-valued keys before serializePanel?`);
 });
