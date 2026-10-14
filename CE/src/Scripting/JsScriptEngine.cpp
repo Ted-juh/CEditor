@@ -7,12 +7,13 @@
 // calls go through a registered "__api" object; helpers / on / emit / self / noTransmit are defined
 // in a JS prelude (kept in sync with the Lua prelude + panelApi.js).
 //
-// A name a script assigns without declaring it is the script's own too, as it is in the WebView, where
-// each script has a QuickJS context of its own: the prelude keeps it in the script's context and
-// answers for it from behind the global object (the top of the prelude says how). What a shared engine
-// does NOT isolate is a write onto something that already exists on the global: a built-in (Math,
-// Array.prototype), `ce`, or a property put on the global object by name (`globalThis.x = 1`,
-// `this.x = 1` at a script's top level). None of the 236 scripts in the tree does any of these.
+// A new name a script assigns without declaring it, or puts on the global object by name
+// (`globalThis.x = 1`, `this.x = 1` at its top level), is the script's own too, as it is in the WebView,
+// where each script has a QuickJS context and a global of its own: the prelude keeps it in the script's
+// context and answers for it from behind the global object (the top of the prelude says how). What a
+// shared engine does NOT isolate is a write onto something that already exists on the global: a
+// built-in (Math, Array.prototype), `ce`, a function of the prelude. None of the 236 scripts in the
+// tree does any of these.
 //
 // NOTE: juce::JavascriptEngine's exact surface (registerNativeObject / callFunction / NativeFunctionArgs)
 // should be confirmed against the JUCE 8 headers during the build — this is the less-certain engine.
@@ -79,7 +80,10 @@ __ceCur.self = __ceMakeSelf();
 // module declares — is found on the global itself and never reaches the proxy, so it costs nothing.
 // Only a lookup that finds nothing there does:
 //   - an assignment to such a name lands in the running script's __globals rather than on the
-//     global, which is what a sloppy-mode assignment to an unknown name would otherwise create;
+//     global, which is what a sloppy-mode assignment to an unknown name would otherwise create. So
+//     does `globalThis.x = 1` for a new x: the global's own [[Set]] asks its prototype about a name
+//     it does not have, the trap cannot tell the two apart, and in the WebView a script's global is
+//     its own anyway, so that is the same rule;
 //   - a read finds the running script's own, and for a name the script never set the proxy says it
 //     has nothing, so the read throws "not defined" and `typeof` says 'undefined', exactly as in an
 //     engine of its own.

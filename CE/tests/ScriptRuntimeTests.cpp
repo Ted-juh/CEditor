@@ -3019,6 +3019,14 @@ int main()
             "function onImp() { log('B sees ' + typeof tally); }\n"
             "function onReadTally() { log('B read ' + tally); }\n"
             "function onTakeOwn() { tally = 1; log('B own ' + tally); }"));
+        // A new name put on the global object by name is the script's own as well: in the WebView each
+        // script's global is its own, so a write there was never one another script could read.
+        scripts.add (makeScript ("impD", "javascript", "panel", "onImp", "*",
+            "globalThis.viaGlobal = 'D1'; this.viaThis = 'D2';\n"
+            "function onImp() { log('D has ' + viaGlobal + ' ' + globalThis.viaThis); }\n"
+            "function onProbeGlobal() { log('D sees ' + typeof viaGlobal); }"));
+        scripts.add (makeScript ("impE", "javascript", "panel", "onImp", "*",
+            "function onImp() { log('E sees ' + typeof viaGlobal + ' ' + typeof viaThis + ' ' + typeof globalThis.viaGlobal); }"));
         // The way such names are usually used: made the first time through, by asking typeof.
         scripts.add (makeScript ("impC", "javascript", "panel", "onImp", "*",
             "if (typeof seen === 'undefined') seen = 0;\n"
@@ -3028,6 +3036,9 @@ int main()
         imp.dispatchEvent ("onImp", "panel", juce::var());
         check (impHost.logs.contains ("A tally 6"), "a script's undeclared name works for that script");
         check (impHost.logs.contains ("B sees undefined"), "…and another script's typeof says it is not there");
+        check (impHost.logs.contains ("D has D1 D2"), "a script reads back what it put on globalThis or this");
+        check (impHost.logs.contains ("E sees undefined undefined undefined"),
+               "…and another script finds neither, as in the WebView where each global is a script's own");
 
         impHost.logs.clear(); impErrors.clear();
         imp.runAction ("onReadTally", juce::var());
