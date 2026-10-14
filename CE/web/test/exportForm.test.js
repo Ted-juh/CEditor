@@ -49,6 +49,24 @@ function rebuildPart(sparse, defaults) {
   return merge(sparse, base);
 }
 
+/** A drawing the payload carries once, put back into a control and its children (documentDrawings.js). */
+function resolve(sparse, drawings) {
+  const sections = sparse?._children;
+  if (!isObject(sections)) return sparse;
+  const out = { ...sparse, _children: { ...sections } };
+  const parts = sections.Parts;
+  if (isObject(parts) && '_drawing' in parts) {
+    const { _drawing: name, ...own } = parts;
+    out._children.Parts = isObject(drawings?.[name]) ? merge(own, copy(drawings[name])) : own;
+  }
+  const kids = sections.Children?._children;
+  if (isObject(kids)) {
+    out._children.Children = { ...sections.Children, _children: Object.fromEntries(Object.entries(kids)
+      .map(([key, child]) => [key, isObject(child) ? resolve(child, drawings) : child])) };
+  }
+  return out;
+}
+
 function rebuild(sparse, defaults) {
   const pristine = defaults.types[sparse?._children?.Core?.controlType];
   const typeParts = new Set(Object.keys(pristine?._children?.Parts?._children ?? {}));
@@ -101,7 +119,7 @@ test('rebuilt from the table it carries, every control is the one the complete f
     assert.equal(payload.documentForm, 'export');
     assert.equal(payload.controls.length, whole.controls.length);
     payload.controls.forEach((control, i) => {
-      const rebuilt = rebuild(control, payload.controlDefaults);
+      const rebuilt = rebuild(resolve(control, payload.drawings), payload.controlDefaults);
       // The complete form's authored parts travel sparse; compare in that form. Byte for byte, key
       // order included: the C++ finds a property named without its section by taking the first
       // section that has it, so a rebuilt control in another order could answer differently.
@@ -110,7 +128,7 @@ test('rebuilt from the table it carries, every control is the one the complete f
         assert.fail(`${rel}: control ${i} rebuilds with its keys in another order`);
       }
       // …and the table agrees with the editor's own defaults, part by part included.
-      same(rebuilt, expandControl(control), `${rel}: control ${i}, the table and expandControl disagree`);
+      same(rebuilt, expandControl(resolve(control, payload.drawings)), `${rel}: control ${i}, the table and expandControl disagree`);
     });
   }
 });
@@ -135,17 +153,22 @@ test('an item the author deleted stays deleted through the payload', () => {
   const payload = exportFormDocument(complete(panel));
   const sparse = [...everyControl(payload.controls)].find((c) => c._children.Core.id === target._children.Core.id);
   assert.ok(sparse._children.States._children._removed?.includes(gone), `the deletion of ${gone} is written down`);
-  assert.equal(rebuild(sparse, payload.controlDefaults)._children.States._children[gone], undefined, 'and the rebuild leaves it out');
+  assert.equal(rebuild(resolve(sparse, payload.drawings), payload.controlDefaults)._children.States._children[gone], undefined, 'and the rebuild leaves it out');
 });
 
 test('the payload is the saved size, not the complete one', () => {
   const panel = open('CE/panels/Roland GAIA SH-01.cepanel');
   const whole = JSON.stringify(complete(panel)).length;
-  const payload = JSON.stringify(exportFormDocument(complete(panel))).length;
-  const table = JSON.stringify(exportFormDocument(complete(panel)).controlDefaults).length;
+  const doc = exportFormDocument(complete(panel));
+  const payload = JSON.stringify(doc).length;
+  const table = JSON.stringify(doc.controlDefaults).length;
   assert.ok(whole > 10e6, `the complete form is the old size, ${whole} bytes`);
-  assert.ok(payload < whole / 3, `the payload is ${payload} bytes against ${whole}`);
+  assert.ok(payload < whole / 6, `the payload is ${payload} bytes against ${whole}`);
   assert.ok(table < 300e3, `the table it carries is small: ${table} bytes`);
+  // GAIA's 184 hand-drawn controls are made from a few dozen drawings, and those used more than once
+  // travel once (documentDrawings.js).
+  const drawings = Object.keys(doc.drawings ?? {}).length;
+  assert.ok(drawings >= 10 && drawings < 40, `the drawings its controls share go once: ${drawings} of them`);
 });
 
 test('the player page loads the payload as the editor has the panel, deleted items included', () => {

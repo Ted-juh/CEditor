@@ -65,6 +65,14 @@ export function exportSizeReport(doc, { fileBytes = null, top = 5 } = {}) {
   const partSections = new Map();
   let controls = 0;
   let parts = 0;
+  const countParts = (section) => {
+    for (const part of Object.values(section?._children ?? {})) {
+      parts += 1;
+      for (const [name, value] of Object.entries(part?._children ?? {})) {
+        partSections.set(name, (partSections.get(name) ?? 0) + compactBytes(value));
+      }
+    }
+  };
   const visitControl = (control) => {
     controls += 1;
     const type = String(control?._children?.Core?.controlType ?? 'unknown');
@@ -75,15 +83,13 @@ export function exportSizeReport(doc, { fileBytes = null, top = 5 } = {}) {
     const { Children: _members, ...own } = control._children;
     entry.bytes += compactBytes({ ...control, _children: own });
     byType.set(type, entry);
-    for (const part of Object.values(control?._children?.Parts?._children ?? {})) {
-      parts += 1;
-      for (const [section, value] of Object.entries(part?._children ?? {})) {
-        partSections.set(section, (partSections.get(section) ?? 0) + compactBytes(value));
-      }
-    }
+    countParts(control?._children?.Parts);
     for (const child of childControls(control)) visitControl(child);
   };
   for (const control of doc?.controls ?? []) if (control?._children?.Core) visitControl(control);
+  // A drawing several controls share is carried once (stores/documentDrawings.js), and counted once:
+  // the parts here are the ones the payload carries, not the ones the panel draws.
+  for (const drawing of Object.values(doc?.drawings ?? {})) countParts(drawing);
 
   // Embedded media: every data URL, wherever it is, with repeats by content. The carried fonts are
   // data URLs too and are reported on their own line below, so they are not walked here.
