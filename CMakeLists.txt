@@ -521,6 +521,7 @@ if(CEDITOR_BUILD_APP)
     target_sources(CEditorPlayerVST PRIVATE
         "${CE_ROOT}/src/Player/PluginProcessor.cpp"
         "${CE_ROOT}/src/Player/PlayerHost.cpp"
+        "${CE_ROOT}/src/Player/PlayerStandaloneApp.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
@@ -543,6 +544,11 @@ if(CEDITOR_BUILD_APP)
         CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
         CEDITOR_PLAYER_PANEL_PATH="${CE_VST_PANEL_PATH}"
         CEDITOR_SIDECAR_IDENTITY=$<IF:$<BOOL:${CEDITOR_TEMPLATE_PLAYER}>,1,0>
+        # The standalone is ours (Player/PlayerStandaloneApp.cpp): JUCE's keeps one settings file per
+        # product name, so every copy of a panel open at once, and every panel sharing a name, read
+        # and overwrote one plug-in state. PUBLIC, because the Standalone wrapper target compiles the
+        # JUCE file that reads it.
+        JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1
     )
 
     # PUBLIC for CE_ROOT/src, not PRIVATE, and the reason is easy to trip over: juce_add_plugin puts

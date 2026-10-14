@@ -76,7 +76,7 @@ private:
         , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams))
 #endif
     {
-        juce::ignoreUnused (panelDocument);
+        logTag = logTagFor (panelDocument);
 #if CEDITOR_VALUE_LAYER
         // The two things the processor reads out of the panel directly: the restore policy and the
         // baked program bank. Both are constant for the life of the plugin — the host caches
@@ -1429,14 +1429,31 @@ private:
     // Window-closed activity, appended to a file, so it is observable without a debugger or a MIDI
     // monitor: tail %TEMP%\ceditor-player-scripts.log.
     //
+    // Every line says which instance wrote it — the panel's name and an id of this instance's own —
+    // because every instance of every panel on the machine writes to this one file, and two copies
+    // of a panel used to read as one, their lines interleaved with nothing to tell them apart.
+    //
     // OUTSIDE BOTH GUARDS, for the reason written up on sendRawMidiBytes below: it used to live
     // under `#if CEDITOR_SCRIPTING`, and the restore push (CEDITOR_VALUE_LAYER) logs through it
     // too. The two flags are independent, so a build with the value layer on and scripting off had
     // the call and not the callee — the exact `C3861: identifier not found` that bit once already.
-    static void scriptLogLine (const juce::String& line)
+    void scriptLogLine (const juce::String& line) const
     {
         auto f = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("ceditor-player-scripts.log");
-        f.appendText (juce::Time::getCurrentTime().toString (true, true, true, true) + "  " + line + juce::newLine);
+        f.appendText (juce::Time::getCurrentTime().toString (true, true, true, true) + "  [" + logTag + "]  "
+                      + line + juce::newLine);
+    }
+
+    /** "GAIA SH-01 3f2a": the panel's name, and four hex digits that are this instance's. Set
+        first thing in the constructor, from the document it is built with. */
+    juce::String logTag;
+
+    static juce::String logTagFor (const juce::var& panelDocument)
+    {
+        auto name = juce::String (juce::CharPointer_UTF8 (JucePlugin_Name));
+        if (auto* doc = panelDocument.getDynamicObject())
+            if (const auto n = doc->getProperty ("name").toString(); n.isNotEmpty()) name = n;
+        return name + " " + juce::String::toHexString (juce::Random().nextInt (0x10000)).paddedLeft ('0', 4);
     }
 
 #if CEDITOR_SCRIPTING
@@ -2197,7 +2214,7 @@ private:
         // runAction / emitEvent are left unset on purpose: BridgeScriptHost routes them to the
         // ScriptRuntime, which resolves them against the loaded scripts. Stubbing them here is
         // what made run() and emit() silent no-ops in the shipped plugin.
-        cb.log = [] (const juce::String& msg, const juce::var& value)
+        cb.log = [this] (const juce::String& msg, const juce::var& value)
         {
             scriptLogLine ("[script] " + msg + (value.isVoid() ? juce::String() : " " + juce::JSON::toString (value)));
         };
@@ -2257,7 +2274,7 @@ private:
         scriptHost = std::make_unique<BridgeScriptHost> (std::move (cb));
         scriptRuntime = std::make_unique<ScriptRuntime> (*scriptHost);
         scriptHost->attachRuntime (scriptRuntime.get());
-        scriptRuntime->setErrorLogger ([] (const juce::String& line) { scriptLogLine ("[script-error] " + line); });
+        scriptRuntime->setErrorLogger ([this] (const juce::String& line) { scriptLogLine ("[script-error] " + line); });
        #if CEDITOR_VALUE_LAYER
         scriptRuntime->setActivityCallback ([this] { scriptStateDirty.store (true); });
        #endif
