@@ -1,4 +1,5 @@
 {
+  "formatVersion": 2,
   "panelGuid": "49dd0e7a-2d83-9fc4-9326-3d7fa4ee0294",
   "exportSettings": {
     "pluginName": "",
@@ -12,7 +13,7 @@
     "restoreHardware": "ask"
   },
   "name": "Tessera — starter",
-  "scriptId": "panel_17",
+  "scriptId": "tessera_starter",
   "author": "",
   "version": "1.0.0",
   "description": "Rotating square frame, mosaic keys, hexagonal pads and a stepped number stack.",
@@ -126,10 +127,10 @@
   "parameterSnapshots": {},
   "exportParameters": [
     {
-      "id": "Knob_1789883153323.value",
-      "label": "Knob_1789883153323",
-      "controlName": "Knob_1789883153323",
-      "path": "Knob_1789883153323.value",
+      "id": "Knob_1723522335976.value",
+      "label": "Knob_1723522335976",
+      "controlName": "Knob_1723522335976",
+      "path": "Knob_1723522335976.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.63,
@@ -140,10 +141,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Knob_1789883153324.value",
-      "label": "Knob_1789883153324",
-      "controlName": "Knob_1789883153324",
-      "path": "Knob_1789883153324.value",
+      "id": "Knob_1723522335977.value",
+      "label": "Knob_1723522335977",
+      "controlName": "Knob_1723522335977",
+      "path": "Knob_1723522335977.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.35,
@@ -154,10 +155,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789883153325.value",
-      "label": "Slider_1789883153325",
-      "controlName": "Slider_1789883153325",
-      "path": "Slider_1789883153325.value",
+      "id": "Slider_1723522335978.value",
+      "label": "Slider_1723522335978",
+      "controlName": "Slider_1723522335978",
+      "path": "Slider_1723522335978.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.66,
@@ -168,10 +169,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Crossfader_1789883153326.value",
-      "label": "Crossfader_1789883153326",
-      "controlName": "Crossfader_1789883153326",
-      "path": "Crossfader_1789883153326.value",
+      "id": "Crossfader_1723522335979.value",
+      "label": "Crossfader_1723522335979",
+      "controlName": "Crossfader_1723522335979",
+      "path": "Crossfader_1723522335979.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -184,10 +185,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "ToggleButton_1789883153328.value",
-      "label": "ToggleButton_1789883153328",
-      "controlName": "ToggleButton_1789883153328",
-      "path": "ToggleButton_1789883153328.value",
+      "id": "ToggleButton_1723522335981.value",
+      "label": "ToggleButton_1723522335981",
+      "controlName": "ToggleButton_1723522335981",
+      "path": "ToggleButton_1723522335981.value",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -198,10 +199,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "CyclicButton_1789883153329.value",
-      "label": "CyclicButton_1789883153329",
-      "controlName": "CyclicButton_1789883153329",
-      "path": "CyclicButton_1789883153329.value",
+      "id": "CyclicButton_1723522335982.value",
+      "label": "CyclicButton_1723522335982",
+      "controlName": "CyclicButton_1723522335982",
+      "path": "CyclicButton_1723522335982.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -217,10 +218,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Combobox_1789883153330.value",
-      "label": "Combobox_1789883153330",
-      "controlName": "Combobox_1789883153330",
-      "path": "Combobox_1789883153330.value",
+      "id": "Combobox_1723522335983.value",
+      "label": "Combobox_1723522335983",
+      "controlName": "Combobox_1723522335983",
+      "path": "Combobox_1723522335983.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -236,10 +237,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Number_1789883153331.value",
-      "label": "Number_1789883153331",
-      "controlName": "Number_1789883153331",
-      "path": "Number_1789883153331.value",
+      "id": "Number_1723522335984.value",
+      "label": "Number_1723522335984",
+      "controlName": "Number_1723522335984",
+      "path": "Number_1723522335984.value",
       "min": 0,
       "max": 100,
       "defaultValue": 0,
@@ -250,10 +251,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Ribbon_1789883153337.value",
-      "label": "Ribbon_1789883153337",
-      "controlName": "Ribbon_1789883153337",
-      "path": "Ribbon_1789883153337.value",
+      "id": "Ribbon_1723522335990.value",
+      "label": "Ribbon_1723522335990",
+      "controlName": "Ribbon_1723522335990",
+      "path": "Ribbon_1723522335990.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -266,10 +267,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789883153340.x",
-      "label": "VectorJoystick_1789883153340 X",
-      "controlName": "VectorJoystick_1789883153340",
-      "path": "VectorJoystick_1789883153340.x",
+      "id": "VectorJoystick_1723522335993.x",
+      "label": "VectorJoystick_1723522335993 X",
+      "controlName": "VectorJoystick_1723522335993",
+      "path": "VectorJoystick_1723522335993.x",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -282,10 +283,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789883153340.y",
-      "label": "VectorJoystick_1789883153340 Y",
-      "controlName": "VectorJoystick_1789883153340",
-      "path": "VectorJoystick_1789883153340.y",
+      "id": "VectorJoystick_1723522335993.y",
+      "label": "VectorJoystick_1723522335993 Y",
+      "controlName": "VectorJoystick_1723522335993",
+      "path": "VectorJoystick_1723522335993.y",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -298,10 +299,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1789883153341.bpm",
-      "label": "StepSequencer_1789883153341 Tempo",
-      "controlName": "StepSequencer_1789883153341",
-      "path": "StepSequencer_1789883153341.bpm",
+      "id": "StepSequencer_1723522335994.bpm",
+      "label": "StepSequencer_1723522335994 Tempo",
+      "controlName": "StepSequencer_1723522335994",
+      "path": "StepSequencer_1723522335994.bpm",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -314,10 +315,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1789883153341.run",
-      "label": "StepSequencer_1789883153341 Run",
-      "controlName": "StepSequencer_1789883153341",
-      "path": "StepSequencer_1789883153341.run",
+      "id": "StepSequencer_1723522335994.run",
+      "label": "StepSequencer_1723522335994 Run",
+      "controlName": "StepSequencer_1723522335994",
+      "path": "StepSequencer_1723522335994.run",
       "min": 0,
       "max": 1,
       "defaultValue": 0,
@@ -342,9 +343,9 @@
   "controls": [
     {
       "_children": {
-        "Core": {"name":"Label_1789883153319","controlSetId":"tessera","id":"ctrl_1789883153319","controlType":"Label"},
+        "Core": {"name":"Label_1723522335972","controlSetId":"tessera","id":"ctrl_1723522335972","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"TESSERA","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBC592C","lampOffColour":"FFE8E3D7","lampBezelColour":"66FFFFFF"}
       },
@@ -352,9 +353,9 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789883153320","controlSetId":"tessera","id":"ctrl_1789883153320","controlType":"Label"},
+        "Core": {"name":"Label_1723522335973","controlSetId":"tessera","id":"ctrl_1723522335973","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Mosaic / modular","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBC592C","lampOffColour":"FFE8E3D7","lampBezelColour":"66FFFFFF"}
       },
@@ -362,9 +363,9 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789883153321","controlSetId":"tessera","id":"ctrl_1789883153321","controlType":"Label"},
+        "Core": {"name":"Label_1723522335974","controlSetId":"tessera","id":"ctrl_1723522335974","controlType":"Label"},
         "Transform": {"x":26,"y":82,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"TURN / SLIDE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBC592C","lampOffColour":"FFE8E3D7","lampBezelColour":"66FFFFFF"}
       },
@@ -372,9 +373,9 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789883153322","controlSetId":"tessera","id":"ctrl_1789883153322","controlType":"Label"},
+        "Core": {"name":"Label_1723522335975","controlSetId":"tessera","id":"ctrl_1723522335975","controlType":"Label"},
         "Transform": {"x":580,"y":82,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PRESS / SELECT","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBC592C","lampOffColour":"FFE8E3D7","lampBezelColour":"66FFFFFF"}
       },
@@ -382,7 +383,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Knob_1789883153323","controlSetId":"tessera","controlForm":"new-tessera","formFaceColour":"FF365E63","formHousingColour":"FFE8E3D7","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FFBC592C","id":"ctrl_1789883153323","controlType":"Knob"},
+        "Core": {"name":"Knob_1723522335976","controlSetId":"tessera","controlForm":"new-tessera","formFaceColour":"FF365E63","formHousingColour":"FFE8E3D7","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FFBC592C","id":"ctrl_1723522335976","controlType":"Knob"},
         "Transform": {"x":26,"y":112,"width":190,"height":190},
         "Behavior": {"defaultCurrentValue":0.63,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
@@ -413,7 +414,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Knob_1789883153324","controlSetId":"tessera","controlForm":"new-tessera","formFaceColour":"FF365E63","formHousingColour":"FFE8E3D7","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FFBC592C","id":"ctrl_1789883153324","controlType":"Knob"},
+        "Core": {"name":"Knob_1723522335977","controlSetId":"tessera","controlForm":"new-tessera","formFaceColour":"FF365E63","formHousingColour":"FFE8E3D7","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FFBC592C","id":"ctrl_1723522335977","controlType":"Knob"},
         "Transform": {"x":220,"y":125,"width":128,"height":158},
         "Behavior": {"defaultCurrentValue":0.35,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
@@ -444,7 +445,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789883153325","controlSetId":"tessera","id":"ctrl_1789883153325","controlType":"Slider"},
+        "Core": {"name":"Slider_1723522335978","controlSetId":"tessera","id":"ctrl_1723522335978","controlType":"Slider"},
         "Transform": {"x":364,"y":133,"width":190,"height":78},
         "Behavior": {"defaultCurrentValue":0.66,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -475,7 +476,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Crossfader_1789883153326","controlSetId":"tessera","id":"ctrl_1789883153326","controlType":"Crossfader"},
+        "Core": {"name":"Crossfader_1723522335979","controlSetId":"tessera","id":"ctrl_1723522335979","controlType":"Crossfader"},
         "Transform": {"x":364,"y":234,"width":190,"height":62},
         "Background": {"_children":{"Fill":{"colour":"FFE8E3D7"},"Corners":{"radius":4}}},
         "Crossfader": {"handleSize":22,"handleStyle":"block","trackSize":8,"trackColour":"FFE8E3D7","fillAColour":"FFBC592C","fillBColour":"FF7BB3FF","handleColour":"FF365E63","labelColour":"FF202020"},
@@ -485,7 +486,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Button_1789883153327","controlSetId":"tessera","controlForm":"new-tessera","formFaceColour":"FF365E63","formHousingColour":"FFE8E3D7","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FFBC592C","id":"ctrl_1789883153327","controlType":"Button"},
+        "Core": {"name":"Button_1723522335980","controlSetId":"tessera","controlForm":"new-tessera","formFaceColour":"FF365E63","formHousingColour":"FFE8E3D7","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FFBC592C","id":"ctrl_1723522335980","controlType":"Button"},
         "Transform": {"x":576,"y":118,"width":124,"height":84},
         "Background": {"_children":{"Fill":{"colour":"FF365E63"},"Border":{"colour":"66FFFFFF"}}},
         "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
@@ -496,7 +497,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"ToggleButton_1789883153328","controlSetId":"tessera","controlForm":"new-tessera","formFaceColour":"FF365E63","formHousingColour":"FFE8E3D7","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FFBC592C","id":"ctrl_1789883153328","controlType":"ToggleButton"},
+        "Core": {"name":"ToggleButton_1723522335981","controlSetId":"tessera","controlForm":"new-tessera","formFaceColour":"FF365E63","formHousingColour":"FFE8E3D7","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FFBC592C","id":"ctrl_1723522335981","controlType":"ToggleButton"},
         "Transform": {"x":716,"y":118,"height":84},
         "Background": {"_children":{"Fill":{"colour":"FF365E63"},"Border":{"colour":"66FFFFFF"}}},
         "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
@@ -508,7 +509,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"CyclicButton_1789883153329","controlSetId":"tessera","id":"ctrl_1789883153329","controlType":"CyclicButton"},
+        "Core": {"name":"CyclicButton_1723522335982","controlSetId":"tessera","id":"ctrl_1723522335982","controlType":"CyclicButton"},
         "Transform": {"x":576,"y":220,"width":124,"height":36},
         "Background": {"_children":{"Fill":{"colour":"FF365E63"},"Border":{"colour":"66FFFFFF"}}},
         "Text": {"content":"CYCLE","_children":{"Fill":{"colour":"FFF2F2F2"}}},
@@ -519,7 +520,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Combobox_1789883153330","controlSetId":"tessera","id":"ctrl_1789883153330","controlType":"Combobox"},
+        "Core": {"name":"Combobox_1723522335983","controlSetId":"tessera","id":"ctrl_1723522335983","controlType":"Combobox"},
         "Transform": {"x":716,"y":220,"width":136,"height":36},
         "Background": {"_children":{"Fill":{"colour":"FF2F2F2F"},"Border":{"colour":"66FFFFFF"},"Corners":{"radius":8}}},
         "Text": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
@@ -530,7 +531,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Number_1789883153331","controlSetId":"tessera","id":"ctrl_1789883153331","controlType":"Number"},
+        "Core": {"name":"Number_1723522335984","controlSetId":"tessera","id":"ctrl_1723522335984","controlType":"Number"},
         "Transform": {"x":576,"y":265,"width":124,"height":46},
         "Parts": {
           "_children": {
@@ -545,7 +546,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"TextInput_1789883153332","controlSetId":"tessera","id":"ctrl_1789883153332","controlType":"TextInput"},
+        "Core": {"name":"TextInput_1723522335985","controlSetId":"tessera","id":"ctrl_1723522335985","controlType":"TextInput"},
         "Transform": {"x":716,"y":273,"width":136},
         "Background": {"_children":{"Fill":{"colour":"FFE8E3D7"},"Border":{"colour":"66FFFFFF"},"Corners":{"radius":8}}},
         "Text": {"content":"Studio A","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans"}}},
@@ -556,9 +557,9 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789883153333","controlSetId":"tessera","id":"ctrl_1789883153333","controlType":"Label"},
+        "Core": {"name":"Label_1723522335986","controlSetId":"tessera","id":"ctrl_1723522335986","controlType":"Label"},
         "Transform": {"x":26,"y":310,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PLAY / SHAPE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBC592C","lampOffColour":"FFE8E3D7","lampBezelColour":"66FFFFFF"}
       },
@@ -566,9 +567,9 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789883153334","controlSetId":"tessera","id":"ctrl_1789883153334","controlType":"Label"},
+        "Core": {"name":"Label_1723522335987","controlSetId":"tessera","id":"ctrl_1723522335987","controlType":"Label"},
         "Transform": {"x":540,"y":310,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"MEASURE / ROUTE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBC592C","lampOffColour":"FFE8E3D7","lampBezelColour":"66FFFFFF"}
       },
@@ -576,7 +577,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"DrumPads_1789883153335","controlSetId":"tessera","id":"ctrl_1789883153335","controlType":"DrumPads"},
+        "Core": {"name":"DrumPads_1723522335988","controlSetId":"tessera","id":"ctrl_1723522335988","controlType":"DrumPads"},
         "Transform": {"x":26,"y":348,"width":228,"height":214},
         "Background": {"_children":{"Fill":{"colour":"FFE8E3D7"},"Corners":{"radius":4}}},
         "DrumPads": {"rows":2,"cols":2,"showNotes":false,"showHeader":false,"padForm":"hex","padLayout":"stagger","padAppearance":"raised","padRadius":4,"fieldColour":"FFE8E3D7","padColour":"FF365E63","accentColour":"FFBC592C","hitColour":"FFBC592C","labelColour":"FFF2F2F2"},
@@ -586,7 +587,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Envelope_1789883153336","controlSetId":"tessera","id":"ctrl_1789883153336","controlType":"Envelope"},
+        "Core": {"name":"Envelope_1723522335989","controlSetId":"tessera","id":"ctrl_1723522335989","controlType":"Envelope"},
         "Transform": {"x":284,"y":348,"width":220,"height":70},
         "Background": {"_children":{"Fill":{"colour":"FFE8E3D7"},"Corners":{"radius":4}}},
         "Envelope": {"lineWidth":3,"nodeRadius":3,"lineColour":"FFBC592C","fillColour":"20000000","nodeColour":"FF365E63","gridColour":"664C4C4C","sustainColour":"FF7BB3FF","playheadColour":"FFBC592C"},
@@ -596,7 +597,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Ribbon_1789883153337","controlSetId":"tessera","id":"ctrl_1789883153337","controlType":"Ribbon"},
+        "Core": {"name":"Ribbon_1723522335990","controlSetId":"tessera","id":"ctrl_1723522335990","controlType":"Ribbon"},
         "Transform": {"x":284,"y":427,"width":220,"height":30},
         "Background": {"_children":{"Fill":{"colour":"FFE8E3D7"},"Corners":{"radius":4}}},
         "Ribbon": {"orientation":"horizontal","style":"wheel3d","showGlow":false,"indicatorSize":8,"trackColour":"FFE8E3D7","fillColour":"FFBC592C","indicatorColour":"FF365E63","glowColour":"FFBC592C","wheelColour":"FF3A3A3A","labelColour":"FF202020"},
@@ -606,7 +607,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Meter_1789883153338","controlSetId":"tessera","controlForm":"new-tessera","formFaceColour":"FF365E63","formHousingColour":"FFE8E3D7","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FFBC592C","id":"ctrl_1789883153338","controlType":"Meter"},
+        "Core": {"name":"Meter_1723522335991","controlSetId":"tessera","controlForm":"new-tessera","formFaceColour":"FF365E63","formHousingColour":"FFE8E3D7","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FFBC592C","id":"ctrl_1723522335991","controlType":"Meter"},
         "Transform": {"x":540,"y":342,"width":312,"height":108},
         "Background": {"_children":{"Fill":{"colour":"FFE8E3D7"},"Corners":{"radius":4}}},
         "Meter": {"value":0.7,"segments":12,"segmentGap":3,"trackColour":"FFE8E3D7","fillColour":"FFBC592C","thickness":16,"rounded":false,"peakColour":"FFBC592C","showTicks":true,"valuePrecision":2},
@@ -616,7 +617,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Matrix_1789883153339","controlSetId":"tessera","id":"ctrl_1789883153339","controlType":"Matrix"},
+        "Core": {"name":"Matrix_1723522335992","controlSetId":"tessera","id":"ctrl_1723522335992","controlType":"Matrix"},
         "Transform": {"x":540,"y":466,"width":166,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FFE8E3D7"},"Corners":{"radius":4}}},
         "Matrix": {"rows":["LFO","ENV","VEL"],"cols":["OSC","FLT","AMP"],"amounts":[0.6,0,-0.4,0,0.7,0,0,0.4,0.8],"cellStyle":"dot","rowHeaderW":42,"cellBg":"FFE8E3D7","gridColour":"664C4C4C","posColour":"FFBC592C","negColour":"FF7BB3FF","labelColour":"FF202020","activeColour":"FFBC592C"},
@@ -626,7 +627,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"VectorJoystick_1789883153340","controlSetId":"tessera","id":"ctrl_1789883153340","controlType":"VectorJoystick"},
+        "Core": {"name":"VectorJoystick_1723522335993","controlSetId":"tessera","id":"ctrl_1723522335993","controlType":"VectorJoystick"},
         "Transform": {"x":728,"y":466,"width":124,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FFE8E3D7"},"Corners":{"radius":4}}},
         "Joystick": {"puckRadius":7,"padColour":"FFE8E3D7","gridColour":"664C4C4C","crosshairColour":"FFBC592C","puckColour":"FF365E63","cornerColour":"FF202529","labelColour":"FF202020"},
@@ -636,7 +637,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"StepSequencer_1789883153341","controlSetId":"tessera","id":"ctrl_1789883153341","controlType":"StepSequencer"},
+        "Core": {"name":"StepSequencer_1723522335994","controlSetId":"tessera","id":"ctrl_1723522335994","controlType":"StepSequencer"},
         "Transform": {"x":284,"y":466,"width":220,"height":100},
         "StepSequencer": {"cellForm":"hex","steps":8,"trackHeaderWidth":38,"tracks":[{"id":"kick","label":"Kick","note":36,"channel":10},{"id":"hat","label":"Hat","note":42,"channel":10}],"pattern":{"kick:0":{"on":true,"velocity":100},"kick:4":{"on":true,"velocity":100},"hat:0":{"on":true,"velocity":70},"hat:2":{"on":true,"velocity":70},"hat:4":{"on":true,"velocity":70},"hat:6":{"on":true,"velocity":70}},"cellColour":"FF365E63","cellOnColour":"FFBC592C","playheadColour":"FFBC592C","gridColour":"664C4C4C","labelColour":"FF202529"},
         "Text": {"_children":{"Fill":{"colour":"FF202529"}}}
@@ -645,9 +646,9 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789883153342","controlSetId":"tessera","id":"ctrl_1789883153342","controlType":"Label"},
+        "Core": {"name":"Label_1723522335995","controlSetId":"tessera","id":"ctrl_1723522335995","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Copy a control into your panel. Its pinned design travels with it.","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
         "ContentLayout": {"lampColour":"FFBC592C","lampOffColour":"FFE8E3D7","lampBezelColour":"66FFFFFF"}
       },

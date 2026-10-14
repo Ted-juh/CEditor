@@ -1,4 +1,5 @@
 {
+  "formatVersion": 2,
   "panelGuid": "68534dcc-6498-0d18-73c2-d3bcfe63590a",
   "exportSettings": {
     "pluginName": "",
@@ -12,7 +13,7 @@
     "restoreHardware": "ask"
   },
   "name": "Lever Dial — starter",
-  "scriptId": "panel_57",
+  "scriptId": "lever_dial_starter",
   "author": "",
   "version": "1.0.0",
   "description": "A raised radial lever travels above a numbered plate, with long lever faders and guarded action keys.",
@@ -126,10 +127,10 @@
   "parameterSnapshots": {},
   "exportParameters": [
     {
-      "id": "Knob_1789993398781.value",
-      "label": "Knob_1789993398781",
-      "controlName": "Knob_1789993398781",
-      "path": "Knob_1789993398781.value",
+      "id": "Knob_1761215344946.value",
+      "label": "Knob_1761215344946",
+      "controlName": "Knob_1761215344946",
+      "path": "Knob_1761215344946.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.63,
@@ -140,10 +141,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Knob_1789993398782.value",
-      "label": "Knob_1789993398782",
-      "controlName": "Knob_1789993398782",
-      "path": "Knob_1789993398782.value",
+      "id": "Knob_1761215344947.value",
+      "label": "Knob_1761215344947",
+      "controlName": "Knob_1761215344947",
+      "path": "Knob_1761215344947.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.35,
@@ -154,10 +155,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789993398785.value",
-      "label": "Slider_1789993398785",
-      "controlName": "Slider_1789993398785",
-      "path": "Slider_1789993398785.value",
+      "id": "Slider_1761215344950.value",
+      "label": "Slider_1761215344950",
+      "controlName": "Slider_1761215344950",
+      "path": "Slider_1761215344950.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.2,
@@ -168,10 +169,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789993398786.value",
-      "label": "Slider_1789993398786",
-      "controlName": "Slider_1789993398786",
-      "path": "Slider_1789993398786.value",
+      "id": "Slider_1761215344951.value",
+      "label": "Slider_1761215344951",
+      "controlName": "Slider_1761215344951",
+      "path": "Slider_1761215344951.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.55,
@@ -182,10 +183,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789993398787.value",
-      "label": "Slider_1789993398787",
-      "controlName": "Slider_1789993398787",
-      "path": "Slider_1789993398787.value",
+      "id": "Slider_1761215344952.value",
+      "label": "Slider_1761215344952",
+      "controlName": "Slider_1761215344952",
+      "path": "Slider_1761215344952.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.7,
@@ -196,10 +197,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789993398788.value",
-      "label": "Slider_1789993398788",
-      "controlName": "Slider_1789993398788",
-      "path": "Slider_1789993398788.value",
+      "id": "Slider_1761215344953.value",
+      "label": "Slider_1761215344953",
+      "controlName": "Slider_1761215344953",
+      "path": "Slider_1761215344953.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.35,
@@ -210,10 +211,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "ToggleButton_1789993398790.value",
-      "label": "ToggleButton_1789993398790",
-      "controlName": "ToggleButton_1789993398790",
-      "path": "ToggleButton_1789993398790.value",
+      "id": "ToggleButton_1761215344955.value",
+      "label": "ToggleButton_1761215344955",
+      "controlName": "ToggleButton_1761215344955",
+      "path": "ToggleButton_1761215344955.value",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -224,10 +225,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "CyclicButton_1789993398791.value",
-      "label": "CyclicButton_1789993398791",
-      "controlName": "CyclicButton_1789993398791",
-      "path": "CyclicButton_1789993398791.value",
+      "id": "CyclicButton_1761215344956.value",
+      "label": "CyclicButton_1761215344956",
+      "controlName": "CyclicButton_1761215344956",
+      "path": "CyclicButton_1761215344956.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -243,10 +244,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Combobox_1789993398792.value",
-      "label": "Combobox_1789993398792",
-      "controlName": "Combobox_1789993398792",
-      "path": "Combobox_1789993398792.value",
+      "id": "Combobox_1761215344957.value",
+      "label": "Combobox_1761215344957",
+      "controlName": "Combobox_1761215344957",
+      "path": "Combobox_1761215344957.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -262,10 +263,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Number_1789993398793.value",
-      "label": "Number_1789993398793",
-      "controlName": "Number_1789993398793",
-      "path": "Number_1789993398793.value",
+      "id": "Number_1761215344958.value",
+      "label": "Number_1761215344958",
+      "controlName": "Number_1761215344958",
+      "path": "Number_1761215344958.value",
       "min": 0,
       "max": 100,
       "defaultValue": 0,
@@ -276,10 +277,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Crossfader_1789993398799.value",
-      "label": "Crossfader_1789993398799",
-      "controlName": "Crossfader_1789993398799",
-      "path": "Crossfader_1789993398799.value",
+      "id": "Crossfader_1761215344964.value",
+      "label": "Crossfader_1761215344964",
+      "controlName": "Crossfader_1761215344964",
+      "path": "Crossfader_1761215344964.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -292,10 +293,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1789993398800.bpm",
-      "label": "StepSequencer_1789993398800 Tempo",
-      "controlName": "StepSequencer_1789993398800",
-      "path": "StepSequencer_1789993398800.bpm",
+      "id": "StepSequencer_1761215344965.bpm",
+      "label": "StepSequencer_1761215344965 Tempo",
+      "controlName": "StepSequencer_1761215344965",
+      "path": "StepSequencer_1761215344965.bpm",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -308,10 +309,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1789993398800.run",
-      "label": "StepSequencer_1789993398800 Run",
-      "controlName": "StepSequencer_1789993398800",
-      "path": "StepSequencer_1789993398800.run",
+      "id": "StepSequencer_1761215344965.run",
+      "label": "StepSequencer_1761215344965 Run",
+      "controlName": "StepSequencer_1761215344965",
+      "path": "StepSequencer_1761215344965.run",
       "min": 0,
       "max": 1,
       "defaultValue": 0,
@@ -324,10 +325,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789993398803.x",
-      "label": "VectorJoystick_1789993398803 X",
-      "controlName": "VectorJoystick_1789993398803",
-      "path": "VectorJoystick_1789993398803.x",
+      "id": "VectorJoystick_1761215344968.x",
+      "label": "VectorJoystick_1761215344968 X",
+      "controlName": "VectorJoystick_1761215344968",
+      "path": "VectorJoystick_1761215344968.x",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -340,10 +341,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789993398803.y",
-      "label": "VectorJoystick_1789993398803 Y",
-      "controlName": "VectorJoystick_1789993398803",
-      "path": "VectorJoystick_1789993398803.y",
+      "id": "VectorJoystick_1761215344968.y",
+      "label": "VectorJoystick_1761215344968 Y",
+      "controlName": "VectorJoystick_1761215344968",
+      "path": "VectorJoystick_1761215344968.y",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -368,57 +369,57 @@
   "controls": [
     {
       "_children": {
-        "Core": {"name":"Label_1789993398776","controlSetId":"lever-dial","id":"ctrl_1789993398776","controlType":"Label"},
+        "Core": {"name":"Label_1761215344941","controlSetId":"lever-dial","id":"ctrl_1761215344941","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"LEVER DIAL","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LEVER DIAL","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD5B36D","lampOffColour":"FF34332D","lampBezelColour":"AA1D2118"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789993398777","controlSetId":"lever-dial","id":"ctrl_1789993398777","controlType":"Label"},
+        "Core": {"name":"Label_1761215344942","controlSetId":"lever-dial","id":"ctrl_1761215344942","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"Field / radial lever","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Field / radial lever","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD5B36D","lampOffColour":"FF34332D","lampBezelColour":"AA1D2118"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789993398778","controlSetId":"lever-dial","id":"ctrl_1789993398778","controlType":"Label"},
+        "Core": {"name":"Label_1761215344943","controlSetId":"lever-dial","id":"ctrl_1761215344943","controlType":"Label"},
         "Transform": {"x":26,"y":85,"width":300,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"OSCILLATOR / FILTER","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OSCILLATOR / FILTER","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD5B36D","lampOffColour":"FF34332D","lampBezelColour":"AA1D2118"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789993398779","controlSetId":"lever-dial","id":"ctrl_1789993398779","controlType":"Label"},
+        "Core": {"name":"Label_1761215344944","controlSetId":"lever-dial","id":"ctrl_1761215344944","controlType":"Label"},
         "Transform": {"x":356,"y":85,"width":210,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"ENVELOPE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ENVELOPE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD5B36D","lampOffColour":"FF34332D","lampBezelColour":"AA1D2118"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789993398780","controlSetId":"lever-dial","id":"ctrl_1789993398780","controlType":"Label"},
+        "Core": {"name":"Label_1761215344945","controlSetId":"lever-dial","id":"ctrl_1761215344945","controlType":"Label"},
         "Transform": {"x":586,"y":85,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"PERFORMANCE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PERFORMANCE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD5B36D","lampOffColour":"FF34332D","lampBezelColour":"AA1D2118"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Knob_1789993398781","controlSetId":"lever-dial","controlForm":"new-lever-dial","formDepth":92,"formFaceColour":"FF777564","formHousingColour":"FF34332D","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD5B36D","id":"ctrl_1789993398781","controlType":"Knob"},
+        "Core": {"name":"Knob_1761215344946","controlSetId":"lever-dial","controlForm":"new-lever-dial","formDepth":92,"formFaceColour":"FF777564","formHousingColour":"FF34332D","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD5B36D","id":"ctrl_1761215344946","controlType":"Knob"},
         "Transform": {"x":26,"y":120,"width":150,"height":164},
         "Behavior": {"defaultCurrentValue":0.63,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
@@ -449,7 +450,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Knob_1789993398782","controlSetId":"lever-dial","controlForm":"new-lever-dial","formDepth":92,"formFaceColour":"FF777564","formHousingColour":"FF34332D","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD5B36D","id":"ctrl_1789993398782","controlType":"Knob"},
+        "Core": {"name":"Knob_1761215344947","controlSetId":"lever-dial","controlForm":"new-lever-dial","formDepth":92,"formFaceColour":"FF777564","formHousingColour":"FF34332D","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD5B36D","id":"ctrl_1761215344947","controlType":"Knob"},
         "Transform": {"x":194,"y":120,"width":150,"height":164},
         "Behavior": {"defaultCurrentValue":0.35,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
@@ -480,27 +481,27 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789993398783","controlSetId":"lever-dial","id":"ctrl_1789993398783","controlType":"Label"},
+        "Core": {"name":"Label_1761215344948","controlSetId":"lever-dial","id":"ctrl_1761215344948","controlType":"Label"},
         "Transform": {"x":26,"y":280,"width":150,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"TUNE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TUNE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD5B36D","lampOffColour":"FF34332D","lampBezelColour":"AA1D2118"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789993398784","controlSetId":"lever-dial","id":"ctrl_1789993398784","controlType":"Label"},
+        "Core": {"name":"Label_1761215344949","controlSetId":"lever-dial","id":"ctrl_1761215344949","controlType":"Label"},
         "Transform": {"x":194,"y":280,"width":150,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"CUTOFF","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CUTOFF","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD5B36D","lampOffColour":"FF34332D","lampBezelColour":"AA1D2118"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789993398785","controlSetId":"lever-dial","id":"ctrl_1789993398785","controlType":"Slider"},
+        "Core": {"name":"Slider_1761215344950","controlSetId":"lever-dial","id":"ctrl_1761215344950","controlType":"Slider"},
         "Transform": {"x":356,"y":120,"width":44,"height":173},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"majorTickCount":9,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"showValueReadout":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -531,7 +532,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789993398786","controlSetId":"lever-dial","id":"ctrl_1789993398786","controlType":"Slider"},
+        "Core": {"name":"Slider_1761215344951","controlSetId":"lever-dial","id":"ctrl_1761215344951","controlType":"Slider"},
         "Transform": {"x":406,"y":120,"width":44,"height":173},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"majorTickCount":9,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"showValueReadout":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -562,7 +563,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789993398787","controlSetId":"lever-dial","id":"ctrl_1789993398787","controlType":"Slider"},
+        "Core": {"name":"Slider_1761215344952","controlSetId":"lever-dial","id":"ctrl_1761215344952","controlType":"Slider"},
         "Transform": {"x":456,"y":120,"width":44,"height":173},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"majorTickCount":9,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"showValueReadout":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -593,7 +594,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789993398788","controlSetId":"lever-dial","id":"ctrl_1789993398788","controlType":"Slider"},
+        "Core": {"name":"Slider_1761215344953","controlSetId":"lever-dial","id":"ctrl_1761215344953","controlType":"Slider"},
         "Transform": {"x":506,"y":120,"width":44,"height":173},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"majorTickCount":9,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"showValueReadout":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -624,7 +625,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Button_1789993398789","controlSetId":"lever-dial","controlForm":"new-lever-dial","formDepth":92,"formFaceColour":"FF777564","formHousingColour":"FF34332D","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD5B36D","id":"ctrl_1789993398789","controlType":"Button"},
+        "Core": {"name":"Button_1761215344954","controlSetId":"lever-dial","controlForm":"new-lever-dial","formDepth":92,"formFaceColour":"FF777564","formHousingColour":"FF34332D","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD5B36D","id":"ctrl_1761215344954","controlType":"Button"},
         "Transform": {"x":586,"y":126,"width":116,"height":76},
         "Background": {"_children":{"Fill":{"colour":"FF3A4230","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"656C5E","position":0},{"color":"3A4230","position":55},{"color":"2A3023","position":100}]}},"Border":{"colour":"FF1D2118"},"Corners":{"radius":6,"style":"chamfer"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"hammer","strength":50,"shine":30,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Allerta Stencil","letterSpacing":0.7},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
@@ -636,7 +637,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"ToggleButton_1789993398790","controlSetId":"lever-dial","controlForm":"new-lever-dial","formDepth":92,"formFaceColour":"FF777564","formHousingColour":"FF34332D","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD5B36D","id":"ctrl_1789993398790","controlType":"ToggleButton"},
+        "Core": {"name":"ToggleButton_1761215344955","controlSetId":"lever-dial","controlForm":"new-lever-dial","formDepth":92,"formFaceColour":"FF777564","formHousingColour":"FF34332D","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD5B36D","id":"ctrl_1761215344955","controlType":"ToggleButton"},
         "Transform": {"x":728,"y":126,"width":124,"height":76},
         "Background": {"_children":{"Fill":{"colour":"FF3A4230","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"656C5E","position":0},{"color":"3A4230","position":55},{"color":"2A3023","position":100}]}},"Border":{"colour":"FF1D2118"},"Corners":{"radius":6,"style":"chamfer"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"hammer","strength":50,"shine":30,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Allerta Stencil","letterSpacing":0.7},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
@@ -649,7 +650,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"CyclicButton_1789993398791","controlSetId":"lever-dial","formDepth":92,"id":"ctrl_1789993398791","controlType":"CyclicButton"},
+        "Core": {"name":"CyclicButton_1761215344956","controlSetId":"lever-dial","formDepth":92,"id":"ctrl_1761215344956","controlType":"CyclicButton"},
         "Transform": {"x":586,"y":218,"width":116,"height":34},
         "Background": {"_children":{"Fill":{"colour":"FF777564","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"BBBAB2","position":0},{"color":"777564","position":45},{"color":"414037","position":100}]}},"Border":{"colour":"FF1D2118"},"Corners":{"radius":6,"style":"chamfer"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"brushed","strength":8,"shine":65,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Text": {"content":"MODE","_children":{"Fill":{"colour":"FFF2F2F2"},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
@@ -661,7 +662,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Combobox_1789993398792","controlSetId":"lever-dial","id":"ctrl_1789993398792","controlType":"Combobox"},
+        "Core": {"name":"Combobox_1761215344957","controlSetId":"lever-dial","id":"ctrl_1761215344957","controlType":"Combobox"},
         "Transform": {"x":728,"y":218,"width":124},
         "Background": {"_children":{"Fill":{"colour":"FF777564","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"BBBAB2","position":0},{"color":"777564","position":45},{"color":"414037","position":100}]}},"Border":{"colour":"FF1D2118"},"Corners":{"style":"chamfer"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"brushed","strength":8,"shine":65,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Text": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Allerta Stencil","letterSpacing":0.7},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
@@ -673,7 +674,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Number_1789993398793","controlSetId":"lever-dial","id":"ctrl_1789993398793","controlType":"Number"},
+        "Core": {"name":"Number_1761215344958","controlSetId":"lever-dial","id":"ctrl_1761215344958","controlType":"Number"},
         "Transform": {"x":586,"y":267,"width":116,"height":42},
         "Parts": {
           "_children": {
@@ -688,7 +689,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"TextInput_1789993398794","controlSetId":"lever-dial","id":"ctrl_1789993398794","controlType":"TextInput"},
+        "Core": {"name":"TextInput_1761215344959","controlSetId":"lever-dial","id":"ctrl_1761215344959","controlType":"TextInput"},
         "Transform": {"x":728,"y":267,"width":124,"height":36},
         "Background": {"_children":{"Fill":{"colour":"FF34332D","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"121210","position":0},{"color":"34332D","position":35},{"color":"4C4B46","position":100}]}},"Border":{"colour":"FF1D2118"},"Corners":{"style":"chamfer"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":false,"kind":"brushed","strength":8,"shine":65,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Text": {"content":"Init patch","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Allerta Stencil"}}},
@@ -700,27 +701,27 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789993398795","controlSetId":"lever-dial","id":"ctrl_1789993398795","controlType":"Label"},
+        "Core": {"name":"Label_1761215344960","controlSetId":"lever-dial","id":"ctrl_1761215344960","controlType":"Label"},
         "Transform": {"x":26,"y":318,"width":360,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"PADS / MODULATION","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PADS / MODULATION","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD5B36D","lampOffColour":"FF34332D","lampBezelColour":"AA1D2118"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789993398796","controlSetId":"lever-dial","id":"ctrl_1789993398796","controlType":"Label"},
+        "Core": {"name":"Label_1761215344961","controlSetId":"lever-dial","id":"ctrl_1761215344961","controlType":"Label"},
         "Transform": {"x":540,"y":318,"width":300,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"OUTPUT / ROUTING","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OUTPUT / ROUTING","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD5B36D","lampOffColour":"FF34332D","lampBezelColour":"AA1D2118"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"DrumPads_1789993398797","controlSetId":"lever-dial","id":"ctrl_1789993398797","controlType":"DrumPads"},
+        "Core": {"name":"DrumPads_1761215344962","controlSetId":"lever-dial","id":"ctrl_1761215344962","controlType":"DrumPads"},
         "Transform": {"x":26,"y":356,"width":228,"height":206},
         "Background": {"_children":{"Fill":{"colour":"FF34332D","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"656C5E","position":0},{"color":"3A4230","position":55},{"color":"2A3023","position":100}]}},"Border":{"colour":"FF1D2118"},"Corners":{"radius":6,"style":"chamfer"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"hammer","strength":50,"shine":30,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "DrumPads": {"rows":2,"cols":2,"showNotes":false,"showHeader":false,"padForm":"physical-lever-dial","padAppearance":"raised","fieldColour":"FF34332D","padColour":"FF777564","accentColour":"FFD5B36D","hitColour":"FFD5B36D","labelColour":"FFF2F2F2"},
@@ -731,7 +732,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Envelope_1789993398798","controlSetId":"lever-dial","id":"ctrl_1789993398798","controlType":"Envelope"},
+        "Core": {"name":"Envelope_1761215344963","controlSetId":"lever-dial","id":"ctrl_1761215344963","controlType":"Envelope"},
         "Transform": {"x":284,"y":356,"width":220,"height":70},
         "Background": {"_children":{"Fill":{"colour":"FF34332D","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"656C5E","position":0},{"color":"3A4230","position":55},{"color":"2A3023","position":100}]}},"Border":{"colour":"FF1D2118"},"Corners":{"radius":6,"style":"chamfer"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"hammer","strength":50,"shine":30,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Envelope": {"lineWidth":3,"nodeRadius":3,"lineColour":"FFD5B36D","fillColour":"20000000","nodeColour":"FF777564","gridColour":"6623281D","sustainColour":"FFC9A227","playheadColour":"FFD5B36D"},
@@ -742,7 +743,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Crossfader_1789993398799","controlSetId":"lever-dial","id":"ctrl_1789993398799","controlType":"Crossfader"},
+        "Core": {"name":"Crossfader_1761215344964","controlSetId":"lever-dial","id":"ctrl_1761215344964","controlType":"Crossfader"},
         "Transform": {"x":284,"y":435,"width":220,"height":42},
         "Background": {"_children":{"Fill":{"colour":"FF34332D","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"656C5E","position":0},{"color":"3A4230","position":55},{"color":"2A3023","position":100}]}},"Border":{"colour":"FF1D2118"},"Corners":{"radius":6,"style":"chamfer"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"hammer","strength":50,"shine":30,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Crossfader": {"handleSize":22,"handleStyle":"block","trackSize":8,"trackColour":"FF34332D","fillAColour":"FFD5B36D","fillBColour":"FFC9A227","handleColour":"FF777564","labelColour":"FFF2F2F2"},
@@ -753,7 +754,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"StepSequencer_1789993398800","controlSetId":"lever-dial","id":"ctrl_1789993398800","controlType":"StepSequencer"},
+        "Core": {"name":"StepSequencer_1761215344965","controlSetId":"lever-dial","id":"ctrl_1761215344965","controlType":"StepSequencer"},
         "Transform": {"x":284,"y":489,"width":220,"height":77},
         "Background": {"_children":{"Fill":{"colour":"FF34332D"}}},
         "StepSequencer": {"cellForm":"physical-lever-dial","steps":8,"trackHeaderWidth":38,"tracks":[{"id":"kick","label":"Kick","note":36,"channel":10},{"id":"hat","label":"Hat","note":42,"channel":10}],"pattern":{"kick:0":{"on":true,"velocity":100},"kick:4":{"on":true,"velocity":100},"hat:0":{"on":true,"velocity":70},"hat:2":{"on":true,"velocity":70},"hat:4":{"on":true,"velocity":70},"hat:6":{"on":true,"velocity":70}},"cellColour":"FF777564","cellOnColour":"FFD5B36D","playheadColour":"FFD5B36D","gridColour":"6623281D","labelColour":"FFF7F4EC"},
@@ -763,7 +764,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Meter_1789993398801","controlSetId":"lever-dial","controlForm":"new-lever-dial","formDepth":92,"formFaceColour":"FF777564","formHousingColour":"FF34332D","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD5B36D","id":"ctrl_1789993398801","controlType":"Meter"},
+        "Core": {"name":"Meter_1761215344966","controlSetId":"lever-dial","controlForm":"new-lever-dial","formDepth":92,"formFaceColour":"FF777564","formHousingColour":"FF34332D","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD5B36D","id":"ctrl_1761215344966","controlType":"Meter"},
         "Transform": {"x":540,"y":352,"width":312,"height":92},
         "Background": {"_children":{"Fill":{"colour":"FF34332D","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"656C5E","position":0},{"color":"3A4230","position":55},{"color":"2A3023","position":100}]}},"Border":{"colour":"FF1D2118"},"Corners":{"style":"chamfer"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"hammer","strength":50,"shine":30,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Meter": {"value":0.7,"segments":20,"segmentGap":3,"trackColour":"FF34332D","fillColour":"FFD5B36D","thickness":16,"rounded":false,"peakColour":"FFD5B36D","showTicks":true,"valuePrecision":2},
@@ -774,7 +775,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Matrix_1789993398802","controlSetId":"lever-dial","id":"ctrl_1789993398802","controlType":"Matrix"},
+        "Core": {"name":"Matrix_1761215344967","controlSetId":"lever-dial","id":"ctrl_1761215344967","controlType":"Matrix"},
         "Transform": {"x":540,"y":466,"width":166,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FF34332D","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"656C5E","position":0},{"color":"3A4230","position":55},{"color":"2A3023","position":100}]}},"Border":{"colour":"FF1D2118"},"Corners":{"radius":6,"style":"chamfer"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"hammer","strength":50,"shine":30,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Matrix": {"rows":["LFO","ENV","VEL"],"cols":["OSC","FLT","AMP"],"amounts":[0.6,0,-0.4,0,0.7,0,0,0.4,0.8],"cellStyle":"dot","rowHeaderW":42,"cellBg":"FF34332D","gridColour":"6623281D","posColour":"FFD5B36D","negColour":"FFC9A227","labelColour":"FFF2F2F2","activeColour":"FFD5B36D"},
@@ -785,7 +786,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"VectorJoystick_1789993398803","controlSetId":"lever-dial","id":"ctrl_1789993398803","controlType":"VectorJoystick"},
+        "Core": {"name":"VectorJoystick_1761215344968","controlSetId":"lever-dial","id":"ctrl_1761215344968","controlType":"VectorJoystick"},
         "Transform": {"x":728,"y":466,"width":124,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FF34332D","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"656C5E","position":0},{"color":"3A4230","position":55},{"color":"2A3023","position":100}]}},"Border":{"colour":"FF1D2118"},"Corners":{"radius":6,"style":"chamfer"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"hammer","strength":50,"shine":30,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Joystick": {"puckRadius":7,"padColour":"FF34332D","gridColour":"6623281D","crosshairColour":"FFD5B36D","puckColour":"FF777564","cornerColour":"FFF7F4EC","labelColour":"FFF2F2F2"},
@@ -796,10 +797,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789993398804","controlSetId":"lever-dial","id":"ctrl_1789993398804","controlType":"Label"},
+        "Core": {"name":"Label_1761215344969","controlSetId":"lever-dial","id":"ctrl_1761215344969","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"Editable synthesizer controls — copy individual controls into your panel.","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Editable synthesizer controls — copy individual controls into your panel.","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD5B36D","lampOffColour":"FF34332D","lampBezelColour":"AA1D2118"}
       },
       "_type": "Control"

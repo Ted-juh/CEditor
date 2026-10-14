@@ -1,4 +1,5 @@
 {
+  "formatVersion": 2,
   "panelGuid": "5e71e281-fef5-f2dc-ac3d-b906900c2a4d",
   "exportSettings": {
     "pluginName": "",
@@ -12,7 +13,7 @@
     "restoreHardware": "ask"
   },
   "name": "Modular Metal — starter",
-  "scriptId": "panel_29",
+  "scriptId": "flightdeck_starter",
   "author": "",
   "version": "1.0.0",
   "description": "Narrow ribbed knobs, full printed scales, machined faders and compact latching switches.",
@@ -126,10 +127,10 @@
   "parameterSnapshots": {},
   "exportParameters": [
     {
-      "id": "Knob_1789891718590.value",
-      "label": "Knob_1789891718590",
-      "controlName": "Knob_1789891718590",
-      "path": "Knob_1789891718590.value",
+      "id": "Knob_1735513508404.value",
+      "label": "Knob_1735513508404",
+      "controlName": "Knob_1735513508404",
+      "path": "Knob_1735513508404.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.63,
@@ -140,10 +141,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Knob_1789891718591.value",
-      "label": "Knob_1789891718591",
-      "controlName": "Knob_1789891718591",
-      "path": "Knob_1789891718591.value",
+      "id": "Knob_1735513508405.value",
+      "label": "Knob_1735513508405",
+      "controlName": "Knob_1735513508405",
+      "path": "Knob_1735513508405.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.35,
@@ -154,10 +155,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789891718594.value",
-      "label": "Slider_1789891718594",
-      "controlName": "Slider_1789891718594",
-      "path": "Slider_1789891718594.value",
+      "id": "Slider_1735513508408.value",
+      "label": "Slider_1735513508408",
+      "controlName": "Slider_1735513508408",
+      "path": "Slider_1735513508408.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.2,
@@ -168,10 +169,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789891718595.value",
-      "label": "Slider_1789891718595",
-      "controlName": "Slider_1789891718595",
-      "path": "Slider_1789891718595.value",
+      "id": "Slider_1735513508409.value",
+      "label": "Slider_1735513508409",
+      "controlName": "Slider_1735513508409",
+      "path": "Slider_1735513508409.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.55,
@@ -182,10 +183,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789891718596.value",
-      "label": "Slider_1789891718596",
-      "controlName": "Slider_1789891718596",
-      "path": "Slider_1789891718596.value",
+      "id": "Slider_1735513508410.value",
+      "label": "Slider_1735513508410",
+      "controlName": "Slider_1735513508410",
+      "path": "Slider_1735513508410.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.7,
@@ -196,10 +197,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789891718597.value",
-      "label": "Slider_1789891718597",
-      "controlName": "Slider_1789891718597",
-      "path": "Slider_1789891718597.value",
+      "id": "Slider_1735513508411.value",
+      "label": "Slider_1735513508411",
+      "controlName": "Slider_1735513508411",
+      "path": "Slider_1735513508411.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.35,
@@ -210,10 +211,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "ToggleButton_1789891718599.value",
-      "label": "ToggleButton_1789891718599",
-      "controlName": "ToggleButton_1789891718599",
-      "path": "ToggleButton_1789891718599.value",
+      "id": "ToggleButton_1735513508413.value",
+      "label": "ToggleButton_1735513508413",
+      "controlName": "ToggleButton_1735513508413",
+      "path": "ToggleButton_1735513508413.value",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -224,10 +225,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "CyclicButton_1789891718600.value",
-      "label": "CyclicButton_1789891718600",
-      "controlName": "CyclicButton_1789891718600",
-      "path": "CyclicButton_1789891718600.value",
+      "id": "CyclicButton_1735513508414.value",
+      "label": "CyclicButton_1735513508414",
+      "controlName": "CyclicButton_1735513508414",
+      "path": "CyclicButton_1735513508414.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -243,10 +244,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Combobox_1789891718601.value",
-      "label": "Combobox_1789891718601",
-      "controlName": "Combobox_1789891718601",
-      "path": "Combobox_1789891718601.value",
+      "id": "Combobox_1735513508415.value",
+      "label": "Combobox_1735513508415",
+      "controlName": "Combobox_1735513508415",
+      "path": "Combobox_1735513508415.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -262,10 +263,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Number_1789891718602.value",
-      "label": "Number_1789891718602",
-      "controlName": "Number_1789891718602",
-      "path": "Number_1789891718602.value",
+      "id": "Number_1735513508416.value",
+      "label": "Number_1735513508416",
+      "controlName": "Number_1735513508416",
+      "path": "Number_1735513508416.value",
       "min": 0,
       "max": 100,
       "defaultValue": 0,
@@ -276,10 +277,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Crossfader_1789891718608.value",
-      "label": "Crossfader_1789891718608",
-      "controlName": "Crossfader_1789891718608",
-      "path": "Crossfader_1789891718608.value",
+      "id": "Crossfader_1735513508422.value",
+      "label": "Crossfader_1735513508422",
+      "controlName": "Crossfader_1735513508422",
+      "path": "Crossfader_1735513508422.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -292,10 +293,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1789891718609.bpm",
-      "label": "StepSequencer_1789891718609 Tempo",
-      "controlName": "StepSequencer_1789891718609",
-      "path": "StepSequencer_1789891718609.bpm",
+      "id": "StepSequencer_1735513508423.bpm",
+      "label": "StepSequencer_1735513508423 Tempo",
+      "controlName": "StepSequencer_1735513508423",
+      "path": "StepSequencer_1735513508423.bpm",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -308,10 +309,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1789891718609.run",
-      "label": "StepSequencer_1789891718609 Run",
-      "controlName": "StepSequencer_1789891718609",
-      "path": "StepSequencer_1789891718609.run",
+      "id": "StepSequencer_1735513508423.run",
+      "label": "StepSequencer_1735513508423 Run",
+      "controlName": "StepSequencer_1735513508423",
+      "path": "StepSequencer_1735513508423.run",
       "min": 0,
       "max": 1,
       "defaultValue": 0,
@@ -324,10 +325,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789891718612.x",
-      "label": "VectorJoystick_1789891718612 X",
-      "controlName": "VectorJoystick_1789891718612",
-      "path": "VectorJoystick_1789891718612.x",
+      "id": "VectorJoystick_1735513508426.x",
+      "label": "VectorJoystick_1735513508426 X",
+      "controlName": "VectorJoystick_1735513508426",
+      "path": "VectorJoystick_1735513508426.x",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -340,10 +341,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789891718612.y",
-      "label": "VectorJoystick_1789891718612 Y",
-      "controlName": "VectorJoystick_1789891718612",
-      "path": "VectorJoystick_1789891718612.y",
+      "id": "VectorJoystick_1735513508426.y",
+      "label": "VectorJoystick_1735513508426 Y",
+      "controlName": "VectorJoystick_1735513508426",
+      "path": "VectorJoystick_1735513508426.y",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -368,57 +369,57 @@
   "controls": [
     {
       "_children": {
-        "Core": {"name":"Label_1789891718585","controlSetId":"flightdeck","id":"ctrl_1789891718585","controlType":"Label"},
+        "Core": {"name":"Label_1735513508399","controlSetId":"flightdeck","id":"ctrl_1735513508399","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"MODULAR METAL","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"MODULAR METAL","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"CCDDDEDD"}}},
         "ContentLayout": {"lampColour":"FF97523D","lampOffColour":"FFA9ACA9","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718586","controlSetId":"flightdeck","id":"ctrl_1789891718586","controlType":"Label"},
+        "Core": {"name":"Label_1735513508400","controlSetId":"flightdeck","id":"ctrl_1735513508400","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"Modular / hardware","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Modular / hardware","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"CCDDDEDD"}}},
         "ContentLayout": {"lampColour":"FF97523D","lampOffColour":"FFA9ACA9","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718587","controlSetId":"flightdeck","id":"ctrl_1789891718587","controlType":"Label"},
+        "Core": {"name":"Label_1735513508401","controlSetId":"flightdeck","id":"ctrl_1735513508401","controlType":"Label"},
         "Transform": {"x":26,"y":85,"width":300,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"OSCILLATOR / FILTER","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OSCILLATOR / FILTER","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"CCDDDEDD"}}},
         "ContentLayout": {"lampColour":"FF97523D","lampOffColour":"FFA9ACA9","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718588","controlSetId":"flightdeck","id":"ctrl_1789891718588","controlType":"Label"},
+        "Core": {"name":"Label_1735513508402","controlSetId":"flightdeck","id":"ctrl_1735513508402","controlType":"Label"},
         "Transform": {"x":356,"y":85,"width":210,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"ENVELOPE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"ENVELOPE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"CCDDDEDD"}}},
         "ContentLayout": {"lampColour":"FF97523D","lampOffColour":"FFA9ACA9","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718589","controlSetId":"flightdeck","id":"ctrl_1789891718589","controlType":"Label"},
+        "Core": {"name":"Label_1735513508403","controlSetId":"flightdeck","id":"ctrl_1735513508403","controlType":"Label"},
         "Transform": {"x":586,"y":85,"width":250,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"PERFORMANCE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PERFORMANCE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"CCDDDEDD"}}},
         "ContentLayout": {"lampColour":"FF97523D","lampOffColour":"FFA9ACA9","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Knob_1789891718590","controlSetId":"flightdeck","controlForm":"new-flightdeck","formFaceColour":"FF363C3B","formHousingColour":"FFA9ACA9","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FF97523D","id":"ctrl_1789891718590","controlType":"Knob"},
+        "Core": {"name":"Knob_1735513508404","controlSetId":"flightdeck","controlForm":"new-flightdeck","formFaceColour":"FF363C3B","formHousingColour":"FFA9ACA9","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FF97523D","id":"ctrl_1735513508404","controlType":"Knob"},
         "Transform": {"x":26,"y":120,"width":150,"height":164},
         "Behavior": {"defaultCurrentValue":0.63,"minorTickCount":0,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
@@ -449,7 +450,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Knob_1789891718591","controlSetId":"flightdeck","controlForm":"new-flightdeck","formFaceColour":"FF363C3B","formHousingColour":"FFA9ACA9","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FF97523D","id":"ctrl_1789891718591","controlType":"Knob"},
+        "Core": {"name":"Knob_1735513508405","controlSetId":"flightdeck","controlForm":"new-flightdeck","formFaceColour":"FF363C3B","formHousingColour":"FFA9ACA9","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FF97523D","id":"ctrl_1735513508405","controlType":"Knob"},
         "Transform": {"x":194,"y":120,"width":150,"height":164},
         "Behavior": {"defaultCurrentValue":0.35,"minorTickCount":0,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
@@ -480,27 +481,27 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718592","controlSetId":"flightdeck","id":"ctrl_1789891718592","controlType":"Label"},
+        "Core": {"name":"Label_1735513508406","controlSetId":"flightdeck","id":"ctrl_1735513508406","controlType":"Label"},
         "Transform": {"x":26,"y":280,"width":150,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"TUNE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"TUNE","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"CCDDDEDD"}}},
         "ContentLayout": {"lampColour":"FF97523D","lampOffColour":"FFA9ACA9","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718593","controlSetId":"flightdeck","id":"ctrl_1789891718593","controlType":"Label"},
+        "Core": {"name":"Label_1735513508407","controlSetId":"flightdeck","id":"ctrl_1735513508407","controlType":"Label"},
         "Transform": {"x":194,"y":280,"width":150,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"CUTOFF","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"CUTOFF","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"CCDDDEDD"}}},
         "ContentLayout": {"lampColour":"FF97523D","lampOffColour":"FFA9ACA9","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789891718594","controlSetId":"flightdeck","id":"ctrl_1789891718594","controlType":"Slider"},
+        "Core": {"name":"Slider_1735513508408","controlSetId":"flightdeck","id":"ctrl_1735513508408","controlType":"Slider"},
         "Transform": {"x":356,"y":120,"width":44,"height":173},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"showValueReadout":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -531,7 +532,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789891718595","controlSetId":"flightdeck","id":"ctrl_1789891718595","controlType":"Slider"},
+        "Core": {"name":"Slider_1735513508409","controlSetId":"flightdeck","id":"ctrl_1735513508409","controlType":"Slider"},
         "Transform": {"x":406,"y":120,"width":44,"height":173},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"showValueReadout":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -562,7 +563,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789891718596","controlSetId":"flightdeck","id":"ctrl_1789891718596","controlType":"Slider"},
+        "Core": {"name":"Slider_1735513508410","controlSetId":"flightdeck","id":"ctrl_1735513508410","controlType":"Slider"},
         "Transform": {"x":456,"y":120,"width":44,"height":173},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"showValueReadout":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -593,7 +594,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789891718597","controlSetId":"flightdeck","id":"ctrl_1789891718597","controlType":"Slider"},
+        "Core": {"name":"Slider_1735513508411","controlSetId":"flightdeck","id":"ctrl_1735513508411","controlType":"Slider"},
         "Transform": {"x":506,"y":120,"width":44,"height":173},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"showValueReadout":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -624,7 +625,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Button_1789891718598","controlSetId":"flightdeck","controlForm":"new-flightdeck","formFaceColour":"FF363C3B","formHousingColour":"FFA9ACA9","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FF97523D","id":"ctrl_1789891718598","controlType":"Button"},
+        "Core": {"name":"Button_1735513508412","controlSetId":"flightdeck","controlForm":"new-flightdeck","formFaceColour":"FF363C3B","formHousingColour":"FFA9ACA9","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FF97523D","id":"ctrl_1735513508412","controlType":"Button"},
         "Transform": {"x":586,"y":126,"width":116,"height":76},
         "Background": {"_children":{"Fill":{"colour":"FFB4B9BF","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":3}}},
         "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.7},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
@@ -636,7 +637,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"ToggleButton_1789891718599","controlSetId":"flightdeck","controlForm":"new-flightdeck","formFaceColour":"FF363C3B","formHousingColour":"FFA9ACA9","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FF97523D","id":"ctrl_1789891718599","controlType":"ToggleButton"},
+        "Core": {"name":"ToggleButton_1735513508413","controlSetId":"flightdeck","controlForm":"new-flightdeck","formFaceColour":"FF363C3B","formHousingColour":"FFA9ACA9","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FF97523D","id":"ctrl_1735513508413","controlType":"ToggleButton"},
         "Transform": {"x":728,"y":126,"width":124,"height":76},
         "Background": {"_children":{"Fill":{"colour":"FFB4B9BF","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":3}}},
         "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.7},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
@@ -649,7 +650,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"CyclicButton_1789891718600","controlSetId":"flightdeck","id":"ctrl_1789891718600","controlType":"CyclicButton"},
+        "Core": {"name":"CyclicButton_1735513508414","controlSetId":"flightdeck","id":"ctrl_1735513508414","controlType":"CyclicButton"},
         "Transform": {"x":586,"y":218,"width":116,"height":34},
         "Background": {"_children":{"Fill":{"colour":"FF363C3B","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"9B9E9D","position":0},{"color":"363C3B","position":45},{"color":"1E2120","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"brushed","strength":8,"shine":65,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Text": {"content":"MODE","_children":{"Fill":{"colour":"FFF2F2F2"},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
@@ -661,7 +662,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Combobox_1789891718601","controlSetId":"flightdeck","id":"ctrl_1789891718601","controlType":"Combobox"},
+        "Core": {"name":"Combobox_1735513508415","controlSetId":"flightdeck","id":"ctrl_1735513508415","controlType":"Combobox"},
         "Transform": {"x":728,"y":218,"width":124},
         "Background": {"_children":{"Fill":{"colour":"FF363C3B","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"9B9E9D","position":0},{"color":"363C3B","position":45},{"color":"1E2120","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"brushed","strength":8,"shine":65,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Text": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.7},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
@@ -673,7 +674,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Number_1789891718602","controlSetId":"flightdeck","id":"ctrl_1789891718602","controlType":"Number"},
+        "Core": {"name":"Number_1735513508416","controlSetId":"flightdeck","id":"ctrl_1735513508416","controlType":"Number"},
         "Transform": {"x":586,"y":267,"width":116,"height":42},
         "Parts": {
           "_children": {
@@ -688,7 +689,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"TextInput_1789891718603","controlSetId":"flightdeck","id":"ctrl_1789891718603","controlType":"TextInput"},
+        "Core": {"name":"TextInput_1735513508417","controlSetId":"flightdeck","id":"ctrl_1735513508417","controlType":"TextInput"},
         "Transform": {"x":728,"y":267,"width":124,"height":36},
         "Background": {"_children":{"Fill":{"colour":"FFA9ACA9","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"3B3C3B","position":0},{"color":"A9ACA9","position":35},{"color":"B3B6B3","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":false,"kind":"brushed","strength":8,"shine":65,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Text": {"content":"Init patch","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow"}}},
@@ -700,27 +701,27 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718604","controlSetId":"flightdeck","id":"ctrl_1789891718604","controlType":"Label"},
+        "Core": {"name":"Label_1735513508418","controlSetId":"flightdeck","id":"ctrl_1735513508418","controlType":"Label"},
         "Transform": {"x":26,"y":318,"width":360,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"PADS / MODULATION","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"PADS / MODULATION","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"CCDDDEDD"}}},
         "ContentLayout": {"lampColour":"FF97523D","lampOffColour":"FFA9ACA9","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718605","controlSetId":"flightdeck","id":"ctrl_1789891718605","controlType":"Label"},
+        "Core": {"name":"Label_1735513508419","controlSetId":"flightdeck","id":"ctrl_1735513508419","controlType":"Label"},
         "Transform": {"x":540,"y":318,"width":300,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"OUTPUT / ROUTING","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"OUTPUT / ROUTING","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"CCDDDEDD"}}},
         "ContentLayout": {"lampColour":"FF97523D","lampOffColour":"FFA9ACA9","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"DrumPads_1789891718606","controlSetId":"flightdeck","id":"ctrl_1789891718606","controlType":"DrumPads"},
+        "Core": {"name":"DrumPads_1735513508420","controlSetId":"flightdeck","id":"ctrl_1735513508420","controlType":"DrumPads"},
         "Transform": {"x":26,"y":356,"width":228,"height":206},
         "Background": {"_children":{"Fill":{"colour":"FFA9ACA9","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4}}},
         "DrumPads": {"rows":2,"cols":2,"showNotes":false,"showHeader":false,"padForm":"physical-flightdeck","padAppearance":"inset","padRadius":4,"fieldColour":"FFA9ACA9","padColour":"FF363C3B","accentColour":"FF97523D","hitColour":"FF97523D","labelColour":"FFF2F2F2"},
@@ -731,7 +732,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Envelope_1789891718607","controlSetId":"flightdeck","id":"ctrl_1789891718607","controlType":"Envelope"},
+        "Core": {"name":"Envelope_1735513508421","controlSetId":"flightdeck","id":"ctrl_1735513508421","controlType":"Envelope"},
         "Transform": {"x":284,"y":356,"width":220,"height":70},
         "Background": {"_children":{"Fill":{"colour":"FFA9ACA9","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4}}},
         "Envelope": {"lineWidth":3,"nodeRadius":3,"lineColour":"FF97523D","fillColour":"20000000","nodeColour":"FF363C3B","gridColour":"66303338","sustainColour":"FF5FD3F0","playheadColour":"FF97523D"},
@@ -742,7 +743,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Crossfader_1789891718608","controlSetId":"flightdeck","id":"ctrl_1789891718608","controlType":"Crossfader"},
+        "Core": {"name":"Crossfader_1735513508422","controlSetId":"flightdeck","id":"ctrl_1735513508422","controlType":"Crossfader"},
         "Transform": {"x":284,"y":435,"width":220,"height":42},
         "Background": {"_children":{"Fill":{"colour":"FFA9ACA9","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4}}},
         "Crossfader": {"showGains":true,"handleSize":34,"handleStyle":"blade","trackSize":8,"trackColour":"FFA9ACA9","fillAColour":"FF97523D","fillBColour":"FF5FD3F0","handleColour":"FF363C3B","labelColour":"FF202020"},
@@ -753,7 +754,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"StepSequencer_1789891718609","controlSetId":"flightdeck","id":"ctrl_1789891718609","controlType":"StepSequencer"},
+        "Core": {"name":"StepSequencer_1735513508423","controlSetId":"flightdeck","id":"ctrl_1735513508423","controlType":"StepSequencer"},
         "Transform": {"x":284,"y":489,"width":220,"height":77},
         "Background": {"_children":{"Fill":{"colour":"FFA9ACA9"}}},
         "StepSequencer": {"cellForm":"physical-flightdeck","steps":8,"trackHeaderWidth":38,"tracks":[{"id":"kick","label":"Kick","note":36,"channel":10},{"id":"hat","label":"Hat","note":42,"channel":10}],"pattern":{"kick:0":{"on":true,"velocity":100},"kick:4":{"on":true,"velocity":100},"hat:0":{"on":true,"velocity":70},"hat:2":{"on":true,"velocity":70},"hat:4":{"on":true,"velocity":70},"hat:6":{"on":true,"velocity":70}},"cellColour":"FF363C3B","cellOnColour":"FF97523D","playheadColour":"FF97523D","gridColour":"66303338","labelColour":"FF202529"},
@@ -763,7 +764,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Meter_1789891718610","controlSetId":"flightdeck","controlForm":"new-flightdeck","formFaceColour":"FF363C3B","formHousingColour":"FFA9ACA9","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FF97523D","id":"ctrl_1789891718610","controlType":"Meter"},
+        "Core": {"name":"Meter_1735513508424","controlSetId":"flightdeck","controlForm":"new-flightdeck","formFaceColour":"FF363C3B","formHousingColour":"FFA9ACA9","formInkColour":"FFF2F2F2","formLabelColour":"FF202529","formAccentColour":"FF97523D","id":"ctrl_1735513508424","controlType":"Meter"},
         "Transform": {"x":540,"y":352,"width":312,"height":92},
         "Background": {"_children":{"Fill":{"colour":"FFA9ACA9","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4}}},
         "Meter": {"value":0.7,"segments":16,"segmentGap":3,"trackColour":"FFA9ACA9","fillColour":"FF97523D","thickness":10,"rounded":false,"peakColour":"FF97523D","showTicks":true,"valuePrecision":2},
@@ -774,7 +775,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Matrix_1789891718611","controlSetId":"flightdeck","id":"ctrl_1789891718611","controlType":"Matrix"},
+        "Core": {"name":"Matrix_1735513508425","controlSetId":"flightdeck","id":"ctrl_1735513508425","controlType":"Matrix"},
         "Transform": {"x":540,"y":466,"width":166,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FFA9ACA9","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4}}},
         "Matrix": {"rows":["LFO","ENV","VEL"],"cols":["OSC","FLT","AMP"],"amounts":[0.6,0,-0.4,0,0.7,0,0,0.4,0.8],"cellStyle":"dot","rowHeaderW":42,"cellBg":"FFA9ACA9","gridColour":"66303338","posColour":"FF97523D","negColour":"FF5FD3F0","labelColour":"FF202020","activeColour":"FF97523D"},
@@ -785,7 +786,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"VectorJoystick_1789891718612","controlSetId":"flightdeck","id":"ctrl_1789891718612","controlType":"VectorJoystick"},
+        "Core": {"name":"VectorJoystick_1735513508426","controlSetId":"flightdeck","id":"ctrl_1735513508426","controlType":"VectorJoystick"},
         "Transform": {"x":728,"y":466,"width":124,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FFA9ACA9","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4}}},
         "Joystick": {"puckRadius":7,"padColour":"FFA9ACA9","gridColour":"66303338","crosshairColour":"FF97523D","puckColour":"FF363C3B","cornerColour":"FF202529","labelColour":"FF202020"},
@@ -796,10 +797,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718613","controlSetId":"flightdeck","id":"ctrl_1789891718613","controlType":"Label"},
+        "Core": {"name":"Label_1735513508427","controlSetId":"flightdeck","id":"ctrl_1735513508427","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
-        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"Editable synthesizer controls — copy individual controls into your panel.","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"Editable synthesizer controls — copy individual controls into your panel.","_children":{"Fill":{"colour":"FF202529"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"CCDDDEDD"}}},
         "ContentLayout": {"lampColour":"FF97523D","lampOffColour":"FFA9ACA9","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
