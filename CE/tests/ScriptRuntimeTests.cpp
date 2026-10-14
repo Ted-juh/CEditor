@@ -2998,6 +2998,62 @@ int main()
                "…and both fire: each script starts with its own copy of the prelude's listeners");
     }
 
+    // 40b) A name a script assigns without declaring it is the script's own --------------------------
+    // In an engine of its own it became a global only that script could see, and in the WebView,
+    // where each script has a context of its own, it still does. In the shared engine it used to land
+    // on the one global every script sees. The prelude now keeps it in the script's context.
+    {
+        TestHost impHost;
+        ScriptRuntime imp (impHost);
+        impHost.runtime = &imp;
+        juce::StringArray impErrors;
+        imp.setErrorLogger ([&impErrors] (const juce::String& line)
+            { impErrors.add (line); std::cout << "  [error] " << line << "\n"; });
+
+        juce::Array<juce::var> scripts;
+        scripts.add (makeScript ("impA", "javascript", "panel", "onImp", "*",
+            "tally = 5;\n"
+            "function onImp() { tally++; log('A tally ' + tally); }\n"
+            "function onArmLater() { after(10, function () { tally += 100; log('A later ' + tally); }); }"));
+        scripts.add (makeScript ("impB", "javascript", "panel", "onImp", "*",
+            "function onImp() { log('B sees ' + typeof tally); }\n"
+            "function onReadTally() { log('B read ' + tally); }\n"
+            "function onTakeOwn() { tally = 1; log('B own ' + tally); }"));
+        // The way such names are usually used: made the first time through, by asking typeof.
+        scripts.add (makeScript ("impC", "javascript", "panel", "onImp", "*",
+            "if (typeof seen === 'undefined') seen = 0;\n"
+            "function onImp() { seen++; log('C seen ' + seen); }"));
+        imp.loadScripts (juce::var (scripts));
+
+        imp.dispatchEvent ("onImp", "panel", juce::var());
+        check (impHost.logs.contains ("A tally 6"), "a script's undeclared name works for that script");
+        check (impHost.logs.contains ("B sees undefined"), "…and another script's typeof says it is not there");
+
+        impHost.logs.clear(); impErrors.clear();
+        imp.runAction ("onReadTally", juce::var());
+        check (! impHost.logs.contains ("B read 6") && impErrors.joinIntoString ("\n").contains ("tally"),
+               "reading another script's undeclared name fails as a name that is not defined, not with its value");
+
+        impHost.logs.clear();
+        imp.runAction ("onTakeOwn", juce::var());
+        imp.dispatchEvent ("onImp", "panel", juce::var());
+        check (impHost.logs.contains ("B own 1") && impHost.logs.contains ("A tally 7")
+                   && impHost.logs.contains ("B sees number"),
+               "two scripts assigning the same undeclared name each keep their own");
+        check (impHost.logs.contains ("C seen 2"), "typeof on a name not yet made says 'undefined', so it can be made once");
+
+        // A callback runs later, from a timer, and has to find its own script's name then too.
+        impHost.logs.clear(); impHost.timerStarts.clear();
+        imp.runAction ("onArmLater", juce::var());
+        for (const auto& id : impHost.timerStarts)
+        {
+            auto* info = new juce::DynamicObject();
+            info->setProperty ("id", id);
+            imp.dispatchEvent ("onTimer", "", juce::var (info));
+        }
+        check (impHost.logs.contains ("A later 107"), "…including in a callback that runs later, from a timer");
+    }
+
     std::cout << "------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

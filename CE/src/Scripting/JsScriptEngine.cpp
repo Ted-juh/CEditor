@@ -7,9 +7,12 @@
 // calls go through a registered "__api" object; helpers / on / emit / self / noTransmit are defined
 // in a JS prelude (kept in sync with the Lua prelude + panelApi.js).
 //
-// What a shared engine does NOT isolate: an assignment to a name the script never declared creates a
-// global, and a write onto a built-in (Math, Array.prototype) or onto `ce` changes it for every
-// script on the panel. Declared names are private. None of the 236 scripts in the tree does either.
+// A name a script assigns without declaring it is the script's own too, as it is in the WebView, where
+// each script has a QuickJS context of its own: the prelude keeps it in the script's context and
+// answers for it from behind the global object (the top of the prelude says how). What a shared engine
+// does NOT isolate is a write onto something that already exists on the global: a built-in (Math,
+// Array.prototype), `ce`, or a property put on the global object by name (`globalThis.x = 1`,
+// `this.x = 1` at a script's top level). None of the 236 scripts in the tree does any of these.
 //
 // NOTE: juce::JavascriptEngine's exact surface (registerNativeObject / callFunction / NativeFunctionArgs)
 // should be confirmed against the JUCE 8 headers during the build — this is the less-certain engine.
@@ -46,7 +49,8 @@ var __ceCur = {
   __listeners: [], __watchers: [], __computeds: [], __filters: [], __actions: {},
   __filterDepth: 0, __reactiveDepth: 0, __timerIds: {}, __syncFollow: {},
   __rndStates: {}, __streamOverride: "", __midiIn: [], __midiOut: [], __lastSyncBpm: null,
-  __after: {}, __afterN: 0, __animDone: {}, __animGroup: {}, __animGroupN: 0, __dumpWaiters: []
+  __after: {}, __afterN: 0, __animDone: {}, __animGroup: {}, __animGroupN: 0, __dumpWaiters: [],
+  __globals: {}
 };
 var __CE_OWN = Object.keys(__ceCur);
 // The prelude's own context, current while this file loads. What the prelude registers for itself
@@ -66,6 +70,35 @@ for (var __ceI = 0; __ceI < __CE_OWN.length; __ceI++) {
   })(__CE_OWN[__ceI]);
 }
 __ceCur.self = __ceMakeSelf();
+
+// A name a script assigns without ever declaring it. In an engine of its own that made a global only
+// that script could see; here it would make one every script sees, and two scripts using the same
+// undeclared name would write into each other. So it is kept in the script's context (__globals),
+// from behind the global object: a proxy goes into the global's prototype chain, between it and
+// Object.prototype. Everything that IS on the global — the prelude, the built-ins, `ce`, anything a
+// module declares — is found on the global itself and never reaches the proxy, so it costs nothing.
+// Only a lookup that finds nothing there does:
+//   - an assignment to such a name lands in the running script's __globals rather than on the
+//     global, which is what a sloppy-mode assignment to an unknown name would otherwise create;
+//   - a read finds the running script's own, and for a name the script never set the proxy says it
+//     has nothing, so the read throws "not defined" and `typeof` says 'undefined', exactly as in an
+//     engine of its own.
+// Code that runs as the prelude's own context — this file and the modules, at their top level — is
+// not a script, and keeps the old rule: its undeclared assignments make real globals.
+(function () {
+  var base = Object.create(Object.getPrototypeOf(__ceGlobal));
+  var owned = function (k) {
+    return typeof k === "string" && __ceCur !== __cePrelude && Object.prototype.hasOwnProperty.call(__ceCur.__globals, k);
+  };
+  Object.setPrototypeOf(__ceGlobal, new Proxy(base, {
+    has: function (t, k) { return owned(k) || Reflect.has(t, k); },
+    get: function (t, k, r) { return owned(k) ? __ceCur.__globals[k] : Reflect.get(t, k, r); },
+    set: function (t, k, v, r) {
+      if (typeof k === "string" && __ceCur !== __cePrelude && !Reflect.has(t, k)) { __ceCur.__globals[k] = v; return true; }
+      return Reflect.set(t, k, v, r);
+    }
+  }));
+})();
 
 // A script's starting context: a copy of the prelude's, with its own identity, `self` and `state`.
 // Arrays and tables are copied one level deep, which is as deep as anything here is shared: a
