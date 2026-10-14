@@ -7,13 +7,20 @@ import { starterDirection } from './controlSetCoverage.js';
 
 // Gallery and starter share ordinary controls. Materialization exposes design values in the
 // inspector; the pin keeps the design when the user copies a control to another panel.
-export function createControlSetStarter(setId, { materialize = true } = {}) {
+//
+// `nextId` numbers the controls. Left out, each one gets the editor's own id and name, as any new
+// control does — taken from a counter that starts at the clock, so no two starters opened from the
+// gallery share one. The starters that ship as files pass a fixed sequence instead, so a file is
+// the same on every export and a test can hold it to the code (scripts/export-control-set-starters.mjs).
+export function createControlSetStarter(setId, { materialize = true, nextId = null } = {}) {
   const set = getControlSet(setId);
   if (!set) throw new Error(`Unknown control set: ${setId}`);
   const direction = starterDirection(setId);
   const controls = [];
   function place(type, x, y, width, height, extra = {}) {
-    let c = createControl(type, { Core: { controlSetId: setId, ...(setId === 'graphite' && setAnatomy(type, setId) ? { controlForm: setAnatomy(type, setId), formFaceColour: '{surface}', formInkColour: '{text.primary}', formLabelColour: '{text.primary}', formAccentColour: '{accent}' } : {}) }, Transform: { x, y, width, height }, ...extra });
+    // Given a number, the id and the name createControl would have made from it.
+    const n = nextId?.();
+    let c = createControl(type, { ...(n == null ? {} : { name: `${type}_${n}` }), Core: { ...(n == null ? {} : { id: `ctrl_${n}` }), controlSetId: setId, ...(setId === 'graphite' && setAnatomy(type, setId) ? { controlForm: setAnatomy(type, setId), formFaceColour: '{surface}', formInkColour: '{text.primary}', formLabelColour: '{text.primary}', formAccentColour: '{accent}' } : {}) }, Transform: { x, y, width, height }, ...extra });
     if (materialize) c = resolveControlForSet(c, set);
     controls.push(c);
     return c;

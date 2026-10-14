@@ -1,4 +1,5 @@
 {
+  "formatVersion": 2,
   "panelGuid": "18f9cd7b-2219-8771-d102-c70070302f9c",
   "exportSettings": {
     "pluginName": "",
@@ -12,7 +13,7 @@
     "restoreHardware": "ask"
   },
   "name": "Precision — starter",
-  "scriptId": "panel_32",
+  "scriptId": "chronograph_starter",
   "author": "",
   "version": "1.0.0",
   "description": "Fine knurling, inset aluminium faces, engraved scales and milled rectangular sliders.",
@@ -126,10 +127,10 @@
   "parameterSnapshots": {},
   "exportParameters": [
     {
-      "id": "Knob_1789891718677.value",
-      "label": "Knob_1789891718677",
-      "controlName": "Knob_1789891718677",
-      "path": "Knob_1789891718677.value",
+      "id": "Knob_1724717883926.value",
+      "label": "Knob_1724717883926",
+      "controlName": "Knob_1724717883926",
+      "path": "Knob_1724717883926.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.63,
@@ -140,10 +141,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Knob_1789891718678.value",
-      "label": "Knob_1789891718678",
-      "controlName": "Knob_1789891718678",
-      "path": "Knob_1789891718678.value",
+      "id": "Knob_1724717883927.value",
+      "label": "Knob_1724717883927",
+      "controlName": "Knob_1724717883927",
+      "path": "Knob_1724717883927.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.35,
@@ -154,10 +155,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789891718681.value",
-      "label": "Slider_1789891718681",
-      "controlName": "Slider_1789891718681",
-      "path": "Slider_1789891718681.value",
+      "id": "Slider_1724717883930.value",
+      "label": "Slider_1724717883930",
+      "controlName": "Slider_1724717883930",
+      "path": "Slider_1724717883930.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.2,
@@ -168,10 +169,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789891718682.value",
-      "label": "Slider_1789891718682",
-      "controlName": "Slider_1789891718682",
-      "path": "Slider_1789891718682.value",
+      "id": "Slider_1724717883931.value",
+      "label": "Slider_1724717883931",
+      "controlName": "Slider_1724717883931",
+      "path": "Slider_1724717883931.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.55,
@@ -182,10 +183,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789891718683.value",
-      "label": "Slider_1789891718683",
-      "controlName": "Slider_1789891718683",
-      "path": "Slider_1789891718683.value",
+      "id": "Slider_1724717883932.value",
+      "label": "Slider_1724717883932",
+      "controlName": "Slider_1724717883932",
+      "path": "Slider_1724717883932.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.7,
@@ -196,10 +197,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789891718684.value",
-      "label": "Slider_1789891718684",
-      "controlName": "Slider_1789891718684",
-      "path": "Slider_1789891718684.value",
+      "id": "Slider_1724717883933.value",
+      "label": "Slider_1724717883933",
+      "controlName": "Slider_1724717883933",
+      "path": "Slider_1724717883933.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.35,
@@ -210,10 +211,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "ToggleButton_1789891718686.value",
-      "label": "ToggleButton_1789891718686",
-      "controlName": "ToggleButton_1789891718686",
-      "path": "ToggleButton_1789891718686.value",
+      "id": "ToggleButton_1724717883935.value",
+      "label": "ToggleButton_1724717883935",
+      "controlName": "ToggleButton_1724717883935",
+      "path": "ToggleButton_1724717883935.value",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -224,10 +225,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "CyclicButton_1789891718687.value",
-      "label": "CyclicButton_1789891718687",
-      "controlName": "CyclicButton_1789891718687",
-      "path": "CyclicButton_1789891718687.value",
+      "id": "CyclicButton_1724717883936.value",
+      "label": "CyclicButton_1724717883936",
+      "controlName": "CyclicButton_1724717883936",
+      "path": "CyclicButton_1724717883936.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -243,10 +244,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Combobox_1789891718688.value",
-      "label": "Combobox_1789891718688",
-      "controlName": "Combobox_1789891718688",
-      "path": "Combobox_1789891718688.value",
+      "id": "Combobox_1724717883937.value",
+      "label": "Combobox_1724717883937",
+      "controlName": "Combobox_1724717883937",
+      "path": "Combobox_1724717883937.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -262,10 +263,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Number_1789891718689.value",
-      "label": "Number_1789891718689",
-      "controlName": "Number_1789891718689",
-      "path": "Number_1789891718689.value",
+      "id": "Number_1724717883938.value",
+      "label": "Number_1724717883938",
+      "controlName": "Number_1724717883938",
+      "path": "Number_1724717883938.value",
       "min": 0,
       "max": 100,
       "defaultValue": 0,
@@ -276,10 +277,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Crossfader_1789891718695.value",
-      "label": "Crossfader_1789891718695",
-      "controlName": "Crossfader_1789891718695",
-      "path": "Crossfader_1789891718695.value",
+      "id": "Crossfader_1724717883944.value",
+      "label": "Crossfader_1724717883944",
+      "controlName": "Crossfader_1724717883944",
+      "path": "Crossfader_1724717883944.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -292,10 +293,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1789891718696.bpm",
-      "label": "StepSequencer_1789891718696 Tempo",
-      "controlName": "StepSequencer_1789891718696",
-      "path": "StepSequencer_1789891718696.bpm",
+      "id": "StepSequencer_1724717883945.bpm",
+      "label": "StepSequencer_1724717883945 Tempo",
+      "controlName": "StepSequencer_1724717883945",
+      "path": "StepSequencer_1724717883945.bpm",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -308,10 +309,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1789891718696.run",
-      "label": "StepSequencer_1789891718696 Run",
-      "controlName": "StepSequencer_1789891718696",
-      "path": "StepSequencer_1789891718696.run",
+      "id": "StepSequencer_1724717883945.run",
+      "label": "StepSequencer_1724717883945 Run",
+      "controlName": "StepSequencer_1724717883945",
+      "path": "StepSequencer_1724717883945.run",
       "min": 0,
       "max": 1,
       "defaultValue": 0,
@@ -324,10 +325,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789891718699.x",
-      "label": "VectorJoystick_1789891718699 X",
-      "controlName": "VectorJoystick_1789891718699",
-      "path": "VectorJoystick_1789891718699.x",
+      "id": "VectorJoystick_1724717883948.x",
+      "label": "VectorJoystick_1724717883948 X",
+      "controlName": "VectorJoystick_1724717883948",
+      "path": "VectorJoystick_1724717883948.x",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -340,10 +341,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789891718699.y",
-      "label": "VectorJoystick_1789891718699 Y",
-      "controlName": "VectorJoystick_1789891718699",
-      "path": "VectorJoystick_1789891718699.y",
+      "id": "VectorJoystick_1724717883948.y",
+      "label": "VectorJoystick_1724717883948 Y",
+      "controlName": "VectorJoystick_1724717883948",
+      "path": "VectorJoystick_1724717883948.y",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -368,57 +369,57 @@
   "controls": [
     {
       "_children": {
-        "Core": {"name":"Label_1789891718672","controlSetId":"chronograph","id":"ctrl_1789891718672","controlType":"Label"},
+        "Core": {"name":"Label_1724717883921","controlSetId":"chronograph","id":"ctrl_1724717883921","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"PRECISION","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9}}},
+        "Text": {"content":"PRECISION","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD4BA8E","lampOffColour":"FF292D31","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718673","controlSetId":"chronograph","id":"ctrl_1789891718673","controlType":"Label"},
+        "Core": {"name":"Label_1724717883922","controlSetId":"chronograph","id":"ctrl_1724717883922","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"Instrument / aluminium","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
+        "Text": {"content":"Instrument / aluminium","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD4BA8E","lampOffColour":"FF292D31","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718674","controlSetId":"chronograph","id":"ctrl_1789891718674","controlType":"Label"},
+        "Core": {"name":"Label_1724717883923","controlSetId":"chronograph","id":"ctrl_1724717883923","controlType":"Label"},
         "Transform": {"x":26,"y":85,"width":300,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"OSCILLATOR / FILTER","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Text": {"content":"OSCILLATOR / FILTER","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD4BA8E","lampOffColour":"FF292D31","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718675","controlSetId":"chronograph","id":"ctrl_1789891718675","controlType":"Label"},
+        "Core": {"name":"Label_1724717883924","controlSetId":"chronograph","id":"ctrl_1724717883924","controlType":"Label"},
         "Transform": {"x":356,"y":85,"width":210,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"ENVELOPE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Text": {"content":"ENVELOPE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD4BA8E","lampOffColour":"FF292D31","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718676","controlSetId":"chronograph","id":"ctrl_1789891718676","controlType":"Label"},
+        "Core": {"name":"Label_1724717883925","controlSetId":"chronograph","id":"ctrl_1724717883925","controlType":"Label"},
         "Transform": {"x":586,"y":85,"width":250,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"PERFORMANCE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Text": {"content":"PERFORMANCE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD4BA8E","lampOffColour":"FF292D31","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Knob_1789891718677","controlSetId":"chronograph","controlForm":"new-chronograph","formFaceColour":"FF9EA8AE","formHousingColour":"FF292D31","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFD4BA8E","id":"ctrl_1789891718677","controlType":"Knob"},
+        "Core": {"name":"Knob_1724717883926","controlSetId":"chronograph","controlForm":"new-chronograph","formFaceColour":"FF9EA8AE","formHousingColour":"FF292D31","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFD4BA8E","id":"ctrl_1724717883926","controlType":"Knob"},
         "Transform": {"x":26,"y":120,"width":150,"height":164},
         "Behavior": {"defaultCurrentValue":0.63,"minorTickCount":0,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
@@ -449,7 +450,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Knob_1789891718678","controlSetId":"chronograph","controlForm":"new-chronograph","formFaceColour":"FF9EA8AE","formHousingColour":"FF292D31","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFD4BA8E","id":"ctrl_1789891718678","controlType":"Knob"},
+        "Core": {"name":"Knob_1724717883927","controlSetId":"chronograph","controlForm":"new-chronograph","formFaceColour":"FF9EA8AE","formHousingColour":"FF292D31","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFD4BA8E","id":"ctrl_1724717883927","controlType":"Knob"},
         "Transform": {"x":194,"y":120,"width":150,"height":164},
         "Behavior": {"defaultCurrentValue":0.35,"minorTickCount":0,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
@@ -480,27 +481,27 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718679","controlSetId":"chronograph","id":"ctrl_1789891718679","controlType":"Label"},
+        "Core": {"name":"Label_1724717883928","controlSetId":"chronograph","id":"ctrl_1724717883928","controlType":"Label"},
         "Transform": {"x":26,"y":280,"width":150,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"TUNE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9}}},
+        "Text": {"content":"TUNE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD4BA8E","lampOffColour":"FF292D31","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718680","controlSetId":"chronograph","id":"ctrl_1789891718680","controlType":"Label"},
+        "Core": {"name":"Label_1724717883929","controlSetId":"chronograph","id":"ctrl_1724717883929","controlType":"Label"},
         "Transform": {"x":194,"y":280,"width":150,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"CUTOFF","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9}}},
+        "Text": {"content":"CUTOFF","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD4BA8E","lampOffColour":"FF292D31","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789891718681","controlSetId":"chronograph","id":"ctrl_1789891718681","controlType":"Slider"},
+        "Core": {"name":"Slider_1724717883930","controlSetId":"chronograph","id":"ctrl_1724717883930","controlType":"Slider"},
         "Transform": {"x":356,"y":120,"width":44,"height":173},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"showValueReadout":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -531,7 +532,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789891718682","controlSetId":"chronograph","id":"ctrl_1789891718682","controlType":"Slider"},
+        "Core": {"name":"Slider_1724717883931","controlSetId":"chronograph","id":"ctrl_1724717883931","controlType":"Slider"},
         "Transform": {"x":406,"y":120,"width":44,"height":173},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"showValueReadout":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -562,7 +563,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789891718683","controlSetId":"chronograph","id":"ctrl_1789891718683","controlType":"Slider"},
+        "Core": {"name":"Slider_1724717883932","controlSetId":"chronograph","id":"ctrl_1724717883932","controlType":"Slider"},
         "Transform": {"x":456,"y":120,"width":44,"height":173},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"showValueReadout":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -593,7 +594,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789891718684","controlSetId":"chronograph","id":"ctrl_1789891718684","controlType":"Slider"},
+        "Core": {"name":"Slider_1724717883933","controlSetId":"chronograph","id":"ctrl_1724717883933","controlType":"Slider"},
         "Transform": {"x":506,"y":120,"width":44,"height":173},
         "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"showValueReadout":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -624,7 +625,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Button_1789891718685","controlSetId":"chronograph","controlForm":"new-chronograph","formFaceColour":"FF9EA8AE","formHousingColour":"FF292D31","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFD4BA8E","id":"ctrl_1789891718685","controlType":"Button"},
+        "Core": {"name":"Button_1724717883934","controlSetId":"chronograph","controlForm":"new-chronograph","formFaceColour":"FF9EA8AE","formHousingColour":"FF292D31","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFD4BA8E","id":"ctrl_1724717883934","controlType":"Button"},
         "Transform": {"x":586,"y":126,"width":116,"height":76},
         "Background": {"_children":{"Fill":{"colour":"FFB4B9BF","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":3}}},
         "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FF202020"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.7},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
@@ -636,7 +637,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"ToggleButton_1789891718686","controlSetId":"chronograph","controlForm":"new-chronograph","formFaceColour":"FF9EA8AE","formHousingColour":"FF292D31","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFD4BA8E","id":"ctrl_1789891718686","controlType":"ToggleButton"},
+        "Core": {"name":"ToggleButton_1724717883935","controlSetId":"chronograph","controlForm":"new-chronograph","formFaceColour":"FF9EA8AE","formHousingColour":"FF292D31","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFD4BA8E","id":"ctrl_1724717883935","controlType":"ToggleButton"},
         "Transform": {"x":728,"y":126,"width":124,"height":76},
         "Background": {"_children":{"Fill":{"colour":"FFB4B9BF","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":3}}},
         "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FF202020"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.7},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
@@ -649,7 +650,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"CyclicButton_1789891718687","controlSetId":"chronograph","id":"ctrl_1789891718687","controlType":"CyclicButton"},
+        "Core": {"name":"CyclicButton_1724717883936","controlSetId":"chronograph","id":"ctrl_1724717883936","controlType":"CyclicButton"},
         "Transform": {"x":586,"y":218,"width":116,"height":34},
         "Background": {"_children":{"Fill":{"colour":"FF9EA8AE","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CFD4D7","position":0},{"color":"9EA8AE","position":45},{"color":"575C60","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"brushed","strength":8,"shine":65,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Text": {"content":"MODE","_children":{"Fill":{"colour":"FF202020"},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
@@ -661,7 +662,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Combobox_1789891718688","controlSetId":"chronograph","id":"ctrl_1789891718688","controlType":"Combobox"},
+        "Core": {"name":"Combobox_1724717883937","controlSetId":"chronograph","id":"ctrl_1724717883937","controlType":"Combobox"},
         "Transform": {"x":728,"y":218,"width":124},
         "Background": {"_children":{"Fill":{"colour":"FF9EA8AE","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CFD4D7","position":0},{"color":"9EA8AE","position":45},{"color":"575C60","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"brushed","strength":8,"shine":65,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Text": {"_children":{"Fill":{"colour":"FF202020"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.7},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
@@ -673,7 +674,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Number_1789891718689","controlSetId":"chronograph","id":"ctrl_1789891718689","controlType":"Number"},
+        "Core": {"name":"Number_1724717883938","controlSetId":"chronograph","id":"ctrl_1724717883938","controlType":"Number"},
         "Transform": {"x":586,"y":267,"width":116,"height":42},
         "Parts": {
           "_children": {
@@ -688,7 +689,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"TextInput_1789891718690","controlSetId":"chronograph","id":"ctrl_1789891718690","controlType":"TextInput"},
+        "Core": {"name":"TextInput_1724717883939","controlSetId":"chronograph","id":"ctrl_1724717883939","controlType":"TextInput"},
         "Transform": {"x":728,"y":267,"width":124,"height":36},
         "Background": {"_children":{"Fill":{"colour":"FF292D31","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"0E1011","position":0},{"color":"292D31","position":35},{"color":"43464A","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":false,"kind":"brushed","strength":8,"shine":65,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Text": {"content":"Init patch","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow"}}},
@@ -700,27 +701,27 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718691","controlSetId":"chronograph","id":"ctrl_1789891718691","controlType":"Label"},
+        "Core": {"name":"Label_1724717883940","controlSetId":"chronograph","id":"ctrl_1724717883940","controlType":"Label"},
         "Transform": {"x":26,"y":318,"width":360,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"PADS / MODULATION","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Text": {"content":"PADS / MODULATION","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD4BA8E","lampOffColour":"FF292D31","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718692","controlSetId":"chronograph","id":"ctrl_1789891718692","controlType":"Label"},
+        "Core": {"name":"Label_1724717883941","controlSetId":"chronograph","id":"ctrl_1724717883941","controlType":"Label"},
         "Transform": {"x":540,"y":318,"width":300,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"OUTPUT / ROUTING","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
+        "Text": {"content":"OUTPUT / ROUTING","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD4BA8E","lampOffColour":"FF292D31","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"DrumPads_1789891718693","controlSetId":"chronograph","id":"ctrl_1789891718693","controlType":"DrumPads"},
+        "Core": {"name":"DrumPads_1724717883942","controlSetId":"chronograph","id":"ctrl_1724717883942","controlType":"DrumPads"},
         "Transform": {"x":26,"y":356,"width":228,"height":206},
         "Background": {"_children":{"Fill":{"colour":"FF292D31","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4}}},
         "DrumPads": {"rows":2,"cols":2,"showNotes":false,"showHeader":false,"padForm":"physical-chronograph","padAppearance":"inset","padRadius":4,"fieldColour":"FF292D31","padColour":"FF9EA8AE","accentColour":"FFD4BA8E","hitColour":"FFD4BA8E","labelColour":"FF202020"},
@@ -731,7 +732,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Envelope_1789891718694","controlSetId":"chronograph","id":"ctrl_1789891718694","controlType":"Envelope"},
+        "Core": {"name":"Envelope_1724717883943","controlSetId":"chronograph","id":"ctrl_1724717883943","controlType":"Envelope"},
         "Transform": {"x":284,"y":356,"width":220,"height":70},
         "Background": {"_children":{"Fill":{"colour":"FF292D31","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4}}},
         "Envelope": {"lineWidth":3,"nodeRadius":3,"lineColour":"FFD4BA8E","fillColour":"20000000","nodeColour":"FF9EA8AE","gridColour":"66303338","sustainColour":"FF5FD3F0","playheadColour":"FFD4BA8E"},
@@ -742,7 +743,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Crossfader_1789891718695","controlSetId":"chronograph","id":"ctrl_1789891718695","controlType":"Crossfader"},
+        "Core": {"name":"Crossfader_1724717883944","controlSetId":"chronograph","id":"ctrl_1724717883944","controlType":"Crossfader"},
         "Transform": {"x":284,"y":435,"width":220,"height":42},
         "Background": {"_children":{"Fill":{"colour":"FF292D31","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4}}},
         "Crossfader": {"showGains":true,"handleSize":34,"handleStyle":"blade","trackSize":8,"trackColour":"FF292D31","fillAColour":"FFD4BA8E","fillBColour":"FF5FD3F0","handleColour":"FF9EA8AE","labelColour":"FFF2F2F2"},
@@ -753,7 +754,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"StepSequencer_1789891718696","controlSetId":"chronograph","id":"ctrl_1789891718696","controlType":"StepSequencer"},
+        "Core": {"name":"StepSequencer_1724717883945","controlSetId":"chronograph","id":"ctrl_1724717883945","controlType":"StepSequencer"},
         "Transform": {"x":284,"y":489,"width":220,"height":77},
         "Background": {"_children":{"Fill":{"colour":"FF292D31"}}},
         "StepSequencer": {"cellForm":"physical-chronograph","steps":8,"trackHeaderWidth":38,"tracks":[{"id":"kick","label":"Kick","note":36,"channel":10},{"id":"hat","label":"Hat","note":42,"channel":10}],"pattern":{"kick:0":{"on":true,"velocity":100},"kick:4":{"on":true,"velocity":100},"hat:0":{"on":true,"velocity":70},"hat:2":{"on":true,"velocity":70},"hat:4":{"on":true,"velocity":70},"hat:6":{"on":true,"velocity":70}},"cellColour":"FF9EA8AE","cellOnColour":"FFD4BA8E","playheadColour":"FFD4BA8E","gridColour":"66303338","labelColour":"FFF7F4EC"},
@@ -763,7 +764,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Meter_1789891718697","controlSetId":"chronograph","controlForm":"new-chronograph","formFaceColour":"FF9EA8AE","formHousingColour":"FF292D31","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFD4BA8E","id":"ctrl_1789891718697","controlType":"Meter"},
+        "Core": {"name":"Meter_1724717883946","controlSetId":"chronograph","controlForm":"new-chronograph","formFaceColour":"FF9EA8AE","formHousingColour":"FF292D31","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFD4BA8E","id":"ctrl_1724717883946","controlType":"Meter"},
         "Transform": {"x":540,"y":352,"width":312,"height":92},
         "Background": {"_children":{"Fill":{"colour":"FF292D31","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4}}},
         "Meter": {"value":0.7,"segments":16,"segmentGap":3,"trackColour":"FF292D31","fillColour":"FFD4BA8E","thickness":10,"rounded":false,"peakColour":"FFD4BA8E","showTicks":true,"valuePrecision":2},
@@ -774,7 +775,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Matrix_1789891718698","controlSetId":"chronograph","id":"ctrl_1789891718698","controlType":"Matrix"},
+        "Core": {"name":"Matrix_1724717883947","controlSetId":"chronograph","id":"ctrl_1724717883947","controlType":"Matrix"},
         "Transform": {"x":540,"y":466,"width":166,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FF292D31","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4}}},
         "Matrix": {"rows":["LFO","ENV","VEL"],"cols":["OSC","FLT","AMP"],"amounts":[0.6,0,-0.4,0,0.7,0,0,0.4,0.8],"cellStyle":"dot","rowHeaderW":42,"cellBg":"FF292D31","gridColour":"66303338","posColour":"FFD4BA8E","negColour":"FF5FD3F0","labelColour":"FFF2F2F2","activeColour":"FFD4BA8E"},
@@ -785,7 +786,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"VectorJoystick_1789891718699","controlSetId":"chronograph","id":"ctrl_1789891718699","controlType":"VectorJoystick"},
+        "Core": {"name":"VectorJoystick_1724717883948","controlSetId":"chronograph","id":"ctrl_1724717883948","controlType":"VectorJoystick"},
         "Transform": {"x":728,"y":466,"width":124,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FF292D31","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"CED2D5","position":0},{"color":"B4B9BF","position":55},{"color":"8C9095","position":100}]}},"Border":{"colour":"FF4A4F55"},"Corners":{"radius":4}}},
         "Joystick": {"puckRadius":7,"padColour":"FF292D31","gridColour":"66303338","crosshairColour":"FFD4BA8E","puckColour":"FF9EA8AE","cornerColour":"FFF7F4EC","labelColour":"FFF2F2F2"},
@@ -796,10 +797,10 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789891718700","controlSetId":"chronograph","id":"ctrl_1789891718700","controlType":"Label"},
+        "Core": {"name":"Label_1724717883949","controlSetId":"chronograph","id":"ctrl_1724717883949","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
-        "Text": {"content":"Editable synthesizer controls — copy individual controls into your panel.","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
+        "Text": {"content":"Editable synthesizer controls — copy individual controls into your panel.","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowOffsetY":-1,"shadowBlur":0,"shadowColour":"A6000000"}}},
         "ContentLayout": {"lampColour":"FFD4BA8E","lampOffColour":"FF292D31","lampBezelColour":"AA3A3E43"}
       },
       "_type": "Control"

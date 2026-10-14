@@ -1,4 +1,5 @@
 {
+  "formatVersion": 2,
   "panelGuid": "cbed324b-62d0-94cb-acf9-21b38f312ec0",
   "exportSettings": {
     "pluginName": "",
@@ -12,7 +13,7 @@
     "restoreHardware": "ask"
   },
   "name": "Arcade — starter",
-  "scriptId": "panel_15",
+  "scriptId": "arcade_starter",
   "author": "",
   "version": "1.0.0",
   "description": "Joystick dial, octagonal punch keys, diamond pads and oversized directional steppers.",
@@ -126,10 +127,10 @@
   "parameterSnapshots": {},
   "exportParameters": [
     {
-      "id": "Knob_1789883153275.value",
-      "label": "Knob_1789883153275",
-      "controlName": "Knob_1789883153275",
-      "path": "Knob_1789883153275.value",
+      "id": "Knob_1796200226747.value",
+      "label": "Knob_1796200226747",
+      "controlName": "Knob_1796200226747",
+      "path": "Knob_1796200226747.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.63,
@@ -140,10 +141,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Knob_1789883153276.value",
-      "label": "Knob_1789883153276",
-      "controlName": "Knob_1789883153276",
-      "path": "Knob_1789883153276.value",
+      "id": "Knob_1796200226748.value",
+      "label": "Knob_1796200226748",
+      "controlName": "Knob_1796200226748",
+      "path": "Knob_1796200226748.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.35,
@@ -154,10 +155,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789883153277.value",
-      "label": "Slider_1789883153277",
-      "controlName": "Slider_1789883153277",
-      "path": "Slider_1789883153277.value",
+      "id": "Slider_1796200226749.value",
+      "label": "Slider_1796200226749",
+      "controlName": "Slider_1796200226749",
+      "path": "Slider_1796200226749.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.66,
@@ -168,10 +169,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Crossfader_1789883153278.value",
-      "label": "Crossfader_1789883153278",
-      "controlName": "Crossfader_1789883153278",
-      "path": "Crossfader_1789883153278.value",
+      "id": "Crossfader_1796200226750.value",
+      "label": "Crossfader_1796200226750",
+      "controlName": "Crossfader_1796200226750",
+      "path": "Crossfader_1796200226750.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -184,10 +185,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "ToggleButton_1789883153280.value",
-      "label": "ToggleButton_1789883153280",
-      "controlName": "ToggleButton_1789883153280",
-      "path": "ToggleButton_1789883153280.value",
+      "id": "ToggleButton_1796200226752.value",
+      "label": "ToggleButton_1796200226752",
+      "controlName": "ToggleButton_1796200226752",
+      "path": "ToggleButton_1796200226752.value",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -198,10 +199,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "CyclicButton_1789883153281.value",
-      "label": "CyclicButton_1789883153281",
-      "controlName": "CyclicButton_1789883153281",
-      "path": "CyclicButton_1789883153281.value",
+      "id": "CyclicButton_1796200226753.value",
+      "label": "CyclicButton_1796200226753",
+      "controlName": "CyclicButton_1796200226753",
+      "path": "CyclicButton_1796200226753.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -217,10 +218,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Combobox_1789883153282.value",
-      "label": "Combobox_1789883153282",
-      "controlName": "Combobox_1789883153282",
-      "path": "Combobox_1789883153282.value",
+      "id": "Combobox_1796200226754.value",
+      "label": "Combobox_1796200226754",
+      "controlName": "Combobox_1796200226754",
+      "path": "Combobox_1796200226754.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -236,10 +237,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Number_1789883153283.value",
-      "label": "Number_1789883153283",
-      "controlName": "Number_1789883153283",
-      "path": "Number_1789883153283.value",
+      "id": "Number_1796200226755.value",
+      "label": "Number_1796200226755",
+      "controlName": "Number_1796200226755",
+      "path": "Number_1796200226755.value",
       "min": 0,
       "max": 100,
       "defaultValue": 0,
@@ -250,10 +251,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Ribbon_1789883153289.value",
-      "label": "Ribbon_1789883153289",
-      "controlName": "Ribbon_1789883153289",
-      "path": "Ribbon_1789883153289.value",
+      "id": "Ribbon_1796200226761.value",
+      "label": "Ribbon_1796200226761",
+      "controlName": "Ribbon_1796200226761",
+      "path": "Ribbon_1796200226761.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -266,10 +267,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789883153292.x",
-      "label": "VectorJoystick_1789883153292 X",
-      "controlName": "VectorJoystick_1789883153292",
-      "path": "VectorJoystick_1789883153292.x",
+      "id": "VectorJoystick_1796200226764.x",
+      "label": "VectorJoystick_1796200226764 X",
+      "controlName": "VectorJoystick_1796200226764",
+      "path": "VectorJoystick_1796200226764.x",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -282,10 +283,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789883153292.y",
-      "label": "VectorJoystick_1789883153292 Y",
-      "controlName": "VectorJoystick_1789883153292",
-      "path": "VectorJoystick_1789883153292.y",
+      "id": "VectorJoystick_1796200226764.y",
+      "label": "VectorJoystick_1796200226764 Y",
+      "controlName": "VectorJoystick_1796200226764",
+      "path": "VectorJoystick_1796200226764.y",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -298,10 +299,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1789883153293.bpm",
-      "label": "StepSequencer_1789883153293 Tempo",
-      "controlName": "StepSequencer_1789883153293",
-      "path": "StepSequencer_1789883153293.bpm",
+      "id": "StepSequencer_1796200226765.bpm",
+      "label": "StepSequencer_1796200226765 Tempo",
+      "controlName": "StepSequencer_1796200226765",
+      "path": "StepSequencer_1796200226765.bpm",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -314,10 +315,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1789883153293.run",
-      "label": "StepSequencer_1789883153293 Run",
-      "controlName": "StepSequencer_1789883153293",
-      "path": "StepSequencer_1789883153293.run",
+      "id": "StepSequencer_1796200226765.run",
+      "label": "StepSequencer_1796200226765 Run",
+      "controlName": "StepSequencer_1796200226765",
+      "path": "StepSequencer_1796200226765.run",
       "min": 0,
       "max": 1,
       "defaultValue": 0,
@@ -342,7 +343,7 @@
   "controls": [
     {
       "_children": {
-        "Core": {"name":"Label_1789883153271","controlSetId":"arcade","id":"ctrl_1789883153271","controlType":"Label"},
+        "Core": {"name":"Label_1796200226743","controlSetId":"arcade","id":"ctrl_1796200226743","controlType":"Label"},
         "Transform": {"x":26,"y":16,"width":650,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
         "Text": {"content":"ARCADE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"size":24,"letterSpacing":0.9}}},
@@ -352,7 +353,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789883153272","controlSetId":"arcade","id":"ctrl_1789883153272","controlType":"Label"},
+        "Core": {"name":"Label_1796200226744","controlSetId":"arcade","id":"ctrl_1796200226744","controlType":"Label"},
         "Transform": {"x":26,"y":48,"width":650,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
         "Text": {"content":"Arcade / cabinet","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},
@@ -362,7 +363,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789883153273","controlSetId":"arcade","id":"ctrl_1789883153273","controlType":"Label"},
+        "Core": {"name":"Label_1796200226745","controlSetId":"arcade","id":"ctrl_1796200226745","controlType":"Label"},
         "Transform": {"x":26,"y":82,"width":250,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
         "Text": {"content":"TURN / SLIDE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
@@ -372,7 +373,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789883153274","controlSetId":"arcade","id":"ctrl_1789883153274","controlType":"Label"},
+        "Core": {"name":"Label_1796200226746","controlSetId":"arcade","id":"ctrl_1796200226746","controlType":"Label"},
         "Transform": {"x":580,"y":82,"width":250,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
         "Text": {"content":"PRESS / SELECT","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
@@ -382,7 +383,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Knob_1789883153275","controlSetId":"arcade","controlForm":"new-arcade","formFaceColour":"FFECD94A","formHousingColour":"FF202039","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFFF7085","id":"ctrl_1789883153275","controlType":"Knob"},
+        "Core": {"name":"Knob_1796200226747","controlSetId":"arcade","controlForm":"new-arcade","formFaceColour":"FFECD94A","formHousingColour":"FF202039","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFFF7085","id":"ctrl_1796200226747","controlType":"Knob"},
         "Transform": {"x":26,"y":112,"width":190,"height":190},
         "Behavior": {"defaultCurrentValue":0.63,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
@@ -413,7 +414,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Knob_1789883153276","controlSetId":"arcade","controlForm":"new-arcade","formFaceColour":"FFECD94A","formHousingColour":"FF202039","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFFF7085","id":"ctrl_1789883153276","controlType":"Knob"},
+        "Core": {"name":"Knob_1796200226748","controlSetId":"arcade","controlForm":"new-arcade","formFaceColour":"FFECD94A","formHousingColour":"FF202039","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFFF7085","id":"ctrl_1796200226748","controlType":"Knob"},
         "Transform": {"x":220,"y":125,"width":128,"height":158},
         "Behavior": {"defaultCurrentValue":0.35,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
@@ -444,7 +445,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1789883153277","controlSetId":"arcade","id":"ctrl_1789883153277","controlType":"Slider"},
+        "Core": {"name":"Slider_1796200226749","controlSetId":"arcade","id":"ctrl_1796200226749","controlType":"Slider"},
         "Transform": {"x":364,"y":133,"width":190,"height":78},
         "Behavior": {"defaultCurrentValue":0.66,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
@@ -475,7 +476,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Crossfader_1789883153278","controlSetId":"arcade","id":"ctrl_1789883153278","controlType":"Crossfader"},
+        "Core": {"name":"Crossfader_1796200226750","controlSetId":"arcade","id":"ctrl_1796200226750","controlType":"Crossfader"},
         "Transform": {"x":364,"y":234,"width":190,"height":62},
         "Background": {"_children":{"Fill":{"colour":"FF202039"},"Border":{"thickness":3,"colour":"FF1B1B1B"},"Corners":{"radius":4}}},
         "Crossfader": {"handleSize":22,"handleStyle":"block","trackSize":8,"trackColour":"FF202039","fillAColour":"FFFF7085","fillBColour":"FF5BC8FF","handleColour":"FFECD94A","labelColour":"FFF2F2F2"},
@@ -486,7 +487,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Button_1789883153279","controlSetId":"arcade","controlForm":"new-arcade","formFaceColour":"FFECD94A","formHousingColour":"FF202039","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFFF7085","id":"ctrl_1789883153279","controlType":"Button"},
+        "Core": {"name":"Button_1796200226751","controlSetId":"arcade","controlForm":"new-arcade","formFaceColour":"FFECD94A","formHousingColour":"FF202039","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFFF7085","id":"ctrl_1796200226751","controlType":"Button"},
         "Transform": {"x":576,"y":118,"width":124,"height":84},
         "Background": {"_children":{"Fill":{"colour":"FFFFFFFF"},"Border":{"thickness":3,"colour":"FF1B1B1B"},"Corners":{"radius":999}}},
         "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FF202020"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
@@ -498,7 +499,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"ToggleButton_1789883153280","controlSetId":"arcade","controlForm":"new-arcade","formFaceColour":"FFECD94A","formHousingColour":"FF202039","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFFF7085","id":"ctrl_1789883153280","controlType":"ToggleButton"},
+        "Core": {"name":"ToggleButton_1796200226752","controlSetId":"arcade","controlForm":"new-arcade","formFaceColour":"FFECD94A","formHousingColour":"FF202039","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFFF7085","id":"ctrl_1796200226752","controlType":"ToggleButton"},
         "Transform": {"x":716,"y":118,"height":84},
         "Background": {"_children":{"Fill":{"colour":"FFFFFFFF"},"Border":{"thickness":3,"colour":"FF1B1B1B"},"Corners":{"radius":999}}},
         "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FF202020"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
@@ -511,7 +512,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"CyclicButton_1789883153281","controlSetId":"arcade","id":"ctrl_1789883153281","controlType":"CyclicButton"},
+        "Core": {"name":"CyclicButton_1796200226753","controlSetId":"arcade","id":"ctrl_1796200226753","controlType":"CyclicButton"},
         "Transform": {"x":576,"y":220,"width":124,"height":36},
         "Background": {"_children":{"Fill":{"colour":"FFFFFFFF"},"Border":{"thickness":3,"colour":"FF1B1B1B"},"Corners":{"radius":999}}},
         "Text": {"content":"CYCLE","_children":{"Fill":{"colour":"FF202020"}}},
@@ -523,7 +524,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Combobox_1789883153282","controlSetId":"arcade","id":"ctrl_1789883153282","controlType":"Combobox"},
+        "Core": {"name":"Combobox_1796200226754","controlSetId":"arcade","id":"ctrl_1796200226754","controlType":"Combobox"},
         "Transform": {"x":716,"y":220,"width":136,"height":36},
         "Background": {"_children":{"Fill":{"colour":"FFFFFFFF"},"Border":{"thickness":3,"colour":"FF1B1B1B"},"Corners":{"radius":12}}},
         "Text": {"_children":{"Fill":{"colour":"FF202020"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
@@ -535,7 +536,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Number_1789883153283","controlSetId":"arcade","id":"ctrl_1789883153283","controlType":"Number"},
+        "Core": {"name":"Number_1796200226755","controlSetId":"arcade","id":"ctrl_1796200226755","controlType":"Number"},
         "Transform": {"x":576,"y":265,"width":124,"height":46},
         "Parts": {
           "_children": {
@@ -550,7 +551,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"TextInput_1789883153284","controlSetId":"arcade","id":"ctrl_1789883153284","controlType":"TextInput"},
+        "Core": {"name":"TextInput_1796200226756","controlSetId":"arcade","id":"ctrl_1796200226756","controlType":"TextInput"},
         "Transform": {"x":716,"y":273,"width":136},
         "Background": {"_children":{"Fill":{"colour":"FF202039"},"Border":{"thickness":3,"colour":"FF1B1B1B"},"Corners":{"radius":999}}},
         "Text": {"content":"Studio A","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Rubik"}}},
@@ -562,7 +563,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789883153285","controlSetId":"arcade","id":"ctrl_1789883153285","controlType":"Label"},
+        "Core": {"name":"Label_1796200226757","controlSetId":"arcade","id":"ctrl_1796200226757","controlType":"Label"},
         "Transform": {"x":26,"y":310,"width":250,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
         "Text": {"content":"PLAY / SHAPE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
@@ -572,7 +573,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789883153286","controlSetId":"arcade","id":"ctrl_1789883153286","controlType":"Label"},
+        "Core": {"name":"Label_1796200226758","controlSetId":"arcade","id":"ctrl_1796200226758","controlType":"Label"},
         "Transform": {"x":540,"y":310,"width":250,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
         "Text": {"content":"MEASURE / ROUTE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
@@ -582,7 +583,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"DrumPads_1789883153287","controlSetId":"arcade","id":"ctrl_1789883153287","controlType":"DrumPads"},
+        "Core": {"name":"DrumPads_1796200226759","controlSetId":"arcade","id":"ctrl_1796200226759","controlType":"DrumPads"},
         "Transform": {"x":26,"y":348,"width":228,"height":214},
         "Background": {"_children":{"Fill":{"colour":"FF202039"},"Border":{"thickness":3,"colour":"FF1B1B1B"},"Corners":{"radius":4}}},
         "DrumPads": {"rows":2,"cols":2,"showNotes":false,"showHeader":false,"padForm":"diamond","padAppearance":"raised","padRadius":4,"fieldColour":"FF202039","padColour":"FFECD94A","accentColour":"FFFF7085","hitColour":"FFFF7085","labelColour":"FF202020"},
@@ -593,7 +594,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Envelope_1789883153288","controlSetId":"arcade","id":"ctrl_1789883153288","controlType":"Envelope"},
+        "Core": {"name":"Envelope_1796200226760","controlSetId":"arcade","id":"ctrl_1796200226760","controlType":"Envelope"},
         "Transform": {"x":284,"y":348,"width":220,"height":70},
         "Background": {"_children":{"Fill":{"colour":"FF202039"},"Border":{"thickness":3,"colour":"FF1B1B1B"},"Corners":{"radius":4}}},
         "Envelope": {"lineWidth":3,"nodeRadius":3,"lineColour":"FFFF7085","fillColour":"20000000","nodeColour":"FFECD94A","gridColour":"661B1B1B","sustainColour":"FF5BC8FF","playheadColour":"FFFF7085"},
@@ -604,7 +605,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Ribbon_1789883153289","controlSetId":"arcade","id":"ctrl_1789883153289","controlType":"Ribbon"},
+        "Core": {"name":"Ribbon_1796200226761","controlSetId":"arcade","id":"ctrl_1796200226761","controlType":"Ribbon"},
         "Transform": {"x":284,"y":427,"width":220,"height":30},
         "Background": {"_children":{"Fill":{"colour":"FF202039"},"Border":{"thickness":3,"colour":"FF1B1B1B"},"Corners":{"radius":4}}},
         "Ribbon": {"orientation":"horizontal","style":"wheel3d","showGlow":false,"indicatorSize":8,"trackColour":"FF202039","fillColour":"FFFF7085","indicatorColour":"FFECD94A","glowColour":"FFFF7085","wheelColour":"FFFFFFFF","labelColour":"FFF2F2F2"},
@@ -615,7 +616,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Meter_1789883153290","controlSetId":"arcade","controlForm":"new-arcade","formFaceColour":"FFECD94A","formHousingColour":"FF202039","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFFF7085","id":"ctrl_1789883153290","controlType":"Meter"},
+        "Core": {"name":"Meter_1796200226762","controlSetId":"arcade","controlForm":"new-arcade","formFaceColour":"FFECD94A","formHousingColour":"FF202039","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FFFF7085","id":"ctrl_1796200226762","controlType":"Meter"},
         "Transform": {"x":540,"y":342,"width":312,"height":108},
         "Background": {"_children":{"Fill":{"colour":"FF202039"},"Border":{"thickness":3,"colour":"FF1B1B1B"},"Corners":{"radius":4}}},
         "Meter": {"value":0.7,"segments":12,"segmentGap":3,"trackColour":"FF202039","fillColour":"FFFF7085","thickness":16,"rounded":false,"peakColour":"FFFF7085","showTicks":true,"valuePrecision":2},
@@ -626,7 +627,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Matrix_1789883153291","controlSetId":"arcade","id":"ctrl_1789883153291","controlType":"Matrix"},
+        "Core": {"name":"Matrix_1796200226763","controlSetId":"arcade","id":"ctrl_1796200226763","controlType":"Matrix"},
         "Transform": {"x":540,"y":466,"width":166,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FF202039"},"Border":{"thickness":3,"colour":"FF1B1B1B"},"Corners":{"radius":4}}},
         "Matrix": {"rows":["LFO","ENV","VEL"],"cols":["OSC","FLT","AMP"],"amounts":[0.6,0,-0.4,0,0.7,0,0,0.4,0.8],"cellStyle":"dot","rowHeaderW":42,"cellBg":"FF202039","gridColour":"661B1B1B","posColour":"FFFF7085","negColour":"FF5BC8FF","labelColour":"FFF2F2F2","activeColour":"FFFF7085"},
@@ -637,7 +638,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"VectorJoystick_1789883153292","controlSetId":"arcade","id":"ctrl_1789883153292","controlType":"VectorJoystick"},
+        "Core": {"name":"VectorJoystick_1796200226764","controlSetId":"arcade","id":"ctrl_1796200226764","controlType":"VectorJoystick"},
         "Transform": {"x":728,"y":466,"width":124,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FF202039"},"Border":{"thickness":3,"colour":"FF1B1B1B"},"Corners":{"radius":4}}},
         "Joystick": {"puckRadius":7,"padColour":"FF202039","gridColour":"661B1B1B","crosshairColour":"FFFF7085","puckColour":"FFECD94A","cornerColour":"FFF7F4EC","labelColour":"FFF2F2F2"},
@@ -648,7 +649,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"StepSequencer_1789883153293","controlSetId":"arcade","id":"ctrl_1789883153293","controlType":"StepSequencer"},
+        "Core": {"name":"StepSequencer_1796200226765","controlSetId":"arcade","id":"ctrl_1796200226765","controlType":"StepSequencer"},
         "Transform": {"x":284,"y":466,"width":220,"height":100},
         "StepSequencer": {"cellForm":"diamond","steps":8,"trackHeaderWidth":38,"tracks":[{"id":"kick","label":"Kick","note":36,"channel":10},{"id":"hat","label":"Hat","note":42,"channel":10}],"pattern":{"kick:0":{"on":true,"velocity":100},"kick:4":{"on":true,"velocity":100},"hat:0":{"on":true,"velocity":70},"hat:2":{"on":true,"velocity":70},"hat:4":{"on":true,"velocity":70},"hat:6":{"on":true,"velocity":70}},"cellColour":"FFECD94A","cellOnColour":"FFFF7085","playheadColour":"FFFF7085","gridColour":"661B1B1B","labelColour":"FFF7F4EC"},
         "Text": {"_children":{"Fill":{"colour":"FFF7F4EC"}}}
@@ -657,7 +658,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1789883153294","controlSetId":"arcade","id":"ctrl_1789883153294","controlType":"Label"},
+        "Core": {"name":"Label_1796200226766","controlSetId":"arcade","id":"ctrl_1796200226766","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
         "Text": {"content":"Copy a control into your panel. Its pinned design travels with it.","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Rubik","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},

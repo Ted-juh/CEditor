@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync } from 'node:fs';
+import { assertSameText, readText } from './support/readText.mjs';
+import { SHIPPED_STARTER_IDS, STARTERS_DIR, starterFile } from '../scripts/export-control-set-starters.mjs';
 import { STARTER_CONTROL_SETS } from '../src/CE_Application/models/controlSetCoverage.js';
 import { PHYSICAL_DIRECTIONS } from '../src/CE_Application/models/physicalControlSets.js';
 import { createControlSetStarter } from '../src/CE_Application/models/controlSetStarter.js';
@@ -23,6 +26,30 @@ test('sixty editable starters round-trip with portable design pins and finite bo
     }
     const slider = restored.controls.find(c => c._children.Core.controlType === 'Slider');
     assert.deepEqual(slider._children.Parts, panel.controls.find(c => c._children.Core.controlType === 'Slider')._children.Parts);
+  }
+});
+
+test('the shipped starters are what the generator writes, byte for byte', () => {
+  // They were written once and then left while the sets' designs moved on, which nothing could
+  // catch: every export renamed every control, so a fresh one never matched the committed one.
+  // starterFile numbers them from a fixed point, and this holds the files to it. Run after the test
+  // above has opened all sixty, so a starter whose bytes depend on what the process did first —
+  // the panel counter, the control counter — fails here rather than in CI.
+  assert.deepEqual(readdirSync(STARTERS_DIR).filter((f) => f.endsWith('.cepanel')).sort(),
+    SHIPPED_STARTER_IDS.map((id) => `${id}.cepanel`).sort(),
+    'every file in the folder is a starter the code still makes, and every starter has its file');
+  const owner = new Map();
+  for (const id of SHIPPED_STARTER_IDS) {
+    const { path, text } = starterFile(id);
+    assertSameText(readText(path), text,
+      `${id}.cepanel is stale — run scripts/export-control-set-starters.mjs from CE/web`,
+      { actual: 'committed', expected: 'the generator' });
+    // Distinct across starters, so controls copied from two of them into one panel do not collide.
+    for (const control of JSON.parse(text).controls) {
+      const cid = control._children.Core.id;
+      assert.ok(!owner.has(cid), `${cid} is in both ${owner.get(cid)} and ${id}`);
+      owner.set(cid, id);
+    }
   }
 });
 
