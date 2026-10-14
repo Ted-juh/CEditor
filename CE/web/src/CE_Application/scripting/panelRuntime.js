@@ -295,38 +295,64 @@ function activePanel() {
 }
 
 // Editor document writes replace the controls array. Reuse name/id lookups
-// across the many watch() reads in a settle pass; host adapters can own mutable
-// documents, so retain their uncached lookup semantics.
+// across the many watch() reads in a settle pass.
 const editorNameIndexes = new WeakMap();
+
+// The player's document is its host's and is written in place (playerScriptHost.js), so its controls
+// array stays the same object when a name changes and cannot key an index on its own. It used to be
+// scanned whole on every lookup instead, and with the window open that was most of what GAIA's
+// preset-name script cost: 1,070 lookups across 818 controls in one call, 160 to 220 ms of the
+// 250 ms a call may take. Its index is kept honest as it is used: a hit is checked against the
+// control's current name and id, a miss looks again in a fresh index (a control a script created),
+// and a script's write to a name or an id drops it (noteHostWrite).
+const hostNameIndexes = new WeakMap();
+let hostNamesVersion = 0;
+
+/** Name and id (lower-cased) to the first control that answers to it, in the order a scan meets them. */
+function nameIndexFor(controls) {
+  const index = new Map();
+  // flatControls, NOT the top level: a control inside a Group or Container was unreachable by
+  // name — get("Osc1Cutoff.value") returned nothing for a knob that was plainly there, in both
+  // runtimes, and most real panels group their controls. ce.panel.snapshot found it, because a
+  // snapshot that stopped at the top level would have silently missed most of a panel.
+  for (const control of flatControls(controls)) {
+    const core = control?._children?.Core;
+    for (const key of [String(core?.name ?? '').toLowerCase(), String(core?.id ?? '').toLowerCase()]) {
+      if (!index.has(key)) index.set(key, control);
+    }
+  }
+  return index;
+}
+
+function answersTo(control, target) {
+  const core = control?._children?.Core;
+  return String(core?.name ?? '').toLowerCase() === target || String(core?.id ?? '').toLowerCase() === target;
+}
+
+/** A host write that renames a control, or changes its id, leaves the player's name index stale. */
+function noteHostWrite(modelPath) {
+  if (modelPath === 'Core.name' || modelPath === 'Core.id') hostNamesVersion += 1;
+}
 
 /** Find a control in the active panel by its friendly name (case-insensitive), id fallback. */
 function findControlByName(name) {
   const panel = activePanel();
   if (!panel) return null;
   const target = String(name ?? '').toLowerCase();
-  if (!host && Array.isArray(panel.controls)) {
-    let index = editorNameIndexes.get(panel.controls);
-    if (!index) {
-      index = new Map();
-      for (const control of flatControls(panel.controls)) {
-        const core = control?._children?.Core;
-        for (const key of [String(core?.name ?? '').toLowerCase(), String(core?.id ?? '').toLowerCase()]) {
-          if (!index.has(key)) index.set(key, control);
-        }
-      }
-      editorNameIndexes.set(panel.controls, index);
-    }
+  const controls = Array.isArray(panel.controls) ? panel.controls : [];
+  if (!host) {
+    let index = editorNameIndexes.get(controls);
+    if (!index) editorNameIndexes.set(controls, (index = nameIndexFor(controls)));
     return index.get(target) ?? null;
   }
-  // flatControls, NOT panel.controls: a control inside a Group or Container was unreachable by
-  // name — get("Osc1Cutoff.value") returned nothing for a knob that was plainly there, in both
-  // runtimes, and most real panels group their controls. ce.panel.snapshot found it, because a
-  // snapshot that stopped at the top level would have silently missed most of a panel.
-  // A name that resolved before still resolves; this only adds the ones that never could.
-  return flatControls(panel.controls ?? []).find((c) => {
-    const core = c?._children?.Core;
-    return String(core?.name ?? '').toLowerCase() === target || String(core?.id ?? '').toLowerCase() === target;
-  }) ?? null;
+  let entry = hostNameIndexes.get(controls);
+  if (entry?.version === hostNamesVersion) {
+    const found = entry.index.get(target);
+    if (found && answersTo(found, target)) return found;
+  }
+  entry = { version: hostNamesVersion, index: nameIndexFor(controls) };
+  hostNameIndexes.set(controls, entry);
+  return entry.index.get(target) ?? null;
 }
 
 // Common shorthands → their canonical section path (visible lives under Core, x under Transform, …).
@@ -662,6 +688,7 @@ function setValue(path, value, formOrOpts = '') {
   let wrote = true;
   if (host) {
     wrote = host.writeValue(control, modelPath, value) !== false;
+    noteHostWrite(modelPath);
   } else if (live && liveId) {
     updatePanelPreviewSession(liveId, channelName
       ? customChannelPatch(control, channelName, value, get(panelPreviewSessions))
@@ -6110,7 +6137,7 @@ function deviceDefineDumpImpl(kind, spec, role) {
  * plugin runs this runtime in its OPEN window, so a panel-view-only verb still has a host.
  */
 function writeControlProperty(control, path, value) {
-  if (host) { host.writeValue(control, path, value); return; }
+  if (host) { host.writeValue(control, path, value); noteHostWrite(path); return; }
   noteEditorScriptTouchedControl(control?._children?.Core?.id);
   writeEditorControlProperty(control, path, value);
 }
