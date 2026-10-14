@@ -123,3 +123,23 @@ test('the format number moves, so an older CEditor says a newer one wrote the fi
   assert.equal(PANEL_FORMAT_VERSION, 3);
   assert.equal(JSON.parse(serializePanel(open('CE/qa/QA-08-export.cepanel'))).formatVersion, 3);
 });
+
+test('a document from a newer CEditor keeps its drawings table: what this build did not put back is written back', () => {
+  // The loader's promise to a newer document is that what this build does not understand survives a
+  // save (utils/panelFormat.js). Its table may hold such a thing: here, an entry no control names.
+  const doc = JSON.parse(serializePanel(open(GAIA)));
+  doc.formatVersion = 99;
+  const unknown = { _children: { later: { _type: 'Part', name: 'later', _children: { Text: { content: 'from a newer build' } } } } };
+  doc.drawings.ffffffff = unknown;
+  const panel = deserializePanel(JSON.stringify(doc), 'newer.cepanel', null);
+  assert.ok(panelOpenReport().warnings.some((w) => /newer CEditor/.test(w)), 'it opens with the newer-version warning');
+  const [name] = Object.keys(doc.drawings);
+  const user = [...everyControl(doc.controls)].find((c) => c._children.Parts?.[DRAWING_KEY] === name);
+  const opened = [...everyControl(panel.controls)].find((c) => c._children.Core.id === user._children.Core.id);
+  assert.ok(Object.keys(opened._children.Parts._children ?? {}).length, 'the drawings this build understands are drawn');
+
+  const saved = JSON.parse(serializePanel(panel));
+  assert.equal(saved.formatVersion, 99);
+  assert.deepEqual(saved.drawings.ffffffff, unknown, 'the entry no control names is written back');
+  for (const kept of Object.keys(doc.drawings)) assert.ok(kept in saved.drawings, `drawing ${kept} is still in the table`);
+});

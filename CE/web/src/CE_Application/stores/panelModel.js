@@ -449,15 +449,19 @@ export function serializePanel(panel, options = {}) {
   //
   // Laid out one line per control section, not one per property (stores/documentLayout.js).
   //
-  // The drawings table goes right after the controls that refer to it.
-  const { formatVersion, documentForm, controlDefaults, drawings, ...rest } = data;
+  // The drawings table goes right after the controls that refer to it. A document from a newer
+  // CEditor brought its own table, which goes back with this one's shares over it
+  // (resolveDrawings' keepTable); a saved document only, since the complete form shares nothing.
+  const { formatVersion, documentForm, controlDefaults, drawings: carried, ...rest } = data;
+  const kept = carried && typeof carried === 'object' && !Array.isArray(carried) ? carried : null;
+  const table = elide && (kept || shared.drawings) ? { ...kept, ...shared.drawings } : null;
   const doc = {
     formatVersion: Math.max(PANEL_FORMAT_VERSION, panelFormatVersion({ formatVersion })),
     ...(elide ? {} : { documentForm: 'complete' }),
   };
   for (const [key, value] of Object.entries(rest)) {
     doc[key] = value;
-    if (key === 'controls' && shared.drawings) doc.drawings = shared.drawings;
+    if (key === 'controls' && table) doc.drawings = table;
   }
   return panelDocumentText(doc);
 }

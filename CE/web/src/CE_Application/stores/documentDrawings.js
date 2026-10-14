@@ -124,8 +124,13 @@ function over(own, base) {
  * `{ doc, missing }`: `doc` is the input itself when it has neither a table nor a reference (it is
  * never changed), and `missing` names each drawing a control referred to that the table does not
  * have. Such a control opens without it.
+ *
+ * `keepTable` leaves the table on the document as well, for one from a newer CEditor: whatever such
+ * a table holds that this build did not put back (an entry no control names, or anything a later
+ * format keeps there) is written back on save, as everything else a newer document carries is
+ * (utils/panelFormat.js). serializePanel writes it under the drawings it shares itself.
  */
-export function resolveDrawings(doc) {
+export function resolveDrawings(doc, { keepTable = false } = {}) {
   const table = isObject(doc?.drawings) ? doc.drawings : {};
   const missing = new Set();
   let referred = false;
@@ -142,10 +147,10 @@ export function resolveDrawings(doc) {
   const controls = Array.isArray(doc?.controls) ? doc.controls.map((control) => mapControl(control, resolve)) : doc?.controls;
   if (!referred && !Object.hasOwn(doc ?? {}, 'drawings')) return { doc, missing: [] };
 
-  // The document's own key order, less the table.
+  // The document's own key order, less the table unless it is kept.
   const out = {};
   for (const [key, value] of Object.entries(doc)) {
-    if (key === 'drawings') continue;
+    if (key === 'drawings' && !keepTable) continue;
     out[key] = key === 'controls' ? controls : value;
   }
   return { doc: out, missing: [...missing] };
