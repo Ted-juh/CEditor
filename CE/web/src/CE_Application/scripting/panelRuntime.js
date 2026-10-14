@@ -6437,8 +6437,9 @@ export function clearDeviceRuntimeDefinitions() {
 // C++ engines that falls out of the per-script environment for free, and here it falls out of the
 // handler cache, so both behave the same. Settings outlive the session: they go into the panel
 // document under scripting.settings, which is what makes them travel with the panel and survive an
-// export. In the player the document is in memory, so they last the session and ride along in the
-// DAW state the plugin already saves.
+// export. In the player they are the plug-in instance's, which saves them with the DAW project (see
+// the scopes below). This said they rode along in the DAW state from the document in memory; nothing
+// carried them there, and a setting saved with the window open was gone when the project reopened.
 
 const scriptState = new Map();   // scriptId -> the script's own scratch table
 
@@ -6462,6 +6463,11 @@ function stateFor(scriptId) {
  *
  * script scope is a key prefix rather than a second store on purpose: a private setting should
  * persist and travel exactly like a shared one, and only its visibility differs.
+ *
+ * In the exported plug-in both stores are the instance's own, and two copies of a panel keep theirs
+ * apart: the instance saves them with the DAW project ("local" under this machine's id, applied on
+ * no other) and the page reads and writes them through the host (playerScriptHost.js,
+ * createInstanceStorage), so the window open and the window closed see one store.
  */
 const STORAGE_SCOPES = ['panel', 'script', 'local'];
 const LOCAL_STORAGE_PREFIX = 'ce.storage:';
@@ -6505,6 +6511,8 @@ function storageKeyFrom(scope, stored, scriptId) {
 }
 
 function settingsStore() {
+  // The plug-in instance's own store, window open in the player (playerScriptHost.js).
+  if (host?.storage) return host.storage.read('panel');
   const panel = activePanel();
   if (!panel) return null;
   panel.scripting ??= {};
@@ -6521,6 +6529,7 @@ function localStore() {
 }
 
 function localRead() {
+  if (host?.storage) return host.storage.read('local');
   const store = localStore();
   if (!store) return null;
   const panel = activePanel();
@@ -6540,6 +6549,8 @@ function saveSetting(key, value, opts, scriptId) {
   const scope = storageScopeOf(opts, scriptId);
   if (!scope) return false;
   const stored = storageKeyFor(scope, key, scriptId);
+  // In the player, both scopes are the instance's, and every write goes back to it.
+  if (host?.storage) return host.storage.write(scope === 'local' ? 'local' : 'panel', stored, value);
   if (scope === 'local') {
     const map = localRead();
     if (!map) {
@@ -6602,6 +6613,7 @@ function forgetSetting(key, opts, scriptId) {
   const scope = storageScopeOf(opts, scriptId);
   if (!scope) return false;
   const stored = storageKeyFor(scope, key, scriptId);
+  if (host?.storage) return host.storage.forget(scope === 'local' ? 'local' : 'panel', stored);
   if (scope === 'local') {
     const map = localRead();
     if (!map || !(stored in map)) return false;

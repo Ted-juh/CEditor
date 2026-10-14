@@ -71,6 +71,14 @@ public:
     std::function<bool()> isSessionRestored;
     void notifySessionRestored();
 
+    // --- ce.storage, window open --------------------------------------------------------------
+    // The instance's two stores ({ panel: {...}, local: {...} }), handed to the page with the panel,
+    // and each write the page makes ({ store, key, value } or { store, key, forget: true }) handed
+    // back, so the page and the window-closed runtime keep one store between them. Unset (the
+    // CEditor Player app, which has no plug-in instance), the page keeps its own.
+    std::function<juce::var()> scriptStores;
+    std::function<void (const juce::var& change)> onScriptSetting;
+
 private:
     void showStatusMessage (const juce::String& title, const juce::String& message);
     void loadPanelIntoWebView();

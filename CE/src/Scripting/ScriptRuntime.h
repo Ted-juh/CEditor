@@ -258,7 +258,8 @@ public:
         already persists for as long as it is loaded. */
     /** `store` is "panel" (the document, and the DAW project state in the export) or "local" (this
         machine only, never written into the document — a panel you send somebody should not carry
-        the recipient's MIDI port choice). A host with no local store leaves loadSetting void and
+        the recipient's MIDI port choice; in the export, this instance's, saved with the project
+        under the machine's id). A host with no local store leaves loadSetting void and
         saveSetting a no-op, and settingsAvailable() says so once rather than per key.
 
         ce.storage's third scope, "script", needs nothing here: it is a key prefix the prelude

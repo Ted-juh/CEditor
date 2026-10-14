@@ -8,35 +8,7 @@
 #include <vector>
 #include "PlayerHost.h"
 
-#ifndef CEDITOR_PLAYER_PANEL_PATH
- #define CEDITOR_PLAYER_PANEL_PATH ""
-#endif
-
-#ifndef CEDITOR_SIDECAR_IDENTITY
- #define CEDITOR_SIDECAR_IDENTITY 0
-#endif
-
-#if CEDITOR_SIDECAR_IDENTITY
- #include "Export/PanelIdentitySidecar.h"
-#endif
-
-/**
- * The panel this build loads.
- *
- * A per-panel build bakes the path and this is that path, exactly as before. A TEMPLATE build --
- * one prebuilt binary copied per panel rather than relinked -- has no meaningful path baked in and
- * finds the panel sitting beside itself instead. See CE/src/Export/PanelIdentitySidecar.h.
- *
- * Behind the guard so a build that does not opt in cannot start reading files next to itself.
- */
-static inline juce::File ceditorPlayerPanelFile()
-{
-   #if CEDITOR_SIDECAR_IDENTITY
-    return ceditor::exporter::resolvePlayerPanelFile (CEDITOR_PLAYER_PANEL_PATH);
-   #else
-    return juce::File (CEDITOR_PLAYER_PANEL_PATH);
-   #endif
-}
+#include "PlayerPanelFile.h"
 
 #ifndef CEDITOR_VALUE_LAYER
  #define CEDITOR_VALUE_LAYER 0
@@ -430,16 +402,19 @@ public:
        #if CEDITOR_SCRIPTING
         if (scriptRuntimeReady.load())
         {
-            juce::String stateJson, settingsJson;
+            juce::String stateJson, settingsJson, localJson;
             {
                 const juce::SpinLock::ScopedLockType lock (scriptStateLock);
                 stateJson = cachedScriptStateJson;
                 settingsJson = cachedScriptSettingsJson;
+                localJson = cachedScriptLocalJson;
             }
             root.createNewChildElement ("ScriptState")->addTextElement (stateJson);
             // ce.storage settings ride along separately: they are the runtime's, not any one
             // script's, so merging them into `store` would let a script overwrite another's key.
             root.createNewChildElement ("ScriptSettings")->addTextElement (settingsJson);
+            // "local" scope, per machine (localSettingsForState).
+            root.createNewChildElement ("ScriptLocal")->addTextElement (localJson);
         }
        #endif
         copyXmlToBinary (root, destData);
@@ -487,10 +462,16 @@ public:
                 const juce::SpinLock::ScopedLockType lock (scriptStateLock);
                 pendingScriptSettingsPresent = false;
                 pendingScriptStatePresent = false;
+                pendingScriptLocalPresent = false;
                 if (auto* sset = xml->getChildByName ("ScriptSettings"))
                 {
                     pendingScriptSettingsJson = sset->getAllSubText();
                     pendingScriptSettingsPresent = true;
+                }
+                if (auto* sloc = xml->getChildByName ("ScriptLocal"))
+                {
+                    pendingScriptLocalJson = sloc->getAllSubText();
+                    pendingScriptLocalPresent = true;
                 }
                 if (auto* sx = xml->getChildByName ("ScriptState"))
                 {
@@ -576,15 +557,13 @@ private:
         juce::var store (new juce::DynamicObject());
         scriptRuntime->onDawSaveState (store);
 
-        auto* settings = new juce::DynamicObject();
-        for (int i = 0; i < scriptSettings.size(); ++i)
-            settings->setProperty (scriptSettings.getName (i), scriptSettings.getValueAt (i));
-
         auto stateJson = juce::JSON::toString (store);
-        auto settingsJson = juce::JSON::toString (juce::var (settings));
+        auto settingsJson = juce::JSON::toString (settingsToVar (scriptSettings));
+        auto localJson = juce::JSON::toString (localSettingsForState());
         const juce::SpinLock::ScopedLockType lock (scriptStateLock);
         cachedScriptStateJson = std::move (stateJson);
         cachedScriptSettingsJson = std::move (settingsJson);
+        cachedScriptLocalJson = std::move (localJson);
     }
 
     /** Apply state parsed by a host callback. The timer is the thread handoff. */
@@ -593,27 +572,24 @@ private:
         if (scriptRuntime == nullptr || ! scriptRestorePending.exchange (false))
             return;
 
-        juce::String stateJson, settingsJson;
-        bool hasState = false, hasSettings = false;
+        juce::String stateJson, settingsJson, localJson;
+        bool hasState = false, hasSettings = false, hasLocal = false;
         {
             const juce::SpinLock::ScopedLockType lock (scriptStateLock);
             stateJson = std::move (pendingScriptStateJson);
             settingsJson = std::move (pendingScriptSettingsJson);
+            localJson = std::move (pendingScriptLocalJson);
             hasState = pendingScriptStatePresent;
             hasSettings = pendingScriptSettingsPresent;
+            hasLocal = pendingScriptLocalPresent;
             pendingScriptStatePresent = false;
             pendingScriptSettingsPresent = false;
+            pendingScriptLocalPresent = false;
         }
 
         // Settings first: a script's onDawRestoreState may well read one back.
-        if (hasSettings)
-        {
-            scriptSettings.clear();
-            const auto parsedSettings = juce::JSON::parse (settingsJson);
-            if (auto* obj = parsedSettings.getDynamicObject())
-                for (const auto& p : obj->getProperties())
-                    scriptSettings.set (p.name, p.value);
-        }
+        if (hasSettings) settingsFromVar (scriptSettings, juce::JSON::parse (settingsJson));
+        if (hasLocal)    localSettingsFromState (juce::JSON::parse (localJson));
         if (hasState)
             scriptRuntime->onDawRestoreState (juce::JSON::parse (stateJson));
         refreshScriptStateCache();
@@ -2245,53 +2221,35 @@ private:
             o->setProperty ("source", "host");
             return juce::var (o);
         };
-        // "panel" scope rides in the DAW project state (scriptSettings, saved with the session);
-        // "local" scope goes to the plugin's own settings file, which the project does not carry.
+        // Both scopes are this instance's own and ride in the DAW project state: "panel" scope as
+        // it is, "local" scope under this machine's id, so it applies on no other (see
+        // scriptMachineId). Window open, the page reads and writes these same two sets
+        // (scriptStoresForPage, applyScriptSettingFromPage).
         cb.saveSetting = [this] (const juce::String& key, const juce::var& value, const juce::String& store)
         {
-            if (store != "local") { scriptSettings.set (key, value); return; }
-            loadLocalSettings();
-            localSettings.set (key, value);
-            // Written through immediately: a machine-local setting has no "save the project" moment
-            // to ride along with, and the DAW may never close this instance politely.
-            if (! localStore()->update ([&] (juce::PropertySet& values)
-                {
-                    values.setValue (localKey (key), juce::JSON::toString (value));
-                }))
-                scriptLogLine ("[script] local setting could not be saved");
+            settingsFor (store).set (key, value);
+            noteScriptSettingsChanged();
         };
         cb.loadSetting = [this] (const juce::String& key, const juce::String& store)
         {
-            if (store != "local") return scriptSettings.getWithDefault (key, juce::var());
-            loadLocalSettings();
-            return localSettings.getWithDefault (key, juce::var());
+            return settingsFor (store).getWithDefault (key, juce::var());
         };
         cb.listSettings = [this] (const juce::String& store)
         {
-            if (store == "local") loadLocalSettings();
-            const auto& set = (store == "local" ? localSettings : scriptSettings);
+            const auto& set = settingsFor (store);
             juce::Array<juce::var> keys;
             for (int i = 0; i < set.size(); ++i) keys.add (set.getName (i).toString());
             return juce::var (keys);
         };
         cb.forgetSetting = [this] (const juce::String& key, const juce::String& store)
         {
-            if (store == "local") loadLocalSettings();
-            auto& set = (store == "local" ? localSettings : scriptSettings);
+            auto& set = settingsFor (store);
             if (! set.contains (key)) return false;      // so "cleaned up" reads differently from
             set.remove (key);                            // "there was nothing there"
-            if (store == "local")
-            {
-                if (! localStore()->update ([&] (juce::PropertySet& values)
-                    {
-                        values.removeValue (localKey (key));
-                    }))
-                    scriptLogLine ("[script] local setting could not be removed");
-            }
+            noteScriptSettingsChanged();
             return true;
         };
-        // Both stores are real here: the project state carries one and a properties file beside the
-        // app's own preferences carries the other.
+        // Both stores are real here: the project state carries both.
         cb.settingsAvailable = [] (const juce::String&) { return true; };
         cb.startTimer = [this] (const juce::String& id, int intervalMs) { scriptTimers.start (id, intervalMs); };
         cb.stopTimer  = [this] (const juce::String& id) { scriptTimers.stop (id); };
@@ -2355,6 +2313,12 @@ private:
         if (! declaredModules.isEmpty())
             scriptLogLine ("scripting modules: " + declaredModules.joinIntoString (", "));
 
+        // "panel" scope starts from the settings the author saved into the document, as it does in
+        // the editor and as the page did window open. A restored project replaces them after.
+        if (scriptSettings.isEmpty())
+            if (auto* scripting = scriptValues.panel().getProperty ("scripting", {}).getDynamicObject())
+                settingsFromVar (scriptSettings, scripting->getProperty ("settings"));
+
         const auto loaded = ceditor::gatherPanelScripts (scriptValues.panel());
         scriptRuntime->loadScripts (loaded);
         for (const auto& f : scriptRuntime->failedScripts())
@@ -2386,75 +2350,125 @@ private:
     juce::SpinLock scriptStateLock;
     juce::String cachedScriptStateJson { "{}" };
     juce::String cachedScriptSettingsJson { "{}" };
-    juce::String pendingScriptStateJson, pendingScriptSettingsJson;
+    juce::String cachedScriptLocalJson { "{}" };
+    juce::String pendingScriptStateJson, pendingScriptSettingsJson, pendingScriptLocalJson;
     bool pendingScriptStatePresent = false;
     bool pendingScriptSettingsPresent = false;
+    bool pendingScriptLocalPresent = false;
     bool refreshingScriptState = false;
     std::atomic<bool> scriptRuntimeReady { false };
     std::atomic<bool> scriptRestorePending { false };
     std::atomic<bool> scriptStateDirty { false };
    #endif
-    // …and "local" scope, which is deliberately NOT saved with the project: a session handed to
-    // somebody else should carry the patch, not the sender's MIDI port choice. It goes to a
-    // properties file beside the app's own preferences instead, so it outlives the instance the way
-    // a machine-local setting is supposed to — "this machine only", not "this session only".
+    // …and "local" scope: this machine only, and this instance only. It is not the panel's to carry
+    // — a session handed to somebody else should carry the patch, not the sender's MIDI port choice
+    // — so it rides in the project state under this machine's id (scriptMachineId) and is applied
+    // on that machine alone; what other machines stored is carried through unread.
+    //
+    // Until October 2026 this was one properties file for the plugin as a whole, keyed by panel id,
+    // so every instance of a panel on the machine read and wrote the same values: two copies in one
+    // DAW, a standalone beside a plug-in, each overwrote the other's MIDI port choice. And the page,
+    // window open, kept its own copy in the WebView's localStorage instead.
     juce::NamedValueSet localSettings;
+    juce::var otherMachinesLocal;   // { machineId: { key: value } } for every machine but this one
 
-    /** The properties file behind "local" scope, opened on first use.
+    juce::NamedValueSet& settingsFor (const juce::String& store) { return store == "local" ? localSettings : scriptSettings; }
 
-        Lazily, because most panels never touch local scope and opening a file per plugin instance
-        for nothing is not free. One file for the plugin as a whole, keys prefixed by panel id, so
-        two panels loaded in one session do not read each other's. */
-    ceditor::SharedPropertiesFile* localStore()
+    /** A setting moved: the saved-state cache is rebuilt on the next timer tick. */
+    void noteScriptSettingsChanged()
     {
-        if (localProps == nullptr)
+       #if CEDITOR_VALUE_LAYER
+        scriptStateDirty.store (true);
+       #endif
+    }
+
+    static juce::var settingsToVar (const juce::NamedValueSet& set)
+    {
+        auto* o = new juce::DynamicObject();
+        for (int i = 0; i < set.size(); ++i) o->setProperty (set.getName (i), set.getValueAt (i));
+        return juce::var (o);
+    }
+
+    static void settingsFromVar (juce::NamedValueSet& set, const juce::var& from)
+    {
+        set.clear();
+        if (auto* o = from.getDynamicObject())
+            for (const auto& p : o->getProperties()) set.set (p.name, p.value);
+    }
+
+    /** This machine, as "local" scope means it: an id made once and kept beside the app's own
+        preferences. JUCE's getUniqueDeviceID would do, but on Linux it runs cat and lscpu as child
+        processes, which a plug-in has no business doing inside a DAW. If the file cannot be
+        written, the computer's name is the next best thing. */
+    static juce::String scriptMachineId()
+    {
+        static const juce::String id = []
         {
             juce::PropertiesFile::Options options;
             options.applicationName     = "CEditor";
-            options.filenameSuffix      = ".scriptlocal";
+            options.filenameSuffix      = ".machine";
             options.folderName          = "CEditor";
             options.osxLibrarySubFolder = "Application Support";
-            localProps = std::make_unique<ceditor::SharedPropertiesFile> (options);
-        }
-        return localProps.get();
+            ceditor::SharedPropertiesFile file (options);
+            juce::String made;
+            const bool kept = file.update ([&made] (juce::PropertySet& values)
+            {
+                made = values.getValue ("id");
+                if (made.isEmpty()) { made = juce::Uuid().toString(); values.setValue ("id", made); }
+            });
+            return kept && made.isNotEmpty() ? made : juce::SystemStats::getComputerName();
+        }();
+        return id;
     }
 
-    /** The panel this instance loaded, as a string to hang local settings off. */
-    juce::String localPanelId() const
+    /** The "local" element of the saved state: every machine's settings, this one's as they are now. */
+    juce::var localSettingsForState() const
     {
-        if (auto* obj = scriptValues.panel().getDynamicObject())
-        {
-            const auto id = obj->getProperty ("id").toString();
-            if (id.isNotEmpty()) return id;
-            const auto name = obj->getProperty ("name").toString();
-            if (name.isNotEmpty()) return name;
-        }
-        return "panel";
+        auto* all = new juce::DynamicObject();
+        if (auto* others = otherMachinesLocal.getDynamicObject())
+            for (const auto& p : others->getProperties()) all->setProperty (p.name, p.value);
+        all->setProperty (scriptMachineId(), settingsToVar (localSettings));
+        return juce::var (all);
     }
 
-    /** The file key for a script key: the panel id, so two panels do not share a namespace. */
-    juce::String localKey (const juce::String& key) const { return localPanelId() + "/" + key; }
-
-    /** Read the file's keys for this panel back into localSettings, once. */
-    void loadLocalSettings()
+    /** …and back: this machine's settings into localSettings, every other machine's kept aside. */
+    void localSettingsFromState (const juce::var& saved)
     {
-        if (localLoaded) return;
-        localLoaded = true;
-        const auto props = localStore()->read();
-        if (! props.has_value())
-        {
-            scriptLogLine ("[script] local settings could not be read");
-            return;
-        }
-        const auto prefix = localPanelId() + "/";
-        for (const auto& name : props->getAllKeys())
-            if (name.startsWith (prefix))
-                localSettings.set (name.substring (prefix.length()),
-                                   juce::JSON::parse ((*props)[name]));
+        const juce::Identifier here (scriptMachineId());
+        auto* others = new juce::DynamicObject();
+        juce::var mine;
+        if (auto* all = saved.getDynamicObject())
+            for (const auto& p : all->getProperties())
+            {
+                if (p.name == here) mine = p.value;
+                else others->setProperty (p.name, p.value);
+            }
+        settingsFromVar (localSettings, mine);
+        otherMachinesLocal = juce::var (others);
     }
 
-    std::unique_ptr<ceditor::SharedPropertiesFile> localProps;
-    bool localLoaded = false;
+public:
+    /** Both of this instance's stores, for the page to start from when the window opens. */
+    juce::var scriptStoresForPage() const
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("panel", settingsToVar (scriptSettings));
+        o->setProperty ("local", settingsToVar (localSettings));
+        return juce::var (o);
+    }
+
+    /** A write the page made, window open: { store, key, value } or { store, key, forget: true }. */
+    void applyScriptSettingFromPage (const juce::var& change)
+    {
+        const auto key = change.getProperty ("key", {}).toString();
+        if (key.isEmpty()) return;
+        auto& set = settingsFor (change.getProperty ("store", "panel").toString());
+        if ((bool) change.getProperty ("forget", false)) set.remove (key);
+        else set.set (key, change.getProperty ("value", {}));
+        noteScriptSettingsChanged();
+    }
+
+private:
     std::map<juce::String, juce::String> scriptBoundParamByPath;  // control path -> APVTS param id (bound)
     std::map<juce::String, juce::String> scriptDumpParamPaths;    // deviceParameterId -> control path (dump fill)
     std::map<juce::String, float> lastScriptValue;                // change-detect for window-closed onValueChanged
@@ -2499,6 +2513,12 @@ public:
         host.onRestoreAnswer = [&p] (const juce::String& answer) { p.answerRestorePrompt (answer); };
         // A new instance reads the synth on connect; a reopened project must not be read over.
         host.isSessionRestored = [&p] { return p.wasSessionRestored(); };
+       #if CEDITOR_SCRIPTING
+        // ce.storage, window open: the page starts from this instance's stores and writes back to
+        // them, so one store serves the window open and closed.
+        host.scriptStores = [&p] { return p.scriptStoresForPage(); };
+        host.onScriptSetting = [&p] (const juce::var& change) { p.applyScriptSettingFromPage (change); };
+       #endif
         seenSessionRestore = p.sessionRestoreGeneration();
         // host parameter -> UI: poll the (atomic) parameter values and push changes to the panel so
         // automation playback moves the on-screen controls. Polling keeps us off the audio thread.

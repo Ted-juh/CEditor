@@ -3020,7 +3020,8 @@ export const COMMANDS = [
        · "panel"  — shared by every script on the panel, in the document, travels with it.
        · "script" — private to the calling script, the way `state` already is.
        · "local"  — THIS MACHINE only, never written into the document. A panel you send somebody
-                    should not carry your MIDI port choice with it.
+                    should not carry your MIDI port choice with it. In the exported plug-in it is
+                    also this instance only: two copies of a panel each keep their own.
      A scope this build does not know is REFUSED rather than quietly treated as "panel": storing a
      value somewhere the caller did not ask for is how a private setting becomes a shared one. */
   {

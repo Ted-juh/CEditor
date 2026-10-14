@@ -7,7 +7,7 @@
 // the SAME runtime drives scripts in the shipped plugin exactly as it does in the editor preview.
 //
 // Host interface (consumed by panelRuntime.setRuntimeHost):
-//   { panel, scripts, readValue(control, modelPath), writeValue(control, modelPath, value) }
+//   { panel, scripts, readValue(control, modelPath), writeValue(control, modelPath, value), storage? }
 
 import { get } from 'svelte/store';
 import { panelPreviewSessions, updatePanelPreviewSession } from '../stores/interactionPreview.js';
@@ -46,16 +46,60 @@ function setValueAtPath(control, modelPath, value) {
   return false;
 }
 
+/** A value as the instance will store it: JSON, so a script mutating an object after saving it does
+ *  not change what the page reads without changing what the instance keeps. */
+const asStored = (value) => (value === undefined ? null : JSON.parse(JSON.stringify(value)));
+
+/**
+ * The plug-in instance's ce.storage stores, as the page sees them with the window open. The
+ * instance keeps both scopes, "panel" and "local", and saves them with the project; it hands the
+ * page a copy of each with the panel (`initial`, `{ panel, local }`) and takes every write back
+ * through `send({ store, key, value })` or `send({ store, key, forget: true })`. So the page and the
+ * window-closed runtime keep one store between them, and each instance its own.
+ *
+ * Without it the page kept panel scope in its copy of the document, which nothing saved, and local
+ * scope in the WebView's localStorage, which every instance on the machine shared — and which is a
+ * new, empty folder each time on Windows, where every instance gets a WebView2 profile of its own.
+ */
+export function createInstanceStorage(initial, send) {
+  const maps = {
+    panel: { ...(initial?.panel ?? {}) },
+    local: { ...(initial?.local ?? {}) },
+  };
+  const scope = (store) => (store === 'local' ? 'local' : 'panel');
+  return {
+    /** The live map for a store: read it, never write to it — write() and forget() say so to the instance. */
+    read: (store) => maps[scope(store)],
+    write(store, key, value) {
+      const s = scope(store);
+      const stored = asStored(value);
+      maps[s][key] = stored;
+      send?.({ store: s, key, value: stored });
+      return true;
+    },
+    forget(store, key) {
+      const s = scope(store);
+      if (!Object.hasOwn(maps[s], key)) return false;
+      delete maps[s][key];
+      send?.({ store: s, key, forget: true });
+      return true;
+    },
+  };
+}
+
 /**
  * Build the runtime host for a loaded player panel.
  * @param {object|function(): object} panel the deserialized panel document the player is running,
  *   or a getter for it when the player replaces the document object reactively
- * @param {{ onDocumentWrite?: function(object, string, unknown): void }} options
+ * @param {{ onDocumentWrite?: function(object, string, unknown): void,
+ *           storage?: ReturnType<typeof createInstanceStorage> | null }} options
  */
-export function createPlayerHost(panel, { onDocumentWrite = null } = {}) {
+export function createPlayerHost(panel, { onDocumentWrite = null, storage = null } = {}) {
   const currentPanel = () => (typeof panel === 'function' ? panel() : panel);
   return {
     get panel() { return currentPanel(); },
+    // The plug-in instance's ce.storage stores, when the page runs in one (createInstanceStorage).
+    storage,
     // Panel-level + per-control scripts (honoring panel.scripting.runOnExport / enabled flags),
     // filtered to the source (Lua/JS) scripts this runtime can execute — legacy command-graph
     // scripts are skipped (they ran in the retired engine).
