@@ -1944,7 +1944,9 @@ if (CEDITOR_SCRIPTING)
     # --- Optional: native embedded CPython (third language, full stdlib) ---
     if (CEDITOR_PYTHON)
         # Development.Embed gives the libpython needed to embed an interpreter (vs. build a C extension).
-        find_package(Python3 COMPONENTS Development.Embed REQUIRED)
+        # 3.12 or later: each instance runs in an interpreter of its own, made with
+        # Py_NewInterpreterFromConfig (PythonScriptEngine.cpp says why). The exporter bundles 3.13.
+        find_package(Python3 3.12 COMPONENTS Development.Embed REQUIRED)
         target_sources(ceditor_scripting PRIVATE "${CE_ROOT}/src/Scripting/PythonScriptEngine.cpp")
         target_link_libraries(ceditor_scripting PUBLIC Python3::Python)
         target_compile_definitions(ceditor_scripting PUBLIC CEDITOR_PYTHON=1)
@@ -1959,8 +1961,10 @@ if (CEDITOR_SCRIPTING)
 ce_configure_test(CEditorPythonScriptTests)
         # The embedded interpreter needs a stdlib home. Exports stage a PythonRuntime folder next to
         # the plugin; for the bare test exe, point CEDITOR_PYTHONHOME at the dev Python found above
-        # (its runtime-DLL dir is the install root on Windows).
-        if (Python3_RUNTIME_LIBRARY_DIRS)
+        # (its runtime-DLL dir is the install root on Windows). Windows only: elsewhere that dir is
+        # /usr/lib/<triplet>, which is not a Python home ("Failed to import encodings module"), and the
+        # dev Python's compiled-in prefix already finds its stdlib.
+        if (WIN32 AND Python3_RUNTIME_LIBRARY_DIRS)
             list(GET Python3_RUNTIME_LIBRARY_DIRS 0 _ce_python_home)
             set_tests_properties(PythonScriptEngine PROPERTIES
                 ENVIRONMENT "CEDITOR_PYTHONHOME=${_ce_python_home}")

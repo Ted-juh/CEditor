@@ -6,21 +6,34 @@
 // (window-open) keeps using Pyodide (also real CPython, in WASM) — both are genuine CPython, so the
 // fidelity gap between open/closed is only the patch version, not the language.
 //
-// Isolation: ONE process-wide interpreter (CPython is single-interpreter friendliest), but each
-// script is exec'd into its OWN module namespace dict — exactly like Lua's sol::environment and the
-// per-engine QuickJS scope. So two scripts can both `def onValueChanged(...)` and own a distinct
-// `self` without clashing. `import`ed modules / sys.modules are shared (importing json once is fine).
+// Isolation: an interpreter per instance. Two copies of a panel, or two panels, in one DAW or one
+// process share nothing through Python: each instance has its own sub-interpreter, so its own
+// sys.modules, builtins and everything its scripts import or change, and its own `ceditor` bridge
+// module, whose state names the instance — a call from a script reaches its own instance's host and
+// no other. Within an instance each script is exec'd into its OWN namespace dict, exactly like Lua's
+// sol::environment and the per-script QuickJS scope, so two scripts can both `def onValueChanged(...)`
+// and own a distinct `self` without clashing; they share their instance's imports.
 //
-// The native bridge is a builtin module `ceditor` (registered via PyImport_AppendInittab BEFORE
-// Py_Initialize). The Python prelude wraps it as globals + the same pure-math / MIDI helpers as the
-// Lua + JS preludes (kept in sync with panelApi.js).
+// Until October 2026 there was ONE interpreter for the process, and the bridge reached the host
+// through a global pointer re-aimed at each instance as it was entered. Anything a script changed in
+// a module (random.seed, a monkeypatched builtin, a module-level cache) changed it for every other
+// instance; and a second exported plug-in in the same process imported the first one's bridge, whose
+// pointer was the first one's to aim.
 //
-// THREADING: message thread only. We Py_InitializeFromConfig once on that thread and never release
-// the GIL, so every dispatch holds it implicitly. The audio thread never touches this.
+// The bridge's functions are plain C, made into a module per instance rather than imported through
+// an inittab entry, so that each instance's module is its own object with its own state. The Python
+// prelude wraps it as globals + the same pure-math / MIDI helpers as the Lua + JS preludes (kept in
+// sync with panelApi.js).
 //
-// Requires Python3::Python (CMake, behind CEDITOR_PYTHON). UNVERIFIED until built with a Python
-// dev install present. Stdlib search path: env CEDITOR_PYTHONHOME, else a `PythonRuntime` folder
-// next to the host binary (what the exporter bundles), else the build-time default.
+// THREADING: one thread at a time per instance, in practice the message thread. CPython is started
+// once per process and the GIL let go; each call into an instance takes it with that instance's
+// thread state current and lets it go on the way out, so another instance (or another component
+// using Python) can run between calls. The audio thread never touches this.
+//
+// Requires Python3::Python 3.12 or later (CMake, behind CEDITOR_PYTHON) — Py_NewInterpreterFromConfig,
+// which is what allows an interpreter without threads, and a per-thread current thread state. Stdlib
+// search path: env CEDITOR_PYTHONHOME, else a `PythonRuntime` folder next to the host binary (what the
+// exporter bundles, 3.13), else the build-time default.
 
 #define PY_SSIZE_T_CLEAN
 // On MSVC, including Python.h while _DEBUG is defined auto-links python3xx_d.lib (the *debug*
@@ -37,9 +50,14 @@
 #  include <Python.h>
 #endif
 
+#if PY_VERSION_HEX < 0x030C0000
+ #error "The embedded Python engine needs CPython 3.12 or later: each instance runs in an interpreter of its own (Py_NewInterpreterFromConfig)."
+#endif
+
 #include "ScriptRuntime.h"
 
 #include <atomic>
+#include <cmath>
 #include <map>
 #include <vector>
 
@@ -63,12 +81,55 @@ class PythonScriptEngine; // defined below; the anon-namespace globals + native 
 namespace
 {
 
-// --- One host + one engine, process-wide (single interpreter, single message thread). ----------
-// These are re-pointed at the currently-executing engine on every loadScript/dispatch/deliverEvent
-// (all on the message thread, serial) so multi-instance plugins route api_* calls to the right host,
-// and cleared by the owning engine's dtor so a torn-down instance never leaves g_host dangling.
-ScriptHostApi*      g_host   = nullptr;
-PythonScriptEngine* g_engine = nullptr;
+// --- Which instance a bridge call belongs to -----------------------------------------------------
+// Each instance runs its scripts in an interpreter of its own, whose `ceditor` module is its own
+// too, and the module's state names the instance. Every bridge call arrives with its module, so it
+// reaches the host of the instance whose script made it, whatever else is running. These used to
+// be two process-wide pointers, re-aimed at whichever instance had last been entered.
+struct BridgeOwner
+{
+    ScriptHostApi*      host   = nullptr;
+    PythonScriptEngine* engine = nullptr;
+};
+
+/** The host a call reaches when its instance has none: before installApi, and while the instance's
+    interpreter ends, when a finalizer or an atexit handler may still call. It does nothing. */
+class GoneHost final : public ScriptHostApi
+{
+public:
+    juce::var getValue (const juce::String&, const juce::String&) override { return {}; }
+    void setValue (const juce::String&, const juce::var&, const juce::var&) override {}
+    void sendCC (int, int, const juce::var&) override {}
+    void sendNRPN (int, int, int, const juce::var&) override {}
+    void sendSysex (const juce::var&) override {}
+    void requestDump (const juce::String&) override {}
+    void applyDump (const juce::var&) override {}
+    void sendDump (const juce::String&) override {}
+    juce::var buildDump (const juce::String&) override { return {}; }
+    juce::var runAction (const juce::String&, const juce::var&) override { return {}; }
+    void emitEvent (const juce::String&, const juce::var&) override {}
+    void log (const juce::String&, const juce::var&) override {}
+};
+
+BridgeOwner* ownerOf (PyObject* module) { return static_cast<BridgeOwner*> (PyModule_GetState (module)); }
+
+ScriptHostApi& hostOf (PyObject* module)
+{
+    static GoneHost gone;
+    auto* owner = ownerOf (module);
+    return owner != nullptr && owner->host != nullptr ? *owner->host : gone;
+}
+
+/** The thread state current on this thread, or null. Every interpreter here shares the one GIL, so
+    a thread holds it exactly when one of them is current. */
+PyThreadState* currentThreadState()
+{
+   #if PY_VERSION_HEX >= 0x030D0000
+    return PyThreadState_GetUnchecked();
+   #else
+    return _PyThreadState_UncheckedGet();
+   #endif
+}
 
 juce::String pyStr (PyObject* o)
 {
@@ -149,7 +210,7 @@ juce::var pyToVar (PyObject* o)
     {
         // An int beyond int64 sets OverflowError + returns -1; clear it and fall back to double
         // (juce::var has no >64-bit integer) so we never return with a pending exception that would
-        // leak into the next dispatch's fetchPyError() (the GIL is never released between calls).
+        // leak into the next call's fetchPyError().
         long long ll = PyLong_AsLongLong (o);
         if (ll == -1 && PyErr_Occurred()) { PyErr_Clear(); double d = PyLong_AsDouble (o); if (PyErr_Occurred()) PyErr_Clear(); return juce::var (d); }
         return juce::var ((juce::int64) ll);
@@ -195,266 +256,265 @@ juce::var pyToVar (PyObject* o)
 }
 
 // --- native `ceditor` module: the host bridge -------------------------------------------------
-PyObject* api_set (PyObject*, PyObject* args)
+PyObject* api_set (PyObject* self, PyObject* args)
 {
     const char* path = nullptr; PyObject* value = nullptr; PyObject* opts = nullptr;
     if (! PyArg_ParseTuple (args, "sO|O", &path, &value, &opts)) return nullptr;
-    g_host->setValue (juce::String::fromUTF8 (path), pyToVar (value),
-                      (opts && opts != Py_None) ? pyToVar (opts) : juce::var());
+    hostOf (self).setValue (juce::String::fromUTF8 (path), pyToVar (value),
+                            (opts && opts != Py_None) ? pyToVar (opts) : juce::var());
     Py_RETURN_NONE;
 }
-PyObject* api_get (PyObject*, PyObject* args)
+PyObject* api_get (PyObject* self, PyObject* args)
 {
     const char* path = nullptr; const char* form = "value";
     if (! PyArg_ParseTuple (args, "s|s", &path, &form)) return nullptr;
-    return varToPy (g_host->getValue (juce::String::fromUTF8 (path), juce::String::fromUTF8 (form)));
+    return varToPy (hostOf (self).getValue (juce::String::fromUTF8 (path), juce::String::fromUTF8 (form)));
 }
-PyObject* api_sendCC (PyObject*, PyObject* args)
+PyObject* api_sendCC (PyObject* self, PyObject* args)
 {
     int ch = 0, cc = 0; PyObject* v = nullptr;
     if (! PyArg_ParseTuple (args, "iiO", &ch, &cc, &v)) return nullptr;
-    g_host->sendCC (ch, cc, pyToVar (v)); Py_RETURN_NONE;
+    hostOf (self).sendCC (ch, cc, pyToVar (v)); Py_RETURN_NONE;
 }
-PyObject* api_sendNRPN (PyObject*, PyObject* args)
+PyObject* api_sendNRPN (PyObject* self, PyObject* args)
 {
     int ch = 0, msb = 0, lsb = 0; PyObject* v = nullptr;
     if (! PyArg_ParseTuple (args, "iiiO", &ch, &msb, &lsb, &v)) return nullptr;
-    g_host->sendNRPN (ch, msb, lsb, pyToVar (v)); Py_RETURN_NONE;
+    hostOf (self).sendNRPN (ch, msb, lsb, pyToVar (v)); Py_RETURN_NONE;
 }
-PyObject* api_sendSysex (PyObject*, PyObject* args)
+PyObject* api_sendSysex (PyObject* self, PyObject* args)
 {
     PyObject* bytes = nullptr;
     if (! PyArg_ParseTuple (args, "O", &bytes)) return nullptr;
-    g_host->sendSysex (pyToVar (bytes)); Py_RETURN_NONE;
+    hostOf (self).sendSysex (pyToVar (bytes)); Py_RETURN_NONE;
 }
-PyObject* api_requestDump (PyObject*, PyObject* args)
+PyObject* api_requestDump (PyObject* self, PyObject* args)
 {
     const char* kind = nullptr; if (! PyArg_ParseTuple (args, "s", &kind)) return nullptr;
-    g_host->requestDump (juce::String::fromUTF8 (kind)); Py_RETURN_NONE;
+    hostOf (self).requestDump (juce::String::fromUTF8 (kind)); Py_RETURN_NONE;
 }
-PyObject* api_applyDump (PyObject*, PyObject* args)
+PyObject* api_applyDump (PyObject* self, PyObject* args)
 {
     PyObject* bytes = nullptr; if (! PyArg_ParseTuple (args, "O", &bytes)) return nullptr;
-    g_host->applyDump (pyToVar (bytes)); Py_RETURN_NONE;
+    hostOf (self).applyDump (pyToVar (bytes)); Py_RETURN_NONE;
 }
-PyObject* api_deviceDefine (PyObject*, PyObject* args)
+PyObject* api_deviceDefine (PyObject* self, PyObject* args)
 {
     const char* what = nullptr; const char* id = nullptr; PyObject* spec = nullptr;
     if (! PyArg_ParseTuple (args, "ssO", &what, &id, &spec)) return nullptr;
-    const bool ok = g_host->deviceDefine (juce::String::fromUTF8 (what), juce::String::fromUTF8 (id),
-                                          pyToVar (spec));
+    const bool ok = hostOf (self).deviceDefine (juce::String::fromUTF8 (what), juce::String::fromUTF8 (id),
+                                                pyToVar (spec));
     return PyBool_FromLong (ok ? 1 : 0);
 }
-PyObject* api_sendDump (PyObject*, PyObject* args)
+PyObject* api_sendDump (PyObject* self, PyObject* args)
 {
     const char* kind = nullptr; if (! PyArg_ParseTuple (args, "s", &kind)) return nullptr;
-    g_host->sendDump (juce::String::fromUTF8 (kind)); Py_RETURN_NONE;
+    hostOf (self).sendDump (juce::String::fromUTF8 (kind)); Py_RETURN_NONE;
 }
-PyObject* api_buildDump (PyObject*, PyObject* args)
+PyObject* api_buildDump (PyObject* self, PyObject* args)
 {
     const char* kind = nullptr; if (! PyArg_ParseTuple (args, "s", &kind)) return nullptr;
-    return varToPy (g_host->buildDump (juce::String::fromUTF8 (kind)));
+    return varToPy (hostOf (self).buildDump (juce::String::fromUTF8 (kind)));
 }
-PyObject* api_animate (PyObject*, PyObject* args)
+PyObject* api_animate (PyObject* self, PyObject* args)
 {
     // `path` is a str OR a list of str — one call, one shape, one completion — so it comes through
     // as an object and pyToVar decides which it was.
     const char* kind = nullptr; PyObject* path = nullptr; double target = 0.0; PyObject* opts = nullptr;
     if (! PyArg_ParseTuple (args, "sOd|O", &kind, &path, &target, &opts)) return nullptr;
-    g_host->startAnimation (juce::String::fromUTF8 (kind), pyToVar (path), target,
-                            opts != nullptr ? pyToVar (opts) : juce::var());
+    hostOf (self).startAnimation (juce::String::fromUTF8 (kind), pyToVar (path), target,
+                                  opts != nullptr ? pyToVar (opts) : juce::var());
     Py_RETURN_NONE;
 }
-PyObject* api_animateStop (PyObject*, PyObject* args)
+PyObject* api_animateStop (PyObject* self, PyObject* args)
 {
     const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
-    g_host->stopAnimation (juce::String::fromUTF8 (path)); Py_RETURN_NONE;
+    hostOf (self).stopAnimation (juce::String::fromUTF8 (path)); Py_RETURN_NONE;
 }
-PyObject* api_animateRunning (PyObject*, PyObject* args)
+PyObject* api_animateRunning (PyObject* self, PyObject* args)
 {
     const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
-    if (g_host->animationRunning (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
+    if (hostOf (self).animationRunning (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
     Py_RETURN_FALSE;
 }
-PyObject* api_animateValue (PyObject*, PyObject* args)
+PyObject* api_animateValue (PyObject* self, PyObject* args)
 {
     const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
-    return varToPy (g_host->animationValue (juce::String::fromUTF8 (path)));
+    return varToPy (hostOf (self).animationValue (juce::String::fromUTF8 (path)));
 }
-PyObject* api_animateList (PyObject*, PyObject*)
+PyObject* api_animateList (PyObject* self, PyObject*)
 {
-    return varToPy (g_host->animationList());
+    return varToPy (hostOf (self).animationList());
 }
-PyObject* api_animatePause (PyObject*, PyObject* args)
+PyObject* api_animatePause (PyObject* self, PyObject* args)
 {
     const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
-    if (g_host->animationPause (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
+    if (hostOf (self).animationPause (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
     Py_RETURN_FALSE;
 }
-PyObject* api_animateResume (PyObject*, PyObject* args)
+PyObject* api_animateResume (PyObject* self, PyObject* args)
 {
     const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
-    if (g_host->animationResume (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
+    if (hostOf (self).animationResume (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
     Py_RETURN_FALSE;
 }
-PyObject* api_animateReverse (PyObject*, PyObject* args)
+PyObject* api_animateReverse (PyObject* self, PyObject* args)
 {
     const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
-    if (g_host->animationReverse (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
+    if (hostOf (self).animationReverse (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
     Py_RETURN_FALSE;
 }
-PyObject* api_animateFinish (PyObject*, PyObject* args)
+PyObject* api_animateFinish (PyObject* self, PyObject* args)
 {
     const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
-    if (g_host->animationFinish (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
+    if (hostOf (self).animationFinish (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
     Py_RETURN_FALSE;
 }
-PyObject* api_transportState (PyObject*, PyObject*)
+PyObject* api_transportState (PyObject* self, PyObject*)
 {
-    return varToPy (g_host->transportState());
+    return varToPy (hostOf (self).transportState());
 }
-PyObject* api_nowMs (PyObject*, PyObject*)
+PyObject* api_nowMs (PyObject* self, PyObject*)
 {
-    return PyFloat_FromDouble (g_host->nowMs());
+    return PyFloat_FromDouble (hostOf (self).nowMs());
 }
-PyObject* api_deviceQuery (PyObject*, PyObject* args)
+PyObject* api_deviceQuery (PyObject* self, PyObject* args)
 {
     const char* kind = nullptr; PyObject* payload = nullptr;
     if (! PyArg_ParseTuple (args, "s|O", &kind, &payload)) return nullptr;
-    return varToPy (g_host->deviceQuery (juce::String::fromUTF8 (kind),
-                                         payload != nullptr ? pyToVar (payload) : juce::var()));
+    return varToPy (hostOf (self).deviceQuery (juce::String::fromUTF8 (kind),
+                                               payload != nullptr ? pyToVar (payload) : juce::var()));
 }
-PyObject* api_panelQuery (PyObject*, PyObject* args)
+PyObject* api_panelQuery (PyObject* self, PyObject* args)
 {
     const char* kind = nullptr; PyObject* payload = nullptr;
     if (! PyArg_ParseTuple (args, "s|O", &kind, &payload)) return nullptr;
-    return varToPy (g_host->panelQuery (juce::String::fromUTF8 (kind),
-                                        payload != nullptr ? pyToVar (payload) : juce::var()));
+    return varToPy (hostOf (self).panelQuery (juce::String::fromUTF8 (kind),
+                                              payload != nullptr ? pyToVar (payload) : juce::var()));
 }
-PyObject* api_deviceSet (PyObject*, PyObject* args)
+PyObject* api_deviceSet (PyObject* self, PyObject* args)
 {
     const char* kind = nullptr; const char* name = nullptr; PyObject* value = nullptr; const char* role = nullptr;
     if (! PyArg_ParseTuple (args, "ssOs", &kind, &name, &value, &role)) return nullptr;
-    if (g_host == nullptr) Py_RETURN_FALSE;
-    const bool ok = g_host->deviceSet (juce::String::fromUTF8 (kind), juce::String::fromUTF8 (name),
-                                       pyToVar (value), juce::String::fromUTF8 (role));
+    const bool ok = hostOf (self).deviceSet (juce::String::fromUTF8 (kind), juce::String::fromUTF8 (name),
+                                             pyToVar (value), juce::String::fromUTF8 (role));
     if (ok) Py_RETURN_TRUE;
     Py_RETURN_FALSE;
 }
 
-PyObject* api_deviceWrite (PyObject*, PyObject* args)
+PyObject* api_deviceWrite (PyObject* self, PyObject* args)
 {
     const char* id = nullptr; PyObject* value = nullptr; const char* role = nullptr;
     if (! PyArg_ParseTuple (args, "sOs", &id, &value, &role)) return nullptr;
-    const bool ok = g_host->deviceWrite (juce::String::fromUTF8 (id),
-                                         value != nullptr ? pyToVar (value) : juce::var(),
-                                         juce::String::fromUTF8 (role));
+    const bool ok = hostOf (self).deviceWrite (juce::String::fromUTF8 (id),
+                                               value != nullptr ? pyToVar (value) : juce::var(),
+                                               juce::String::fromUTF8 (role));
     return PyBool_FromLong (ok ? 1 : 0);
 }
-PyObject* api_run (PyObject*, PyObject* args)
+PyObject* api_run (PyObject* self, PyObject* args)
 {
     const char* target = nullptr; PyObject* a = nullptr;
     if (! PyArg_ParseTuple (args, "s|O", &target, &a)) return nullptr;
-    return varToPy (g_host->runAction (juce::String::fromUTF8 (target),
-                                       (a && a != Py_None) ? pyToVar (a) : juce::var()));
+    return varToPy (hostOf (self).runAction (juce::String::fromUTF8 (target),
+                                             (a && a != Py_None) ? pyToVar (a) : juce::var()));
 }
-PyObject* api_emit (PyObject*, PyObject* args)
+PyObject* api_emit (PyObject* self, PyObject* args)
 {
     const char* name = nullptr; PyObject* d = nullptr;
     if (! PyArg_ParseTuple (args, "s|O", &name, &d)) return nullptr;
-    g_host->emitEvent (juce::String::fromUTF8 (name), (d && d != Py_None) ? pyToVar (d) : juce::var());
+    hostOf (self).emitEvent (juce::String::fromUTF8 (name), (d && d != Py_None) ? pyToVar (d) : juce::var());
     Py_RETURN_NONE;
 }
-PyObject* api_logAt (PyObject*, PyObject* args)
+PyObject* api_logAt (PyObject* self, PyObject* args)
 {
     const char* kind = nullptr; const char* message = nullptr; PyObject* value = nullptr;
     if (! PyArg_ParseTuple (args, "ss|O", &kind, &message, &value)) return nullptr;
-    g_host->logAt (juce::String::fromUTF8 (kind), juce::String::fromUTF8 (message),
-                   value != nullptr ? pyToVar (value) : juce::var());
+    hostOf (self).logAt (juce::String::fromUTF8 (kind), juce::String::fromUTF8 (message),
+                         value != nullptr ? pyToVar (value) : juce::var());
     Py_RETURN_NONE;
 }
-PyObject* api_log (PyObject*, PyObject* args)
+PyObject* api_log (PyObject* self, PyObject* args)
 {
     const char* msg = nullptr; PyObject* v = nullptr;
     if (! PyArg_ParseTuple (args, "s|O", &msg, &v)) return nullptr;
-    g_host->log (juce::String::fromUTF8 (msg), (v && v != Py_None) ? pyToVar (v) : juce::var());
+    hostOf (self).log (juce::String::fromUTF8 (msg), (v && v != Py_None) ? pyToVar (v) : juce::var());
     Py_RETURN_NONE;
 }
-PyObject* api_sendMidi (PyObject*, PyObject* args)
+PyObject* api_sendMidi (PyObject* self, PyObject* args)
 {
     PyObject* bytes = nullptr;
     if (! PyArg_ParseTuple (args, "O", &bytes)) return nullptr;
-    g_host->sendMidi (pyToVar (bytes)); Py_RETURN_NONE;
+    hostOf (self).sendMidi (pyToVar (bytes)); Py_RETURN_NONE;
 }
 // The store argument is "panel" or "local" — the two places a setting can actually live.
 // ce.storage's third scope, "script", is a key prefix on the panel store, resolved in the prelude
 // so all four runtimes spell a private key the same way.
-PyObject* api_saveSetting (PyObject*, PyObject* args)
+PyObject* api_saveSetting (PyObject* self, PyObject* args)
 {
     const char* key = nullptr; PyObject* v = nullptr; const char* store = "panel";
     if (! PyArg_ParseTuple (args, "sO|s", &key, &v, &store)) return nullptr;
-    g_host->saveSetting (juce::String::fromUTF8 (key), pyToVar (v), juce::String::fromUTF8 (store));
+    hostOf (self).saveSetting (juce::String::fromUTF8 (key), pyToVar (v), juce::String::fromUTF8 (store));
     Py_RETURN_NONE;
 }
-PyObject* api_listSettings (PyObject*, PyObject* args)
+PyObject* api_listSettings (PyObject* self, PyObject* args)
 {
     const char* store = "panel";
     if (! PyArg_ParseTuple (args, "|s", &store)) return nullptr;
-    return varToPy (g_host->listSettings (juce::String::fromUTF8 (store)));
+    return varToPy (hostOf (self).listSettings (juce::String::fromUTF8 (store)));
 }
-PyObject* api_forgetSetting (PyObject*, PyObject* args)
+PyObject* api_forgetSetting (PyObject* self, PyObject* args)
 {
     const char* key = nullptr; const char* store = "panel";
     if (! PyArg_ParseTuple (args, "s|s", &key, &store)) return nullptr;
-    return PyBool_FromLong (g_host->forgetSetting (juce::String::fromUTF8 (key),
-                                                   juce::String::fromUTF8 (store)) ? 1 : 0);
+    return PyBool_FromLong (hostOf (self).forgetSetting (juce::String::fromUTF8 (key),
+                                                         juce::String::fromUTF8 (store)) ? 1 : 0);
 }
-PyObject* api_loadSetting (PyObject*, PyObject* args)
+PyObject* api_loadSetting (PyObject* self, PyObject* args)
 {
     const char* key = nullptr; const char* store = "panel";
     if (! PyArg_ParseTuple (args, "s|s", &key, &store)) return nullptr;
-    return varToPy (g_host->loadSetting (juce::String::fromUTF8 (key), juce::String::fromUTF8 (store)));
+    return varToPy (hostOf (self).loadSetting (juce::String::fromUTF8 (key), juce::String::fromUTF8 (store)));
 }
-PyObject* api_settingsAvailable (PyObject*, PyObject* args)
+PyObject* api_settingsAvailable (PyObject* self, PyObject* args)
 {
     const char* store = "panel";
     if (! PyArg_ParseTuple (args, "|s", &store)) return nullptr;
-    return PyBool_FromLong (g_host->settingsAvailable (juce::String::fromUTF8 (store)) ? 1 : 0);
+    return PyBool_FromLong (hostOf (self).settingsAvailable (juce::String::fromUTF8 (store)) ? 1 : 0);
 }
-PyObject* api_startTimer (PyObject*, PyObject* args)
+PyObject* api_startTimer (PyObject* self, PyObject* args)
 {
     const char* id = nullptr; int ms = 0;
     if (! PyArg_ParseTuple (args, "s|i", &id, &ms)) return nullptr;
-    g_host->startTimer (juce::String::fromUTF8 (id), ms); Py_RETURN_NONE;
+    hostOf (self).startTimer (juce::String::fromUTF8 (id), ms); Py_RETURN_NONE;
 }
-PyObject* api_stopTimer (PyObject*, PyObject* args)
+PyObject* api_stopTimer (PyObject* self, PyObject* args)
 {
     const char* id = nullptr; if (! PyArg_ParseTuple (args, "s", &id)) return nullptr;
-    g_host->stopTimer (juce::String::fromUTF8 (id)); Py_RETURN_NONE;
+    hostOf (self).stopTimer (juce::String::fromUTF8 (id)); Py_RETURN_NONE;
 }
-PyObject* api_beginTransmit (PyObject*, PyObject* args)
+PyObject* api_beginTransmit (PyObject* self, PyObject* args)
 {
     int on = 0; if (! PyArg_ParseTuple (args, "p", &on)) return nullptr;
-    g_host->beginTransmitOverride (on != 0); Py_RETURN_NONE;
+    hostOf (self).beginTransmitOverride (on != 0); Py_RETURN_NONE;
 }
-PyObject* api_endTransmit (PyObject*, PyObject*) { g_host->endTransmitOverride(); Py_RETURN_NONE; }
+PyObject* api_endTransmit (PyObject* self, PyObject*) { hostOf (self).endTransmitOverride(); Py_RETURN_NONE; }
 // routeMidi(role, fn) blocks — the destination for a RUN of sends, the same block shape
 // noTransmit() uses rather than a role argument threaded through thirteen signatures.
-PyObject* api_beginRoute (PyObject*, PyObject* args)
+PyObject* api_beginRoute (PyObject* self, PyObject* args)
 {
     const char* role = nullptr; if (! PyArg_ParseTuple (args, "s", &role)) return nullptr;
-    g_host->beginRouteOverride (juce::String::fromUTF8 (role)); Py_RETURN_NONE;
+    hostOf (self).beginRouteOverride (juce::String::fromUTF8 (role)); Py_RETURN_NONE;
 }
-PyObject* api_endRoute (PyObject*, PyObject*) { g_host->endRouteOverride(); Py_RETURN_NONE; }
-PyObject* api_feedMidi (PyObject*, PyObject* args)
+PyObject* api_endRoute (PyObject* self, PyObject*) { hostOf (self).endRouteOverride(); Py_RETURN_NONE; }
+PyObject* api_feedMidi (PyObject* self, PyObject* args)
 {
     PyObject* b = nullptr; if (! PyArg_ParseTuple (args, "O", &b)) return nullptr;
-    g_host->feedMidi (pyToVar (b)); Py_RETURN_NONE;
+    hostOf (self).feedMidi (pyToVar (b)); Py_RETURN_NONE;
 }
 
-// on(target, event, fn) — defined here so it can capture the engine's listener registry.
-PyObject* api_on  (PyObject*, PyObject* args);  // fwd (needs the engine class)
-PyObject* api_off (PyObject*, PyObject* args);  // fwd (needs the engine class)
+// on(target, event, fn) — defined after the engine, whose listener registry they write.
+PyObject* api_on  (PyObject* self, PyObject* args);
+PyObject* api_off (PyObject* self, PyObject* args);
 
 PyMethodDef apiMethods[] = {
     { "set",           api_set,           METH_VARARGS, nullptr },
@@ -504,17 +564,22 @@ PyMethodDef apiMethods[] = {
     { nullptr, nullptr, 0, nullptr }
 };
 
+// Not imported: each instance makes its own module from this and puts it in its interpreter's
+// sys.modules before any script runs, so the state each one carries is that instance's.
 PyModuleDef apiModuleDef = {
-    PyModuleDef_HEAD_INIT, "ceditor", "CEditor panel host bridge", -1,
+    PyModuleDef_HEAD_INIT, "ceditor", "CEditor panel host bridge", (Py_ssize_t) sizeof (BridgeOwner),
     apiMethods, nullptr, nullptr, nullptr, nullptr
 };
-
-PyObject* PyInit_ceditor() { return PyModule_Create (&apiModuleDef); }
 
 // --- Python prelude: globals wrapping `ceditor` + helpers (parity with Lua/JS) -----------------
 const char* kPrelude = R"PY(
 # @module -
 import ceditor as __api
+# on()/off() first: the prelude's own sections register listeners at load (onTransport, onTimer), and
+# with these defined further down every Python script stopped at load with "name 'on' is not
+# defined" from 23 September until it was found.
+def on(target, event, fn):        return __api.on(target, event, fn)
+def off(target, event):           return __api.off(target, event)
 
 # @module ce.core
 # --- the reactive core: watch / compute / intercept / defineAction ---------------------------
@@ -1026,8 +1091,6 @@ def runningTimers():
 def run(target, args=None):       return __api.run(target, args)
 def emit(name, data=None):        return __api.emit(name, data)
 def log(msg, v=None):             return __api.log(str(msg), v)
-def on(target, event, fn):        return __api.on(target, event, fn)
-def off(target, event):           return __api.off(target, event)
 
 def noTransmit(fn):
     __api.beginTransmit(False)
@@ -3006,21 +3069,177 @@ __ce_apply_modules(None)
 
 } // namespace
 
+// --- the runtime: started once, shared by every instance's interpreter ---------------------------
+namespace
+{
+
+// Where the stdlib lives: env override → `PythonRuntime` next to THIS binary → none. `diag`
+// accumulates what we found, surfaced into the script log so a failure is debuggable in-host.
+juce::String resolvePythonHome (juce::String& diag)
+{
+    if (auto env = juce::SystemStats::getEnvironmentVariable ("CEDITOR_PYTHONHOME", {}); env.isNotEmpty())
+    { diag << "env CEDITOR_PYTHONHOME=" << env; return env; }
+
+    // In a PLUGIN the process exe is the HOST (reaper.exe), so currentExecutableFile is wrong. Get
+    // the directory of THIS module (the plugin DLL / this code) instead, so we find the bundled runtime.
+    juce::File moduleDir;
+   #if defined(_WIN32)
+    HMODULE hmod = nullptr;
+    if (GetModuleHandleExW (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                            reinterpret_cast<LPCWSTR> (&resolvePythonHome), &hmod) && hmod != nullptr)
+    {
+        wchar_t path[MAX_PATH] = {};
+        if (GetModuleFileNameW (hmod, path, MAX_PATH) > 0)
+            moduleDir = juce::File (juce::String (path)).getParentDirectory();
+    }
+   #elif defined(__APPLE__) || defined(__linux__)
+    // dladdr on a locally-defined symbol resolves the .dylib/.so that contains THIS code (the
+    // plugin), whose folder holds the bundled PythonRuntime — currentExecutableFile would give the
+    // HOST exe (reaper, etc.), the wrong place to look.
+    Dl_info di {};
+    if (dladdr (reinterpret_cast<void*> (&resolvePythonHome), &di) && di.dli_fname != nullptr)
+        moduleDir = juce::File (juce::String::fromUTF8 (di.dli_fname)).getParentDirectory();
+   #endif
+    if (moduleDir == juce::File())
+        moduleDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+
+    diag << "moduleDir=" << moduleDir.getFullPathName();
+    // Candidates: next to the binary (Windows/Linux layout), a Resources child, and — for the macOS
+    // .vst3 bundle, where the binary is in Contents/MacOS — the sibling Contents/Resources.
+    for (auto candidate : { moduleDir.getChildFile ("PythonRuntime"),
+                            moduleDir.getChildFile ("Resources").getChildFile ("PythonRuntime"),
+                            moduleDir.getParentDirectory().getChildFile ("Resources").getChildFile ("PythonRuntime") })
+        if (candidate.isDirectory()) { diag << " (found PythonRuntime)"; return candidate.getFullPathName(); }
+
+    diag << " (no PythonRuntime alongside)";
+    return {}; // fall back to the interpreter's compiled-in default (a dev Python install)
+}
+
+struct PythonRuntime
+{
+    bool ok = false;
+    juce::String info;   // why it failed, or where the stdlib was found — for the log
+};
+
+/** CPython, initialised once with the bundled stdlib home if there is one, and the GIL let go so
+    that each instance can take it for each call into its own interpreter. Never finalised: a plug-in
+    cannot know it is the last thing in the process using Python. */
+const PythonRuntime& pythonRuntime()
+{
+    static const PythonRuntime runtime = []
+    {
+        PythonRuntime r;
+        if (Py_IsInitialized())
+        {
+            r.ok = true;
+            r.info = "Python ready (started by the host or another component)";
+            return r;
+        }
+
+        PyConfig config;
+        PyConfig_InitIsolatedConfig (&config);   // don't read user site / env that could break a plugin
+        config.site_import = 1;                  // but DO import site so the full stdlib is wired up
+
+        juce::String diag;
+        const auto home = resolvePythonHome (diag);
+        if (home.isNotEmpty())
+            PyConfig_SetBytesString (&config, &config.home, home.toRawUTF8());
+
+        PyStatus status = Py_InitializeFromConfig (&config);
+        PyConfig_Clear (&config);
+
+        if (PyStatus_Exception (status))
+        {
+            r.info = "Python init FAILED: " + juce::String (status.err_msg ? status.err_msg : "unknown")
+                   + " | home=" + (home.isNotEmpty() ? home : juce::String ("<none — isolated init can't auto-find stdlib>"))
+                   + " | " + diag;
+            juce::Logger::writeToLog ("[python] " + r.info);
+            return r;
+        }
+        PyEval_SaveThread();
+        r.ok = true;
+        r.info = "Python ready | home=" + (home.isNotEmpty() ? home : juce::String ("<compiled-in>")) + " | " + diag;
+        return r;
+    }();
+    return runtime;
+}
+
+/** The thread state to make current again when an entry ends with nothing current: the main
+    interpreter's, if PyGILState had that one bound to this thread. Since 3.12, making a thread state
+    current binds PyGILState to it, so after an entry into an instance PyGILState_Ensure on this
+    thread would answer with that instance's interpreter, and hand it whatever Python called it —
+    another component's, or the host's. It did exactly that to this engine's first version of this
+    code, which then swapped to a thread state the instance had already freed. */
+PyThreadState* gilStateToRestore()
+{
+    PyThreadState* bound = PyGILState_GetThisThreadState();
+    return bound != nullptr && PyThreadState_GetInterpreter (bound) == PyInterpreterState_Main() ? bound : nullptr;
+}
+
+/** Lets go of the GIL, leaving nothing current and PyGILState bound to `restore` if there is one. */
+void letGo (PyThreadState* restore)
+{
+    if (restore != nullptr) PyThreadState_Swap (restore);
+    PyEval_SaveThread();
+}
+
+/** The GIL let go for a while if this thread holds it, and taken back after. */
+struct GilReleased
+{
+    GilReleased() : saved (currentThreadState() != nullptr ? PyEval_SaveThread() : nullptr) {}
+    ~GilReleased() { if (saved != nullptr) PyEval_RestoreThread (saved); }
+    GilReleased (const GilReleased&) = delete;
+    GilReleased& operator= (const GilReleased&) = delete;
+
+    PyThreadState* saved;
+};
+
+} // namespace
+
 // --- the engine --------------------------------------------------------------------------------
 class PythonScriptEngine final : public ScriptEngine
 {
 public:
-    PythonScriptEngine() { g_engine = this; ensureInterpreter(); }
+    // The interpreter is made by the first script that needs it: every instance has this engine,
+    // and most panels have no Python.
+    PythonScriptEngine() = default;
+
     ~PythonScriptEngine() override
     {
+        if (sub == nullptr) return;
+        {
+            // The watchdog takes the GIL to stop a script: never wait for it while holding it.
+            const GilReleased released;
+            watchdog.stop();
+        }
         reset();
-        if (g_engine == this)   g_engine = nullptr;
-        if (g_host   == host)   g_host   = nullptr; // don't leave g_host dangling at a destroyed host
+        {
+            const Entry entry (*this, false);
+            bridgeOwner->host = nullptr;   // what the interpreter runs as it ends reaches no instance
+            bridgeOwner->engine = nullptr;
+            Py_CLEAR (timeLimit);
+            Py_CLEAR (bridge);
+        }
+        // Ended from nothing current, or from inside another instance's call, which is current
+        // again afterwards. Py_EndInterpreter leaves nothing current and the GIL let go.
+        PyThreadState* const prev = currentThreadState();
+        PyThreadState* const restore = prev == nullptr ? gilStateToRestore() : nullptr;
+        if (prev == nullptr) PyEval_RestoreThread (sub);
+        else                 PyThreadState_Swap (sub);
+        Py_EndInterpreter (sub);
+        sub = nullptr;
+        if (prev != nullptr)         PyEval_RestoreThread (prev);
+        else if (restore != nullptr) { PyEval_RestoreThread (restore); PyEval_SaveThread(); }
     }
 
     juce::String language() const override { return "python"; }
 
-    bool installApi (ScriptHostApi& h) override { host = &h; g_host = &h; return interpreterOk; }
+    bool installApi (ScriptHostApi& h) override
+    {
+        host = &h;
+        if (bridgeOwner != nullptr) bridgeOwner->host = &h;
+        return true;   // whether Python itself is there is said by the first script that needs it
+    }
 
     // Stored, then re-applied to every namespace that already exists, so toggling a module in the
     // editor takes effect without reloading the scripts.
@@ -3028,6 +3247,7 @@ public:
     {
         enabledModules = moduleIds;
         if (! interpreterOk) return;
+        const Entry entry (*this);
         const auto call = moduleGateCall();
         for (auto& [id, ns] : namespaces)
         {
@@ -3043,6 +3263,7 @@ public:
         if (! interpreterOk) return;
         const auto boot = extensionBoot();
         if (boot.isEmpty()) return;
+        const Entry entry (*this);
         for (auto& [id, ns] : namespaces)
         {
             juce::ignoreUnused (id);
@@ -3052,12 +3273,13 @@ public:
 
     bool loadScript (const ScriptDefinition& def, const ScriptErrorSink& onError) override
     {
+        if (! interpreterTried) { interpreterTried = true; createInterpreter(); }
         if (! interpreterOk) { onError (def.id, initInfo.isNotEmpty() ? initInfo : juce::String ("Python interpreter failed to initialize")); return false; }
-        g_host = host; g_engine = this; // a script may call api at module scope during exec — route to THIS instance
+        const Entry entry (*this); // module-level statements obey the execution budget too
 
         // Fresh namespace dict per script (isolation). Seed builtins + owner, then prelude + source.
         PyObject* ns = PyDict_New();
-        if (ns == nullptr) { onError (def.id, fetchPyError()); return false; }
+        if (ns == nullptr) { onError (def.id, pyError()); return false; }
         PyDict_SetItemString (ns, "__builtins__", PyEval_GetBuiltins());
         {
             // resolveSelfOwner: a panel script's `self` is the panel (see ScriptRuntime.h).
@@ -3071,7 +3293,6 @@ public:
             Py_XDECREF (sid);
         }
 
-        const WatchdogScope guard (*this); // module-level statements obey the execution budget too
         currentScriptId = def.id;          // so a module-level on() tags its listener correctly
         // Prelude, then the module gate, then the user source — the gate has to be in place before
         // any top-level statement runs. Each script gets its own namespace dict, so the gate is
@@ -3081,8 +3302,8 @@ public:
                              && exec (moduleGateCall().toRawUTF8(), ns);
         const bool sourceOk  = preludeOk && exec (def.source.toRawUTF8(), ns);
         currentScriptId = {};
-        if (! preludeOk) { onError (def.id, "prelude error: " + fetchPyError()); Py_DECREF (ns); return false; }
-        if (! sourceOk)  { onError (def.id, "load error: " + fetchPyError()); Py_DECREF (ns); return false; }
+        if (! preludeOk) { onError (def.id, "prelude error: " + pyError()); Py_DECREF (ns); return false; }
+        if (! sourceOk)  { onError (def.id, "load error: " + pyError()); Py_DECREF (ns); return false; }
 
         if (auto it = namespaces.find (def.id); it != namespaces.end()) Py_DECREF (it->second);
         namespaces[def.id] = ns; // keep the ref
@@ -3093,15 +3314,11 @@ public:
     {
         auto it = namespaces.find (scriptId);
         if (it == namespaces.end()) return false;
+        const Entry entry (*this, false);
         PyObject* f = PyDict_GetItemString (it->second, fn.toRawUTF8()); // borrowed
         return f != nullptr && PyCallable_Check (f);
     }
 
-    // Anti-flood / loop guard (parity with Lua's instruction hook and JS's
-    // QuickJS interrupt): a watchdog thread calls PyErr_SetInterrupt() when a
-    // single entry into Python overruns its wall-clock budget, which raises
-    // KeyboardInterrupt in the interpreter and aborts the runaway handler.
-    // The error surfaces through the normal error sink via fetchPyError().
     /** Call a prelude function in one namespace. Returns the NEW reference, or nullptr after
         reporting. `args` may be null for a no-arg call; ownership stays with the caller. */
     PyObject* callPreludeRaw (PyObject* ns, const char* fn, PyObject* args,
@@ -3110,7 +3327,7 @@ public:
         PyObject* f = PyDict_GetItemString (ns, fn);       // borrowed
         if (f == nullptr || ! PyCallable_Check (f)) return nullptr;
         PyObject* r = args != nullptr ? PyObject_CallObject (f, args) : PyObject_CallNoArgs (f);
-        if (r == nullptr) { onError (what, fetchPyError()); return nullptr; }
+        if (r == nullptr) { onError (what, pyError()); return nullptr; }
         return r;
     }
 
@@ -3127,21 +3344,20 @@ public:
     juce::var dispatch (const juce::String& scriptId, const juce::String& fn,
                         const juce::var& payload, const ScriptErrorSink& onError) override
     {
-        g_host = host; g_engine = this; // route api_* calls during this dispatch to THIS instance
         auto it = namespaces.find (scriptId);
         if (it == namespaces.end()) return {};
+        const Entry entry (*this);
         PyObject* f = PyDict_GetItemString (it->second, fn.toRawUTF8()); // borrowed
         if (f == nullptr || ! PyCallable_Check (f)) return {};
 
         PyObject* arg = varToPy (payload);
-        if (arg == nullptr) { onError (scriptId, "failed to convert payload: " + fetchPyError()); return {}; }
-        const WatchdogScope guard (*this);
+        if (arg == nullptr) { onError (scriptId, "failed to convert payload: " + pyError()); return {}; }
         currentScriptId = scriptId;        // a handler may call on()/off() while running
         PyObject* result = PyObject_CallFunctionObjArgs (f, arg, nullptr);
         currentScriptId = {};
         Py_DECREF (arg);
 
-        if (result == nullptr) { onError (scriptId, fetchPyError()); return {}; }
+        if (result == nullptr) { onError (scriptId, pyError()); return {}; }
         auto v = pyToVar (result);
         Py_DECREF (result);
         return v;
@@ -3150,10 +3366,10 @@ public:
     void deliverEvent (const juce::String& target, const juce::String& event,
                        const juce::var& payload, const ScriptErrorSink& onError) override
     {
-        g_host = host; g_engine = this; // route api_* calls during delivery to THIS instance
+        if (! interpreterOk) return;
+        const Entry entry (*this);
         PyObject* arg = varToPy (payload);              // convert ONCE; the call borrows it
-        if (arg == nullptr) { onError ("on:" + event, "failed to convert payload: " + fetchPyError()); return; }
-        const WatchdogScope guard (*this);
+        if (arg == nullptr) { onError ("on:" + event, "failed to convert payload: " + pyError()); return; }
 
         // Handlers may add or remove listeners. Keep an owned snapshot: off() decrements the live
         // record's callable, so copying only the raw pointer would still leave this dispatch with a
@@ -3169,7 +3385,7 @@ public:
             currentScriptId = l.scriptId;
             PyObject* r = PyObject_CallFunctionObjArgs (l.fn, arg, nullptr);
             currentScriptId = {};
-            if (r == nullptr) onError ("on:" + event, fetchPyError());
+            if (r == nullptr) onError ("on:" + event, pyError());
             else Py_DECREF (r);
         }
         for (auto& l : listenersAtStart)
@@ -3184,8 +3400,7 @@ public:
     void runReactive (const ScriptErrorSink& onError) override
     {
         if (! interpreterOk) return;
-        g_host = host; g_engine = this;
-        const WatchdogScope guard (*this);
+        const Entry entry (*this);
         for (auto& kv : namespaces)
             if (! callPrelude (kv.second, "__runReactive", nullptr, onError, "compute/watch")) { /* reported */ }
     }
@@ -3193,11 +3408,11 @@ public:
     bool applyMidiFilter (bool inbound, juce::var& bytes, const ScriptErrorSink& onError) override
     {
         if (! interpreterOk) return true;
-        g_host = host; g_engine = this;
+        const Entry entry (*this);
         for (auto& kv : namespaces)
         {
-            PyObject* a = Py_BuildValue ("(OO)", inbound ? Py_True : Py_False, varToPy (bytes));
-            if (a == nullptr) { fetchPyError(); continue; }
+            PyObject* a = Py_BuildValue ("(ON)", inbound ? Py_True : Py_False, varToPy (bytes));
+            if (a == nullptr) { PyErr_Clear(); continue; }
             PyObject* out = callPreludeRaw (kv.second, "__applyMidiFilter", a, onError, "interceptMidi");
             Py_DECREF (a);
             if (out == nullptr) continue;
@@ -3216,12 +3431,11 @@ public:
                      const ScriptErrorSink& onError) override
     {
         if (! interpreterOk) return false;
-        g_host = host; g_engine = this;
-        const WatchdogScope guard (*this);
+        const Entry entry (*this);
         for (auto& kv : namespaces)
         {
-            PyObject* a = Py_BuildValue ("(sO)", name.toRawUTF8(), varToPy (args));
-            if (a == nullptr) { fetchPyError(); continue; }
+            PyObject* a = Py_BuildValue ("(sN)", name.toRawUTF8(), varToPy (args));
+            if (a == nullptr) { PyErr_Clear(); continue; }
             PyObject* out = callPreludeRaw (kv.second, "__callAction", a, onError, "action:" + name);
             Py_DECREF (a);
             if (out == nullptr) continue;
@@ -3237,6 +3451,7 @@ public:
     {
         juce::StringArray out;
         if (! interpreterOk) return out;
+        const Entry entry (*this);
         for (auto& kv : namespaces)
         {
             PyObject* f = PyDict_GetItemString (kv.second, "__actionNames");   // borrowed
@@ -3254,6 +3469,7 @@ public:
     void reset() override
     {
         if (! interpreterOk) return;
+        const Entry entry (*this, false);
         for (auto& kv : namespaces) Py_XDECREF (kv.second);
         namespaces.clear();
         for (auto& l : listeners) Py_XDECREF (l.fn);
@@ -3293,25 +3509,39 @@ private:
     // JS engine's 2s maximumExecutionTime).
     static constexpr double executionBudgetSeconds = 2.0;
 
-    // PyErr_SetInterrupt() is documented as callable from any thread without
-    // the GIL — it simulates SIGINT, making the interpreter raise
-    // KeyboardInterrupt in the main thread mid-execution.
+    /** Anti-flood / loop guard (parity with Lua's instruction hook and JS's QuickJS interrupt).
+        When an entry into this instance's interpreter overruns its budget, this thread takes the
+        GIL with a thread state of its own in that interpreter and raises `ceditor.TimeLimit` in the
+        instance's thread, which unwinds the runaway handler at its next bytecode; it does so again
+        every quarter second while the entry still runs, for a loop that caught it. TimeLimit is a
+        BaseException, so `except Exception:` does not catch it.
+
+        This used PyErr_SetInterrupt. That signals the main interpreter, never a sub-interpreter,
+        and is ignored outright when Python installed no SIGINT handler — which an isolated config
+        does not — so it never stopped a loop: the guard's test hung. A loop inside one C call that
+        holds the GIL (a regex that backtracks for ever) is out of reach either way. */
     class Watchdog : private juce::Thread
     {
     public:
         Watchdog() : juce::Thread ("ce-python-watchdog") {}
-        ~Watchdog() override { stopThread (2000); }
+        ~Watchdog() override { stop(); }
 
-        void beginDispatch (double budgetSeconds)
+        void setTarget (PyInterpreterState* interpIn, unsigned long threadIdIn, PyObject* exceptionIn)
+        { interp = interpIn; threadId = threadIdIn; exception = exceptionIn; }
+
+        // arm, disarm and the watchdog's own re-arming all happen with the GIL held, so it can
+        // never stop an entry that has already returned. Only an idle watchdog is woken: one
+        // waiting on an earlier deadline wakes before this one and reads it then. Waking it for
+        // every call was a context switch per call, a third of what a call into Python cost.
+        void arm (double budgetSeconds)
         {
-            fired.store (false);
-            deadlineMs.store (juce::Time::getMillisecondCounterHiRes() + (budgetSeconds * 1000.0));
+            deadlineMs.store (juce::Time::getMillisecondCounterHiRes() + budgetSeconds * 1000.0);
             if (! isThreadRunning()) startThread();
-            notify();
+            else if (idle.load()) notify();
         }
+        void disarm() { deadlineMs.store (0.0); }
 
-        void endDispatch()   { deadlineMs.store (0.0); }
-        bool firedThisRun()  { return fired.exchange (false); }
+        void stop() { stopThread (-1); }
 
     private:
         void run() override
@@ -3319,44 +3549,162 @@ private:
             while (! threadShouldExit())
             {
                 const double deadline = deadlineMs.load();
-                if (deadline > 0.0 && juce::Time::getMillisecondCounterHiRes() > deadline)
+                if (deadline <= 0.0)
                 {
-                    PyErr_SetInterrupt();   // -> KeyboardInterrupt in the interpreter thread
-                    fired.store (true);
-                    deadlineMs.store (0.0); // fire once per dispatch
+                    // Idle, said before the deadline is read again: an arm either sees the flag and
+                    // wakes this, or stored its deadline before the read below sees it.
+                    idle.store (true);
+                    if (deadlineMs.load() <= 0.0) wait (-1);
+                    idle.store (false);
+                    continue;
                 }
-                wait (50);
+                const double left = deadline - juce::Time::getMillisecondCounterHiRes();
+                if (left > 0.0) { wait ((int) std::ceil (left)); continue; }
+                interruptOverrun();
             }
         }
 
-        std::atomic<double> deadlineMs { 0.0 };
-        std::atomic<bool>   fired { false };
-    };
-
-    // Depth-shared like the Lua watchdog: only the outermost entry arms the
-    // deadline, so nested dispatches (handler -> emit -> handler) don't reset
-    // or prematurely clear it. On exit, absorb an interrupt that raced in
-    // AFTER Python returned, so it can't leak into the next dispatch.
-    struct WatchdogScope
-    {
-        explicit WatchdogScope (PythonScriptEngine& engineIn) : engine (engineIn)
+        void interruptOverrun()
         {
-            if (engine.watchdogDepth++ == 0)
-                engine.watchdog.beginDispatch (executionBudgetSeconds);
-        }
-
-        ~WatchdogScope()
-        {
-            if (--engine.watchdogDepth == 0)
+            PyThreadState* own = PyThreadState_New (interp);
+            if (own == nullptr) { deadlineMs.store (0.0); return; }
+            PyEval_RestoreThread (own);
+            const double deadline = deadlineMs.load();
+            const double now = juce::Time::getMillisecondCounterHiRes();
+            if (deadline > 0.0 && now >= deadline)
             {
-                engine.watchdog.endDispatch();
-                if (engine.watchdog.firedThisRun() && PyErr_CheckSignals() != 0)
-                    PyErr_Clear(); // late interrupt with no Python running — swallow it
+                PyThreadState_SetAsyncExc (threadId, exception);
+                deadlineMs.store (now + 250.0);
             }
+            PyThreadState_Clear (own);
+            PyThreadState_DeleteCurrent();   // and lets go of the GIL
         }
 
-        PythonScriptEngine& engine;
+        PyInterpreterState* interp = nullptr;
+        unsigned long threadId = 0;
+        PyObject* exception = nullptr;
+        std::atomic<double> deadlineMs { 0.0 };
+        std::atomic<bool> idle { false };
     };
+
+    /** This instance's interpreter, held for one entry from C++: the GIL, with this instance's
+        thread state current. Whatever was current before is current again on the way out — nothing
+        usually, or another instance's interpreter whose script reached this one through its host —
+        so entries nest. A timed entry is on the clock; only the outermost one arms the watchdog, so
+        a handler that emits into another does not reset it. */
+    class Entry
+    {
+    public:
+        explicit Entry (const PythonScriptEngine& engineIn, bool timedIn = true)
+            : engine (engineIn), timed (timedIn), prev (currentThreadState()),
+              restore (prev == nullptr ? gilStateToRestore() : nullptr)
+        {
+            if (prev == nullptr)          PyEval_RestoreThread (engine.sub);
+            else if (prev != engine.sub)  PyThreadState_Swap (engine.sub);
+            if (timed && engine.timedDepth++ == 0)
+                engine.watchdog.arm (executionBudgetSeconds);
+        }
+
+        ~Entry()
+        {
+            if (timed && --engine.timedDepth == 0)
+            {
+                engine.watchdog.disarm();
+                PyThreadState_SetAsyncExc (engine.threadId, nullptr); // one raised as the call returned
+            }
+            if (prev == nullptr)          letGo (restore);
+            else if (prev != engine.sub)  PyThreadState_Swap (prev);
+        }
+
+        Entry (const Entry&) = delete;
+        Entry& operator= (const Entry&) = delete;
+
+    private:
+        const PythonScriptEngine& engine;
+        const bool timed;
+        PyThreadState* const prev;
+        PyThreadState* const restore;
+    };
+
+    /** An interpreter of this instance's own, sharing nothing with any other instance but the
+        runtime: its own modules (sys.modules, builtins, everything a script imports or changes),
+        and its own `ceditor` module, whose state names this instance. Threads are not allowed in
+        it, as they are not in Pyodide with the window open: one would outlive the instance, and
+        an interpreter cannot end while a thread of its own still runs. */
+    void createInterpreter()
+    {
+        const auto& runtime = pythonRuntime();
+        initInfo = runtime.info;
+        if (! runtime.ok) return;
+
+        // Made from nothing current, or from inside another instance's call, which is current
+        // again afterwards. On success the new interpreter's thread state is current, holding the GIL.
+        PyThreadState* const prev = currentThreadState();
+        PyThreadState* const restore = prev == nullptr ? gilStateToRestore() : nullptr;
+        const auto handBack = [prev, restore]
+        {
+            if (prev != nullptr) PyThreadState_Swap (prev);
+            else                 letGo (restore);
+        };
+
+        PyInterpreterConfig config {};
+        config.use_main_obmalloc = 1;
+        config.allow_fork = 1;
+        config.allow_exec = 1;
+        config.allow_threads = 0;
+        config.allow_daemon_threads = 0;
+        config.check_multi_interp_extensions = 0;
+        config.gil = PyInterpreterConfig_SHARED_GIL;
+        PyThreadState* created = nullptr;
+        const PyStatus status = Py_NewInterpreterFromConfig (&created, &config);
+        if (PyStatus_Exception (status) || created == nullptr)
+        {
+            initInfo = "Python: this instance's interpreter could not be created: "
+                     + juce::String (status.err_msg != nullptr ? status.err_msg : "unknown") + " | " + runtime.info;
+            juce::Logger::writeToLog ("[python] " + initInfo);
+            return;   // CPython has put back whatever was current
+        }
+
+        // `created` is current now, so this is its sys.modules.
+        bridge = PyModule_Create (&apiModuleDef);
+        timeLimit = bridge != nullptr ? PyErr_NewException ("ceditor.TimeLimit", PyExc_BaseException, nullptr) : nullptr;
+        PyObject* modules = PyImport_GetModuleDict();   // borrowed
+        if (timeLimit == nullptr || modules == nullptr
+            || PyModule_AddObjectRef (bridge, "TimeLimit", timeLimit) != 0
+            || PyDict_SetItemString (modules, "ceditor", bridge) != 0)
+        {
+            initInfo = "Python: this instance's bridge could not be set up: " + fetchPyError();
+            juce::Logger::writeToLog ("[python] " + initInfo);
+            Py_CLEAR (timeLimit);
+            Py_CLEAR (bridge);
+            Py_EndInterpreter (created);   // leaves nothing current and the GIL let go
+            if (prev != nullptr)         PyEval_RestoreThread (prev);
+            else if (restore != nullptr) { PyEval_RestoreThread (restore); PyEval_SaveThread(); }
+            return;
+        }
+
+        bridgeOwner = ownerOf (bridge);
+        bridgeOwner->engine = this;
+        bridgeOwner->host = host;
+        sub = created;
+        threadId = created->thread_id;
+        watchdog.setTarget (PyThreadState_GetInterpreter (created), threadId, timeLimit);
+        interpreterOk = true;
+        handBack();
+    }
+
+    /** The pending Python error as one line, and cleared. A call the watchdog stopped says so, in
+        the words the editor's own limit uses (scripting/scriptWatchdog.js). */
+    juce::String pyError() const
+    {
+        if (timeLimit != nullptr && PyErr_ExceptionMatches (timeLimit))
+        {
+            PyErr_Clear();
+            return "script stopped: it ran for more than " + juce::String ((int) executionBudgetSeconds)
+                 + " s without returning, so it was stopped (an endless loop?)";
+        }
+        return fetchPyError();
+    }
 
     /** Each installed ce.ext.* module's Python prelude, followed by its registration call. A
         module that ships no Python contributes nothing — its members never appear in this engine,
@@ -3422,129 +3770,42 @@ private:
         return true;
     }
 
-    // Initialise CPython once, process-wide, with the bundled stdlib home if we can find one.
-    void ensureInterpreter()
-    {
-        if (Py_IsInitialized())
-        {
-            // Another component (the host, or another plugin) already started CPython. Inittab can no
-            // longer be appended, so register the `ceditor` bridge directly in sys.modules — otherwise
-            // every script's `import ceditor` in the prelude would raise ModuleNotFoundError.
-            PyObject* mods = PyImport_GetModuleDict(); // borrowed
-            if (mods != nullptr && PyDict_GetItemString (mods, "ceditor") == nullptr)
-            {
-                PyObject* m = PyInit_ceditor(); // apiModuleDef has m_size = -1, so creating post-init is fine
-                if (m == nullptr)
-                {
-                    interpreterOk = false;
-                    initInfo = "Python ready (pre-initialized elsewhere) but failed to register 'ceditor' bridge: " + fetchPyError();
-                    juce::Logger::writeToLog ("[python] " + initInfo);
-                    return;
-                }
-                PyDict_SetItemString (mods, "ceditor", m);
-                Py_DECREF (m);
-            }
-            interpreterOk = true;
-            initInfo = "Python ready (interpreter pre-initialized by host/other component; ceditor bridge ensured)";
-            return;
-        }
-
-        PyImport_AppendInittab ("ceditor", &PyInit_ceditor);
-
-        PyConfig config;
-        PyConfig_InitIsolatedConfig (&config);   // don't read user site / env that could break a plugin
-        config.site_import = 1;                  // but DO import site so the full stdlib is wired up
-
-        juce::String diag;
-        const auto home = resolvePythonHome (diag);
-        if (home.isNotEmpty())
-            PyConfig_SetBytesString (&config, &config.home, home.toRawUTF8());
-
-        PyStatus status = Py_InitializeFromConfig (&config);
-        PyConfig_Clear (&config);
-
-        if (PyStatus_Exception (status))
-        {
-            interpreterOk = false;
-            initInfo = "Python init FAILED: " + juce::String (status.err_msg ? status.err_msg : "unknown")
-                     + " | home=" + (home.isNotEmpty() ? home : juce::String ("<none — isolated init can't auto-find stdlib>"))
-                     + " | " + diag;
-            juce::Logger::writeToLog ("[python] " + initInfo);
-            return;
-        }
-        interpreterOk = true;
-        initInfo = "Python ready | home=" + (home.isNotEmpty() ? home : juce::String ("<compiled-in>")) + " | " + diag;
-    }
-
-    // Where the stdlib lives: env override → `PythonRuntime` next to THIS binary → none. `diag`
-    // accumulates what we found, surfaced into the script log so a failure is debuggable in-host.
-    static juce::String resolvePythonHome (juce::String& diag)
-    {
-        if (auto env = juce::SystemStats::getEnvironmentVariable ("CEDITOR_PYTHONHOME", {}); env.isNotEmpty())
-        { diag << "env CEDITOR_PYTHONHOME=" << env; return env; }
-
-        // In a PLUGIN the process exe is the HOST (reaper.exe), so currentExecutableFile is wrong. Get
-        // the directory of THIS module (the plugin DLL / this code) instead, so we find the bundled runtime.
-        juce::File moduleDir;
-       #if defined(_WIN32)
-        HMODULE hmod = nullptr;
-        if (GetModuleHandleExW (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                                reinterpret_cast<LPCWSTR> (&PyInit_ceditor), &hmod) && hmod != nullptr)
-        {
-            wchar_t path[MAX_PATH] = {};
-            if (GetModuleFileNameW (hmod, path, MAX_PATH) > 0)
-                moduleDir = juce::File (juce::String (path)).getParentDirectory();
-        }
-       #elif defined(__APPLE__) || defined(__linux__)
-        // dladdr on a locally-defined symbol resolves the .dylib/.so that contains THIS code (the
-        // plugin), whose folder holds the bundled PythonRuntime — currentExecutableFile would give the
-        // HOST exe (reaper, etc.), the wrong place to look.
-        Dl_info di {};
-        if (dladdr (reinterpret_cast<void*> (&PyInit_ceditor), &di) && di.dli_fname != nullptr)
-            moduleDir = juce::File (juce::String::fromUTF8 (di.dli_fname)).getParentDirectory();
-       #endif
-        if (moduleDir == juce::File())
-            moduleDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
-
-        diag << "moduleDir=" << moduleDir.getFullPathName();
-        // Candidates: next to the binary (Windows/Linux layout), a Resources child, and — for the macOS
-        // .vst3 bundle, where the binary is in Contents/MacOS — the sibling Contents/Resources.
-        for (auto candidate : { moduleDir.getChildFile ("PythonRuntime"),
-                                moduleDir.getChildFile ("Resources").getChildFile ("PythonRuntime"),
-                                moduleDir.getParentDirectory().getChildFile ("Resources").getChildFile ("PythonRuntime") })
-            if (candidate.isDirectory()) { diag << " (found PythonRuntime)"; return candidate.getFullPathName(); }
-
-        diag << " (no PythonRuntime alongside)";
-        return {}; // fall back to the interpreter's compiled-in default (a dev Python install)
-    }
-
     ScriptHostApi* host = nullptr;
+    bool interpreterTried = false;
     bool interpreterOk = false;
     juce::String initInfo;                        // why init failed (or where the stdlib was found) — for the log
+    PyThreadState* sub = nullptr;                 // this instance's interpreter, by its thread state
+    unsigned long threadId = 0;                   // that thread state's, which the watchdog raises in
+    PyObject* bridge = nullptr;                   // its `ceditor` module (owned)
+    BridgeOwner* bridgeOwner = nullptr;           // that module's state
+    PyObject* timeLimit = nullptr;                // ceditor.TimeLimit (owned)
     std::map<juce::String, PyObject*> namespaces; // scriptId -> namespace dict (owned ref)
     std::vector<Listener> listeners;
-    Watchdog watchdog;
-    int watchdogDepth = 0;
+    mutable Watchdog watchdog;
+    mutable int timedDepth = 0;
 };
 
 namespace
 {
-PyObject* api_on (PyObject*, PyObject* args)
+PyObject* api_on (PyObject* self, PyObject* args)
 {
     const char* target = nullptr; const char* event = nullptr; PyObject* fn = nullptr;
     if (! PyArg_ParseTuple (args, "ssO", &target, &event, &fn)) return nullptr;
     if (! PyCallable_Check (fn)) { PyErr_SetString (PyExc_TypeError, "on() needs a callable"); return nullptr; }
-    Py_INCREF (fn);
-    if (g_engine != nullptr) g_engine->addListener (juce::String::fromUTF8 (target), juce::String::fromUTF8 (event), fn);
-    else Py_DECREF (fn);
+    if (auto* engine = ownerOf (self)->engine)
+    {
+        Py_INCREF (fn);
+        engine->addListener (juce::String::fromUTF8 (target), juce::String::fromUTF8 (event), fn);
+    }
     Py_RETURN_NONE;
 }
 
-PyObject* api_off (PyObject*, PyObject* args)
+PyObject* api_off (PyObject* self, PyObject* args)
 {
     const char* target = nullptr; const char* event = nullptr;
     if (! PyArg_ParseTuple (args, "ss", &target, &event)) return nullptr;
-    if (g_engine != nullptr) g_engine->removeListener (juce::String::fromUTF8 (target), juce::String::fromUTF8 (event));
+    if (auto* engine = ownerOf (self)->engine)
+        engine->removeListener (juce::String::fromUTF8 (target), juce::String::fromUTF8 (event));
     Py_RETURN_NONE;
 }
 } // namespace
