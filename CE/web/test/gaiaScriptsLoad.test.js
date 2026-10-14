@@ -11,8 +11,8 @@
 // host over the real panel, and reads the console for errors. (It used a stand-in host whose panel
 // had no controls, so every set() a script made missed, and only load errors could be checked.)
 //
-// With the time limit lifted. It is wall-clock: idle, the slowest of these takes about 200 ms
-// against 250, and the full suite running beside a C++ build pushed one over, which stopped its
+// With the time limit lifted. It is wall-clock, and when it was 250 ms the full suite running beside
+// a C++ build pushed one of these over (the slowest took about 200 ms idle), which stopped its
 // sandbox and made the count 231. That is the time limit doing its job, not the cap this is about.
 
 import test from 'node:test';

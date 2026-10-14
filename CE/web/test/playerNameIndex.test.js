@@ -3,7 +3,7 @@
 // With the window open, the exported plug-in runs the panel's scripts through its host, whose
 // document is written in place. Every lookup by name used to scan the whole panel, and on GAIA that
 // was most of what its preset-name script cost (1,070 lookups across 818 controls, 160 to 220 ms of
-// the 250 ms one call may take). The player now looks names up in an index, checked as it is used.
+// the 250 ms one call could take then). The player now looks names up in an index, checked as it is used.
 // These pin that it answers exactly as the scan did, whatever happens to the document under it.
 
 import test from 'node:test';

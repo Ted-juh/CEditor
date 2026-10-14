@@ -302,7 +302,7 @@ const editorNameIndexes = new WeakMap();
 // array stays the same object when a name changes and cannot key an index on its own. It used to be
 // scanned whole on every lookup instead, and with the window open that was most of what GAIA's
 // preset-name script cost: 1,070 lookups across 818 controls in one call, 160 to 220 ms of the
-// 250 ms a call may take. Its index is kept honest as it is used: a hit is checked against the
+// 250 ms a call could take then. Its index is kept honest as it is used: a hit is checked against the
 // control's current name and id, a miss looks again in a fresh index (a control a script created),
 // and a script's write to a name or an id drops it (noteHostWrite).
 const hostNameIndexes = new WeakMap();
