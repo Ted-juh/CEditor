@@ -102,3 +102,26 @@ test('a label an author coloured keeps its colours under every design', () => {
     assert.equal(label.Text._children.Fill.colour, 'FFFFEE00', `${id} lettering`);
   }
 });
+
+test('a label whose author took the plate away keeps its own lettering and draws no box', () => {
+  // The plate's rim, ink and emboss go with the plate (models/familyConditions.js). Before, a label
+  // made transparent under a plate set kept the dark plate ink on the dark panel: 1.0:1 on
+  // Brassworks and Valve Console, inside the factory's white box.
+  const transparent = { Background: { _children: { Fill: { colour: '00000000' } } } };
+  for (const id of ['walnut', 'valve', 'saddle', 'valve-console', 'brassworks']) {
+    const label = labelUnder(id, transparent);
+    const panel = resolveToken('panel.surface', getControlSet(id));
+    const ink = resolveToken(label.Text._children.Fill.colour.replace(/^\{(.+)\}$/, '$1'), getControlSet(id)) ?? label.Text._children.Fill.colour;
+    assert.equal(label.Background._children.Fill.colour, '00000000', `${id}: the author's background`);
+    assert.ok(contrast(ink, panel) >= 4.5, `${id}: lettering on the bare panel, ${contrast(ink, panel).toFixed(2)}:1`);
+    assert.equal(label.Background._children.Border.enabled, false, `${id}: no rim around nothing`);
+    assert.equal(label.Text._children.Effects.shadowEnabled, false, `${id}: no emboss without the plate`);
+  }
+});
+
+test('a label an author gave the brass itself has the plate, lettering and all', () => {
+  const brass = labelUnder('brassworks').Background._children.Fill.colour;
+  const label = labelUnder('brassworks', { Background: { _children: { Fill: { colour: brass } } } });
+  assert.equal(label.Text._children.Fill.colour, labelUnder('brassworks').Text._children.Fill.colour);
+  assert.equal(label.Background._children.Border.enabled, true);
+});

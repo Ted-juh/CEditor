@@ -5,6 +5,7 @@ import { normalizeCaptureSession } from '../utils/captureSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
 import { expandAuthoredParts, expandControl, exportDefaultsFor, shrinkAuthoredParts, shrinkControl } from './documentShape.js';
 import { panelDocumentText } from './documentLayout.js';
+import { shareDrawings } from './documentDrawings.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
 import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
 import { controlSetLibrary } from './controlSetLibraryStore.js';
@@ -278,7 +279,8 @@ function toDocumentForm(control) {
  * C++ reads controls raw and could not rebuild a default it never saw. GAIA's came to 12.2 MB, the
  * same panel saved is 3.0 MB, and the difference was the same defaults again for each of its 818
  * controls. Now the payload brings them once, per type, and the C++ rebuilds each control from them
- * as it loads (Player/PanelValueModel.h), sharing them rather than copying.
+ * as it loads (Player/PanelValueModel.h), sharing them rather than copying. A drawing several
+ * controls share goes once too, as in a saved document (documentDrawings.js): 1.8 MB for GAIA.
  *
  * It takes the COMPLETE document serializePanelForExport writes, and it is the last thing done to
  * one: everything before it in an export reads whole controls (the host parameter list, the fonts a
@@ -292,7 +294,9 @@ export function exportFormDocument(doc) {
     throw new Error('exportFormDocument takes the complete document serializePanelForExport writes');
   }
   const whole = (doc.controls ?? []).map(expandAuthoredParts);
-  return { ...doc, documentForm: 'export', controls: whole.map(shrinkControl), controlDefaults: exportDefaultsFor(whole) };
+  // A drawing more than one control uses goes once, as in a saved document (documentDrawings.js).
+  const { controls, drawings } = shareDrawings(whole.map(shrinkControl));
+  return { ...doc, documentForm: 'export', controls, ...(drawings ? { drawings } : {}), controlDefaults: exportDefaultsFor(whole) };
 }
 
 /**
@@ -350,6 +354,11 @@ export function serializePanel(panel, options = {}) {
     ? controls.map((control) => resolveControlForSet(control, options.bakeControlSet))
     : controls;
   data.controls = elide ? baked.map(toDocumentForm) : baked.map(shrinkAuthoredParts);
+  // A saved document writes each drawing more than one control uses once, beside the controls
+  // (documentDrawings.js). The complete form keeps every control's own: it is the step before the
+  // export form, which does the same to its controls once they are a diff again.
+  const shared = elide ? shareDrawings(data.controls) : { controls: data.controls, drawings: null };
+  data.controls = shared.controls;
 
   // Panel identity. deserializePanel prefers the name the host derives from the filename, so a
   // stale `name` in the document is invisible in the app and only shows up when someone reads the
@@ -439,12 +448,22 @@ export function serializePanel(panel, options = {}) {
   // no structural test can: a default item the author deleted is simply absent from both forms.
   //
   // Laid out one line per control section, not one per property (stores/documentLayout.js).
-  const { formatVersion, documentForm, controlDefaults, ...rest } = data;
-  return panelDocumentText({
+  //
+  // The drawings table goes right after the controls that refer to it. A document from a newer
+  // CEditor brought its own table, which goes back with this one's shares over it
+  // (resolveDrawings' keepTable); a saved document only, since the complete form shares nothing.
+  const { formatVersion, documentForm, controlDefaults, drawings: carried, ...rest } = data;
+  const kept = carried && typeof carried === 'object' && !Array.isArray(carried) ? carried : null;
+  const table = elide && (kept || shared.drawings) ? { ...kept, ...shared.drawings } : null;
+  const doc = {
     formatVersion: Math.max(PANEL_FORMAT_VERSION, panelFormatVersion({ formatVersion })),
     ...(elide ? {} : { documentForm: 'complete' }),
-    ...rest,
-  });
+  };
+  for (const [key, value] of Object.entries(rest)) {
+    doc[key] = value;
+    if (key === 'controls' && table) doc.drawings = table;
+  }
+  return panelDocumentText(doc);
 }
 
 // What the last deserializePanel call had to say, for the caller to show: why a document was

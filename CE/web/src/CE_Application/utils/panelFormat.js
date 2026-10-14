@@ -26,13 +26,17 @@
 import { validate as validatePanelSchema } from '../generated/panelDocumentValidator.js';
 import { deepClone } from './deepClone.js';
 import { migrateDottedControlNames } from './controlNames.js';
+import { resolveDrawings } from '../stores/documentDrawings.js';
 
-export const PANEL_FORMAT_VERSION = 2;
+export const PANEL_FORMAT_VERSION = 3;
 
 const MIGRATIONS = {
   // 1 -> 2: control names lost their dots, and every reference that addresses a control by name
   // was converted with them (utils/controlNames.js has the reasoning and the list).
   1: (doc) => migrateDottedControlNames(doc),
+  // 2 -> 3: a drawing more than one control uses is written once (stores/documentDrawings.js). No
+  // step: a version-2 document has no table to convert. The number moves so that an older CEditor,
+  // which would open such a file with every shared drawing missing, says a newer one wrote it.
 };
 
 /** The format version a document says it is. No field, or nonsense in it, reads as 1. */
@@ -124,11 +128,18 @@ export function readPanelDocument(json) {
   if (!check.ok) {
     return { doc: null, migration: null, error: `the document is not a valid panel: ${check.errors.join('; ')}` };
   }
+  // Drawings written once go back into the controls that use them before anything else sees the
+  // document, migrations included: from here on each control has its own Parts, as it always did.
+  // A newer document keeps its table too, so what this build does not understand in it survives.
+  const drawings = resolveDrawings(data, { keepTable: panelFormatVersion(data) > PANEL_FORMAT_VERSION });
   let migration;
   try {
-    migration = migratePanelDocument(data);
+    migration = migratePanelDocument(drawings.doc);
   } catch (error) {
     return { doc: null, migration: null, error: `the document could not be converted from format ${panelFormatVersion(data)} (${error.message})` };
+  }
+  if (drawings.missing.length) {
+    migration.warnings.push(`Some controls use a drawing the file does not contain (${drawings.missing.join(', ')}); they open without it.`);
   }
   return { doc: migration.doc, migration, error: null };
 }

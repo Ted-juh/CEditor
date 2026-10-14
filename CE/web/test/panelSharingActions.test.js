@@ -161,3 +161,37 @@ test('the saved file name comes from the package, not the tab', async () => {
   const { envelope } = await packagePanelForSharing({ name: 'x', controls: [] }, { name: 'Shared: One' });
   assert.equal(panelPackageFile(envelope).fileName, 'Shared_ One.cepanelpkg');
 });
+
+test('an image inside a drawing two controls share travels too', async () => {
+  // Save writes a drawing several controls use once, beside the controls (documentDrawings.js), and
+  // packaging finds images by walking the controls: it has to see the drawing in each of them.
+  const { deserializePanel } = await import('../src/CE_Application/stores/panelModel.js');
+  const { readText } = await import('./support/readText.mjs');
+  const gaia = deserializePanel(readText(new URL('../../panels/Roland GAIA SH-01.cepanel', import.meta.url)), 'gaia.cepanel', null);
+  const custom = (function find(controls) {
+    for (const c of controls) {
+      if (c._children.Core.controlType === 'CustomComponent' && Object.values(c._children.Parts?._children ?? {}).some((p) => p._children?.Background)) return c;
+      const inner = find(Object.values(c._children.Children?._children ?? {}));
+      if (inner) return inner;
+    }
+    return null;
+  })(gaia.controls);
+  assert.ok(custom, 'GAIA has a hand-drawn control to copy');
+  const twin = (id) => {
+    const copy = structuredClone(custom);
+    copy._children.Core = { ...copy._children.Core, id, name: id };
+    const part = Object.values(copy._children.Parts._children).find((p) => p._children?.Background);
+    part._children.Background._children.Fill.imageSrc = 'C:/pics/cap.png';
+    return copy;
+  };
+  fileCache.set({ 'C:/pics/cap.png': 'data:image/png;base64,Y2Fw' });
+  const panel = panelOnScreen();
+  panel.controls = [twin('one'), twin('two')];
+  addPanel(panel);
+
+  const { envelope, assetCount, missing } = await sharePanelToFile();
+  assert.deepEqual(missing, []);
+  assert.equal(assetCount, 1, 'the drawing\'s image is in the package');
+  assert.equal(envelope.panel.drawings, undefined, 'the package carries each control\'s drawing in it');
+  assert.ok(!JSON.stringify(envelope.panel).includes('C:/pics'), 'and neither copy points at the author\'s disk');
+});

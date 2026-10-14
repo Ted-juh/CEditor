@@ -1,6 +1,6 @@
 {
   "format": "ceditor-controlset",
-  "formatVersion": 1,
+  "formatVersion": 2,
   "exportedAt": "2026-09-18T00:00:00.000Z",
   "metadata": {
     "id": "valve-console",
@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "46c24a54",
+  "fingerprint": "0c3332c8",
   "set": {
     "id": "valve-console",
     "name": "Valve Console",
@@ -753,18 +753,86 @@
       },
       "Label": {
         "component": {
-          "Text.Fill.colour": "FF2A2116",
+          "Text.Fill.colour": {
+            "onlyWhere": {
+              "path": "Background.Fill.colour",
+              "is": "FFC8A45A"
+            },
+            "value": "FF2A2116",
+            "otherwise": "{text.primary}"
+          },
           "Background.Fill.colour": "FFC8A45A",
-          "Background.Border.enabled": true,
-          "Background.Border.colour": "FF7C6638",
-          "Background.Border.thickness": 1,
-          "Background.Corners.radius": 2,
-          "Text.Effects.shadowEnabled": true,
-          "Text.Effects.shadowStyle": "soft",
-          "Text.Effects.shadowOffsetX": 0,
-          "Text.Effects.shadowOffsetY": 1,
-          "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99E6D6B5"
+          "Background.Border.enabled": {
+            "onlyWhere": {
+              "path": "Background.Fill.colour",
+              "is": "FFC8A45A"
+            },
+            "value": true,
+            "otherwise": false
+          },
+          "Background.Border.colour": {
+            "onlyWhere": {
+              "path": "Background.Fill.colour",
+              "is": "FFC8A45A"
+            },
+            "value": "FF7C6638"
+          },
+          "Background.Border.thickness": {
+            "onlyWhere": {
+              "path": "Background.Fill.colour",
+              "is": "FFC8A45A"
+            },
+            "value": 1
+          },
+          "Background.Corners.radius": {
+            "onlyWhere": {
+              "path": "Background.Fill.colour",
+              "is": "FFC8A45A"
+            },
+            "value": 2
+          },
+          "Text.Effects.shadowEnabled": {
+            "onlyWhere": {
+              "path": "Background.Fill.colour",
+              "is": "FFC8A45A"
+            },
+            "value": true
+          },
+          "Text.Effects.shadowStyle": {
+            "onlyWhere": {
+              "path": "Background.Fill.colour",
+              "is": "FFC8A45A"
+            },
+            "value": "soft"
+          },
+          "Text.Effects.shadowOffsetX": {
+            "onlyWhere": {
+              "path": "Background.Fill.colour",
+              "is": "FFC8A45A"
+            },
+            "value": 0
+          },
+          "Text.Effects.shadowOffsetY": {
+            "onlyWhere": {
+              "path": "Background.Fill.colour",
+              "is": "FFC8A45A"
+            },
+            "value": 1
+          },
+          "Text.Effects.shadowBlur": {
+            "onlyWhere": {
+              "path": "Background.Fill.colour",
+              "is": "FFC8A45A"
+            },
+            "value": 0
+          },
+          "Text.Effects.shadowColour": {
+            "onlyWhere": {
+              "path": "Background.Fill.colour",
+              "is": "FFC8A45A"
+            },
+            "value": "99E6D6B5"
+          }
         }
       },
       "TextInput": {

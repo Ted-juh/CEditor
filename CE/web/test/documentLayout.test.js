@@ -63,12 +63,21 @@ test('each section of each control is one line, nested controls and parts includ
       sections++;
     }
   }
-  assert.ok(nested > 800 && sections > 4000 && parts > 3000,
-    `the GAIA panel should exercise all three: ${nested} nested controls, ${sections} sections, ${parts} parts`);
+  // A drawing several controls share is written once, in `drawings` (stores/documentDrawings.js),
+  // laid out as the Parts section it is: a part to a line.
+  let shared = 0;
+  for (const [name, drawing] of Object.entries(doc.drawings ?? {})) {
+    for (const [partName, part] of Object.entries(drawing._children ?? {})) {
+      assert.ok(lines.has(`${JSON.stringify(partName)}: ${JSON.stringify(part)}`), `part ${partName} of drawing ${name} is not on a line of its own`);
+      shared++;
+    }
+  }
+  assert.ok(nested > 800 && sections > 4000 && parts > 100 && shared > 100,
+    `the GAIA panel should exercise all four: ${nested} nested controls, ${sections} sections, ${parts} parts, ${shared} in shared drawings`);
 });
 
-test('everything outside the controls keeps the layout it had', () => {
-  const doc = JSON.parse(serializePanel(open(GAIA)));
+test('everything outside the controls and the drawings keeps the layout it had', () => {
+  const { drawings: _drawings, ...doc } = JSON.parse(serializePanel(open(GAIA)));
   const before = JSON.stringify({ ...doc, controls: [] }, null, 2);
   const after = panelDocumentText({ ...doc, controls: [] });
   assert.equal(after, before);

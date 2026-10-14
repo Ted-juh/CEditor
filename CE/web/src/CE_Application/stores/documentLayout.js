@@ -26,7 +26,7 @@
 // a few dozen to a component, so one line for all of them would make every redrawn part a rewrite of
 // the whole set.
 //
-// Everything outside `controls` keeps JSON.stringify's own layout, byte for byte. Readers are not
+// Everything outside `controls` and `drawings` keeps JSON.stringify's own layout, byte for byte. Readers are not
 // affected at all: this is whitespace, and every reader — deserializePanel, the exporters, the
 // plug-in's juce::JSON::parse — skips it.
 
@@ -45,7 +45,12 @@ const SECTIONS = (section) => {
   if (section === 'Parts') return entriesPerLine(ONE_LINE);
   return ONE_LINE;
 };
-const DOCUMENT = (key) => (key === 'controls' ? () => CONTROL : PRETTY);
+// The drawings a document writes once (documentDrawings.js) are Parts sections, laid out as one.
+const DOCUMENT = (key) => {
+  if (key === 'controls') return () => CONTROL;
+  if (key === 'drawings') return () => SECTIONS('Parts');
+  return PRETTY;
+};
 
 /** The text of a panel document: what serializePanel writes, in the layout the header describes. */
 export function panelDocumentText(doc) {

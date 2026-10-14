@@ -22,6 +22,7 @@
 // Graphite has no Label design: it is the look every existing document has.
 
 import { argb, darken, lighten } from './controlSetDesigns.js';
+import { conditionOf, onlyWhere } from './familyConditions.js';
 
 // Which sets take which treatment beyond silkscreen. Short enough to read, which is the point: it
 // is the design decision per set. The metal rule below covers the engraved sets.
@@ -96,19 +97,25 @@ export function labelFamily(set) {
     } };
   }
   if (treatment === 'plate') {
+    // The plate's rim, its lettering and the lettering's emboss go with the plate: a label whose
+    // author took the plate away (a transparent background, say) keeps its own ink and draws no
+    // box, as a label under the plain sets does, rather than dark brass-plate lettering in the
+    // factory's white box on a dark panel (familyConditions.js).
+    const plate = argb(BRASS);
+    const onPlate = (value, otherwise) => onlyWhere('Background.Fill.colour', plate, value, otherwise);
     return { component: {
-      'Background.Fill.colour': argb(BRASS),
-      'Background.Border.enabled': true,
-      'Background.Border.colour': argb(darken(BRASS, 0.38)),
-      'Background.Border.thickness': 1,
-      'Background.Corners.radius': 2,
-      'Text.Fill.colour': PLATE_INK,
-      'Text.Effects.shadowEnabled': true,
-      'Text.Effects.shadowStyle': 'soft',
-      'Text.Effects.shadowOffsetX': 0,
-      'Text.Effects.shadowOffsetY': 1,
-      'Text.Effects.shadowBlur': 0,
-      'Text.Effects.shadowColour': argb(lighten(BRASS, 0.55), '99'),
+      'Background.Fill.colour': plate,
+      'Background.Border.enabled': onPlate(true, false),
+      'Background.Border.colour': onPlate(argb(darken(BRASS, 0.38))),
+      'Background.Border.thickness': onPlate(1),
+      'Background.Corners.radius': onPlate(2),
+      'Text.Fill.colour': onPlate(PLATE_INK),
+      'Text.Effects.shadowEnabled': onPlate(true),
+      'Text.Effects.shadowStyle': onPlate('soft'),
+      'Text.Effects.shadowOffsetX': onPlate(0),
+      'Text.Effects.shadowOffsetY': onPlate(1),
+      'Text.Effects.shadowBlur': onPlate(0),
+      'Text.Effects.shadowColour': onPlate(argb(lighten(BRASS, 0.55), '99')),
     } };
   }
   // frame: one ink, one paper, a hairline.
@@ -123,11 +130,19 @@ export function labelFamily(set) {
 /**
  * The set with its Label design merged into its Label family. The design wins over what the family
  * already says (the additional sets name the text colour, which a plate must replace with its own
- * ink), and the set's type block still sets the face, beneath both (controlSetFamilies).
+ * ink), and the set's type block still sets the face, beneath both (controlSetFamilies). Where a
+ * design's value goes with another property and says nothing for where it does not hold, what the
+ * family said is kept for there.
  */
 export function withLabelDesign(set) {
   const design = labelFamily(set);
   if (!design) return set;
   const current = set.families?.Label ?? {};
-  return { ...set, families: { ...set.families, Label: { ...current, component: { ...(current.component ?? {}), ...design.component } } } };
+  const component = { ...(current.component ?? {}) };
+  for (const [path, value] of Object.entries(design.component)) {
+    const before = component[path];
+    const keep = conditionOf(value) && !Object.hasOwn(value, 'otherwise') && before !== undefined && !conditionOf(before);
+    component[path] = keep ? { ...value, otherwise: before } : value;
+  }
+  return { ...set, families: { ...set.families, Label: { ...current, component } } };
 }

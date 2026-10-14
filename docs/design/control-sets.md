@@ -653,6 +653,13 @@ Graphite has none, as rule 1 requires. Every Label still reads at 4.7:1 or bette
 behind it: the panel, or the brass plate at 6.7:1. The Settings editor's Control families gained
 Labels, so a personal set can take any template's label design the way it takes a knob's.
 
+The plate's rim, lettering and emboss go with the plate (`models/familyConditions.js`). The family
+rule applies each property on its own, so a label whose author made its background transparent kept
+that background and still took the dark plate ink, inside the factory's white box: 1.0:1 on
+Brassworks and Valve Console, 1.3:1 on Walnut. Those properties now apply only where the label
+draws the brass, and elsewhere the label keeps its own ink (`text.primary`, 4.8:1 or better on all
+five panels) and draws no box, as it would under a plain set.
+
 Two things the designs found. A caption with a text shadow or glow is drawn as SVG. Folded scenery
 is baked in a detached element where nothing is measured, so its SVG copy was anchored on the line
 box's left edge with half its width cut off: "Cutoff" read "toff". That had been true of any

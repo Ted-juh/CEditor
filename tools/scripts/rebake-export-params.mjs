@@ -5,6 +5,7 @@
 // type's defaults (see stores/documentShape.js), so `panel.controls` off a raw JSON.parse is
 // sparse — deriving export parameters from it would read a Behavior or Value that is only absent
 // because it was unchanged, and quietly bake a shorter parameter list than the panel actually has.
+// Before that, a drawing several controls share is put back into each (stores/documentDrawings.js).
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -19,8 +20,9 @@ const webSrc = (rel) => pathToFileURL(path.join(REPO, 'CE/web/src/CE_Application
 const mod = await import(webSrc('utils/exportParameters.js'));
 const { expandControl } = await import(webSrc('stores/documentShape.js'));
 const { panelDocumentText } = await import(webSrc('stores/documentLayout.js'));
+const { resolveDrawings } = await import(webSrc('stores/documentDrawings.js'));
 
-const panel = JSON.parse(readFileSync(panelPath, 'utf8'));
+const { doc: panel } = resolveDrawings(JSON.parse(readFileSync(panelPath, 'utf8')));
 panel.controls = (panel.controls ?? []).map(expandControl);
 panel.exportParameters = mod.deriveExportParameters(panel);  // force re-derive from controls
 writeFileSync(panelPath, panelDocumentText(panel));   // the layout serializePanel writes

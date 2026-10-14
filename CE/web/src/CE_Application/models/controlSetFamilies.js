@@ -21,6 +21,8 @@
 //   addParts  — `{ jewel: { _type: 'Part', … } }`: whole parts the family adds when the control
 //               has no part of that name (a jewel lamp, a guard). Not used by the pilot sets.
 // A value may be a colour token reference ('{control.cap}'); the token resolver runs after this.
+// A value may also go with another property (familyConditions.js): a plate's lettering applies only
+// where the plate is drawn. Those are applied after the rest, against what the rest drew.
 //
 // PINS. The rule cannot see an author who chose the factory value itself: a set that hides a
 // slider's ticks overrode an author who turned them back on, because "on" is the default and so
@@ -36,6 +38,7 @@ import { BUILT_IN_CONTROL_SETS, isTokenReference, resolveColourValue, resolveCon
 import { GRAPHITE_SERIES, INSTRUMENT_TYPES, SERIES_ROLES } from './instrumentDesigns.js';
 import { typeFamilies } from './controlSetRecipes.js';
 import { deepClone } from '../utils/deepClone.js';
+import { conditionOf } from './familyConditions.js';
 
 const pristineCache = new Map();
 
@@ -129,14 +132,26 @@ export function writeControlPath(root, path, value) {
 }
 
 function applyPatchWhereDefault(target, pristine, patch, prefix, out, pinned) {
-  for (const [path, value] of Object.entries(patch ?? {})) {
-    if (pinned.has(prefix ? `${prefix}.${path}` : path)) continue;
+  const at = (path) => (prefix ? `${prefix}.${path}` : path);
+  const apply = (path, value) => {
+    if (pinned.has(at(path))) return;
     const current = readControlPath(target, path);
     const factory = readControlPath(pristine, path);
     // The author changed this one: it is theirs. (A property neither has counts as unchanged.)
-    if (!sameValue(current, factory)) continue;
-    if (sameValue(current, value)) continue;
-    out = writeControlPath(out, prefix ? `${prefix}.${path}` : path, value);
+    if (!sameValue(current, factory)) return;
+    if (sameValue(current, value)) return;
+    out = writeControlPath(out, at(path), value);
+  };
+  const dependent = [];
+  for (const [path, value] of Object.entries(patch ?? {})) {
+    if (conditionOf(value)) dependent.push([path, value]);
+    else apply(path, value);
+  }
+  // Then the values that go with another property, against what was drawn above (familyConditions.js).
+  for (const [path, value] of dependent) {
+    const { path: anchor, is } = conditionOf(value);
+    const chosen = sameValue(readControlPath(out, at(anchor)), is) ? value.value : value.otherwise;
+    if (chosen !== undefined) apply(path, chosen);
   }
   return out;
 }

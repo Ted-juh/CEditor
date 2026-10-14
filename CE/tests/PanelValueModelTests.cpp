@@ -100,6 +100,60 @@ const char* kExportPanel = R"JSON({
     }
   }
 })JSON";
+
+// An export payload whose controls share a drawing (stores/documentDrawings.js): written once in
+// `drawings`, referred to by name, over the same defaults as above.
+const char* kDrawingsPanel = R"JSON({
+  "name": "Drawings",
+  "documentForm": "export",
+  "controls": [
+    { "_type": "Control", "_children": {
+        "Core": { "id": "a", "name": "twinA", "controlType": "CustomComponent" },
+        "Parts": { "_drawing": "d1" } } },
+    { "_type": "Control", "_children": {
+        "Core": { "id": "b", "name": "twinB", "controlType": "CustomComponent" },
+        "Parts": { "_drawing": "d1" } } },
+    { "_type": "Control", "_children": {
+        "Core": { "id": "e", "name": "extra", "controlType": "CustomComponent" },
+        "Parts": { "_drawing": "d1", "_children": {
+          "badge": { "_type": "Part", "name": "badge", "_children": { "Layout": { "x": 9 } } } } } } },
+    { "_type": "Control", "_children": {
+        "Core": { "id": "l", "name": "lost", "controlType": "CustomComponent" },
+        "Parts": { "_drawing": "nowhere" } } },
+    { "_type": "Control", "_children": {
+        "Core": { "id": "k", "name": "knobbed", "controlType": "Knob" },
+        "Parts": { "_drawing": "d1" } } },
+    { "_type": "Control", "_children": {
+        "Core": { "id": "box", "name": "box", "controlType": "Container" },
+        "Children": { "_children": {
+          "i": { "_type": "Control", "_children": {
+            "Core": { "id": "i", "name": "inner", "controlType": "CustomComponent" },
+            "Parts": { "_drawing": "d1" } } } } } } }
+  ],
+  "drawings": {
+    "d1": { "_children": {
+      "cap": { "_type": "Part", "name": "cap", "_children": {
+        "Background": { "_type": "Background" },
+        "Layout": { "x": 4 } } } } }
+  },
+  "controlDefaults": {
+    "types": {
+      "Knob": { "_type": "Control", "_children": {
+        "Core": { "_type": "Core", "id": "", "name": "", "controlType": "Knob" },
+        "Parts": { "_type": "Parts", "_children": { "track": { "_type": "Part", "name": "track", "_children": {} } } } } },
+      "Container": { "_type": "Control", "_children": {
+        "Core": { "_type": "Core", "id": "", "name": "", "controlType": "Container" },
+        "Children": { "_type": "Children", "_children": {} } } },
+      "CustomComponent": { "_type": "Control", "_children": {
+        "Core": { "_type": "Core", "id": "", "name": "", "controlType": "CustomComponent" },
+        "Parts": { "_type": "Parts", "_children": {} } } }
+    },
+    "part": { "_type": "Part", "name": "", "_children": { "Layout": { "_type": "Layout", "x": 0, "y": 0 } } },
+    "partSections": {
+      "Background": { "_type": "Background", "_children": { "Fill": { "_type": "Fill", "colour": "FFFFFFFF" } } }
+    }
+  }
+})JSON";
 }
 
 int main()
@@ -223,6 +277,38 @@ int main()
                    && m.getValue ("custom.Parts.cap.Background.Fill.colour").toString() == "FF00FF00",
                "export: a write into an authored part's defaulted section lands (it was refused when the part was sparse)");
 
+    }
+
+    // --- an export payload with drawings written once: each control that names one has it --------
+    {
+        ceditor::PanelValueModel m;
+        check (m.loadFromJson (kDrawingsPanel), "Parsed the payload with drawings");
+        const auto fill = [&m] (const char* control) { return m.getValue (juce::String (control) + ".Parts.cap.Background.Fill.colour").toString(); };
+        check ((int) m.getValue ("twinA.Parts.cap.Layout.x") == 4 && fill ("twinA") == "FFFFFFFF"
+                   && (int) m.getValue ("twinB.Parts.cap.Layout.x") == 4 && fill ("twinB") == "FFFFFFFF",
+               "drawings: both controls that name the drawing have it, rebuilt over the defaults");
+        check ((int) m.getValue ("extra.Parts.cap.Layout.x") == 4 && (int) m.getValue ("extra.Parts.badge.Layout.x") == 9,
+               "drawings: a reference's own keys go over the drawing");
+        check (m.getValue ("lost.Parts.cap").isVoid(), "drawings: a control naming a drawing the payload lacks opens without it");
+        check ((int) m.getValue ("inner.Parts.cap.Layout.x") == 4, "drawings: a container's child has its drawing too");
+        check (! m.getValue ("knobbed.Parts.track").isVoid() && m.getValue ("twinA.Parts.track").isVoid()
+                   && (int) m.getValue ("knobbed.Parts.cap.Layout.x") == 4,
+               "drawings: one drawing over two types is rebuilt over each (the knob keeps the part its type ships)");
+        check (m.getValue ("panel.drawings").isVoid(), "drawings: the table is not part of the panel a script sees");
+
+        check (m.setValue ("twinA.Parts.cap.Background.Fill.colour", juce::var ("FF00FF00")) && fill ("twinA") == "FF00FF00",
+               "drawings: a write into a shared drawing's part lands");
+        check (fill ("twinB") == "FFFFFFFF" && fill ("inner") == "FFFFFFFF" && fill ("extra") == "FFFFFFFF" && fill ("knobbed") == "FFFFFFFF",
+               "  and reaches no other control that shares the drawing, rebuilt or carried");
+        check (m.setValue ("twinB.Parts.cap.Layout.x", juce::var (7)) && (int) m.getValue ("twinB.Parts.cap.Layout.x") == 7
+                   && (int) m.getValue ("twinA.Parts.cap.Layout.x") == 4 && (int) m.getValue ("inner.Parts.cap.Layout.x") == 4,
+               "drawings: so does one into the twin");
+
+        ceditor::PanelValueModel again;
+        check (again.loadFromJson (kDrawingsPanel)
+                   && again.getValue ("twinA.Parts.cap.Background.Fill.colour").toString() == "FFFFFFFF"
+                   && (int) again.getValue ("twinB.Parts.cap.Layout.x") == 4,
+               "drawings: a second model of the same payload starts from the drawing, not from the first one's writes");
     }
 
     std::cout << "--------------------\n" << (failures == 0 ? "ALL PASS" : (juce::String (failures) + " FAILED").toRawUTF8()) << std::endl;

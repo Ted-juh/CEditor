@@ -26,7 +26,8 @@ namespace ceditor
  * says why, and what keeps it true.
  *
  * An export payload's controls arrive as a diff against their types, carrying the defaults it is
- * against, and load() rebuilds them sharing those defaults; rebuildFromDefaults says how.
+ * against and the drawings several controls share, and load() rebuilds them sharing both;
+ * rebuildFromDefaults says how.
  *
  * Pure juce_core; message-thread only (like the rest of ScriptRuntime). Header-only for easy testing.
  */
@@ -487,7 +488,7 @@ private:
     // the panel uses; `part`, the shell an authored part (any part a type does not ship with) is a
     // diff against; `partSections`, what each section of an authored part is a diff against. The
     // payload used to carry every control whole instead, because this reader could not rebuild a
-    // default it never saw: 12.2 MB for GAIA, where the payload is now 2.9.
+    // default it never saw: 12.2 MB for GAIA, where the payload is now 1.8.
     //
     // What follows is expandControl and expandPart in documentShape.js, step for step, so a control
     // comes out exactly as the complete form had it, key order included: a key in `_removed` is the
@@ -499,38 +500,106 @@ private:
     //
     // A document without `controlDefaults` (a complete one, from before the export form) is used
     // as it is.
+    //
+    // A payload also writes a drawing (a custom component's Parts section) that several controls use
+    // once, in `drawings`, and those controls refer to it by name (documentDrawings.js). It goes back
+    // into each of them first, as readPanelDocument does in the WebView, shared like the defaults.
+    // And since a drawing over the same type rebuilds to the same parts every time, it is rebuilt
+    // once and that is shared too: GAIA's 163 controls that use a shared drawing hold 15 of them.
     void rebuildFromDefaults()
     {
         carriedDefaults = juce::var();
+        carriedDrawings = juce::var();
+        drawingNames.clear();
+        rebuiltDrawings.clear();
         sharedNodes.clear();
         auto* obj = doc.getDynamicObject();
-        if (obj == nullptr || ! obj->hasProperty ("controlDefaults")) return;
+        if (obj == nullptr) return;
+        auto* controls = obj->getProperty ("controls").getArray();
+        // Neither table is part of the panel a script can see, as neither is in the WebView's.
+        if (obj->hasProperty ("drawings"))
+        {
+            carriedDrawings = obj->getProperty ("drawings");
+            obj->removeProperty ("drawings");
+            markShared (carriedDrawings);
+            if (auto* table = carriedDrawings.getDynamicObject())
+                for (const auto& p : table->getProperties())
+                    if (auto* drawing = p.value.getDynamicObject()) drawingNames[drawing] = p.name.toString();
+            if (controls != nullptr)
+                for (const auto& control : *controls) resolveDrawings (control);
+        }
+        if (! obj->hasProperty ("controlDefaults")) return;
         carriedDefaults = obj->getProperty ("controlDefaults");
-        // Not part of the panel a script can see, as it never is in the WebView's.
         obj->removeProperty ("controlDefaults");
         markShared (carriedDefaults);
-        if (auto* controls = obj->getProperty ("controls").getArray())
+        if (controls != nullptr)
             for (auto& control : *controls)
                 control = rebuildControl (control);
+    }
+
+    // resolveDrawings in documentDrawings.js: each control's reference, its children's included,
+    // replaced by the drawing it names. A reference that is nothing else becomes the carried
+    // drawing itself (which is how rebuildControl knows it); one with keys of its own has them over
+    // it; one naming a drawing the table lacks keeps only its own keys, as the editor does.
+    void resolveDrawings (const juce::var& control)
+    {
+        auto* sections = control.getProperty ("_children", {}).getDynamicObject();
+        if (sections == nullptr) return;
+        if (auto* parts = sections->getProperty ("Parts").getDynamicObject(); parts != nullptr && parts->hasProperty ("_drawing"))
+        {
+            const auto drawing = carriedDrawings.getProperty (juce::Identifier (parts->getProperty ("_drawing").toString()), {});
+            auto* own = new juce::DynamicObject();
+            for (const auto& p : parts->getProperties())
+                if (p.name.toString() != "_drawing") own->setProperty (p.name, p.value);
+            const juce::var ownVar (own);
+            const bool onlyTheName = own->getProperties().isEmpty();
+            sections->setProperty ("Parts", ! drawing.isObject() ? ownVar : onlyTheName ? drawing : merge (ownVar, drawing));
+        }
+        if (auto* kids = sections->getProperty ("Children").getProperty ("_children", {}).getDynamicObject())
+            for (const auto& p : kids->getProperties())
+                if (p.value.isObject()) resolveDrawings (p.value);
     }
 
     // expandControl: the diff over its type's pristine control, its authored parts over theirs,
     // its children each over their own type's. A type the payload has no defaults for is used as
     // it came, its parts aside, and so are its children, as expandControl does.
-    juce::var rebuildControl (const juce::var& sparse) const
+    juce::var rebuildControl (const juce::var& sparse)
     {
         const auto type = readChildValue (sparse, "Core").getProperty ("controlType", {}).toString();
         const auto pristine = type.isNotEmpty() ? carriedDefaults.getProperty ("types", {}).getProperty (juce::Identifier (type), {})
                                                 : juce::var();
         const auto control = pristine.isObject() ? merge (sparse, pristine) : sparse;
 
-        std::set<juce::String> typeParts;
-        if (auto* shipped = mapOf (pristine, "Parts"))
-            for (const auto& p : shipped->getProperties()) typeParts.insert (p.name.toString());
-        // Replaced by name: setProperty on a name already there keeps its place, and so the order.
-        if (auto* parts = mapOf (control, "Parts"); parts != nullptr && ! isShared (parts))
-            for (const auto& name : namesOf (*parts))
-                if (typeParts.count (name.toString()) == 0) parts->setProperty (name, rebuildPart (parts->getProperty (name)));
+        // When the control's Parts is a carried drawing and nothing else, what it rebuilds to is
+        // shared under "<type>/<drawing>".
+        juce::String rebuiltAs;
+        if (auto* parts = readChildValue (sparse, "Parts").getDynamicObject())
+            if (auto it = drawingNames.find (parts); it != drawingNames.end()) rebuiltAs = type + "/" + it->second;
+
+        if (auto it = rebuiltDrawings.find (rebuiltAs); rebuiltAs.isNotEmpty() && it != rebuiltDrawings.end())
+        {
+            control.getProperty ("_children", {}).getDynamicObject()->setProperty ("Parts", it->second);
+        }
+        else
+        {
+            std::set<juce::String> typeParts;
+            if (auto* shipped = mapOf (pristine, "Parts"))
+                for (const auto& p : shipped->getProperties()) typeParts.insert (p.name.toString());
+            bool authored = false;
+            if (auto* parts = mapOf (control, "Parts"))
+                for (const auto& p : parts->getProperties()) authored = authored || typeParts.count (p.name.toString()) == 0;
+            // Replaced by name: setProperty on a name already there keeps its place, and so the order.
+            // Made the control's own first: the map is the defaults' or a carried drawing's otherwise.
+            if (auto* parts = authored ? ownedMap (control, "Parts") : nullptr)
+                for (const auto& name : namesOf (*parts))
+                    if (typeParts.count (name.toString()) == 0) parts->setProperty (name, rebuildPart (parts->getProperty (name)));
+            if (rebuiltAs.isNotEmpty())
+            {
+                const auto rebuilt = readChildValue (control, "Parts");
+                markShared (rebuilt);
+                rebuiltDrawings[rebuiltAs] = rebuilt;
+            }
+        }
 
         if (pristine.isObject())
             if (auto* kids = mapOf (control, "Children"); kids != nullptr && ! isShared (kids))
@@ -646,6 +715,13 @@ private:
         return v;
     }
 
+    // A section's `_children` map, made the control's own along with the section (ownedChild).
+    juce::DynamicObject* ownedMap (const juce::var& control, const char* section) const
+    {
+        auto* node = ownedChild (control, section).getDynamicObject();
+        return node != nullptr && node->hasProperty ("_children") ? ownProperty (*node, "_children").getDynamicObject() : nullptr;
+    }
+
     // readChildValue for a node about to be written into (which is the control's own already): the
     // child it finds, by the same precedence, made the control's own too, the `_children` map it is
     // found in included.
@@ -675,8 +751,12 @@ private:
     }
 
     // What the payload's controls were rebuilt from, kept for the model's lifetime so every node the
-    // shared set names stays alive and stays that node.
+    // shared set names stays alive and stays that node: the defaults, the drawings (with each one's
+    // name, by node), and each drawing as rebuilt over a type ("<type>/<name>").
     juce::var carriedDefaults;
+    juce::var carriedDrawings;
+    std::map<const void*, juce::String> drawingNames;
+    std::map<juce::String, juce::var> rebuiltDrawings;
     std::unordered_set<const void*> sharedNodes;
 };
 
