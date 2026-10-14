@@ -8,8 +8,9 @@ test('both export paths receive portable artwork, automation and current TypeScr
   const artPath = 'C:/release-test/background.svg';
   const data = 'data:image/svg+xml;base64,PHN2Zy8+';
   fileCache.set({ [artPath]: data });
+  // Complete, as serializePanelForExport hands it over: whole controls, and the mark that says so.
   const panel = {
-    panelGuid: 'portable-export', name: 'Portable Export', filePath: 'C:/private/panel.cepanel',
+    panelGuid: 'portable-export', name: 'Portable Export', filePath: 'C:/private/panel.cepanel', documentForm: 'complete',
     controls: [createControl('Knob')], bgImage: artPath,
     deviceSession: { restorePolicy: 'ask', marker: 'preserve recall' },
     scripts: [{ language: 'typescript', source: 'function onPanelReady() { const amount: number = 2; set("amount", amount); }', compiledJs: 'stale' }],
@@ -20,6 +21,7 @@ test('both export paths receive portable artwork, automation and current TypeScr
   assert.equal(result.filePath, undefined);
   assert.deepEqual(result.deviceSession, panel.deviceSession);
   assert.ok(result.exportParameters.length > 0, 'the knob must be host-automatable');
+  assert.equal(result.documentForm, 'export', 'and last, the form the plug-in is built from');
   assert.ok(result.scripting.apiVersion);
   assert.match(result.scripts[0].compiledJs, /amount = 2/);
   assert.doesNotMatch(result.scripts[0].compiledJs, /: number|stale/);

@@ -3,7 +3,7 @@ import { defaultControlSetId, defaultGridSize, defaultSnapToGrid } from './runti
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
 import { normalizeCaptureSession } from '../utils/captureSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
-import { expandControl, shrinkAuthoredParts, shrinkControl } from './documentShape.js';
+import { expandAuthoredParts, expandControl, exportDefaultsFor, shrinkAuthoredParts, shrinkControl } from './documentShape.js';
 import { panelDocumentText } from './documentLayout.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
 import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
@@ -270,6 +270,32 @@ function toDocumentForm(control) {
 }
 
 /**
+ * The export payload in the form a plug-in is built from: its controls as a diff against their
+ * types, like a saved document's, carrying the defaults that diff is against (`controlDefaults`),
+ * marked `documentForm: 'export'`.
+ *
+ * The payload used to be complete, every field of every control written out, because the plug-in's
+ * C++ reads controls raw and could not rebuild a default it never saw. GAIA's came to 12.2 MB, the
+ * same panel saved is 3.0 MB, and the difference was the same defaults again for each of its 818
+ * controls. Now the payload brings them once, per type, and the C++ rebuilds each control from them
+ * as it loads (Player/PanelValueModel.h), sharing them rather than copying.
+ *
+ * It takes the COMPLETE document serializePanelForExport writes, and it is the last thing done to
+ * one: everything before it in an export reads whole controls (the host parameter list, the fonts a
+ * panel carries and the characters they are cut to). A complete control still knows what its author
+ * deleted, which a diff has to record; only its authored parts travel sparse in that form, and they
+ * are made whole again first, so they are diffed from what they are rather than from a diff.
+ */
+export function exportFormDocument(doc) {
+  if (doc?.documentForm === 'export') return doc;
+  if (doc?.documentForm !== 'complete') {
+    throw new Error('exportFormDocument takes the complete document serializePanelForExport writes');
+  }
+  const whole = (doc.controls ?? []).map(expandAuthoredParts);
+  return { ...doc, documentForm: 'export', controls: whole.map(shrinkControl), controlDefaults: exportDefaultsFor(whole) };
+}
+
+/**
  * Card presets as read off a document: an array of entries with an id, deduplicated. Anything
  * else in the field is dropped rather than repaired — a preset with no id cannot be merged,
  * applied or deleted, so keeping it would only mean carrying it forward for ever.
@@ -407,13 +433,13 @@ export function serializePanel(panel, options = {}) {
   // The format version goes first, where a person opening the file sees it. A document from a
   // newer CEditor keeps its number: writing ours would tell that newer version to run its
   // migrations again over a document that already had them (utils/panelFormat.js).
-  // A complete document says so. The exporters read a document either way (the app hands them this
-  // one; a person may pass a saved .cepanel), and a saved one has to be completed first —
-  // tools/scripts/lib/exportDocument.mjs. The mark is how they tell, where no structural test can:
-  // a default item the author deleted is simply absent from both forms.
+  // A complete document says so. It is the step before the export payload (exportFormDocument
+  // above), which needs controls that still know what their author deleted, and the exporters read
+  // a document in any form (tools/scripts/lib/exportDocument.mjs). The mark is how they tell, where
+  // no structural test can: a default item the author deleted is simply absent from both forms.
   //
   // Laid out one line per control section, not one per property (stores/documentLayout.js).
-  const { formatVersion, documentForm, ...rest } = data;
+  const { formatVersion, documentForm, controlDefaults, ...rest } = data;
   return panelDocumentText({
     formatVersion: Math.max(PANEL_FORMAT_VERSION, panelFormatVersion({ formatVersion })),
     ...(elide ? {} : { documentForm: 'complete' }),
@@ -444,6 +470,10 @@ export function deserializePanel(json, filePath, name) {
   }
   for (const warning of lastOpenReport.warnings) console.warn(`[panels] ${warning}`);
   const data = read.doc;
+  // An export payload (exportFormDocument) carries the defaults its controls are a diff against, for
+  // the plug-in's C++. expandControl below has its own, from the same code, so they are dropped
+  // rather than kept in the panel and written into a document that has no use for them.
+  delete data.controlDefaults;
   const id = nextId++;
   if (data.deviceSession) {
     data.deviceSession = normalizeProjectDeviceSession(data.deviceSession);

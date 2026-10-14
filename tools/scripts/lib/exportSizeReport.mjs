@@ -15,8 +15,8 @@
 //   - the carried fonts, which are already cut to the panel's characters by the time they are here.
 //
 // Pure and dependency-free (node built-ins only), so the installed exporter — which ships these
-// scripts and no node_modules — can run it too. Fed the COMPLETE document, after
-// completeExportDocument: a sparse one would report the defaults it does not carry as savings.
+// scripts and no node_modules — can run it too. Fed the export payload, after exportFormFor: what it
+// reports is what the plug-in carries, the defaults table included (`controlDefaults`).
 
 import { createHash } from 'node:crypto';
 
@@ -159,7 +159,7 @@ export function formatExportSizeReport(report) {
     lines.push(`  ${count} controls${parts ? `, ${parts} parts` : ''}: ${types}`);
     const heaviest = report.partSections[0];
     if (heaviest && parts && heaviest.bytes >= total * 0.1) {
-      lines.push(`  parts' ${heaviest.section} sections: ${kb(heaviest.bytes)} (${pct(heaviest.bytes, total)}), ${kb(Math.round(heaviest.bytes / parts))} per part — the complete form carries every default`);
+      lines.push(`  parts' ${heaviest.section} sections: ${kb(heaviest.bytes)} (${pct(heaviest.bytes, total)}), ${kb(Math.round(heaviest.bytes / parts))} per part`);
     }
   }
 

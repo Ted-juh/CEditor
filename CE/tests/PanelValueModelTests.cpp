@@ -50,6 +50,56 @@ const char* kIndexPanel = R"JSON({
             "Value": { "_type": "Value", "value": 3 } } } } } } }
   ]
 })JSON";
+
+// An export payload (documentForm "export"): each control a diff against its type, and the defaults
+// it is against carried in controlDefaults. Two knobs on one type, a container holding a third, and a
+// custom component with an authored part whose Background is a marker only, at its defaults.
+const char* kExportPanel = R"JSON({
+  "name": "Export",
+  "documentForm": "export",
+  "controls": [
+    { "_type": "Control", "_children": {
+        "Core": { "id": "k1", "name": "first", "controlType": "Knob" },
+        "Transform": { "x": 10 },
+        "Value": { "steps": [1, 2] } } },
+    { "_type": "Control", "_children": {
+        "Core": { "id": "k2", "name": "second", "controlType": "Knob", "tooltip": null },
+        "States": { "_children": { "_removed": ["Hover"] } } } },
+    { "_type": "Control", "_children": {
+        "Core": { "id": "box", "name": "box", "controlType": "Container" },
+        "Children": { "_children": {
+          "k3": { "_type": "Control", "_children": {
+            "Core": { "id": "k3", "name": "inner", "controlType": "Knob" },
+            "Value": { "value": 0.75 } } } } } } },
+    { "_type": "Control", "_children": {
+        "Core": { "id": "c1", "name": "custom", "controlType": "CustomComponent" },
+        "Parts": { "_children": {
+          "cap": { "_type": "Part", "name": "cap", "_children": {
+            "Background": { "_type": "Background" },
+            "Layout": { "x": 4 } } } } } } }
+  ],
+  "controlDefaults": {
+    "types": {
+      "Knob": { "_type": "Control", "_children": {
+        "Core": { "_type": "Core", "id": "", "name": "", "controlType": "Knob", "tooltip": "turn me" },
+        "Transform": { "_type": "Transform", "x": 0, "y": 0 },
+        "Value": { "_type": "Value", "value": 0.5, "steps": [0] },
+        "Background": { "_type": "Background", "_children": { "Fill": { "_type": "Fill", "colour": "FF000000" } } },
+        "States": { "_type": "States", "_children": { "Normal": { "_type": "State" }, "Hover": { "_type": "State" } } },
+        "Parts": { "_type": "Parts", "_children": { "track": { "_type": "Part", "name": "track", "_children": {} } } } } },
+      "Container": { "_type": "Control", "_children": {
+        "Core": { "_type": "Core", "id": "", "name": "", "controlType": "Container" },
+        "Children": { "_type": "Children", "_children": {} } } },
+      "CustomComponent": { "_type": "Control", "_children": {
+        "Core": { "_type": "Core", "id": "", "name": "", "controlType": "CustomComponent" },
+        "Parts": { "_type": "Parts", "_children": {} } } }
+    },
+    "part": { "_type": "Part", "name": "", "_children": { "Layout": { "_type": "Layout", "x": 0, "y": 0 } } },
+    "partSections": {
+      "Background": { "_type": "Background", "_children": { "Fill": { "_type": "Fill", "colour": "FFFFFFFF" } } }
+    }
+  }
+})JSON";
 }
 
 int main()
@@ -137,6 +187,42 @@ int main()
         check (m.loadFromJson (kPanel), "index: load a different panel");
         check (m.getValue ("whole.value").isVoid(), "  the old names are gone");
         check ((int) m.getValue ("cutoff.value") == 42, "  the new ones are there");
+    }
+
+    // --- an export payload: controls rebuilt from the defaults it carries ---------------------------
+    // Reads answer as the complete form would; a write reaches the control written to and nothing
+    // that shares its defaults; the old complete form still loads as it is (everything above).
+    {
+        ceditor::PanelValueModel m;
+        check (m.loadFromJson (kExportPanel), "Parsed the export payload");
+        check ((int) m.getValue ("first.x") == 10 && (int) m.getValue ("first.y") == 0,
+               "export: the diff over its type's defaults (x written, y the default)");
+        check ((double) m.getValue ("second.value") == 0.5, "export: a section the diff never mentions");
+        check (m.getValue ("second.background.fill.colour").toString() == "FF000000", "export: a nested default");
+        check (m.getValue ("first.value.steps").getArray() != nullptr && m.getValue ("first.value.steps").getArray()->size() == 2,
+               "export: an array is the diff's, whole");
+        check (! m.getValue ("first.States.Hover").isVoid() && m.getValue ("second.States.Hover").isVoid(),
+               "export: a default the author deleted stays deleted, and only where they deleted it");
+        check (m.getValue ("first.tooltip").toString() == "turn me" && m.getValue ("second.tooltip").isVoid(),
+               "export: a JSON null in the diff is the value, not a gap to fill");
+        check ((double) m.getValue ("inner.value") == 0.75 && (int) m.getValue ("inner.x") == 0,
+               "export: a container's child is rebuilt over its own type");
+        check (m.getValue ("custom.Parts.cap.Background.Fill.colour").toString() == "FFFFFFFF"
+                   && (int) m.getValue ("custom.Parts.cap.Layout.x") == 4,
+               "export: an authored part's section, a marker in the file, reads its defaults (and its own Layout)");
+        check (m.getValue ("panel.controlDefaults").isVoid(), "export: the table is not part of the panel a script sees");
+
+        check (m.setValue ("first.background.fill.colour", juce::var ("FF123456")), "export: write a default-valued colour");
+        check (m.getValue ("first.background.fill.colour").toString() == "FF123456", "  the control has it");
+        check (m.getValue ("second.background.fill.colour").toString() == "FF000000"
+                   && m.getValue ("inner.background.fill.colour").toString() == "FF000000",
+               "  and the other knobs, which share those defaults' nodes, do not");
+        check (m.setValue ("inner.y", juce::var (33)) && (int) m.getValue ("inner.y") == 33 && (int) m.getValue ("first.y") == 0,
+               "export: a write inside a container's child stays in that child");
+        check (m.setValue ("custom.Parts.cap.Background.Fill.colour", juce::var ("FF00FF00"))
+                   && m.getValue ("custom.Parts.cap.Background.Fill.colour").toString() == "FF00FF00",
+               "export: a write into an authored part's defaulted section lands (it was refused when the part was sparse)");
+
     }
 
     std::cout << "--------------------\n" << (failures == 0 ? "ALL PASS" : (juce::String (failures) + " FAILED").toRawUTF8()) << std::endl;

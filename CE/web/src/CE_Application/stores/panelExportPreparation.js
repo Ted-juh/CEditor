@@ -3,8 +3,12 @@ import { panelModules, CE_API_VERSION } from '../scripting/panelApi.js';
 import { extensionsToBundle } from '../scripting/extensionModules.js';
 import { ensureTs, transpileTs } from '../scripting/tsService.js';
 import { packagePanelForSharing, openSharedPanel } from './panelSharing.js';
+import { exportFormDocument } from './panelModel.js';
 
-/** Prepare the same complete document for either native exporter. */
+/**
+ * Prepare the same document for either native exporter: assets carried, TypeScript compiled,
+ * modules and host parameters baked, and last, the export form the plug-in is built from.
+ */
 export async function preparePanelForExport(serialized) {
   const original = JSON.parse(serialized);
   const packed = await packagePanelForSharing(original);
@@ -34,5 +38,6 @@ export async function preparePanelForExport(serialized) {
   if (extensions.length) panel.scripting.extensions = extensions;
   else delete panel.scripting.extensions;
   panel.exportParameters = deriveExportParameters(panel);
-  return JSON.stringify(panel);
+  // Last, because everything above reads whole controls (exportFormDocument says why).
+  return JSON.stringify(exportFormDocument(panel));
 }

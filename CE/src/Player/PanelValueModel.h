@@ -2,7 +2,9 @@
 
 #include <juce_core/juce_core.h>
 #include <map>
+#include <set>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace ceditor
 {
@@ -23,6 +25,9 @@ namespace ceditor
  * findControlByName answers from an index of names and ids built on first use; nameIndex below
  * says why, and what keeps it true.
  *
+ * An export payload's controls arrive as a diff against their types, carrying the defaults it is
+ * against, and load() rebuilds them sharing those defaults; rebuildFromDefaults says how.
+ *
  * Pure juce_core; message-thread only (like the rest of ScriptRuntime). Header-only for easy testing.
  */
 class PanelValueModel
@@ -30,8 +35,9 @@ class PanelValueModel
 public:
     PanelValueModel() = default;
 
-    /** Load from a parsed panel document (juce::JSON::parse of a .cepanel). */
-    void load (const juce::var& panelDocument) { doc = panelDocument; forgetNames(); }
+    /** Load from a parsed panel document (juce::JSON::parse of a .cepanel). An export payload's
+        controls are rebuilt from the defaults it carries, in the document itself. */
+    void load (const juce::var& panelDocument) { doc = panelDocument; rebuildFromDefaults(); forgetNames(); }
 
     /** Load from raw .cepanel JSON text. Returns false if the JSON is invalid. */
     bool loadFromJson (const juce::String& json)
@@ -39,6 +45,7 @@ public:
         auto parsed = juce::JSON::parse (json);
         if (! parsed.isObject()) return false;
         doc = parsed;
+        rebuildFromDefaults();
         forgetNames();
         return true;
     }
@@ -441,9 +448,12 @@ public:
         return channelizePath (control, path);
     }
 
+private:
     // Navigate to the leaf's parent (via readChildValue semantics) and assign the leaf with the same
-    // _children-first precedence. Mutates the shared DynamicObject tree in place.
-    static bool setAtPath (const juce::var& control, const juce::String& path, const juce::var& value)
+    // _children-first precedence. Mutates the control in place, first copying any node on the way
+    // that it shares with the defaults it was rebuilt from (ownedChild), so the write reaches this
+    // control and nothing else: not another control of the same type, not the defaults.
+    bool setAtPath (const juce::var& control, const juce::String& path, const juce::var& value)
     {
         const auto parts = juce::StringArray::fromTokens (path, ".", "");
         if (parts.isEmpty()) return false;
@@ -451,20 +461,223 @@ public:
         juce::var node = control;
         for (int i = 0; i < parts.size() - 1; ++i)
         {
-            node = readChildValue (node, parts[i]);
+            node = ownedChild (node, parts[i]);
             if (node.isVoid()) return false;
         }
 
         const juce::Identifier last (parts[parts.size() - 1]);
         if (auto* obj = node.getDynamicObject())
         {
-            if (auto* children = obj->getProperty ("_children").getDynamicObject())
-                if (children->hasProperty (last)) { children->setProperty (last, value); return true; }
+            if (auto* children = obj->getProperty ("_children").getDynamicObject(); children != nullptr && children->hasProperty (last))
+            {
+                ownProperty (*obj, "_children").getDynamicObject()->setProperty (last, value);
+                return true;
+            }
             obj->setProperty (last, value);
             return true;
         }
         return false;
     }
+
+    // ---- an export payload's controls, rebuilt from the defaults it carries -----------------------
+    //
+    // An export payload (documentForm "export", exportFormDocument in panelModel.js) stores each
+    // control as a diff against its type's pristine control, as a saved document does, and carries
+    // what the diff is against in `controlDefaults`: `types`, a pristine control per control type
+    // the panel uses; `part`, the shell an authored part (any part a type does not ship with) is a
+    // diff against; `partSections`, what each section of an authored part is a diff against. The
+    // payload used to carry every control whole instead, because this reader could not rebuild a
+    // default it never saw: 12.2 MB for GAIA, where the payload is now 2.9.
+    //
+    // What follows is expandControl and expandPart in documentShape.js, step for step, so a control
+    // comes out exactly as the complete form had it, key order included: a key in `_removed` is the
+    // author's deletion and is left out, the diff's own keys win, an array or a value is taken whole.
+    // With one difference that is the point of it: a default the diff does not touch is not copied
+    // into the control but shared with it, so 818 GAIA controls hold their own changes and refer to
+    // twelve pristine ones for the rest. The defaults are therefore read-only, and setAtPath, the one
+    // place that writes into a control, copies a shared node before writing into it.
+    //
+    // A document without `controlDefaults` (a complete one, from before the export form) is used
+    // as it is.
+    void rebuildFromDefaults()
+    {
+        carriedDefaults = juce::var();
+        sharedNodes.clear();
+        auto* obj = doc.getDynamicObject();
+        if (obj == nullptr || ! obj->hasProperty ("controlDefaults")) return;
+        carriedDefaults = obj->getProperty ("controlDefaults");
+        // Not part of the panel a script can see, as it never is in the WebView's.
+        obj->removeProperty ("controlDefaults");
+        markShared (carriedDefaults);
+        if (auto* controls = obj->getProperty ("controls").getArray())
+            for (auto& control : *controls)
+                control = rebuildControl (control);
+    }
+
+    // expandControl: the diff over its type's pristine control, its authored parts over theirs,
+    // its children each over their own type's. A type the payload has no defaults for is used as
+    // it came, its parts aside, and so are its children, as expandControl does.
+    juce::var rebuildControl (const juce::var& sparse) const
+    {
+        const auto type = readChildValue (sparse, "Core").getProperty ("controlType", {}).toString();
+        const auto pristine = type.isNotEmpty() ? carriedDefaults.getProperty ("types", {}).getProperty (juce::Identifier (type), {})
+                                                : juce::var();
+        const auto control = pristine.isObject() ? merge (sparse, pristine) : sparse;
+
+        std::set<juce::String> typeParts;
+        if (auto* shipped = mapOf (pristine, "Parts"))
+            for (const auto& p : shipped->getProperties()) typeParts.insert (p.name.toString());
+        // Replaced by name: setProperty on a name already there keeps its place, and so the order.
+        if (auto* parts = mapOf (control, "Parts"); parts != nullptr && ! isShared (parts))
+            for (const auto& name : namesOf (*parts))
+                if (typeParts.count (name.toString()) == 0) parts->setProperty (name, rebuildPart (parts->getProperty (name)));
+
+        if (pristine.isObject())
+            if (auto* kids = mapOf (control, "Children"); kids != nullptr && ! isShared (kids))
+                for (const auto& name : namesOf (*kids)) kids->setProperty (name, rebuildControl (kids->getProperty (name)));
+        return control;
+    }
+
+    // expandPart: the part over the shell, with each section it owns (its marker names the type) at
+    // that section type's defaults. Layout is the part's own and has none.
+    juce::var rebuildPart (const juce::var& sparse) const
+    {
+        auto* sections = sparse.getProperty ("_children", {}).getDynamicObject();
+        if (sections == nullptr) return sparse;
+
+        auto* base = new juce::DynamicObject();
+        auto* baseSections = new juce::DynamicObject();
+        if (auto* shell = carriedDefaults.getProperty ("part", {}).getDynamicObject())
+        {
+            for (const auto& p : shell->getProperties()) base->setProperty (p.name, p.value);
+            if (auto* shellSections = shell->getProperty ("_children").getDynamicObject())
+                for (const auto& p : shellSections->getProperties()) baseSections->setProperty (p.name, p.value);
+        }
+        const auto partSections = carriedDefaults.getProperty ("partSections", {});
+        for (const auto& p : sections->getProperties())
+        {
+            const auto sectionType = p.value.getProperty ("_type", {}).toString();
+            if (p.name.toString() == "Layout" || sectionType.isEmpty()) continue;
+            const auto baseline = partSections.getProperty (juce::Identifier (sectionType), {});
+            if (baseline.isObject()) baseSections->setProperty (p.name, baseline);
+        }
+        base->setProperty ("_children", juce::var (baseSections));
+        return merge (sparse, juce::var (base));
+    }
+
+    // expand: the base's keys less those in `_removed`, then the diff's keys over them, an object
+    // over an object merged in turn and anything else (an array, a value, a JSON null) taken whole.
+    // What the diff leaves alone is the base's own node, shared, never copied.
+    static juce::var merge (const juce::var& sparse, const juce::var& base)
+    {
+        auto* s = sparse.getDynamicObject();
+        auto* b = base.getDynamicObject();
+        if (s == nullptr || b == nullptr) return sparse;
+
+        std::set<juce::String> removed;
+        if (auto* list = s->getProperty ("_removed").getArray())
+            for (const auto& name : *list) removed.insert (name.toString());
+
+        auto* out = new juce::DynamicObject();
+        for (const auto& p : b->getProperties())
+            if (removed.count (p.name.toString()) == 0) out->setProperty (p.name, p.value);
+        for (const auto& p : s->getProperties())
+        {
+            if (p.name.toString() == "_removed") continue;
+            const auto under = removed.count (p.name.toString()) == 0 ? b->getProperty (p.name) : juce::var();
+            out->setProperty (p.name, merge (p.value, under));
+        }
+        return juce::var (out);
+    }
+
+    static juce::Array<juce::Identifier> namesOf (const juce::DynamicObject& obj)
+    {
+        juce::Array<juce::Identifier> names;
+        for (const auto& p : obj.getProperties()) names.add (p.name);
+        return names;
+    }
+
+    // A section's `_children` map: control._children.<section>._children.
+    static juce::DynamicObject* mapOf (const juce::var& control, const char* section)
+    {
+        return readChildValue (control, section).getProperty ("_children", {}).getDynamicObject();
+    }
+
+    void markShared (const juce::var& v)
+    {
+        if (auto* o = v.getDynamicObject())
+        {
+            if (! sharedNodes.insert (o).second) return;
+            for (const auto& p : o->getProperties()) markShared (p.value);
+        }
+        else if (auto* a = v.getArray())
+        {
+            if (! sharedNodes.insert (a).second) return;
+            for (const auto& item : *a) markShared (item);
+        }
+    }
+
+    bool isShared (const void* node) const { return sharedNodes.count (node) != 0; }
+    bool isShared (const juce::var& v) const
+    {
+        if (auto* o = v.getDynamicObject()) return isShared (o);
+        if (auto* a = v.getArray()) return isShared (a);
+        return false;
+    }
+
+    // One level of a shared node, copied: what is under it stays shared until a write goes there.
+    static juce::var copyOfNode (const juce::var& v)
+    {
+        if (auto* o = v.getDynamicObject())
+        {
+            auto* copy = new juce::DynamicObject();
+            for (const auto& p : o->getProperties()) copy->setProperty (p.name, p.value);
+            return juce::var (copy);
+        }
+        if (auto* a = v.getArray()) return juce::var (juce::Array<juce::var> (*a));
+        return v;
+    }
+
+    // obj[id], made the control's own: a node shared with the defaults is replaced by a copy.
+    juce::var ownProperty (juce::DynamicObject& obj, const juce::Identifier& id) const
+    {
+        auto v = obj.getProperty (id);
+        if (isShared (v)) { v = copyOfNode (v); obj.setProperty (id, v); }
+        return v;
+    }
+
+    // readChildValue for a node about to be written into (which is the control's own already): the
+    // child it finds, by the same precedence, made the control's own too, the `_children` map it is
+    // found in included.
+    juce::var ownedChild (const juce::var& node, const juce::String& part) const
+    {
+        if (auto* arr = node.getArray())
+        {
+            if (part.isNotEmpty() && part.containsOnly ("0123456789"))
+            {
+                const int i = part.getIntValue();
+                if (i >= 0 && i < arr->size())
+                {
+                    auto& item = arr->getReference (i);
+                    if (isShared (item)) item = copyOfNode (item);
+                    return item;
+                }
+            }
+        }
+        if (auto* obj = node.getDynamicObject())
+        {
+            const juce::Identifier id (part);
+            if (auto* children = obj->getProperty ("_children").getDynamicObject(); children != nullptr && children->hasProperty (id))
+                return ownProperty (*ownProperty (*obj, "_children").getDynamicObject(), id);
+            if (obj->hasProperty (id)) return ownProperty (*obj, id);
+        }
+        return {};
+    }
+
+    // What the payload's controls were rebuilt from, kept for the model's lifetime so every node the
+    // shared set names stays alive and stays that node.
+    juce::var carriedDefaults;
+    std::unordered_set<const void*> sharedNodes;
 };
 
 /**

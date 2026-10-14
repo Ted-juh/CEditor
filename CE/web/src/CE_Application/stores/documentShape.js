@@ -181,22 +181,24 @@ function pristinePartShell() {
   return shell;
 }
 
+/** What one section of a part is a diff against: SECTION_DEFAULTS for its type, less ALWAYS_WRITTEN. */
+function partSectionBaseline(sectionType) {
+  const baseline = JSON.parse(JSON.stringify(SECTION_DEFAULTS[sectionType]));
+  // Withholding a key from the baseline is what makes shrink() write it and expand() take it
+  // back unchanged — the same mechanism an unknown section already goes through.
+  for (const [child, keys] of Object.entries(ALWAYS_WRITTEN)) {
+    const node = baseline._children?.[child];
+    if (node) for (const leaf of keys) delete node[leaf];
+  }
+  return baseline;
+}
+
 /** The baseline for one part: its shell, plus SECTION_DEFAULTS for each section it actually owns. */
 function pristinePart(part) {
   const shell = pristinePartShell();
   for (const [key, section] of Object.entries(part?._children ?? {})) {
-    if (key === 'Layout') continue;
-    const defaults = SECTION_DEFAULTS[section?._type];
-    if (!defaults) continue;
-
-    const baseline = JSON.parse(JSON.stringify(defaults));
-    // Withholding a key from the baseline is what makes shrink() write it and expand() take it
-    // back unchanged — the same mechanism an unknown section already goes through.
-    for (const [child, keys] of Object.entries(ALWAYS_WRITTEN)) {
-      const node = baseline._children?.[child];
-      if (node) for (const leaf of keys) delete node[leaf];
-    }
-    shell._children[key] = baseline;
+    if (key === 'Layout' || !SECTION_DEFAULTS[section?._type]) continue;
+    shell._children[key] = partSectionBaseline(section._type);
   }
   return shell;
 }
@@ -347,6 +349,50 @@ export function shrinkAuthoredParts(control) {
     ? withChildMap(control, Object.fromEntries(Object.entries(kids).map(([key, child]) => [key, shrinkAuthoredParts(child)])))
     : control;
   return mapAuthoredParts(working, typePartNames(pristine), shrinkPart);
+}
+
+/** The inverse of shrinkAuthoredParts: a control of the export payload's complete form, made whole. */
+export function expandAuthoredParts(control) {
+  const pristine = pristineFor(control?._children?.Core?.controlType);
+  const kids = childMapOf(control);
+  const working = kids && Object.keys(kids).length
+    ? withChildMap(control, Object.fromEntries(Object.entries(kids).map(([key, child]) => [key, expandAuthoredParts(child)])))
+    : control;
+  return mapAuthoredParts(working, typePartNames(pristine), expandPart);
+}
+
+/**
+ * Everything the sparse `controls` are a diff against, written down for a reader that cannot run
+ * createControl: the plug-in's C++ (Player/PanelValueModel.h), which rebuilds an export payload's
+ * controls from it the way expandControl does here.
+ *
+ *   types         each control type the panel uses (children included): its pristine control.
+ *   part          the shell every authored part is a diff against.
+ *   partSections  each section type an authored part owns: what that section is a diff against.
+ *
+ * Built by the same functions expandControl uses, so the two cannot disagree about a default.
+ */
+export function exportDefaultsFor(controls) {
+  const types = {};
+  const partSections = {};
+  const visit = (control) => {
+    const controlType = control?._children?.Core?.controlType;
+    const pristine = pristineFor(controlType);
+    if (pristine && !types[controlType]) types[controlType] = pristine;
+    const typeParts = typePartNames(pristine);
+    for (const [key, part] of Object.entries(control?._children?.Parts?._children ?? {})) {
+      if (typeParts.has(key)) continue;
+      for (const [sectionKey, section] of Object.entries(part?._children ?? {})) {
+        const sectionType = section?._type;
+        if (sectionKey === 'Layout' || !SECTION_DEFAULTS[sectionType] || partSections[sectionType]) continue;
+        partSections[sectionType] = partSectionBaseline(sectionType);
+      }
+    }
+    // As expandControl does: a control's children are expanded only when its own type is known.
+    if (pristine) for (const child of Object.values(childMapOf(control) ?? {})) visit(child);
+  };
+  (controls ?? []).forEach(visit);
+  return { types, part: pristinePartShell(), partSections };
 }
 
 /** Exposed so tests can assert the reserved key never collides with a real model key. */
