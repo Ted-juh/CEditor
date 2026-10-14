@@ -2778,7 +2778,7 @@ ce.storage.state.count = (ce.storage.state.count ?? 0) + 1;
 
 #### `ce.storage.saveSetting(key, value [, opts]) -> boolean`
 
-Save a value under `key` so it outlasts the script — unlike `ce.storage.state`, it survives a reload. By default it is stored with the panel and travels with it; in an exported plugin it is saved in the DAW project. `opts.scope` sets who sees it: "panel" (every script on the panel, the default), "script" (only this script) or "local" (only this computer, never saved into the panel). Returns false if the value could not be saved, for example because storage is not available.
+Save a value under `key` so it outlasts the script — unlike `ce.storage.state`, it survives a reload. By default it is stored with the panel and travels with it; in an exported plugin it is saved in the DAW project. `opts.scope` sets who sees it: "panel" (every script on the panel, the default), "script" (only this script) or "local" (only this computer, never saved into the panel; in an exported plugin, only this instance of it). Returns false if the value could not be saved, for example because storage is not available.
 
 *Short name: `saveSetting`.*
 
