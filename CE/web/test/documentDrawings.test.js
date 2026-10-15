@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { readText } from './support/readText.mjs';
 import { deserializePanel, panelOpenReport, serializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { DRAWING_KEY, resolveDrawings, shareDrawings } from '../src/CE_Application/stores/documentDrawings.js';
-import { PANEL_FORMAT_VERSION } from '../src/CE_Application/utils/panelFormat.js';
+import { PANEL_FORMAT_VERSION, migratePanelDocument } from '../src/CE_Application/utils/panelFormat.js';
 import { deepClone } from '../src/CE_Application/utils/deepClone.js';
 import { setNestedValueShared } from '../src/CE_Application/stores/controlTreeUtils.js';
 
@@ -149,4 +149,26 @@ test('a document from a newer CEditor keeps its drawings table: what this build 
   assert.equal(saved.formatVersion, 99);
   assert.deepEqual(saved.drawings.ffffffff, unknown, 'the entry no control names is written back');
   for (const kept of Object.keys(doc.drawings)) assert.ok(kept in saved.drawings, `drawing ${kept} is still in the table`);
+});
+
+test('opening puts the table\'s own drawing in each control, and a migration still gets a copy each', () => {
+  // resolveDrawings copies per control unless asked not to; readPanelDocument asks not to, because
+  // expandControls shares what two controls hold anyway (copying 15 drawings into GAIA's controls
+  // was 28 ms of opening it). What made the copy necessary was a migration writing into one
+  // control's part in place: migratePanelDocument works on a deepClone, which keeps two references
+  // to one object as two objects, so a step still reaches one control only.
+  const { drawings, controls } = shareDrawings([drawn('a', 'x'), drawn('b', 'x')]);
+  assert.ok(drawings, 'the two controls share a drawing');
+  const doc = { formatVersion: PANEL_FORMAT_VERSION, controls, drawings };
+  const shared = resolveDrawings(structuredClone(doc), { copy: false }).doc;
+  const [a, b] = shared.controls;
+  assert.equal(a._children.Parts._children.cap, b._children.Parts._children.cap, 'one object, not a copy each');
+  const copied = resolveDrawings(structuredClone(doc)).doc;
+  assert.notEqual(copied.controls[0]._children.Parts._children.cap, copied.controls[1]._children.Parts._children.cap, 'copies by default');
+
+  const migrated = migratePanelDocument({ ...shared, formatVersion: PANEL_FORMAT_VERSION - 1 }, {
+    migrations: { [PANEL_FORMAT_VERSION - 1]: (d) => { d.controls[0]._children.Parts._children.cap.name = 'only a'; return d; } },
+  }).doc;
+  assert.equal(migrated.controls[0]._children.Parts._children.cap.name, 'only a');
+  assert.equal(migrated.controls[1]._children.Parts._children.cap.name, 'cap', 'the step reached one control');
 });

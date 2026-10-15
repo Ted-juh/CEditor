@@ -129,8 +129,14 @@ function over(own, base) {
  * a table holds that this build did not put back (an entry no control names, or anything a later
  * format keeps there) is written back on save, as everything else a newer document carries is
  * (utils/panelFormat.js). serializePanel writes it under the drawings it shares itself.
+ *
+ * `copy: false` puts the table's own drawing into every control that names it instead of a copy
+ * each. Opening a file does that (readPanelDocument): the controls are expanded together right
+ * after (expandControls), which shares and freezes whatever two of them hold anyway, and a
+ * migration works on a deepClone, which copies two references as two objects. Copying 15 drawings
+ * into 300 controls was 28 ms of a GAIA open, for objects the expansion then merged back.
  */
-export function resolveDrawings(doc, { keepTable = false } = {}) {
+export function resolveDrawings(doc, { keepTable = false, copy = true } = {}) {
   const table = isObject(doc?.drawings) ? doc.drawings : {};
   const missing = new Set();
   let referred = false;
@@ -141,10 +147,11 @@ export function resolveDrawings(doc, { keepTable = false } = {}) {
     const { [DRAWING_KEY]: name, ...own } = parts;
     const drawing = Object.hasOwn(table, name) && isObject(table[name]) ? table[name] : null;
     if (!drawing) missing.add(String(name));
-    // Each control its own copy. What controls end up sharing is decided as they are expanded
-    // (expandControls in documentShape.js), which freezes it; an alias made here would be shared
-    // without the freeze, by any path that expands a control on its own.
-    return withParts(control, drawing ? over(own, deepClone(drawing)) : own);
+    // Each control its own copy, unless the caller expands the controls together (`copy`, above).
+    // What controls end up sharing is decided as they are expanded (expandControls in
+    // documentShape.js), which freezes it; an alias made here would be shared without the freeze
+    // by any path that expands a control on its own.
+    return withParts(control, drawing ? over(own, copy ? deepClone(drawing) : drawing) : own);
   };
   const controls = Array.isArray(doc?.controls) ? doc.controls.map((control) => mapControl(control, resolve)) : doc?.controls;
   if (!referred && !Object.hasOwn(doc ?? {}, 'drawings')) return { doc, missing: [] };
