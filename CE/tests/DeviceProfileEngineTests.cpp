@@ -31,6 +31,18 @@ struct DeviceProfileServiceTestAccess
         request.timeoutAtMs = request.createdAtMs + 60000.0;
         service.addPendingDeviceRequest (request);
     }
+
+    /** Moves what the service was answered with past the grace period, as time would. */
+    static void lapseAnswers (DeviceProfileService& service)
+    {
+        for (auto& answered : service.answeredReplies)
+            answered.atMs -= DeviceProfileService::answeredReplyGraceMs + 1.0;
+    }
+
+    /** One timer tick's publishing, which these tests have no message loop to run. */
+    static void publish (DeviceProfileService& service)  { service.publishPendingRequests(); }
+    static juce::File publishedFile (const DeviceProfileService& service)  { return service.publishedRequestsFile; }
+    static juce::File directory()  { return DeviceProfileService::pendingRequestsDirectory(); }
 };
 } // namespace ceditor::device
 
@@ -2296,9 +2308,12 @@ int runSharedInputReplyTests()
         service.ingestIncomingMidiMessage (juce::var (incoming));
     };
 
+    // Unique to the run: a run that crashed a moment ago may have left its requests published for
+    // other processes (runSharedInputAcrossProcessesTests), and they would name its port.
+    const auto port = "shared-port-" + juce::Uuid().toString().substring (0, 8);
     DeviceProfileService a, b;
-    mapOnto (a, "shared-port");
-    mapOnto (b, "shared-port");
+    mapOnto (a, port);
+    mapOnto (b, port);
 
     // currentPatchDump in one message (the checksum is the 7-bit sum of 01 40 02), and the id the
     // profile reads it as.
@@ -2328,6 +2343,32 @@ int runSharedInputReplyTests()
         return 1;
     }
 
+    // The same, with A handling the message first: its request is resolved by the time B looks,
+    // and what answered it is what tells B the message was A's.
+    heardA = {}; heardB = {};
+    DeviceProfileServiceTestAccess::lapseAnswers (a);
+    DeviceProfileServiceTestAccess::awaitDump (a, "mainSynth", dumpId);
+    send (a, dumpHex);
+    send (b, dumpHex);
+    if (heardA.resolved != 1 || heardB.sysex != 0 || heardB.parsed != 0)
+    {
+        std::cerr << "[FAIL] shared input :: handled by A first, A's reply still reached B (B sysex=" << heardB.sysex
+                  << " parsed=" << heardB.parsed << ", A resolved=" << heardA.resolved << ")\n";
+        return 1;
+    }
+
+    // A's own published file still lists the request (no timer has ticked here), and must not be
+    // read as another process's: this process's services are asked directly.
+    heardB = {};
+    DeviceProfileServiceTestAccess::lapseAnswers (a);
+    send (b, dumpHex);
+    if (heardB.parsed != 1)
+    {
+        std::cerr << "[FAIL] shared input :: once A's answer lapsed, the same bytes unasked did not reach B (parsed="
+                  << heardB.parsed << ")\n";
+        return 1;
+    }
+
     // Nobody asked: both apply it, as both follow that synth.
     heardA = {}; heardB = {};
     send (a, dumpHex);
@@ -2353,8 +2394,10 @@ int runSharedInputReplyTests()
 
     // A on another port: its request says nothing about B's input.
     heardA = {}; heardB = {};
+    DeviceProfileServiceTestAccess::lapseAnswers (a);
+    DeviceProfileServiceTestAccess::lapseAnswers (b);
     DeviceProfileService c;
-    mapOnto (c, "another-port");
+    mapOnto (c, port + "-other");
     DeviceProfileServiceTestAccess::awaitDump (c, "mainSynth", dumpId);
     send (b, dumpHex);
     if (heardB.parsed != 1)
@@ -2364,6 +2407,185 @@ int runSharedInputReplyTests()
     }
 
     std::cout << "[PASS] shared MIDI input :: a requested dump reaches only the instance that asked; one nobody asked for reaches all\n";
+    return 0;
+}
+
+/** The test synth, on hardware input `port` (which does not open here: there is no MIDI hardware,
+    and the mapping stays). */
+void mapOntoSharedPort (ceditor::device::DeviceProfileService& service, const juce::String& port)
+{
+    auto* mapping = new juce::DynamicObject();
+    mapping->setProperty ("role", "mainSynth");
+    mapping->setProperty ("profileId", "test-sysex-synth");
+    auto* input = new juce::DynamicObject();
+    input->setProperty ("type", "hardwareInput");
+    input->setProperty ("id", port);
+    input->setProperty ("name", "Shared port");
+    mapping->setProperty ("midiInput", juce::var (input));
+    service.setDeviceRoleMapping (juce::var (mapping));
+}
+
+/** The second process of runSharedInputAcrossProcessesTests (this binary, run with
+    --hold-request): waits for the current patch on `port` until `release` exists. */
+int holdRequestAsAnotherProcess (const juce::String& port, const juce::File& release)
+{
+    ceditor::device::DeviceProfileService service;
+    mapOntoSharedPort (service, port);
+    ceditor::device::DeviceProfileServiceTestAccess::awaitDump (service, "mainSynth", "currentPatchDump");
+    std::cout << "holding" << std::endl;
+    for (int waited = 0; ! release.exists() && waited < 20000; waited += 20)
+        juce::Thread::sleep (20);
+    return 0;
+}
+
+/*  The same across processes: a standalone and a DAW on one port (Linux, macOS). A service publishes
+    its pending requests, and what it was just answered with, in a file; a service in another
+    process reads them before applying a reply. First with a real second process, then, for the
+    cases a second process cannot be steered into from here, with another process stood in for by
+    a copy of a service's own file under a name that is not this process's. */
+int runSharedInputAcrossProcessesTests()
+{
+    using ceditor::device::DeviceProfileService;
+    using Access = ceditor::device::DeviceProfileServiceTestAccess;
+
+    const auto port = "xproc-port-" + juce::Uuid().toString().substring (0, 8);
+    const auto mapOnto = [&port] (DeviceProfileService& service) { mapOntoSharedPort (service, port); };
+    const auto send = [] (DeviceProfileService& service, const juce::String& hex)
+    {
+        auto* incoming = new juce::DynamicObject();
+        incoming->setProperty ("deviceRole", "mainSynth");
+        incoming->setProperty ("hex", hex);
+        service.ingestIncomingMidiMessage (juce::var (incoming));
+    };
+    const auto fail = [] (const juce::String& what)
+    {
+        std::cerr << "[FAIL] shared input across processes :: " << what << "\n";
+        return 1;
+    };
+
+    const juce::String dumpHex  = "F0 7D 10 01 40 02 43 F7";   // currentPatchDump
+    const juce::String otherHex = "F0 7D 10 01 40 03 44 F7";   // currentPatchDump, another patch
+    const auto foreign = Access::directory().getChildFile ("another-process-" + juce::Uuid().toString() + ".json");
+
+    int parsedByB = 0, sysexAtB = 0;
+    DeviceProfileService b;
+    mapOnto (b);
+    b.setEventCallback ([&] (const juce::String& name, const juce::var&)
+    {
+        if (name == "dumpMessageParsed") ++parsedByB;
+        if (name == "sysexInputMessage") ++sysexAtB;
+    });
+
+    // A second process, this binary, waiting for the current patch on the port.
+    {
+        const auto release = juce::File::createTempFile (".release");
+        juce::ChildProcess other;
+        const juce::StringArray command { juce::File::getSpecialLocation (juce::File::currentExecutableFile).getFullPathName(),
+                                          "--hold-request", port, release.getFullPathName() };
+        if (! other.start (command, juce::ChildProcess::wantStdOut))
+            return fail ("could not start a second process");
+        // One byte at a time: a larger read waits for that many.
+        juce::String said;
+        char byte = 0;
+        while (! said.contains ("holding") && other.readProcessOutput (&byte, 1) == 1)
+            said += juce::String::charToString ((juce::juce_wchar) (unsigned char) byte);
+
+        send (b, dumpHex);
+        const auto heldBack = parsedByB == 0 && sysexAtB == 0;
+        release.create();
+        other.waitForProcessToFinish (20000);
+        release.deleteFile();
+        if (! said.contains ("holding"))
+            return fail ("the second process did not get to waiting: " + said);
+        if (! heldBack)
+            return fail ("a reply a second process asked for was applied");
+
+        // It has ended, and its file with it: the next one is B's.
+        send (b, dumpHex);
+        if (parsedByB != 1)
+            return fail ("after the second process ended, its reply still did not reach B");
+        parsedByB = 0; sysexAtB = 0;
+    }
+
+    // A process waiting for the current patch: what it publishes.
+    {
+        auto a = std::make_unique<DeviceProfileService>();
+        mapOnto (*a);
+        Access::awaitDump (*a, "mainSynth", "currentPatchDump");
+        const auto file = Access::publishedFile (*a);
+        const auto entries = juce::JSON::parse (file.loadFileAsString());
+        const auto entry = entries[0];
+        if (! file.existsAsFile() || ! entries.isArray() || entries.size() != 1
+            || entry["input"].toString() != port || entry["profile"].toString() != "test-sysex-synth"
+            || entry["kind"].toString() != "dump" || entry["dump"].toString() != "currentPatchDump"
+            || (double) entry["until"] < (double) juce::Time::currentTimeMillis() + 30000.0)
+            return fail ("a pending request was not published as expected: " + file.loadFileAsString());
+
+        if (! file.copyFileTo (foreign))
+            return fail ("could not copy the published file");
+        a.reset();
+        if (file.exists())
+            return fail ("a service's file outlived it");
+    }
+
+    // B, in "another process" from it, leaves the reply alone; and a dump of another patch too,
+    // which answers the same request.
+    send (b, dumpHex);
+    send (b, otherHex);
+    if (parsedByB != 0 || sysexAtB != 0)
+        return fail ("a reply another process asked for was applied (parsed=" + juce::String (parsedByB) + ")");
+
+    // The process got its answer: the request's entry gives way to the answer's, by the bytes.
+    {
+        DeviceProfileService a;
+        mapOnto (a);
+        Access::awaitDump (a, "mainSynth", "currentPatchDump");
+        send (a, dumpHex);
+        Access::publish (a);
+        const auto entries = juce::JSON::parse (Access::publishedFile (a).loadFileAsString());
+        if (entries.size() != 1 || ! entries[0].hasProperty ("reply") || entries[0].hasProperty ("dump"))
+            return fail ("an answered request was not published as its answer: " + Access::publishedFile (a).loadFileAsString());
+        Access::publishedFile (a).copyFileTo (foreign);
+    }
+    send (b, dumpHex);
+    if (parsedByB != 0)
+        return fail ("the reply another process was answered with was applied");
+    send (b, otherHex);
+    if (parsedByB != 1)
+        return fail ("other bytes, after another process's request was answered, did not reach B");
+
+    // Lapsed entries hold nothing back, and a file that has been lapsed a while is tidied away.
+    auto lapsed = juce::JSON::parse (foreign.loadFileAsString());
+    for (auto& entry : *lapsed.getArray())
+        if (auto* object = entry.getDynamicObject())
+            object->setProperty ("until", (double) juce::Time::currentTimeMillis() - 1000.0);
+    foreign.replaceWithText (juce::JSON::toString (lapsed));
+    send (b, dumpHex);
+    if (parsedByB != 2)
+        return fail ("a lapsed answer held back a dump");
+    if (! foreign.existsAsFile())
+        return fail ("a just-lapsed file was deleted (its process may still be running)");
+    foreign.setLastModificationTime (juce::Time::getCurrentTime() - juce::RelativeTime::minutes (2));
+    send (b, dumpHex);
+    if (foreign.existsAsFile())
+    {
+        foreign.deleteFile();
+        return fail ("a file lapsed for minutes was left behind");
+    }
+
+    // B's own file goes once nothing is left in it: its request answered, the answer lapsed.
+    Access::awaitDump (b, "mainSynth", "currentPatchDump");
+    const auto bFile = Access::publishedFile (b);
+    send (b, dumpHex);
+    Access::publish (b);
+    if (! bFile.existsAsFile() || bFile.loadFileAsString().contains ("currentPatchDump"))
+        return fail ("an answered request did not give way to its answer in B's file");
+    Access::lapseAnswers (b);
+    Access::publish (b);
+    if (bFile.existsAsFile())
+        return fail ("a service with nothing pending or answered kept its file: " + bFile.loadFileAsString());
+
+    std::cout << "[PASS] shared MIDI input across processes :: published requests and answers hold a reply back for the process that asked, and lapse\n";
     return 0;
 }
 
@@ -2663,6 +2885,9 @@ int runMidiCiTests()
 
 int main (int argc, char** argv)
 {
+    if (argc == 4 && juce::String (argv[1]) == "--hold-request")
+        return holdRequestAsAnotherProcess (juce::String (argv[2]), juce::File (juce::String (argv[3])));
+
     // Run a copied test binary beside an installed profile tree to prove checkout independence.
     if (argc == 2 && juce::String (argv[1]) == "--installed-profiles")
     {
@@ -2710,6 +2935,7 @@ int main (int argc, char** argv)
     failures += runRealtimeMonitorTests();
     failures += runServiceRequestTests();
     failures += runSharedInputReplyTests();
+    failures += runSharedInputAcrossProcessesTests();
     failures += runMidiCiTests();
     failures += runChecksumTableTests();
     failures += runNibbledEncoderTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));

@@ -513,7 +513,13 @@ void DeviceProfileService::timerCallback()
                             sent ? status + " from queue" : "Not sent from queue: " + error);
     }
 
-    if (! monitorEmitPending && queuedTransactions.empty() && pendingDeviceRequests.empty() && sysexAssemblies.empty() && ! hasRunningBulkSendJobs() && ! midiCiActive)
+    // What this service waits for and was just answered with, for the other processes on the same
+    // input (publishPendingRequests). Before the timer can stop, and it does not stop while there is
+    // any of either or the file is still there, so the file goes when they do.
+    publishPendingRequests();
+
+    if (! monitorEmitPending && queuedTransactions.empty() && pendingDeviceRequests.empty() && sysexAssemblies.empty() && ! hasRunningBulkSendJobs() && ! midiCiActive
+        && answeredReplies.empty() && publishedRequests.isEmpty())
         stopTimer();
 }
 

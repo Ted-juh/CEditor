@@ -287,9 +287,23 @@ private:
     void addPendingDeviceRequest (const PendingDeviceRequest& request);
     // Two instances on one MIDI input both hear every reply; a reply to a request the other one made
     // is the other one's (processIncomingMidiMessage). awaitsReply: whether one of this service's
-    // pending requests on that input is answered by `hex`.
+    // pending requests on that input is answered by `hex`. wasAnsweredWith: whether this service
+    // took `hex` on that input as the answer to one in the last answeredReplyGraceMs — the other
+    // instance may handle the same message after it.
     bool awaitsReply (const juce::String& inputId, const juce::String& hex);
+    bool wasAnsweredWith (const juce::String& inputId, const juce::String& hex) const;
     bool replyBelongsToAnotherInstance (const juce::String& role, const juce::String& hex);
+    struct AnsweredReply { juce::String inputId, fingerprint; double atMs = 0.0; };
+    static constexpr double answeredReplyGraceMs = 3000.0;
+    std::vector<AnsweredReply> answeredReplies;
+    // …and in another process: each service publishes what it waits for and what it was just
+    // answered with, on hardware inputs, as a file in pendingRequestsDirectory(), and reads the
+    // other processes' before applying a reply.
+    static juce::File pendingRequestsDirectory();
+    void publishPendingRequests();
+    bool anotherProcessAwaitsReply (const juce::String& inputId, const juce::String& hex);
+    juce::File publishedRequestsFile;   // this service's, named on first use
+    juce::String publishedRequests;     // what is in it, as a signature; empty when there is no file
     friend struct DeviceProfileServiceTestAccess;
     bool resolvePendingRequestsForIdentity (const juce::String& deviceRole,
                                             const juce::String& profileId,
