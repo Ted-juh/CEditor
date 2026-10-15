@@ -60,3 +60,35 @@ export function deleteStopAt(stops, index) {
   const newStops = stops.filter((_, i) => i !== index);
   return { stops: newStops, newIndex: Math.min(index, newStops.length - 1) };
 }
+
+/**
+ * The stops of a gradient as an SVG gradient element draws them: colour as RRGGBB, position a
+ * number 0–100, in order. Shared by the two SVG border drawings (SegmentedBorder.svelte,
+ * OutlineBorder.svelte).
+ */
+export function svgGradientStops(grad) {
+  if (!grad?.stops?.length) return [];
+  const out = [...grad.stops]
+    .map((s) => {
+      const raw = s?.position;
+      const parsed = typeof raw === 'number'
+        ? raw
+        : parseFloat(String(raw ?? '0').replace('%', ''));
+      const position = Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : 0;
+      return {
+        color: String(s?.color || 'FFFFFF').slice(-6).toUpperCase(),
+        position,
+      };
+    })
+    .sort((a, b) => a.position - b.position);
+
+  // If persisted data accidentally stores every stop at the same position
+  // (for example from malformed input), spread them evenly so gradients do
+  // not collapse into a hard edge.
+  if (out.length >= 2 && Math.abs(out[out.length - 1].position - out[0].position) < 0.0001) {
+    const denom = Math.max(1, out.length - 1);
+    for (let i = 0; i < out.length; i++) out[i].position = (i / denom) * 100;
+  }
+
+  return out;
+}

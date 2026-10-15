@@ -82,6 +82,8 @@ test('the painting elements read the custom property, in every renderer that pai
     'CE_Application/editor/CanvasControl.svelte',
     'CE_Application/editor/InteractivePartRenderer.svelte',
     'CE_Panel/components/BackgroundRenderer.svelte',
+    'CE_Panel/components/SegmentedBorder.svelte',
+    'CE_Panel/components/OutlineBorder.svelte',
   ]) {
     assert.match(read(path), /transition: var\(--ce-colour-transition, none\)/, path);
   }

@@ -22,7 +22,7 @@
   import ScriptDrawOverlay from './ScriptDrawOverlay.svelte';
   import MeterRenderer from './MeterRenderer.svelte';
   import ShapeRenderer from './ShapeRenderer.svelte';
-  import { isMeterFamily, isRibbonFamily } from '../models/componentFamilies.js';
+  import { ownRendererKind } from '../models/componentFamilies.js';
   import KeyboardRenderer from './KeyboardRenderer.svelte';
   import StepSequencerRenderer from './StepSequencerRenderer.svelte';
   import TabContainerRenderer from './TabContainerRenderer.svelte';
@@ -118,24 +118,23 @@
   import { numberOr } from '../utils/primitives.js';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
   import {
-    angleDegreesFromVector, buildReflectionFadeSpec, degToRad,
-    isQuarterTurnAngle, mirrorPointHorizontally, normalizeVector,
+    buildReflectionFadeSpec, isQuarterTurnAngle, mirrorPointHorizontally,
     projectPointOntoAxis, reflectionMatrixTransform, rotatePointAround,
     rotatedBoxSize,
   } from './canvasControlTextGeometry.js';
   import {
     applyTextCaseMode, applyTextReadingOrientation, buildFontFeatureSettings,
-    buildFontVariationSettings, buildGlowShadowLayers, buildIconTintStyle, buildSingleBlurFilterValue,
-    buildTextBlurFilterValue, buildTextFillLayerStyle, buildTextShadowValue,
+    buildFontVariationSettings, buildIconTintStyle, buildTextFillLayerStyle,
     cssColor, customHitZoneStyle, getEnabledValueRows, lineCanvasFont,
     lineGeometry, lineLayerFor, normalizeFillMode, normalizeKey,
     normalizeLastLineAlign, normalizeScriptMode, normalizeTextCaseMode,
-    normalizeTextFlowMode, normalizeTextLayerOrder, normalizeTextOrientation,
-    normalizeTextReadingOrientation, parseHexColor, resolveTextFlowAngle,
+    normalizeTextFlowMode, normalizeTextOrientation,
+    normalizeTextReadingOrientation, resolveTextFlowAngle,
     safeSvgId, scriptBaselineShiftForMode, scriptScaleForMode,
-    sortTextVisualLayers, svgTextAnchorFor, textAlignFor, textCaseVariantCaps,
-    textEffectColor, textOrientationAngle, usesIconTint,
+    svgTextAnchorFor, textAlignFor, textCaseVariantCaps,
+    textOrientationAngle, usesIconTint,
   } from './canvasControlStyles.js';
+  import { resolveTextEffects } from './canvasControlTextEffects.js';
   import {
     buildBlockTextLayoutState, buildCustomFlowDecorationFor,
     buildCustomTextFlowLayout, measureCanvasLineWidth, measureFontMetrics,
@@ -303,42 +302,9 @@
   let hasAnatomy = $derived(!!anatomyForm(core?.controlType, core?.controlForm));
   let transform = $derived(getSection(control, 'Transform'));
   let isCustomComponent = $derived(String(core?.controlType ?? '') === 'CustomComponent');
-  let isLcdDisplay = $derived(String(core?.controlType ?? '') === 'LcdDisplay');
-  let isPixelDisplay = $derived(String(core?.controlType ?? '') === 'PixelDisplay');
-  // Family, not name: a ProgressBar is drawn by the meter renderer and a wheel by the ribbon's.
-  // See METER_FAMILY / RIBBON_FAMILY in componentTypes.js — adding a member is one edit there.
-  let isMeter = $derived(isMeterFamily(core?.controlType));
-  let isKeyboard = $derived(String(core?.controlType ?? '') === 'Keyboard');
-  let isStepSequencer = $derived(String(core?.controlType ?? '') === 'StepSequencer');
-  let isTabContainer = $derived(String(core?.controlType ?? '') === 'TabContainer');
-  let isScrollArea = $derived(String(core?.controlType ?? '') === 'ScrollArea');
-  let isShape = $derived(String(core?.controlType ?? '') === 'Shape');
-  let isEnvelope = $derived(String(core?.controlType ?? '') === 'Envelope');
-  let isMatrix = $derived(String(core?.controlType ?? '') === 'Matrix');
-  let isJoystick = $derived(String(core?.controlType ?? '') === 'VectorJoystick');
-  let isCrossfader = $derived(String(core?.controlType ?? '') === 'Crossfader');
-  let isNumpad = $derived(String(core?.controlType ?? '') === 'Numpad');
-  let isRibbon = $derived(isRibbonFamily(core?.controlType));
-  let isMacro = $derived(String(core?.controlType ?? '') === 'Macro');
-  let isOrbit = $derived(String(core?.controlType ?? '') === 'Orbit');
-  let isLooper = $derived(String(core?.controlType ?? '') === 'Looper');
-  let isRouter = $derived(String(core?.controlType ?? '') === 'Router');
-  let isTimbre = $derived(String(core?.controlType ?? '') === 'Timbre');
-  let isTuring = $derived(String(core?.controlType ?? '') === 'Turing');
-  let isKinetic = $derived(String(core?.controlType ?? '') === 'Kinetic');
-  let isConstellation = $derived(String(core?.controlType ?? '') === 'Constellation');
-  let isConstraint = $derived(String(core?.controlType ?? '') === 'Constraint');
-  let isChordPad = $derived(String(core?.controlType ?? '') === 'ChordPad');
-  let isArp = $derived(String(core?.controlType ?? '') === 'Arp');
-  let isNoteRibbon = $derived(String(core?.controlType ?? '') === 'NoteRibbon');
-  let isDrumPads = $derived(String(core?.controlType ?? '') === 'DrumPads');
-  let isPanic = $derived(String(core?.controlType ?? '') === 'Panic');
-  let isSplitZone = $derived(String(core?.controlType ?? '') === 'SplitZone');
-  let isPhrase = $derived(String(core?.controlType ?? '') === 'Phrase');
-  let isRecorder = $derived(String(core?.controlType ?? '') === 'Recorder');
-  let isHarmoniser = $derived(String(core?.controlType ?? '') === 'Harmoniser');
-  let isSetlist = $derived(String(core?.controlType ?? '') === 'Setlist');
-  let isTransport = $derived(String(core?.controlType ?? '') === 'Transport');
+  // Which body renderer draws this control, if one does: '' for the many that are drawn from
+  // their sections alone. One value for all thirty-three branches below; see ownRendererKind.
+  let ownRenderer = $derived(ownRendererKind(core?.controlType));
   let isTextInput = $derived(String(core?.controlType ?? '') === 'TextInput');
   // TextInput: an editable <input> styled from the Text/Font/ContentLayout
   // sections. Value + placeholder come from the preview surface.
@@ -425,7 +391,7 @@
   // and the value goes in as a runtime. The set is keyed by content, not identity, since a document
   // set can arrive as a new object on any change to the panel, and by all of its colours, which the
   // knob and its ring read (macroKnobSignature).
-  let macroKnobKey = $derived(isMacro && macroUsesSetKnob(renderControl)
+  let macroKnobKey = $derived(ownRenderer === 'Macro' && macroUsesSetKnob(renderControl)
     ? macroKnobSignature(renderControl, macroKnobBox(macroGeometry(displayW, displayH, renderControl), renderControl), controlSet)
     : '');
   let macroKnob = $derived.by(() => {
@@ -821,7 +787,7 @@
   // button that was already there.
   let childControls = $derived(isContainer
     ? sortControlsForRender(getChildControls(control))
-      .filter((child) => !isTabContainer || isChildOnActivePage(child, renderControl ?? control))
+      .filter((child) => ownRenderer !== 'TabContainer' || isChildOnActivePage(child, renderControl ?? control))
     : []);
   // Something inside this container is selected, so its children are click targets in the editor:
   // the other half of double-click-to-drill. See stores/selectionScope.js.
@@ -835,7 +801,7 @@
   // is not where the child is on screen, and a scenery layer visibly sliding its contents on lock.
   // Nothing could write a per-side value before the Children editor existed, which is why it went
   // unnoticed; the same reason it had to be fixed alongside it.
-  let tabPageRect = $derived(isTabContainer ? tabGeometry(displayW, displayH, renderControl ?? control).page : null);
+  let tabPageRect = $derived(ownRenderer === 'TabContainer' ? tabGeometry(displayW, displayH, renderControl ?? control).page : null);
   let childrenPad = $derived.by(() => {
     const pad = fitSettings(control).padding;
     return tabPageRect ? {
@@ -847,11 +813,11 @@
   let childrenGap = $derived(Number(childrenSection?.gap ?? 0));
   // A Tab Container clips its pages by default. `clip: false` opts out, for a page that puts its own
   // controls on the tab strip beside the tabs (TabContainer.tabWidth leaves the room for them).
-  let childrenClip = $derived((isTabContainer && childrenSection?.clip !== false) || isScrollArea || childrenSection?.clip === true);
-  let childScroll = $derived(isScrollArea ? clampScroll(
+  let childrenClip = $derived((ownRenderer === 'TabContainer' && childrenSection?.clip !== false) || ownRenderer === 'ScrollArea' || childrenSection?.clip === true);
+  let childScroll = $derived(ownRenderer === 'ScrollArea' ? clampScroll(
     previewSession?.scrollOffset ?? { x: control?._children?.ScrollArea?.scrollX ?? 0, y: control?._children?.ScrollArea?.scrollY ?? 0 },
     displayW, displayH, control) : { x: 0, y: 0 });
-  let scrollViewport = $derived(isScrollArea ? scrollGeometry(displayW, displayH, control).viewport : null);
+  let scrollViewport = $derived(ownRenderer === 'ScrollArea' ? scrollGeometry(displayW, displayH, control).viewport : null);
   // The container's own corner radius, so a clip follows the curve rather than the border box.
   // Clamped to half the shorter side exactly as boxElement clamps it, so the two never disagree.
   let childrenClipRadius = $derived(Math.min(
@@ -2258,21 +2224,6 @@
   let textFlowMode = $derived(normalizeTextFlowMode(textPosition?.flowMode));
   let usesCustomTextFlow = $derived(textFlowMode !== 'rotate');
   let textFlowAngle = $derived(resolveTextFlowAngle(textPosition));
-  let textFlowStepX = $derived(numberOr(textPosition?.flowStepX, Math.max(6, numberOr(textFont?.size, 12) * 0.6)));
-  let textFlowStepY = $derived(numberOr(textPosition?.flowStepY, Math.max(6, numberOr(textFont?.size, 12) * 0.45)));
-  let textFlowRadius = $derived(Math.max(1, numberOr(textPosition?.flowRadius, Math.max(18, numberOr(textFont?.size, 12) * 3))));
-  let textFlowSweep = $derived(numberOr(textPosition?.flowSweep, 180));
-  let textFlowDistribution = $derived(String(textPosition?.flowDistribution ?? 'natural'));
-  let textFlowFacing = $derived(String(textPosition?.flowFacing ?? 'path'));
-  let textFlowSide = $derived(String(textPosition?.flowSide ?? 'center'));
-  let textFlowReverse = $derived(textPosition?.flowReverse === true);
-  let textFlowStartOffset = $derived(numberOr(textPosition?.flowStartOffset, 0));
-  let textFlowFixedAdvance = $derived(numberOr(textPosition?.flowFixedAdvance, 0));
-  let textFlowAmplitude = $derived(numberOr(textPosition?.flowAmplitude, 18));
-  let textFlowFrequency = $derived(numberOr(textPosition?.flowFrequency, 1));
-  let textFlowTurns = $derived(numberOr(textPosition?.flowTurns, 2));
-  let textFlowPerimeterInset = $derived(numberOr(textPosition?.flowPerimeterInset, 0));
-  let textFlowStairUnit = $derived(String(textPosition?.flowStairUnit ?? 'character'));
   let textOrientation = $derived(normalizeTextOrientation(textPosition?.orientation));
   let textRotationDegrees = $derived(usesCustomTextFlow ? 0 : numberOr(textFlowAngle, textOrientationAngle(textOrientation)));
   let textContentWidth = $derived(Math.max(0, displayW - effectiveTextPaddingLeft - effectiveTextPaddingRight));
@@ -2283,179 +2234,14 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!hasAnatomy && !isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isKeyboard && !isStepSequencer && !isTabContainer && !isScrollArea && !isShape && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isNumpad && !isRibbon && !isMacro && !isOrbit && !isLooper && !isRouter && !isTimbre && !isTuring && !isKinetic && !isConstellation && !isConstraint && !isChordPad && !isArp && !isNoteRibbon && !isDrumPads && !isPanic && !isTransport && !isSplitZone && !isPhrase && !isRecorder && !isHarmoniser && !isSetlist && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
-  let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
-  let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
-  let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
-  let textOutlineFill = $derived(textEffects?.outlineFill !== false);
-  let textOutlineInnerRadius = $derived(textOutlineFill ? 0 : textOutlineDistance);
-  let textOutlineOuterRadius = $derived(textOutlineDistance + textOutlineThickness);
-  let textOutlineColour = $derived(textEffectColor(textEffects?.outlineColour, textEffects?.knockout === true ? (textFill?.colour ?? 'FFFFFFFF') : 'FF000000'));
-  let textOutlineJoin = $derived(String(textEffects?.outlineJoin ?? 'round'));
-  let textOutlinePlacement = $derived(String(textEffects?.outlinePlacement ?? 'outer'));
-  let textOutlineDashEnabled = $derived(textEffects?.outlineDashEnabled === true);
-  let textOutlineDashArray = $derived.by(() => (
-    textOutlineDashEnabled
-      ? `${Math.max(1, numberOr(textEffects?.outlineDashLength, 8))} ${Math.max(1, numberOr(textEffects?.outlineDashGap, 4))}`
-      : ''
-  ));
-  let textOutlineUseStroke = $derived(textOutlineDashEnabled || textOutlinePlacement !== 'outer');
-  let textKnockout = $derived(textEffects?.knockout === true);
-  let textFillOrder = $derived(normalizeTextLayerOrder(textFill?.order, 50));
-  let textOutlineOrder = $derived(normalizeTextLayerOrder(textEffects?.outlineOrder, 40));
-  let textStroke2Order = $derived(normalizeTextLayerOrder(textEffects?.stroke2Order, 45));
-  let textShadowStyle = $derived(String(textEffects?.shadowStyle ?? 'soft'));
-  let textShadowEnabled = $derived(textEffects?.shadowEnabled === true);
-  let textShadowOrder = $derived(normalizeTextLayerOrder(textEffects?.shadowOrder, 10));
-  let textSoftShadowEnabled = $derived(
-    textShadowEnabled
-    && textShadowStyle === 'soft'
-    && (
-      Math.abs(numberOr(textEffects?.shadowOffsetX, 1)) > 0.001
-      || Math.abs(numberOr(textEffects?.shadowOffsetY, 1)) > 0.001
-      || Math.max(0, numberOr(textEffects?.shadowBlur, 2)) > 0
-    )
-  );
-  let textLongShadowEnabled = $derived(textShadowEnabled && textShadowStyle !== 'soft');
-  let textLongShadowCopies = $derived.by(() => {
-    if (!textLongShadowEnabled) return [];
-    const steps = Math.max(1, Math.round(numberOr(textEffects?.shadowSteps, 8)));
-    const distance = Math.max(0, numberOr(textEffects?.shadowDistance, 12));
-    const direction = normalizeVector(numberOr(textEffects?.shadowOffsetX, 1), numberOr(textEffects?.shadowOffsetY, 1));
-    return Array.from({ length: steps }, (_, index) => {
-      const ratio = (index + 1) / steps;
-      return {
-        dx: direction.x * distance * ratio,
-        dy: direction.y * distance * ratio,
-        opacity: textShadowStyle === 'extrude' ? 0.88 : Math.max(0.12, 0.5 * (1 - ratio)),
-      };
-    });
-  });
-  let textShadowColour = $derived(textEffectColor(textEffects?.shadowColour, '80000000'));
-  let textShadowValue = $derived(buildTextShadowValue(textEffects, textFill?.colour ?? 'FFFFFFFF'));
-  let textSoftShadowFilterValue = $derived(buildSingleBlurFilterValue(textEffects?.shadowBlur ?? 0));
-  let textGlowLayers = $derived(buildGlowShadowLayers(textEffects, textFill?.colour ?? 'FFFFFFFF'));
-  let textGlowEnabled = $derived(textGlowLayers.length > 0);
-  let textGlowOrder = $derived(normalizeTextLayerOrder(textEffects?.glowOrder, 20));
-  let textFilterValue = $derived(buildTextBlurFilterValue(textEffects));
-  let textFillColourResolved = $derived(cssColor(textFill?.colour ?? 'FFFFFFFF'));
-  let textMainFillColour = $derived(textKnockout ? 'rgba(0,0,0,0)' : textFillColourResolved);
-  let textInnerGlowEnabled = $derived(textEffects?.innerGlowEnabled === true && Math.max(0, numberOr(textEffects?.innerGlowSize, 0)) > 0);
-  let textInnerGlowOrder = $derived(normalizeTextLayerOrder(textEffects?.innerGlowOrder, 80));
-  let textInnerGlowColour = $derived(textEffectColor(textEffects?.innerGlowColour, textFill?.colour ?? 'FFFFFFFF'));
-  let textInnerGlowFilterValue = $derived(buildSingleBlurFilterValue(textEffects?.innerGlowSize ?? 0));
-  let textInnerShadowEnabled = $derived(textEffects?.innerShadowEnabled === true);
-  let textInnerShadowOrder = $derived(normalizeTextLayerOrder(textEffects?.innerShadowOrder, 60));
-  let textInnerShadowColour = $derived(textEffectColor(textEffects?.innerShadowColour, '80000000'));
-  let textInnerShadowBlurValue = $derived(buildSingleBlurFilterValue(textEffects?.innerShadowBlur ?? 0));
-  let textStroke2Enabled = $derived(textEffects?.stroke2Enabled === true && Math.max(0, numberOr(textEffects?.stroke2Thickness, 0)) > 0);
-  let textStroke2Colour = $derived(textEffectColor(textEffects?.stroke2Colour, 'FFFFFFFF'));
-  let textStroke2Placement = $derived(String(textEffects?.stroke2Placement ?? 'inner'));
-  let textStroke2DashEnabled = $derived(textEffects?.stroke2DashEnabled === true);
-  let textStroke2DashArray = $derived.by(() => (
-    textStroke2DashEnabled
-      ? `${Math.max(1, numberOr(textEffects?.stroke2DashLength, 6))} ${Math.max(1, numberOr(textEffects?.stroke2DashGap, 3))}`
-      : ''
-  ));
+  let hasText = $derived(!hasAnatomy && !isRadioGroupControl && !isListboxControl && !isTextInput && (!ownRenderer || ownRenderer === 'LcdDisplay') && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
+  // Every value the text effect layers are drawn from, in one object: see canvasControlTextEffects.js
+  // for why it is not sixty-eight deriveds.
+  let textFx = $derived(resolveTextEffects(textEffects, textFill));
   let needsVisualTextFill = $derived(textFillMode !== 'solid');
   // WebView2 intermittently drops masked foreignObject fills for custom-flow SVG text.
   // Fall back to direct glyph fill there so labels still render and the editor stays interactive.
   let useTextFillForeignObject = $derived(needsVisualTextFill && !usesCustomTextFlow);
-  let textReflectionEnabled = $derived(
-    textEffects?.reflectionEnabled === true || (textEffects?.reflectionEnabled == null && textEffects?.copyEnabled === true)
-  );
-  let textReflectionOrder = $derived(normalizeTextLayerOrder(textEffects?.reflectionOrder, 5));
-  let textReflectionAngle = $derived.by(() => {
-    const explicit = Number(textEffects?.reflectionAngle);
-    if (Number.isFinite(explicit)) return explicit;
-    return angleDegreesFromVector(textEffects?.copyOffsetX, textEffects?.copyOffsetY, 90);
-  });
-  let textReflectionDistance = $derived.by(() => {
-    const explicit = Number(textEffects?.reflectionDistance);
-    if (Number.isFinite(explicit)) return Math.max(0, explicit);
-    return Math.hypot(numberOr(textEffects?.copyOffsetX, 0), numberOr(textEffects?.copyOffsetY, 0));
-  });
-  let textReflectionIntensity = $derived.by(() => {
-    const explicit = Number(textEffects?.reflectionIntensity);
-    if (Number.isFinite(explicit)) return Math.max(0, Math.min(1, explicit));
-    const legacy = parseHexColor(textEffects?.copyColour ?? textFill?.colour ?? 'FFFFFFFF', textFill?.colour ?? 'FFFFFFFF');
-    return Math.max(0, Math.min(1, legacy.a));
-  });
-  let textReflectionColour = $derived.by(() => {
-    const stored = String(textEffects?.reflectionColour ?? '').replace(/^#/, '');
-    if (stored.length === 8 || stored.length === 6) return textEffectColor(stored, textFill?.colour ?? 'FFFFFFFF');
-    const legacy = String(textEffects?.copyColour ?? '').replace(/^#/, '');
-    if (legacy.length === 8 || legacy.length === 6) return textEffectColor(legacy, textFill?.colour ?? 'FFFFFFFF');
-    return textEffectColor(textFill?.colour ?? 'FFFFFFFF', 'FFFFFFFF');
-  });
-  let textReflectionFilterValue = $derived(buildSingleBlurFilterValue(
-    textEffects?.reflectionBlur ?? textEffects?.copyBlur ?? 0
-  ));
-  let textMotionEnabled = $derived(textEffects?.motionEnabled === true && Math.max(0, numberOr(textEffects?.motionDistance, 0)) > 0);
-  let textMotionOrder = $derived(normalizeTextLayerOrder(textEffects?.motionOrder, 30));
-  let textMotionColour = $derived(textEffectColor(textEffects?.motionColour, textFill?.colour ?? 'FFFFFFFF'));
-  let textMotionCopies = $derived.by(() => {
-    const steps = Math.max(1, Math.round(numberOr(textEffects?.motionSteps, 4)));
-    const distance = Math.max(0, numberOr(textEffects?.motionDistance, 8));
-    if (!textMotionEnabled || distance <= 0) return [];
-    const angleRadians = degToRad(numberOr(textEffects?.motionAngle, 0));
-    return Array.from({ length: steps }, (_, index) => {
-      const ratio = (index + 1) / steps;
-      return {
-        dx: Math.cos(angleRadians) * distance * ratio,
-        dy: Math.sin(angleRadians) * distance * ratio,
-        opacity: Math.max(0.08, 0.35 * (1 - ((index + 1) / (steps + 1)))),
-      };
-    });
-  });
-  let textBevelEnabled = $derived(textEffects?.bevelEnabled === true && Math.max(0, numberOr(textEffects?.bevelDepth, 0)) > 0);
-  let textBevelOrder = $derived(normalizeTextLayerOrder(textEffects?.bevelOrder, 60));
-  let textBevelStyle = $derived(String(textEffects?.bevelStyle ?? 'emboss'));
-  let textBevelDepth = $derived(Math.max(0, numberOr(textEffects?.bevelDepth, 1.5)));
-  let textBevelHighlightColour = $derived(textEffectColor(textEffects?.bevelHighlightColour, '99FFFFFF'));
-  let textBevelShadowColour = $derived(textEffectColor(textEffects?.bevelShadowColour, '99000000'));
-  let textBevelIsOuter = $derived(textBevelEnabled && textBevelStyle === 'outer');
-  let textBevelIsInside = $derived(textBevelEnabled && textBevelStyle !== 'outer');
-  let textBevelHighlightOpacity = $derived.by(() => {
-    if (!textBevelEnabled) return 0;
-    if (textBevelStyle === 'inner') return 0.65;
-    if (textBevelStyle === 'emboss') return 0.8;
-    return 0.8;
-  });
-  let textBevelShadowOpacity = $derived.by(() => {
-    if (!textBevelEnabled) return 0;
-    if (textBevelStyle === 'inner') return 0.6;
-    if (textBevelStyle === 'emboss') return 0.78;
-    return 0.8;
-  });
-  let textBevelNeedsMask = $derived(textBevelEnabled && textBevelStyle !== 'outer');
-  let textVisualLayers = $derived.by(() => sortTextVisualLayers([
-    ...(textReflectionEnabled ? [{ key: 'reflection', order: textReflectionOrder, priority: 10 }] : []),
-    ...(textSoftShadowEnabled ? [{ key: 'softShadow', order: textShadowOrder, priority: 20 }] : []),
-    ...(textLongShadowEnabled ? [{ key: 'longShadow', order: textShadowOrder, priority: 21 }] : []),
-    ...(textGlowEnabled ? [{ key: 'glow', order: textGlowOrder, priority: 30 }] : []),
-    ...(textMotionEnabled ? [{ key: 'motion', order: textMotionOrder, priority: 40 }] : []),
-    ...(textBevelIsOuter ? [{ key: 'bevelOuter', order: textBevelOrder, priority: 50 }] : []),
-    ...(textOutlineEnabled ? [{ key: 'outline', order: textOutlineOrder, priority: 60 }] : []),
-    ...(textStroke2Enabled ? [{ key: 'stroke2', order: textStroke2Order, priority: 70 }] : []),
-    { key: 'fill', order: textFillOrder, priority: 80 },
-    ...(textInnerShadowEnabled ? [{ key: 'innerShadow', order: textInnerShadowOrder, priority: 90 }] : []),
-    ...(textBevelIsInside ? [{ key: 'bevelInner', order: textBevelOrder, priority: 100 }] : []),
-    ...(textInnerGlowEnabled ? [{ key: 'innerGlow', order: textInnerGlowOrder, priority: 110 }] : []),
-  ]));
-  let hasTextEffects = $derived(
-    textOutlineEnabled
-    || textStroke2Enabled
-    || textKnockout
-    || textShadowEnabled
-    || textGlowEnabled
-    || textInnerGlowEnabled
-    || textInnerShadowEnabled
-    || textEffects?.blurEnabled === true
-    || textMotionEnabled
-    || textBevelEnabled
-    || textReflectionEnabled
-  );
   let resolvedStoredFont = $derived.by(() => {
     const requestedFamily = textFont?.family ?? '';
     if (!requestedFamily) return null;
@@ -2542,22 +2328,22 @@
     const runLayout = () => buildCustomTextFlowLayout(sourceTextLines, {
       mode: textFlowMode,
       angle: textFlowAngle,
-      stepX: textFlowStepX,
-      stepY: textFlowStepY,
-      radius: textFlowRadius,
-      sweep: textFlowSweep,
+      stepX: numberOr(textPosition?.flowStepX, Math.max(6, numberOr(textFont?.size, 12) * 0.6)),
+      stepY: numberOr(textPosition?.flowStepY, Math.max(6, numberOr(textFont?.size, 12) * 0.45)),
+      radius: Math.max(1, numberOr(textPosition?.flowRadius, Math.max(18, numberOr(textFont?.size, 12) * 3))),
+      sweep: numberOr(textPosition?.flowSweep, 180),
       wordSpacing: textWordSpacing,
-      distribution: textFlowDistribution,
-      facing: textFlowFacing,
-      side: textFlowSide,
-      reverse: textFlowReverse,
-      startOffset: textFlowStartOffset,
-      fixedAdvance: textFlowFixedAdvance,
-      amplitude: textFlowAmplitude,
-      frequency: textFlowFrequency,
-      turns: textFlowTurns,
-      perimeterInset: textFlowPerimeterInset,
-      stairUnit: textFlowStairUnit,
+      distribution: String(textPosition?.flowDistribution ?? 'natural'),
+      facing: String(textPosition?.flowFacing ?? 'path'),
+      side: String(textPosition?.flowSide ?? 'center'),
+      reverse: textPosition?.flowReverse === true,
+      startOffset: numberOr(textPosition?.flowStartOffset, 0),
+      fixedAdvance: numberOr(textPosition?.flowFixedAdvance, 0),
+      amplitude: numberOr(textPosition?.flowAmplitude, 18),
+      frequency: numberOr(textPosition?.flowFrequency, 1),
+      turns: numberOr(textPosition?.flowTurns, 2),
+      perimeterInset: numberOr(textPosition?.flowPerimeterInset, 0),
+      stairUnit: String(textPosition?.flowStairUnit ?? 'character'),
       boxWidth: textContentWidth,
       boxHeight: textContentHeight,
       polylinePoints: textPosition?.flowPolylinePoints,
@@ -2828,8 +2614,8 @@
     reflectionMatrixTransform(
       textAxisCenter.x,
       textAxisCenter.y,
-      textReflectionAngle,
-      textReflectionDistance
+      textFx.reflectionAngle,
+      textFx.reflectionDistance
     )
   );
   let textReflectionSourceProjectionRange = $derived.by(() => {
@@ -2871,7 +2657,7 @@
     });
 
     const projections = transformedCorners.map((point) =>
-      projectPointOntoAxis(point.x, point.y, textAxisCenter.x, textAxisCenter.y, textReflectionAngle)
+      projectPointOntoAxis(point.x, point.y, textAxisCenter.x, textAxisCenter.y, textFx.reflectionAngle)
     );
     return {
       min: Math.min(...projections, 0),
@@ -2879,12 +2665,12 @@
     };
   });
   let textReflectionFadeSpec = $derived.by(() => (
-    textReflectionEnabled
+    textFx.reflectionEnabled
       ? buildReflectionFadeSpec(
         textAxisCenter.x,
         textAxisCenter.y,
-        textReflectionAngle,
-        textReflectionDistance,
+        textFx.reflectionAngle,
+        textFx.reflectionDistance,
         textEffects?.reflectionFadeMode,
         textEffects?.reflectionFadeAmount,
         textReflectionSourceProjectionRange
@@ -2903,7 +2689,7 @@
       svgTextLines.find((line) => /\S/.test(line)) ?? 'Hg'
     )
   );
-  let svgBlockTextDominantBaseline = $derived('alphabetic');
+  const svgBlockTextDominantBaseline = 'alphabetic';
   let svgTextBaselineOffset = $derived.by(() => {
     const ascent = svgTextFontMetrics.ascent;
     const descent = svgTextFontMetrics.descent;
@@ -2928,6 +2714,8 @@
     textUnrotatedOrigin.top
     + svgTextBaselineOffset
   );
+  // The font of SVG-drawn text, block or custom flow alike: the two had a copy each of this, and of
+  // the three filtered variants below.
   let svgTextMaskStyle = $derived.by(() => {
     const weightValue = textFont?.weightValue ?? (textFont?.weight === 'Bold' ? 700 : 400);
     const styles = [
@@ -2944,60 +2732,24 @@
     ];
     return styles.join('; ');
   });
-  let svgTextStyle = $derived.by(() => {
-    return svgTextMaskStyle;
-  });
   let svgTextSoftShadowStyle = $derived.by(() => {
     const styles = [svgTextMaskStyle];
-    if (textSoftShadowFilterValue) styles.push(`filter:${textSoftShadowFilterValue}`);
+    if (textFx.softShadowFilterValue) styles.push(`filter:${textFx.softShadowFilterValue}`);
     return styles.join('; ');
   });
   let svgTextReflectionStyle = $derived.by(() => {
     const styles = [svgTextMaskStyle];
-    if (textReflectionFilterValue) styles.push(`filter:${textReflectionFilterValue}`);
+    if (textFx.reflectionFilterValue) styles.push(`filter:${textFx.reflectionFilterValue}`);
     return styles.join('; ');
   });
   let svgTextInnerGlowStyle = $derived.by(() => {
     const styles = [svgTextMaskStyle];
-    if (textInnerGlowFilterValue) styles.push(`filter:${textInnerGlowFilterValue}`);
+    if (textFx.innerGlowFilterValue) styles.push(`filter:${textFx.innerGlowFilterValue}`);
     return styles.join('; ');
-  });
-  let customFlowTextMaskStyle = $derived.by(() => {
-    const weightValue = textFont?.weightValue ?? (textFont?.weight === 'Bold' ? 700 : 400);
-    return [
-      `font-family:'${resolvedFontFamily}'`,
-      `font-size:${(textFont?.size ?? 12) * textScriptScale}px`,
-      `font-weight:${weightValue}`,
-      `font-style:${textFont?.style === 'Italic' ? 'italic' : 'normal'}`,
-      `letter-spacing:${textFont?.letterSpacing ?? 0}px`,
-      `word-spacing:${textWordSpacing}px`,
-      `font-feature-settings:${textFontFeatureSettings || 'normal'}`,
-      `font-variation-settings:${textFontVariationSettings || 'normal'}`,
-      `font-variant-caps:${textVariantCaps}`,
-      'white-space:pre',
-    ].join('; ');
-  });
-  let customFlowTextStyle = $derived.by(() => {
-    return customFlowTextMaskStyle;
   });
   let textVisualEffectStyle = $derived.by(() => (
-    textFilterValue ? `filter:${textFilterValue}` : ''
+    textFx.filterValue ? `filter:${textFx.filterValue}` : ''
   ));
-  let customFlowSoftShadowStyle = $derived.by(() => {
-    const styles = [customFlowTextMaskStyle];
-    if (textSoftShadowFilterValue) styles.push(`filter:${textSoftShadowFilterValue}`);
-    return styles.join('; ');
-  });
-  let customFlowReflectionStyle = $derived.by(() => {
-    const styles = [customFlowTextMaskStyle];
-    if (textReflectionFilterValue) styles.push(`filter:${textReflectionFilterValue}`);
-    return styles.join('; ');
-  });
-  let customFlowInnerGlowStyle = $derived.by(() => {
-    const styles = [customFlowTextMaskStyle];
-    if (textInnerGlowFilterValue) styles.push(`filter:${textInnerGlowFilterValue}`);
-    return styles.join('; ');
-  });
   let customFlowDecorations = $derived.by(() => ({
     underline: buildCustomFlowDecorationFor('underline', customTextLayout, textFont, textFill),
     strikethrough: buildCustomFlowDecorationFor('strikethrough', customTextLayout, textFont, textFill),
@@ -3125,7 +2877,7 @@
     if (normalizeTextCaseMode(textCaseMode) === 'smallcaps') {
       styles.push('font-variant-caps:small-caps');
     }
-    if (textShadowValue) styles.push(`text-shadow:${textShadowValue}`);
+    if (textFx.shadowValue) styles.push(`text-shadow:${textFx.shadowValue}`);
     return styles.join('; ');
   });
   /**
@@ -3144,7 +2896,7 @@
   );
   let showCustomFlowLineDecorations = $derived(hasLineDecorations && usesCustomTextFlow);
   let showBlockLineDecorations = $derived(hasLineDecorations && !usesCustomTextFlow);
-  let showBlockTextVisual = $derived((!usesCustomTextFlow) && (showBlockLineDecorations || hasTextEffects || needsVisualTextFill));
+  let showBlockTextVisual = $derived((!usesCustomTextFlow) && (showBlockLineDecorations || textFx.hasEffects || needsVisualTextFill));
   let nativePreviewStyle = $derived.by(() => {
     if (!hasText || usesCustomTextFlow) return '';
     return `transform:translate(${effectiveTextOffsetX}px, ${effectiveTextOffsetY}px)`;
@@ -3536,16 +3288,16 @@
   // The layer stack names the style it wants; each layout mode owns the actual variable, so the
   // shared stack does not need to know which spelling applies.
   function customFlowTextStyleFor(key) {
-    return key === 'reflection' ? customFlowReflectionStyle
-      : key === 'softShadow' ? customFlowSoftShadowStyle
-      : key === 'text' ? customFlowTextStyle
-      : key === 'innerGlow' ? customFlowInnerGlowStyle
-      : customFlowTextMaskStyle;
+    return key === 'reflection' ? svgTextReflectionStyle
+      : key === 'softShadow' ? svgTextSoftShadowStyle
+      : key === 'text' ? svgTextMaskStyle
+      : key === 'innerGlow' ? svgTextInnerGlowStyle
+      : svgTextMaskStyle;
   }
   function blockTextStyleFor(key) {
     return key === 'reflection' ? svgTextReflectionStyle
       : key === 'softShadow' ? svgTextSoftShadowStyle
-      : key === 'text' ? svgTextStyle
+      : key === 'text' ? svgTextMaskStyle
       : key === 'innerGlow' ? svgTextInnerGlowStyle
       : svgTextMaskStyle;
   }
@@ -3626,47 +3378,47 @@
       <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} />
     {/if}
 
-    {#if isLcdDisplay}
+    {#if ownRenderer === 'LcdDisplay'}
       {#if renderControl?._children?.Display?.parameterEditor}
       <ParameterStatusEditor model={previewParameterEditor ?? parameterStatusDesignModel(allControls)} control={renderControl} {allControls} width={displayW} height={displayH} />
       {:else}
       <LcdDisplayRenderer control={renderControl} allControls={allControls} width={displayW} height={displayH} />
       {/if}
-    {:else if isMeter && !hasAnatomy}
+    {:else if ownRenderer === 'Meter' && !hasAnatomy}
       <MeterRenderer control={renderControl} width={displayW} height={displayH} />
-    {:else if isShape}
+    {:else if ownRenderer === 'Shape'}
       <ShapeRenderer control={renderControl} width={displayW} height={displayH} />
-    {:else if isKeyboard}
+    {:else if ownRenderer === 'Keyboard'}
       <KeyboardRenderer
         control={renderControl}
         width={displayW}
         height={displayH}
         held={previewSession?.keyboardHeld ?? []}
       />
-    {:else if isStepSequencer}
+    {:else if ownRenderer === 'StepSequencer'}
       <StepSequencerRenderer control={renderControl} width={displayW} height={displayH} />
-    {:else if isTabContainer}
+    {:else if ownRenderer === 'TabContainer'}
       <TabContainerRenderer control={renderControl} width={displayW} height={displayH} />
-    {:else if isScrollArea}
+    {:else if ownRenderer === 'ScrollArea'}
       <ScrollAreaRenderer
         control={renderControl}
         width={displayW}
         height={displayH}
         offset={previewSession?.scrollOffset ?? null}
       />
-    {:else if isEnvelope}
+    {:else if ownRenderer === 'Envelope'}
       <EnvelopeRenderer control={renderControl} width={displayW} height={displayH} activeIndex={previewSession?.envActiveIndex ?? -1} />
-    {:else if isMatrix}
+    {:else if ownRenderer === 'Matrix'}
       <MatrixRenderer control={renderControl} width={displayW} height={displayH} activeCell={previewSession?.matrixActiveCell ?? null} />
-    {:else if isJoystick}
+    {:else if ownRenderer === 'VectorJoystick'}
       <JoystickRenderer control={renderControl} width={displayW} height={displayH} />
-    {:else if isNumpad}
+    {:else if ownRenderer === 'Numpad'}
       <NumpadRenderer control={renderControl} width={displayW} height={displayH} />
-    {:else if isCrossfader}
+    {:else if ownRenderer === 'Crossfader'}
       <CrossfaderRenderer control={renderControl} width={displayW} height={displayH} />
-    {:else if isRibbon}
+    {:else if ownRenderer === 'Ribbon'}
       <RibbonRenderer control={renderControl} width={displayW} height={displayH} />
-    {:else if isMacro}
+    {:else if ownRenderer === 'Macro'}
       {#if macroKnobRing}
         <div class="macro-knob-ring" style={macroKnobRing} aria-hidden="true"></div>
       {/if}
@@ -3684,43 +3436,43 @@
         />
       {/if}
       <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} series={seriesPalette} tone={instrumentTone} ownKnob={!macroKnob} />
-    {:else if isOrbit}
+    {:else if ownRenderer === 'Orbit'}
       <OrbitRenderer control={renderControl} width={displayW} height={displayH} series={seriesPalette} />
-    {:else if isLooper}
+    {:else if ownRenderer === 'Looper'}
       <LooperRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {:else if isRouter}
+    {:else if ownRenderer === 'Router'}
       <RouterRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {:else if isTimbre}
+    {:else if ownRenderer === 'Timbre'}
       <TimbreRenderer control={renderControl} width={displayW} height={displayH} idSeed={svgIdSeed} series={seriesPalette} tone={instrumentTone} />
-    {:else if isTuring}
+    {:else if ownRenderer === 'Turing'}
       <TuringRenderer control={renderControl} width={displayW} height={displayH} />
-    {:else if isKinetic}
+    {:else if ownRenderer === 'Kinetic'}
       <KineticRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {:else if isConstellation}
+    {:else if ownRenderer === 'Constellation'}
       <ConstellationRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {:else if isConstraint}
+    {:else if ownRenderer === 'Constraint'}
       <ConstraintRenderer control={renderControl} width={displayW} height={displayH} series={seriesPalette} tone={instrumentTone} />
-    {:else if isChordPad}
+    {:else if ownRenderer === 'ChordPad'}
       <ChordPadRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {:else if isArp}
+    {:else if ownRenderer === 'Arp'}
       <ArpRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {:else if isNoteRibbon}
+    {:else if ownRenderer === 'NoteRibbon'}
       <NoteRibbonRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {:else if isDrumPads}
+    {:else if ownRenderer === 'DrumPads'}
       <DrumPadsRenderer control={renderControl} width={displayW} height={displayH} />
-    {:else if isPanic}
+    {:else if ownRenderer === 'Panic'}
       <PanicRenderer control={renderControl} width={displayW} height={displayH} />
-    {:else if isSplitZone}
+    {:else if ownRenderer === 'SplitZone'}
       <SplitZoneRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {:else if isPhrase}
+    {:else if ownRenderer === 'Phrase'}
       <PhraseRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {:else if isRecorder}
+    {:else if ownRenderer === 'Recorder'}
       <RecorderRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {:else if isHarmoniser}
+    {:else if ownRenderer === 'Harmoniser'}
       <HarmoniserRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {:else if isSetlist}
+    {:else if ownRenderer === 'Setlist'}
       <SetlistRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {:else if isTransport}
+    {:else if ownRenderer === 'Transport'}
       <TransportRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
@@ -3729,7 +3481,7 @@
          Background or a readout over a Knob without a dedicated canvas component existing. -->
     <ScriptDrawOverlay controlId={core?.id ?? ''} width={displayW} height={displayH} />
 
-    {#if isPixelDisplay}
+    {#if core?.controlType === 'PixelDisplay'}
       <PixelDisplayRenderer
         control={renderControl}
         allControls={allControls}
@@ -4051,7 +3803,7 @@
                           stroke="#000"
                           stroke-width={Math.max(0, customFlowDecorations.underline.gap * 2)}
                           paint-order="stroke fill"
-                          style={customFlowTextMaskStyle}
+                          style={svgTextMaskStyle}
                           transform={glyph.rotation ? `rotate(${glyph.rotation} ${glyph.x} ${glyph.y})` : null}
                         >{glyph.char}</text>
                       {/if}
@@ -4076,7 +3828,7 @@
                           stroke="#000"
                           stroke-width={Math.max(0, customFlowDecorations.strikethrough.gap * 2)}
                           paint-order="stroke fill"
-                          style={customFlowTextMaskStyle}
+                          style={svgTextMaskStyle}
                           transform={glyph.rotation ? `rotate(${glyph.rotation} ${glyph.x} ${glyph.y})` : null}
                         >{glyph.char}</text>
                       {/if}
@@ -4101,7 +3853,7 @@
                           stroke="#000"
                           stroke-width={Math.max(0, customFlowDecorations.overline.gap * 2)}
                           paint-order="stroke fill"
-                          style={customFlowTextMaskStyle}
+                          style={svgTextMaskStyle}
                           transform={glyph.rotation ? `rotate(${glyph.rotation} ${glyph.x} ${glyph.y})` : null}
                         >{glyph.char}</text>
                       {/if}
@@ -4210,7 +3962,7 @@
     -->
     {#snippet textVisual(ns, fillGate, drawText)}
         <svg class="text-visual-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
-          {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textOutlineEnabled || textStroke2Enabled || fillGate || textReflectionFadeEnabled}
+          {#if textFx.innerGlowEnabled || textFx.innerShadowEnabled || textFx.bevelNeedsMask || textFx.outlineEnabled || textFx.stroke2Enabled || fillGate || textReflectionFadeEnabled}
             <defs>
               {#if textReflectionFadeEnabled}
                 <linearGradient
@@ -4237,80 +3989,80 @@
                   <rect x="0" y="0" width={displayW} height={displayH} fill={`url(#${textReflectionFadeGradientId(ns)})`}></rect>
                 </mask>
               {/if}
-              {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textStroke2Enabled || fillGate}
+              {#if textFx.innerGlowEnabled || textFx.innerShadowEnabled || textFx.bevelNeedsMask || textFx.stroke2Enabled || fillGate}
                 <mask id={textShapeMaskId(ns)} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
                   <rect x="0" y="0" width={displayW} height={displayH} fill="#000"></rect>
                     {@render drawText({ 'fill': "#fff" }, 'mask', 0, 0, '', undefined)}
                 </mask>
               {/if}
-              {#if textOutlineEnabled && !textOutlineUseStroke}
+              {#if textFx.outlineEnabled && !textFx.outlineUseStroke}
                 <mask id={textOutlineMaskId(ns)} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
                   <rect x="0" y="0" width={displayW} height={displayH} fill="#000"></rect>
-                    {@render drawText({ 'fill': "#fff", 'stroke': "#fff", 'stroke-width': textOutlineOuterRadius * 2, 'stroke-linejoin': textOutlineJoin, 'paint-order': "stroke fill" }, 'mask', 0, 0, '', undefined)}
-                    {@render drawText({ 'fill': "#000", 'stroke': "#000", 'stroke-width': textOutlineInnerRadius * 2, 'stroke-linejoin': textOutlineJoin, 'paint-order': "stroke fill" }, 'mask', 0, 0, '', undefined)}
+                    {@render drawText({ 'fill': "#fff", 'stroke': "#fff", 'stroke-width': textFx.outlineOuterRadius * 2, 'stroke-linejoin': textFx.outlineJoin, 'paint-order': "stroke fill" }, 'mask', 0, 0, '', undefined)}
+                    {@render drawText({ 'fill': "#000", 'stroke': "#000", 'stroke-width': textFx.outlineInnerRadius * 2, 'stroke-linejoin': textFx.outlineJoin, 'paint-order': "stroke fill" }, 'mask', 0, 0, '', undefined)}
                 </mask>
               {/if}
             </defs>
           {/if}
-          {#each textVisualLayers as layer}
+          {#each textFx.visualLayers as layer}
             {#if layer.key === 'reflection'}
-              <g opacity={textReflectionIntensity} mask={textReflectionFadeEnabled ? `url(#${textReflectionFadeMaskId(ns)})` : undefined}>
+              <g opacity={textFx.reflectionIntensity} mask={textReflectionFadeEnabled ? `url(#${textReflectionFadeMaskId(ns)})` : undefined}>
                 <g transform={textReflectionTransform}>
-                    {@render drawText({ 'fill': textReflectionColour }, 'reflection', 0, 0, '', undefined)}
+                    {@render drawText({ 'fill': textFx.reflectionColour }, 'reflection', 0, 0, '', undefined)}
                 </g>
               </g>
             {:else if layer.key === 'softShadow'}
-                {@render drawText({ 'fill': textShadowColour }, 'softShadow', + numberOr(textEffects?.shadowOffsetX, 1), + numberOr(textEffects?.shadowOffsetY, 1), '', undefined)}
+                {@render drawText({ 'fill': textFx.shadowColour }, 'softShadow', + numberOr(textEffects?.shadowOffsetX, 1), + numberOr(textEffects?.shadowOffsetY, 1), '', undefined)}
             {:else if layer.key === 'longShadow'}
-                {#each textLongShadowCopies as shadowCopy}
+                {#each textFx.longShadowCopies as shadowCopy}
                   <g opacity={shadowCopy.opacity}>
-                    {@render drawText({ 'fill': textShadowColour }, 'mask', + shadowCopy.dx, + shadowCopy.dy, '', undefined)}
+                    {@render drawText({ 'fill': textFx.shadowColour }, 'mask', + shadowCopy.dx, + shadowCopy.dy, '', undefined)}
                   </g>
                 {/each}
             {:else if layer.key === 'glow'}
-                {#each textGlowLayers as glowLayer}
+                {#each textFx.glowLayers as glowLayer}
                   {@render drawText({ 'fill': glowLayer.colour }, 'mask', 0, 0, `${glowLayer.blur > 0 ? `;filter:blur(${glowLayer.blur}px)` : ''}`, undefined)}
                 {/each}
             {:else if layer.key === 'motion'}
-                {#each textMotionCopies as motionCopy}
+                {#each textFx.motionCopies as motionCopy}
                   <g opacity={motionCopy.opacity}>
-                    {@render drawText({ 'fill': textMotionColour }, 'mask', + motionCopy.dx, + motionCopy.dy, '', undefined)}
+                    {@render drawText({ 'fill': textFx.motionColour }, 'mask', + motionCopy.dx, + motionCopy.dy, '', undefined)}
                   </g>
                 {/each}
             {:else if layer.key === 'bevelOuter'}
                 <g>
-                  {@render drawText({ 'fill': textBevelHighlightColour, 'opacity': textBevelHighlightOpacity }, 'mask', - textBevelDepth, - textBevelDepth, '', undefined)}
-                  {@render drawText({ 'fill': textBevelShadowColour, 'opacity': textBevelShadowOpacity }, 'mask', + textBevelDepth, + textBevelDepth, '', undefined)}
+                  {@render drawText({ 'fill': textFx.bevelHighlightColour, 'opacity': textFx.bevelHighlightOpacity }, 'mask', - textFx.bevelDepth, - textFx.bevelDepth, '', undefined)}
+                  {@render drawText({ 'fill': textFx.bevelShadowColour, 'opacity': textFx.bevelShadowOpacity }, 'mask', + textFx.bevelDepth, + textFx.bevelDepth, '', undefined)}
                 </g>
             {:else if layer.key === 'outline'}
               <g style={textVisualEffectStyle}>
-                {#if textOutlineUseStroke}
-                    {@render drawText({ 'fill': "none", 'stroke': textOutlineColour, 'stroke-width': (textOutlinePlacement === 'center' ? Math.max(1, textOutlineThickness) : Math.max(1, textOutlineThickness * 2)), 'stroke-dasharray': textOutlineDashArray || undefined, 'stroke-linejoin': textOutlineJoin }, 'text', 0, 0, '', textOutlinePlacement === 'inner' ? `url(#${textShapeMaskId(ns)})` : undefined)}
+                {#if textFx.outlineUseStroke}
+                    {@render drawText({ 'fill': "none", 'stroke': textFx.outlineColour, 'stroke-width': (textFx.outlinePlacement === 'center' ? Math.max(1, textFx.outlineThickness) : Math.max(1, textFx.outlineThickness * 2)), 'stroke-dasharray': textFx.outlineDashArray || undefined, 'stroke-linejoin': textFx.outlineJoin }, 'text', 0, 0, '', textFx.outlinePlacement === 'inner' ? `url(#${textShapeMaskId(ns)})` : undefined)}
                 {:else}
-                  <rect x="0" y="0" width={displayW} height={displayH} fill={textOutlineColour} mask={`url(#${textOutlineMaskId(ns)})`}></rect>
+                  <rect x="0" y="0" width={displayW} height={displayH} fill={textFx.outlineColour} mask={`url(#${textOutlineMaskId(ns)})`}></rect>
                 {/if}
               </g>
             {:else if layer.key === 'stroke2'}
               <g style={textVisualEffectStyle}>
-                  {@render drawText({ 'fill': "none", 'stroke': textStroke2Colour, 'stroke-width': (textStroke2Placement === 'center' ? Math.max(1, numberOr(textEffects?.stroke2Thickness, 1)) : Math.max(1, numberOr(textEffects?.stroke2Thickness, 1) * 2)), 'stroke-dasharray': textStroke2DashArray || undefined, 'stroke-linejoin': "round" }, 'text', 0, 0, '', textStroke2Placement === 'inner' ? `url(#${textShapeMaskId(ns)})` : undefined)}
+                  {@render drawText({ 'fill': "none", 'stroke': textFx.stroke2Colour, 'stroke-width': (textFx.stroke2Placement === 'center' ? Math.max(1, numberOr(textEffects?.stroke2Thickness, 1)) : Math.max(1, numberOr(textEffects?.stroke2Thickness, 1) * 2)), 'stroke-dasharray': textFx.stroke2DashArray || undefined, 'stroke-linejoin': "round" }, 'text', 0, 0, '', textFx.stroke2Placement === 'inner' ? `url(#${textShapeMaskId(ns)})` : undefined)}
               </g>
             {:else if layer.key === 'fill'}
               <g style={textVisualEffectStyle}>
-                {#if fillGate && !textKnockout}
+                {#if fillGate && !textFx.knockout}
                   <foreignObject x="0" y="0" width={displayW} height={displayH} mask={`url(#${textShapeMaskId(ns)})`} style="pointer-events:none;">
                     <div xmlns="http://www.w3.org/1999/xhtml" style={`${textFillLayerStyle};pointer-events:none;`}></div>
                   </foreignObject>
-                {:else if !textKnockout}
-                    {@render drawText({ 'fill': textMainFillColour }, 'text', 0, 0, '', undefined)}
+                {:else if !textFx.knockout}
+                    {@render drawText({ 'fill': textFx.mainFillColour }, 'text', 0, 0, '', undefined)}
                 {/if}
               </g>
             {:else if layer.key === 'innerShadow'}
-                {@render drawText({ 'fill': textInnerShadowColour }, 'mask', + numberOr(textEffects?.innerShadowOffsetX, 1), + numberOr(textEffects?.innerShadowOffsetY, 1), `;${textInnerShadowBlurValue ? `filter:${textInnerShadowBlurValue};` : ''}`, `url(#${textShapeMaskId(ns)})`)}
+                {@render drawText({ 'fill': textFx.innerShadowColour }, 'mask', + numberOr(textEffects?.innerShadowOffsetX, 1), + numberOr(textEffects?.innerShadowOffsetY, 1), `;${textFx.innerShadowBlurValue ? `filter:${textFx.innerShadowBlurValue};` : ''}`, `url(#${textShapeMaskId(ns)})`)}
             {:else if layer.key === 'bevelInner'}
-                {@render drawText({ 'fill': textBevelHighlightColour, 'opacity': textBevelHighlightOpacity }, 'mask', - textBevelDepth, - textBevelDepth, '', `url(#${textShapeMaskId(ns)})`)}
-                {@render drawText({ 'fill': textBevelShadowColour, 'opacity': textBevelShadowOpacity }, 'mask', + textBevelDepth, + textBevelDepth, '', `url(#${textShapeMaskId(ns)})`)}
+                {@render drawText({ 'fill': textFx.bevelHighlightColour, 'opacity': textFx.bevelHighlightOpacity }, 'mask', - textFx.bevelDepth, - textFx.bevelDepth, '', `url(#${textShapeMaskId(ns)})`)}
+                {@render drawText({ 'fill': textFx.bevelShadowColour, 'opacity': textFx.bevelShadowOpacity }, 'mask', + textFx.bevelDepth, + textFx.bevelDepth, '', `url(#${textShapeMaskId(ns)})`)}
             {:else if layer.key === 'innerGlow'}
-                  {@render drawText({ 'fill': textInnerGlowColour }, 'innerGlow', 0, 0, '', `url(#${textShapeMaskId(ns)})`)}
+                  {@render drawText({ 'fill': textFx.innerGlowColour }, 'innerGlow', 0, 0, '', `url(#${textShapeMaskId(ns)})`)}
             {/if}
           {/each}
         </svg>
