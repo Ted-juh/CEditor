@@ -28,22 +28,42 @@ function controlId(control) {
 // is a plain model property. The predicate itself lives in ./liveValue.js because the editor asks
 // the same question and the two answers used to differ — see that module's header.
 
-// Best-effort write of a non-value model path straight into the (reactive) panel control object,
-// so property mutations (colour, visible, …) reflect. Mirrors valueAtPath's _children/plain walk.
+// Best-effort write of a non-value model path into the panel control object, so property mutations
+// (colour, visible, …) reflect. Mirrors valueAtPath's _children/plain walk.
+//
+// The control object itself is changed — the player's update model is a raw tree it is told was
+// written (onDocumentWrite) — but nothing below it is: every object on the way to the property is
+// replaced by a copy, and the copy written. Below a control, an untouched section is the default
+// itself, shared by every control of that type and frozen (stores/documentShape.js); writing into
+// it would recolour all of them, and throws instead.
 function setValueAtPath(control, modelPath, value) {
   const segs = String(modelPath).split('.').filter(Boolean);
-  if (!segs.length) return false;
+  if (!segs.length || !control || typeof control !== 'object') return false;
+  const copy = (v) => (Array.isArray(v) ? [...v] : { ...v });
+
+  // The objects the path walks, each with the holder and key it hangs from.
+  const steps = [];
   let node = control;
   for (let i = 0; i < segs.length - 1; i++) {
     const seg = segs[i];
-    if (node?._children && seg in node._children) node = node._children[seg];
-    else if (node && typeof node === 'object' && seg in node) node = node[seg];
+    if (node?._children && seg in node._children) steps.push([node, '_children'], [node._children, seg]);
+    else if (node && typeof node === 'object' && seg in node) steps.push([node, seg]);
     else return false;
+    node = steps[steps.length - 1][0][steps[steps.length - 1][1]];
   }
   const last = segs[segs.length - 1];
-  if (node?._children && last in node._children) { node._children[last] = value; return true; }
-  if (node && typeof node === 'object') { node[last] = value; return true; }
-  return false;
+  if (node?._children && last in node._children) steps.push([node, '_children']);
+  else if (!node || typeof node !== 'object') return false;
+
+  // Copy from the control down, re-hanging each copy on the copy above it.
+  let holder = control;
+  for (const [, key] of steps) {
+    const next = copy(holder[key]);
+    holder[key] = next;
+    holder = next;
+  }
+  holder[last] = value;
+  return true;
 }
 
 /** A value as the instance will store it: JSON, so a script mutating an object after saving it does

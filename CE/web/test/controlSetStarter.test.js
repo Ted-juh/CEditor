@@ -8,6 +8,7 @@ import { PHYSICAL_DIRECTIONS } from '../src/CE_Application/models/physicalContro
 import { createControlSetStarter } from '../src/CE_Application/models/controlSetStarter.js';
 import { getControlSet, resolveToken } from '../src/CE_Application/models/controlSets.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
+import { deepClone } from '../src/CE_Application/utils/deepClone.js';
 import { resolveControlForSet, readControlPath } from '../src/CE_Application/models/controlSetFamilies.js';
 import { shrinkControl, expandControl } from '../src/CE_Application/stores/documentShape.js';
 import { serializePanel, deserializePanel } from '../src/CE_Application/stores/panelModel.js';
@@ -98,7 +99,9 @@ test('the third synth collection has twelve distinct sculpted mechanisms, not pa
 test('mixed controls retain shapes after copy/save, and edits override the pinned design', () => {
   for (const [id, shape] of [['console', 'console'], ['machined', 'block'], ['blueprint', 'ring']]) {
     const source = createControl('Slider', { Core: { controlSetId: id } });
-    const copied = expandControl(shrinkControl(source));
+    // A copy to write into, as the editor's drafts are: a loaded control shares its untouched
+    // defaults with every other control of its type, frozen (stores/documentShape.js).
+    const copied = deepClone(expandControl(shrinkControl(source)));
     const drawn = resolveControlForSet(copied, getControlSet('pop'));
     assert.equal(drawn._children.Parts._children.pointerCurrent.kind, shape);
     copied._children.Parts._children.pointerCurrent._children.Layout.width = 61;

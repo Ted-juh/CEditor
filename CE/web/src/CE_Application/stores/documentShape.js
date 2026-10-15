@@ -67,7 +67,7 @@ const NEVER_ELIDE = new Set();
 /** Pristine control per type, as JSON so each caller gets its own copy to mutate. */
 const pristineCache = new Map();
 
-function pristineFor(controlType) {
+function pristineJson(controlType) {
   if (!controlType || NEVER_ELIDE.has(controlType) || !COMPONENT_TYPES[controlType]) return null;
 
   if (!pristineCache.has(controlType)) {
@@ -79,7 +79,48 @@ function pristineFor(controlType) {
     control._children.Core.name = '';
     pristineCache.set(controlType, JSON.stringify(control));
   }
-  return JSON.parse(pristineCache.get(controlType));
+  return pristineCache.get(controlType);
+}
+
+function pristineFor(controlType) {
+  const json = pristineJson(controlType);
+  return json === null ? null : JSON.parse(json);
+}
+
+/* ------------------------------------------------------------------ shared defaults */
+
+// WHAT THE EDITOR HOLDS. The full control, as above — but the parts of it still at their defaults
+// are the defaults themselves, one copy per type shared by every control built from it, not a copy
+// each. A loaded GAIA held 25 MB, and 11 MB of it was the Corners section alone: 4,159 of them, in
+// 13 distinct forms. Shared, the panel holds 2.5 MB.
+//
+// It is safe because nothing writes into a document object it did not just copy: the document is
+// already shared structurally between one undo step and the next (setNestedValueShared copies only
+// the path a write passes through), and an in-place write would have corrupted the history. Sharing
+// between controls asks the same of every writer that sharing between versions already did.
+//
+// And it is enforced rather than hoped for: the shared defaults are frozen. A writer that forgot to
+// copy throws (modules are strict) instead of repainting every control of that type, and the
+// defaults every later control is built from with it. deepClone copies a control without keeping
+// two references to one default as one object, so a draft made from it is free to write anywhere.
+
+/** Freezes `value` and everything in it; returns it. */
+function deepFreeze(value) {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) deepFreeze(child);
+  }
+  return value;
+}
+
+const sharedPristines = new Map();
+
+/** The pristine control of a type, shared and frozen: for building on, never for writing into. */
+function sharedPristineFor(controlType) {
+  const json = pristineJson(controlType);
+  if (json === null) return null;
+  if (!sharedPristines.has(controlType)) sharedPristines.set(controlType, deepFreeze(JSON.parse(json)));
+  return sharedPristines.get(controlType);
 }
 
 const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -120,20 +161,56 @@ function shrink(value, pristine) {
   return Object.keys(out).length === 0 ? OMIT : out;
 }
 
-/** The inverse. `pristine` is consumed — callers pass a fresh copy. */
+/**
+ * The inverse. `pristine` is shared and left as it is: what the diff does not touch is the
+ * pristine's own object, and only the objects on the way to a difference are new. Keys come out in
+ * the order writing into a copy of the pristine would give them — its own, then any the document
+ * adds — because that order is what the next save writes.
+ */
 function expand(sparse, pristine) {
   if (sparse === undefined) return pristine;
   if (pristine === undefined) return sparse;
   if (!isPlainObject(sparse) || !isPlainObject(pristine)) return sparse;
 
-  const out = pristine;
-  for (const key of sparse[REMOVED] ?? []) delete out[key];
+  const removed = sparse[REMOVED];
+  let added = false;
+  for (const key in sparse) if (key !== REMOVED && !Object.hasOwn(pristine, key)) { added = true; break; }
 
-  for (const [key, child] of Object.entries(sparse)) {
+  let out;
+  if (!added && !removed?.length) {
+    out = { ...pristine };
+  } else {
+    const keys = Object.keys(pristine).filter((key) => !removed?.includes(key));
+    for (const key of Object.keys(sparse)) if (key !== REMOVED && !keys.includes(key)) keys.push(key);
+    out = { ...shapeOf(keys) };
+    for (const key of keys) if (Object.hasOwn(pristine, key)) out[key] = pristine[key];
+  }
+  for (const key of Object.keys(sparse)) {
     if (key === REMOVED) continue;
-    out[key] = expand(child, out[key]);
+    out[key] = expand(sparse[key], pristine[key]);
   }
   return out;
+}
+
+/*  Why expand copies instead of building: V8 keeps an object's properties in a compact, fixed layout
+    only while code does not ADD many of them one at a time through a computed key; past a dozen it
+    switches the object to a hash table, about three times the size. A copy made by spread starts
+    with all its keys, and writing a key it already has adds nothing. So an object gains its keys from
+    a copy — of the pristine, or, when the document adds or removes keys, of an empty object with
+    exactly the keys it ends up with, made once per key list. Building them one by one doubled the
+    memory a loaded GAIA held, and its Corners were already a hash table each before this file
+    shared anything: the part baseline withholds `linked`, which every part then added. */
+const shapes = new Map();
+
+function shapeOf(keys) {
+  const signature = keys.join('\u0000');
+  let shape = shapes.get(signature);
+  if (!shape) {
+    // JSON.parse lays an object out with all its keys at once.
+    shape = Object.freeze(JSON.parse(JSON.stringify(Object.fromEntries(keys.map((key) => [key, 0])))));
+    shapes.set(signature, shape);
+  }
+  return shape;
 }
 
 /* ------------------------------------------------------------------ custom component parts */
@@ -223,9 +300,26 @@ function shrinkPart(part) {
   return out;
 }
 
+/** pristinePart, built from shared, frozen pieces: the shell and one baseline per section type. */
+let sharedShell = null;
+const sharedSectionBaselines = new Map();
+
+function sharedPristinePart(part) {
+  sharedShell ??= deepFreeze(pristinePartShell());
+  const children = { ...sharedShell._children };
+  for (const [key, section] of Object.entries(part?._children ?? {})) {
+    if (key === 'Layout' || !SECTION_DEFAULTS[section?._type]) continue;
+    if (!sharedSectionBaselines.has(section._type)) {
+      sharedSectionBaselines.set(section._type, deepFreeze(partSectionBaseline(section._type)));
+    }
+    children[key] = sharedSectionBaselines.get(section._type);
+  }
+  return { ...sharedShell, _children: children };
+}
+
 function expandPart(sparse) {
   if (!isPlainObject(sparse) || !isPlainObject(sparse._children)) return sparse;
-  return expand(sparse, pristinePart(sparse));
+  return expand(sparse, sharedPristinePart(sparse));
 }
 
 /**
@@ -307,10 +401,9 @@ export function shrinkControl(control) {
 /** The sparse form a document stores -> the full control the editor works with. */
 export function expandControl(sparse) {
   const controlType = sparse?._children?.Core?.controlType;
-  const pristine = pristineFor(controlType);
+  const pristine = sharedPristineFor(controlType);
   if (!pristine) return mapAuthoredParts(sparse, new Set(), expandPart);
 
-  // Captured before expand(), which consumes the pristine it is handed.
   const typeParts = typePartNames(pristine);
   const control = mapAuthoredParts(expand(sparse, pristine), typeParts, expandPart);
 
@@ -353,7 +446,7 @@ export function shrinkAuthoredParts(control) {
 
 /** The inverse of shrinkAuthoredParts: a control of the export payload's complete form, made whole. */
 export function expandAuthoredParts(control) {
-  const pristine = pristineFor(control?._children?.Core?.controlType);
+  const pristine = sharedPristineFor(control?._children?.Core?.controlType);
   const kids = childMapOf(control);
   const working = kids && Object.keys(kids).length
     ? withChildMap(control, Object.fromEntries(Object.entries(kids).map(([key, child]) => [key, expandAuthoredParts(child)])))
