@@ -58,8 +58,36 @@ function stubNodeModuleBuiltin() {
   };
 }
 
+// V8 holds a script's source for as long as the page lives, at one byte per character only while
+// every character fits in Latin-1: one character past U+00FF and the whole script is stored at two.
+// Most chunks had some — dashes, arrows, ♯ and ♭, in strings and labels: 541 in the 2.9 MB chunk
+// every page shares, 1,713 in the editor's 3.9 MB entry — so each of them was held twice over. A
+// heap snapshot of the player page with GAIA loaded put external string data at 6.22 MB with them
+// and 3.26 MB without.
+//
+// `esbuild: { charset: 'ascii' }` below writes strings, templates and names as escapes. It leaves a
+// regex literal as written, and a regex is where the last eight sat, so this fails the build on any
+// chunk that would still be stored two-byte, rather than let one character quietly double it again.
+export function oneByteChunks() {
+  return {
+    name: 'ce-one-byte-chunks',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      for (const [fileName, output] of Object.entries(bundle)) {
+        if (!fileName.endsWith('.js')) continue;
+        const code = output.type === 'chunk' ? output.code : String(output.source);
+        const at = code.search(/[^\x00-\xff]/);
+        if (at < 0) continue;
+        const char = code.codePointAt(at).toString(16).toUpperCase().padStart(4, '0');
+        this.error(`${fileName} has U+${char} at ${JSON.stringify(code.slice(Math.max(0, at - 40), at + 10))}, `
+          + `so V8 would hold all of it at two bytes per character. In a regex, write it as \\u${char}.`);
+      }
+    },
+  };
+}
+
 export default defineConfig(({ command }) => ({
-  plugins: [stubNodeModuleBuiltin(), svelte()],
+  plugins: [stubNodeModuleBuiltin(), svelte(), oneByteChunks()],
   define: {
     __APP_BUILD__: JSON.stringify(buildStamp()),
   },
@@ -97,6 +125,9 @@ export default defineConfig(({ command }) => ({
       'Expires': '0',
     },
   },
+  // Any character past ASCII is written as an escape (`\u2014`), so every chunk is held one byte
+  // per character — see oneByteChunks above. The escapes read the same at run time.
+  esbuild: { charset: 'ascii' },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

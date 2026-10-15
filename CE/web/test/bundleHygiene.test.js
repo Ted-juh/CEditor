@@ -1,8 +1,9 @@
-// bundleHygiene.test.js — the two source-level rules that decide how big the built bundle is.
+// bundleHygiene.test.js — the rules that decide how big the built bundle is, and how much of it
+// the page holds in memory.
 //
-// Both are invariants that vite.config.js depends on and neither can defend itself: breaking
-// either one still compiles, still passes every other test, and still runs correctly in the app.
-// The only symptom is the size of dist/, which nobody reads.
+// Each is an invariant that vite.config.js depends on and none can defend itself: breaking one
+// still compiles, still passes every other test, and still runs correctly in the app. The only
+// symptom is the size of dist/, or of the page, which nobody reads.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -78,4 +79,32 @@ test('no built chunk exceeds vite.config.js chunkSizeWarningLimit', () => {
     .map((c) => `${c.name} ${Math.round(c.kb)} kB`);
 
   assert.deepEqual(oversized, [], `chunks above the ${limitKb} kB ceiling`);
+});
+
+// --- Rule 3: every chunk is held one byte per character ---------------------------------------
+// V8 stores a script's source two bytes per character from the first character past U+00FF, and
+// keeps it for the life of the page. vite.config.js writes everything past ASCII as an escape and
+// fails the build on a chunk that still has one (a regex literal, which esbuild leaves as written).
+// This checks that the failure happens, and that it names the chunk and the escape to write.
+
+test('the build refuses a chunk that V8 would hold two bytes per character', async () => {
+  const { oneByteChunks } = await import('../vite.config.js');
+  const plugin = oneByteChunks();
+  const run = (bundle) => plugin.generateBundle.call({ error(message) { throw new Error(message); } }, {}, bundle);
+
+  // Latin-1 is one byte: paper.js keeps "Jürg Lehni" in its licence banner, and that is fine.
+  run({
+    'assets/paper-core.js': { type: 'chunk', code: '/*! Copyright (c) J\u00fcrg Lehni */ x="\\u2014";' },
+    'assets/style.css': { type: 'asset', source: 'a::before{content:"\u2014"}' },
+  });
+
+  assert.throws(
+    () => run({ 'assets/main.js': { type: 'chunk', code: 'const m=s=>s.replace(/\u266F/g,"#");' } }),
+    /assets\/main\.js has U\+266F .*write it as \\u266F/,
+  );
+  assert.throws(
+    () => run({ 'assets/fontWorker.js': { type: 'asset', source: 't.replace(/^\uFEFF/,"")' } }),
+    /assets\/fontWorker\.js has U\+FEFF/,
+    'a worker bundle is emitted as an asset and is checked as well',
+  );
 });

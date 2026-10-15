@@ -905,7 +905,7 @@ const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 
 const musicMod12 = (n) => ((Math.floor(n) % 12) + 12) % 12;
 // The panel writes accidentals as ♯ and ♭; a script types # and b. Both are the same note, so both
 // spellings are folded to the ASCII pair before anything tries to read a name.
-const musicAscii = (s) => String(s).replace(/♯/g, '#').replace(/♭/g, 'b');
+const musicAscii = (s) => String(s).replace(/\u266F/g, '#').replace(/\u266D/g, 'b');
 const FLAT_LETTER = { C: 11, D: 1, E: 3, F: 4, G: 6, A: 8, B: 10 };
 
 // A pitch argument is a MIDI number or a name ("C4"), the way sendNote's already is. An unreadable

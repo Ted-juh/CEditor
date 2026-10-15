@@ -772,7 +772,7 @@
     if (!src) return null;
     if (src._children?.Designer?.deviceSyncFeedback?.kind === 'gaiaArpeggio') {
       const resolved = applyDeviceSyncStatus(src);
-      return { present: true, text: resolved._children.Parts._children.feedback._children.Text.content.replace(/^● /, '') };
+      return { present: true, text: resolved._children.Parts._children.feedback._children.Text.content.replace(/^\u25CF /, '') };
     }
     const custom = customLcdInfo(src, customSessionValues(src));
     if (custom) return custom;
