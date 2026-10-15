@@ -127,18 +127,16 @@
     buildFontVariationSettings, buildIconTintStyle, buildTextFillLayerStyle,
     cssColor, customHitZoneStyle, getEnabledValueRows, lineCanvasFont,
     lineGeometry, lineLayerFor, normalizeFillMode, normalizeKey,
-    normalizeLastLineAlign, normalizeScriptMode, normalizeTextCaseMode,
-    normalizeTextFlowMode, normalizeTextOrientation,
-    normalizeTextReadingOrientation, resolveTextFlowAngle,
-    safeSvgId, scriptBaselineShiftForMode, scriptScaleForMode,
-    svgTextAnchorFor, textAlignFor, textCaseVariantCaps,
-    textOrientationAngle, usesIconTint,
+    normalizeTextCaseMode, safeSvgId, svgTextAnchorFor, textAlignFor,
+    textCaseVariantCaps, usesIconTint, withFilter,
   } from './canvasControlStyles.js';
   import { resolveTextEffects } from './canvasControlTextEffects.js';
+  import { resolveTextSettings } from './canvasControlTextSettings.js';
+  import { resolveContentBox } from './canvasControlContentBox.js';
   import {
     buildBlockTextLayoutState, buildCustomFlowDecorationFor,
     buildCustomTextFlowLayout, measureCanvasLineWidth, measureFontMetrics,
-    measureGlyphAdvance, normalizeParagraphMode,
+    measureGlyphAdvance,
   } from './canvasControlTextLayout.js';
   import {
     buildRadioWholeBackground,
@@ -1827,7 +1825,7 @@
     ctx.textAlign = 'left';
     ctx.fillStyle = '#FFF';
 
-    if (textIsMirrored) {
+    if (textSet.isMirrored) {
       ctx.translate(textAxisCenter.x * 2, 0);
       ctx.scale(-1, 1);
     }
@@ -2049,17 +2047,17 @@
     ctx.clearRect(0, 0, displayW, displayH);
 
     for (const kind of ['underline', 'strikethrough', 'overline']) {
-      if (fontSectionForCanvas?.[kind] !== true) continue;
-      if (lineLayerFor(kind, fontSectionForCanvas) !== targetLayer) continue;
+      if (textFont?.[kind] !== true) continue;
+      if (lineLayerFor(kind, textFont) !== targetLayer) continue;
 
-      const geometry = lineGeometryFor(kind, fontSectionForCanvas, textFillForCanvas);
+      const geometry = lineGeometryFor(kind, textFont, textFill);
       const width = Math.max(0, geometry.right - geometry.left);
       if (width <= 0 || geometry.thickness <= 0) continue;
 
       ctx.fillStyle = geometry.colour;
       const segments = measurePerfDebug(
         `text line mask ${core?.id ?? 'control'}`,
-        () => buildLineSegmentsFromMask(geometry, fontSectionForCanvas, pixelWidth, pixelHeight, dpr),
+        () => buildLineSegmentsFromMask(geometry, textFont, pixelWidth, pixelHeight, dpr),
         {
           minDurationMs: 3,
           detail: `kind=${kind} width=${Math.round(width)} gap=${numberOr(geometry.gap, 0)}`,
@@ -2129,50 +2127,16 @@
     const bezel = lampCss(contentLayout?.lampBezelColour, 'rgba(255,255,255,0.4)');
     return { lever, bezel };
   });
-  let layoutPaddingLeft = $derived(numberOr(contentLayout?.paddingLeft, textPosition?.paddingLeft ?? 4) + (hasLamp && !lampOnRight ? lampWidth + lampGap : 0));
-  let layoutPaddingRight = $derived(numberOr(contentLayout?.paddingRight, textPosition?.paddingRight ?? 4) + (hasLamp && lampOnRight ? lampWidth + lampGap : 0));
-  let layoutPaddingTop = $derived(numberOr(contentLayout?.paddingTop, 0));
-  let layoutPaddingBottom = $derived(numberOr(contentLayout?.paddingBottom, 0));
-  let layoutGap = $derived(Math.max(0, numberOr(contentLayout?.gap, 8)));
-  let effectiveTextOffsetX = $derived(numberOr(textPosition?.offsetX, 0) + numberOr(contentLayout?.textOffsetX, 0));
-  let effectiveTextOffsetY = $derived(numberOr(textPosition?.offsetY, 0) + numberOr(contentLayout?.textOffsetY, 0));
-  let effectiveTextPaddingLeft = $derived(
-    layoutPaddingLeft + (
-      contentLayoutMode === 'icon_left_text_right' && icon?.source !== 'none'
-        ? Math.max(4, Number(icon?.size ?? 16)) + layoutGap
-        : 0
-    )
-  );
-  let effectiveTextPaddingRight = $derived(
-    layoutPaddingRight + (
-      contentLayoutMode === 'text_left_icon_right' && icon?.source !== 'none'
-        ? Math.max(4, Number(icon?.size ?? 16)) + layoutGap
-        : 0
-    )
-  );
-  let effectiveTextPaddingTop = $derived(
-    layoutPaddingTop + (
-      contentLayoutMode === 'icon_above_text_below' && icon?.source !== 'none'
-        ? Math.max(4, Number(icon?.size ?? 16)) + layoutGap
-        : 0
-    )
-  );
-  let effectiveTextPaddingBottom = $derived(
-    layoutPaddingBottom + (
-      contentLayoutMode === 'text_above_icon_below' && icon?.source !== 'none'
-        ? Math.max(4, Number(icon?.size ?? 16)) + layoutGap
-        : 0
-    )
-  );
-  let textReadingOrientation = $derived(normalizeTextReadingOrientation(textPosition?.readingOrientation));
-  let textIsMirrored = $derived(textReadingOrientation === 'mirrored');
-  let textCaseMode = $derived(normalizeTextCaseMode(textFont?.caseMode));
-  let textScriptMode = $derived(normalizeScriptMode(textFont?.scriptMode));
-  let textScriptScale = $derived(scriptScaleForMode(textScriptMode));
-  let textScriptBaselineShift = $derived(scriptBaselineShiftForMode(textScriptMode, numberOr(textFont?.size, 12)) + numberOr(textFont?.baselineShift, 0));
-  let textFontFeatureSettings = $derived(buildFontFeatureSettings(textFont));
-  let textFontVariationSettings = $derived(buildFontVariationSettings(textFont?.variationAxes));
-  let textVariantCaps = $derived(textCaseVariantCaps(textCaseMode));
+  // The layout paddings and gap and the text's own paddings and offset, in one object that stays
+  // the same object while they are unchanged: see canvasControlContentBox.js. The lamp's size and
+  // side are read only for a control that draws one.
+  let lastContentBox = null;
+  let contentBox = $derived(lastContentBox = resolveContentBox(contentLayout, textPosition, contentLayoutMode, icon,
+    hasLamp ? { onRight: lampOnRight, width: lampWidth, gap: lampGap } : null, lastContentBox));
+  // The case, script, wrap, fit, flow and orientation settings, resolved in one object that stays
+  // the same object while they are unchanged: see canvasControlTextSettings.js.
+  let lastTextSet = null;
+  let textSet = $derived(lastTextSet = resolveTextSettings(textFont, textPosition, textMultiline, lastTextSet));
   let textFillMode = $derived(normalizeFillMode(textFill?.mode));
   let rawTextContent = $derived.by(() => {
     const isSelectorFace = buttonType === 'cyclic' || buttonType === 'combobox';
@@ -2190,58 +2154,28 @@
 
     return String(text?.content ?? '');
   });
-  let casedTextContent = $derived.by(() => applyTextCaseMode(rawTextContent, textCaseMode));
-  let renderedTextContent = $derived.by(() => applyTextReadingOrientation(casedTextContent, textReadingOrientation));
-  let textFillImageUrl = $derived.by(() => {
-    const source = String(textFill?.imageSrc ?? '');
+  let casedTextContent = $derived.by(() => applyTextCaseMode(rawTextContent, textSet.caseMode));
+  let renderedTextContent = $derived.by(() => applyTextReadingOrientation(casedTextContent, textSet.readingOrientation));
+  // An image or texture fill's picture: a data or web URL as it is, a library file once it has loaded.
+  function textFillSourceUrl(source) {
     if (!source) return '';
     if (source.startsWith('data:') || /^https?:/i.test(source)) return source;
     loadFile(source);
     return $fileCache[source] ?? '';
-  });
-  let textFillTextureUrl = $derived.by(() => {
-    const source = String(textFill?.textureSrc ?? '');
-    if (!source) return '';
-    if (source.startsWith('data:') || /^https?:/i.test(source)) return source;
-    loadFile(source);
-    return $fileCache[source] ?? '';
-  });
-  let textFillLayerStyle = $derived.by(() => buildTextFillLayerStyle(textFill, textFillImageUrl, textFillTextureUrl));
-  let textWordSpacing = $derived(numberOr(textFont?.wordSpacing, 0));
-  let textLineHeightMultiplier = $derived(Math.max(0.5, numberOr(textMultiline?.lineHeight, 1.2)));
-  let textWrapMode = $derived.by(() => {
-    const value = String(textMultiline?.wrapMode ?? 'word');
-    return value === 'none' || value === 'character' ? value : 'word';
-  });
-  let textParagraphMode = $derived.by(() =>
-    normalizeParagraphMode(String(textMultiline?.paragraphMode ?? textMultiline?.fillWidthMode ?? 'normal'))
-  );
-  let textOverflowMode = $derived(String(textMultiline?.overflowMode ?? 'clip') === 'ellipsis' ? 'ellipsis' : 'clip');
-  let textFitMode = $derived(String(textMultiline?.fitMode ?? 'none') === 'shrink' ? 'shrink' : 'none');
-  let textMaxLines = $derived(Math.max(0, Math.round(numberOr(textMultiline?.maxLines, 0))));
-  let textJustifyLastLine = $derived(textMultiline?.justifyLastLine === true);
-  let textLastLineAlign = $derived(normalizeLastLineAlign(textMultiline?.lastLineAlign));
-  let textFlowMode = $derived(normalizeTextFlowMode(textPosition?.flowMode));
-  let usesCustomTextFlow = $derived(textFlowMode !== 'rotate');
-  let textFlowAngle = $derived(resolveTextFlowAngle(textPosition));
-  let textOrientation = $derived(normalizeTextOrientation(textPosition?.orientation));
-  let textRotationDegrees = $derived(usesCustomTextFlow ? 0 : numberOr(textFlowAngle, textOrientationAngle(textOrientation)));
-  let textContentWidth = $derived(Math.max(0, displayW - effectiveTextPaddingLeft - effectiveTextPaddingRight));
-  let textContentHeight = $derived(Math.max(0, displayH - effectiveTextPaddingTop - effectiveTextPaddingBottom));
+  }
+  let textFillLayerStyle = $derived.by(() => buildTextFillLayerStyle(textFill,
+    textFillSourceUrl(String(textFill?.imageSrc ?? '')), textFillSourceUrl(String(textFill?.textureSrc ?? ''))));
+  let textContentWidth = $derived(Math.max(0, displayW - contentBox.textPaddingLeft - contentBox.textPaddingRight));
+  let textContentHeight = $derived(Math.max(0, displayH - contentBox.textPaddingTop - contentBox.textPaddingBottom));
   let textMeasureMaxWidth = $derived.by(() => {
-    if (usesCustomTextFlow) return textContentWidth;
-    return isQuarterTurnAngle(textRotationDegrees) ? textContentHeight : textContentWidth;
+    if (textSet.usesCustomFlow) return textContentWidth;
+    return isQuarterTurnAngle(textSet.rotationDegrees) ? textContentHeight : textContentWidth;
   });
-  let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
-  let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
   let hasText = $derived(!hasAnatomy && !isRadioGroupControl && !isListboxControl && !isTextInput && (!ownRenderer || ownRenderer === 'LcdDisplay') && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   // Every value the text effect layers are drawn from, in one object: see canvasControlTextEffects.js
   // for why it is not sixty-eight deriveds.
   let textFx = $derived(resolveTextEffects(textEffects, textFill));
   let needsVisualTextFill = $derived(textFillMode !== 'solid');
-  // WebView2 intermittently drops masked foreignObject fills for custom-flow SVG text.
-  // Fall back to direct glyph fill there so labels still render and the editor stays interactive.
-  let useTextFillForeignObject = $derived(needsVisualTextFill && !usesCustomTextFlow);
   let resolvedStoredFont = $derived.by(() => {
     const requestedFamily = textFont?.family ?? '';
     if (!requestedFamily) return null;
@@ -2267,24 +2201,22 @@
   let domGlyphCharacterRects = $state.raw([]);
   let lineCanvasBackElement = $state(null);
   let lineCanvasFrontElement = $state(null);
-  let fontSectionForCanvas = $derived(textFont ?? null);
-  let textFillForCanvas = $derived(textFill ?? null);
   let sourceTextLines = $derived(renderedTextContent.split(/\r\n|\r|\n/));
   let blockTextLayoutState = $derived.by(() => {
     const runLayout = () => buildBlockTextLayoutState(renderedTextContent, {
       fontSection: textFont,
       family: resolvedFontFamily,
-      maxWidth: textParagraphMeasureWidth,
+      maxWidth: textMeasureMaxWidth,
       maxHeight: textContentHeight,
-      forceLineBoxWidth: textForceLineBoxWidth,
-      wrapMode: textWrapMode,
-      paragraphMode: textParagraphMode,
-      justifyLastLine: textJustifyLastLine,
-      lastLineAlign: textLastLineAlign,
-      overflowMode: textOverflowMode,
-      maxLines: textMaxLines,
-      fitMode: textFitMode,
-      lineHeightMultiplier: textLineHeightMultiplier,
+      forceLineBoxWidth: textSet.forceLineBoxWidth,
+      wrapMode: textSet.wrapMode,
+      paragraphMode: textSet.paragraphMode,
+      justifyLastLine: textSet.justifyLastLine,
+      lastLineAlign: textSet.lastLineAlign,
+      overflowMode: textSet.overflowMode,
+      maxLines: textSet.maxLines,
+      fitMode: textSet.fitMode,
+      lineHeightMultiplier: textSet.lineHeightMultiplier,
     });
 
     if (!text || renderedTextContent.length === 0) {
@@ -2296,18 +2228,18 @@
       runLayout,
       {
         minDurationMs: 4,
-        detail: `chars=${renderedTextContent.length} wrap=${textWrapMode} fit=${textFitMode}`,
+        detail: `chars=${renderedTextContent.length} wrap=${textSet.wrapMode} fit=${textSet.fitMode}`,
       }
     );
   });
   let blockTextLayout = $derived(blockTextLayoutState.layout);
-  let blockTextFitScale = $derived(usesCustomTextFlow ? 1 : blockTextLayoutState.fitScale);
+  let blockTextFitScale = $derived(textSet.usesCustomFlow ? 1 : blockTextLayoutState.fitScale);
   let displayedBlockTextContent = $derived(blockTextLayout.renderedContent);
-  let blockTextLineEntries = $derived(usesCustomTextFlow ? [] : blockTextLayout.lineEntries);
-  let textBlockInlineExtent = $derived.by(() => Math.max(0, blockTextLayout.lineBoxWidth || textParagraphMeasureWidth));
-  let svgTextLines = $derived(usesCustomTextFlow ? sourceTextLines : blockTextLayout.lines);
+  let blockTextLineEntries = $derived(textSet.usesCustomFlow ? [] : blockTextLayout.lineEntries);
+  let textBlockInlineExtent = $derived.by(() => Math.max(0, blockTextLayout.lineBoxWidth || textMeasureMaxWidth));
+  let svgTextLines = $derived(textSet.usesCustomFlow ? sourceTextLines : blockTextLayout.lines);
   let customTextLayout = $derived.by(() => {
-    if (!usesCustomTextFlow) {
+    if (!textSet.usesCustomFlow) {
       return {
         glyphs: [],
         lineEntries: [],
@@ -2326,13 +2258,13 @@
     }
 
     const runLayout = () => buildCustomTextFlowLayout(sourceTextLines, {
-      mode: textFlowMode,
-      angle: textFlowAngle,
+      mode: textSet.flowMode,
+      angle: textSet.flowAngle,
       stepX: numberOr(textPosition?.flowStepX, Math.max(6, numberOr(textFont?.size, 12) * 0.6)),
       stepY: numberOr(textPosition?.flowStepY, Math.max(6, numberOr(textFont?.size, 12) * 0.45)),
       radius: Math.max(1, numberOr(textPosition?.flowRadius, Math.max(18, numberOr(textFont?.size, 12) * 3))),
       sweep: numberOr(textPosition?.flowSweep, 180),
-      wordSpacing: textWordSpacing,
+      wordSpacing: textSet.wordSpacing,
       distribution: String(textPosition?.flowDistribution ?? 'natural'),
       facing: String(textPosition?.flowFacing ?? 'path'),
       side: String(textPosition?.flowSide ?? 'center'),
@@ -2354,7 +2286,7 @@
         c2: { x: textPosition?.flowPathC2X, y: textPosition?.flowPathC2Y },
         end: { x: textPosition?.flowPathEndX, y: textPosition?.flowPathEndY },
       },
-      lineHeight: Math.max(1, numberOr(textFont?.size, 12) * textLineHeightMultiplier),
+      lineHeight: Math.max(1, numberOr(textFont?.size, 12) * textSet.lineHeightMultiplier),
       fontSection: textFont,
       family: resolvedFontFamily,
     });
@@ -2368,21 +2300,21 @@
       runLayout,
       {
         minDurationMs: 4,
-        detail: `mode=${textFlowMode} chars=${renderedTextContent.length}`,
+        detail: `mode=${textSet.flowMode} chars=${renderedTextContent.length}`,
       }
     );
   });
   let textGlyphSize = $derived.by(() => (
-    usesCustomTextFlow
+    textSet.usesCustomFlow
       ? {
         width: customTextLayout.bounds.width,
         height: customTextLayout.bounds.height,
       }
       : domTextGlyphSize
   ));
-  let glyphCharacterRects = $derived.by(() => (usesCustomTextFlow ? [] : domGlyphCharacterRects));
+  let glyphCharacterRects = $derived.by(() => (textSet.usesCustomFlow ? [] : domGlyphCharacterRects));
   let nativePreviewKey = $derived.by(() => {
-    if (!resolvedStoredFont?.id || !hasText || usesCustomTextFlow) return '';
+    if (!resolvedStoredFont?.id || !hasText || textSet.usesCustomFlow) return '';
     return [
       'canvas',
       resolvedStoredFont.id,
@@ -2392,22 +2324,22 @@
       textFont?.size ?? 12,
       textFill?.colour ?? 'FFFFFFFF',
       textPosition?.justification ?? 'centred',
-      effectiveTextPaddingLeft,
-      effectiveTextPaddingRight,
-      effectiveTextPaddingTop,
-      effectiveTextPaddingBottom,
-      textReadingOrientation,
-      textFlowMode,
-      textFlowAngle,
+      contentBox.textPaddingLeft,
+      contentBox.textPaddingRight,
+      contentBox.textPaddingTop,
+      contentBox.textPaddingBottom,
+      textSet.readingOrientation,
+      textSet.flowMode,
+      textSet.flowAngle,
       textFont?.style ?? 'Normal',
       textFont?.wordSpacing ?? 0,
       textFont?.letterSpacing ?? 0,
-      textWrapMode,
-      textParagraphMode,
-      textOverflowMode,
-      textMaxLines,
-      textFitMode,
-      textLineHeightMultiplier,
+      textSet.wrapMode,
+      textSet.paragraphMode,
+      textSet.overflowMode,
+      textSet.maxLines,
+      textSet.fitMode,
+      textSet.lineHeightMultiplier,
       textEffects?.outlineEnabled === true,
       textEffects?.outlineThickness ?? textEffects?.outlineWidth ?? 1,
       textEffects?.outlineDistance ?? 0,
@@ -2447,26 +2379,26 @@
       fontSize: Number(textFont?.size ?? 12),
       colour: String(textFill?.colour ?? 'FFFFFFFF'),
       justification: String(textPosition?.justification ?? 'centred'),
-      paddingLeft: Number(effectiveTextPaddingLeft),
-      paddingRight: Number(effectiveTextPaddingRight),
-      paddingTop: Number(effectiveTextPaddingTop),
-      paddingBottom: Number(effectiveTextPaddingBottom),
+      paddingLeft: Number(contentBox.textPaddingLeft),
+      paddingRight: Number(contentBox.textPaddingRight),
+      paddingTop: Number(contentBox.textPaddingTop),
+      paddingBottom: Number(contentBox.textPaddingBottom),
       italic: textFont?.style === 'Italic' || resolvedStoredFont.fontStyle === 'italic',
       underline: false,
       wordSpacing: Number(textFont?.wordSpacing ?? 0),
       letterSpacing: Number(textFont?.letterSpacing ?? 0),
-      paragraphMode: textParagraphMode,
+      paragraphMode: textSet.paragraphMode,
     });
   });
   let textStyle = $derived.by(() => {
     if (!hasText) return '';
     return [
-      `padding:${effectiveTextPaddingTop}px ${effectiveTextPaddingRight}px ${effectiveTextPaddingBottom}px ${effectiveTextPaddingLeft}px`,
+      `padding:${contentBox.textPaddingTop}px ${contentBox.textPaddingRight}px ${contentBox.textPaddingBottom}px ${contentBox.textPaddingLeft}px`,
       `z-index:${numberOr(contentLayout?.textZIndex, 2)}`,
     ].join('; ');
   });
   let textLayoutBounds = $derived.by(() => {
-    if (usesCustomTextFlow) {
+    if (textSet.usesCustomFlow) {
       return {
         width: customTextLayout.bounds.width,
         height: customTextLayout.bounds.height,
@@ -2479,7 +2411,7 @@
     // Detached scenery has no DOM measurement. Match the explicit CSS line box
     // (including multiline and integer offsetHeight rounding), not just font size.
     const baseHeight = Math.max(0, domTextGlyphSize.height || Math.round(blockTextLayout.lineHeight * Math.max(1, blockTextLayout.lines.length))) * blockTextFitScale;
-    return rotatedBoxSize(baseWidth, baseHeight, textRotationDegrees);
+    return rotatedBoxSize(baseWidth, baseHeight, textSet.rotationDegrees);
   });
   let textPlacement = $derived.by(() => {
     if (!hasText) return null;
@@ -2488,8 +2420,8 @@
     const glyphHeight = textLayoutBounds.height;
     const justification = textPosition?.justification ?? 'centred';
 
-    let left = effectiveTextPaddingLeft;
-    let top = effectiveTextPaddingTop;
+    let left = contentBox.textPaddingLeft;
+    let top = contentBox.textPaddingTop;
 
     switch (justification) {
       case 'top':
@@ -2566,7 +2498,7 @@
    * the decoration is rather than where the text is.
    */
   let textAnchorStyle = $derived.by(() => {
-    if (!hasText || !textPlacement || usesCustomTextFlow) return '';
+    if (!hasText || !textPlacement || textSet.usesCustomFlow) return '';
     const anchorMaxWidth = Math.max(0, Math.max(textMeasureMaxWidth, blockTextLayout.lineBoxWidth || 0));
     return [
       `left:${textUnrotatedOrigin.left}px`,
@@ -2577,14 +2509,14 @@
   });
   // Label->Text->Position stays locked to glyph bounds only.
   let textAxisCenter = $derived.by(() => {
-    const baseLeft = textPlacement?.left ?? effectiveTextPaddingLeft;
-    const baseTop = textPlacement?.top ?? effectiveTextPaddingTop;
+    const baseLeft = textPlacement?.left ?? contentBox.textPaddingLeft;
+    const baseTop = textPlacement?.top ?? contentBox.textPaddingTop;
     const glyphWidth = textPlacement?.width ?? textLayoutBounds.width;
     const glyphHeight = textPlacement?.height ?? textLayoutBounds.height;
 
     return {
-      x: baseLeft + (glyphWidth / 2) + effectiveTextOffsetX,
-      y: baseTop + (glyphHeight / 2) + effectiveTextOffsetY - textScriptBaselineShift,
+      x: baseLeft + (glyphWidth / 2) + contentBox.textOffsetX,
+      y: baseTop + (glyphHeight / 2) + contentBox.textOffsetY - textSet.scriptBaselineShift,
     };
   });
   let svgTextAnchor = $derived(svgTextAnchorFor(textPosition?.justification ?? 'centred'));
@@ -2593,35 +2525,24 @@
     y: textAxisCenter.y - customTextLayout.bounds.centerY,
   }));
   let customTextTranslateTransform = $derived.by(() => `translate(${customTextOrigin.x} ${customTextOrigin.y})`);
-  let textSvgRotationTransform = $derived.by(() =>
-    (!usesCustomTextFlow && textRotationDegrees) ? `rotate(${textRotationDegrees} ${textAxisCenter.x} ${textAxisCenter.y})` : null
-  );
-  let textBlockScaleTransform = $derived.by(() => {
-    if (usesCustomTextFlow || Math.abs(blockTextFitScale - 1) < 0.001) return null;
-    return `translate(${textAxisCenter.x} ${textAxisCenter.y}) scale(${blockTextFitScale}) translate(${-textAxisCenter.x} ${-textAxisCenter.y})`;
-  });
+  // Block text's SVG transform: the fit scale about the text's centre, then its rotation.
   let textSvgBlockTransform = $derived.by(() => {
-    if (usesCustomTextFlow) return null;
+    if (textSet.usesCustomFlow) return null;
     const parts = [];
-    if (textBlockScaleTransform) parts.push(textBlockScaleTransform);
-    if (textSvgRotationTransform) parts.push(textSvgRotationTransform);
+    if (!(Math.abs(blockTextFitScale - 1) < 0.001)) {
+      parts.push(`translate(${textAxisCenter.x} ${textAxisCenter.y}) scale(${blockTextFitScale}) translate(${-textAxisCenter.x} ${-textAxisCenter.y})`);
+    }
+    if (textSet.rotationDegrees) parts.push(`rotate(${textSet.rotationDegrees} ${textAxisCenter.x} ${textAxisCenter.y})`);
     return parts.length > 0 ? parts.join(' ') : null;
   });
   let textSvgMirrorTransform = $derived.by(() =>
-    textIsMirrored ? `translate(${textAxisCenter.x * 2} 0) scale(-1 1)` : null
+    textSet.isMirrored ? `translate(${textAxisCenter.x * 2} 0) scale(-1 1)` : null
   );
-  let textReflectionTransform = $derived.by(() =>
-    reflectionMatrixTransform(
-      textAxisCenter.x,
-      textAxisCenter.y,
-      textFx.reflectionAngle,
-      textFx.reflectionDistance
-    )
-  );
-  let textReflectionSourceProjectionRange = $derived.by(() => {
+  // How far the text reaches along the reflection's axis, which the fade is measured against.
+  function textReflectionSourceProjectionRange() {
     const corners = [];
 
-    if (usesCustomTextFlow) {
+    if (textSet.usesCustomFlow) {
       const minX = customTextOrigin.x + customTextLayout.bounds.minX;
       const maxX = customTextOrigin.x + customTextLayout.bounds.maxX;
       const minY = customTextOrigin.y + customTextLayout.bounds.minY;
@@ -2647,10 +2568,10 @@
 
     const transformedCorners = corners.map((corner) => {
       let point = corner;
-      if (!usesCustomTextFlow && textRotationDegrees) {
-        point = rotatePointAround(point.x, point.y, textAxisCenter.x, textAxisCenter.y, textRotationDegrees);
+      if (!textSet.usesCustomFlow && textSet.rotationDegrees) {
+        point = rotatePointAround(point.x, point.y, textAxisCenter.x, textAxisCenter.y, textSet.rotationDegrees);
       }
-      if (textIsMirrored) {
+      if (textSet.isMirrored) {
         point = mirrorPointHorizontally(point.x, point.y, textAxisCenter.x);
       }
       return point;
@@ -2663,7 +2584,7 @@
       min: Math.min(...projections, 0),
       max: Math.max(...projections, 0),
     };
-  });
+  }
   let textReflectionFadeSpec = $derived.by(() => (
     textFx.reflectionEnabled
       ? buildReflectionFadeSpec(
@@ -2673,13 +2594,13 @@
         textFx.reflectionDistance,
         textEffects?.reflectionFadeMode,
         textEffects?.reflectionFadeAmount,
-        textReflectionSourceProjectionRange
+        textReflectionSourceProjectionRange()
       )
       : null
   ));
   let textReflectionFadeEnabled = $derived(textReflectionFadeSpec !== null);
   let svgTextLineHeight = $derived.by(() => {
-    if (usesCustomTextFlow) return customTextLayout.lineHeight;
+    if (textSet.usesCustomFlow) return customTextLayout.lineHeight;
     return blockTextLayout.lineHeight;
   });
   let svgTextFontMetrics = $derived.by(() =>
@@ -2690,13 +2611,6 @@
     )
   );
   const svgBlockTextDominantBaseline = 'alphabetic';
-  let svgTextBaselineOffset = $derived.by(() => {
-    const ascent = svgTextFontMetrics.ascent;
-    const descent = svgTextFontMetrics.descent;
-    const inkHeight = Math.max(1, ascent + descent);
-    const extraLeading = Math.max(0, svgTextLineHeight - inkHeight);
-    return (extraLeading / 2) + ascent;
-  });
   let svgTextBaseX = $derived.by(() => {
     const left = textUnrotatedOrigin.left;
     // The origin's width, which falls back to the layout's line box, not the raw DOM measurement.
@@ -2710,46 +2624,29 @@
     if (svgTextAnchor === 'end') return left + width;
     return left + (width / 2);
   });
-  let svgTextBaseY = $derived.by(() =>
-    textUnrotatedOrigin.top
-    + svgTextBaselineOffset
-  );
-  // The font of SVG-drawn text, block or custom flow alike: the two had a copy each of this, and of
-  // the three filtered variants below.
+  // The first baseline: the ascent, below half the leading the line height adds to the ink.
+  let svgTextBaseY = $derived.by(() => {
+    const { ascent, descent } = svgTextFontMetrics;
+    const extraLeading = Math.max(0, svgTextLineHeight - Math.max(1, ascent + descent));
+    return textUnrotatedOrigin.top + ((extraLeading / 2) + ascent);
+  });
+  // The font of SVG-drawn text, block or custom flow alike (svgTextStyleFor adds a layer's blur).
   let svgTextMaskStyle = $derived.by(() => {
     const weightValue = textFont?.weightValue ?? (textFont?.weight === 'Bold' ? 700 : 400);
     const styles = [
       `font-family:'${resolvedFontFamily}'`,
-      `font-size:${(textFont?.size ?? 12) * textScriptScale}px`,
+      `font-size:${(textFont?.size ?? 12) * textSet.scriptScale}px`,
       `font-weight:${weightValue}`,
       `font-style:${textFont?.style === 'Italic' ? 'italic' : 'normal'}`,
       `letter-spacing:${textFont?.letterSpacing ?? 0}px`,
-      `word-spacing:${textWordSpacing}px`,
-      `font-feature-settings:${textFontFeatureSettings || 'normal'}`,
-      `font-variation-settings:${textFontVariationSettings || 'normal'}`,
-      `font-variant-caps:${textVariantCaps}`,
+      `word-spacing:${textSet.wordSpacing}px`,
+      `font-feature-settings:${textSet.fontFeatureSettings || 'normal'}`,
+      `font-variation-settings:${textSet.fontVariationSettings || 'normal'}`,
+      `font-variant-caps:${textSet.variantCaps}`,
       'white-space:pre',
     ];
     return styles.join('; ');
   });
-  let svgTextSoftShadowStyle = $derived.by(() => {
-    const styles = [svgTextMaskStyle];
-    if (textFx.softShadowFilterValue) styles.push(`filter:${textFx.softShadowFilterValue}`);
-    return styles.join('; ');
-  });
-  let svgTextReflectionStyle = $derived.by(() => {
-    const styles = [svgTextMaskStyle];
-    if (textFx.reflectionFilterValue) styles.push(`filter:${textFx.reflectionFilterValue}`);
-    return styles.join('; ');
-  });
-  let svgTextInnerGlowStyle = $derived.by(() => {
-    const styles = [svgTextMaskStyle];
-    if (textFx.innerGlowFilterValue) styles.push(`filter:${textFx.innerGlowFilterValue}`);
-    return styles.join('; ');
-  });
-  let textVisualEffectStyle = $derived.by(() => (
-    textFx.filterValue ? `filter:${textFx.filterValue}` : ''
-  ));
   let customFlowDecorations = $derived.by(() => ({
     underline: buildCustomFlowDecorationFor('underline', customTextLayout, textFont, textFill),
     strikethrough: buildCustomFlowDecorationFor('strikethrough', customTextLayout, textFont, textFill),
@@ -2761,7 +2658,7 @@
   }
 
   function blockLineWordSpacingFor(index) {
-    return textWordSpacing + numberOr(blockTextLineEntryFor(index)?.extraWordSpacing, 0);
+    return textSet.wordSpacing + numberOr(blockTextLineEntryFor(index)?.extraWordSpacing, 0);
   }
 
   function blockLineLetterSpacingFor(index) {
@@ -2798,14 +2695,14 @@
   }
 
   function blockLineDomStyleFor(index) {
-    if (usesCustomTextFlow) return '';
+    if (textSet.usesCustomFlow) return '';
     return ['display:block', ...blockLinePaintStyles(index)].join('; ');
   }
 
   // A caption is usually one line, and one line needs no box of its own: alignment and spacing say
   // the same thing on the span that carries the face. Two or more do need their own, because each
   // can hold its own alignment and its own justification spacing.
-  let foldsSoleLine = $derived(!usesCustomTextFlow && svgTextLines.length === 1);
+  let foldsSoleLine = $derived(!textSet.usesCustomFlow && svgTextLines.length === 1);
   let soleLineStyle = $derived(foldsSoleLine ? blockLinePaintStyles(0).join('; ') : '');
 
   function blockLineDomText(line) {
@@ -2837,26 +2734,26 @@
   }
 
   let textSpanStyle = $derived.by(() => {
-    if (!hasText || usesCustomTextFlow) return '';
+    if (!hasText || textSet.usesCustomFlow) return '';
     const weightValue = textFont?.weightValue ?? (textFont?.weight === 'Bold' ? 700 : 400);
     const styles = [
       `font-family:'${resolvedFontFamily}'`,
-      `font-size:${(textFont?.size ?? 12) * textScriptScale}px`,
+      `font-size:${(textFont?.size ?? 12) * textSet.scriptScale}px`,
       `font-weight:${weightValue}`,
       `font-style:${textFont?.style === 'Italic' ? 'italic' : 'normal'}`,
       `line-height:${blockTextLayout.lineHeight}px`,
       'width:max-content',
       `color:${cssColor(textFill?.colour ?? 'FFFFFFFF')}`,
-      `font-feature-settings:${textFontFeatureSettings || 'normal'}`,
-      `font-variation-settings:${textFontVariationSettings || 'normal'}`,
-      `font-variant-caps:${textVariantCaps}`,
+      `font-feature-settings:${textSet.fontFeatureSettings || 'normal'}`,
+      `font-variation-settings:${textSet.fontVariationSettings || 'normal'}`,
+      `font-variant-caps:${textSet.variantCaps}`,
     ];
     if (blockTextLayout.lineBoxWidth > 0) {
       styles.push(`width:${blockTextLayout.lineBoxWidth}px`);
     }
     const transforms = [];
-    if (textRotationDegrees) {
-      transforms.push(`rotate(${textRotationDegrees}deg)`);
+    if (textSet.rotationDegrees) {
+      transforms.push(`rotate(${textSet.rotationDegrees}deg)`);
     }
     if (Math.abs(blockTextFitScale - 1) >= 0.001) {
       transforms.push(`scale(${blockTextFitScale})`);
@@ -2868,13 +2765,13 @@
     return styles.join('; ');
   });
   let textGlyphStyle = $derived.by(() => {
-    if (usesCustomTextFlow) return '';
+    if (textSet.usesCustomFlow) return '';
     const styles = [];
-    if (textIsMirrored) {
+    if (textSet.isMirrored) {
       styles.push('transform:scaleX(-1)');
       styles.push('transform-origin:center center');
     }
-    if (normalizeTextCaseMode(textCaseMode) === 'smallcaps') {
+    if (normalizeTextCaseMode(textSet.caseMode) === 'smallcaps') {
       styles.push('font-variant-caps:small-caps');
     }
     if (textFx.shadowValue) styles.push(`text-shadow:${textFx.shadowValue}`);
@@ -2894,17 +2791,17 @@
   let hasLineDecorations = $derived(
     textFont?.underline === true || textFont?.strikethrough === true || textFont?.overline === true
   );
-  let showCustomFlowLineDecorations = $derived(hasLineDecorations && usesCustomTextFlow);
-  let showBlockLineDecorations = $derived(hasLineDecorations && !usesCustomTextFlow);
-  let showBlockTextVisual = $derived((!usesCustomTextFlow) && (showBlockLineDecorations || textFx.hasEffects || needsVisualTextFill));
+  let showCustomFlowLineDecorations = $derived(hasLineDecorations && textSet.usesCustomFlow);
+  let showBlockLineDecorations = $derived(hasLineDecorations && !textSet.usesCustomFlow);
+  let showBlockTextVisual = $derived((!textSet.usesCustomFlow) && (showBlockLineDecorations || textFx.hasEffects || needsVisualTextFill));
   let nativePreviewStyle = $derived.by(() => {
-    if (!hasText || usesCustomTextFlow) return '';
-    return `transform:translate(${effectiveTextOffsetX}px, ${effectiveTextOffsetY}px)`;
+    if (!hasText || textSet.usesCustomFlow) return '';
+    return `transform:translate(${contentBox.textOffsetX}px, ${contentBox.textOffsetY}px)`;
   });
   $effect(() => {
     renderedTextContent;
     displayedBlockTextContent;
-    usesCustomTextFlow;
+    textSet.usesCustomFlow;
     showBlockLineDecorations;
     textFont?.family;
     textFont?.size;
@@ -2913,21 +2810,21 @@
     textFont?.wordSpacing;
     textFont?.letterSpacing;
     textPosition?.justification;
-    textFlowAngle;
-    textWrapMode;
-    textParagraphMode;
-    textParagraphMeasureWidth;
-    textOverflowMode;
-    textMaxLines;
-    textFitMode;
-    textLineHeightMultiplier;
-    effectiveTextOffsetX;
-    effectiveTextOffsetY;
+    textSet.flowAngle;
+    textSet.wrapMode;
+    textSet.paragraphMode;
+    textMeasureMaxWidth;
+    textSet.overflowMode;
+    textSet.maxLines;
+    textSet.fitMode;
+    textSet.lineHeightMultiplier;
+    contentBox.textOffsetX;
+    contentBox.textOffsetY;
     textMeasureMaxWidth;
     displayW;
     displayH;
 
-    if (usesCustomTextFlow) {
+    if (textSet.usesCustomFlow) {
       domTextGlyphSize = { width: 0, height: 0 };
       domGlyphCharacterRects = [];
       return;
@@ -3005,7 +2902,7 @@
     glyphCharacterRects;
     textAxisCenter.x;
     textAxisCenter.y;
-    textRotationDegrees;
+    textSet.rotationDegrees;
     textFont?.family;
     textFont?.weightValue;
     textFont?.weight;
@@ -3038,13 +2935,13 @@
     textFont?.overlineLayer;
     textFill?.colour;
     displayedBlockTextContent;
-    textLineHeightMultiplier;
-    textWrapMode;
-    textParagraphMode;
-    textParagraphMeasureWidth;
-    textOverflowMode;
-    textMaxLines;
-    textFitMode;
+    textSet.lineHeightMultiplier;
+    textSet.wrapMode;
+    textSet.paragraphMode;
+    textMeasureMaxWidth;
+    textSet.overflowMode;
+    textSet.maxLines;
+    textSet.fitMode;
     lineCanvasBackElement;
     lineCanvasFrontElement;
 
@@ -3090,11 +2987,11 @@
     valueRows,
     width: displayW,
     height: displayH,
-    paddingLeft: layoutPaddingLeft,
-    paddingRight: layoutPaddingRight,
-    paddingTop: layoutPaddingTop,
-    paddingBottom: layoutPaddingBottom,
-    gap: layoutGap,
+    paddingLeft: contentBox.paddingLeft,
+    paddingRight: contentBox.paddingRight,
+    paddingTop: contentBox.paddingTop,
+    paddingBottom: contentBox.paddingBottom,
+    gap: contentBox.gap,
   }));
   let radioGroupSelectedKeys = $derived.by(() => {
     if (!isRadioGroupControl) return new Set();
@@ -3204,8 +3101,8 @@
   let radioGroupStyle = $derived.by(() => {
     if (!isRadioGroupControl) return '';
     return [
-      `padding:${layoutPaddingTop}px ${layoutPaddingRight}px ${layoutPaddingBottom}px ${layoutPaddingLeft}px`,
-      `gap:${layoutGap}px`,
+      `padding:${contentBox.paddingTop}px ${contentBox.paddingRight}px ${contentBox.paddingBottom}px ${contentBox.paddingLeft}px`,
+      `gap:${contentBox.gap}px`,
       `--radio-columns:${Math.max(1, radioGroupLayout.columns)}`,
       `--radio-rows:${Math.max(1, radioGroupLayout.rowCount)}`,
     ].join('; ');
@@ -3219,10 +3116,10 @@
 
     const horizontalAlign = String(contentLayout?.horizontalAlign ?? 'center');
     const verticalAlign = String(contentLayout?.verticalAlign ?? 'center');
-    const contentLeft = layoutPaddingLeft;
-    const contentRight = Math.max(contentLeft, displayW - layoutPaddingRight);
-    const contentTop = layoutPaddingTop;
-    const contentBottom = Math.max(contentTop, displayH - layoutPaddingBottom);
+    const contentLeft = contentBox.paddingLeft;
+    const contentRight = Math.max(contentLeft, displayW - contentBox.paddingRight);
+    const contentTop = contentBox.paddingTop;
+    const contentBottom = Math.max(contentTop, displayH - contentBox.paddingBottom);
 
     const alignAxis = (min, max, size, align, startValue, endValue) => {
       if (align === startValue) return min + (size / 2);
@@ -3285,21 +3182,13 @@
     icon?.fit,
   ));
 
-  // The layer stack names the style it wants; each layout mode owns the actual variable, so the
-  // shared stack does not need to know which spelling applies.
-  function customFlowTextStyleFor(key) {
-    return key === 'reflection' ? svgTextReflectionStyle
-      : key === 'softShadow' ? svgTextSoftShadowStyle
-      : key === 'text' ? svgTextMaskStyle
-      : key === 'innerGlow' ? svgTextInnerGlowStyle
-      : svgTextMaskStyle;
-  }
-  function blockTextStyleFor(key) {
-    return key === 'reflection' ? svgTextReflectionStyle
-      : key === 'softShadow' ? svgTextSoftShadowStyle
-      : key === 'text' ? svgTextMaskStyle
-      : key === 'innerGlow' ? svgTextInnerGlowStyle
-      : svgTextMaskStyle;
+  // The style a layer of SVG-drawn text wants, block or custom flow alike: the font, and the blur
+  // of the layers that have one.
+  function svgTextStyleFor(key) {
+    return withFilter(svgTextMaskStyle, key === 'reflection' ? textFx.reflectionFilterValue
+      : key === 'softShadow' ? textFx.softShadowFilterValue
+      : key === 'innerGlow' ? textFx.innerGlowFilterValue
+      : '');
   }
 
 </script>
@@ -3912,11 +3801,11 @@
         </svg>
     {/snippet}
 
-    {#if hasText && !usesCustomTextFlow && shouldUseNativeTextPreview && nativePreviewData}
+    {#if hasText && !textSet.usesCustomFlow && shouldUseNativeTextPreview && nativePreviewData}
       <img class="native-text-preview" style={nativePreviewStyle} src={nativePreviewData} alt="" />
     {/if}
 
-    {#if hasText && !usesCustomTextFlow && (!shouldUseNativeTextPreview || !nativePreviewData || showBlockTextVisual)}
+    {#if hasText && !textSet.usesCustomFlow && (!shouldUseNativeTextPreview || !nativePreviewData || showBlockTextVisual)}
       <div class="text-content" style={textStyle}>
         <!--
           Two elements, not three and not one. The placement and the face share `.text-span`,
@@ -4007,7 +3896,7 @@
           {#each textFx.visualLayers as layer}
             {#if layer.key === 'reflection'}
               <g opacity={textFx.reflectionIntensity} mask={textReflectionFadeEnabled ? `url(#${textReflectionFadeMaskId(ns)})` : undefined}>
-                <g transform={textReflectionTransform}>
+                <g transform={reflectionMatrixTransform(textAxisCenter.x, textAxisCenter.y, textFx.reflectionAngle, textFx.reflectionDistance)}>
                     {@render drawText({ 'fill': textFx.reflectionColour }, 'reflection', 0, 0, '', undefined)}
                 </g>
               </g>
@@ -4035,7 +3924,7 @@
                   {@render drawText({ 'fill': textFx.bevelShadowColour, 'opacity': textFx.bevelShadowOpacity }, 'mask', + textFx.bevelDepth, + textFx.bevelDepth, '', undefined)}
                 </g>
             {:else if layer.key === 'outline'}
-              <g style={textVisualEffectStyle}>
+              <g style={withFilter('', textFx.filterValue)}>
                 {#if textFx.outlineUseStroke}
                     {@render drawText({ 'fill': "none", 'stroke': textFx.outlineColour, 'stroke-width': (textFx.outlinePlacement === 'center' ? Math.max(1, textFx.outlineThickness) : Math.max(1, textFx.outlineThickness * 2)), 'stroke-dasharray': textFx.outlineDashArray || undefined, 'stroke-linejoin': textFx.outlineJoin }, 'text', 0, 0, '', textFx.outlinePlacement === 'inner' ? `url(#${textShapeMaskId(ns)})` : undefined)}
                 {:else}
@@ -4043,11 +3932,11 @@
                 {/if}
               </g>
             {:else if layer.key === 'stroke2'}
-              <g style={textVisualEffectStyle}>
+              <g style={withFilter('', textFx.filterValue)}>
                   {@render drawText({ 'fill': "none", 'stroke': textFx.stroke2Colour, 'stroke-width': (textFx.stroke2Placement === 'center' ? Math.max(1, numberOr(textEffects?.stroke2Thickness, 1)) : Math.max(1, numberOr(textEffects?.stroke2Thickness, 1) * 2)), 'stroke-dasharray': textFx.stroke2DashArray || undefined, 'stroke-linejoin': "round" }, 'text', 0, 0, '', textFx.stroke2Placement === 'inner' ? `url(#${textShapeMaskId(ns)})` : undefined)}
               </g>
             {:else if layer.key === 'fill'}
-              <g style={textVisualEffectStyle}>
+              <g style={withFilter('', textFx.filterValue)}>
                 {#if fillGate && !textFx.knockout}
                   <foreignObject x="0" y="0" width={displayW} height={displayH} mask={`url(#${textShapeMaskId(ns)})`} style="pointer-events:none;">
                     <div xmlns="http://www.w3.org/1999/xhtml" style={`${textFillLayerStyle};pointer-events:none;`}></div>
@@ -4079,7 +3968,7 @@
               text-anchor="middle"
               dominant-baseline="middle"
               {...attrs}
-              style={`${customFlowTextStyleFor(styleKey)}${styleSuffix}`}
+              style={`${svgTextStyleFor(styleKey)}${styleSuffix}`}
               transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x + dx} ${customTextOrigin.y + glyph.y + dy})` : null}
             >{glyph.char}</text>
           {/if}
@@ -4098,15 +3987,17 @@
               text-anchor={blockSvgLineAnchorFor(index)}
               dominant-baseline={svgBlockTextDominantBaseline}
               {...attrs}
-              style={blockSvgLineStyleFor(index, `${blockTextStyleFor(styleKey)}${styleSuffix}`)}
+              style={blockSvgLineStyleFor(index, `${svgTextStyleFor(styleKey)}${styleSuffix}`)}
             >{line}</text>
           {/each}
         </g>
       </g>
     {/snippet}
 
-    {#if hasText && usesCustomTextFlow}
-      {@render textVisual('custom', useTextFillForeignObject, glyphTextRun)}
+    {#if hasText && textSet.usesCustomFlow}
+      <!-- No foreignObject fill here: WebView2 intermittently drops masked foreignObject fills for
+           custom-flow SVG text, so its glyphs are filled directly and labels still render. -->
+      {@render textVisual('custom', false, glyphTextRun)}
     {/if}
 
     {#if hasText && showBlockTextVisual}

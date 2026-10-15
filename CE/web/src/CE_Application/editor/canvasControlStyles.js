@@ -491,3 +491,8 @@ export function lineCanvasFont(fontSection, familyName) {
   const fontSize = Math.max(1, numberOr(fontSection?.size, 12) * scriptScaleForMode(normalizeScriptMode(fontSection?.scriptMode)));
   return `${fontStyle} ${fontWeight} ${fontSize}px "${familyName}"`;
 }
+
+/** `style` with a CSS filter added when there is one: `withFilter('a:b', 'blur(2px)')` is 'a:b; filter:blur(2px)'. */
+export function withFilter(style, filter) {
+  return [style, filter ? `filter:${filter}` : ''].filter(Boolean).join('; ');
+}

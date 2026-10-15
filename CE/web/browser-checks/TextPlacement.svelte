@@ -34,8 +34,8 @@
     { name: 'rotated', text: {}, font: {}, size: [160, 40], position: { flowAngle: 0 }, rotation: 30 },
     { name: 'big-font', text: {}, font: { size: 28 }, size: [160, 40] },
     { name: 'tight', text: { content: 'Squeezed into a narrow box' }, font: { size: 20 }, size: [70, 24] },
-    // Padding comes from ContentLayout, not Text.Position — effectiveTextPaddingLeft reads
-    // layoutPaddingLeft. Setting it on Position looks right and moves nothing.
+    // Padding comes from ContentLayout, not Text.Position — the text's padding is the content
+    // box's (canvasControlContentBox.js). Setting it on Position looks right and moves nothing.
     { name: 'padded', text: {}, font: {}, size: [160, 40], layout: { paddingLeft: 24, paddingTop: 12, paddingRight: 6, paddingBottom: 2 } },
     { name: 'offset', text: {}, font: {}, size: [160, 40], position: { offsetX: 7, offsetY: -5 } },
     { name: 'italic-bold', text: {}, font: { style: 'Italic', weight: 'Bold', weightValue: 700, size: 16 }, size: [160, 40] },
