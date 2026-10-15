@@ -3,7 +3,7 @@ import { defaultControlSetId, defaultGridSize, defaultSnapToGrid } from './runti
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
 import { normalizeCaptureSession } from '../utils/captureSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
-import { expandAuthoredParts, expandControl, exportDefaultsFor, shrinkAuthoredParts, shrinkControl } from './documentShape.js';
+import { expandAuthoredParts, expandControls, exportDefaultsFor, shrinkAuthoredParts, shrinkControl } from './documentShape.js';
 import { panelDocumentText } from './documentLayout.js';
 import { shareDrawings } from './documentDrawings.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
@@ -509,8 +509,9 @@ export function deserializePanel(json, filePath, name) {
   // The document stores each control as a diff against its type's defaults; the editor's model
   // is always the full control, because everything that reads one reads deep paths off it. Done
   // once and reused — expanding a 4.8 MB panel twice to build a layer list would be a silly way
-  // to spend a hundred milliseconds.
-  const controls = repairGaiaNoteChoices((data.controls ?? []).map(expandControl));
+  // to spend a hundred milliseconds. Equal sections are one object between the controls, as their
+  // defaults are (expandControls).
+  const controls = repairGaiaNoteChoices(expandControls(data.controls ?? []));
 
   const panel = {
     ...createPanel(),

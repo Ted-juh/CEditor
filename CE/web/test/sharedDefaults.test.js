@@ -5,6 +5,9 @@
 // 25 MB loaded; 11 MB of it was 4,159 Corners sections in 13 distinct forms. These tests pin the
 // sharing, the freezing that makes it safe, the writers that have to copy because of it, and the
 // one V8 detail that undid it on the first attempt.
+//
+// The same goes, once a panel is loaded (expandControls), for what its controls change the same
+// way: one frozen object for all the controls that have it, which took GAIA from 8.6 MB to 1.6.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,10 +19,12 @@ import { fileURLToPath } from 'node:url';
 import { readText } from './support/readText.mjs';
 import { deserializePanel, serializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
-import { expandControl, shrinkControl } from '../src/CE_Application/stores/documentShape.js';
+import { expandControl, expandControls, shrinkControl } from '../src/CE_Application/stores/documentShape.js';
 import { setNestedValueShared } from '../src/CE_Application/stores/controlTreeUtils.js';
 import { createPlayerHost } from '../src/CE_Application/scripting/playerScriptHost.js';
 import { deepClone } from '../src/CE_Application/utils/deepClone.js';
+import { flatControls } from '../src/CE_Application/utils/containment.js';
+import { resolveDrawings } from '../src/CE_Application/stores/documentDrawings.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const GAIA = 'CE/panels/Roland GAIA SH-01.cepanel';
@@ -31,6 +36,17 @@ function twoButtons() {
   a._children.Background._children.Fill.colour = 'FF336699';
   const b = createControl('Button');
   return [expandControl(shrinkControl(a)), expandControl(shrinkControl(b))];
+}
+
+/** Three buttons loaded together: A and B with the same fill, C with one of its own. */
+function threeButtons() {
+  const made = ['FF336699', 'FF336699', 'FF993366'].map((colour, i) => {
+    const button = createControl('Button');
+    button._children.Core.name = `b${i}`;
+    button._children.Background._children.Fill.colour = colour;
+    return shrinkControl(button);
+  });
+  return expandControls(made);
 }
 
 function* objectsIn(value, seen = new Set()) {
@@ -85,6 +101,59 @@ test('a player script\'s write changes its own control only', () => {
   assert.equal(fresh._children.Background._children.Corners.radius, before, 'and so does the next button loaded');
 });
 
+test('controls loaded together share the sections they change the same way, frozen', () => {
+  const [a, b, c] = threeButtons();
+  assert.equal(a._children.Background, b._children.Background, 'the same change is one object');
+  assert.ok(Object.isFrozen(a._children.Background));
+  assert.throws(() => { a._children.Background._children.Fill.colour = 'FF000000'; }, TypeError);
+  // A change only one control has is its own, and stays writable as it always was.
+  assert.notEqual(c._children.Background, a._children.Background);
+  assert.ok(!Object.isFrozen(c._children.Background));
+  assert.equal(c._children.Background._children.Fill.colour, 'FF993366');
+});
+
+test('a control, and the way from it to its parts and children, is never shared or frozen', () => {
+  const panel = open(GAIA);
+  const controls = flatControls(panel.controls);
+  assert.ok(controls.length > 800);
+  for (const control of controls) {
+    const name = control._children.Core.name;
+    assert.ok(!Object.isFrozen(control) && !Object.isFrozen(control._children), name);
+    const { Parts, Children } = control._children;
+    if (Parts && Object.keys(Parts._children ?? {}).length) assert.ok(!Object.isFrozen(Parts) && !Object.isFrozen(Parts._children), `${name} Parts`);
+    if (Children && Object.keys(Children._children ?? {}).length) assert.ok(!Object.isFrozen(Children) && !Object.isFrozen(Children._children), `${name} Children`);
+  }
+  assert.equal(new Set(controls).size, controls.length, 'no control is another\'s object');
+});
+
+test('two controls equal down to their id are still two controls', () => {
+  // A document is not supposed to repeat an id, and a pasted or hand-edited one can. Each control is
+  // its own object whatever the document says, because the editor and the player write into it.
+  const button = shrinkControl(createControl('Button'));
+  const [a, b] = expandControls([button, structuredClone(button)]);
+  assert.notEqual(a, b);
+  assert.notEqual(a._children, b._children);
+  assert.ok(!Object.isFrozen(a) && !Object.isFrozen(a._children));
+  assert.equal(a._children.Core, b._children.Core, 'below the control, equal is shared as anywhere');
+});
+
+test('a player script\'s write into a section controls share changes its own control only', () => {
+  const [a, b] = threeButtons();
+  const host = createPlayerHost({ id: 'p', controls: [a, b], scripts: [] });
+  assert.equal(host.writeValue(b, 'Background.Fill.colour', 'FF000000'), true);
+  assert.equal(b._children.Background._children.Fill.colour, 'FF000000');
+  assert.equal(a._children.Background._children.Fill.colour, 'FF336699');
+});
+
+test('a loaded GAIA is a sixth of the objects it would be without sharing equal changes', () => {
+  // GAIA's 818 controls are a few dozen designs, repeated with their own ids, names and bindings.
+  const sparse = () => resolveDrawings(JSON.parse(readText(path.join(REPO, GAIA)))).doc.controls;
+  const count = (controls) => [...objectsIn(controls)].length;
+  const alone = count(sparse().map(expandControl));
+  const together = count(expandControls(sparse()));
+  assert.ok(together * 4 < alone, `${together} objects loaded together, ${alone} one control at a time`);
+});
+
 test('deepClone copies two references to one object as two objects, so a draft can write anywhere', () => {
   const shared = { radius: 1 };
   const clone = deepClone({ first: shared, second: shared });
@@ -128,8 +197,9 @@ test('a loaded GAIA holds a fraction of what it did', () => {
   const panel = deserializePanel(text, GAIA, null);
   gc(); gc();
   const held = process.memoryUsage().heapUsed - before;
-  // 25 MB before the defaults were shared, 9.9 MB after; the margin is for the collector.
-  assert.ok(held < 16e6, `GAIA holds ${(held / 1e6).toFixed(1)} MB loaded`);
+  // 25 MB before the defaults were shared, 9.9 MB after, 1.6 MB once equal changes were shared
+  // too; the margin is for the collector.
+  assert.ok(held < 3e6, `GAIA holds ${(held / 1e6).toFixed(1)} MB loaded`);
   assert.ok(panel.controls.length > 0);
 });
 

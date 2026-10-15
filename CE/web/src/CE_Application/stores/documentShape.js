@@ -166,30 +166,45 @@ function shrink(value, pristine) {
  * pristine's own object, and only the objects on the way to a difference are new. Keys come out in
  * the order writing into a copy of the pristine would give them — its own, then any the document
  * adds — because that order is what the next save writes.
+ *
+ * With `sharing` (expandControls), each new object is also offered to it, and an equal one an
+ * earlier control already has is used instead — except along `spine`, the objects a control owns
+ * outright (CONTROL_SPINE, below), and what hangs below a spine map without a default of its own.
  */
-function expand(sparse, pristine) {
+function expand(sparse, pristine, sharing = null, spine = undefined) {
   if (sparse === undefined) return pristine;
-  if (pristine === undefined) return sparse;
-  if (!isPlainObject(sparse) || !isPlainObject(pristine)) return sparse;
+  const share = sharing !== null && spine === undefined;
+  if (pristine === undefined || !isPlainObject(sparse) || !isPlainObject(pristine)) {
+    return share ? sharing.plain(sparse) : sparse;
+  }
 
   const removed = sparse[REMOVED];
+  const changed = Object.keys(sparse);
+  if (removed !== undefined) changed.splice(changed.indexOf(REMOVED), 1);
+  // What goes in first, so that an object an earlier control already has is found before a copy of
+  // the pristine is made for nothing.
+  const values = changed.map((key) => (spine === SPINE_MAP && pristine[key] === undefined
+    ? sparse[key]
+    : expand(sparse[key], pristine[key], sharing, spine === SPINE_MAP ? undefined : spine?.[key])));
+  if (share) {
+    const found = sharing.find(pristine, removed, changed, values);
+    if (found !== undefined) return found;
+  }
+
   let added = false;
-  for (const key in sparse) if (key !== REMOVED && !Object.hasOwn(pristine, key)) { added = true; break; }
+  for (const key of changed) if (!Object.hasOwn(pristine, key)) { added = true; break; }
 
   let out;
   if (!added && !removed?.length) {
     out = { ...pristine };
   } else {
     const keys = Object.keys(pristine).filter((key) => !removed?.includes(key));
-    for (const key of Object.keys(sparse)) if (key !== REMOVED && !keys.includes(key)) keys.push(key);
+    for (const key of changed) if (!keys.includes(key)) keys.push(key);
     out = { ...shapeOf(keys) };
     for (const key of keys) if (Object.hasOwn(pristine, key)) out[key] = pristine[key];
   }
-  for (const key of Object.keys(sparse)) {
-    if (key === REMOVED) continue;
-    out[key] = expand(sparse[key], pristine[key]);
-  }
-  return out;
+  for (let i = 0; i < changed.length; i++) out[changed[i]] = values[i];
+  return share ? sharing.keep(out, pristine, changed) : out;
 }
 
 /*  Why expand copies instead of building: V8 keeps an object's properties in a compact, fixed layout
@@ -211,6 +226,132 @@ function shapeOf(keys) {
     shapes.set(signature, shape);
   }
   return shape;
+}
+
+/* ------------------------------------------------------------------ one copy of each equal section */
+
+// SHARING WHAT A DOCUMENT CHANGED. With the defaults shared, what a loaded panel holds is what its
+// document changed — and a panel changes the same things over and over. GAIA's 818 controls are
+// mostly a few dozen designs, each repeated with its own id, name, position and binding; every one
+// of them still held its own copy of the same coloured fill, the same rounded corners, the same
+// forty-five-part drawing. Two sections expanded from the same default with the same changes are now
+// one object, as two sections at their defaults already were: GAIA 8.6 MB loaded to 1.6 MB, the
+// AN1x 11.2 MB to 1.4 MB, and neither takes measurably longer to load for it (below).
+//
+// The rules are the defaults' rules, for the same reasons. An object two controls hold is frozen,
+// so a writer that forgot to copy throws instead of changing both; one only a single control holds
+// is left as it was. A CONTROL is never shared — the player's script host (setValueAtPath) and the
+// editor's own reducers write into the control object they are given — nor is anything on the way
+// from it to its parts and its children (CONTROL_SPINE), which belong to that control alone.
+//
+// What makes it cheap is that expand() already knows what an object was made from. An object it
+// builds is fixed by the default it copied and the document's changes to it, so that is what the
+// object is looked up by: the default's identity, then each changed key and the (already shared)
+// value it got — two or three entries, not the forty keys of a Core section. Only data with no
+// default under it (a row list, a binding, an added key) is looked up by all of its keys. Hashing
+// every key of every object instead cost more than the load itself. And the lookup comes before the
+// copy of the pristine (expand), so an object found is a copy never made: most of them, on GAIA.
+
+/** The objects a control owns: itself, the way to its parts and to its children, and both maps. */
+const SPINE_MAP = Symbol('spine map');
+const CONTROL_SPINE = { _children: { Parts: { _children: SPINE_MAP }, Children: { _children: SPINE_MAP } } };
+
+/** One load's table of the objects seen so far, by what they were made from. */
+function createSharing() {
+  const ids = new Map();
+  const table = new Map();
+  let nextId = 8;
+  // A small number per value: Map compares strings and numbers by value and objects by identity,
+  // which is exactly the equality wanted, children being shared before their parents are looked up.
+  const idOf = (value) => {
+    if (value === null) return 1;
+    if (value === true) return 2;
+    if (value === false) return 3;
+    if (value === undefined) return 4;
+    let id = ids.get(value);
+    if (id === undefined) { id = nextId++; ids.set(value, id); }
+    return id;
+  };
+  const mix = (hash, id) => Math.imul(hash ^ id, 0x01000193);
+
+  /** The equal object already in the table, frozen once two places hold it; or undefined. */
+  const lookUp = (hash, matches) => {
+    const found = table.get(hash);
+    if (found === undefined) return undefined;
+    for (const entry of Array.isArray(found) ? found : [found]) {
+      if (!matches(entry)) continue;
+      if (++entry.count === 2) deepFreeze(entry.object);
+      return entry.object;
+    }
+    return undefined;
+  };
+  const enter = (hash, entry) => {
+    const found = table.get(hash);
+    if (found === undefined) table.set(hash, entry);
+    else if (Array.isArray(found)) found.push(entry);
+    else table.set(hash, [found, entry]);
+    return entry.object;
+  };
+  /** `object`, or the equal one already in the table. */
+  const settle = (hash, object, matches, entryFor) => lookUp(hash, matches) ?? enter(hash, entryFor());
+
+  // An object expand() builds is fixed by the pristine it copies, the keys the document changes in
+  // it (in their order, which decides where an added key goes), the values they get, and the keys
+  // it removes. find() is asked before the object is made, keep() after, about the same object:
+  // nothing is expanded in between, so the hash find() worked out is still the one to keep it by.
+  let pendingHash = 0;
+  let pendingRemoved = '';
+  const find = (pristine, removedKeys, changed, values) => {
+    let hash = mix(0x2545f491, idOf(pristine));
+    for (let i = 0; i < changed.length; i++) hash = mix(mix(hash, idOf(changed[i])), idOf(values[i]));
+    const removed = removedKeys === undefined ? '' : JSON.stringify(removedKeys);
+    if (removed) hash = mix(hash, idOf(removed));
+    pendingHash = hash;
+    pendingRemoved = removed;
+    return lookUp(hash, (entry) => {
+      if (entry.pristine !== pristine || entry.removed !== removed || entry.keys.length !== changed.length) return false;
+      for (let i = 0; i < changed.length; i++) {
+        if (entry.keys[i] !== changed[i] || entry.object[changed[i]] !== values[i]) return false;
+      }
+      return true;
+    });
+  };
+  const keep = (object, pristine, changed) => enter(pendingHash, { object, count: 1, pristine, removed: pendingRemoved, keys: changed });
+
+  /** Data with no default under it, by every key and value; what is in it first. */
+  const plain = (value) => {
+    if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return value;
+    if (Array.isArray(value)) {
+      let hash = mix(0x9e3779b9, value.length);
+      for (let i = 0; i < value.length; i++) {
+        const item = plain(value[i]);
+        if (item !== value[i]) value[i] = item;
+        hash = mix(hash, idOf(item));
+      }
+      return settle(hash, value, ({ object }) => Array.isArray(object) && object.length === value.length
+        && object.every((item, i) => item === value[i]), () => ({ object: value, count: 1, pristine: undefined, removed: '', keys: null }));
+    }
+    let hash = 0x85ebca6b;
+    for (const key in value) {
+      const child = plain(value[key]);
+      if (child !== value[key]) value[key] = child;
+      hash = mix(mix(hash, idOf(key)), idOf(child));
+    }
+    return settle(hash, value, (entry) => {
+      if (entry.pristine !== undefined || Array.isArray(entry.object)) return false;
+      const keys = entry.keys ??= Object.keys(entry.object);
+      let i = 0;
+      for (const key in value) if (keys[i++] !== key || entry.object[key] !== value[key]) return false;
+      return i === keys.length;
+    }, () => ({ object: value, count: 1, pristine: undefined, removed: '', keys: null }));
+  };
+
+  // Emptied when the load is done rather than left to the collector: they hold every object the
+  // load made, and whether anything still reaches them afterwards is up to the engine. Something
+  // did once, measured: GAIA held 2.7 MB loaded instead of 1.7, and an earlier version held more
+  // than it had without sharing at all.
+  const clear = () => { ids.clear(); table.clear(); };
+  return { find, keep, plain, clear };
 }
 
 /* ------------------------------------------------------------------ custom component parts */
@@ -300,26 +441,38 @@ function shrinkPart(part) {
   return out;
 }
 
-/** pristinePart, built from shared, frozen pieces: the shell and one baseline per section type. */
+/**
+ * pristinePart, built from shared, frozen pieces: the shell and one baseline per section type. One
+ * per list of sections, so two parts with the same sections have the same default — which is what
+ * lets expandControls see that two parts are equal.
+ */
 let sharedShell = null;
 const sharedSectionBaselines = new Map();
+const sharedPartPristines = new Map();
 
 function sharedPristinePart(part) {
   sharedShell ??= deepFreeze(pristinePartShell());
-  const children = { ...sharedShell._children };
-  for (const [key, section] of Object.entries(part?._children ?? {})) {
-    if (key === 'Layout' || !SECTION_DEFAULTS[section?._type]) continue;
-    if (!sharedSectionBaselines.has(section._type)) {
-      sharedSectionBaselines.set(section._type, deepFreeze(partSectionBaseline(section._type)));
+  const sections = Object.entries(part?._children ?? {})
+    .filter(([key, section]) => key !== 'Layout' && SECTION_DEFAULTS[section?._type]);
+  const signature = sections.map(([key, section]) => `${key}\u0000${section._type}`).join('\u0001');
+  let pristine = sharedPartPristines.get(signature);
+  if (!pristine) {
+    const children = { ...sharedShell._children };
+    for (const [key, section] of sections) {
+      if (!sharedSectionBaselines.has(section._type)) {
+        sharedSectionBaselines.set(section._type, deepFreeze(partSectionBaseline(section._type)));
+      }
+      children[key] = sharedSectionBaselines.get(section._type);
     }
-    children[key] = sharedSectionBaselines.get(section._type);
+    pristine = Object.freeze({ ...sharedShell, _children: Object.freeze(children) });
+    sharedPartPristines.set(signature, pristine);
   }
-  return { ...sharedShell, _children: children };
+  return pristine;
 }
 
-function expandPart(sparse) {
+function expandPart(sparse, sharing = null) {
   if (!isPlainObject(sparse) || !isPlainObject(sparse._children)) return sparse;
-  return expand(sparse, sharedPristinePart(sparse));
+  return expand(sparse, sharedPristinePart(sparse), sharing);
 }
 
 /**
@@ -400,16 +553,34 @@ export function shrinkControl(control) {
 
 /** The sparse form a document stores -> the full control the editor works with. */
 export function expandControl(sparse) {
+  return expandControlWith(sparse, null);
+}
+
+/**
+ * A document's controls, expanded, with one copy of each equal section between them (the comment
+ * above createSharing says what that saves and what it asks of writers). What a load calls.
+ */
+export function expandControls(sparseControls) {
+  const sharing = createSharing();
+  try {
+    return sparseControls.map((sparse) => expandControlWith(sparse, sharing));
+  } finally {
+    sharing.clear();
+  }
+}
+
+function expandControlWith(sparse, sharing) {
   const controlType = sparse?._children?.Core?.controlType;
   const pristine = sharedPristineFor(controlType);
-  if (!pristine) return mapAuthoredParts(sparse, new Set(), expandPart);
+  const partOf = (part) => expandPart(part, sharing);
+  if (!pristine) return mapAuthoredParts(sparse, new Set(), partOf);
 
   const typeParts = typePartNames(pristine);
-  const control = mapAuthoredParts(expand(sparse, pristine), typeParts, expandPart);
+  const control = mapAuthoredParts(expand(sparse, pristine, sharing, CONTROL_SPINE), typeParts, partOf);
 
   const kids = childMapOf(control);
   if (kids && Object.keys(kids).length) {
-    return withChildMap(control, Object.fromEntries(Object.entries(kids).map(([key, child]) => [key, expandControl(child)])));
+    return withChildMap(control, Object.fromEntries(Object.entries(kids).map(([key, child]) => [key, expandControlWith(child, sharing)])));
   }
   return control;
 }
