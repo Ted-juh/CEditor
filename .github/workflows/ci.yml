@@ -51,9 +51,9 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -62,19 +62,19 @@ jobs:
       # 3.13, the version the exporter bundles; CEDITOR_PYTHON needs 3.12 or later. setup-python's
       # Windows install carries the headers and python313.lib that find_package's Development.Embed
       # wants, and puts python313.dll on PATH for the tests and the plug-in validators.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
 
       # The native-handler checks below build and run real Java and C# handler modules: JDK 21 for
       # javac, jar and jlink (the image's default Java is older and has no jlink), and .NET 10, the
       # generator's target framework.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
@@ -108,13 +108,16 @@ jobs:
           $env:CHROMIUM_PATH = $browser
           npm run test:browser
 
+      # The one action still declared for Node 20, so GitHub runs it on Node 24 and says so in every
+      # log. It has had no release since v1.13.0 (March 2024) and none for Node 24; it runs green on
+      # Node 24 as it is, which is cheaper to keep than a hand-written vcvars step only CI can test.
       - name: Set up MSVC environment (Ninja generator)
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
       - name: Compiler cache (sccache)
-        uses: mozilla-actions/sccache-action@v0.0.9
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       # The plug-in is built with a real panel in it, so the validation below exercises the scripts
       # too: the script-threading defects in docs/plugin-validation.md only showed with scripts
@@ -168,7 +171,7 @@ jobs:
 
       - name: Upload the validation report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: plugin-validation
           path: build/validation/
