@@ -17,7 +17,7 @@
   import { choiceParameterForControl, controlParamValue, hostValuePatch, hostParameterLeaf } from './CE_Application/utils/playerParameterSession.js';
   import { fileCache, loadFile } from './CE_Application/stores/fileCache.js';
   import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState, requestProfileSource, startDeviceSync } from './CE_Application/stores/deviceProfiles.js';
-  import { playerDeviceTarget, startupReadPlan, createHostSeedTracker } from './CE_Application/utils/playerStartup.js';
+  import { playerDeviceTarget, startupReadPlan, createHostSeedTracker, sendFromBoundControls } from './CE_Application/utils/playerStartup.js';
   import { profileSources, latestPresetListScan } from './CE_Application/stores/deviceProfileStores.js';
   import { injectPresetRowsIntoPanel } from './CE_Application/utils/presetChoiceRows.js';
   import { decodeInbound, inboundReadTargets } from './CE_Application/utils/inboundParameterIndex.js';
@@ -493,9 +493,7 @@
     nrpnState = EMPTY_NRPN_STATE;
     // Player is a runtime: make bound controls SEND (not dry-run). Safe — the engine still
     // only transmits when the role's output is a real hardware port (else it's a no-op).
-    for (const c of flatControls(next.controls ?? []))
-      for (const b of c?._children?.DeviceBindings?.bindings ?? [])
-        if (b && typeof b === 'object') b.dryRun = false;
+    sendFromBoundControls(next.controls);
     ({ deviceRole, profileId } = playerDeviceTarget(next));
     if (typeof window !== 'undefined' && window.__CE_PLAYER_SESSION__?.restored) sessionRestored = true;
     // Start (or restart) the panel script runtime for this panel — the SAME Lua/JS runtime the editor
