@@ -7,6 +7,10 @@ All three avoid Visual Studio entirely and ship only redistributable runtimes. T
 in-DAW end-to-end load test of a fully-bundled VST3 (the per-language modules + the host loader are each
 proven; the export-pipeline wiring is exercised by the verifiers).
 
+**Windows too, on every PR.** CI configures with `CEDITOR_NATIVE_HANDLERS=ON`, so MSVC builds the loader,
+and runs `verify-all.mjs --require`, where a missing toolchain fails instead of skipping: the C++, C# and
+Java modules are built and dispatched on `windows-latest`, two instances of each in one process apart.
+
 ### Implementation status (this branch)
 | Piece | File | Status |
 |---|---|---|

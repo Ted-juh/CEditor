@@ -1900,7 +1900,10 @@ option(CEDITOR_PYTHON "Embed native CPython (full stdlib) as a third window-clos
 # Optional: load COMPILE-AT-EXPORT native handler modules (C++/C#/Java). No language runtime is
 # embedded — the exporter AOT-compiles each panel's handlers into a small native shared library that
 # the player loads via the flat C ABI in CE/src/Scripting/NativeHandlerAbi.h. Requires CEDITOR_SCRIPTING.
-# See CE/src/Scripting/native-handlers-design.md. OFF by default (feature is build-unverified).
+# See CE/src/Scripting/native-handlers-design.md. OFF by default because it is per export: the exporter
+# passes ON only for a panel with such handlers (export-panel-vst3.mjs). Not unverified: CI configures
+# with it ON, so MSVC builds the loader into the tests and the GAIA plug-in it validates, and
+# verify-all.mjs --require builds and runs real C++, C# and Java modules against it on Windows.
 option(CEDITOR_NATIVE_HANDLERS "Load compile-at-export native handler modules (C++/C#/Java) in the player" OFF)
 
 if (CEDITOR_SCRIPTING)
