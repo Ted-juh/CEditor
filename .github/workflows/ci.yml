@@ -16,6 +16,8 @@
 # suites: pluginval for the VST3, clap-validator for the CLAP. docs/plugin-validation.md has what
 # the first runs found. Not covered yet: the installer packaging scripts.
 #
+# The browser checks (CE/web/browser-checks) run too, after the web tests.
+#
 # The optional script engines are on too: embedded CPython (CEDITOR_PYTHON) and the loader for
 # compiled-at-export C++/C#/Java handlers (CEDITOR_NATIVE_HANDLERS). Both are what an export with
 # such scripts ships, and neither had been compiled by MSVC or tested on Windows before. The
@@ -93,6 +95,18 @@ jobs:
       - name: Build web bundle (required by CMake PlayerWebData glob)
         working-directory: CE/web
         run: npm run build
+
+      # The browser checks: Playwright driving the built pages, and Vite dev servers for the editor's
+      # docks and the host. The image has Chrome (Edge failing that); CHROMIUM_PATH points every check
+      # at it. browser-checks/runAll.mjs runs them all and names every failure, not just the first.
+      - name: Browser checks (Playwright)
+        working-directory: CE/web
+        run: |
+          $browser = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $browser) { throw "Neither Chrome nor Edge is installed on this runner." }
+          "Browser checks run in $browser"
+          $env:CHROMIUM_PATH = $browser
+          npm run test:browser
 
       - name: Set up MSVC environment (Ninja generator)
         uses: ilammy/msvc-dev-cmd@v1

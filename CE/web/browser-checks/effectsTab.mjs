@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
+import { DEV_SERVER_FIRST_LOAD_MS } from './chromiumLaunch.mjs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
@@ -38,7 +39,7 @@ const target = async (id, domain) => {
 };
 
 try {
-  await page.goto(url); await page.locator('.app').waitFor();
+  await page.goto(url, { timeout: DEV_SERVER_FIRST_LOAD_MS }); await page.locator('.app').waitFor();
   const ids = await page.evaluate(async () => {
     const p = await import('/src/CE_Application/stores/panels.js');
     const c = await import('/src/CE_Application/stores/controls.js');

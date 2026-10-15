@@ -128,8 +128,10 @@ The node suite takes about three and a half minutes here. `validate-script-expor
 `SKIP` for any language whose toolchain is absent (commonly Lua and C#) — a skip is not a
 failure, but do not read a run full of skips as coverage.
 
-`npm run test:browser` additionally drives Playwright over the built bundle. It is not in CI; run it
-locally when you touch rendering, the player inbound path or the learn chips.
+`npm run test:browser` additionally drives Playwright over the built bundle and the editor's dev
+server: 35 checks, run by `browser-checks/runAll.mjs`, which reports every failure rather than the
+first (`node browser-checks/runAll.mjs effectsTab` runs one). CI runs them on Windows; run them
+locally when you touch rendering, the docks, the player inbound path or the learn chips.
 
 ### C++ *on* Windows: use a Developer shell, or you will get MinGW
 

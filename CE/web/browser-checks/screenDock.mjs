@@ -1,7 +1,7 @@
 /** Screen dock: property coverage, selection, document edits and history. */
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
-import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
+import { chromiumLaunchOptions, DEV_SERVER_FIRST_LOAD_MS } from './chromiumLaunch.mjs';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -26,7 +26,7 @@ const read=(id,path)=>page.evaluate(async({id,path})=>{
 },{id,path});
 const signatures=loc=>loc.locator('[data-screen-section]').evaluateAll(es=>Object.fromEntries(es.map(e=>[e.dataset.screenSection,Array.from(e.querySelectorAll('.property-label,.nc-label')).map(n=>n.textContent.trim()).sort()])));
 try {
- await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`);await page.locator('.app').waitFor();
+ await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, { timeout: DEV_SERVER_FIRST_LOAD_MS });await page.locator('.app').waitFor();
  // On plain Graphite, which leaves a display as the factory makes it. A new panel starts on the
  // designed Graphite, where an LCD is an unlit OLED: its Backlight switch starts off and its dots
  // square, and this check is of the dock's controls, not of what a set does to a screen.
