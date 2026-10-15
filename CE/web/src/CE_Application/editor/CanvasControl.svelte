@@ -3630,66 +3630,41 @@
       {:else}
       <LcdDisplayRenderer control={renderControl} allControls={allControls} width={displayW} height={displayH} />
       {/if}
-    {/if}
-
-    {#if isMeter && !hasAnatomy}
+    {:else if isMeter && !hasAnatomy}
       <MeterRenderer control={renderControl} width={displayW} height={displayH} />
-    {/if}
-
-    {#if isShape}
+    {:else if isShape}
       <ShapeRenderer control={renderControl} width={displayW} height={displayH} />
-    {/if}
-
-    {#if isKeyboard}
+    {:else if isKeyboard}
       <KeyboardRenderer
         control={renderControl}
         width={displayW}
         height={displayH}
         held={previewSession?.keyboardHeld ?? []}
       />
-    {/if}
-
-    {#if isStepSequencer}
+    {:else if isStepSequencer}
       <StepSequencerRenderer control={renderControl} width={displayW} height={displayH} />
-    {/if}
-
-    {#if isTabContainer}
+    {:else if isTabContainer}
       <TabContainerRenderer control={renderControl} width={displayW} height={displayH} />
-    {/if}
-
-    {#if isScrollArea}
+    {:else if isScrollArea}
       <ScrollAreaRenderer
         control={renderControl}
         width={displayW}
         height={displayH}
         offset={previewSession?.scrollOffset ?? null}
       />
-    {/if}
-
-    {#if isEnvelope}
+    {:else if isEnvelope}
       <EnvelopeRenderer control={renderControl} width={displayW} height={displayH} activeIndex={previewSession?.envActiveIndex ?? -1} />
-    {/if}
-
-    {#if isMatrix}
+    {:else if isMatrix}
       <MatrixRenderer control={renderControl} width={displayW} height={displayH} activeCell={previewSession?.matrixActiveCell ?? null} />
-    {/if}
-
-    {#if isJoystick}
+    {:else if isJoystick}
       <JoystickRenderer control={renderControl} width={displayW} height={displayH} />
-    {/if}
-
-    {#if isNumpad}
+    {:else if isNumpad}
       <NumpadRenderer control={renderControl} width={displayW} height={displayH} />
-    {/if}
-    {#if isCrossfader}
+    {:else if isCrossfader}
       <CrossfaderRenderer control={renderControl} width={displayW} height={displayH} />
-    {/if}
-
-    {#if isRibbon}
+    {:else if isRibbon}
       <RibbonRenderer control={renderControl} width={displayW} height={displayH} />
-    {/if}
-
-    {#if isMacro}
+    {:else if isMacro}
       {#if macroKnobRing}
         <div class="macro-knob-ring" style={macroKnobRing} aria-hidden="true"></div>
       {/if}
@@ -3707,78 +3682,43 @@
         />
       {/if}
       <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} series={seriesPalette} tone={instrumentTone} ownKnob={!macroKnob} />
-    {/if}
-
-    {#if isOrbit}
+    {:else if isOrbit}
       <OrbitRenderer control={renderControl} width={displayW} height={displayH} series={seriesPalette} />
-    {/if}
-
-    {#if isLooper}
+    {:else if isLooper}
       <LooperRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {/if}
-
-    {#if isRouter}
+    {:else if isRouter}
       <RouterRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {/if}
-
-    {#if isTimbre}
+    {:else if isTimbre}
       <TimbreRenderer control={renderControl} width={displayW} height={displayH} idSeed={svgIdSeed} series={seriesPalette} tone={instrumentTone} />
-    {/if}
-
-    {#if isTuring}
+    {:else if isTuring}
       <TuringRenderer control={renderControl} width={displayW} height={displayH} />
-    {/if}
-
-    {#if isKinetic}
+    {:else if isKinetic}
       <KineticRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {/if}
-
-    {#if isConstellation}
+    {:else if isConstellation}
       <ConstellationRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {/if}
-
-    {#if isConstraint}
+    {:else if isConstraint}
       <ConstraintRenderer control={renderControl} width={displayW} height={displayH} series={seriesPalette} tone={instrumentTone} />
-    {/if}
-
-    {#if isChordPad}
+    {:else if isChordPad}
       <ChordPadRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {/if}
-
-    {#if isArp}
+    {:else if isArp}
       <ArpRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {/if}
-
-    {#if isNoteRibbon}
+    {:else if isNoteRibbon}
       <NoteRibbonRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {/if}
-
-    {#if isDrumPads}
+    {:else if isDrumPads}
       <DrumPadsRenderer control={renderControl} width={displayW} height={displayH} />
-    {/if}
-
-    {#if isPanic}
+    {:else if isPanic}
       <PanicRenderer control={renderControl} width={displayW} height={displayH} />
-    {/if}
-
-    {#if isSplitZone}
+    {:else if isSplitZone}
       <SplitZoneRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {/if}
-
-    {#if isPhrase}
+    {:else if isPhrase}
       <PhraseRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {/if}
-    {#if isRecorder}
+    {:else if isRecorder}
       <RecorderRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {/if}
-    {#if isHarmoniser}
+    {:else if isHarmoniser}
       <HarmoniserRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {/if}
-    {#if isSetlist}
+    {:else if isSetlist}
       <SetlistRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
-    {/if}
-
-    {#if isTransport}
+    {:else if isTransport}
       <TransportRenderer control={renderControl} width={displayW} height={displayH} tone={instrumentTone} />
     {/if}
 
