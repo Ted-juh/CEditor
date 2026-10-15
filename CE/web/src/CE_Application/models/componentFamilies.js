@@ -20,3 +20,22 @@ export function isMeterFamily(type) {
 export function isRibbonFamily(type) {
   return RIBBON_FAMILY.has(String(type ?? ''));
 }
+
+// The controlTypes CanvasControl draws with a body renderer of their own, one branch each. A
+// control asks which branch is its with one lookup, `ownRendererKind`, rather than holding a
+// derived flag per branch: thirty-three flags were thirty-three reactive values in every control on
+// a panel, buttons and knobs included, for an answer that is one string.
+const OWN_RENDERER_TYPES = new Set([
+  'LcdDisplay', 'Shape', 'Keyboard', 'StepSequencer', 'TabContainer', 'ScrollArea', 'Envelope',
+  'Matrix', 'VectorJoystick', 'Numpad', 'Crossfader', 'Macro', 'Orbit', 'Looper', 'Router', 'Timbre',
+  'Turing', 'Kinetic', 'Constellation', 'Constraint', 'ChordPad', 'Arp', 'NoteRibbon', 'DrumPads',
+  'Panic', 'SplitZone', 'Phrase', 'Recorder', 'Harmoniser', 'Setlist', 'Transport',
+]);
+
+/** The branch that draws `type`: its own name, its family's engine ('Meter', 'Ribbon'), or ''. */
+export function ownRendererKind(type) {
+  const name = String(type ?? '');
+  if (METER_FAMILY.has(name)) return 'Meter';
+  if (RIBBON_FAMILY.has(name)) return 'Ribbon';
+  return OWN_RENDERER_TYPES.has(name) ? name : '';
+}
