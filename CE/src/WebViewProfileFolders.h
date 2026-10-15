@@ -16,13 +16,18 @@ namespace ceditor::webview
     standalone ran, or a second instance). Nothing deleted those folders, so every player window
     ever opened left a WebView2 profile behind in %TEMP%.
 
-    A folder is now named p<pid>-<token>-<n>: the process that made it, a token that process drew at
-    random, and a counter. The first webview a process makes sweeps the base folder of what is no
-    longer anyone's: a folder whose process has gone, one with this process's id but another
-    token (the id came round again, so its owner is gone), and one in the earlier name (hex
-    ticks _ counter, from builds before this) that was made more than 30 days ago. A live process's
-    folders are never touched, and a folder the system will not let go of (WebView2 still has its
-    files open) is left for the next sweep.
+    A folder is now named p<pid>-<start>-<module>-<n>: the process that made it and when that
+    process started, a token the plug-in binary drew at random, and a counter. The first webview a
+    binary makes sweeps the base folder of what is no longer anyone's: a folder whose process has
+    gone, one with this process's id but another start (the id came round again, so its owner has
+    gone), and one in the earlier name (hex ticks _ counter, from builds before this) made more than
+    30 days ago. A live process's folders are never touched, whichever binary in it made them, and
+    a folder the system will not let go of (WebView2 still has its files open) is left for the next
+    sweep.
+
+    Why the start time and not a token alone: a token is a static, and statics are per binary, so
+    two different plug-ins in one DAW would each take the other's folders, under the same process
+    id, for a dead process's. The start time is the same for every binary in a process.
 
     Synchronous, and bounded: the sweep stops taking folders once it has spent its budget, and the
     next process start carries on. A background thread would not wait on the window, but it could
@@ -34,8 +39,9 @@ juce::File profileFolderForNewWebView (const juce::String& appFolderName);
 struct ProfileFolderName
 {
     int pid = 0;
-    juce::String token;
-    int counter = 0;
+    juce::String processStart;   // hex
+    juce::String module;         // hex, per binary
+    juce::String instance;       // a counter
 };
 
 juce::String profileFolderName (const ProfileFolderName&);
@@ -43,12 +49,14 @@ std::optional<ProfileFolderName> parseProfileFolderName (const juce::String& fol
 bool isEarlierProfileFolderName (const juce::String& folderName);
 
 int currentProcessId();
+/** When this process started, as hex: the same in every binary loaded into it. */
+juce::String currentProcessStart();
 bool processIsRunning (int pid);
 
 struct SweepContext
 {
     int currentPid = 0;
-    juce::String currentToken;
+    juce::String currentProcessStart;
     std::function<bool (int pid)> isRunning;
     juce::Time now;
     juce::RelativeTime earlierFolderAge = juce::RelativeTime::days (30);
