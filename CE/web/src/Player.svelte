@@ -10,7 +10,7 @@
   import { setDocumentIcons } from './CE_Application/utils/documentIcons.js';
   import { updatePanelPreviewSession, updatePanelPreviewSessions, panelPreviewSessions, setPreviewModeEnabled, setInteractionPreviewPanelProvider } from './CE_Application/stores/interactionPreview.js';
   import { initPanelRuntime, setRuntimeHost } from './CE_Application/scripting/panelRuntime.js';
-  import { createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
+  import { createInstanceStorage, createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
   import { choiceValueAt } from './CE_Application/utils/exportParameters.js';
@@ -38,6 +38,9 @@
   // script-driven visual writes replace its shallow shell after mutating the addressed field.
   let panel = $state.raw(null);
   let panelLoadGeneration = $state(0);
+  // The instance storage for the current processor session (see loadPanel).
+  let instanceStorage = null;
+  let instanceStorageSession = null;
 
   // --- Live device output (step 1): pick a MIDI port and send for real ---
   let hasBridge = $state(false);
@@ -502,12 +505,25 @@
     setPreviewModeEnabled(false);
     panel = next;
     panelLoadGeneration += 1;
+    // ce.storage: the plug-in instance's own stores, when there is an instance (the CEditor Player
+    // app has none, and the page then keeps its own). Each write goes back to it as it happens. Made
+    // once per session the processor hands over: the copy it sent is stale after the first write,
+    // and a reload of the panel within the session keeps what was written since.
+    const session = typeof window !== 'undefined' ? window.__CE_PLAYER_SESSION__ : null;
+    const backendForStorage = typeof window !== 'undefined' ? window.__JUCE__?.backend : null;
+    if (session !== instanceStorageSession) {
+      instanceStorageSession = session;
+      instanceStorage = session?.storage && backendForStorage
+        ? createInstanceStorage(session.storage, (change) => backendForStorage.emitEvent('scriptSetting', change))
+        : null;
+    }
+    const storage = instanceStorage;
     setRuntimeHost(createPlayerHost(
       () => panel,
       // The player keeps its document in $state.raw so native objects remain cloneable. A script
       // changing text, colour or visibility mutates that raw tree; replace the shallow panel shell
       // to tell Svelte and PanelPreviewSurface that the document changed.
-      { onDocumentWrite: () => { panel = { ...panel }; } },
+      { onDocumentWrite: () => { panel = { ...panel }; }, storage },
     ));
     rebuildParamControlMap(panel.controls ?? []);
     rebuildHostParamMaps(panel);

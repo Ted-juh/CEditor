@@ -320,15 +320,22 @@ test('the bank is read once, at construction', () => {
   assert.match(ctor, /programBank = ce::parseProgramBank \(panelDocument\);/);
 });
 
-test('the panel file is parsed once per instance', () => {
+test('the panel file is parsed once per process, for every instance of the panel', () => {
   // Most of a second each on a large panel, on the thread the host builds us on, for every instance
   // in a project. It was parsed three times: for the host parameters, the policy and bank, and the
-  // window-closed script model. One parse now feeds all three.
+  // window-closed script model. Then once per instance, which each kept: 14 MB parsed and 9.5 MB of
+  // rebuilt controls for GAIA, again for every instance. Now one parse, shared by all of them.
+  assert.match(PROCESSOR, /PanelValueModel::sharedForFile \(ceditorPlayerPanelFile\(\)\)/);
+  // The build without scripting parses it itself, keeps nothing and so has nothing to share.
   const parses = PROCESSOR.match(/JSON::parse \(ceditorPlayerPanelFile\(\)\.loadFileAsString\(\)\)/g) ?? [];
-  assert.equal(parses.length, 1, `the panel file is parsed ${parses.length} times`);
+  assert.ok(parses.length <= 1, `the panel file is parsed in ${parses.length} places`);
   assert.ok(!/loadFromJson/.test(PROCESSOR), 'the script model reads the file again instead of taking the parsed document');
-  assert.match(PROCESSOR, /panelParams \(ce::parseExportParameters \(panelDocument\)\)/);
-  assert.match(PROCESSOR, /scriptValues\.load \(panelDocument\);/);
+  assert.match(PROCESSOR, /panelParams \(ce::parseExportParameters \(panel->doc\)\)/);
+  assert.match(PROCESSOR, /scriptValues\.load \(panel\);/);
+  // One parse under a lock, held only while an instance holds it.
+  const model = readFileSync(new URL('../../src/Player/PanelValueModel.h', import.meta.url), 'utf8');
+  assert.match(model, /static std::weak_ptr<const SharedPanelDocument> cached;/);
+  assert.match(model, /const std::scoped_lock held \(lock\);/);
 });
 
 test('the Player asks in a bar, and "not now" answers nothing', () => {

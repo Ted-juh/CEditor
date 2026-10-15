@@ -188,6 +188,12 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         if (onResyncRequest != nullptr) onResyncRequest();
     });
 
+    // A ce.storage write the page made (scriptStores, in PlayerHost.h).
+    options = options.withEventListener ("scriptSetting", [this] (const juce::var& payload)
+    {
+        if (onScriptSetting != nullptr) onScriptSetting (payload);
+    });
+
     // The answer to the restore question: "always", "never", or "load" (take the synth's patch
     // instead). "Not now" simply dismisses the bar, because a restore the user deferred is still
     // pending and should be offered again next time the project opens.
@@ -290,9 +296,11 @@ void PlayerHost::loadPanelIntoWebView()
     // The panel JSON is itself a valid JS object literal, so it can be passed directly.
     // Before the panel, so the Player knows at connect time whether this is a reopened project,
     // whose saved sound must not be read over, or a new instance, which reads the synth.
+    // The instance's ce.storage stores go with it, when there is an instance to have them.
     const bool restored = isSessionRestored != nullptr && isSessionRestored();
+    const auto stores = scriptStores != nullptr ? juce::JSON::toString (scriptStores(), true) : juce::String ("null");
     webView->evaluateJavascript (juce::String ("window.__CE_PLAYER_SESSION__ = { restored: ")
-                                 + (restored ? "true" : "false") + " };"
+                                 + (restored ? "true" : "false") + ", storage: " + stores + " };"
                                  + "if (window.__CE_LOAD_PANEL__) window.__CE_LOAD_PANEL__(" + panelJson + ");");
 }
 

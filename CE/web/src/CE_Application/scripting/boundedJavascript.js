@@ -16,7 +16,14 @@ export function initialiseJavascriptSandbox() {
 // pays for. It replaces a cap of 32 sandboxes, which was the same 512 MB reached by counting
 // scripts — 32 at 16 MB each — and refused the 33rd script of any panel. The GAIA panel has 232,
 // at about 51 KB apiece; counting stopped 200 of them while the memory was nowhere near the limit.
-export const SCRIPT_LIMITS = Object.freeze({ milliseconds: 250, memoryBytes: 16 * 1024 * 1024,
+//
+// `milliseconds` is how long one call into a script may run (a load, a click, a timer's tick), and
+// it is the plug-in's: JsScriptEngine.cpp gives each call 2 seconds, and a panel that works with the
+// plug-in's window closed has to work with it open. It was 250 ms, and GAIA's preset-name script
+// repaints every preset button in one call: 160 to 220 ms on a fast machine before the player found
+// controls from an index, so a slower one stopped it, and every recall button with it. Two seconds
+// still stops a runaway loop; scriptLimitParity.test.js holds the two numbers together.
+export const SCRIPT_LIMITS = Object.freeze({ milliseconds: 2000, memoryBytes: 16 * 1024 * 1024,
   panelMemoryBytes: 512 * 1024 * 1024, stackBytes: 256 * 1024, calls: 4096, entries: 20000, text: 1024 * 1024 });
 const active = new Set();
 let panelMemoryBytes = SCRIPT_LIMITS.panelMemoryBytes;

@@ -63,6 +63,14 @@ Two more came from reading the player log those runs left, not from a validator'
 | 14,000 refused script writes | A plug-in built from a *saved* `.cepanel` lacked every default-valued property, and the command-line exporter derived its host parameters from the sparse controls: 5 instead of 60 on QA-08. | `tools/scripts/lib/exportDocument.mjs`: a saved document is completed first. Build by hand with `prepare-export-panel.mjs`. |
 | the MIDI flood guard, at every load | Every `set()` counted as a MIDI send, a label's text included, so painting a long list silently dropped the MIDI of the next bound control. | `BridgeScriptHost.h`: only writes to bound paths count. |
 
+Two more when QA-08 was first run through clap-validator (October 2026), both in how a panel's
+host parameters are built, and neither visible to pluginval:
+
+| Found by | Defect | Fixed in |
+| --- | --- | --- |
+| clap-validator `state-reproducibility-*` | Two controls named `Cutoff` gave two host parameters one id, `Cutoff.value`. The host keys saved state by id, so a reload restored one and left the other at its default. | `exportParameters.js` `collectExportParameters` and `PanelParameters.h` `parseExportParameters`: the first entry with an id wins (the C++ for panels exported before) |
+| clap-validator `param-conversions` | A float parameter with no step printed seven decimals (JUCE's default), finer than a 32-bit value survives: read back from its own text, `0.5820895` printed `0.5820894`. | `PanelParameters.h` `buildParameterLayout`: five significant digits of the range's span |
+
 Two clap-validator **warnings** remain and are understood:
 
 - `process-audio-denormals` — processing takes several times longer on denormal input. The plug-in
@@ -79,8 +87,8 @@ re-read.
 ## What it does not cover
 
 - **macOS.** The first runs were on Linux, and CI now runs the same check on Windows on every
-  run: the Windows job builds the player with the GAIA panel in it and validates the VST3 and the
-  CLAP with `--require` (`.github/workflows/ci.yml`; the report is uploaded as the
-  `plugin-validation` artifact). The LV2 is validated on Linux only. There is no macOS build.
+  run: the Windows job builds the player with the GAIA panel in it and validates the VST3, the
+  CLAP and the LV2 with `--require` (`.github/workflows/ci.yml`; the report is uploaded as the
+  `plugin-validation` artifact). There is no macOS build.
 - **The panel's own scripts.** The validators drive the plug-in with no hardware attached. A panel
   script that misbehaves only when a synth answers will not show up here.

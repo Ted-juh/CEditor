@@ -10,11 +10,13 @@
 // Run:  node tools/scripts/nativeHandlers/java/verify-java.mjs
 // Skips (exit 0) if javac is not usable.
 import { execSync } from 'node:child_process';
-import { mkdirSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { mkdirSync, rmSync, existsSync, readdirSync, cpSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { generateJavaModule } from './genJava.mjs';
+import { buildEngineE2E, engineE2EUnavailable } from '../engineE2E.mjs';
+import { DL_LIBS, EXE_EXT, IS_WINDOWS, LIB_EXT, cCompiler, skip, which } from '../toolchain.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../../..');
@@ -39,15 +41,22 @@ const SCRIPTS = [
     try { ctx.get("cutoff.value", null); } catch (NullPointerException x) { refused++; }
     ctx.log("still running", null);
     ctx.setValue("refused", refused); }` },
+  // Two instances of this module in one process must count apart (harness.c), in a field and a static.
+  { id: 'counter', name: 'Counter', event: 'onValueChanged', source: 'int count = 0; static int calls = 0;\nvoid onValueChanged(CeContext ctx, CeEvent e){ count++; calls++; ctx.setValue("count", count == calls ? count : -1); }' },
+];
+// Another panel: the same class and script names, different code. Loaded beside the first in one
+// process, each panel's instances must run their own classes.
+const OTHER_PANEL = [
+  { id: 'counter', name: 'Counter', event: 'onValueChanged', source: 'static int count = 0;\nvoid onValueChanged(CeContext ctx, CeEvent e){ count += 100; ctx.setValue("count", count); }' },
 ];
 
-function which(c) { try { execSync(`command -v ${c}`, { stdio: 'ignore' }); return true; } catch { return false; } }
-function ext() { return process.platform === 'win32' ? '.dll' : process.platform === 'darwin' ? '.dylib' : '.so'; }
-if (!which('javac')) { console.log('verify-java: javac not found — skipping.'); process.exit(0); }
+const ext = () => LIB_EXT;
+if (!which('javac')) skip('verify-java: javac not found — skipping.');
 
 // Resolve the JDK home (for jlink + the JNI include dir) from JAVA_HOME or javac's real location.
 function jdkHome() {
   if (process.env.JAVA_HOME && existsSync(path.join(process.env.JAVA_HOME, 'include'))) return process.env.JAVA_HOME;
+  if (IS_WINDOWS) return null;
   try {
     const real = execSync('readlink -f "$(command -v javac)"', { encoding: 'utf8', shell: '/bin/bash' }).trim();
     const home = path.dirname(path.dirname(real)); // <home>/bin/javac
@@ -63,7 +72,7 @@ mkdirSync(work, { recursive: true });
 try {
   const gen = generateJavaModule({ scripts: SCRIPTS, outDir: work, abiInfo: { dir: ABI_DIR } });
   const home = jdkHome();
-  const cc = which('cc') ? 'cc' : which('clang') ? 'clang' : null;
+  const cc = cCompiler();
 
   // --- FULL hosted-JVM build + dispatch ---
   if (home && which('jlink') && cc) {
@@ -72,15 +81,61 @@ try {
       jniIncludeDir: path.join(home, 'include'), abiDir: ABI_DIR, ext: ext(),
     });
     for (const step of [...plan.compile, ...plan.jlink, ...plan.shim]) execSync(step, { cwd: work, stdio: 'inherit' });
-    execSync(`${cc} -I "${ABI_DIR}" "${path.join(HERE, '..', 'harness.c')}" -o "${path.join(work, 'jharness')}" -ldl`, { stdio: 'inherit' });
-    const out = execSync(`"${path.join(work, 'jharness')}" "./ce_handlers_java${ext()}"`, { cwd: work, encoding: 'utf8' });
+    // The other panel, in a folder of its own with a copy of the runtime, as a second exported plug-in
+    // would have: its shim must find the JVM the first one started rather than load its own libjvm.
+    const other = path.join(work, 'other-panel');
+    const gen2 = generateJavaModule({ scripts: OTHER_PANEL, outDir: other, abiInfo: { dir: ABI_DIR } });
+    const plan2 = gen2.buildPlan({
+      javac: 'javac', jar: 'jar', jlink: 'jlink', cc,
+      jniIncludeDir: path.join(home, 'include'), abiDir: ABI_DIR, ext: ext(),
+    });
+    for (const step of [...plan2.compile, ...plan2.shim]) execSync(step, { cwd: other, stdio: 'inherit' });
+    cpSync(path.join(work, 'jre'), path.join(other, 'jre'), { recursive: true });
+    const harness = path.join(work, `jharness${EXE_EXT}`);
+    execSync(`${cc} -I "${ABI_DIR}" "${path.join(HERE, '..', 'harness.c')}" -o "${harness}" ${DL_LIBS}`, { stdio: 'inherit' });
+    const out = execSync(`"${harness}" "${path.join(work, `ce_handlers_java${ext()}`)}" "${path.join(other, `ce_handlers_java${ext()}`)}"`, { cwd: work, encoding: 'utf8' });
     process.stdout.write(out.replace(/Picked up JAVA_TOOL_OPTIONS.*\n/g, ''));
     if (!/NATIVE HANDLER E2E PASS/.test(out)) { console.error('verify-java: FAIL (full build)'); process.exit(1); }
     console.log('verify-java: full hosted-JVM build (javac + jlink + JNI shim) loads + dispatches a Java handler ✓');
+
+    // The same module through the real loader, as the plug-in runs it: two instances count apart, a
+    // reload starts an instance's handlers afresh, and closing one leaves the other running.
+    const unavailable = engineE2EUnavailable();
+    if (unavailable) skip(`verify-java: ${unavailable} — the NativeHandlerEngine run is skipped.`);
+    const e2e = buildEngineE2E({ work, main: `
+  TestHost hostA, hostB;
+  auto a = createNativeHandlerEngine(); a->installApi(hostA);
+  auto b = createNativeHandlerEngine(); b->installApi(hostB);
+  ScriptDefinition c; c.id="counter"; c.name="Counter"; c.language="java"; c.event="onValueChanged"; c.scope="component";
+  const bool loaded = a->loadScript(c, onErr) && b->loadScript(c, onErr);
+  a->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+  a->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+  b->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+  const bool apart = loaded && hostA.vals["count"] == 2.0 && hostB.vals["count"] == 1.0;
+  std::printf("engine: two instances, A counted %.0f, B %.0f -> %s\\n", hostA.vals["count"], hostB.vals["count"], apart ? "PASS" : "FAIL");
+  b->reset(); b->loadScript(c, onErr);
+  b->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+  a->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+  const bool reload = hostB.vals["count"] == 1.0 && hostA.vals["count"] == 3.0;
+  std::printf("engine: B reloaded counts afresh (%.0f), A carries on (%.0f) -> %s\\n", hostB.vals["count"], hostA.vals["count"], reload ? "PASS" : "FAIL");
+  b.reset();
+  a->dispatch("counter","onValueChanged", juce::var(1.0), onErr);
+  const bool survives = hostA.vals["count"] == 4.0;
+  std::printf("engine: B closed, A counted %.0f -> %s\\n", hostA.vals["count"], survives ? "PASS" : "FAIL");
+  return apart && reload && survives ? 0 : 1;
+` });
+    const eout = execSync(`"${e2e}"`, { cwd: work, encoding: 'utf8' });
+    process.stdout.write(eout);
+    if (/FAIL/.test(eout) || !/PASS/.test(eout)) { console.error('verify-java: FAIL (NativeHandlerEngine)'); process.exit(1); }
+    console.log('verify-java: NativeHandlerEngine runs the Java module per instance ✓');
     process.exit(0);
   }
 
   // --- javac-only type-check fallback (no jlink/shim) ---
+  if (process.env.CE_NH_REQUIRE === '1') {
+    console.error(`verify-java: the full build needs a JDK home with jlink and a C compiler (home=${home}, cc=${cc}) — and this run requires it (--require).`);
+    process.exit(1);
+  }
   const javaFiles = readdirSync(work).filter((f) => f.endsWith('.java')).map((f) => `"${path.join(work, f)}"`);
   const classes = path.join(work, 'classes');
   mkdirSync(classes, { recursive: true });

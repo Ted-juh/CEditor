@@ -16,6 +16,7 @@ import { deserializePanel, exportFormDocument, serializePanel } from '../src/CE_
 import { serializePanelForExport } from '../src/CE_Application/stores/panels.js';
 import { controlSetForPanel } from '../src/CE_Application/models/controlSets.js';
 import { expandControl, shrinkAuthoredParts } from '../src/CE_Application/stores/documentShape.js';
+import { deepClone } from '../src/CE_Application/utils/deepClone.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const PANELS = ['CE/panels/Roland GAIA SH-01.cepanel', 'CE/panels/Yamaha AN1x.cepanel',
@@ -146,6 +147,8 @@ test('made from the complete form, the diff is the one the panel itself gives', 
 
 test('an item the author deleted stays deleted through the payload', () => {
   const panel = open('CE/qa/QA-03-states.cepanel');
+  // Deleted in a copy, as the editor's drafts are: loaded controls share their defaults, frozen.
+  panel.controls = deepClone(panel.controls);
   const target = [...everyControl(panel.controls)].find((c) => Object.keys(c._children.States?._children ?? {}).length > 1);
   assert.ok(target, 'QA-03 has a control with states to delete one of');
   const [gone] = Object.keys(target._children.States._children).slice(-1);

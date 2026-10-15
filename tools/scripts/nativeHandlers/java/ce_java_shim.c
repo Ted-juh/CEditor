@@ -47,12 +47,23 @@
 #endif
 
 /* ----------------------------------------------------------------- shim state
- * The JVM is process-global (one per process, created once, reused by every plugin instance). The host
- * vtable is NOT global — it is per-instance and threaded through dispatch via the ABI `state` handle, so
- * two instances of the plugin in one DAW each call back into their own host. */
+ * The JVM is process-global: a process can host one, and it cannot be recreated. Everything else is the
+ * instance's own. Each instance loads the jar beside this shim through a class loader of its own, so
+ * its CeRuntime, its registry and every handler class, with every static field in them, are its own
+ * copies: two copies of a panel in one DAW count apart, and two different panels (two shims, two jars,
+ * the same class names) each run their own classes. The ABI `state` handle is the instance.
+ *
+ * Until October 2026 the jar was the JVM's class path and every instance used the one CeRuntime: two
+ * copies of a panel shared every static a handler kept, and a second panel's shim either loaded a
+ * second libjvm beside the first or, finding the JVM, ran the first panel's classes. */
 static JavaVM* gVm   = NULL;
-static jclass  gCls  = NULL;   /* global ref to CeRuntime */
-static jmethodID mInit, mHas, mDispatch, mShutdown;
+
+typedef struct CeInstance {
+    const CeHostVtable* host;   /* this instance's host, handed to Java on every dispatch */
+    jobject   loader;           /* global ref: this instance's URLClassLoader over the jar */
+    jclass    cls;              /* global ref: CeRuntime as that loader defined it */
+    jmethodID mHas, mDispatch, mShutdown;
+} CeInstance;
 
 /* ----------------------------------------------------------------- small ABI helpers (C side owns marshalling) */
 
@@ -341,18 +352,25 @@ static const JNINativeMethod kNatives[] = {
 typedef jint (JNICALL *CreateJavaVM_t)(JavaVM**, void**, void*);
 typedef jint (JNICALL *GetCreatedJavaVMs_t)(JavaVM**, jsize, jsize*);
 
+/* An address inside THIS module, to ask the loader which file it came from. Private on purpose: an
+ * exported function's address, which this used, resolves through the global symbol scope, so with
+ * another panel's copy of this shim loaded too it named the other one's file, and this panel ran the
+ * other panel's handlers. Nor is this module put in the global scope when it pins itself, for the same
+ * reason. */
+static void ce_self_anchor(void) {}
+
 static int ce_self_dir(ch_t* out, size_t cap) {
 #ifdef _WIN32
     HMODULE self = NULL;
     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                            (LPCWSTR)(void*)&ce_handler_abi_version, &self)) return 0;
+                            (LPCWSTR)(void*)&ce_self_anchor, &self)) return 0;
     DWORD n = GetModuleFileNameW(self, out, (DWORD)cap);
     if (n == 0 || n >= cap) return 0;
     for (DWORD i = n; i > 0; --i) if (out[i-1] == L'\\' || out[i-1] == L'/') { out[i-1] = 0; return 1; }
     return 0;
 #else
     Dl_info info;
-    if (!dladdr((void*)&ce_handler_abi_version, &info) || !info.dli_fname) return 0;
+    if (!dladdr((void*)&ce_self_anchor, &info) || !info.dli_fname) return 0;
     size_t n = strlen(info.dli_fname);
     if (n >= cap) return 0;
     memcpy(out, info.dli_fname, n + 1);
@@ -393,11 +411,11 @@ static void ce_pin_self(void) {
 #ifdef _WIN32
     HMODULE self = NULL;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
-                       (LPCWSTR)(void*)&ce_handler_abi_version, &self);
+                       (LPCWSTR)(void*)&ce_self_anchor, &self);
 #else
     Dl_info info;
-    if (dladdr((void*)&ce_handler_abi_version, &info) && info.dli_fname)
-        dlopen(info.dli_fname, RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE);
+    if (dladdr((void*)&ce_self_anchor, &info) && info.dli_fname)
+        dlopen(info.dli_fname, RTLD_NOW | RTLD_NOLOAD | RTLD_NODELETE);
 #endif
 }
 
@@ -418,6 +436,103 @@ static jstring ce_jstr(JNIEnv* e, CeStr s) {
     return r;
 }
 
+/* The JVM already in this process, if there is one, found without loading a libjvm: another panel's
+ * shim, beside its own jre/, may have started it. Loading this shim's libjvm too would put a second
+ * JVM library in the process, which HotSpot does not survive. */
+static JavaVM* ce_existing_vm(void) {
+    GetCreatedJavaVMs_t get = NULL;
+#ifdef _WIN32
+    HMODULE jvm = GetModuleHandleW(L"jvm.dll");
+    if (jvm) get = (GetCreatedJavaVMs_t)GetProcAddress(jvm, "JNI_GetCreatedJavaVMs");
+#else
+    get = (GetCreatedJavaVMs_t)dlsym(RTLD_DEFAULT, "JNI_GetCreatedJavaVMs");   /* libjvm is loaded RTLD_GLOBAL */
+#endif
+    JavaVM* vm = NULL; jsize n = 0;
+    if (get && get(&vm, 1, &n) == JNI_OK && n > 0) return vm;
+    return NULL;
+}
+
+/* A Java String naming the jar beside this shim. */
+static jstring ce_jar_path(JNIEnv* e) {
+    ch_t selfdir[4096];
+    if (!ce_self_dir(selfdir, 4096)) return NULL;
+#ifdef _WIN32
+    ch_t p[4200]; int n = _snwprintf(p, 4200, L"%s\\ce_handlers_java.jar", selfdir);
+    if (n < 0) return NULL;
+    return (*e)->NewString(e, (const jchar*)p, (jsize)wcslen(p));   /* UTF-16 as Windows has it */
+#else
+    char p[4200]; snprintf(p, sizeof p, "%s/ce_handlers_java.jar", selfdir);
+    return (*e)->NewStringUTF(e, p);
+#endif
+}
+
+/* Clears a pending Java exception; true if there was one. */
+static int ce_failed(JNIEnv* e) {
+    if (!(*e)->ExceptionCheck(e)) return 0;
+    (*e)->ExceptionClear(e);
+    return 1;
+}
+
+/* new URLClassLoader(new URL[] { new File(jar).toURI().toURL() }, ClassLoader.getPlatformClassLoader()).
+ * Its parent is the platform loader, not the application loader: the class path is not this panel's
+ * to read (the JVM may be another panel's), so nothing of ours can come from it. Local ref, or NULL. */
+static jobject ce_new_loader(JNIEnv* e) {
+    jstring jar = ce_jar_path(e); if (!jar) return NULL;
+    jclass fileC = (*e)->FindClass(e, "java/io/File");
+    jclass uriC  = (*e)->FindClass(e, "java/net/URI");
+    jclass urlC  = (*e)->FindClass(e, "java/net/URL");
+    jclass clC   = (*e)->FindClass(e, "java/lang/ClassLoader");
+    jclass uclC  = (*e)->FindClass(e, "java/net/URLClassLoader");
+    if (ce_failed(e) || !fileC || !uriC || !urlC || !clC || !uclC) return NULL;
+    jobject file = (*e)->NewObject(e, fileC, (*e)->GetMethodID(e, fileC, "<init>", "(Ljava/lang/String;)V"), jar);
+    if (ce_failed(e) || !file) return NULL;
+    jobject uri = (*e)->CallObjectMethod(e, file, (*e)->GetMethodID(e, fileC, "toURI", "()Ljava/net/URI;"));
+    if (ce_failed(e) || !uri) return NULL;
+    jobject url = (*e)->CallObjectMethod(e, uri, (*e)->GetMethodID(e, uriC, "toURL", "()Ljava/net/URL;"));
+    if (ce_failed(e) || !url) return NULL;
+    jobjectArray urls = (*e)->NewObjectArray(e, 1, urlC, url);
+    if (ce_failed(e) || !urls) return NULL;
+    jobject parent = (*e)->CallStaticObjectMethod(e, clC,
+        (*e)->GetStaticMethodID(e, clC, "getPlatformClassLoader", "()Ljava/lang/ClassLoader;"));
+    if (ce_failed(e) || !parent) return NULL;
+    jobject loader = (*e)->NewObject(e, uclC,
+        (*e)->GetMethodID(e, uclC, "<init>", "([Ljava/net/URL;Ljava/lang/ClassLoader;)V"), urls, parent);
+    if (ce_failed(e)) return NULL;
+    return loader;
+}
+
+/* Class.forName(name, true, loader). Local ref, or NULL. */
+static jclass ce_load_class(JNIEnv* e, jobject loader, const char* name) {
+    jclass classC = (*e)->FindClass(e, "java/lang/Class");
+    if (ce_failed(e) || !classC) return NULL;
+    jmethodID forName = (*e)->GetStaticMethodID(e, classC, "forName",
+        "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;");
+    jstring jname = (*e)->NewStringUTF(e, name);
+    if (ce_failed(e) || !forName || !jname) return NULL;
+    jclass cls = (jclass)(*e)->CallStaticObjectMethod(e, classC, forName, jname, JNI_TRUE, loader);
+    if (ce_failed(e)) return NULL;
+    return cls;
+}
+
+/* Lets go of an instance: its registry cleared, its loader closed (which releases the jar), and its
+ * classes left for the collector. */
+static void ce_free_instance(JNIEnv* e, CeInstance* inst) {
+    if (!inst) return;
+    /* A native thread's local refs last until it detaches, which the host's never does. */
+    if (e && (*e)->PushLocalFrame(e, 8) != 0) { ce_failed(e); e = NULL; }
+    if (e && inst->cls && inst->mShutdown) { (*e)->CallStaticVoidMethod(e, inst->cls, inst->mShutdown); ce_failed(e); }
+    if (e && inst->loader) {
+        jclass uclC = (*e)->FindClass(e, "java/net/URLClassLoader");
+        jmethodID close = uclC ? (*e)->GetMethodID(e, uclC, "close", "()V") : NULL;
+        if (close) (*e)->CallVoidMethod(e, inst->loader, close);
+        ce_failed(e);
+    }
+    if (e && inst->cls)    (*e)->DeleteGlobalRef(e, inst->cls);
+    if (e && inst->loader) (*e)->DeleteGlobalRef(e, inst->loader);
+    if (e) (*e)->PopLocalFrame(e, NULL);
+    free(inst);
+}
+
 /* ----------------------------------------------------------------- exported flat ABI */
 
 CE_EXPORT uint32_t CE_CALL ce_handler_abi_version(void) { return CE_ABI_VERSION; }
@@ -427,8 +542,8 @@ CE_EXPORT int CE_CALL ce_handler_init(const CeHostVtable* host, void** out_state
     ce_pin_self();   /* stay mapped across the plugin going offline/online */
 
     /* The JVM is process-global: created once, reused by every plugin instance (a process can host only
-     * ONE JVM, and it cannot be recreated). A second instance reuses the existing JVM + class/methods —
-     * only the per-instance host vtable differs, and that is threaded through dispatch, not stored here. */
+     * ONE JVM, and it cannot be recreated). */
+    if (gVm == NULL) gVm = ce_existing_vm();
     if (gVm == NULL) {
         ch_t selfdir[4096];
         if (!ce_self_dir(selfdir, 4096)) { fprintf(stderr, "[ce-java] cannot locate own module dir\n"); return -2; }
@@ -441,71 +556,73 @@ CE_EXPORT int CE_CALL ce_handler_init(const CeHostVtable* host, void** out_state
         if (!createVm) { fprintf(stderr, "[ce-java] JNI_CreateJavaVM not found\n"); return -2; }
         GetCreatedJavaVMs_t getCreatedVms = (GetCreatedJavaVMs_t)ce_dlsym(jvmLib, "JNI_GetCreatedJavaVMs");
 
-        /* classpath = <selfdir>/ce_handlers_java.jar */
-        char cp[5000];
-#ifdef _WIN32
-        /* selfdir is wide; build the classpath option in narrow UTF-8 for JNI (paths are ASCII here). */
-        char sd[4096]; size_t cv = 0; wcstombs_s(&cv, sd, sizeof(sd), selfdir, _TRUNCATE);
-        snprintf(cp, sizeof(cp), "-Djava.class.path=%s\\ce_handlers_java.jar", sd);
-#else
-        snprintf(cp, sizeof(cp), "-Djava.class.path=%s/ce_handlers_java.jar", selfdir);
-#endif
-
-        JavaVMOption opts[1];
-        opts[0].optionString = cp;
+        /* No class path: each instance loads its classes through a loader of its own (ce_new_loader). */
         JavaVMInitArgs args;
         memset(&args, 0, sizeof args);
         args.version = JNI_VERSION_1_8;
-        args.nOptions = 1;
-        args.options = opts;
+        args.nOptions = 0;
+        args.options = NULL;
         args.ignoreUnrecognized = JNI_FALSE;
 
         JavaVM* vm = NULL; JNIEnv* env = NULL;
         // A process can host only ONE JVM and it cannot be recreated. If this module was unloaded and
         // reloaded (e.g. all plugin instances were removed, dropping the DLL refcount, then a new one was
         // added) the original JVM is still alive in the process — recover and reuse it instead of trying
-        // to create a second one (which would fail). NativeHandlerEngine::reset() now keeps this module
-        // resident to avoid the unload in the first place; this is the belt-and-suspenders path.
+        // to create a second one (which would fail). The shim pins itself resident to avoid the unload
+        // in the first place; this is the belt-and-suspenders path.
         jsize nvms = 0;
         if (getCreatedVms && getCreatedVms(&vm, 1, &nvms) == JNI_OK && nvms > 0 && vm != NULL) {
-            if ((*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_8) != JNI_OK)
-                (*vm)->AttachCurrentThread(vm, (void**)&env, NULL);
+            /* reuse it */
         } else {
-            vm = NULL; env = NULL;
+            vm = NULL;
             if (createVm(&vm, (void**)&env, &args) != JNI_OK || !env) { fprintf(stderr, "[ce-java] JNI_CreateJavaVM failed\n"); return -2; }
         }
-        if (!env) { fprintf(stderr, "[ce-java] no JNIEnv after VM bring-up\n"); return -2; }
-
-        jclass cls = (*env)->FindClass(env, "CeRuntime");
-        if (!cls) { (*env)->ExceptionClear(env); fprintf(stderr, "[ce-java] CeRuntime class not found on classpath\n"); return -2; }
-        gCls = (*env)->NewGlobalRef(env, cls);
-
-        if ((*env)->RegisterNatives(env, gCls, kNatives, (jint)(sizeof(kNatives)/sizeof(kNatives[0]))) != 0) {
-            (*env)->ExceptionClear(env); fprintf(stderr, "[ce-java] RegisterNatives failed\n"); return -2;
-        }
-
-        mInit     = (*env)->GetStaticMethodID(env, gCls, "init", "()I");
-        mHas      = (*env)->GetStaticMethodID(env, gCls, "has", "(Ljava/lang/String;Ljava/lang/String;)I");
-        mDispatch = (*env)->GetStaticMethodID(env, gCls, "dispatch", "(Ljava/lang/String;Ljava/lang/String;JJ)I");
-        mShutdown = (*env)->GetStaticMethodID(env, gCls, "shutdown", "()V");
-        if (!mInit || !mHas || !mDispatch || !mShutdown) { fprintf(stderr, "[ce-java] entry-point method IDs missing\n"); return -2; }
-
-        jint r = (*env)->CallStaticIntMethod(env, gCls, mInit);
-        if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); return -3; }
-        gVm = vm; /* publish only after full, successful bring-up */
-        if (r != 0) return (int)r;
+        gVm = vm; /* the VM is up; an instance that fails below leaves it for the next */
     }
 
-    /* The ABI `state` handle IS this instance's host vtable — dispatch threads it back to the natives. */
-    if (out_state) *out_state = (void*)host;
+    JNIEnv* env = ce_env();
+    if (!env) { fprintf(stderr, "[ce-java] no JNIEnv after VM bring-up\n"); return -2; }
+    if ((*env)->PushLocalFrame(env, 32) != 0) { ce_failed(env); return -2; }
+
+    CeInstance* inst = (CeInstance*)calloc(1, sizeof(CeInstance));
+    if (!inst) { (*env)->PopLocalFrame(env, NULL); return -2; }
+    inst->host = host;
+    int rc = -2;
+    jobject loader = ce_new_loader(env);
+    jclass cls = loader ? ce_load_class(env, loader, "CeRuntime") : NULL;
+    if (!loader)   fprintf(stderr, "[ce-java] could not make this instance's class loader\n");
+    else if (!cls) fprintf(stderr, "[ce-java] CeRuntime class not found in ce_handlers_java.jar\n");
+    else {
+        inst->loader = (*env)->NewGlobalRef(env, loader);
+        inst->cls    = (jclass)(*env)->NewGlobalRef(env, cls);
+        /* Each instance's CeRuntime is a class of its own, so its natives are bound to it here. */
+        if ((*env)->RegisterNatives(env, inst->cls, kNatives, (jint)(sizeof(kNatives)/sizeof(kNatives[0]))) != 0) {
+            ce_failed(env); fprintf(stderr, "[ce-java] RegisterNatives failed\n");
+        } else {
+            jmethodID mInit = (*env)->GetStaticMethodID(env, inst->cls, "init", "()I");
+            inst->mHas      = (*env)->GetStaticMethodID(env, inst->cls, "has", "(Ljava/lang/String;Ljava/lang/String;)I");
+            inst->mDispatch = (*env)->GetStaticMethodID(env, inst->cls, "dispatch", "(Ljava/lang/String;Ljava/lang/String;JJ)I");
+            inst->mShutdown = (*env)->GetStaticMethodID(env, inst->cls, "shutdown", "()V");
+            if (ce_failed(env) || !mInit || !inst->mHas || !inst->mDispatch || !inst->mShutdown) {
+                fprintf(stderr, "[ce-java] entry-point method IDs missing\n");
+            } else {
+                jint r = (*env)->CallStaticIntMethod(env, inst->cls, mInit);
+                rc = ce_failed(env) ? -3 : (int)r;
+            }
+        }
+    }
+    (*env)->PopLocalFrame(env, NULL);
+    if (rc != 0) { ce_free_instance(env, inst); return rc; }
+
+    if (out_state) *out_state = inst;
     return 0;
 }
 
 CE_EXPORT int CE_CALL ce_handler_has(void* state, CeStr script_id, CeStr event_id) {
-    (void)state; if (!gVm || !gCls) return 0;
+    CeInstance* inst = (CeInstance*)state; if (!gVm || !inst) return 0;
     JNIEnv* e = ce_env(); if (!e) return 0;
     jstring js = ce_jstr(e, script_id), jev = ce_jstr(e, event_id);
-    jint r = (*e)->CallStaticIntMethod(e, gCls, mHas, js, jev);
+    jint r = (*e)->CallStaticIntMethod(e, inst->cls, inst->mHas, js, jev);
     if ((*e)->ExceptionCheck(e)) { (*e)->ExceptionClear(e); r = 0; }
     (*e)->DeleteLocalRef(e, js); (*e)->DeleteLocalRef(e, jev);
     return (int)r;
@@ -513,21 +630,20 @@ CE_EXPORT int CE_CALL ce_handler_has(void* state, CeStr script_id, CeStr event_i
 
 CE_EXPORT int CE_CALL ce_handler_dispatch(void* state, CeStr script_id, CeStr event_id,
                                           const CeValue* payload, CeValue* out_result) {
-    (void)out_result; if (!gVm || !gCls) return -1;
+    (void)out_result; CeInstance* inst = (CeInstance*)state; if (!gVm || !inst) return -1;
     JNIEnv* e = ce_env(); if (!e) return -1;
     jstring js = ce_jstr(e, script_id), jev = ce_jstr(e, event_id);
-    /* state is this instance's CeHostVtable* (from ce_handler_init) — thread it to Java so callbacks
-     * reach THIS instance's host. */
-    jint r = (*e)->CallStaticIntMethod(e, gCls, mDispatch, js, jev,
-                                       (jlong)(intptr_t)payload, (jlong)(intptr_t)state);
+    /* This instance's own CeRuntime, handed this instance's host, so callbacks reach THIS instance. */
+    jint r = (*e)->CallStaticIntMethod(e, inst->cls, inst->mDispatch, js, jev,
+                                       (jlong)(intptr_t)payload, (jlong)(intptr_t)inst->host);
     if ((*e)->ExceptionCheck(e)) { (*e)->ExceptionClear(e); r = -1; }
     (*e)->DeleteLocalRef(e, js); (*e)->DeleteLocalRef(e, jev);
     return (int)r;
 }
 
 CE_EXPORT void CE_CALL ce_handler_shutdown(void* state) {
-    (void)state;
-    /* Per-instance teardown only — the JVM stays up for process lifetime (DestroyJavaVM blocks until all
-     * threads exit and a JVM cannot be recreated in-process; other instances may still be live). The Java
-     * shutdown() clears the registry, so we DON'T call it here (it would break sibling instances). */
+    /* This instance only: its registry, loader and classes. The JVM stays up for the process lifetime
+     * (DestroyJavaVM blocks until all threads exit, and a JVM cannot be recreated in-process). */
+    CeInstance* inst = (CeInstance*)state; if (!inst) return;
+    ce_free_instance(gVm ? ce_env() : NULL, inst);
 }

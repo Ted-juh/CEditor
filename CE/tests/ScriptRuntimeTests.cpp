@@ -3065,6 +3065,32 @@ int main()
         check (impHost.logs.contains ("A later 107"), "…including in a callback that runs later, from a timer");
     }
 
+    // ---- Two instances in one process ------------------------------------------------------------
+    // Each ScriptRuntime is one plug-in instance (one standalone window). Two copies of one panel,
+    // in one DAW, must keep their own variables in Lua and in JavaScript — a global JavaScript
+    // assigns without declaring included — and each copy's scripts must reach its own host.
+    {
+        TestHost hostA, hostB;
+        ScriptRuntime a (hostA), b (hostB);
+        hostA.runtime = &a; hostB.runtime = &b;
+        juce::Array<juce::var> panel;
+        panel.add (makeScript ("luaCount", "lua", "panel", "onTick", "*",
+            "count = 0\nfunction onTick(v)\n  count = count + 1\n  set(\"lua.count\", count)\nend\n"));
+        panel.add (makeScript ("jsCount", "javascript", "panel", "onTick", "*",
+            "var count = 0; total = 0;\n"
+            "function onTick(v) { count += 1; total += 1; set(\"js.count\", count); set(\"js.total\", total); }"));
+        a.loadScripts (juce::var (panel));
+        b.loadScripts (juce::var (panel));
+        a.dispatchEvent ("onTick", "panel", juce::var());
+        a.dispatchEvent ("onTick", "panel", juce::var());
+        b.dispatchEvent ("onTick", "panel", juce::var());
+        check ((int) hostA.values["lua.count"] == 2 && (int) hostB.values["lua.count"] == 1,
+               "Two copies of one panel: Lua globals count apart (A 2, B 1)");
+        check ((int) hostA.values["js.count"] == 2 && (int) hostB.values["js.count"] == 1
+                   && (int) hostA.values["js.total"] == 2 && (int) hostB.values["js.total"] == 1,
+               "Two copies of one panel: JavaScript variables count apart, declared or not");
+    }
+
     std::cout << "------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

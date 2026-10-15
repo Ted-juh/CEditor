@@ -521,6 +521,7 @@ if(CEDITOR_BUILD_APP)
     target_sources(CEditorPlayerVST PRIVATE
         "${CE_ROOT}/src/Player/PluginProcessor.cpp"
         "${CE_ROOT}/src/Player/PlayerHost.cpp"
+        "${CE_ROOT}/src/Player/PlayerStandaloneApp.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
@@ -543,6 +544,11 @@ if(CEDITOR_BUILD_APP)
         CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
         CEDITOR_PLAYER_PANEL_PATH="${CE_VST_PANEL_PATH}"
         CEDITOR_SIDECAR_IDENTITY=$<IF:$<BOOL:${CEDITOR_TEMPLATE_PLAYER}>,1,0>
+        # The standalone is ours (Player/PlayerStandaloneApp.cpp): JUCE's keeps one settings file per
+        # product name, so every copy of a panel open at once, and every panel sharing a name, read
+        # and overwrote one plug-in state. PUBLIC, because the Standalone wrapper target compiles the
+        # JUCE file that reads it.
+        JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1
     )
 
     # PUBLIC for CE_ROOT/src, not PRIVATE, and the reason is easy to trip over: juce_add_plugin puts
@@ -1894,7 +1900,10 @@ option(CEDITOR_PYTHON "Embed native CPython (full stdlib) as a third window-clos
 # Optional: load COMPILE-AT-EXPORT native handler modules (C++/C#/Java). No language runtime is
 # embedded — the exporter AOT-compiles each panel's handlers into a small native shared library that
 # the player loads via the flat C ABI in CE/src/Scripting/NativeHandlerAbi.h. Requires CEDITOR_SCRIPTING.
-# See CE/src/Scripting/native-handlers-design.md. OFF by default (feature is build-unverified).
+# See CE/src/Scripting/native-handlers-design.md. OFF by default because it is per export: the exporter
+# passes ON only for a panel with such handlers (export-panel-vst3.mjs). Not unverified: CI configures
+# with it ON, so MSVC builds the loader into the tests and the GAIA plug-in it validates, and
+# verify-all.mjs --require builds and runs real C++, C# and Java modules against it on Windows.
 option(CEDITOR_NATIVE_HANDLERS "Load compile-at-export native handler modules (C++/C#/Java) in the player" OFF)
 
 if (CEDITOR_SCRIPTING)
@@ -1944,7 +1953,9 @@ if (CEDITOR_SCRIPTING)
     # --- Optional: native embedded CPython (third language, full stdlib) ---
     if (CEDITOR_PYTHON)
         # Development.Embed gives the libpython needed to embed an interpreter (vs. build a C extension).
-        find_package(Python3 COMPONENTS Development.Embed REQUIRED)
+        # 3.12 or later: each instance runs in an interpreter of its own, made with
+        # Py_NewInterpreterFromConfig (PythonScriptEngine.cpp says why). The exporter bundles 3.13.
+        find_package(Python3 3.12 COMPONENTS Development.Embed REQUIRED)
         target_sources(ceditor_scripting PRIVATE "${CE_ROOT}/src/Scripting/PythonScriptEngine.cpp")
         target_link_libraries(ceditor_scripting PUBLIC Python3::Python)
         target_compile_definitions(ceditor_scripting PUBLIC CEDITOR_PYTHON=1)
@@ -1959,8 +1970,10 @@ if (CEDITOR_SCRIPTING)
 ce_configure_test(CEditorPythonScriptTests)
         # The embedded interpreter needs a stdlib home. Exports stage a PythonRuntime folder next to
         # the plugin; for the bare test exe, point CEDITOR_PYTHONHOME at the dev Python found above
-        # (its runtime-DLL dir is the install root on Windows).
-        if (Python3_RUNTIME_LIBRARY_DIRS)
+        # (its runtime-DLL dir is the install root on Windows). Windows only: elsewhere that dir is
+        # /usr/lib/<triplet>, which is not a Python home ("Failed to import encodings module"), and the
+        # dev Python's compiled-in prefix already finds its stdlib.
+        if (WIN32 AND Python3_RUNTIME_LIBRARY_DIRS)
             list(GET Python3_RUNTIME_LIBRARY_DIRS 0 _ce_python_home)
             set_tests_properties(PythonScriptEngine PROPERTIES
                 ENVIRONMENT "CEDITOR_PYTHONHOME=${_ce_python_home}")

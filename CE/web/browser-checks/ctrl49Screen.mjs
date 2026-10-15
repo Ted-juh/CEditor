@@ -8,7 +8,7 @@ import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
+import { chromiumLaunchOptions, DEV_SERVER_FIRST_LOAD_MS } from './chromiumLaunch.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({
@@ -27,7 +27,7 @@ try {
   page.setDefaultTimeout(20000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/ctrl49.html`);
+  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/ctrl49.html`, { timeout: DEV_SERVER_FIRST_LOAD_MS });
 
   // The canvas, as numbers: how many pixels are lit at all, and how many are the page's orange.
   const measure = () => page.evaluate(() => {

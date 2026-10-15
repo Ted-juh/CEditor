@@ -141,7 +141,9 @@ export function resolveDrawings(doc, { keepTable = false } = {}) {
     const { [DRAWING_KEY]: name, ...own } = parts;
     const drawing = Object.hasOwn(table, name) && isObject(table[name]) ? table[name] : null;
     if (!drawing) missing.add(String(name));
-    // Each control its own copy: the editor's model changes a control's parts in place.
+    // Each control its own copy. What controls end up sharing is decided as they are expanded
+    // (expandControls in documentShape.js), which freezes it; an alias made here would be shared
+    // without the freeze, by any path that expands a control on its own.
     return withParts(control, drawing ? over(own, deepClone(drawing)) : own);
   };
   const controls = Array.isArray(doc?.controls) ? doc.controls.map((control) => mapControl(control, resolve)) : doc?.controls;

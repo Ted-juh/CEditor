@@ -7,6 +7,10 @@ All three avoid Visual Studio entirely and ship only redistributable runtimes. T
 in-DAW end-to-end load test of a fully-bundled VST3 (the per-language modules + the host loader are each
 proven; the export-pipeline wiring is exercised by the verifiers).
 
+**Windows too, on every PR.** CI configures with `CEDITOR_NATIVE_HANDLERS=ON`, so MSVC builds the loader,
+and runs `verify-all.mjs --require`, where a missing toolchain fails instead of skipping: the C++, C# and
+Java modules are built and dispatched on `windows-latest`, two instances of each in one process apart.
+
 ### Implementation status (this branch)
 | Piece | File | Status |
 |---|---|---|
@@ -119,8 +123,38 @@ if (language == "cpp" || language == "csharp" || language == "java")
   pointers trampoline into the live `ScriptHostApi`, and calls `ce_handler_init`.
 - `hasHandler` → `ce_handler_has`. `dispatch` → marshal payload `juce::var`→`CeValue`, call
   `ce_handler_dispatch` inside the crash-guard (§6), marshal the result back.
-- `reset`/dtor → `ce_handler_shutdown` + close the library (note: C# NativeAOT can't truly unload —
-  keep loaded for process lifetime; Java tears down its isolate here).
+- `reset`/dtor → `ce_handler_shutdown` + close the library, for every language. The C# and Java
+  runtimes stay up for the process (neither can be started again in one process; each shim pins itself
+  resident, so closing the handle unloads nothing) — what shutdown lets go of is the instance's own state
+  (see *Instances* below), so a reload starts its handlers afresh, as Lua's and JS's are.
+
+### Instances
+
+Two plug-in instances of a panel in one process (two in one DAW) share nothing through their handlers:
+
+| Language | An instance's own | Shared by the process |
+|----------|-------------------|-----------------------|
+| C++ | a copy of the module at its own path (a library is mapped once however often it is opened), so its globals | nothing |
+| C# | a collectible `AssemblyLoadContext` holding a copy of `ce_managed.dll`: the registry, every handler object and static | the CoreCLR |
+| Java | a `URLClassLoader` over the jar (parent: the platform loader): `CeRuntime`, the registry, every handler class and static | the JVM |
+
+Every call carries the instance's `state`, which leads to its own host. Until October 2026 the C# and
+Java instances shared the one registry and every static, a reset kept their state, and a destroyed
+engine never shut its modules down. `harness.c` (driven by `verify-java.mjs` and `verify-csharp.mjs`)
+checks two instances side by side, and both verifiers run the real `NativeHandlerEngine` through
+reload and close.
+
+Two *different* panels in one process: each shim finds its own folder through a private symbol (an
+exported one resolved through the global scope to the other panel's shim, which then loaded the other
+panel's jar). Java uses the JVM already in the process rather than load its own `libjvm` beside it
+(the harness counts one mapped). A second C# panel boots its own hostfxr and CoreCLR from its own
+folder, so the process has two. .NET does not promise that works; it does work, and the harness drives
+it hard: 500 calls into each panel, interleaved, every one throwing and catching, faulting on a null
+(the signal each runtime turns into a NullReferenceException) and forcing a collection, with both
+counters exact at the end. Sharing the first panel's runtime instead — the configuration .NET does
+support — is the worse risk here: each panel's runtime is trimmed to what its own handlers use, so a
+second panel's code could find a framework type the first one's trim removed, and fail when that code
+first runs rather than at load. Tested on Linux; Windows and macOS have not run the two-panel case.
 
 The `juce::var`↔`CeValue` marshalling mirrors the existing `varToPy`/`pyToVar` in
 `PythonScriptEngine.cpp`.

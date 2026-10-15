@@ -14,6 +14,7 @@ import { deserializePanel, panelOpenReport, serializePanel } from '../src/CE_App
 import { DRAWING_KEY, resolveDrawings, shareDrawings } from '../src/CE_Application/stores/documentDrawings.js';
 import { PANEL_FORMAT_VERSION } from '../src/CE_Application/utils/panelFormat.js';
 import { deepClone } from '../src/CE_Application/utils/deepClone.js';
+import { setNestedValueShared } from '../src/CE_Application/stores/controlTreeUtils.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const GAIA = 'CE/panels/Roland GAIA SH-01.cepanel';
@@ -57,7 +58,7 @@ test('GAIA and the AN1x save their shared drawings once, and open to exactly the
   }
 });
 
-test('each control opens with its own copy of a shared drawing', () => {
+test('controls opened with a shared drawing hold it frozen, and an edit to one reaches no other', () => {
   const reopened = deserializePanel(serializePanel(open(GAIA)), GAIA, null);
   const doc = JSON.parse(serializePanel(reopened));
   const name = Object.keys(doc.drawings)[0];
@@ -65,7 +66,13 @@ test('each control opens with its own copy of a shared drawing', () => {
   assert.ok(ids.length >= 2, `drawing ${name} is shared by ${ids.length} controls`);
   const [first, second] = ids.map((id) => [...everyControl(reopened.controls)].find((c) => c._children.Core.id === id));
   const [part] = Object.keys(first._children.Parts._children);
-  first._children.Parts._children[part].name = 'changed in one';
+  // Equal parts are one object once loaded (expandControls in documentShape.js), and frozen: a
+  // write into it in place throws instead of changing every control that has the drawing.
+  assert.equal(first._children.Parts._children[part], second._children.Parts._children[part]);
+  assert.throws(() => { first._children.Parts._children[part].name = 'changed in one'; }, TypeError);
+  // The editor's write path copies what it walks, so the edit lands in one control.
+  const { control } = setNestedValueShared(first, `Parts.${part}.name`, 'changed in one');
+  assert.equal(control._children.Parts._children[part].name, 'changed in one');
   assert.notEqual(second._children.Parts._children[part].name, 'changed in one', 'an edit to one control reaches no other');
 });
 

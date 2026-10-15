@@ -13,6 +13,8 @@ import Player from '../src/Player.svelte';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { appSettings } from '../src/CE_Application/stores/appSettings.js';
 import { preparePanelForExport } from '../src/CE_Application/stores/panelExportPreparation.js';
+import { createPanel } from '../src/CE_Application/stores/panelModel.js';
+import { serializePanelForExport } from '../src/CE_Application/stores/panels.js';
 
 const listeners = new Map();
 let nextToken = 1;
@@ -55,8 +57,10 @@ function button(id, x, iconFields) {
 window.__player = {
   async exportAndLoad() {
     appSettings.update((current) => ({ ...current, icons: library }));
-    const prepared = await preparePanelForExport(JSON.stringify({
-      panelGuid: 'player-icons', name: 'player icons', width: 400, height: 140,
+    // Through the export's own first step, as stores/panels.js runs it: the preparation takes the
+    // complete document serializePanelForExport writes, and refuses anything else.
+    const prepared = await preparePanelForExport(serializePanelForExport({
+      ...createPanel(), panelGuid: 'player-icons', name: 'player icons', width: 400, height: 140,
       controls: [
         button('withIcon', 20, { source: 'library', assetId: 'gicon_play', name: 'play_arrow' }),
         button('noIcon', 200, { source: 'none', assetId: '', name: '' }),

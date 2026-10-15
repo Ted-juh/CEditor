@@ -6,10 +6,68 @@
 #include "DeviceProfileServiceInternal.h"
 #include "../AtomicFileWrite.h"
 
+#include <algorithm>
+#include <map>
+#include <memory>
+#include <mutex>
+
 namespace ceditor::device
 {
+
+namespace
+{
+// Every service alive in this process — one per plug-in instance — so one can tell whether a reply
+// arriving on a MIDI input it shares with another is the other's (replyBelongsToAnotherInstance).
+// Services live and are used on the message thread; the lock guards the list.
+struct LiveServices
+{
+    std::mutex lock;
+    std::vector<DeviceProfileService*> all;
+};
+
+LiveServices& liveServices()
+{
+    static LiveServices services;
+    return services;
+}
+
+/*  A profile file's engine, loaded once for every service in the process that loads that file
+    unchanged. Each plug-in instance has a service of its own, and each scans the whole profiles
+    folder: two GAIA instances held every profile there twice, 9.4 MB apiece (the AN1x's and the
+    SH-201's included, for a GAIA panel). An engine is read-only once loaded (every question it
+    answers is const), so services can share one, on any thread. Held weakly: the last service to
+    let go of it frees it. */
+std::shared_ptr<DeviceProfileEngine> sharedEngineForFile (const juce::File& file, juce::String& error)
+{
+    struct Entry { juce::Time modified; std::weak_ptr<DeviceProfileEngine> engine; };
+    static std::mutex lock;
+    static std::map<juce::String, Entry> cache;
+
+    const auto path = file.getFullPathName();
+    const auto modified = file.getLastModificationTime();
+    {
+        const std::scoped_lock held (lock);
+        if (auto it = cache.find (path); it != cache.end() && it->second.modified == modified)
+            if (auto engine = it->second.engine.lock()) return engine;
+    }
+    // Loaded outside the lock, so instances built at once on two threads load two files at once.
+    auto engine = std::make_shared<DeviceProfileEngine>();
+    if (! engine->loadFromFile (file, error))
+        return nullptr;
+    const std::scoped_lock held (lock);
+    auto& entry = cache[path];
+    if (entry.modified == modified)
+        if (auto first = entry.engine.lock()) return first;   // another thread loaded it meanwhile
+    entry = { modified, engine };
+    return engine;
+}
+} // namespace
 DeviceProfileService::DeviceProfileService()
 {
+    {
+        const std::scoped_lock lock (liveServices().lock);
+        liveServices().all.push_back (this);
+    }
     loadInternalTestProfiles();
 
     if (! profiles.empty())
@@ -21,6 +79,13 @@ DeviceProfileService::DeviceProfileService()
 
 DeviceProfileService::~DeviceProfileService()
 {
+    {
+        const std::scoped_lock lock (liveServices().lock);
+        auto& all = liveServices().all;
+        all.erase (std::remove (all.begin(), all.end(), this), all.end());
+    }
+    if (publishedRequests.isNotEmpty())
+        publishedRequestsFile.deleteFile();
     // MidiInput::stop waits for an in-flight callback. The callback resolves its role under
     // midiInputLock, so stopping while holding that lock can deadlock with it. Detach first.
     decltype (midiInputsByRole) inputsToStop;
@@ -651,8 +716,8 @@ bool DeviceProfileService::isLoadedProfileCurrent (const juce::File& file) const
 
 bool DeviceProfileService::loadProfileFile (const juce::File& file, juce::String& error)
 {
-    auto engine = std::make_unique<DeviceProfileEngine>();
-    if (! engine->loadFromFile (file, error))
+    auto engine = sharedEngineForFile (file, error);
+    if (engine == nullptr)
         return false;
 
     auto profileId = engine->getProfileId();
@@ -662,7 +727,7 @@ bool DeviceProfileService::loadProfileFile (const juce::File& file, juce::String
         return false;
     }
 
-    profiles[profileId] = LoadedProfile { file, file.getLastModificationTime(), std::move (engine) };
+    profiles[profileId] = LoadedProfile { file, file.getLastModificationTime(), engine };
     return true;
 }
 
@@ -704,4 +769,222 @@ void DeviceProfileService::emitDeviceEvent (const juce::String& eventName, const
     if (eventCallback)
         eventCallback (eventName, payload);
 }
+namespace
+{
+/** Whether `hex` answers a request for `kind` ("identity", or a dump) `expectedDumpId`, read with
+    the requester's profile. Reading a message this way changes nothing. */
+bool answersRequest (DeviceProfileEngine& engine, const juce::String& kind,
+                     const juce::String& expectedDumpId, const juce::String& hex)
+{
+    if (kind == "identity")
+        return engine.matchIdentityReply (hex).isIdentityReply;
+    const auto parsed = engine.parseDumpMessage (hex);
+    if (! parsed.ok)
+        return false;
+    const auto collectionId = parsed.completion.getProperty ("collectionId", {}).toString();
+    return expectedDumpId == parsed.dumpId || (collectionId.isNotEmpty() && expectedDumpId == collectionId);
+}
+
+/** A message, short enough to publish one per message of a bulk dump: its bytes' 64-bit hash. */
+juce::String fingerprintOf (const juce::String& hex)
+{
+    return juce::String::toHexString ((juce::int64) hex.removeCharacters (" ").toUpperCase().hashCode64());
+}
+
+/** The start of the names of this process's files in pendingRequestsDirectory(). Its own services
+    are asked directly instead: a file trails what it describes by up to a timer tick. */
+const juce::String& processToken()
+{
+    static const juce::String token = juce::Uuid().toString().substring (0, 12);
+    return token;
+}
+} // namespace
+
+bool DeviceProfileService::awaitsReply (const juce::String& inputId, const juce::String& hex)
+{
+    for (const auto& [correlationId, request] : pendingDeviceRequests)
+    {
+        juce::ignoreUnused (correlationId);
+        auto mapping = roleMappings.find (request.deviceRole);
+        if (mapping == roleMappings.end() || mapping->second.input.type != "hardwareInput"
+            || mapping->second.input.id != inputId)
+            continue;
+
+        if (auto* engine = resolveEngine (request.profileId, request.deviceRole))
+            if (answersRequest (*engine, request.expectedResponseKind, request.expectedDumpId, hex))
+                return true;
+    }
+    return false;
+}
+
+bool DeviceProfileService::wasAnsweredWith (const juce::String& inputId, const juce::String& hex) const
+{
+    if (answeredReplies.empty())
+        return false;
+    const auto since = nowMs() - answeredReplyGraceMs;
+    const auto fingerprint = fingerprintOf (hex);
+    for (const auto& answered : answeredReplies)
+        if (answered.atMs >= since && answered.inputId == inputId && answered.fingerprint == fingerprint)
+            return true;
+    return false;
+}
+
+juce::File DeviceProfileService::pendingRequestsDirectory()
+{
+    return juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("CEditorMidiRequests");
+}
+
+/*  Another process can share a MIDI input too: a standalone beside a DAW, or the editor beside
+    either, on Linux and macOS (and on Windows where the MIDI driver lets several programs open a
+    port). So each service writes to a file of its own what it waits for on which input, and what
+    it was just answered with, each until when; and removes the file when there is nothing in it.
+    A file a crash left behind lapses with its deadlines.
+
+    Called when a request is added and on every tick of the timer, which runs while anything is
+    pending, answered within the grace period, or still in the file — so the file follows within a
+    tick. A request's entry and its answer's entry change places in one write: there is no moment
+    at which another process could see neither. */
+void DeviceProfileService::publishPendingRequests()
+{
+    const auto now = nowMs();
+    answeredReplies.erase (std::remove_if (answeredReplies.begin(), answeredReplies.end(),
+                                           [since = now - answeredReplyGraceMs] (const AnsweredReply& answered)
+                                           { return answered.atMs < since; }),
+                           answeredReplies.end());
+
+    // The deadlines are wall-clock time, the one clock other processes share, so they come out a
+    // little different on every tick; the signature leaves them out and says when to write.
+    const auto wallNow = (double) juce::Time::currentTimeMillis();
+    const auto until = [&] (double atMs) { return wallNow + juce::jmax (0.0, atMs - now); };
+    juce::Array<juce::var> entries;
+    juce::String signature;
+    for (const auto& [correlationId, request] : pendingDeviceRequests)
+    {
+        auto mapping = roleMappings.find (request.deviceRole);
+        if (mapping == roleMappings.end() || mapping->second.input.type != "hardwareInput"
+            || mapping->second.input.id.isEmpty())
+            continue;
+        auto* entry = new juce::DynamicObject();
+        entry->setProperty ("input", mapping->second.input.id);
+        entry->setProperty ("profile", resolveProfileId (request.profileId, request.deviceRole));
+        entry->setProperty ("kind", request.expectedResponseKind);
+        entry->setProperty ("dump", request.expectedDumpId);
+        entry->setProperty ("until", until (request.timeoutAtMs));
+        entries.add (juce::var (entry));
+        signature << correlationId << ' ' << mapping->second.input.id << ' ' << request.timeoutAtMs << '\n';
+    }
+    for (const auto& answered : answeredReplies)
+    {
+        auto* entry = new juce::DynamicObject();
+        entry->setProperty ("input", answered.inputId);
+        entry->setProperty ("reply", answered.fingerprint);
+        entry->setProperty ("until", until (answered.atMs + answeredReplyGraceMs));
+        entries.add (juce::var (entry));
+        signature << answered.inputId << ' ' << answered.fingerprint << ' ' << answered.atMs << '\n';
+    }
+
+    if (signature == publishedRequests)
+        return;
+    if (entries.isEmpty())
+    {
+        // Kept until it is gone (a reader can hold it open on Windows): the timer runs until then.
+        if (publishedRequestsFile.deleteFile())
+            publishedRequests = {};
+        return;
+    }
+    if (publishedRequestsFile == juce::File())
+        publishedRequestsFile = pendingRequestsDirectory().getChildFile (
+            processToken() + "-" + juce::Uuid().toString().substring (0, 12) + ".json");
+    // replaceWithText writes beside it and renames: a reader sees the old file or the new one.
+    if (pendingRequestsDirectory().createDirectory()
+        && publishedRequestsFile.replaceWithText (juce::JSON::toString (juce::var (entries), true)))
+        publishedRequests = signature;
+}
+
+bool DeviceProfileService::anotherProcessAwaitsReply (const juce::String& inputId, const juce::String& hex)
+{
+    const auto directory = pendingRequestsDirectory();
+    if (! directory.isDirectory())
+        return false;
+
+    const auto wallNow = (double) juce::Time::currentTimeMillis();
+    juce::String fingerprint;
+    for (const auto& file : directory.findChildFiles (juce::File::findFiles, false, "*.json"))
+    {
+        if (file.getFileName().startsWith (processToken() + "-"))
+            continue;
+        bool live = false;
+        const auto entries = juce::JSON::parse (file.loadFileAsString());
+        if (auto* list = entries.getArray())
+            for (const auto& entry : *list)
+            {
+                if ((double) entry.getProperty ("until", 0.0) < wallNow)
+                    continue;
+                live = true;
+                if (entry.getProperty ("input", {}).toString() != inputId)
+                    continue;
+
+                if (entry.hasProperty ("reply"))
+                {
+                    if (fingerprint.isEmpty())
+                        fingerprint = fingerprintOf (hex);
+                    if (entry["reply"].toString() == fingerprint)
+                        return true;
+                    continue;
+                }
+                // A request, read with the requester's profile when this process has it (the
+                // same panel does). Without it, only the answer's entry, once there, can tell.
+                const auto profile = entry.getProperty ("profile", {}).toString();
+                if (profile.isEmpty() || profiles.find (profile) == profiles.end())
+                    continue;
+                if (auto* engine = resolveEngine (profile, {}))
+                    if (answersRequest (*engine, entry.getProperty ("kind", "dump").toString(),
+                                        entry.getProperty ("dump", {}).toString(), hex))
+                        return true;
+            }
+        // Everything in it lapsed a while ago: a process that ended without tidying up.
+        if (! live && file.getLastModificationTime() < juce::Time::getCurrentTime() - juce::RelativeTime::minutes (1))
+            file.deleteFile();
+    }
+    return false;
+}
+
+/*  Two instances in one process listening to one MIDI input — two copies of a panel in a DAW, or
+    two panels on one synth — both receive every message the synth sends. A dump one of them
+    requested used to be applied by both: the other instance's panel changed to a patch nobody had
+    asked it for. So a reply is left to the instance waiting for it, when this one is not waiting
+    for it too. Anything nobody asked for (a dump sent from the synth's front panel, a knob turned
+    on it) still reaches every instance, as before: they are all following that synth.
+
+    The two handle the one message in either order. If the instance that asked goes first, its
+    request is resolved and gone by the time the other looks, so what it was answered with is
+    remembered for answeredReplyGraceMs, by the message's bytes: the same bytes arriving again
+    unasked within that time — the synth sending the very patch it just sent — are the one thing
+    this holds back that it should not, and they change nothing in the instance that asked. */
+bool DeviceProfileService::replyBelongsToAnotherInstance (const juce::String& role, const juce::String& hex)
+{
+    auto mapping = roleMappings.find (role);
+    if (mapping == roleMappings.end() || mapping->second.input.type != "hardwareInput"
+        || mapping->second.input.id.isEmpty())
+        return false;
+
+    const auto inputId = mapping->second.input.id;
+    if (awaitsReply (inputId, hex))
+    {
+        // This instance asked for it, and maybe another did as well.
+        answeredReplies.push_back ({ inputId, fingerprintOf (hex), nowMs() });
+        return false;
+    }
+
+    {
+        // Held while asking the others, so none can be destroyed mid-question (the destructor
+        // takes itself off the list first).
+        const std::scoped_lock lock (liveServices().lock);
+        for (auto* other : liveServices().all)
+            if (other != this && (other->awaitsReply (inputId, hex) || other->wasAnsweredWith (inputId, hex)))
+                return true;
+    }
+    return anotherProcessAwaitsReply (inputId, hex);
+}
+
 }

@@ -5,6 +5,8 @@
 
 #include "Player/PanelValueModel.h"
 #include <iostream>
+#include <thread>
+#include <vector>
 
 namespace
 {
@@ -99,6 +101,17 @@ const char* kExportPanel = R"JSON({
       "Background": { "_type": "Background", "_children": { "Fill": { "_type": "Fill", "colour": "FFFFFFFF" } } }
     }
   }
+})JSON";
+
+// Arrays on the way to a value: a control's list of items, and a panel property with a nested object.
+const char* kArrayPanel = R"JSON({
+  "name": "Arrays",
+  "bgGradient": { "angle": 90, "name": "dusk" },
+  "controls": [
+    { "_type": "Control", "_children": {
+        "Core": { "_type": "Core", "id": "l1", "name": "list" },
+        "Items": { "_type": "Items", "items": [ { "label": "A" }, { "label": "B" } ] } } }
+  ]
 })JSON";
 
 // An export payload whose controls share a drawing (stores/documentDrawings.js): written once in
@@ -309,6 +322,91 @@ int main()
                    && again.getValue ("twinA.Parts.cap.Background.Fill.colour").toString() == "FFFFFFFF"
                    && (int) again.getValue ("twinB.Parts.cap.Layout.x") == 4,
                "drawings: a second model of the same payload starts from the drawing, not from the first one's writes");
+    }
+
+    // --- one document, two models: two instances of a panel in one DAW --------------------------
+    // The document is parsed and rebuilt once and shared (SharedPanelDocument); each model owns
+    // only what it writes, so neither sees the other's writes and the shared document stays as it was.
+    {
+        const auto shared = ceditor::PanelValueModel::share (juce::JSON::parse (kExportPanel));
+        ceditor::PanelValueModel a, b;
+        a.load (shared);
+        b.load (shared);
+        const auto node = [] (const ceditor::PanelValueModel& m, const char* name) { return (const void*) m.controlByName (name).getDynamicObject(); };
+        check (node (a, "first") == node (b, "first") && node (a, "inner") == node (b, "inner"),
+               "shared: two models of one document read the same controls; nothing was copied for either");
+
+        check (a.setValue ("first.Transform.x", juce::var (33)) && (int) a.getValue ("first.Transform.x") == 33,
+               "shared: a write in one model lands there");
+        check ((int) b.getValue ("first.Transform.x") == 10, "  and the other model does not see it");
+        check (node (a, "first") != node (b, "first") && node (a, "second") == node (b, "second"),
+               "  the control it reached is the writer's own now, and the rest are still shared");
+        ceditor::PanelValueModel later;
+        later.load (shared);
+        check ((int) later.getValue ("first.Transform.x") == 10,
+               "  and a model loaded after it starts from the shared document, not from the write");
+
+        check (b.setValue ("inner.value", juce::var (0.25)) && (double) b.getValue ("inner.value") == 0.25
+                   && (double) a.getValue ("inner.value") == 0.75 && (double) later.getValue ("inner.value") == 0.75,
+               "shared: a write into a container's child stays in the model that made it");
+        check (node (b, "box") != node (a, "box") && node (a, "box") == node (later, "box"),
+               "  the container on the way became that model's own too");
+
+        check (a.setValue ("custom.Parts.cap.Background.Fill.colour", juce::var ("FF0000FF"))
+                   && b.getValue ("custom.Parts.cap.Background.Fill.colour").toString() == "FFFFFFFF",
+               "shared: a write into a part's defaulted section reaches neither the defaults nor the other model");
+
+        check (a.setValue ("panel.name", juce::var ("Renamed")) && a.getValue ("panel.name").toString() == "Renamed"
+                   && b.getValue ("panel.name").toString() == "Export",
+               "shared: a panel property written in one model only");
+
+        check (a.setValue ("first.name", juce::var ("primo")) && ! a.controlByName ("primo").isVoid() && a.controlByName ("first").isVoid()
+                   && ! b.controlByName ("first").isVoid() && b.controlByName ("primo").isVoid(),
+               "shared: a rename in one model leaves the other's names as they were");
+        check ((int) a.getValue ("primo.Transform.x") == 33, "  and the renamed control is still the one it wrote into");
+    }
+
+    // --- through an array: the copy has to go into the document ----------------------------------
+    // JUCE's setProperty skips a value equal to the one there, and compares arrays by their items, so
+    // a copy of an array (the same items) was never put in, and a write through it went nowhere.
+    {
+        const auto shared = ceditor::PanelValueModel::share (juce::JSON::parse (kArrayPanel));
+        ceditor::PanelValueModel a, b;
+        a.load (shared);
+        b.load (shared);
+        check (a.setValue ("list.Items.items.1.label", juce::var ("B2")) && a.getValue ("list.Items.items.1.label").toString() == "B2",
+               "arrays: a write through an item of a shared array lands");
+        check (b.getValue ("list.Items.items.1.label").toString() == "B" && a.getValue ("list.Items.items.0.label").toString() == "A",
+               "  in the writer only, and the item beside it is untouched");
+        check (a.setValue ("panel.bgGradient.angle", juce::var (45)) && (int) a.getValue ("panel.bgGradient.angle") == 45
+                   && (int) b.getValue ("panel.bgGradient.angle") == 90 && b.getValue ("panel.bgGradient.name").toString() == "dusk",
+               "arrays: a nested panel property written in one model only");
+    }
+
+    // --- one document per panel file, for every caller on any thread -----------------------------
+    // Hosts build plug-in instances on threads of their own choosing, sometimes several at once.
+    {
+        const auto file = juce::File::createTempFile (".cepanel");
+        file.replaceWithText (kExportPanel);
+        std::vector<std::shared_ptr<const ceditor::SharedPanelDocument>> got (8);
+        std::vector<std::thread> threads;
+        for (size_t i = 0; i < got.size(); ++i)
+            threads.emplace_back ([&got, &file, i] { got[i] = ceditor::PanelValueModel::sharedForFile (file); });
+        for (auto& t : threads) t.join();
+        bool same = got[0] != nullptr;
+        for (const auto& g : got) same = same && g == got[0];
+        check (same, "file: eight threads asking at once get one document");
+        check (ceditor::PanelValueModel::sharedForFile (file) == got[0], "  and so does a caller while it is held");
+
+        const std::weak_ptr<const ceditor::SharedPanelDocument> held = got[0];
+        got.clear();
+        check (held.expired(), "file: nobody holding it, it is gone (the cache keeps no document alive)");
+
+        juce::Thread::sleep (20);
+        file.replaceWithText (juce::String (kExportPanel).replace ("\"Export\"", "\"Changed\""));
+        check (ceditor::PanelValueModel::sharedForFile (file)->doc.getProperty ("name", {}).toString() == "Changed",
+               "file: a file that changed is read again");
+        file.deleteFile();
     }
 
     std::cout << "--------------------\n" << (failures == 0 ? "ALL PASS" : (juce::String (failures) + " FAILED").toRawUTF8()) << std::endl;

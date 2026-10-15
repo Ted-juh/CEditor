@@ -13,8 +13,15 @@
 # PlayerWebData (the embedded player UI).
 #
 # The player plug-in is built with the GAIA panel in it and put through the hosts' conformance
-# suites: pluginval for the VST3, clap-validator for the CLAP. docs/plugin-validation.md has what
-# the first runs found. Not covered yet: the installer packaging scripts.
+# suites: pluginval for the VST3 and the LV2, clap-validator for the CLAP. docs/plugin-validation.md
+# has what the first runs found. Not covered yet: the installer packaging scripts.
+#
+# The browser checks (CE/web/browser-checks) run too, after the web tests.
+#
+# The optional script engines are on too: embedded CPython (CEDITOR_PYTHON) and the loader for
+# compiled-at-export C++/C#/Java handlers (CEDITOR_NATIVE_HANDLERS). Both are what an export with
+# such scripts ships, and neither had been compiled by MSVC or tested on Windows before. The
+# handlers themselves are built and run by tools/scripts/nativeHandlers/verify-all.mjs.
 
 name: CI
 
@@ -52,6 +59,25 @@ jobs:
           cache: npm
           cache-dependency-path: CE/web/package-lock.json
 
+      # 3.13, the version the exporter bundles; CEDITOR_PYTHON needs 3.12 or later. setup-python's
+      # Windows install carries the headers and python313.lib that find_package's Development.Embed
+      # wants, and puts python313.dll on PATH for the tests and the plug-in validators.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # The native-handler checks below build and run real Java and C# handler modules: JDK 21 for
+      # javac, jar and jlink (the image's default Java is older and has no jlink), and .NET 10, the
+      # generator's target framework.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
       - name: Install web dependencies
         working-directory: CE/web
         run: npm ci
@@ -69,6 +95,18 @@ jobs:
       - name: Build web bundle (required by CMake PlayerWebData glob)
         working-directory: CE/web
         run: npm run build
+
+      # The browser checks: Playwright driving the built pages, and Vite dev servers for the editor's
+      # docks and the host. The image has Chrome (Edge failing that); CHROMIUM_PATH points every check
+      # at it. browser-checks/runAll.mjs runs them all and names every failure, not just the first.
+      - name: Browser checks (Playwright)
+        working-directory: CE/web
+        run: |
+          $browser = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $browser) { throw "Neither Chrome nor Edge is installed on this runner." }
+          "Browser checks run in $browser"
+          $env:CHROMIUM_PATH = $browser
+          npm run test:browser
 
       - name: Set up MSVC environment (Ninja generator)
         uses: ilammy/msvc-dev-cmd@v1
@@ -91,14 +129,23 @@ jobs:
           node tools/scripts/prepare-export-panel.mjs "CE/panels/Roland GAIA SH-01.cepanel" build/gaia-export.cepanel
           "CE_GAIA_PANEL=$(($env:GITHUB_WORKSPACE -replace '\\','/') + '/build/gaia-export.cepanel')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: Configure (scripting ON, dev-mode OFF, GAIA panel in the plug-in)
-        run: cmake --preset native -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache "-DCE_VST_PANEL_PATH=$env:CE_GAIA_PANEL" "-DCE_VST_PRODUCT_NAME=GAIA Validate"
+      # Python3_ROOT_DIR: the interpreter setup-python installed, not whichever else the image has.
+      - name: Configure (scripting ON with Python and native handlers, dev-mode OFF, GAIA panel in the plug-in)
+        run: cmake --preset native -DCEDITOR_SCRIPTING=ON -DCEDITOR_PYTHON=ON -DCEDITOR_NATIVE_HANDLERS=ON "-DPython3_ROOT_DIR=$env:pythonLocation" -DCEDITOR_DEV_MODE=OFF -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache "-DCE_VST_PANEL_PATH=$env:CE_GAIA_PANEL" "-DCE_VST_PRODUCT_NAME=GAIA Validate"
 
       - name: Build (Release, all targets)
         run: cmake --build --preset native-release
 
       - name: C++ tests (CTest)
         run: ctest --test-dir build/native -C Release --output-on-failure
+
+      # Compiled-at-export handlers, end to end, built as an export builds them: C++ through the flat
+      # ABI and through the real loader, and Java and C# through their shims with two instances of a
+      # panel and two different panels in one process. The loader is built with cl, the modules and
+      # shims with LLVM's clang (on the image's PATH); both need the MSVC environment set up above.
+      # --require: a check that cannot run fails instead of skipping.
+      - name: Native handlers (C++, Java, C#) end to end
+        run: node tools/scripts/nativeHandlers/verify-all.mjs --require
 
       # Pinned, so a new validator release cannot turn this red on its own. pluginval is its
       # release binary; clap-validator is built from the commit of its 0.4.1 release, which needs
@@ -114,8 +161,10 @@ jobs:
 
       # --require: a validator that did not run fails the step rather than passing it. GUI tests are
       # skipped; they open the WebView editor, which is not what this step checks.
+      # The LV2 is built here anyway (CEDITOR_LV2 is on everywhere) and goes through pluginval like
+      # the VST3; until October 2026 it was validated on Linux only.
       - name: Validate the player plug-in (pluginval, clap-validator)
-        run: node tools/scripts/validate-plugins.mjs "build/native/CEditorPlayerVST_artefacts/Release/VST3/GAIA Validate.vst3" "build/native/CEditorPlayerVST_artefacts/Release/CLAP/GAIA Validate.clap" --require --skip-gui --report build/validation/report.json
+        run: node tools/scripts/validate-plugins.mjs "build/native/CEditorPlayerVST_artefacts/Release/VST3/GAIA Validate.vst3" "build/native/CEditorPlayerVST_artefacts/Release/CLAP/GAIA Validate.clap" "build/native/CEditorPlayerVST_artefacts/Release/LV2/GAIA Validate.lv2" --require --skip-gui --report build/validation/report.json
 
       - name: Upload the validation report
         if: always()

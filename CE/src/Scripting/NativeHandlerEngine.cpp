@@ -286,6 +286,31 @@ juce::File hostModuleDir()
     return dir;
 }
 
+// A copy of the C++ handler module of this instance's own, in a folder of the OS temp directory.
+//
+// A script's variables are globals of the module, and a process maps one library file once however
+// many times it is opened, so two plug-in instances of the same panel in one DAW shared every one
+// of them: a counter one instance kept, the other read. A copy at its own path is a library of its
+// own. Where the OS lets a loaded library's file go (Linux, macOS) the copy is deleted as soon as it
+// is open; on Windows it goes when the instance closes it, and a copy left by a crash is swept up the
+// next time any instance makes one (a library still loaded refuses to be deleted, so that is safe).
+juce::File privateModuleCopy (const juce::File& shared)
+{
+    auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("CEditorHandlerModules");
+    if (! dir.createDirectory()) return {};
+   #if defined(_WIN32)
+    // Ten minutes old at least, so a copy another process has made and not yet opened is left alone.
+    const auto old = juce::Time::getCurrentTime() - juce::RelativeTime::minutes (10);
+    for (const auto& stale : dir.findChildFiles (juce::File::findFiles, false))
+        if (stale.getLastModificationTime() < old) stale.deleteFile();
+   #endif
+    auto copy = dir.getChildFile (shared.getFileNameWithoutExtension() + "_"
+                                  + juce::Uuid().toString() + shared.getFileExtension());
+    if (! shared.copyFileTo (copy)) return {};
+    copy.setLastModificationTime (juce::Time::getCurrentTime());
+    return copy;
+}
+
 juce::String moduleFileName (const juce::String& language)
 {
    #if defined(_WIN32)
@@ -328,6 +353,10 @@ static void pinModuleResident (const juce::String& fullPath)
 class NativeHandlerEngine final : public ScriptEngine
 {
 public:
+    // Shut down and close what this instance loaded. Without it, a removed instance's module vtable
+    // was freed with it while the module could still be called.
+    ~NativeHandlerEngine() override { reset(); }
+
     juce::String language() const override { return "native"; } // serves cpp/csharp/java
 
     bool installApi (ScriptHostApi& h) override { host = &h; return true; }
@@ -395,30 +424,27 @@ public:
 
     void reset() override
     {
-        // C#/Java host an IN-PROCESS runtime (CoreCLR via hostfxr, JVM via JNI) that CANNOT be torn down
-        // and recreated in the same process. reset() runs on every reload (e.g. the panel window
-        // closing/reopening), so closing those modules' library would drop the DLL refcount, lose the
-        // shim's handle to the still-alive runtime, and make the NEXT load's init fail (JNI_CreateJavaVM
-        // refuses a second VM) — which is exactly why C#/Java fired on the first window-open but went
-        // silent on the second. So we keep the hosted-runtime modules RESIDENT + initialised for the
-        // process lifetime (their handlers are compiled-in and immutable anyway); ensureModule's
-        // short-circuit reuses them on the next load. Only the runtime-less modules (C++) are torn down.
-        for (auto it = modules.begin(); it != modules.end(); )
+        // Every module lets go of this instance's state, so a reload (the panel window closing and
+        // opening, say) starts each language's handlers afresh, as Lua's and JS's are: the C++ module's
+        // copy is closed and deleted, and the C# and Java modules drop this instance's load context or
+        // class loader. Their runtime (CoreCLR via hostfxr, the JVM via JNI) cannot be torn down and
+        // started again in one process, and is not: each shim pins itself resident, as does
+        // pinModuleResident, so closing this handle unloads nothing and the next load reuses the
+        // live runtime.
+        //
+        // Until October 2026 the C# and Java modules were kept open and initialised across a reset
+        // instead (from before they were pinned, when closing them lost the runtime and the next
+        // window went silent), and the engine was never shut down when it was destroyed — so a closed
+        // instance's Java or C# state stayed for the process lifetime.
+        for (auto& entry : modules)
         {
-            const bool keepResident = (it->first == "csharp" || it->first == "java");
-            if (keepResident && it->second != nullptr && it->second->ok)
-            {
-                ++it; // leave loaded + inited; reused via ensureModule on the next loadScript
-                continue;
-            }
-            auto& m = it->second;
-            if (m != nullptr)
-            {
-                if (m->ok && m->shutdown != nullptr && m->state != nullptr) m->shutdown (m->state);
-                m->lib.close();
-            }
-            it = modules.erase (it);
+            auto& m = entry.second;
+            if (m == nullptr) continue;
+            if (m->ok && m->shutdown != nullptr && m->state != nullptr) m->shutdown (m->state);
+            m->lib.close();
+            if (m->privateCopy != juce::File()) m->privateCopy.deleteFile();
         }
+        modules.clear();
         scriptLang.clear();
     }
 
@@ -438,6 +464,7 @@ private:
         void*      state    = nullptr;
         CeHostVtable vtable {};
         HostCtx    ctx {};
+        juce::File privateCopy;   // this instance's copy of the module, where it has one (C++)
         bool       ok = false;
     };
 
@@ -451,12 +478,38 @@ private:
         auto mp = std::make_unique<Module>();
         Module& m = *mp;
         const auto file = hostModuleDir().getChildFile (moduleFileName (language));
-        if (! file.existsAsFile() || ! m.lib.open (file.getFullPathName()))
+        if (! file.existsAsFile())
         {
             onError ("native:" + language, "handler module not found: " + file.getFullPathName());
             modules[language] = std::move (mp);
             return nullptr;
         }
+        // C++ modules are opened from a copy of this instance's own (privateModuleCopy says why). The
+        // C# and Java modules host a runtime that exists once per process, and keep each instance's
+        // state apart themselves.
+        juce::File toOpen = file;
+        if (language == "cpp")
+        {
+            m.privateCopy = privateModuleCopy (file);
+            if (m.privateCopy == juce::File())
+            {
+                onError ("native:" + language, "could not make this instance's own copy of the handler module in "
+                                                + juce::File::getSpecialLocation (juce::File::tempDirectory).getFullPathName());
+                modules[language] = std::move (mp);
+                return nullptr;
+            }
+            toOpen = m.privateCopy;
+        }
+        if (! m.lib.open (toOpen.getFullPathName()))
+        {
+            onError ("native:" + language, "handler module could not be loaded: " + toOpen.getFullPathName());
+            if (m.privateCopy != juce::File()) m.privateCopy.deleteFile();
+            modules[language] = std::move (mp);
+            return nullptr;
+        }
+       #if ! defined(_WIN32)
+        if (m.privateCopy != juce::File()) { m.privateCopy.deleteFile(); m.privateCopy = juce::File(); }
+       #endif
 
         auto ver = (FnAbiVersion) m.lib.getFunction ("ce_handler_abi_version");
         auto ini = (FnInit)       m.lib.getFunction ("ce_handler_init");

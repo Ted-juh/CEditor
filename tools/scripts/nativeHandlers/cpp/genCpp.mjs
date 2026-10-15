@@ -2,7 +2,9 @@
 //
 // Output: <outDir>/{glue.cpp, CMakeLists.txt}. Each script's source is wrapped in its own namespace
 // (so two controls can both define onValueChanged), and a dispatch table routes (scriptId, event) to
-// the right namespace's function. The module is built with `add_library(MODULE)` to ce_handlers_cpp.
+// the right namespace's function. A variable a script declares is a module global; the host loads
+// a copy of the module of its own for each plug-in instance (NativeHandlerEngine.cpp), so two
+// instances never share one. The module is built with `add_library(MODULE)` to ce_handlers_cpp.
 // <ext>, the exact name the host's NativeHandlerEngine looks for. Build-unverified until run on a real
 // toolchain (see native-handlers-design.md).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -48,8 +50,6 @@ struct Entry { const char* sid; const char* ev; void (*fn)(CeContext&, const CeE
 const Entry kEntries[] = {
 ${entries}
 };
-const CeHostVtable* g_host = nullptr;
-
 inline bool eq(const CeStr& a, const char* b) {
   const size_t bl = std::strlen(b);
   return (size_t) a.len == bl && std::memcmp(a.ptr, b, bl) == 0;
@@ -60,10 +60,12 @@ extern "C" {
 
 CE_EXPORT uint32_t CE_CALL ce_handler_abi_version(void) { return CE_ABI_VERSION; }
 
+// The state IS the instance's host vtable, handed back on every call, so each plug-in instance's
+// calls reach its own host. (One cached global sent every instance's calls to whichever instance
+// loaded last, and pointed into freed memory once that instance was removed.)
 CE_EXPORT int CE_CALL ce_handler_init(const CeHostVtable* host, void** out_state) {
   if (host == nullptr || host->abi_version != CE_ABI_VERSION) return -1;
-  g_host = host;
-  *out_state = (void*) host;   // stateless module; the host vtable is all we need
+  *out_state = (void*) host;
   return 0;
 }
 
@@ -72,11 +74,11 @@ CE_EXPORT int CE_CALL ce_handler_has(void* /*state*/, CeStr sid, CeStr ev) {
   return 0;
 }
 
-CE_EXPORT int CE_CALL ce_handler_dispatch(void* /*state*/, CeStr sid, CeStr ev,
+CE_EXPORT int CE_CALL ce_handler_dispatch(void* state, CeStr sid, CeStr ev,
                                           const CeValue* payload, CeValue* /*out_result*/) {
   for (const auto& e : kEntries) {
     if (eq(sid, e.sid) && eq(ev, e.ev)) {
-      CeContext ctx(g_host);
+      CeContext ctx(static_cast<const CeHostVtable*>(state));
       CeEvent evt(payload);
       e.fn(ctx, evt);        // value-returning handlers (onDawSaveState) are a TODO — see design §4
       return 0;
@@ -85,7 +87,7 @@ CE_EXPORT int CE_CALL ce_handler_dispatch(void* /*state*/, CeStr sid, CeStr ev,
   return 0; // no such handler is not an error
 }
 
-CE_EXPORT void CE_CALL ce_handler_shutdown(void* /*state*/) { g_host = nullptr; }
+CE_EXPORT void CE_CALL ce_handler_shutdown(void* /*state*/) {}
 
 } // extern "C"
 `;

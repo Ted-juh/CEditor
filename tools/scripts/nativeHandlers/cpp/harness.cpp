@@ -4,12 +4,26 @@
 // into the host. Builds against a module produced by genCpp.mjs from a fixed set of sample scripts.
 #include "NativeHandlerAbi.h"
 #include "ce_runtime.h"
-#include <dlfcn.h>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <map>
 #include <vector>
+
+#ifdef _WIN32
+ #define WIN32_LEAN_AND_MEAN
+ #include <windows.h>
+ static void* lib_open(const char* path) { return (void*)LoadLibraryA(path); }
+ static void* lib_sym(void* lib, const char* name) { return (void*)GetProcAddress((HMODULE)lib, name); }
+ static std::string lib_error() { return "error " + std::to_string(GetLastError()); }
+ static const char* const MODULE_PATH = ".\\ce_handlers_cpp.dll";
+#else
+ #include <dlfcn.h>
+ static void* lib_open(const char* path) { return dlopen(path, RTLD_NOW); }
+ static void* lib_sym(void* lib, const char* name) { return dlsym(lib, name); }
+ static std::string lib_error() { return dlerror(); }
+ static const char* const MODULE_PATH = "./ce_handlers_cpp.so";
+#endif
 
 static std::map<std::string,double> g_set;
 static int g_cc = -1;
@@ -50,12 +64,12 @@ static bool varKeepsItsText(){
 }
 
 int main(){
-  void* lib = dlopen("./ce_handlers_cpp.so", RTLD_NOW);
-  if(!lib){ printf("dlopen failed: %s\n", dlerror()); return 1; }
-  auto ver  = (uint32_t(CE_CALL*)())dlsym(lib,"ce_handler_abi_version");
-  auto init = (int(CE_CALL*)(const CeHostVtable*,void**))dlsym(lib,"ce_handler_init");
-  auto disp = (int(CE_CALL*)(void*,CeStr,CeStr,const CeValue*,CeValue*))dlsym(lib,"ce_handler_dispatch");
-  auto has  = (int(CE_CALL*)(void*,CeStr,CeStr))dlsym(lib,"ce_handler_has");
+  void* lib = lib_open(MODULE_PATH);
+  if(!lib){ printf("dlopen failed: %s\n", lib_error().c_str()); return 1; }
+  auto ver  = (uint32_t(CE_CALL*)())lib_sym(lib,"ce_handler_abi_version");
+  auto init = (int(CE_CALL*)(const CeHostVtable*,void**))lib_sym(lib,"ce_handler_init");
+  auto disp = (int(CE_CALL*)(void*,CeStr,CeStr,const CeValue*,CeValue*))lib_sym(lib,"ce_handler_dispatch");
+  auto has  = (int(CE_CALL*)(void*,CeStr,CeStr))lib_sym(lib,"ce_handler_has");
   if(ver()!=CE_ABI_VERSION){ printf("ABI mismatch\n"); return 1; }
 
   CeHostVtable vt{}; vt.abi_version=CE_ABI_VERSION; vt.struct_size=sizeof(vt);

@@ -90,7 +90,10 @@ test('an edit is one changed line', () => {
   const [button] = [...everyControl(panel.controls)]
     .find(([c, depth]) => depth > 0 && c._children.Core.controlType === 'Button') ?? [];
   assert.ok(button, 'the GAIA panel has a button inside a container');
-  button._children.Transform.x += 7;
+  // The control is its own to write into; its sections may be shared with an equal one, frozen
+  // (expandControls), so the move replaces the Transform as the editor's write path does.
+  const { Transform } = button._children;
+  button._children = { ...button._children, Transform: { ...Transform, x: Transform.x + 7 } };
   const after = serializePanel(panel).split('\n');
   assert.equal(after.length, before.length, 'moving a control adds or removes no lines');
   const changed = after.filter((line, i) => line !== before[i]);

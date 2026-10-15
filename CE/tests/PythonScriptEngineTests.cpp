@@ -7,12 +7,15 @@
 //   • event dispatch routes by language to the python handler
 //   • THE FULL-STDLIB CLAIM: `import json` / `import re` work (this is the whole point of native CPython)
 //   • per-script namespace isolation (two scripts, same handler name, no clash)
+//   • per-INSTANCE isolation: two runtimes (two copies of a panel, or two panels, in one process)
+//     share no module, no builtin and no host — each has an interpreter of its own
 //
 // Build with -DCEDITOR_SCRIPTING=ON -DCEDITOR_PYTHON=ON, then run ./CEditorPythonScriptTests.
 // Requires the bundled/installed stdlib to be discoverable (env CEDITOR_PYTHONHOME or a dev install).
 
 #include "Scripting/ScriptRuntime.h"
 #include <juce_core/juce_core.h>
+#include <functional>
 #include <iostream>
 
 using namespace ceditor::scripting;
@@ -23,10 +26,12 @@ public:
     std::map<juce::String, juce::var> values;
     juce::StringArray logs;
 
+    std::function<void (const juce::String&)> onSet;   // lets a test reach into another instance mid-call
+
     juce::var getValue (const juce::String& path, const juce::String&) override
     { auto it = values.find (path); return it != values.end() ? it->second : juce::var(); }
     void setValue (const juce::String& path, const juce::var& value, const juce::var&) override
-    { values[path] = value; }
+    { values[path] = value; if (onSet) onSet (path); }
     void sendCC (int, int, const juce::var&) override {}
     void sendNRPN (int, int, int, const juce::var&) override {}
     void sendSysex (const juce::var&) override {}
@@ -103,8 +108,8 @@ int main()
     runtime.onPanelReady (true);
     check (host.logs.contains ("stdlib 7 42"), "FULL STDLIB: import json + re worked window-closed");
 
-    // Anti-flood guard: a runaway Python loop must be aborted by the watchdog
-    // (PyErr_SetInterrupt -> KeyboardInterrupt) instead of hanging the host.
+    // Anti-flood guard: a runaway Python loop must be aborted by the watchdog (it raises
+    // ceditor.TimeLimit in the instance's interpreter) instead of hanging the host.
     juce::StringArray errors;
     runtime.setErrorLogger ([&errors] (const juce::String& line)
         { errors.add (line); std::cout << "  [error] " << line << "\n"; });
@@ -126,6 +131,102 @@ int main()
     host.logs.clear();
     runtime.dispatchEvent ("onAfter", "panel", juce::var());
     check (host.logs.contains ("after ok"), "Guard: next dispatch runs clean after a watchdog trip");
+
+    // ---- Two instances in one process ------------------------------------------------------------
+    // What the user asked for: every instance of a panel is on its own, even two copies of the same
+    // panel. Each runtime is one instance (one plug-in, one standalone window).
+    {
+        TestHost hostA, hostB;
+        juce::StringArray errorsA, errorsB;
+        auto runtimeA = std::make_unique<ScriptRuntime> (hostA);
+        auto runtimeB = std::make_unique<ScriptRuntime> (hostB);
+        runtimeA->setErrorLogger ([&errorsA] (const juce::String& line) { errorsA.add (line); std::cout << "  [A error] " << line << "\n"; });
+        runtimeB->setErrorLogger ([&errorsB] (const juce::String& line) { errorsB.add (line); std::cout << "  [B error] " << line << "\n"; });
+
+        // The same panel twice: identical scripts, identical ids.
+        const auto samePanel = [] (const char* extra)
+        {
+            juce::Array<juce::var> list;
+            list.add (makeScript ("counter", "onTick", "*",
+                "count = 0\n"
+                "def onTick(value):\n"
+                "    global count\n"
+                "    count += 1\n"
+                "    set(\"count\", count)\n"));
+            list.add (makeScript ("modules", "onCheck", "*", extra));
+            list.add (makeScript ("poker", "onPoke", "*",
+                "def onPoke(value):\n"
+                "    set(\"poke\", 1)\n"
+                "    set(\"after\", \"mine\")\n"));
+            list.add (makeScript ("threads", "onThread", "*",
+                "import threading\n"
+                "def onThread(value):\n"
+                "    threading.Thread(target=lambda: None).start()\n"));
+            return juce::var (list);
+        };
+        // A changes a module and a builtin at load; B, the same panel, looks for the change.
+        runtimeA->loadScripts (samePanel (
+            "import json, builtins\n"
+            "json.tag = 'set by A'\n"
+            "builtins.leak = 1\n"
+            "def onCheck(value):\n"
+            "    pass\n"));
+        runtimeB->loadScripts (samePanel (
+            "import json, builtins\n"
+            "def onCheck(value):\n"
+            "    set(\"tag\", str(getattr(json, 'tag', None)))\n"
+            "    set(\"leak\", hasattr(builtins, 'leak'))\n"));
+
+        runtimeA->dispatchEvent ("onTick", "panel", juce::var());
+        runtimeA->dispatchEvent ("onTick", "panel", juce::var());
+        runtimeB->dispatchEvent ("onTick", "panel", juce::var());
+        check ((int) hostA.values["count"] == 2 && (int) hostB.values["count"] == 1,
+               "Two copies of one panel keep their own variables (A counted 2, B 1)");
+
+        runtimeB->dispatchEvent ("onCheck", "panel", juce::var());
+        check (hostB.values["tag"].toString() == "None",
+               "A module one instance changes is not changed for the other (got " + hostB.values["tag"].toString() + ")");
+        check (hostB.values.count ("leak") == 1 && ! (bool) hostB.values["leak"],
+               "A builtin one instance adds is not there for the other");
+
+        // A's script, mid-call, causes B's script to run (through A's host), then carries on: its
+        // next call must still reach A's host. With one process-wide host pointer it reached B's.
+        hostA.onSet = [&] (const juce::String& path) { if (path == "poke") runtimeB->dispatchEvent ("onPoke", "panel", juce::var()); };
+        runtimeA->dispatchEvent ("onPoke", "panel", juce::var());
+        hostA.onSet = nullptr;
+        check (hostA.values["after"].toString() == "mine" && hostB.values["after"].toString() == "mine",
+               "Each instance's script reaches its own host, even with the other's call inside its own");
+
+        runtimeA->dispatchEvent ("onThread", "panel", juce::var());
+        check (errorsA.joinIntoString ("\n").contains ("thread"),
+               "A script cannot start a thread, which would outlive its instance (as in Pyodide)");
+
+        // A runaway loop in A is stopped in A; B is not touched.
+        juce::Array<juce::var> loop;
+        loop.add (makeScript ("spin", "onSpin", "*", "def onSpin(value):\n    while True:\n        pass\n"));
+        juce::Array<juce::var> bye;
+        bye.add (makeScript ("bye", "onTick", "*",
+            "import atexit\n"
+            "atexit.register(lambda: set(\"bye\", 1))\n"
+            "def onTick(value):\n"
+            "    set(\"ticked\", 1)\n"));
+        runtimeB->loadScripts (juce::var (bye));
+        runtimeA->loadScripts (juce::var (loop));
+        errorsA.clear();
+        runtimeA->dispatchEvent ("onSpin", "panel", juce::var());
+        runtimeB->dispatchEvent ("onTick", "panel", juce::var());
+        check (errorsA.joinIntoString ("\n").contains ("spin") && (int) hostB.values["ticked"] == 1 && errorsB.isEmpty(),
+               "A runaway loop in one instance is stopped there, and the other runs on");
+
+        // Closing B ends its interpreter: what runs as it ends reaches no host, and A carries on.
+        runtimeB.reset();
+        check (hostB.values.count ("bye") == 0, "A closed instance's last code reaches no host");
+        juce::Array<juce::var> after;
+        after.add (makeScript ("still", "onTick", "*", "def onTick(value):\n    set(\"still\", 1)\n"));
+        runtimeA->loadScripts (juce::var (after));
+        runtimeA->dispatchEvent ("onTick", "panel", juce::var());
+        check ((int) hostA.values["still"] == 1, "The other instance runs on after one is closed");
+    }
 
     std::cout << "-----------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";

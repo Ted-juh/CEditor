@@ -20,6 +20,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { scriptApiForTesting, setRuntimeHost } from '../src/CE_Application/scripting/panelRuntime.js';
+import { createInstanceStorage, createPlayerHost } from '../src/CE_Application/scripting/playerScriptHost.js';
 import {
   MEMBER_BY_ID, MODULES, memberPath, memberRuntime, RUNTIME_ANY,
 } from '../src/CE_Application/scripting/panelApi.js';
@@ -160,6 +161,77 @@ test('local scope is never written into the panel document', () => {
     assert.equal(a.storageInfo({ scope: 'local' }).available, false,
       'and info() is where a script finds that out, rather than per key');
   });
+});
+
+/* ------------------------------------------------------------------------ the plug-in instance */
+//
+// In the exported plug-in both stores are the instance's (PluginProcessor.h keeps them and saves
+// them with the project), and the page reads and writes them through the host. Two copies of a
+// panel are two instances, and keep theirs apart.
+
+/** A player host for one plug-in instance: its stores, and every write it was sent. */
+function instance(initial = {}) {
+  const sent = [];
+  const storage = createInstanceStorage(initial, (change) => sent.push(change));
+  const panel = { id: 'p', name: 'P', scripting: { modules: ['ce.storage'], settings: { fromDocument: 1 } }, controls: [] };
+  return { sent, panel, host: createPlayerHost(panel, { storage }) };
+}
+
+function inInstance(inst, fn) {
+  setRuntimeHost(inst.host);
+  try { return fn(scriptApiForTesting('', 'scriptA'), scriptApiForTesting('', 'scriptB')); } finally { setRuntimeHost(null); }
+}
+
+test('in the plug-in, the page starts from the instance’s stores, not the document or localStorage', () => {
+  const inst = instance({ panel: { bank: 'B' }, local: { port: 'IAC 2' } });
+  inInstance(inst, (a) => {
+    assert.equal(a.loadSetting('bank'), 'B');
+    assert.equal(a.loadSetting('fromDocument', 'absent'), 'absent',
+      'the instance seeded its panel store from the document already; the page does not read it again');
+    assert.equal(a.loadSetting('port', null, { scope: 'local' }), 'IAC 2');
+    assert.equal(a.storageInfo({ scope: 'local' }).available, true, 'there is a local store: the instance');
+  });
+});
+
+test('every write and forget the page makes goes back to the instance, in both scopes', () => {
+  const inst = instance();
+  inInstance(inst, (a) => {
+    assert.equal(a.saveSetting('bank', 'C'), true);
+    assert.equal(a.saveSetting('port', 'IAC', { scope: 'local' }), true);
+    assert.equal(a.saveSetting('mine', 3, { scope: 'script' }), true);
+    assert.equal(a.forgetSetting('bank'), true);
+    assert.equal(a.forgetSetting('bank'), false, 'and says when there was nothing to forget, sending nothing');
+  });
+  assert.deepEqual(inst.sent, [
+    { store: 'panel', key: 'bank', value: 'C' },
+    { store: 'local', key: 'port', value: 'IAC' },
+    { store: 'panel', key: '\u0001script:scriptA:mine', value: 3 },
+    { store: 'panel', key: 'bank', forget: true },
+  ]);
+  assert.deepEqual(inst.panel.scripting.settings, { fromDocument: 1 }, 'the document is not the store here');
+});
+
+test('two copies of one panel keep their settings apart, local scope too', () => {
+  const one = instance();
+  const two = instance();
+  inInstance(one, (a) => { a.saveSetting('port', 'IAC 1', { scope: 'local' }); a.saveSetting('bank', 'A'); });
+  inInstance(two, (a) => { a.saveSetting('port', 'IAC 2', { scope: 'local' }); });
+  inInstance(one, (a) => {
+    assert.equal(a.loadSetting('port', null, { scope: 'local' }), 'IAC 1', 'the other copy did not overwrite it');
+    assert.equal(a.loadSetting('bank'), 'A');
+  });
+  inInstance(two, (a) => assert.equal(a.loadSetting('bank', 'none'), 'none'));
+});
+
+test('a value is stored as the instance will keep it, so changing the object afterwards changes neither', () => {
+  const inst = instance();
+  inInstance(inst, (a) => {
+    const patch = { cutoff: 10 };
+    a.saveSetting('patch', patch);
+    patch.cutoff = 99;
+    assert.deepEqual(a.loadSetting('patch'), { cutoff: 10 });
+  });
+  assert.deepEqual(inst.sent[0].value, { cutoff: 10 });
 });
 
 /* ------------------------------------------------------------------------ bulk reads */

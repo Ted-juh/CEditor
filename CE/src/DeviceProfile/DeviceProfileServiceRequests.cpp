@@ -232,6 +232,7 @@ juce::var DeviceProfileService::pushRuntimeStateToDevice (const juce::String& co
 void DeviceProfileService::addPendingDeviceRequest (const PendingDeviceRequest& request)
 {
     pendingDeviceRequests[request.correlationId] = request;
+    publishPendingRequests();
     startTimerHz (60);
 }
 

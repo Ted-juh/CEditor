@@ -2973,7 +2973,7 @@ export const COMMANDS = [
   },
   {
     id: 'saveSetting', category: 'Storage', signature: 'saveSetting(key, value [, opts]) -> boolean',
-    summary: 'Save a value under `key` so it outlasts the script — unlike `ce.storage.state`, it survives a reload. By default it is stored with the panel and travels with it; in an exported plugin it is saved in the DAW project. `opts.scope` sets who sees it: "panel" (every script on the panel, the default), "script" (only this script) or "local" (only this computer, never saved into the panel). Returns false if the value could not be saved, for example because storage is not available.',
+    summary: 'Save a value under `key` so it outlasts the script — unlike `ce.storage.state`, it survives a reload. By default it is stored with the panel and travels with it; in an exported plugin it is saved in the DAW project. `opts.scope` sets who sees it: "panel" (every script on the panel, the default), "script" (only this script) or "local" (only this computer, never saved into the panel; in an exported plugin, only this instance of it). Returns false if the value could not be saved, for example because storage is not available.',
     params: [
       { name: 'key', type: 'string', required: true },
       { name: 'value', type: 'value', required: true },
@@ -3020,7 +3020,8 @@ export const COMMANDS = [
        · "panel"  — shared by every script on the panel, in the document, travels with it.
        · "script" — private to the calling script, the way `state` already is.
        · "local"  — THIS MACHINE only, never written into the document. A panel you send somebody
-                    should not carry your MIDI port choice with it.
+                    should not carry your MIDI port choice with it. In the exported plug-in it is
+                    also this instance only: two copies of a panel each keep their own.
      A scope this build does not know is REFUSED rather than quietly treated as "panel": storing a
      value somewhere the caller did not ask for is how a private setting becomes a shared one. */
   {
