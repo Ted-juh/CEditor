@@ -10,6 +10,7 @@
 #include "HostageManifest.h"
 #include "InstrumentHostService.h"
 #include "BinaryData.h" // PlayerWebData — the embedded web bundle (host.html rides in it)
+#include "../WebViewProfileFolders.h"
 
 // HostRuntimeShared — the glue both generated Hostage targets share.
 //
@@ -139,12 +140,8 @@ inline juce::WebBrowserComponent::Options
 makeHostWebViewOptions (const juce::String& userDataFolderName,
                         std::function<void (const juce::var& payload)> onCommand)
 {
-    static std::atomic<int> instanceCounter { 0 };
-
-    const auto userDataFolder = juce::File::getSpecialLocation (juce::File::tempDirectory)
-        .getChildFile (userDataFolderName)
-        .getChildFile (juce::String::toHexString (juce::Time::getHighResolutionTicks())
-                       + "_" + juce::String (++instanceCounter));
+    // One per webview, as the player's; the folders gone processes left are swept (WebViewProfileFolders.h).
+    const auto userDataFolder = ceditor::webview::profileFolderForNewWebView (userDataFolderName);
 
     auto webview2Options = juce::WebBrowserComponent::Options::WinWebView2()
         .withBackgroundColour (juce::Colour (0xFF1E1E1E))
