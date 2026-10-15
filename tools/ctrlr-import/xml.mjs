@@ -197,7 +197,7 @@ class Reader {
  * AFTER a leading byte-order mark is removed, so slice that, not the raw input.
  */
 export function parseXml(source, options = {}) {
-  const text = String(source ?? '').replace(/^﻿/, '');
+  const text = String(source ?? '').replace(/^\uFEFF/, '');
   if (!text.trim()) throw new Error('The file is empty');
 
   const reader = new Reader(text, options);

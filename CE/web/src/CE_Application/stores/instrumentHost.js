@@ -2050,7 +2050,7 @@ export function isBipolarParameter(parameter) {
   if (Math.abs(Number(parameter?.defaultValue ?? 0) - 0.5) > 0.01) return false;
   if (/pan|balance|detune|fine|bend|spread|offset|amount|width/i.test(String(parameter?.name ?? ''))) return true;
   const text = String(parameter?.text ?? '').trim();
-  return /^[+\-−]\s*\d/.test(text) || /^[LR]\s*\d/.test(text) || text === 'C';
+  return /^[+\-\u2212]\s*\d/.test(text) || /^[LR]\s*\d/.test(text) || text === 'C';
 }
 
 export function parameterControlKind(parameter) {

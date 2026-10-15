@@ -28,7 +28,7 @@ export function customNumericFields(control, values = {}) {
 }
 
 function pitchNumber(text) {
-  const match = /^([a-g])([#b♯♭]?)(-?\d+)$/i.exec(text);
+  const match = /^([a-g])([#b\u266F\u266D]?)(-?\d+)$/i.exec(text);
   if (!match) return Number(text);
   const accidental = ['#', '♯'].includes(match[2]) ? 1 : ['b', '♭'].includes(match[2].toLowerCase()) ? -1 : 0;
   return (Number(match[3]) + 1) * 12 + { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[match[1].toUpperCase()] + accidental;
