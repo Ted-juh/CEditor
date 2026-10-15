@@ -87,8 +87,8 @@ re-read.
 ## What it does not cover
 
 - **macOS.** The first runs were on Linux, and CI now runs the same check on Windows on every
-  run: the Windows job builds the player with the GAIA panel in it and validates the VST3 and the
-  CLAP with `--require` (`.github/workflows/ci.yml`; the report is uploaded as the
-  `plugin-validation` artifact). The LV2 is validated on Linux only. There is no macOS build.
+  run: the Windows job builds the player with the GAIA panel in it and validates the VST3, the
+  CLAP and the LV2 with `--require` (`.github/workflows/ci.yml`; the report is uploaded as the
+  `plugin-validation` artifact). There is no macOS build.
 - **The panel's own scripts.** The validators drive the plug-in with no hardware attached. A panel
   script that misbehaves only when a synth answers will not show up here.

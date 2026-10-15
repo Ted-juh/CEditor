@@ -13,8 +13,8 @@
 # PlayerWebData (the embedded player UI).
 #
 # The player plug-in is built with the GAIA panel in it and put through the hosts' conformance
-# suites: pluginval for the VST3, clap-validator for the CLAP. docs/plugin-validation.md has what
-# the first runs found. Not covered yet: the installer packaging scripts.
+# suites: pluginval for the VST3 and the LV2, clap-validator for the CLAP. docs/plugin-validation.md
+# has what the first runs found. Not covered yet: the installer packaging scripts.
 #
 # The browser checks (CE/web/browser-checks) run too, after the web tests.
 #
@@ -161,8 +161,10 @@ jobs:
 
       # --require: a validator that did not run fails the step rather than passing it. GUI tests are
       # skipped; they open the WebView editor, which is not what this step checks.
+      # The LV2 is built here anyway (CEDITOR_LV2 is on everywhere) and goes through pluginval like
+      # the VST3; until October 2026 it was validated on Linux only.
       - name: Validate the player plug-in (pluginval, clap-validator)
-        run: node tools/scripts/validate-plugins.mjs "build/native/CEditorPlayerVST_artefacts/Release/VST3/GAIA Validate.vst3" "build/native/CEditorPlayerVST_artefacts/Release/CLAP/GAIA Validate.clap" --require --skip-gui --report build/validation/report.json
+        run: node tools/scripts/validate-plugins.mjs "build/native/CEditorPlayerVST_artefacts/Release/VST3/GAIA Validate.vst3" "build/native/CEditorPlayerVST_artefacts/Release/CLAP/GAIA Validate.clap" "build/native/CEditorPlayerVST_artefacts/Release/LV2/GAIA Validate.lv2" --require --skip-gui --report build/validation/report.json
 
       - name: Upload the validation report
         if: always()
