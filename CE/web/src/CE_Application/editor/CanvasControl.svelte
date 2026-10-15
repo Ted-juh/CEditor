@@ -393,7 +393,9 @@
   });
   let interactiveRenderingEnabled = $derived(isCustomComponent || previewSessionOverride !== null || editorInteractionEnabled === false);
   let shouldResolveInteractive = $derived(interactiveRenderingEnabled && resolvedControlOverride == null && interactionRuntimeOverride == null);
-  let resolvedInteractive = $derived(shouldResolveInteractive ? resolveInteractiveControl(control, appliedPreviewSession) : null);
+  // shareUnchanged: what the resolution left as it was is the control's own shared objects again,
+  // not a copy each (interactionRuntime.js, reshareUnchanged); nothing here writes into it.
+  let resolvedInteractive = $derived(shouldResolveInteractive ? resolveInteractiveControl(control, appliedPreviewSession, { shareUnchanged: true }) : null);
   let renderControl = $derived(
     (resolvedControlOverride ? resolveControlForSet(resolvedControlOverride, controlSet) : null)
       ?? resolveLinkedEnvelope(interactiveRenderingEnabled ? (resolvedInteractive?.control ?? control) : control, allControls)

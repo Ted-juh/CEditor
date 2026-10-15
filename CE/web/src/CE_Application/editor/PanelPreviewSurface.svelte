@@ -667,7 +667,10 @@
     // already applied to the document's control is a state the set can no longer change. Tokens
     // are resolved later, in CanvasControl, as they are for every control.
     const control = applyDeviceSyncStatus(applySectionValues(resolveControlFamily(rawControl, controlSetForPanel(panel)), previewOverrides?.sectionValues));
-    const resolved = applyKeyboardValueSource(control, resolveInteractiveControl(control, previewOverrides));
+    // shareUnchanged: what the resolution leaves as it was stays the control's own shared, frozen
+    // objects (interactionRuntime.js, reshareUnchanged), not a copy each for as long as it is drawn;
+    // the value sources below copy what they change.
+    const resolved = applyKeyboardValueSource(control, resolveInteractiveControl(control, previewOverrides, { shareUnchanged: true }));
     return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyStepSequencerValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))))))));
   }
 
