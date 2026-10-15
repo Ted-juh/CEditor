@@ -153,6 +153,30 @@ int main(int argc, char** argv) {
             int panels = lib2 && rc2 == 0 && c.count == 100 && a.count == 4;
             printf("another panel: init=%d its counter %g, first panel's A %g -> %s\n", rc2, c.count, a.count, panels ? "ok" : "WRONG");
             ok = ok && panels;
+
+            /* Both panels' runtimes busy side by side: 500 calls each, interleaved. The counters
+             * throw and catch, fault on a null and collect garbage on every call (verify-*.mjs), so
+             * each runtime's exception handling and GC run while the other's is loaded. */
+            if (panels && disp2) {
+                for (int i = 0; i < 500; i++) { disp(sa, sidc, ev, &p, NULL); disp2(sc, sidc, ev, &p, NULL); }
+                int busy = a.count == 504 && c.count == 100.0 * 501;
+                printf("both panels busy: A %g (504), other %g (50100) -> %s\n", a.count, c.count, busy ? "ok" : "WRONG");
+                ok = ok && busy;
+                /* How many runtime libraries the process has mapped: one JVM for Java (the second
+                 * panel uses the first one's), one CoreCLR per panel for C#. */
+                char line[4096], seen[8][1024]; int nseen = 0;
+                FILE* maps = fopen("/proc/self/maps", "r");
+                while (maps && fgets(line, sizeof line, maps)) {
+                    char* path = strchr(line, '/');
+                    if (!path || (!strstr(path, "libcoreclr.") && !strstr(path, "libjvm."))) continue;
+                    path[strcspn(path, "\n")] = 0;
+                    int known = 0;
+                    for (int k = 0; k < nseen; k++) if (strcmp(seen[k], path) == 0) known = 1;
+                    if (!known && nseen < 8) { strncpy(seen[nseen], path, sizeof seen[0] - 1); seen[nseen][sizeof seen[0] - 1] = 0; nseen++; }
+                }
+                if (maps) fclose(maps);
+                printf("runtime libraries mapped: %d\n", nseen);
+            }
         }
         if (shut) shut(sa);
     }

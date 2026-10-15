@@ -54,7 +54,9 @@ try {
       { id: 'knob1', name: 'Cutoff', event: 'onValueChanged', source: 'void onValueChanged(CeContext ctx, CeEvent e){ ctx.sendCC(1, 25, 127); ctx.setValue("out", e.value*2+1); ctx.log("ran"); }' },
       { id: 'knob2', name: 'Values', event: 'onValueChanged', source: 'void OnValueChanged(CeContext ctx, CeEvent e){ ctx.Log("v", 1.5); ctx.SendSysex(new[] { 0xF0, 0x7F, 0xF7 }); ctx.SendSysex("F0 7E F7"); ctx.SendNRPN(1, 2, 3, 400); ctx.SendCC(1, 64, true); ctx.SetValue("typed", ctx.GetValue("cutoff.value") + 42); }' },
       // Two instances of this module in one process must count apart (harness.c), in a field and a static.
-      { id: 'counter', name: 'Counter', event: 'onValueChanged', source: 'int count = 0; static int calls = 0;\nvoid onValueChanged(CeContext ctx, CeEvent e){ count++; calls++; ctx.setValue("count", count == calls ? count : -1); }' },
+      // Each call also throws and catches, faults on a null (a signal the runtime turns into an
+      // exception) and collects garbage, so the two-panel run exercises both runtimes' machinery.
+      { id: 'counter', name: 'Counter', event: 'onValueChanged', source: 'int count = 0; static int calls = 0;\nvoid onValueChanged(CeContext ctx, CeEvent e){ try { string s = null; count += s.Length; } catch (NullReferenceException) { } try { throw new InvalidOperationException("x"); } catch (InvalidOperationException) { } GC.Collect(); count++; calls++; ctx.setValue("count", count == calls ? count : -1); }' },
     ], outDir: work, abiInfo: { dir: ABI_DIR, targetFramework: targetFramework() } });
 
     // 1) Roslyn → self-contained CoreCLR + ce_managed.dll
@@ -70,7 +72,7 @@ try {
     // have: the same class and script names, different code.
     const other = path.join(work, 'other-panel');
     const gen2 = generateCsharpModule({ scripts: [
-      { id: 'counter', name: 'Counter', event: 'onValueChanged', source: 'static int count = 0;\nvoid onValueChanged(CeContext ctx, CeEvent e){ count += 100; ctx.setValue("count", count); }' },
+      { id: 'counter', name: 'Counter', event: 'onValueChanged', source: 'static int count = 0;\nvoid onValueChanged(CeContext ctx, CeEvent e){ try { string s = null; count += s.Length; } catch (NullReferenceException) { } try { throw new InvalidOperationException("y"); } catch (InvalidOperationException) { } GC.Collect(); count += 100; ctx.setValue("count", count); }' },
     ], outDir: other, abiInfo: { dir: ABI_DIR, targetFramework: targetFramework() } });
     execSync(gen2.publishCommand(rid()), { cwd: other, stdio: 'inherit', env: { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_NOLOGO: '1' } });
     const otherShim = path.join(other, gen2.publishSubdir, `ce_handlers_csharp${ext()}`);

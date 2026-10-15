@@ -142,10 +142,15 @@ reload and close.
 
 Two *different* panels in one process: each shim finds its own folder through a private symbol (an
 exported one resolved through the global scope to the other panel's shim, which then loaded the other
-panel's jar). Java uses the JVM already in the process rather than load its own `libjvm` beside it. A
-second C# panel boots its own hostfxr and CoreCLR from its own folder; that runs (the harness checks it
-on Linux) but two CoreCLRs in one process is not a configuration .NET supports, and is untested on
-Windows and macOS.
+panel's jar). Java uses the JVM already in the process rather than load its own `libjvm` beside it
+(the harness counts one mapped). A second C# panel boots its own hostfxr and CoreCLR from its own
+folder, so the process has two. .NET does not promise that works; it does work, and the harness drives
+it hard: 500 calls into each panel, interleaved, every one throwing and catching, faulting on a null
+(the signal each runtime turns into a NullReferenceException) and forcing a collection, with both
+counters exact at the end. Sharing the first panel's runtime instead — the configuration .NET does
+support — is the worse risk here: each panel's runtime is trimmed to what its own handlers use, so a
+second panel's code could find a framework type the first one's trim removed, and fail when that code
+first runs rather than at load. Tested on Linux; Windows and macOS have not run the two-panel case.
 
 The `juce::var`↔`CeValue` marshalling mirrors the existing `varToPy`/`pyToVar` in
 `PythonScriptEngine.cpp`.
