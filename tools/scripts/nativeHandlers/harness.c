@@ -7,10 +7,26 @@
  * path (another panel's) both panels in one process. Used by verify-{java,csharp}.mjs when the
  * toolchain is available. */
 #include "NativeHandlerAbi.h"
-#include <dlfcn.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#ifdef _WIN32
+ #define WIN32_LEAN_AND_MEAN
+ #define PSAPI_VERSION 2      /* K32EnumProcessModules, in kernel32: nothing more to link */
+ #include <windows.h>
+ #include <psapi.h>
+ static void* lib_open(const char* path) { return (void*)LoadLibraryA(path); }
+ static void* lib_sym(void* lib, const char* name) { return (void*)GetProcAddress((HMODULE)lib, name); }
+ static const char* lib_error(void) { static char text[32]; snprintf(text, sizeof text, "error %lu", (unsigned long)GetLastError()); return text; }
+ #define DEFAULT_MODULE ".\\ce_handlers_java.dll"
+#else
+ #include <dlfcn.h>
+ static void* lib_open(const char* path) { return dlopen(path, RTLD_NOW); }
+ static void* lib_sym(void* lib, const char* name) { return dlsym(lib, name); }
+ static const char* lib_error(void) { return dlerror(); }
+ #define DEFAULT_MODULE "./ce_handlers_java.so"
+#endif
 
 static char g_out_key[64]; static double g_out_val; static char g_log[64];
 /* knob2 — the calls that carry a value through the slots appended after ABI 1 */
@@ -61,12 +77,12 @@ typedef int  (CE_CALL *HasFn)(void*, CeStr, CeStr);
 typedef void (CE_CALL *ShutFn)(void*);
 
 int main(int argc, char** argv) {
-    void* lib = dlopen(argc>1?argv[1]:"./ce_handlers_java.so", RTLD_NOW);
-    if (!lib) { printf("dlopen: %s\n", dlerror()); return 1; }
-    uint32_t (CE_CALL *ver)(void)                                      = (uint32_t(CE_CALL*)(void))dlsym(lib,"ce_handler_abi_version");
-    int (CE_CALL *init)(const CeHostVtable*, void**)                   = (int(CE_CALL*)(const CeHostVtable*,void**))dlsym(lib,"ce_handler_init");
-    int (CE_CALL *disp)(void*, CeStr, CeStr, const CeValue*, CeValue*) = (int(CE_CALL*)(void*,CeStr,CeStr,const CeValue*,CeValue*))dlsym(lib,"ce_handler_dispatch");
-    int (CE_CALL *has)(void*, CeStr, CeStr)                            = (int(CE_CALL*)(void*,CeStr,CeStr))dlsym(lib,"ce_handler_has");
+    void* lib = lib_open(argc>1?argv[1]:DEFAULT_MODULE);
+    if (!lib) { printf("dlopen: %s\n", lib_error()); return 1; }
+    uint32_t (CE_CALL *ver)(void)                                      = (uint32_t(CE_CALL*)(void))lib_sym(lib,"ce_handler_abi_version");
+    int (CE_CALL *init)(const CeHostVtable*, void**)                   = (int(CE_CALL*)(const CeHostVtable*,void**))lib_sym(lib,"ce_handler_init");
+    int (CE_CALL *disp)(void*, CeStr, CeStr, const CeValue*, CeValue*) = (int(CE_CALL*)(void*,CeStr,CeStr,const CeValue*,CeValue*))lib_sym(lib,"ce_handler_dispatch");
+    int (CE_CALL *has)(void*, CeStr, CeStr)                            = (int(CE_CALL*)(void*,CeStr,CeStr))lib_sym(lib,"ce_handler_has");
     if (!ver||!init||!disp||!has) { printf("missing symbols\n"); return 1; }
 
     CeHostVtable vt; memset(&vt,0,sizeof(vt));
@@ -119,7 +135,7 @@ int main(int argc, char** argv) {
      * called again: each host must see its own count, A 2, B 1, A 3. With the handler classes shared
      * between instances (the Java shim until October 2026), B saw 3 and A then 4. */
     CeStr sidc = { "counter", 7 };
-    ShutFn shut = (ShutFn)dlsym(lib, "ce_handler_shutdown");
+    ShutFn shut = (ShutFn)lib_sym(lib, "ce_handler_shutdown");
     if (has(st, sidc, ev)) {
         Instance a = { -1 }, b = { -1 };
         CeHostVtable va = vt, vb = vt;
@@ -141,9 +157,9 @@ int main(int argc, char** argv) {
          * own code, and the first panel's instance must not notice. The old Java shim found the first
          * panel's jar from the second panel's module and ran the first panel's counter. */
         if (argc > 2) {
-            void* lib2 = dlopen(argv[2], RTLD_NOW);
-            InitFn init2 = lib2 ? (InitFn)dlsym(lib2, "ce_handler_init") : NULL;
-            DispFn disp2 = lib2 ? (DispFn)dlsym(lib2, "ce_handler_dispatch") : NULL;
+            void* lib2 = lib_open(argv[2]);
+            InitFn init2 = lib2 ? (InitFn)lib_sym(lib2, "ce_handler_init") : NULL;
+            DispFn disp2 = lib2 ? (DispFn)lib_sym(lib2, "ce_handler_dispatch") : NULL;
             Instance c = { -1 };
             CeHostVtable vc = vt; vc.set = h_set_instance; vc.host_ctx = &c;
             void* sc = NULL;
@@ -164,7 +180,17 @@ int main(int argc, char** argv) {
                 ok = ok && busy;
                 /* How many runtime libraries the process has mapped: one JVM for Java (the second
                  * panel uses the first one's), one CoreCLR per panel for C#. */
-                char line[4096], seen[8][1024]; int nseen = 0;
+                int nseen = 0;
+#ifdef _WIN32
+                HMODULE mods[1024]; DWORD bytes = 0;
+                if (K32EnumProcessModules(GetCurrentProcess(), mods, sizeof mods, &bytes))
+                    for (DWORD k = 0; k < bytes / sizeof(HMODULE) && k < 1024; k++) {
+                        char name[MAX_PATH];
+                        if (!K32GetModuleBaseNameA(GetCurrentProcess(), mods[k], name, sizeof name)) continue;
+                        if (_stricmp(name, "coreclr.dll") == 0 || _stricmp(name, "jvm.dll") == 0) nseen++;
+                    }
+#else
+                char line[4096], seen[8][1024];
                 FILE* maps = fopen("/proc/self/maps", "r");
                 while (maps && fgets(line, sizeof line, maps)) {
                     char* path = strchr(line, '/');
@@ -175,6 +201,7 @@ int main(int argc, char** argv) {
                     if (!known && nseen < 8) { strncpy(seen[nseen], path, sizeof seen[0] - 1); seen[nseen][sizeof seen[0] - 1] = 0; nseen++; }
                 }
                 if (maps) fclose(maps);
+#endif
                 printf("runtime libraries mapped: %d\n", nseen);
             }
         }

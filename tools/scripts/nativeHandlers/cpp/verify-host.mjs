@@ -12,11 +12,15 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { generateCppModule } from './genCpp.mjs';
 import { ABI_DIR, buildEngineE2E, engineE2EUnavailable } from '../engineE2E.mjs';
+import { LIB_EXT, SHARED_FLAGS, cxxCompiler, skip } from '../toolchain.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const unavailable = engineE2EUnavailable();
-if (unavailable) { console.log(`verify-host: ${unavailable} — skipping (the C++ ABI itself is covered by verify.mjs).`); process.exit(0); }
-const cxx = ['clang++', 'g++', 'c++'].find((c) => { try { execSync(`command -v ${c}`, { stdio: 'ignore' }); return true; } catch { return false; } });
+if (unavailable) skip(`verify-host: ${unavailable} — skipping (the C++ ABI itself is covered by verify.mjs).`);
+// The module is built as an export builds it, with clang where there is one; the engine as the
+// plug-in is (engineE2E.mjs). The ABI between them is flat C.
+const cxx = cxxCompiler(['clang++', 'g++', 'c++']);
+if (!cxx) skip('verify-host: no C++ compiler for the handler module — skipping.');
 
 const work = path.join(tmpdir(), `ce-nh-host-${process.pid}`);
 rmSync(work, { recursive: true, force: true });
@@ -38,7 +42,7 @@ try {
       source: 'int count = 0;\nvoid onValueChanged(CeContext& ctx, const CeEvent&){ ++count; ctx.setValue("count", count); }' }],
     outDir: work, abiHeaderDir: ABI_DIR, runtimeHeaderDir: HERE,
   });
-  run(`${cxx} -std=c++20 -fPIC -shared -fvisibility=hidden -I ${q(ABI_DIR)} -I ${q(HERE)} ${q(path.join(work, 'glue.cpp'))} -o ${q(path.join(work, 'ce_handlers_cpp.so'))}`);
+  run(`${cxx} -std=c++20 ${SHARED_FLAGS} -I ${q(ABI_DIR)} -I ${q(HERE)} ${q(path.join(work, 'glue.cpp'))} -o ${q(path.join(work, `ce_handlers_cpp${LIB_EXT}`))}`);
 
   // 2) the real engine and a main that drives it.
   const e2e = buildEngineE2E({ work, main: `

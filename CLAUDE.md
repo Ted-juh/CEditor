@@ -345,6 +345,11 @@ node tools/scripts/nativeHandlers/verify-all.mjs
 node tools/toolchains/languages.mjs status
 ```
 
+`verify-all.mjs` builds and runs real C++, Java and C# handler modules where it finds a compiler,
+a JDK with `jlink` and `dotnet`, and skips each check it cannot run. CI runs it on Windows with
+`--require`, where a skip fails; pass the same flag locally when you touch
+`tools/scripts/nativeHandlers/` or the loader, so a missing toolchain does not read as a pass.
+
 `docs/verify-end-to-end.md` is the full gated checklist for the export toolchain, most of which is
 Windows-only. Gates 0 and 1 run anywhere and are the cheapest way to catch a broken script/export
 path.

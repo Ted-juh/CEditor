@@ -2,8 +2,10 @@
 // program, for the verifiers that drive a generated module through it: verify-host.mjs (C++) and
 // verify-java.mjs. juce_core.o is cached in the OS temp dir between runs (its compile is the slow part).
 //
-// The program is `<work>/e2e`, and the engine looks for handler modules beside the binary it is in,
-// so the module under test goes in `work` too. `main` is the body of main(): it has TestHost (a
+// The program is `<work>/e2e` (e2e.exe on Windows), and the engine looks for handler modules beside
+// the binary it is in, so the module under test goes in `work` too. On Windows it is built with
+// cl.exe, as the plug-in is — the SEH guard in NativeHandlerCrashGuard.c is MSVC's __try, and only
+// cl compiles it as the product does — so it needs a Developer environment. `main` is the body of main(): it has TestHost (a
 // ScriptHostApi that records what reaches it), `onErr` and the engine factory to work with, and
 // returns the exit code.
 import { execSync } from 'node:child_process';
@@ -11,6 +13,7 @@ import { existsSync, writeFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { IS_WINDOWS, which } from './toolchain.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -21,7 +24,6 @@ const SRC = path.join(REPO, 'CE/src/Scripting/NativeHandlerEngine.cpp');
 const GUARD = path.join(REPO, 'CE/src/Scripting/NativeHandlerCrashGuard.c');
 const DEFS = ['-DJUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1', '-DJUCE_STANDALONE_APPLICATION=1', '-DJUCE_USE_CURL=0'];
 
-function which(c) { try { execSync(`command -v ${c}`, { stdio: 'ignore' }); return true; } catch { return false; } }
 const q = (s) => `"${s}"`;
 
 /** <repo>/JUCE/include/JUCE-*\/modules, or null. */
@@ -34,24 +36,16 @@ function findJuceModules() {
 
 /** Why the engine cannot be built here, or null when it can. */
 export function engineE2EUnavailable() {
-  if (!['clang++', 'g++', 'c++'].some(which)) return 'no C++ compiler';
+  if (IS_WINDOWS && !which('cl')) return 'no cl.exe (run it from a Visual Studio Developer environment)';
+  if (!IS_WINDOWS && !['clang++', 'g++', 'c++'].some(which)) return 'no C++ compiler';
   if (!findJuceModules()) return 'vendored JUCE not found';
   return null;
 }
 
 /** Builds `<work>/e2e` from the engine and `main`, and returns its path. */
 export function buildEngineE2E({ work, main }) {
-  const cxx = ['clang++', 'g++', 'c++'].find(which);
   const JM = findJuceModules();
   const run = (cmd) => execSync(cmd, { stdio: 'inherit' });
-
-  const juceObj = path.join(tmpdir(), 'ce-nh-juce_core.o');
-  if (!existsSync(juceObj)) {
-    console.log('engine e2e: compiling juce_core (cached after first run)...');
-    const unit = path.join(work, 'juce_unit.cpp');
-    writeFileSync(unit, '#include <juce_core/juce_core.cpp>\n');
-    run(`${cxx} -c -std=c++20 ${DEFS.join(' ')} -I ${q(JM)} ${q(unit)} -o ${q(juceObj)}`);
-  }
 
   writeFileSync(path.join(work, 'e2e.cpp'), `
 namespace juce { extern const char* const juce_compilationDate; extern const char* const juce_compilationTime;
@@ -82,9 +76,35 @@ ${main}
 }
 `);
 
-  run(`${cxx} -c -std=c++20 ${DEFS.join(' ')} -I ${q(ABI_DIR)} -I ${q(JM)} ${q(SRC)} -o ${q(path.join(work, 'engine.o'))}`);
-  run(`${cxx} -c -std=c++20 ${DEFS.join(' ')} -I ${q(ABI_DIR)} -I ${q(JM)} ${q(path.join(work, 'e2e.cpp'))} -o ${q(path.join(work, 'e2e.o'))}`);
-  run(`${cxx.replace(/\+\+$/, '').replace(/^g$/, 'gcc').replace(/^c$/, 'cc')} -c -I ${q(ABI_DIR)} ${q(GUARD)} -o ${q(path.join(work, 'guard.o'))}`);
-  run(`${cxx} ${q(path.join(work, 'e2e.o'))} ${q(path.join(work, 'engine.o'))} ${q(path.join(work, 'guard.o'))} ${q(juceObj)} -o ${q(path.join(work, 'e2e'))} -ldl -lpthread`);
-  return path.join(work, 'e2e');
+  const unit = path.join(work, 'juce_unit.cpp');
+  writeFileSync(unit, '#include <juce_core/juce_core.cpp>\n');
+  const at = (name) => path.join(work, name);
+
+  if (IS_WINDOWS) {
+    // /bigobj for juce_core's section count; JUCE's own #pragma comment(lib, ...) lines name the
+    // system libraries, so the link needs nothing more.
+    const cl = `cl /nologo /c /std:c++20 /EHsc /MD /O2 /bigobj /utf-8 /Zc:__cplusplus ${DEFS.map((d) => d.replace(/^-D/, '/D')).join(' ')}`;
+    const juceObj = path.join(tmpdir(), 'ce-nh-juce_core.obj');
+    if (!existsSync(juceObj)) {
+      console.log('engine e2e: compiling juce_core (cached after first run)...');
+      run(`${cl} /I ${q(JM)} ${q(unit)} /Fo${q(juceObj)}`);
+    }
+    run(`${cl} /I ${q(ABI_DIR)} /I ${q(JM)} ${q(SRC)} /Fo${q(at('engine.obj'))}`);
+    run(`${cl} /I ${q(ABI_DIR)} /I ${q(JM)} ${q(at('e2e.cpp'))} /Fo${q(at('e2e.obj'))}`);
+    run(`cl /nologo /c /O2 /MD /I ${q(ABI_DIR)} ${q(GUARD)} /Fo${q(at('guard.obj'))}`);
+    run(`cl /nologo ${q(at('e2e.obj'))} ${q(at('engine.obj'))} ${q(at('guard.obj'))} ${q(juceObj)} /Fe${q(at('e2e.exe'))}`);
+    return at('e2e.exe');
+  }
+
+  const cxx = ['clang++', 'g++', 'c++'].find(which);
+  const juceObj = path.join(tmpdir(), 'ce-nh-juce_core.o');
+  if (!existsSync(juceObj)) {
+    console.log('engine e2e: compiling juce_core (cached after first run)...');
+    run(`${cxx} -c -std=c++20 ${DEFS.join(' ')} -I ${q(JM)} ${q(unit)} -o ${q(juceObj)}`);
+  }
+  run(`${cxx} -c -std=c++20 ${DEFS.join(' ')} -I ${q(ABI_DIR)} -I ${q(JM)} ${q(SRC)} -o ${q(at('engine.o'))}`);
+  run(`${cxx} -c -std=c++20 ${DEFS.join(' ')} -I ${q(ABI_DIR)} -I ${q(JM)} ${q(at('e2e.cpp'))} -o ${q(at('e2e.o'))}`);
+  run(`${cxx.replace(/\+\+$/, '').replace(/^g$/, 'gcc').replace(/^c$/, 'cc')} -c -I ${q(ABI_DIR)} ${q(GUARD)} -o ${q(at('guard.o'))}`);
+  run(`${cxx} ${q(at('e2e.o'))} ${q(at('engine.o'))} ${q(at('guard.o'))} ${q(juceObj)} -o ${q(at('e2e'))} -ldl -lpthread`);
+  return at('e2e');
 }
