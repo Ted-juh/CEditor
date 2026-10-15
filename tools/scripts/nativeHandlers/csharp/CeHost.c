@@ -36,24 +36,6 @@
 #include <string.h>
 #include <stdarg.h>
 
-/* Opt-in diagnostics: when the env var CE_HANDLER_LOG is set, append a line to
- * <temp>/ce_handlers_csharp.log on each ABI call (init/has/dispatch). Off by default (no overhead, no
- * file). Used to pin down why a handler fires once but not on a later window-open. */
-static void ce_log(const char* fmt, ...) {
-    if (getenv("CE_HANDLER_LOG") == NULL) return;
-    char path[4096];
-#ifdef _WIN32
-    wchar_t tmpW[2048]; DWORD n = GetTempPathW(2048, tmpW);
-    char tmpA[4096]; size_t cv = 0; if (n == 0) return; wcstombs_s(&cv, tmpA, sizeof tmpA, tmpW, _TRUNCATE);
-    snprintf(path, sizeof path, "%sce_handlers_csharp.log", tmpA);
-#else
-    const char* t = getenv("TMPDIR"); if (t == NULL || !*t) t = "/tmp";
-    snprintf(path, sizeof path, "%s/ce_handlers_csharp.log", t);
-#endif
-    FILE* f = fopen(path, "a"); if (!f) return;
-    va_list ap; va_start(ap, fmt); vfprintf(f, fmt, ap); va_end(ap); fputc('\n', f); fclose(f);
-}
-
 #ifdef _WIN32
   #include <windows.h>
   typedef wchar_t ch_t;                 /* == char_t in hostfxr.h on Windows */
@@ -72,6 +54,24 @@ static void ce_log(const char* fmt, ...) {
   static void*  ce_dlsym(void* h, const char* n){ return dlsym(h, n); }
   static int    ce_exists(const ch_t* p){ struct stat st; return stat(p, &st) == 0; }
 #endif
+
+/* Opt-in diagnostics: when the env var CE_HANDLER_LOG is set, append a line to
+ * <temp>/ce_handlers_csharp.log on each ABI call (init/has/dispatch). Off by default (no overhead, no
+ * file). Used to pin down why a handler fires once but not on a later window-open. */
+static void ce_log(const char* fmt, ...) {
+    if (getenv("CE_HANDLER_LOG") == NULL) return;
+    char path[4096];
+#ifdef _WIN32
+    wchar_t tmpW[2048]; DWORD n = GetTempPathW(2048, tmpW);
+    char tmpA[4096]; size_t cv = 0; if (n == 0) return; wcstombs_s(&cv, tmpA, sizeof tmpA, tmpW, _TRUNCATE);
+    snprintf(path, sizeof path, "%sce_handlers_csharp.log", tmpA);
+#else
+    const char* t = getenv("TMPDIR"); if (t == NULL || !*t) t = "/tmp";
+    snprintf(path, sizeof path, "%s/ce_handlers_csharp.log", t);
+#endif
+    FILE* f = fopen(path, "a"); if (!f) return;
+    va_list ap; va_start(ap, fmt); vfprintf(f, fmt, ap); va_end(ap); fputc('\n', f); fclose(f);
+}
 
 /* ---- managed entry-point function-pointer types (must match Ce.Exports' [UnmanagedCallersOnly]) ---- */
 typedef int  (CE_CALL *m_init_fn)(const CeHostVtable*, void**);

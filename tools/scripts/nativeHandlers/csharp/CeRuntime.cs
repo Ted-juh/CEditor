@@ -756,6 +756,8 @@ namespace Ce
         [UnmanagedCallersOnly(EntryPoint = "ce_handler_init", CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
         [UnconditionalSuppressMessage("Trimming", "IL2075",
             Justification = "InstanceEntry is found by name in a copy of this assembly, which roots.xml preserves whole.")]
+        [UnconditionalSuppressMessage("Trimming", "IL2026",
+            Justification = "Assembly.GetType names a type of this assembly's own copy, which roots.xml preserves whole.")]
         public static int Init(CeHostVtable* host, void** outState)
         {
             AssemblyLoadContext? context = null;
