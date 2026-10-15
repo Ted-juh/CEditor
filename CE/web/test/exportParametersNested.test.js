@@ -58,3 +58,20 @@ test('a parameter finds its control inside a container', () => {
   const [, attack] = deriveExportParameters(panel);
   assert.equal(controlIdForParameter(attack, panel), 'id_attack');
 });
+
+test('an explicit list with two entries of one id exports the first: two host parameters with one id is a broken plug-in', () => {
+  // QA-08 carries two controls named Cutoff, and its explicit list one Cutoff.value for each. The
+  // host keys automation and saved state by id, so a project restored one and left the other at its
+  // default (clap-validator's state-reproducibility tests).
+  const panel = {
+    controls: [],
+    exportParameters: [
+      { id: 'Cutoff.value', path: 'Cutoff.value', min: 20, max: 20000, defaultValue: 440, unit: 'Hz' },
+      { id: 'Cutoff.value', path: 'Cutoff.value', min: 20, max: 20000, defaultValue: 440, unit: '' },
+      { id: 'Res.value', path: 'Res.value', min: 0, max: 1 },
+    ],
+  };
+  const params = collectExportParameters(panel);
+  assert.deepEqual(params.map((p) => p.id), ['Cutoff.value', 'Res.value']);
+  assert.equal(params[0].unit, 'Hz', 'the first one is the one kept');
+});

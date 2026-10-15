@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <cmath>
 
 // Milestone 2 — the host-automatable parameter layer.
 //
@@ -64,6 +65,7 @@ struct PanelParameter
 inline juce::Array<PanelParameter> parseExportParameters (const juce::var& parsed)
 {
     juce::Array<PanelParameter> params;
+    juce::StringArray ids;
     const auto list = parsed.getProperty ("exportParameters", juce::var());
     if (auto* arr = list.getArray())
     {
@@ -74,6 +76,14 @@ inline juce::Array<PanelParameter> parseExportParameters (const juce::var& parse
             p.path = entry.getProperty ("path", "").toString();
             if (p.id.isEmpty() || p.path.isEmpty())
                 continue;
+            // The first of two entries with one id wins. Two host parameters with one id is a
+            // broken plug-in: the host keys automation and saved state by it, so a project restored
+            // one of them and left the other at its default (clap-validator's state tests, on
+            // QA-08's two controls named Cutoff). collectExportParameters drops the second as well;
+            // this covers panels exported before it did.
+            if (ids.contains (p.id))
+                continue;
+            ids.add (p.id);
 
             p.label = entry.getProperty ("label", p.id).toString();
             p.min   = static_cast<float> (static_cast<double> (entry.getProperty ("min", 0.0)));
@@ -164,12 +174,25 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout buildParameterLayout 
             continue;
         }
 
+        // The text a host shows, and reads back. JUCE's default for a range with no step is seven
+        // decimals, finer than a 32-bit value survives: a value read back from its own text printed
+        // a different last digit (clap-validator's param-conversions, on QA-08's Kinetic Gravity,
+        // -1 to 1). Five significant digits of the range's span is as fine as anybody reads, and
+        // survives the trip.
+        const auto decimals = juce::jlimit (0, 6, 4 - (int) std::floor (std::log10 (p.max - p.min)));
         layout.add (std::make_unique<juce::AudioParameterFloat> (
             juce::ParameterID { p.id, 1 },
             p.label,
             juce::NormalisableRange<float> (p.min, p.max),
             p.defaultValue,
-            juce::AudioParameterFloatAttributes().withLabel (p.unit)));
+            juce::AudioParameterFloatAttributes()
+                .withLabel (p.unit)
+                .withStringFromValueFunction ([decimals] (float value, int maximumLength)
+                {
+                    const auto text = decimals > 0 ? juce::String (value, decimals)
+                                                   : juce::String (juce::roundToInt (value));
+                    return maximumLength > 0 ? text.substring (0, maximumLength) : text;
+                })));
     }
     return layout;
 }
