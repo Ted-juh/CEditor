@@ -285,6 +285,12 @@ private:
                              int startMessageIndex = 0);
     juce::String sendOrQueueTransaction (const juce::String& deviceRole, const MidiTransaction& transaction);
     void addPendingDeviceRequest (const PendingDeviceRequest& request);
+    // Two instances on one MIDI input both hear every reply; a reply to a request the other one made
+    // is the other one's (processIncomingMidiMessage). awaitsReply: whether one of this service's
+    // pending requests on that input is answered by `hex`.
+    bool awaitsReply (const juce::String& inputId, const juce::String& hex);
+    bool replyBelongsToAnotherInstance (const juce::String& role, const juce::String& hex);
+    friend struct DeviceProfileServiceTestAccess;
     bool resolvePendingRequestsForIdentity (const juce::String& deviceRole,
                                             const juce::String& profileId,
                                             const IdentityMatchResult& result);

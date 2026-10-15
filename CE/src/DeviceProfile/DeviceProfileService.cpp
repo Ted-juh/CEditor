@@ -6,10 +6,35 @@
 #include "DeviceProfileServiceInternal.h"
 #include "../AtomicFileWrite.h"
 
+#include <algorithm>
+#include <mutex>
+
 namespace ceditor::device
 {
+
+namespace
+{
+// Every service alive in this process — one per plug-in instance — so one can tell whether a reply
+// arriving on a MIDI input it shares with another is the other's (replyBelongsToAnotherInstance).
+// Services live and are used on the message thread; the lock guards the list.
+struct LiveServices
+{
+    std::mutex lock;
+    std::vector<DeviceProfileService*> all;
+};
+
+LiveServices& liveServices()
+{
+    static LiveServices services;
+    return services;
+}
+} // namespace
 DeviceProfileService::DeviceProfileService()
 {
+    {
+        const std::scoped_lock lock (liveServices().lock);
+        liveServices().all.push_back (this);
+    }
     loadInternalTestProfiles();
 
     if (! profiles.empty())
@@ -21,6 +46,11 @@ DeviceProfileService::DeviceProfileService()
 
 DeviceProfileService::~DeviceProfileService()
 {
+    {
+        const std::scoped_lock lock (liveServices().lock);
+        auto& all = liveServices().all;
+        all.erase (std::remove (all.begin(), all.end(), this), all.end());
+    }
     // MidiInput::stop waits for an in-flight callback. The callback resolves its role under
     // midiInputLock, so stopping while holding that lock can deadlock with it. Detach first.
     decltype (midiInputsByRole) inputsToStop;
@@ -704,4 +734,60 @@ void DeviceProfileService::emitDeviceEvent (const juce::String& eventName, const
     if (eventCallback)
         eventCallback (eventName, payload);
 }
+bool DeviceProfileService::awaitsReply (const juce::String& inputId, const juce::String& hex)
+{
+    for (const auto& [correlationId, request] : pendingDeviceRequests)
+    {
+        juce::ignoreUnused (correlationId);
+        auto mapping = roleMappings.find (request.deviceRole);
+        if (mapping == roleMappings.end() || mapping->second.input.type != "hardwareInput"
+            || mapping->second.input.id != inputId)
+            continue;
+
+        auto* engine = resolveEngine (request.profileId, request.deviceRole);
+        if (engine == nullptr)
+            continue;
+        if (request.expectedResponseKind == "identity")
+        {
+            if (engine->matchIdentityReply (hex).isIdentityReply)
+                return true;
+            continue;
+        }
+        const auto parsed = engine->parseDumpMessage (hex);
+        if (! parsed.ok)
+            continue;
+        const auto collectionId = parsed.completion.getProperty ("collectionId", {}).toString();
+        if (request.expectedDumpId == parsed.dumpId
+            || (collectionId.isNotEmpty() && request.expectedDumpId == collectionId))
+            return true;
+    }
+    return false;
+}
+
+/*  Two instances in one process listening to one MIDI input — two copies of a panel in a DAW, or
+    two panels on one synth — both receive every message the synth sends. A dump one of them
+    requested used to be applied by both: the other instance's panel changed to a patch nobody had
+    asked it for. So a reply is left to the instance waiting for it, when this one is not waiting
+    for it too. Anything nobody asked for (a dump sent from the synth's front panel, a knob turned
+    on it) still reaches every instance, as before: they are all following that synth. */
+bool DeviceProfileService::replyBelongsToAnotherInstance (const juce::String& role, const juce::String& hex)
+{
+    auto mapping = roleMappings.find (role);
+    if (mapping == roleMappings.end() || mapping->second.input.type != "hardwareInput"
+        || mapping->second.input.id.isEmpty())
+        return false;
+
+    const auto inputId = mapping->second.input.id;
+    if (awaitsReply (inputId, hex))
+        return false;   // this instance asked for it as well
+
+    // Held while asking the others, so none can be destroyed mid-question (the destructor takes
+    // itself off the list first).
+    const std::scoped_lock lock (liveServices().lock);
+    for (auto* other : liveServices().all)
+        if (other != this && other->awaitsReply (inputId, hex))
+            return true;
+    return false;
+}
+
 }

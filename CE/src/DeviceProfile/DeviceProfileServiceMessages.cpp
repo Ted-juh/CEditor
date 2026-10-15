@@ -537,6 +537,17 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
     if (mapping != roleMappings.end())
         mapping->second.lastInboundAtMs = nowMs();
 
+    // A reply to another instance's request, on an input this one shares with it: that instance's
+    // to apply. Stopped before anything is emitted, because the page applies incoming SysEx from
+    // the raw event too (replyBelongsToAnotherInstance says more).
+    if (messageType == "sysex" && replyBelongsToAnotherInstance (role, hex))
+    {
+        appendMonitorEvent ("in", role, "sysex", "reply to another instance's request", hex,
+                            "Left to the instance that asked for it");
+        emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+        return;
+    }
+
     auto* incoming = new juce::DynamicObject();
     incoming->setProperty ("ok", true);
     incoming->setProperty ("deviceRole", role);

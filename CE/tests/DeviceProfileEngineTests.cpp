@@ -15,6 +15,25 @@
 #include <utility>
 #include <vector>
 
+namespace ceditor::device
+{
+/** Reaches a service's pending requests, which only a real MIDI send creates otherwise. */
+struct DeviceProfileServiceTestAccess
+{
+    static void awaitDump (DeviceProfileService& service, const juce::String& role, const juce::String& dumpId)
+    {
+        DeviceProfileService::PendingDeviceRequest request;
+        request.correlationId = "test_" + dumpId;
+        request.deviceRole = role;
+        request.expectedResponseKind = "dump";
+        request.expectedDumpId = dumpId;
+        request.createdAtMs = juce::Time::getMillisecondCounterHiRes();
+        request.timeoutAtMs = request.createdAtMs + 60000.0;
+        service.addPendingDeviceRequest (request);
+    }
+};
+} // namespace ceditor::device
+
 namespace
 {
 juce::File profileRoot()
@@ -2236,6 +2255,118 @@ struct TestCiResponder : juce::midi_ci::DeviceMessageHandler,
 // The numbers below are CE/web/test/fixtures/checksumCases.js. The four CRC values for "123456789"
 // are additionally the published catalogue check values, which is what makes them right rather than
 // merely consistent with ourselves.
+
+/*  Two instances in one process on one MIDI input — two copies of a panel in a DAW — both receive
+    whatever the synth sends. A dump one of them asked for must reach that one alone; a dump nobody
+    asked for (sent from the synth's front panel) still reaches both. */
+int runSharedInputReplyTests()
+{
+    using ceditor::device::DeviceProfileService;
+    using ceditor::device::DeviceProfileServiceTestAccess;
+
+    // The same synth on the same input for each. Opening the port fails here (there is no MIDI
+    // hardware), which leaves the mapping in place: the input is what the check compares.
+    const auto mapOnto = [] (DeviceProfileService& service, const juce::String& inputId)
+    {
+        auto* mapping = new juce::DynamicObject();
+        mapping->setProperty ("role", "mainSynth");
+        mapping->setProperty ("profileId", "test-sysex-synth");
+        auto* input = new juce::DynamicObject();
+        input->setProperty ("type", "hardwareInput");
+        input->setProperty ("id", inputId);
+        input->setProperty ("name", "Shared port");
+        mapping->setProperty ("midiInput", juce::var (input));
+        service.setDeviceRoleMapping (juce::var (mapping));
+    };
+    struct Heard { int sysex = 0, parsed = 0, resolved = 0; };
+    const auto listen = [] (DeviceProfileService& service, Heard& heard)
+    {
+        service.setEventCallback ([&heard] (const juce::String& name, const juce::var&)
+        {
+            if (name == "sysexInputMessage") ++heard.sysex;
+            if (name == "dumpMessageParsed") ++heard.parsed;
+            if (name == "deviceRequestResolved") ++heard.resolved;
+        });
+    };
+    const auto send = [] (DeviceProfileService& service, const juce::String& hex)
+    {
+        auto* incoming = new juce::DynamicObject();
+        incoming->setProperty ("deviceRole", "mainSynth");
+        incoming->setProperty ("hex", hex);
+        service.ingestIncomingMidiMessage (juce::var (incoming));
+    };
+
+    DeviceProfileService a, b;
+    mapOnto (a, "shared-port");
+    mapOnto (b, "shared-port");
+
+    // currentPatchDump in one message (the checksum is the 7-bit sum of 01 40 02), and the id the
+    // profile reads it as.
+    const juce::String dumpHex = "F0 7D 10 01 40 02 43 F7";
+    auto* probe = new juce::DynamicObject();
+    probe->setProperty ("deviceRole", "mainSynth");
+    probe->setProperty ("hex", dumpHex);
+    const auto dumpId = a.parseDumpMessage (juce::var (probe), false).getProperty ("dumpId", "").toString();
+    if (dumpId != "currentPatchDump")
+    {
+        std::cerr << "[FAIL] shared input :: the test dump did not parse (got \"" << dumpId << "\")\n";
+        return 1;
+    }
+
+    Heard heardA, heardB;
+    listen (a, heardA);
+    listen (b, heardB);
+
+    // A asked for it: A applies it and is answered; B, on the same port, is left alone.
+    DeviceProfileServiceTestAccess::awaitDump (a, "mainSynth", dumpId);
+    send (b, dumpHex);
+    send (a, dumpHex);
+    if (heardB.sysex != 0 || heardB.parsed != 0 || heardA.parsed != 1 || heardA.resolved != 1)
+    {
+        std::cerr << "[FAIL] shared input :: a reply to A's request reached B (B sysex=" << heardB.sysex
+                  << " parsed=" << heardB.parsed << ", A parsed=" << heardA.parsed << " resolved=" << heardA.resolved << ")\n";
+        return 1;
+    }
+
+    // Nobody asked: both apply it, as both follow that synth.
+    heardA = {}; heardB = {};
+    send (a, dumpHex);
+    send (b, dumpHex);
+    if (heardA.parsed != 1 || heardB.parsed != 1)
+    {
+        std::cerr << "[FAIL] shared input :: a dump nobody asked for did not reach both (A " << heardA.parsed
+                  << ", B " << heardB.parsed << ")\n";
+        return 1;
+    }
+
+    // Both asked: both are answered.
+    heardA = {}; heardB = {};
+    DeviceProfileServiceTestAccess::awaitDump (a, "mainSynth", dumpId);
+    DeviceProfileServiceTestAccess::awaitDump (b, "mainSynth", dumpId);
+    send (a, dumpHex);
+    send (b, dumpHex);
+    if (heardA.resolved != 1 || heardB.resolved != 1)
+    {
+        std::cerr << "[FAIL] shared input :: when both asked, both were not answered\n";
+        return 1;
+    }
+
+    // A on another port: its request says nothing about B's input.
+    heardA = {}; heardB = {};
+    DeviceProfileService c;
+    mapOnto (c, "another-port");
+    DeviceProfileServiceTestAccess::awaitDump (c, "mainSynth", dumpId);
+    send (b, dumpHex);
+    if (heardB.parsed != 1)
+    {
+        std::cerr << "[FAIL] shared input :: a request on another port held back B's dump\n";
+        return 1;
+    }
+
+    std::cout << "[PASS] shared MIDI input :: a requested dump reaches only the instance that asked; one nobody asked for reaches all\n";
+    return 0;
+}
+
 int runChecksumTableTests()
 {
     struct Case { const char* id; juce::uint32 ascii; juce::uint32 block; int width; };
@@ -2578,6 +2709,7 @@ int main (int argc, char** argv)
     failures += runMonitorClearTests();
     failures += runRealtimeMonitorTests();
     failures += runServiceRequestTests();
+    failures += runSharedInputReplyTests();
     failures += runMidiCiTests();
     failures += runChecksumTableTests();
     failures += runNibbledEncoderTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
