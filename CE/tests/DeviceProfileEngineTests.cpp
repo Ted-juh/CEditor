@@ -43,6 +43,7 @@ struct DeviceProfileServiceTestAccess
     static void publish (DeviceProfileService& service)  { service.publishPendingRequests(); }
     static juce::File publishedFile (const DeviceProfileService& service)  { return service.publishedRequestsFile; }
     static juce::File directory()  { return DeviceProfileService::pendingRequestsDirectory(); }
+    static const void* engineFor (DeviceProfileService& service, const juce::String& profileId)  { return service.resolveEngine (profileId, {}); }
 };
 } // namespace ceditor::device
 
@@ -2410,6 +2411,27 @@ int runSharedInputReplyTests()
     return 0;
 }
 
+/*  Each plug-in instance has a device service of its own, and each scans the whole profiles folder.
+    A profile file loaded unchanged is one engine for all of them (sharedEngineForFile): two GAIA
+    instances held every profile in the folder twice, 9.4 MB apiece. */
+int runSharedProfileEngineTests()
+{
+    using ceditor::device::DeviceProfileService;
+    using Access = ceditor::device::DeviceProfileServiceTestAccess;
+
+    DeviceProfileService a, b;
+    const auto* sysexA = Access::engineFor (a, "test-sysex-synth");
+    const auto* sysexB = Access::engineFor (b, "test-sysex-synth");
+    const auto* ccA = Access::engineFor (a, "test-cc-synth");
+    if (sysexA == nullptr || sysexA != sysexB || ccA == nullptr || ccA == sysexA || ccA != Access::engineFor (b, "test-cc-synth"))
+    {
+        std::cerr << "[FAIL] shared profile engines :: two services do not share one engine per profile file\n";
+        return 1;
+    }
+    std::cout << "[PASS] shared profile engines :: two services hold one engine per profile file\n";
+    return 0;
+}
+
 /** The test synth, on hardware input `port` (which does not open here: there is no MIDI hardware,
     and the mapping stays). */
 void mapOntoSharedPort (ceditor::device::DeviceProfileService& service, const juce::String& port)
@@ -2935,6 +2957,7 @@ int main (int argc, char** argv)
     failures += runRealtimeMonitorTests();
     failures += runServiceRequestTests();
     failures += runSharedInputReplyTests();
+    failures += runSharedProfileEngineTests();
     failures += runSharedInputAcrossProcessesTests();
     failures += runMidiCiTests();
     failures += runChecksumTableTests();

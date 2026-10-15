@@ -85,7 +85,9 @@ private:
     {
         juce::File file;
         juce::Time lastModificationTime;
-        std::unique_ptr<DeviceProfileEngine> engine;
+        // Shared with every other service in the process that loaded the same file, unchanged
+        // (loadProfileFile): an engine only answers questions once loaded, and never loads again.
+        std::shared_ptr<DeviceProfileEngine> engine;
     };
 
     struct MidiDestination

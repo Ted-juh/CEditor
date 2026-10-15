@@ -7,6 +7,8 @@
 #include "../AtomicFileWrite.h"
 
 #include <algorithm>
+#include <map>
+#include <memory>
 #include <mutex>
 
 namespace ceditor::device
@@ -27,6 +29,37 @@ LiveServices& liveServices()
 {
     static LiveServices services;
     return services;
+}
+
+/*  A profile file's engine, loaded once for every service in the process that loads that file
+    unchanged. Each plug-in instance has a service of its own, and each scans the whole profiles
+    folder: two GAIA instances held every profile there twice, 9.4 MB apiece (the AN1x's and the
+    SH-201's included, for a GAIA panel). An engine is read-only once loaded (every question it
+    answers is const), so services can share one, on any thread. Held weakly: the last service to
+    let go of it frees it. */
+std::shared_ptr<DeviceProfileEngine> sharedEngineForFile (const juce::File& file, juce::String& error)
+{
+    struct Entry { juce::Time modified; std::weak_ptr<DeviceProfileEngine> engine; };
+    static std::mutex lock;
+    static std::map<juce::String, Entry> cache;
+
+    const auto path = file.getFullPathName();
+    const auto modified = file.getLastModificationTime();
+    {
+        const std::scoped_lock held (lock);
+        if (auto it = cache.find (path); it != cache.end() && it->second.modified == modified)
+            if (auto engine = it->second.engine.lock()) return engine;
+    }
+    // Loaded outside the lock, so instances built at once on two threads load two files at once.
+    auto engine = std::make_shared<DeviceProfileEngine>();
+    if (! engine->loadFromFile (file, error))
+        return nullptr;
+    const std::scoped_lock held (lock);
+    auto& entry = cache[path];
+    if (entry.modified == modified)
+        if (auto first = entry.engine.lock()) return first;   // another thread loaded it meanwhile
+    entry = { modified, engine };
+    return engine;
 }
 } // namespace
 DeviceProfileService::DeviceProfileService()
@@ -683,8 +716,8 @@ bool DeviceProfileService::isLoadedProfileCurrent (const juce::File& file) const
 
 bool DeviceProfileService::loadProfileFile (const juce::File& file, juce::String& error)
 {
-    auto engine = std::make_unique<DeviceProfileEngine>();
-    if (! engine->loadFromFile (file, error))
+    auto engine = sharedEngineForFile (file, error);
+    if (engine == nullptr)
         return false;
 
     auto profileId = engine->getProfileId();
@@ -694,7 +727,7 @@ bool DeviceProfileService::loadProfileFile (const juce::File& file, juce::String
         return false;
     }
 
-    profiles[profileId] = LoadedProfile { file, file.getLastModificationTime(), std::move (engine) };
+    profiles[profileId] = LoadedProfile { file, file.getLastModificationTime(), engine };
     return true;
 }
 

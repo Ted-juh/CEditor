@@ -2,9 +2,12 @@
 
 #include <juce_core/juce_core.h>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace ceditor
 {
@@ -26,28 +29,86 @@ namespace ceditor
  * says why, and what keeps it true.
  *
  * An export payload's controls arrive as a diff against their types, carrying the defaults it is
- * against and the drawings several controls share, and load() rebuilds them sharing both;
+ * against and the drawings several controls share, and share() rebuilds them sharing both;
  * rebuildFromDefaults says how.
+ *
+ * The rebuilt document is shared by every model of that panel in the process (SharedPanelDocument):
+ * two copies of a panel in a DAW hold it once. Each model owns only what it has written; ownership
+ * below says how.
  *
  * Pure juce_core; message-thread only (like the rest of ScriptRuntime). Header-only for easy testing.
  */
+
+/**
+ * A panel document, parsed and its controls rebuilt, for every PanelValueModel of that panel: each
+ * instance of an exported plug-in loads the same file, and holding it once per instance was most of
+ * what an instance cost (GAIA: the parse 14 MB, the rebuilt controls 9.5 MB, each time).
+ *
+ * Never written once built. A model writes into copies of what it changes (PanelValueModel's
+ * ownership), so instances do not see each other's writes, and reading a tree nobody writes needs
+ * no lock whichever thread reads it.
+ */
+struct SharedPanelDocument
+{
+    juce::var doc;
+};
+
 class PanelValueModel
 {
 public:
     PanelValueModel() = default;
 
-    /** Load from a parsed panel document (juce::JSON::parse of a .cepanel). An export payload's
-        controls are rebuilt from the defaults it carries, in the document itself. */
-    void load (const juce::var& panelDocument) { doc = panelDocument; rebuildFromDefaults(); forgetNames(); }
+    /** Parse-and-rebuild once: an export payload's controls rebuilt from the defaults it carries,
+        in the document itself, which is then never written again. */
+    static std::shared_ptr<const SharedPanelDocument> share (const juce::var& panelDocument)
+    {
+        PanelValueModel builder;
+        builder.building = true;
+        builder.doc = panelDocument;
+        builder.rebuildFromDefaults();
+        return std::make_shared<const SharedPanelDocument> (SharedPanelDocument { builder.doc });
+    }
+
+    /** The shared document for a panel file, parsed and rebuilt by the first caller and shared by
+        every caller while any of them holds it. A file that has changed since (size or time) is
+        read again. Callers may be on any thread: hosts build plug-in instances where they like. */
+    static std::shared_ptr<const SharedPanelDocument> sharedForFile (const juce::File& file)
+    {
+        static std::mutex lock;
+        static std::weak_ptr<const SharedPanelDocument> cached;
+        static juce::String cachedKey;
+        const auto key = file.getFullPathName() + "|" + juce::String (file.getSize())
+                       + "|" + juce::String (file.getLastModificationTime().toMilliseconds());
+        const std::scoped_lock held (lock);
+        if (auto panel = cached.lock(); panel != nullptr && cachedKey == key) return panel;
+        auto panel = share (juce::JSON::parse (file.loadFileAsString()));
+        cached = panel;
+        cachedKey = key;
+        return panel;
+    }
+
+    /** Load a shared document. This model's panel is its own from here: a write copies what it
+        goes through, and nothing it writes reaches the shared document or another model. */
+    void load (std::shared_ptr<const SharedPanelDocument> panel)
+    {
+        shared = std::move (panel);
+        ownedNodes.clear();
+        ownedHold.clear();
+        building = false;
+        doc = shared != nullptr ? ownCopy (shared->doc) : juce::var();
+        forgetNames();
+    }
+
+    /** Load from a parsed panel document (juce::JSON::parse of a .cepanel), shared by nobody. An
+        export payload's controls are rebuilt from the defaults it carries, in the document itself. */
+    void load (const juce::var& panelDocument) { load (share (panelDocument)); }
 
     /** Load from raw .cepanel JSON text. Returns false if the JSON is invalid. */
     bool loadFromJson (const juce::String& json)
     {
         auto parsed = juce::JSON::parse (json);
         if (! parsed.isObject()) return false;
-        doc = parsed;
-        rebuildFromDefaults();
-        forgetNames();
+        load (share (parsed));
         return true;
     }
 
@@ -81,7 +142,9 @@ public:
     {
         const auto split = splitScriptPath (scriptPath);
         if (isPanelTarget (split.first)) return setPanelValue (split.second, value);
-        const auto control = findControlByName (split.first);
+        const auto* where = findControlPath (split.first);
+        if (where == nullptr) return false;
+        const auto control = ownedAt (*where);
         if (! control.isObject()) return false;
 
         juce::var toWrite = value;
@@ -238,13 +301,18 @@ private:
     {
         if (segs.isEmpty() || isPanelReadOnly (segs[0])) return false;
 
-        // Walk to the leaf's parent, then assign with the document's real-case key.
-        juce::var node = segs.size() > 1 ? panelValueAt (doc, segs, 0) : doc;
-        if (segs.size() > 1)
+        // Walk to the leaf's parent, case-insensitively, making each node on the way this model's
+        // own, then assign with the document's real-case key.
+        juce::var node = doc;
+        for (int i = 0; i < segs.size() - 1; ++i)
         {
-            juce::StringArray parent = segs;
-            parent.remove (parent.size() - 1);
-            node = panelValueAt (doc, parent);
+            auto* parent = node.getDynamicObject();
+            if (parent == nullptr) return false;
+            juce::Identifier key;
+            for (const auto& p : parent->getProperties())
+                if (p.name.toString().equalsIgnoreCase (segs[i])) { key = p.name; break; }
+            if (key.isNull()) return false;
+            node = ownProperty (*parent, key);
         }
         auto* obj = node.getDynamicObject();
         if (obj == nullptr) return false;
@@ -272,11 +340,20 @@ private:
     template <typename Fn>
     void forEachControl (Fn&& fn) const
     {
+        forEachControlAt ([&fn] (const juce::var& c, const juce::StringArray&) { fn (c); });
+    }
+
+    // Each control with where it is: the steps from the document to it, as readChildValue takes
+    // them ("controls", "3", then "Children", "<key>" for each container it is inside).
+    template <typename Fn>
+    void forEachControlAt (Fn&& fn) const
+    {
         auto* obj = doc.getDynamicObject();
         if (obj == nullptr) return;
         auto* arr = obj->getProperty ("controls").getArray();
         if (arr == nullptr) return;
-        for (const auto& c : *arr) visitControl (c, fn);
+        for (int i = 0; i < arr->size(); ++i)
+            visitControlAt ((*arr)[i], juce::StringArray { "controls", juce::String (i) }, fn);
     }
 
     // Matches on name OR id, case-insensitively, and DOES descend into containers — a control
@@ -285,33 +362,63 @@ private:
     // The first control in document order wins, whether it matched by name or by id.
     juce::var findControlByName (const juce::String& name) const
     {
+        const auto* where = findControlPath (name);
+        return where != nullptr ? at (*where) : juce::var();
+    }
+
+    const juce::StringArray* findControlPath (const juce::String& name) const
+    {
         if (! nameIndexBuilt)
         {
-            forEachControl ([this] (const juce::var& c)
+            forEachControlAt ([this] (const juce::var& c, const juce::StringArray& where)
             {
                 if (auto* coreObj = readChildValue (c, "Core").getDynamicObject())
                 {
                     // emplace keeps the first entry for a key, which is what keeps document order.
-                    nameIndex.emplace (coreObj->getProperty ("name").toString().toLowerCase(), c);
-                    nameIndex.emplace (coreObj->getProperty ("id").toString().toLowerCase(), c);
+                    nameIndex.emplace (coreObj->getProperty ("name").toString().toLowerCase(), where);
+                    nameIndex.emplace (coreObj->getProperty ("id").toString().toLowerCase(), where);
                 }
             });
             nameIndexBuilt = true;
         }
         const auto it = nameIndex.find (name.toLowerCase());
-        return it != nameIndex.end() ? it->second : juce::var();
+        return it != nameIndex.end() ? &it->second : nullptr;
     }
 
-    // The index findControlByName answers from: lower-cased name and id to control. A panel's load
-    // scripts call set() thousands of times, and each call used to walk every control lower-casing
-    // two strings apiece; on the GAIA panel that was two thirds of an instance's start-up.
+    // The node at `where`, read; and made this model's own, each node on the way included.
+    juce::var at (const juce::StringArray& where) const
+    {
+        juce::var node = doc;
+        for (const auto& step : where) node = readChildValue (node, step);
+        return node;
+    }
+
+    juce::var ownedAt (const juce::StringArray& where) const
+    {
+        juce::var node = doc;
+        for (const auto& step : where)
+        {
+            node = ownedChild (node, step);
+            if (node.isVoid()) return {};
+        }
+        return node;
+    }
+
+    // The index findControlByName answers from: lower-cased name and id to where the control is.
+    // A panel's load scripts call set() thousands of times, and each call used to walk every
+    // control lower-casing two strings apiece; on the GAIA panel that was two thirds of an
+    // instance's start-up.
+    //
+    // It holds where, not the control, because a write replaces the control it reaches with this
+    // model's own copy the first time (ownership below): a control held here would be the shared
+    // one, which a later write must not go into and a later read must not see.
     //
     // What a name finds depends on each control's Core.name and Core.id and on the controls under
     // each Children section, and on nothing else in the document. Every write that reaches a
     // control comes through setValue, which drops the index when the write could touch one of
     // those (writeCanMoveAName); writes to the panel document cannot, because `controls` is
     // read-only there. The next lookup rebuilds it.
-    mutable std::unordered_map<juce::String, juce::var> nameIndex;
+    mutable std::unordered_map<juce::String, juce::StringArray> nameIndex;
     mutable bool nameIndexBuilt = false;
 
     void forgetNames() { nameIndex.clear(); nameIndexBuilt = false; }
@@ -332,16 +439,21 @@ private:
 
 private:
     template <typename Fn>
-    static void visitControl (const juce::var& control, Fn& fn)
+    static void visitControlAt (const juce::var& control, const juce::StringArray& where, Fn& fn)
     {
         if (! control.isObject()) return;
-        fn (control);
+        fn (control, where);
         if (auto* kids = readChildValue (control, "Children").getDynamicObject())
         {
             auto nested = kids->getProperty ("_children");
             if (auto* nestedObj = nested.getDynamicObject())
                 for (const auto& prop : nestedObj->getProperties())
-                    visitControl (prop.value, fn);
+                {
+                    auto inside = where;
+                    inside.add ("Children");
+                    inside.add (prop.name.toString());
+                    visitControlAt (prop.value, inside, fn);
+                }
         }
     }
 
@@ -451,9 +563,10 @@ public:
 
 private:
     // Navigate to the leaf's parent (via readChildValue semantics) and assign the leaf with the same
-    // _children-first precedence. Mutates the control in place, first copying any node on the way
-    // that it shares with the defaults it was rebuilt from (ownedChild), so the write reaches this
-    // control and nothing else: not another control of the same type, not the defaults.
+    // _children-first precedence. `control` is this model's own (setValue made it so); each node on
+    // the way that is not is copied first (ownedChild), so the write reaches this control in this
+    // model and nothing else: not another control of the same type, not the defaults, not the
+    // shared document another instance reads.
     bool setAtPath (const juce::var& control, const juce::String& path, const juce::var& value)
     {
         const auto parts = juce::StringArray::fromTokens (path, ".", "");
@@ -686,7 +799,16 @@ private:
         }
     }
 
-    bool isShared (const void* node) const { return sharedNodes.count (node) != 0; }
+    // OWNERSHIP. While share() rebuilds the document, what is shared is what markShared named: the
+    // defaults and the drawings, which many controls point at. Once a model has loaded it, the whole
+    // document is shared, with the other models of that panel, and the model's own nodes are the
+    // ones it copied (ownCopy): its top-level panel object, then each node a write has gone
+    // through. Everything else is copied before it is written into. The copies are held as well as
+    // named, so no address in ownedNodes can come back as some other object's.
+    bool isShared (const void* node) const
+    {
+        return building ? sharedNodes.count (node) != 0 : ownedNodes.count (node) == 0;
+    }
     bool isShared (const juce::var& v) const
     {
         if (auto* o = v.getDynamicObject()) return isShared (o);
@@ -707,11 +829,33 @@ private:
         return v;
     }
 
-    // obj[id], made the control's own: a node shared with the defaults is replaced by a copy.
+    // A copy of one node that is this model's own from now on (see isShared).
+    juce::var ownCopy (const juce::var& v) const
+    {
+        auto copy = copyOfNode (v);
+        if (! building)
+        {
+            if (auto* o = copy.getDynamicObject()) ownedNodes.insert (o);
+            else if (auto* a = copy.getArray()) ownedNodes.insert (a);
+            ownedHold.push_back (copy);
+        }
+        return copy;
+    }
+
+    // obj[id], made the control's own: a shared node is replaced by a copy.
+    //
+    // Into the slot itself, not through setProperty: that skips a value equal to the one there, and
+    // JUCE compares arrays by their items, so a copy of an array, which has the same items, was never
+    // put in and the write went into a copy nothing held. (An object compares by identity, which is
+    // why only arrays were lost: a write into an array a control shared with its defaults, before.)
     juce::var ownProperty (juce::DynamicObject& obj, const juce::Identifier& id) const
     {
         auto v = obj.getProperty (id);
-        if (isShared (v)) { v = copyOfNode (v); obj.setProperty (id, v); }
+        if (isShared (v))
+        {
+            v = ownCopy (v);
+            if (auto* slot = obj.getProperties().getVarPointer (id)) *slot = v;
+        }
         return v;
     }
 
@@ -735,7 +879,7 @@ private:
                 if (i >= 0 && i < arr->size())
                 {
                     auto& item = arr->getReference (i);
-                    if (isShared (item)) item = copyOfNode (item);
+                    if (isShared (item)) item = ownCopy (item);
                     return item;
                 }
             }
@@ -758,6 +902,11 @@ private:
     std::map<const void*, juce::String> drawingNames;
     std::map<juce::String, juce::var> rebuiltDrawings;
     std::unordered_set<const void*> sharedNodes;
+
+    std::shared_ptr<const SharedPanelDocument> shared;   // what doc was copied from, kept alive
+    bool building = false;                               // share() is rebuilding the document
+    mutable std::unordered_set<const void*> ownedNodes;
+    mutable std::vector<juce::var> ownedHold;
 };
 
 /**

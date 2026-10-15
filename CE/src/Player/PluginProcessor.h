@@ -56,26 +56,35 @@ private:
 
         It used to be parsed three times, once by each, and a parse is most of a second on a large
         panel (GAIA's 12 MB took 0.37 s each), all of it on the thread the host builds us on, for
-        every instance in a project. Only the script model keeps it, and it keeps this same tree:
-        nothing is held twice, and without scripting nothing is held at all once we are built. */
-    static juce::var readPanelDocument()
+        every instance in a project.
+
+        And once for every instance of the panel in the process, with scripting: the script model
+        keeps the document, its controls rebuilt from the defaults the payload carries, and each
+        instance holding its own was most of what it cost (GAIA: 14 MB parsed, 9.5 MB rebuilt, per
+        instance). The instances now share one (SharedPanelDocument), and each owns only what its
+        scripts write. Without scripting nothing is held once we are built, so nothing is shared. */
+    static std::shared_ptr<const ceditor::SharedPanelDocument> readPanelDocument()
     {
-       #if CEDITOR_VALUE_LAYER || CEDITOR_SCRIPTING
-        return juce::JSON::parse (ceditorPlayerPanelFile().loadFileAsString());
+       #if CEDITOR_SCRIPTING
+        return ceditor::PanelValueModel::sharedForFile (ceditorPlayerPanelFile());
+       #elif CEDITOR_VALUE_LAYER
+        return std::make_shared<const ceditor::SharedPanelDocument> (
+            ceditor::SharedPanelDocument { juce::JSON::parse (ceditorPlayerPanelFile().loadFileAsString()) });
        #else
-        return {};
+        return std::make_shared<const ceditor::SharedPanelDocument>();
        #endif
     }
 
-    explicit PlayerAudioProcessor (const juce::var& panelDocument)
+    explicit PlayerAudioProcessor (std::shared_ptr<const ceditor::SharedPanelDocument> panel)
         : juce::AudioProcessor (BusesProperties()
               .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
               .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 #if CEDITOR_VALUE_LAYER
-        , panelParams (ce::parseExportParameters (panelDocument))
+        , panelParams (ce::parseExportParameters (panel->doc))
         , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams))
 #endif
     {
+        const juce::var& panelDocument = panel->doc;
         logTag = logTagFor (panelDocument);
 #if CEDITOR_VALUE_LAYER
         // The two things the processor reads out of the panel directly: the restore policy and the
@@ -95,7 +104,7 @@ private:
         // window-closed: load the panel's scripts + fire onPanelLoad — ON the message thread,
         // whichever thread the host is building us on (see onMessageThread). onMessageThread waits
         // for it, so the document outlives the call.
-        onMessageThread ([this, &panelDocument] { setupScripting (panelDocument); });
+        onMessageThread ([this, &panel] { setupScripting (panel); });
 #endif
     }
 
@@ -1667,12 +1676,12 @@ private:
         return juce::var (out);
     }
 
-    void setupScripting (const juce::var& panelDocument)
+    void setupScripting (const std::shared_ptr<const ceditor::SharedPanelDocument>& panel)
     {
-        // The document construction already parsed, kept rather than read again: the script model
-        // edits it in place as scripts set values, and nothing else holds it after construction.
-        if (! panelDocument.isObject()) return;
-        scriptValues.load (panelDocument);
+        // The document construction already parsed, shared with every other instance of the panel:
+        // the script model copies what a script writes and leaves the shared document as it is.
+        if (panel == nullptr || ! panel->doc.isObject()) return;
+        scriptValues.load (panel);
 
         using namespace ceditor::scripting;
         BridgeScriptHost::Callbacks cb;
