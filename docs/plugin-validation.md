@@ -75,7 +75,9 @@ Two clap-validator **warnings** remain and are understood:
 
 - `process-audio-denormals` — processing takes several times longer on denormal input. The plug-in
   does not touch the audio at all, and adding flush-to-zero to `processBlock` did not change the
-  figure, so the time is spent outside CEditor's code.
+  figure, so the time is spent outside CEditor's code. It is also noise: the same GAIA build run
+  six times gave 1.20×, 3.33×, 1.93×, a pass, 2.13× and a pass, timing a callback that does next to
+  nothing.
 - `state-invalid-random` — random bytes load "successfully". The plug-in ignores a state it cannot
   parse, which is the safe outcome. The CLAP wrapper reports success for every load because
   JUCE's `setStateInformation` cannot return a failure.
