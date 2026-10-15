@@ -154,6 +154,11 @@ int sweepProfileFolders (const juce::File& base, const SweepContext& context, ju
     return removed;
 }
 
+bool sharedEnginePerProcess()
+{
+    return juce::SystemStats::getEnvironmentVariable ("CEDITOR_WEBVIEW2_SHARED", {}).trim() == "1";
+}
+
 juce::File profileFolderForNewWebView (const juce::String& appFolderName)
 {
     // Per binary (statics are), which is all it is for: telling apart the folders two plug-ins in
@@ -175,7 +180,9 @@ juce::File profileFolderForNewWebView (const juce::String& appFolderName)
                                       + " WebView2 profile folder(s) nothing uses any more from " + base.getFullPathName());
     });
 
-    return base.getChildFile (profileFolderName ({ pid, currentProcessStart(), module, juce::String (++counter) }));
+    // Instance 0 is this binary's shared folder; the counter starts at 1, so the two never meet.
+    const auto instance = sharedEnginePerProcess() ? juce::String (0) : juce::String (++counter);
+    return base.getChildFile (profileFolderName ({ pid, currentProcessStart(), module, instance }));
 }
 
 } // namespace ceditor::webview

@@ -7,6 +7,9 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#if ! JUCE_WINDOWS
+ #include <cstdlib>
+#endif
 
 using namespace ceditor::webview;
 
@@ -109,9 +112,21 @@ static void sweep()
     base.deleteRecursively();
 }
 
+static void setShared (bool on)
+{
+   #if JUCE_WINDOWS
+    _putenv_s ("CEDITOR_WEBVIEW2_SHARED", on ? "1" : "");
+   #else
+    if (on) setenv ("CEDITOR_WEBVIEW2_SHARED", "1", 1); else unsetenv ("CEDITOR_WEBVIEW2_SHARED");
+   #endif
+}
+
 static void folderForNewWebView()
 {
     std::cout << "a folder for a new webview\n";
+    // The default, whatever the environment running the test says: docs/webview2-profiles.md
+    // has testers set the switch machine-wide.
+    setShared (false);
     const auto app = "CEditorWebViewProfileTest_" + juce::String (currentProcessId());
     const auto first = profileFolderForNewWebView (app);
     const auto second = profileFolderForNewWebView (app);
@@ -124,6 +139,24 @@ static void folderForNewWebView()
     check (first.getParentDirectory() == juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile (app), "under the app's folder in temp");
 }
 
+static void sharedEngine()
+{
+    std::cout << "one engine per process, behind CEDITOR_WEBVIEW2_SHARED\n";
+    const auto app = "CEditorWebViewProfileTest_" + juce::String (currentProcessId());
+    setShared (false);
+    check (! sharedEnginePerProcess(), "off unless the environment says so");
+    check (profileFolderForNewWebView (app) != profileFolderForNewWebView (app), "and then each webview has a folder of its own");
+    setShared (true);
+    check (sharedEnginePerProcess(), "on with CEDITOR_WEBVIEW2_SHARED=1");
+    const auto shared = profileFolderForNewWebView (app);
+    check (shared == profileFolderForNewWebView (app), "every webview of this binary in this process then has the same one");
+    const auto name = parseProfileFolderName (shared.getFileName());
+    check (name && name->instance == "0" && name->pid == currentProcessId(), "instance 0, still named so the sweep knows whose it is");
+    SweepContext context { currentProcessId(), currentProcessStart(), processIsRunning, juce::Time::getCurrentTime() };
+    check (! isAbandoned (shared.getFileName(), juce::Time::getCurrentTime(), context), "and kept while the process runs");
+    setShared (false);
+}
+
 int main()
 {
     names();
@@ -131,6 +164,7 @@ int main()
     processes();
     sweep();
     folderForNewWebView();
+    sharedEngine();
     std::cout << (failures == 0 ? "All WebView profile folder tests passed.\n" : "FAILURES\n");
     return failures == 0 ? 0 : 1;
 }

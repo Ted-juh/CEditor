@@ -34,6 +34,16 @@ namespace ceditor::webview
     still be running when a host unloads the plug-in, which is a crash. */
 juce::File profileFolderForNewWebView (const juce::String& appFolderName);
 
+/*  SHARING ONE ENGINE, behind a switch. WebView2 runs one browser process (with its GPU, network and
+    utility processes, about 200 MB in Chromium terms) per profile folder, so a folder per webview
+    is an engine per plug-in copy. With CEDITOR_WEBVIEW2_SHARED=1 in the environment, every webview
+    a plug-in binary makes in one process gets the same folder, p<pid>-<start>-<module>-0, and the
+    copies of a panel in one DAW share an engine. A second binary (another panel, or the same panel
+    as CLAP beside VST3) still gets its own, and so does every other process: the standalone, a
+    sandboxed host's plug-in process. Off by default until it has been tried in DAWs on Windows,
+    since a shared folder is what once blanked a second panel (docs/webview2-profiles.md). */
+bool sharedEnginePerProcess();
+
 // --- The pieces, for the tests ------------------------------------------------------------------
 
 struct ProfileFolderName
@@ -41,7 +51,7 @@ struct ProfileFolderName
     int pid = 0;
     juce::String processStart;   // hex
     juce::String module;         // hex, per binary
-    juce::String instance;       // a counter
+    juce::String instance;       // a counter, or 0: the binary's one shared folder (sharedEnginePerProcess)
 };
 
 juce::String profileFolderName (const ProfileFolderName&);
