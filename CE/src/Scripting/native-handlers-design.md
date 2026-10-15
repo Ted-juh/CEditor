@@ -7,6 +7,15 @@ All three avoid Visual Studio entirely and ship only redistributable runtimes. T
 in-DAW end-to-end load test of a fully-bundled VST3 (the per-language modules + the host loader are each
 proven; the export-pipeline wiring is exercised by the verifiers).
 
+**A bundled plug-in, end to end, on Linux (October 2026).** A panel with one `onPanelLoad` handler per
+language, each setting a different exported parameter, built as a VST3 with the loader on and its modules
+compiled by `compileNativeHandlers` into the binary's folder, then loaded in a VST3 host: all three
+parameters read back at the values the handlers set (C++ 0.25, C# 100 of 127, Java 4096 of 16383), and at
+their defaults with the modules moved away. A second instance loaded in 47 ms. That run is also what
+found the C++ export failing on Linux: the exporter linked with `-static`, which cannot make a shared
+object there, while the verifiers, compiling with flags of their own, passed. Both now build with
+`cpp/moduleCommand.mjs`. Not yet automated, and not yet run on Windows.
+
 **Windows too, on every PR.** CI configures with `CEDITOR_NATIVE_HANDLERS=ON`, so MSVC builds the loader,
 and runs `verify-all.mjs --require`, where a missing toolchain fails instead of skipping: the C++, C# and
 Java modules are built and dispatched on `windows-latest`, two instances of each in one process apart.

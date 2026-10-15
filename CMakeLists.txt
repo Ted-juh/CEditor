@@ -392,6 +392,7 @@ if(CEDITOR_BUILD_APP)
     target_sources(CEditorPlayer PRIVATE
         "${CE_ROOT}/src/Player/PlayerMain.cpp"
         "${CE_ROOT}/src/Player/PlayerHost.cpp"
+        "${CE_ROOT}/src/WebViewProfileFolders.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
@@ -521,6 +522,7 @@ if(CEDITOR_BUILD_APP)
     target_sources(CEditorPlayerVST PRIVATE
         "${CE_ROOT}/src/Player/PluginProcessor.cpp"
         "${CE_ROOT}/src/Player/PlayerHost.cpp"
+        "${CE_ROOT}/src/WebViewProfileFolders.cpp"
         "${CE_ROOT}/src/Player/PlayerStandaloneApp.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
@@ -683,6 +685,7 @@ if(CEDITOR_BUILD_APP)
     target_sources(CEHostStandalone PRIVATE
         "${CE_ROOT}/src/InstrumentHost/HostRuntimeMain.cpp"
         "${CE_ROOT}/src/InstrumentHost/HostRuntimeShell.cpp"
+        "${CE_ROOT}/src/WebViewProfileFolders.cpp"
         ${CE_HOST_COMMON_SOURCES}
     )
 
@@ -741,6 +744,7 @@ if(CEDITOR_BUILD_APP)
 
     target_sources(CEHostVST3 PRIVATE
         "${CE_ROOT}/src/InstrumentHost/HostPluginProcessor.cpp"
+        "${CE_ROOT}/src/WebViewProfileFolders.cpp"
         ${CE_HOST_COMMON_SOURCES}
     )
 
@@ -987,6 +991,18 @@ target_link_libraries(CEditorUpdateCheckTests PRIVATE
 
 add_test(NAME UpdateCheck COMMAND CEditorUpdateCheckTests)
 ce_configure_test(CEditorUpdateCheckTests)
+
+# The WebView2 profile folders a player or host webview gets, and the sweep of the ones processes
+# that have gone left in temp (WebViewProfileFolders.h). Plain juce_core: the folders are files and
+# the sweep never makes a webview, so it runs anywhere.
+add_executable(CEditorWebViewProfileFolderTests
+    "${CE_ROOT}/tests/WebViewProfileFolderTests.cpp"
+    "${CE_ROOT}/src/WebViewProfileFolders.cpp"
+)
+target_include_directories(CEditorWebViewProfileFolderTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorWebViewProfileFolderTests PRIVATE juce::juce_core)
+add_test(NAME WebViewProfileFolders COMMAND CEditorWebViewProfileFolderTests)
+ce_configure_test(CEditorWebViewProfileFolderTests)
 
 add_executable(CEditorNativeFileAccessTests "${CE_ROOT}/tests/NativeFileAccessTests.cpp")
 target_include_directories(CEditorNativeFileAccessTests PRIVATE "${CE_ROOT}/src")

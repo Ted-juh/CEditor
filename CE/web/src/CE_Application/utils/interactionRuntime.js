@@ -935,7 +935,46 @@ export function applyCustomBindings(control, signals = {}) {
   return control;
 }
 
-export function resolveInteractiveControl(control, previewSession = {}) {
+/**
+ * `resolved`, with every part of it that came out equal to the part of `source` it was copied from
+ * put back as that part, where `source`'s is frozen (one object that controls share; see
+ * stores/documentShape.js). Returns `[value, equal]` for the subtree. Only `resolved`'s own objects
+ * are written to, and only once their subtree has been compared.
+ *
+ * WHY. Resolving copies the whole control, so the variants, bindings and states can be written into
+ * it, and a custom component is mostly parts no state or binding touches. The copy was kept for as
+ * long as the control was drawn: 296 KB for each of GAIA's 184 custom components, every one a copy
+ * of drawings the controls otherwise share, 54 MB of a player page's 200.
+ */
+function reshareUnchanged(resolved, source) {
+  if (resolved === source) return [resolved, true];
+  if (resolved === null || source === null || typeof resolved !== 'object' || typeof source !== 'object') {
+    return [resolved, Object.is(resolved, source)];
+  }
+  if (Array.isArray(resolved) !== Array.isArray(source)) return [resolved, false];
+  const keys = Object.keys(resolved);
+  const sourceKeys = Object.keys(source);
+  let equal = keys.length === sourceKeys.length;
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (sourceKeys[i] !== key) equal = false;
+    if (!Object.hasOwn(source, key)) { equal = false; continue; }
+    const [value, same] = reshareUnchanged(resolved[key], source[key]);
+    if (value !== resolved[key]) resolved[key] = value;
+    if (!same) equal = false;
+  }
+  return equal && Object.isFrozen(source) ? [source, true] : [resolved, equal];
+}
+
+/**
+ * The control as drawn: its variant, generators, bindings, states and keyframes applied, and the
+ * interaction runtime they were worked out from.
+ *
+ * `shareUnchanged` (the canvas, CanvasControl) keeps only what the resolution changed: everything
+ * else is the control's own shared, frozen objects again (reshareUnchanged). The result is then
+ * read-only in those places, which every other caller here would not expect, so it is opt-in.
+ */
+export function resolveInteractiveControl(control, previewSession = {}, { shareUnchanged = false } = {}) {
   const behavior = getNodeChild(control, 'Behavior');
   const parts = getNodeChild(control, 'Parts');
   const bindings = getNodeChild(control, 'Bindings');
@@ -1020,7 +1059,7 @@ export function resolveInteractiveControl(control, previewSession = {}) {
   const keyframes = buildKeyframeCatalog(resolved, effectivePreviewSession);
 
   return {
-    control: resolved,
+    control: shareUnchanged ? reshareUnchanged(resolved, control)[0] : resolved,
     runtime: {
       signals,
       activeStates: activeStates.map(([name]) => name),

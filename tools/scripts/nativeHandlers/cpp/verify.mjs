@@ -12,7 +12,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { generateCppModule } from './genCpp.mjs';
-import { DL_LIBS, EXE_EXT, LIB_EXT, SHARED_FLAGS, cxxCompiler, skip } from '../toolchain.mjs';
+import { cppModuleCommand } from './moduleCommand.mjs';
+import { DL_LIBS, EXE_EXT, LIB_EXT, cxxCompiler, skip } from '../toolchain.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ABI_DIR = path.resolve(HERE, '../../../../CE/src/Scripting');
@@ -35,7 +36,7 @@ mkdirSync(work, { recursive: true });
 try {
   generateCppModule({ scripts: SAMPLES, outDir: work, abiHeaderDir: ABI_DIR, runtimeHeaderDir: HERE });
   const so = path.join(work, `ce_handlers_cpp${LIB_EXT}`);
-  execSync(`${cxx} -std=c++20 ${SHARED_FLAGS} -I "${ABI_DIR}" -I "${HERE}" "${path.join(work, 'glue.cpp')}" -o "${so}"`, { stdio: 'inherit' });
+  execSync(cppModuleCommand({ cxx, glue: path.join(work, 'glue.cpp'), out: so, includeDirs: [ABI_DIR, HERE] }), { stdio: 'inherit' });
   const harness = path.join(work, `harness${EXE_EXT}`);
   execSync(`${cxx} -std=c++20 -I "${ABI_DIR}" "${path.join(HERE, 'harness.cpp')}" -o "${harness}" ${DL_LIBS}`, { stdio: 'inherit' });
   const out = execSync(`"${harness}"`, { cwd: work, encoding: 'utf8' });

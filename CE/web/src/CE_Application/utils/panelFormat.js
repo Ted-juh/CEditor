@@ -129,9 +129,10 @@ export function readPanelDocument(json) {
     return { doc: null, migration: null, error: `the document is not a valid panel: ${check.errors.join('; ')}` };
   }
   // Drawings written once go back into the controls that use them before anything else sees the
-  // document, migrations included: from here on each control has its own Parts, as it always did.
+  // document, migrations included. Not a copy per control: the one caller expands the controls
+  // together, and a migration step works on a deepClone (resolveDrawings' `copy`).
   // A newer document keeps its table too, so what this build does not understand in it survives.
-  const drawings = resolveDrawings(data, { keepTable: panelFormatVersion(data) > PANEL_FORMAT_VERSION });
+  const drawings = resolveDrawings(data, { keepTable: panelFormatVersion(data) > PANEL_FORMAT_VERSION, copy: false });
   let migration;
   try {
     migration = migratePanelDocument(drawings.doc);

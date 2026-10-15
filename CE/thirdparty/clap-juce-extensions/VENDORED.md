@@ -37,3 +37,9 @@ without them.
   version come from the panel beside the module (`CE/src/Export/ClapSidecarIdentity.h`), and a
   template with no panel reports no plugins. This is what lets the installed exporter copy one
   prebuilt CLAP per panel. CEditor-specific; not for upstream.
+- `src/wrapper/clap-juce-wrapper.cpp`, `stateLoad`: returns whether the processor recognised the
+  state (`ceditor::ReportsStateLoad`, `CE/src/Player/StateLoadReport.h`) instead of `true` for any
+  bytes at all. JUCE's `setStateInformation` cannot report a failure, so the wrapper asks.
+  clap-validator's `state-invalid-random` warned that random bytes loaded "successfully".
+  Compiled only where that header is on the include path (`__has_include`), so the patch is inert
+  anywhere else.

@@ -198,3 +198,23 @@ test('QuickJS still asks a proxy in the global prototype chain before reading a 
     assert.ok(before.includes(piece), `Missing ${piece} before the proxy's get. ${REAPPLY}`);
 });
 
+
+test('the vendored CLAP wrapper reports a state the player did not recognise as a failed load', () => {
+  // JUCE's setStateInformation is void, so the wrapper returned true for any bytes at all and
+  // clap-validator's state-invalid-random warned. The wrapper now asks (Player/StateLoadReport.h).
+  const wrapper = readFileSync(join(repoRoot, 'CE/thirdparty/clap-juce-extensions/src/wrapper/clap-juce-wrapper.cpp'), 'utf8');
+  const load = wrapper.slice(wrapper.indexOf('bool stateLoad(const clap_istream *stream)'));
+  const body = load.slice(0, load.indexOf('\n    }\n'));
+  const ask = body.indexOf('report->lastStateLoadAccepted()');
+  assert.ok(ask > body.indexOf('processor->setStateInformation('), 'asked after the state is handed over. Re-apply the patch — CE/thirdparty/clap-juce-extensions/VENDORED.md.');
+  assert.match(body, /dynamic_cast<ceditor::ReportsStateLoad \*>\(processor\.get\(\)\)/);
+  assert.match(wrapper, /#include "Player\/StateLoadReport\.h"/);
+  assert.match(readFileSync(join(repoRoot, 'CE/thirdparty/clap-juce-extensions/VENDORED.md'), 'utf8'), /`stateLoad`: returns whether the processor recognised the/);
+
+  const processor = readFileSync(join(repoRoot, 'CE/src/Player/PluginProcessor.h'), 'utf8');
+  assert.match(processor, /class PlayerAudioProcessor : public juce::AudioProcessor\s+, public ceditor::ReportsStateLoad/);
+  const setState = processor.slice(processor.indexOf('void setStateInformation (const void* data, int sizeInBytes) override'));
+  const setBody = setState.slice(0, setState.indexOf('\n    }\n'));
+  assert.ok(setBody.indexOf('stateLoadAccepted.store (false);') < setBody.indexOf('getXmlFromBinary'), 'cleared before anything can return early');
+  assert.ok(setBody.indexOf('stateLoadAccepted.store (true);') > setBody.indexOf('backward-compat: APVTS-only state'), 'set only once a known form was read');
+});

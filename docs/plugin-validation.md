@@ -71,14 +71,18 @@ host parameters are built, and neither visible to pluginval:
 | clap-validator `state-reproducibility-*` | Two controls named `Cutoff` gave two host parameters one id, `Cutoff.value`. The host keys saved state by id, so a reload restored one and left the other at its default. | `exportParameters.js` `collectExportParameters` and `PanelParameters.h` `parseExportParameters`: the first entry with an id wins (the C++ for panels exported before) |
 | clap-validator `param-conversions` | A float parameter with no step printed seven decimals (JUCE's default), finer than a 32-bit value survives: read back from its own text, `0.5820895` printed `0.5820894`. | `PanelParameters.h` `buildParameterLayout`: five significant digits of the range's span |
 
-Two clap-validator **warnings** remain and are understood:
+One clap-validator **warning** remains and is understood:
 
 - `process-audio-denormals` — processing takes several times longer on denormal input. The plug-in
   does not touch the audio at all, and adding flush-to-zero to `processBlock` did not change the
-  figure, so the time is spent outside CEditor's code.
-- `state-invalid-random` — random bytes load "successfully". The plug-in ignores a state it cannot
-  parse, which is the safe outcome. The CLAP wrapper reports success for every load because
-  JUCE's `setStateInformation` cannot return a failure.
+  figure, so the time is spent outside CEditor's code. It is also noise: the same GAIA build run
+  six times gave 1.20×, 3.33×, 1.93×, a pass, 2.13× and a pass, timing a callback that does next to
+  nothing.
+
+A second, `state-invalid-random` (random bytes loaded "successfully"), is fixed: the plug-in still
+ignores a state it cannot parse, and the CLAP wrapper now says so. JUCE's `setStateInformation`
+cannot return a failure, so the wrapper asks the processor (`CE/src/Player/StateLoadReport.h`, a
+patch listed in `CE/thirdparty/clap-juce-extensions/VENDORED.md`).
 
 The VST3 passed pluginval at strictness 10 throughout. pluginval restores state into the same
 instance, and clap-validator into a fresh one; only the fresh-instance case exposed the missing

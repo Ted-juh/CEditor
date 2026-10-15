@@ -11,8 +11,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { generateCppModule } from './genCpp.mjs';
+import { cppModuleCommand } from './moduleCommand.mjs';
 import { ABI_DIR, buildEngineE2E, engineE2EUnavailable } from '../engineE2E.mjs';
-import { LIB_EXT, SHARED_FLAGS, cxxCompiler, skip } from '../toolchain.mjs';
+import { LIB_EXT, cxxCompiler, skip } from '../toolchain.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const unavailable = engineE2EUnavailable();
@@ -42,7 +43,7 @@ try {
       source: 'int count = 0;\nvoid onValueChanged(CeContext& ctx, const CeEvent&){ ++count; ctx.setValue("count", count); }' }],
     outDir: work, abiHeaderDir: ABI_DIR, runtimeHeaderDir: HERE,
   });
-  run(`${cxx} -std=c++20 ${SHARED_FLAGS} -I ${q(ABI_DIR)} -I ${q(HERE)} ${q(path.join(work, 'glue.cpp'))} -o ${q(path.join(work, `ce_handlers_cpp${LIB_EXT}`))}`);
+  run(cppModuleCommand({ cxx, glue: path.join(work, 'glue.cpp'), out: path.join(work, `ce_handlers_cpp${LIB_EXT}`), includeDirs: [ABI_DIR, HERE] }));
 
   // 2) the real engine and a main that drives it.
   const e2e = buildEngineE2E({ work, main: `

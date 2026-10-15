@@ -145,6 +145,23 @@ Good local smoke test:
 2. Launch `build\package\stage\CEditor\CEditor.exe`.
 3. Verify it opens without the Vite dev server running.
 
+### Off Windows
+
+The PowerShell script, `vcvars64.bat` and Inno Setup are Windows-only, but the staging step they
+depend on is not. With the app built off Windows as `CLAUDE.md` describes, `cmake --install` stages
+the same tree the installer packs, and the staged app run from outside the repository proves it
+serves its UI from its own `web/dist`:
+
+```bash
+cmake --install build/app --component CEditor --prefix /tmp/stage
+cd /tmp/stage && ./CEditor        # under Xvfb, as in CLAUDE.md
+```
+
+Checked in October 2026: the tree had `CE/profiles`, `CE/sets`, the control-set starters, the app,
+the scanner and `web/dist`, and the app opened its editor from `/tmp`. The worker is missing there
+because it is a Windows-only target; `CEditor.iss` lists it without `skipifsourcedoesntexist`, so a
+Windows build without it fails to package, which is what it should do.
+
 ## Current external prerequisites
 
 The built Release executable depends on:

@@ -9,6 +9,7 @@
 #include "PlayerHost.h"
 
 #include "PlayerPanelFile.h"
+#include "StateLoadReport.h"
 
 #ifndef CEDITOR_VALUE_LAYER
  #define CEDITOR_VALUE_LAYER 0
@@ -43,6 +44,7 @@
  * the panel is loaded from a fixed path; Phase D bakes it per-panel with a unique identity.
  */
 class PlayerAudioProcessor : public juce::AudioProcessor
+                           , public ceditor::ReportsStateLoad
                           #if CEDITOR_VALUE_LAYER
                            , private juce::Timer
                           #endif
@@ -293,6 +295,10 @@ private:
     std::atomic<int>    hostPosTimeSigNum { 0 };
     std::atomic<int>    hostPosTimeSigDen { 0 };
 
+    // What lastStateLoadAccepted reports (StateLoadReport.h): set by the state forms
+    // setStateInformation recognises, cleared at the start of every call.
+    std::atomic<bool>   stateLoadAccepted { false };
+
 public:
 
     // Everything the panel sends is queued here off the audio thread and drained into the host's output
@@ -432,8 +438,11 @@ public:
 #endif
     }
 
+    bool lastStateLoadAccepted() const noexcept override { return stateLoadAccepted.load(); }
+
     void setStateInformation (const void* data, int sizeInBytes) override
     {
+        stateLoadAccepted.store (false);
 #if CEDITOR_VALUE_LAYER
         auto xml = getXmlFromBinary (data, sizeInBytes);
         if (xml == nullptr) return;
@@ -504,6 +513,7 @@ public:
         {
             return;
         }
+        stateLoadAccepted.store (true);
 
         // Every parameter may have just moved, and the host has to be told to read them again. A
         // DAW reopening a project builds a FRESH instance and loads the state into it, so what it
