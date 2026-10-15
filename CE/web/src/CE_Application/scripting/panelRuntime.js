@@ -7100,10 +7100,8 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
   // by exactly the same code, with no separate path to keep in step.
   const epoch = executionEpoch;
   const wrapFunctions = (object) => Object.fromEntries(Object.entries(object).map(([key, value]) => [key,
-    typeof value === 'function' ? (...args) => {
-      if (epoch !== executionEpoch) throw new Error('Script approval expired; enable the current code before running it.');
-      return value(...args);
-    } : value && typeof value === 'object' && key !== 'state' ? wrapFunctions(value) : value]));
+    typeof value === 'function' ? approvalGuard(value, epoch)
+      : value && typeof value === 'object' && key !== 'state' ? wrapFunctions(value) : value]));
   // Also guard capabilities handed to extension code, before evaluating it.
   if (guardExecution) Object.assign(api, wrapFunctions(api));
   installExtensionMembers(api, scriptId);
@@ -7119,6 +7117,38 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
   // embedded as a string literal cannot import anything.
   api.ce = buildModuleNamespace(api, enabled);
   return guardExecution ? wrapFunctions(api) : api;
+}
+
+// What a guarded script API calls through: a call made after the approval the API was built under
+// has expired throws instead of running. One wrapper per function per approval, shared by every
+// script and every spelling of it — the flat sendCC and ce.midi.sendCC are one function, and the
+// helpers every script is handed are the same functions in all of them — and a wrapper is never
+// wrapped again.
+//
+// It used to be one per spelling, per script, and the flat names were wrapped a second time on the
+// way out: a script is handed 761 functions, and GAIA's 232 scripts built 509,220 wrappers for them.
+// Built once, with the shared gate stubs below, the player page's JS heap went from 153 MB to
+// 116 MB. The wrappers are held weakly, so a script's own functions go with the script.
+let guardEpoch = -1;
+let guards = new WeakMap();
+const isGuard = new WeakSet();
+
+function approvalGuard(fn, epoch) {
+  if (isGuard.has(fn)) return fn;
+  if (guardEpoch !== epoch) {
+    guardEpoch = epoch;
+    guards = new WeakMap();
+  }
+  let guard = guards.get(fn);
+  if (!guard) {
+    guard = (...args) => {
+      if (epoch !== executionEpoch) throw new Error('Script approval expired; enable the current code before running it.');
+      return fn(...args);
+    };
+    guards.set(fn, guard);
+    isGuard.add(guard);
+  }
+  return guard;
 }
 
 /**
@@ -7162,8 +7192,7 @@ function applyModuleGates(flat, enabled) {
     if (module.global || enabled.has(module.id)) continue;
     for (const memberId of Object.values(memberMapFor(module.id))) {
       if (isValueMember(MEMBER_BY_ID[memberId])) continue;
-      const message = moduleGateMessage(memberId, module.id);
-      flat[memberId] = () => addScriptTrace('log', '', message);
+      flat[memberId] = gateStub(memberId, module.id);
     }
   }
   // Declared aliases follow their member: to14Bit is to14bit, gated or not.
@@ -7172,6 +7201,20 @@ function applyModuleGates(flat, enabled) {
       if (flat[member.id] !== undefined) flat[alias] = flat[member.id];
     }
   }
+}
+
+// A stub says the same thing in every script, so every script is handed the same one: GAIA's
+// scripts built 16,560 of them, one per gated member per script.
+const gateStubs = new Map();   // member id -> stub
+
+function gateStub(memberId, moduleId) {
+  let stub = gateStubs.get(memberId);
+  if (!stub) {
+    const message = moduleGateMessage(memberId, moduleId);
+    stub = () => addScriptTrace('log', '', message);
+    gateStubs.set(memberId, stub);
+  }
+  return stub;
 }
 
 /**
@@ -7295,9 +7338,11 @@ const HANDLER_NAMES = handlerNamesForRuntime(RUNTIME_WEBVIEW);
  * panelApi.js in both directions: nothing declared and unimplemented, nothing bound and
  * undeclared. Reading the real object rather than scanning the source is the point — a surface
  * that drifts from what scripts actually receive is the bug being guarded against.
+ *
+ * `guarded` builds it the way a script about to run receives it, behind the approval guard.
  */
-export function scriptApiForTesting(owner = '', scriptId = 'parity-probe') {
-  return buildApi(owner, scriptId);
+export function scriptApiForTesting(owner = '', scriptId = 'parity-probe', guarded = false) {
+  return buildApi(owner, scriptId, guarded);
 }
 
 /** Just the names — what the parity check compares against panelApi.js. */
