@@ -239,31 +239,26 @@ sent to a child already reaped.
 upgrade. **If you upgrade JUCE:** if `killChild` still waits for `WIFEXITED`, re-apply
 `childHasGone` and the three-step shutdown. The pin test fails while the loop is back.
 
-### 9. Windows WebView2: low memory while hidden, no autofill
+### 9. Windows WebView2: no autofill in a panel
 
 **File:** `include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp`,
-`WebView2::setControlVisible` and `WebView2::setWebViewPreferences`.
+`WebView2::setWebViewPreferences`.
 
-**Guard:** none. Both ask the WebView2 runtime for an interface and do nothing when it is older than
-the interface (`ICoreWebView2_19`, `ICoreWebView2Settings4`); the SDK in `CE/thirdparty/webview2`
-declares both.
+**Guard:** none. It asks the WebView2 runtime for `ICoreWebView2Settings4` and does nothing when the
+runtime is older than that; the SDK in `CE/thirdparty/webview2` declares it.
 
 **Pinned by:** `CE/web/test/vendoredJucePatches.test.js`.
 
-**What it does.**
-- `setControlVisible` already set the controller's `IsVisible` from `Component::isShowing`, which is
-  false while the window is minimised (the peer sends a visibility change then) or the host hides
-  it. It now also sets the webview's `MemoryUsageTargetLevel`: low while hidden, normal when shown.
-  Every CEditor host keeps the page loaded while hidden (`withKeepPageLoadedWhenBrowserIsHidden`),
-  so the page keeps running; WebView2 gives back what it can in the meantime. A standalone player
-  minimised beside a DAW is the case it is for.
-- `setWebViewPreferences` turns off general autofill and password saving. A panel's text fields are
-  not a web form: there is nothing to fill them from, and no password for the browser to keep.
+**What it does.** Turns off general autofill and password saving. A panel's text fields are not a
+web form: there is nothing to fill them from, and no password for the browser to keep.
 
-JUCE 8.0.7 exposes neither. What the first saves is measured by `CEditorWebViewEngineProbe`, which
-leaves every window open for 10 s, minimises them all for 30 s and restores them, and reports
-WebView2's memory by process at each point (docs/webview2-profiles.md).
+**What it no longer does.** It also asked a hidden webview for WebView2's low memory target
+(`ICoreWebView2_19::put_MemoryUsageTargetLevel`, from `setControlVisible`, which JUCE calls with
+`Component::isShowing` and so with false while the window is minimised). `CEditorWebViewEngineProbe`
+measured it with three windows minimised (docs/webview2-profiles.md): no difference in 10 s, and with
+it in, the pages kept growing for all 30 s they were minimised. It came out. What grows is the
+pages' own garbage, and the low target does not touch that.
 
-**If you upgrade JUCE:** if `setControlVisible` and `setWebViewPreferences` are still there, re-apply
-both hunks; if JUCE grows options for these, use them instead.
+**If you upgrade JUCE:** if `setWebViewPreferences` is still there, re-apply the hunk; if JUCE grows
+options for these, use them instead.
 
