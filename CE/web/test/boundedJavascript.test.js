@@ -1,7 +1,8 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateBoundedJavascript as evaluate, disposeJavascriptSandboxes, initialiseJavascriptSandbox,
-  sandboxCountForTesting } from '../src/CE_Application/scripting/boundedJavascript.js';
+  sandboxCountForTesting, sharedRuntimeAliveForTesting, allocationCounterForTesting,
+  SCRIPT_LIMITS } from '../src/CE_Application/scripting/boundedJavascript.js';
 await initialiseJavascriptSandbox();
 
 afterEach(() => disposeJavascriptSandboxes());
@@ -61,4 +62,67 @@ test('a panel holds as many scripts as its memory allows, not a fixed count', ()
   for (let i = 0; i < 300; i++) scripts.push(evaluate(`function id() { return ${i}; }`, {}, ['id']));
   assert.equal(sandboxCountForTesting(), 300);
   scripts.forEach((script, i) => assert.equal(script.id(), i));
+});
+
+// One runtime for the panel, a context per script (boundedJavascript.js says why). What a script had
+// to itself with a runtime of its own, and now shares, is what these are about.
+test('the panel\'s scripts share one runtime, made with the first and freed with the last', () => {
+  assert.equal(sharedRuntimeAliveForTesting(), false);
+  const a = evaluate('var x = "a"; function name() { return x; }', {}, ['name']);
+  const b = evaluate('var x = "b"; function name() { return x; }', {}, ['name']);
+  assert.equal(sharedRuntimeAliveForTesting(), true);
+  assert.deepEqual([a.name(), b.name()], ['a', 'b'], 'each script still has globals of its own');
+  disposeJavascriptSandboxes();
+  assert.equal(sharedRuntimeAliveForTesting(), false);
+});
+test('a runaway promise chain goes with the call that ran out of time, not on into the next script\'s', async () => {
+  assert.throws(() => evaluate('Promise.resolve().then(function spin() { Promise.resolve().then(spin); });', {}, [],
+    { milliseconds: 30 }), /limit exceeded/);
+  // Had the chain been left queued, this call would run it, and be stopped by its time limit.
+  const next = evaluate('async function later() { await null; await null; return 5; }', {}, ['later'], { milliseconds: 30 });
+  assert.equal(await next.later(), 5);
+});
+test('what a script queues while another script calls it runs before that call returns', () => {
+  const log = [];
+  let callB;
+  evaluate('register(() => { Promise.resolve().then(() => say("b, later")); say("b"); });',
+    { register: (fn) => { callB = fn; }, say: (text) => log.push(text) }, []);
+  const a = evaluate('function go() { poke(); return "a"; }', { poke: () => callB() }, ['go']);
+  assert.equal(a.go(), 'a');
+  assert.deepEqual(log, ['b', 'b, later']);
+});
+test('a script stopped during another script\'s call is freed when the call ends, and what it queued reaches nothing', async () => {
+  const sent = [];
+  let callB;
+  evaluate('register(() => { Promise.resolve().then(() => send("late")); });',
+    { register: (fn) => { callB = fn; }, send: (text) => sent.push(text) }, [], { owner: 'b' });
+  const a = evaluate('function go() { poke(); stop(); return "a"; } async function again() { await null; return "again"; }',
+    { poke: () => callB(), stop: () => disposeJavascriptSandboxes('b') }, ['go', 'again'], { owner: 'a' });
+  assert.equal(a.go(), 'a');
+  assert.deepEqual(sent, [], 'its job ran in the call that stopped it, and its panel API refused it');
+  assert.equal(sandboxCountForTesting(), 1);
+  assert.throws(callB, /stopped/);
+  assert.equal(await a.again(), 'again', 'the runtime is sound after freeing a context mid-call');
+});
+test('a call may not make one allocation larger than its memory budget', () => {
+  const mb = SCRIPT_LIMITS.memoryBytes / (1024 * 1024);
+  const script = evaluate(`function take(mb) { return new Uint8Array(mb * 1024 * 1024).length; }`, {}, ['take']);
+  assert.equal(script.take(mb / 2), SCRIPT_LIMITS.memoryBytes / 2);
+  assert.throws(() => script.take(mb * 2), /memory limit exceeded|out of memory/);
+  assert.throws(() => script.take(1), /stopped/);
+  assert.equal(evaluate('function ok() { return 1; }', {}, ['ok']).ok(), 1);
+});
+test('the runtime\'s allocation counter is read from where QuickJS keeps it', () => {
+  evaluate('globalThis.many = Array.from({ length: 5000 }, (_, i) => ({ i }));', {}, []);
+  const { count, size, reported } = allocationCounterForTesting();
+  // A few allocations apart: reporting the usage allocates the object it reports in.
+  assert.ok(Math.abs(count - reported.malloc_count) < 64, `${count} counted here, ${reported.malloc_count} reported`);
+  // Eight bytes an allocation, whatever its size: why the budget is a per-allocation cap and not a
+  // ceiling on what a script keeps. A QuickJS build that counts bytes would fail this, and could
+  // give each script a real ceiling.
+  assert.equal(size, count * 8);
+});
+test('scripts are not given FinalizationRegistry, whose callbacks the collector queues outside any call', () => {
+  assert.deepEqual(evaluate('function kinds() { return [typeof FinalizationRegistry, typeof WeakRef]; }', {}, ['kinds']).kinds(),
+    ['undefined', 'function']);
 });

@@ -43,3 +43,19 @@ test('a script that grows the heap past the budget and then throws is stopped al
   assert.throws(hog.grow, /stopped/);
 });
 
+test('what a stopped script held is free for the others at once, without the heap growing', () => {
+  // A context is freed with the next run of the cycle collector, and QuickJS runs that by how many
+  // allocations the runtime has made, not how large they were. On a panel of a few hundred thousand
+  // (GAIA's scripts make about that), forty 1 MB arrays would have waited a long time.
+  const bystander = evaluate('let keep; function take(mb) { keep = []; for (let i = 0; i < mb; i++) keep.push(new Uint8Array(1024 * 1024)); return keep.length; }',
+    {}, ['take']);
+  evaluate('globalThis.panel = Array.from({ length: 300000 }, (_, i) => ({ i }));', {}, []);
+  budgetJustAboveTheHeap();
+  setPanelMemoryBudgetForTesting();
+  evaluate('const keep = []; for (let i = 0; i < 40; i++) keep.push(new Uint8Array(1024 * 1024)); function held() { return keep.length; }',
+    {}, ['held'], { owner: 'hog' });
+  const grown = scriptHeapBytesForTesting();
+  disposeJavascriptSandboxes('hog');
+  assert.equal(bystander.take(40), 40);
+  assert.equal(scriptHeapBytesForTesting(), grown, 'the bystander\'s 40 MB went where the hog\'s had been');
+});
