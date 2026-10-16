@@ -11,7 +11,7 @@ corruption. `.gitignore` now has an explicit exception and
 
 ## Local modifications
 
-Upstream JUCE is otherwise untouched. There are exactly seven patches, and they are listed here because a
+Upstream JUCE is otherwise untouched. There are exactly eight patches, and they are listed here because a
 patch inside a vendored tree is invisible in a diff against upstream and dies silently the day
 somebody drops in a new JUCE.
 
@@ -206,3 +206,35 @@ only; `typeof` uses `OP_get_var_undef`, which does not set it), it calls the exo
 `throw_ref_error` to exotic objects; if not, re-apply the five lines after the `XXX` comment. The
 pin test fails while they are missing, and `ScriptRuntimeTests` section 40b fails without them.
 
+### 8. Linux webview: a closing window could spin the host forever
+
+**File:** `include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp`,
+`Platform::killChild`, and the `childHasGone` helper beside it.
+
+**Guard:** none. The file is compiled on Linux only, and it is a fix: the child is still asked to
+quit and given the same second and a half before anything harsher happens.
+
+**Pinned by:** `CE/web/test/vendoredJucePatches.test.js`.
+
+**What was wrong.** On Linux a webview runs in a child process (inside a plug-in, a fork of the host
+that never execs). Closing the window tells the child to quit and waits 1.5 s; a child still there
+after that was handled by `for (;;) { kill (child, SIGTERM); waitpid (child, &status, 0); if
+(WIFEXITED (status)) break; }`. A child the SIGTERM kills reports `WIFSIGNALED`, never `WIFEXITED`,
+so the loop went round again: `waitpid` on a child already reaped fails at once with `ECHILD`, the
+status is never touched, and the host's message thread spun at full CPU inside the window's
+destructor for good, re-sending SIGTERM each time to a pid the system was free to hand to another
+process. Any child slower than 1.5 s to go (a large panel, a busy machine) was enough.
+
+Found by `CEditorWebViewEngineProbe` (tests/WebViewEngineProbe.cpp) on Linux, 2026-10-16: three
+copies of GAIA in one process, every window closed and reopened at once. The second time round, the
+host stopped in `~Platform` → `killChild` → `wait4` on a pid that no longer existed, at 97% CPU. In a
+DAW that is the whole application hung when a plug-in window closes.
+
+**What the patch does.** Waits for the child with `WNOHANG` for the 1.5 s upstream allowed, then
+sends SIGTERM and waits up to a second more, then SIGKILL and a blocking wait, and stops the moment
+`waitpid` reports the child, however it ended, or fails with anything but `EINTR`. SIGTERM is never
+sent to a child already reaped.
+
+**Upstream status (checked 2026-10-16).** Not compared against `develop` from here; check on an
+upgrade. **If you upgrade JUCE:** if `killChild` still waits for `WIFEXITED`, re-apply
+`childHasGone` and the three-step shutdown. The pin test fails while the loop is back.
