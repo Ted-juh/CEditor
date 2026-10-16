@@ -97,36 +97,38 @@ It is not a DAW: a host's own threads and windows are still worth a look, which 
 
 ### What minimising gives back
 
-Most of what the pages hold, now. The probe's minimise stage (QA-08, three windows, the shared
-engine; the renderers are the pages, and the GPU, browser and utility processes stay flat), before
-and after the two fixes below:
+Not much, and it no longer grows. The probe's minimise stage (QA-08, three windows, the shared
+engine; the renderers are the pages, and the GPU, browser and utility processes stay flat):
 
-| | renderers before (#14) | CPU | renderers after (#18) | CPU |
+| | renderers before (#14) | CPU | renderers now (#19) | CPU |
 | --- | --- | --- | --- | --- |
-| just opened | 193 MB | | 192 MB | |
-| after 10 s shown | 743 MB | 7.0 s | 709 MB | 8.2 s |
-| then 10 s minimised | 865 MB | 2.2 s | 710 MB | 0.2 s |
-| 20 s minimised | 992 MB | 1.9 s | 373 MB | 0.8 s |
-| 30 s minimised | 1149 MB | 2.9 s | 349 MB | 0.2 s |
+| just opened | 193 MB | | 190 MB | |
+| after 10 s shown | 743 MB | 7.0 s | 749 MB | 6.0 s |
+| then 10 s minimised | 865 MB | 2.2 s | 812 MB | 1.3 s |
+| 20 s minimised | 992 MB | 1.9 s | 790 MB | 1.1 s |
+| 30 s minimised | 1149 MB | 2.9 s | 866 MB | 1.2 s |
+| 3 s after restoring | 1205 MB | | 902 MB | |
 
-Opted out the same: 718 MB shown, 348 MB after 20 s minimised. What the pages were doing, as the
-page watcher below saw it (release checks #17):
+Opted out, 779 to 896 MB and back. Inside each page (the page watcher below) the JS heap now stays
+at 43 to 53 MB used where it climbed past 120. What the pages were doing, as the watcher saw it
+(release checks #17):
 
-- **They were never minimised.** A plug-in's window is a child of the host's, and Windows tells a
-  child nothing when the top-level window is minimised, nor when a host hides its plug-in window.
-  JUCE never learnt the webview was not showing, so the pages stayed `visible` and drew at sixty
-  frames a second throughout. `PlayerHost` now looks four times a second, and hides the webview
-  while the host's window is minimised or ours is hidden; the page stays loaded and goes `hidden`,
-  and WebView2 throttles it.
 - **They were sent the MIDI monitor log.** The device service pushes the whole log, up to 500
   events, with every MIDI message, at up to 20 a second, and QA-08's free-running controls send 17
   a second: each window was pushed 2 to 9 MB of it every 5 s, to compile and parse, for a page that
-  shows no monitor. `PlayerHost::emitToWebView` drops it.
+  shows no monitor. `PlayerHost::emitToWebView` drops it. This was the growth.
+- **They are never minimised.** A plug-in's window is a child of the host's, and Windows tells a
+  child nothing when the top-level window is minimised, nor when a host hides its plug-in window.
+  JUCE never learns the webview is not showing, so the pages stay `visible` and draw at sixty
+  frames a second throughout. This is still so. Hiding the webview while the host's window is
+  minimised was tried (release checks #18: 349 MB after 30 s minimised, on 0.2 s of CPU) and taken
+  out: a hidden component drops every event sent to it, and a hidden page gets no frames and runs
+  its timers once a second, while the window-open page is what drives free-running modulators,
+  panel scripts' timers and automation out to the hardware. The processor takes those over only
+  when the editor is closed; a page that rests while minimised needs them handed over first.
 
 Asking WebView2 for its low memory target while hidden (`MemoryUsageTargetLevel`, tried as part of
-JUCE patch 9) made no difference and came out. What is left is the first 10 s: a page just opened
-makes most of its garbage while it loads and starts its animations, and a collection takes it back
-once it rests.
+JUCE patch 9) made no difference and came out.
 
 To see inside the pages, release checks watch the first shared run with
 `tools/scripts/watch-webview-pages.mjs`. WebView2 is started with a debugging port of its own
