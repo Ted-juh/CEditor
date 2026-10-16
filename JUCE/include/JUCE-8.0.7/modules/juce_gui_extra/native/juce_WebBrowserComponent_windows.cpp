@@ -1039,6 +1039,16 @@ private:
                 if (settings2 != nullptr)
                     settings2->put_UserAgent (userAgent.toWideCharPointer());
             }
+
+            // CEditor: a panel's text fields are not a web form. There is nothing to fill them from
+            // and no password for the browser to offer to keep. JUCE/VENDORED.md, patch 9.
+            ComSmartPtr<ICoreWebView2Settings4> settings4;
+
+            if (SUCCEEDED (settings.QueryInterface (settings4)) && settings4 != nullptr)
+            {
+                settings4->put_IsGeneralAutofillEnabled (FALSE);
+                settings4->put_IsPasswordAutosaveEnabled (FALSE);
+            }
         }
     }
 

@@ -11,7 +11,7 @@ corruption. `.gitignore` now has an explicit exception and
 
 ## Local modifications
 
-Upstream JUCE is otherwise untouched. There are exactly eight patches, and they are listed here because a
+Upstream JUCE is otherwise untouched. There are exactly nine patches, and they are listed here because a
 patch inside a vendored tree is invisible in a diff against upstream and dies silently the day
 somebody drops in a new JUCE.
 
@@ -238,3 +238,27 @@ sent to a child already reaped.
 **Upstream status (checked 2026-10-16).** Not compared against `develop` from here; check on an
 upgrade. **If you upgrade JUCE:** if `killChild` still waits for `WIFEXITED`, re-apply
 `childHasGone` and the three-step shutdown. The pin test fails while the loop is back.
+
+### 9. Windows WebView2: no autofill in a panel
+
+**File:** `include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp`,
+`WebView2::setWebViewPreferences`.
+
+**Guard:** none. It asks the WebView2 runtime for `ICoreWebView2Settings4` and does nothing when the
+runtime is older than that; the SDK in `CE/thirdparty/webview2` declares it.
+
+**Pinned by:** `CE/web/test/vendoredJucePatches.test.js`.
+
+**What it does.** Turns off general autofill and password saving. A panel's text fields are not a
+web form: there is nothing to fill them from, and no password for the browser to keep.
+
+**What it no longer does.** It also asked a hidden webview for WebView2's low memory target
+(`ICoreWebView2_19::put_MemoryUsageTargetLevel`, from `setControlVisible`, which JUCE calls with
+`Component::isShowing` and so with false while the window is minimised). `CEditorWebViewEngineProbe`
+measured it with three windows minimised (docs/webview2-profiles.md): no difference in 10 s, and with
+it in, the pages kept growing for all 30 s they were minimised. It came out. What grows is the
+pages' own garbage, and the low target does not touch that.
+
+**If you upgrade JUCE:** if `setWebViewPreferences` is still there, re-apply the hunk; if JUCE grows
+options for these, use them instead.
+

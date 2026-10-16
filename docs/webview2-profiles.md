@@ -75,7 +75,8 @@ blank panel this section is about — and `opened, no webview` means the WebView
 
 `CEditorWebViewEngineProbe` (tests/WebViewEngineProbe.cpp) does what a tester would do in a DAW,
 in one process of its own: loads an exported player plug-in three times, opens every editor in a
-window, closes one and reopens it, closes all three and reopens them at once (three times), and
+window, leaves them open for 10 s, minimises them all for 30 s and restores them (reporting WebView2's memory by
+process at each point, the 10 s shown being what tells minimising from time passing), closes one and reopens it, closes all three and reopens them at once (three times), and
 starts a second process with the same panel while the windows are open, once as a program started
 from Explorer is and once as one started from a terminal. Each window has to log `panel shown`. On Windows it also counts the WebView2 engines it owns, one per profile folder in use, and
 prints their memory. Build it beside a player plug-in and run it as it is and opted out:
@@ -93,6 +94,30 @@ runs on Linux too, where the webview is WebKitGTK and the switch only changes th
 proves the probe, not WebView2. `.github/workflows/release-checks.yml` runs it both ways on Windows.
 
 It is not a DAW: a host's own threads and windows are still worth a look, which is what follows.
+
+### What minimising gives back
+
+Nothing, so far. The probe's minimise stage, release checks #12 and #13 (QA-08, three windows, the
+shared engine; the renderers are the pages, and the GPU, browser and utility processes stay flat):
+
+| | renderers' memory | renderers' CPU in the interval |
+| --- | --- | --- |
+| just opened | 190 MB | |
+| after 10 s shown | 730-760 MB | 5.4 s |
+| then 10 s minimised | 820-907 MB | 1.3 s |
+| 20 s minimised | 941-1031 MB | 1.9 s |
+| 30 s minimised | 1120-1217 MB | 1.7 s |
+| 3 s after restoring | 1183-1283 MB | 0.2 s |
+
+Opted out, the same within 10%. A minimised page does slow down, to about a third of its CPU, but
+its memory keeps growing at 12 to 18 MB a second, and did not fall within the 43 s measured; only
+closing the windows gives it back. Asking WebView2 for its low memory target while hidden
+(`MemoryUsageTargetLevel`, tried as part of JUCE patch 9) made no difference and came out.
+
+The same page in Chromium here, hidden as a background tab, goes quiet (one frame request a second)
+and is collected about 12 s later, from 327 to 121 MB. What keeps a minimised WebView2 page busy and
+growing is not yet known: its growth does not follow its own CPU, which points at something reaching
+it from outside rather than its animation.
 
 ### Checking it in a DAW
 
